@@ -83,6 +83,7 @@
 \newcommand{\lennart}[1]{}
 \fi
 
+\newcommand{\vtt}[1]{{\tt #1}}
 
 \begin{document}
 
@@ -188,6 +189,63 @@
 
 
 \section{Introduction}
+
+\section{Primitives}
+Blah, blah
+
+\begin{tabular}{|l|l|}
+  \hline
+  Notation &  \\
+  \hline
+  $x,f$ & variable \\
+  $e$ & expression \\
+  $i$ & natural number literal \\
+  \hline
+\end{tabular}
+
+\begin{tabular}{|l|l|}
+  \hline
+  Primitive & Comment \\
+  \hline
+  \vtt{def\{ $x_1$,$\cdots$,$x_n$ \}} & define variables $x_1$ etc. \\
+  $x$ & use variable \\
+  $i$ & literal \\
+  \vtt{$e_1$ = $e_2$} & unification \\
+  \vtt{$e_1$[$e_2$]} & function application \\
+  \vtt{$x$ => $e$} & lambda expression \\
+  \vtt{$e_1$ | $e_2$} & alternative \\
+  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation \\
+  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing \\
+  \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  \vtt{for ($e_1$) $e_2$} & array formation \\
+  \vtt{do $e$} & scope delimiter \\
+  \hline
+\end{tabular}
+
+\begin{tabular}{|l|l|l|}
+  \hline
+  Macro & Expansion & Comment \\
+  \hline
+  \vtt{$x$ := $e$} & \vtt{def\{$x$\}; $x$ = $e$} & \\
+  \vtt{$x$ :$e$} & \vtt{$x$ := :$e$} & \\
+  \vtt{:}$e$ & \vtt{do \{ def\{x\}; $e$[x] \}} & $x$ fresh \\
+  \vtt{$e_1$($e_2$)} & \vtt{if (x:=$e_1$[$e_2$]) then x else wrong} & $x$ fresh \\
+  \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & $x$ fresh \\
+  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => do \{ x = $e_1$; $e_2$ \}} \\
+  \hline
+\end{tabular}
+
+\begin{tabular}{|l|l|}
+  \hline
+  Predefined name & Comment \\
+  \hline
+  \vtt{false} & identity on the empty set \\
+  \vtt{int} & identity on the integers \\
+  \vtt{type} & identity on types \\
+  \vtt{any} & identity function \\
+  \vtt{wrong} & semantic error \\
+  \hline
+\end{tabular}
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
