@@ -198,42 +198,54 @@ Blah, blah
   Notation &  \\
   \hline
   $x,f$ & variable \\
-  $e$ & expression \\
+  $e,t$ & expression \\
   $i$ & natural number literal \\
   \hline
 \end{tabular}
+
 
 \begin{tabular}{|l|l|}
   \hline
   Primitive & Comment \\
   \hline
-  \vtt{def\{ $x_1$,$\cdots$,$x_n$ \}} & define variables $x_1$ etc. \\
+  \vtt{def\{$x$\}} & define variable $x$ \\
   $x$ & use variable \\
   $i$ & literal \\
   \vtt{$e_1$ = $e_2$} & unification \\
   \vtt{$e_1$[$e_2$]} & function application \\
   \vtt{$x$ => $e$} & lambda expression \\
   \vtt{$e_1$ | $e_2$} & alternative \\
-  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation \\
-  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing \\
+  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, empty tuple valid in some syntactic contexts \\
   \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   \vtt{for ($e_1$) $e_2$} & array formation \\
-  \vtt{do $e$} & scope delimiter \\
+  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, {\em could be a macro} \\
+  \vtt{do $e$} & scope delimiter, {\em could be a macro} \\
   \hline
 \end{tabular}
+
 
 \begin{tabular}{|l|l|l|}
   \hline
   Macro & Expansion & Comment \\
   \hline
-  \vtt{$x$ := $e$} & \vtt{def\{$x$\}; $x$ = $e$} & \\
-  \vtt{$x$ :$e$} & \vtt{$x$ := :$e$} & \\
-  \vtt{:}$e$ & \vtt{do \{ def\{x\}; $e$[x] \}} & $x$ fresh \\
-  \vtt{$e_1$($e_2$)} & \vtt{if (x:=$e_1$[$e_2$]) then x else wrong} & $x$ fresh \\
-  \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & $x$ fresh \\
-  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => do \{ x = $e_1$; $e_2$ \}} \\
+  \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
+  \vtt{$x$:$t$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $t$[$e$] \}} & \\
+  \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
+  \vtt{:}$t$ & \vtt{do \{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
+  \vtt{$e_1$($e_2$)} & \vtt{if (x:=$e_1$[$e_2$]) then x else wrong} & \vtt{x} fresh \\
+  \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => do \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$):$t$ := $e_2$} & \vtt{$f$($e_1$) := $t$[x => do \{ x = $e_1$; $e_2$ \}]} & \vtt{x} fresh \\
+  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[1]} & \\
+  \hline \hline
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & \\
+  \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
+  \hline \hline
+  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
+  \vtt{do $e$} & \vtt{if (:false) then :false else $e$} & \\
   \hline
 \end{tabular}
+
 
 \begin{tabular}{|l|l|}
   \hline
@@ -243,9 +255,12 @@ Blah, blah
   \vtt{int} & identity on the integers \\
   \vtt{type} & identity on types \\
   \vtt{any} & identity function \\
+  \vtt{void} & ... \\
   \vtt{wrong} & semantic error \\
+  ... & ... \\
   \hline
 \end{tabular}
+
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
