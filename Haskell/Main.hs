@@ -1,6 +1,7 @@
 import Data.List
 import System.Environment
 
+import Desugar
 import Parse
 import ParseExpr
 
@@ -15,4 +16,6 @@ main = do
       verbose = "-v" `elem` flags
   file <- readFile fn
   let e = parseDie pFile fn file
+      d = desugar e
   print e
+  print d

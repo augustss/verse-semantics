@@ -104,7 +104,7 @@ pExpr1 =
       pKeyword "for" *> (For <$> pParens pExpr <*> (pKeywordOpt "in" *> pBlock)),
       pKeyword "let" *> (Let <$> pParens pExpr <*> (pKeywordOpt "in" *> pBlock)),
       pKeyword "case" *> (Case <$> pParens pExpr <*> (pKeywordOpt "of" *> pBraces (sepBy1 pExprT (pOp ";")))),
-      pKeyword "do" *> pBlock,
+      pKeyword "do" *> (Do <$> pBlock),
       pTerm
     ]
   where
