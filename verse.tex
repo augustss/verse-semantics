@@ -215,18 +215,18 @@ Blah, blah
   \vtt{$e_1$[$e_2$]} & function application \\
   \vtt{$x$ => $e$} & lambda expression \\
   \vtt{$e_1$ | $e_2$} & alternative \\
-  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, empty tuple valid in some syntactic contexts \\
+  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also $ n = 0$ in some syntactic contexts \\
   \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   \vtt{for ($e_1$) $e_2$} & array formation \\
   \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, {\em could be a macro} \\
+  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, $n >= 1$, {\em could be a macro} \\
   \hline
 \end{tabular}
 
 
 \begin{tabular}{|l|l|l|}
   \hline
-  Macro & Expansion & Comment \\
+  Syntactic sugar (macro) & Expansion & Comment \\
   \hline
   \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
   \vtt{$x$:$t$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $t$[$e$] \}} & \\
@@ -234,10 +234,11 @@ Blah, blah
   \vtt{:}$t$ & \vtt{do \{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{if (x:=$e_1$[$e_2$]) then x else wrong} & \vtt{x} fresh \\
   \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => do \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$):$t$ := $e_2$} & \vtt{$f$($e_1$) := $t$[x => do \{ x = $e_1$; $e_2$ \}]} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$):$t$ := $e_2$} & \vtt{$f$($e_1$) := x => $t$[\{ x = $e_1$; $e_2$ \}]} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[1]} & \\
   \vtt{do $e$} & \vtt{let (x := $e$) in x} & \vtt{x} fresh \\
+  \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{let (x := $e$) in $e_1$[x] || $\cdots$ || $e_n$[x]} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
