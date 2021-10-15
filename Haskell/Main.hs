@@ -1,9 +1,14 @@
+import Control.Monad
 import Data.List
 import System.Environment
+import Text.PrettyPrint.HughesPJClass
 
 import Desugar
 import Parse
 import ParseExpr
+
+pp :: (Pretty a) => a -> IO ()
+pp = putStrLn . prettyShow
 
 main :: IO ()
 main = do
@@ -17,5 +22,10 @@ main = do
   file <- readFile fn
   let e = parseDie pFile fn file
       d = desugar e
-  print e
-  print d
+  when verbose $
+    print e
+  pp e
+  when verbose $
+    print d
+  pp d
+  
