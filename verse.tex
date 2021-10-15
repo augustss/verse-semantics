@@ -236,7 +236,7 @@ Blah, blah
   \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
   \vtt{$f$($e_1$):$t$ := $e_2$} & \vtt{$f$($e_1$) := x => $t$[\{ x = $e_1$; $e_2$ \}]} & \vtt{x} fresh \\
-  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[1]} & \\
+  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
   \vtt{do $e$} & \vtt{let (x := $e$) in x} & \vtt{x} fresh \\
   \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{let (x := $e$) in $e_1$[x] || $\cdots$ || $e_n$[x]} & \vtt{x} fresh \\
   \hline \hline
