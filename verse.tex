@@ -61,6 +61,8 @@
 \usepackage{stmaryrd}
 \usepackage{colortbl}
 
+\usepackage{bussproofs}
+
 % Boxed figures
 \usepackage{float}
 \floatstyle{boxed}
@@ -193,60 +195,69 @@
 \section{Primitives}
 Blah, blah
 
+In the tables below we will use the following notation:
+
 \begin{tabular}{|l|l|}
   \hline
   Notation &  \\
   \hline
-  $x,f$ & variable \\
-  $e,t$ & expression \\
+  $x$ & variable \\
+  $e,f,t$ & expression \\
   $i$ & natural number literal \\
   \hline
 \end{tabular}
 
 
+These constructs are primtive and can not be defined in terms other primitives.
+
 \begin{tabular}{|l|l|}
   \hline
   Primitive & Comment \\
   \hline
-  \vtt{def\{$x$\}} & define variable $x$ \\
   $x$ & use variable \\
   $i$ & literal \\
+  \vtt{def\{$x$\}} & define variable $x$ \\
+  \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope \\
   \vtt{$e_1$ = $e_2$} & unification \\
-  \vtt{$e_1$[$e_2$]} & function application \\
+  \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  \vtt{$e_1$($e_2$)} & function application, may not fail \\
   \vtt{$x$ => $e$} & lambda expression \\
   \vtt{$e_1$ | $e_2$} & alternative \\
   \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also $ n = 0$ in some syntactic contexts \\
   \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   \vtt{for ($e_1$) $e_2$} & array formation \\
   \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  \vtt{do $e$} & limit scope \\
   \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, $n >= 1$, {\em could be a macro} \\
   \hline
 \end{tabular}
 
 
+Some constructs can simply be (recursively) expanded into primitives.
+
 \begin{tabular}{|l|l|l|}
   \hline
   Syntactic sugar (macro) & Expansion & Comment \\
   \hline
-  \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
-  \vtt{$x$:$t$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $t$[$e$] \}} & \\
   \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
-  \vtt{:}$t$ & \vtt{do \{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
-  \vtt{$e_1$($e_2$)} & \vtt{if (x:=$e_1$[$e_2$]) then x else wrong} & \vtt{x} fresh \\
+  \vtt{:}$t$ & \vtt{\{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
   \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$):$t$ := $e_2$} & \vtt{$f$($e_1$) := x => $t$[\{ x = $e_1$; $e_2$ \}]} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
-  \vtt{do $e$} & \vtt{let (x := $e$) in x} & \vtt{x} fresh \\
-  \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{let (x := $e$) in $e_1$[x] || $\cdots$ || $e_n$[x]} & \vtt{x} fresh \\
+  \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{\{ x := $e$; $e_1$[x] || $\cdots$ || $e_n$[x] \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
+  \hline \hline
+  \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
+  \vtt{$e_1$:$t$ := $e_2$} & \vtt{$e_1$ := $t$[$e_2$]} & \\
+  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{ x := $e$; $e_0$ := x[0]; $\cdots$; $e_n$ := x[n] \}} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
   \hline
 \end{tabular}
 
+There are a number of predefined identifiers:
 
 \begin{tabular}{|l|l|}
   \hline
@@ -262,6 +273,97 @@ Blah, blah
   \hline
 \end{tabular}
 
+\newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
+\newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
+\newcommand{\defempty}{$\varnothing$}
+\newcommand{\defset}[1]{$\{#1\}$}
+\newcommand{\defunion}[2]{$#1 \uplus #2$}
+\newcommand{\defunions}[1]{$\biguplus #1$}
+\newcommand{\defunique}[1]{$\# #1$}
+\newcommand{\defafter}{\\ \vspace*{1em}}
+
+\vspace{3em}
+
+Rules for collecting variable definitions to the beginning of blocks.
+Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
+\defempty is the empty multiset.
+\vspace{2em}
+
+\AxiomC{~}
+\UnaryInfC{\defarrow{$x$}{$x$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{~}
+\UnaryInfC{\defarrow{$i$}{$i$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{~}
+\UnaryInfC{\defarrow{def\{$x$\}}{$x$}{\defset{x}}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\BinaryInfC{\defarrow{$e_1$=$e_2$}{$e'_1$=$e'_2$}{\defunion{D_1}{D_2}}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\BinaryInfC{\defarrow{$e_1$[$e_2$]}{$e'_1$[$e'_2$]}{\defunion{D_1}{D_2}}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\BinaryInfC{\defarrow{$e_1$($e_2$)}{$e'_1$($e'_2$)}{\defunion{D_1}{D_2}}}
+\DisplayProof \defafter
+
+\AxiomC{\defdefin{$e$}{$e'$}}
+\UnaryInfC{\defarrow{$x$=>$e$}{$x$=>$e'$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{\defdefin{$e_1$}{$e'_1$}}
+\AxiomC{\defdefin{$e_2$}{$e'_2$}}
+\BinaryInfC{\defarrow{$e_1$|$e_2$}{$e'_1$|$e'_2$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{$\cdots$}
+\AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
+\TrinaryInfC{\defarrow{$e_1$,$\cdots$,$e_n$}{$e'_1$,$\cdots$,$e'_n$}{\defunions{D_i}}}
+\DisplayProof \defafter
+
+\AxiomC{\defdefin{$e_1$}{$e'_1$}}
+\AxiomC{\defdefin{$e_2$}{$e'_2$}}
+\AxiomC{\defdefin{$e_3$}{$e'_3$}}
+\TrinaryInfC{\defarrow{if($e_1$) then $e_2$ else $e_3$}{if($e'_1$) then $e'_2$ else $e'_3$}{\defempty}}
+\DisplayProof \defafter
+The variables defined in the condition are also in scope in the \vtt{then} branch.
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D$}}
+\AxiomC{\defdefin{$e_2$}{$e'_2$}}
+\AxiomC{\defunique{D}}
+\TrinaryInfC{\defarrow{for($e_1$) $e_2$}{def\{$D$\} in for($e'_1$) $e'_2$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\AxiomC{\defunique{D_1}}
+\TrinaryInfC{\defarrow{let ($e_1$) in $e_2$}{def\{$D_1$\}in\{$e'_1$; $e'_2$\}}{$D_2$}}
+\DisplayProof \defafter
+
+\AxiomC{\defdefin{$e$}{$e'$}}
+\UnaryInfC{\defarrow{do $e$}{$e'$}{\defempty}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+\AxiomC{$\cdots$}
+\AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
+\TrinaryInfC{\defarrow{\{$e_1$;$\cdots$;$e_n$\}}{\{$e'_1$;$\cdots$;$e'_n$\}}{\defunions{D_i}}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$e$}{$e'$}{$D$}}
+\AxiomC{\defunique{D}}
+\BinaryInfC{\defdefin{$e$}{def\{$D$\}in $e'$}}
+\DisplayProof \defafter
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
