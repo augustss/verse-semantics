@@ -287,6 +287,8 @@ There are a number of predefined identifiers:
 Rules for collecting variable definitions to the beginning of blocks.
 Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
 \defempty is the empty multiset.
+The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the \vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
+The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but with all \vtt{def}s replaced by \vtt{def-in}.
 \vspace{2em}
 
 \AxiomC{~}
