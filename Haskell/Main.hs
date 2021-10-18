@@ -28,4 +28,6 @@ main = do
   when verbose $
     print d
   pp d
-  
+
+str :: String -> IO ()
+str = pp . desugar . parseString

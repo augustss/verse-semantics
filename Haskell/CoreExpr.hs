@@ -20,6 +20,7 @@ data Expr
   | If Expr Expr Expr                -- if(e1) then e2 else e3
   | For Expr Expr                    -- for(e1) e2
   | Let Expr Expr                    -- let (e1) in e2
+  | Do Expr                          -- do e
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
   deriving (Eq, Ord, Show)
 
@@ -38,4 +39,5 @@ toParseExpr (Alt e1 e2) = P.Alt (toParseExpr e1) (toParseExpr e2)
 toParseExpr (If e1 e2 e3) = P.If (toParseExpr e1) (toParseExpr e2) (toParseExpr e3)
 toParseExpr (For e1 e2) = P.For (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Let e1 e2) = P.Let (toParseExpr e1) (toParseExpr e2)
+toParseExpr (Do e) = P.Do (toParseExpr e)
 toParseExpr (Seq es) = P.Seq (map toParseExpr es)
