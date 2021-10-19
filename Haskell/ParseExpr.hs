@@ -1,5 +1,5 @@
 module ParseExpr(
-  Ident,
+  Ident(..),
   Expr(..),
   Type,
   Pat,
@@ -15,7 +15,13 @@ indent :: Doc -> Doc
 indent = nest 2
 -----
 
-type Ident = String
+newtype Ident = Ident String
+  deriving (Eq, Ord, Show)
+
+instance Pretty Ident where
+  pPrintPrec _ _ (Ident s) = text s
+
+--
 
 -- Syntax tree from parsing, includes all "macros"
 data Expr
@@ -67,8 +73,8 @@ instance Pretty Expr where
           _ -> ppNormal expr
       ppNormal expr =
         case expr of
-          Def n -> text "def" <> braces (ppIdent n)
-          Var n -> ppIdent n
+          Def n -> text "def" <> braces (pPrintPrec l 0 n)
+          Var n -> pPrintPrec l 0 n
           Int i
             | i >= 0 -> ppr p i
             | otherwise -> maybeParens (p >= 10) $ text $ show i
@@ -96,6 +102,3 @@ instance Pretty Expr where
                   indent $ ppBlock (Seq bs)
                 ]
       ppBlock e = pPrintL l e
-
-ppIdent :: Ident -> Doc
-ppIdent = text

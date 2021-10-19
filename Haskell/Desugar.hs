@@ -15,7 +15,7 @@ newIdent :: D Ident
 newIdent = do
   i <- get
   put $! i+1
-  pure $ "x#" ++ show i
+  pure $ Ident $ "x#" ++ show i
 
 desugar :: Expr -> C.Expr
 desugar e = evalState (dsExpr e) 1
@@ -44,10 +44,10 @@ dsExpr (Case e es) = do x <- Var <$> newIdent; dsExpr =<< (Let (Define x e) <$> 
   where eArm a e = do y <- Var <$> newIdent; pure $ If (Define y a) y e
 
 eWrong :: Expr
-eWrong = Var "wrong"
+eWrong = Var $ Ident "wrong"
 
 eColonFalse :: Expr
-eColonFalse = Range $ Var "false"
+eColonFalse = Range $ Var $ Ident "false"
 
 dsLambda :: Pat -> Expr -> D C.Expr
 dsLambda (Var i) e = C.Lambda i <$> dsExpr e

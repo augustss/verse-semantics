@@ -30,7 +30,7 @@ pIdent :: P Ident
 pIdent = try $ do
   w <- pWord
   guard $ w `notElem` keywords
-  pure w
+  pure $ Ident w
 
 keywords :: [String]
 keywords = ["case", "def", "do", "else", "for", "if", "in", "let", "of", "then", "typedef", "where"]
@@ -139,7 +139,7 @@ operatorTable =
     postOp :: String -> Operator P Expr
     postOp s = post app s
       where
-        app x = Call (Var ("postfix'" ++ s ++ "'")) x
+        app x = Call (Var (Ident ("postfix'" ++ s ++ "'"))) x
 
     fn :: (Expr -> Expr -> Expr) -> (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
     fn f fx s = fx (f <$ pOp s)
@@ -156,7 +156,7 @@ operatorTable =
     opA :: (Expr -> Expr -> Expr) -> (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
     opA c fx s = fn app2 fx s
       where
-        app2 x y = c (Var ("operator'" ++ s ++ "'")) (Array [x, y])
+        app2 x y = c (Var (Ident ("operator'" ++ s ++ "'"))) (Array [x, y])
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
