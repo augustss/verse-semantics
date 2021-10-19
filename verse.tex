@@ -243,24 +243,21 @@ Some constructs can simply be (recursively) expanded into primitives.
   \vtt{:}$t$ & \vtt{\{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
   \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
-  \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{\{ x := $e$; $e_1$[x] || $\cdots$ || $e_n$[x] \}} & \vtt{x} fresh \\
+  \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]\}} & \vtt{x} fresh \\
   \hline \hline
-  \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & \\
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & {\it maybe not the right scope rules} \\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\{$e_1$; $e_2$\}} & {\it an alternate definition} \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
   \vtt{$e_1$:$t$ := $e_2$} & \vtt{$e_1$ := $t$[$e_2$]} & \\
-  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{ x := $e$; $e_0$ := x[0]; $\cdots$; $e_n$ := x[n] \}} & \vtt{x} fresh \\
+  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]\}} & \vtt{x} fresh \\
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
   \hline \hline
-  \vtt{$e_1$ + $e_2$} & \vtt{ infix'+'($e_1$,$e_2$) } & \\
-  \vtt{$e_1$ - $e_2$} & \vtt{ infix'-'($e_1$,$e_2$) } & \\
-  \vtt{$e_1$ * $e_2$} & \vtt{ infix'*'($e_1$,$e_2$) } & \\
-  \vtt{$e_1$ / $e_2$} & \vtt{ infix'/'[$e_1$,$e_2$] } & \\
-  \vtt{$e_1$ < $e_2$} & \vtt{ infix'<'[$e_1$,$e_2$] } & \\
+  \vtt{$e_1 \oplus e_2$} & \vtt{operator'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
+  \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g., \vtt{/}, \vtt{<} \\
   \hline
 \end{tabular}
 
@@ -359,7 +356,7 @@ The variables defined in the condition are also in scope in the \vtt{then} branc
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
 \AxiomC{\defunique{D_1}}
-\TrinaryInfC{\defarrow{let ($e_1$) in $e_2$}{def\{$D_1$\}in\{$e'_1$; $e'_2$\}}{$D_2$}}
+\TrinaryInfC{\defarrow{let ($e_1$) in $e_2$}{def\{$D_1$\} in \{$e'_1$; $e'_2$\}}{$D_2$}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e$}{$e'$}}
@@ -374,7 +371,7 @@ The variables defined in the condition are also in scope in the \vtt{then} branc
 
 \AxiomC{\defarrow{$e$}{$e'$}{$D$}}
 \AxiomC{\defunique{D}}
-\BinaryInfC{\defdefin{$e$}{def\{$D$\}in $e'$}}
+\BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
 \begin{acks}                            %% acks environment is optional
