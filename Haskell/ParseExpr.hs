@@ -1,9 +1,11 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module ParseExpr(
   Ident(..),
   Expr(..),
   Type,
   Pat,
   ) where
+import Data.Data(Data)
 import Prelude hiding ((<>))
 import Text.PrettyPrint.HughesPJClass
 
@@ -16,7 +18,7 @@ indent = nest 2
 -----
 
 newtype Ident = Ident String
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance Pretty Ident where
   pPrintPrec _ _ (Ident s) = text s

@@ -1,19 +1,25 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module CoreExpr(
   P.Ident,
   Expr(..),
   toParseExpr,
+  flattenDefs,
   ) where
+import Data.Data(Data)
 import Text.PrettyPrint.HughesPJClass
+import Data.Generics.Uniplate.Data
 
 import qualified ParseExpr as P
 
 -- After desugaring
 data Expr
-  = Def P.Ident                      -- def{x}
-  | Var P.Ident                      -- x
+  = Var P.Ident                      -- x
   | Int Integer                      -- i
+  | Def P.Ident                      -- def{x}
+  | DefIn [P.Ident] Expr             -- def{x,...}in e
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
+  | Call Expr Expr                   -- e1(e2)
   | Lambda P.Ident Expr              -- x => e
   | Alt Expr Expr                    -- e1 | e2
   | Array [Expr]                     -- e1, ..., en
@@ -22,17 +28,22 @@ data Expr
   | Let Expr Expr                    -- let (e1) in e2
   | Do Expr                          -- do e
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance Pretty Expr where
-  pPrintPrec l p = pPrintPrec l p . toParseExpr
+  pPrintPrec l p (DefIn is e) = maybeParens (p > 0) $
+    fsep [text "def" <+> fsep (punctuate comma $ map (pPrintPrec l 0) is),
+          text "in" <+> pPrintPrec l 0 e]
+  pPrintPrec l p e = pPrintPrec l p . toParseExpr $ e
 
 toParseExpr :: Expr -> P.Expr
 toParseExpr (Def x) = P.Def x
+toParseExpr (DefIn _ _) = error $ "toParseExpr: DefIn"
 toParseExpr (Var x) = P.Var x
 toParseExpr (Int x) = P.Int x
 toParseExpr (Unify e1 e2) = P.Unify (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Apply e1 e2) = P.Apply (toParseExpr e1) (toParseExpr e2)
+toParseExpr (Call e1 e2) = P.Call (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Array es) = P.Array (map toParseExpr es)
 toParseExpr (Lambda x e) = P.Lambda (P.Var x) (toParseExpr e)
 toParseExpr (Alt e1 e2) = P.Alt (toParseExpr e1) (toParseExpr e2)
@@ -41,3 +52,12 @@ toParseExpr (For e1 e2) = P.For (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Let e1 e2) = P.Let (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Do e) = P.Do (toParseExpr e)
 toParseExpr (Seq es) = P.Seq (map toParseExpr es)
+
+flattenDefs :: Expr -> Expr
+flattenDefs = transform tr
+  where
+    tr (Seq es) = Seq $ concatMap getSeq es
+    tr e = e
+    getSeq (Seq es) = es
+    getSeq e = [e]
+

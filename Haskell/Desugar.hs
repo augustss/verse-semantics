@@ -26,6 +26,7 @@ dsExpr (Var x) = pure $ C.Var x
 dsExpr (Int i) = pure $ C.Int i
 dsExpr (Unify e1 e2) = C.Unify <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Apply e1 e2) = C.Apply <$> dsExpr e1 <*> dsExpr e2
+dsExpr (Call e1 e2) = C.Call <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Lambda p e) = dsLambda p e
 dsExpr (Alt e1 e2) = C.Alt <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Array es) = C.Array <$> mapM dsExpr es
@@ -34,17 +35,16 @@ dsExpr (For e1 e2) = C.For <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Let e1 e2) = C.Let <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Do e) = C.Do <$> dsExpr e
 dsExpr (Seq es) = C.Seq <$> mapM dsExpr es
+--- macros below
 dsExpr (Define p e) = dsDefine p e
 dsExpr (HasType x t) = dsExpr $ Define x (Range t)
 dsExpr (Range t) = do x <- newIdent; dsExpr $ Do $ Seq [Def x, Apply t (Var x)]
-dsExpr (Call f e) = do x <- Var <$> newIdent; dsExpr $ If (Define x (Apply f e)) x eWrong
 dsExpr (TypeDef e) = do x <- Var <$> newIdent; dsExpr $ Lambda x $ Unify x e
 dsExpr (Where e1 e2) = dsExpr $ Apply (Array [e1, e2]) (Int 1)
-dsExpr (Case e es) = do x <- Var <$> newIdent; dsExpr =<< (Let (Define x e) <$> foldrM eArm eColonFalse es)
-  where eArm a e = do y <- Var <$> newIdent; pure $ If (Define y a) y e
-
-eWrong :: Expr
-eWrong = Var $ Ident "wrong"
+dsExpr (Case e es) = do
+  x <- Var <$> newIdent
+  let eArm a r = do y <- Var <$> newIdent; pure $ If (Define y $ Apply a x) y r
+  dsExpr =<< (Let (Define x e) <$> foldrM eArm eColonFalse es)
 
 eColonFalse :: Expr
 eColonFalse = Range $ Var $ Ident "false"
@@ -61,4 +61,7 @@ dsDefine (HasType p t) e = dsDefine p (Apply t e)
 dsDefine (Call f a) e = do
   x <- Var <$> newIdent
   dsDefine f $ Lambda x $ Seq [ Unify x a, e]
+dsDefine (Array ps) e = do
+  x <- Var <$> newIdent
+  dsExpr $ Seq $ Define x e : zipWith (\ i p -> Define p $ Apply x (Int i)) [0..] ps
 dsDefine p e = error $ "dsDefine: " ++ show p

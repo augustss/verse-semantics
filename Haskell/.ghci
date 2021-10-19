@@ -1,3 +1,4 @@
 :set -package parser-combinators
 :set -package megaparsec
 :set -package mtl
+:set -package uniplate
