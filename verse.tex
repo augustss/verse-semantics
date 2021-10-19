@@ -246,6 +246,7 @@ Some constructs can simply be (recursively) expanded into primitives.
   \vtt{case ($e$) of \{ $e_1$; $\cdots$; $e_n$ \}} & \vtt{\{ x := $e$; $e_1$[x] || $\cdots$ || $e_n$[x] \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & \\
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{\{$e_1$; $e_2$\}} & {\it an alternate definition} \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
@@ -254,6 +255,12 @@ Some constructs can simply be (recursively) expanded into primitives.
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
+  \hline \hline
+  \vtt{$e_1$ + $e_2$} & \vtt{ infix'+'($e_1$,$e_2$) } & \\
+  \vtt{$e_1$ - $e_2$} & \vtt{ infix'-'($e_1$,$e_2$) } & \\
+  \vtt{$e_1$ * $e_2$} & \vtt{ infix'*'($e_1$,$e_2$) } & \\
+  \vtt{$e_1$ / $e_2$} & \vtt{ infix'/'[$e_1$,$e_2$] } & \\
+  \vtt{$e_1$ < $e_2$} & \vtt{ infix'<'[$e_1$,$e_2$] } & \\
   \hline
 \end{tabular}
 
@@ -267,6 +274,9 @@ There are a number of predefined identifiers:
   \vtt{int} & identity on the integers \\
   \vtt{type} & identity on types \\
   \vtt{any} & identity function \\
+  \vtt{array} & array type \\
+  \vtt{tuple} & tuple type \\
+  \vtt{arrow} & function type \\
   \vtt{void} & ... \\
   \vtt{wrong} & semantic error \\
   ... & ... \\
