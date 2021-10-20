@@ -374,6 +374,70 @@ The variables defined in the condition are also in scope in the \vtt{then} branc
 \BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
+\vspace{2em}
+Scoping rules.
+
+\newcommand{\scinf}[2]{#1 $\vdash$ #2}
+
+\AxiomC{$x \in \Gamma$}
+\UnaryInfC{\scinf{$\Gamma$}{$x$}}
+\DisplayProof \defafter
+
+\AxiomC{}
+\UnaryInfC{\scinf{$\Gamma$}{$i$}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e$}}}
+\UnaryInfC{\scinf{$\Gamma$}{\vtt{def $D$ in $e$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$ = $e_2$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$[$e_2$]}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$($e_2$)}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma \cup \{x\}$}{\vtt{$e$}}}
+\UnaryInfC{\scinf{$\Gamma$}{\vtt{$x$ => $e$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$ | $e_2$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{$\cdots$}
+\AxiomC{\scinf{$\Gamma$}{$e_n$}}
+\TrinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$, $\cdots$, $e_n$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
+\AxiomC{\scinf{$\Gamma$}{$e_3$}}
+\TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def $D$ in $e_1$) then $e_2$ else $e_3$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{for ($e_1$) $e_2$}}}
+\DisplayProof \defafter
+
+\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+\AxiomC{$\cdots$}
+\AxiomC{\scinf{$\Gamma$}{$e_n$}}
+\TrinaryInfC{\scinf{$\Gamma$}{\vtt{\{$e_1$; $\cdots$; $e_n$\}}}}
+\DisplayProof \defafter
+
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
 \end{acks}
