@@ -28,6 +28,7 @@ instance Pretty Ident where
 -- Syntax tree from parsing, includes all "macros"
 data Expr
   = Def Ident                        -- def{x}
+  | DefIn [Ident] Expr               -- def{x,...}in e
   | Var Ident                        -- x
   | Int Integer                      -- i
   | Unify Expr Expr                  -- e1 = e2
@@ -70,18 +71,22 @@ instance Pretty Expr where
       ppr = pPrintPrec l
       ppNice expr =
         case expr of
---          Array es | length es /= 1 -> parens $ commaSep $ map (ppr 1) es
+          Array es | length es /= 1 -> maybeParens (p>0) $ commaSep $ map (ppr 1) es
 --          Define i (Range e) -> ppr 6 i <> text ":" <+> ppr 5 e
           _ -> ppNormal expr
       ppNormal expr =
         case expr of
           Def n -> text "def" <> braces (pPrintPrec l 0 n)
+          DefIn is e -> maybeParens (p > 0) $
+            fsep [text "def" <+> fsep (punctuate comma $ map (pPrintPrec l 0) is),
+                  text "in" <+> pPrintPrec l 0 e]
           Var n -> pPrintPrec l 0 n
           Int i
             | i >= 0 -> ppr p i
             | otherwise -> maybeParens (p >= 10) $ text $ show i
           Unify e1 e2 -> maybeParens (p >= 6) $ ppr 6 e1 <+> text "=" <+> ppr 5 e2
           Apply f a -> maybeParens (p > 13) $ ppr 13 f <> brackets (ppr 0 a)
+          Call f a -> maybeParens (p > 13) $ ppr 13 f <> parens (ppr 0 a)
           Lambda a e -> maybeParens (p > 4) $ ppr 5 a <> text "=>" <> ppr 4 e
           Alt e1 e2 -> maybeParens (p >= 7) $ ppr 6 e1 <+> text "|" <+> ppr 6 e2
           Array es -> text "array" <> braces (commaSep (map (ppr 1) es))
@@ -94,7 +99,6 @@ instance Pretty Expr where
           Define i e -> maybeParens (p >= 3) $ ppr 3 i <> text ":=" <+> ppr 2 e
           HasType i e -> ppr 6 i <> text ":" <+> ppr 5 e
           Range e -> maybeParens (p >= 10) $ text ":" <> ppr 10 e
-          Call f a -> maybeParens (p > 13) $ ppr 13 f <> parens (ppr 0 a)
           TypeDef e -> text "typedef" <+> braces (ppr 0 e)
           Where e1 e2 -> maybeParens (p > 0) $ ppr 1 e1 <+> text "where" <+> ppr 1 e2
           Case e bs ->

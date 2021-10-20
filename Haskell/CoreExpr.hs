@@ -3,7 +3,7 @@ module CoreExpr(
   P.Ident,
   Expr(..),
   toParseExpr,
-  flattenDefs,
+  flattenSeqs,
   ) where
 import Data.Data(Data)
 import Text.PrettyPrint.HughesPJClass
@@ -31,14 +31,11 @@ data Expr
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Expr where
-  pPrintPrec l p (DefIn is e) = maybeParens (p > 0) $
-    fsep [text "def" <+> fsep (punctuate comma $ map (pPrintPrec l 0) is),
-          text "in" <+> pPrintPrec l 0 e]
   pPrintPrec l p e = pPrintPrec l p . toParseExpr $ e
 
 toParseExpr :: Expr -> P.Expr
 toParseExpr (Def x) = P.Def x
-toParseExpr (DefIn _ _) = error $ "toParseExpr: DefIn"
+toParseExpr (DefIn is e) = P.DefIn is (toParseExpr e)
 toParseExpr (Var x) = P.Var x
 toParseExpr (Int x) = P.Int x
 toParseExpr (Unify e1 e2) = P.Unify (toParseExpr e1) (toParseExpr e2)
@@ -53,11 +50,20 @@ toParseExpr (Let e1 e2) = P.Let (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Do e) = P.Do (toParseExpr e)
 toParseExpr (Seq es) = P.Seq (map toParseExpr es)
 
-flattenDefs :: Expr -> Expr
-flattenDefs = transform tr
+-- Flatten all sequences and drop simple expressions that can have no effect.
+flattenSeqs :: Expr -> Expr
+flattenSeqs = transform flatten
   where
-    tr (Seq es) = Seq $ concatMap getSeq es
-    tr e = e
+    flatten (Seq es) = Seq $ dropVar $ concatMap getSeq es
+    flatten e = e
     getSeq (Seq es) = es
     getSeq e = [e]
+    dropVar es =
+      reverse $ case reverse es of
+                [] -> []
+                e:es -> e: filter eff es
+    eff Var{} = False
+    eff Int{} = False
+    eff _ = True
+    
 
