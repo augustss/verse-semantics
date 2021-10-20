@@ -1,0 +1,45 @@
+{{def{x};
+  x = {def{x#1};
+       int[x#1]}};
+ {def{x#2};
+  float[x#2]};
+ x#3 => x#3 = 1 | 2;
+ (x, operator'>'[x, 0])[0];
+ (let ({def{x#4};
+        x#4 = operator'+'(x, 1)})
+  in
+    (if ({def{x#7};
+          x#7 = (x#8 => {x#8 = 0;
+                         1})[x#4]})
+       x#7
+     else
+       (if ({def{x#6};
+             x#6 = (x#9 => {x#9 = 1;
+                            1})[x#4]})
+          x#6
+        else
+          (if ({def{x#5};
+                x#5 = (n => operator'-'(n, 1))[x#4]})
+             x#5
+           else
+             {def{x#10};
+              false[x#10]}))));
+ operator'&&'[x, y];
+ operator'||'[x, y];
+ {def{x};
+  x = e};
+ {def{x};
+  x = int[e]};
+ {{def{x#11};
+   x#11 = e};
+  {def{x};
+   x = x#11[0]};
+  {def{y};
+   y = x#11[1]}};
+ {def{f};
+  f = (x#12 => {x#12 = {def{x};
+                        x = {def{x#13};
+                             int[x#13]}};
+                e})};
+ operator'+'(x, y);
+ operator'<'[x, y]}
