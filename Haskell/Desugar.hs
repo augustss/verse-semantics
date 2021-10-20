@@ -25,6 +25,8 @@ dsExpr (Def x) = pure $ C.Def x
 dsExpr (Var x) = pure $ C.Var x
 dsExpr (Int i) = pure $ C.Int i
 dsExpr (Unify e1 e2) = C.Unify <$> dsExpr e1 <*> dsExpr e2
+dsExpr (Apply (Var (Ident "operator'&&'")) (Array [e1, e2])) = dsAnd e1 e2
+dsExpr (Apply (Var (Ident "operator'||'")) (Array [e1, e2])) = dsOr e1 e2
 dsExpr (Apply e1 e2) = C.Apply <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Call e1 e2) = C.Call <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Lambda p e) = dsLambda p e
@@ -38,9 +40,9 @@ dsExpr (Seq es) = C.Seq <$> mapM dsExpr es
 --- macros below
 dsExpr (Define p e) = dsDefine p e
 dsExpr (HasType x t) = dsExpr $ Define x (Range t)
-dsExpr (Range t) = do x <- newIdent; dsExpr $ Do $ Seq [Def x, Apply t (Var x)]
+dsExpr (Range t) = do x <- newIdent; dsExpr $ Seq [Def x, Apply t (Var x)]
 dsExpr (TypeDef e) = do x <- Var <$> newIdent; dsExpr $ Lambda x $ Unify x e
-dsExpr (Where e1 e2) = dsExpr $ Apply (Array [e1, e2]) (Int 1)
+dsExpr (Where e1 e2) = dsExpr $ Apply (Array [e1, e2]) (Int 0)
 dsExpr (Case e es) = do
   x <- Var <$> newIdent
   let eArm a r = do y <- Var <$> newIdent; pure $ If (Define y $ Apply a x) y r
@@ -65,3 +67,12 @@ dsDefine (Array ps) e = do
   x <- Var <$> newIdent
   dsExpr $ Seq $ Define x e : zipWith (\ i p -> Define p $ Apply x (Int i)) [0..] ps
 dsDefine p e = error $ "dsDefine: " ++ show p
+
+dsAnd :: Expr -> Expr -> D C.Expr
+dsAnd e1 e2 = dsExpr $ If e1 e2 eColonFalse
+--dsAnd e1 e2 = dsExpr $ Seq [e1, e2]
+
+dsOr :: Expr -> Expr -> D C.Expr
+dsOr e1 e2 = do
+  x <- Var <$> newIdent
+  dsExpr $ If (Define x e1) x e2

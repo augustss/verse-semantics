@@ -4,8 +4,7 @@ PACKAGES= -package megaparsec -package parser-combinators -package mtl -package 
 
 .PHONY:	all test clean
 
-all:
-	@echo Pick a target
+all:	$(FWVERSE)
 
 $(FWVERSE):	*.hs
 	@mkdir -p $(FWTMP)
@@ -13,6 +12,7 @@ $(FWVERSE):	*.hs
 
 test:	$(FWVERSE) runtest.sh tests/*.verse
 	@sh runtest.sh $(FWVERSE) dump-parse allExprs
+	@sh runtest.sh $(FWVERSE) dump-desugar allDesugar
 
 clean:
 	rm -rf $(FWTMP)

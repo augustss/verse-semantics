@@ -24,22 +24,30 @@
            else
              {def{x#10};
               false[x#10]}))));
- operator'&&'[x, y];
- operator'||'[x, y];
+ (if (x)
+    y
+  else
+    {def{x#11};
+     false[x#11]});
+ (if ({def{x#12};
+       x#12 = x})
+    x#12
+  else
+    y);
  {def{x};
   x = e};
  {def{x};
   x = int[e]};
- {{def{x#11};
-   x#11 = e};
+ {{def{x#13};
+   x#13 = e};
   {def{x};
-   x = x#11[0]};
+   x = x#13[0]};
   {def{y};
-   y = x#11[1]}};
+   y = x#13[1]}};
  {def{f};
-  f = (x#12 => {x#12 = {def{x};
-                        x = {def{x#13};
-                             int[x#13]}};
+  f = (x#14 => {x#14 = {def{x};
+                        x = {def{x#15};
+                             int[x#15]}};
                 e})};
  operator'+'(x, y);
  operator'<'[x, y]}

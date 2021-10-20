@@ -87,7 +87,7 @@ instance Pretty Expr where
           Unify e1 e2 -> maybeParens (p >= 6) $ ppr 6 e1 <+> text "=" <+> ppr 5 e2
           Apply f a -> maybeParens (p > 13) $ ppr 13 f <> brackets (ppr 0 a)
           Call f a -> maybeParens (p > 13) $ ppr 13 f <> parens (ppr 0 a)
-          Lambda a e -> maybeParens (p > 4) $ ppr 5 a <> text "=>" <> ppr 4 e
+          Lambda a e -> maybeParens (p > 4) $ ppr 5 a <+> text "=>" <+> ppr 4 e
           Alt e1 e2 -> maybeParens (p >= 7) $ ppr 6 e1 <+> text "|" <+> ppr 6 e2
           Array es -> text "array" <> braces (commaSep (map (ppr 1) es))
           If e1 e2 e3 -> maybeParens (p >= 0) $ sep [text "if" <+> parens (ppr 0 e1), indent $ ppBlock e2, text "else", indent $ ppBlock e3]
