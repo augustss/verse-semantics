@@ -54,7 +54,7 @@ toParseExpr (Seq es) = P.Seq (map toParseExpr es)
 flattenSeqs :: Expr -> Expr
 flattenSeqs = transform flatten
   where
-    flatten (Seq es) = Seq $ dropVar $ concatMap getSeq es
+    flatten (Seq es) = sSeq $ dropVar $ concatMap getSeq es
     flatten e = e
     getSeq (Seq es) = es
     getSeq e = [e]
@@ -65,5 +65,6 @@ flattenSeqs = transform flatten
     eff Var{} = False
     eff Int{} = False
     eff _ = True
-    
-
+    sSeq [] = error "sSeq []"
+    sSeq [e] = e
+    sSeq es = Seq es

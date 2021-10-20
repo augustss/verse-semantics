@@ -5,35 +5,30 @@
   float[x#2]};
  x#3 => x#3 = 1 | 2;
  (x, operator'>'[x, 0])[0];
- (let ({def{x#4};
-        x#4 = operator'+'(x, 1)})
-  in
-    (if ({def{x#7};
-          x#7 = (x#8 => {x#8 = 0;
-                         1})[x#4]})
-       x#7
-     else
-       (if ({def{x#6};
-             x#6 = (x#9 => {x#9 = 1;
-                            1})[x#4]})
-          x#6
-        else
-          (if ({def{x#5};
-                x#5 = (n => operator'-'(n, 1))[x#4]})
-             x#5
-           else
-             {def{x#10};
-              false[x#10]}))));
- (if (x)
-    y
-  else
-    {def{x#11};
-     false[x#11]});
- (if ({def{x#12};
-       x#12 = x})
-    x#12
-  else
-    y);
+ let ({def{x#4};
+       x#4 = operator'+'(x, 1)})
+ in
+   if ({def{x#7};
+        x#7 = (x#8 => {x#8 = 0;
+                       1})[x#4]})
+   then x#7
+   else (if ({def{x#6};
+              x#6 = (x#9 => {x#9 = 1;
+                             1})[x#4]})
+         then x#6
+         else (if ({def{x#5};
+                    x#5 = (n => operator'-'(n, 1))[x#4]})
+               then x#5
+               else {def{x#10};
+                     false[x#10]}));
+ if (x)
+ then y
+ else {def{x#11};
+       false[x#11]};
+ if ({def{x#12};
+      x#12 = x})
+ then x#12
+ else y;
  {def{x};
   x = e};
  {def{x};

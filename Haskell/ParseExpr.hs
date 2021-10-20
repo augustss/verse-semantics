@@ -90,9 +90,9 @@ instance Pretty Expr where
           Lambda a e -> maybeParens (p > 4) $ ppr 5 a <+> text "=>" <+> ppr 4 e
           Alt e1 e2 -> maybeParens (p >= 7) $ ppr 6 e1 <+> text "|" <+> ppr 6 e2
           Array es -> text "array" <> braces (commaSep (map (ppr 1) es))
-          If e1 e2 e3 -> maybeParens (p >= 0) $ sep [text "if" <+> parens (ppr 0 e1), indent $ ppBlock e2, text "else", indent $ ppBlock e3]
-          For e1 e2 -> maybeParens (p >= 0) $ sep [text "for" <+> parens (ppr 0 e1), indent $ ppBlock e2]
-          Let e1 e2 -> maybeParens (p >= 0) $ sep [text "let" <+> parens (ppr 0 e1), text "in", indent $ ppr 0 e2]
+          If e1 e2 e3 -> maybeParens (p > 0) $ sep [text "if" <+> parens (ppr 0 e1), text "then" <+> indent (ppBlock e2), text "else" <+> indent (ppBlock e3)]
+          For e1 e2 -> maybeParens (p > 0) $ sep [text "for" <+> parens (ppr 0 e1), indent $ ppBlock e2]
+          Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1), text "in", indent $ ppr 0 e2]
           Seq es -> braces $ vcat $ punctuate (text ";") $ map (ppr 0) es
           --
           Do e -> maybeParens (p > 0) $ text "do" <+> indent (ppBlock e)
@@ -107,4 +107,4 @@ instance Pretty Expr where
                 [ text "case" <+> parens (pPrintL l e) <+> text "of",
                   indent $ ppBlock (Seq bs)
                 ]
-      ppBlock e = pPrintL l e
+      ppBlock e = pPrintPrec l 1 e
