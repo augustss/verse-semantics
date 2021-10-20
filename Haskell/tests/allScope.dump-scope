@@ -1,0 +1,36 @@
+{5;
+ def x
+ in {x;
+     x};
+ def x, y
+ in {x;
+     y;
+     x = y};
+ def x, f
+ in {x;
+     f;
+     f[x]};
+ def x, f
+ in {x;
+     f;
+     f(x)};
+ {x => x};
+ def x
+ in {x;
+     x | (def y
+          in {y;
+              y})};
+ def x, y
+ in {x;
+     x, x, 2, y, y};
+ {if ({x;
+       x = 1})
+  then (def y
+        in {{y;
+             y = 2};
+            operator'+'(x, y)})
+  else 3};
+ {def x
+  in for ({x;
+           x = 1 | 2})
+       operator'+'(x, 1)}}

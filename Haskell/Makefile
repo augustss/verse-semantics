@@ -14,6 +14,7 @@ test:	$(FWVERSE) runtest.sh tests/*.verse
 	@sh runtest.sh $(FWVERSE) dump-parse allExprs
 	@sh runtest.sh $(FWVERSE) dump-desugar allDesugar
 	@sh runtest.sh $(FWVERSE) dump-extrude allExtrude
+	@sh runtest.sh $(FWVERSE) dump-scope allScope
 
 clean:
 	rm -rf $(FWTMP)

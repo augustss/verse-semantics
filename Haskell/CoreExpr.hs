@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module CoreExpr(
-  P.Ident,
+  P.Ident(..),
   Expr(..),
   toParseExpr,
   flattenSeqs,

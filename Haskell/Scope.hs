@@ -42,6 +42,30 @@ defIn (e, is)
 
 -----
 
-scopeCheck :: Expr -> Expr
-scopeCheck = id
+type IdentSet = [Ident]
 
+primops :: IdentSet
+primops = map Ident $ words $
+  "any array arrow false float int tuple type void wrong " ++
+  "operator'+' operator'-' operator'*' operator'/' " ++
+  "operator'<' operator'<=' operator'>' operator'>=' "
+
+scopeCheck :: Expr -> Expr
+scopeCheck = scope primops
+
+scope :: IdentSet -> Expr -> Expr
+scope r e@(Var x) | x `elem` r = e
+                  | otherwise = error $ "scope: undefined " ++ show (x, r)
+scope _ e@(Int _) = e
+scope r (DefIn d e) = DefIn d (scope (d ++ r) e)
+scope r (Unify e1 e2) = Unify (scope r e1) (scope r e2)
+scope r (Apply e1 e2) = Apply (scope r e1) (scope r e2)
+scope r (Call e1 e2) = Call (scope r e1) (scope r e2)
+scope r (Lambda x e) = Lambda x (scope (x:r) e)
+scope r (Alt e1 e2) = Alt (scope r e1) (scope r e2)
+scope r (Array es) = Array (map (scope r) es)
+scope r (If (DefIn d e1) e2 e3) = If (scope r' e1) (scope r' e2) (scope r e3)
+  where r' = d ++ r
+scope r (For e1 e2) = For (scope r e1) (scope r e2)
+scope r (Seq es) = Seq (map (scope r) es)
+scope _ e = error $ "scope: unexpected " ++ show e
