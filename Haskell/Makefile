@@ -11,8 +11,8 @@ $(FWVERSE):	*.hs
 	@mkdir -p $(FWTMP)
 	ghc --make -odir $(FWTMP) -o $(FWVERSE) $(PACKAGES) Main.hs
 
-test:	$(FWVERSE) tests/*.verse
-	$(FWVERSE) --dump-parse tests/allExprs.verse > $(FWTMP)/allExprs.dump-parse && diff tests/allExprs.dump-parse $(FWTMP)//allExpr.dump-parse
+test:	$(FWVERSE) runtest.sh tests/*.verse
+	@sh runtest.sh $(FWVERSE) dump-parse allExprs
 
 clean:
 	rm -rf $(FWTMP)
