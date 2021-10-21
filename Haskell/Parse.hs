@@ -94,7 +94,7 @@ pTerm = do
   foldl apply fn <$> many pArg
 
 pSeq :: P Expr
-pSeq = Seq <$> pBraces (sepBy1 pExpr (pOp ";"))
+pSeq = Seq <$> pBraces (sepEndBy1 pExpr (pOp ";"))
 
 pExpr1 :: P Expr
 pExpr1 =
