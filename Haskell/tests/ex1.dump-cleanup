@@ -1,0 +1,4 @@
+def x, y
+in {x = 1;
+    y = int[2];
+    print(operator'+'(x, y))}

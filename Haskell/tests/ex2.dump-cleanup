@@ -1,0 +1,5 @@
+def fac
+in {fac = (x#1 => (def n, x#2
+                   in {x#1 = n = int[x#2];
+                       if (n = 0) then 1 else operator'*'(n, fac(operator'-'(n, 1)))}));
+    print(fac(5))}

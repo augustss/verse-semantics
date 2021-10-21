@@ -1,0 +1,16 @@
+def sumProd, sumProdLoop, x#8, s, p
+in {sumProd = (x#1 => (def xs, x#2
+                       in {x#1 = xs = array(int)[x#2];
+                           tuple(int, int)[sumProdLoop(0, xs, (0, 1))]}));
+    sumProdLoop = (x#3 => (def i, x#4, xs, x#5, sp, sum, x#6, prod, x#7
+                           in {x#3 = (i = int[x#4], xs = array(int)[x#5],
+                                      sp = (sum = int[x#6], prod = int[x#7]));
+                               tuple(int, int)[if (x = xs[i])
+                                               then sumProdLoop(operator'+'(i, 1), xs,
+                                                                (operator'+'(x, sum),
+                                                                 operator'*'(x, prod)))
+                                               else sp]}));
+    x#8 = sumProd(1, 2, 3, 4, 5);
+    s = x#8[0];
+    p = x#8[1];
+    print(operator'+'(s, p))}

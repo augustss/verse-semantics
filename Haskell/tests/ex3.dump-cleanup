@@ -1,0 +1,5 @@
+def avg
+in {avg = (x#1 => (def x, x#2, y, x#3
+                   in {x#1 = (x = int[x#2], y = int[x#3]);
+                       operator'/'[operator'+'(x, y), 2]}));
+    print(avg(2, 4))}
