@@ -195,8 +195,7 @@
 \section{Primitives}
 Blah, blah
 
-In the tables below we will use the following notation:
-
+\begin{table}
 \begin{tabular}{|l|l|}
   \hline
   Notation &  \\
@@ -206,10 +205,11 @@ In the tables below we will use the following notation:
   $i$ & natural number literal \\
   \hline
 \end{tabular}
+\caption{Notation}
+\end{table}
 
 
-These constructs are primtive and can not be defined in terms other primitives.
-
+\begin{table}
 \begin{tabular}{|l|l|}
   \hline
   Primitive & Comment \\
@@ -231,10 +231,11 @@ These constructs are primtive and can not be defined in terms other primitives.
   \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, $n >= 1$, {\em could be a macro} \\
   \hline
 \end{tabular}
+\caption{Primitive constructs}
+\end{table}
 
 
-Some constructs can simply be (recursively) expanded into primitives.
-
+\begin{table}
 \begin{tabular}{|l|l|l|}
   \hline
   Syntactic sugar (macro) & Expansion & Comment \\
@@ -260,9 +261,10 @@ Some constructs can simply be (recursively) expanded into primitives.
   \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g., \vtt{/}, \vtt{<} \\
   \hline
 \end{tabular}
+\caption{Constructs that are just syntactic sugar}
+\end{table}
 
-There are a number of predefined identifiers:
-
+\begin{table}
 \begin{tabular}{|l|l|}
   \hline
   Predefined name & Comment \\
@@ -279,6 +281,8 @@ There are a number of predefined identifiers:
   ... & ... \\
   \hline
 \end{tabular}
+\caption{Predefined identifiers}
+\end{table}
 
 \newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
 \newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
@@ -291,12 +295,13 @@ There are a number of predefined identifiers:
 
 \vspace{3em}
 
-Rules for collecting variable definitions to the beginning of blocks.
+Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
 Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
 \defempty is the empty multiset.
 The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the \vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
 The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but with all \vtt{def}s replaced by \vtt{def-in}.
-\vspace{2em}
+
+\begin{figure}
 
 \AxiomC{~}
 \UnaryInfC{\defarrow{$x$}{$x$}{\defempty}}
@@ -374,8 +379,11 @@ The variables defined in the condition are also in scope in the \vtt{then} branc
 \BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
-\vspace{2em}
-Scoping rules.
+\caption{Scope extrusion rules}
+\label{extrusion-rules}
+\end{figure}
+
+\begin{figure}
 
 \newcommand{\scinf}[2]{#1 $\vdash$ #2}
 
@@ -437,6 +445,10 @@ Scoping rules.
 \AxiomC{\scinf{$\Gamma$}{$e_n$}}
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{\{$e_1$; $\cdots$; $e_n$\}}}}
 \DisplayProof \defafter
+
+\caption{Scoping rules}
+\label{scoping-rules}
+\end{figure}
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
