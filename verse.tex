@@ -216,8 +216,8 @@ Blah, blah
   \hline
   $x$ & use variable \\
   $i$ & literal \\
-  \vtt{def\{$x$\}} & define variable $x$ \\
-  \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope \\
+  \vtt{$x$ := $e$} & define a variable \\
+  \vtt{:}$t$ & range of a function \\
   \vtt{$e_1$ = $e_2$} & unification \\
   \vtt{$e_1$[$e_2$]} & function application, may fail \\
   \vtt{$e_1$($e_2$)} & function application, may not fail \\
@@ -229,6 +229,8 @@ Blah, blah
   \vtt{let ($e_1$) in $e_2$} & local bindings \\
   \vtt{do $e$} & limit scope \\
   \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, $n >= 1$, {\em could be a macro} \\
+  \hline \hline
+  \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
   \hline
 \end{tabular}
 \caption{Primitive constructs}
@@ -241,8 +243,7 @@ Blah, blah
   Syntactic sugar (macro) & Expansion & Comment \\
   \hline
   \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
-  \vtt{:}$t$ & \vtt{\{ def\{x\}; $t$[x] \}} & \vtt{x} fresh \\
-  \vtt{typedef\{$e$\}} & \vtt{x => x = $e$} & \vtt{x} fresh \\
+  \vtt{typedef\{$e$\}} & \vtt{(x:any) => x = $e$} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
   \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]\}} & \vtt{x} fresh \\
   \hline \hline
@@ -250,7 +251,6 @@ Blah, blah
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\{$e_1$; $e_2$\}} & {\it an alternate definition} \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
   \hline \hline
-  \vtt{$x$ := $e$} & \vtt{\{ def\{$x$\}; $x$ = $e$ \}} & \\
   \vtt{$e_1$:$t$ := $e_2$} & \vtt{$e_1$ := $t$[$e_2$]} & \\
   \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]\}} & \vtt{x} fresh \\
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
@@ -269,16 +269,16 @@ Blah, blah
   \hline
   Predefined name & Comment \\
   \hline
-  \vtt{false} & identity on the empty set \\
   \vtt{int} & identity on the integers \\
   \vtt{type} & identity on types \\
   \vtt{any} & identity function \\
   \vtt{array} & array type \\
   \vtt{tuple} & tuple type \\
   \vtt{arrow} & function type \\
-  \vtt{void} & ... \\
   \vtt{wrong} & semantic error \\
   ... & ... \\
+  \vtt{false} & \vtt{= ()} \\
+  \vtt{void} & \vtt{= (:any) => false} \\
   \hline
 \end{tabular}
 \caption{Predefined identifiers}
@@ -287,7 +287,7 @@ Blah, blah
 \newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
 \newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
 \newcommand{\defempty}{$\varnothing$}
-\newcommand{\defset}[1]{$\{#1\}$}
+\newcommand{\defset}[1]{\{#1\}}
 \newcommand{\defunion}[2]{$#1 \uplus #2$}
 \newcommand{\defunions}[1]{$\biguplus #1$}
 \newcommand{\defunique}[1]{$\# #1$}
@@ -311,8 +311,12 @@ The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but wi
 \UnaryInfC{\defarrow{$i$}{$i$}{\defempty}}
 \DisplayProof \defafter
 
-\AxiomC{~}
-\UnaryInfC{\defarrow{def\{$x$\}}{$x$}{\defset{x}}}
+\AxiomC{\defarrow{$e$}{$e'$}{$D$}}
+\UnaryInfC{\defarrow{$x$ := $e$}{$x$ = $e'$}{\defunion{D}{\defset{x}}}}
+\DisplayProof \defafter
+
+\AxiomC{\defarrow{$t$}{$t'$}{$D$}}
+\UnaryInfC{\defarrow{:$t$}{$t'$[def\{x\}in x]}{$D$}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
