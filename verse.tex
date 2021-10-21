@@ -349,8 +349,9 @@ The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but wi
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
 \AxiomC{\defdefin{$e_3$}{$e'_3$}}
 \TrinaryInfC{\defarrow{if($e_1$) then $e_2$ else $e_3$}{if($e'_1$) then $e'_2$ else $e'_3$}{\defempty}}
-\DisplayProof \defafter
-The variables defined in the condition are also in scope in the \vtt{then} branch.
+\DisplayProof
+\\ The variables defined in the condition are also in scope in the \vtt{then} branch.
+\defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
