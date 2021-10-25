@@ -1,36 +1,31 @@
 {5;
  def x
- in {x;
+ in {x = any[def _ in _];
      x};
  def x, y
- in {x;
-     y;
+ in {x = any[def _ in _];
+     y = any[def _ in _];
      x = y};
  def x, f
- in {x;
-     f;
+ in {x = any[def _ in _];
+     f = any[def _ in _];
      f[x]};
  def x, f
- in {x;
-     f;
+ in {x = any[def _ in _];
+     f = any[def _ in _];
      f(x)};
  {x => x};
  def x
- in {x;
+ in {x = any[def _ in _];
      x | (def y
-          in {y;
+          in {y = any[def _ in _];
               y})};
  def x, y
- in {x;
-     x, x, 2, y, y};
- {if ({x;
-       x = 1})
+ in {x = any[def _ in _];
+     x, x, 2, y = any[def _ in _], y};
+ {if (x = 1)
   then (def y
-        in {{y;
-             y = 2};
+        in {y = 2;
             operator'+'(x, y)})
   else 3};
- {def x
-  in for ({x;
-           x = 1 | 2})
-       operator'+'(x, 1)}}
+ {def x in for (x = 1 | 2) operator'+'(x, 1)}}

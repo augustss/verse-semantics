@@ -77,10 +77,7 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [Var <$> pIdent, Int <$> pDecimal, pParens pExprET, pDef, pSeq, pTypedef]
-
-pDef :: P Expr
-pDef = Def <$> (pKeyword "def" *> pBraces pIdent)
+pAtom = choice [Var <$> pIdent, Int <$> pDecimal, pParens pExprET, pSeq, pTypedef]
 
 pTypedef :: P Expr
 pTypedef = TypeDef <$> (pKeyword "typedef" *> pBraces pExpr)

@@ -15,8 +15,8 @@ import qualified ParseExpr as P
 data Expr
   = Var P.Ident                      -- x
   | Int Integer                      -- i
-  | Def P.Ident                      -- def{x}
-  | DefIn [P.Ident] Expr             -- def{x,...}in e
+  | Define P.Ident Expr              -- x := e
+  | Range Expr                       -- :t
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
   | Call Expr Expr                   -- e1(e2)
@@ -28,16 +28,18 @@ data Expr
   | Let Expr Expr                    -- let (e1) in e2
   | Do Expr                          -- do e
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
+  -- after extrusion
+  | DefIn [P.Ident] Expr             -- def{x,...}in e
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Expr where
   pPrintPrec l p e = pPrintPrec l p . toParseExpr $ e
 
 toParseExpr :: Expr -> P.Expr
-toParseExpr (Def x) = P.Def x
-toParseExpr (DefIn is e) = P.DefIn is (toParseExpr e)
 toParseExpr (Var x) = P.Var x
 toParseExpr (Int x) = P.Int x
+toParseExpr (Define x e) = P.Define (P.Var x) (toParseExpr e)
+toParseExpr (Range e) = P.Range (toParseExpr e)
 toParseExpr (Unify e1 e2) = P.Unify (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Apply e1 e2) = P.Apply (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Call e1 e2) = P.Call (toParseExpr e1) (toParseExpr e2)
@@ -49,6 +51,7 @@ toParseExpr (For e1 e2) = P.For (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Let e1 e2) = P.Let (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Do e) = P.Do (toParseExpr e)
 toParseExpr (Seq es) = P.Seq (map toParseExpr es)
+toParseExpr (DefIn is e) = P.DefIn is (toParseExpr e)
 
 -- Flatten all sequences and drop simple expressions that can have no effect.
 flattenSeqs :: Expr -> Expr

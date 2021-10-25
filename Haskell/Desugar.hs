@@ -21,9 +21,10 @@ desugar :: Expr -> C.Expr
 desugar e = evalState (dsExpr e) 1
 
 dsExpr :: Expr -> D C.Expr
-dsExpr (Def x) = pure $ C.Def x
 dsExpr (Var x) = pure $ C.Var x
 dsExpr (Int i) = pure $ C.Int i
+dsExpr (Define p e) = dsDefine p e
+dsExpr (Range t) = C.Range <$> dsExpr t
 dsExpr (Unify e1 e2) = C.Unify <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Apply (Var (Ident "operator'&&'")) (Array [e1, e2])) = dsAnd e1 e2
 dsExpr (Apply (Var (Ident "operator'||'")) (Array [e1, e2])) = dsOr e1 e2
@@ -38,9 +39,7 @@ dsExpr (Let e1 e2) = C.Let <$> dsExpr e1 <*> dsExpr e2
 dsExpr (Do e) = C.Do <$> dsExpr e
 dsExpr (Seq es) = C.Seq <$> mapM dsExpr es
 --- macros below
-dsExpr (Define p e) = dsDefine p e
 dsExpr (HasType x t) = dsExpr $ Define x (Range t)
-dsExpr (Range t) = do x <- newIdent; dsExpr $ Seq [Def x, Apply t (Var x)]
 dsExpr (TypeDef e) = do x <- Var <$> newIdent; dsExpr $ Lambda x $ Unify x e
 dsExpr (Where e1 e2) = dsExpr $ Apply (Array [e1, e2]) (Int 0)
 dsExpr (Case e es) = do
@@ -58,7 +57,7 @@ dsLambda p e = do
   C.Lambda x <$> dsExpr (Seq [Unify (Var x) p, e])
 
 dsDefine :: Pat -> Expr -> D C.Expr
-dsDefine p@(Var x) e = dsExpr $ Seq [Def x, Unify p e]
+dsDefine p@(Var x) e = C.Define x <$> dsExpr e
 dsDefine (HasType p t) e = dsDefine p (Apply t e)
 dsDefine (Call f a) e = do
   x <- Var <$> newIdent

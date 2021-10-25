@@ -1,66 +1,22 @@
 {{x};
  {6};
- def x in {x};
- def x, x#1, y, x#2
- in {{x;
-      x = {x#1;
-           int[x#1]}};
-     x = {y;
-          y = {x#2;
-               int[x#2]}}};
- def f, x#3, e, x#4
- in {{f;
-      f = {x#3;
-           t[x#3]}}[{e;
-                     e = {x#4;
-                          u[x#4]}}]};
- def f, x#5, e, x#6
- in {{f;
-      f = {x#5;
-           t[x#5]}}({e;
-                     e = {x#6;
-                          u[x#6]}})};
- {x => (def y
-        in {y;
-            y = 0})};
- {(def x
-   in {x;
-       x = 1}) | (def y
-                  in {y;
-                      y = 2})};
+ def x in {x = 0};
  def x, y
- in {{x;
-      x = 1},
-     2,
-     {y;
-      y = 3}};
- {if (def x
-      in {x;
-          x = 1})
-  then (def y
-        in {y;
-            y = x})
-  else (def z
-        in {z;
-            z = 2})};
- {def x, x#7
-  in for ({x;
-           x = {x#7;
-                int[x#7]}})
-       (def y
-        in {y;
-            y = x})};
+ in {x = int[def _ in _];
+     x = y = int[def _ in _]};
+ def f, e in {(f = t[def _ in _])[e = u[def _ in _]]};
+ def f, e in {(f = t[def _ in _])(e = u[def _ in _])};
+ {x => (def y in y = 0)};
+ {(def x in x = 1) | (def y in y = 2)};
+ def x, y in {x = 1, 2, y = 3};
+ {if (def x in x = 1) then (def y in y = x) else (def z in z = 2)};
+ {def x in for (x = int[def _ in _]) (def y in y = x)};
  def y, z
  in {def x
-     in {{x;
-          x = 1};
-         {y;
-          y = x}};
-     {z;
-      z = y}};
+     in {x = 1;
+         y = x};
+     z = y};
  def x, y
- in {{x;
-      x = 1};
+ in {x = 1;
      2;
-     {y;
-      y = 3}}}
+     y = 3}}

@@ -27,10 +27,10 @@ instance Pretty Ident where
 
 -- Syntax tree from parsing, includes all "macros"
 data Expr
-  = Def Ident                        -- def{x}
-  | DefIn [Ident] Expr               -- def{x,...}in e
-  | Var Ident                        -- x
+  = Var Ident                        -- x
   | Int Integer                      -- i
+  | Define Pat Expr                  -- p := e
+  | Range Type                       -- :t
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
   | Lambda Pat Expr                  -- p => e
@@ -41,10 +41,10 @@ data Expr
   | Let Expr Expr                    -- let (e1) in e2
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
   ---
+  | DefIn [Ident] Expr               -- def{x,...}in e
+  ---
   | Do Expr                          -- do e
-  | Define Pat Expr                  -- p := e
   | HasType Expr Type                -- x : t
-  | Range Type                       -- :t
   | Call Expr Expr                   -- e1(e2)
   | TypeDef Expr                     -- typedef{e}
   | Where Expr Expr                  -- e1 where e2
@@ -76,7 +76,6 @@ instance Pretty Expr where
           _ -> ppNormal expr
       ppNormal expr =
         case expr of
-          Def n -> text "def" <> braces (pPrintPrec l 0 n)
           DefIn is e -> maybeParens (p > 0) $
             fsep [text "def" <+> fsep (punctuate comma $ map (pPrintPrec l 0) is),
                   text "in" <+> pPrintPrec l 0 e]

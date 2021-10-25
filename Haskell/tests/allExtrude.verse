@@ -1,7 +1,7 @@
 {
 do { x };
 do { 6 };
-do { def{x} };
+do { x:=0; };
 do { x:int; x=(y:int) };
 do { (f:t)[e:u] };
 do { (f:t)(e:u) };

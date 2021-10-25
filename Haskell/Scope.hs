@@ -15,8 +15,8 @@ extrude = extDef
 ext :: Expr -> (Expr, [Ident])
 ext e@Var{} = (e, [])
 ext e@Int{} = (e, [])
-ext (Def i) = (Var i, [i])
-ext (DefIn _ _) = error "ext: DefIn"
+ext (Define x e) = (Unify (Var x) e', x:d) where (e', d) = ext e
+ext (Range e) = (Apply e' (DefIn [x] (Var x)), d) where (e', d) = ext e; x = Ident "_"
 ext (Unify e1 e2) = (Unify e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
 ext (Apply e1 e2) = (Apply e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
 ext (Call e1 e2) = (Call e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
@@ -28,6 +28,7 @@ ext (For e1 e2) = (defIn (For e1' (extDef e2), d1), []) where (e1', d1) = ext e1
 ext (Let e1 e2) = (defIn (Seq [e1', e2'], d1), d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
 ext (Do e) = (extDef e, [])
 ext (Seq es) = (Seq es', concat ds) where (es', ds) = unzip $ map ext es
+ext (DefIn _ _) = error "ext: DefIn"
 
 
 -- Extract defs and insert a DefIn

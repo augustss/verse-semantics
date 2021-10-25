@@ -1,48 +1,24 @@
-{{def{x};
-  x = {def{x#1};
-       int[x#1]}};
- {def{x#2};
-  float[x#2]};
- x#3 => x#3 = 1 | 2;
+{x:= :int;
+ x#1 => x#1 = 1 | 2;
  (x, operator'>'[x, 0])[0];
- let ({def{x#4};
-       x#4 = operator'+'(x, 1)})
+ let (x#2:= operator'+'(x, 1))
  in
-   if ({def{x#7};
-        x#7 = (x#8 => {x#8 = 0;
-                       1})[x#4]})
-   then x#7
-   else (if ({def{x#6};
-              x#6 = (x#9 => {x#9 = 1;
-                             1})[x#4]})
-         then x#6
-         else (if ({def{x#5};
-                    x#5 = (n => operator'-'(n, 1))[x#4]})
-               then x#5
-               else {def{x#10};
-                     false[x#10]}));
- if (x)
- then y
- else {def{x#11};
-       false[x#11]};
- if ({def{x#12};
-      x#12 = x})
- then x#12
- else y;
- {def{x};
-  x = e};
- {def{x};
-  x = int[e]};
- {{def{x#13};
-   x#13 = e};
-  {def{x};
-   x = x#13[0]};
-  {def{y};
-   y = x#13[1]}};
- {def{f};
-  f = (x#14 => {x#14 = {def{x};
-                        x = {def{x#15};
-                             int[x#15]}};
-                e})};
+   if (x#5:= (x#6 => {x#6 = 0;
+                      1})[x#2])
+   then x#5
+   else (if (x#4:= (x#7 => {x#7 = 1;
+                            1})[x#2])
+         then x#4
+         else (if (x#3:= (n => operator'-'(n, 1))[x#2])
+               then x#3
+               else :false));
+ if (x) then y else :false;
+ if (x#8:= x) then x#8 else y;
+ x:= int[e];
+ {x#9:= e;
+  x:= x#9[0];
+  y:= x#9[1]};
+ f:= x#10 => {x#10 = (x:= :int);
+              e};
  operator'+'(x, y);
  operator'<'[x, y]}
