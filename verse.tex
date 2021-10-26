@@ -298,8 +298,10 @@ Blah, blah
 Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
 Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
 \defempty is the empty multiset.
-The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the \vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
-The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but with all \vtt{def}s replaced by \vtt{def-in}.
+The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
+\vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
+The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
+but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \begin{figure}
 
@@ -357,11 +359,12 @@ The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but wi
 \\ The variables defined in the condition are also in scope in the \vtt{then} branch.
 \defafter
 
-\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D$}}
+\AxiomC{\defdefin{$e_1$}{$e'_1$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
-\AxiomC{\defunique{D}}
-\TrinaryInfC{\defarrow{for($e_1$) $e_2$}{def\{$D$\} in for($e'_1$) $e'_2$}{\defempty}}
-\DisplayProof \defafter
+\BinaryInfC{\defarrow{for($e_1$) $e_2$}{for($e'_1$) $e'_2$}{\defempty}}
+\DisplayProof
+\\ The variables defined in the domain are also in scope in body.
+\defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
@@ -440,9 +443,9 @@ The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$, but wi
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def $D$ in $e_1$) then $e_2$ else $e_3$}}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma$}{$e_1$}}
-\AxiomC{\scinf{$\Gamma$}{$e_2$}}
-\BinaryInfC{\scinf{$\Gamma$}{\vtt{for ($e_1$) $e_2$}}}
+\AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def $D$ in $e_1$) $e_2$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
