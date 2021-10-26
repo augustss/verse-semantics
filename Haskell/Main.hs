@@ -11,6 +11,7 @@ import Desugar
 import Parse
 import Scope
 import CoreExpr(flattenSeqs)
+import Eval
 
 pp :: (Pretty a) => a -> IO ()
 pp = putStrLn . prettyShow
@@ -87,3 +88,6 @@ main = do
 
 comp :: String -> IO ()
 comp = pp . flattenSeqs . scopeCheck . extrude . desugar . parseString
+
+ev :: String -> IO ()
+ev = putStrLn . unlines . map prettyShow . runE . eval initialEnv . flattenSeqs . scopeCheck . extrude . desugar . parseString
