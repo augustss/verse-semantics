@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module CoreExpr(
-  P.Ident(..),
+  Ident(..),
   Expr(..),
+  pattern DefInX,
   toParseExpr,
   flattenSeqs,
   ) where
@@ -10,17 +13,18 @@ import Text.PrettyPrint.HughesPJClass
 import Data.Generics.Uniplate.Data
 
 import qualified ParseExpr as P
+import ParseExpr(Ident)
 
 -- After desugaring
 data Expr
-  = Var P.Ident                      -- x
+  = Var Ident                      -- x
   | Int Integer                      -- i
-  | Define P.Ident Expr              -- x := e
+  | Define Ident Expr              -- x := e
   | Range Expr                       -- :t
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
   | Call Expr Expr                   -- e1(e2)
-  | Lambda P.Ident Expr              -- x => e
+  | Lambda Ident Expr              -- x => e
   | Alt Expr Expr                    -- e1 | e2
   | Array [Expr]                     -- e1, ..., en
   | If Expr Expr Expr                -- if(e1) then e2 else e3
@@ -29,8 +33,17 @@ data Expr
   | Do Expr                          -- do e
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
   -- after extrusion
-  | DefIn [P.Ident] Expr             -- def{x,...}in e
+  | DefIn [Ident] Expr             -- def{x,...}in e
   deriving (Eq, Ord, Show, Data)
+
+pattern DefInX :: [Ident] -> Expr -> Expr
+pattern DefInX d e <- (getDefIn -> (d, e))
+  where DefInX [] e = e
+        DefInX d e = DefIn d e
+
+getDefIn :: Expr -> ([Ident], Expr)
+getDefIn (DefIn d e) = (d, e)
+getDefIn e = ([], e)
 
 instance Pretty Expr where
   pPrintPrec l p e = pPrintPrec l p . toParseExpr $ e

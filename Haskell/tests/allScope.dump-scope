@@ -23,9 +23,9 @@
  def x, y
  in {x = any[def _ in _];
      x, x, 2, y = any[def _ in _], y};
- {if (x = 1)
+ {if (def x in x = 1)
   then (def y
         in {y = 2;
             operator'+'(x, y)})
   else 3};
- {def x in for (x = 1 | 2) operator'+'(x, 1)}}
+ {for (def x in x = 1 | 2) operator'+'(x, 1)}}

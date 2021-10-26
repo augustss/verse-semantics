@@ -10,7 +10,7 @@
  {(def x in x = 1) | (def y in y = 2)};
  def x, y in {x = 1, 2, y = 3};
  {if (def x in x = 1) then (def y in y = x) else (def z in z = 2)};
- {def x in for (x = int[def _ in _]) (def y in y = x)};
+ {for (def x in x = int[def _ in _]) (def y in y = x)};
  def y, z
  in {def x
      in {x = 1;

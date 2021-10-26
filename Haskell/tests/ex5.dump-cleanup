@@ -5,7 +5,7 @@ in {sumProd = (x#1 => (def xs
     sumProdLoop = (x#2 => (def i, xs, sp, sum, prod
                            in {x#2 = (i = int[def _ in _], xs = array(int)[def _ in _],
                                       sp = (sum = int[def _ in _], prod = int[def _ in _]));
-                               tuple(int, int)[if (x = xs[i])
+                               tuple(int, int)[if (def x in x = xs[i])
                                                then sumProdLoop(operator'+'(i, 1), xs,
                                                                 (operator'+'(x, sum),
                                                                  operator'*'(x, prod)))
