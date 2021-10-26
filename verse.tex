@@ -62,6 +62,10 @@
 \usepackage{colortbl}
 
 \usepackage{bussproofs}
+%%\usepackage{semantic}
+\usepackage{stmaryrd}
+\usepackage{mathtools}
+\usepackage{amsmath}
 
 % Boxed figures
 \usepackage{float}
@@ -457,6 +461,52 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \caption{Scoping rules}
 \label{scoping-rules}
 \end{figure}
+
+\begin{figure}
+  $Value = \mathbb{Z} + Value^{*} + (Value \rightarrow Value^{*}) + WRONG$ \\
+  $Env = Ident \rightarrow Value$
+\caption{Semantic domains}
+\label{semantic-domains}
+\end{figure}
+
+\newcommand{\semapp}[2]{\mathcal{E}\llbracket #1 \rrbracket #2}
+\newcommand{\semeqn}[2]{\begin{equation*}   \semapp{#1}{\rho} = #2   \end{equation*}}
+\newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
+
+\begin{figure}
+  
+  \begin{equation*}   \semapp{\cdot}{} : Env \rightarrow Value^{*}   \end{equation*}
+  \semeqn{x}{[\rho(x)]}
+  \semeqn{i}{[i]}
+  \semeqn{e_1 \vtt{=} e_2}{
+      \begin{cases*}
+        [v_1] & if $v_1=^{*}v_2, v_1=\semapp{e_1}{\rho}; v_2=\semapp{e_2}{\rho}$ XXX wrong \\
+        [] & otherwise
+      \end{cases*}
+      }
+  \semeqn{e_1[e_2]}{ xxx }
+  \semeqn{e_1(e_2)}{ xxx }
+  \semeqn{x \vtt{=>} e}{ \lambda v . \semapp{e} (\rho \circ (x \mapsto v)) }
+  \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} +\!\!\!+ \semapp{e_2}{\rho}}
+  \semeqn{e_1,\cdots,e_n}{\semapp{e_1}{\rho} :^{*} \cdots :^{*} \semapp{e_n}{\rho} :^{*} [[]]}
+  \semeqn{\vtt{if(def\{}s\vtt{\}in}\: e_1 \vtt{)\:then}\: e_3 \: \vtt{else}\: e_3}{
+      \begin{cases*}
+        \semapp{e_3}{\rho} & if $\envapp{e_1}{s\,\rho} = []$ \\
+        \semapp{e_2}{(\rho \circ \rho')} & if $\envapp{e_1}{s\, \rho} = \rho' : \_$
+      \end{cases*}
+      }
+
+  \begin{equation*}   \envapp{\cdot}{} : Ident^{*} \rightarrow Env \rightarrow Env^{*}   \end{equation*}
+  \begin{equation*}   \envapp{e}{s\,\rho} = env(s, \semapp{e \vtt{;} s}{\rho})
+  \end{equation*}
+  
+  \begin{equation*}   env : Ident^{*} \rightarrow Value^{*} \rightarrow Env^{*}   \end{equation*}
+
+    \caption{Expression semantics}
+\label{expression-semantics}
+\end{figure}
+
+ %%%%
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
