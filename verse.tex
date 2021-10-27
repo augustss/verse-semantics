@@ -81,7 +81,7 @@
 
 \newcommand{\wrong}[1]{{\color{red} #1}}
 
-\iffalse  % iftrue to reenable
+\iftrue  % iftrue to reenable
 \newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \else
@@ -533,7 +533,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \end{aligned}
     }
   
-  \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{f(v_1, v_2)}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}}}
+  \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{v}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}, \mbind{v}{f(v_1, v_2)}}}
 
   \equa{\hat{f}(x,y) =
     \begin{cases*}
@@ -545,15 +545,15 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
   \equa{\mathrm{apply}(f,x) = 
       \begin{cases*}
         f(x) & if $f \in Value \rightarrow Value^{*}$ \\
-        f_x & if $f \in \tuple{Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
+        \munit{f_x} & if $f \in \tuple{Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
         \mempty & otherwise, if $f \in \tuple{Value}$ \\
-        \mathrm{WRONG} & otherwise
+        \munit{\mathrm{WRONG}} & otherwise
       \end{cases*}
   }
   \equa{\mathrm{call}(f,x) = 
       \begin{cases*}
         apply(f,x) & if $apply(f,x) \ne \mempty$ \\
-        \mathrm{WRONG} & otherwise
+        \munit{\mathrm{WRONG}} & otherwise
       \end{cases*}
   }
 
@@ -565,10 +565,14 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
       \munit{v_{m1},v_{m2},\cdots,v_{mn_m}}}) = \\
     \munit{
       \tuple{v_{11},v_{21},\cdots,v_{m1}},
-      \tuple{v_{12},v_{22},\cdots,v_{m2}},
+      \tuple{v_{11},v_{21},\cdots,v_{m2}},
       \cdots,
       \tuple{v_{1n_1},\cdots,v_{mn_m}}}
   \end{multline*}
+
+  \lennart{This is all slighly wrong, since it doesn't propagate WRONG correctly.
+    Perhaps * should be a monad that can throw an exception when something is WRONG.
+  }
 
 \caption{Expression semantics}
 \label{expression-semantics}
