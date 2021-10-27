@@ -216,12 +216,10 @@ Blah, blah
 \begin{table}
 \begin{tabular}{|l|l|}
   \hline
-  Primitive & Comment \\
+  Expression & Comment \\
   \hline
   $x$ & use variable \\
   $i$ & literal \\
-  \vtt{$x$ := $e$} & define a variable \\
-  \vtt{:}$t$ & range of a function \\
   \vtt{$e_1$ = $e_2$} & unification \\
   \vtt{$e_1$[$e_2$]} & function application, may fail \\
   \vtt{$e_1$($e_2$)} & function application, may not fail \\
@@ -230,14 +228,11 @@ Blah, blah
   \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also $ n = 0$ in some syntactic contexts \\
   \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   \vtt{for ($e_1$) $e_2$} & array formation \\
-  \hline \hline
-  \vtt{let ($e_1$) in $e_2$} & local bindings, {\it only before extrusion} \\
-  \vtt{do $e$} & limit scope, {\it only before extrusion} \\
-  \hline \hline
+  \hline
   \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
   \hline
 \end{tabular}
-\caption{Primitive constructs}
+\caption{Core expressions}
 \end{table}
 
 
@@ -265,6 +260,20 @@ Blah, blah
   \hline
 \end{tabular}
 \caption{Constructs that are just syntactic sugar}
+\end{table}
+
+\begin{table}
+\begin{tabular}{|l|l|}
+  \hline
+  Primitive & Comment \\
+  \hline
+  \vtt{$x$ := $e$} & define a variable \\
+  \vtt{:}$t$ & range of a function \\
+  \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  \vtt{do $e$} & limit scope \\
+  \hline
+\end{tabular}
+\caption{Constructs that are eliminated by extrusion}
 \end{table}
 
 \begin{table}
