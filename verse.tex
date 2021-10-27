@@ -529,6 +529,8 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
       \end{cases*}
       }
   \semeqn{\vtt{for(}e_1\vtt{)}e_2}{\mathrm{tuples}(\mcompr{\semapp{e_2}{\rho'}}{\mbind{\rho'}{\envapp{e_1}{\rho}}})}
+  \semeqn{\vtt{def\{}x_1,\cdots,x_n\vtt{\}in}\,e}
+         {\mcompr{\semapp{e}{(\rho \circ \{ x_1 \mapsto v_1, \cdots, x_n \mapsto v_n\})}} {\mbind{v_1}{univ},\cdots,\mbind{v_n}{univ}}}
   \end{align*}
 
   \equa { \envapp{\cdot}{} : Env \rightarrow Env^{*} }
