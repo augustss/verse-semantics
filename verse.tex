@@ -584,7 +584,8 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \vtt{any} & $x \mapsto \munit{x}$ \\
     \vtt{false} & $x \mapsto \mempty$ \\
     \vtt{int} & $x \mapsto \checkcase{\munit{x}}{x \in \mathbb{Z}}{\mempty} $ \\
-    
+    \vtt{operator'+'} & $x \mapsto \checkcase{\munit{x_1+x_2}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}}{\mempty}$ \\
+    \vtt{operator'/'} & $x \mapsto \checkcase{\munit{\frac{x_1}{x_2}}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}, x_2 \ne 0}{\mempty}$ \\
     \hline
   \end{tabular}
 \caption{Predefine identifiers}
