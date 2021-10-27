@@ -7,10 +7,12 @@ module CoreExpr(
   pattern DefInX,
   toParseExpr,
   flattenSeqs,
+  freeVars,
   ) where
 import Data.Data(Data)
 import Text.PrettyPrint.HughesPJClass
 import Data.Generics.Uniplate.Data
+import Data.List
 
 import qualified ParseExpr as P
 import ParseExpr(Ident)
@@ -84,3 +86,18 @@ flattenSeqs = transform flatten
     sSeq [] = error "sSeq []"
     sSeq [e] = e
     sSeq es = Seq es
+
+freeVars :: Expr -> [Ident]
+freeVars (Var x) = [x]
+freeVars (Int _) = []
+freeVars (Unify e1 e2) = freeVars e1 `union` freeVars e2
+freeVars (Apply e1 e2) = freeVars e1 `union` freeVars e2
+freeVars (Call e1 e2) = freeVars e1 `union` freeVars e2
+freeVars (Array es) = foldl' union [] $ map freeVars es
+freeVars (Lambda x e) = freeVars e \\ [x]
+freeVars (Alt e1 e2) = freeVars e1 `union` freeVars e2
+freeVars (If (DefInX xs e1) e2 e3) = ((freeVars e1 `union` freeVars e2) \\ xs) `union` freeVars e3
+freeVars (For (DefInX xs e1) e2) = (freeVars e1 `union` freeVars e2) \\ xs
+freeVars (Seq es) = foldl' union [] $ map freeVars es
+freeVars (DefIn xs e) = freeVars e \\ xs
+freeVars e = error $ "freeVars: " ++ show e

@@ -8,6 +8,9 @@ import Data.Foldable(asum)
 import CoreExpr
 import Value
 
+snoc :: [a] -> a -> [a]
+snoc xs x= xs ++ [x]
+
 ------
 
 newtype E a = E { runE :: [a] }
@@ -25,36 +28,29 @@ eval r (Lambda x e) = pure $ VLambda r x e
 eval r (Alt e1 e2) = eval r e1 <|> eval r e2
 eval r (Array es) = VArray <$> traverse (eval r) es
 eval r (If e1 e2 e3) = do
-  rs <- evalEnvs r e1
-  case rs of
+  case evalEnvs r e1 of
     [] -> eval r e3
     r' : _ -> eval (r' ++ r) e2
-eval r (For e1 e2) = do
-  rs <- evalEnvs r e1
-  let
-    loop as [] = pure $ VArray $ reverse as
-    loop as (q:qs) = do
-      case runE $ eval (q ++ r) e2 of
-        [] -> empty
-        [a] -> loop (a:as) qs
-        _ -> pure $ VWrong "for multi-value"
-  loop [] rs
-  
+eval r (For e1 e2) =
+  let rs = evalEnvs r e1
+      vss = map (\ q -> runE (eval (q ++ r) e2)) rs
+      vs = map VArray $ sequence vss
+  in  E vs
 eval r (Seq es) = last <$> mapM (eval r) es
 eval r (DefIn [] e) = eval r e
 eval r (DefIn (x:xs) e) = asum [ eval ((x, v):r) (DefIn xs e) | v <- allValues ]
 eval _ e = error $ "eval: unexpected " ++ show e
 
-evalEnvs :: Env -> Expr -> E [Env]
+evalEnvs :: Env -> Expr -> [Env]
 evalEnvs r ee =
   case ee of
     DefIn xs e -> defs xs e
     e -> defs [] e
   where
-    defs xs e = do
+    defs xs e =
       let arrs = runE $ eval r $ DefIn xs $ Seq [e, Array $ map Var xs]
           envs = map (\ (VArray vs) -> zip xs vs) arrs
-      pure envs
+      in  envs
 
 
 nonEmpty :: E Value -> E Value
