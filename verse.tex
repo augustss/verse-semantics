@@ -230,9 +230,9 @@ Blah, blah
   \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also $ n = 0$ in some syntactic contexts \\
   \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   \vtt{for ($e_1$) $e_2$} & array formation \\
-  \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  \vtt{do $e$} & limit scope \\
-  \vtt{\{ $e_1$;$\cdots$;$e_n$ \}} & sequencing, $n >= 1$, {\em could be a macro} \\
+  \hline \hline
+  \vtt{let ($e_1$) in $e_2$} & local bindings, {\it only before extrusion} \\
+  \vtt{do $e$} & limit scope, {\it only before extrusion} \\
   \hline \hline
   \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
   \hline
@@ -250,6 +250,7 @@ Blah, blah
   \vtt{typedef\{$e$\}} & \vtt{(x:any) => x = $e$} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
   \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]\}} & \vtt{x} fresh \\
+  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
   \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & {\it maybe not the right scope rules} \\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\{$e_1$; $e_2$\}} & {\it an alternate definition} \\
@@ -258,8 +259,6 @@ Blah, blah
   \vtt{$e_1$:$t$ := $e_2$} & \vtt{$e_1$ := $t$[$e_2$]} & \\
   \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]\}} & \vtt{x} fresh \\
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
-  \hline \hline
-  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
   \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{operator'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g., \vtt{/}, \vtt{<} \\
@@ -462,51 +461,135 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \label{scoping-rules}
 \end{figure}
 
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+
 \begin{figure}
-  $Value = \mathbb{Z} + Value^{*} + (Value \rightarrow Value^{*}) + WRONG$ \\
-  $Env = Ident \rightarrow Value$
+  $Value = \mathbb{Z} + \tuple{Value} + (Value \rightarrow Value^{*}) + \mathrm{WRONG}$ \\
+  $Env = Ident \rightarrow Value$ \\
+  where $\tuple{Value}$ is a tuple (array) of values, $Value^{*}$ is a (semantic) sequence (monad) of values.
 \caption{Semantic domains}
 \label{semantic-domains}
 \end{figure}
 
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \:|\: #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+\newcommand{\munit}[1]{[#1]}
+\newcommand{\mempty}{\munit{}}
+
 \newcommand{\semapp}[2]{\mathcal{E}\llbracket #1 \rrbracket #2}
-\newcommand{\semeqn}[2]{\begin{equation*}   \semapp{#1}{\rho} = #2   \end{equation*}}
+%\newcommand{\semeqn}[2]{\equa{ \semapp{#1}{\rho} = #2 }}
+\newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
 \newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
 
 \begin{figure}
-  
-  \begin{equation*}   \semapp{\cdot}{} : Env \rightarrow Value^{*}   \end{equation*}
-  \semeqn{x}{[\rho(x)]}
-  \semeqn{i}{[i]}
-  \semeqn{e_1 \vtt{=} e_2}{
+  \begin{align*}
+    \tuple{v_1,\cdots,v_n} && \text{create a tuple} \\
+    \munit{v}              && \text{create a singleton sequence} \\
+    \mempty                && \text{empty sequence} \\
+    s_1 \malt s_2          && \text{sequence concatenation} \\
+    \mcompr{e}{\mbind{x}{s}, \cdots} && \text{sequence comprehension} \\
+    t_i                    && \text{index into a tuple} \\
+    \mathrm{size}(t)       && \text{number of elements in a tuple}
+  \end{align*}
+\caption{Semantic notation}
+\label{semantic-notation}
+\end{figure}
+
+\begin{figure}
+
+  \begin{align*}
+  \semapp{\cdot}{} &: Env \rightarrow Value^{*} \\
+  \semeqn{x}{\munit{\rho(x)}}
+  \semeqn{i}{\munit{i}}
+  \semeqn{e_1 \vtt{=} e_2}{\mathrm{lift}(\hat{=}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
+  \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
+  \semeqn{e_1(e_2)}{\mathrm{lift}(\mathrm{call}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
+  \semeqn{x \vtt{=>} e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
+  \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}}
+  \semeqn{e_1,\cdots,e_n}{
+    \mcompr{\tuple{v_1,\cdots,v_n}}
+          {\mbind{v_1}{\semapp{e_1}{\rho}}, \cdots, \mbind{v_n}{\semapp{e_n}{\rho}}}
+          }
+  \semeqn{\vtt{if(}e_1\vtt{)\:then}\: e_2 \: \vtt{else}\: e_3}{
       \begin{cases*}
-        [v_1] & if $v_1=^{*}v_2, v_1=\semapp{e_1}{\rho}; v_2=\semapp{e_2}{\rho}$ XXX wrong \\
-        [] & otherwise
+        \semapp{e_2}{\rho'} & if $\envapp{e_1}{s\, \rho} = \munit{\rho', \cdots}$ \\
+        \semapp{e_3}{\rho} & if $\envapp{e_1}{s\,\rho} = \mempty$
       \end{cases*}
       }
-  \semeqn{e_1[e_2]}{ xxx }
-  \semeqn{e_1(e_2)}{ xxx }
-  \semeqn{x \vtt{=>} e}{ \lambda v . \semapp{e} (\rho \circ (x \mapsto v)) }
-  \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} +\!\!\!+ \semapp{e_2}{\rho}}
-  \semeqn{e_1,\cdots,e_n}{\semapp{e_1}{\rho} :^{*} \cdots :^{*} \semapp{e_n}{\rho} :^{*} [[]]}
-  \semeqn{\vtt{if(def\{}s\vtt{\}in}\: e_1 \vtt{)\:then}\: e_3 \: \vtt{else}\: e_3}{
-      \begin{cases*}
-        \semapp{e_3}{\rho} & if $\envapp{e_1}{s\,\rho} = []$ \\
-        \semapp{e_2}{(\rho \circ \rho')} & if $\envapp{e_1}{s\, \rho} = \rho' : \_$
-      \end{cases*}
-      }
+  \semeqn{\vtt{for(}e_1\vtt{)}e_2}{\mathrm{tuples}(\mcompr{\semapp{e_2}{\rho'}}{\mbind{\rho'}{\envapp{e_1}{\rho}}})}
+  \end{align*}
 
-  \begin{equation*}   \envapp{\cdot}{} : Ident^{*} \rightarrow Env \rightarrow Env^{*}   \end{equation*}
-  \begin{equation*}   \envapp{e}{s\,\rho} = env(s, \semapp{e \vtt{;} s}{\rho})
-  \end{equation*}
+  \equa { \envapp{\cdot}{} : Env \rightarrow Env^{*} }
+  \equa {
+    \begin{aligned}
+      \envapp{e}{\rho} =
+      \rho \circ  \{ & x_1 \mapsto \semapp{\vtt{(}e\vtt{,}\, x_1\vtt{)[1]} }{\rho}, \\
+                  & \cdots, \\
+                  & x_n \mapsto \semapp{\vtt{(}e\vtt{,}\, x_n\vtt{)[1]} }{\rho} \}  \\
+      & \mathrm{where}\, e = \vtt{def\{}x_1,\cdots,x_n\vtt{\} in}\,\_ \hfill
+    \end{aligned}
+    }
   
-  \begin{equation*}   env : Ident^{*} \rightarrow Value^{*} \rightarrow Env^{*}   \end{equation*}
+  \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{f(v_1, v_2)}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}}}
 
-    \caption{Expression semantics}
+  \equa{\hat{f}(x,y) =
+    \begin{cases*}
+      \munit{x} & if $f(x,y)$ \\
+      \mempty & otherwise
+    \end{cases*}
+    }
+
+  \equa{\mathrm{apply}(f,x) = 
+      \begin{cases*}
+        f(x) & if $f \in Value \rightarrow Value^{*}$ \\
+        f_x & if $f \in \tuple{Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
+        \mempty & otherwise, if $f \in \tuple{Value}$ \\
+        \mathrm{WRONG} & otherwise
+      \end{cases*}
+  }
+  \equa{\mathrm{call}(f,x) = 
+      \begin{cases*}
+        apply(f,x) & if $apply(f,x) \ne \mempty$ \\
+        \mathrm{WRONG} & otherwise
+      \end{cases*}
+  }
+
+  \begin{multline*}
+    \mathrm{tuples}(\munit{
+      \munit{v_{11},v_{12},\cdots,v_{1n_1}},
+      \munit{v_{21},v_{22},\cdots,v_{2n_2}},
+      \cdots,
+      \munit{v_{m1},v_{m2},\cdots,v_{mn_m}}}) = \\
+    \munit{
+      \tuple{v_{11},v_{21},\cdots,v_{m1}},
+      \tuple{v_{12},v_{22},\cdots,v_{m2}},
+      \cdots,
+      \tuple{v_{1n_1},\cdots,v_{mn_m}}}
+  \end{multline*}
+
+\caption{Expression semantics}
 \label{expression-semantics}
 \end{figure}
 
- %%%%
+\newcommand{\checkcase}[3]{\begin{cases*} #1 & if $#2$ \\ #3 & otherwise \end{cases*}}
+
+\begin{figure}
+  \begin{tabular}{|l|l|}
+    \hline
+    Name & Semantic value \\
+    \hline
+    \vtt{any} & $x \mapsto \munit{x}$ \\
+    \vtt{false} & $x \mapsto \mempty$ \\
+    \vtt{int} & $x \mapsto \checkcase{\munit{x}}{x \in \mathbb{Z}}{\mempty} $ \\
+    
+    \hline
+  \end{tabular}
+\caption{Predefine identifiers}
+\label{predefined}
+\end{figure}
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
