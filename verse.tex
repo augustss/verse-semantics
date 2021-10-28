@@ -484,11 +484,13 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \end{figure}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{V}
+\newcommand{\Env}{E}
 
 \begin{figure}
-  $Value = \mathbb{Z} + \tuple{Value} + (Value \rightarrow Value^{*}) + \mathrm{WRONG}$ \\
-  $Env = Ident \rightarrow Value$ \\
-  where $\tuple{Value}$ is a tuple (array) of values, $Value^{*}$ is a (semantic) sequence (monad) of values.
+  $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
+  $\Env = Ident \rightarrow \Value$ \\
+  where $\tuple{\Value}$ is a tuple (array) of values, $\Value^{*}$ is a (semantic) sequence (monad) of values.
 \caption{Semantic domains}
 \label{semantic-domains}
 \end{figure}
@@ -522,7 +524,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \begin{figure}
 
   \begin{align*}
-  \semapp{\cdot}{} &: Env \rightarrow Value^{*} \\
+  \semapp{\cdot}{} &: \Env \rightarrow \Value^{*} \\
   \semeqn{x}{\munit{\rho(x)}}
   \semeqn{i}{\munit{i}}
 \ifunify
@@ -547,7 +549,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
          {\mcompr{\semapp{e}{(\rho \circ \{ x_1 \mapsto v_1, \cdots, x_n \mapsto v_n\})}} {\mbind{v_1}{univ},\cdots,\mbind{v_n}{univ}}}
   \end{align*}
 
-  \equa { \envapp{\cdot}{} : Env \rightarrow Env^{*} }
+  \equa { \envapp{\cdot}{} : \Env \rightarrow \Env^{*} }
   \equa {
     \begin{aligned}
       \envapp{e}{\rho} =
@@ -571,9 +573,9 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
   \equa{\mathrm{apply}(f,x) = 
       \begin{cases*}
-        f(x) & if $f \in Value \rightarrow Value^{*}$ \\
-        \munit{f_x} & if $f \in \tuple{Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
-        \mempty & otherwise, if $f \in \tuple{Value}$ \\
+        f(x) & if $f \in \Value \rightarrow \Value^{*}$ \\
+        \munit{f_x} & if $f \in \tuple{\Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
+        \mempty & otherwise, if $f \in \tuple{\Value}$ \\
         \munit{\mathrm{WRONG}} & otherwise
       \end{cases*}
   }
@@ -606,6 +608,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \end{figure}
 
 \newcommand{\checkcase}[3]{\begin{cases*} #1 & if $#2$ \\ #3 & otherwise \end{cases*}}
+\newcommand{\isfunction}[1]{#1 \in \Value \rightarrow \Value^{*}}
 
 \begin{table}
   \begin{tabular}{|l|l|}
@@ -615,6 +618,20 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \vtt{any} & $x \mapsto \munit{x}$ \\
     \vtt{false} & $x \mapsto \mempty$ \\
     \vtt{int} & $x \mapsto \checkcase{\munit{x}}{x \in \mathbb{Z}}{\mempty} $ \\
+    \vtt{tuple} & $f \mapsto x \mapsto
+      \begin{cases*}
+        \mathrm{tuples}(f_1(x_1),\cdots,f_n(x_n)) & if $f = \tuple{f_1,\cdots,f_n}, x = \tuple{x_1,\cdots,x_n}$ \\
+          & $ \isfunction{f_1}, \cdots, \isfunction{f_n} $ \\
+          \mempty & otherwise
+      \end{cases*}
+      $ \\
+    \vtt{array} & $f \mapsto x \mapsto
+      \checkcase{\mathrm{tuples}(f(x_1),\cdots,f(x_n))}
+                {x = \tuple{x_1,\cdots,x_n}, \isfunction{f}}
+                {\mempty} $ \\
+    \vtt{arrow} & $ t \mapsto u \mapsto f \mapsto x \mapsto $ \\
+         & $ \quad \checkcase{\mcompr{v}{\mbind{y}{t(x)}, \mbind{z}{f(y)}, \mbind{v}{u(z)}}}{\isfunction{t}, \isfunction{u}, \isfunction{f}}{\mempty}
+                  $ \\
     \vtt{operator'+'} & $x \mapsto \checkcase{\munit{x_1+x_2}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}}{\mempty}$ \\
     \vtt{operator'/'} & $x \mapsto \checkcase{\munit{\frac{x_1}{x_2}}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}, x_2 \ne 0}{\mempty}$ \\
 \ifunify
@@ -624,7 +641,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \vtt{operator'<'}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 < x_2}{\mempty}$ \\
     \hline
   \end{tabular}
-\caption{Some predefined identifiers}
+\caption{Some predefined identifiers.  Note that several of these could be defined in Verse}
 \label{predefined}
 \end{table}
 
