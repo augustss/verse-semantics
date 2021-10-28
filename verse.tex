@@ -193,6 +193,9 @@
 %% environment and commands, and keywords command.
 \maketitle
 
+%% Include unification (equality) among the primitives.
+\newif\ifunify
+\unifyfalse % change to unifytrue to include unification
 
 \section{Introduction}
 
@@ -220,7 +223,9 @@ Blah, blah
   \hline
   $x$ & use variable \\
   $i$ & literal \\
+\ifunify
   \vtt{$e_1$ = $e_2$} & unification \\
+\fi
   \vtt{$e_1$[$e_2$]} & function application, may fail \\
   \vtt{$e_1$($e_2$)} & function application, may not fail \\
   \vtt{$x$ => $e$} & lambda expression \\
@@ -256,7 +261,11 @@ Blah, blah
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{operator'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
-  \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g., \vtt{/}, \vtt{<} \\
+  \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
+\ifunify  \else
+    \vtt{=},
+\fi
+    \vtt{/}, \vtt{<} \\
   \hline
 \end{tabular}
 \caption{Constructs that are just syntactic sugar}
@@ -333,10 +342,12 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \UnaryInfC{\defarrow{:$t$}{$t'$[def\{x\}in x]}{$D$}}
 \DisplayProof \defafter
 
+\ifunify
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
 \BinaryInfC{\defarrow{$e_1$=$e_2$}{$e'_1$=$e'_2$}{\defunion{D_1}{D_2}}}
 \DisplayProof \defafter
+\fi
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
@@ -416,13 +427,15 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e$}}}
-\UnaryInfC{\scinf{$\Gamma$}{\vtt{def $D$ in $e$}}}
+\UnaryInfC{\scinf{$\Gamma$}{\vtt{def\{$D$\}in $e$}}}
 \DisplayProof \defafter
 
+\ifunify
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$ = $e_2$}}}
 \DisplayProof \defafter
+\fi
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
@@ -452,12 +465,12 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
 \AxiomC{\scinf{$\Gamma$}{$e_3$}}
-\TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def $D$ in $e_1$) then $e_2$ else $e_3$}}}
+\TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def\{$D$\}in $e_1$) then $e_2$ else $e_3$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
-\BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def $D$ in $e_1$) $e_2$}}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def\{$D$\}in $e_1$) $e_2$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
@@ -495,9 +508,8 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \begin{figure}
   \begin{align*}
-    \tuple{v_1,\cdots,v_n} && \text{create a tuple} \\
-    \munit{v}              && \text{create a singleton sequence} \\
-    \mempty                && \text{empty sequence} \\
+    \tuple{v_1,\cdots,v_n} && \text{create a tuple,}\, n >= 0 \\
+    \munit{v_1,\cdots,v_n} && \text{create a sequence,}\, n >= 0 \\
     s_1 \malt s_2          && \text{sequence concatenation} \\
     \mcompr{e}{\mbind{x}{s}, \cdots} && \text{sequence comprehension} \\
     t_i                    && \text{index into a tuple} \\
@@ -513,7 +525,9 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
   \semapp{\cdot}{} &: Env \rightarrow Value^{*} \\
   \semeqn{x}{\munit{\rho(x)}}
   \semeqn{i}{\munit{i}}
+\ifunify
   \semeqn{e_1 \vtt{=} e_2}{\mathrm{lift}(\hat{=}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
+\fi
   \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
   \semeqn{e_1(e_2)}{\mathrm{lift}(\mathrm{call}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
   \semeqn{x \vtt{=>} e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
@@ -525,7 +539,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
   \semeqn{\vtt{if(}e_1\vtt{)\:then}\: e_2 \: \vtt{else}\: e_3}{
       \begin{cases*}
         \semapp{e_2}{\rho'} & if $\envapp{e_1}{s\, \rho} = \munit{\rho', \cdots}$ \\
-        \semapp{e_3}{\rho} & if $\envapp{e_1}{s\,\rho} = \mempty$
+        \semapp{e_3}{\rho} & otherwise
       \end{cases*}
       }
   \semeqn{\vtt{for(}e_1\vtt{)}e_2}{\mathrm{tuples}(\mcompr{\semapp{e_2}{\rho'}}{\mbind{\rho'}{\envapp{e_1}{\rho}}})}
@@ -537,21 +551,23 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
   \equa {
     \begin{aligned}
       \envapp{e}{\rho} =
-      \rho \circ  \{ & x_1 \mapsto \semapp{\vtt{(}e\vtt{,}\, x_1\vtt{)[1]} }{\rho}, \\
-                  & \cdots, \\
-                  & x_n \mapsto \semapp{\vtt{(}e\vtt{,}\, x_n\vtt{)[1]} }{\rho} \}  \\
-      & \mathrm{where}\, e = \vtt{def\{}x_1,\cdots,x_n\vtt{\} in}\,\_ \hfill
+      \rho \circ  \{ & x_1 \mapsto \semapp{\vtt{def\{}x_1,\cdots,x_n\vtt{\} in (}e',x_1\vtt{)[1]}}{\rho}, \\
+                     & \cdots, \\
+                     & x_n \mapsto \semapp{\vtt{def\{}x_1,\cdots,x_n\vtt{\} in (}e',x_n\vtt{)[1]}}{\rho}, \\
+      & \mathrm{where}\, e = \vtt{def\{}x_1,\cdots,x_n\vtt{\} in}\,e'
     \end{aligned}
     }
   
   \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{v}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}, \mbind{v}{f(v_1, v_2)}}}
 
+\ifunify
   \equa{\hat{f}(x,y) =
     \begin{cases*}
       \munit{x} & if $f(x,y)$ \\
       \mempty & otherwise
     \end{cases*}
     }
+\fi
 
   \equa{\mathrm{apply}(f,x) = 
       \begin{cases*}
@@ -591,7 +607,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \newcommand{\checkcase}[3]{\begin{cases*} #1 & if $#2$ \\ #3 & otherwise \end{cases*}}
 
-\begin{figure}
+\begin{table}
   \begin{tabular}{|l|l|}
     \hline
     Name & Semantic value \\
@@ -601,11 +617,16 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \vtt{int} & $x \mapsto \checkcase{\munit{x}}{x \in \mathbb{Z}}{\mempty} $ \\
     \vtt{operator'+'} & $x \mapsto \checkcase{\munit{x_1+x_2}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}}{\mempty}$ \\
     \vtt{operator'/'} & $x \mapsto \checkcase{\munit{\frac{x_1}{x_2}}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}, x_2 \ne 0}{\mempty}$ \\
+\ifunify
+\else
+    \vtt{operator'='}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 = x_2}{\mempty}$ \\
+\fi
+    \vtt{operator'<'}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 < x_2}{\mempty}$ \\
     \hline
   \end{tabular}
-\caption{Predefine identifiers}
+\caption{Some predefined identifiers}
 \label{predefined}
-\end{figure}
+\end{table}
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
