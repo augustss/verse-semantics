@@ -8,7 +8,7 @@ all:	$(FWVERSE)
 
 $(FWVERSE):	*.hs
 	@mkdir -p $(FWTMP)
-	ghc --make -odir $(FWTMP) -o $(FWVERSE) $(PACKAGES) Main.hs
+	ghc -O2 --make -odir $(FWTMP) -o $(FWVERSE) $(PACKAGES) Main.hs
 
 test:	$(FWVERSE) runtest.sh tests/*.verse
 	@sh runtest.sh $(FWVERSE) dump-parse allExprs

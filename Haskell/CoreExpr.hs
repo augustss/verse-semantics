@@ -15,7 +15,7 @@ import Data.Generics.Uniplate.Data
 import Data.List
 
 import qualified ParseExpr as P
-import ParseExpr(Ident)
+import ParseExpr(Ident(..))
 
 -- After desugaring
 data Expr

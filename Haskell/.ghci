@@ -3,3 +3,4 @@
 :set -package mtl
 :set -package uniplate
 :set -package optparse-applicative
+:set -package smallcheck

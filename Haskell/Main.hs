@@ -12,6 +12,8 @@ import Parse
 import Scope
 import CoreExpr(flattenSeqs)
 import Eval
+import Value
+import Opt
 
 pp :: (Pretty a) => a -> IO ()
 pp = putStrLn . prettyShow
@@ -25,6 +27,8 @@ data VerseOptions = VerseOptions {
   dumpExtrude :: !Bool,
   dumpScope :: !Bool,
   dumpCleanup :: !Bool,
+  dumpOpt :: !Bool,
+  dumpEval :: !Bool,
   inputFile :: !String
   }
   deriving (Show)
@@ -56,6 +60,14 @@ verseOptions = VerseOptions
       ( long "dump-cleanup"
      <> help "dump after cleanup"
       )
+  <*> switch
+      ( long "dump-opt"
+     <> help "dump after opt"
+      )
+  <*> switch
+      ( long "dump-eval"
+     <> help "dump after evaluation"
+      )
   <*> argument str (metavar "FILE")
 
 verseInfo :: ParserInfo VerseOptions
@@ -75,6 +87,8 @@ main = do
       eExtrude = extrude eDesugar
       eScope = scopeCheck eExtrude
       eCleanup = flattenSeqs eScope
+      eOpt = optimize eCleanup
+      eEval = runE $ eval initialEnv eOpt
       dump d e = do
         when d $ do
           when verbose $
@@ -85,6 +99,8 @@ main = do
   dump dumpExtrude eExtrude
   dump dumpScope eScope
   dump dumpCleanup eCleanup
+  dump dumpOpt eOpt
+  dump dumpEval eEval
 
 comp :: String -> IO ()
 comp = pp . flattenSeqs . scopeCheck . extrude . desugar . parseString
