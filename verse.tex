@@ -66,6 +66,8 @@
 \usepackage{stmaryrd}
 \usepackage{mathtools}
 \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \Cref
 
 % Boxed figures
 \usepackage{float}
@@ -199,10 +201,84 @@
 
 \section{Introduction}
 
-\section{Primitives}
-Blah, blah
+\section{A short introduction to Verse}
 
-\begin{table}
+Verse is primarily a dynamically-typed functional language: the main syntactic construct is the \emph{expression}.
+
+\subsection{Expressions yield multiple values}
+
+Verse's most salient and unusual feature is that an expression yields a (possibly-empty) \emph{sequence of values}.
+For example:
+\begin{itemize}
+\item The expression \vtt{2} yields (a sequences consisting of) exactly one value, namely $2$.
+\item The expression \vtt{(2 | 7 | 2)} yields a sequence of three values, namely $2$, $7$, and $2$.  We write this sequence $[2,7,2]$.
+In general, the expression \vtt{($e_1$ | $e_2$)} yields all the values of $e_1$ followed by all the values of $e_2$.
+\item The expression \vtt{fail} yields no values at all, the empty sequence $[]$.  \simon{It's not \vtt{fail} is it? What is it?}
+\end{itemize}
+
+An expression that yields no values is said to \emph{fail}; it if returns one or more, it is said to \emph{succeed}.
+
+The semicolon operator propagates failure.
+Specifically, the expression \vtt{($e_1$ ; $e_2$)}
+fails if $e_1$ fails; and otherwise yields $e_2$. \simon{Is this right?  For example, consider
+\vtt{((1 | 2) ; (3 | 4))}.  Does that yield $[3,4]$, or does it yield $[3,4,3,4]$?  The desugaring in Fig 2 suggests the latter...}
+
+\subsection{Function application is lifted over the argment sequences}
+\label{sec:lifting}
+
+All functions are lifted to work over sequences, by taking the Cartesian product of their argument sequences.
+For example, the expression \vtt{($e_1$ + $e_2$)} returns the sequence of all values $v_1 + v_2$ where
+$v_1$ is drawn from the sequence yielded by $e_1$, and
+$v_2$ is drawn from the sequence yielded by $e_2$.
+Thus \vtt{(2 | 7) + (4 | 11)} evaluates to the sequence $[6, 13, 11, 18]$.
+
+From this lifting semantics, you can see that failure propagates
+upward; for example, \vtt{(fail + $e$)} fails for any $e$, since there
+are no values $v_1$ returned by \vtt{fail}.
+
+\subsection{Comparisons and conditionals} \label{sec:bool}
+
+In Verse, there are no Boolean values \vtt{true} and \vtt{false}.  Instead, in a conditional \vtt{if $e_1$ then $e_2$ else $e_3$},
+if $e_1$ fails (yields no values), the conditional returns $e_3$.  If $e_1$ returns one or more values, the conditional returns $e_2$.
+
+The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, use the same idiom: \vtt{($e_1$ < $e_2$)} returns $e_2$ if the condition
+holds, and fails if it does not.  That makes \vtt{(if (3 > 4) then 10 else 20)} return $20$ as you would expect.
+
+Amusingly, this semantics allows us to write
+\vtt{(0 < x < 10)}, an expression that succeeds (returning $10$) if and only if \vtt{x} is between 0 and 10.
+This only works because \vtt{(<)} is left associative, so the expression means \vtt{(0<x) < 10}. (Exercise for the reader:
+what does \vtt{0 < (x<10)} do?
+
+What if $e_1$ and/or $e_2$ return a sequence of values?  Remembering the lifting semantics of \Cref{sec:lifting},
+we take all pairs of values $(v_1,v_2)$ yielded by $e_1$ and $e_2$.  For each such pair, if $v_1 < v_2$ return $v_2$,
+otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yeilds the sequence $[2,10,10]$.
+
+\subsection{Variables}
+
+In functional programming, a variable is bound to a specified immutable value as soon as it comes into scope.
+Not so in Verse.  Instead, a variable is brought into scope \emph{without a specified value}.  Here is an example:
+\begin{verbatim}
+  def x in x + (x = 7; 5)
+\end{verbatim}
+The construct \vtt{def x in $e$} brings \vtt{x} into scope in $e$.  Its semantics is unusual: the expression
+\vtt{def x in $e$} binds $x$ successively to \emph{all possible values}, and returns all the values yielded
+by $e$ under those bindings.  For which value(s) of \vtt{x} will the expression succeed?  Answer: because of the
+\vtt{x=7} in the second argument of the \vtt{+}, all execuctions will fail except the one that binds \vtt{x}
+to $7$.  So the expression yields just one value, namely 12.
+
+Of course, no implementation could possibly work by binding \vtt{x} to every possible value and
+evaluating $e$ -- there are an infinite set of such values.  But that is the semantics.
+Notice that there is nothing special about \vtt{(=)}; it is just the ordinary equality operator
+described in \Cref{sec:bool}.
+
+It is easy to write an expression that will give any implementation a heart attack;
+for example \vtt{def x in x} returns a sequence of all possible values.
+
+In Verse, although an expression yields multiple values, a variable is always bound to a single value.
+
+\begin{figure}
+
+\begin{tabular}{c}
 \begin{tabular}{|l|l|}
   \hline
   Notation &  \\
@@ -212,11 +288,9 @@ Blah, blah
   $i$ & natural number literal \\
   \hline
 \end{tabular}
-\caption{Notation}
-\end{table}
 
+\\ \\[2mm]
 
-\begin{table}
 \begin{tabular}{|l|l|}
   \hline
   Expression & Comment \\
@@ -237,11 +311,14 @@ Blah, blah
   \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
   \hline
 \end{tabular}
+\end{tabular}
+
 \caption{Core expressions}
-\end{table}
+\end{figure}
 
-
-\begin{table}
+\begin{figure}
+\begin{tabular}{c}
+Constructs that are just syntactic sugar \\
 \begin{tabular}{|l|l|l|}
   \hline
   Syntactic sugar (macro) & Expansion & Comment \\
@@ -268,10 +345,8 @@ Blah, blah
     \vtt{/}, \vtt{<} \\
   \hline
 \end{tabular}
-\caption{Constructs that are just syntactic sugar}
-\end{table}
-
-\begin{table}
+\\ \\
+Constructs that are eliminated by extrusion \\
 \begin{tabular}{|l|l|}
   \hline
   Primitive & Comment \\
@@ -282,8 +357,9 @@ Blah, blah
   \vtt{do $e$} & limit scope \\
   \hline
 \end{tabular}
-\caption{Constructs that are eliminated by extrusion}
-\end{table}
+\end{tabular}
+\caption{Syntactic sugar}
+\end{figure}
 
 \begin{table}
 \begin{tabular}{|l|l|}
