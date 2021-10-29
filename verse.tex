@@ -201,19 +201,22 @@
 
 \section{Introduction}
 
+\lennart{Should we make all examples be valid actual Verse?  Possibly adding def{x}in.}
+
 \section{A short introduction to Verse}
 
-Verse is primarily a dynamically-typed functional language: the main syntactic construct is the \emph{expression}.
+Verse is a statically typed functional-logic language: the main syntactic construct is the \emph{expression}.
 
 \subsection{Expressions yield multiple values}
 
 Verse's most salient and unusual feature is that an expression yields a (possibly-empty) \emph{sequence of values}.
+\lennart{Sequences is a semantic concept; not something at the language level.}
 For example:
 \begin{itemize}
 \item The expression \vtt{2} yields (a sequences consisting of) exactly one value, namely $2$.
 \item The expression \vtt{(2 | 7 | 2)} yields a sequence of three values, namely $2$, $7$, and $2$.  We write this sequence $[2,7,2]$.
 In general, the expression \vtt{($e_1$ | $e_2$)} yields all the values of $e_1$ followed by all the values of $e_2$.
-\item The expression \vtt{fail} yields no values at all, the empty sequence $[]$.  \simon{It's not \vtt{fail} is it? What is it?}
+\item The expression \vtt{:false} yields no values at all, the empty sequence $[]$.
 \end{itemize}
 
 An expression that yields no values is said to \emph{fail}; it if returns one or more, it is said to \emph{succeed}.
@@ -233,30 +236,31 @@ $v_2$ is drawn from the sequence yielded by $e_2$.
 Thus \vtt{(2 | 7) + (4 | 11)} evaluates to the sequence $[6, 13, 11, 18]$.
 
 From this lifting semantics, you can see that failure propagates
-upward; for example, \vtt{(fail + $e$)} fails for any $e$, since there
+upward; for example, \vtt{(:fail + $e$)} fails for any $e$, since there
 are no values $v_1$ returned by \vtt{fail}.
 
 \subsection{Comparisons and conditionals} \label{sec:bool}
 
 In Verse, there are no Boolean values \vtt{true} and \vtt{false}.  Instead, in a conditional \vtt{if $e_1$ then $e_2$ else $e_3$},
 if $e_1$ fails (yields no values), the conditional returns $e_3$.  If $e_1$ returns one or more values, the conditional returns $e_2$.
+\cite{Icon}
 
-The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, use the same idiom: \vtt{($e_1$ < $e_2$)} returns $e_2$ if the condition
+The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, use the same idiom: \vtt{($e_1$ < $e_2$)} returns $e_1$ if the condition
 holds, and fails if it does not.  That makes \vtt{(if (3 > 4) then 10 else 20)} return $20$ as you would expect.
 
 Amusingly, this semantics allows us to write
 \vtt{(0 < x < 10)}, an expression that succeeds (returning $10$) if and only if \vtt{x} is between 0 and 10.
-This only works because \vtt{(<)} is left associative, so the expression means \vtt{(0<x) < 10}. (Exercise for the reader:
-what does \vtt{0 < (x<10)} do?
+This only works because \vtt{(<)} is right associative, so the expression means \vtt{0 < (x<10)}. (Exercise for the reader:
+what does \vtt{(0<x) < 10)} do?
 
 What if $e_1$ and/or $e_2$ return a sequence of values?  Remembering the lifting semantics of \Cref{sec:lifting},
 we take all pairs of values $(v_1,v_2)$ yielded by $e_1$ and $e_2$.  For each such pair, if $v_1 < v_2$ return $v_2$,
-otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yeilds the sequence $[2,10,10]$.
+otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yeilds the sequence $[1,1,8]$.
 
 \subsection{Variables}
 
 In functional programming, a variable is bound to a specified immutable value as soon as it comes into scope.
-Not so in Verse.  Instead, a variable is brought into scope \emph{without a specified value}.  Here is an example:
+Not so in Verse.  Instead, a variable can be brought into scope \emph{without a specified value}.  Here is an example:
 \begin{verbatim}
   def x in x + (x = 7; 5)
 \end{verbatim}
