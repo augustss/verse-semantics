@@ -283,22 +283,11 @@ In Verse, although an expression yields multiple values, a variable is always bo
 \begin{figure}
 
 \begin{tabular}{c}
-\begin{tabular}{|l|l|}
-  \hline
-  Notation &  \\
-  \hline
-  $x$ & variable \\
-  $e,f,t$ & expression \\
-  $i$ & natural number literal \\
-  \hline
-\end{tabular}
-
-\\ \\[2mm]
 
 \begin{tabular}{rcll}
   $e$ & ::= &
     $x$ & use variable \\
-  && $i$ & literal \\
+  && $k$ & constant \\
 \ifunify
   && \vtt{$e_1$ = $e_2$} & unification \\
 \fi
@@ -310,11 +299,19 @@ In Verse, although an expression yields multiple values, a variable is always bo
   && \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   && \vtt{for ($e_1$) $e_2$} & array formation \\
   && \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+$k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
+  && $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
+  && $ \vtt{op'+'} \;|\; \vtt{op'-'} \;|\; \vtt{op'<'} \;|\; \cdots$ & predefined constants \\
+  && $ \vtt{op';'} $ & predefined constants \\
 \end{tabular}
 \end{tabular}
 
 \caption{Core expressions}
 \end{figure}
+
+% Use alternate definition for {}
+% \newcommand{\vseq}[1]{\{#1\}}
+\newcommand{\vseq}[1]{#1}
 
 \begin{figure}
 \begin{tabular}{c}
@@ -326,16 +323,15 @@ Constructs that are just syntactic sugar \\
   \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
   \vtt{typedef\{$e$\}} & \vtt{(x:any) => x = $e$} & \vtt{x} fresh \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
-  \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]\}} & \vtt{x} fresh \\
-  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
+  \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
+%%  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
   \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & {\it maybe not the right scope rules} \\
-  \vtt{$e_1$ \&\& $e_2$} & \vtt{\{$e_1$; $e_2$\}} & {\it an alternate definition} \\
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} & {\it an alternate definition} \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
   \hline \hline
-  \vtt{$e_1$:$t$ := $e_2$} & \vtt{$e_1$ := $t$[$e_2$]} & \\
-  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]\}} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \{ x = $e_1$; $e_2$ \}} & \vtt{x} fresh \\
+  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\vseq{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]}} & \vtt{x} fresh \\
+  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \vseq{ x = $e_1$; $e_2$ }} & \vtt{x} fresh \\
   \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{operator'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
