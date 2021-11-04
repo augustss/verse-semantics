@@ -377,58 +377,69 @@ The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
 but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \begin{figure}
-
+\vspace*{4mm}
 \AxiomC{~}
+\RightLabel{VAR}
 \UnaryInfC{\defarrow{$x$}{$x$}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{~}
-\UnaryInfC{\defarrow{$i$}{$i$}{\defempty}}
+\RightLabel{CON}
+\UnaryInfC{\defarrow{$k$}{$k$}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$e$}{$e'$}{$D$}}
+\RightLabel{DEF}
 \UnaryInfC{\defarrow{$x$ := $e$}{$x$ = $e'$}{\defunion{D}{\defset{x}}}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$t$}{$t'$}{$D$}}
+\RightLabel{RNG}
 \UnaryInfC{\defarrow{:$t$}{$t'$[def\{x\}in x]}{$D$}}
 \DisplayProof \defafter
 
 \ifunify
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\RightLabel{UNI}
 \BinaryInfC{\defarrow{$e_1$=$e_2$}{$e'_1$=$e'_2$}{\defunion{D_1}{D_2}}}
 \DisplayProof \defafter
 \fi
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\RightLabel{APP}
 \BinaryInfC{\defarrow{$e_1$[$e_2$]}{$e'_1$[$e'_2$]}{\defunion{D_1}{D_2}}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
+\RightLabel{APP'}
 \BinaryInfC{\defarrow{$e_1$($e_2$)}{$e'_1$($e'_2$)}{\defunion{D_1}{D_2}}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e$}{$e'$}}
+\RightLabel{LAM}
 \UnaryInfC{\defarrow{$x$=>$e$}{$x$=>$e'$}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
+\RightLabel{ALT}
 \BinaryInfC{\defarrow{$e_1$|$e_2$}{$e'_1$|$e'_2$}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{$\cdots$}
 \AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
+\RightLabel{ARR}
 \TrinaryInfC{\defarrow{$e_1$,$\cdots$,$e_n$}{$e'_1$,$\cdots$,$e'_n$}{\defunions{D_i}}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
 \AxiomC{\defdefin{$e_3$}{$e'_3$}}
+\RightLabel{IF}
 \TrinaryInfC{\defarrow{if($e_1$) then $e_2$ else $e_3$}{if($e'_1$) then $e'_2$ else $e'_3$}{\defempty}}
 \DisplayProof
 \\ The variables defined in the condition are also in scope in the \vtt{then} branch.
@@ -436,6 +447,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
+\RightLabel{FOR}
 \BinaryInfC{\defarrow{for($e_1$) $e_2$}{for($e'_1$) $e'_2$}{\defempty}}
 \DisplayProof
 \\ The variables defined in the domain are also in scope in body.
@@ -444,21 +456,25 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
 \AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
 \AxiomC{\defunique{D_1}}
+\RightLabel{LET}
 \TrinaryInfC{\defarrow{let ($e_1$) in $e_2$}{def\{$D_1$\} in \{$e'_1$; $e'_2$\}}{$D_2$}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e$}{$e'$}}
+\RightLabel{DO}
 \UnaryInfC{\defarrow{do $e$}{$e'$}{\defempty}}
 \DisplayProof \defafter
 
-\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
-\AxiomC{$\cdots$}
-\AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
-\TrinaryInfC{\defarrow{\{$e_1$;$\cdots$;$e_n$\}}{\{$e'_1$;$\cdots$;$e'_n$\}}{\defunions{D_i}}}
-\DisplayProof \defafter
+% sequencing
+%\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
+%\AxiomC{$\cdots$}
+%\AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
+%\TrinaryInfC{\defarrow{\{$e_1$;$\cdots$;$e_n$\}}{\{$e'_1$;$\cdots$;$e'_n$\}}{\defunions{D_i}}}
+%\DisplayProof \defafter
 
 \AxiomC{\defarrow{$e$}{$e'$}{$D$}}
 \AxiomC{\defunique{D}}
+\RightLabel{DEF}
 \BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
@@ -471,14 +487,17 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \newcommand{\scinf}[2]{#1 $\vdash$ #2}
 
 \AxiomC{$x \in \Gamma$}
+\RightLabel{VAR}
 \UnaryInfC{\scinf{$\Gamma$}{$x$}}
 \DisplayProof \defafter
 
 \AxiomC{}
-\UnaryInfC{\scinf{$\Gamma$}{$i$}}
+\RightLabel{CON}
+\UnaryInfC{\scinf{$\Gamma$}{$k$}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e$}}}
+\RightLabel{DEF}
 \UnaryInfC{\scinf{$\Gamma$}{\vtt{def\{$D$\}in $e$}}}
 \DisplayProof \defafter
 
@@ -491,45 +510,52 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\RightLabel{APP}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$[$e_2$]}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\RightLabel{APP'}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$($e_2$)}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup \{x\}$}{\vtt{$e$}}}
+\RightLabel{LAM}
 \UnaryInfC{\scinf{$\Gamma$}{\vtt{$x$ => $e$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
+\RightLabel{ALT}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$ | $e_2$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{$\cdots$}
 \AxiomC{\scinf{$\Gamma$}{$e_n$}}
+\RightLabel{ARR}
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$, $\cdots$, $e_n$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
 \AxiomC{\scinf{$\Gamma$}{$e_3$}}
+\RightLabel{IF}
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def\{$D$\}in $e_1$) then $e_2$ else $e_3$}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
+\RightLabel{FOR}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def\{$D$\}in $e_1$) $e_2$}}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma$}{$e_1$}}
-\AxiomC{$\cdots$}
-\AxiomC{\scinf{$\Gamma$}{$e_n$}}
-\TrinaryInfC{\scinf{$\Gamma$}{\vtt{\{$e_1$; $\cdots$; $e_n$\}}}}
-\DisplayProof \defafter
+%\AxiomC{\scinf{$\Gamma$}{$e_1$}}
+%\AxiomC{$\cdots$}
+%\AxiomC{\scinf{$\Gamma$}{$e_n$}}
+%\TrinaryInfC{\scinf{$\Gamma$}{\vtt{\{$e_1$; $\cdots$; $e_n$\}}}}
+%\DisplayProof \defafter
 
 \caption{Scoping rules}
 \label{scoping-rules}
