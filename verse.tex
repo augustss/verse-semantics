@@ -333,8 +333,8 @@ Constructs that are just syntactic sugar \\
   \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\vseq{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]}} & \vtt{x} fresh \\
   \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \vseq{ x = $e_1$; $e_2$ }} & \vtt{x} fresh \\
   \hline \hline
-  \vtt{$e_1 \oplus e_2$} & \vtt{operator'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
-  \vtt{$e_1 \oslash e_2$} & \vtt{operator'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
+  \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
+  \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
 \ifunify  \else
     \vtt{=},
 \fi
@@ -356,26 +356,6 @@ Constructs that are eliminated by extrusion \\
 \end{tabular}
 \caption{Syntactic sugar}
 \end{figure}
-
-\begin{table}
-\begin{tabular}{|l|l|}
-  \hline
-  Predefined name & Comment \\
-  \hline
-  \vtt{int} & identity on the integers \\
-  \vtt{type} & identity on types \\
-  \vtt{any} & identity function \\
-  \vtt{array} & array type \\
-  \vtt{tuple} & tuple type \\
-  \vtt{arrow} & function type \\
-  \vtt{wrong} & semantic error \\
-  ... & ... \\
-  \vtt{false} & \vtt{= ()} \\
-  \vtt{void} & \vtt{= (:any) => false} \\
-  \hline
-\end{tabular}
-\caption{Predefined identifiers}
-\end{table}
 
 \newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
 \newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
@@ -589,6 +569,19 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     t_i                    && \text{index into a tuple} \\
     \mathrm{size}(t)       && \text{number of elements in a tuple}
   \end{align*}
+  \begin{multline*}
+    \mathrm{tuples}(\munit{
+      \munit{v_{11},v_{12},\cdots,v_{1n_1}},
+      \munit{v_{21},v_{22},\cdots,v_{2n_2}},
+      \cdots,
+      \munit{v_{m1},v_{m2},\cdots,v_{mn_m}}}) = \\
+    \munit{
+      \tuple{v_{11},v_{21},\cdots,v_{m1}},
+      \tuple{v_{11},v_{21},\cdots,v_{m2}},
+      \cdots,
+      \tuple{v_{1n_1},\cdots,v_{mn_m}}}
+  \end{multline*}
+
 \caption{Semantic notation}
 \label{semantic-notation}
 \end{figure}
@@ -658,20 +651,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
       \end{cases*}
   }
 
-  \begin{multline*}
-    \mathrm{tuples}(\munit{
-      \munit{v_{11},v_{12},\cdots,v_{1n_1}},
-      \munit{v_{21},v_{22},\cdots,v_{2n_2}},
-      \cdots,
-      \munit{v_{m1},v_{m2},\cdots,v_{mn_m}}}) = \\
-    \munit{
-      \tuple{v_{11},v_{21},\cdots,v_{m1}},
-      \tuple{v_{11},v_{21},\cdots,v_{m2}},
-      \cdots,
-      \tuple{v_{1n_1},\cdots,v_{mn_m}}}
-  \end{multline*}
-
-  \lennart{This is all slighly wrong, since it doesn't propagate WRONG correctly.
+  \lennart{This is all slightly wrong, since it doesn't propagate WRONG correctly.
     Perhaps * should be a monad that can throw an exception when something is WRONG.
   }
 
@@ -704,16 +684,17 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
     \vtt{arrow} & $ t \mapsto u \mapsto f \mapsto x \mapsto $ \\
          & $ \quad \checkcase{\mcompr{v}{\mbind{y}{t(x)}, \mbind{z}{f(y)}, \mbind{v}{u(z)}}}{\isfunction{t}, \isfunction{u}, \isfunction{f}}{\mempty}
                   $ \\
-    \vtt{operator'+'} & $x \mapsto \checkcase{\munit{x_1+x_2}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}}{\mempty}$ \\
-    \vtt{operator'/'} & $x \mapsto \checkcase{\munit{\frac{x_1}{x_2}}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}, x_2 \ne 0}{\mempty}$ \\
+    \vtt{op'+'} & $x \mapsto \checkcase{\munit{x_1+x_2}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}}{\mempty}$ \\
+    \vtt{op'/'} & $x \mapsto \checkcase{\munit{\frac{x_1}{x_2}}}{x = \tuple{x_1,x_2}, x_1 \in \mathbb{Z}, x_2 \in \mathbb{Z}, x_2 \ne 0, \frac{x_1}{x_2} \in \mathbb{Z}}{\mempty}$ \\
 \ifunify
 \else
-    \vtt{operator'='}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 = x_2}{\mempty}$ \\
+    \vtt{op'='}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 = x_2}{\mempty}$ \\
 \fi
-    \vtt{operator'<'}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 < x_2}{\mempty}$ \\
+    \vtt{op'<'}  & $x \mapsto \checkcase{\munit{x_1}}{x = \tuple{x_1,x_2}, x_1 < x_2}{\mempty}$ \\
+    \vtt{op';'}  & $x \mapsto \checkcase{\munit{x_2}}{x = \tuple{x_1,x_2}}{\mempty}$ \\
     \hline
   \end{tabular}
-\caption{Some predefined identifiers.  Note that several of these could be defined in Verse}
+\caption{Some predefined constants.  Note that several of these could be defined in Verse}
 \label{predefined}
 \end{table}
 
