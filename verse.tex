@@ -295,25 +295,21 @@ In Verse, although an expression yields multiple values, a variable is always bo
 
 \\ \\[2mm]
 
-\begin{tabular}{|l|l|}
-  \hline
-  Expression & Comment \\
-  \hline
-  $x$ & use variable \\
-  $i$ & literal \\
+\begin{tabular}{rcll}
+  $e$ & ::= &
+    $x$ & use variable \\
+  && $i$ & literal \\
 \ifunify
-  \vtt{$e_1$ = $e_2$} & unification \\
+  && \vtt{$e_1$ = $e_2$} & unification \\
 \fi
-  \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  \vtt{$x$ => $e$} & lambda expression \\
-  \vtt{$e_1$ | $e_2$} & alternative \\
-  \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also $ n = 0$ in some syntactic contexts \\
-  \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  \vtt{for ($e_1$) $e_2$} & array formation \\
-  \hline
-  \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
-  \hline
+  && \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  && \vtt{$e_1$($e_2$)} & function application, may not fail \\
+  && \vtt{$x$ => $e$} & lambda expression \\
+  && \vtt{$e_1$ | $e_2$} & alternative \\
+  && \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  && \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  && \vtt{for ($e_1$) $e_2$} & array formation \\
+  && \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
 \end{tabular}
 \end{tabular}
 
