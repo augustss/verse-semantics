@@ -69,6 +69,21 @@
 \usepackage{verbatim}
 \usepackage[capitalize]{cleveref}   % \Cref
 
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+\usepackage{lmodern}
+\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+\DeclareFontShape{T1}{lmttc}{m}{n}
+     {<-> ec-lmtlc10}{}
+\DeclareFontShape{T1}{lmttc}{m}{it}
+     {<->sub*lmttc/m/sl}{}
+\DeclareFontShape{T1}{lmttc}{m}{sl}
+     {<-> ec-lmtlco10}{}
+\renewcommand{\ttdefault}{lmttc}
+
 % Boxed figures
 \usepackage{float}
 \floatstyle{boxed}
