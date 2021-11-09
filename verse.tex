@@ -91,7 +91,7 @@
 \newcommand{\lennart}[1]{}
 \fi
 
-\newcommand{\vtt}[1]{{\tt #1}}
+\newcommand{\vtt}[1]{\text{\tt #1}}
 
 \begin{document}
 
@@ -205,11 +205,22 @@
 
 \section{A short introduction to Verse}
 
-Verse is a statically typed functional-logic language: the main syntactic construct is the \emph{expression}.
+This section gives an informal introduction to Verse, leaving a formal description
+for subsequent sections.
+
+Verse is a statically typed functional-logic language: the main
+syntactic construct is the \emph{expression}.  Some expressions are
+part of \emph{Core Verse}, defined in \Cref{fig:core}.  Others are
+mere syntactic sugar, which can be described by translation into
+simpler constructs (see \Cref{fig:sugar}). This Figure covers two
+forms of syntactic sugar: sugar that can be translated with a local rewrite;
+and sugar that requires some care with scoping when translating.  The
+latter is dealt with by \emph{scope extrusion}, which we discuss in
+\Cref{sec:extrusion}.
 
 \subsection{Expressions yield multiple values}
 
-Verse's most salient and unusual feature is that an expression yields a (possibly-empty) \emph{sequence of values}.
+Verse's most salient and unusual feature is that \emph{an expression yields a (possibly-empty) sequence of values}.
 \lennart{Sequences is a semantic concept; not something at the language level.}
 For example:
 \begin{itemize}
@@ -234,7 +245,7 @@ From this lifting semantics, you can see that failure propagates
 upward; for example, \vtt{(:false + $e$)} fails for any $e$, since there
 are no values $v_1$ returned by \vtt{:false}.
 
-The semicolon operator is an ordinary binary operator that simply returns its right-hand argument. Because of the lifting semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{:false ; e} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
+The semicolon operator is an ordinary binary operator that simply returns its right-hand argument. Because of the lifting semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{(:false ; $e$)} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
 
 
 \subsection{Comparisons and conditionals} \label{sec:bool}
@@ -259,6 +270,8 @@ we take all pairs of values $(v_1,v_2)$ yielded by $e_1$ and $e_2$.  For each su
 otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yields the sequence $[1,1,8]$.
 
 \subsection{Variables}
+\label{sec:any} % for def x in x
+\label{sec:variables}
 
 In functional programming, a variable is bound to a specified immutable value as soon as it comes into scope.
 Not so in Verse.  Instead, a variable can be brought into scope \emph{without a specified value}.  Here is an example:
@@ -282,18 +295,22 @@ evaluating $e$ -- there are infinitely many such values.  But that is the semant
 Notice that there is nothing special about \vtt{(=)}; it is just the ordinary equality operator
 described in \Cref{sec:bool}.
 
-It is easy to write an expression that yields too many values;
-for example \vtt{def x in x} returns a sequence of all possible values.
+It is easy to write an expression that yields an infinite sequence of values,
+by omitting all equalities.
+For example \vtt{def x in x} returns a sequence of all possible values.
 
-Verse allows you to omit the \vtt{def} entirely; you may write, for example,
-\vtt{(x + (x=7; 5)}.
-There are simple, static rules that explain exactly where to place any missing \vtt{def}s,
+\paragraph{Scoping.} Verse allows you to omit the \vtt{def} entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitteing the \vtt{def}:
+\vtt{(x + (x:=7; 5)}.
+The binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
+Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s,
 as we describe in \Cref{sec:scope}.
+In pracical Verse code, however, a programmer will typically write an equality before any uses;
+so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 
-In pracical Verse code, a programmer will typically write an equality before any uses;
-so \vtt{(x=7; x+5)} would be a more typical way to write our running example.
 
-\subsection{Functions and application}
+
+
+\subsection{Lambdas and application} \label{sec:application}
 
 Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
 Function application is lifted, just like any other binary operator, but comes in two forms:
@@ -302,20 +319,60 @@ Function application is lifted, just like any other binary operator, but comes i
 
 \item \vtt{$e_1$($e_2$)} is exactly the same, except that \simon{except that what, specifically}.
 \end{itemize}
+For example, the call \vtt{(x => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
+More generally, Verse enjoys a form of the beta-rule, thus
+$$
+\begin{array}{rcl}
+\vtt{(x => $body$)[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
+                           & \equiv & \vtt{def x in x=$arg$; $body$}
+\end{array}
+$$
+That is, the lambda reduces to a \vtt{def} that brings \vtt{x} into scope; an equality \vtt{x=$arg$} that binds \vtt{x} successively to the values yielded by $arg$; before finally returning $body$.
+The two right-hand sides above are equivalent, via the desugaring of \vtt{:=} (\Cref{sec:variables}).
+
+\subsection{Let-bindings}
+
+Unusually, in Verse a \vtt{let} binding takes an \emph{expression} not a \emph{binding}.  Thus we have \vtt{(let $e_1$ in $e_2$)}.  For example, \vtt{let x := p*q in x+x}. But this \vtt{let}-expression is simply syntactic sugar for
+\begin{center}
+  \vtt{def x in x = p*q ; x+x}
+\end{center}
+That is, we bring \vtt{x} into scope with the \vtt{def}; then constrain it to be equal to \vtt{p+q}; and return \vtt{x+x}.
+
+A \vtt{let} may bind many variables.  For example
+$$
+\begin{array}{l}
+  \vtt{let (x:=7+y; y:=10) in x+y} \\
+  \equiv \vtt{def \{x,y\} in (x=7+y; y=10) ; x+y}
+\end{array}
+$$
+
+In principle, the \vtt{def} binds \vtt{x} and \vtt{y} to (all combinations of) all possible values;
+but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \vtt{x=7+y} makes
+  execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
+  as you would expect.
+
+\simon{I can use comma or semicolon in a 'let', can't I?  It makes no difference.}
+
+A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
+
+In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
+\begin{center}
+  \vtt{let x:=7 + (y:=10) in x+y}
+\end{center}  
+Here the binding for \vtt{y} is buried inside the argument to ``vtt{+}''.  We will formalise the scoping rules in \Cref{sec:extrusion}.
 
 \subsection{Types}
 
-Verse is designed to be statically type-checked; but the ``type system'' is actually
-just more Verse code, so the type checker is necessarily partial.
-
+Verse is designed to be statically type-checked.
 As in any typed language, a type describes as set of values.  In
-Verse, a ``type'' is just a particular sort of Verse expression.
+Verse, unusually, \emph{a ``type'' is just a particular sort of Verse expression}.
 Specifically a type is a partial identity function;
 it fails on values that do not belong to the type, and is the identity function (returning a singleton sequence) for the values that do belong.  A mathematician would call it the
-\emph{characteristic function} of the set of values; a denotational semantics person might call it a \emph{retraction}. So:
+\emph{characteristic function} of the set of values; a denotational semantics person might call it a \emph{retraction}. So, for example:
 \begin{itemize}
 \item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an ingeter; and fails otherwise.
-\item \vtt{false} is the function that always fails.
+\item \vtt{false} is the function that always fails; \vtt{false} denotes the empty set of values.
+\simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
 \item The function \vtt{(x => x>0)} is the type of positive integers.  Since \vtt{x>0} succeeds, returning {x} for integers greater than zero, if we lambda-abstract over \vtt{x} we get a partial identity function.
 \item The function \vtt{(x,y) => (x>y); (x,y)} is the type of pairs in which the second component is less than the first.
 \end{itemize}
@@ -323,6 +380,15 @@ So in Verse, it is easy to carve out arbitrarily complex sets of
 values; refinement types are built in.  Of course, that puts a complete type checker well
 out of reach, but an incomplete typechecker can still give strong static guarantees about some
 Verse programs.
+
+\paragraph{Typedef.}  If we have an expression $e$ that yields a sequence of
+values $[v_1,\ldots,v_n]$, can we define a type (that is, a Verse function) that denotes that
+set of values?  Yes, of course: it is just \vtt{(x => x=$e$)}; that is, a function that,
+given a value $v$, will succeed (returning $v$) iff $v$ is among the values yielded by $e$.
+This idiom is sufficiently useful that Verse defines \vtt{typedef\{$e$\}} as syntactic sugar
+for that lambda (see \Cref{fig:sugar}).
+
+So, for example \vtt{typedef\{3 | 7 | 21\}} is the type consisting of 3, 7, and 21.
 
 \simon{What about \vtt{int-> int}?  Presumably \vtt{(->)} is a binary operator on types.  I was thinnking something like}
 \begin{verbatim}
@@ -332,17 +398,33 @@ Verse programs.
 
 \subsection{The colon operator}
 
-Verse has a unary prefix operator ``\vtt{:}'', where \vtt{:e} yields the sequence of all
-values that inhabit the type \vtt{e}. But this is mere syntactic sugar:
+The expression \vtt{:e}, written with a unary prefix colon, yields the sequence of all
+values that inhabit the type \vtt{e}.  So, for example,
+\vtt{:char} yields the sequence of all characters.
+
+But this is mere syntactic sugar:
 \begin{center}
 \begin{tabular}{rcl}
-\vtt{:$e4} & $\equiv$ & \vtt{$e$(def x in x)}
+\vtt{:$e$} & $\equiv$ & \vtt{$e$(def x in x)}
 \end{tabular}
 \end{center}
 As mentioned in \Cref{sec:any}, the expression \vtt{(def x in x)} enumerates all values; then
-we apply the type $e$ (which is just a Verse function) to filter out just those values that belong to the type that $e$ describes.
+we apply the type $e$ (which is just a Verse function) to select just those values that
+belong to the type that $e$ describes.
 
-\section{Scope} \label{sec:scope}
+\simon{Why does \vtt{:t} have to be in Fig 3. It can be done with a simple syntactic rewrite in Fig 2, can't it?}
+
+\subsection{Arrays}
+
+Verse's only data structure is a one-dimensional array:
+\begin{itemize}
+\item A literal array, sometimes called a tuple, is built with comma notation. For example \vtt{(2,7,7)} is an array of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
+\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  (Indexing is zero-based.)
+  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
+\end{itemize}
+
+
+\section{Scope extrusion} \label{sec:scope} \label{sec:extrusion}
 
 \begin{figure}
 
@@ -370,7 +452,7 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 \end{tabular}
 \end{tabular}
 
-\caption{Core expressions}
+\caption{Core expressions} \label{fig:core}
 \end{figure}
 
 % Use alternate definition for {}
@@ -418,7 +500,7 @@ Constructs that are eliminated by extrusion \\
   \hline
 \end{tabular}
 \end{tabular}
-\caption{Syntactic sugar}
+\caption{Syntactic sugar} \label{fig:sugar}
 \end{figure}
 
 \newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
