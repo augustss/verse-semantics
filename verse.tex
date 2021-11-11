@@ -330,9 +330,10 @@ so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
 Function application is lifted, just like any other binary operator, but comes in two forms:
 \begin{itemize}
-\item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yeilded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded.
+\item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yielded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded.
 
 \item \vtt{$e_1$($e_2$)} is exactly the same, except that \simon{except that what, specifically}.
+\simon{Roughly: if the call fails, execution stops; it's WRONG. Not sure if that happens if all the calls $v_1(v_2)$ fail, or if any of them fail.}
 \end{itemize}
 For example, the call \vtt{(x => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
 More generally, Verse enjoys a form of the beta-rule, thus
@@ -437,6 +438,20 @@ Verse's only data structure is a one-dimensional array:
 \item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  (Indexing is zero-based.)
   \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
 \end{itemize}
+
+There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
+\begin{verbatim}
+ array := ((x:(a:type -> b:type)) => for (y:x) x(y)
+\end{verbatim}
+\simon{Or something like this.  Need to explain!!!}
+
+\subsection{Failure}
+
+When you declare a function, you can declare whether or not it is allowed to fail.
+\simon{Syntax?}
+
+In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
+Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
 
 \section{Scope extrusion} \label{sec:scope} \label{sec:extrusion}
