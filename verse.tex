@@ -74,15 +74,15 @@
 
 % This incantation makes tt be Latin Modern Mono Light Cond
 % which is narrower than normal tt.
-\usepackage{lmodern}
-\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
-\DeclareFontShape{T1}{lmttc}{m}{n}
-     {<-> ec-lmtlc10}{}
-\DeclareFontShape{T1}{lmttc}{m}{it}
-     {<->sub*lmttc/m/sl}{}
-\DeclareFontShape{T1}{lmttc}{m}{sl}
-     {<-> ec-lmtlco10}{}
-\renewcommand{\ttdefault}{lmttc}
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
 
 % Boxed figures
 \usepackage{float}
@@ -293,7 +293,10 @@ Not so in Verse.  Instead, a variable can be brought into scope \emph{without a 
 \begin{verbatim}
   def x in x + (x = 7; 5)
 \end{verbatim}
-The construct \vtt{def x in $e$} brings \vtt{x} into scope in $e$.  Its semantics is unusual:
+The construct \vtt{def x in $e$} brings \vtt{x} into scope in $e$.\footnote{
+In actual Verse there is no \vtt{def} construct; it is an explanatory device in this paper.
+In actual Verse you would write \vtt{x:any} to introduce an unbound variable.
+}  Its semantics is unusual:
 \begin{itemize}
 \item The expression \vtt{(def x in $e$)} binds $x$ successively to
   \emph{all possible values}, and returns all the values yielded
@@ -314,7 +317,7 @@ It is easy to write an expression that yields an infinite sequence of values,
 by omitting all equalities.
 For example \vtt{def x in x} returns a sequence of all possible values.
 
-\paragraph{Scoping.} Verse allows you to omit the \vtt{def} entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitteing the \vtt{def}:
+\paragraph{Scoping.} Verse allows you to omit the \vtt{def} entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitting the \vtt{def}:
 \vtt{(x + (x:=7; 5)}.
 The binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
 Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s,
