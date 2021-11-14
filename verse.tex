@@ -331,6 +331,9 @@ so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 \subsection{Lambdas and application} \label{sec:application}
 
 Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
+\simon{Or would that be an occurrence of $x$?  Do we have to write \vtt{($x$:$t$) => $e$}?
+In the syntax I've put \vtt{$p$ => $e$}; is that right?}
+
 Function application is lifted, just like any other binary operator, but comes in two forms:
 \begin{itemize}
 \item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yielded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded.
@@ -380,18 +383,64 @@ In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables 
 \end{center}  
 Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We will formalise the scoping rules in \Cref{sec:extrusion}.
 
-\subsection{Types}
+\subsection{Arrays}
+
+Verse's only data structure is a one-dimensional \emph{array}.  When the array is of small fixed
+size, it is often called a \emph{tuple}.
+\begin{itemize}
+\item A literal array is built with comma notation. For example \vtt{(2,7,7)} is an tuple of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
+\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
+  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
+\end{itemize}
+
+\subsubsection{The \vtt{for} construct}
+
+The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
+For example:
+\begin{verbatim}
+for (i := (1 | 2 | 3) (i*i)
+\end{verbatim}
+So \vtt{for} reifies the sequence of values yielded by an expression into a value (the array)
+containing all those values.
+A \vtt{for} always yields a single value.
+
+\simon{What if the sequence is empty?  Failure, or an empty array?}
+
+\simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
+  of all the values returned by $e$?  Then we would write the above example like this:}
+\begin{verbatim}
+for (i := (1 | 2 | 3); i*i)
+\end{verbatim}
+\simon{Also what happens if $e_2$ yields multiple values, e.g. \vtt{for (i := (1|2|3)) (i | i*i)}?}
+
+\subsubsection{The array type}
+
+There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
+\begin{verbatim}
+ array := ((x:(a:type -> b:type)) => for (y:x) x(y)
+\end{verbatim}
+\simon{Or something like this.  Need to explain!!!}
+
+\subsection{Failure}
+
+When you declare a function, you can declare whether or not it is allowed to fail.
+\simon{Syntax?}
+
+In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
+Almost all interesting functions can fail; e.g. any type constraint can make it fail.
+
+
+\section{Types}
 
 Verse is designed to be statically type-checked.
-As in any typed language, a type describes as set of values.  In
+As in any typed language, a type describes a set of values.  In
 Verse, unusually, \emph{a ``type'' is just a particular sort of Verse expression}.
 Specifically a type is a partial identity function;
 it fails on values that do not belong to the type, and is the identity function (returning a singleton sequence) for the values that do belong.  A mathematician would call it the
-\emph{characteristic function} of the set of values; a denotational semantics person might call it a \emph{retraction}. So, for example:
+\emph{characteristic function} of the set of values; a denotational semantics person might call it a \emph{retraction}.
+
+So, for example:
 \begin{itemize}
-\item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an ingeter; and fails otherwise.
-\item \vtt{false} is the function that always fails; \vtt{false} denotes the empty set of values.
-\simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
 \item The function \vtt{(x => x>0)} is the type of positive integers.  Since \vtt{x>0} succeeds, returning {x} for integers greater than zero, if we lambda-abstract over \vtt{x} we get a partial identity function.
 \item The function \vtt{(x,y) => (x>y); (x,y)} is the type of pairs in which the second component is less than the first.
 \end{itemize}
@@ -400,7 +449,38 @@ values; refinement types are built in.  Of course, that puts a complete type che
 out of reach, but an incomplete typechecker can still give strong static guarantees about some
 Verse programs.
 
-\paragraph{Typedef.}  If we have an expression $e$ that yields a sequence of
+\subsection{Built in types}
+
+Verse has some built-in types:
+\begin{itemize}
+\item \vtt{any} is defined as \vtt{any := x => x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
+\item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an integer; and fails otherwise.
+\item \vtt{false} is the function that always fails; \vtt{false} denotes the empty set of values.
+\simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
+\end{itemize}
+
+\subsection{Function types}
+
+A function type \vtt{($t_1$ -> $t_2$)} is, like any Verse type, an expression.
+  It is partial identity that, given a function, either leaves it alone, or makes it fail.
+  Here is the definition of \vtt{op`->`}:
+\begin{verbatim}
+   op`->` := arg_ty => res_ty => f => x => res_ty( f( arg_ty( x )))
+\end{verbatim}
+That is, given an argument and result type (each of which is a partial identity function),
+and the function \vtt{f} itself, it returns a function that
+checks that the argument \vtt{x} satisfies
+\vtt{arg\_ty} and the result satisfies \vtt{res\_ty}.  This construction uses the now-standard
+method used by Findler and Felleisen for \emph{contracts} in Scheme; indeed Verse's types
+are very like Findler/Felleisen contracts.
+
+Notice that \vtt{($t_1$ -> $t_2$)} does not \emph{immediately} fail on functions
+that do not satisfy the type; it fails lazily, when the function is applied, which
+is the best we can hope for.
+
+\subsection{Typedef}
+
+If we have an expression $e$ that yields a sequence of
 values $[v_1,\ldots,v_n]$, can we define a type (that is, a Verse function) that denotes that
 set of values?  Yes, of course: it is just \vtt{(x => x=$e$)}; that is, a function that,
 given a value $v$, will succeed (returning $v$) iff $v$ is among the values yielded by $e$.
@@ -408,12 +488,6 @@ This idiom is sufficiently useful that Verse defines \vtt{typedef\{$e$\}} as syn
 for that lambda (see \Cref{fig:sugar}).
 
 So, for example \vtt{typedef\{3 | 7 | 21\}} is the type consisting of 3, 7, and 21.
-
-\simon{What about \vtt{int-> int}?  Presumably \vtt{(->)} is a binary operator on types.  I was thinnking something like}
-\begin{verbatim}
-   (->) = arg_ty => res_ty => the_fun => x => res_ty( the_fun (arg_ty( x )))
-\end{verbatim}
-\simon{But that doesn't work because \vtt{int -> int} never fails; it always returns a singleton.}
 
 \subsection{The colon operator}
 
@@ -431,30 +505,7 @@ As mentioned in \Cref{sec:any}, the expression \vtt{(def x in x)} enumerates all
 we apply the type $e$ (which is just a Verse function) to select just those values that
 belong to the type that $e$ describes.
 
-\simon{Why does \vtt{:t} have to be in Fig 3. It can be done with a simple syntactic rewrite in Fig 2, can't it?}
-
-\subsection{Arrays}
-
-Verse's only data structure is a one-dimensional array:
-\begin{itemize}
-\item A literal array, sometimes called a tuple, is built with comma notation. For example \vtt{(2,7,7)} is an array of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
-\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  (Indexing is zero-based.)
-  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
-\end{itemize}
-
-There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
-\begin{verbatim}
- array := ((x:(a:type -> b:type)) => for (y:x) x(y)
-\end{verbatim}
-\simon{Or something like this.  Need to explain!!!}
-
-\subsection{Failure}
-
-When you declare a function, you can declare whether or not it is allowed to fail.
-\simon{Syntax?}
-
-In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
-Almost all interesting functions can fail; e.g. any type constraint can make it fail.
+\simon{Why does \vtt{:t} have to be in Fig 3. It can be done with a simple syntactic rewrite in Fig 2, can't it?} \simon{Answer: only because we don't want \vtt{def} in the pre-extrusion language.}
 
 
 \section{Scope extrusion} \label{sec:scope} \label{sec:extrusion}
@@ -464,28 +515,46 @@ Almost all interesting functions can fail; e.g. any type constraint can make it 
 \begin{tabular}{c}
 
 \begin{tabular}{rcll}
-  $e$ & ::= &
-    $x$ & use variable \\
-  && $k$ & constant \\
+  $e,t$ & ::= &
+    $x$ & Variable \\
+  && $k$ & Constant \\
 \ifunify
   && \vtt{$e_1$ = $e_2$} & unification \\
 \fi
-  && \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  && \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  && \vtt{$x$ => $e$} & lambda expression \\
-  && \vtt{$e_1$ | $e_2$} & alternative \\
-  && \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  && \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  && \vtt{for ($e_1$) $e_2$} & array formation \\
-  && \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+  & | & \vtt{$e_1$[$e_2$]} & Function application, may fail \\
+  & | & \vtt{$e_1$($e_2$)} & Function application, may not fail \\
+  & | & \vtt{$x$ => $e$} & Lambda expression \\
+  & | & \vtt{$e_1$ | $e_2$} & Alternative \\
+  & | & \vtt{$e_1$,$\cdots$,$e_n$} & Tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & Conditional \\
+  & | & \vtt{for ($e_1$) $e_2$} & Array formation \\
+  & | & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & Define variables in a scope {\it [only after extrusion]} \\[1mm]
+  \multicolumn{3}{l}{\it Below here is syntactic sugar} \\[1mm]
+  & | & \vtt{:$t$} & Range of a type \\
+  & | & \vtt{$x$ : $t$} & Type ascription \\
+  & | & \vtt{typedef\{$e$\}} & Type definition \\
+  & | & \vtt{let ($e_1$) in $e_s$} & Local declaration \\
+  & | & \vtt{$e_1$ where $e_s$} & Local declaration \\
+  & | & \vtt{do \{ $e$ \}} & Limit scope \\
+  & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & Case analysis \\
+%  & | & \vtt{$e_1$ && $e_2$} & \\
+  & | & \vtt{$e_1$ || $e_2$} & \\
+  & | & \vtt{$p$ => $e$} & Lambda expression with pattern \\
+  & | & \vtt{$p$ := $e$ } & Binding \\
+  & | & \vtt{f(p) := e} & Function definition \\
+  & | & \vtt{$e_1 \oplus e_2$} & Infix function that cannot fail \\
+  & | & \vtt{$e_1 \oslash e_2$} & Infix function that can fail \\[2mm]
+
+$p$ & ::= & \vtt{$x$:$t$} ~|~ \vtt{($p_1$, \ldots, $p_n$)} & Patterns \\[2mm]
+
 $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
-  && $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
-  && $ \vtt{op'+'} \;|\; \vtt{op'-'} \;|\; \vtt{op'<'} \;|\; \cdots$ & predefined constants \\
-  && $ \vtt{op';'} $ & predefined constants \\
+  & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
+  & | & $ \vtt{op'+'} \;|\; \vtt{op'-'} \;|\; \vtt{op'<'} \;|\; \cdots$ & predefined constants \\
+  & | & $ \vtt{op';'} $ & predefined constants \\
 \end{tabular}
 \end{tabular}
 
-\caption{Core expressions} \label{fig:core}
+\caption{Verse syntax} \label{fig:core}
 \end{figure}
 
 % Use alternate definition for {}
@@ -504,14 +573,11 @@ Constructs that are just syntactic sugar \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
   \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
 %%  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
-  \hline \hline
   \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & {\it maybe not the right scope rules} \\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} & {\it an alternate definition} \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
-  \hline \hline
   \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\vseq{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]}} & \vtt{x} fresh \\
-  \vtt{$f$($e_1$) := $e_2$} & \vtt{$f$ := x => \vseq{ x = $e_1$; $e_2$ }} & \vtt{x} fresh \\
-  \hline \hline
+  \vtt{$f$($p$) := $e$} & \vtt{$f$ := x => \vseq{ $p$ = x; $e$ }} & \vtt{x} fresh \\
   \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
 \ifunify  \else
