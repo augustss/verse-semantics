@@ -515,38 +515,69 @@ belong to the type that $e$ describes.
 \begin{tabular}{c}
 
 \begin{tabular}{rcll}
-  $e,t$ & ::= &
-    $x$ & Variable \\
-  && $k$ & Constant \\
-\ifunify
-  && \vtt{$e_1$ = $e_2$} & unification \\
-\fi
-  & | & \vtt{$e_1$[$e_2$]} & Function application, may fail \\
-  & | & \vtt{$e_1$($e_2$)} & Function application, may not fail \\
-  & | & \vtt{$x$ => $e$} & Lambda expression \\
-  & | & \vtt{$e_1$ | $e_2$} & Alternative \\
-  & | & \vtt{$e_1$,$\cdots$,$e_n$} & Tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & Conditional \\
-  & | & \vtt{for ($e_1$) $e_2$} & Array formation \\
-  & | & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & Define variables in a scope {\it [only after extrusion]} \\[1mm]
-  \multicolumn{3}{l}{\it Below here is syntactic sugar} \\[1mm]
-  & | & \vtt{:$t$} & Range of a type \\
-  & | & \vtt{$x$ : $t$} & Type ascription \\
-  & | & \vtt{typedef\{$e$\}} & Type definition \\
-  & | & \vtt{let ($e_1$) in $e_s$} & Local declaration \\
-  & | & \vtt{$e_1$ where $e_s$} & Local declaration \\
-  & | & \vtt{do \{ $e$ \}} & Limit scope \\
-  & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & Case analysis \\
-%  & | & \vtt{$e_1$ && $e_2$} & \\
-  & | & \vtt{$e_1$ || $e_2$} & \\
-  & | & \vtt{$p$ => $e$} & Lambda expression with pattern \\
-  & | & \vtt{$p$ := $e$ } & Binding \\
-  & | & \vtt{f(p) := e} & Function definition \\
-  & | & \vtt{$e_1 \oplus e_2$} & Infix function that cannot fail \\
-  & | & \vtt{$e_1 \oslash e_2$} & Infix function that can fail \\[2mm]
+  \multicolumn{3}{l}{Expressions:} \\  
+  $e$ & ::= & $x$ & use variable \\
+  & | & $k$ & constant \\
+  & | & $p$ := $e$ & definition \\
+  & | & $x$ : $t$ & definition \\
+  & | & : $t$ & range \\
+  & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & | & \vtt{$e_1$($e_2$)} & function application, may not fail \\
+  & | & \vtt{$p$ => $e$} & lambda expression \\
+  & | & \vtt{$e_1$ | $e_2$} & alternative \\
+  & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & | & \vtt{for ($e_1$) $e_2$} & array creation \\
+  & | & $e_1 \;o\; e_2$ & infix operator \\
+  & | & \vtt{typedef\{$e$\}} & type definition \\
+  & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
+  & | & \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  & | & \vtt{do $e$} & scope delimiter \\
+  $t$ & ::= & $e$ & types are expressions \\
+  \\
+  \multicolumn{3}{l}{Patterns:} \\
+  $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
+  & | & \vtt{$p_1$($p_2$)} & function pattern \\
+  & | & $p$ : $t$ & type pattern \\
+  & | & : $t$ & type pattern \\
+  & | & $x$ & variable pattern \\
+  & | & $e$ & expression pattern \\
+  \\
+  \multicolumn{3}{l}{Constants}\\
+  $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
+  & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
+  \\
+  \multicolumn{3}{l}{Infix operators:} \\
+  $o$ & ::= & \vtt{;} & sequencing \\
+  & | & \vtt{where} & reverse sequencing \\
+  & | & \vtt{\&\&} \;|\; \vtt{||} & logic \\
+  & | & \vtt{=} \;|\; \vtt{<} \;|\; \vtt{>} \;|\;  $\cdots$ & comparisons \\
+  & | & \vtt{+} \;|\; \vtt{*} \;|\;  $\cdots$ & arithmetic \\
+\end{tabular}
+\end{tabular}
 
-$p$ & ::= & \vtt{$x$:$t$} ~|~ \vtt{($p_1$, \ldots, $p_n$)} & Patterns \\[2mm]
+\caption{Featherweight Verse} \label{fig:featherweight}
+\end{figure}
 
+% A core lambda expression where the argument is always a variable.
+\newcommand{\clamsym}{\Rightarrow}
+\newcommand{\clam}[2]{#1 $\clamsym$ #2}
+
+\begin{figure}
+
+\begin{tabular}{c}
+
+\begin{tabular}{rcll}
+  $e$ & ::= &
+    $x$ & use variable \\
+  & | & $k$ & constant \\
+  & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & | & \vtt{\clam{$x$}{$e$}} & lambda expression \\
+  & | & \vtt{$e_1$ | $e_2$} & alternative \\
+  & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & | & \vtt{for ($e_1$) $e_2$} & array formation \\
+  & | & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
 $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
   & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
   & | & $ \vtt{op'+'} \;|\; \vtt{op'-'} \;|\; \vtt{op'<'} \;|\; \cdots$ & predefined constants \\
@@ -560,6 +591,7 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 % Use alternate definition for {}
 % \newcommand{\vseq}[1]{\{#1\}}
 \newcommand{\vseq}[1]{#1}
+\newcommand{\pmatch}[2]{$\mathbb{P}(#1, #2)$}
 
 \begin{figure}
 \begin{tabular}{c}
@@ -569,21 +601,36 @@ Constructs that are just syntactic sugar \\
   Syntactic sugar (macro) & Expansion & Comment \\
   \hline
   \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
-  \vtt{typedef\{$e$\}} & \vtt{(x:any) => x = $e$} & \vtt{x} fresh \\
-  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$, $e_2$)[0]} & \\
+  \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
   \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
-%%  \vtt{\{ $e_0$;$\cdots$;$e_i$ \}} & \vtt{($e_0$,$\cdots$,$e_i$)[$i$]} & \\
-  \vtt{$e_1$ \&\& $e_2$} & \vtt{if ($e_1$) then $e_2$ else :false} & {\it maybe not the right scope rules} \\
-  \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} & {\it an alternate definition} \\
+  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$; if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh \\
+  \hline \hline
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
-  \vtt{($e_0$,$\cdots$,$e_n$) := $e$} & \vtt{\vseq{x:=$e$; $e_0$:=x[0]; $\cdots$; $e_n$:=x[n]}} & \vtt{x} fresh \\
-  \vtt{$f$($p$) := $e$} & \vtt{$f$ := x => \vseq{ $p$ = x; $e$ }} & \vtt{x} fresh \\
+  \hline \hline
+  \vtt{$e_1$ ; $e_2$} & \vtt{($e_1$,$e_2$)[1]} &  \\
+  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
+  \hline \hline
+  \vtt{($p_0$,$\cdots$,$p_n$) := $e$} & \vtt{\vseq{x:=$e$; $p_0$:=x[0]; $\cdots$; $p_n$:=x[n]}} & \vtt{x} fresh \\
+  \vtt{$p_1$($p_2$) := $e$} & \vtt{$p_1$ := $p_2$ => $e$} &  \\
+  \vtt{$p$ : $t$ := $e$} & \vtt{$p$ := $t$[$e$]} & \\
+  \vtt{: $t$ := $e$} & \vtt{$t$[$e$]} & \\
+  \vtt{$e_1$ := $e_2$} & \vtt{$e_1$ = $e_2$} & $e_1$ not any other pattern \\
+  \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
 \ifunify  \else
     \vtt{=},
 \fi
     \vtt{/}, \vtt{<} \\
+  \hline \hline
+  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
+  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
+  \pmatch{p_1(p_2)}{e} & ??? \\
+  \pmatch{x \vtt{:} t}{e} & \vtt{$x$ := $t$[$e$]} \\
+  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} \\
+  \pmatch{x}{e} & \vtt{$x$ = $e$} \\
+  \pmatch{e_1}{e_2} & \vtt{$e_1$ = $e_2$} \\
   \hline
 \end{tabular}
 \\ \\
@@ -619,7 +666,7 @@ Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for mult
 The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
 \vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
 The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
-but with all \vtt{def}s replaced by \vtt{def-in}.
+but with all definitions replaced by \vtt{def-in}.
 
 \begin{figure}
 \vspace*{4mm}
@@ -665,7 +712,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \AxiomC{\defdefin{$e$}{$e'$}}
 \RightLabel{LAM}
-\UnaryInfC{\defarrow{$x$=>$e$}{$x$=>$e'$}{\defempty}}
+\UnaryInfC{\defarrow{\clam{$x$}{$e$}}{\clam{$x$}{$e'$}}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
@@ -767,7 +814,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 
 \AxiomC{\scinf{$\Gamma \cup \{x\}$}{\vtt{$e$}}}
 \RightLabel{LAM}
-\UnaryInfC{\scinf{$\Gamma$}{\vtt{$x$ => $e$}}}
+\UnaryInfC{\scinf{$\Gamma$}{\vtt{\clam{$x$}{$e$}}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
@@ -868,7 +915,7 @@ but with all \vtt{def}s replaced by \vtt{def-in}.
 \fi
   \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
   \semeqn{e_1(e_2)}{\mathrm{lift}(\mathrm{call}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
-  \semeqn{x \vtt{=>} e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
+  \semeqn{x \clamsym e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
   \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}}
   \semeqn{e_1,\cdots,e_n}{
     \mcompr{\tuple{v_1,\cdots,v_n}}
