@@ -1016,7 +1016,9 @@ but with all definitions replaced by \vtt{def-in}.
 \label{predefined}
 \end{table}
 
+\clearpage
 \section{Examples}
+%\begin{figure}
 \begin{verbatim}
   2+5   # evaluates to 7
   2+3*7 # evaluates to 23
@@ -1062,7 +1064,49 @@ but with all definitions replaced by \vtt{def-in}.
   for(x:xs) x>5 # fails
   for(x:xs, y:=10|20) x+y  #evaluates to (12,13,20,22,23,30)
 
+  int[5] # evaluates to 5
+  int[(2,3)] # fails
+
+  (x:int) => x+1  # function that adds 1
+  succ := (x:int) => x+1  # function that adds 1
+  succ(x:int) := x+1  # function that adds 1
+  succ(x:int):int := x+1  # function that adds 1
+  succ(5)  # evaluates to 6
+
+  array(int)  # type of array of int
+  array(int)[5]  # fails
+  array(int)[(2,3)]  # evaluates to (2,3)
+
+  addOne(xs:array(int)) := for(x:xs) x+1  # add one to all array elements
+
+  # test if all the elements in the array that are >10 are also <20
+  # Either return those, or fail.
+  testArr(xs:array(int)) := for(x:xs, x>10) x<20
+
+  testArr(10,11,12) # evaluates to (11,12)
+  testArr(10,11,30) # fails
+  testArr(9,10)   # evaluates to ()
+
+  nat:=typedef{x:int where x>=0}  # type of integers >= 0
+  nat[10]  # evaluates to 10
+  nat[-1]  # fails
+
+  pred(x:nat where x>0):nat := x-1  # predecessor for natural numbers
+
+  fin2 := typedef{0|1};  # type of 0 and 1
+
+  samePair((x,x) where x:int) := x;  # accept an input with two identical ints
+  samePair(1,1)  # evalutates to 1
+  samePair(1,2)  # fails
+
+  sameTriple((for(1|2|3) x) where x:int) := x;
+  sameTriple(2,2,2)  # evaluates to 2
+  sameTriple(2,2) # fails
+
 \end{verbatim}
+%\caption{Examples}
+%\label{examples}
+%\end{figure}
 
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
