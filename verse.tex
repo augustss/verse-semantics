@@ -414,7 +414,10 @@ A \vtt{for} always yields a single value.
 \begin{verbatim}
 for (i := (1 | 2 | 3); i*i)
 \end{verbatim}
+\lennart{In fact, full Verse has exactly that shorthand.
+  But the long version is more powerful: failure in $e_1$ act as a filter whereas failure in $e_2$ causes failure.}
 \simon{Also what happens if $e_2$ yields multiple values, e.g. \vtt{for (i := (1|2|3)) (i | i*i)}?}
+\lennart{I don't know what that means.  Tim's implementation crashes when I try it.}
 
 \subsubsection{The array type}
 
@@ -428,6 +431,7 @@ There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
 
 When you declare a function, you can declare whether or not it is allowed to fail.
 \simon{Syntax?}
+\lennart{\vtt{foo(x:int)<decides> := ...}}
 
 In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
 Almost all interesting functions can fail; e.g. any type constraint can make it fail.
@@ -444,8 +448,8 @@ it fails on values that do not belong to the type, and is the identity function 
 
 So, for example:
 \begin{itemize}
-\item The function \vtt{(x => x>0)} is the type of positive integers.  Since \vtt{x>0} succeeds, returning {x} for integers greater than zero, if we lambda-abstract over \vtt{x} we get a partial identity function.
-\item The function \vtt{(x,y) => (x>y); (x,y)} is the type of pairs in which the second component is less than the first.
+\item The function \vtt{((x:int) => x>0)} is the type of positive integers.  Since \vtt{x>0} succeeds, returning {x} for integers greater than zero, if we lambda-abstract over \vtt{x} we get a partial identity function.
+\item The function \vtt{(x:int,y:int) => (x>y); (x,y)} is the type of pairs in which the second component is less than the first.
 \end{itemize}
 So in Verse, it is easy to carve out arbitrarily complex sets of
 values; refinement types are built in.  Of course, that puts a complete type checker well
@@ -456,10 +460,12 @@ Verse programs.
 
 Verse has some built-in types:
 \begin{itemize}
-\item \vtt{any} is defined as \vtt{any := x => x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
+\item \vtt{any} is defined as \vtt{any := (x:ANY) => x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
+  \lennart{I'm not sure what to write instead of ANY.)
 \item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an integer; and fails otherwise.
-\item \vtt{false} is the function that always fails; \vtt{false} denotes the empty set of values.
-\simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
+\item \vtt{false} is the function that always fails; \vtt{:false} denotes the empty set of values.
+  \simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
+  \lennart{I agree, it's not a good name.}
 \end{itemize}
 
 \subsection{Function types}
@@ -480,6 +486,7 @@ are very like Findler/Felleisen contracts.
 Notice that \vtt{($t_1$ -> $t_2$)} does not \emph{immediately} fail on functions
 that do not satisfy the type; it fails lazily, when the function is applied, which
 is the best we can hope for.
+\lennart{We could give a non-executable semantics for the type that fails at the right time.}
 
 \subsection{Typedef}
 
@@ -491,8 +498,10 @@ This idiom is sufficiently useful that Verse defines \vtt{typedef\{$e$\}} as syn
 for that lambda (see \Cref{fig:sugar}).
 
 So, for example \vtt{typedef\{3 | 7 | 21\}} is the type consisting of 3, 7, and 21.
+The type of natural numbers can be defined by \vtt{nat := typedef\{x:int where x>=0\}}.
 
 \subsection{The colon operator}
+\lennart{This has to also deal with abstraction contexts.}
 
 The expression \vtt{:e}, written with a unary prefix colon, yields the sequence of all
 values that inhabit the type \vtt{e}.  So, for example,
