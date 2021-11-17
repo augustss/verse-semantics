@@ -1135,6 +1135,12 @@ but with all definitions replaced by \vtt{def-in}.
   sameTriple(2,2,2)  # evaluates to 2
   sameTriple(2,2) # fails
 
+  threeInts(xs:= for(1|2|3) :int) := xs
+  threeInts(4,5,6)  # evaluates to (4,5,6)
+
+  weird(x:succ) := x
+  weird(5)  # evaluates to 6
+
 \end{verbatim}
 %\caption{Examples}
 %\label{examples}
