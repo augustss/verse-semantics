@@ -527,16 +527,16 @@ belong to the type that $e$ describes.
   \multicolumn{3}{l}{Expressions:} \\  
   $e$ & ::= & $x$ & use variable \\
   & | & $k$ & constant \\
-  & | & $p$ := $e$ & definition \\
-  & | & $x$ : $t$ & definition \\
-  & | & : $t$ & range \\
+  & | & \vtt{$d$ := $e$} & definition \\
+  & | & \vtt{$x$ : $t$} & definition \\
+  & | & \vtt{: $t$} & range \\
   & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
   & | & \vtt{$e_1$($e_2$)} & function application, may not fail \\
   & | & \vtt{$p$ => $e$} & lambda expression \\
   & | & \vtt{$e_1$ | $e_2$} & alternative \\
   & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & | & \vtt{for ($e_1$) $e_2$} & array creation \\
+  & | & \vtt{for ($e_1$) in $e_2$} & array creation \\
   & | & $e_1 \;o\; e_2$ & infix operator \\
   & | & \vtt{typedef\{$e$\}} & type definition \\
   & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
@@ -544,12 +544,17 @@ belong to the type that $e$ describes.
   & | & \vtt{do $e$} & scope delimiter \\
   $t$ & ::= & $e$ & types are expressions \\
   \\
+  \multicolumn{3}{l}{Definitions:} \\
+  $d$ & ::= & \vtt{$d$($p$)} & function \\
+  & | & \vtt{$d$ : $t$} & type \\
+  & | & $x$ & variable \\
+  \\
   \multicolumn{3}{l}{Patterns:} \\
   $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
-  & | & \vtt{$p_1$($p_2$)} & function pattern \\
-  & | & $p$ : $t$ & type pattern \\
-  & | & : $t$ & type pattern \\
-  & | & $x$ & variable pattern \\
+%%  & | & \vtt{$p_1$($p_2$)} & function pattern \\
+  & | & \vtt{$d$ : $t$} & binding pattern \\
+  & | & \vtt{$d$ := $e$} & binding pattern \\
+  & | & \vtt{: $t$} & type pattern \\
   & | & $e$ & expression pattern \\
   \\
   \multicolumn{3}{l}{Constants}\\
@@ -565,7 +570,7 @@ belong to the type that $e$ describes.
 \end{tabular}
 \end{tabular}
 
-\caption{Featherweight Verse} \label{fig:featherweight}
+\caption{Mini Verse syntax} \label{fig:featherweight}
 \end{figure}
 
 % A core lambda expression where the argument is always a variable.
@@ -585,7 +590,7 @@ belong to the type that $e$ describes.
   & | & \vtt{$e_1$ | $e_2$} & alternative \\
   & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & | & \vtt{for ($e_1$) $e_2$} & array formation \\
+  & | & \vtt{for ($e_1$) in $e_2$} & array formation \\
   & | & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
 $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
   & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
@@ -594,7 +599,7 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 \end{tabular}
 \end{tabular}
 
-\caption{Verse syntax} \label{fig:core}
+\caption{Core Verse syntax} \label{fig:core}
 \end{figure}
 
 % Use alternate definition for {}
@@ -619,6 +624,9 @@ Constructs that are just syntactic sugar \\
   \hline \hline
   \vtt{$e_1$ ; $e_2$} & \vtt{($e_1$,$e_2$)[1]} &  \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
+  \hline \hline
+  \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
+  \hline \hline
   \hline \hline
   \vtt{($p_0$,$\cdots$,$p_n$) := $e$} & \vtt{\vseq{x:=$e$; $p_0$:=x[0]; $\cdots$; $p_n$:=x[n]}} & \vtt{x} fresh \\
   \vtt{$p_1$($p_2$) := $e$} & \vtt{$p_1$ := $p_2$ => $e$} &  \\
@@ -749,7 +757,7 @@ but with all definitions replaced by \vtt{def-in}.
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
 \AxiomC{\defdefin{$e_2$}{$e'_2$}}
 \RightLabel{FOR}
-\BinaryInfC{\defarrow{for($e_1$) $e_2$}{for($e'_1$) $e'_2$}{\defempty}}
+\BinaryInfC{\defarrow{for($e_1$) in $e_2$}{for($e'_1$) in $e'_2$}{\defempty}}
 \DisplayProof
 \\ The variables defined in the domain are also in scope in body.
 \defafter
@@ -849,7 +857,7 @@ but with all definitions replaced by \vtt{def-in}.
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
 \RightLabel{FOR}
-\BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def\{$D$\}in $e_1$) $e_2$}}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def\{$D$\}in $e_1$) in $e_2$}}}
 \DisplayProof \defafter
 
 %\AxiomC{\scinf{$\Gamma$}{$e_1$}}
