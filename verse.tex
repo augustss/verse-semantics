@@ -461,7 +461,7 @@ Verse programs.
 Verse has some built-in types:
 \begin{itemize}
 \item \vtt{any} is defined as \vtt{any := (x:ANY) => x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
-  \lennart{I'm not sure what to write instead of ANY.)
+  \lennart{I'm not sure what to write instead of ANY.}
 \item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an integer; and fails otherwise.
 \item \vtt{false} is the function that always fails; \vtt{:false} denotes the empty set of values.
   \simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
