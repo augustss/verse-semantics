@@ -330,9 +330,10 @@ so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 
 \subsection{Lambdas and application} \label{sec:application}
 
-Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
-\simon{Or would that be an occurrence of $x$?  Do we have to write \vtt{($x$:$t$) => $e$}?
-In the syntax I've put \vtt{$p$ => $e$}; is that right?}
+%Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
+%\simon{Or would that be an occurrence of $x$?  Do we have to write \vtt{($x$:$t$) => $e$}?
+%In the syntax I've put \vtt{$p$ => $e$}; is that right?}
+\lennart{Lambdas and the beta rule are peculiar.}
 
 Function application is lifted, just like any other binary operator, but comes in two forms:
 \begin{itemize}
@@ -341,8 +342,8 @@ Function application is lifted, just like any other binary operator, but comes i
 \item \vtt{$e_1$($e_2$)} is exactly the same, except that \simon{except that what, specifically}.
 \simon{Roughly: if the call fails, execution stops; it's WRONG. Not sure if that happens if all the calls $v_1(v_2)$ fail, or if any of them fail.}
 \end{itemize}
-For example, the call \vtt{(x => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
-More generally, Verse enjoys a form of the beta-rule, thus
+For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
+More generally, Verse enjoys a form of the beta-rule, thus \lennart{This needs to be changed}
 $$
 \begin{array}{rcl}
 \vtt{(x => $body$)[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
@@ -373,7 +374,8 @@ but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \
   execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
   as you would expect.
 
-\simon{I can use comma or semicolon in a 'let', can't I?  It makes no difference.}
+  \simon{I can use comma or semicolon in a 'let', can't I?  It makes no difference.}
+  \lennart{Yes, since the actual expression is discarded , and ; do the same thing.}
 
 A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
 
@@ -398,13 +400,14 @@ size, it is often called a \emph{tuple}.
 The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
 For example:
 \begin{verbatim}
-for (i := (1 | 2 | 3) (i*i)
+for (i := (1 | 2 | 3)) (i*i)
 \end{verbatim}
 So \vtt{for} reifies the sequence of values yielded by an expression into a value (the array)
 containing all those values.
 A \vtt{for} always yields a single value.
 
 \simon{What if the sequence is empty?  Failure, or an empty array?}
+\lennart{The empty array.  But if any $e_2$ fails the whole \vtt{for} fails.}
 
 \simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
   of all the values returned by $e$?  Then we would write the above example like this:}
@@ -523,7 +526,7 @@ belong to the type that $e$ describes.
   & | & : $t$ & range \\
   & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
   & | & \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  & | & \vtt{$p$ => $e$} & lambda expression \\
+  & | & \vtt{$e_1$ => $e_2$} & lambda expression \\
   & | & \vtt{$e_1$ | $e_2$} & alternative \\
   & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
@@ -559,10 +562,6 @@ belong to the type that $e$ describes.
 \caption{Featherweight Verse} \label{fig:featherweight}
 \end{figure}
 
-% A core lambda expression where the argument is always a variable.
-\newcommand{\clamsym}{\Rightarrow}
-\newcommand{\clam}[2]{#1 $\clamsym$ #2}
-
 \begin{figure}
 
 \begin{tabular}{c}
@@ -571,8 +570,9 @@ belong to the type that $e$ describes.
   $e$ & ::= &
     $x$ & use variable \\
   & | & $k$ & constant \\
+  & | & : $e$ & range \\
   & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & | & \vtt{\clam{$x$}{$e$}} & lambda expression \\
+  & | & \vtt{$e_1$ => $e_2$} & lambda expression \\
   & | & \vtt{$e_1$ | $e_2$} & alternative \\
   & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
@@ -591,7 +591,6 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 % Use alternate definition for {}
 % \newcommand{\vseq}[1]{\{#1\}}
 \newcommand{\vseq}[1]{#1}
-\newcommand{\pmatch}[2]{$\mathbb{P}(#1, #2)$}
 
 \begin{figure}
 \begin{tabular}{c}
@@ -601,7 +600,7 @@ Constructs that are just syntactic sugar \\
   Syntactic sugar (macro) & Expansion & Comment \\
   \hline
   \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
-  \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
+  \vtt{typedef\{$e$\}} & \vtt{(x:any) => x = $e$} & \vtt{x} fresh \\
   \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$; if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh \\
   \hline \hline
@@ -623,14 +622,6 @@ Constructs that are just syntactic sugar \\
     \vtt{=},
 \fi
     \vtt{/}, \vtt{<} \\
-  \hline \hline
-  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
-  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
-  \pmatch{p_1(p_2)}{e} & ??? \\
-  \pmatch{x \vtt{:} t}{e} & \vtt{$x$ := $t$[$e$]} \\
-  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} \\
-  \pmatch{x}{e} & \vtt{$x$ = $e$} \\
-  \pmatch{e_1}{e_2} & \vtt{$e_1$ = $e_2$} \\
   \hline
 \end{tabular}
 \\ \\
@@ -640,7 +631,6 @@ Constructs that are eliminated by extrusion \\
   Primitive & Comment \\
   \hline
   \vtt{$x$ := $e$} & define a variable \\
-  \vtt{:}$t$ & range of a function \\
   \vtt{let ($e_1$) in $e_2$} & local bindings \\
   \vtt{do $e$} & limit scope \\
   \hline
@@ -687,7 +677,7 @@ but with all definitions replaced by \vtt{def-in}.
 
 \AxiomC{\defarrow{$t$}{$t'$}{$D$}}
 \RightLabel{RNG}
-\UnaryInfC{\defarrow{:$t$}{$t'$[def\{x\}in x]}{$D$}}
+\UnaryInfC{\defarrow{:$t$}{:$t'$}{$D$}}
 \DisplayProof \defafter
 
 \ifunify
@@ -704,15 +694,10 @@ but with all definitions replaced by \vtt{def-in}.
 \BinaryInfC{\defarrow{$e_1$[$e_2$]}{$e'_1$[$e'_2$]}{\defunion{D_1}{D_2}}}
 \DisplayProof \defafter
 
-\AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
-\AxiomC{\defarrow{$e_2$}{$e'_2$}{$D_2$}}
-\RightLabel{APP'}
-\BinaryInfC{\defarrow{$e_1$($e_2$)}{$e'_1$($e'_2$)}{\defunion{D_1}{D_2}}}
-\DisplayProof \defafter
-
-\AxiomC{\defdefin{$e$}{$e'$}}
+\AxiomC{\defdefin{$e_1$}{$e_1'$}}
+\AxiomC{\defdefin{$e_2$}{$e_2'$}}
 \RightLabel{LAM}
-\UnaryInfC{\defarrow{\clam{$x$}{$e$}}{\clam{$x$}{$e'$}}{\defempty}}
+\BinaryInfC{\defarrow{\vtt{$e_1$ => $e_2$}}{\vtt{$e_1'$ => $e_2'$}}{\defempty}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
@@ -734,7 +719,6 @@ but with all definitions replaced by \vtt{def-in}.
 \RightLabel{IF}
 \TrinaryInfC{\defarrow{if($e_1$) then $e_2$ else $e_3$}{if($e'_1$) then $e'_2$ else $e'_3$}{\defempty}}
 \DisplayProof
-\\ The variables defined in the condition are also in scope in the \vtt{then} branch.
 \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
@@ -742,7 +726,6 @@ but with all definitions replaced by \vtt{def-in}.
 \RightLabel{FOR}
 \BinaryInfC{\defarrow{for($e_1$) $e_2$}{for($e'_1$) $e'_2$}{\defempty}}
 \DisplayProof
-\\ The variables defined in the domain are also in scope in body.
 \defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}
@@ -770,6 +753,8 @@ but with all definitions replaced by \vtt{def-in}.
 \BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
+%%%%%%%%%
+
 \caption{Scope extrusion rules}
 \label{extrusion-rules}
 \end{figure}
@@ -793,6 +778,11 @@ but with all definitions replaced by \vtt{def-in}.
 \UnaryInfC{\scinf{$\Gamma$}{\vtt{def\{$D$\}in $e$}}}
 \DisplayProof \defafter
 
+\AxiomC{\scinf{$\Gamma$}{\vtt{$e$}}}
+\RightLabel{RNG}
+\UnaryInfC{\scinf{$\Gamma$}{\vtt{: $e$}}}
+\DisplayProof \defafter
+
 \ifunify
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
 \AxiomC{\scinf{$\Gamma$}{$e_2$}}
@@ -806,15 +796,10 @@ but with all definitions replaced by \vtt{def-in}.
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$[$e_2$]}}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma$}{$e_1$}}
-\AxiomC{\scinf{$\Gamma$}{$e_2$}}
-\RightLabel{APP'}
-\BinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$($e_2$)}}}
-\DisplayProof \defafter
-
-\AxiomC{\scinf{$\Gamma \cup \{x\}$}{\vtt{$e$}}}
+\AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e_1$}}}
+\AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e_2$}}}
 \RightLabel{LAM}
-\UnaryInfC{\scinf{$\Gamma$}{\vtt{\clam{$x$}{$e$}}}}
+\BinaryInfC{\scinf{$\Gamma$}{\vtt{\vtt{(def\{$D$\}in $e_1$) => $e_2$}}}}
 \DisplayProof \defafter
 
 \AxiomC{\scinf{$\Gamma$}{$e_1$}}
@@ -855,7 +840,7 @@ but with all definitions replaced by \vtt{def-in}.
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{V}
-\newcommand{\Env}{E}
+\newcommand{\Env}{Env}
 
 \begin{figure}
   $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
@@ -872,11 +857,15 @@ but with all definitions replaced by \vtt{def-in}.
 \newcommand{\munit}[1]{[#1]}
 \newcommand{\mempty}{\munit{}}
 
+\newcommand{\mtchapp}[3]{\mathcal{M}\llbracket #1 \rrbracket #2 \, #3}
+\newcommand{\vsemapp}[3]{\mathcal{V}\llbracket #1 \rrbracket #2 \, #3}
+\newcommand{\vsemeqn}[2]{\vsemapp{#1}{v}{\rho} & = #2 \\ }
 \newcommand{\semapp}[2]{\mathcal{E}\llbracket #1 \rrbracket #2}
 %\newcommand{\semeqn}[2]{\equa{ \semapp{#1}{\rho} = #2 }}
 \newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
 \newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
+\newcommand{\vchk}[1]{\mathrm{chk}(v,#1)}
 
 \begin{figure}
   \begin{align*}
@@ -906,16 +895,17 @@ but with all definitions replaced by \vtt{def-in}.
 
 \begin{figure}
 
+%%%%% E
   \begin{align*}
   \semapp{\cdot}{} &: \Env \rightarrow \Value^{*} \\
   \semeqn{x}{\munit{\rho(x)}}
   \semeqn{i}{\munit{i}}
+  \semeqn{: e}{\mathrm{lift}(\mathrm{apply}, \semapp{e}{\rho}, univ)}
 \ifunify
   \semeqn{e_1 \vtt{=} e_2}{\mathrm{lift}(\hat{=}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
 \fi
   \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
-  \semeqn{e_1(e_2)}{\mathrm{lift}(\mathrm{call}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
-  \semeqn{x \clamsym e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
+  \semeqn{e_1 => e_2}{\munit{\lambda v . \semapp{e_2}{(\mtchapp{e_1}{v}{\rho})}}}
   \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}}
   \semeqn{e_1,\cdots,e_n}{
     \mcompr{\tuple{v_1,\cdots,v_n}}
@@ -932,6 +922,7 @@ but with all definitions replaced by \vtt{def-in}.
          {\mcompr{\semapp{e}{(\rho \circ \{ x_1 \mapsto v_1, \cdots, x_n \mapsto v_n\})}} {\mbind{v_1}{univ},\cdots,\mbind{v_n}{univ}}}
   \end{align*}
 
+%%%%% R
   \equa { \envapp{\cdot}{} : \Env \rightarrow \Env^{*} }
   \equa {
     \begin{aligned}
@@ -943,7 +934,44 @@ but with all definitions replaced by \vtt{def-in}.
     \end{aligned}
     }
   
+%%%%% M
+  \equa { \mtchapp{\cdot}{} : \Value \rightarrow \Env \rightarrow \Env^{*} }
+  \lennart{Like $\mathcal{R}$ but with $\mathcal{V}$ instead of $\mathcal{E}$}
+
+%%%%% V
+  \begin{align*}
+  \vsemapp{\cdot}{}{} &: \Value \rightarrow \Env \rightarrow \Value^{*} \\
+  \vsemeqn{x}{\vchk{\munit{\rho(x)}}}
+  \vsemeqn{i}{\vchk{\munit{i}}}
+  \vsemeqn{: e}{\mathrm{lift}(\mathrm{apply}, \semapp{e}{\rho}, \munit{v})}
+\ifunify
+  \vsemeqn{e_1 \vtt{=} e_2}{\mathrm{lift}(\hat{=}, \vsemapp{e_1}{v}{\rho}, \vsemapp{e_2}{v}{\rho})}
+\fi
+  \vsemeqn{e_1[e_2]}{\vchk{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}}
+  \vsemeqn{e_1 => e_2}{\vchk{\munit{\lambda v . \semapp{e_2}{(\mtchapp{e_1}{v}{\rho})}}}}
+  \vsemeqn{e_1 \vtt{|} e_2}{\vchk{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}} ????}
+  \vsemeqn{e_1,\cdots,e_n}{???? }
+  \vsemeqn{\vtt{if(}e_1\vtt{)\:then}\: e_2 \: \vtt{else}\: e_3}{
+      \begin{cases*}
+        \vsemapp{e_2}{v}{\rho'} & if $\envapp{e_1}{s\, \rho} = \munit{\rho', \cdots}$ \\
+        \vsemapp{e_3}{v}{\rho} & otherwise
+      \end{cases*}
+      }
+  \vsemeqn{\vtt{for(}e_1\vtt{)}e_2}{????}
+  \vsemeqn{\vtt{def\{}x_1,\cdots,x_n\vtt{\}in}\,e}
+         {\mcompr{\vsemapp{e}{v}{(\rho \circ \{ x_1 \mapsto v_1, \cdots, x_n \mapsto v_n\})}} {\mbind{v_1}{univ},\cdots,\mbind{v_n}{univ}} ????}
+  \end{align*}
+
+\caption{Expression semantics}
+\label{expression-semantics}
+\end{figure}
+
+\begin{figure}
+%%%%% lift
   \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{v}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}, \mbind{v}{f(v_1, v_2)}}}
+
+%%%%% chk
+  \equa{\vchk{w} = \mcompr{v}{\mbind{x}{w}, v = x}}
 
 \ifunify
   \equa{\hat{f}(x,y) =
@@ -954,17 +982,12 @@ but with all definitions replaced by \vtt{def-in}.
     }
 \fi
 
+%%%%% apply
   \equa{\mathrm{apply}(f,x) = 
       \begin{cases*}
         f(x) & if $f \in \Value \rightarrow \Value^{*}$ \\
         \munit{f_x} & if $f \in \tuple{\Value}, x \in \mathbb{Z}, x \geqslant 0, x < \mathrm{size}(f)$ \\
         \mempty & otherwise, if $f \in \tuple{\Value}$ \\
-        \munit{\mathrm{WRONG}} & otherwise
-      \end{cases*}
-  }
-  \equa{\mathrm{call}(f,x) = 
-      \begin{cases*}
-        apply(f,x) & if $apply(f,x) \ne \mempty$ \\
         \munit{\mathrm{WRONG}} & otherwise
       \end{cases*}
   }
@@ -974,7 +997,7 @@ but with all definitions replaced by \vtt{def-in}.
   }
 
 \caption{Expression semantics}
-\label{expression-semantics}
+\label{expression-semantics-2}
 \end{figure}
 
 \newcommand{\checkcase}[3]{\begin{cases*} #1 & if $#2$ \\ #3 & otherwise \end{cases*}}
