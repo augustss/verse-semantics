@@ -108,6 +108,10 @@
 
 \newcommand{\vtt}[1]{\text{\tt #1}}
 
+\newcommand{\clamsymx}{\Rightarrow}
+\newcommand{\clamsym}{$\clamsymx$}
+\newcommand{\clam}[2]{#1 \clamsym #2}
+
 \begin{document}
 
 %% Title information
@@ -330,6 +334,11 @@ so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 
 \subsection{Lambdas and application} \label{sec:application}
 
+Lambda expressions are written \vtt{$p$ => $e$} in Verse, where the pattern clearly show which variable
+occurrences are binding and which are just usage.
+In the core language the lambda expressions are written \vtt{\clam{$x$}{$e$}} where there is just a single
+variable being bound.
+
 %Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
 %\simon{Or would that be an occurrence of $x$?  Do we have to write \vtt{($x$:$t$) => $e$}?
 %In the syntax I've put \vtt{$p$ => $e$}; is that right?}
@@ -346,7 +355,7 @@ For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values 
 More generally, Verse enjoys a form of the beta-rule, thus \lennart{This needs to be changed}
 $$
 \begin{array}{rcl}
-\vtt{(x => $body$)[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
+\vtt{(x \clamsym $body$)[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
                            & \equiv & \vtt{def x in x=$arg$; $body$}
 \end{array}
 $$
@@ -423,7 +432,7 @@ for (i := (1 | 2 | 3); i*i)
 
 There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
 \begin{verbatim}
- array := ((x:(a:type -> b:type)) => for (y:x) x(y)
+ array := t \clamsym xs \clamsym for (x:xs) in t[x]
 \end{verbatim}
 \simon{Or something like this.  Need to explain!!!}
 
@@ -460,8 +469,7 @@ Verse programs.
 
 Verse has some built-in types:
 \begin{itemize}
-\item \vtt{any} is defined as \vtt{any := (x:ANY) => x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
-  \lennart{I'm not sure what to write instead of ANY.}
+\item \vtt{any} is defined as \vtt{any := x \clamsym x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
 \item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an integer; and fails otherwise.
 \item \vtt{false} is the function that always fails; \vtt{:false} denotes the empty set of values.
   \simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
@@ -474,7 +482,7 @@ A function type \vtt{($t_1$ -> $t_2$)} is, like any Verse type, an expression.
   It is partial identity that, given a function, either leaves it alone, or makes it fail.
   Here is the definition of \vtt{op`->`}:
 \begin{verbatim}
-   op`->` := arg_ty => res_ty => f => x => res_ty( f( arg_ty( x )))
+   op`->` := arg_ty \clamsym res_ty \clamsym f \clamsym x \clamsym res_ty[ f[ arg_ty[x] ] ]
 \end{verbatim}
 That is, given an argument and result type (each of which is a partial identity function),
 and the function \vtt{f} itself, it returns a function that
@@ -492,7 +500,7 @@ is the best we can hope for.
 
 If we have an expression $e$ that yields a sequence of
 values $[v_1,\ldots,v_n]$, can we define a type (that is, a Verse function) that denotes that
-set of values?  Yes, of course: it is just \vtt{(x => x=$e$)}; that is, a function that,
+set of values?  Yes, of course: it is just \vtt{(x \clamsym x=$e$)}; that is, a function that,
 given a value $v$, will succeed (returning $v$) iff $v$ is among the values yielded by $e$.
 This idiom is sufficiently useful that Verse defines \vtt{typedef\{$e$\}} as syntactic sugar
 for that lambda (see \Cref{fig:sugar}).
@@ -544,6 +552,8 @@ belong to the type that $e$ describes.
   & | & \vtt{typedef\{$e$\}} & type definition \\
   & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
   & | & \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  & | & \vtt{$e_1$ ; $e_2$} & sequencing \\
+  & | & \vtt{$e_1$ where $e_2$} & sequencing \\
   & | & \vtt{do $e$} & scope delimiter \\
   $t$ & ::= & $e$ & types are expressions \\
   \\
@@ -558,6 +568,9 @@ belong to the type that $e$ describes.
   & | & \vtt{$d$ : $t$} & binding pattern \\
   & | & \vtt{$d$ := $e$} & binding pattern \\
   & | & \vtt{: $t$} & type pattern \\
+  & | & \vtt{let ($e$) in $p$} & local pattern \\
+  & | & \vtt{$e$ ; $p$} & sequence pattern \\
+  & | & \vtt{$p$ where $e$} & where pattern \\
   & | & $e$ & expression pattern \\
   \\
   \multicolumn{3}{l}{Constants}\\
@@ -565,11 +578,12 @@ belong to the type that $e$ describes.
   & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
   \\
   \multicolumn{3}{l}{Infix operators:} \\
-  $o$ & ::= & \vtt{;} & sequencing \\
-  & | & \vtt{where} & reverse sequencing \\
-  & | & \vtt{\&\&} \;|\; \vtt{||} & logic \\
+  $o$ & ::= & \vtt{\&\&} \;|\; \vtt{||} & logic \\
   & | & \vtt{=} \;|\; \vtt{<} \;|\; \vtt{>} \;|\;  $\cdots$ & comparisons \\
   & | & \vtt{+} \;|\; \vtt{*} \;|\;  $\cdots$ & arithmetic \\
+%%  & \vtt{;} & sequencing \\
+%%  & | & \vtt{where} & reverse sequencing \\
+%%  & |
 \end{tabular}
 \end{tabular}
 
@@ -577,9 +591,6 @@ belong to the type that $e$ describes.
 \end{figure}
 
 % A core lambda expression where the argument is always a variable.
-\newcommand{\clamsym}{\Rightarrow}
-\newcommand{\clam}[2]{#1 $\clamsym$ #2}
-
 \begin{figure}
 
 \begin{tabular}{c}
@@ -608,7 +619,7 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 % Use alternate definition for {}
 % \newcommand{\vseq}[1]{\{#1\}}
 \newcommand{\vseq}[1]{#1}
-\newcommand{\pmatch}[2]{$\mathbb{P}(#1, #2)$}
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
 
 \begin{figure}
 \begin{tabular}{c}
@@ -629,13 +640,8 @@ Constructs that are just syntactic sugar \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
   \hline \hline
   \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
-  \hline \hline
-  \hline \hline
-  \vtt{($p_0$,$\cdots$,$p_n$) := $e$} & \vtt{\vseq{x:=$e$; $p_0$:=x[0]; $\cdots$; $p_n$:=x[n]}} & \vtt{x} fresh \\
-  \vtt{$p_1$($p_2$) := $e$} & \vtt{$p_1$ := $p_2$ => $e$} &  \\
-  \vtt{$p$ : $t$ := $e$} & \vtt{$p$ := $t$[$e$]} & \\
-  \vtt{: $t$ := $e$} & \vtt{$t$[$e$]} & \\
-  \vtt{$e_1$ := $e_2$} & \vtt{$e_1$ = $e_2$} & $e_1$ not any other pattern \\
+  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
+  \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
   \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
@@ -646,13 +652,17 @@ Constructs that are just syntactic sugar \\
   \hline \hline
   \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
   \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
-  \pmatch{p_1(p_2)}{e} & ??? \\
-  \pmatch{x \vtt{:} t}{e} & \vtt{$x$ := $t$[$e$]} \\
-  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} \\
-  \pmatch{x}{e} & \vtt{$x$ = $e$} \\
-  \pmatch{e_1}{e_2} & \vtt{$e_1$ = $e_2$} \\
+  \pmatch{d \vtt{~:~} t}{e} & \vtt{$d$ : $t$ := $e$} & \\
+  \pmatch{d \vtt{~:=~} e_1}{e_2} & \vtt{$d$ := do $(e_1 = e_2)$} & \\
+  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
+  \pmatch{e_1 \vtt{;~} p}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
+  \pmatch{p \vtt{~where~} e_1}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
+  \pmatch{\vtt{let (} e_1 \vtt{) in } p}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
+  \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
   \hline
 \end{tabular}
+\\
+The \pmatch{p}{e} notation is just used during desugaring to indicate that a pattern is being desugared.
 \\ \\
 Constructs that are eliminated by extrusion \\
 \begin{tabular}{|l|l|}
@@ -935,7 +945,7 @@ but with all definitions replaced by \vtt{def-in}.
 \fi
   \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
   \semeqn{e_1(e_2)}{\mathrm{lift}(\mathrm{call}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
-  \semeqn{x \clamsym e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
+  \semeqn{x \clamsymx e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
   \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}}
   \semeqn{e_1,\cdots,e_n}{
     \mcompr{\tuple{v_1,\cdots,v_n}}
