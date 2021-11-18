@@ -218,6 +218,10 @@
 \newif\ifunify
 \unifyfalse % change to unifytrue to include unification
 
+%% Include matching operator
+\newif\ifmatch
+\matchtrue
+
 \section{Introduction}
 
 \lennart{Should we make all examples be valid actual Verse?  Possibly adding def{x}in.}
@@ -555,6 +559,9 @@ belong to the type that $e$ describes.
   & | & \vtt{$e_1$ ; $e_2$} & sequencing \\
   & | & \vtt{$e_1$ where $e_2$} & sequencing \\
   & | & \vtt{do $e$} & scope delimiter \\
+\ifmatch
+  & | & \vtt{$p$ :== $e$} & match \\
+\fi
   $t$ & ::= & $e$ & types are expressions \\
   \\
   \multicolumn{3}{l}{Definitions:} \\
@@ -618,7 +625,11 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 % Use alternate definition for {}
 % \newcommand{\vseq}[1]{\{#1\}}
 \newcommand{\vseq}[1]{#1}
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :== } #2$}
+\else
 \newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
 
 \begin{figure}
 \begin{tabular}{c}
@@ -651,17 +662,20 @@ Constructs that are just syntactic sugar \\
   \hline \hline
   \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
   \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
-  \pmatch{d \vtt{~:~} t}{e} & \vtt{$d$ : $t$ := $e$} & \\
-  \pmatch{d \vtt{~:=~} e_1}{e_2} & \vtt{$d$ := do $(e_1 = e_2)$} & \\
+  \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
+  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := do $(e_1 = e_2)$} & \\
   \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
-  \pmatch{e_1 \vtt{;~} p}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
-  \pmatch{p \vtt{~where~} e_1}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
-  \pmatch{\vtt{let (} e_1 \vtt{) in } p}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
+  \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
+  \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
+  \pmatch{(\vtt{let (} e_1 \vtt{) in } p)}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
   \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
   \hline
 \end{tabular}
 \\
+\ifmatch
+\else
 The \pmatch{p}{e} notation is just used during desugaring to indicate that a pattern is being desugared.
+\fi
 \\ \lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
 \\ \\
 Constructs that are eliminated by extrusion \\
