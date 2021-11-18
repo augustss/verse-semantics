@@ -564,7 +564,6 @@ belong to the type that $e$ describes.
   \\
   \multicolumn{3}{l}{Patterns:} \\
   $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
-%%  & | & \vtt{$p_1$($p_2$)} & function pattern \\
   & | & \vtt{$d$ : $t$} & binding pattern \\
   & | & \vtt{$d$ := $e$} & binding pattern \\
   & | & \vtt{: $t$} & type pattern \\
@@ -663,6 +662,7 @@ Constructs that are just syntactic sugar \\
 \end{tabular}
 \\
 The \pmatch{p}{e} notation is just used during desugaring to indicate that a pattern is being desugared.
+\\ \lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
 \\ \\
 Constructs that are eliminated by extrusion \\
 \begin{tabular}{|l|l|}
