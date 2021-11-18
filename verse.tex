@@ -885,7 +885,7 @@ but with all definitions replaced by \vtt{def-in}.
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{V}
-\newcommand{\Env}{E}
+\newcommand{\Env}{Env}
 
 \begin{figure}
   $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
@@ -956,7 +956,7 @@ but with all definitions replaced by \vtt{def-in}.
         \semapp{e_3}{\rho} & otherwise
       \end{cases*}
       }
-  \semeqn{\vtt{for(}e_1\vtt{)}e_2}{\mathrm{tuples}(\mcompr{\semapp{e_2}{\rho'}}{\mbind{\rho'}{\envapp{e_1}{\rho}}})}
+  \semeqn{\vtt{for(}e_1\vtt{)in }e_2}{\mathrm{tuples}(\mcompr{\semapp{e_2}{\rho'}}{\mbind{\rho'}{\envapp{e_1}{\rho}}})}
   \semeqn{\vtt{def\{}x_1,\cdots,x_n\vtt{\}in}\,e}
          {\mcompr{\semapp{e}{(\rho \circ \{ x_1 \mapsto v_1, \cdots, x_n \mapsto v_n\})}} {\mbind{v_1}{univ},\cdots,\mbind{v_n}{univ}}}
   \semeqn{\vtt{wrong}}{WRONG}
@@ -996,6 +996,11 @@ but with all definitions replaced by \vtt{def-in}.
   \lennart{This is all slightly wrong, since it doesn't propagate WRONG correctly.
     Perhaps * should be a monad that can throw an exception when something is WRONG.
   }
+  \lennart{Changing so $\mathcal{E}$ returns $V^{*}+WRONG$ is better in many ways,
+    but might impose some sequencing constraints.
+    But maybe not, since there is only one WRONG value so different errors cannot be distinguished.}
+  \lennart{The definition of $\mathcal{R}$ is wrong.}
+  \lennart{The definition of $\mathcal{R}$ is not compositional.}
 
 \caption{Expression semantics}
 \label{expression-semantics}
