@@ -8,7 +8,7 @@ x&&y;
 x||y;
 #
 x:int := e;
-(x,y) := e;
+## not currently allowed (x,y) := e;
 f(x:int) := e;
 x+y;
 x<y

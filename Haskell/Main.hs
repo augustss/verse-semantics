@@ -10,8 +10,8 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 import Desugar
 import Parse
 import Scope
-import CoreExpr(flattenSeqs)
 import Eval
+import Cleanup
 import Value
 import Opt
 
@@ -86,7 +86,7 @@ main = do
       eDesugar = desugar eParse
       eExtrude = extrude eDesugar
       eScope = scopeCheck eExtrude
-      eCleanup = flattenSeqs eScope
+      eCleanup = cleanup eScope
       eOpt = optimize eCleanup
       eEval = runE $ eval initialEnv eOpt
       dump d e = do
@@ -103,7 +103,7 @@ main = do
   dump dumpEval eEval
 
 comp :: String -> IO ()
-comp = pp . flattenSeqs . scopeCheck . extrude . desugar . parseString
+comp = pp . cleanup . scopeCheck . extrude . desugar . parseString
 
 ev :: String -> IO ()
-ev = putStrLn . unlines . map prettyShow . runE . eval initialEnv . flattenSeqs . scopeCheck . extrude . desugar . parseString
+ev = putStrLn . unlines . map prettyShow . runE . eval initialEnv . cleanup . scopeCheck . extrude . desugar . parseString

@@ -62,7 +62,7 @@ pString :: P String
 pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
 
 pOp :: String -> P String
-pOp ":" = pOp' ":" "="
+pOp ":" = pOp' ":" "=-"
 pOp "=" = pOp' "=" ">"
 pOp "<" = pOp' "<" ">="
 pOp ">" = pOp' ">" "="
@@ -121,7 +121,7 @@ operatorTable =
     [fn HasType InfixL ":", fn Unify InfixR "="] ++ map (opI InfixR) [">=", "<=", "<", ">", "<>"],
     [opI InfixR "&&"],
     [opI InfixR "||"],
-    [fn Define InfixL ":=", kw Where InfixN "where"],
+    [fn Define InfixL ":=", fn Match InfixN ":-", kw Where InfixN "where"],
     [fn Lambda InfixR "=>"]
   ]
   where

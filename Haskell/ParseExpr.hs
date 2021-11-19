@@ -4,6 +4,7 @@ module ParseExpr(
   Expr(..),
   Type,
   Pat,
+  Def,
   ) where
 import Data.Data(Data)
 import Prelude hiding ((<>))
@@ -29,33 +30,38 @@ instance Pretty Ident where
 data Expr
   = Var Ident                        -- x
   | Int Integer                      -- i
-  | Define Pat Expr                  -- p := e
+  | Define Def Expr                  -- d := e
+  | HasType Def Type                 -- d : t
   | Range Type                       -- :t
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
+  | Call Expr Expr                   -- e1(e2)
   | Lambda Pat Expr                  -- p => e
   | Alt Expr Expr                    -- e1 | e2
   | Array [Expr]                     -- e1, ..., en
   | If Expr Expr Expr                -- if(e1) then e2 else e3
   | For Expr Expr                    -- for(e1) e2
+  | TypeDef Expr                     -- typedef{e}
+  | Case Expr [Expr]                 -- case(e) of { e1; ...; en }
   | Let Expr Expr                    -- let (e1) in e2
   | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
-  ---
-  | DefIn [Ident] Expr               -- def{x,...}in e
-  ---
-  | Do Expr                          -- do e
-  | HasType Expr Type                -- x : t
-  | Call Expr Expr                   -- e1(e2)
-  | TypeDef Expr                     -- typedef{e}
   | Where Expr Expr                  -- e1 where e2
-  | Case Expr [Expr]                 -- case(e) of { e1; ...; en }
+  | Do Expr                          -- do e
+  | Match Pat Expr                   -- p ::= e
+  ----- Only for transforming CoreExpr to ParseExpr
+  | DefIn [Ident] Expr               -- def{is}in e
   deriving (Eq, Ord, Show)
 
 type Type = Expr
 
--- Stuff on the left of a :=
--- Only Var, HasType, Call are allowed
 type Pat = Expr
+
+type Def = Expr
+{- Notionall with these constructors:
+  = Func Def Pat                     -- d(p)
+  | HasType Def Type                 -- d : t
+  | Var Ident                        -- x
+-}
 
 ----------------------
 
@@ -106,4 +112,5 @@ instance Pretty Expr where
                 [ text "case" <+> parens (pPrintL l e) <+> text "of",
                   indent $ ppBlock (Seq bs)
                 ]
+          Match e1 e2 -> maybeParens (p >= 3) $ ppr 3 e1 <+> text ":-" <+> ppr 2 e2
       ppBlock e = pPrintPrec l 1 e

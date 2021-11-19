@@ -28,7 +28,8 @@ valueToExpr (VWrong s) = Var $ Ident $ "WRONG{" ++ s ++ "}"
 
 toLet :: Env -> Expr -> Expr
 toLet [] e = e
-toLet xvs e = Let (Seq [ Define x (valueToExpr v) | (x, v) <- xvs ]) e
+toLet xvs e = --Let (Seq [ Define x (valueToExpr v) | (x, v) <- xvs ]) e
+  DefIn (map fst xvs) $ Seq [ Unify (Var x) (valueToExpr v) | (x, v) <- xvs ]
 
 allValues :: [Value]
 allValues = --map VInt [0..63]

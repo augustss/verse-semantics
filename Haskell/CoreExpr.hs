@@ -21,21 +21,18 @@ import ParseExpr(Ident(..))
 data Expr
   = Var Ident                      -- x
   | Int Integer                      -- i
-  | Define Ident Expr              -- x := e
-  | Range Expr                       -- :t
   | Unify Expr Expr                  -- e1 = e2
   | Apply Expr Expr                  -- e1[e2]
-  | Call Expr Expr                   -- e1(e2)
   | Lambda Ident Expr              -- x => e
   | Alt Expr Expr                    -- e1 | e2
   | Array [Expr]                     -- e1, ..., en
   | If Expr Expr Expr                -- if(e1) then e2 else e3
   | For Expr Expr                    -- for(e1) e2
-  | Let Expr Expr                    -- let (e1) in e2
-  | Do Expr                          -- do e
-  | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
   -- after extrusion
   | DefIn [Ident] Expr             -- def{x,...}in e
+  -- These could be desugared
+  | Call Expr Expr                   -- e1(e2)
+  | Seq [Expr]  -- non-empty list    -- { e1; ...; en }
   deriving (Eq, Ord, Show, Data)
 
 pattern DefInX :: [Ident] -> Expr -> Expr
@@ -53,20 +50,16 @@ instance Pretty Expr where
 toParseExpr :: Expr -> P.Expr
 toParseExpr (Var x) = P.Var x
 toParseExpr (Int x) = P.Int x
-toParseExpr (Define x e) = P.Define (P.Var x) (toParseExpr e)
-toParseExpr (Range e) = P.Range (toParseExpr e)
 toParseExpr (Unify e1 e2) = P.Unify (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Apply e1 e2) = P.Apply (toParseExpr e1) (toParseExpr e2)
-toParseExpr (Call e1 e2) = P.Call (toParseExpr e1) (toParseExpr e2)
 toParseExpr (Array es) = P.Array (map toParseExpr es)
 toParseExpr (Lambda x e) = P.Lambda (P.Var x) (toParseExpr e)
 toParseExpr (Alt e1 e2) = P.Alt (toParseExpr e1) (toParseExpr e2)
 toParseExpr (If e1 e2 e3) = P.If (toParseExpr e1) (toParseExpr e2) (toParseExpr e3)
 toParseExpr (For e1 e2) = P.For (toParseExpr e1) (toParseExpr e2)
-toParseExpr (Let e1 e2) = P.Let (toParseExpr e1) (toParseExpr e2)
-toParseExpr (Do e) = P.Do (toParseExpr e)
-toParseExpr (Seq es) = P.Seq (map toParseExpr es)
 toParseExpr (DefIn is e) = P.DefIn is (toParseExpr e)
+toParseExpr (Call e1 e2) = P.Call (toParseExpr e1) (toParseExpr e2)
+toParseExpr (Seq es) = P.Seq (map toParseExpr es)
 
 -- Flatten all sequences and drop simple expressions that can have no effect.
 flattenSeqs :: Expr -> Expr
@@ -92,12 +85,12 @@ freeVars (Var x) = [x]
 freeVars (Int _) = []
 freeVars (Unify e1 e2) = freeVars e1 `union` freeVars e2
 freeVars (Apply e1 e2) = freeVars e1 `union` freeVars e2
-freeVars (Call e1 e2) = freeVars e1 `union` freeVars e2
 freeVars (Array es) = foldl' union [] $ map freeVars es
 freeVars (Lambda x e) = freeVars e \\ [x]
 freeVars (Alt e1 e2) = freeVars e1 `union` freeVars e2
 freeVars (If (DefInX xs e1) e2 e3) = ((freeVars e1 `union` freeVars e2) \\ xs) `union` freeVars e3
 freeVars (For (DefInX xs e1) e2) = (freeVars e1 `union` freeVars e2) \\ xs
-freeVars (Seq es) = foldl' union [] $ map freeVars es
 freeVars (DefIn xs e) = freeVars e \\ xs
+freeVars (Call e1 e2) = freeVars e1 `union` freeVars e2
+freeVars (Seq es) = foldl' union [] $ map freeVars es
 freeVars e = error $ "freeVars: " ++ show e

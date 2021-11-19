@@ -23,7 +23,6 @@ eval r (Var x) | Just v <- lookup x r = pure v
 eval r (Int i) = pure $ VInt i
 eval r (Unify e1 e2) = bind2 unify (eval r e1) (eval r e2)
 eval r (Apply e1 e2) = bind2 (apply True) (eval r e1) (eval r e2)
-eval r (Call e1 e2) = bind2 (apply False) (eval r e1) (eval r e2)
 eval r (Lambda x e) = pure $ VLambda r x e
 eval r (Alt e1 e2) = eval r e1 <|> eval r e2
 eval r (Array es) = VArray <$> traverse (eval r) es
@@ -36,10 +35,10 @@ eval r (For e1 e2) =
       vss = map (\ q -> runE (eval (q ++ r) e2)) rs
       vs = map VArray $ sequence vss
   in  E vs
-eval r (Seq es) = last <$> mapM (eval r) es
 eval r (DefIn [] e) = eval r e
 eval r (DefIn (x:xs) e) = asum [ eval ((x, v):r) (DefIn xs e) | v <- allValues ]
-eval _ e = error $ "eval: unexpected " ++ show e
+eval r (Call e1 e2) = bind2 (apply False) (eval r e1) (eval r e2)
+eval r (Seq es) = last <$> mapM (eval r) es
 
 evalEnvs :: Env -> Expr -> [Env]
 evalEnvs r ee =

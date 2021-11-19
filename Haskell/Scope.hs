@@ -1,5 +1,6 @@
 module Scope(extrude, scopeCheck) where
 
+import qualified Desugar as D
 import CoreExpr
 
 anySame :: (Eq a) => [a] -> Bool
@@ -8,37 +9,36 @@ anySame (x:xs) = elem x xs || anySame xs
 
 -----
 
-extrude :: Expr -> Expr
+extrude :: D.Expr -> Expr
 extrude = extDef
 
 -- Extract defs
-ext :: Expr -> (Expr, [Ident])
-ext e@Var{} = (e, [])
-ext e@Int{} = (e, [])
-ext (Define x e) = (Unify (Var x) e', x:d) where (e', d) = ext e
-ext (Range e) = (Apply e' (DefIn [x] (Var x)), d) where (e', d) = ext e; x = Ident "_"
-ext (Unify e1 e2) = (Unify e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
-ext (Apply e1 e2) = (Apply e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
-ext (Call e1 e2) = (Call e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
-ext (Lambda i e) = (Lambda i $ extDef e, [])
-ext (Alt e1 e2) = (Alt (extDef e1) (extDef e2), [])
-ext (Array es) = (Array es', concat ds) where (es', ds) = unzip $ map ext es
-ext (If e1 e2 e3) = (If (extDef e1) (extDef e2) (extDef e3), [])
-ext (For e1 e2) = (For (extDef e1) (extDef e2), [])
-ext (Let e1 e2) = (defIn (Seq [e1', e2'], d1), d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
-ext (Do e) = (extDef e, [])
-ext (Seq es) = (Seq es', concat ds) where (es', ds) = unzip $ map ext es
-ext (DefIn _ _) = error "ext: DefIn"
+ext :: D.Expr -> (Expr, [Ident])
+ext (D.Var x) = (Var x, [])
+ext (D.Int i) = (Int i, [])
+ext (D.Define x e) = (Unify (Var x) e', x:d) where (e', d) = ext e
+ext (D.Range e) = (Apply e' (DefIn [x] (Var x)), d) where (e', d) = ext e; x = Ident "_"
+ext (D.Unify e1 e2) = (Unify e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
+ext (D.Apply e1 e2) = (Apply e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
+ext (D.Call e1 e2) = (Call e1' e2', d1 ++ d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
+ext (D.Lambda i e) = (Lambda i $ extDef e, [])
+ext (D.Alt e1 e2) = (Alt (extDef e1) (extDef e2), [])
+ext (D.Array es) = (Array es', concat ds) where (es', ds) = unzip $ map ext es
+ext (D.If e1 e2 e3) = (If (extDef e1) (extDef e2) (extDef e3), [])
+ext (D.For e1 e2) = (For (extDef e1) (extDef e2), [])
+ext (D.Let e1 e2) = (defIn (Seq [e1', e2'], d1), d2) where (e1', d1) = ext e1; (e2', d2) = ext e2
+ext (D.Do e) = (extDef e, [])
+ext (D.Seq es) = (Seq es', concat ds) where (es', ds) = unzip $ map ext es
 
 
 -- Extract defs and insert a DefIn
-extDef :: Expr -> Expr
+extDef :: D.Expr -> Expr
 extDef = defIn . ext
 
 defIn :: (Expr, [Ident]) -> Expr
 defIn (e, is)
-        | anySame is = error $ "defIn" ++ show is
-        | otherwise = DefInX is e
+  | anySame is = error $ "defIn" ++ show is
+  | otherwise = DefInX is e
 
 -----
 

@@ -560,7 +560,7 @@ belong to the type that $e$ describes.
   & | & \vtt{$e_1$ where $e_2$} & sequencing \\
   & | & \vtt{do $e$} & scope delimiter \\
 \ifmatch
-  & | & \vtt{$p$ :== $e$} & match \\
+  & | & \vtt{$p$ :- $e$} & match \\
 \fi
   $t$ & ::= & $e$ & types are expressions \\
   \\
@@ -626,7 +626,7 @@ $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
 % \newcommand{\vseq}[1]{\{#1\}}
 \newcommand{\vseq}[1]{#1}
 \ifmatch
-\newcommand{\pmatch}[2]{$#1 \vtt{ :== } #2$}
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
 \else
 \newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
 \fi
@@ -663,7 +663,7 @@ Constructs that are just syntactic sugar \\
   \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
   \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
   \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
-  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := do $(e_1 = e_2)$} & \\
+  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := ($e_1$ = $e_2$)} & ??? use do?  continue matching in e1? \\
   \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
   \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
   \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
@@ -778,7 +778,6 @@ but with all definitions replaced by \vtt{def-in}.
 \RightLabel{IF}
 \TrinaryInfC{\defarrow{if($e_1$) then $e_2$ else $e_3$}{if($e'_1$) then $e'_2$ else $e'_3$}{\defempty}}
 \DisplayProof
-\\ The variables defined in the condition are also in scope in the \vtt{then} branch.
 \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
@@ -786,7 +785,6 @@ but with all definitions replaced by \vtt{def-in}.
 \RightLabel{FOR}
 \BinaryInfC{\defarrow{for($e_1$) in $e_2$}{for($e'_1$) in $e'_2$}{\defempty}}
 \DisplayProof
-\\ The variables defined in the domain are also in scope in body.
 \defafter
 
 \AxiomC{\defarrow{$e_1$}{$e'_1$}{$D_1$}}

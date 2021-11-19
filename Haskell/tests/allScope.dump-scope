@@ -14,7 +14,9 @@
  in {x = any[def _ in _];
      f = any[def _ in _];
      f(x)};
- {x => x};
+ {x#1 => (def x
+          in {x = any[x#1];
+              x})};
  def x
  in {x = any[def _ in _];
      x | (def y

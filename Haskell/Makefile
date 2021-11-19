@@ -1,6 +1,6 @@
 FWTMP=tmp
 FWVERSE=$(FWTMP)/fwverse
-PACKAGES= -package megaparsec -package parser-combinators -package mtl -package uniplate -package optparse-applicative
+PACKAGES= -package megaparsec -package parser-combinators -package mtl -package uniplate -package optparse-applicative -package smallcheck
 
 .PHONY:	all test clean
 

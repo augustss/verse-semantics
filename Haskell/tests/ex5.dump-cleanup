@@ -1,16 +1,18 @@
-def sumProd, sumProdLoop, x#3, s, p
+def sumProd, sumProdLoop, x#4, s, p
 in {sumProd = (x#1 => (def xs
-                       in {x#1 = xs = array(int)[def _ in _];
+                       in {xs = array(int)[x#1];
                            tuple(int, int)[sumProdLoop(0, xs, (0, 1))]}));
-    sumProdLoop = (x#2 => (def i, xs, sp, sum, prod
-                           in {x#2 = (i = int[def _ in _], xs = array(int)[def _ in _],
-                                      sp = (sum = int[def _ in _], prod = int[def _ in _]));
+    sumProdLoop = (x#2 => (def x#3, i, xs, sp, sum, prod
+                           in {x#3 = x#2;
+                               i = int[x#3[0]];
+                               xs = array(int)[x#3[1]];
+                               sp = (sum = int[def _ in _], prod = int[def _ in _]) = x#3[2];
                                tuple(int, int)[if (def x in x = xs[i])
                                                then sumProdLoop(operator'+'(i, 1), xs,
                                                                 (operator'+'(x, sum),
                                                                  operator'*'(x, prod)))
                                                else sp]}));
-    x#3 = sumProd(1, 2, 3, 4, 5);
-    s = x#3[0];
-    p = x#3[1];
+    x#4 = sumProd(1, 2, 3, 4, 5);
+    s = x#4[0];
+    p = x#4[1];
     print(operator'+'(s, p))}
