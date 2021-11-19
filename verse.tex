@@ -568,6 +568,7 @@ belong to the type that $e$ describes.
   $d$ & ::= & \vtt{$d$($p$)} & function \\
   & | & \vtt{$d$ : $t$} & type \\
   & | & $x$ & variable \\
+  & | & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
   \\
   \multicolumn{3}{l}{Patterns:} \\
   $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
@@ -650,8 +651,9 @@ Constructs that are just syntactic sugar \\
   \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
   \hline \hline
   \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
-  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
+  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} & ??? use t to transform? \\
   \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
+  \vtt{($d_0$,$\cdots$,$d_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh ??? allow tuples \\
   \hline \hline
   \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
   \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
