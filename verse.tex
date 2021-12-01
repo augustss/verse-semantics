@@ -374,7 +374,9 @@ Unusually, in Verse a \vtt{let} binding takes an \emph{expression} not a \emph{b
 \end{center}
 That is, we bring \vtt{x} into scope with the \vtt{def}; then constrain it to be equal to \vtt{p+q}; and return \vtt{x+x}.
 
-A \vtt{let} may bind many variables.  For example
+Some specifics:
+\begin{itemize}
+\item \emph{Binding multiple variables.}  A \vtt{let} may bind many variables.  For example
 $$
 \begin{array}{l}
   \vtt{let (x:=7+y; y:=10) in x+y} \\
@@ -387,16 +389,21 @@ but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \
   execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
   as you would expect.
 
-  \simon{I can use comma or semicolon in a 'let', can't I?  It makes no difference.}
-  \lennart{Yes, since the actual expression is discarded , and ; do the same thing.}
+\item It does not matter whether you use a comma or a semicolon in a
+  \vtt{let}; that is \vtt{(let (x:=7; y:=10) in $e$)} and \vtt{(let (x:=7; y:=10) in $e$)}
+  behave identically.  The \emph{value} of the first argument of the \vtt{let} is irrelevant; only its \emph{bindings} are important.
 
-A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
+\item \emph{Binding no variables.} A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
 
-In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
+\item \emph{Nested bindings.}  In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
 \begin{center}
   \vtt{let x:=7 + (y:=10) in x+y}
-\end{center}  
+\end{center}
 Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We will formalise the scoping rules in \Cref{sec:extrusion}.
+
+\item {Let substitution.}  Because of multiple values, \vtt{let} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(let x := (3|4) in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
+\simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
+\end{itemize}
 
 \subsection{Arrays}
 
@@ -450,9 +457,36 @@ In a function declared as non-failing, the compiler must \emph{prove} that it ca
 Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
 
-\section{Types}
+\section{Types and type checking}
 
-Verse is designed to be statically type-checked.
+Verse is designed to be statically type-checked.  The type checker is called the \emph{verifier}.
+Paraphrasing Milner: \emph{verified programs don't go wrong}.
+
+What does ``going wrong'' mean?  Going wrong is quite different
+to failure.  An expression \emph{fails} if it yields zero values, but
+it \emph{goes wrong} if something fundamentally unexpected happens. For example:
+\begin{itemize}
+\item We add an integer to a character, say.  That is the argument to a primitive operator is of the wrong type.
+\item The argument to a function does not satisfy its declared type.  (All functions in Verse have an explicitly declared argument type. \simon{Is tthis true?  What about result type?}
+\item Failure in a non-failing context.
+Failure (returning zero values) is only permitted in two contexts:
+\begin{enumerate}
+\item The first argument of \vtt{if}
+\item The first argument of \vtt{for}
+\item The body of a function declared as \vtt{<decides>}.
+\end{enumerate}
+Failure in any other context makes the program go wrong.
+\item \simon{Any other cases?}
+\end{itemize}
+The semantics of \Cref{sec:semantics} makes all this precise.
+
+
+We expect that the verifier may get smarter over time, accepting more
+programs.  But regardless of how smart or otherwise it is, a verified
+program should never go wrong.
+
+\subsection{What is a ``type''?}
+
 As in any typed language, a type describes a set of values.  In
 Verse, unusually, \emph{a ``type'' is just a particular sort of Verse expression}.
 Specifically a type is a partial identity function;
@@ -484,10 +518,11 @@ Verse has some built-in types:
 
 A function type \vtt{($t_1$ -> $t_2$)} is, like any Verse type, an expression.
   It is partial identity that, given a function, either leaves it alone, or makes it fail.
+%  Here is the definition of \vtt{op`->`}: \vtt{op`->` := $arg_ty$ \clamsym $res_ty$ \clamsym $f$ \clamsym $x$ \clamsym res_ty[ f[ arg_ty[x] ] ]}
   Here is the definition of \vtt{op`->`}:
-\begin{verbatim}
-   op`->` := arg_ty \clamsym res_ty \clamsym f \clamsym x \clamsym res_ty[ f[ arg_ty[x] ] ]
-\end{verbatim}
+  $$
+  \vtt{op`->` := arg\_ty \clamsym\, res\_ty \clamsym\, f \clamsym\, x \clamsym\, res\_ty[ f[ arg\_ty[x] ] ]}
+  $$
 That is, given an argument and result type (each of which is a partial identity function),
 and the function \vtt{f} itself, it returns a function that
 checks that the argument \vtt{x} satisfies
@@ -531,6 +566,15 @@ belong to the type that $e$ describes.
 
 \simon{Why does \vtt{:t} have to be in Fig 3. It can be done with a simple syntactic rewrite in Fig 2, can't it?} \simon{Answer: only because we don't want \vtt{def} in the pre-extrusion language.}
 
+
+\subsection{Typechecking functions}
+
+We typecheck a function in isolation, using the declared types of its arguments. Consider
+$$ \vtt{ f( x:int ) <succeeds> := x=3; x} $$
+The \vtt{<succeeds>} asks the verifier to check that the body never fails.
+It is possible that a call could succeed, thus $f(3)$.  But other calls can fail such as $f(4)$.  The verifier tries
+to prove that the body succeeds, using only the declared type of the argument, here \vtt{int}.  It cannot prove that
+\vtt{(x=3)} for any \vtt{int}, so the verifier rejects the definition.
 
 \section{Scope extrusion} \label{sec:scope} \label{sec:extrusion}
 
