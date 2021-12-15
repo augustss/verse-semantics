@@ -51,6 +51,7 @@
 
 
 %% Some recommended packages.
+\usepackage{amssymb}
 \usepackage{booktabs}   %% For formal tables:
                         %% http://ctan.org/pkg/booktabs
 \usepackage{subcaption} %% For complex figures with subfigures/subcaptions
@@ -628,23 +629,26 @@ to prove that the body succeeds, using only the declared type of the argument, h
 
 \section{Effects}
 
-\begin{verbatim}
-    Multiplicity Effects
+\subsection{Multiplicity Effects}
 
-                     abstracts
-                      /    |
-                evaluates  |
-                    /      |     UNDECIDABLE
-             resolves      |
-         ========|=========|================
-                 |    iterates
-                 |   /     |       DECIDABLE
-              decides      |
-         ========|=========|================
-             succeeds   fails        DECIDED
-                 \        / 
-                  diverges
+\begin{figure}
+\begin{verbatim}
+                          abstracts
+                           /    |
+                     evaluates  |
+                         /      |     UNDECIDABLE
+                  resolves      |
+              ========|=========|================
+                      |    iterates
+                      |   /     |       DECIDABLE
+                   decides      |
+              ========|=========|================
+                  succeeds   fails        DECIDED
+                      \        / 
+                       diverges
 \end{verbatim}
+\caption{Multiplicity effects} \label{fig:mult-effects}
+\end{figure}
 
 These effects have the following meaning:
 \begin{itemize}
