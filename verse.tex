@@ -66,6 +66,7 @@
 \usepackage{stmaryrd}
 \usepackage{mathtools}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{verbatim}
 \usepackage[capitalize]{cleveref}   % \Cref
 
@@ -244,8 +245,11 @@ latter is dealt with by \emph{scope extrusion}, which we discuss in
 \subsection{Expressions yield multiple values}
 
 Verse's most salient and unusual feature is that \emph{an expression yields a (possibly-empty) sequence of values}.
+This is not a new idea --- Verse inherits it from Ontic \cite{ontic} and $\lambda_\aleph$ \cite{lambda-aleph}
+--- but it makes Verse look and feel very different to a vanilla functional language.
 \lennart{Sequences is a semantic concept; not something at the language level.}
-For example:
+
+Here are some examples:
 \begin{itemize}
 \item The expression \vtt{2} yields (a sequences consisting of) exactly one value, namely $2$.
 \item The expression \vtt{(2 | 7 | 2)} yields a sequence of three values, namely $2$, $7$, and $2$.  We write this sequence $[2,7,2]$.
@@ -253,9 +257,27 @@ In general, the expression \vtt{($e_1$ | $e_2$)} yields all the values of $e_1$ 
 \item The expression \vtt{:false} yields no values at all, the empty sequence $[]$.  We will see in \Cref{sec:booleans} why \vtt{:false} is the canonical name for the expression yielding the empty sequence.
 \end{itemize}
 
-An expression that yields no values is said to \emph{fail}; it if returns one or more, it is said to \emph{succeed}.
+In general, the evaluation of an expression may:
+\begin{itemize}
+\item \emph{Diverge}.
+\item \emph{Fail}: evaluation terminates, but yields zero values.
+\item \emph{Succeed}: evaluation yields one or more values.
+\end{itemize}
+A value can be:
+\begin{itemize}
+\item An integer
+\item A character
+\item A function values
+\item \vtt{WRONG}
+\end{itemize}
+where \vtt{WRONG} is the value used when something ``impossible'' happens, such as adding an integer to a character.
+Note that we distinguish strongly between \emph{failing} which is perfectly normal, and \emph{going wrong} (i.e. returning \vtt{WRONG})
+which should never happen.
+Verse is statically typed, and its verifier guarantees that no \vtt{WRONG} values will ever occur (\Cref{sec:types}).
 
-\subsection{Function application is lifted over the argment sequences}
+\simon{The program could yield some values and then diverge.  That's not covered by the above description.}
+
+\subsection{Cross-product semantics}
 \label{sec:lifting}
 
 All functions are lifted to work over sequences, by taking the Cartesian product of their argument sequences.
@@ -263,13 +285,29 @@ For example, the expression \vtt{($e_1$ + $e_2$)} returns the sequence of all va
 $v_1$ is drawn from the sequence yielded by $e_1$, and
 $v_2$ is drawn from the sequence yielded by $e_2$.
 Thus \vtt{(2 | 7) + (4 | 11)} evaluates to the sequence $[6, 13, 11, 18]$.
+We call this the \emph{cross-product semantics}, because the result sequence is obtained a cross product of the argument sequences.
 
-From this lifting semantics, you can see that failure propagates
+From the cross-product semantics, you can see that failure propagates
 upward; for example, \vtt{(:false + $e$)} fails for any $e$, since there
 are no values $v_1$ returned by \vtt{:false}.
 
-The semicolon operator is an ordinary binary operator that simply returns its right-hand argument. Because of the lifting semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{(:false ; $e$)} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
+The semicolon operator is an ordinary binary operator that simply returns its right-hand argument. Because of the cross-product semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{(:false ; $e$)} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
 
+\subsection{Built in values}
+
+Verse has built-in integers (\vtt{1}, \vtt{21}, \vtt{-2} etc), and characters (\vtt{'x'}, \vtt{';'} etc).
+The integers come equipped with standard arithmetic operations like addition \vtt{$e_1$+$e_2$}, etc.   Infix operations can be
+written prefix using the C++-derived \vtt{operator} notation, thus: \vtt{operator'+'($e_1$,$e_2$)}.
+
+\simon{There must be a function that generates the sequence $[a, a+1, ..., b]$.  What is it?}
+
+Verse's only data structure is a one-dimensional \emph{array}.  When the array is of small fixed
+size, it is often called a \emph{tuple}.
+\begin{itemize}
+\item A literal array is built with comma notation. For example \vtt{(2,7,7)} is an tuple of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
+\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
+  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
+\end{itemize}
 
 \subsection{Comparisons and conditionals} \label{sec:bool}
 
@@ -280,15 +318,23 @@ conditional expression \vtt{(if $e_1$ then $e_2$ else $e_3$)},
   \item if $e_1$ returns one or more values, the conditional returns $e_2$.
 \end{itemize}
 
-The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, use the same idiom: \vtt{($e_1$ < $e_2$)} returns $e_1$ if the condition
-holds, and fails if it does not.  That makes \vtt{(if (3 > 4) then 10 else 20)} return $20$ as you would expect.
+Conjunction (and) and disjunction (or) are readily expressed:
+\begin{itemize}
+\item \emph{Conjunction.} The term \vtt{($e_1$,$e_2$)} succeeds iff both $e_1$ succeeds and $e_2$ succeeds.
+\item \emph{Disjunction.} The term \vtt{($e_1$ | $e_2$)} succeeds if either $e_1$ succeeds or $e_2$ succeeds.
+\end{itemize}
+
+The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, do not return a Boolean value; instead
+they fail if the comparison is false, or succeed otherwise.  More specifically, when a comparision succeeds
+it returns its left argument.
+That makes \vtt{(if (3 > 4) then 10 else 20)} return $20$ as you would expect.
 
 Amusingly, this semantics allows us to write
 \vtt{(0 < x < 10)}, an expression that succeeds (returning $10$) if and only if \vtt{x} is between 0 and 10.
-This only works because \vtt{(<)} is right associative, so the expression means \vtt{0 < (x<10)}. (Exercise for the reader:
+This works because \vtt{(<)} is right associative, so the expression means \vtt{0 < (x<10)}. (Exercise for the reader:
 what does \vtt{((0<x) < 10)} do?)
 
-What if $e_1$ and/or $e_2$ return a \emph{sequence} of values?  Remembering the lifting semantics of \Cref{sec:lifting},
+What if $e_1$ and/or $e_2$ return a \emph{sequence} of values?  Remembering the cross-product semantics of \Cref{sec:lifting},
 we take all pairs of values $(v_1,v_2)$ yielded by $e_1$ and $e_2$.  For each such pair, if $v_1 < v_2$ return $v_1$,
 otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yields the sequence $[1,1,8]$.
 
@@ -301,12 +347,12 @@ Not so in Verse.  Instead, a variable can be brought into scope \emph{without a 
 \begin{verbatim}
   def x in x + (x = 7; 5)
 \end{verbatim}
-The construct \vtt{def x in $e$} brings \vtt{x} into scope in $e$.\footnote{
+The construct \vtt{(def $v$ in $e$)} brings $v$ into scope in $e$.\footnote{
 In actual Verse there is no \vtt{def} construct; it is an explanatory device in this paper.
-In actual Verse you would write \vtt{x:any} to introduce an unbound variable.
+In actual Verse you would write \vtt{v:any} to introduce an unbound variable.
 }  Its semantics is unusual:
 \begin{itemize}
-\item The expression \vtt{(def x in $e$)} binds $x$ successively to
+\item The expression \vtt{(def $v$ in $e$)} binds $v$ successively to
   \emph{all possible values}, and returns all the values yielded
   by $e$ under those bindings.
 \item Although an expression yields multiple values, a variable is always bound to
@@ -325,7 +371,7 @@ It is easy to write an expression that yields an infinite sequence of values,
 by omitting all equalities.
 For example \vtt{def x in x} returns a sequence of all possible values.
 
-\paragraph{Scoping.} Verse allows you to omit the \vtt{def} entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitting the \vtt{def}:
+\paragraph{Scoping.} Verse allows you to omit the ``\vtt{def}'' entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitting the ``\vtt{def}'':
 \vtt{(x + (x:=7; 5)}.
 The binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
 Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s,
@@ -348,12 +394,14 @@ variable being bound.
 %In the syntax I've put \vtt{$p$ => $e$}; is that right?}
 \lennart{Lambdas and the beta rule are peculiar.}
 
-Function application is lifted, just like any other binary operator, but comes in two forms:
+Function application uses cross-product semantics, just like any other binary operator, but comes in two forms:
 \begin{itemize}
 \item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yielded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded.
 
-\item \vtt{$e_1$($e_2$)} is exactly the same, except that \simon{except that what, specifically}.
-\simon{Roughly: if the call fails, execution stops; it's WRONG. Not sure if that happens if all the calls $v_1(v_2)$ fail, or if any of them fail.}
+\item \vtt{$e_1$($e_2$)} is exactly the same, except that if any call in the cartesian product fails (yields zero results),
+  that call yields \vtt{WRONG}.
+  The verifier should guarantee that this cannot occur \Cref{sec:types}.
+  \simon{Have I got this right?}
 \end{itemize}
 For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
 More generally, Verse enjoys a form of the beta-rule, thus \lennart{This needs to be changed}
@@ -389,11 +437,13 @@ but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \
   execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
   as you would expect.
 
-\item It does not matter whether you use a comma or a semicolon in a
+It does not matter whether you use a comma or a semicolon in a
   \vtt{let}; that is \vtt{(let (x:=7; y:=10) in $e$)} and \vtt{(let (x:=7; y:=10) in $e$)}
   behave identically.  The \emph{value} of the first argument of the \vtt{let} is irrelevant; only its \emph{bindings} are important.
 
 \item \emph{Binding no variables.} A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
+
+  \simon{So what is the difference between \vtt{(let $e_1$ in $e_2$)} and \vtt{($e_1$ ; $e_2$)}?}
 
 \item \emph{Nested bindings.}  In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
 \begin{center}
@@ -407,27 +457,21 @@ Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We w
 
 \subsection{Arrays}
 
-Verse's only data structure is a one-dimensional \emph{array}.  When the array is of small fixed
-size, it is often called a \emph{tuple}.
-\begin{itemize}
-\item A literal array is built with comma notation. For example \vtt{(2,7,7)} is an tuple of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
-\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
-  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
-\end{itemize}
 
 \subsubsection{The \vtt{for} construct}
 
 The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
 For example:
 \begin{verbatim}
-for (i := (1 | 2 | 3)) (i*i)
+      for (i := (1 | 2 | 3)) (i*i)
 \end{verbatim}
-So \vtt{for} reifies the sequence of values yielded by an expression into a value (the array)
+So \vtt{for} reifies the \emph{sequence of values} yielded by an expression into a \emph{single value} (the array)
 containing all those values.
-A \vtt{for} always yields a single value.
-
-\simon{What if the sequence is empty?  Failure, or an empty array?}
-\lennart{The empty array.  But if any $e_2$ fails the whole \vtt{for} fails.}
+\begin{itemize}
+\item If $e_1$ yields the empty sequence, the \vtt{for} yields (a singleton sequence of) the empty array.
+\item Cross-product semantics applies to $e_2$.  So if $e_2$ fails for any iteration, the entire \vtt{for} fails;
+  if an iteration of $e_2$ yields multiple values, the \vtt{for} returns an array for each of them.
+\end{itemize}
 
 \simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
   of all the values returned by $e$?  Then we would write the above example like this:}
@@ -457,7 +501,7 @@ In a function declared as non-failing, the compiler must \emph{prove} that it ca
 Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
 
-\section{Types and type checking}
+\section{Types and type checking} \label{sec:types}
 
 Verse is designed to be statically type-checked.  The type checker is called the \emph{verifier}.
 Paraphrasing Milner: \emph{verified programs don't go wrong}.
@@ -469,7 +513,7 @@ it \emph{goes wrong} if something fundamentally unexpected happens. For example:
 \item We add an integer to a character, say.  That is the argument to a primitive operator is of the wrong type.
 \item The argument to a function does not satisfy its declared type.  (All functions in Verse have an explicitly declared argument type. \simon{Is tthis true?  What about result type?}
 \item Failure in a non-failing context.
-Failure (returning zero values) is only permitted in two contexts:
+Failure (returning zero values) is only permitted in three contexts:
 \begin{enumerate}
 \item The first argument of \vtt{if}
 \item The first argument of \vtt{for}
@@ -485,13 +529,19 @@ We expect that the verifier may get smarter over time, accepting more
 programs.  But regardless of how smart or otherwise it is, a verified
 program should never go wrong.
 
-\subsection{What is a ``type''?}
+\subsection{What is a ``type''?} \label{sec:what-is-a-type}
 
 As in any typed language, a type describes a set of values.  In
 Verse, unusually, \emph{a ``type'' is just a particular sort of Verse expression}.
-Specifically a type is a partial identity function;
-it fails on values that do not belong to the type, and is the identity function (returning a singleton sequence) for the values that do belong.  A mathematician would call it the
-\emph{characteristic function} of the set of values; a denotational semantics person might call it a \emph{retraction}.
+Specifically a \emph{type} is a function that
+\begin{itemize}
+\item Returns zero or one results
+\item Is idempotent
+\end{itemize}
+The \emph{inhabitants of a type} $t$ are the values $v$ such that $t(v) = [v]$; that is, the values
+on which $t$ succeeds, and returns its input.
+A denotational semantics person might describe a type as a \emph{retraction}, and
+indeed Cardelli used retractions as types in \cite{cardelli:type-in-type}.
 
 So, for example:
 \begin{itemize}
@@ -502,7 +552,7 @@ So in Verse, it is easy to carve out arbitrarily complex sets of
 values; refinement types are built in.  Of course, that puts a complete type checker well
 out of reach, but an incomplete typechecker can still give strong static guarantees about some
 Verse programs.
-
+a
 \subsection{Built in types}
 
 Verse has some built-in types:
@@ -547,17 +597,16 @@ for that lambda (see \Cref{fig:sugar}).
 So, for example \vtt{typedef\{3 | 7 | 21\}} is the type consisting of 3, 7, and 21.
 The type of natural numbers can be defined by \vtt{nat := typedef\{x:int where x>=0\}}.
 
-\subsection{The colon operator}
+\subsection{Colon operators: \vtt{:e} and \vtt{x:e}}
 \lennart{This has to also deal with abstraction contexts.}
 
-The expression \vtt{:e}, written with a unary prefix colon, yields the sequence of all
-values that inhabit the type \vtt{e}.  So, for example,
+The expression \vtt{:e}, written with a unary prefix colon, yields the sequence of inhabitatnts of
+the type \vtt{e} (\Cref{sec:what-is-a-type}).  So, for example,
 \vtt{:char} yields the sequence of all characters.
-
 But this is mere syntactic sugar:
 \begin{center}
 \begin{tabular}{rcl}
-\vtt{:$e$} & $\equiv$ & \vtt{$e$(def x in x)}
+\vtt{:$e$} & $\equiv$ & \vtt{$e$[def x in x]}
 \end{tabular}
 \end{center}
 As mentioned in \Cref{sec:any}, the expression \vtt{(def x in x)} enumerates all values; then
@@ -566,6 +615,8 @@ belong to the type that $e$ describes.
 
 \simon{Why does \vtt{:t} have to be in Fig 3. It can be done with a simple syntactic rewrite in Fig 2, can't it?} \simon{Answer: only because we don't want \vtt{def} in the pre-extrusion language.}
 
+The expression \vtt{x:e} is just syntactic sugar for \vtt{x := :e}; that is, it brings \vtt{x}
+into scope, and limits its bindings to the inhabitants of \vtt{e} (\Cref{fig:sugar}).
 
 \subsection{Typechecking functions}
 
@@ -576,62 +627,93 @@ It is possible that a call could succeed, thus $f(3)$.  But other calls can fail
 to prove that the body succeeds, using only the declared type of the argument, here \vtt{int}.  It cannot prove that
 \vtt{(x=3)} for any \vtt{int}, so the verifier rejects the definition.
 
-\section{Scope extrusion} \label{sec:scope} \label{sec:extrusion}
+\section{Effects}
+
+\begin{verbatim}
+    Multiplicity Effects
+
+                     abstracts
+                      /    |
+                evaluates  |
+                    /      |     UNDECIDABLE
+             resolves      |
+         ========|=========|================
+                 |    iterates
+                 |   /     |       DECIDABLE
+              decides      |
+         ========|=========|================
+             succeeds   fails        DECIDED
+                 \        / 
+                  diverges
+\end{verbatim}
+
+These effects have the following meaning:
+\begin{itemize}
+\item Diverges: evalution fails to terminate.
+\item Fails: evaluation diverges of fails (returns zero values)
+\item Succeeds: evaluation diverges or returns one or more values
+\item Iterates: eavluation diverges or returns a finite number of values 
+\item Decides: ???
+\item Resolves: ???
+\item Evaluates: ???
+\item Abstracts: ???
+\end{itemize}
+  
+
+\section{Syntax and syntactic sugar}
 
 \begin{figure}
-
 \begin{tabular}{c}
-
 \begin{tabular}{rcll}
   \multicolumn{3}{l}{Expressions:} \\  
   $e$ & ::= & $x$ & use variable \\
-  & | & $k$ & constant \\
-  & | & \vtt{$d$ := $e$} & definition \\
-  & | & \vtt{$x$ : $t$} & definition \\
-  & | & \vtt{: $t$} & range \\
-  & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & | & \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  & | & \vtt{$p$ => $e$} & lambda expression \\
-  & | & \vtt{$e_1$ | $e_2$} & alternative \\
-  & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & | & \vtt{for ($e_1$) in $e_2$} & array creation \\
-  & | & $e_1 \;o\; e_2$ & infix operator \\
-  & | & \vtt{typedef\{$e$\}} & type definition \\
-  & | & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
-  & | & \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  & | & \vtt{$e_1$ ; $e_2$} & sequencing \\
-  & | & \vtt{$e_1$ where $e_2$} & sequencing \\
-  & | & \vtt{do $e$} & scope delimiter \\
+  & $\mid$ & $k$ & constant \\
+  & $\mid$ & \vtt{$d$ := $e$} & definition \\
+  & $\mid$ & \vtt{$x$ : $t$} & definition \\
+  & $\mid$ & \vtt{: $t$} & range \\
+  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
+  & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
+  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
+  & $\mid$ & $e_1 \;o\; e_2$ & infix operator \\
+  & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
+  & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
+  & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
+  & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
+  & $\mid$ & \vtt{do $e$} & scope delimiter \\
 \ifmatch
-  & | & \vtt{$p$ :- $e$} & match \\
+  & $\mid$ & \vtt{$p$ :- $e$} & match \\
 \fi
   $t$ & ::= & $e$ & types are expressions \\
   \\
   \multicolumn{3}{l}{Definitions:} \\
   $d$ & ::= & \vtt{$d$($p$)} & function \\
-  & | & \vtt{$d$ : $t$} & type \\
-  & | & $x$ & variable \\
-  & | & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
+  & $\mid$ & \vtt{$d$ : $t$} & type \\
+  & $\mid$ & $x$ & variable \\
+  & $\mid$ & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
   \\
   \multicolumn{3}{l}{Patterns:} \\
   $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
-  & | & \vtt{$d$ : $t$} & binding pattern \\
-  & | & \vtt{$d$ := $e$} & binding pattern \\
-  & | & \vtt{: $t$} & type pattern \\
-  & | & \vtt{let ($e$) in $p$} & local pattern \\
-  & | & \vtt{$e$ ; $p$} & sequence pattern \\
-  & | & \vtt{$p$ where $e$} & where pattern \\
-  & | & $e$ & expression (exact match) pattern \\
+  & $\mid$ & \vtt{$d$ : $t$} & binding pattern \\
+  & $\mid$ & \vtt{$d$ := $e$} & binding pattern \\
+  & $\mid$ & \vtt{: $t$} & type pattern \\
+  & $\mid$ & \vtt{let ($e$) in $p$} & local pattern \\
+  & $\mid$ & \vtt{$e$ ; $p$} & sequence pattern \\
+  & $\mid$ & \vtt{$p$ where $e$} & where pattern \\
+  & $\mid$ & $e$ & expression (exact match) pattern \\
   \\
   \multicolumn{3}{l}{Constants}\\
-  $k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
-  & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
+  $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
+  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
   \\
   \multicolumn{3}{l}{Infix operators:} \\
-  $o$ & ::= & \vtt{\&\&} \;|\; \vtt{||} & logic \\
-  & | & \vtt{=} \;|\; \vtt{<} \;|\; \vtt{>} \;|\;  $\cdots$ & comparisons \\
-  & | & \vtt{+} \;|\; \vtt{*} \;|\;  $\cdots$ & arithmetic \\
+  $o$ & ::= & \vtt{\&\&} \;$\mid$\; \vtt{||} & logic \\
+  & $\mid$ & \vtt{=} \;$\mid$\; \vtt{<} \;$\mid$\; \vtt{>} \;$\mid$\;  $\cdots$ & comparisons \\
+  & $\mid$ & \vtt{+} \;$\mid$\; \vtt{*} \;$\mid$\;  $\cdots$ & arithmetic \\
 %%  & \vtt{;} & sequencing \\
 %%  & | & \vtt{where} & reverse sequencing \\
 %%  & |
@@ -649,20 +731,21 @@ to prove that the body succeeds, using only the declared type of the argument, h
 \begin{tabular}{rcll}
   $e$ & ::= &
     $x$ & use variable \\
-  & | & $k$ & constant \\
-  & | & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & | & \vtt{\clam{$x$}{$e$}} & lambda expression \\
-  & | & \vtt{$e_1$ | $e_2$} & alternative \\
-  & | & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  & | & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & | & \vtt{for ($e_1$) in $e_2$} & array formation \\
-  & | & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
-$k$ & ::= & $0 \;|\; 1 \;|\; 2 \;|\; 3 \cdots$ & natural numbers \\
-  & | & $ \vtt{int} \;|\; \vtt{any} \;|\; \cdots$ & predefined constants \\
-  & | & $ \vtt{op'+'} \;|\; \vtt{op'-'} \;|\; \vtt{op'<'} \;|\; \cdots$ & predefined constants \\
-  & | & $ \vtt{op';'} $ & predefined constants \\
+  & $\mid$ & $k$ & constant \\
+  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & $\mid$ & \vtt{\clam{$x$}{$e$}} & lambda expression \\
+  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
+  & $\mid$ & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
+  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
+  & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
+  & $\mid$ & $ \vtt{op';'} $ & predefined constants \\
 \end{tabular}
 \end{tabular}
+
 
 \caption{Core Verse syntax} \label{fig:core}
 \end{figure}
@@ -739,6 +822,13 @@ Constructs that are eliminated by extrusion \\
 \caption{Syntactic sugar} \label{fig:sugar}
 \end{figure}
 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Scoping rules}  \label{sec:scope} \label{sec:extrusion}
+
 \newcommand{\defdefin}[2]{\vtt{#1} $\rightsquigarrow$ \vtt{#2}}
 \newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
 \newcommand{\defempty}{$\varnothing$}
@@ -747,16 +837,6 @@ Constructs that are eliminated by extrusion \\
 \newcommand{\defunions}[1]{$\biguplus #1$}
 \newcommand{\defunique}[1]{$\# #1$}
 \newcommand{\defafter}{\\ \vspace*{1em}}
-
-\vspace{3em}
-
-Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
-Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
-\defempty is the empty multiset.
-The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
-\vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
-The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
-but with all definitions replaced by \vtt{def-in}.
 
 \begin{figure}
 \vspace*{4mm}
@@ -940,6 +1020,20 @@ but with all definitions replaced by \vtt{def-in}.
 \caption{Scoping rules}
 \label{scoping-rules}
 \end{figure}
+
+In Verse, as in Python, 
+Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
+Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
+\defempty is the empty multiset.
+The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
+\vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
+The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
+but with all definitions replaced by \vtt{def-in}.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Semantics}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{V}
@@ -1206,7 +1300,7 @@ but with all definitions replaced by \vtt{def-in}.
 \end{acks}
 
 %% Bibliography
-\bibliography{bibliography}
+\bibliography{verse}
 
 
 \end{document}
