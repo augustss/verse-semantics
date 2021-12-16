@@ -223,6 +223,15 @@
 \newif\ifmatch
 \matchtrue
 
+\section{Questions for Tim}
+
+\begin{itemize}
+\item Currently \vtt{false} is a synonym for \vtt{()}, the empty array.  So \vtt{:false} is an expression that always fails, returning no values.
+  But this means that we have to write \vtt{:false} where in an ordinary language one would write just \vtt{false}.  For example \vtt{(if :false then $e_1$ else $e_2$)} is equivalent to $e_2$.  But \vtt{if false then $e_1$ else $e_2$} is equivalent to $e_1$.  This is jolly confusing.
+
+  Could we not say that \vtt{false} is a synonym for \vtt{:()}; that is, it is the expression that always fails?
+\end{itemize}
+
 \section{Introduction}
 
 \lennart{Should we make all examples be valid actual Verse?  Possibly adding def{x}in.}
@@ -242,7 +251,7 @@ and sugar that requires some care with scoping when translating.  The
 latter is dealt with by \emph{scope extrusion}, which we discuss in
 \Cref{sec:extrusion}.
 
-\subsection{Expressions yield multiple values}
+\subsection{Expressions yield multiple values} \label{sec:multi-value}
 
 Verse's most salient and unusual feature is that \emph{an expression yields a (possibly-empty) sequence of values}.
 This is not a new idea --- Verse inherits it from Ontic \cite{ontic} and $\lambda_\aleph$ \cite{lambda-aleph}
@@ -256,18 +265,15 @@ Here are some examples:
 In general, the expression \vtt{($e_1$ | $e_2$)} yields all the values of $e_1$ followed by all the values of $e_2$.
 \item The expression \vtt{:false} yields no values at all, the empty sequence $[]$.  We will see in \Cref{sec:booleans} why \vtt{:false} is the canonical name for the expression yielding the empty sequence.
 \end{itemize}
+\noindent
+An expression is said to \emph{fail} if it returns no values at all; and to \emph{succeed} if it returns one or more values.
 
-In general, the evaluation of an expression may:
-\begin{itemize}
-\item \emph{Diverge}.
-\item \emph{Fail}: evaluation terminates, but yields zero values.
-\item \emph{Succeed}: evaluation yields one or more values.
-\end{itemize}
 A value can be:
 \begin{itemize}
 \item An integer
+\item A floating point number
 \item A character
-\item A function values
+\item A function value
 \item \vtt{WRONG}
 \end{itemize}
 where \vtt{WRONG} is the value used when something ``impossible'' happens, such as adding an integer to a character.
@@ -275,7 +281,6 @@ Note that we distinguish strongly between \emph{failing} which is perfectly norm
 which should never happen.
 Verse is statically typed, and its verifier guarantees that no \vtt{WRONG} values will ever occur (\Cref{sec:types}).
 
-\simon{The program could yield some values and then diverge.  That's not covered by the above description.}
 
 \subsection{Cross-product semantics}
 \label{sec:lifting}
@@ -300,6 +305,7 @@ The integers come equipped with standard arithmetic operations like addition \vt
 written prefix using the C++-derived \vtt{operator} notation, thus: \vtt{operator'+'($e_1$,$e_2$)}.
 
 \simon{There must be a function that generates the sequence $[a, a+1, ..., b]$.  What is it?}
+\simon{Answer \vtt{1..5}}.
 
 Verse's only data structure is a one-dimensional \emph{array}.  When the array is of small fixed
 size, it is often called a \emph{tuple}.
@@ -320,8 +326,11 @@ conditional expression \vtt{(if $e_1$ then $e_2$ else $e_3$)},
 
 Conjunction (and) and disjunction (or) are readily expressed:
 \begin{itemize}
-\item \emph{Conjunction.} The term \vtt{($e_1$,$e_2$)} succeeds iff both $e_1$ succeeds and $e_2$ succeeds.
+\item \emph{Conjunction.} The term \vtt{($e_1$ ; $e_2$)} succeeds iff both $e_1$ succeeds and $e_2$ succeeds.
 \item \emph{Disjunction.} The term \vtt{($e_1$ | $e_2$)} succeeds if either $e_1$ succeeds or $e_2$ succeeds.
+\item \emph{Negation.} Verse provides a negation operator \vtt{!$e$}, which is syntactic sugar
+  for \vtt{(if x then :false else ())}.  That is, if $e$ fails, \vtt{!$e$} succeeds, returning the value \vtt{()};
+  but if $e$ succeeds, \vtt{!$e$} fails.  (Remember, \vtt{:false} is the expression that fails (\Cref{sec:multi-value}).
 \end{itemize}
 
 The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, do not return a Boolean value; instead
@@ -506,6 +515,18 @@ Almost all interesting functions can fail; e.g. any type constraint can make it 
 Verse is designed to be statically type-checked.  The type checker is called the \emph{verifier}.
 Paraphrasing Milner: \emph{verified programs don't go wrong}.
 
+\subsection{Going wrong}
+
+There are exactly two ways in which a program can produce the value \vtt{WRONG}
+\begin{enumerate}
+\item The body of a function fails (returns zero values), but the function's multiplicity effects
+  are declared as \vtt{<succeeds>} or \vtt{divereges}.
+\item A round-parenthesis function call \vtt{$f$($e$)} fails. (Presumably $f$ is not labelled
+  as \vtt{<succeeds>} or \vtt{divereges}.)
+\end{enumerate}
+In both cases, the call succeeds, returning the singleton \vtt{WRONG} value.
+One way in which (2) can occur
+
 What does ``going wrong'' mean?  Going wrong is quite different
 to failure.  An expression \emph{fails} if it yields zero values, but
 it \emph{goes wrong} if something fundamentally unexpected happens. For example:
@@ -652,18 +673,19 @@ to prove that the body succeeds, using only the declared type of the argument, h
 
 These effects have the following meaning:
 \begin{itemize}
-\item Diverges: evalution fails to terminate.
-\item Fails: evaluation diverges of fails (returns zero values)
-\item Succeeds: evaluation diverges or returns one or more values
-\item Iterates: eavluation diverges or returns a finite number of values 
-\item Decides: ???
+\item Diverges: evalution diverges
+\item Fails: evaluation diverges or fails (returns zero values)
+\item Succeeds: evaluation diverges or returns exactly one value.
+\item Iterates: evaluation diverges, fails, or returns a finite number of values
+\item Decides: diverges, fails, or succeeds with one value.
+\simon{There should be a line from fails to decides}
 \item Resolves: ???
 \item Evaluates: ???
-\item Abstracts: ???
+\item Abstracts: we don't know anything
 \end{itemize}
-  
+\simon{Runtime checks possible for fail, succeeds, decides.}
 
-\section{Syntax and syntactic sugar}
+\section{Formalising Verse}
 
 \begin{figure}
 \begin{tabular}{c}
@@ -1041,15 +1063,6 @@ but with all definitions replaced by \vtt{def-in}.
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{V}
 \newcommand{\Env}{Env}
-
-\begin{figure}
-  $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
-  $\Env = Ident \rightarrow \Value$ \\
-  where $\tuple{\Value}$ is a tuple (array) of values, $\Value^{*}$ is a (semantic) sequence (monad) of values.
-\caption{Semantic domains}
-\label{semantic-domains}
-\end{figure}
-
 \newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
 \newcommand{\mcompr}[2]{[ #1 \:|\: #2 ]}
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
@@ -1063,14 +1076,20 @@ but with all definitions replaced by \vtt{def-in}.
 \newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
 
+
 \begin{figure}
+  $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
+  $\Env = Ident \rightarrow \Value$ \\
+  where $\tuple{\Value}$ is a tuple (array) of values, $\Value^{*}$ is a (semantic) sequence (monad) of values.
+
   \begin{align*}
     \tuple{v_1,\cdots,v_n} && \text{create a tuple,}\, n >= 0 \\
+    t_i                    && \text{index into a tuple} \\
+    \mathrm{size}(t)       && \text{number of elements in a tuple} \\
     \munit{v_1,\cdots,v_n} && \text{create a sequence,}\, n >= 0 \\
+    v : s                 && \text{add an item to the front of a sequence} \\
     s_1 \malt s_2          && \text{sequence concatenation} \\
     \mcompr{e}{\mbind{x}{s}, \cdots} && \text{sequence comprehension} \\
-    t_i                    && \text{index into a tuple} \\
-    \mathrm{size}(t)       && \text{number of elements in a tuple}
   \end{align*}
   \begin{multline*}
     \mathrm{tuples}(\munit{
@@ -1199,6 +1218,31 @@ but with all definitions replaced by \vtt{def-in}.
 \caption{Some predefined constants.  Note that several of these could be defined in Verse}
 \label{predefined}
 \end{table}
+
+\subsection{Divergence and sequencing}
+
+In general, the evaluation of an expression may:
+\begin{itemize}
+\item \emph{Diverge}.
+\item \emph{Terminate} with no further values.
+\item \emph{Yield a value}, and then behave in one of these three ways.
+\end{itemize}
+Another way to say this is that the semantics of an expression is a sequence of values,
+where the sequence may be infinite, may terminate, or may at some point diverge.
+
+Notice that we say \emph{sequence} of values rather than \emph{set} or \emph{bag} of values.
+The order is semantically significant in two places:
+\begin{itemize}
+\item Consider \vtt{(if (loop | 3) then $e_1$ else $e_2$)}. To evaluate \vtt{(loop | 3)} Verse
+  will try to return all the values of \vtt{loop}.  So if \vtt{loop} diverges, the \vtt{if} will diverge too.
+  In contrast \vtt{(if (3 | loop) then $e_1$ else $e_2$)} will immediately return $e_1$.  In terms of
+  semantics, \vtt{loop | 3} evaluates to $\bot$, whereas \vtt{3 | loop} evaluates to $3 : \bot$.
+
+\item The expression \vtt{for($e_1$) in $e_2$} iterates over the values returned by $e_1$, forming an
+  array of the values of $e_2$ for each iteration.  So $for(i := (1|7)) in (i+1)$ returns the array $(2,8)$,
+  not the array $(8,2)$; the order of the results yielded by $(1|7)$ is reified into the array
+  returned by the \vtt{for}.
+\end{itemize}
 
 \clearpage
 \section{Examples}
