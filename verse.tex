@@ -672,7 +672,7 @@ to prove that the body succeeds, using only the declared type of the argument, h
 
 These effects have the following meaning:
 \begin{itemize}
-\item Diverges $\{\bot\}$): evalution diverges
+\item Diverges $\{\bot\}$: evalution diverges
 \item Fails $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
 \item Succeeds $\{\bot, [v]\}$: evaluation diverges or returns exactly one value.
 \item Decides $\{\bot, [], [v]\}$: diverges, fails, or succeeds with one value.
@@ -683,6 +683,12 @@ These effects have the following meaning:
 \item Abstracts: we don't know anything
 \end{itemize}
 \simon{Runtime checks possible for fail, succeeds, decides.}
+
+\begin{itemize}
+  \item \simon{Question: what about $v:\bot$?  Is that ``succeeds''?  Probably not.}
+  \item \simon{What are resolves, evaluates, abstracts?}
+  \item \simon{What about $v:\bot$?  Is that ``succeeds''?  Probably not.}
+\end{itemize}
 
 \section{Formalising Verse}
 
