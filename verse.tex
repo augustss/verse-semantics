@@ -673,16 +673,17 @@ to prove that the body succeeds, using only the declared type of the argument, h
 
 These effects have the following meaning:
 \begin{itemize}
-\item Diverges: evalution diverges
-\item Fails: evaluation diverges or fails (returns zero values)
-\item Succeeds: evaluation diverges or returns exactly one value.
-\item Iterates: evaluation diverges, fails, or returns a finite number of values
-\item Decides: diverges, fails, or succeeds with one value.
+\item Diverges $\{\bot\}$): evalution diverges
+\item Fails $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
+\item Succeeds $\{\bot, [v]\}$: evaluation diverges or returns exactly one value.
+\item Decides $\{\bot, [], [v]\}$: diverges, fails, or succeeds with one value.
 \simon{There should be a line from fails to decides}
+\item Iterates: $\{\bot, [v_1, \ldots, v_n]\}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values
 \item Resolves: ???
 \item Evaluates: ???
 \item Abstracts: we don't know anything
 \end{itemize}
+\simon{What about 
 \simon{Runtime checks possible for fail, succeeds, decides.}
 
 \section{Formalising Verse}
