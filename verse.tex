@@ -229,6 +229,8 @@
   But this means that we have to write \vtt{:false} where in an ordinary language one would write just \vtt{false}.  For example \vtt{(if :false then $e_1$ else $e_2$)} is equivalent to $e_2$.  But \vtt{if false then $e_1$ else $e_2$} is equivalent to $e_1$.  This is jolly confusing.
 
   Could we not say that \vtt{false} is a synonym for \vtt{:()}; that is, it is the expression that always fails?
+
+\item Multiplicity effects: see \Cref{sec:multiplicity}
 \end{itemize}
 
 \section{Introduction}
@@ -649,7 +651,7 @@ to prove that the body succeeds, using only the declared type of the argument, h
 
 \section{Effects}
 
-\subsection{Multiplicity Effects}
+\subsection{Multiplicity Effects} \label{sec:multiplicity}
 
 \begin{figure}
 \begin{verbatim}
@@ -687,6 +689,7 @@ These effects have the following meaning:
 \begin{itemize}
   \item \simon{Question: what about $v:\bot$?  Is that ``succeeds''?  Probably not.}
   \item \simon{What are resolves, evaluates, abstracts?}
+  \item \simon{What about an infinite list?}
   \item \simon{What about $v:\bot$?  Is that ``succeeds''?  Probably not.}
 \end{itemize}
 
