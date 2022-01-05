@@ -1431,13 +1431,13 @@ The order is semantically significant in two places:
 \exampleFail{testArr(10,11,30)}
 \exampleOne{testArr(9,10)}{()}
 \\
-\exampleOne{nat:=typedef{x:int where x>=0}}{type of integers >= 0}
+\exampleOne{nat:=typedef\{x:int where x>=0\}}{type of integers >= 0}
 \exampleOne{nat[10]}{10}
 \exampleFail{nat[-1]}
 \\
 \exampleOne{pred(x:nat where x>0):nat := x-1}{predecessor for natural numbers}
 \\
-\exampleOne{fin2 := typedef{0|1}}{type of 0 and 1}
+\exampleOne{fin2 := typedef\{0|1\}}{type of 0 and 1}
 \\
 \exampleOne{samePair((x,x) where x:int) := x}{accept an input with two identical ints}
 \exampleOne{samePair(1,1)}{1}
