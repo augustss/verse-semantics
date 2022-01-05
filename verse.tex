@@ -106,11 +106,30 @@
 \newcommand{\lennart}[1]{}
 \fi
 
+% ------------------- Local notational macros -----------------
 \newcommand{\vtt}[1]{\text{\tt #1}}
 
 \newcommand{\clamsymx}{\Rightarrow}
 \newcommand{\clamsym}{$\clamsymx$}
 \newcommand{\clam}[2]{#1 \clamsym #2}
+
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{V}
+\newcommand{\Env}{Env}
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \:|\: #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+\newcommand{\munit}[1]{[#1]}
+\newcommand{\mempty}{\munit{}}
+
+\newcommand{\semapp}[2]{\mathcal{E}\llbracket #1 \rrbracket #2}
+%\newcommand{\semeqn}[2]{\equa{ \semapp{#1}{\rho} = #2 }}
+\newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
+\newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
+% ------------------- End of local notational macros -----------------
+
 
 \begin{document}
 
@@ -237,6 +256,173 @@
 
 \lennart{Should we make all examples be valid actual Verse?  Possibly adding def{x}in.}
 
+
+\begin{figure}
+\begin{tabular}{c}
+\begin{tabular}{rcll}
+  \multicolumn{3}{l}{Expressions:} \\  
+  $e$ & ::= & $x$ & use variable \\
+  & $\mid$ & $k$ & constant \\
+  & $\mid$ & \vtt{$d$ := $e$} & definition \\
+  & $\mid$ & \vtt{$x$ : $t$} & definition \\
+  & $\mid$ & \vtt{: $t$} & range \\
+  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
+  & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
+  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
+  & $\mid$ & $e_1 \;o\; e_2$ & infix operator \\
+  & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
+  & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
+  & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
+  & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
+  & $\mid$ & \vtt{do $e$} & scope delimiter \\
+\ifmatch
+  & $\mid$ & \vtt{$p$ :- $e$} & match \\
+\fi
+  $t$ & ::= & $e$ & types are expressions \\
+  \\
+  \multicolumn{3}{l}{Definitions:} \\
+  $d$ & ::= & \vtt{$d$($p$)} & function \\
+  & $\mid$ & \vtt{$d$ : $t$} & type \\
+  & $\mid$ & $x$ & variable \\
+  & $\mid$ & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
+  \\
+  \multicolumn{3}{l}{Patterns:} \\
+  $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
+  & $\mid$ & \vtt{$d$ : $t$} & binding pattern \\
+  & $\mid$ & \vtt{$d$ := $e$} & binding pattern \\
+  & $\mid$ & \vtt{: $t$} & type pattern \\
+  & $\mid$ & \vtt{let ($e$) in $p$} & local pattern \\
+  & $\mid$ & \vtt{$e$ ; $p$} & sequence pattern \\
+  & $\mid$ & \vtt{$p$ where $e$} & where pattern \\
+  & $\mid$ & $e$ & expression (exact match) pattern \\
+  \\
+  \multicolumn{3}{l}{Constants}\\
+  $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
+  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
+  \\
+  \multicolumn{3}{l}{Infix operators:} \\
+  $o$ & ::= & \vtt{\&\&} \;$\mid$\; \vtt{||} & logic \\
+  & $\mid$ & \vtt{=} \;$\mid$\; \vtt{<} \;$\mid$\; \vtt{>} \;$\mid$\;  $\cdots$ & comparisons \\
+  & $\mid$ & \vtt{+} \;$\mid$\; \vtt{*} \;$\mid$\;  $\cdots$ & arithmetic \\
+%%  & \vtt{;} & sequencing \\
+%%  & | & \vtt{where} & reverse sequencing \\
+%%  & |
+\end{tabular}
+\end{tabular}
+
+\caption{Mini Verse syntax} \label{fig:syntax}
+\end{figure}
+
+% A core lambda expression where the argument is always a variable.
+\begin{figure}
+
+\begin{tabular}{c}
+
+\begin{tabular}{rcll}
+  $e$ & ::= &
+    $x$ & use variable \\
+  & $\mid$ & $k$ & constant \\
+  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & $\mid$ & \vtt{\clam{$x$}{$e$}} & lambda expression \\
+  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
+  & $\mid$ & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
+  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
+  & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
+  & $\mid$ & $ \vtt{op';'} $ & predefined constants \\
+\end{tabular}
+\end{tabular}
+
+
+\caption{Core Verse syntax} \label{fig:core}
+\end{figure}
+
+% Use alternate definition for {}
+% \newcommand{\vseq}[1]{\{#1\}}
+\newcommand{\vseq}[1]{#1}
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
+\else
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
+
+\begin{figure}
+\begin{tabular}{c}
+\begin{tabular}{l|l|l}
+  Source & Expansion & Comment \\
+  \hline
+  \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
+  \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
+  \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
+  \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
+  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
+  & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
+  \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
+  \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
+  \vtt{$e_1$ ; $e_2$} & \vtt{($e_1$,$e_2$)[1]} &  \\
+  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
+  \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail \\
+   & & e.g., \vtt{+}, \vtt{*} \\
+  \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail \\
+  & & e.g.
+\ifunify  \else
+    \vtt{=},
+\fi
+    \vtt{/}, \vtt{<} \\
+\end{tabular}
+\\ \\
+Constructs that are eliminated by extrusion \\
+\begin{tabular}{|l|l|}
+  \hline
+  Primitive & Comment \\
+  \hline
+  \vtt{$x$ := $e$} & define a variable \\
+  \vtt{:}$t$ & range of a function \\
+  \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  \vtt{do $e$} & limit scope \\
+  \hline
+\end{tabular}
+\end{tabular}
+\caption{Syntactic sugar} \label{fig:sugar}
+\end{figure}
+
+
+\begin{figure}
+\begin{tabular}{l|ll}
+  Source & Expansion & Comment \\
+  \hline
+  \multicolumn{3}{c}{\bf Definitions $d$} \\
+  \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
+  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
+  \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
+  \vtt{($d_0$,$\cdots$,$d_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\
+  \hline
+  \multicolumn{3}{c}{\bf Patterns $p$} \\
+  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
+  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
+  \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
+  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := ($e_1$ = $e_2$)} & ??? \\
+   & \multicolumn{2}{l}{Use do?  continue matching in e1?} \\
+  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
+  \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
+  \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
+  \pmatch{(\vtt{let (} e_1 \vtt{) in } p)}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
+  \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
+  \hline
+\end{tabular}\\[2mm]
+\lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
+\caption{Syntactic sugar for pattern matching} \label{fig:pat-sugar}
+\end{figure}
+
+
 \section{A short introduction to Verse}
 
 This section gives an informal introduction to Verse, leaving a formal description
@@ -305,18 +491,17 @@ Verse has built-in integers (\vtt{1}, \vtt{21}, \vtt{-2} etc), and characters (\
 The integers come equipped with standard arithmetic operations like addition \vtt{$e_1$+$e_2$}, etc.   Infix operations can be
 written prefix using the C++-derived \vtt{operator} notation, thus: \vtt{operator'+'($e_1$,$e_2$)}.
 
-\simon{There must be a function that generates the sequence $[a, a+1, ..., b]$.  What is it?}
-\simon{Answer \vtt{1..5}}.
+Verse's only data structure is a one-dimensional \emph{array}.  When
+the array is of small fixed size, it is often called a \emph{tuple}. A
+literal array is built with comma notation. For example \vtt{(2,7,7)}
+is an tuple of three elements.  As with other operators, tuple
+construction yields all combinations of values yielded by the
+sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the
+sequence $[(3,7), (3,22), (1,7), (1,22)]$.
 
-Verse's only data structure is a one-dimensional \emph{array}.  When the array is of small fixed
-size, it is often called a \emph{tuple}.
-\begin{itemize}
-\item A literal array is built with comma notation. For example \vtt{(2,7,7)} is an tuple of three elements.  As with other operators, tuple construction yields all combinations of values yielded by the sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the sequence $[(3,7), (3,22), (1,7), (1,22)]$.
-\item An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
-  \item Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
-\end{itemize}
+Arrays of variable size, array indexing, and for-loops, are discussed in \Cref{sec:arrays}.
 
-\subsection{Comparisons and conditionals} \label{sec:bool}
+\subsection{Comparisons and conditionals} \label{sec:bool} \label{sec:conditionals}
 
 In Verse, there are no Boolean values \vtt{true} and \vtt{false}.  Instead, failure plays the role of falsity \cite{Icon}.  In a
 conditional expression \vtt{(if $e_1$ then $e_2$ else $e_3$)},
@@ -381,28 +566,47 @@ It is easy to write an expression that yields an infinite sequence of values,
 by omitting all equalities.
 For example \vtt{def x in x} returns a sequence of all possible values.
 
-\paragraph{Scoping.} Verse allows you to omit the ``\vtt{def}'' entirely, using a ``\vtt{:=}'' to introduce the variable instead. We may write our running example like this, omitting the ``\vtt{def}'':
-\vtt{(x + (x:=7; 5)}.
-The binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
-Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s,
-as we describe in \Cref{sec:scope}.
+\subsection{Scoping and \vtt{:=}}
+
+Verse allows you to omit the ``\vtt{def}'' entirely, using a ``\vtt{:=}'' to introduce the variable instead.
+Intead of writing
+\begin{verbatim}
+  def x in x + (x = 7; 5)
+\end{verbatim}
+we may write this, omitting the ``\vtt{def}'':
+\begin{verbatim}
+  x + (x:=7; 5)
+\end{verbatim}
+Note that the binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
 In pracical Verse code, however, a programmer will typically write an equality before any uses;
 so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
 
-
+Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s.
+Specifically, every variable bound by \vtt{:=} has a scope that begins at the innermost
+enclosing \emph{scope-limiting construct}.  The scope-limiting constructs are:
+\begin{itemize}
+\item The arguments of ``\vtt{|}''.  E.g. in \vtt{((x:=7; x+1) | (y>v; y:=9; 7))}, the bindings of \vtt{x} and \vtt{y} are limited to the first and second arms of the alternative ``\vtt{|}'' respectively, so the expression could also be written
+\begin{verbatim}
+  (def x in (x=7; x+1)) | (def y in (y>v; y=9; 7))
+\end{verbatim}
+\item Body of lambda.
+\item All three arguments of \vtt{if}.
+\item \vtt{do} block.  Limiting scope is the only purpose of \vtt{do}.  For example, \vtt{(x + do\{ x:=7, x+1 \})} means
+\begin{verbatim}
+  x + (def x in (x=7; x+1))
+\end{verbatim}
+where the first \vtt{x} is presumably bound in some outer scope.
+\end{itemize}
+These rules are formalised in \Cref{sec:scope}.
 
 
 \subsection{Lambdas and application} \label{sec:application}
 
-Lambda expressions are written \vtt{$p$ => $e$} in Verse, where the pattern clearly show which variable
-occurrences are binding and which are just usage.
-In the core language the lambda expressions are written \vtt{\clam{$x$}{$e$}} where there is just a single
-variable being bound.
-
-%Lambda expressions, written \vtt{($x$ => $e$)}, are conventional.
-%\simon{Or would that be an occurrence of $x$?  Do we have to write \vtt{($x$:$t$) => $e$}?
-%In the syntax I've put \vtt{$p$ => $e$}; is that right?}
 \lennart{Lambdas and the beta rule are peculiar.}
+
+Lambda expressions are written \vtt{$p$ => $e$} in Verse, where $p$ is a \emph{pattern}.
+The simplest pattern is just a variable with a type ascription, thus \vtt{x:int => $e$}.
+Types are covered in \Cref{sec:types} and patterns in \Cref{sec:patterns}.
 
 Function application uses cross-product semantics, just like any other binary operator, but comes in two forms:
 \begin{itemize}
@@ -410,7 +614,7 @@ Function application uses cross-product semantics, just like any other binary op
 
 \item \vtt{$e_1$($e_2$)} is exactly the same, except that if any call in the cartesian product fails (yields zero results),
   that call yields \vtt{WRONG}.
-  The verifier should guarantee that this cannot occur \Cref{sec:types}.
+  The verifier should guarantee that this cannot occur; see \Cref{sec:types}.
   \simon{Have I got this right?}
 \end{itemize}
 For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
@@ -465,8 +669,21 @@ Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We w
 \simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
 \end{itemize}
 
-\subsection{Arrays}
+\subsection{Arrays} \label{sec:arrays}
 
+\subsubsection{Indexing}
+
+An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
+
+Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
+
+\subsubsection{Enumerations}
+
+The notation \vtt{($e_1$..$e_2$)} is short for \vtt{enumerate($e_1$,$e_2$)}, where
+\vtt{enumerate} is a built-in function that generates the array
+$\tuple{n_1, n_1+1, \ldots, n_2}$, where $n_1$ and $n_2$ are the integer values of $e_1$ and $e_2$ respectively.
+Like any function call, the  cartesian-product semantics applies, so the notation may produce a sequence of arrays).
+Any non-integer values yielded by $e_1$ and $e_2$ are ignored. \simon{Is ``ignored'' right; or does the program go wrong?}
 
 \subsubsection{The \vtt{for} construct}
 
@@ -511,6 +728,7 @@ In a function declared as non-failing, the compiler must \emph{prove} that it ca
 Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
 
+
 \section{Types and type checking} \label{sec:types}
 
 Verse is designed to be statically type-checked.  The type checker is called the \emph{verifier}.
@@ -528,9 +746,7 @@ There are exactly two ways in which a program can produce the value \vtt{WRONG}
 In both cases, the call succeeds, returning the singleton \vtt{WRONG} value.
 One way in which (2) can occur
 
-What does ``going wrong'' mean?  Going wrong is quite different
-to failure.  An expression \emph{fails} if it yields zero values, but
-it \emph{goes wrong} if something fundamentally unexpected happens. For example:
+What does ``going wrong'' mean?  It means that something fundamentally unexpected happens. For example:
 \begin{itemize}
 \item We add an integer to a character, say.  That is the argument to a primitive operator is of the wrong type.
 \item The argument to a function does not satisfy its declared type.  (All functions in Verse have an explicitly declared argument type. \simon{Is tthis true?  What about result type?}
@@ -546,10 +762,17 @@ Failure in any other context makes the program go wrong.
 \end{itemize}
 The semantics of \Cref{sec:semantics} makes all this precise.
 
-
+The job of the verifier is to ensure that \emph{verified programs don't go wrong}.
+Like any type system, the verifier may reject programs that do not, in fact, go wrong.
+But it must never accept a program that does go wrong.
 We expect that the verifier may get smarter over time, accepting more
-programs.  But regardless of how smart or otherwise it is, a verified
-program should never go wrong.
+programs.
+
+Crucially, notice that \emph{going wrong} is quite different
+to \emph{failure}.  An expression \emph{fails} if it yields zero values.
+Failure is fully expected as part of normal execution -- for example, failure is used
+instead of falsehood in a conditional (\Cref{sec:conditionals}).  So verified programs
+(or, rather, sub-expressions thereof) may certain fail, but they cannot go wrong.
 
 \subsection{What is a ``type''?} \label{sec:what-is-a-type}
 
@@ -574,7 +797,9 @@ So in Verse, it is easy to carve out arbitrarily complex sets of
 values; refinement types are built in.  Of course, that puts a complete type checker well
 out of reach, but an incomplete typechecker can still give strong static guarantees about some
 Verse programs.
-a
+
+Moreover, a Verse type can perform conversions.  For example the built-in function \vtt{abs} take the absolute value of an integer, and fails on a non-integer argument.  So \vtt{abs} is a type: it is idempotent, but also converts a negative integer to a positive one.  We will see how these value-converting types are useful in \Cref{sec:definitions}.
+
 \subsection{Built in types}
 
 Verse has some built-in types:
@@ -640,7 +865,56 @@ belong to the type that $e$ describes.
 The expression \vtt{x:e} is just syntactic sugar for \vtt{x := :e}; that is, it brings \vtt{x}
 into scope, and limits its bindings to the inhabitants of \vtt{e} (\Cref{fig:sugar}).
 
-\subsection{Typechecking functions}
+\section{Definitions, functions, and pattern matching} \label{sec:patterns}
+
+\subsection{Definitions} \label{sec:definitions}
+
+So far we have seen bindings of form \vtt{x := $e$}, but the general form is \vtt{$d$ := $e$} where $d$ is a \emph{definition} (\Cref{fig:syntax}).  As well as \vtt{x:=$e$} there are three other forms of definition $d$:
+\begin{itemize}
+\item A \emph{function binding} \vtt{$d(p)$ := $e$}, which means the same as binding $d$ with a lambda on the right hand side, thus $\vtt{$d$ := $p$=>$e$}$.  This applies recursively, so \vtt{f(x:int)(y:int) := $e$} means the curried binding
+  \vtt{f := (x:int) => (y:int) => $e$}.
+\item A \emph{tuple binding} \vtt{($d_0$,$\cdots$,$d_n$):= $e$}, which means the same as
+  \begin{center}
+  \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]}
+  \end{center}
+where \vtt{x} is fresh. That is, we bind \vtt{x} to the right hand side, and take the components apart
+\item A \emph{typed binding} \vtt{($d$:$t$) := $e$}, which means the same as \vtt{$d$ := $t$[$e$]}.
+\end{itemize}
+These desugarings are given in \Cref{fig:pat-sugar}.  The first two are unsurprising, but the third is unusual.
+For a typed binding we take the type and \emph{apply it to the right-hand side}.  Remember from \Cref{sec:what-is-a-type} that a type is just an idempotent function.  By applying it to the right hand side $e$, the type $t$ will either return an inhabitant of the type (possibly applying a conversion), or it will fail (if the input lies outside the domain of the type).
+
+For example, \vtt{(x:int := $e$)} means \vtt{(x := int[$e$]}.  Suppose $e$ yields the sequence $[3, 'x', 4.5, 20]$.
+The type (function) \vtt{int} fails (i.e. returns no values) when applied to a character or float. Like any
+function call, \vtt{int[$e$]} concatenates the results of \vtt{int[$3$]}, \vtt{int[$'x'$]}, \vtt{int[$4.5$]},
+and \vtt{int[$20$]}.  The middle two calls fail, returning no values; so \vtt{int[$e$]} returns $[3,20]$, and these
+are the values to which \vtt{x} is successively bound.
+
+Now consider \vtt{(x:abs := $e$)} when $e$ yields the sequence $[3, 4.3, -5]$.
+The call \vtt{abs[$e$]} will yield $[3, 5]$.   
+
+
+\noindent
+\simon{Problem}  Consider
+\begin{verbatim}
+  (f(x:int), g(y:float)) := e
+\end{verbatim}
+It does not make sense to desugar this to
+\begin{verbatim}
+  t := e
+  f := (x:int)   => t[0]
+  g := (y:float) => t[1]
+\end{verbatim}
+\simon{End of problem}
+
+\subsection{Patterns and pattern matching}
+
+In the core language the lambda expressions are written \vtt{\clam{$x$}{$e$}} where there is just a single
+variable being bound.
+
+\simon{working here}
+
+% -----------------------------------------
+\section{Typechecking functions, and effects}
 
 We typecheck a function in isolation, using the declared types of its arguments. Consider
 $$ \vtt{ f( x:int ) <succeeds> := x=3; x} $$
@@ -649,7 +923,6 @@ It is possible that a call could succeed, thus $f(3)$.  But other calls can fail
 to prove that the body succeeds, using only the declared type of the argument, here \vtt{int}.  It cannot prove that
 \vtt{(x=3)} for any \vtt{int}, so the verifier rejects the definition.
 
-\section{Effects}
 
 \subsection{Multiplicity Effects} \label{sec:multiplicity}
 
@@ -693,168 +966,11 @@ These effects have the following meaning:
   \item \simon{What about $v:\bot$?  Is that ``succeeds''?  Probably not.}
 \end{itemize}
 
+
+
+
+
 \section{Formalising Verse}
-
-\begin{figure}
-\begin{tabular}{c}
-\begin{tabular}{rcll}
-  \multicolumn{3}{l}{Expressions:} \\  
-  $e$ & ::= & $x$ & use variable \\
-  & $\mid$ & $k$ & constant \\
-  & $\mid$ & \vtt{$d$ := $e$} & definition \\
-  & $\mid$ & \vtt{$x$ : $t$} & definition \\
-  & $\mid$ & \vtt{: $t$} & range \\
-  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
-  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
-  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
-  & $\mid$ & $e_1 \;o\; e_2$ & infix operator \\
-  & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
-  & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
-  & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
-  & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
-  & $\mid$ & \vtt{do $e$} & scope delimiter \\
-\ifmatch
-  & $\mid$ & \vtt{$p$ :- $e$} & match \\
-\fi
-  $t$ & ::= & $e$ & types are expressions \\
-  \\
-  \multicolumn{3}{l}{Definitions:} \\
-  $d$ & ::= & \vtt{$d$($p$)} & function \\
-  & $\mid$ & \vtt{$d$ : $t$} & type \\
-  & $\mid$ & $x$ & variable \\
-  & $\mid$ & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
-  \\
-  \multicolumn{3}{l}{Patterns:} \\
-  $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
-  & $\mid$ & \vtt{$d$ : $t$} & binding pattern \\
-  & $\mid$ & \vtt{$d$ := $e$} & binding pattern \\
-  & $\mid$ & \vtt{: $t$} & type pattern \\
-  & $\mid$ & \vtt{let ($e$) in $p$} & local pattern \\
-  & $\mid$ & \vtt{$e$ ; $p$} & sequence pattern \\
-  & $\mid$ & \vtt{$p$ where $e$} & where pattern \\
-  & $\mid$ & $e$ & expression (exact match) pattern \\
-  \\
-  \multicolumn{3}{l}{Constants}\\
-  $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
-  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
-  \\
-  \multicolumn{3}{l}{Infix operators:} \\
-  $o$ & ::= & \vtt{\&\&} \;$\mid$\; \vtt{||} & logic \\
-  & $\mid$ & \vtt{=} \;$\mid$\; \vtt{<} \;$\mid$\; \vtt{>} \;$\mid$\;  $\cdots$ & comparisons \\
-  & $\mid$ & \vtt{+} \;$\mid$\; \vtt{*} \;$\mid$\;  $\cdots$ & arithmetic \\
-%%  & \vtt{;} & sequencing \\
-%%  & | & \vtt{where} & reverse sequencing \\
-%%  & |
-\end{tabular}
-\end{tabular}
-
-\caption{Mini Verse syntax} \label{fig:featherweight}
-\end{figure}
-
-% A core lambda expression where the argument is always a variable.
-\begin{figure}
-
-\begin{tabular}{c}
-
-\begin{tabular}{rcll}
-  $e$ & ::= &
-    $x$ & use variable \\
-  & $\mid$ & $k$ & constant \\
-  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & $\mid$ & \vtt{\clam{$x$}{$e$}} & lambda expression \\
-  & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
-  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
-  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
-  & $\mid$ & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
-$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
-  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
-  & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
-  & $\mid$ & $ \vtt{op';'} $ & predefined constants \\
-\end{tabular}
-\end{tabular}
-
-
-\caption{Core Verse syntax} \label{fig:core}
-\end{figure}
-
-% Use alternate definition for {}
-% \newcommand{\vseq}[1]{\{#1\}}
-\newcommand{\vseq}[1]{#1}
-\ifmatch
-\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
-\else
-\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
-\fi
-
-\begin{figure}
-\begin{tabular}{c}
-Constructs that are just syntactic sugar \\
-\begin{tabular}{|l|l|l|}
-  \hline
-  Syntactic sugar (macro) & Expansion & Comment \\
-  \hline
-  \vtt{$x$ : $t$} & \vtt{$x$ := :$t$} & \\
-  \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
-  \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
-  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$; if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh \\
-  \hline \hline
-  \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
-  \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
-  \hline \hline
-  \vtt{$e_1$ ; $e_2$} & \vtt{($e_1$,$e_2$)[1]} &  \\
-  \vtt{$e_1$ where $e_2$} & \vtt{($e_1$,$e_2$)[0]} &  \\
-  \hline \hline
-  \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
-  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} & ??? use t to transform? \\
-  \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
-  \vtt{($d_0$,$\cdots$,$d_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh ??? allow tuples \\
-  \hline \hline
-  \vtt{$e_1 \oplus e_2$} & \vtt{op'$\oplus$'($e_1$,$e_2$) } & operator that cannot fail, e.g., \vtt{+}, \vtt{*} \\
-  \vtt{$e_1 \oslash e_2$} & \vtt{op'$\oslash$'[$e_1$,$e_2$] } & operator that can fail, e.g.,
-\ifunify  \else
-    \vtt{=},
-\fi
-    \vtt{/}, \vtt{<} \\
-  \hline \hline
-  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
-  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
-  \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
-  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := ($e_1$ = $e_2$)} & ??? use do?  continue matching in e1? \\
-  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
-  \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
-  \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
-  \pmatch{(\vtt{let (} e_1 \vtt{) in } p)}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
-  \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
-  \hline
-\end{tabular}
-\\
-\ifmatch
-\else
-The \pmatch{p}{e} notation is just used during desugaring to indicate that a pattern is being desugared.
-\fi
-\\ \lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
-\\ \\
-Constructs that are eliminated by extrusion \\
-\begin{tabular}{|l|l|}
-  \hline
-  Primitive & Comment \\
-  \hline
-  \vtt{$x$ := $e$} & define a variable \\
-  \vtt{:}$t$ & range of a function \\
-  \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  \vtt{do $e$} & limit scope \\
-  \hline
-\end{tabular}
-\end{tabular}
-\caption{Syntactic sugar} \label{fig:sugar}
-\end{figure}
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1066,23 +1182,7 @@ but with all definitions replaced by \vtt{def-in}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Semantics}
-
-\newcommand{\tuple}[1]{\langle #1 \rangle}
-\newcommand{\Value}{V}
-\newcommand{\Env}{Env}
-\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
-\newcommand{\mcompr}[2]{[ #1 \:|\: #2 ]}
-\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
-\newcommand{\malt}{\diamond}
-\newcommand{\munit}[1]{[#1]}
-\newcommand{\mempty}{\munit{}}
-
-\newcommand{\semapp}[2]{\mathcal{E}\llbracket #1 \rrbracket #2}
-%\newcommand{\semeqn}[2]{\equa{ \semapp{#1}{\rho} = #2 }}
-\newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
-\newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
-\newcommand{\liftrel}[1]{\hat{#1}}
+\section{Semantics} \label{sec:semantics}
 
 
 \begin{figure}
