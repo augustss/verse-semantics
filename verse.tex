@@ -286,10 +286,13 @@
   $t$ & ::= & $e$ & types are expressions \\
   \\
   \multicolumn{3}{l}{Definitions:} \\
-  $d$ & ::= & \vtt{$d$($p$)} & function \\
-  & $\mid$ & \vtt{$d$ : $t$} & type \\
-  & $\mid$ & $x$ & variable \\
-  & $\mid$ & $d_1$\vtt{,} $\cdots$\vtt{,} $d_n$ & tuple ??? include this\\
+  $d$ & ::= & $f \mid b$ \\
+  $f$ & ::= & \vtt{$f$($p$)} & function \\
+  & $\mid$ & \vtt{$f$ : $t$} \\
+  & $\mid$ & $x$ & \\
+  $b$ & ::= & $x$ & variable \\
+  & $\mid$ & \vtt{$b$ : $t$} & type \\
+  & $\mid$ & $b_1$\vtt{,} $\cdots$\vtt{,} $b_n$ & tuple \\
   \\
   \multicolumn{3}{l}{Patterns:} \\
   $p$ & ::= & \vtt{$p_1$,$\cdots$,$p_n$} & tuple pattern \\
