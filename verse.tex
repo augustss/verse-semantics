@@ -244,6 +244,7 @@
 \section{Questions for Tim}
 
 \begin{itemize}
+\item One-armed conditionals; see \label{sec:conditionals}.
 \item Currently \vtt{false} is a synonym for \vtt{()}, the empty array.  So \vtt{:false} is an expression that always fails, returning no values.
   But this means that we have to write \vtt{:false} where in an ordinary language one would write just \vtt{false}.  For example \vtt{(if :false then $e_1$ else $e_2$)} is equivalent to $e_2$.  But \vtt{if false then $e_1$ else $e_2$} is equivalent to $e_1$.  This is jolly confusing.
 
@@ -260,7 +261,7 @@
 \begin{figure}
 \begin{tabular}{c}
 \begin{tabular}{rcll}
-  \multicolumn{3}{l}{Expressions:} \\  
+  \multicolumn{3}{l}{Expressions:} \\
   $e$ & ::= & $x$ & use variable \\
   & $\mid$ & $k$ & constant \\
   & $\mid$ & \vtt{$d$ := $e$} & definition \\
@@ -270,9 +271,12 @@
   & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
   & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
   & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
-  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$ \\
+  & $\mid$ & \vtt{()} & empty tuple \simon{right?} \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
   & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
+  & $\mid$ & \vtt{for ($e_1$)}  & simple array creation \\
   & $\mid$ & $e_1 \;o\; e_2$ & infix operator \\
   & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
   & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
@@ -366,6 +370,7 @@ $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
   \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
+  \vtt{for(e)} & \vtt{for(x:=$e$) in x} & vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
@@ -402,11 +407,11 @@ Constructs that are eliminated by extrusion \\
 \begin{tabular}{l|ll}
   Source & Expansion & Comment \\
   \hline
-  \multicolumn{3}{c}{\bf Definitions $d$} \\
+  \multicolumn{3}{c}{\bf Definitions $d$, $f$, $b$} \\
   \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
   \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
   \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
-  \vtt{($d_0$,$\cdots$,$d_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\
+  \vtt{($b_0$,$\cdots$,$b_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\
   \hline
   \multicolumn{3}{c}{\bf Patterns $p$} \\
   \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
@@ -475,7 +480,8 @@ Verse is statically typed, and its verifier guarantees that no \vtt{WRONG} value
 \subsection{Cross-product semantics}
 \label{sec:lifting}
 
-All functions are lifted to work over sequences, by taking the Cartesian product of their argument sequences.
+All functions are lifted to work over sequences, by taking the Cartesian product of their argument sequences,
+and concatenating the result sequences yielded by each combination.
 For example, the expression \vtt{($e_1$ + $e_2$)} returns the sequence of all values $v_1 + v_2$ where
 $v_1$ is drawn from the sequence yielded by $e_1$, and
 $v_2$ is drawn from the sequence yielded by $e_2$.
@@ -512,8 +518,10 @@ conditional expression \vtt{(if $e_1$ then $e_2$ else $e_3$)},
 \item if $e_1$ fails (yields no values), the conditional returns $e_3$;
   \item if $e_1$ returns one or more values, the conditional returns $e_2$.
 \end{itemize}
+A one-armed conditional \vtt{(if $e_1$ then $e_2$)} is equivalent to the normal two-armed conditional
+with an \vtt{else} branch of \vtt{:false}; that is, if $e_1$ fails then so does the conditional.  \simon{Check with Tim.}
 
-Conjunction (and) and disjunction (or) are readily expressed:
+\noindent Conjunction (and) and disjunction (or) are readily expressed:
 \begin{itemize}
 \item \emph{Conjunction.} The term \vtt{($e_1$ ; $e_2$)} succeeds iff both $e_1$ succeeds and $e_2$ succeeds.
 \item \emph{Disjunction.} The term \vtt{($e_1$ | $e_2$)} succeeds if either $e_1$ succeeds or $e_2$ succeeds.
@@ -557,7 +565,7 @@ In actual Verse you would write \vtt{v:any} to introduce an unbound variable.
   a \emph{single} value.
 \end{itemize}
 For which value(s) of \vtt{x} will this particular expression succeed?  Answer: because of the
-\vtt{x=7} in the second argument of the \vtt{+}, all execuctions will fail except the one that binds \vtt{x}
+\vtt{x=7} in the second argument of the \vtt{+}, all executions will fail except the one that binds \vtt{x}
 to $7$.  So the expression yields just one value, namely 12.
 
 Of course, no implementation could possibly work by binding \vtt{x} to every possible value and
@@ -680,20 +688,12 @@ An array is treated by Verse as a function, so that indexing is just function ap
 
 Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
 
-\subsubsection{Enumerations}
-
-The notation \vtt{($e_1$..$e_2$)} is short for \vtt{enumerate($e_1$,$e_2$)}, where
-\vtt{enumerate} is a built-in function that generates the array
-$\tuple{n_1, n_1+1, \ldots, n_2}$, where $n_1$ and $n_2$ are the integer values of $e_1$ and $e_2$ respectively.
-Like any function call, the  cartesian-product semantics applies, so the notation may produce a sequence of arrays).
-Any non-integer values yielded by $e_1$ and $e_2$ are ignored. \simon{Is ``ignored'' right; or does the program go wrong?}
-
 \subsubsection{The \vtt{for} construct}
 
 The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
 For example:
 \begin{verbatim}
-      for (i := (1 | 2 | 3)) (i*i)
+      for (i := (1 | 2 | 3)) in (i*i)
 \end{verbatim}
 So \vtt{for} reifies the \emph{sequence of values} yielded by an expression into a \emph{single value} (the array)
 containing all those values.
@@ -702,6 +702,7 @@ containing all those values.
 \item Cross-product semantics applies to $e_2$.  So if $e_2$ fails for any iteration, the entire \vtt{for} fails;
   if an iteration of $e_2$ yields multiple values, the \vtt{for} returns an array for each of them.
 \end{itemize}
+If you give only one argument to \vtt{for}
 
 \simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
   of all the values returned by $e$?  Then we would write the above example like this:}
@@ -712,6 +713,22 @@ for (i := (1 | 2 | 3); i*i)
   But the long version is more powerful: failure in $e_1$ act as a filter whereas failure in $e_2$ causes failure.}
 \simon{Also what happens if $e_2$ yields multiple values, e.g. \vtt{for (i := (1|2|3)) (i | i*i)}?}
 \lennart{I don't know what that means.  Tim's implementation crashes when I try it.}
+
+\subsubsection{Enumerations}
+
+The notation \vtt{($e_1$..$e_2$)} is short for \vtt{range($e_1$,$e_2$)}, where
+\vtt{range} is a built-in function that yields the sequence of values
+$[n_1, n_1+1, \ldots, n_2]$, where $n_1$ and $n_2$ are the integer values of $e_1$ and $e_2$ respectively.
+For example \vtt{2..5} is equivalent to \vtt{(2 | 3 | 4 | 5)} and yields the sequence $[2,3,4,5]$.
+You may imagine \vtt{range} being defined like this:
+\begin{verbatim}
+  range(lo,hi) := if (lo<=hi) then (lo | range( lo+1, hi ))
+\end{verbatim}
+Like any function call, the  cartesian-product semantics applies, so the notation may produce a sequence of arrays).
+Any non-integer values yielded by $e_1$ and $e_2$ are ignored. \simon{Is ``ignored'' right; or does the program go wrong?}
+
+The \emph{sequence} generated by the \vtt{|} alternation maybe reified into an \emph{array} using \vtt{for},
+so that \vtt{for(2..5)} will return a singleton value, the array (or tuple) $\tuple{2,3,4,5}$.
 
 \subsubsection{The array type}
 
@@ -872,49 +889,76 @@ into scope, and limits its bindings to the inhabitants of \vtt{e} (\Cref{fig:sug
 
 \subsection{Definitions} \label{sec:definitions}
 
-So far we have seen bindings of form \vtt{x := $e$}, but the general form is \vtt{$d$ := $e$} where $d$ is a \emph{definition} (\Cref{fig:syntax}).  As well as \vtt{x:=$e$} there are three other forms of definition $d$:
+So far we have seen bindings of form \vtt{x := $e$}, but the general form is \vtt{$d$ := $e$} where $d$ is a \emph{definition}. As \Cref{fig:syntax} shows, there are two forms of definitions, a \emph{function definition} $f$, and a \emph{value binding} $b$.
+They may all be understood by the following desugarings, which are given in \Cref{fig:pat-sugar}:
 \begin{itemize}
-\item A \emph{function binding} \vtt{$d(p)$ := $e$}, which means the same as binding $d$ with a lambda on the right hand side, thus $\vtt{$d$ := $p$=>$e$}$.  This applies recursively, so \vtt{f(x:int)(y:int) := $e$} means the curried binding
+\item A \emph{function binding} \vtt{$f(p)$ := $e$}, means the same as binding $d$ with a lambda on the right hand side, thus $\vtt{$f$ := $p$=>$e$}$.  This applies recursively, so \vtt{f(x:int)(y:int) := $e$} means the curried binding
   \vtt{f := (x:int) => (y:int) => $e$}.
-\item A \emph{tuple binding} \vtt{($d_0$,$\cdots$,$d_n$):= $e$}, which means the same as
+\item A \emph{tuple binding} \vtt{($b_0$,$\cdots$,$b_n$):= $e$}, which means the same as
   \begin{center}
-  \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]}
+  \vtt{x := $e$;} \vtt{$b_0$ := x[0];} $\cdots$\vtt{;} \vtt{$b_n$ := x[n]}
   \end{center}
 where \vtt{x} is fresh. That is, we bind \vtt{x} to the right hand side, and take the components apart
 \item A \emph{typed binding} \vtt{($d$:$t$) := $e$}, which means the same as \vtt{$d$ := $t$[$e$]}.
 \end{itemize}
-These desugarings are given in \Cref{fig:pat-sugar}.  The first two are unsurprising, but the third is unusual.
+The first two are unsurprising, but the third is unusual.
 For a typed binding we take the type and \emph{apply it to the right-hand side}.  Remember from \Cref{sec:what-is-a-type} that a type is just an idempotent function.  By applying it to the right hand side $e$, the type $t$ will either return an inhabitant of the type (possibly applying a conversion), or it will fail (if the input lies outside the domain of the type).
 
-For example, \vtt{(x:int := $e$)} means \vtt{(x := int[$e$]}.  Suppose $e$ yields the sequence $[3, 'x', 4.5, 20]$.
-The type (function) \vtt{int} fails (i.e. returns no values) when applied to a character or float. Like any
-function call, \vtt{int[$e$]} concatenates the results of \vtt{int[$3$]}, \vtt{int[$'x'$]}, \vtt{int[$4.5$]},
+For example, \vtt{(x:int := $e$)} means \vtt{(x := int[$e$])}.  Suppose $e$ yields the sequence $[3, \vtt{\text{`x'}}, 4.5, 20]$.
+The built-in type (function) \vtt{int} fails (i.e. returns no values) when applied to a character or float. Like any
+function call, \vtt{int[$e$]} concatenates the results of \vtt{int[$3$]}, \vtt{int[\text{`x'}]}, \vtt{int[$4.5$]},
 and \vtt{int[$20$]}.  The middle two calls fail, returning no values; so \vtt{int[$e$]} returns $[3,20]$, and these
 are the values to which \vtt{x} is successively bound.
 
 Now consider \vtt{(x:abs := $e$)} when $e$ yields the sequence $[3, 4.3, -5]$.
-The call \vtt{abs[$e$]} will yield $[3, 5]$.   
-
-
-\noindent
-\simon{Problem}  Consider
+The call \vtt{abs[$e$]} will yield $[3, 5]$, and \emph{converts} the input $-5$ into an inhabitant of the type (namely
+the non-negative integers).  So the definition
 \begin{verbatim}
-  (f(x:int), g(y:float)) := e
+   x : abs := -7
 \end{verbatim}
-It does not make sense to desugar this to
-\begin{verbatim}
-  t := e
-  f := (x:int)   => t[0]
-  g := (y:float) => t[1]
-\end{verbatim}
-\simon{End of problem}
+applies \vtt{abs} to \vtt{7} before binding it to \vtt{x}.
 
-\subsection{Patterns and pattern matching}
+\simon{I'm wondering whether typed bindings should use round or square parens.  I'd expect \vtt{x:int := 4.5} to go wrong (and hence be rejecgted by the verifier) rather than be accepted by the verifier but fail by returning no values.  Function calls are aggressively checked in this way, are they not?}
+
+In fact, the ``type'' in a type binding does not even have to be a type in the sense of \Cref{sec:what-is-a-type};
+it can be an arbitrary function.
+For example, the definition \vtt{(x : inc := 4)}, where \vtt{inc} is a function than increments an integer, will bind \vtt{x} to 5.
+But \vtt{inc} is not a type, because it is not idempotent.   We will see useful applications of this idea when
+we discuss pattern matching in \Cref{sec:pattern-matching}.
+
+Why do we distinguish value bindings from function bindings?  Because it makes no sense to nest a function definition
+under a tuple binding; nor does it make sense for a tuple to appear in a function position.   For example:
+\begin{verbatim}
+   (f(x), g(y)) := ...   # Function definition inside tuple binding
+   (x,y)(p) := ...       # Tuple binding in function position
+\end{verbatim}
+The $f$/$b$ syntax excludes these possiblities.
+
+\subsection{Patterns and pattern matching} \label{sec:pattern-matching}
+
+In Verse a \emph{patterns} can occur in a lambda, or in a function definition. For example:
+\begin{itemize}
+\item \vtt{(f(x:int,y:float) := $e$)} defines a function $f$ that matches its argument against the pattern \vtt{(x:int,y:float)} and,
+  if that match is successful (binding \vtt{x} and \vtt{y}), returns $e$.
+\item \vtt{((x:int, 4) => $e$)} is a lambda expression that matches its argument against the pattern \vtt{(x:int,4)} and,
+  if that match is successful (binding \vtt{x}), returns $e$.  The second component of argument pair is matched against the literal 4.
+\end{itemize}
+A key property of patterns is that only type-ascribed variables are \emph{binding}; naked variables are \emph{occurrences}.
+For example, consider
+\begin{verbatim}
+   x := 7
+   f(x, y:int) := y+1
+   g(7, y:int) := y+1
+\end{verbatim}
+Here \vtt{f} and \vtt{g} are equivalent: both match the first component of the argument against 7.
+In \vtt{f}'s pattern \vtt{(x,y:int)}, the \vtt{x} is an occurrence, brought into scope by the definition
+\vtt{x:=7}.  Only \vtt{y} is brought into scope by the pattern.
+
+\simon{working here}
 
 In the core language the lambda expressions are written \vtt{\clam{$x$}{$e$}} where there is just a single
 variable being bound.
 
-\simon{working here}
 
 % -----------------------------------------
 \section{Typechecking functions, and effects}
@@ -942,7 +986,7 @@ to prove that the body succeeds, using only the declared type of the argument, h
                    decides      |
               ========|=========|================
                   succeeds   fails        DECIDED
-                      \        / 
+                      \        /
                        diverges
 \end{verbatim}
 \caption{Multiplicity effects} \label{fig:mult-effects}
@@ -1173,7 +1217,7 @@ These effects have the following meaning:
 \label{scoping-rules}
 \end{figure}
 
-In Verse, as in Python, 
+In Verse, as in Python,
 Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
 Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
 \defempty is the empty multiset.
@@ -1257,7 +1301,7 @@ but with all definitions replaced by \vtt{def-in}.
       & \mathrm{where}\, e = \vtt{def\{}x_1,\cdots,x_n\vtt{\} in}\,e'
     \end{aligned}
     }
-  
+
   \equa{\mathrm{lift}(f, w_1, w_2) = \mcompr{v}{\mbind{v_1}{w_1}, \mbind{v_2}{w_2}, \mbind{v}{f(v_1, v_2)}}}
 
 \ifunify
@@ -1269,7 +1313,7 @@ but with all definitions replaced by \vtt{def-in}.
     }
 \fi
 
-  \equa{\mathrm{apply}(f,x) = 
+  \equa{\mathrm{apply}(f,x) =
       \begin{cases*}
         f(x) & if $f \in \Value \rightarrow \Value^{*}$ \\
         \munit{f_x} & if $f \in \tuple{\Value}, x \in \mathbb{Z}, x \geq 0, x < \mathrm{size}(f)$ \\
@@ -1466,4 +1510,3 @@ The order is semantically significant in two places:
 
 
 \end{document}
-
