@@ -340,8 +340,8 @@
   & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
-  & $\mid$ & \vtt{def\{$x_1$,...,$x_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
-$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
+  & $\mid$ & \vtt{def\{$x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbers \\
   & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
   & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
   & $\mid$ & $ \vtt{op';'} $ & predefined constants \\
@@ -370,7 +370,7 @@ $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
   \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
-  \vtt{for(e)} & \vtt{for(x:=$e$) in x} & vtt{x} fresh \\
+  \vtt{for(e)} & \vtt{for(x:=$e$) in x} & \vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
@@ -548,11 +548,14 @@ otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yields the sequence $[1,
 \label{sec:any} % for def x in x
 \label{sec:variables}
 
+\lennart{
+  \em{This section is now nonsense.}
+  
 In functional programming, a variable is bound to a specified immutable value as soon as it comes into scope.
 Not so in Verse.  Instead, a variable can be brought into scope \emph{without a specified value}.  Here is an example:
-\begin{verbatim}
-  def x in x + (x = 7; 5)
-\end{verbatim}
+%%%\begin{verbatim}
+%%%  def x in x + (x = 7; 5)
+%%%\end{verbatim}
 The construct \vtt{(def $v$ in $e$)} brings $v$ into scope in $e$.\footnote{
 In actual Verse there is no \vtt{def} construct; it is an explanatory device in this paper.
 In actual Verse you would write \vtt{v:any} to introduce an unbound variable.
@@ -576,6 +579,7 @@ described in \Cref{sec:bool}.
 It is easy to write an expression that yields an infinite sequence of values,
 by omitting all equalities.
 For example \vtt{def x in x} returns a sequence of all possible values.
+}
 
 \subsection{Scoping and \vtt{:=}}
 
@@ -1029,8 +1033,8 @@ These effects have the following meaning:
 \newcommand{\defarrow}[3]{\vtt{#1} $\leadsto$ \vtt{#2} ; #3}
 \newcommand{\defempty}{$\emptyset$}
 \newcommand{\defset}[1]{\{#1\}}
-\newcommand{\defunion}[2]{$#1 \uplus #2$}
-\newcommand{\defunions}[1]{$\biguplus #1$}
+\newcommand{\defunion}[2]{$#1 \diamond #2$}
+%%%\newcommand{\defunions}[1]{$\biguplus #1$}
 \newcommand{\defunique}[1]{$\# #1$}
 \newcommand{\defafter}{\\ \vspace*{1em}}
 
@@ -1048,12 +1052,12 @@ These effects have the following meaning:
 
 \AxiomC{\defarrow{$e$}{$e'$}{$D$}}
 \RightLabel{DEF}
-\UnaryInfC{\defarrow{$x$ := $e$}{$x$ = $e'$}{\defunion{D}{\defset{x}}}}
+\UnaryInfC{\defarrow{$x$ := $e$}{$x$}{\defunion{D}{\defset{x\vtt{:=}e'}}}}
 \DisplayProof \defafter
 
 \AxiomC{\defarrow{$t$}{$t'$}{$D$}}
 \RightLabel{RNG}
-\UnaryInfC{\defarrow{:$t$}{$t'$[def\{x\}in x]}{$D$}}
+\UnaryInfC{\defarrow{:$t$}{$t'$[ANY]}{$D$}}
 \DisplayProof \defafter
 
 \ifunify
@@ -1091,7 +1095,7 @@ These effects have the following meaning:
 \AxiomC{$\cdots$}
 \AxiomC{\defarrow{$e_n$}{$e'_n$}{$D_n$}}
 \RightLabel{ARR}
-\TrinaryInfC{\defarrow{$e_1$,$\cdots$,$e_n$}{$e'_1$,$\cdots$,$e'_n$}{\defunions{D_i}}}
+\TrinaryInfC{\defarrow{$e_1$,$\cdots$,$e_n$}{$e'_1$,$\cdots$,$e'_n$}{\defunion{D_1}{$\defunion{\cdots}{D_n}$}}}
 \DisplayProof \defafter
 
 \AxiomC{\defdefin{$e_1$}{$e'_1$}}
@@ -1152,7 +1156,7 @@ These effects have the following meaning:
 \UnaryInfC{\scinf{$\Gamma$}{$k$}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma \cup D$}{\vtt{$e$}}}
+\AxiomC{\scinf{$\Gamma \cup V(D)$}{\vtt{$e$}}}
 \RightLabel{DEF}
 \UnaryInfC{\scinf{$\Gamma$}{\vtt{def\{$D$\}in $e$}}}
 \DisplayProof \defafter
@@ -1194,15 +1198,15 @@ These effects have the following meaning:
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{$e_1$, $\cdots$, $e_n$}}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
-\AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
+\AxiomC{\scinf{$\Gamma \cup V(D)$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma \cup V(D)$}{$e_2$}}
 \AxiomC{\scinf{$\Gamma$}{$e_3$}}
 \RightLabel{IF}
 \TrinaryInfC{\scinf{$\Gamma$}{\vtt{if (def\{$D$\}in $e_1$) then $e_2$ else $e_3$}}}
 \DisplayProof \defafter
 
-\AxiomC{\scinf{$\Gamma \cup D$}{$e_1$}}
-\AxiomC{\scinf{$\Gamma \cup D$}{$e_2$}}
+\AxiomC{\scinf{$\Gamma \cup V(D)$}{$e_1$}}
+\AxiomC{\scinf{$\Gamma \cup V(D)$}{$e_2$}}
 \RightLabel{FOR}
 \BinaryInfC{\scinf{$\Gamma$}{\vtt{for (def\{$D$\}in $e_1$) in $e_2$}}}
 \DisplayProof \defafter
@@ -1219,12 +1223,14 @@ These effects have the following meaning:
 
 In Verse, as in Python,
 Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
-Notation: \defunion{}{} represents multiset union, $\#D$ is a predicate for multiset uniqueness,
-\defempty is the empty multiset.
+Notation: The $D$ is a sequnence of bindings of the form \vtt{$x$:=$e$};
+\defunion{}{} represents concatenation, $\#D$ is a predicate for sequence uniqueness, i.e., the same variable is not defined more than once;
+\defempty is the empty sequence.
 The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
 \vtt{def}s for the variables in $D$, and $e'$ is the expression $e$ with all \vtt{def}s removed.
 The relation \defdefin{$e$}{$e'$} denotes that $e'$ is equivalent to $e$,
 but with all definitions replaced by \vtt{def-in}.
+The $V(D)$ denotes all the variables bound in $D$, i.e., $V(x_1:=e_1,\cdots,x_n:=e_n)$ is $\{x_1,\cdots,x_n\}$.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
