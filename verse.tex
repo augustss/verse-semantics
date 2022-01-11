@@ -129,6 +129,9 @@
 \newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
 \newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
+
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+
 % ------------------- End of local notational macros -----------------
 
 
@@ -246,6 +249,9 @@
 
 \begin{itemize}
 \item One-armed conditionals; see \Cref{sec:conditionals}.
+\item \vtt{for} in which $e_2$ yields multiple values; see \Cref{sec:for}.
+\item $f(e)$ when the function returns \emph{multiple} values; see \Cref{sec:going-wrong}.
+\item What are \vtt{<resolves>}, \vtt{<evaluates>}, and \vtt{<abstracts>}?  See \Cref{sec:multiplicity}.
 \item Currently \vtt{false} is a synonym for \vtt{()}, the empty array.  So \vtt{:false} is an expression that always fails, returning no values.
   But this means that we have to write \vtt{:false} where in an ordinary language one would write just \vtt{false}.  For example \vtt{(if :false then $e_1$ else $e_2$)} is equivalent to $e_2$.  But \vtt{if false then $e_1$ else $e_2$} is equivalent to $e_1$.  This is jolly confusing.
 
@@ -290,7 +296,7 @@ Some points about Featherweight Verse (FW):
   & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
   & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
   & $\mid$ & \vtt{for ($e_1$)}  & simple array creation \\
-  & $\mid$ & $e_1 \;o\; e_2$ & infix operator \\
+  & $\mid$ & $e_1 \;op\; e_2$ & infix operator \\
   & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
   & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
   & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
@@ -306,6 +312,7 @@ Some points about Featherweight Verse (FW):
   $d$ & ::= & $f \mid b$ \\
   $f$ & ::= & \vtt{$f$($p$)} & function \\
   & $\mid$ & \vtt{$f$ : $t$} \\
+  & $\mid$ & \vtt{$f$ $\eff$} \\
   & $\mid$ & $x$ & \\
   $b$ & ::= & $x$ & variable \\
   & $\mid$ & \vtt{$b$ : $t$} & type \\
@@ -320,22 +327,31 @@ Some points about Featherweight Verse (FW):
   & $\mid$ & \vtt{$e$ ; $p$} & sequence pattern \\
   & $\mid$ & \vtt{$p$ where $e$} & where pattern \\
   & $\mid$ & $e$ & expression (exact match) pattern \\
-  \\
-  \multicolumn{3}{l}{Constants}\\
-  $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \cdots$ & natural numbers \\
-  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
-  \\
-  \multicolumn{3}{l}{Infix operators:} \\
-  $o$ & ::= & \vtt{\&\&} \;$\mid$\; \vtt{||} & logic \\
-  & $\mid$ & \vtt{=} \;$\mid$\; \vtt{<} \;$\mid$\; \vtt{>} \;$\mid$\;  $\cdots$ & comparisons \\
-  & $\mid$ & \vtt{+} \;$\mid$\; \vtt{*} \;$\mid$\;  $\cdots$ & arithmetic \\
-%%  & \vtt{;} & sequencing \\
-%%  & | & \vtt{where} & reverse sequencing \\
-%%  & |
 \end{tabular}
 \end{tabular}
+\caption{Source Verse syntax} \label{fig:syntax}
+\end{figure}
 
-\caption{Featherweight Verse syntax} \label{fig:syntax}
+
+\begin{figure}
+\begin{tabular}{c}
+\begin{tabular}{rcll}
+\multicolumn{3}{l}{Constants}\\
+$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbers \\
+  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
+  & $\mid$ & \vtt{op'}$op$\vtt{'}  & e.g. \vtt{op'+'}, \vtt{op'<'} \\
+  & $\mid$ & $ \vtt{op';'} $ & predefined constants \\[2mm]
+\multicolumn{3}{l}{Infix operators:} \\
+$op$ & ::= & \vtt{\&\&} \;$\mid$\; \vtt{||} & logic \\
+  & $\mid$ & \vtt{=} \;$\mid$\; \vtt{<} \;$\mid$\; \vtt{>} \;$\mid$\;  $\cdots$ & comparisons \\
+  & $\mid$ & \vtt{+} \;$\mid$\; \vtt{*} \;$\mid$\;  $\cdots$ & arithmetic \\[2mm]
+\multicolumn{3}{l}{Effects} \\
+$\eff$ & ::= & \vtt{<diverges>} $\mid$ \vtt{<succeeds>} $\mid$ \vtt{<fails>} & \\
+  & $\mid$ & \vtt{<decides>} $\mid$ \vtt{<iterates>} $\mid$ \vtt{<resolves>} \\
+  & $\mid$ & \vtt{<evaluates>} $\mid$ \vtt{<abstracts>} 
+\end{tabular}
+\end{tabular}
+\caption{Verse built-ins} \label{fig:built-in}
 \end{figure}
 
 \lennart{Function definitions need to have multiplicity effect annotations, since we nned to use this to decide if definition reordering is possible.}
@@ -352,14 +368,12 @@ Some points about Featherweight Verse (FW):
   & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
   & $\mid$ & \vtt{\clam{$x$}{$e$}} & lambda expression \\
   & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
-  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
+  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$ \\
+  & $\mid$ & \vtt{()} & empty tuple \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
-  & $\mid$ & \vtt{def ($x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$) in $e$} & define variables in a scope \\
-$k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbers \\
-  & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
-  & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
-  & $\mid$ & $ \vtt{op';'} $ & predefined constants \\
+  & $\mid$ & \vtt{def\{$x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$\} in $e$} & define variables in a scope \\
+  & $\mid$ & \vtt{check $\eff$ in $e$} & check effects in a scope \\[3mm]
 \end{tabular}
 \end{tabular}
 
@@ -386,8 +400,10 @@ $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbe
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
   \vtt{for(e)} & \vtt{for(x:=$e$) in x} & \vtt{x} fresh \\
-  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} & ??? should x be exactly 1 value \\
+  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  ??? should x be exactly 1 value \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
+  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
+  & \vtt{check <succeeds> in f[a]} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
   \vtt{$e_1$ ; $e_2$} & \vtt{($e_1$,$e_2$)[1]} &  \\
@@ -423,10 +439,11 @@ Constructs that are eliminated by extrusion \\
   Source & Expansion & Comment \\
   \hline
   \multicolumn{3}{c}{\bf Definitions $d$, $f$, $b$} \\
-  \vtt{$d$($p$) := $e$} & \vtt{$d$ := $p$ => $e$} &  \\
+  \vtt{$f$($p$) := $e$} & \vtt{$f$ := $p$ => $e$} &  \\
   \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
+  \vtt{$f$ $\eff$ := $e$} & \vtt{$f$ := \vtt{check $\eff$ in $e$}}  \\
   \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
-  \vtt{($b_0$,$\cdots$,$b_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\
+  \vtt{($b_0$,$\cdots$,$b_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\[2mm]
   \hline
   \multicolumn{3}{c}{\bf Patterns $p$} \\
   \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
@@ -454,14 +471,22 @@ This section gives an informal introduction to Verse, leaving a formal descripti
 for subsequent sections.
 
 Verse is a statically typed functional-logic language: the main
-syntactic construct is the \emph{expression}.  Some expressions are
-part of \emph{Core Verse}, defined in \Cref{fig:core}.  Others are
-mere syntactic sugar, which can be described by translation into
-simpler constructs (see \Cref{fig:sugar}). This Figure covers two
+syntactic construct is the \emph{expression}.  We define two languages:
+\begin{itemize}
+\item \emph{Source Verse} is the language written by the programmer, whose syntax is given in
+  Figures \ref{fig:syntax} and \ref{fig:built-in}).
+\item \emph{Core Verse} is a much smaller and simpler language containing the fundamental elements of Verse. Its syntax is given in \Cref{fig:core}.
+\end{itemize}
+We define what Source Verse means by desugaring it into Core Verse. We will discuss these desugaring rules
+as we go, but they are collected for reference in Figures \ref{fig:sugar} and \ref{fig:pat-sugar}.
+There are two
 forms of syntactic sugar: sugar that can be translated with a local rewrite;
 and sugar that requires some care with scoping when translating.  The
 latter is dealt with by \emph{scope extrusion}, which we discuss in
 \Cref{sec:extrusion}.
+
+Core Verse is not a strict subset of Source Verse; some of its constructs (such as \vtt{def}, \vtt{\clam{x}{e}} and \vtt{check})
+are not part of Source Verse, although they could be.
 
 \subsection{Expressions yield multiple values} \label{sec:multi-value}
 
@@ -561,77 +586,53 @@ What if $e_1$ and/or $e_2$ return a \emph{sequence} of values?  Remembering the 
 we take all pairs of values $(v_1,v_2)$ yielded by $e_1$ and $e_2$.  For each such pair, if $v_1 < v_2$ return $v_1$,
 otherwise return nothing.   So \vtt{(1 | 8) < (2 | 10)} yields the sequence $[1,1,8]$.
 
-\subsection{Variables}
-\label{sec:any} % for def x in x
-\label{sec:variables}
+\subsection{Variables and \vtt{:=}}
 
-\lennart{
-  \em{This section is now nonsense.}
-  
-In functional programming, a variable is bound to a specified immutable value as soon as it comes into scope.
-Not so in Verse.  Instead, a variable can be brought into scope \emph{without a specified value}.  Here is an example:
-%%%\begin{verbatim}
-%%%  def x in x + (x = 7; 5)
-%%%\end{verbatim}
-The construct \vtt{(def $v$ in $e$)} brings $v$ into scope in $e$.\footnote{
-In actual Verse there is no \vtt{def} construct; it is an explanatory device in this paper.
-In actual Verse you would write \vtt{v:any} to introduce an unbound variable.
-}  Its semantics is unusual:
-\begin{itemize}
-\item The expression \vtt{(def $v$ in $e$)} binds $v$ successively to
-  \emph{all possible values}, and returns all the values yielded
-  by $e$ under those bindings.
-\item Although an expression yields multiple values, a variable is always bound to
-  a \emph{single} value.
-\end{itemize}
-For which value(s) of \vtt{x} will this particular expression succeed?  Answer: because of the
-\vtt{x=7} in the second argument of the \vtt{+}, all executions will fail except the one that binds \vtt{x}
-to $7$.  So the expression yields just one value, namely 12.
-
-Of course, no implementation could possibly work by binding \vtt{x} to every possible value and
-evaluating $e$ -- there are infinitely many such values.  But that is the semantics.
-Notice that there is nothing special about \vtt{(=)}; it is just the ordinary equality operator
-described in \Cref{sec:bool}.
-
-It is easy to write an expression that yields an infinite sequence of values,
-by omitting all equalities.
-For example \vtt{def x in x} returns a sequence of all possible values.
-}
-
-\subsection{Scoping and \vtt{:=}}
-
-\lennart{THIS IS WRONG}
-Verse allows you to omit the ``\vtt{def}'' entirely, using a ``\vtt{:=}'' to introduce the variable instead.
-Intead of writing
+Verse allows you to bind a new local variable with ``\vtt{:=}''.  For example
+consider the expression
 \begin{verbatim}
-  def x in x + (x = 7; 5)
+  x*2 + (x:=7; x+2)
 \end{verbatim}
-we may write this, omitting the ``\vtt{def}'':
+Here, the expression \vtt{(x:=7)} brings \vtt{x} into scope, and binds it to \vtt{7}.
+However the \emph{extent} of definition -- that is, the code in which \vtt{x}
+is in scope -- extends backwards as well as forwards.  In this case, the expression
+\vtt{(x*2)} has an \emph{occurrence} of \vtt{x} that is \emph{bound} by the expression
+\vtt{(x:=7)}.
+
+To make the scoping more explicit, and give us a language for discussing it,
+Core Verse has a \vtt{def} construct that behaves very much like \vtt{let} in a
+conventional language.  In our example we might write
 \begin{verbatim}
-  x + (x:=7; 5)
+  def {x := 7} in (x*2) + (x+2)
 \end{verbatim}
-Note that the binding \vtt{x:=7} is not required to precede uses of \vtt{x}.
-In pracical Verse code, however, a programmer will typically write an equality before any uses;
-so \vtt{(x:=7; x+5)} would be a more typical way to write our running example.
+In a \vtt{def}, the binding extends only over the \vtt{in} part, so the \vtt{def} makes explicit the
+extent of the binding. The syntax of \vtt{def}, given in \Cref{fig:core}, allows multiple
+bindings. For now we assume that they are non-recursive, and in dependency order, but see \Cref{sec:recursion}
+for a discussion of recursive bindings.
 
 Verse has simple, static rules that explain exactly where to place any missing \vtt{def}s.
-Specifically, every variable bound by \vtt{:=} has a scope that begins at the innermost
+Specifically, every variable bound by \vtt{:=} has a scope whose extent begins at the innermost
 enclosing \emph{scope-limiting construct}.  The scope-limiting constructs are:
 \begin{itemize}
 \item The arguments of ``\vtt{|}''.  E.g. in \vtt{((x:=7; x+1) | (y>v; y:=9; 7))}, the bindings of \vtt{x} and \vtt{y} are limited to the first and second arms of the alternative ``\vtt{|}'' respectively, so the expression could also be written
 \begin{verbatim}
-  (def (x:=7) in (x; x+1)) | (def (y:=9) in (y>v; y; 7))
+  (def {x:=7} in (x; x+1)) | (def {y:=9} in (y>v; y; 7))
 \end{verbatim}
-\item Body of lambda.
+\item The body of lambda.
+\item The body of \vtt{let}. \simon{Correct?}
 \item All three arguments of \vtt{if}.
-\item \vtt{do} block.  Limiting scope is the only purpose of \vtt{do}.  For example, \vtt{(x + do\{ x:=7, x+1 \})} means
-\begin{verbatim}
-  x + (def (x:=7) in (x; x+1))
-\end{verbatim}
-where the first \vtt{x} is presumably bound in some outer scope.
+\item \vtt{do} block.
 \end{itemize}
 These rules are formalised in \Cref{sec:scope}.
 
+Limiting scope is the only purpose of \vtt{do}.  For example, \vtt{(x + do\{ x:=7, x+1 \})} means
+\begin{verbatim}
+  x + (def {x:=7} in (x; x+1))
+\end{verbatim}
+where the first \vtt{x} is presumably bound in some outer scope.
+
+\paragraph{Substitution.} Because of multiple values, \vtt{def} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(def {x := (3|4)} in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
+% \simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
 
 \subsection{Lambdas and application} \label{sec:application}
 
@@ -641,11 +642,11 @@ Lambda expressions are written \vtt{$p$ => $e$} in Verse, where $p$ is a \emph{p
 The simplest pattern is just a variable with a type ascription, thus \vtt{x:int => $e$}.
 Types are covered in \Cref{sec:types} and patterns in \Cref{sec:patterns}.
 
-Function application uses cross-product semantics, just like any other binary operator, but comes in two forms:
+Function application applies a function to a single argument, and comes in two forms:
 \begin{itemize}
-\item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yielded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded.
+\item \vtt{$e_1$[$e_2$]} takes each pair $(v_1,v_2)$ where $v_1$ is one of the values yielded by $e_1$ and similarly $v_2$; if $v_1$ is a lambda, we apply $v_1$ to $v_2$ in the usual way; and concatenate all the sequences thus yielded. \simon{What if $v_1$ is not a lambda?  Fail, I think.}
 
-\item \vtt{$e_1$($e_2$)} is exactly the same, except that if any call in the cartesian product fails (yields zero results),
+\item \vtt{$e_1$($e_2$)} is exactly the same, except that if any call fails (yields zero results),
   that call yields \vtt{WRONG}.
   The verifier should guarantee that this cannot occur; see \Cref{sec:types}.
   \simon{Have I got this right?}
@@ -653,54 +654,57 @@ Function application uses cross-product semantics, just like any other binary op
 For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values $[3, 1, 4, 3]$.
 More generally, Verse enjoys a form of the beta-rule, thus \lennart{This needs to be changed}
 $$
-\begin{array}{rcl}
-\vtt{(\clamx{x}{$body$})[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
-                           & \equiv & \vtt{def x in x=$arg$; $body$}
-\end{array}
+\vtt{(\clamx{x}{$body$})[$arg$]} \;\; \equiv \;\; \vtt{def {x:=$arg$} in $body$}
 $$
-That is, the lambda reduces to a \vtt{def} that brings \vtt{x} into scope; an equality \vtt{x=$arg$} that binds \vtt{x} successively to the values yielded by $arg$; before finally returning $body$.
-The two right-hand sides above are equivalent, via the desugaring of \vtt{:=} (\Cref{sec:variables}).
+Currying is supported, so you can write a call like \vtt{f(3)(5)}.
 
 \subsection{Let-bindings}
 
-Unusually, in Verse a \vtt{let} binding takes an \emph{expression} not a \emph{binding}.  Thus we have \vtt{(let $e_1$ in $e_2$)}.  For example, \vtt{let x := p*q in x+x}. But this \vtt{let}-expression is simply syntactic sugar for
+Unusually, in Verse a \vtt{let} binding takes an \emph{expression} not a \emph{binding}.  Thus we have \vtt{(let $e_1$ in $e_2$)}.
+Its meaning is simple:
 \begin{center}
-  \vtt{def x in x = p*q ; x+x}
+  \vtt{let $e_1$ in $e_2$} \;\; means \;\; \vtt{$e_1$; do{ $e_2$ }}
 \end{center}
-That is, we bring \vtt{x} into scope with the \vtt{def}; then constrain it to be equal to \vtt{p+q}; and return \vtt{x+x}.
-
-Some specifics:
-\begin{itemize}
-\item \emph{Binding multiple variables.}  A \vtt{let} may bind many variables.  For example
-$$
-\begin{array}{l}
-  \vtt{let (x:=7+y; y:=10) in x+y} \\
-  \equiv \vtt{def (y:=10, x:=7+y) in x+y}
-\end{array}
-$$
-
-In principle, the \vtt{def} binds \vtt{x} and \vtt{y} to (all combinations of) all possible values;
-but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \vtt{x=7+y} makes
-  execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
-  as you would expect.
-
-It does not matter whether you use a comma or a semicolon in a
-  \vtt{let}; that is \vtt{(let (x:=7; y:=10) in $e$)} and \vtt{(let (x:=7; y:=10) in $e$)}
-  behave identically.  The \emph{value} of the first argument of the \vtt{let} is irrelevant; only its \emph{bindings} are important.
-
-\item \emph{Binding no variables.} A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
-
-  \simon{So what is the difference between \vtt{(let $e_1$ in $e_2$)} and \vtt{($e_1$ ; $e_2$)}?}
-
-\item \emph{Nested bindings.}  In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
-\begin{center}
-  \vtt{let x:=7 + (y:=10) in x+y}
-\end{center}
-Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We will formalise the scoping rules in \Cref{sec:extrusion}.
-
-\item {Let substitution.}  Because of multiple values, \vtt{let} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(let x := (3|4) in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
-\simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
-\end{itemize}
+\simon{Is this right?  Assuming so, needs explanation.  Indeed, does \vtt{let} pay its way?}
+  
+% For example, \vtt{let x := p*q in x+x}. But this \vtt{let}-expression is simply syntactic sugar for
+% \begin{center}
+%   \vtt{def x in x = p*q ; x+x}
+% \end{center}
+% That is, we bring \vtt{x} into scope with the \vtt{def}; then constrain it to be equal to \vtt{p+q}; and return \vtt{x+x}.
+% 
+% Some specifics:
+% \begin{itemize}
+% \item \emph{Binding multiple variables.}  A \vtt{let} may bind many variables.  For example
+% $$
+% \begin{array}{l}
+%   \vtt{let (x:=7+y; y:=10) in x+y} \\
+%   \equiv \vtt{def (y:=10, x:=7+y) in x+y}
+% \end{array}
+% $$
+% 
+% In principle, the \vtt{def} binds \vtt{x} and \vtt{y} to (all combinations of) all possible values;
+% but the \vtt{y=10} makes execution fail unless \vtt{y} is bound to 10; and the \vtt{x=7+y} makes
+%   execution fail unless \vtt{x} is bound to 17; so the whole expression returns (the singeton) 27
+%   as you would expect.
+% 
+% It does not matter whether you use a comma or a semicolon in a
+%   \vtt{let}; that is \vtt{(let (x:=7; y:=10) in $e$)} and \vtt{(let (x:=7; y:=10) in $e$)}
+%   behave identically.  The \emph{value} of the first argument of the \vtt{let} is irrelevant; only its \emph{bindings} are important.
+% 
+% \item \emph{Binding no variables.} A \vtt{let} is not required to bind \emph{any} variables, in which case it behaves just like ``\vtt{;}''.  For example \vtt{(let 7 in 9)} behaves like \vtt{(7 ; 9)}, which in turn is equivalent to \vtt{9}.
+% 
+%   \simon{So what is the difference between \vtt{(let $e_1$ in $e_2$)} and \vtt{($e_1$ ; $e_2$)}?}
+% 
+% \item \emph{Nested bindings.}  In the most general form \vtt{let $e_1$ in $e_2$}, we must know which variables are \emph{bound} in $e_1$, because they are brought into scope in $e_2$.   These bindings may in principle be nested; for example, here is another way of writing the previous example:
+% \begin{center}
+%   \vtt{let x:=7 + (y:=10) in x+y}
+% \end{center}
+% Here the binding for \vtt{y} is buried inside the argument to ``\vtt{+}''.  We will formalise the scoping rules in \Cref{sec:extrusion}.
+% 
+% \item {Let substitution.}  Because of multiple values, \vtt{let} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(let x := (3|4) in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
+% \simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
+% \end{itemize}
 
 \subsection{Arrays} \label{sec:arrays}
 
@@ -710,7 +714,7 @@ An array is treated by Verse as a function, so that indexing is just function ap
 
 Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
 
-\subsubsection{The \vtt{for} construct}
+\subsubsection{The \vtt{for} construct} \label{sec:for}
 
 The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
 For example:
@@ -747,7 +751,10 @@ You may imagine \vtt{range} being defined like this:
 \begin{verbatim}
   range(lo,hi) := if (lo<=hi) then (lo | range( lo+1, hi ))
 \end{verbatim}
-Like any function call, the  cartesian-product semantics applies, so the notation may produce a sequence of arrays).
+Like any function call, the  cartesian-product semantics applies, so the notation may produce a concatenation of sequences.
+For example \vtt{1..(2|3)} yields all the values of \vtt{range(1,2)} and then all the values of \vtt{range(1,3)},
+thus yielding $[1,2,1,2,3]$\footnote{Agrees with Tim's prototype.}.
+
 Any non-integer values yielded by $e_1$ and $e_2$ are ignored. \simon{Is ``ignored'' right; or does the program go wrong?}
 
 The \emph{sequence} generated by the \vtt{|} alternation maybe reified into an \emph{array} using \vtt{for},
@@ -770,21 +777,23 @@ When you declare a function, you can declare whether or not it is allowed to fai
 In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
 Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
+\subsection{Recursive bindings} \label{sec:recursion}
 
+\simon{ToDo}
 
 \section{Types and type checking} \label{sec:types}
 
 Verse is designed to be statically type-checked.  The type checker is called the \emph{verifier}.
 Paraphrasing Milner: \emph{verified programs don't go wrong}.
 
-\subsection{Going wrong}
+\subsection{Going wrong} \label{sec:going-wrong}
 
 There are exactly two ways in which a program can produce the value \vtt{WRONG}
 \begin{enumerate}
-\item The body of a function fails (returns zero values), but the function's multiplicity effects
-  are declared as \vtt{<succeeds>} or \vtt{diverges}.
+\item The body of a function returns a sequence of values whose multiplicity is incompatible with the
+  function's declared multiplicity (see \Cref{sec:multiplicity}).
 \item A round-parenthesis function call \vtt{$f$($e$)} fails. (Presumably $f$ is not labelled
-  as \vtt{<succeeds>} or \vtt{diverges}.)
+  as \vtt{<succeeds>} or \vtt{diverges}.) \simon{Do we expect exactly one result? Or can it return multiple results?}
 \end{enumerate}
 In both cases, the call succeeds, returning the singleton \vtt{WRONG} value.
 One way in which (2) can occur
@@ -939,7 +948,7 @@ the non-negative integers).  So the definition
 \begin{verbatim}
    x : abs := -7
 \end{verbatim}
-applies \vtt{abs} to \vtt{7} before binding it to \vtt{x}.
+applies \vtt{abs} to \vtt{7} before binding it to \vtt{x}, thus \vtt{(x := abs[-7])}.
 
 \simon{I'm wondering whether typed bindings should use round or square parens.  I'd expect \vtt{x:int := 4.5} to go wrong (and hence be rejecgted by the verifier) rather than be accepted by the verifier but fail by returning no values.  Function calls are aggressively checked in this way, are they not?}
 
@@ -1006,8 +1015,9 @@ to prove that the body succeeds, using only the declared type of the argument, h
               ========|=========|================
                       |    iterates
                       |   /     |       DECIDABLE
-                   decides      |
-              ========|=========|================
+                     decides    |
+                      |     \   |
+              ========|======\==|================
                   succeeds   fails        DECIDED
                       \        /
                        diverges
@@ -1021,13 +1031,15 @@ These effects have the following meaning:
 \item Fails $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
 \item Succeeds $\{\bot, [v]\}$: evaluation diverges or returns exactly one value.
 \item Decides $\{\bot, [], [v]\}$: diverges, fails, or succeeds with one value.
-\simon{There should be a line from fails to decides}
 \item Iterates: $\{\bot, [v_1, \ldots, v_n]\}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values
 \item Resolves: ???
 \item Evaluates: ???
 \item Abstracts: we don't know anything
 \end{itemize}
 \simon{Runtime checks possible for fail, succeeds, decides.}
+
+If you do not explicitly declare the effects of a function definition, it defaults to \vtt{<succeeds>};
+that is, ordinary functional programming.
 
 \begin{itemize}
   \item \simon{Question: what about $v:\bot$?  Is that ``succeeds''?  Probably not.}
@@ -1038,9 +1050,6 @@ These effects have the following meaning:
 
 
 
-
-
-\section{Formalising Verse}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
