@@ -244,7 +244,7 @@
 \section{Questions for Tim}
 
 \begin{itemize}
-\item One-armed conditionals; see \label{sec:conditionals}.
+\item One-armed conditionals; see \Cref{sec:conditionals}.
 \item Currently \vtt{false} is a synonym for \vtt{()}, the empty array.  So \vtt{:false} is an expression that always fails, returning no values.
   But this means that we have to write \vtt{:false} where in an ordinary language one would write just \vtt{false}.  For example \vtt{(if :false then $e_1$ else $e_2$)} is equivalent to $e_2$.  But \vtt{if false then $e_1$ else $e_2$} is equivalent to $e_1$.  This is jolly confusing.
 
@@ -706,7 +706,8 @@ containing all those values.
 \item Cross-product semantics applies to $e_2$.  So if $e_2$ fails for any iteration, the entire \vtt{for} fails;
   if an iteration of $e_2$ yields multiple values, the \vtt{for} returns an array for each of them.
 \end{itemize}
-If you give only one argument to \vtt{for}
+If you give only one argument to \vtt{for}, it behaves thus: \vtt{for($e$)} behave like \vtt{for(x:=$e$) in x} where \vtt{x} is fresh.
+That is, $e$ enumerates all the elements of the array.
 
 \simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
   of all the values returned by $e$?  Then we would write the above example like this:}
@@ -1223,6 +1224,7 @@ These effects have the following meaning:
 
 In Verse, as in Python,
 Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
+
 Notation: The $D$ is a sequnence of bindings of the form \vtt{$x$:=$e$};
 \defunion{}{} represents concatenation, $\#D$ is a predicate for sequence uniqueness, i.e., the same variable is not defined more than once;
 \defempty is the empty sequence.
