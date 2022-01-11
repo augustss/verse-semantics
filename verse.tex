@@ -134,7 +134,7 @@
 \begin{document}
 
 %% Title information
-\title{Verse}
+\title{Featherweight Verse}
 
                                         %% [Short Title] is optional;
                                         %% when present, will be used in
@@ -180,7 +180,7 @@
 \orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
   \position{Position1}
-  \institution{Microsoft Research}            %% \institution is required
+  \institution{Epic Games}            %% \institution is required
   \streetaddress{Street1 Address1}
   \city{City1}
   \state{State1}
@@ -255,7 +255,18 @@
 
 \section{Introduction}
 
-\lennart{Should we make all examples be valid actual Verse?  Possibly adding def{x}in.}
+\subsection{Caveat}
+\emph{
+Some points about Featherweight Verse (FW):
+\begin{itemize}
+\item FW is not exactly a subset of Verse, more notably \vtt{;} is an infix sequencing operator in FW.
+\item FW does not include effects like assignment and I/O.
+\item FW does not include any object oriented features.
+\item FW does not have structs nor maps.
+\end{itemize}
+}
+
+\lennart{Should we make all examples be valid actual Verse?}
 
 
 \begin{figure}
