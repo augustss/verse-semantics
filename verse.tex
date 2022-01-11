@@ -245,7 +245,37 @@
 \newif\ifmatch
 \matchtrue
 
+\section{Introduction}
+
+This working paper is intended to develop into a precise specification of MaxVerse. For now we are starting
+with a subset of MaxVerse, which we'll call Featherweight Verse (FV).  We'll keep growing features until
+we get to MaxVerse.
+
+Some points about Featherweight Verse:
+\begin{itemize}
+\item FV is not exactly a subset of Verse.  Most notably \vtt{;} is an infix
+  sequencing operator in FV \simon{I'm not sure of the significance of this point}.
+  And \vtt{\{\}} mostly behave like \vtt{()}.
+\item FV does not yet have structs nor maps.
+\item FV does not yet include effects like assignment and I/O.
+\item FV does not yet include any object oriented features.
+\item We have defined a syntax for definitions and patterns in \Cref{fig:syntax}, but we need to check that it's right.
+\end{itemize}
+\lennart{Should we make all examples be valid actual Verse?}
+
+We would love all kinds of feedback. The status is
+\begin{itemize}
+  \item The narrative of the overview in \Cref{sec:informal} should make sense.
+  \item The description of types in \Cref{sec:types} should likewise make sense.
+  \item \Cref{sec:functions} is less finished, especially the parts about pattern matching, although \Cref{fig:pat-sugar}
+    is complete.  (Whether it is correct is another matter.)
+  \item \Cref{sec:extrusion} has virtually no text, but \Cref{fig:extrusion-rules} pretty much tells the story.
+    \item \Cref{sec:semantics} on semantics is just an initial stab.
+\end{itemize}
+
 \section{Questions for Tim}
+
+Many of these questions are small points.
 
 \begin{itemize}
 \item One-armed conditionals; see \Cref{sec:conditionals}.
@@ -259,22 +289,6 @@
 
 \item Multiplicity effects: see \Cref{sec:multiplicity}
 \end{itemize}
-
-\section{Introduction}
-
-\subsection{Caveat}
-\emph{
-Some points about Featherweight Verse (FW):
-\begin{itemize}
-\item FW is not exactly a subset of Verse, more notably \vtt{;} is an infix sequencing operator in FW.
-  And \vtt{\{\}} mostly behave like \vtt{()}.
-\item FW does not include effects like assignment and I/O.
-\item FW does not include any object oriented features.
-\item FW does not have structs nor maps.
-\end{itemize}
-}
-
-\lennart{Should we make all examples be valid actual Verse?}
 
 
 \begin{figure}
@@ -329,7 +343,7 @@ Some points about Featherweight Verse (FW):
   & $\mid$ & $e$ & expression (exact match) pattern \\
 \end{tabular}
 \end{tabular}
-\caption{Source Verse syntax} \label{fig:syntax}
+\caption{Featherweight Verse syntax} \label{fig:syntax}
 \end{figure}
 
 
@@ -465,7 +479,7 @@ Constructs that are eliminated by extrusion \\
 \end{figure}
 
 
-\section{A short introduction to Verse}
+\section{A short introduction to Verse} \label{sec:informal}
 
 This section gives an informal introduction to Verse, leaving a formal description
 for subsequent sections.
@@ -473,11 +487,11 @@ for subsequent sections.
 Verse is a statically typed functional-logic language: the main
 syntactic construct is the \emph{expression}.  We define two languages:
 \begin{itemize}
-\item \emph{Source Verse} is the language written by the programmer, whose syntax is given in
+\item \emph{Featherweight Verse} is the language written by the programmer, whose syntax is given in
   Figures \ref{fig:syntax} and \ref{fig:built-in}).
 \item \emph{Core Verse} is a much smaller and simpler language containing the fundamental elements of Verse. Its syntax is given in \Cref{fig:core}.
 \end{itemize}
-We define what Source Verse means by desugaring it into Core Verse. We will discuss these desugaring rules
+We define what Featherweight Verse means by desugaring it into Core Verse. We will discuss these desugaring rules
 as we go, but they are collected for reference in Figures \ref{fig:sugar} and \ref{fig:pat-sugar}.
 There are two
 forms of syntactic sugar: sugar that can be translated with a local rewrite;
@@ -485,8 +499,10 @@ and sugar that requires some care with scoping when translating.  The
 latter is dealt with by \emph{scope extrusion}, which we discuss in
 \Cref{sec:extrusion}.
 
-Core Verse is not a strict subset of Source Verse; some of its constructs (such as \vtt{def}, \vtt{\clam{x}{e}} and \vtt{check})
-are not part of Source Verse, although they could be.
+Finally, we say what it means to \emph{execute} Core Verse, in \Cref{sec:semantics}.
+
+Core Verse is not a strict subset of Featherweight Verse; some of its constructs (such as \vtt{def}, \vtt{\clam{x}{e}} and \vtt{check})
+are not part of Featherweight Verse, although they could be.
 
 \subsection{Expressions yield multiple values} \label{sec:multi-value}
 
@@ -917,7 +933,7 @@ belong to the type that $e$ describes.
 The expression \vtt{x:e} is just syntactic sugar for \vtt{x := :e}; that is, it brings \vtt{x}
 into scope, and limits its bindings to the inhabitants of \vtt{e} (\Cref{fig:sugar}).
 
-\section{Definitions, functions, and pattern matching} \label{sec:patterns}
+\section{Definitions, functions, and pattern matching} \label{sec:functions} \label{sec:patterns}
 
 \subsection{Definitions} \label{sec:definitions}
 
@@ -992,8 +1008,7 @@ In the core language the lambda expressions are written \clam{$x$}{$e$} where th
 variable being bound.
 
 
-% -----------------------------------------
-\section{Typechecking functions, and effects}
+\subsection{Typechecking functions, and effects}
 
 We typecheck a function in isolation, using the declared types of its arguments. Consider
 $$ \vtt{ f( x:int ) <succeeds> := x=3; x} $$
@@ -1166,8 +1181,7 @@ that is, ordinary functional programming.
 \BinaryInfC{\defdefin{$e$}{def\{$D$\} in $e'$}}
 \DisplayProof \defafter
 
-\caption{Scope extrusion rules}
-\label{extrusion-rules}
+\caption{Scope extrusion rules} \label{fig:extrusion-rules}
 \end{figure}
 
 \begin{figure}
@@ -1251,8 +1265,7 @@ that is, ordinary functional programming.
 \label{scoping-rules}
 \end{figure}
 
-In Verse, as in Python,
-Figure \ref{extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
+Figure \ref{fig:extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
 
 Notation: The $D$ is a sequnence of bindings of the form \vtt{$x$:=$e$};
 \defunion{}{} represents concatenation, $\#D$ is a predicate for sequence uniqueness, i.e., the same variable is not defined more than once;
