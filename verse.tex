@@ -109,9 +109,10 @@
 % ------------------- Local notational macros -----------------
 \newcommand{\vtt}[1]{\text{\tt #1}}
 
-\newcommand{\clamsymx}{\Rightarrow}
-\newcommand{\clamsym}{$\clamsymx$}
-\newcommand{\clam}[2]{#1 \clamsym #2}
+%%\newcommand{\clamsymx}{\Rightarrow}
+%%\newcommand{\clamsym}{$\clamsymx$}
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{V}
@@ -260,6 +261,7 @@
 Some points about Featherweight Verse (FW):
 \begin{itemize}
 \item FW is not exactly a subset of Verse, more notably \vtt{;} is an infix sequencing operator in FW.
+  And \vtt{\{\}} mostly behave like \vtt{()}.
 \item FW does not include effects like assignment and I/O.
 \item FW does not include any object oriented features.
 \item FW does not have structs nor maps.
@@ -333,8 +335,10 @@ Some points about Featherweight Verse (FW):
 \end{tabular}
 \end{tabular}
 
-\caption{Mini Verse syntax} \label{fig:syntax}
+\caption{Featherweight Verse syntax} \label{fig:syntax}
 \end{figure}
+
+\lennart{Function definitions need to have multiplicity effect annotations, since we nned to use this to decide if definition reordering is possible.}
 
 % A core lambda expression where the argument is always a variable.
 \begin{figure}
@@ -351,7 +355,7 @@ Some points about Featherweight Verse (FW):
   & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$, also sometimes $ n = 0$ \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
-  & $\mid$ & \vtt{def\{$x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$\} in $e$} & define variables in a scope, {\it only after extrusion} \\
+  & $\mid$ & \vtt{def ($x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$) in $e$} & define variables in a scope \\
 $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbers \\
   & $\mid$ & $ \vtt{int} \;\mid\; \vtt{any} \;\mid\; \cdots$ & predefined constants \\
   & $\mid$ & $ \vtt{op'+'} \;\mid\; \vtt{op'-'} \;\mid\; \vtt{op'<'} \;\mid\; \cdots$ & predefined constants \\
@@ -382,7 +386,7 @@ $k$ & ::= & $0 \;\mid\; 1 \;\mid\; 2 \;\mid\; 3 \;\mid\; \cdots$ & natural numbe
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
   \vtt{for(e)} & \vtt{for(x:=$e$) in x} & \vtt{x} fresh \\
-  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
+  \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} & ??? should x be exactly 1 value \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$ \&\& $e_2$} & \vtt{\vseq{$e_1$; $e_2$}} &  \\
   \vtt{$e_1$ || $e_2$} & \vtt{if (x := $e_1$) then x else $e_2$} & \vtt{x} fresh \\
@@ -438,6 +442,8 @@ Constructs that are eliminated by extrusion \\
   \hline
 \end{tabular}\\[2mm]
 \lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
+\lennart{The desugaring of d is probably subtly wrong.}
+\lennart{Mention Tim's principle that a d cab be turned into an e which turns :- into unification}
 \caption{Syntactic sugar for pattern matching} \label{fig:pat-sugar}
 \end{figure}
 
@@ -594,6 +600,7 @@ For example \vtt{def x in x} returns a sequence of all possible values.
 
 \subsection{Scoping and \vtt{:=}}
 
+\lennart{THIS IS WRONG}
 Verse allows you to omit the ``\vtt{def}'' entirely, using a ``\vtt{:=}'' to introduce the variable instead.
 Intead of writing
 \begin{verbatim}
@@ -613,13 +620,13 @@ enclosing \emph{scope-limiting construct}.  The scope-limiting constructs are:
 \begin{itemize}
 \item The arguments of ``\vtt{|}''.  E.g. in \vtt{((x:=7; x+1) | (y>v; y:=9; 7))}, the bindings of \vtt{x} and \vtt{y} are limited to the first and second arms of the alternative ``\vtt{|}'' respectively, so the expression could also be written
 \begin{verbatim}
-  (def x in (x=7; x+1)) | (def y in (y>v; y=9; 7))
+  (def (x:=7) in (x; x+1)) | (def (y:=9) in (y>v; y; 7))
 \end{verbatim}
 \item Body of lambda.
 \item All three arguments of \vtt{if}.
 \item \vtt{do} block.  Limiting scope is the only purpose of \vtt{do}.  For example, \vtt{(x + do\{ x:=7, x+1 \})} means
 \begin{verbatim}
-  x + (def x in (x=7; x+1))
+  x + (def (x:=7) in (x; x+1))
 \end{verbatim}
 where the first \vtt{x} is presumably bound in some outer scope.
 \end{itemize}
@@ -647,7 +654,7 @@ For example, the call \vtt{((x:int) => (x+1 | x-1))[(2 | 3)]} yields the values 
 More generally, Verse enjoys a form of the beta-rule, thus \lennart{This needs to be changed}
 $$
 \begin{array}{rcl}
-\vtt{(x \clamsym $body$)[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
+\vtt{(\clamx{x}{$body$})[$arg$]} & \equiv & \vtt{x:=$arg$; $body$} \\
                            & \equiv & \vtt{def x in x=$arg$; $body$}
 \end{array}
 $$
@@ -668,7 +675,7 @@ Some specifics:
 $$
 \begin{array}{l}
   \vtt{let (x:=7+y; y:=10) in x+y} \\
-  \equiv \vtt{def \{x,y\} in (x=7+y; y=10) ; x+y}
+  \equiv \vtt{def (y:=10, x:=7+y) in x+y}
 \end{array}
 $$
 
@@ -728,7 +735,7 @@ for (i := (1 | 2 | 3); i*i)
 \lennart{In fact, full Verse has exactly that shorthand.
   But the long version is more powerful: failure in $e_1$ act as a filter whereas failure in $e_2$ causes failure.}
 \simon{Also what happens if $e_2$ yields multiple values, e.g. \vtt{for (i := (1|2|3)) (i | i*i)}?}
-\lennart{I don't know what that means.  Tim's implementation crashes when I try it.}
+\lennart{I don't know what that means.  Tim's implementation complains when I try it.}
 
 \subsubsection{Enumerations}
 
@@ -750,7 +757,7 @@ so that \vtt{for(2..5)} will return a singleton value, the array (or tuple) $\tu
 
 There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
 \begin{verbatim}
- array := t \clamsym xs \clamsym for (x:xs) in t[x]
+ array := lam (t) in lam (xs) in for (x:xs) in t[x]
 \end{verbatim}
 \simon{Or something like this.  Need to explain!!!}
 
@@ -775,9 +782,9 @@ Paraphrasing Milner: \emph{verified programs don't go wrong}.
 There are exactly two ways in which a program can produce the value \vtt{WRONG}
 \begin{enumerate}
 \item The body of a function fails (returns zero values), but the function's multiplicity effects
-  are declared as \vtt{<succeeds>} or \vtt{divereges}.
+  are declared as \vtt{<succeeds>} or \vtt{diverges}.
 \item A round-parenthesis function call \vtt{$f$($e$)} fails. (Presumably $f$ is not labelled
-  as \vtt{<succeeds>} or \vtt{divereges}.)
+  as \vtt{<succeeds>} or \vtt{diverges}.)
 \end{enumerate}
 In both cases, the call succeeds, returning the singleton \vtt{WRONG} value.
 One way in which (2) can occur
@@ -840,7 +847,7 @@ Moreover, a Verse type can perform conversions.  For example the built-in functi
 
 Verse has some built-in types:
 \begin{itemize}
-\item \vtt{any} is defined as \vtt{any := x \clamsym x}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
+\item \vtt{any} is defined as \vtt{any := \clamx{x}{x}}, the function that always succeeds.  So type type \vtt{any} is inhabited by all values.
 \item \vtt{int} is a function that, given an argument value $v$, yields the singleton sequence $[v]$ if $v$ is an integer; and fails otherwise.
 \item \vtt{false} is the function that always fails; \vtt{:false} denotes the empty set of values.
   \simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
@@ -854,7 +861,7 @@ A function type \vtt{($t_1$ -> $t_2$)} is, like any Verse type, an expression.
 %  Here is the definition of \vtt{op`->`}: \vtt{op`->` := $arg_ty$ \clamsym $res_ty$ \clamsym $f$ \clamsym $x$ \clamsym res_ty[ f[ arg_ty[x] ] ]}
   Here is the definition of \vtt{op`->`}:
   $$
-  \vtt{op`->` := arg\_ty \clamsym\, res\_ty \clamsym\, f \clamsym\, x \clamsym\, res\_ty[ f[ arg\_ty[x] ] ]}
+  \vtt{op`->` := lam {arg\_ty} in lam {res\_ty} in lam {f} in lam {x} in res\_ty[ f[ arg\_ty[x] ] ]}
   $$
 That is, given an argument and result type (each of which is a partial identity function),
 and the function \vtt{f} itself, it returns a function that
@@ -872,7 +879,7 @@ is the best we can hope for.
 
 If we have an expression $e$ that yields a sequence of
 values $[v_1,\ldots,v_n]$, can we define a type (that is, a Verse function) that denotes that
-set of values?  Yes, of course: it is just \vtt{(x \clamsym x=$e$)}; that is, a function that,
+set of values?  Yes, of course: it is just \vtt{(\clamx{x}{x=$e$})}; that is, a function that,
 given a value $v$, will succeed (returning $v$) iff $v$ is among the values yielded by $e$.
 This idiom is sufficiently useful that Verse defines \vtt{typedef\{$e$\}} as syntactic sugar
 for that lambda (see \Cref{fig:sugar}).
@@ -889,10 +896,10 @@ the type \vtt{e} (\Cref{sec:what-is-a-type}).  So, for example,
 But this is mere syntactic sugar:
 \begin{center}
 \begin{tabular}{rcl}
-\vtt{:$e$} & $\equiv$ & \vtt{$e$[def x in x]}
+\vtt{:$e$} & $\equiv$ & \vtt{$e$[:any]}
 \end{tabular}
 \end{center}
-As mentioned in \Cref{sec:any}, the expression \vtt{(def x in x)} enumerates all values; then
+As mentioned in \Cref{sec:any}, the expression \vtt{:any} enumerates all values; then
 we apply the type $e$ (which is just a Verse function) to select just those values that
 belong to the type that $e$ describes.
 
@@ -972,7 +979,7 @@ In \vtt{f}'s pattern \vtt{(x,y:int)}, the \vtt{x} is an occurrence, brought into
 
 \simon{working here}
 
-In the core language the lambda expressions are written \vtt{\clam{$x$}{$e$}} where there is just a single
+In the core language the lambda expressions are written \clam{$x$}{$e$} where there is just a single
 variable being bound.
 
 
@@ -1229,6 +1236,8 @@ These effects have the following meaning:
 %\TrinaryInfC{\scinf{$\Gamma$}{\vtt{\{$e_1$; $\cdots$; $e_n$\}}}}
 %\DisplayProof \defafter
 
+\lennart{Somewhere around extrusion and scope checking we need to check if the D makes sense with respect to mutual recursion.}
+
 \caption{Scoping rules}
 \label{scoping-rules}
 \end{figure}
@@ -1292,7 +1301,7 @@ The $V(D)$ denotes all the variables bound in $D$, i.e., $V(x_1:=e_1,\cdots,x_n:
   \semeqn{e_1 \vtt{=} e_2}{\mathrm{lift}(\hat{=}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
 \fi
   \semeqn{e_1[e_2]}{\mathrm{lift}(\mathrm{apply}, \semapp{e_1}{\rho}, \semapp{e_2}{\rho})}
-  \semeqn{x \clamsymx e}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
+  \semeqn{\clam{$x$}{$e$}}{\munit{\lambda v . \semapp{e} (\rho \circ (x \mapsto v))}}
   \semeqn{e_1 \vtt{|} e_2}{\semapp{e_1}{\rho} \malt \semapp{e_2}{\rho}}
   \semeqn{e_1,\cdots,e_n}{
     \mcompr{\tuple{v_1,\cdots,v_n}}
