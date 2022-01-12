@@ -129,7 +129,7 @@
 \newcommand{\semeqn}[2]{\semapp{#1}{\rho} & = #2 \\ }
 \newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
-
+\newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
 
 % ------------------- End of local notational macros -----------------
@@ -272,6 +272,8 @@ We would love all kinds of feedback. The status is
   \item \Cref{sec:extrusion} has virtually no text, but \Cref{fig:extrusion-rules} pretty much tells the story.
     \item \Cref{sec:semantics} on semantics is just an initial stab.
 \end{itemize}
+One particularly valuable form of feedback would be ``here's an example Verse program that illustrates some point''.
+We don't have enough examples.
 
 \section{Questions for Tim}
 
@@ -304,19 +306,20 @@ Many of these questions are small points.
   & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
   & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
   & $\mid$ & \vtt{$e_1$ | $e_2$} & alternative \\
-  & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$ \\
+  & $\mid$ & \vtt{$e_1$..$e_2$} & alternative range \\
+  & $\mid$ & \vtt{$e_1$,$\ldots$,$e_n$} & tuple formation, $n >= 2$ \\
   & $\mid$ & \vtt{()} & empty tuple \simon{right?} \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
-  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array creation \\
-  & $\mid$ & \vtt{for ($e_1$)}  & simple array creation \\
+  & $\mid$ & \vtt{for \{$e_1$\} in $e_2$} & array creation \\
+  & $\mid$ & \vtt{for \{$e_1$\}}  & simple array creation \\
   & $\mid$ & $e_1 \;op\; e_2$ & infix operator \\
   & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
   & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
   & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
   & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
   & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
-  & $\mid$ & \vtt{do $e$} & scope delimiter \\
+  & $\mid$ & \vtt{do \{$e$\} } & scope delimiter \\
 \ifmatch
   & $\mid$ & \vtt{$p$ :- $e$} & match \\
 \fi
@@ -385,7 +388,7 @@ $\eff$ & ::= & \vtt{<diverges>} $\mid$ \vtt{<succeeds>} $\mid$ \vtt{<fails>} & \
   & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$ \\
   & $\mid$ & \vtt{()} & empty tuple \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & $\mid$ & \vtt{for ($e_1$) in $e_2$} & array formation \\
+  & $\mid$ & \vtt{for \{ $e_1$ \} in $e_2$} & array formation \\
   & $\mid$ & \vtt{def\{$x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$\} in $e$} & define variables in a scope \\
   & $\mid$ & \vtt{check $\eff$ in $e$} & check effects in a scope \\[3mm]
 \end{tabular}
@@ -413,7 +416,7 @@ $\eff$ & ::= & \vtt{<diverges>} $\mid$ \vtt{<succeeds>} $\mid$ \vtt{<fails>} & \
   \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
-  \vtt{for(e)} & \vtt{for(x:=$e$) in x} & \vtt{x} fresh \\
+  \vtt{for\{e\}} & \vtt{for\{x:=$e$\} in x} & \vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  ??? should x be exactly 1 value \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
@@ -504,7 +507,7 @@ Finally, we say what it means to \emph{execute} Core Verse, in \Cref{sec:semanti
 Core Verse is not a strict subset of Featherweight Verse; some of its constructs (such as \vtt{def}, \vtt{\clam{x}{e}} and \vtt{check})
 are not part of Featherweight Verse, although they could be.
 
-\subsection{Expressions yield multiple values} \label{sec:multi-value}
+\subsection{Expressions yield multiple values} \label{sec:multi-value} \label{sec:false}
 
 Verse's most salient and unusual feature is that \emph{an expression yields a (possibly-empty) sequence of values}.
 This is not a new idea --- Verse inherits it from Ontic \cite{ontic} and $\lambda_\aleph$ \cite{lambda-aleph}
@@ -521,7 +524,7 @@ In general, the expression \vtt{($e_1$ | $e_2$)} yields all the values of $e_1$ 
 \noindent
 An expression is said to \emph{fail} if it returns no values at all; and to \emph{succeed} if it returns one or more values.
 
-A value can be:
+A \emph{value} can be:
 \begin{itemize}
 \item An integer
 \item A floating point number
@@ -533,7 +536,6 @@ where \vtt{WRONG} is the value used when something ``impossible'' happens, such 
 Note that we distinguish strongly between \emph{failing} which is perfectly normal, and \emph{going wrong} (i.e. returning \vtt{WRONG})
 which should never happen.
 Verse is statically typed, and its verifier guarantees that no \vtt{WRONG} values will ever occur (\Cref{sec:types}).
-
 
 \subsection{Cross-product semantics}
 \label{sec:lifting}
@@ -647,7 +649,7 @@ Limiting scope is the only purpose of \vtt{do}.  For example, \vtt{(x + do\{ x:=
 \end{verbatim}
 where the first \vtt{x} is presumably bound in some outer scope.
 
-\paragraph{Substitution.} Because of multiple values, \vtt{def} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(def {x := (3|4)} in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
+\paragraph{Substitution.} Because of multiple values, \vtt{def} does not enjoy an arbitrary substitution property.  For example, \vtt{(def {x := (3|4)} in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
 % \simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
 
 \subsection{Lambdas and application} \label{sec:application}
@@ -732,30 +734,31 @@ Indexing can fail, if the index is out of bounds, yielding an empty sequence of 
 
 \subsubsection{The \vtt{for} construct} \label{sec:for}
 
-The \vtt{for} construct builds an array.  Specifically \vtt{for $e_1$ in $e_2$} takes each value returned by $e_1$, ignores it, and evaluates $e_2$ in the presence of the bindings from $e_1$.
+The \vtt{for} construct builds an array.  Specifically \vtt{for\{$e$\}} returns the array of values successively yielded
+by $e$.  For example:
+\begin{itemize}
+\item \vtt{for \{2 | 1 | 3\}} returns the array $\tuple{2,1,3}$.
+\item \vtt{for \{ i:=(2 | 1 | 3); i*i \}} returns the array $\tuple{4,1,9}$.
+\item \vtt{for \{:false\}} returns the empty array.  Recall that \vtt{:false} is the expression that fails,
+  returning no values (\Cref{sec:false});
+  and the empty sequence reifies to an empty array.
+\end{itemize}
+Verse also provides a two-armed version of \vtt{for}, thus \vtt{for\{$e$\} in $elt$}, where $e$ and $elt$ are both
+experiments.  Its semantic is this: take each value yielded by $e$, say $v_1, v_2, \ldots$, discard it, and evaluate
+$elt$ in the presence of the bindings from $e$. Now form the array from the Cartesian product of the sequences
+returned by $elt$.
 For example:
 \begin{verbatim}
-      for (i := (1 | 2 | 3)) in (i*i)
+      for {1 | 2 | 3} in (0 | 1)
 \end{verbatim}
-So \vtt{for} reifies the \emph{sequence of values} yielded by an expression into a \emph{single value} (the array)
-containing all those values.
-\begin{itemize}
-\item If $e_1$ yields the empty sequence, the \vtt{for} yields (a singleton sequence of) the empty array.
-\item Cross-product semantics applies to $e_2$.  So if $e_2$ fails for any iteration, the entire \vtt{for} fails;
-  if an iteration of $e_2$ yields multiple values, the \vtt{for} returns an array for each of them.
-\end{itemize}
-If you give only one argument to \vtt{for}, it behaves thus: \vtt{for($e$)} behave like \vtt{for(x:=$e$) in x} where \vtt{x} is fresh.
-That is, $e$ enumerates all the elements of the array.
+will yield the sequence of three-element arrays $[ (0,0,0), (0,0,1), (0,1,0), \ldots, (1,1,1) ]$.
+If any iteration of $elt$ fails (returns no values) then the entire Cartesian product becomes empty,
+returning no values.
+\simon{Is this right?}
 
-\simon{Remark. This seems really strange.  Why not just have \vtt{for $e$} which returns an array
-  of all the values returned by $e$?  Then we would write the above example like this:}
-\begin{verbatim}
-for (i := (1 | 2 | 3); i*i)
-\end{verbatim}
-\lennart{In fact, full Verse has exactly that shorthand.
-  But the long version is more powerful: failure in $e_1$ act as a filter whereas failure in $e_2$ causes failure.}
-\simon{Also what happens if $e_2$ yields multiple values, e.g. \vtt{for (i := (1|2|3)) (i | i*i)}?}
-\lennart{I don't know what that means.  Tim's implementation complains when I try it.}
+You can see the one-armed \vtt{for} as a special case of the two-armed \vtt{for} thus: \vtt{for\{$e$\}} behaves
+like \vtt{for(x:=$e$) in x} where \vtt{x} is fresh.
+
 
 \subsubsection{Enumerations}
 
@@ -765,16 +768,19 @@ $[n_1, n_1+1, \ldots, n_2]$, where $n_1$ and $n_2$ are the integer values of $e_
 For example \vtt{2..5} is equivalent to \vtt{(2 | 3 | 4 | 5)} and yields the sequence $[2,3,4,5]$.
 You may imagine \vtt{range} being defined like this:
 \begin{verbatim}
-  range(lo,hi) := if (lo<=hi) then (lo | range( lo+1, hi ))
+  range(lo:int,hi:int) := if (lo<=hi) then (lo | range( lo+1, hi ))
 \end{verbatim}
 Like any function call, the  cartesian-product semantics applies, so the notation may produce a concatenation of sequences.
 For example \vtt{1..(2|3)} yields all the values of \vtt{range(1,2)} and then all the values of \vtt{range(1,3)},
 thus yielding $[1,2,1,2,3]$\footnote{Agrees with Tim's prototype.}.
 
-Any non-integer values yielded by $e_1$ and $e_2$ are ignored. \simon{Is ``ignored'' right; or does the program go wrong?}
+Any non-integer values yielded by $e_1$ and $e_2$ make the program go wrong, and hence
+are rejected by the verifier. This is a consequence of \vtt{($e_1$..$e_2$)} being desugared
+to \vtt{range($e_1$,$e_2$)}, with round parentheses; recall that such calls are not allowed to fail.
+\simon{Right now?}
 
 The \emph{sequence} generated by the \vtt{|} alternation maybe reified into an \emph{array} using \vtt{for},
-so that \vtt{for(2..5)} will return a singleton value, the array (or tuple) $\tuple{2,3,4,5}$.
+so that \vtt{for\{2..5}} will return a singleton value, the array (or tuple) $\tuple{2,3,4,5}$.
 
 \subsubsection{The array type}
 
@@ -783,15 +789,6 @@ There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
  array := lam (t) in lam (xs) in for (x:xs) in t[x]
 \end{verbatim}
 \simon{Or something like this.  Need to explain!!!}
-
-\subsection{Failure}
-
-When you declare a function, you can declare whether or not it is allowed to fail.
-\simon{Syntax?}
-\lennart{\vtt{foo(x:int)<decides> := ...}}
-
-In a function declared as non-failing, the compiler must \emph{prove} that it can't fail.
-Almost all interesting functions can fail; e.g. any type constraint can make it fail.
 
 \subsection{Recursive bindings} \label{sec:recursion}
 
@@ -804,17 +801,25 @@ Paraphrasing Milner: \emph{verified programs don't go wrong}.
 
 \subsection{Going wrong} \label{sec:going-wrong}
 
-There are exactly two ways in which a program can produce the value \vtt{WRONG}
+The verifier is supposed to guarantee that the program does not ``go wrong'' at runtime.
+What does ``going wrong'' mean?  It means that something fundamentally unexpected happens.
+There is exactly one way in which a program can go wrong: when evaluating
+\vtt{(check $\eff$ in $e$)}, $e$ must produce a sequence of values that satisfies $\eff$; if not,
+the program goes wrong.
+
+This single definition covers many cases, including:
 \begin{enumerate}
 \item The body of a function returns a sequence of values whose multiplicity is incompatible with the
-  function's declared multiplicity (see \Cref{sec:multiplicity}).
-\item A round-parenthesis function call \vtt{$f$($e$)} fails. (Presumably $f$ is not labelled
-  as \vtt{<succeeds>} or \vtt{diverges}.) \simon{Do we expect exactly one result? Or can it return multiple results?}
+  function's declared multiplicity (see \Cref{sec:multiplicity}); because this declared
+  multiplicity desguars to a use of \vtt{check} (\Cref{fig:pat-sugar}).
+\item A round-parenthesis function call \vtt{$f$($e$)} fails.
+  Again \vtt{check} checks for this, via the desugaring of \vtt{$e_1$($e_2$)} in \Cref{fig:sugar}.
 \end{enumerate}
 In both cases, the call succeeds, returning the singleton \vtt{WRONG} value.
 One way in which (2) can occur
 
-What does ``going wrong'' mean?  It means that something fundamentally unexpected happens. For example:
+\simon{Out of date text follows}
+For example:
 \begin{itemize}
 \item We add an integer to a character, say.  That is the argument to a primitive operator is of the wrong type.
 \item The argument to a function does not satisfy its declared type.  (All functions in Verse have an explicitly declared argument type. \simon{Is tthis true?  What about result type?}
@@ -1018,6 +1023,20 @@ to prove that the body succeeds, using only the declared type of the argument, h
 \vtt{(x=3)} for any \vtt{int}, so the verifier rejects the definition.
 
 
+Notice that, in contrast to other languages, an ill-typed function call can \emph{fail} rather
+than \emph{go wrong}.  For example, suppose function \vtt{f} is defined thus:
+\begin{verbatim}
+  f( x:int )<succeeds> := x+1
+\end{verbatim}
+The call \vtt{f[ 'x' ]}, which applies \vtt{f} to a character, is not rejected by the verifier.
+Using the desugaring rules, the definition desugars to
+$$
+  \vtt{f := $\clam{y}{\vtt{def {x:=int[y]} in check <succeeds> in x+1}}$}
+$$
+When we call \vtt{f['x']}, the \vtt{int['x']} call will fail (returning zero results) but not go wrong, and hence so
+will the call.  The call \vtt{f('x')} \emph{will} go wrong, however, because the round parens checks the call does not fail
+(see the desugaring in \Cref{fig:sugar}).
+
 \subsection{Multiplicity Effects} \label{sec:multiplicity}
 
 \begin{figure}
@@ -1040,24 +1059,25 @@ to prove that the body succeeds, using only the declared type of the argument, h
 \caption{Multiplicity effects} \label{fig:mult-effects}
 \end{figure}
 
-These effects have the following meaning:
+Each of these effects identifies a subset of sequences $\Value^{*}$ that are acceptable:
 \begin{itemize}
 \item Diverges $\{\bot\}$: evalution diverges
 \item Fails $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
-\item Succeeds $\{\bot, [v]\}$: evaluation diverges or returns exactly one value.
-\item Decides $\{\bot, [], [v]\}$: diverges, fails, or succeeds with one value.
-\item Iterates: $\{\bot, [v_1, \ldots, v_n]\}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values
+\item Succeeds $\{\bot, v \cons \bot, v \cons [] \}$: evaluation diverges, yields one value and then diverges, or yields ecactly one value.
+\item Decides $\{\bot, [], v \cons \bot, v\cons[] \}$: diverges, fails, or succeeds with one value.
+\item Iterates: $\{\bot, v_1\cons\bot, v_1\cons v_2\cons\bot, \ldots, v_1\cons v_2\cons\ldots\cons v_n\cons\bot, v_1\cons v_2\cons\ldots\cons v_n\cons[] \}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values
 \item Resolves: ???
 \item Evaluates: ???
-\item Abstracts: we don't know anything
+\item Abstracts: $\{ \bot, [], v_1\cons\bot, v_1\cons[], v_1\cons v_2\cons\bot, v_1\cons v_2\cons[], \ldots \}$.  That is, any sequence in $V*$.
 \end{itemize}
 \simon{Runtime checks possible for fail, succeeds, decides.}
+
 
 If you do not explicitly declare the effects of a function definition, it defaults to \vtt{<succeeds>};
 that is, ordinary functional programming.
 
 \begin{itemize}
-  \item \simon{Question: what about $v:\bot$?  Is that ``succeeds''?  Probably not.}
+  \item \simon{Question: I ave assuemd here that $v \cons \bot$ is a valid result for \vtt{<succeeds>}, etc.  That is, divergence can show up anywhere.  Is that right?}
   \item \simon{What are resolves, evaluates, abstracts?}
   \item \simon{What about an infinite list?}
   \item \simon{What about $v:\bot$?  Is that ``succeeds''?  Probably not.}
@@ -1267,7 +1287,7 @@ that is, ordinary functional programming.
 
 Figure \ref{fig:extrusion-rules} has rules for collecting variable definitions to the beginning of blocks.
 
-Notation: The $D$ is a sequnence of bindings of the form \vtt{$x$:=$e$};
+Notation: The $D$ is a sequence of bindings of the form \vtt{$x$:=$e$};
 \defunion{}{} represents concatenation, $\#D$ is a predicate for sequence uniqueness, i.e., the same variable is not defined more than once;
 \defempty is the empty sequence.
 The relation \defarrow{$e$}{$e'$}{$D$} denotes that the topmost scope of $e$ contains the
@@ -1284,6 +1304,7 @@ The $V(D)$ denotes all the variables bound in $D$, i.e., $V(x_1:=e_1,\cdots,x_n:
 
 \begin{figure}
   $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
+  $\Value^{*} = \bot + [] + (\Value \times \Value^{*})$ \\
   $\Env = Ident \rightarrow \Value$ \\
   where $\tuple{\Value}$ is a tuple (array) of values, $\Value^{*}$ is a (semantic) sequence (monad) of values.
 
