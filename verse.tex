@@ -1303,7 +1303,7 @@ The $V(D)$ denotes all the variables bound in $D$, i.e., $V(x_1:=e_1,\cdots,x_n:
 
 
 \begin{figure}
-  $\Value = \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
+  $\Value = \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG}$ \\
   $\Value^{*} = \bot + [] + (\Value \times \Value^{*})$ \\
   $\Env = Ident \rightarrow \Value$ \\
   where $\tuple{\Value}$ is a tuple (array) of values, $\Value^{*}$ is a (semantic) sequence (monad) of values.
