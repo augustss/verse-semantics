@@ -51,6 +51,10 @@ ex5 = mdo
   y <- u 3 <|> u 4
   pure (x,y)
 
+ex7 = mdo
+  x <- u 1 <|> u x
+  pure x
+
 {- Discussion
 
 Currently:   Env = Var -> V
