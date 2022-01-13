@@ -490,19 +490,21 @@ for subsequent sections.
 Verse is a statically typed functional-logic language: the main
 syntactic construct is the \emph{expression}.  We define two languages:
 \begin{itemize}
-\item \emph{Featherweight Verse} is the language written by the programmer, whose syntax is given in
+\item \emph{Featherweight Verse} (FV) is the language written by the programmer, whose syntax is given in
   Figures \ref{fig:syntax} and \ref{fig:built-in}).
-\item \emph{Core Verse} is a much smaller and simpler language containing the fundamental elements of Verse. Its syntax is given in \Cref{fig:core}.
+\item \emph{Core Verse} (CV) is a much smaller and simpler language containing the fundamental elements of Verse. Its syntax is given in \Cref{fig:core}.
 \end{itemize}
-We define what Featherweight Verse means by desugaring it into Core Verse. We will discuss these desugaring rules
+We define what Featherweight Verse means by desugaring it into Core Verse, thereby converting many convenient
+constructs (FV) into a few less convenient but more fundamental ones (CV).  Then we can give the semantics
+of Core Verse, to say what it means to \emph{execute} Core Verse (\Cref{sec:semantics}).
+
+We will discuss the desugaring rules
 as we go, but they are collected for reference in Figures \ref{fig:sugar} and \ref{fig:pat-sugar}.
 There are two
 forms of syntactic sugar: sugar that can be translated with a local rewrite;
 and sugar that requires some care with scoping when translating.  The
 latter is dealt with by \emph{scope extrusion}, which we discuss in
 \Cref{sec:extrusion}.
-
-Finally, we say what it means to \emph{execute} Core Verse, in \Cref{sec:semantics}.
 
 Core Verse is not a strict subset of Featherweight Verse; some of its constructs (such as \vtt{def}, \vtt{\clam{x}{e}} and \vtt{check})
 are not part of Featherweight Verse, although they could be.
@@ -1061,14 +1063,15 @@ will the call.  The call \vtt{f('x')} \emph{will} go wrong, however, because the
 
 Each of these effects identifies a subset of sequences $\Value^{*}$ that are acceptable:
 \begin{itemize}
-\item Diverges $\{\bot\}$: evalution diverges
-\item Fails $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
-\item Succeeds $\{\bot, v \cons \bot, v \cons [] \}$: evaluation diverges, yields one value and then diverges, or yields ecactly one value.
-\item Decides $\{\bot, [], v \cons \bot, v\cons[] \}$: diverges, fails, or succeeds with one value.
-\item Iterates: $\{\bot, v_1\cons\bot, v_1\cons v_2\cons\bot, \ldots, v_1\cons v_2\cons\ldots\cons v_n\cons\bot, v_1\cons v_2\cons\ldots\cons v_n\cons[] \}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values
-\item Resolves: ???
-\item Evaluates: ???
-\item Abstracts: $\{ \bot, [], v_1\cons\bot, v_1\cons[], v_1\cons v_2\cons\bot, v_1\cons v_2\cons[], \ldots \}$.  That is, any sequence in $V*$.
+\item \vtt{<diverges>}: $\{\bot\}$: evalution diverges
+\item \vtt{<fails>}: $\{\bot, []\}$: evaluation diverges or fails (returns zero values)
+\item \vtt{<succeeds>}: $\{\bot, v \cons \bot, v \cons [] \}$: evaluation diverges, yields one value and then diverges, or yields exactly one value.
+\item \vtt{<decides>}: $\{\bot, [], v \cons \bot, v\cons[] \}$: diverges, fails, or succeeds with one value.
+\item \vtt{<iterates>}: $\{\bot, v_1\cons\bot, v_1\cons v_2\cons\bot, \ldots, v_1\cons v_2\cons\ldots\cons v_n\cons\bot, v_1\cons v_2\cons\ldots\cons v_n\cons[] \}, n \geq 0$: evaluation diverges, fails, or returns a finite number of values.
+  NB: you can't check for this at runtime.
+\item \vtt{<resolves>}: ???
+\item \vtt{<evaluates>}: ???
+\item \vtt{<abstracts>}: $\{ \bot, [], v_1\cons\bot, v_1\cons[], v_1\cons v_2\cons\bot, v_1\cons v_2\cons[], \ldots \}$.  That is, any sequence in $V*$.
 \end{itemize}
 \simon{Runtime checks possible for fail, succeeds, decides.}
 
