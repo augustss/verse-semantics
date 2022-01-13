@@ -26,13 +26,7 @@ instance Show Value where
   show (VCon i) = show i
   show (VPair v1 v2) = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
 
-data Cell = Val Value | Clo Env Exp
-
-instance Show Cell where
-  show (Val v) = "Val " ++ show v
-  show (Clo _ e) = "Clo _ (" ++ show e ++ ")"
-
-type Env = [(Ident, Cell)]
+type Env = [(Ident, Value)]
 
 ---------------------
 --      Semantics
@@ -55,24 +49,14 @@ eval (Succ e1) rho = map vsucc (eval e1 rho)
   where vsucc (VCon i) = VCon (succ i)
         vsucc v = error $ "vsucc " ++ show v
   
-eval (Def x r e) rho = [ v | xv <- eval r rho', v <- eval e ((x, Val xv) : rho) ]
-  where rho' = (x, Clo rho' r) : rho
+eval (Def x r e) rho = [ v | xv <- eval r rho', v <- eval e ((x, xv) : rho) ]
+  where rho' = (x, head $ eval r rho') : rho
 
 evalVar :: Ident -> Env -> [Value]
---evalVar i rho | trace ("evalVar " ++ show (i, rho)) False = undefined
 evalVar i rho =
   case lookup i rho of
     Nothing -> error $ "not found " ++ show i
-    Just (Val v) -> [v]
-    Just (Clo rho' e) ->
-{- Deadlocks on ex2
-      case eval e rho' of
-        [] -> error "it happened"
-        v : _ -> [v]
--}
-      [ case eval e rho' of
-        []    -> error "it happened"
-        v : _ -> v ]
+    Just v -> [v]
 
 ---------------------
 --      Tests
@@ -97,3 +81,6 @@ ex2 = Def ixy (Pair (Succ y `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
 
 -- eval ex5 [] == bottom (eval loops)
 ex5 = Def ixy (Pair (Equal y (Con 4) `Alt` Con 2) (Con 3 `Alt` Con 4)) xy
+
+
+ex7 = Def "x" (Con 1 `Alt` Con 2 `Alt` Var "x") (Var "x")
