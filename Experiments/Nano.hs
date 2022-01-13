@@ -3,7 +3,12 @@ import Debug.Trace
 type Ident = String
 
 -- e ::= x | k |  (e1 | e2)  |  (e = k)  |  defrec { x := e } in e | (e1,e2) | fst(e) | snd(e)
-data Exp = Var Ident | Con Integer | Alt Exp Exp | Equal Exp Exp | Pair Exp Exp | Fst Exp | Snd Exp | Def Ident Exp Exp | Succ Exp
+data Exp = Var Ident | Con Integer |
+           Alt Exp Exp | Fail |
+           Pair Exp Exp | Fst Exp | Snd Exp |
+           Def Ident Exp Exp |
+           Equal Exp Exp |
+           Succ Exp
   deriving (Show)
 
 data Value = VCon Integer | VPair Value Value
@@ -25,6 +30,7 @@ eval :: Exp -> Env -> [Value]
 eval (Var i) rho = evalVar i rho
 eval (Con k) _ = [VCon k]
 eval (Alt e1 e2) rho = eval e1 rho ++ eval e2 rho
+eval Fail _ = []
 eval (Equal e1 e2) rho = [ v1 | v1 <- eval e1 rho, v2 <- eval e2 rho, v1 == v2]
 eval (Pair e1 e2) rho = [ VPair v1 v2 | v1 <- eval e1 rho, v2 <- eval e2 rho ]
 eval (Fst e1) rho = map vfst (eval e1 rho)
