@@ -94,3 +94,10 @@ ex5 = Def ixy (Pair (Equal y (Con 4) `Alt` Con 2) (Con 3 `Alt` Con 4)) xy
 -- Rec            [1,       -- loops, but length ex7 == 3
 -- eval ex7 [] == [1,1,2]   -- WRONG
 ex7 = Def "x" (Con 1 `Alt` Var "x" `Alt` Con 2) (Var "x")
+
+-- ex8: def { x = 1|2 } in def { y = 3|4 } in (x, y)
+-- eval ex8 [] == [(1,3),(1,4),(2,3),(2,4)]
+ex8 = Def "x" (Con 1 `Alt` Con 2) $
+        Def "y" (Con 3 `Alt` Con 4) $
+          Pair (Var "x") (Var "y")
+          
