@@ -86,7 +86,7 @@ ex2 = mdo
   y <- u 1 <|> u 2
   pure (x,y)
 
--- Deadlock
+-- Loops
 -- Tim is happy that this deadlocks
 ex3 :: [(Int,Int)]
 ex3 = mdo
@@ -94,7 +94,7 @@ ex3 = mdo
   y <- u 1 <|> u 2
   pure (x,y)
 
--- Deadlock
+-- Loops
 -- But Tim's impl squeezes through a narrow gap
 ex5 :: [(Int,Int)]
 ex5 = mdo
@@ -104,8 +104,9 @@ ex5 = mdo
   y <- u 3 <|> u 4
   pure (x,y)
 
+-- Loops on second elements, but result has length 3
 ex7 = mdo
-  x <- u 1 <|> u x
+  x <- u 1 <|> u x <|> u 2
   pure x
 
 {- Discussion

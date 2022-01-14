@@ -24,7 +24,7 @@ data Value = VCon Integer | VPair Value Value
 
 instance Show Value where
   show (VCon i) = show i
-  show (VPair v1 v2) = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
+  show (VPair v1 v2) = "(" ++ show v1 ++ "," ++ show v2 ++ ")"
 
 type Env = [(Ident, Value)]
 
@@ -68,19 +68,29 @@ y = Snd xy
 
 -- ex1:           def { xy = ( 1|2, 2|3 ) } in xy
 -- Equivalently:  def { (x,y) = ( 1|2, 2|3 ) } in (x,y)
--- eval ex1 [] == [(1, 2),(1, 3),(2, 2),(2, 3)]
+-- Tim:           [(1,2),(1,3),(2,2),(2,3)]
+-- Rec:           [(1,2),(1,3),(2,2),(2,3)]
+-- eval ex1 [] == [(1,2),(1,3),(2,2),(2,3)]
 ex1 = Def ixy (Pair (Con 1 `Alt` Con 2) (Con 2 `Alt` Con 3)) xy
 
 -- ex1a:  def { (x,y) = ( 1|2, 2|3 ) } in (y,x)
 -- eval ex1a [] == [(2, 1),(3, 1),(2, 2),(3, 2)]
 ex1a = Def ixy (Pair (Con 1 `Alt` Con 2) (Con 2 `Alt` Con 3)) (Pair (Snd xy) (Fst xy))
 
--- ex2:   def { (x,y) = ( (y+1)|3, 1|3 ) in (x,y)
--- eval ex2 [] == [(2, 1),(2, 2),(3, 1),(3, 2)]
+-- ex2:   def { (x,y) = ( (y+1)|3, 1|2 ) in (x,y)
+-- Tim            [(2,1),(3,2),(3,1),(3,2)]
+-- Rec            [(2,1),(3,2),(3,1),(3,2)]
+-- eval ex2 [] == [(2,1),(2,2),(3,1),(3,2)]  -- WRONG
 ex2 = Def ixy (Pair (Succ y `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
 
+-- ex5: def { xy = ((y=4)|2), (3|4) } in xy
+-- Tim            [(4,4),(2,3),(2,4)]
+-- Rec            bottom
 -- eval ex5 [] == bottom (eval loops)
 ex5 = Def ixy (Pair (Equal y (Con 4) `Alt` Con 2) (Con 3 `Alt` Con 4)) xy
 
-
-ex7 = Def "x" (Con 1 `Alt` Con 2 `Alt` Var "x") (Var "x")
+-- ex7: def { x = 1 | x | 2 } in x
+-- Tim            [1,..,2]
+-- Rec            [1,       -- loops, but length ex7 == 3
+-- eval ex7 [] == [1,1,2]   -- WRONG
+ex7 = Def "x" (Con 1 `Alt` Var "x" `Alt` Con 2) (Var "x")
