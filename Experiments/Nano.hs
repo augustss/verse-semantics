@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# LANGUAGE OverloadedStrings #-}
+import Data.String
 import Debug.Trace
 
 ---------------------
@@ -14,6 +17,32 @@ data Exp = Var Ident | Con Integer |
            Equal Exp Exp |
            Plus Exp Exp
   deriving (Show)
+
+---------------------
+--      Sugar
+---------------------
+
+instance Num Exp where
+  (+) = Plus
+  fromInteger = Con
+
+instance IsString Exp where
+  fromString = Var
+
+infixl 3 |||
+(|||) :: Exp -> Exp -> Exp
+(|||) = Alt
+
+infixl 2 #
+(#) :: Exp -> Exp -> Exp
+(#) = Pair
+
+infixl 5 ===
+(===) :: Exp -> Exp -> Exp
+(===) = Equal  
+
+def :: Ident -> Exp -> Exp -> Exp
+def = Def
 
 ---------------------
 --      Types for semantics
@@ -118,3 +147,9 @@ ex8 = Def "x" (Con 1 `Alt` Con 2) $
         Def "y" (Con 3 `Alt` Con 4) $
           Pair (Var "x") (Var "y")
           
+------ Sugared examples
+ex1s = def "xy" (1 ||| 2 # 2 ||| 3) "xy"
+
+ex2s = def "xy" (Snd "xy" + 1 ||| 3 # 1 ||| 2) "xy"
+
+ex8s = def "x" (1 ||| 2) $ def "y" (3 ||| 4) $ "x" # "y"
