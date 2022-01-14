@@ -12,7 +12,7 @@ data Exp = Var Ident | Con Integer |
            Pair Exp Exp | Fst Exp | Snd Exp |
            Def Ident Exp Exp |
            Equal Exp Exp |
-           Succ Exp
+           Plus Exp Exp
   deriving (Show)
 
 ---------------------
@@ -51,9 +51,9 @@ eval (Fst e1) rho = map (vfst .) (eval e1 rho)
 eval (Snd e1) rho = map (vsnd .) (eval e1 rho)
   where vsnd (VPair _ v) = v
         vsnd v = error $ "vsnd " ++ show v
-eval (Succ e1) rho = map (vsucc .) (eval e1 rho)
-  where vsucc (VCon i) = VCon (succ i)
-        vsucc v = error $ "vsucc " ++ show v
+eval (Plus e1 e2) rho = [ \ext -> vplus (fv1 ext) (fv2 ext) | fv1 <- eval e1 rho, fv2 <- eval e2 rho ]
+  where vplus (VCon i1) (VCon i2) = VCon (i1 + i2)
+        vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
 eval (Def x r b) rho =
   -- Why does it work with const?
   [ const v | xv <- xvs, v <- evalV b ((x,xv):rho) ]
@@ -98,7 +98,7 @@ ex1a = Def ixy (Pair (Con 1 `Alt` Con 2) (Con 2 `Alt` Con 3)) (Pair (Snd xy) (Fs
 -- Tim            [(2,1),(3,2),(3,1),(3,2)]
 -- Rec            [(2,1),(3,2),(3,1),(3,2)]
 -- eval ex2 [] == [(2,1),(3,2),(3,1),(3,2)]
-ex2 = Def ixy (Pair (Succ y `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
+ex2 = Def ixy (Pair (Plus y (Con 1) `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
 
 -- ex5: def { xy = ((y=4)|2), (3|4) } in xy
 -- Tim            [(4,4),(2,3),(2,4)]
