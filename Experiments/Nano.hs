@@ -126,8 +126,6 @@ evalV e rho = [withExt empty f | f <- eval e rho]
 ---------------------
 ixy = "xy"
 xy = Var ixy
-x = Fst xy
-y = Snd xy
 
 -- ex1:           def { xy = ( 1|2, 2|3 ) } in xy
 -- Equivalently:  def { (x,y) = ( 1|2, 2|3 ) } in (x,y)
@@ -144,13 +142,13 @@ ex1a = Def ixy (Pair (Con 1 `Alt` Con 2) (Con 2 `Alt` Con 3)) (Pair (Snd xy) (Fs
 -- Tim            [(2,1),(3,2),(3,1),(3,2)]
 -- Rec            [(2,1),(3,2),(3,1),(3,2)]
 -- eval ex2 [] == [(2,1),(3,2),(3,1),(3,2)]
-ex2 = Def ixy (Pair (Plus y (Con 1) `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
+ex2 = Def ixy (Pair (Plus (Snd xy) (Con 1) `Alt` Con 3) (Con 1 `Alt` Con 2)) xy
 
 -- ex5: def { xy = ((y=4)|2), (3|4) } in xy
 -- Tim            [(4,4),(2,3),(2,4)]
 -- Rec            bottom
 -- eval ex5 [] == bottom (error, xy unbound)
-ex5 = Def ixy (Pair (Equal y (Con 4) `Alt` Con 2) (Con 3 `Alt` Con 4)) xy
+ex5 = Def ixy (Pair (Equal (Snd xy) (Con 4) `Alt` Con 2) (Con 3 `Alt` Con 4)) xy
 
 -- ex7: def { x = 1 | x | 2 } in x
 -- Tim            [1,..,2]
@@ -170,3 +168,7 @@ ex1s = def "xy" (1 ||| 2 # 2 ||| 3) "xy"
 ex2s = def "xy" (Snd "xy" + 1 ||| 3 # 1 ||| 2) "xy"
 
 ex8s = def "x" (1 ||| 2) $ def "y" (3 ||| 4) $ "x" # "y"
+
+exx = def "xy" ( (1|||2|||3|||4)  #  1|||2|||(Fst "xy" === 3) ) "xy"
+
+ttt = def "t" (1 ||| Fst "t") "t"
