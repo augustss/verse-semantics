@@ -83,7 +83,7 @@ type Res = (Env, Value)
 eval :: Exp -> Env -> [Res]
 eval (Var i) rho = [(empty, evalVar i rho)]
 eval (Con k) _ = [(empty, VCon k)]
-eval (Alt e1 e2) rho = [ (empty, v) | (_, v) <- eval e1 rho ++ eval e2 rho ]
+eval (Alt e1 e2) rho = tieKnot (eval e1 rho) ++ tieKnot (eval e2 rho)
 eval Fail _ = []
 eval (Plus e1 e2) rho =
   [ (ext1 ++ ext2, liftL2 vplus fv1 fv2)
@@ -115,6 +115,10 @@ evalVar i rho =
     Nothing -> error $ "not found " ++ show i
     Just v -> v
 
+-- No knots to tie in this version, just dump the environment.
+tieKnot :: [Res] -> [Res]
+tieKnot vs = [ (empty, v) | (_, v) <- vs ]
+
 liftL1 :: (Value -> Value) -> Lenient -> Lenient
 liftL1 g v = g v
 
@@ -141,7 +145,7 @@ liftL2 g (Done v1) (Done v2) = Done (v1 `g` v2)
 -}
 
 ev :: Exp -> [Value]
-ev e = map snd $ eval e []
+ev e = map snd $ tieKnot (eval e [])
 
 ---------------------
 --      Tests
