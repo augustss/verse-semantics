@@ -43,7 +43,7 @@ infixl 2 #
 
 infixl 5 ===
 (===) :: Exp -> Exp -> Exp
-(===) = Equal  
+(===) = Equal
 
 pattern (:=) :: Ident -> Exp -> Exp
 pattern (:=) x e = Set x e
@@ -52,11 +52,11 @@ pattern (:=) x e = Set x e
 --      Types for semantics
 ---------------------
 
-data Value = VCon Integer | VPair Value Value
+data Value = VInt Integer | VPair Value Value
   deriving (Eq)
 
 instance Show Value where
-  show (VCon i) = show i
+  show (VInt i) = show i
   show (VPair v1 v2) = "(" ++ show v1 ++ "," ++ show v2 ++ ")"
 
 type Env = [(Ident, Value)]
@@ -81,27 +81,32 @@ type Res = (Env, Value)
 -- A fix for this would be to delete x from rho in the Def case.
 
 eval :: Exp -> Env -> [Res]
+-- In a call (eval e rho), the domain of the Env in the returned Res
+-- is precisely the variables bound in 'e'.
+
 eval (Var i) rho = [(empty, evalVar i rho)]
-eval (Con k) _ = [(empty, VCon k)]
-eval (Alt e1 e2) rho = tieKnot (eval e1 rho) ++ tieKnot (eval e2 rho)
-eval Fail _ = []
+eval (Con k) _   = [(empty, VInt k)]
+eval Fail    _   = []
+
+eval (Fst e1) rho = [ (ext1, liftL1 vfst fv1) | (ext1, fv1) <- eval e1 rho ]
+eval (Snd e1) rho = [ (ext1, liftL1 vsnd fv1) | (ext1, fv1) <- eval e1 rho ]
+
 eval (Plus e1 e2) rho =
   [ (ext1 ++ ext2, liftL2 vplus fv1 fv2)
   | (ext1, fv1) <- eval e1 rho
   , (ext2, fv2) <- eval e2 (ext1 ++ rho) ]
-  where vplus (VCon i1) (VCon i2) = VCon (i1 + i2)
-        vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
+
 eval (Pair e1 e2) rho =
   [ (ext1 ++ ext2, liftL2 VPair fv1 fv2)
   | (ext1, fv1) <- eval e1 rho
   , (ext2, fv2) <- eval e2 (ext1 ++ rho) ]
-eval (Fst e1) rho = [ (ext1, liftL1 vfst fv1) | (ext1, fv1) <- eval e1 rho ]
-  where vfst (VPair v _) = v
-        vfst v = error $ "vfst " ++ show v
-eval (Snd e1) rho = [ (ext1, liftL1 vsnd fv1) | (ext1, fv1) <- eval e1 rho ]
-  where vsnd (VPair _ v) = v
-        vsnd v = error $ "vsnd " ++ show v
-eval (Set x e) rho = [ ([(x, fv1)] ++ ext1, fv1) | (ext1, fv1) <- eval e rho ]
+
+eval (Alt e1 e2) rho =
+  tieKnot (eval e1 rho) ++ tieKnot (eval e2 rho)
+
+eval (Set x e) rho =
+  [ (extendEnv x fv1 rho, fv1) | (ext1, fv1) <- eval e rho ]
+
 eval (Equal e1 e2) rho =
   [ (ext1 ++ ext2, fv1)
   | (ext1, fv1) <- eval e1 rho
@@ -111,13 +116,48 @@ eval (Equal e1 e2) rho =
 
 evalVar :: Ident -> Env -> Lenient
 evalVar i rho =
-  case lookup i rho of
+  case lookupEnv i rho of
     Nothing -> error $ "not found " ++ show i
     Just v -> v
+
+{-
+evalVar :: Ident -> Env -> Lenient
+evalVar i rho =
+  case lookup i rho of
+    Nothing -> Delay $ \ ext -> fromMaybe (error $ "not found " ++ show i) (lookup i ext)
+    Just v -> Done v
+-}
 
 -- No knots to tie in this version, just dump the environment.
 tieKnot :: [Res] -> [Res]
 tieKnot vs = [ (empty, v) | (_, v) <- vs ]
+
+
+---------------------
+--      Auxiliary semantic operations
+---------------------
+
+extendEnv :: Ident -> Value -> Env -> Env
+extendEnv x v rho = (x,v) : rho
+
+unionEnv :: Env -> Env -> Env
+-- If both envs bind the same variable 'ext2' wins
+unionEnv ext1 ext2 = ext1 ++ ext2
+
+lookupEnv :: Ident -> Env -> Maybe Value
+lookupEnv = lookup
+
+vplus :: Value -> Value -> Value
+vplus (VInt i1) (VInt i2) = VInt (i1 + i2)
+vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
+
+vfst :: Value -> Value
+vfst (VPair a _) = a
+vfst v           = error $ "vfst " ++ show v
+
+vsnd :: Value -> Value
+vsnd (VPair _ v) = v
+vsnd v           = error $ "vsnd " ++ show v
 
 liftL1 :: (Value -> Value) -> Lenient -> Lenient
 liftL1 g v = g v
@@ -126,12 +166,6 @@ liftL2 :: (Value -> Value -> Value) -> Lenient -> Lenient -> Lenient
 liftL2 g v1 v2 = v1 `g` v2
 
 {-
-evalVar :: Ident -> Env -> Lenient
-evalVar i rho =
-  case lookup i rho of
-    Nothing -> Delay $ \ ext -> fromMaybe (error $ "not found " ++ show i) (lookup i ext)
-    Just v -> Done v
-
 liftL1 :: (Value -> Value) -> Lenient -> Lenient
 liftL1 g (Delay f) = Delay (g . f)
 liftL1 g (Done v) = Done (g v)
@@ -144,12 +178,12 @@ liftL2 g (Done v1) (Done v2) = Done (v1 `g` v2)
 
 -}
 
-ev :: Exp -> [Value]
-ev e = map snd $ tieKnot (eval e [])
-
 ---------------------
 --      Tests
 ---------------------
+
+ev :: Exp -> [Value]
+ev e = map snd $ tieKnot (eval e [])
 
 test1 = 1 ||| 2
 
