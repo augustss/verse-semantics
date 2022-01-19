@@ -18,7 +18,8 @@ data Exp = Var Ident | Con Integer |
            Pair Exp Exp | Fst Exp | Snd Exp |
            Set Ident Exp |
            Equal Exp Exp |
-           Plus Exp Exp
+           Plus Exp Exp |
+           Error  -- to test strictness
   deriving (Show)
 
 infix 1 :=
@@ -150,6 +151,8 @@ eval (Equal e1 e2) rho =
   , fv1 `equalLenient` fv2
   ]
 
+eval Error _ = error "eval: Error"
+
 evalVar :: Ident -> Env -> Lenient
 evalVar i rho = case lookupEnv i rho of
                   Just v  -> v
@@ -215,6 +218,7 @@ dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
 --      Tests
 ---------------------
 
+evalTop :: Exp -> [Res]
 evalTop e = tieKnot (eval e [])
 
 ev :: Exp -> [Value]
@@ -274,3 +278,12 @@ test13 = "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
 
 -- Fails (equalLenient)
 test14 = "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+
+-- Generates an error, as it should
+test15 = Error
+
+-- Generates an error, as it should
+test16 = Error `semi` 1
+
+-- Generates an error, as it should
+test17 = (2 # Error) `semi` 1
