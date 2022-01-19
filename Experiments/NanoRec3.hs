@@ -151,27 +151,20 @@ eval (Equal e1 e2) rho =
   ]
 
 evalVar :: Ident -> Env -> Lenient
-evalVar i rho =
-  case lookupEnv i rho of
-    Just v  -> v
-    Nothing -> delay
-       where
-          delay :: Lenient
-          delay = Delay (dly "Var" [i]) $
-                    \ ext -> case lookupEnv i ext of
-                               Just len -> len
-                               Nothing  -> delay
+evalVar i rho = case lookupEnv i rho of
+                  Just v  -> v
+                  Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
 tieKnot :: [Res] -> [Res]
 --tieKnot vs | trace ("tieKnot: " ++ show vs) False = undefined
 tieKnot vs = [ (empty, apply v ext) | (ext, v) <- vs ]
    where
      apply :: Lenient -> Env -> Lenient
-     apply (Done v)  ext = Done (applyV v ext)
-     apply (Delay s f) ext =
-       trace ("apply-Delay" ++ show (s, ext)) $
-       f ext
-     applyV v@(VInt _) _ = v
+     apply (Done v)    ext = Done (applyV v ext)
+     apply (Delay s f) ext = f ext
+
+     applyV :: Value -> Env -> Value
+     applyV v@(VInt _)    _   = v
      applyV (VPair l1 l2) ext = VPair (apply l1 ext) (apply l2 ext)
 
 ---------------------
@@ -266,7 +259,7 @@ test10 = Pair ("x" := (Pair 1 7 |||
                        Pair "y" ("y" := 2)))
               (Fst "x" === 1)
 
--- x's value depends on recurively bound z, so we get stuck.
+-- x's value depends on recursively bound z, so we get stuck.
 -- Produces []
 -- LA: Is this the intended test.
 test11 = Pair ("x" := (Pair 1 "z" |||
