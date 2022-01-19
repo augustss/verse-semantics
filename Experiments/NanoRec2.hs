@@ -48,6 +48,11 @@ infixl 5 ===
 pattern (:=) :: Ident -> Exp -> Exp
 pattern (:=) x e = Set x e
 
+-- Sequencing, evaluate both and return second
+infixl 0 `semi`
+semi :: Exp -> Exp -> Exp
+semi x y = Snd (Pair x y)
+
 ---------------------
 --      Types for semantics
 ---------------------
@@ -189,31 +194,51 @@ ev e = map get (tieKnot (eval e []))
                          Done v -> v
                          Delay {} -> error "Top level delay"
 
+-- Works [1,2]
 test1 = 1 ||| 2
 
+-- Works [2,3,3,4]
 test2 = (1 ||| 2) + (1 ||| 2)
 
+-- Works [2,4]
 test3 = ("x" := 1 ||| 2) + "x"
 
 -- Should fail, since variables in ||| do not escape
+-- Fails
 test4 = (("x" := 1) ||| 2) + "x"
 
+-- works [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))]
 test5 = ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
 
+-- works [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))]
 test6 = ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
 
+-- works [4]
 test7 = ("x" := 1 ||| 2) + ("x" === 2)
 
+-- works [(1,1),(2,2)]
 test8 = Pair "x" ("x" := 1 ||| 2)
 
+-- Works [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))]
 test9 = Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
 
 -- x's value should not be delayed, because x's RHS has no depenedncies
+-- test10 works [((1,7),1)]
 test10 = Pair ("x" := (Pair 1 7 |||
                        Pair "y" ("y" := 2)))
               (Fst "x" === 1)
 
 -- x's value depends on recurively bound z, so we get stuck.
-test10a = Pair ("x" := (Pair 1 "z" |||
+-- Fails
+test11 = Pair ("x" := (Pair 1 "z" |||
                         Pair "y" ("y" := 2)))
                (Pair ("x" === 1) ("z" := 3))
+
+-- Fails (top level delay)
+test12 = "t" := Pair 1 (Fst "t")
+
+-- Works [(1,1)]
+test13 = "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
+
+-- Fails (equalLenient)
+test14 = "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
