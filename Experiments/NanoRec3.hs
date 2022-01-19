@@ -12,14 +12,30 @@ import Debug.Trace
 
 type Ident = String
 
--- e ::= x | k |  (e1 | e2)  |  (e = k)  |  defrec { x := e } in e | (e1,e2) | fst(e) | snd(e)
-data Exp = Var Ident | Con Integer |
-           Alt Exp Exp | Fail |
-           Pair Exp Exp | Fst Exp | Snd Exp |
-           Set Ident Exp |
-           Equal Exp Exp |
-           Plus Exp Exp |
-           Error  -- to test strictness
+{- BNF syntax for the language
+   e ::= x
+      |  k
+      |  (e1 | e2)
+      |  (e = k)
+      |  x := e
+      |  (e1,e2)
+      |  fst(e)
+      |  snd(e)
+      |  e1 + e2
+      |  :false
+-}
+
+data Exp = Var Ident
+         | Con Integer
+         | Alt Exp Exp
+         | Equal Exp Exp
+         | Set Ident Exp
+         | Pair Exp Exp
+         | Fst Exp
+         | Snd Exp
+         | Plus Exp Exp
+         | Fail
+         | Error  -- to test strictness
   deriving (Show)
 
 infix 1 :=
