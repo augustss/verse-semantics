@@ -194,6 +194,8 @@ evalVar i rho = case lookupEnv i rho of
                   Just v  -> v
                   Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
+-- WRONG: after a Delay has been resolved, it may contain further delays.
+-- See test26
 tieKnot :: [Res] -> [Res]
 --tieKnot vs | trace ("tieKnot: " ++ show vs) False = undefined
 tieKnot vs = [ (empty, withExt ext v) | (ext, v) <- vs ]
@@ -334,3 +336,5 @@ test24 = For ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
 
 test25 = For ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
 
+-- This doesn't work properly.
+test26 = "x" := (1 # "y") `semi` "y" := (2 # "z") `semi` "z" := 3 `semi` "x"
