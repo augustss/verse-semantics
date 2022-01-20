@@ -22,6 +22,7 @@ type Ident = String
       |  e[i]
       |  e1 + e2
       |  :false
+      |  for(e1){e2}
 -}
 
 data Exp = Var Ident
@@ -33,6 +34,7 @@ data Exp = Var Ident
          | Sel Exp Int
          | Plus Exp Exp
          | Fail
+         | For Exp Exp
          | Error  -- to test strictness
   deriving (Show)
 
@@ -72,6 +74,11 @@ pattern Pair e1 e2 = Array [e1, e2]
 infixl 0 `semi`
 semi :: Exp -> Exp -> Exp
 semi x y = Snd (Pair x y)
+
+-- Sequencing, evaluate both and return first
+infix 0 `wher`
+wher :: Exp -> Exp -> Exp
+wher x y = Fst (Pair x y)
 
 ---------------------
 --      Types for semantics
@@ -170,6 +177,16 @@ eval (Equal e1 e2) rho =
   , fv1 `equalLenient` fv2
   ]
 
+eval (For e1 e2) rho = map mkArr $ sequence
+  [ tieKnot (eval e2 (unionEnv ext1' rho))
+  | (ext1, _) <- eval e1 rho
+  -- ext1 has delay for its own variables
+  -- Note the recursice use of ext1', without it we would need several passes.
+  , let ext1' = [(x, withExt ext1' v) | (x, v) <- ext1 ]
+  ]
+  where mkArr :: [Res] -> Res
+        mkArr rs = (empty, Done $ VArray $ map snd rs)
+
 eval Error _ = error "eval: Error"
 
 evalVar :: Ident -> Env -> Lenient
@@ -179,15 +196,16 @@ evalVar i rho = case lookupEnv i rho of
 
 tieKnot :: [Res] -> [Res]
 --tieKnot vs | trace ("tieKnot: " ++ show vs) False = undefined
-tieKnot vs = [ (empty, apply v ext) | (ext, v) <- vs ]
-   where
-     apply :: Lenient -> Env -> Lenient
-     apply (Done v)    ext = Done (applyV v ext)
-     apply (Delay s f) ext = f ext
+tieKnot vs = [ (empty, withExt ext v) | (ext, v) <- vs ]
 
-     applyV :: Value -> Env -> Value
-     applyV v@(VInt _)    _   = v
-     applyV (VArray ls) ext = VArray (map (`apply` ext) ls)
+withExt :: Ext -> Lenient -> Lenient
+withExt ext =
+  let
+     withExtV v@(VInt _) = v
+     withExtV (VArray ls) = VArray (map withExtL ls)
+     withExtL (Done v) = Done (withExtV v)
+     withExtL (Delay _ f) = f ext
+  in withExtL
 
 ---------------------
 --      Auxiliary semantic operations
@@ -196,8 +214,8 @@ tieKnot vs = [ (empty, apply v ext) | (ext, v) <- vs ]
 extendEnv :: Ident -> Lenient -> Env -> Env
 extendEnv x v rho = (x,v) : rho
 
-unionEnv :: Env -> Env -> Env
--- If both envs bind the same variable 'ext2' wins
+unionEnv :: Ext -> Env -> Env
+-- If both envs bind the same variable 'ext1' wins
 unionEnv ext1 ext2 = ext1 ++ ext2
 
 lookupEnv :: Ident -> Env -> Maybe Lenient
@@ -299,3 +317,20 @@ test16 = Error `semi` 1
 
 -- Generates an error, as it should
 test17 = (2 # Error) `semi` 1
+
+test18 = For (1|||2|||3) 5
+
+test19 = For ("x" := 1|||2|||3) "x"
+
+test20 = For ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
+
+test21 = "y" := 4|||5 `semi` For ("x" := 1|||2|||3) ("x" # "y")
+
+test22 = For ("y" := 4|||5) $ For ("x" := 1|||2|||3) ("x" # "y")
+
+test23 = For ("x" := 1|||2|||3) ("x" ||| 99)
+
+test24 = For ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
+
+test25 = For ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
+
