@@ -175,16 +175,21 @@ evalVar i rho = case lookupEnv i rho of
                   Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
 tieKnot :: [Res] -> [Res]
---tieKnot vs | trace ("tieKnot: " ++ show vs) False = undefined
-tieKnot vs = [ (empty, apply v ext) | (ext, v) <- vs ]
+tieKnot vs = [ (empty, withExtL rec_ext v)
+             | (ext, v) <- vs
+             , let rec_ext = mapEnv (withExtL rec_ext) ext ]
+             -- Here is where we tie the knot.  Consider an example like
+             --   x:=y; y:=z; z:=3; z
+             -- we get an 'ext' that binds x and y to Delays, and we
+             -- must resolve both at once when we tie the knot
    where
-     apply :: Lenient -> Env -> Lenient
-     apply (Done v)    ext = Done (applyV v ext)
-     apply (Delay s f) ext = f ext
+     withExtL :: Env -> Lenient -> Lenient
+     withExtL ext (Done v)    = Done (withExtV ext v)
+     withExtL ext (Delay s f) = f ext
 
-     applyV :: Value -> Env -> Value
-     applyV v@(VInt _)    _   = v
-     applyV (VPair l1 l2) ext = VPair (apply l1 ext) (apply l2 ext)
+     withExtV :: Env -> Value -> Value
+     withExtV _ v@(VInt _)      = v
+     withExtV ext (VPair l1 l2) = VPair (withExtL ext l1) (withExtL ext l2)
 
 ---------------------
 --      Auxiliary semantic operations
@@ -192,6 +197,9 @@ tieKnot vs = [ (empty, apply v ext) | (ext, v) <- vs ]
 
 extendEnv :: Ident -> Lenient -> Env -> Env
 extendEnv x v rho = (x,v) : rho
+
+mapEnv :: (Lenient -> Lenient) -> Env -> Env
+mapEnv f env = [ (i, f v) | (i,v) <- env ]
 
 unionEnv :: Env -> Env -> Env
 -- If both envs bind the same variable 'ext2' wins
@@ -303,3 +311,11 @@ test16 = Error `semi` 1
 
 -- Generates an error, as it should
 test17 = (2 # Error) `semi` 1
+
+
+-- Cascaded forward references
+test18 = "x" := ("y" ||| 2)  `semi`
+         "y" := (3  ||| "z") `semi`
+         "z" := 7            `semi`
+         "x"
+
