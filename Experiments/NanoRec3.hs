@@ -210,7 +210,7 @@ lookupEnv = lookup
 
 vplus :: Value -> Value -> Value
 vplus (VInt i1) (VInt i2) = VInt (i1 + i2)
-vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
+gvplus v1 v2 = error $ "vplus " ++ show (v1, v2)
 
 vfst :: Value -> Lenient
 vfst (VPair a _) = a
@@ -317,5 +317,18 @@ test17 = (2 # Error) `semi` 1
 test18 = "x" := ("y" ||| 2)  `semi`
          "y" := (3  ||| "z") `semi`
          "z" := 7            `semi`
+         "x"
+
+
+-- test19 and test20 should give same results, namely
+--   [ (55+1) + 6,  (127+1) + 6 ] = [62, 134]
+-- But test19 does, and test20 gives [6,6]  Boo!
+test19 = "v" := "t" + 1 `semi`
+         "x" := ("t" := 6 `semi` "z" := "v" + "t" `semi` "z") `semi`
+         "t" := 55 ||| 127 `semi`
+         "x"
+test20 = "v" := "t" + 1 `semi`
+         "x" := ("z" := "v" + "t" `semi` "t" := 6 `semi` "z") `semi`
+         "t" := 55 ||| 127 `semi`
          "x"
 
