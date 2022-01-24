@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 import Data.String
 import Debug.Trace
+import Ex
 
 ---------------------
 --      Expressions
@@ -38,7 +39,7 @@ data Exp = Var Ident
          | Error  -- to test strictness
   deriving (Show)
 
-infix 1 :=
+infix 2 :=
 
 ---------------------
 --      Sugar
@@ -51,11 +52,11 @@ instance Num Exp where
 instance IsString Exp where
   fromString = Var
 
-infixl 3 |||
+infixl 4 |||
 (|||) :: Exp -> Exp -> Exp
 (|||) = Alt
 
-infixl 2 #
+infixl 3 #
 (#) :: Exp -> Exp -> Exp
 (#) = Pair
 
@@ -67,7 +68,7 @@ pattern (:=) :: Ident -> Exp -> Exp
 pattern (:=) x e = Set x e
 
 -- Sequencing, evaluate both and return second
-infixl 0 `semi`
+infixl 1 `semi`
 semi :: Exp -> Exp -> Exp
 semi x y = Snd (Pair x y)
 
@@ -242,10 +243,6 @@ liftL2 _ g (Done v1) (Done v2)   = Done (v1 `g` v2)
 dly :: String -> [String] -> String
 dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
 
----------------------
---      Tests
----------------------
-
 evalTop :: Exp -> [Res]
 evalTop e = tieKnot (eval e [])
 
@@ -257,68 +254,84 @@ ev e = map get (evalTop e)
                            Done v -> v
                            Delay {} -> error "Top level delay"
 
--- Works [1,2]
-test1 = 1 ||| 2
+---------------------
+--      Tests
+---------------------
 
--- Works [2,3,3,4]
-test2 = (1 ||| 2) + (1 ||| 2)
+ok :: (Show a) => String -> a -> Exp -> Ex String
+ok n r e = Ex n (Just $ show r) (show $ ev e)
 
--- Works [2,4]
-test3 = ("x" := 1 ||| 2) + "x"
+bad :: String -> Exp -> Ex String
+bad n e = Ex n Nothing (show $ ev e)
+
+test1 = ok "test1" [1,2] $
+  1 ||| 2
+
+test2 = ok "test2" [2,3,3,4] $
+  (1 ||| 2) + (1 ||| 2)
+
+test3 = ok "test3" [2,4] $
+  ("x" := 1 ||| 2) + "x"
 
 -- Should fail, since variables in ||| do not escape
 -- Fails
-test4 = (("x" := 1) ||| 2) + "x"
+test4 = bad "test4" $
+  (("x" := 1) ||| 2) + "x"
 
--- works [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))]
-test5 = ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
+test5 = ok "test5" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
+  ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
 
--- works [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))]
-test6 = ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
+test6 = ok "test6" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
+  ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
 
--- works [4]
-test7 = ("x" := 1 ||| 2) + ("x" === 2)
+test7 = ok "test7" [4] $
+  ("x" := 1 ||| 2) + ("x" === 2)
 
--- works [(1,1),(2,2)]
-test8 = Pair "x" ("x" := 1 ||| 2)
+test8 = ok "test8" [(1,1),(2,2)] $
+  Pair "x" ("x" := 1 ||| 2)
 
--- Works [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))]
-test9 = Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
+test9 = ok "test9" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
+  Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
 
 -- x's value should not be delayed, because x's RHS has no depenedncies
--- test10 works [((1,7),1)]
-test10 = Pair ("x" := (Pair 1 7 |||
+test10 = ok "test10" [((1,7),1)] $
+         Pair ("x" := (Pair 1 7 |||
                        Pair "y" ("y" := 2)))
               (Fst "x" === 1)
 
 -- x's value depends on recursively bound z, so we get stuck.
 -- Produces []
--- LA: Is this the intended test.
-test11 = Pair ("x" := (Pair 1 "z" |||
+-- LA: Is this the intended test?
+test11 = ok "test11" ([]::[()]) $
+         Pair ("x" := (Pair 1 "z" |||
                         Pair "y" ("y" := 2)))
                (Pair ("x" === 1) ("z" := 3))
 
--- Works [(1,1)]
-test12 = "t" := Pair 1 (Fst "t")
+test12 = ok "test12" [(1,1)] $
+  "t" := Pair 1 (Fst "t")
 
--- Works [(1,1)]
-test13 = "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
+test13 = ok "test13" [(1,1)] $
+  "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
 
 -- Fails (equalLenient)
-test14 = "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+test14 = bad "test14" $
+  "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
 
 -- Generates an error, as it should
-test15 = Error
+test15 = bad "test15"
+  Error
 
 -- Generates an error, as it should
-test16 = Error `semi` 1
+test16 = bad "test16" $
+  Error `semi` 1
 
 -- Generates an error, as it should
-test17 = (2 # Error) `semi` 1
+test17 = bad "test17" $
+   (2 # Error) `semi` 1
 
--- Works [3,7,2,2]
 -- Cascaded forward references
-test18 = "x" := ("y" ||| 2)  `semi`
+test18 = ok "test18" [3,7,2,2] $
+         "x" := ("y" ||| 2)  `semi`
          "y" := (3 ||| "z")  `semi`
          "z" := 7            `semi`
          "x"
@@ -337,3 +350,8 @@ test20 = "v" := "t" + 1 `semi`
          "t" := 55 ||| 127 `semi`
          "x"
 -}
+
+testAll = mapM_ testEx
+  [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
+   test11,test12,test13,test14,test15,test16,test17,test18
+  ]
