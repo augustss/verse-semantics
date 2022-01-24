@@ -26,3 +26,5 @@ cabal.project.local~
 *.pdf
 *~
 tmp
+\#*
+.#*
