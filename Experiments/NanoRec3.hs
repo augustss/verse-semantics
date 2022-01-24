@@ -175,22 +175,26 @@ evalVar i rho = case lookupEnv i rho of
                   Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
 tieKnot :: [Res] -> [Res]
-tieKnot vs = [ (empty, withExtL rec_ext v)
+tieKnot vs = [ (empty, withExtL (tieKnotExt ext) v)
              | (ext, v) <- vs
-             , let rec_ext = mapEnv (withExtL rec_ext) ext ]
-             -- Here is where we tie the knot.  Consider an example like
-             --   x:=y; y:=z; z:=3; z
-             -- we get an 'ext' that binds x and y to Delays, and we
-             -- must resolve both at once when we tie the knot
-   where
-     withExtL :: Env -> Lenient -> Lenient
-     withExtL ext (Done v)    = Done (withExtV ext v)
-     withExtL ext (Delay s f) = f ext
+             ]
 
+withExtL :: Env -> Lenient -> Lenient
+withExtL ext (Delay s f) = f ext
+withExtL ext (Done v)    = Done (withExtV ext v)
+  where
      withExtV :: Env -> Value -> Value
      withExtV _ v@(VInt _)      = v
      withExtV ext (VPair l1 l2) = VPair (withExtL ext l1) (withExtL ext l2)
 
+tieKnotExt :: Ext -> Ext
+tieKnotExt ext = rec_ext
+  -- Here is where we tie the knot.  Consider an example like
+  --   x:=y; y:=z; z:=3; z
+  -- we get an 'ext' that binds x and y to Delays, and we
+  -- must resolve both at once when we tie the knot
+  where rec_ext = mapEnv (withExtL rec_ext) ext
+ 
 ---------------------
 --      Auxiliary semantic operations
 ---------------------
@@ -312,14 +316,15 @@ test16 = Error `semi` 1
 -- Generates an error, as it should
 test17 = (2 # Error) `semi` 1
 
-
+-- Works [3,7,2,2]
 -- Cascaded forward references
 test18 = "x" := ("y" ||| 2)  `semi`
-         "y" := (3  ||| "z") `semi`
+         "y" := (3 ||| "z")  `semi`
          "z" := 7            `semi`
          "x"
 
-
+-- These tests do not obey the invariant that all variables have to be unique.
+{-
 -- test19 and test20 should give same results, namely
 --   [ (55+1) + 6,  (127+1) + 6 ] = [62, 134]
 -- But test19 does, and test20 gives [6,6]  Boo!
@@ -331,4 +336,4 @@ test20 = "v" := "t" + 1 `semi`
          "x" := ("z" := "v" + "t" `semi` "t" := 6 `semi` "z") `semi`
          "t" := 55 ||| 127 `semi`
          "x"
-
+-}
