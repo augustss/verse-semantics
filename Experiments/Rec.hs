@@ -1,8 +1,6 @@
 {-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-import Control.DeepSeq
-import Control.Exception
 import Control.Applicative
+import Ex
 
 -- u generates a singleton list
 u :: a -> [a]
@@ -12,21 +10,6 @@ x ==. y | x == y = [x]
         | otherwise = []
 
 --  <|> is just (++)
-
-data Ex a = Ex
-  { name :: String,
-    ref :: Maybe a,
-    test :: a
-  }
-  deriving (Show)
-
-runEx :: (Eq a, NFData a) => Ex a -> IO (Maybe a)
-runEx ex = catch (evaluate (force $ Just $ test ex)) (\ (_ :: SomeException) -> return Nothing)
-
-testEx :: (Eq a, NFData a, Show a) => Ex a -> IO ()
-testEx ex = do
-  res <- runEx ex
-  putStrLn $ name ex ++ " " ++ if res == ref ex then "OK" else "failed: " ++ show res
 
 {-
 class (Monad m) => MonadFix m where
@@ -91,62 +74,57 @@ the (Just x) = x
 -}
 
 -- 
-ex1 :: Ex [(Int,Int)]
 ex1 = Ex "ex1" (Just [(1,2),(1,3),(2,2),(2,3)]) $ mdo
   x <- u 1 <|> u 2
   y <- u 2 <|> u 3
-  pure (x,y)
+  pure (x::Int,y::Int)
 
-ex1a :: Ex [(Int,Int)]
 ex1a = Ex "ex1a" (Just [(1,2),(1,3),(2,2),(2,3)]) $ mdo
   (x, y) <- (,) <$> (u 1 <|> u 2) <*> (u 2 <|> u 3)
-  pure (x,y)
+  pure (x::Int,y::Int)
 
 -- 
-ex2 :: Ex [(Int,Int)]
 ex2 = Ex "ex2" (Just [(2,1),(3,2),(3,1),(3,2)]) $ mdo
   x <- u (y+1) <|> u 3
   y <- u 1 <|> u 2
-  pure (x,y)
+  pure (x::Int,y::Int)
 
-ex2a :: Ex [(Int,Int)]
 ex2a = Ex "ex2a" (Just [(2,1),(3,2),(3,1),(3,2)]) $ mdo
   (x, y) <- (,) <$> (u (y+1) <|> u 3) <*> (u 1 <|> u 2)
-  pure (x,y)
+  pure (x::Int,y::Int)
 
 
 -- Loops
 -- Tim is happy that this deadlocks
-ex3 :: Ex [(Int,Int)]
 ex3 = Ex "ex3" Nothing $ mdo
   x <- [1..y]
   y <- u 1 <|> u 2
-  pure (x,y)
+  pure (x::Int,y::Int)
 
-ex3a :: Ex [(Int,Int)]
 ex3a = Ex "ex3a" (Just [(1,1),(2,1),(2,2)]) $ mdo
   x <- u 1 <|> u 2
   y <- [1..x]
-  pure (x,y)
+  pure (x::Int,y::Int)
 
 -- Loops
 -- But Tim's impl squeezes through a narrow gap
-ex5 :: Ex [(Int,Int)]
 ex5 = Ex "ex5" Nothing $ mdo
   x <- y ==. 4 <|> u 2
        -- (y ==. 4) yields an empty list or singleton,
        --           depending on y
   y <- u 3 <|> u 4
-  pure (x,y)
+  pure (x::Int,y::Int)
 
 -- Loops on second elements, but result has length 3
 ex7 = Ex "ex7" (Just 3) $ length $ mdo
   x <- u 1 <|> u x <|> u 2
-  pure x
+  pure (x::Int)
 
 ex8 = Ex "ex8" (Just [(1,1)]) $ mdo
   (x,y) <- (,) <$> u 1 <*> u x
-  pure (x, y)
+  pure (x::Int,y::Int)
+
+testAll = mapM_ testEx [ex1, ex1a, ex2, ex2a, ex3, ex5, ex7, ex8]
 
 {- Discussion
 
