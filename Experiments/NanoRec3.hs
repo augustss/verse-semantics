@@ -173,6 +173,8 @@ eval Error _ = error "eval: Error"
 evalVar :: Ident -> Env -> Lenient
 evalVar i rho = case lookupEnv i rho of
                   Just v  -> v
+-- This is a possible fix for test19
+--                  Just v -> withExtL rho v
                   Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
 tieKnot :: [Res] -> [Res]
@@ -336,22 +338,23 @@ test18 = ok "test18" [3,7,2,2] $
          "z" := 7            `semi`
          "x"
 
--- These tests do not obey the invariant that all variables have to be unique.
-{-
--- test19 and test20 should give same results, namely
---   [ (55+1) + 6,  (127+1) + 6 ] = [62, 134]
--- But test19 does, and test20 gives [6,6]  Boo!
-test19 = "v" := "t" + 1 `semi`
-         "x" := ("t" := 6 `semi` "z" := "v" + "t" `semi` "z") `semi`
-         "t" := 55 ||| 127 `semi`
-         "x"
-test20 = "v" := "t" + 1 `semi`
-         "x" := ("z" := "v" + "t" `semi` "t" := 6 `semi` "z") `semi`
-         "t" := 55 ||| 127 `semi`
-         "x"
--}
+-- Test that when evaluating z the x is fully determined.
+-- BUG: This test does not pass.
+test19 = ok "test19" [5] $
+  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+
+-- Check that mutual recursion fails
+test20 = bad "test20" $
+  "x" := "y" `semi` "y" := "x"
+
+-- Nested delays
+test21 = ok "test21" [(1,(2,3))] $
+  "x" := (1 # "y") `semi`
+  "y" := (2 # "z") `semi`
+  "z" := 3 `semi`
+  "x"
 
 testAll = mapM_ testEx
   [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
-   test11,test12,test13,test14,test15,test16,test17,test18
+   test11,test12,test13,test14,test15,test16,test17,test18,test19,test20,test21
   ]
