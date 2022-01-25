@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 import Data.String
 import Debug.Trace
+import GHC.Stack
 import Ex
 
 ---------------------
@@ -41,7 +42,7 @@ data Exp = Var Name
          | Sel Exp Int
          | Plus Exp Exp
          | Fail
-         | For SExp Exp
+         | For SExp SExp
          | Do SExp
          | Error  -- to test strictness
   deriving (Show)
@@ -92,13 +93,13 @@ wher :: Exp -> Exp -> Exp
 wher x y = Fst (Pair x y)
 
 for :: Exp -> Exp -> Exp
-for e1 e2 = For (addDef e1) e2
+for e1 e2 = For (addDef e1) (addDef e2)
 
 doo :: Exp -> Exp
 doo e = Do (addDef e)
 
 -- Add all 
-addDef :: Exp -> SExp
+addDef :: HasCallStack => Exp -> SExp
 addDef e | xs /= nub xs = scopeError $ "Duplicate := " ++ show (e, xs)
          | otherwise = Def xs e
   where xs = findSet e
@@ -122,14 +123,13 @@ findSet Error = []
 ---------------------
 
 data Value = VInt Integer | VArray [Lenient]
-  deriving (Show)
-{-
+--  deriving (Show)
+
 instance Show Value where
   show (VInt i) = show i
   show (VArray vs) = "(" ++ intercalate "," (map show' vs) ++ ")"
     where show' (Done v) = show v
           show' l = show l
--}
 
 type Id = Int
 
@@ -155,7 +155,7 @@ instance Show Lenient where
   show (Done v)  = "(Done " ++ show v ++ ")"
   show (Delay s f) = "Delay-" ++ s ++ "!"
 
-equalLenient :: Lenient -> Lenient -> Bool
+equalLenient :: HasCallStack => Lenient -> Lenient -> Bool
 equalLenient v1 v2 =
   case cmpL v1 v2 of
     Equ -> True
@@ -189,7 +189,7 @@ cmpL _ _ = Dunno
 -- in the outer environment.
 -- A fix for this would be to delete x from rho in the Def case.
 
-eval :: Exp -> Env -> Binds -> [Res]
+eval :: HasCallStack => Exp -> Env -> Binds -> [Res]
 -- In a call (eval e rho), the domain of the Env in the returned Res
 -- is precisely the variables bound in 'e'.
 
@@ -202,15 +202,19 @@ eval (Sel e1 i) rho bnd = [ (ext1, liftLL1 ("Sel-"++show i) (vsel i) fv1) | (ext
 eval (Plus e1 e2) rho bnd =
   [ (ext1 `appBinds` ext2, liftL2 "Plus" vplus fv1 fv2)
   | (ext1, fv1) <- eval e1 rho bnd
-  , (ext2, fv2) <- eval e2 rho (ext1 `appBinds` bnd) ]
+  , (ext2, fv2) <- eval e2 rho (ext1 `updBinds` bnd) ]
 
-eval (Array es) rho abnd = [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray es abnd ]
+eval (Array es) rho abnd =
+--  trace ("\neval 1 Array " ++ show (es, rho, abnd) ++ "\n") $
+--  trace ("\neval 2 Array " ++ show (evalArray es abnd) ++ "\n") $
+  [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray es abnd ]
   where evalArray :: [Exp] -> Binds -> [(Binds, [Lenient])]
         evalArray [] bnd = [(emptyBinds, [])]
         evalArray (e:es) bnd =
           [ (ext' `appBinds` ext'', fv : fvs)
           | (ext', fv) <- eval e rho bnd
-          , (ext'', fvs) <- evalArray es (ext' `appBinds` bnd)
+--          , trace ("\nevalArray " ++ show (ext') ++ "\n") True
+          , (ext'', fvs) <- evalArray es (ext' `updBinds` bnd)
           ]
 
 eval (Alt e1 e2) rho bnd =
@@ -222,45 +226,46 @@ eval (Set x e) rho bnd =
 eval (Equal e1 e2) rho bnd =
   [ (ext1 `appBinds` ext2, fv1)
   | (ext1, fv1) <- eval e1 rho bnd
-  , (ext2, fv2) <- eval e2 rho (ext1 `appBinds` bnd)
+  , (ext2, fv2) <- eval e2 rho (ext1 `updBinds` bnd)
   , fv1 `equalLenient` fv2
   ]
 
-{-
-eval (For (Def xs1 e1) e2) rho = map mkArr $ sequence
-  [ tieKnot (eval e2 (unionEnv ext1' rho))
-  | (ext1, _) <- eval e1 rho
+eval (For (Def xs1 e1) e2) arho abnd = map mkArr $ sequence
+  [ tieKnot (evalS e2 rho (updBinds ext1' bnd))
+  | (ext1, _) <- eval e1 rho bnd
   -- ext1 has delay for its own variables
   -- Note the recursice use of ext1', without it we would need several passes.
   , let ext1' = tieKnotExt ext1
   ]
   where mkArr :: [Res] -> Res
-        mkArr rs = (empty, Done $ VArray $ map snd rs)
--}
+        mkArr rs = (emptyBinds, Done $ VArray $ map snd rs)
+        (rho, bnd) = extend xs1 arho abnd
 
 eval (Do e) rho bnd = evalS e rho bnd
 
 eval Error _ _ = expectedError "eval: Error"
 
-evalS :: SExp -> Env -> Binds -> [Res]
+evalS :: HasCallStack => SExp -> Env -> Binds -> [Res]
 evalS (Def ns e) rho bnd = tieKnot $ eval e rho' bnd'
   where (rho', bnd') = extend ns rho bnd
 
-evalVar :: Name -> Env -> Binds -> Lenient
+evalVar :: HasCallStack => Name -> Env -> Binds -> Lenient
 evalVar n rho bnd = evalId n (lookupEnv n rho) bnd
 
 -- NOTE: The Name is used only for debugging.
-evalId :: Name -> Id -> Binds -> Lenient
+evalId :: HasCallStack => Name -> Id -> Binds -> Lenient
 evalId n i bnd =
   case lookupBinds i bnd of
-    Just v -> v
-    Nothing -> Delay (dly "Var" [n ++ "#" ++ show i]) (evalId n i)
+--    Just (Just v) -> v
+    Just (Just v) -> withBindsL bnd v   -- fixes test19
+    _ -> Delay (dly "Var" [n ++ "#" ++ show i]) (evalId n i)
 
-tieKnot :: [Res] -> [Res]
-tieKnot vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
+tieKnot :: HasCallStack => [Res] -> [Res]
+--tieKnot _ = undefined
+--tieKnot vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
 tieKnot vs | bad:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show bad
   where badRes (Binds ext, _) = nub (map fst ext) /= map fst ext
-tieKnot vs = [ (emptyBinds, withBindsL (tieKnotBinds ext) v)
+tieKnot vs = [ (emptyBinds, withBindsL (tieKnotExt ext) v)
              | (ext, v) <- vs
              ]
 
@@ -272,9 +277,9 @@ withBindsL ext (Done v)    = Done (withBindsV ext v)
      withBindsV _ v@(VInt _)      = v
      withBindsV ext (VArray ls) = VArray (map (withBindsL ext) ls)
 
-tieKnotBinds :: Binds -> Binds
-tieKnotBinds ext =
-  trace ("\ntieKnotBinds: " ++ show ext ++ "\n") $
+tieKnotExt :: Binds -> Binds
+tieKnotExt ext =
+--  trace ("\ntieKnotExt: " ++ show ext ++ "\n") $
   rec_ext
   -- Here is where we tie the knot.  Consider an example like
   --   x:=y; y:=z; z:=3; z
@@ -290,11 +295,7 @@ tieKnotBinds ext =
 extendEnv :: [(Name, Id)] -> Env -> Env
 extendEnv xvs rho = xvs ++ rho
 
---unionEnv :: Ext -> Env -> Env
--- If both envs bind the same variable 'ext1' wins
---unionEnv ext1 ext2 = ext1 ++ ext2
-
-lookupEnv :: Name -> Env -> Id
+lookupEnv :: HasCallStack => Name -> Env -> Id
 lookupEnv n rho =
   case lookup n rho of
     Nothing -> scopeError $ "Not in scope " ++ show n
@@ -316,24 +317,31 @@ extendBinds n (Binds bnd) = (is, Binds $ zip is (repeat Nothing) ++ bnd)
 mapBinds :: (Lenient -> Lenient) -> Binds -> Binds
 mapBinds f (Binds ext) = Binds [ (i, fmap f v) | (i, v) <- ext ]
 
-lookupBinds :: Id -> Binds -> Maybe Lenient
-lookupBinds i (Binds bnd) =
-  case lookup i bnd of
-    Nothing -> internalError $ "Id not found " ++ show i
-    Just r -> r
+lookupBinds :: HasCallStack => Id -> Binds -> Maybe (Maybe Lenient)
+lookupBinds i (Binds bnd) = lookup i bnd
+--  case lookup i bnd of
+--    Nothing -> internalError $ "Id not found " ++ show (i, bnd)
+--    Just r -> r
 
 -- Extend the environment and bindings with the given identifiers.
 extend :: [Name] -> Env -> Binds -> (Env, Binds)
 extend xs env bnd =
-  trace ("\nextend " ++ show (zip xs is) ++ "\n") $
+--  trace ("\nextend " ++ show (zip xs is) ++ "\n") $
   (env', bnd')
   where (is, bnd') = extendBinds (length xs) bnd
         env' = extendEnv (zip xs is) env
 
-appBinds :: Binds -> Binds -> Binds
+appBinds :: HasCallStack => Binds -> Binds -> Binds
 appBinds (Binds ext1) (Binds ext2)
   | not $ null $ intersect (map fst ext1) (map fst ext2) = error $ "appBinds: " ++ show (ext1, ext2)
   | otherwise = Binds $ ext1 ++ ext2
+
+updBinds :: HasCallStack => Binds -> Binds -> Binds
+updBinds (Binds ext1) (Binds ext2)
+  | not $ null $ ks1 \\ ks2 = error $ "updBinds: " ++ show (ext1, ext2)
+  | otherwise = Binds $ ext1 ++ [ (k, mv) | (k, mv) <- ext2, k `notElem` ks1 ]
+ where ks1 = map fst ext1
+       ks2 = map fst ext2
 
 ---------------------
 -- Value operations
@@ -362,11 +370,11 @@ dly :: String -> [String] -> String
 dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
 
 -- Top level evaluation
-evalTop :: Exp -> [Res]
+evalTop :: HasCallStack => Exp -> [Res]
 evalTop e = evalS (addDef e) emptyEnv emptyBinds
 
 -- Ensure all delays are gone.
-ev :: Exp -> [Value]
+ev :: HasCallStack => Exp -> [Value]
 ev e = map get (evalTop e)
   where
     get (_, Done v)  = v
@@ -379,23 +387,23 @@ ev e = map get (evalTop e)
 ---------------------
 
 -- Error in the implementation of the semantics.
-internalError :: String -> a
+internalError :: HasCallStack => String -> a
 internalError s = error $ "internalError: " ++ s
 
 -- Some scope problem
-scopeError :: String -> a
+scopeError :: HasCallStack => String -> a
 scopeError s = error $ "scopeError: " ++ s
 
 -- Semantic error (should be caught by the verifier)
-wrong :: String -> a
+wrong :: HasCallStack => String -> a
 wrong s = error $ "wrong: " ++ s
 
 -- Use of Error
-expectedError :: String -> a
+expectedError :: HasCallStack => String -> a
 expectedError s = error $ "expectedError: " ++ s
 
 -- I'm not sure
-whatError :: String -> a
+whatError :: HasCallStack => String -> a
 whatError s = error $ "whatError: " ++ s
 
 
@@ -425,9 +433,6 @@ test4 = bad "test4" $
 
 test5 = ok "test5" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
   ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
-
-ttt = 
-  ("x" := 1 ) + ("y" := 3 ||| 4) # "y" -- # ("x" # "y")
 
 test6 = ok "test6" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
   ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
@@ -484,46 +489,58 @@ test18 = ok "test18" [3,7,2,2] $
          "z" := 7            `semi`
          "x"
 
-test19 = ok "test19" [(5,5,5)] $
+-- Test that when evaluating z the x is fully determined.
+-- BUG: This test does not pass.
+test19 = ok "test19" [5] $
+  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+
+-- Check that mutual recursion fails
+test20 = bad "test20" $
+  "x" := "y" `semi` "y" := "x"
+
+-- Nested delays
+test21 = ok "test21" [(1,(2,3))] $
+  "x" := (1 # "y") `semi`
+  "y" := (2 # "z") `semi`
+  "z" := 3 `semi`
+  "x"
+
+test22 = ok "test22" [(5,5,5)] $
   for (1|||2|||3) 5
 
-test20 = ok "test20" [(1,2,3)] $
+test23 = ok "test23" [(1,2,3)] $
   for ("x" := 1|||2|||3) "x"
 
-test21 = ok "test21" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
+test24 = ok "test24" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
   for ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
 
-test22 = ok "test22" [((1,4),(2,4),(3,4)),
+test25 = ok "test25" [((1,4),(2,4),(3,4)),
                       ((1,5),(2,5),(3,5))] $
   "y" := 4|||5 `semi` for ("x" := 1|||2|||3) ("x" # "y")
 
-test23 = ok "test23" [(((1,4),(2,4),(3,4)),
+test26 = ok "test26" [(((1,4),(2,4),(3,4)),
                        ((1,5),(2,5),(3,5)))] $
   for ("y" := 4|||5) $ for ("x" := 1|||2|||3) ("x" # "y")
 
-test24 = ok "test24" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
+test27 = ok "test27" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
   for ("x" := 1|||2|||3) ("x" ||| 99)
 
-test25 = ok "test25" [(1,2,3)] $
+test28 = ok "test28" [(1,2,3)] $
   for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
 
-test26 = ok "test26" [(2,3,4)] $
+test29 = ok "test29" [(2,3,4)] $
   for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
 
-test27 = ok "test27" [(1,(2,3))] $
-  "x" := (1 # "y") `semi` "y" := (2 # "z") `semi` "z" := 3 `semi` "x"
-
-test28 = bad "test28" $
+test30 = bad "test30" $
   "x" := 1 `semi` "x" := 2
 
--- This test fails because we don't handle scope properly yet
-test29 = ok "test29" [(1,2)] $
+test31 = ok "test31" [(1,2)] $
   "x" := 2 `semi` (doo ("x" `wher` "x" := 1) # "x")
+
 
 testAll = mapM_ testEx
   [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
    test11,test12,test13,test14,test15,test16,test17,test18,
-   test19,test20,test21,test22,test23,test24,test25,test26,test27,
-   test28 --, test29
+   test19,test20,test21,test22,test23,test24,test25,test26,
+   test27,test28,test29,test30,test31
   ]
-
