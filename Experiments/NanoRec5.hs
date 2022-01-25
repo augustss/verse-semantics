@@ -99,7 +99,7 @@ doo e = Do (addDef e)
 
 -- Add all 
 addDef :: Exp -> SExp
-addDef e | xs /= nub xs = error $ "Duplicate := " ++ show (e, xs)
+addDef e | xs /= nub xs = scopeError $ "Duplicate := " ++ show (e, xs)
          | otherwise = Def xs e
   where xs = findSet e
 
@@ -122,23 +122,34 @@ findSet Error = []
 ---------------------
 
 data Value = VInt Integer | VArray [Lenient]
-
+  deriving (Show)
+{-
 instance Show Value where
   show (VInt i) = show i
   show (VArray vs) = "(" ++ intercalate "," (map show' vs) ++ ")"
     where show' (Done v) = show v
           show' l = show l
+-}
 
-type Env = [(Name, Lenient)]
-type Ext = Env  -- Environment extension
+type Id = Int
 
-empty :: Ext
-empty = []
+type Env = [(Name, Id)]
+--type Ext = [(Id, Lenient)]
+-- All Id in use should be in the mapping.
+-- An unset Id maps to Nothing.
+newtype Binds = Binds [(Id, Maybe Lenient)]
+  deriving (Show)
 
-data Lenient = Delay String (Env -> Lenient)  -- The string is just for debugging
+emptyEnv :: Env
+emptyEnv = []
+
+emptyBinds :: Binds
+emptyBinds = Binds []
+
+data Lenient = Delay String (Binds -> Lenient)  -- The string is just for debugging
              | Done Value  -- (Done v) is equivalent to (Delay (\_. v))
 
-type Res = (Env, Lenient)
+type Res = (Binds, Lenient)
 
 instance Show Lenient where
   show (Done v)  = "(Done " ++ show v ++ ")"
@@ -149,7 +160,7 @@ equalLenient v1 v2 =
   case cmpL v1 v2 of
     Equ -> True
     NotEqu -> False
-    Dunno -> error $ "equalLenient: not evaluated: " ++ show (v1, v2)
+    Dunno -> whatError $ "equalLenient: not evaluated: " ++ show (v1, v2)
 
 data IsEqual = Equ | NotEqu | Dunno
   deriving (Show)
@@ -178,42 +189,44 @@ cmpL _ _ = Dunno
 -- in the outer environment.
 -- A fix for this would be to delete x from rho in the Def case.
 
-eval :: Exp -> Env -> [Res]
+eval :: Exp -> Env -> Binds -> [Res]
 -- In a call (eval e rho), the domain of the Env in the returned Res
 -- is precisely the variables bound in 'e'.
 
-eval (Var i) rho = [(empty, evalVar i rho)]
-eval (Con k) _   = [(empty, Done (VInt k))]
-eval Fail    _   = []
+eval (Var i) rho bnd = [(emptyBinds, evalVar i rho bnd)]
+eval (Con k) _   _   = [(emptyBinds, Done (VInt k))]
+eval Fail    _   _   = []
 
-eval (Sel e1 i) rho = [ (ext1, liftLL1 ("Sel-"++show i) (vsel i) fv1) | (ext1, fv1) <- eval e1 rho ]
+eval (Sel e1 i) rho bnd = [ (ext1, liftLL1 ("Sel-"++show i) (vsel i) fv1) | (ext1, fv1) <- eval e1 rho bnd ]
 
-eval (Plus e1 e2) rho =
-  [ (ext1 ++ ext2, liftL2 "Plus" vplus fv1 fv2)
-  | (ext1, fv1) <- eval e1 rho
-  , (ext2, fv2) <- eval e2 (ext1 ++ rho) ]
+eval (Plus e1 e2) rho bnd =
+  [ (ext1 `appBinds` ext2, liftL2 "Plus" vplus fv1 fv2)
+  | (ext1, fv1) <- eval e1 rho bnd
+  , (ext2, fv2) <- eval e2 rho (ext1 `appBinds` bnd) ]
 
-eval (Array es) arho = [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray es arho ]
-  where evalArray [] rho = [(empty, [])]
-        evalArray (e:es) rho =
-          [ (ext' ++ ext'', fv : fvs)
-          | (ext', fv) <- eval e rho
-          , (ext'', fvs) <- evalArray es (ext' ++ rho)
+eval (Array es) rho abnd = [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray es abnd ]
+  where evalArray :: [Exp] -> Binds -> [(Binds, [Lenient])]
+        evalArray [] bnd = [(emptyBinds, [])]
+        evalArray (e:es) bnd =
+          [ (ext' `appBinds` ext'', fv : fvs)
+          | (ext', fv) <- eval e rho bnd
+          , (ext'', fvs) <- evalArray es (ext' `appBinds` bnd)
           ]
 
-eval (Alt e1 e2) rho =
-  evalS e1 rho ++ evalS e2 rho
+eval (Alt e1 e2) rho bnd =
+  evalS e1 rho bnd ++ evalS e2 rho bnd
 
-eval (Set x e) rho =
-  [ (extendEnv x fv1 rho, fv1) | (ext1, fv1) <- eval e rho ]
+eval (Set x e) rho bnd =
+  [ (setBind (lookupEnv x rho) fv1 bnd, fv1) | (ext1, fv1) <- eval e rho bnd ]
 
-eval (Equal e1 e2) rho =
-  [ (ext1 ++ ext2, fv1)
-  | (ext1, fv1) <- eval e1 rho
-  , (ext2, fv2) <- eval e2 (ext1 ++ rho)
+eval (Equal e1 e2) rho bnd =
+  [ (ext1 `appBinds` ext2, fv1)
+  | (ext1, fv1) <- eval e1 rho bnd
+  , (ext2, fv2) <- eval e2 rho (ext1 `appBinds` bnd)
   , fv1 `equalLenient` fv2
   ]
 
+{-
 eval (For (Def xs1 e1) e2) rho = map mkArr $ sequence
   [ tieKnot (eval e2 (unionEnv ext1' rho))
   | (ext1, _) <- eval e1 rho
@@ -223,67 +236,122 @@ eval (For (Def xs1 e1) e2) rho = map mkArr $ sequence
   ]
   where mkArr :: [Res] -> Res
         mkArr rs = (empty, Done $ VArray $ map snd rs)
+-}
 
-eval (Do e) rho = evalS e rho
+eval (Do e) rho bnd = evalS e rho bnd
 
-eval Error _ = error "eval: Error"
+eval Error _ _ = expectedError "eval: Error"
 
--- TODO: actually use the variables
-evalS :: SExp -> Env -> [Res]
-evalS (Def _ e) rho = tieKnot $ eval e rho
+evalS :: SExp -> Env -> Binds -> [Res]
+evalS (Def ns e) rho bnd = tieKnot $ eval e rho' bnd'
+  where (rho', bnd') = extend ns rho bnd
 
-evalVar :: Name -> Env -> Lenient
-evalVar i rho = case lookupEnv i rho of
-                  Just v  -> v
-                  Nothing -> Delay (dly "Var" [i]) (evalVar i)
+evalVar :: Name -> Env -> Binds -> Lenient
+evalVar n rho bnd = evalId n (lookupEnv n rho) bnd
+
+-- NOTE: The Name is used only for debugging.
+evalId :: Name -> Id -> Binds -> Lenient
+evalId n i bnd =
+  case lookupBinds i bnd of
+    Just v -> v
+    Nothing -> Delay (dly "Var" [n ++ "#" ++ show i]) (evalId n i)
 
 tieKnot :: [Res] -> [Res]
-tieKnot vs = [ (empty, withExtL (tieKnotExt ext) v)
+tieKnot vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
+tieKnot vs | bad:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show bad
+  where badRes (Binds ext, _) = nub (map fst ext) /= map fst ext
+tieKnot vs = [ (emptyBinds, withBindsL (tieKnotBinds ext) v)
              | (ext, v) <- vs
              ]
 
-withExtL :: Env -> Lenient -> Lenient
-withExtL ext (Delay s f) = f ext
-withExtL ext (Done v)    = Done (withExtV ext v)
+withBindsL :: Binds -> Lenient -> Lenient
+withBindsL ext (Delay s f) = f ext
+withBindsL ext (Done v)    = Done (withBindsV ext v)
   where
-     withExtV :: Env -> Value -> Value
-     withExtV _ v@(VInt _)      = v
-     withExtV ext (VArray ls) = VArray (map (withExtL ext) ls)
+     withBindsV :: Binds -> Value -> Value
+     withBindsV _ v@(VInt _)      = v
+     withBindsV ext (VArray ls) = VArray (map (withBindsL ext) ls)
 
-tieKnotExt :: Ext -> Ext
-tieKnotExt ext = rec_ext
+tieKnotBinds :: Binds -> Binds
+tieKnotBinds ext =
+  trace ("\ntieKnotBinds: " ++ show ext ++ "\n") $
+  rec_ext
   -- Here is where we tie the knot.  Consider an example like
   --   x:=y; y:=z; z:=3; z
   -- we get an 'ext' that binds x and y to Delays, and we
   -- must resolve both at once when we tie the knot
-  where rec_ext = mapEnv (withExtL rec_ext) ext
+  where rec_ext = mapBinds (withBindsL rec_ext) ext
  
 ---------------------
 --      Auxiliary semantic operations
 ---------------------
 
-extendEnv :: Name -> Lenient -> Env -> Env
-extendEnv x v rho = (x,v) : rho
+-- Environment
+extendEnv :: [(Name, Id)] -> Env -> Env
+extendEnv xvs rho = xvs ++ rho
 
-mapEnv :: (Lenient -> Lenient) -> Env -> Env
-mapEnv f env = [ (i, f v) | (i,v) <- env ]
-
-unionEnv :: Ext -> Env -> Env
+--unionEnv :: Ext -> Env -> Env
 -- If both envs bind the same variable 'ext1' wins
-unionEnv ext1 ext2 = ext1 ++ ext2
+--unionEnv ext1 ext2 = ext1 ++ ext2
 
-lookupEnv :: Name -> Env -> Maybe Lenient
-lookupEnv = lookup
+lookupEnv :: Name -> Env -> Id
+lookupEnv n rho =
+  case lookup n rho of
+    Nothing -> scopeError $ "Not in scope " ++ show n
+    Just i  -> i
 
+-- Bindings
+-- Set a binding.
+-- This implementation is overly cautious. :)
+setBind :: Id -> Lenient -> Binds -> Binds
+setBind i v (Binds bnd) =
+  trace ("\nsetBind " ++ show (i, v) ++ "\n") $
+  case lookup i bnd of
+    Nothing -> internalError $ "setBind: Id not found " ++ show i
+    Just (Just v) -> internalError $ "setBind: Id already set " ++ show (i, v)
+    Just Nothing -> Binds $ (i, Just v) : [ (k, mv) | (k, mv) <- bnd, k /= i ]
+
+-- Extend with n unbound Ids.
+-- The new Ids will be numbered higher than any existing Ids.
+extendBinds :: Int -> Binds -> ([Id], Binds)
+extendBinds n (Binds bnd) = (is, Binds $ zip is (repeat Nothing) ++ bnd)
+  where is = take n [m+1..]
+        m = maximum (0 : map fst bnd)
+
+mapBinds :: (Lenient -> Lenient) -> Binds -> Binds
+mapBinds f (Binds ext) = Binds [ (i, fmap f v) | (i, v) <- ext ]
+
+lookupBinds :: Id -> Binds -> Maybe Lenient
+lookupBinds i (Binds bnd) =
+  case lookup i bnd of
+    Nothing -> internalError $ "Id not found " ++ show i
+    Just r -> r
+
+-- Extend the environment and bindings with the given identifiers.
+extend :: [Name] -> Env -> Binds -> (Env, Binds)
+extend xs env bnd =
+  trace ("\nextend " ++ show (zip xs is) ++ "\n") $
+  (env', bnd')
+  where (is, bnd') = extendBinds (length xs) bnd
+        env' = extendEnv (zip xs is) env
+
+appBinds :: Binds -> Binds -> Binds
+appBinds (Binds ext1) (Binds ext2)
+  | not $ null $ intersect (map fst ext1) (map fst ext2) = error $ "appBinds: " ++ show (ext1, ext2)
+  | otherwise = Binds $ ext1 ++ ext2
+
+---------------------
+-- Value operations
 vplus :: Value -> Value -> Value
 vplus (VInt i1) (VInt i2) = VInt (i1 + i2)
-vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
+vplus v1 v2 = wrong $ "vplus " ++ show (v1, v2)
 
 vsel :: Int -> Value -> Lenient
 vsel i (VArray as) | i >= 0 && i < length as = as !! i
-                   | otherwise = error $ "vsel: out of bounds " ++ show (as, i)
-vsel _ v           = error $ "vsel: not an array " ++ show v
+                   | otherwise = wrong $ "vsel: out of bounds " ++ show (as, i)
+vsel _ v           = wrong $ "vsel: not an array " ++ show v
 
+-- Lifting
 liftLL1 :: String -> (Value -> Lenient) -> Lenient -> Lenient
 liftLL1 s g (Delay s' f) = Delay (dly s [s']) (\ext -> liftLL1 s g (f ext))
 liftLL1 _ g (Done v)  = g v
@@ -298,16 +366,43 @@ liftL2 _ g (Done v1) (Done v2)   = Done (v1 `g` v2)
 dly :: String -> [String] -> String
 dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
 
+-- Top level evaluation
 evalTop :: Exp -> [Res]
-evalTop e = evalS (addDef e) []
+evalTop e = evalS (addDef e) emptyEnv emptyBinds
 
+-- Ensure all delays are gone.
 ev :: Exp -> [Value]
 ev e = map get (evalTop e)
   where
     get (_, Done v)  = v
-    get (_, Delay _ f) = case f empty of
+    get (_, Delay _ f) = case f emptyBinds of
                            Done v -> v
-                           Delay {} -> error "Top level delay"
+                           Delay {} -> whatError "Top level delay"
+
+---------------------
+--      Different kinds of errors
+---------------------
+
+-- Error in the implementation of the semantics.
+internalError :: String -> a
+internalError s = error $ "internalError: " ++ s
+
+-- Some scope problem
+scopeError :: String -> a
+scopeError s = error $ "scopeError: " ++ s
+
+-- Semantic error (should be caught by the verifier)
+wrong :: String -> a
+wrong s = error $ "wrong: " ++ s
+
+-- Use of Error
+expectedError :: String -> a
+expectedError s = error $ "expectedError: " ++ s
+
+-- I'm not sure
+whatError :: String -> a
+whatError s = error $ "whatError: " ++ s
+
 
 ---------------------
 --      Tests
@@ -335,6 +430,9 @@ test4 = bad "test4" $
 
 test5 = ok "test5" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
   ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
+
+ttt = 
+  ("x" := 1 ) + ("y" := 3 ||| 4) # "y" -- # ("x" # "y")
 
 test6 = ok "test6" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
   ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
