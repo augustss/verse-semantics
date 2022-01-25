@@ -217,7 +217,7 @@ eval (Alt e1 e2) rho bnd =
   evalS e1 rho bnd ++ evalS e2 rho bnd
 
 eval (Set x e) rho bnd =
-  [ (setBind (lookupEnv x rho) fv1 bnd, fv1) | (ext1, fv1) <- eval e rho bnd ]
+  [ (aBind (lookupEnv x rho) fv1, fv1) | (ext1, fv1) <- eval e rho bnd ]
 
 eval (Equal e1 e2) rho bnd =
   [ (ext1 `appBinds` ext2, fv1)
@@ -303,13 +303,8 @@ lookupEnv n rho =
 -- Bindings
 -- Set a binding.
 -- This implementation is overly cautious. :)
-setBind :: Id -> Lenient -> Binds -> Binds
-setBind i v (Binds bnd) =
-  trace ("\nsetBind " ++ show (i, v) ++ "\n") $
-  case lookup i bnd of
-    Nothing -> internalError $ "setBind: Id not found " ++ show i
-    Just (Just v) -> internalError $ "setBind: Id already set " ++ show (i, v)
-    Just Nothing -> Binds $ (i, Just v) : [ (k, mv) | (k, mv) <- bnd, k /= i ]
+aBind :: Id -> Lenient -> Binds
+aBind i v = Binds [(i, Just v)]
 
 -- Extend with n unbound Ids.
 -- The new Ids will be numbered higher than any existing Ids.
