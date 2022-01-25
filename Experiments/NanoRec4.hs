@@ -192,7 +192,9 @@ eval Error _ = error "eval: Error"
 
 evalVar :: Ident -> Env -> Lenient
 evalVar i rho = case lookupEnv i rho of
-                  Just v  -> v
+--                  Just v  -> v
+-- This is a possible fix for test19
+                  Just v -> withExtL rho v
                   Nothing -> Delay (dly "Var" [i]) (evalVar i)
 
 tieKnot :: [Res] -> [Res]
@@ -349,39 +351,53 @@ test18 = ok "test18" [3,7,2,2] $
          "z" := 7            `semi`
          "x"
 
-test19 = ok "test19" [(5,5,5)] $
+-- Test that when evaluating z the x is fully determined.
+-- BUG: This test does not pass.
+test19 = ok "test19" [5] $
+  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+
+-- Check that mutual recursion fails
+test20 = bad "test20" $
+  "x" := "y" `semi` "y" := "x"
+
+-- Nested delays
+test21 = ok "test21" [(1,(2,3))] $
+  "x" := (1 # "y") `semi`
+  "y" := (2 # "z") `semi`
+  "z" := 3 `semi`
+  "x"
+
+test22 = ok "test19" [(5,5,5)] $
   For (1|||2|||3) 5
 
-test20 = ok "test20" [(1,2,3)] $
+test23 = ok "test20" [(1,2,3)] $
   For ("x" := 1|||2|||3) "x"
 
-test21 = ok "test21" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
+test24 = ok "test21" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
   For ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
 
-test22 = ok "test22" [((1,4),(2,4),(3,4)),
+test25 = ok "test22" [((1,4),(2,4),(3,4)),
                       ((1,5),(2,5),(3,5))] $
   "y" := 4|||5 `semi` For ("x" := 1|||2|||3) ("x" # "y")
 
-test23 = ok "test23" [(((1,4),(2,4),(3,4)),
+test26 = ok "test23" [(((1,4),(2,4),(3,4)),
                        ((1,5),(2,5),(3,5)))] $
   For ("y" := 4|||5) $ For ("x" := 1|||2|||3) ("x" # "y")
 
-test24 = ok "test24" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
+test27 = ok "test24" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
   For ("x" := 1|||2|||3) ("x" ||| 99)
 
-test25 = ok "test25" [(1,2,3)] $
+test28 = ok "test25" [(1,2,3)] $
   For ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
 
-test26 = ok "test26" [(2,3,4)] $
+test29 = ok "test26" [(2,3,4)] $
   For ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
-
-test27 = ok "test27" [(1,(2,3))] $
-  "x" := (1 # "y") `semi` "y" := (2 # "z") `semi` "z" := 3 `semi` "x"
 
 
 testAll = mapM_ testEx
   [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
    test11,test12,test13,test14,test15,test16,test17,test18,
-   test19,test20,test21,test22,test23,test24,test25,test26,test27
+   test19,test20,test21,test22,test23,test24,test25,test26,
+   test27,test28,test29
   ]
 
