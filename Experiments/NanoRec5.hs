@@ -30,6 +30,7 @@ type Name = String
       |  :false
       |  for(s1){e2}
       |  do{s}
+      |  :e
    s ::= def {x1,...} in e
 -}
 
@@ -44,6 +45,7 @@ data Exp = Var Name
          | Fail
          | For SExp SExp
          | Do SExp
+         | Range Exp
          | Error  -- to test strictness
   deriving (Show)
 
@@ -116,6 +118,7 @@ findSet (Plus e1 e2) = findSet e1 ++ findSet e2
 findSet Fail = []
 findSet (For _ _) = []
 findSet (Do _) = []
+findSet (Range e) = findSet e
 findSet Error = []
 
 ---------------------
@@ -243,6 +246,12 @@ eval (For (Def xs1 e1) e2) arho abnd = map mkArr $ sequence
 
 eval (Do e) rho bnd = evalS e rho bnd
 
+eval (Range e) rho bnd =
+  [ (ext, fv)
+  | (ext, av) <- eval e rho bnd
+  , fv <- unArray (withBindsL ext av)
+  ]
+
 eval Error _ _ = expectedError "eval: Error"
 
 evalS :: HasCallStack => SExp -> Env -> Binds -> [Res]
@@ -353,6 +362,10 @@ vsel :: Int -> Value -> Lenient
 vsel i (VArray as) | i >= 0 && i < length as = as !! i
                    | otherwise = wrong $ "vsel: out of bounds " ++ show (as, i)
 vsel _ v           = wrong $ "vsel: not an array " ++ show v
+
+unArray :: Lenient -> [Lenient]
+unArray (Done (VArray vs)) = vs
+unArray v = wrong $ "unArray: " ++ show v
 
 -- Lifting
 liftLL1 :: String -> (Value -> Lenient) -> Lenient -> Lenient
@@ -537,10 +550,16 @@ test30 = bad "test30" $
 test31 = ok "test31" [(1,2)] $
   "x" := 2 `semi` (doo ("x" `wher` "x" := 1) # "x")
 
+test32 = ok "test32" [(1,2,3)] $
+  for ("x" := Range (Array [1,2,3])) "x"
+
+test33 = ok "test33" [(102,103,104)] $
+  "xs" := for ("x" := 1|||2|||3) ("x" + 1) `semi`
+  for ("y" := Range "xs") ("y" + 100)
 
 testAll = mapM_ testEx
   [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
    test11,test12,test13,test14,test15,test16,test17,test18,
    test19,test20,test21,test22,test23,test24,test25,test26,
-   test27,test28,test29,test30,test31
+   test27,test28,test29,test30,test31,test32,test33
   ]
