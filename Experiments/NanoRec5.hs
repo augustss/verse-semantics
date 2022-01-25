@@ -40,7 +40,7 @@ data Exp = Var Name
          | Equal Exp Exp
          | Set Name Exp
          | Array [Exp]
-         | Sel Exp Int
+         | Sel Exp Int   -- The Int needs to be generalized to Exp
          | Plus Exp Exp
          | Fail
          | For SExp SExp
@@ -173,7 +173,7 @@ cmp (VInt i1) (VInt i2) = if i1 == i2 then Equ else NotEqu
 cmp (VInt _) (VArray _) = NotEqu
 cmp (VArray _) (VInt _) = NotEqu
 cmp (VArray xs) (VArray ys) | length xs /= length ys = NotEqu
-                           | otherwise = foldl' iand Equ $ zipWith cmpL xs ys
+                            | otherwise = foldl' iand Equ $ zipWith cmpL xs ys
   where iand Equ Equ = Equ
         iand NotEqu _ = NotEqu
         iand _ NotEqu = NotEqu
@@ -186,11 +186,6 @@ cmpL _ _ = Dunno
 ---------------------
 --      Semantics
 ---------------------
-
--- NOTE: This assumes all variable names are unique.
--- If the are not unique the bound variable from a Def might be found
--- in the outer environment.
--- A fix for this would be to delete x from rho in the Def case.
 
 eval :: HasCallStack => Exp -> Env -> Binds -> [Res]
 -- In a call (eval e rho), the domain of the Env in the returned Res
