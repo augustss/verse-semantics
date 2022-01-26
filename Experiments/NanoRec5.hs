@@ -240,11 +240,11 @@ eval (For (Def xs1 e1) e2) arho abnd = map mkArr $ sequence
   | (ext1, _) <- eval e1 rho bnd
   -- ext1 has delay for its own variables
   -- Note the recursive use of ext1', without it we would need several passes.
-  , let ext1' = tieKnotExt ext1
+  , let ext1' = tieKnotExt ids ext1
   ]
   where mkArr :: [Res] -> Res
         mkArr rs = (emptyBinds, Done $ VArray $ map snd rs)
-        (rho, bnd) = extend xs1 arho abnd
+        (rho, bnd, ids) = extend xs1 arho abnd
 
 eval (Do e) rho bnd = evalS e rho bnd
 
@@ -257,8 +257,10 @@ eval (Range e) rho bnd =
 eval Error _ _ = expectedError "eval: Error"
 
 evalS :: HasCallStack => SExp -> Env -> Binds -> [Res]
-evalS (Def ns e) rho bnd = tieKnot $ eval e rho' bnd'
-  where (rho', bnd') = extend ns rho bnd
+evalS (Def ns e) rho bnd =
+  --trace ("evalS " ++ show (ns, e, rho', bnd')) $
+  tieKnot ids $ eval e rho' bnd'
+  where (rho', bnd', ids) = extend ns rho bnd
 
 evalVar :: HasCallStack => Name -> Env -> Binds -> Lenient
 evalVar n rho bnd = evalId n (lookupEnv n rho) bnd
@@ -271,14 +273,13 @@ evalId n i bnd =
     Just (Just v) -> withBindsL bnd v   -- fixes test19
     _ -> Delay (dly "Var" [n ++ "#" ++ show i]) (evalId n i)
 
-tieKnot :: HasCallStack => [Res] -> [Res]
---tieKnot _ = undefined
---tieKnot vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
-tieKnot vs | err:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show err
+tieKnot :: HasCallStack => [Id] -> [Res] -> [Res]
+--tieKnot _ vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
+tieKnot _ vs | err:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show err
   where badRes (Binds ext, _) = nub (map fst ext) /= map fst ext
-tieKnot vs = [ (emptyBinds, withBindsL (tieKnotExt ext) v)
-             | (ext, v) <- vs
-             ]
+tieKnot ids vs = [ (emptyBinds, withBindsL (tieKnotExt ids ext) v)
+                 | (ext, v) <- vs
+                 ]
 
 withBindsL :: Binds -> Lenient -> Lenient
 withBindsL aext (Delay _ f) = f aext
@@ -288,15 +289,22 @@ withBindsL aext (Done av)   = Done (withBindsV aext av)
      withBindsV _   v@(VInt _)  = v
      withBindsV ext (VArray ls) = VArray (map (withBindsL ext) ls)
 
-tieKnotExt :: Binds -> Binds
-tieKnotExt ext =
---  trace ("\ntieKnotExt: " ++ show ext ++ "\n") $
+-- The first argument is the full set of Ids (as returned by extend)
+-- for the current scope.  The second argument is the bindings we have accumulated
+-- during evaluation.  If some defined variables are not assigned then those variables
+-- in ids will be missing in ext.  Since we need to eliminate all ids from the
+-- current scope, we need to add bindings for those.
+tieKnotExt :: HasCallStack => [Id] -> Binds -> Binds
+tieKnotExt ids (Binds new) =
+  --trace ("\ntieKnotExt: " ++ show (ids, new) ++ "\n") $
   rec_ext
   -- Here is where we tie the knot.  Consider an example like
   --   x:=y; y:=z; z:=3; z
   -- we get an 'ext' that binds x and y to Delays, and we
   -- must resolve both at once when we tie the knot
   where rec_ext = mapBinds (withBindsL rec_ext) ext
+        missing = ids \\ map fst new
+        ext = Binds $ [(x, runtimeError $ "Unset Id " ++ show x) | x <- missing] ++ new
  
 ---------------------
 --      Auxiliary semantic operations
@@ -335,10 +343,10 @@ lookupBinds i (Binds bnd) = lookup i bnd
 --    Just r -> r
 
 -- Extend the environment and bindings with the given identifiers.
-extend :: [Name] -> Env -> Binds -> (Env, Binds)
+extend :: [Name] -> Env -> Binds -> (Env, Binds, [Id])
 extend xs env bnd =
---  trace ("\nextend " ++ show (zip xs is) ++ "\n") $
-  (env', bnd')
+  --trace ("\nextend " ++ show (zip xs is) ++ "\n") $
+  (env', bnd', is)
   where (is, bnd') = extendBinds (length xs) bnd
         env' = extendEnv (zip xs is) env
 
@@ -412,6 +420,10 @@ scopeError s = error $ "scopeError: " ++ s
 -- Semantic error (should be caught by the verifier)
 wrong :: HasCallStack => String -> a
 wrong s = error $ "wrong: " ++ s
+
+-- Semantic error, not caught by the verifier
+runtimeError :: HasCallStack => String -> a
+runtimeError s = error $ "runtimeError: " ++ s
 
 -- Use of Error
 expectedError :: HasCallStack => String -> a
