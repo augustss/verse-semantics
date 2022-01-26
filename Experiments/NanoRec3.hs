@@ -159,7 +159,7 @@ eval (Alt e1 e2) rho =
   tieKnot (eval e1 rho) ++ tieKnot (eval e2 rho)
 
 eval (Set x e) rho =
-  [ ([(x, fv1)], fv1) | (ext1, fv1) <- eval e rho ]
+  [ (extendEnv x fv1 ext1, fv1) | (ext1, fv1) <- eval e rho ]
 
 eval (Equal e1 e2) rho =
   [ (ext1 ++ ext2, fv1)
