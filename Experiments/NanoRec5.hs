@@ -1,10 +1,14 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+module NanoRec5(testAll) where
 import Data.List
-import Data.Maybe
+--import Data.Maybe
 import Data.String
-import Debug.Trace
+--import Debug.Trace
 import GHC.Stack
 import Ex
 
@@ -80,8 +84,11 @@ infixl 5 ===
 pattern (:=) :: Name -> Exp -> Exp
 pattern (:=) x e = Set x e
 
+pattern Fst :: Exp -> Exp
 pattern Fst e = Sel e 0
+pattern Snd :: Exp -> Exp
 pattern Snd e = Sel e 1
+pattern Pair :: Exp -> Exp -> Exp
 pattern Pair e1 e2 = Array [e1, e2]
 
 -- Sequencing, evaluate both and return second
@@ -156,7 +163,7 @@ type Res = (Binds, Lenient)
 
 instance Show Lenient where
   show (Done v)  = "(Done " ++ show v ++ ")"
-  show (Delay s f) = "Delay-" ++ s ++ "!"
+  show (Delay s _) = "Delay-" ++ s ++ "!"
 
 equalLenient :: HasCallStack => Lenient -> Lenient -> Bool
 equalLenient v1 v2 =
@@ -202,12 +209,12 @@ eval (Plus e1 e2) rho bnd =
   | (ext1, fv1) <- eval e1 rho bnd
   , (ext2, fv2) <- eval e2 rho (ext1 `updBinds` bnd) ]
 
-eval (Array es) rho abnd =
+eval (Array as) rho abnd =
 --  trace ("\neval 1 Array " ++ show (es, rho, abnd) ++ "\n") $
 --  trace ("\neval 2 Array " ++ show (evalArray es abnd) ++ "\n") $
-  [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray es abnd ]
+  [ (ext, Done $ VArray fvs) | (ext, fvs) <- evalArray as abnd ]
   where evalArray :: [Exp] -> Binds -> [(Binds, [Lenient])]
-        evalArray [] bnd = [(emptyBinds, [])]
+        evalArray [] _ = [(emptyBinds, [])]
         evalArray (e:es) bnd =
           [ (ext' `appBinds` ext'', fv : fvs)
           | (ext', fv) <- eval e rho bnd
@@ -229,10 +236,10 @@ eval (Equal e1 e2) rho bnd =
   ]
 
 eval (For (Def xs1 e1) e2) arho abnd = map mkArr $ sequence
-  [ tieKnot (evalS e2 rho (updBinds ext1' bnd))
+  [ evalS e2 rho (updBinds ext1' bnd)
   | (ext1, _) <- eval e1 rho bnd
   -- ext1 has delay for its own variables
-  -- Note the recursice use of ext1', without it we would need several passes.
+  -- Note the recursive use of ext1', without it we would need several passes.
   , let ext1' = tieKnotExt ext1
   ]
   where mkArr :: [Res] -> Res
@@ -267,18 +274,18 @@ evalId n i bnd =
 tieKnot :: HasCallStack => [Res] -> [Res]
 --tieKnot _ = undefined
 --tieKnot vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
-tieKnot vs | bad:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show bad
+tieKnot vs | err:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show err
   where badRes (Binds ext, _) = nub (map fst ext) /= map fst ext
 tieKnot vs = [ (emptyBinds, withBindsL (tieKnotExt ext) v)
              | (ext, v) <- vs
              ]
 
 withBindsL :: Binds -> Lenient -> Lenient
-withBindsL ext (Delay s f) = f ext
-withBindsL ext (Done v)    = Done (withBindsV ext v)
+withBindsL aext (Delay _ f) = f aext
+withBindsL aext (Done av)   = Done (withBindsV aext av)
   where
      withBindsV :: Binds -> Value -> Value
-     withBindsV _ v@(VInt _)      = v
+     withBindsV _   v@(VInt _)  = v
      withBindsV ext (VArray ls) = VArray (map (withBindsL ext) ls)
 
 tieKnotExt :: Binds -> Binds
@@ -369,8 +376,8 @@ liftLL1 _ g (Done v)  = g v
 
 liftL2 :: String -> (Value -> Value -> Value) -> Lenient -> Lenient -> Lenient
 liftL2 s g (Delay s' f1) (Delay s'' f2) = Delay s (\ ext -> liftL2 (dly s [s',s'']) g (f1 ext) (f2 ext))
-liftL2 s g (Delay s' f1) (Done v2)  = Delay s (\ ext -> liftL2 (dly s [s,"_"]) g (f1 ext) (Done v2))
-liftL2 s g (Done v1) (Delay s' f2)  = Delay s (\ ext -> liftL2 (dly s ["_",s]) g (Done v1) (f2 ext))
+liftL2 s g (Delay s' f1) (Done v2)  = Delay s (\ ext -> liftL2 (dly s [s',"_"]) g (f1 ext) (Done v2))
+liftL2 s g (Done v1) (Delay s' f2)  = Delay s (\ ext -> liftL2 (dly s ["_",s']) g (Done v1) (f2 ext))
 liftL2 _ g (Done v1) (Done v2)   = Done (v1 `g` v2)
 
 -- Combine Delay messages
@@ -395,8 +402,8 @@ ev e = map get (evalTop e)
 ---------------------
 
 -- Error in the implementation of the semantics.
-internalError :: HasCallStack => String -> a
-internalError s = error $ "internalError: " ++ s
+--internalError :: HasCallStack => String -> a
+--internalError s = error $ "internalError: " ++ s
 
 -- Some scope problem
 scopeError :: HasCallStack => String -> a
