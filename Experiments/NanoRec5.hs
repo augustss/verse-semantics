@@ -571,7 +571,7 @@ test33 = ok "test33" [(102,103,104)] $
   "xs" := for ("x" := 1|||2|||3) ("x" + 1) `semi`
   for ("y" := Range "xs") ("y" + 100)
 
--- The variable x gets Id 1, and so does y.
+-- The variable x gets Id 2, and so does y.
 -- If eval does not resolve all the variables in the Def
 -- then the x will wrongly be resolved as 2.
 test34 = bad "test34" $
