@@ -590,11 +590,17 @@ test37 = ok "test37" [((2,3),(2,3))] $
   "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] `semi`
   for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
 
+test38 = ok "test38" [62,134] $
+  "v" := "t" + 1 `semi`
+  "x" := doo ( "z" := "v" + "t" `semi` "t" := 6 `semi` "z" ) `semi`
+  "t" := 55 ||| 127 `semi`
+  "x"
+
 testAll :: IO ()
 testAll = mapM_ testEx
   [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
    test11,test12,test13,test14,test15,test16,test17,test18,
    test19,test20,test21,test22,test23,test24,test25,test26,
    test27,test28,test29,test30,test31,test32,test33,test34,
-   test35,test36,test37
+   test35,test36,test37,test38
   ]
