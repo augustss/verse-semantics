@@ -20,9 +20,9 @@ limit :: Int
 limit = 100000  -- us that the test is allowed to take before timeout
 
 data Ex a = Ex
-  { name :: String,    -- test name
-    ref :: Maybe a,    -- exoected result, or Nothing if it's expected to fail
-    test :: a          -- lazy value to compute
+  { name     :: String,    -- test name
+    expected :: Maybe a,   -- expected result, or Nothing if it's expected to fail
+    test     :: a          -- lazy value to compute
   }
   deriving (Show)
 
@@ -30,5 +30,5 @@ testEx :: (Eq a, NFData a, Show a) => Ex a -> IO ()
 testEx ex = do
   let exio = evaluate $ force $ test ex
   res <- catch (timeout limit exio) (\ (_ :: SomeException) -> return Nothing)
-  putStrLn $ name ex ++ " " ++ if res == ref ex then "OK" else "failed: " ++ show res
+  putStrLn $ name ex ++ " " ++ if res == expected ex then "OK" else "failed: " ++ show res
 

@@ -178,9 +178,13 @@ eval (Equal e1 e2) rho =
   , fv1 `equalLenient` fv2
   ]
 
+-- for(e1){e2}  Variables bound in e1 scope over e2
+--              Variables bound in e2 scope only over e2
+--              No variables escape the whole construct
 eval (For e1 e2) rho = map mkArr $ sequence
   [ tieKnot (eval e2 (unionEnv ext1' rho))
   | (ext1, _) <- eval e1 rho
+    -- We ignore the values from e1
   -- ext1 has delay for its own variables
   -- Note the recursice use of ext1', without it we would need several passes.
   , let ext1' = tieKnotExt ext1

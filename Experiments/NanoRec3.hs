@@ -246,7 +246,9 @@ dly :: String -> [String] -> String
 dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
 
 evalTop :: Exp -> [Res]
-evalTop e = tieKnot (eval e [])
+evalTop e = trace ("evalTop " ++ show res) $
+            tieKnot res
+    where res = eval e []
 
 ev :: Exp -> [Value]
 ev e = map get (evalTop e)
@@ -261,7 +263,9 @@ ev e = map get (evalTop e)
 ---------------------
 
 ok :: (Show a) => String -> a -> Exp -> Ex String
-ok n r e = Ex n (Just $ show r) (show $ ev e)
+ok n r e = Ex { name      = n
+              , expected  = Just $ show r
+              , test      = show $ ev e }
 
 bad :: String -> Exp -> Ex String
 bad n e = Ex n Nothing (show $ ev e)
