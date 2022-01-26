@@ -219,7 +219,7 @@ eval (Alt e1 e2) rho bnd =
   evalS e1 rho bnd ++ evalS e2 rho bnd
 
 eval (Set x e) rho bnd =
-  [ (aBind (lookupEnv x rho) fv1, fv1) | (ext1, fv1) <- eval e rho bnd ]
+  [ (aBind (lookupEnv x rho) fv1 `appBinds` ext1, fv1) | (ext1, fv1) <- eval e rho bnd ]
 
 eval (Equal e1 e2) rho bnd =
   [ (ext1 `appBinds` ext2, fv1)
