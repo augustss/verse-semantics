@@ -273,7 +273,7 @@ evalTop e =
     res = eval e []
 
 ev :: Exp -> [Value]
-ev e = mapMaybe (get . withExtL empty . snd) (evalTop e)
+ev e = mapMaybe (get . snd) (evalTop e)
   where
     get :: Lenient -> Maybe Value
     get None = Nothing
