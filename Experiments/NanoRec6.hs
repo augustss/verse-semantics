@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
-module NanoRec5(testAll) where
+module NanoRec6(testAll) where
 import Data.List
 --import Data.Maybe
 import Data.String
@@ -110,7 +110,7 @@ for e1 e2 = For (addDef e1) (addDef e2)
 doo :: Exp -> Exp
 doo e = Do (addDef e)
 
--- Add all
+-- Add all variables defined in the current scope.
 addDef :: HasCallStack => Exp -> SExp
 addDef e | xs /= nub xs = scopeError $ "Duplicate := " ++ show (e, xs)
          | otherwise = Def xs e
@@ -236,7 +236,7 @@ eval (Equal e1 e2) rho =
   ]
 
 eval (For (Def xs1 e1) e2) arho =
-  checkDup xs1 arho $
+  checkShadow xs1 arho $
   map mkArr $ sequence
   [ evalS e2 (updExt ext1' rho)
   | (ext1, _) <- eval e1 rho
@@ -260,11 +260,12 @@ eval Error _ = expectedError "eval: Error"
 
 evalS :: HasCallStack => SExp -> Env -> [Res]
 -- Evaluate a new scope:
---   * bring the variables into scope, with fresh Ids
+--   * check for shadowing
+--   * bring the variables into scope
 --   * tie the knot
 evalS (Def ns e) rho =
   --trace ("evalS " ++ show (ns, e, rho', bnd')) $
-  checkDup ns rho $
+  checkShadow ns rho $
   tieKnot ns $ eval e rho'
   where
     rho' = extend ns rho
@@ -272,14 +273,14 @@ evalS (Def ns e) rho =
 evalVar :: HasCallStack => Name -> Env -> Lenient
 evalVar n rho = lookupEnv n rho
 
-checkDup :: HasCallStack => [Name] -> Env -> a -> a
-checkDup ns (Env nvs) a | ds@(_:_) <- intersect ns (map fst nvs) = wrong $ "Duplicate defs " ++ show (ds, ns, nvs)
-                        | otherwise = a
+checkShadow :: HasCallStack => [Name] -> Env -> a -> a
+checkShadow ns (Env nvs) a | ds@(_:_) <- intersect ns (map fst nvs) = wrong $ "Duplicate defs " ++ show (ds, ns, nvs)
+                           | otherwise = a
 
 tieKnot :: HasCallStack => [Name] -> [Res] -> [Res]
 --tieKnot _ vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
 tieKnot _ vs
-  | err:_ <- filter badRes vs = error $ "tieKnot: badRes " ++ show err
+  | err:_ <- filter badRes vs = error $ "tieKnot: badRes, multiple Set " ++ show err
   where
     badRes (Ext ext, _) = nub (map fst ext) /= map fst ext
 
@@ -295,10 +296,10 @@ withExtL aext (Done av)   = Done (withExtV aext av)
      withExtV _   v@(VInt _)  = v
      withExtV ext (VArray ls) = VArray (map (withExtL ext) ls)
 
--- The first argument is the full set of Ids (as returned by extend)
--- for the current scope.  The second argument is the bindings we have accumulated
+-- The first argument is the set of names for the current scope.
+-- The second argument is the bindings we have accumulated
 -- during evaluation.  If some defined variables are not assigned then those variables
--- in ids will be missing in ext.  Since we need to eliminate all ids from the
+-- in names will be missing in ext.  Since we need to eliminate all names from the
 -- current scope, we need to add bindings for those.
 tieKnotExt :: HasCallStack => [Name] -> Ext -> Ext
 tieKnotExt ids (Ext new) =
@@ -310,7 +311,7 @@ tieKnotExt ids (Ext new) =
   -- must resolve both at once when we tie the knot
   where
     rec_ext = mapExt (withExtL rec_ext) ext
-    missing = ids \\ map fst new
+    missing = ids \\ map fst new  -- brought into scope, but not assigned.
     ext = Ext $ [(x, runtimeError $ "Unset Id " ++ show x) | x <- missing] ++ new
 
 ---------------------
