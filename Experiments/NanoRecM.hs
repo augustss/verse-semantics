@@ -1,0 +1,446 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
+
+import Data.List
+import Data.Maybe
+import Data.String
+import Debug.Trace
+import Ex
+
+--
+-- This is NanoRec3 modified to have a None constructor in Lenient.
+-- None means that the evaluation failed.
+--
+
+---------------------
+--      Expressions
+---------------------
+
+type Ident = String
+
+{- BNF syntax for the language
+   e ::= x
+      |  k
+      |  (e1 | e2)
+      |  (e = k)
+      |  x := e
+      |  (e1,e2)
+      |  fst(e)
+      |  snd(e)
+      |  e1 + e2
+      |  :false
+-}
+
+data Exp
+  = Var Ident
+  | Con Integer
+  | Alt Exp Exp
+  | Equal Exp Exp
+  | Set Ident Exp
+  | Pair Exp Exp
+  | Fst Exp
+  | Snd Exp
+  | Plus Exp Exp
+  | Fail
+  | Error -- to test strictness
+  deriving (Show)
+
+infix 2 :=
+
+---------------------
+--      Sugar
+---------------------
+
+instance Num Exp where
+  (+) = Plus
+  fromInteger = Con
+
+instance IsString Exp where
+  fromString = Var
+
+infixl 4 |||
+
+(|||) :: Exp -> Exp -> Exp
+(|||) = Alt
+
+infixl 3 #
+
+(#) :: Exp -> Exp -> Exp
+(#) = Pair
+
+infixl 5 ===
+
+(===) :: Exp -> Exp -> Exp
+(===) = Equal
+
+pattern (:=) :: Ident -> Exp -> Exp
+pattern (:=) x e = Set x e
+
+-- Sequencing, evaluate both and return second
+infixl 1 `semi`
+
+semi :: Exp -> Exp -> Exp
+semi x y = Snd (Pair x y)
+
+---------------------
+--      Types for semantics
+---------------------
+
+data Value = VInt Integer | VPair Lenient Lenient
+
+instance Show Value where
+  show (VInt i) = show i
+  show (VPair v1 v2) = "(" ++ show' v1 ++ "," ++ show' v2 ++ ")"
+    where
+      show' (Done v) = show v
+      show' l = show l
+
+type Env = [(Ident, Lenient)]
+
+type Ext = Env -- Environment extension
+
+empty :: Ext
+empty = []
+
+data Lenient
+  = Delay String (Env -> Lenient) -- The string is just for debugging
+  | Done Value -- (Done v) is equivalent to (Delay (\_. v))
+  | None
+
+type Res = (Env, Lenient)
+
+instance Show Lenient where
+  show (Done v) = "(Done " ++ show v ++ ")"
+  show (Delay s _) = "Delay-" ++ s ++ "!"
+  show None = "None"
+
+equalLenient :: Lenient -> Lenient -> Lenient
+equalLenient v1 v2 =
+  case cmpL v1 v2 of
+    Equ -> v1
+    NotEqu -> None
+    Dunno -> Delay "equalLenient" $ \ext -> equalLenient (withExtL ext v1) (withExtL ext v2)
+
+data IsEqual = Equ | NotEqu | Dunno
+  deriving (Show)
+
+cmp :: Value -> Value -> IsEqual
+cmp (VInt i1) (VInt i2) = if i1 == i2 then Equ else NotEqu
+cmp (VInt _) (VPair _ _) = NotEqu
+cmp (VPair _ _) (VInt _) = NotEqu
+cmp (VPair x1 x2) (VPair y1 y2) =
+  case (cmpL x1 y1, cmpL x2 y2) of
+    (Equ, Equ) -> Equ
+    (NotEqu, _) -> NotEqu
+    (_, NotEqu) -> NotEqu
+    _ -> Dunno
+
+cmpL :: Lenient -> Lenient -> IsEqual
+cmpL None _ = NotEqu -- propagates to equalLenient and produces None
+cmpL _ None = NotEqu -- propagates to equalLenient and produces None
+cmpL (Done v1) (Done v2) = cmp v1 v2
+cmpL _ _ = Dunno
+
+---------------------
+--      Semantics
+---------------------
+
+-- NOTE: This assumes all variable names are unique.
+-- If the are not unique the bound variable from a Def might be found
+-- in the outer environment.
+-- A fix for this would be to delete x from rho in the Def case.
+
+eval :: Exp -> Env -> [Res]
+-- In a call (eval e rho), the domain of the Env in the returned Res
+-- is precisely the variables bound in 'e'.
+
+eval (Var i) rho = [(empty, evalVar i rho)]
+eval (Con k) _ = [(empty, Done (VInt k))]
+eval Fail _ = []
+eval (Fst e1) rho = [(ext1, liftLL1 "Fst" vfst fv1) | (ext1, fv1) <- eval e1 rho]
+eval (Snd e1) rho = [(ext1, liftLL1 "Snd" vsnd fv1) | (ext1, fv1) <- eval e1 rho]
+eval (Plus e1 e2) rho =
+  [ (ext1 ++ ext2, liftL2 "Plus" vplus fv1 fv2)
+    | (ext1, fv1) <- eval e1 rho,
+      (ext2, fv2) <- eval e2 (ext1 ++ rho)
+  ]
+eval (Pair e1 e2) rho =
+  [ (ext1 ++ ext2, Done $ VPair fv1 fv2)
+    | (ext1, fv1) <- eval e1 rho,
+      (ext2, fv2) <- eval e2 (ext1 ++ rho)
+  ]
+eval (Alt e1 e2) rho =
+  tieKnot (eval e1 rho) ++ tieKnot (eval e2 rho)
+eval (Set x e) rho =
+  [(extendEnv x fv1 ext1, fv1) | (ext1, fv1) <- eval e rho]
+eval (Equal e1 e2) rho =
+  [ (ext1 ++ ext2, fv1 `equalLenient` fv2)
+    | (ext1, fv1) <- eval e1 rho,
+      (ext2, fv2) <- eval e2 (ext1 ++ rho)
+  ]
+eval Error _ = error "eval: Error"
+
+evalVar :: Ident -> Env -> Lenient
+evalVar i rho = case lookupEnv i rho of
+  -- Just v -> v
+  -- This is a possible fix for test19
+  Just v -> withExtL rho v
+  Nothing -> Delay (dly "Var" [i]) (evalVar i)
+
+tieKnot :: [Res] -> [Res]
+tieKnot vs =
+  [ (empty, withExtL (tieKnotExt ext) v)
+    | (ext, v) <- vs
+  ]
+
+withExtL :: Env -> Lenient -> Lenient
+withExtL _ None = None
+withExtL ext (Delay _ f) = f ext
+withExtL aext (Done av) = Done (withExtV aext av)
+  where
+    withExtV :: Env -> Value -> Value
+    withExtV _ v@(VInt _) = v
+    withExtV ext (VPair l1 l2) = VPair (withExtL ext l1) (withExtL ext l2)
+
+tieKnotExt :: Ext -> Ext
+tieKnotExt ext = rec_ext
+  where
+    -- Here is where we tie the knot.  Consider an example like
+    --   x:=y; y:=z; z:=3; z
+    -- we get an 'ext' that binds x and y to Delays, and we
+    -- must resolve both at once when we tie the knot
+    rec_ext = mapEnv (withExtL rec_ext) ext
+
+---------------------
+--      Auxiliary semantic operations
+---------------------
+
+extendEnv :: Ident -> Lenient -> Env -> Env
+extendEnv x v rho = (x, v) : rho
+
+mapEnv :: (Lenient -> Lenient) -> Env -> Env
+mapEnv f env = [(i, f v) | (i, v) <- env]
+
+unionEnv :: Env -> Env -> Env
+-- If both envs bind the same variable 'ext2' wins
+unionEnv ext1 ext2 = ext1 ++ ext2
+
+lookupEnv :: Ident -> Env -> Maybe Lenient
+lookupEnv = lookup
+
+vplus :: Value -> Value -> Value
+vplus (VInt i1) (VInt i2) = VInt (i1 + i2)
+vplus v1 v2 = error $ "vplus " ++ show (v1, v2)
+
+vfst :: Value -> Lenient
+vfst (VPair a _) = a
+vfst _ = None
+
+vsnd :: Value -> Lenient
+vsnd (VPair _ v) = v
+vsnd _ = None
+
+liftLL1 :: String -> (Value -> Lenient) -> Lenient -> Lenient
+liftLL1 s g (Delay s' f) = Delay (dly s [s']) (\ext -> liftLL1 s g (f ext))
+liftLL1 _ g (Done v) = g v
+liftLL1 _ _ None = None
+
+-- liftL1 :: (Value -> Value) -> Lenient -> Lenient
+-- liftL1 g (Delay f) = Delay (\ext -> liftL1 g (f ext))
+-- liftL1 g (Done v)  = Done (g v)
+
+liftL2 :: String -> (Value -> Value -> Value) -> Lenient -> Lenient -> Lenient
+liftL2 _ _ None _ = None
+liftL2 _ _ _ None = None
+liftL2 s g (Delay s' f1) (Delay s'' f2) = Delay s (\ext -> liftL2 (dly s [s', s'']) g (f1 ext) (f2 ext))
+liftL2 s g (Delay s' f1) (Done v2) = Delay s (\ext -> liftL2 (dly s [s', "_"]) g (f1 ext) (Done v2))
+liftL2 s g (Done v1) (Delay s' f2) = Delay s (\ext -> liftL2 (dly s ["_", s']) g (Done v1) (f2 ext))
+liftL2 _ g (Done v1) (Done v2) = Done (v1 `g` v2)
+
+-- Combine Delay messages
+dly :: String -> [String] -> String
+dly s ss = s ++ "(" ++ intercalate "," ss ++ ")"
+
+evalTop :: Exp -> [Res]
+evalTop e =
+  -- trace ("evalTop " ++ show res) $
+  tieKnot res
+  where
+    res = eval e []
+
+ev :: Exp -> [Value]
+ev e = catMaybes $ map (get . withExtL empty . snd) (evalTop e)
+  where
+    get :: Lenient -> Maybe Value
+    get None = Nothing
+    get (Done v@(VInt _)) = Just v
+    get (Done (VPair v1 v2)) = VPair <$> (Done <$> get v1) <*> (Done <$> get v2)
+    get (Delay _ _) = error "ev"
+
+---------------------
+--      Tests
+---------------------
+
+ok :: (Show a) => String -> a -> Exp -> Ex String
+ok n r e =
+  Ex
+    { name = n,
+      expected = Just $ show r,
+      test = show $ ev e
+    }
+
+bad :: String -> Exp -> Ex String
+bad n e = Ex n Nothing (show $ ev e)
+
+test1 =
+  ok "test1" [1, 2] $
+    1 ||| 2
+
+test2 =
+  ok "test2" [2, 3, 3, 4] $
+    (1 ||| 2) + (1 ||| 2)
+
+test3 =
+  ok "test3" [2, 4] $
+    ("x" := 1 ||| 2) + "x"
+
+-- Should fail, since variables in ||| do not escape
+-- Fails
+test4 =
+  bad "test4" $
+    (("x" := 1) ||| 2) + "x"
+
+test5 =
+  ok "test5" [(4, (1, 3)), (5, (1, 4)), (5, (2, 3)), (6, (2, 4))] $
+    ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
+
+test6 =
+  ok "test6" [(2, (1, 1)), (5, (1, 4)), (4, (2, 2)), (6, (2, 4))] $
+    ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
+
+test7 =
+  ok "test7" [4] $
+    ("x" := 1 ||| 2) + ("x" === 2)
+
+test8 =
+  ok "test8" [(1, 1), (2, 2)] $
+    Pair "x" ("x" := 1 ||| 2)
+
+test9 =
+  ok "test9" [(7, (1, 1)), (7, (2, 2)), (1, (1, 1)), (2, (2, 2))] $
+    Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
+
+-- x's value should not be delayed, because x's RHS has no depenedncies
+test10 =
+  ok "test10" [((1, 7), 1)] $
+    Pair
+      ( "x"
+          := ( Pair 1 7
+                 ||| Pair "y" ("y" := 2)
+             )
+      )
+      (Fst "x" === 1)
+
+-- x's value depends on recursively bound z, so we get stuck.
+-- Produces []
+-- LA: Is this the intended test?
+test11 =
+  ok "test11" ([] :: [()]) $
+    Pair
+      ( "x"
+          := ( Pair 1 "z"
+                 ||| Pair "y" ("y" := 2)
+             )
+      )
+      (Pair ("x" === 1) ("z" := 3))
+
+test12 =
+  ok "test12" [(1, 1)] $
+    "t" := Pair 1 (Fst "t")
+
+test13 =
+  ok "test13" [(1, 1)] $
+    "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
+
+-- Fails (equalLenient)
+test14 =
+  ok "test14" [(1, 1)] $
+    "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+
+test14a =
+  ok "test14a" [(1, 1), (1, 3), (2, 3)] $
+    "y" := ("x" === 1) ||| 3 `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+
+-- Generates an error, as it should
+test15 =
+  bad
+    "test15"
+    Error
+
+-- Generates an error, as it should
+test16 =
+  bad "test16" $
+    Error `semi` 1
+
+-- Generates an error, as it should
+test17 =
+  bad "test17" $
+    (2 # Error) `semi` 1
+
+-- Cascaded forward references
+test18 =
+  ok "test18" [3, 7, 2, 2] $
+    "x" := ("y" ||| 2)
+      `semi` "y" := (3 ||| "z")
+      `semi` "z" := 7
+      `semi` "x"
+
+-- Test that when evaluating z the x is fully determined.
+-- BUG: This test does not pass.
+test19 =
+  ok "test19" [5] $
+    "x" := "y" `semi` "y" := 5 `semi` "z" := ("x" === 5)
+
+-- Check that mutual recursion fails
+test20 =
+  bad "test20" $
+    "x" := "y" `semi` "y" := "x"
+
+-- Nested delays
+test21 =
+  ok "test21" [(1, (2, 3))] $
+    "x" := (1 # "y")
+      `semi` "y" := (2 # "z")
+      `semi` "z" := 3
+      `semi` "x"
+
+testAll =
+  mapM_
+    testEx
+    [ test1,
+      test2,
+      test3,
+      test4,
+      test5,
+      test6,
+      test7,
+      test8,
+      test9,
+      test10,
+      test11,
+      test12,
+      test13,
+      test14,
+      test14a,
+      test15,
+      test16,
+      test17,
+      test18,
+      test19,
+      test20,
+      test21
+    ]
