@@ -273,13 +273,13 @@ evalTop e =
     res = eval e []
 
 ev :: Exp -> [Value]
-ev e = catMaybes $ map (get . withExtL empty . snd) (evalTop e)
+ev e = mapMaybe (get . withExtL empty . snd) (evalTop e)
   where
     get :: Lenient -> Maybe Value
     get None = Nothing
     get (Done v@(VInt _)) = Just v
     get (Done (VPair v1 v2)) = VPair <$> (Done <$> get v1) <*> (Done <$> get v2)
-    get (Delay _ _) = error "ev"
+    get (Delay _ _) = error "top level Delay"
 
 ---------------------
 --      Tests
