@@ -347,6 +347,9 @@ lookupEnv n (Env rho) =
   case lookup n rho of
     Nothing -> scopeError $ "Not in scope " ++ show n
     Just i  -> withExtL (Ext rho) i
+    -- Why withExtL?  Consider x=y; y=3; x==7
+    -- When we look up x we'll find a Delay (lookupEnv "y"),
+    -- and we want to look through that Delay
 
 lookupExt :: HasCallStack => Name -> Ext -> Lenient
 lookupExt n (Ext rho) =
