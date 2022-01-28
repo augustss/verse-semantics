@@ -145,10 +145,13 @@ data Lenient
   | Delay String (Ext -> Lenient)  -- The string is just for debugging
 
 
+-- There should be no duplicates in the domain of the Env;
+-- that is, we do not allow shadowing.
 newtype Env = Env [(Name, Lenient)]
   deriving (Show)
 
 -- Same as Env, but used for new bindings
+-- There should be no duplicates in the domain of Ext
 newtype Ext = Ext [(Name, Lenient)]
   deriving (Show)
 
@@ -266,27 +269,20 @@ evalS :: HasCallStack => SExp -> Env -> [Res]
 evalS (Def ns e) rho =
   --trace ("evalS " ++ show (ns, e, rho', bnd')) $
   checkShadow ns rho $
-  tieKnot ns $ eval e rho'
+  tieKnot ns         $
+  eval e rho'
   where
     rho' = extend ns rho
 
 evalVar :: HasCallStack => Name -> Env -> Lenient
 evalVar n rho = lookupEnv n rho
 
-checkShadow :: HasCallStack => [Name] -> Env -> a -> a
-checkShadow ns (Env nvs) a | ds@(_:_) <- intersect ns (map fst nvs) = wrong $ "Duplicate defs " ++ show (ds, ns, nvs)
-                           | otherwise = a
-
 tieKnot :: HasCallStack => [Name] -> [Res] -> [Res]
 --tieKnot _ vs | trace ("\ntieKnot " ++ show vs ++ "\n") False = undefined
-tieKnot _ vs
-  | err:_ <- filter badRes vs = error $ "tieKnot: badRes, multiple Set " ++ show err
-  where
-    badRes (Ext ext, _) = nub (map fst ext) /= map fst ext
-
-tieKnot ids vs = [ (emptyExt, withExtL (tieKnotExt ids ext) v)
-                 | (ext, v) <- vs
-                 ]
+tieKnot ids vs
+  = checkResultInvariants vs $
+    [ (emptyExt, withExtL (tieKnotExt ids ext) v)
+    | (ext, v) <- vs ]
 
 withExtL :: Ext -> Lenient -> Lenient
 withExtL aext (Delay _ f) = f aext
@@ -302,17 +298,41 @@ withExtL aext (Done av)   = Done (withExtV aext av)
 -- in names will be missing in ext.  Since we need to eliminate all names from the
 -- current scope, we need to add bindings for those.
 tieKnotExt :: HasCallStack => [Name] -> Ext -> Ext
-tieKnotExt ids (Ext new) =
+tieKnotExt ids (Ext new) = rec_ext
   --trace ("\ntieKnotExt: " ++ show (ids, new) ++ "\n") $
-  rec_ext
   -- Here is where we tie the knot.  Consider an example like
   --   x:=y; y:=z; z:=3; z
   -- we get an 'ext' that binds x and y to Delays, and we
   -- must resolve both at once when we tie the knot
   where
-    rec_ext = mapExt (withExtL rec_ext) ext
-    missing = ids \\ map fst new  -- brought into scope, but not assigned.
-    ext = Ext $ [(x, runtimeError $ "Unset Id " ++ show x) | x <- missing] ++ new
+    rec_ext = mapExt (withExtL rec_ext) full_new
+
+    full_new      = Ext $ (missing_binds ++ new)
+    missing_binds = [(x, runtimeError $ "Unset Id " ++ show x)
+                    | x <- ids \\ map fst new ]
+       -- missing_binds are the ones brought into scope by Def,
+       -- but never actually given a value.  They may be entirely
+       -- unsued, but if we do happen to use one, we should blow up.
+       --   e.g. Def{x} in x  should blow up
+
+checkShadow :: HasCallStack => [Name] -> Env -> a -> a
+-- Checks that the newly-bound names don't shadow any existing names
+checkShadow ns (Env nvs) a
+  | ds@(_:_) <- intersect ns (map fst nvs)
+  = wrong $ "Duplicate defs " ++ show (ds, ns, nvs)
+  | otherwise
+  = a
+
+checkResultInvariants :: [Res] -> a -> a
+checkResultInvariants vs thing_inside
+  | err:_ <- filter badRes vs
+  = wrong $ "checkResultInvariants: multiple Set " ++ show err
+  | otherwise
+  = thing_inside
+  where
+    badRes (Ext ext, _) = nub bound_names /= bound_names
+       where
+         bound_names = map fst ext
 
 ---------------------
 --      Auxiliary semantic operations
@@ -352,6 +372,7 @@ appExt (Ext ext1) (Ext ext2)
   = Ext $ ext1 ++ ext2
 
 updExt :: HasCallStack => Ext -> Env -> Env
+-- ext1 overrides ext2
 updExt (Ext ext1) (Env ext2)
   | not $ null $ ks1 \\ ks2 = error $ "updExt: " ++ show (ext1, ext2)
   | otherwise = Env $ ext1 ++ [ (k, mv) | (k, mv) <- ext2, k `notElem` ks1 ]
