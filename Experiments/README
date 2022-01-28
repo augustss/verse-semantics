@@ -1,0 +1,15 @@
+
+NanoRec6
+    Just uses Names (no Binds)
+    Handles arrays
+
+NanoRec5
+    Uses Binds as well as Names
+    Handles arrays
+
+NanoRec4
+    Handles arrays
+
+NanoRec3
+    Deals with recursive bindings
+    Pairs, not array
