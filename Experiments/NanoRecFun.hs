@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
-module NanoRec6(testAll) where
+module NanoRecFun(testAll) where
 import Data.List
 --import Data.Maybe
 import Data.String
@@ -122,14 +122,14 @@ addDef e | xs /= nub xs = scopeError $ "Duplicate := " ++ show (e, xs)
   where xs = findSet e
 
 findSet :: Exp -> [Name]
-findSet (Var {}) = []
-findSet (Con {}) = []
-findSet (Alt {}) = []
+findSet Var {}   = []
+findSet Con {}   = []
+findSet Alt {}   = []
 findSet Fail     = []
-findSet (For {}) = []
-findSet (Do {})  = []
+findSet For {}   = []
+findSet Do {}    = []
 findSet Error    = []
-findSet (Lam {}) = []
+findSet Lam {}   = []
 findSet (App   e1 e2) = findSet e1 ++ findSet e2
 findSet (Equal e1 e2) = findSet e1 ++ findSet e2
 findSet (Set x e) = x : findSet e
