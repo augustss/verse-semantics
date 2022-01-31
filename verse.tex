@@ -280,8 +280,6 @@ We don't have enough examples.
 Many of these questions are small points.
 
 \begin{itemize}
-\item One-armed conditionals; see \Cref{sec:conditionals}.
-\item \vtt{for} in which $e_2$ yields multiple values; see \Cref{sec:for}.
 \item $f(e)$ when the function returns \emph{multiple} values; see \Cref{sec:going-wrong}.
 \item What are \vtt{<resolves>}, \vtt{<evaluates>}, and \vtt{<abstracts>}?  See \Cref{sec:multiplicity}.
 \item Currently \vtt{false} is a synonym for \vtt{()}, the empty array.  So \vtt{:false} is an expression that always fails, returning no values.
@@ -311,8 +309,8 @@ Many of these questions are small points.
   & $\mid$ & \vtt{()} & empty tuple \simon{right?} \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
-  & $\mid$ & \vtt{for \{$e_1$\} in $e_2$} & array creation \\
-  & $\mid$ & \vtt{for \{$e_1$\}}  & simple array creation \\
+  & $\mid$ & \vtt{for($e_1$) in\{ $eb_2$ \}} & array creation \\
+  & $\mid$ & \vtt{for($e_1$)}  & simple array creation \\
   & $\mid$ & $e_1 \;op\; e_2$ & infix operator \\
   & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
   & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
@@ -388,7 +386,7 @@ $\eff$ & ::= & \vtt{<diverges>} $\mid$ \vtt{<succeeds>} $\mid$ \vtt{<fails>} & \
   & $\mid$ & \vtt{$e_1$,$\cdots$,$e_n$} & tuple formation, $n >= 2$ \\
   & $\mid$ & \vtt{()} & empty tuple \\
   & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & $\mid$ & \vtt{for \{ $e_1$ \} in $e_2$} & array formation \\
+  & $\mid$ & \vtt{for($e_1$) in \{ $e_2$ \}} & array formation \\
   & $\mid$ & \vtt{def\{$x_1$:=$e_1$,$\cdots$,$x_n$:=$e_n$\} in $e$} & define variables in a scope \\
   & $\mid$ & \vtt{check $\eff$ in $e$} & check effects in a scope \\[3mm]
 \end{tabular}
@@ -416,7 +414,7 @@ $\eff$ & ::= & \vtt{<diverges>} $\mid$ \vtt{<succeeds>} $\mid$ \vtt{<fails>} & \
   \vtt{typedef\{$e$\}} & \vtt{\clam{x}{x = $e$}} & \vtt{x} fresh \\
   \vtt{case($e$) of} & \vtt{\vseq{x:=$e$; $e_1$[x] || $\cdots$ || $e_n$[x]}} & \vtt{x} fresh \\
   \vtt{\hspace{3mm}\{$e_1$;$\cdots$;$e_n$\}} & & \\
-  \vtt{for\{e\}} & \vtt{for\{x:=$e$\} in x} & \vtt{x} fresh \\
+  \vtt{for(e)} & \vtt{for(x:=$e$) in\{x\} } & \vtt{x} fresh \\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  ??? should x be exactly 1 value \\
   & \vtt{if (x:=f[a]) then x else wrong} & \vtt{f},\vtt{a},\vtt{x} fresh\\
   \vtt{$e_1$($e_2$)} & \vtt{f:=$e_1$; a:=$e_2$;} &  \\
@@ -554,23 +552,13 @@ From the cross-product semantics, you can see that failure propagates
 upward; for example, \vtt{(:false + $e$)} fails for any $e$, since there
 are no values $v_1$ returned by \vtt{:false}.
 
-The semicolon operator is an ordinary binary operator that simply returns its right-hand argument. Because of the cross-product semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{(:false ; $e$)} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
+The semicolon operator ``\vtt{;}'' is an ordinary binary operator that simply returns its right-hand argument. Because of the cross-product semantics, however, it still still iterates over its left-hand argument.  For example, \vtt{(:false ; $e$)} fails, while \vtt{((1 | 2) ; (3 | 4))} yields the sequence $[3,4,3,4]$.
 
 \subsection{Built in values}
 
 Verse has built-in integers (\vtt{1}, \vtt{21}, \vtt{-2} etc), and characters (\vtt{'x'}, \vtt{';'} etc).
 The integers come equipped with standard arithmetic operations like addition \vtt{$e_1$+$e_2$}, etc.   Infix operations can be
 written prefix using the C++-derived \vtt{operator} notation, thus: \vtt{operator'+'($e_1$,$e_2$)}.
-
-Verse's only data structure is a one-dimensional \emph{array}.  When
-the array is of small fixed size, it is often called a \emph{tuple}. A
-literal array is built with comma notation. For example \vtt{(2,7,7)}
-is an tuple of three elements.  As with other operators, tuple
-construction yields all combinations of values yielded by the
-sub-expressions.  For example, \vtt{( (3 | 1), (7 | 22) )} yields the
-sequence $[(3,7), (3,22), (1,7), (1,22)]$.
-
-Arrays of variable size, array indexing, and for-loops, are discussed in \Cref{sec:arrays}.
 
 \subsection{Comparisons and conditionals} \label{sec:bool} \label{sec:conditionals}
 
@@ -581,7 +569,12 @@ conditional expression \vtt{(if $e_1$ then $e_2$ else $e_3$)},
   \item if $e_1$ returns one or more values, the conditional returns $e_2$.
 \end{itemize}
 A one-armed conditional \vtt{(if $e_1$ then $e_2$)} is equivalent to the normal two-armed conditional
-with an \vtt{else} branch of \vtt{:false}; that is, if $e_1$ fails then so does the conditional.  \simon{Check with Tim.}
+with an \vtt{else} branch of \vtt{()}; that is, if $e_1$ fails then the conditional returns the
+empty tuple.  This makes Verse behave sensibly when we add effects; for example
+\begin{verbatim}
+  if (n = 10) then launchMissiles(); print("Done")
+\end{verbatim}
+prints ``\vtt{Done}'' (without launching the missiles) if \vtt{n} is not 10; it does not fail.
 
 \noindent Conjunction (and) and disjunction (or) are readily expressed:
 \begin{itemize}
@@ -593,10 +586,11 @@ with an \vtt{else} branch of \vtt{:false}; that is, if $e_1$ fails then so does 
 \end{itemize}
 
 The comparison operators such as $(>)$, $(<)$, $(=)$ and so on, do not return a Boolean value; instead
-they fail if the comparison is false, or succeed otherwise.  More specifically, when a comparision succeeds
-it returns its left argument.
+they fail if the comparison is false, and succeed otherwise.
 That makes \vtt{(if (3 > 4) then 10 else 20)} return $20$ as you would expect.
 
+More specifically, when a comparision succeeds
+it returns its left argument.
 Amusingly, this semantics allows us to write
 \vtt{(0 < x < 10)}, an expression that succeeds (returning $10$) if and only if \vtt{x} is between 0 and 10.
 This works because \vtt{(<)} is right associative, so the expression means \vtt{0 < (x<10)}. (Exercise for the reader:
@@ -615,7 +609,7 @@ consider the expression
 \end{verbatim}
 Here, the expression \vtt{(x:=7)} brings \vtt{x} into scope, and binds it to \vtt{7}.
 However the \emph{extent} of definition -- that is, the code in which \vtt{x}
-is in scope -- extends backwards as well as forwards.  In this case, the expression
+is in scope -- extends backwards as well as forwards.  In our example, the expression
 \vtt{(x*2)} has an \emph{occurrence} of \vtt{x} that is \emph{bound} by the expression
 \vtt{(x:=7)}.
 
@@ -678,6 +672,84 @@ $$
 $$
 Currying is supported, so you can write a call like \vtt{f(3)(5)}.
 
+\subsection{Arrays} \label{sec:arrays}
+
+
+Verse's only data structure is a one-dimensional \emph{array}.  When
+the array is of small fixed size, it is often called a \emph{tuple}.
+
+\subsubsection{Literal arrays}
+
+A literal array is built with comma notation. For example \vtt{(2,7,7)}
+is an tuple of three elements, and \vtt{()} is the empty tuple.
+Verse also lets you write \vtt{array\{2,7,7\}} and \vtt{array\{\}} to
+denote these same tuples.  The reason for providing this more explicit notation is that
+it works uniformly for single-element tuples; for example, \vtt{array\{3\}} is the singleton
+tuple whose only element is 3.
+
+As with other operators, tuple
+construction yields all combinations of values yielded by the
+sub-expressions.  For example, \vtt{array\{(3 | 1), (7 | 22)\}} yields the
+sequence $[(3,7), (3,22), (1,7), (1,22)]$.
+
+\subsubsection{Indexing}
+
+An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
+
+Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
+
+\subsubsection{The \vtt{for} construct} \label{sec:for}
+
+The \vtt{for} construct builds an array.  Specifically \vtt{for\{$e$\}} returns the array of values successively yielded
+by $e$.  For example:
+\begin{itemize}
+\item \vtt{for( 2 | 1 | 3 )} returns the array $\tuple{2,1,3}$.
+\item \vtt{for( i:=(2 | 1 | 3); i*i )} returns the array $\tuple{4,1,9}$.
+\item \vtt{for( :false )} returns the empty array.  Recall that \vtt{:false} is the expression that fails,
+  returning no values (\Cref{sec:false});
+  and the empty sequence reifies to an empty array.
+\end{itemize}
+Verse also provides a two-armed version of \vtt{for}, thus \vtt{for($e_1$) in \{$e_2$\}}.
+Its meaning is this: take each value yielded by $e_1$, discard it, and evaluate
+$e_2$ in the presence of the bindings from $e$. Now form the array from the Cartesian product of the sequences
+returned by $e_2$.
+For example:
+\begin{verbatim}
+      for(i := 1 | 2 | 3) in (i*2)
+\end{verbatim}
+yields the array $(2,4,6)$.  To see the effect of the Cartesian product,
+\begin{verbatim}
+      for(1 | 2 | 3) in {0 | 1}
+\end{verbatim}
+means the same as \vtt{array\{(0|1), (0|1), (0|1)\}}, and yields the sequence of
+three-element arrays $[ (0,0,0), (0,0,1), (0,1,0), \ldots, (1,1,1) ]$.
+If any iteration of $e_2$ fails (returns no values) then the entire Cartesian product becomes empty,
+returning no values.
+
+You can see the one-armed \vtt{for} as a special case of the two-armed \vtt{for} thus: \vtt{for($e$)} behaves
+like \vtt{for(x:=$e$) in \{x\}} where \vtt{x} is fresh.
+
+\subsubsection{Enumerations}
+
+The notation \vtt{($e_1$..$e_2$)} is short for \vtt{range($e_1$,$e_2$)}, where
+\vtt{range} is a built-in function that yields the sequence of values
+$[n_1, n_1+1, \ldots, n_2]$, where $n_1$ and $n_2$ are the integer values of $e_1$ and $e_2$ respectively.
+For example \vtt{2..5} is equivalent to \vtt{(2 | 3 | 4 | 5)} and yields the sequence $[2,3,4,5]$.
+You may imagine \vtt{range} being defined like this:
+\begin{verbatim}
+  range(lo:int,hi:int) := if (lo<=hi) then (lo | range( lo+1, hi ))
+\end{verbatim}
+Like any function call, the  cartesian-product semantics applies, so the notation may produce a concatenation of sequences.
+For example \vtt{1..(2|3)} yields all the values of \vtt{range(1,2)} and then all the values of \vtt{range(1,3)},
+thus yielding $[1,2,1,2,3]$\footnote{Agrees with Tim's prototype.}.
+
+Any non-integer values yielded by $e_1$ and $e_2$ make the program go wrong, and hence
+are rejected by the verifier. This is a consequence of \vtt{($e_1$..$e_2$)} being desugared
+to \vtt{range($e_1$,$e_2$)}, with \emph{round} parentheses; recall that such calls are not allowed to fail.
+
+The \emph{sequence} generated by the ``\vtt{|}'' alternation maybe reified into an \emph{array} using \vtt{for},
+so that \vtt{for\{2..5\}} will return a singleton value, the array (or tuple) $\tuple{2,3,4,5}$.
+
 \subsection{Let-bindings}
 
 Unusually, in Verse a \vtt{let} binding takes an \emph{expression} not a \emph{binding}.  Thus we have \vtt{(let $e_1$ in $e_2$)}.
@@ -725,72 +797,6 @@ Its meaning is simple:
 % \item {Let substitution.}  Because of multiple values, \vtt{let} does not enjoy an arbitrary substitution property.  For eaxmple, \vtt{(let x := (3|4) in x+x )} yields the values $[6,8]$.  But \vtt{((3|4) + (3|4))} yields $[6,7,7,8]$.
 % \simon{Tim referred to McAlester ``Ontic'' paper and ``recursive coherence''.  Figure out what this means.}
 % \end{itemize}
-
-\subsection{Arrays} \label{sec:arrays}
-
-\subsubsection{Indexing}
-
-An array is treated by Verse as a function, so that indexing is just function application.  For example, in the expression \vtt{(x := (2,7,3); x[1])} we apply the function (= array, = tuple) \vtt{x} to 1, yielding a singleton value 7.  Indexing is zero-based.
-
-Indexing can fail, if the index is out of bounds, yielding an empty sequence of values. This is why Verse uses square brackets (which programmers may think of as array indexing) for a ``function application that can fail'' (\Cref{sec:application}).
-
-\subsubsection{The \vtt{for} construct} \label{sec:for}
-
-The \vtt{for} construct builds an array.  Specifically \vtt{for\{$e$\}} returns the array of values successively yielded
-by $e$.  For example:
-\begin{itemize}
-\item \vtt{for \{2 | 1 | 3\}} returns the array $\tuple{2,1,3}$.
-\item \vtt{for \{ i:=(2 | 1 | 3); i*i \}} returns the array $\tuple{4,1,9}$.
-\item \vtt{for \{:false\}} returns the empty array.  Recall that \vtt{:false} is the expression that fails,
-  returning no values (\Cref{sec:false});
-  and the empty sequence reifies to an empty array.
-\end{itemize}
-Verse also provides a two-armed version of \vtt{for}, thus \vtt{for\{$e$\} in $elt$}, where $e$ and $elt$ are both
-experiments.  Its semantic is this: take each value yielded by $e$, say $v_1, v_2, \ldots$, discard it, and evaluate
-$elt$ in the presence of the bindings from $e$. Now form the array from the Cartesian product of the sequences
-returned by $elt$.
-For example:
-\begin{verbatim}
-      for {1 | 2 | 3} in (0 | 1)
-\end{verbatim}
-will yield the sequence of three-element arrays $[ (0,0,0), (0,0,1), (0,1,0), \ldots, (1,1,1) ]$.
-If any iteration of $elt$ fails (returns no values) then the entire Cartesian product becomes empty,
-returning no values.
-\simon{Is this right?}
-
-You can see the one-armed \vtt{for} as a special case of the two-armed \vtt{for} thus: \vtt{for\{$e$\}} behaves
-like \vtt{for(x:=$e$) in x} where \vtt{x} is fresh.
-
-
-\subsubsection{Enumerations}
-
-The notation \vtt{($e_1$..$e_2$)} is short for \vtt{range($e_1$,$e_2$)}, where
-\vtt{range} is a built-in function that yields the sequence of values
-$[n_1, n_1+1, \ldots, n_2]$, where $n_1$ and $n_2$ are the integer values of $e_1$ and $e_2$ respectively.
-For example \vtt{2..5} is equivalent to \vtt{(2 | 3 | 4 | 5)} and yields the sequence $[2,3,4,5]$.
-You may imagine \vtt{range} being defined like this:
-\begin{verbatim}
-  range(lo:int,hi:int) := if (lo<=hi) then (lo | range( lo+1, hi ))
-\end{verbatim}
-Like any function call, the  cartesian-product semantics applies, so the notation may produce a concatenation of sequences.
-For example \vtt{1..(2|3)} yields all the values of \vtt{range(1,2)} and then all the values of \vtt{range(1,3)},
-thus yielding $[1,2,1,2,3]$\footnote{Agrees with Tim's prototype.}.
-
-Any non-integer values yielded by $e_1$ and $e_2$ make the program go wrong, and hence
-are rejected by the verifier. This is a consequence of \vtt{($e_1$..$e_2$)} being desugared
-to \vtt{range($e_1$,$e_2$)}, with round parentheses; recall that such calls are not allowed to fail.
-\simon{Right now?}
-
-The \emph{sequence} generated by the \vtt{|} alternation maybe reified into an \emph{array} using \vtt{for},
-so that \vtt{for\{2..5\}} will return a singleton value, the array (or tuple) $\tuple{2,3,4,5}$.
-
-\subsubsection{The array type}
-
-There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
-\begin{verbatim}
- array := lam (t) in lam (xs) in for (x:xs) in t[x]
-\end{verbatim}
-\simon{Or something like this.  Need to explain!!!}
 
 \subsection{Recursive bindings} \label{sec:recursion}
 
@@ -885,6 +891,14 @@ Verse has some built-in types:
   \simon{I still don't see the logic of calling this \vtt{false}. E.g. \vtt{if false then..else..} does not do what I expect.}
   \lennart{I agree, it's not a good name.}
 \end{itemize}
+
+\subsubsection{The array type}
+
+There is a type \vtt{array $e$}\footnote{Written \vtt{[]$e$} in Verse}:
+\begin{verbatim}
+ array := lam (t) in lam (xs) in for (x:xs) in t[x]
+\end{verbatim}
+\simon{Or something like this.  Need to explain!!!}
 
 \subsection{Function types}
 
