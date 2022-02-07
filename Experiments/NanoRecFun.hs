@@ -26,7 +26,7 @@ type Name = String
    e ::= x
       |  k
       |  (s1 | s2)
-      |  (e = k)
+      |  (e = e)
       |  x := e
       |  (e1,...,en)
       |  e[i]
@@ -437,6 +437,7 @@ vplus (VInt i1) (VInt i2) = VInt (i1 + i2)
 vplus v1 v2 = wrong $ "vplus " ++ show (v1, v2)
 
 vsel :: Int -> Value -> Lenient
+--vsel i x | trace ("+++vsel: " ++ show (i, x) ++ "***") False = undefined
 vsel i (VArray as) | i >= 0 && i < length as = as !! i
                    | otherwise = wrong $ "vsel: out of bounds " ++ show (as, i)
 vsel _ v           = wrong $ "vsel: not an array " ++ show v
@@ -516,126 +517,237 @@ ok n r e = Ex n (Just $ show r) (show $ ev e)
 bad :: String -> Exp -> Ex String
 bad n e = Ex n Nothing (show $ ev e)
 
-test1 = ok "test1" [1,2] $
-  1 ||| 2
+bug :: (Show a) => String -> a -> Exp -> Ex String
+bug n _r e = Ex ("bug: " ++ n) Nothing (show $ ev e)
 
-test2 = ok "test2" [2,3,3,4] $
-  (1 ||| 2) + (1 ||| 2)
+---------------------
+-- Simple, single valued tests.
+---------------------
+test101 = ok "test101" [5] $
+  5
 
-test3 = ok "test3" [2,4] $
-  ("x" := 1 ||| 2) + "x"
+test102 = ok "test102" [42] $
+  5 + 37
 
--- Should fail, since variables in ||| do not escape
--- Fails
-test4 = bad "test4" $
-  (("x" := 1) ||| 2) + "x"
+test103 = ok "test103" [(5,37)] $
+  5 # 37
 
-test5 = ok "test5" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
-  ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
+test104 = ok "test104" [(1,2,3,4)] $
+  Array [1,2,3,4]
 
-test6 = ok "test6" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
-  ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
+---------------------
+-- Variable scopes
+---------------------
+test201 = ok "test201" [(5,5)] $
+  ("x" := 5) # "x"
 
-test7 = ok "test7" [4] $
-  ("x" := 1 ||| 2) + ("x" === 2)
+test202 = ok "test202" [(5,5)] $
+  "x" # ("x" := 5)
 
-test8 = ok "test8" [(1,1),(2,2)] $
-  Pair "x" ("x" := 1 ||| 2)
+test203 = ok "test203" [(7,6)] $
+  "x"+1 # ("x" := 6)
 
-test9 = ok "test9" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
-  Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
+test204 = ok "test204" [(7,6,6,5)] $
+  Array ["x"+1, "x" := "y", "y" := "z"+1, "z" := 5]
 
--- x's value should not be delayed, because x's RHS has no depenedncies
-test10 = ok "test10" [((1,7),1)] $
-         Pair ("x" := (Pair 1 7 |||
-                       Pair "y" ("y" := 2)))
-              (Fst "x" === 1)
+test205 = bad "test205" $
+  ("x" := 1) # ("x" := 2)
 
--- x's value depends on recursively bound z, so we get stuck.
--- Produces []
--- LA: Is this the intended test?
-test11 = ok "test11" ([]::[()]) $
-         Pair ("x" := (Pair 1 "z" |||
-                        Pair "y" ("y" := 2)))
-               (Pair ("x" === 1) ("z" := 3))
+test206 = bad "test206" $
+  "x"
 
-test12 = ok "test12" [(1,1)] $
-  "t" := Pair 1 (Fst "t")
+test207 = ok "test207" [(3,4)] $
+  3 # doo ("x":= 4)
 
-test13 = ok "test13" [(1,1)] $
-  "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
-
--- Fails (equalLenient)
-test14 = bad "test14" $
-  "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
-
--- Generates an error, as it should
-test15 = bad "test15"
-  Error
-
--- Generates an error, as it should
-test16 = bad "test16" $
-  Error `semi` 1
-
--- Generates an error, as it should
-test17 = bad "test17" $
-   (2 # Error) `semi` 1
-
--- Cascaded forward references
-test18 = ok "test18" [3,7,2,2] $
-         "x" := ("y" ||| 2)  `semi`
-         "y" := (3 ||| "z")  `semi`
-         "z" := 7            `semi`
-         "x"
-
--- Test that when evaluating z the x is fully determined.
--- BUG: This test does not pass.
-test19 = ok "test19" [5] $
-  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+test208 = bad "test208" $
+  "x" # doo ("x":= 4)
 
 -- Check that mutual recursion fails
-test20 = bad "test20" $
+test209 = bad "test209" $
   "x" := "y" `semi` "y" := "x"
 
--- Nested delays
-test21 = ok "test21" [(1,(2,3))] $
+test210 = ok "test210" [(1,(2,3))] $
   "x" := (1 # "y") `semi`
   "y" := (2 # "z") `semi`
   "z" := 3 `semi`
   "x"
 
-test22 = ok "test22" [(5,5,5)] $
-  for (1|||2|||3) 5
-
-test23 = ok "test23" [(1,2,3)] $
-  for ("x" := 1|||2|||3) "x"
-
-test24 = ok "test24" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
-  for ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
-
-test25 = ok "test25" [((1,4),(2,4),(3,4)),
-                      ((1,5),(2,5),(3,5))] $
-  "y" := 4|||5 `semi` for ("x" := 1|||2|||3) ("x" # "y")
-
-test26 = ok "test26" [(((1,4),(2,4),(3,4)),
-                       ((1,5),(2,5),(3,5)))] $
-  for ("y" := 4|||5) $ for ("x" := 1|||2|||3) ("x" # "y")
-
-test27 = ok "test27" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
-  for ("x" := 1|||2|||3) ("x" ||| 99)
-
-test28 = ok "test28" [(1,2,3)] $
-  for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
-
-test29 = ok "test29" [(2,3,4)] $
-  for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
-
-test30 = bad "test30" $
+test211 = bad "test211" $
   "x" := 1 `semi` "x" := 2
 
 -- The x1 used to be x, but shadowing is not allowed
-test31 = ok "test31" [(1,2)] $
+test212 = ok "test212" [(1,2)] $
   "x" := 2 `semi` (doo ("x1" `wher` "x1" := 1) # "x")
+
+---------------------
+-- 0/1 results
+---------------------
+
+test301 = ok "test301" [(3,3)] $
+  ("x" := 3) # ("x" === 3)
+
+test302 = ok "test302" [3] $
+  ("x" := 1+"y") `semi` "y" := 2 `semi` ("x" === 3)
+
+test303 = bug "test303" [(3,3)] $
+  ("x" === 3) # ("x" := 3)
+
+test304 = ok "test304" [20] $
+  ("a" := Array [10,20,30]) `semi` Sel "a" 1
+
+test305 = ok "test305" [20] $
+  Sel "a" 1 `wher` ("a" := Array [10,20,30])
+
+test306 = bug "test306" ([]::[()]) $
+  ("a" := Array [10,20,30]) `semi` Sel "a" 3
+
+test307 = ok "test307" [(1,1)] $
+  "t" := Pair 1 (Fst "t")
+
+-- Test that when evaluating z the x is fully determined.
+test308 = ok "test308" [5] $
+  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+
+---------------------
+-- Multi-valued
+---------------------
+
+test401 = ok "test401" [1,2] $
+  1 ||| 2
+
+test402 = ok "test402" [2,3,3,4] $
+  (1 ||| 2) + (1 ||| 2)
+
+test403 = ok "test403" [2,4] $
+  ("x" := 1 ||| 2) + "x"
+
+-- Should fail, since variables in ||| do not escape
+test404 = bad "test404" $
+  (("x" := 1) ||| 2) + "x"
+
+test405 = ok "test405" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
+  ("x" := 1 ||| 2) + ("y" := 3 ||| 4) # ("x" # "y")
+
+test406 = ok "test406" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
+  ("x" := 1 ||| 2) + ("y" := "x" ||| 4) # ("x" # "y")
+
+test407 = ok "test407" [4] $
+  ("x" := 1 ||| 2) + ("x" === 2)
+
+test408 = ok "test408" [(1,1),(2,2)] $
+  Pair "x" ("x" := 1 ||| 2)
+
+test409 = ok "test409" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
+  Pair ("y" := (7 ||| "x")) (Pair "x" ("x" := (1 ||| 2)))
+
+-- x's value should not be delayed, because x's RHS has no depenedncies
+test410 = ok "test410" [((1,7),1)] $
+         Pair ("x" := (Pair 1 7 |||
+                       Pair "y" ("y" := 2)))
+              (Fst "x" === 1)
+
+test411 = ok "test411" [(1,1)] $
+  "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
+
+-- Fails (equalLenient)
+test412 = bug "test412" [(1,1)] $
+  "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+
+-- Cascaded forward references
+test413 = ok "test413" [3,7,2,2] $
+         "x" := ("y" ||| 2)  `semi`
+         "y" := (3 ||| "z")  `semi`
+         "z" := 7            `semi`
+         "x"
+
+---------------------
+-- Error/strictness
+---------------------
+
+-- Generates an error, as it should
+test501 = bad "test501"
+  Error
+
+-- Generates an error, as it should
+test502 = bad "test502" $
+  Error `semi` 1
+
+-- Generates an error, as it should
+test503 = bad "test504" $
+   (2 # Error) `semi` 1
+
+---------------------
+-- for
+---------------------
+
+test601 = ok "test601" [(5,5,5)] $
+  for (1|||2|||3) 5
+
+test602 = ok "test602" [(1,2,3)] $
+  for ("x" := 1|||2|||3) "x"
+
+test603 = ok "test603" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
+  for ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
+
+test604 = ok "test604" [((1,4),(2,4),(3,4)),
+                      ((1,5),(2,5),(3,5))] $
+  "y" := 4|||5 `semi` for ("x" := 1|||2|||3) ("x" # "y")
+
+test605 = ok "test605" [(((1,4),(2,4),(3,4)),
+                       ((1,5),(2,5),(3,5)))] $
+  for ("y" := 4|||5) $ for ("x" := 1|||2|||3) ("x" # "y")
+
+test606 = ok "test606" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
+  for ("x" := 1|||2|||3) ("x" ||| 99)
+
+test607 = ok "test607" [(1,2,3)] $
+  for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
+
+test608 = ok "test608" [(2,3,4)] $
+  for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
+
+---------------------
+-- Functions
+---------------------
+
+test701 = ok "test701" [5] $
+  "f" := lam "v" ("v" + 1) `semi`
+  App "f" 4
+
+test702 = ok "test702" [11] $
+  "w" := 7 `semi`
+  "f" := lam "v" ("w" + "v") `semi`
+  App "f" 4
+
+test703 = ok "test703" [11] $
+  "f" := lam "v" ("w" + "v") `semi`
+  "w" := 7 `semi`
+  App "f" 4
+
+test704 = ok "test704" [11] $
+  "f" := lam "v" ("w" + "v") `semi`
+  "w" := 7 `semi`
+  "y" := App "f" "t" `semi`
+  "t" := 4 `semi`
+  "y"
+
+-- f is called before it is defined
+test705 = bad "test705" $
+  "y" := App "f" "t" `semi`
+  "w" := 7 `semi`
+  "t" := 4 `semi`
+  "f" := lam "v" ("w" + "v") `semi`
+  "y"
+
+test706 = ok "test706" [11] $
+  "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
+  "y" := App "f" "t" `semi`
+  "t" := 4 `semi`
+  "y"
+
+---------------------
+-- Not yet sorted
+---------------------
 
 test32 = ok "test32" [(1,2,3)] $
   for ("x" := Range (Array [1,2,3])) "x"
@@ -670,47 +782,21 @@ test38 = ok "test38" [62,134] $
   "t" := 55 ||| 127 `semi`
   "x"
 
-test40 = ok "test40" [5] $
-  "f" := lam "v" ("v" + 1) `semi`
-  App "f" 4
-
-test41 = ok "test41" [11] $
-  "w" := 7 `semi`
-  "f" := lam "v" ("w" + "v") `semi`
-  App "f" 4
-
-test42 = ok "test42" [11] $
-  "f" := lam "v" ("w" + "v") `semi`
-  "w" := 7 `semi`
-  App "f" 4
-
-test43 = ok "test43" [11] $
-  "f" := lam "v" ("w" + "v") `semi`
-  "w" := 7 `semi`
-  "y" := App "f" "t" `semi`
-  "t" := 4 `semi`
-  "y"
-
--- f is called before it is defined
-test44 = bad "test44" $
-  "y" := App "f" "t" `semi`
-  "w" := 7 `semi`
-  "t" := 4 `semi`
-  "f" := lam "v" ("w" + "v") `semi`
-  "y"
-
-test45 = ok "test45" [11] $
-  "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
-  "y" := App "f" "t" `semi`
-  "t" := 4 `semi`
-  "y"
+-- This test doesn't work, but it should.
+test46 = bug "test46" [(2,3)] $
+  "a" := for ("x" := Range "xs") ("x" + 1) `semi`
+  "xs" := (1#2) `semi`
+  "a"
 
 testAll :: IO ()
 testAll = mapM_ testEx
-  [test1,test2,test3,test4,test5,test6,test7,test8,test9,test10,
-   test11,test12,test13,test14,test15,test16,test17,test18,
-   test19,test20,test21,test22,test23,test24,test25,test26,
-   test27,test28,test29,test30,test31,test32,test33,test34,
-   test35,test36,test37,test38,
-   test40,test41,test42,test43,test44,test45
+  [test101,test102,test103,test104,
+   test201,test202,test203,test204,test205,test206,test207,test208,test209,test210,test211,test212,
+   test301,test302,test303,test304,test305,test306,test307,test308,
+   test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413,
+   test501,test502,test503,
+   test601,test602,test603,test604,test605,test606,test607,test608,
+   test701,test702,test703,test704,test705,test706,
+
+   test32,test33,test34,test35,test36,test37,test38,test46
   ]
