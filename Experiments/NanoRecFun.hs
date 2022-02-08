@@ -749,8 +749,8 @@ test704 = ok "test704" [11] $
   "y"
 
 -- f is called before it is defined
-test705 = bad "test705" $
-  "y" := AppI "f" "t" `semi`
+test705 = ok "test705" [11] $
+  "y" := AppS "f" "t" `semi`
   "w" := 7 `semi`
   "t" := 4 `semi`
   "f" := lam "v" ("w" + "v") `semi`
@@ -760,6 +760,13 @@ test706 = ok "test706" [11] $
   "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
   "y" := AppS "f" "t" `semi`
   "t" := 4 `semi`
+  "y"
+
+test707 = bad "test705" $
+  "y" := AppI "f" "t" `semi`
+  "w" := 7 `semi`
+  "t" := 4 `semi`
+  "f" := lam "v" ("w" + "v") `semi`
   "y"
 
 ---------------------
@@ -813,7 +820,7 @@ testAll = mapM_ testEx
    test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413,
    test501,test502,test503,
    test601,test602,test603,test604,test605,test606,test607,test608,
-   test701,test702,test703,test704,test705,test706,
+   test701,test702,test703,test704,test705,test706,test707,
 
    test32,test33,test34,test35,test36,test37,test38,test46
   ]
