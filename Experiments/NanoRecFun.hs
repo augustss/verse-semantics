@@ -35,6 +35,9 @@ type Name = String
       |  for(s1){e2}
       |  do{s}
       |  :e
+      |  lam{x}in e
+      |  e(e)
+      |  e[e]
    s ::= def {x1,...} in e
 -}
 
@@ -52,7 +55,8 @@ data Exp = Var Name
          | Range Exp     -- :e
          | Error  -- to test strictness
          | Lam Name SExp
-         | App Exp Exp
+         | AppS Exp Exp  -- e(e)  exactly one result
+         | AppI Exp Exp  -- e[e]  can iterate
   deriving (Show)
 
 data SExp     -- A scope-limiting construct
@@ -130,7 +134,8 @@ findSet For {}   = []
 findSet Do {}    = []
 findSet Error    = []
 findSet Lam {}   = []
-findSet (App   e1 e2) = findSet e1 ++ findSet e2
+findSet (AppS  e1 e2) = findSet e1 ++ findSet e2
+findSet (AppI  e1 e2) = findSet e1 ++ findSet e2
 findSet (Equal e1 e2) = findSet e1 ++ findSet e2
 findSet (Set x e) = x : findSet e
 findSet (Array es) = concatMap findSet es
@@ -274,14 +279,19 @@ eval (Lam x e) rho = [(emptyExt, Done (VFun str rho fn))]
     fn rho_fn v = evalS e (bindEnv x v rho_fn)
     str = "{" ++ show (Lam x e) ++ "}"
 
-eval (App e1 e2) rho =
+eval (AppS e1 e2) rho =
+  [ (ext1 `appExt` ext2, liftLL1 "AppS" (vapp fv2) fv1)
+  | (ext1, fv1) <- eval e1 rho
+  , (ext2, fv2) <- eval e2 (ext1 `updExt` rho) ]
+
+eval (AppI e1 e2) rho =
   [ (ext1 `appExt` ext2, fv3)
   | (ext1, fv1) <- eval e1 rho
   , (ext2, fv2) <- eval e2 (ext1 `updExt` rho)
   , fv3 <- case fv1 of
              Done (VFun _ rho_fn fn) -> fn rho_fn fv2
-             Done _   -> wrong ("eval:App:non-function) " ++ show fv1)
-             Delay {} -> wrong ("eval:App:not evaluated " ++ show fv1)
+             Done _   -> wrong ("eval:AppI:non-function) " ++ show fv1)
+             Delay {} -> wrong ("eval:AppI:not evaluated " ++ show fv1)
   ]
 
 evalS2 :: HasCallStack => SExp -> Env -> [Res]
@@ -441,6 +451,13 @@ vsel :: Int -> Value -> Lenient
 vsel i (VArray as) | i >= 0 && i < length as = as !! i
                    | otherwise = wrong $ "vsel: out of bounds " ++ show (as, i)
 vsel _ v           = wrong $ "vsel: not an array " ++ show v
+
+vapp :: Lenient -> Value -> Lenient
+vapp fv2 (VFun _ rho_fn fn) =
+  case fn rho_fn fv2 of
+    [fv] -> fv
+    _ -> wrong "vapp:AppI: not a singleton"
+vapp _ fv1 = wrong $ "vapp:AppI:non-function) " ++ show fv1
 
 unArray :: Lenient -> [Lenient]
 unArray (Done (VArray vs)) = vs
@@ -712,28 +729,28 @@ test608 = ok "test608" [(2,3,4)] $
 
 test701 = ok "test701" [5] $
   "f" := lam "v" ("v" + 1) `semi`
-  App "f" 4
+  AppS "f" 4
 
 test702 = ok "test702" [11] $
   "w" := 7 `semi`
   "f" := lam "v" ("w" + "v") `semi`
-  App "f" 4
+  AppS "f" 4
 
 test703 = ok "test703" [11] $
   "f" := lam "v" ("w" + "v") `semi`
   "w" := 7 `semi`
-  App "f" 4
+  AppS "f" 4
 
 test704 = ok "test704" [11] $
   "f" := lam "v" ("w" + "v") `semi`
   "w" := 7 `semi`
-  "y" := App "f" "t" `semi`
+  "y" := AppS "f" "t" `semi`
   "t" := 4 `semi`
   "y"
 
 -- f is called before it is defined
 test705 = bad "test705" $
-  "y" := App "f" "t" `semi`
+  "y" := AppI "f" "t" `semi`
   "w" := 7 `semi`
   "t" := 4 `semi`
   "f" := lam "v" ("w" + "v") `semi`
@@ -741,7 +758,7 @@ test705 = bad "test705" $
 
 test706 = ok "test706" [11] $
   "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
-  "y" := App "f" "t" `semi`
+  "y" := AppS "f" "t" `semi`
   "t" := 4 `semi`
   "y"
 
