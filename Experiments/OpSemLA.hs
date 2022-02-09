@@ -38,20 +38,6 @@ data Context
   deriving (Show)
 -}
 
-type Frame = Map Name Value
-
-data Value = VInteger Integer
-           | VArray [Reg]
-           | VUnresolved
-  deriving (Show)
-
-type Nat = Int
-
-data Reg = Reg { reg_frame :: Nat  -- 0 is the outermost frame
-               , reg_name  :: Name }
---  deriving (Show)
-instance Show Reg where
-  show (Reg f n) = n ++ "{" ++ show f ++ "}"
 
 data Suspension
   = Susp Frame Continuation
@@ -293,19 +279,38 @@ sexpToOps t (Def ns e) = do
   pure $ os ++ [Unify t r]
 
 comp :: SExp -> [Op]
+-- The main compiler
 comp e = evalState se cs
   where cs = CompileState{ env = M.empty, curFrame = 0, nextTemp = 1, cops = [] }
         se = do
           t <- newReg
           (++) <$> sexpToOps t e <*> pure [Stop t]
 
------------------------
+------------------------------------------
+--       The evaluator
+------------------------------------------
+
+type Frame = Map Name Value
+
+data Value = VInteger Integer
+           | VArray [Reg]
+           | VUnresolved
+  deriving (Show)
+
+type Nat = Int
+
+data Reg = Reg { reg_frame :: Nat  -- 0 is the outermost frame
+               , reg_name  :: Name }
+
+--  deriving (Show)
+instance Show Reg where
+  show (Reg f n) = n ++ "{" ++ show f ++ "}"
 
 data RunState = RunState
-  { rs_frame :: Frame
-  , rs_outer :: RunState  -- surrounding lexical scope
-  , rs_ops :: [Op]
-  , rs_cur :: Nat
+  { rs_outer :: RunState  -- surrounding lexical scope
+  , rs_frame :: Frame
+  , rs_ops   :: [Op]
+  , rs_cur   :: Nat       -- Current depth (0 is top)
   }
   deriving (Show)
 
@@ -313,7 +318,7 @@ type R = State RunState
 
 assert :: String -> Bool -> R ()
 assert s False = error $ "assert: " ++ s
-assert _ True = pure ()
+assert _ True  = pure ()
 
 getOp :: R Op
 getOp = do
@@ -323,6 +328,9 @@ getOp = do
     op : ops' -> do modify $ \ s -> s {rs_ops = ops'}; pure op
 
 assign :: Reg -> Value -> R ()
+-- Preconditions:
+--   * The register is in the current fram
+--   * Its current binding is VUnresolved
 assign Reg{..} v = do
   fr <- gets rs_frame
   cur <- gets rs_cur

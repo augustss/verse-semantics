@@ -9,22 +9,25 @@ module OpSem where
 -- ExnState: the execution state during evaluation of an expression
 data ExnState
   = Exn { context :: Context
-        , frame   :: Frame
-        , ops     :: [Exp] }
 
 -- Context for expression evaluation
 data Context
   = Cxt { suspension :: [Suspension]
-        , next       :: Maybe ExnState  -- Nothing => no forks
+        , next       :: Maybe Context  -- Nothing => no forks
         , parent     :: Maybe Context
+        , frame      :: Frame
+        , ops        :: [Exp] }
         }
 
-type Frame = Map Name Value
+type Frame = Map Name Value   -- Like a little "store"
+  -- Def initialises the map to [ xi :-> VUnresolved ]
+  -- We could use the Name not being in the Map to mean VUnresolved.
 
 data Value = VInt Int
            | VArray [Reg]
            | VUnresolved
 
+-- Reg plays the role of Lenient
 data Reg = Reg { reg_frame :: Nat  -- 0 is the outermost frame
                , reg_name  :: Name }
 
@@ -35,6 +38,13 @@ data Continuation
   = Add-waiting-first-arg
   | Add-waiting-for-second-arg
   | ...
+
+
+
+x := f(y)
+
+tmp := f(y)
+x := tmp
 
 
 --------------------------------
@@ -86,14 +96,17 @@ data SExp     -- A scope-limiting construct
 --
 --------------------------
 
-data StepResult = Step ExnState
+data StepResult = Step Context
                 | Fail
                 | Done
                      Frame    -- We can lookup "result" in here
                      Context  -- Maybe with new suspensions
 
-step :: ExnState -> StepResult
-step es@(Exn { ops = [] }) = ...
+run :: [Op] -> Context -> Context
+run [] 
+
+step :: Context -> Context
+step cxt@(Cxt { ops = [] }) = drain cxt
 
 step ex@(Exn { ops = Equal a b : ops, context = cxt })
   = let va = getValue cxt a
