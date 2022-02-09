@@ -452,7 +452,9 @@ vsel i (VArray as) | i >= 0 && i < length as = as !! i
                    | otherwise = wrong $ "vsel: out of bounds " ++ show (as, i)
 vsel _ v           = wrong $ "vsel: not an array " ++ show v
 
-vapp :: Lenient -> Value -> Lenient
+vapp :: Lenient   -- Argument, not necessarily a value yet
+     -> Value     -- The function
+     -> Lenient
 vapp fv2 (VFun _ rho_fn fn) =
   case fn rho_fn fv2 of
     [fv] -> fv
@@ -762,6 +764,8 @@ test706 = ok "test706" [11] $
   "t" := 4 `semi`
   "y"
 
+-- Function defined after it is used;
+-- but the call is f[e], so we deadlock
 test707 = bad "test707" $
   "y" := AppI "f" "t" `semi`
   "w" := 7 `semi`
@@ -807,7 +811,7 @@ test37 = ok "test37" [((2,3),(2,3))] $
   "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] `semi`
   for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
 
--- The t1 used to be t, but shadowning is not allowed.
+-- The t1 used to be t, but shadowing is not allowed.
 test38 = ok "test38" [62,134] $
   "v" := "t" + 1 `semi`
   "x" := doo ( "z" := "v" + "t1" `semi` "t1" := 6 `semi` "z" ) `semi`
