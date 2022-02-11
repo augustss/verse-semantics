@@ -55,8 +55,10 @@ data Atom
 data Op
   = Atom Reg Atom
   | Unify Reg Reg
+  | MkArray { target :: Reg, elts :: [Reg] }
+  | Call { target :: Reg, fun :: Reg, arg :: Reg }
+  | Function { target :: Reg, body :: [Op] }
   | Choice [ [Op] ]
-  | MkArray Reg [Reg]
   | Failure
   | Add Reg Reg Reg
   | NewFrame Nat [Name] [Op]
@@ -290,12 +292,45 @@ comp e = evalState se cs
 --       The evaluator
 ------------------------------------------
 
-type Frame = Map Name Value
+data Frame = Frame { fr_vals   :: Map Name Value
+                   , fr_parent :: Frame  -- Lexical parent
+                   }
+
+newFrame :: Frame -> Frame
+newFrame f = Frame { fr_vals = emptyMap, fr_parent = f }
+
+type Heap = Map HeapId Value
+
+-- Context for expression evaluation
+data Context
+  = Cxt { cxt_heap   :: Heap
+        , cxt_frame  :: Frame
+        , cxt_ops    :: [Op]
+        , cxt_stack  :: [Continuation]   -- The call stack that "belongs" to this context
+        , cxt_susp   :: [Suspension]
+        , next       :: Maybe Context  -- Nothing => no forks
+        , parent     :: Maybe Context
+        }
+  deriving (Show)
+
+data Continuation
+  = Return Frame Name [Op]   -- Return from a function call,
+                             -- putting result in the specified slot
+  | More Frame [Op]
+
 
 data Value = VInteger Integer
-           | VArray [Reg]
-           | VUnresolved
+           | VArray [HeapId]
+           | VFun Frame [Op]   -- Frame is captured when we build the closure
+           | WithH Heap Value
   deriving (Show)
+
+expunge :: Heap -> Value -> Value
+-- Remove all references to HeapIds in the Heap from the value
+-- Runtime error if this is circular: just spot when you pass
+--   the same HeapId a second time.  This is WRONG; verifier
+--   should reject.
+
 
 type Nat = Int
 
@@ -306,15 +341,7 @@ data Reg = Reg { reg_frame :: Nat  -- 0 is the outermost frame
 instance Show Reg where
   show (Reg f n) = n ++ "{" ++ show f ++ "}"
 
-data RunState = RunState
-  { rs_outer :: RunState  -- surrounding lexical scope
-  , rs_frame :: Frame
-  , rs_ops   :: [Op]
-  , rs_cur   :: Nat       -- Current depth (0 is top)
-  }
-  deriving (Show)
-
-type R = State RunState
+type R = State Context
 
 assert :: String -> Bool -> R ()
 assert s False = error $ "assert: " ++ s
@@ -345,13 +372,33 @@ getReg r = do
               | otherwise = look (rs_outer rs)
   get >>= look
 
-step :: R ()
-step = do
-  op <- getOp
-  stepOp op
+step :: Context -> Context
+
+--------- Empty [Op] ------------
+step cxt@(Cxt { ops = [ReturnOp $res], stack = Return fr res ops : stk }) =
+  -- "$res" has been set to the return value
+  Expunge, assign res with "$res", pop stack
+
+--------- Choice ------------
+step cxt@(Cxt { ops = Choice ops1 op2 : ops
+              , stack = old_stack
+              , frame = old_frame
+              , next = old_next }) =
+  = cxt1
+  where
+    -- NB: both cxt1 and cxt2 start with the same heap
+    cxt1 = cxt { ops = ops1
+               , frame = newFrame old_frame
+               , stack = More old_frame ops : old_stack
+               , next = Just cxt2 }
+    cxt2 = cxt { ops = ops2 ++ ops }
+
 
 stepOp :: Op -> R ()
 stepOp (Atom r (AnInteger i)) = assign r (VInteger i)
+stepOp (Function r ops) =
+  do { cxt <- get   -- s :: Context
+     ; assign r (VFun (topFrame cxt) ops }
 stepOp (Unify _r1 _r2) = undefined
 stepOp (Choice opss) = undefined
 stepOp (MkArray r rs) = assign r (VArray rs)
