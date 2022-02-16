@@ -554,6 +554,10 @@ test103 = ok "test103" [(5,37)] $
 test104 = ok "test104" [(1,2,3,4)] $
   Array [1,2,3,4]
 
+test100s = mapM_ testEx
+  [test101,test102,test103,test104
+  ]
+
 ---------------------
 -- Variable scopes
 ---------------------
@@ -598,6 +602,11 @@ test211 = bad "test211" $
 test212 = ok "test212" [(1,2)] $
   "x" := 2 `semi` (doo ("x1" `wher` "x1" := 1) # "x")
 
+test200s :: IO ()
+test200s = mapM_ testEx
+  [test201,test202,test203,test204,test205,test206,test207,test208,test209,test210,test211,test212
+  ]
+
 ---------------------
 -- 0/1 results
 ---------------------
@@ -626,6 +635,11 @@ test307 = ok "test307" [(1,1)] $
 -- Test that when evaluating z the x is fully determined.
 test308 = ok "test308" [5] $
   "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+
+test300s :: IO ()
+test300s = mapM_ testEx
+  [test301,test302,test303,test304,test305,test306,test307,test308
+  ]
 
 ---------------------
 -- Multi-valued
@@ -679,6 +693,11 @@ test413 = ok "test413" [3,7,2,2] $
          "z" := 7            `semi`
          "x"
 
+test400s :: IO ()
+test400s = mapM_ testEx
+  [test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413
+  ]
+
 ---------------------
 -- Error/strictness
 ---------------------
@@ -694,6 +713,11 @@ test502 = bad "test502" $
 -- Generates an error, as it should
 test503 = bad "test504" $
    (2 # Error) `semi` 1
+
+test500s :: IO ()
+test500s = mapM_ testEx
+  [test501,test502,test503
+  ]
 
 ---------------------
 -- for
@@ -724,6 +748,11 @@ test607 = ok "test607" [(1,2,3)] $
 
 test608 = ok "test608" [(2,3,4)] $
   for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
+
+test600s :: IO ()
+test600s = mapM_ testEx
+  [test601,test602,test603,test604,test605,test606,test607,test608
+  ]
 
 ---------------------
 -- Functions
@@ -781,6 +810,11 @@ test709 = bad "test709" $
   "f" := lam "v" ("v" ||| "v" + 1) `semi`
   AppS "f" 10
 
+test700s :: IO ()
+test700s = mapM_ testEx
+  [test701,test702,test703,test704,test705,test706,test707,test708,test709
+  ]
+
 ---------------------
 -- Not yet sorted
 ---------------------
@@ -824,15 +858,20 @@ test46 = bug "test46" [(2,3)] $
   "xs" := (1#2) `semi`
   "a"
 
-testAll :: IO ()
-testAll = mapM_ testEx
-  [test101,test102,test103,test104,
-   test201,test202,test203,test204,test205,test206,test207,test208,test209,test210,test211,test212,
-   test301,test302,test303,test304,test305,test306,test307,test308,
-   test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413,
-   test501,test502,test503,
-   test601,test602,test603,test604,test605,test606,test607,test608,
-   test701,test702,test703,test704,test705,test706,test707,test708,test709,
-
-   test32,test33,test34,test35,test36,test37,test38,test46
+testUnsorted :: IO ()
+testUnsorted = mapM_ testEx
+  [test32,test33,test34,test35,test36,test37,test38,test46
   ]
+
+--------
+
+testAll :: IO ()
+testAll = do
+  test100s
+  test200s
+  test300s
+  test400s
+  test500s
+  test600s
+  test700s
+  testUnsorted
