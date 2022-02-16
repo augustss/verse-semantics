@@ -51,6 +51,7 @@ data Exp = Var Name
          | Alt SExp SExp
          | Equal Exp Exp
          | Set Name Exp
+         | SetAny Name
          | Array [Exp]   -- (e1, ..., en)  aka  array{e1, ..., en}
          | Plus Exp Exp
          | Fail
@@ -123,7 +124,9 @@ doo e = Do (addDef e)
 
 lam :: Name -> Exp -> Exp
 lam n e = Lam n (addDef e)
-          
+
+var :: Name -> Exp
+var = SetAny
 
 -- Add all variables defined in the current scope.
 addDef :: HasCallStack => Exp -> SExp
@@ -146,6 +149,7 @@ findSet (AppS  e1 e2) = findSet e1 ++ findSet e2
 findSet (AppI  e1 e2) = findSet e1 ++ findSet e2
 findSet (Equal e1 e2) = findSet e1 ++ findSet e2
 findSet (Set x e) = x : findSet e
+findSet (SetAny x) = [x]
 findSet (Array es) = concatMap findSet es
 findSet (Plus e1 e2) = findSet e1 ++ findSet e2
 findSet (Range e) = findSet e
@@ -207,6 +211,8 @@ expToReg (Equal e1 e2) = do
   pure r1
 expToReg (Set n e) =
   expToReg $ Equal (Var n) e
+expToReg (SetAny n) =
+  expToReg (Var n)
 expToReg (Array es) = do
   rs <- mapM expToReg es
   t <- newReg
@@ -407,40 +413,41 @@ step :: Context -> Context
 step ctx | debug && trace ("step " ++ show (take 1 (ctx_ops ctx))) False = undefined
 
 --------- Draining suspensions ------------
-step ctx@Ctx { ctx_ops = Drain : _, ctx_susp = susp : susps } =
+step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = susp : susps } =
   trySusp susp ctx{ ctx_susp = susps }
-step ctx@Ctx { ctx_ops = Drain : ops, ctx_susp = [] } =
+step ctx@Ctx{ ctx_ops = Drain : ops, ctx_susp = [] } =
   ctx{ ctx_ops = ops }
 
 --------- Function return ------------
-step ctx@Ctx { ctx_ops = [EndFun], ctx_stack = ContFun res fr ops : stk } =
+step ctx@Ctx{ ctx_ops = [EndFun], ctx_stack = ContFun res fr ops : stk } =
   --trace ("EndFun " ++ show (res, ctx_accum ctx)) $
-  unify res (ctx_accum ctx) ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
+  unify res (ctx_accum ctx)
+    ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
 --------- Join (Alt) return ------------
-step ctx@Ctx { ctx_ops = [EndAlt], ctx_stack = ContAlt ops : stk } =
-  ctx { ctx_ops = ops, ctx_stack = stk }
+step ctx@Ctx{ ctx_ops = [EndAlt], ctx_stack = ContAlt ops : stk } =
+  ctx{ ctx_ops = ops, ctx_stack = stk }
 
 --------- PushFrame return ------------
-step ctx@Ctx { ctx_ops = [EndFrame], ctx_stack = ContFrame fr ops : stk } =
-  ctx { ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
+step ctx@Ctx{ ctx_ops = [EndFrame], ctx_stack = ContFrame fr ops : stk } =
+  ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
 
 --------- Choice ------------
-step ctx@Ctx { ctx_ops = Choice ops1 ops2 : ops
-              , ctx_stack = old_stack
-              , ctx_next = old_next } = ctx1
+step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
+            , ctx_stack = old_stack
+            , ctx_next = old_next } = ctx1
   where
     -- NB: both ctx1 and ctx2 start with the same heap
-    ctx1 = ctx { ctx_ops = ops1
-               , ctx_stack = ContAlt ops : old_stack
-               , ctx_next = ctx2 : old_next }
-    ctx2 = ctx { ctx_ops = ops2
-               }
+    ctx1 = ctx{ ctx_ops = ops1
+              , ctx_stack = ContAlt ops : old_stack
+              , ctx_next = ctx2 : old_next }
+    ctx2 = ctx{ ctx_ops = ops2
+              }
 
 --------- Simple ------------
-step actx@Ctx { ctx_ops = op : aops } =
-  let ctx = actx{ctx_ops = aops}
+step actx@Ctx{ ctx_ops = op : aops } =
+  let ctx = actx{ ctx_ops = aops }
   in  case op of
         Atom r (AnInteger i) -> assign r (VInteger i) ctx
         PushFrame ns ops ->
@@ -448,7 +455,6 @@ step actx@Ctx { ctx_ops = op : aops } =
               fr = makeFrame (zip ns $ map VHeap hs) ctx'
           in  ctx'{ ctx_ops = ops, ctx_frame = fr
                   , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
-
         Load r -> ctx{ ctx_accum = loadValue r ctx }
         Store r -> storeValue r (ctx_accum ctx) ctx
         MkArray t rs -> storeValue t (VArray [ loadValue r ctx | r <- rs]) ctx
@@ -498,7 +504,7 @@ unify' v1 (VHeap h2) ctx | isFlex h2 ctx = setHeap h2 v1 ctx
 unify' v1@VHeap{} v2 ctx = suspendUnify v1 v2 ctx
 unify' v1 v2@VHeap{} ctx = suspendUnify v1 v2 ctx
 unify' (VArray vs1) (VArray vs2) ctx
-  | length vs1 == length vs2 = failure ctx
+  | length vs1 /= length vs2 = failure ctx
   | otherwise = foldr (uncurry suspendUnify) ctx (zip vs1 vs2)
 unify' VFun{} VFun{} _ = error "WRONG: comparing functions"
 unify' _ _ ctx = failure ctx
@@ -506,7 +512,7 @@ unify' _ _ ctx = failure ctx
 suspendUnify :: Value -> Value -> Context -> Context
 suspendUnify v1 v2 = addSusp $ SuspUnify v1 v2
 
-failure :: Context -> Context
+failure :: HasCallStack => Context -> Context
 failure _ctx = error "failure: unimplemented"
 
 isFlex :: HeapId -> Context -> Bool
@@ -894,6 +900,39 @@ test709 = bad "test709" $
 test700s :: IO ()
 test700s = mapM_ testEx
   [test701,test702,test703,test704,test705,test706,test707,test708,test709
+  ]
+
+---------------------
+-- Unification
+---------------------
+test801 = ok "test801" [1] $
+  var "x" `semi`
+  "x" === 1 `semi`
+  "x"
+
+test802 = ok "test802" [1] $
+  var "x" `semi`
+  ("x" # 2) === (1 # 2) `semi`
+  "x"
+
+test803 = ok "test803" [(1,2)] $
+  var "x" `semi`
+  var "y" `semi`
+  ("x" # 2) === (1 # "y")
+
+test804 = ok "test804" [1] $
+  "f" := lam "xy" (Fst "xy" === Snd "xy") `semi`
+  var "x" `semi`
+  AppS "f" ("x" # 1) `semi`
+  "x"
+
+test805 = ok "test805" [6] $
+  "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" `semi` "x" + "y" + "z") `semi`
+  AppS "f" (1 # 2 # 3)
+
+test800s :: IO ()
+test800s = mapM_ testEx
+  [test801,test802,test803,test804,test805--,test806,test807,test808,test809
   ]
 
 ---------------------
