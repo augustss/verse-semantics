@@ -30,5 +30,4 @@ testEx :: (Eq a, NFData a, Show a) => Ex a -> IO ()
 testEx ex = do
   let exio = evaluate $ force $ test ex
   res <- catch (timeout limit exio) (\ (_ :: SomeException) -> return Nothing)
-  putStrLn $ name ex ++ " " ++ if res == expected ex then "OK" else "failed: " ++ show res
-
+  putStrLn $ name ex ++ " " ++ if res == expected ex then "OK" else "failed: " ++ show (res, expected ex)
