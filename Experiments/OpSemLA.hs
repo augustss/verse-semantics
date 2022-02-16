@@ -119,6 +119,9 @@ wher x y = Where x y
 for :: Exp -> Exp -> Exp
 for e1 e2 = For (addDef e1) (addDef e2)
 
+iF :: Exp -> Exp -> Exp -> Exp
+iF e1 e2 e3 = If (addDef e1) (addDef e2) (addDef e3)
+
 doo :: Exp -> Exp
 doo e = Do (addDef e)
 
@@ -162,20 +165,12 @@ findSet Error = []
 --------------------------
 
 data CompileState = CompileState
-  { env :: !(Map Name Reg),
-    nextTemp :: !Int,
+  { nextTemp :: !Int,
     cops :: [Op]  -- generated ops so far
   }
   deriving (Show)
 
 type C = State CompileState
-
-cLookup :: Name -> C Reg
-cLookup n = do
-  m <- gets env
-  case M.lookup n m of
-    Nothing -> error $ "cLookup: " ++ show n
-    Just r -> pure r
 
 newReg :: C Reg
 newReg = do
@@ -191,7 +186,7 @@ emit :: Op -> C ()
 emit op = modify $ \ s -> s { cops = cops s ++ [op] }
 
 expToReg :: Exp -> C Reg
-expToReg (Var n) = cLookup n
+expToReg (Var n) = pure $ Reg n
 expToReg (Con i) = do t <- newReg; emit $ Atom t (AnInteger i); pure t
 expToReg (Semi e1 e2) = expToReg e1 >> expToReg e2
 expToReg (Where e1 e2) = do
@@ -228,7 +223,13 @@ expToReg Fail = do
   emit Failure
   newReg                -- we must return something, but this reg will never be set
 expToReg (For _e1 _e2) = undefined
-expToReg (If _e1 _e2 _e3) = undefined
+expToReg (If e1 e2 e3) = do
+  t <- newReg
+  o1 <- sexpToOps' (const [EndDomain]) e1
+  o2 <- sexpToOps e2
+  o3 <- sexpToOps e3
+  emit $ Iterate [o1] [o2, Store t, EndFrame] [o3, Store t, EndFrame]
+  pure t
 expToReg (Do e) = do
   t <- newReg
   o <- sexpToOps e
@@ -237,7 +238,7 @@ expToReg (Do e) = do
   pure t
 expToReg (Range _e) = undefined
 expToReg (Lam n e) = do
-  os <- withNames [n] $ sexpToOps e
+  os <- sexpToOps e
   t <- newReg
   emit $ Function t n [os, EndFun]
   pure t
@@ -248,32 +249,27 @@ expToReg (AppS e1 e2) = do
   emit $ Call t r1 r2
   pure t
 expToReg (AppI _e1 _e2) = undefined
-expToReg Error = undefined
+expToReg Error = do
+  emit $ ErrorOp "Error"
+  newReg
 
-sexpToOps :: SExp -> C Op
-sexpToOps (Def ns e) = do
+sexpToOps' :: (Reg -> [Op]) -> SExp -> C Op
+sexpToOps' ops (Def ns e) = do
   olds <- get
   put olds{ cops = [] }
-  r <- withNames ns $ expToReg e
+  r <- expToReg e
   s <- get
   put olds{ nextTemp = nextTemp s }
   let tmps = [ tmpName t | t <- [nextTemp olds + 1 .. nextTemp s] ]
-  pure $ PushFrame (ns ++ tmps) (cops s ++ [Load r, EndFrame])
+  pure $ PushFrame (ns ++ tmps) (cops s ++ ops r)
 
-withNames :: [Name] -> C a -> C a
-withNames ns ca = do
-  olds <- get
-  put olds { env = foldr (uncurry M.insert) (env olds) [ (n, Reg { reg_name = n }) | n <- ns]
-           }
-  a <- ca
-  s <- get
-  put s{ env = env olds }
-  pure a
+sexpToOps :: SExp -> C Op
+sexpToOps = sexpToOps' $ \ r -> [Load r, EndFrame]
 
 -- The main compiler
 comp :: SExp -> [Op]
 comp e = evalState se cs
-  where cs = CompileState{ env = M.empty, nextTemp = 1, cops = [] }
+  where cs = CompileState{ nextTemp = 1, cops = [] }
         se = do
           op <- sexpToOps e
           pure $ [op, Drain, Stop]
@@ -304,6 +300,10 @@ data Op
   | Load Reg
   | Store Reg
   | Drain
+  | Iterate { domain :: [Op], success :: [Op], failur :: [Op] }
+  | EndDomain
+  --- 
+  | ErrorOp String
   | Stop   -- Just for testing, print the accum and stop
   deriving (Eq, Show)
 
@@ -326,6 +326,8 @@ data Context
         , ctx_next   :: [Context]        -- Backtrack points
         , ctx_parent :: Maybe Context
         , ctx_accum  :: Value            -- argument/result
+        , ctx_success:: [Op]
+        , ctx_failure:: [Op]
         }
   deriving (Show)
 
@@ -372,6 +374,10 @@ expunge heap = value []
                            Just (Just v') -> value (h:s) v'
     frame s Frame{..} = Frame{ fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
 
+expungeFrame :: HasCallStack => Heap -> Frame -> Frame
+expungeFrame heap fr = fr'
+  where VFun fr' "" [] = expunge heap (VFun fr "" [])
+
 type Nat = Int
 
 data Reg = Reg { reg_name  :: Name }
@@ -410,7 +416,7 @@ assign r@Reg{..} val ctx =
 
 step :: Context -> Context
 
-step ctx | debug && trace ("step " ++ show (take 1 (ctx_ops ctx))) False = undefined
+step ctx | debug && trace ("step " ++ show (head (ctx_ops ctx))) False = undefined
 
 --------- Draining suspensions ------------
 step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = susp : susps } =
@@ -432,6 +438,11 @@ step ctx@Ctx{ ctx_ops = [EndAlt], ctx_stack = ContAlt ops : stk } =
 step ctx@Ctx{ ctx_ops = [EndFrame], ctx_stack = ContFrame fr ops : stk } =
   ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
+--------- PushFrame domain return ------------
+step Ctx{ ctx_ops = [EndDomain], ctx_parent = Just ctx, ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } =
+  ctx{ ctx_ops = sOps
+     , ctx_frame = expungeFrame heap fr
+     , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 
 --------- Choice ------------
 step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
@@ -444,6 +455,21 @@ step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
               , ctx_next = ctx2 : old_next }
     ctx2 = ctx{ ctx_ops = ops2
               }
+
+--------- Iterate ------------
+step ctx@Ctx{ ctx_ops = Iterate d s f : ops } =
+  Ctx{ ctx_ops = d
+     , ctx_frame = Frame { fr_vals = M.empty, fr_parent = Just (ctx_frame ctx) }
+     , ctx_stack = []
+     , ctx_next = []
+     , ctx_heap = M.empty
+     , ctx_heapId = ctx_heapId ctx   -- could it start from 1?
+     , ctx_susp = []
+     , ctx_parent = Just ctx{ ctx_ops = ops }
+     , ctx_accum = VInteger 0
+     , ctx_success = s
+     , ctx_failure = f
+     }
 
 --------- Simple ------------
 step actx@Ctx{ ctx_ops = op : aops } =
@@ -463,6 +489,7 @@ step actx@Ctx{ ctx_ops = op : aops } =
         Add t x y -> addOp (loadValue t ctx) (loadValue x ctx) (loadValue y ctx) ctx
         Function t n ops -> assign t (VFun (ctx_frame ctx) n ops) ctx
         Call t f a -> callOp (loadValue t ctx) (loadValue f ctx) (loadValue a ctx) ctx
+        ErrorOp s -> error $ "ErrorOp: " ++ s
         _ -> error $ "step " ++ show op
 
 step _ = undefined
@@ -513,7 +540,11 @@ suspendUnify :: Value -> Value -> Context -> Context
 suspendUnify v1 v2 = addSusp $ SuspUnify v1 v2
 
 failure :: HasCallStack => Context -> Context
-failure _ctx = error "failure: unimplemented"
+failure Ctx{ ctx_parent = Just ctx, ctx_failure = fOps } =
+  ctx{ ctx_ops = fOps
+     , ctx_frame = ctx_frame ctx  -- XXX maybe an empty frame?
+     , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
+failure Ctx{ ctx_parent = Nothing } = error "failure: no parent"
 
 isFlex :: HeapId -> Context -> Bool
 isFlex h ctx = M.member h (ctx_heap ctx)
@@ -591,6 +622,8 @@ run ops = loop Ctx{ ctx_ops = ops
                   , ctx_susp = []
                   , ctx_parent = Nothing
                   , ctx_accum = VInteger 0
+                  , ctx_success = [ErrorOp "ctx_success"]
+                  , ctx_failure = [ErrorOp "ctx_failure"]
                   }
   where
     loop Ctx {ctx_ops = [Stop], ctx_heap = heap, ctx_accum = v} =
@@ -933,6 +966,27 @@ test805 = ok "test805" [6] $
 test800s :: IO ()
 test800s = mapM_ testEx
   [test801,test802,test803,test804,test805--,test806,test807,test808,test809
+  ]
+
+---------------------
+-- Conditional
+---------------------
+
+test901 = ok "test901" [1] $
+  iF (1 === 1) 1 2
+
+test902 = ok "test902" [2] $
+  iF (0 === 1) 1 2
+
+test903 = ok "test903" [10] $
+  iF ("x" := 10) "x" 2
+
+test904 = ok "test904" [2] $
+  iF Fail 1 2
+
+test900s :: IO ()
+test900s = mapM_ testEx
+  [test901,test902,test903,test904
   ]
 
 ---------------------
