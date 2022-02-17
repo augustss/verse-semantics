@@ -331,7 +331,13 @@ data Context
         }
   deriving (Show)
 
-data Suspension
+data Suspension = Susp
+  { susp_waitingFor :: [HeapId]
+  , susp_cont       :: SuspCont
+  }
+  deriving (Show)
+
+data SuspCont
   = SuspUnify Value Value
   | SuspAdd Value Value Value
   | SuspCall Value Value Value
@@ -375,8 +381,9 @@ expunge heap = value []
     frame s Frame{..} = Frame{ fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
 
 expungeFrame :: HasCallStack => Heap -> Frame -> Frame
-expungeFrame heap fr = fr'
-  where VFun fr' "" [] = expunge heap (VFun fr "" [])
+expungeFrame heap fr = f $ expunge heap (VFun fr "" [])
+  where f (VFun fr' "" []) = fr'
+        f _ = error "impossible"
 
 type Nat = Int
 
@@ -419,7 +426,7 @@ step :: Context -> Context
 step ctx | debug && trace ("step " ++ show (head (ctx_ops ctx))) False = undefined
 
 --------- Draining suspensions ------------
-step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = susp : susps } =
+step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = Susp _ susp : susps } =
   trySusp susp ctx{ ctx_susp = susps }
 step ctx@Ctx{ ctx_ops = Drain : ops, ctx_susp = [] } =
   ctx{ ctx_ops = ops }
@@ -528,16 +535,16 @@ unify' :: Value -> Value -> Context -> Context
 unify' v1 v2 ctx | v1 == v2 = ctx
 unify' (VHeap h1) v2 ctx | isFlex h1 ctx = setHeap h1 v2 ctx
 unify' v1 (VHeap h2) ctx | isFlex h2 ctx = setHeap h2 v1 ctx
-unify' v1@VHeap{} v2 ctx = suspendUnify v1 v2 ctx
-unify' v1 v2@VHeap{} ctx = suspendUnify v1 v2 ctx
+unify' v1@(VHeap h1) v2 ctx = suspendUnify h1 v1 v2 ctx
+unify' v1 v2@(VHeap h2) ctx = suspendUnify h2 v1 v2 ctx
 unify' (VArray vs1) (VArray vs2) ctx
   | length vs1 /= length vs2 = failure ctx
-  | otherwise = foldr (uncurry suspendUnify) ctx (zip vs1 vs2)
+  | otherwise = foldr ($) ctx $ zipWith unify vs1 vs2
 unify' VFun{} VFun{} _ = error "WRONG: comparing functions"
 unify' _ _ ctx = failure ctx
 
-suspendUnify :: Value -> Value -> Context -> Context
-suspendUnify v1 v2 = addSusp $ SuspUnify v1 v2
+suspendUnify :: HeapId -> Value -> Value -> Context -> Context
+suspendUnify h v1 v2 = addSusp [h] $ SuspUnify v1 v2
 
 failure :: HasCallStack => Context -> Context
 failure Ctx{ ctx_parent = Just ctx, ctx_failure = fOps } =
@@ -566,32 +573,35 @@ getHeap h Ctx{ctx_heap = heap, ctx_parent = parent}
     Nothing -> error $ "getHeap: unset heap ID " ++ show h
     Just ctx -> getHeap h ctx
 
+{-
 getWHNF :: Context -> Value -> Maybe Value
 getWHNF ctx v =
   case follow v ctx of
     VHeap _ -> Nothing
     v' -> Just v'
+-}
 
 addOp :: Value -> Value -> Value -> Context -> Context
 addOp dst src1 src2 ctx =
-  case traverse (getWHNF ctx) [src1, src2] of
-    Just [VInteger i1, VInteger i2] -> unify dst (VInteger $ i1 + i2) ctx
-    Just _ -> failure ctx
-    Nothing -> addSusp (SuspAdd dst src1 src2) ctx
+  case (follow src1 ctx, follow src2 ctx) of
+    (VInteger i1, VInteger i2) -> unify dst (VInteger $ i1 + i2) ctx
+    (VHeap h1, _) -> addSusp [h1] (SuspAdd dst src1 src2) ctx
+    (_, VHeap h2) -> addSusp [h2] (SuspAdd dst src1 src2) ctx
+    _ -> failure ctx  -- WHNF, but not integers
 
 callOp :: Value -> Value -> Value -> Context -> Context
 callOp t f a ctx | debug && trace ("callOp " ++ show ((t,f,a),(follow t ctx,follow f ctx, follow a ctx))) False = undefined
 callOp t f a ctx =
-  case getWHNF ctx f of
-    Just (VFun fr n ops) -> apply t fr n ops a ctx
-    Just (VArray vs) ->
-      case getWHNF ctx a of
-        Just (VInteger (fromInteger -> i)) | i >= 0 && i < length vs -> unify t (vs !! i) ctx
-                                           | otherwise -> failure ctx
-        Just _ -> failure ctx -- XXX maybe WRONG
-        Nothing -> addSusp (SuspCall t f a) ctx
-    Just v -> error $ "Call: not a function/array " ++ show v
-    Nothing -> addSusp (SuspCall t f a) ctx
+  case follow f ctx of
+    VFun fr n ops -> apply t fr n ops a ctx
+    VArray vs ->
+      case follow a ctx of
+        VInteger (fromInteger -> i) | i >= 0 && i < length vs -> unify t (vs !! i) ctx
+                                    | otherwise -> failure ctx
+        VHeap h -> addSusp [h] (SuspCall t f a) ctx
+        _ -> failure ctx -- XXX maybe WRONG
+    VHeap h -> addSusp [h] (SuspCall t f a) ctx
+    v -> error $ "Call: not a function/array " ++ show v
 
 apply :: Value -> Frame -> Name -> [Op] -> Value -> Context -> Context
 apply target fr argName ops arg ctx =
@@ -602,11 +612,11 @@ apply target fr argName ops arg ctx =
       fr' = makeFrame [(argName, arg)] ctx'
   in  ctx' { ctx_frame = fr' }
 
-addSusp :: Suspension -> Context -> Context
-addSusp susp _ | debug && trace ("addSusp: " ++ show susp) False = undefined
-addSusp susp ctx = ctx{ ctx_susp = ctx_susp ctx ++ [susp] }
+addSusp :: [HeapId] -> SuspCont -> Context -> Context
+addSusp hs susp _ | debug && trace ("addSusp: " ++ show (Susp hs susp)) False = undefined
+addSusp hs susp ctx = ctx{ ctx_susp = ctx_susp ctx ++ [Susp hs susp] }
 
-trySusp :: Suspension -> Context -> Context
+trySusp :: SuspCont -> Context -> Context
 trySusp susp | debug && trace ("trySusp " ++ show susp) False = undefined
 trySusp (SuspUnify v1 v2) = unify v1 v2
 trySusp (SuspAdd v1 v2 v3) = addOp v1 v2 v3
@@ -984,6 +994,16 @@ test903 = ok "test903" [10] $
 test904 = ok "test904" [2] $
   iF Fail 1 2
 
+test905 = --ok "test905" [1] $
+  "y" := iF ("x" === 10) 1 2 `semi`
+  "x" := 10 `semi`
+  "y"
+
+test906 = --ok "test906" [2] $
+  "y" := iF ("x" === 10) 1 2 `semi`
+  "x" := 0 `semi`
+  "y"
+
 test900s :: IO ()
 test900s = mapM_ testEx
   [test901,test902,test903,test904
@@ -1039,6 +1059,12 @@ testUnsorted = mapM_ testEx
 
 --------
 
+testOpSem :: IO ()
+testOpSem = do
+  test100s
+  test200s
+  test800s
+
 testAll :: IO ()
 testAll = do
   test100s
@@ -1048,4 +1074,6 @@ testAll = do
   test500s
   test600s
   test700s
+  test800s
+  test900s
   testUnsorted
