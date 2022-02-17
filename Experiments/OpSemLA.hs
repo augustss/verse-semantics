@@ -225,7 +225,7 @@ expToReg Fail = do
 expToReg (For _e1 _e2) = undefined
 expToReg (If e1 e2 e3) = do
   t <- newReg
-  o1 <- sexpToOps' (const [EndDomain]) e1
+  o1 <- sexpToOps' (const [Drain, EndDomain]) e1
   o2 <- sexpToOps e2
   o3 <- sexpToOps e3
   emit $ Iterate [o1] [o2, Store t, EndFrame] [o3, Store t, EndFrame]
@@ -259,9 +259,10 @@ sexpToOps' ops (Def ns e) = do
   put olds{ cops = [] }
   r <- expToReg e
   s <- get
-  put olds{ nextTemp = nextTemp s }
+  put olds{ nextTemp = nextTemp s + 1 }
   let tmps = [ tmpName t | t <- [nextTemp olds + 1 .. nextTemp s] ]
-  pure $ PushFrame (ns ++ tmps) (cops s ++ ops r)
+      msg = "fr" ++ show (nextTemp s)
+  pure $ PushFrame msg (ns ++ tmps) (cops s ++ ops r)
 
 sexpToOps :: SExp -> C Op
 sexpToOps = sexpToOps' $ \ r -> [Load r, EndFrame]
@@ -293,7 +294,7 @@ data Op
   | Choice [Op] [Op]
   | Failure
   | Add { target :: Reg, arg1 :: Reg, arg2 :: Reg }
-  | PushFrame [Name] [Op]
+  | PushFrame String [Name] [Op]   -- The String is only for debugging
   | EndFrame
   | EndFun
   | EndAlt
@@ -307,11 +308,15 @@ data Op
   | Stop   -- Just for testing, print the accum and stop
   deriving (Eq, Show)
 
-data Frame = Frame { fr_vals   :: Map Name Value
-                   , fr_parent :: Maybe Frame  -- Lexical parent
-                   }
+data Frame = Frame
+  { fr_name   :: String           -- Name for debugging
+  , fr_vals   :: Map Name Value
+  , fr_parent :: Maybe Frame      -- Lexical parent
+  }
   deriving (Eq, Show)
 
+-- XXX HeapId needs both a ContextId and a local heap index.
+-- Otherwise parallel heaps from different subcontexts might be confused.
 type HeapId = Int
 type Heap = Map HeapId (Maybe Value)
 
@@ -326,9 +331,12 @@ data Context
         , ctx_next   :: [Context]        -- Backtrack points
         , ctx_parent :: Maybe Context
         , ctx_accum  :: Value            -- argument/result
-        , ctx_success:: [Op]
-        , ctx_failure:: [Op]
+        , ctx_success:: Cont
+        , ctx_failure:: Cont
         }
+  deriving (Show)
+
+data Cont = Cont Frame [Op]
   deriving (Show)
 
 data Suspension = Susp
@@ -341,6 +349,7 @@ data SuspCont
   = SuspUnify Value Value
   | SuspAdd Value Value Value
   | SuspCall Value Value Value
+  | SuspDomain Context
   deriving (Show)
 
 data Continuation
@@ -378,7 +387,7 @@ expunge heap = value []
                            Nothing -> v  -- Not in this heap
                            Just Nothing -> error $ "WRONG: uninstantiated " ++ show h  -- XXX is it wrong
                            Just (Just v') -> value (h:s) v'
-    frame s Frame{..} = Frame{ fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
+    frame s Frame{..} = Frame{ fr_name = fr_name, fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
 
 expungeFrame :: HasCallStack => Heap -> Frame -> Frame
 expungeFrame heap fr = f $ expunge heap (VFun fr "" [])
@@ -396,9 +405,9 @@ instance Show Reg where
 
 type R = State Context
 
-assert :: String -> Bool -> R ()
-assert s False = error $ "assert: " ++ s
-assert _ True  = pure ()
+assert :: String -> Bool -> a -> a
+assert s False _ = error $ "assert: " ++ s
+assert _ True  a = a
 
 assign :: Reg -> Value -> Context -> Context
 -- Preconditions:
@@ -423,12 +432,12 @@ assign r@Reg{..} val ctx =
 
 step :: Context -> Context
 
-step ctx | debug && trace ("step " ++ show (head (ctx_ops ctx))) False = undefined
+step ctx | debug && trace ("step " ++ fr_name (ctx_frame ctx) ++ ": " ++ show (head (ctx_ops ctx))) False = undefined
 
 --------- Draining suspensions ------------
-step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = Susp _ susp : susps } =
+step ctx@Ctx{ ctx_ops = Drain : _, ctx_susp = asusps@(Susp _ susp : susps) } | any (canRun ctx) asusps =
   trySusp susp ctx{ ctx_susp = susps }
-step ctx@Ctx{ ctx_ops = Drain : ops, ctx_susp = [] } =
+step ctx@Ctx{ ctx_ops = Drain : ops } =
   ctx{ ctx_ops = ops }
 
 --------- Function return ------------
@@ -446,10 +455,19 @@ step ctx@Ctx{ ctx_ops = [EndFrame], ctx_stack = ContFrame fr ops : stk } =
   ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
 --------- PushFrame domain return ------------
-step Ctx{ ctx_ops = [EndDomain], ctx_parent = Just ctx, ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } =
+step Ctx{ ctx_ops = [EndDomain]
+        , ctx_parent = Just ctx
+        , ctx_success = Cont _sfr sOps
+        , ctx_frame = fr
+        , ctx_heap = heap
+        , ctx_susp = [] } =
+  --assert "EndDomain" (chain fr == chain sfr) $
+  --trace (show (chain fr, chain sfr)) $
   ctx{ ctx_ops = sOps
      , ctx_frame = expungeFrame heap fr
      , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
+  --where chain x = fr_name x : maybe [] chain (fr_parent x)
+step ctx@Ctx{ ctx_ops = [EndDomain] } = endDomain ctx
 
 --------- Choice ------------
 step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
@@ -466,7 +484,7 @@ step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
 --------- Iterate ------------
 step ctx@Ctx{ ctx_ops = Iterate d s f : ops } =
   Ctx{ ctx_ops = d
-     , ctx_frame = Frame { fr_vals = M.empty, fr_parent = Just (ctx_frame ctx) }
+     , ctx_frame = Frame { fr_name = "Iterate", fr_vals = M.empty, fr_parent = Just pfr }
      , ctx_stack = []
      , ctx_next = []
      , ctx_heap = M.empty
@@ -474,18 +492,19 @@ step ctx@Ctx{ ctx_ops = Iterate d s f : ops } =
      , ctx_susp = []
      , ctx_parent = Just ctx{ ctx_ops = ops }
      , ctx_accum = VInteger 0
-     , ctx_success = s
-     , ctx_failure = f
+     , ctx_success = Cont pfr s
+     , ctx_failure = Cont pfr f
      }
+  where pfr = ctx_frame ctx
 
 --------- Simple ------------
 step actx@Ctx{ ctx_ops = op : aops } =
   let ctx = actx{ ctx_ops = aops }
   in  case op of
         Atom r (AnInteger i) -> assign r (VInteger i) ctx
-        PushFrame ns ops ->
+        PushFrame msg ns ops ->
           let (hs, ctx') = newHeapIds (length ns) ctx
-              fr = makeFrame (zip ns $ map VHeap hs) ctx'
+              fr = makeFrame msg (zip ns $ map VHeap hs) ctx'
           in  ctx'{ ctx_ops = ops, ctx_frame = fr
                   , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
         Load r -> ctx{ ctx_accum = loadValue r ctx }
@@ -509,8 +528,9 @@ newHeapIds n ctx =
       ,ctx{ctx_heapId = h+n, ctx_heap = foldr (uncurry M.insert) (ctx_heap ctx) (zip hs (repeat Nothing)) }
       )
 
-makeFrame :: [(Name, Value)] -> Context -> Frame
-makeFrame nvs ctx = Frame { fr_vals = M.fromList [(n, v) | (n, v) <- nvs ], fr_parent = Just $ ctx_frame ctx }
+makeFrame :: String -> [(Name, Value)] -> Context -> Frame
+makeFrame msg nvs ctx =
+  Frame { fr_name = msg, fr_vals = M.fromList [(n, v) | (n, v) <- nvs ], fr_parent = Just $ ctx_frame ctx }
 
 loadValue :: Reg -> Context -> Value
 loadValue r ctx = loadValue' (reg_name r) (Just (ctx_frame ctx))
@@ -547,9 +567,9 @@ suspendUnify :: HeapId -> Value -> Value -> Context -> Context
 suspendUnify h v1 v2 = addSusp [h] $ SuspUnify v1 v2
 
 failure :: HasCallStack => Context -> Context
-failure Ctx{ ctx_parent = Just ctx, ctx_failure = fOps } =
+failure Ctx{ ctx_parent = Just ctx, ctx_failure = Cont ffr fOps } =
   ctx{ ctx_ops = fOps
-     , ctx_frame = ctx_frame ctx  -- XXX maybe an empty frame?
+     , ctx_frame = ffr
      , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 failure Ctx{ ctx_parent = Nothing } = error "failure: no parent"
 
@@ -570,7 +590,8 @@ getHeap h Ctx{ctx_heap = heap, ctx_parent = parent}
   | Just mv <- M.lookup h heap = mv
   | otherwise =
   case parent of
-    Nothing -> error $ "getHeap: unset heap ID " ++ show h
+    -- When looking up in canRun we might not have all heaps available.
+    Nothing -> Nothing -- error $ "getHeap: unset heap ID " ++ show h
     Just ctx -> getHeap h ctx
 
 {-
@@ -609,7 +630,7 @@ apply target fr argName ops arg ctx =
         ctx{ ctx_ops = ops
            , ctx_stack = ContFun target (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx
            , ctx_frame = fr }
-      fr' = makeFrame [(argName, arg)] ctx'
+      fr' = makeFrame "apply" [(argName, arg)] ctx'
   in  ctx' { ctx_frame = fr' }
 
 addSusp :: [HeapId] -> SuspCont -> Context -> Context
@@ -621,10 +642,23 @@ trySusp susp | debug && trace ("trySusp " ++ show susp) False = undefined
 trySusp (SuspUnify v1 v2) = unify v1 v2
 trySusp (SuspAdd v1 v2 v3) = addOp v1 v2 v3
 trySusp (SuspCall v1 v2 v3) = callOp v1 v2 v3
+trySusp (SuspDomain ctx) = \ pctx ->
+  ctx{ ctx_ops = [Drain, EndDomain], ctx_parent = Just pctx }
+
+-- Check if a suspension could possibly make progress.
+canRun :: Context -> Suspension -> Bool
+canRun ctx (Susp hs _) = any (\ h -> isJust (getHeap h ctx)) hs
+
+-- There are suspensions left at the end of a domain evaluation.
+-- Switch to the parent and add a suspension.
+endDomain :: Context -> Context
+endDomain actx@Ctx{ ctx_parent = Just ctx, ctx_susp = susps } =
+  addSusp (concatMap susp_waitingFor susps) (SuspDomain actx) ctx
+endDomain _ = error "endDomain: impossible"
 
 run :: [Op] -> [Value]
 run ops = loop Ctx{ ctx_ops = ops
-                  , ctx_frame = Frame { fr_vals = M.empty, fr_parent = Nothing }
+                  , ctx_frame = fr
                   , ctx_stack = []
                   , ctx_next = []
                   , ctx_heap = M.empty
@@ -632,13 +666,15 @@ run ops = loop Ctx{ ctx_ops = ops
                   , ctx_susp = []
                   , ctx_parent = Nothing
                   , ctx_accum = VInteger 0
-                  , ctx_success = [ErrorOp "ctx_success"]
-                  , ctx_failure = [ErrorOp "ctx_failure"]
+                  , ctx_success = Cont fr [ErrorOp "ctx_success"]
+                  , ctx_failure = Cont fr [ErrorOp "ctx_failure"]
                   }
   where
-    loop Ctx {ctx_ops = [Stop], ctx_heap = heap, ctx_accum = v} =
-      [expunge heap v]
+    loop Ctx {ctx_ops = [Stop], ctx_heap = heap, ctx_accum = v, ctx_susp = susps}
+      | null susps = [expunge heap v]
+      | otherwise = error "run: susps not empty"
     loop ctx = loop (step ctx)
+    fr = Frame { fr_name = "run", fr_vals = M.empty, fr_parent = Nothing }
 
 ev :: Exp -> [Value]
 ev = run . comp . addDef
@@ -973,9 +1009,12 @@ test805 = ok "test805" [6] $
   "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" `semi` "x" + "y" + "z") `semi`
   AppS "f" (1 # 2 # 3)
 
+test806 = bad "test806" $
+  var "x" `semi` "x"+1
+
 test800s :: IO ()
 test800s = mapM_ testEx
-  [test801,test802,test803,test804,test805--,test806,test807,test808,test809
+  [test801,test802,test803,test804,test805,test806--,test807,test808,test809
   ]
 
 ---------------------
@@ -994,19 +1033,39 @@ test903 = ok "test903" [10] $
 test904 = ok "test904" [2] $
   iF Fail 1 2
 
-test905 = --ok "test905" [1] $
+test905 = ok "test905" [1] $
+  iF ("x" := 1 `semi` "x" === 1) 1 2
+
+test906 = ok "test906" [2] $
+  iF ("x" := 1 `semi` "x" === 0) 1 2
+
+test907 = ok "test907" [1] $
+  iF ("x" === 1 `semi` "x" := 1) 1 2
+
+test908 = ok "test908" [2] $
+  iF ("x" === 0 `semi` "x" := 1) 1 2
+
+test909 = ok "test909" [1] $
+  "x" := 10 `semi`
+  iF ("x" === 10) 1 2
+
+test910 = ok "test910" [2] $
+  "x" := 0 `semi`
+  iF ("x" === 10) 1 2
+
+test911 = ok "test911" [1] $
   "y" := iF ("x" === 10) 1 2 `semi`
   "x" := 10 `semi`
   "y"
 
-test906 = --ok "test906" [2] $
+test912 = ok "test912" [2] $
   "y" := iF ("x" === 10) 1 2 `semi`
   "x" := 0 `semi`
   "y"
 
 test900s :: IO ()
 test900s = mapM_ testEx
-  [test901,test902,test903,test904
+  [test901,test902,test903,test904,test905,test906,test907,test908,test909,test910,test911,test912
   ]
 
 ---------------------
