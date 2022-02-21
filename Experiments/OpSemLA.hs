@@ -18,7 +18,7 @@ import Ex
 import Debug.Trace
 
 debug :: Bool
-debug = False
+debug = True
 
 --------------------------------
 --
@@ -222,13 +222,24 @@ expToReg (Plus e1 e2) = do
 expToReg Fail = do
   emit Failure
   newReg                -- we must return something, but this reg will never be set
-expToReg (For _e1 _e2) = undefined
-expToReg (If e1 e2 e3) = do
+expToReg (For e1 e2) = do
+  o1 <- sexpToOps' (const [Drain, EndDomain]) e1
+  o2 <- sexpToOps e2
   t <- newReg
+  a <- newReg
+  n <- gets nextTemp
+  let msg = "ctx" ++ show n
+  emit $ MkArray a []
+  emit $ Iterate msg [o1] [Dump "success", o2, NextFor a] [Dump "failure", Unify t a, EndFrame]
+  pure t
+expToReg (If e1 e2 e3) = do
   o1 <- sexpToOps' (const [Drain, EndDomain]) e1
   o2 <- sexpToOps e2
   o3 <- sexpToOps e3
-  emit $ Iterate [o1] [o2, Store t, EndFrame] [o3, Store t, EndFrame]
+  t <- newReg
+  n <- gets nextTemp
+  let msg = "ctx" ++ show n
+  emit $ Iterate msg [o1] [o2, Store t, PopDomain, EndFrame] [o3, Store t, EndFrame]
   pure t
 expToReg (Do e) = do
   t <- newReg
@@ -242,13 +253,21 @@ expToReg (Lam n e) = do
   t <- newReg
   emit $ Function t n [os, EndFun]
   pure t
+-- XXX This wrong.  AppS should make sure there is exactly one result
+-- Could use something like
+--    f(a)  -->  if (x:=f[a]) then x else WRONG
 expToReg (AppS e1 e2) = do
   r1 <- expToReg e1
   r2 <- expToReg e2
   t <- newReg
   emit $ Call t r1 r2
   pure t
-expToReg (AppI _e1 _e2) = undefined
+expToReg (AppI e1 e2) = do
+  r1 <- expToReg e1
+  r2 <- expToReg e2
+  t <- newReg
+  emit $ Call t r1 r2
+  pure t
 expToReg Error = do
   emit $ ErrorOp "Error"
   newReg
@@ -301,9 +320,16 @@ data Op
   | Load Reg
   | Store Reg
   | Drain
-  | Iterate { domain :: [Op], success :: [Op], failur :: [Op] }
+  | Iterate { it_name :: String, domain :: [Op], success :: [Op], failur :: [Op] }
   | EndDomain
+  | PopDomain
+  -- Hacky for loop implementation.
+  -- The arrAcc is where the resulting array is accumulated.
+  -- This reg is never used anywhere else, so the invariant
+  -- that a frame value never changes is ignored.
+  | NextFor { arrAcc :: Reg }   -- append ctx_accum to the arrAcc
   --- 
+  | Dump String
   | ErrorOp String
   | Stop   -- Just for testing, print the accum and stop
   deriving (Eq, Show)
@@ -322,7 +348,8 @@ type Heap = Map HeapId (Maybe Value)
 
 -- Context for expression evaluation
 data Context
-  = Ctx { ctx_heap   :: Heap
+  = Ctx { ctx_name   :: String           -- for debugging
+        , ctx_heap   :: Heap
         , ctx_heapId :: !HeapId          -- Next heap id
         , ctx_frame  :: Frame
         , ctx_ops    :: [Op]
@@ -333,6 +360,7 @@ data Context
         , ctx_accum  :: Value            -- argument/result
         , ctx_success:: Cont
         , ctx_failure:: Cont
+        , ctx_domains:: [Context]        -- temporary storage of nested domain
         }
   deriving (Show)
 
@@ -385,7 +413,7 @@ expunge heap = value []
                        | otherwise =
                          case M.lookup h heap of
                            Nothing -> v  -- Not in this heap
-                           Just Nothing -> error $ "WRONG: uninstantiated " ++ show h  -- XXX is it wrong
+                           Just Nothing -> v -- error $ "WRONG: uninstantiated " ++ show h  -- XXX is it wrong
                            Just (Just v') -> value (h:s) v'
     frame s Frame{..} = Frame{ fr_name = fr_name, fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
 
@@ -432,6 +460,7 @@ assign r@Reg{..} val ctx =
 
 step :: Context -> Context
 
+step ctx@Ctx{ ctx_ops = [] } = error $ "step: empty instructions:\n" ++ show ctx
 step ctx | debug && trace ("step " ++ fr_name (ctx_frame ctx) ++ ": " ++ show (head (ctx_ops ctx))) False = undefined
 
 --------- Draining suspensions ------------
@@ -455,18 +484,17 @@ step ctx@Ctx{ ctx_ops = [EndFrame], ctx_stack = ContFrame fr ops : stk } =
   ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
 --------- PushFrame domain return ------------
-step Ctx{ ctx_ops = [EndDomain]
+step dctx@Ctx
+        { ctx_ops = [EndDomain]
         , ctx_parent = Just ctx
         , ctx_success = Cont _sfr sOps
         , ctx_frame = fr
         , ctx_heap = heap
         , ctx_susp = [] } =
-  --assert "EndDomain" (chain fr == chain sfr) $
-  --trace (show (chain fr, chain sfr)) $
   ctx{ ctx_ops = sOps
      , ctx_frame = expungeFrame heap fr
-     , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
-  --where chain x = fr_name x : maybe [] chain (fr_parent x)
+     , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx
+     , ctx_domains = dctx : ctx_domains ctx}
 step ctx@Ctx{ ctx_ops = [EndDomain] } = endDomain ctx
 
 --------- Choice ------------
@@ -479,11 +507,13 @@ step ctx@Ctx{ ctx_ops = Choice ops1 ops2 : ops
               , ctx_stack = ContAlt ops : old_stack
               , ctx_next = ctx2 : old_next }
     ctx2 = ctx{ ctx_ops = ops2
+              , ctx_stack = ContAlt ops : old_stack
               }
 
 --------- Iterate ------------
-step ctx@Ctx{ ctx_ops = Iterate d s f : ops } =
-  Ctx{ ctx_ops = d
+step ctx@Ctx{ ctx_ops = Iterate n d s f : ops } =
+  Ctx{ ctx_name = n
+     , ctx_ops = d
      , ctx_frame = Frame { fr_name = "Iterate", fr_vals = M.empty, fr_parent = Just pfr }
      , ctx_stack = []
      , ctx_next = []
@@ -494,6 +524,7 @@ step ctx@Ctx{ ctx_ops = Iterate d s f : ops } =
      , ctx_accum = VInteger 0
      , ctx_success = Cont pfr s
      , ctx_failure = Cont pfr f
+     , ctx_domains = []
      }
   where pfr = ctx_frame ctx
 
@@ -516,9 +547,24 @@ step actx@Ctx{ ctx_ops = op : aops } =
         Function t n ops -> assign t (VFun (ctx_frame ctx) n ops) ctx
         Call t f a -> callOp (loadValue t ctx) (loadValue f ctx) (loadValue a ctx) ctx
         ErrorOp s -> error $ "ErrorOp: " ++ s
+        NextFor a ->
+          case loadValue a ctx of
+            VHeap h ->
+              case getHeap h ctx of
+                Just (VArray vs) -> trace (show (vs, ctx_accum ctx)) $
+                  let
+                    va = VArray (vs ++ [ctx_accum ctx])
+                    -- Violating heap invariant by updating a WHNF value.
+                    ctx' = ctx{ ctx_heap = M.insert h (Just va) (ctx_heap ctx), ctx_domains = dctxs }
+                    (dctx, dctxs) = case ctx_domains ctx of [] -> error "impossible"; d:ds -> (d, ds)
+                  in
+                    failure dctx{ ctx_parent = Just ctx' }
+                _ -> error "impossible: NextFor 1"
+            _ -> error "impossible: NextFor 2"
+        PopDomain -> ctx { ctx_domains = tail (ctx_domains ctx) }
+        Dump msg -> trace (msg ++ ":\n" ++ ctxDump ctx) ctx
+          where ctxDump c = ctx_name c ++ ": " ++ fr_name (ctx_frame ctx) ++ " " ++ map stkDump (ctx_stack c)
         _ -> error $ "step " ++ show op
-
-step _ = undefined
 
 newHeapIds :: Int -> Context -> ([HeapId], Context)
 newHeapIds n ctx =
@@ -566,8 +612,11 @@ unify' _ _ ctx = failure ctx
 suspendUnify :: HeapId -> Value -> Value -> Context -> Context
 suspendUnify h v1 v2 = addSusp [h] $ SuspUnify v1 v2
 
+-- When the domain fails, backtrack if possible.
+-- When no more backtracking remains, use failure continuation.
 failure :: HasCallStack => Context -> Context
-failure Ctx{ ctx_parent = Just ctx, ctx_failure = Cont ffr fOps } =
+failure Ctx{ ctx_next = ctx : _, ctx_parent = parent } = ctx{ ctx_parent = parent }  -- hackily reset parent
+failure Ctx{ ctx_next = [], ctx_parent = Just ctx, ctx_failure = Cont ffr fOps } =
   ctx{ ctx_ops = fOps
      , ctx_frame = ffr
      , ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
@@ -657,7 +706,8 @@ endDomain actx@Ctx{ ctx_parent = Just ctx, ctx_susp = susps } =
 endDomain _ = error "endDomain: impossible"
 
 run :: [Op] -> [Value]
-run ops = loop Ctx{ ctx_ops = ops
+run ops = loop Ctx{ ctx_name = "ctx_run"
+                  , ctx_ops = ops
                   , ctx_frame = fr
                   , ctx_stack = []
                   , ctx_next = []
@@ -668,6 +718,7 @@ run ops = loop Ctx{ ctx_ops = ops
                   , ctx_accum = VInteger 0
                   , ctx_success = Cont fr [ErrorOp "ctx_success"]
                   , ctx_failure = Cont fr [ErrorOp "ctx_failure"]
+                  , ctx_domains = []
                   }
   where
     loop Ctx {ctx_ops = [Stop], ctx_heap = heap, ctx_accum = v, ctx_susp = susps}
@@ -889,8 +940,10 @@ test500s = mapM_ testEx
 -- for
 ---------------------
 
-test601 = ok "test601" [(5,5,5)] $
+test601 = ok "test601" [(5,5)] $
   for (1|||2|||3) 5
+x601=
+  for (1|||2) 5
 
 test602 = ok "test602" [(1,2,3)] $
   for ("x" := 1|||2|||3) "x"
@@ -961,7 +1014,7 @@ test706 = ok "test706" [11] $
 
 -- Function defined after it is used;
 -- but the call is f[e], so we deadlock
-test707 = bad "test707" $
+test707 = ok "test707" [11] $
   "y" := AppI "f" "t" `semi`
   "w" := 7 `semi`
   "t" := 4 `semi`
@@ -1063,9 +1116,28 @@ test912 = ok "test912" [2] $
   "x" := 0 `semi`
   "y"
 
+test913 = ok "test913" [1] $
+  iF ("x":=1) "x" 20
+
+test914 = ok "test914" [1] $
+  iF ("x" := (1 ||| 2)) 1 20
+
+test915 = ok "test915" [2] $
+  iF ("x" := (Fail ||| 2)) "x" 20
+
+test916 = ok "test916" [1] $
+  iF ("x" := (1 ||| Fail)) "x" 20
+
+test917 = ok "test917" [20] $
+  iF ("x" := (Fail ||| Fail)) "x" 20
+
+test918 = ok "test918" [3] $
+  iF ("x" := (Fail ||| (Fail ||| 3))) "x" 20
+
 test900s :: IO ()
 test900s = mapM_ testEx
   [test901,test902,test903,test904,test905,test906,test907,test908,test909,test910,test911,test912
+  ,test913,test914,test915,test916,test917,test918
   ]
 
 ---------------------
