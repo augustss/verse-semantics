@@ -329,11 +329,16 @@ instance Show Reg where
 
 data Op
   = Atom { op_target :: Reg, op_atom :: Atom }
+    -- Set r to this value
+
   | PushFrame String [Name] [Op]   -- The String is only for debugging
   | EndFrame
-  | Load Reg
-  | Store Reg
-  | Unify Reg Reg
+
+  | Load Reg  -- ctx_accum := r
+  | Store Reg -- r = ctx_accum
+
+  | Unify Reg Reg  -- r1 = r2
+
   | MkArray { target :: Reg, elts :: [Reg] }
   | Call { target :: Reg, fun :: Reg, arg :: Reg }
   | Function { target :: Reg, argName :: Name, body :: [Op] }
@@ -377,7 +382,9 @@ instance Show Value where
 -----
 -- Global execution state
 ----
-data RunState = RunState
+
+data RunState =  -- The global state of the machine
+  RunState
   { rs_contexts       :: !(Map ContextId Context)   -- all active contexts
   , rs_nextContextId  :: !ContextId                 -- contextId
   , rs_currentContext :: !ContextId                 -- currently active context
@@ -437,17 +444,28 @@ runRunState ra = evalState ra startRunState
 data Context
   = Ctx { ctx_name     :: !String            -- for debugging
         , ctx_id       :: !ContextId         -- Id of this context
-        , ctx_heap     :: !Heap
+        , ctx_parent   :: Maybe ContextId    -- Does not vary
+
+        , ctx_frame    :: !Frame             -- The lexical environment, maps names to values
+
+        , ctx_heap     :: !Heap              -- Stores logical variables
         , ctx_heapAddr :: !HeapAddr          -- Next heap address
-        , ctx_frame    :: !Frame
-        , ctx_ops      :: ![Op]
-        , ctx_accum    :: !Value            -- argument/result
-        , ctx_susps    :: ![Suspension]
+
+        , ctx_ops      :: ![Op]              -- Program counter
+
+        , ctx_accum    :: !Maybe Value       -- Argument/result
         , ctx_stack    :: ![StackFrame]      -- The call stack that "belongs" to this context
-        , ctx_parent   :: Maybe ContextId
-        , ctx_success  :: Cont
-        , ctx_failure  :: Cont
-        , ctx_next     :: [Context]
+
+        , ctx_susps    :: ![Suspension]
+
+        , ctx_failure  :: [Op]          -- Do this if the head Op in ctx_ops fails
+                                        -- Does not vary
+        , ctx_success  :: [Op]          -- ToDo: could this just be the tail of ctx_ops?
+                                        -- Does not vary
+
+        , ctx_next     :: [Context]     -- NB Context not ContextId; this is what
+                                        -- lets us backtrack to an "old" state.
+                                        -- ToDo: do we want a list here or just a Maybe?
         }
   deriving (Show)
 
@@ -482,9 +500,19 @@ addSusp hs susp = modifyContext $ \ ctx -> ctx{ ctx_susps = ctx_susps ctx ++ [Su
 -- Store for logical variables.
 --   There is one heap for each context.
 -----
-type Heap = Map HeapAddr (Maybe Value)
 type HeapAddr = Int
+type Heap = Map HeapAddr (Maybe Value)
+            -- Nothing => no one has instantiated this variable yet
+            -- This is just for assertion-checking; we could equally
+            --      well use (Map HeapAddr Value)
+            -- We can change (x :-> Nothing) to (x :-> Just val); but once
+            -- we add (x :-> Just val) to a Heap, we never change that binding
+
 data HeapId = HeapId !ContextId !HeapAddr
+  -- ContextId: you can only instantiate variables in the current context
+  --            (the "flexible" ones)
+  -- Also distinguishes distinct varaibles with the same HeapAddr
+  --      (HeapAddr's are local to a context)
   deriving (Eq, Ord, Show)
 
 -- Remove all references to HeapAddrs in the Heap from the value
@@ -520,7 +548,8 @@ expungeFrame heap fr = f $ expunge heap (VFun fr "" [])
 -----
 data Frame = Frame
   { fr_name   :: String           -- Name for debugging
-  , fr_vals   :: Map Name Value
+  , fr_vals   :: Map Name Value   -- The value is (VHeap heap_id) for logical variables
+                                  --     but is any value for lamba-bound variables
   , fr_parent :: Maybe Frame      -- Lexical parent
   }
   deriving (Eq, Show)
@@ -664,8 +693,8 @@ pushFrame ops fr ctx =
 
 assign :: Reg -> Value -> Context -> Context
 -- Preconditions:
---   * The register is in the current fram
---   * The value is unbound
+--   * The register is in the current frame
+--   * The register is unbound
 assign r@Reg{..} val ctx =
   let fr = ctx_frame ctx
       heap = ctx_heap ctx
@@ -818,6 +847,7 @@ canRun ctx (Susp hs _) = any (\ h -> isJust (getHeap h ctx)) hs
 -}
 
 getOp :: R Op
+-- Get the next Op from ctx_ops, and remove it from the list
 getOp = do
   ctx <- getContext
   case ctx_ops ctx of
@@ -826,8 +856,8 @@ getOp = do
 
 stepR :: R ()
 stepR = do
-  op <- getOp
   ctx <- getContext
+  op  <- getOp
   when debug $
     traceM $ "stepR " ++ fr_name (ctx_frame ctx) ++ ": " ++ take 50 (show op)
   case op of
