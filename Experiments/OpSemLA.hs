@@ -905,7 +905,7 @@ stepR = do
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
       unify res vres
 
-    EndAlt | Ctx{ ctx_ops = [], ctx_stack = ContAlt ops : stk } =
+    EndAlt | Ctx{ ctx_ops = [], ctx_stack = ContAlt ops : stk } <- ctx ->
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
 
     Atom t (AnInteger i) -> modifyContext $ assign t (VInteger i)
