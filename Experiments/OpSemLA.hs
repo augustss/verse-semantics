@@ -238,8 +238,8 @@ expToReg (For e1 e2) = do
   o1 <- sexpToOps' (const [EndDomain]) e1
   o2 <- sexpToOps e2
   t <- newReg
-  a <- newReg
-  c <- newReg
+  a <- newReg  -- Accumulate the resulting array here
+  c <- newReg  -- Domain context
   n <- gets nextTemp
   let msg = "ctx" ++ show n
   emit $ MkArray a []
@@ -354,13 +354,15 @@ data Op
   | Iterate { it_name :: String, it_context :: Reg, domain :: [Op], success :: [Op], failur :: [Op] }
   | EndDomain
   | NoOp
-  -- Hacky for loop implementation.
+
+  -- NextFor: hacky loop implementation mechanism
   -- The arrAcc is where the resulting array is accumulated.
   -- This reg is never used anywhere else, so the invariant
   -- that a frame value never changes is ignored.
   -- The nx_domain holds the ContextId for the context of the domain.
   | NextFor { nx_domain :: Reg, arrAcc :: Reg }   -- append ctx_accum to the arrAcc and start next iteration
-  --- 
+
+  ---
   | Dump String
   | ErrorOp String
   | Stop   -- Just for testing, print the accum and stop
@@ -372,7 +374,7 @@ data Value = VInteger Integer
            | VArray [Value]
            | VFun Frame Name [Op]   -- Frame is captured when we build the closure
            | VHeap HeapId           -- Possibly unsettled logical variable
-           | VContextId ContextId   -- Only used in 'fot' loops
+           | VContextId ContextId   -- Only used in 'for' loops
   deriving (Eq)
 
 instance Show Value where
@@ -447,7 +449,6 @@ runRunState ra = evalState ra startRunState
 data Context
   = Ctx { ctx_name     :: !String            -- for debugging
         , ctx_id       :: !ContextId         -- Id of this context
-        , ctx_parent   :: Maybe ContextId    -- Does not vary
 
         , ctx_frame    :: !Frame             -- The lexical environment, maps names to values
 
@@ -461,21 +462,32 @@ data Context
 
         , ctx_susps    :: ![Suspension]
 
+        , ctx_next     :: Maybe Context -- NB Context not ContextId; this is what
+                                        -- lets us backtrack to an "old" state.
+
+        -- Only relevant when ctx_next = Nothing
+        , ctx_parent   :: Maybe ContextId    -- Does not vary
         , ctx_failure  :: [Op]          -- Do this if the head Op in ctx_ops fails
                                         -- Does not vary
         , ctx_success  :: [Op]          -- ToDo: could this just be the tail of ctx_ops?
                                         -- Does not vary
+        -- ToDo: put failure and success into parent
 
-        , ctx_next     :: Maybe Context -- NB Context not ContextId; this is what
-                                        -- lets us backtrack to an "old" state.
         }
   deriving (Show)
+
+{-
+   ctx_next :: NextContext
+
+data NextContext = ParentContext ContextId [Op] [Op]
+                 | NextContext Context
+-}
 
 data StackFrame
   = ContFrame Frame [Op]     -- end of a PushFrame
   | ContFun Value Frame [Op] -- Return from a function call,
                              -- unifying the result with the value
-  | ContOps [Op]             -- end of a join (Alt)  
+  | ContOps [Op]             -- end of a join (Alt)
   deriving (Show)
 
 data Suspension = Susp
@@ -524,6 +536,8 @@ instance Show HeapId where
 expunge :: HasCallStack => ContextId -> Heap -> Value -> Value
 expunge ci heap = value []
   where
+    value :: [HeapId] -> Value -> Value
+    -- 's' tracks the HeapIds we have seen already, for loop detection
     value _ v@VInteger{} = v
     value s (VArray vs) = VArray (map (value s) vs)
     value s (VFun fr n os) = VFun (frame s fr) n os
@@ -536,7 +550,11 @@ expunge ci heap = value []
             Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show h  -- XXX is it wrong
             Just (Just v') -> value (h:s) v'
     value _ VContextId{} = error "expunge: ContextId"
-    frame s Frame{..} = Frame{ fr_name = fr_name, fr_vals = M.map (value s) fr_vals, fr_parent = fmap (frame s) fr_parent }
+
+    frame s Frame{..} = Frame{ fr_name = fr_name
+                             , fr_parent = assert (fr_parent `hasNoHeapIdsFrom` heap) $
+                                           fr_parent
+                             , fr_vals = M.map (value s) fr_vals
 
 -- As expunge, but for a Frame
 expungeFrame :: HasCallStack => ContextId -> Heap -> Frame -> Frame
@@ -573,6 +591,8 @@ ctxDumps ctx = do
   (s ++) <$> maybe (pure "") ctxDumps ((contexts M.!) <$> ctx_parent ctx)
 
 pushFrame :: [Op] -> Frame -> Context -> Context
+-- (pushFrame ops fr ctx) returns ctx' which executes (ops, fr),
+-- returning to ctx's (ops,fr) when that is done.
 pushFrame ops fr ctx =
   ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 
@@ -731,11 +751,14 @@ callOp t f a = do
     v -> error $ "Call: not a function/array " ++ show v
 
 apply :: Value -> Frame -> Name -> [Op] -> Value -> R ()
+-- Does not make a new Context/Heap; 
 apply target fr argName ops arg =
   modifyContext $ \ ctx ->
-  ctx{ ctx_ops = ops
-     , ctx_stack = ContFun target (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx
-     , ctx_frame = makeFrame "apply" [(argName, arg)] fr }
+  ctx{ ctx_ops   = ops  -- The 'ops' comes from the function closure
+     , ctx_frame = makeFrame "apply" [(argName, arg)] fr
+                        -- The 'fr' comes from the function closure
+     , ctx_stack = ContFun target (ctx_frame ctx) (ctx_ops ctx)
+                   : ctx_stack ctx }
 
 getOp :: R Op
 -- Get the next Op from ctx_ops, and remove it from the list
@@ -788,11 +811,15 @@ stepR = do
         old_ops = ctx_ops ctx
 
       -- The domain of an if/for has reached the end.
+      -- So we are about to abandon the current context, ctx; in the case of 'for'
+      --    we may come back to (ctx_next ctx).  All other fields are truly abandoned.
       -- The success continuation will now be run in the environment
-      -- with the domain frame added.  All traces of the domain heap will be removed from the frame.
+      --    with the domain frame added.
+      -- All traces of the domain heap must be expunged from the
+      --    frame, since we are abandoning it.
     EndDomain | Ctx { ctx_ops = [], ctx_susps = [], ctx_parent = Just pci, ctx_id = ci
                     , ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
-      setContextId pci
+      setContextId pci  -- Switch to parent context
       modifyContext $ pushFrame sOps (expungeFrame ci heap fr)
     EndDomain | Ctx{ ctx_ops = [], ctx_susps = susps, ctx_parent = Just pci, ctx_id = ci } <- ctx -> do
       setContextId pci
@@ -803,15 +830,19 @@ stepR = do
           fr = makeFrame msg (zip ns $ map (VHeap . HeapId (ctx_id ctx)) hs) (ctx_frame ctx)
       updateContext $ pushFrame ops fr ctx'
 
+    -- EndFrame, EndFun, EndOps are always the last instruction in the [Op]
     EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx ->
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
-    EndFun | Ctx{ ctx_ops = [], ctx_stack = ContFun res fr ops : stk, ctx_accum = vres } <- ctx -> do
+    EndFun | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
+                , ctx_stack = ContFun target fr ops : stk
+                , ctx_accum = vres } <- ctx -> do
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
-      unify res vres
+      unify target vres
 
     EndOps | Ctx{ ctx_ops = [], ctx_stack = ContOps ops : stk } <- ctx ->
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
+
 
     NextFor rc ra | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx -> do
       let dctx =
@@ -869,7 +900,7 @@ runSuspensions :: R ()
 runSuspensions = do
   susps <- concatMapM runSuspension =<< (ctx_susps <$> getContext)
   ctx' <- getContext
-  updateContext $ ctx'{ ctx_susps = susps } 
+  updateContext $ ctx'{ ctx_susps = susps }
 
 runSuspension :: Suspension -> R [Suspension]
 runSuspension susp | debug && trace ("runSuspension " ++ show susp) False = undefined
@@ -879,8 +910,8 @@ runSuspension susp@(Susp hs sc) = do
   if or oks then do
     modifyContext $ \ ctx -> ctx{ ctx_susps = [] }
     case sc of
-      SuspUnify v1 v2 -> unify v1 v2
-      SuspAdd v1 v2 v3 -> addOp v1 v2 v3
+      SuspUnify v1 v2   -> unify v1 v2
+      SuspAdd v1 v2 v3  -> addOp v1 v2 v3
       SuspCall v1 v2 v3 -> callOp v1 v2 v3
       SuspDomain pci -> do
         pctx <- getContext
