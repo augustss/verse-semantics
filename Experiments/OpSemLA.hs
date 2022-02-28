@@ -200,6 +200,7 @@ tmpName t = "%" ++ show t
 emit :: Op -> C ()
 emit op = modify $ \ s -> s { cops = cops s ++ [op] }
 
+{-
 hackOpt :: [Op] -> [Op]
 hackOpt [PushFrame _ [n] [Atom {op_target = Reg n', op_atom = a},Load (Reg n''),EndFrame],Store t,EndOps]
   | n == n', n == n'' = hackOpt [Atom t a, EndOps]
@@ -213,6 +214,7 @@ hackOpt (Choice ops1 ops2 : rs) = Choice (hackOpt ops1) (hackOpt ops2) : hackOpt
 hackOpt (Iterate n c d s f : rs) = Iterate n c (hackOpt d) (hackOpt s) (hackOpt f) : hackOpt rs
 hackOpt (op : rs) = op : hackOpt rs
 hackOpt [] = []
+-}
 
 expToReg :: Exp -> C Reg
 expToReg (Var n) = pure $ Reg n
@@ -361,7 +363,7 @@ data Op
 
   | Load Reg  -- ctx_accum := r
   | Store Reg -- r = ctx_accum
-  | LoadInteger Integer
+--x  | LoadInteger Integer
 
   | Unify Reg Reg  -- r1 = r2
 
@@ -942,7 +944,7 @@ stepR = do
     RangeOp t r -> rangeOp (loadValue t ctx) (loadValue r ctx)
     Atom t (AnInteger i) -> modifyContext $ assign t (VInteger i)
     Load r -> modifyContext $ \ c -> c{ ctx_accum = loadValue r c }
-    LoadInteger i  -> modifyContext $ \ c -> c{ ctx_accum = VInteger i }
+--    LoadInteger i  -> modifyContext $ \ c -> c{ ctx_accum = VInteger i }
     Store r -> storeValue r (ctx_accum ctx)
     MkArray t rs -> modifyContext $ assign t (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
