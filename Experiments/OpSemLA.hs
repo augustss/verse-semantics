@@ -186,12 +186,18 @@ data CompileState = CompileState
 
 type C = State CompileState
 
-newReg :: C Reg
-newReg = do
+newName :: (Int -> String) -> C Name
+newName f = do
   s <- get
   let t = succ (nextTemp s)
-      n = tmpName t
-  put s{nextTemp = t, tempRegs = n : tempRegs s}
+  put s{nextTemp = t}
+  pure $ f t
+
+newReg :: C Reg
+newReg = do
+  n <- newName tmpName
+  s <- get
+  put s{tempRegs = n : tempRegs s}
   pure Reg { reg_name = n }
 
 tmpName :: Int -> Name
@@ -226,9 +232,9 @@ expToReg (Where e1 e2) = do
   pure r1
 expToReg (Alt e1 e2) = do
   t <- newReg
-  op1 <- sexpToOps e1
-  op2 <- sexpToOps e2
-  emit $ Choice [op1, Store t, EndOps] [op2, Store t, EndOps]
+  op1 <- sexpToReg t e1
+  op2 <- sexpToReg t e2
+  emit $ Choice [op1, EndOps] [op2, EndOps]
   pure t
 expToReg (Equal e1 e2) = do
   r1 <- expToReg e1
@@ -254,15 +260,14 @@ expToReg Fail = do
   emit Failure
   newReg                -- we must return something, but this reg will never be set
 expToReg (For e1 e2) = do
-  o1 <- sexpToOps' (const [EndDomain]) e1
-  o2 <- sexpToOps e2
-  t <- newReg
+  t <- newReg  -- Final array
   a <- newReg  -- Accumulate the resulting array here
   c <- newReg  -- Domain context
-  n <- gets nextTemp
-  let msg = "for-ctx" ++ show n
+  o1 <- sexpToOps' (const [EndDomain]) e1
+  o2 <- sexpToOps' (\ v -> [NextFor c a v]) e2
+  msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
-  emit $ Iterate msg c [o1] [o2, NextFor c a] [Unify t a, EndOps]
+  emit $ Iterate msg c [o1] [o2] [Unify t a, EndOps]
   pure t
 expToReg (Range e) = do
   t <- newReg
@@ -270,30 +275,28 @@ expToReg (Range e) = do
   emit $ RangeOp t r
   pure t
 expToReg (If e1 e2 e3) = do
-  o1 <- sexpToOps' (const [EndDomain]) e1
-  o2 <- sexpToOps e2
-  o3 <- sexpToOps e3
   t <- newReg
   c <- newReg
-  n <- gets nextTemp
-  let msg = "if-ctx" ++ show n
+  o1 <- sexpToOps' (const [EndDomain]) e1
+  o2 <- sexpToReg t e2
+  o3 <- sexpToReg t e3
+  msg <- newName (\ n -> "if-ctx" ++ show n)
   -- The o1 sequence has a PushFrame without a matching EndFrame.
   -- The EndDomain instruction expunges this frame and pushes on the
   --   in the parent context.
   -- The success continuation has the EndFrame to pop this.
   -- The failure continuation changes to the parent context, and just pushes the failure ops.
-  emit $ Iterate msg c [o1] [o2, Store t, EndFrame] [o3, Store t, EndOps]
+  emit $ Iterate msg c [o1] [o2, EndFrame] [o3, EndOps]
   pure t
 expToReg (Do e) = do
   t <- newReg
-  o <- sexpToOps e
+  o <- sexpToReg t e
   emit o
-  emit (Store t)
   pure t
 expToReg (Lam n e) = do
-  os <- sexpToOps e
+  o <- sexpToOps' (\ r -> [EndFun r]) e
   t <- newReg
-  emit $ Function t n [os, EndFun]
+  emit $ Function t n [o]
   pure t
 -- XXX This wrong.  AppS should make sure there is exactly one result
 -- Could use something like
@@ -326,16 +329,17 @@ sexpToOps' ops (Def ns e) = do
       msg = "fr" ++ show (nextTemp s)
   pure $ PushFrame msg (ns ++ tmps) (cops s ++ ops r)
 
-sexpToOps :: SExp -> C Op
-sexpToOps = sexpToOps' $ \ r -> [Load r, EndFrame]
+sexpToReg :: Reg -> SExp -> C Op
+sexpToReg t = sexpToOps' $ \ r -> [Unify t r, EndFrame]
 
 -- The main compiler
 comp :: SExp -> [Op]
 comp e = evalState se cs
-  where cs = CompileState{ nextTemp = 1, cops = [], tempRegs = [] }
+  where cs = CompileState{ nextTemp = 0, cops = [], tempRegs = [] }
         se = do
-          op <- sexpToOps e
-          pure $ [op, Stop]
+          t <- newReg
+          op <- sexpToReg t e
+          pure $ [PushFrame "comp" [reg_name t] [op, Stop t]]
 
 --------------------------------
 --
@@ -361,16 +365,12 @@ data Op
   | PushFrame String [Name] [Op]   -- The String is only for debugging
   | EndFrame
 
-  | Load Reg  -- ctx_accum := r
-  | Store Reg -- r = ctx_accum
---x  | LoadInteger Integer
-
   | Unify Reg Reg  -- r1 = r2
 
   | MkArray { target :: Reg, elts :: [Reg] }
   | Call { target :: Reg, fun :: Reg, arg :: Reg }
   | Function { target :: Reg, argName :: Name, body :: [Op] }
-  | EndFun
+  | EndFun Reg
   | Choice [Op] [Op]
   | EndOps
   | Failure
@@ -384,12 +384,12 @@ data Op
   -- This reg is never used anywhere else, so the invariant
   -- that a frame value never changes is ignored.
   -- The nx_domain holds the ContextId for the context of the domain.
-  | NextFor { nx_domain :: Reg, arrAcc :: Reg }   -- append ctx_accum to the arrAcc and start next iteration
+  | NextFor { nx_domain :: Reg, arrAcc :: Reg, domValue :: Reg }   -- append domValue to the arrAcc and start next iteration
   | RangeOp { target :: Reg, arr :: Reg }
   --- 
   | Dump String
   | ErrorOp String
-  | Stop   -- Just for testing, print the accum and stop
+  | Stop Reg  -- Just for testing, print the accum and stop
   deriving (Eq, Show)
 
 -------------------------------------------------
@@ -483,7 +483,6 @@ data Context
 
         , ctx_ops      :: ![Op]              -- Program counter
 
-        , ctx_accum    :: !Value             -- Argument/result
         , ctx_stack    :: ![StackFrame]      -- The call stack that "belongs" to this context
 
         , ctx_susps    :: ![Suspension]
@@ -628,7 +627,7 @@ pushFrame ops fr ctx =
 
 pushOps :: HasCallStack => [Op] -> Context -> Context
 pushOps ops ctx =
-  assert "pushOps" (not $ null $ ctx_ops ctx) $
+--  assert "pushOps" (not $ null $ ctx_ops ctx) $
   ctx{ ctx_ops = ops, ctx_stack = ContOps (ctx_ops ctx) : ctx_stack ctx }
 
 assign :: Reg -> Value -> Context -> Context
@@ -668,15 +667,6 @@ loadValue r ctx = loadValue' (reg_name r) (Just (ctx_frame ctx))
     loadValue' :: Name -> Maybe Frame -> Value
     loadValue' n Nothing = error $ "loadValue: not found " ++ show n
     loadValue' n (Just fr) = fromMaybe (loadValue' n (fr_parent fr)) $ M.lookup n $ fr_vals fr
-
-storeValue :: Reg -> Value -> R ()
-storeValue r v = do
-  when moreDebug $ do
-    ctx <- getContext
-    let Reg n = r
-    traceM $ "storeValue: " ++ show (n, map (\ fr -> (fr_name fr, M.lookup n (fr_vals fr))) $ getFrames ctx)
-  vr <- loadValue r <$> getContext
-  unify vr v
 
 -- Follow VHeap indirections
 follow :: Value -> R Value
@@ -856,7 +846,6 @@ stepR = do
                , ctx_heapAddr = 0
                , ctx_susps = []
                , ctx_parent = Just (ctx_id ctx)
-               , ctx_accum = VInteger 0
                , ctx_success = s
                , ctx_failure = f
                , ctx_next = Nothing
@@ -904,17 +893,23 @@ stepR = do
     EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx ->
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
-    EndFun | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
-                , ctx_stack = ContFun target fr ops : stk
-                , ctx_accum = vres } <- ctx -> do
+    -- The ops for a function lacks the trailing EndFrame.
+    -- So we pop it here.
+    EndFun ret | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
+                    , ctx_stack = ContFrame _ _ : ContFun target fr ops : stk
+                    } <- ctx -> do
+      unify target (loadValue ret ctx)
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
-      unify target vres
 
     EndOps | Ctx{ ctx_ops = [], ctx_stack = ContOps ops : stk } <- ctx ->
       modifyContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
 
 
-    NextFor rc ra | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx -> do
+    -- NextFor is the last instruction of a PushFrame (of locals),
+    -- so that frame is popped.  The second frame that is popped
+    -- was pushed by EndDomain.
+    NextFor rc ra rv | Ctx{ ctx_ops = []
+                          , ctx_stack = ContFrame _ _ : ContFrame fr ops : stk } <- ctx -> do
       let dctx =
             case loadValue rc ctx of
               VHeap (HeapId _ h) ->
@@ -926,10 +921,11 @@ stepR = do
         VHeap (HeapId _ h) ->
           case M.lookup h (ctx_heap ctx) of
             Just (Just (VArray vs)) -> do
-              let va = VArray (vs ++ [ctx_accum ctx])
+              let va = VArray (vs ++ [loadValue rv ctx])
               when debug $ do
-                vs' <- mapM follow $ vs ++ [ctx_accum ctx]
-                traceM ("NextFor appends: " ++ show ((vs, ctx_accum ctx), vs'))
+                vs' <- mapM follow $ vs ++ [loadValue rv ctx]
+                traceM $ "NextFor appends: " ++ show ((vs, loadValue rv ctx), vs')
+                traceM $ "   " ++ show (ctx_stack ctx)
               -- Violating heap invariant by updating a WHNF value.
               updateContext $ ctx{ ctx_heap = M.insert h (Just va) (ctx_heap ctx)
                                  , ctx_ops = ops
@@ -943,9 +939,6 @@ stepR = do
 
     RangeOp t r -> rangeOp (loadValue t ctx) (loadValue r ctx)
     Atom t (AnInteger i) -> modifyContext $ assign t (VInteger i)
-    Load r -> modifyContext $ \ c -> c{ ctx_accum = loadValue r c }
---    LoadInteger i  -> modifyContext $ \ c -> c{ ctx_accum = VInteger i }
-    Store r -> storeValue r (ctx_accum ctx)
     MkArray t rs -> modifyContext $ assign t (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
     Add t x y -> addOp (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
@@ -962,11 +955,9 @@ stepR = do
 
   when stepFrameDebug $ do
     c <- getContext
-    accum <- followDeep (ctx_accum c)
     ps <- getParents (ctx_id c)
     let showNexts p = "    " ++ ctx_name p ++ ": " ++ show (map (head . ctx_ops) (getNexts p))
     traceM $ "  ctx=" ++ ctx_name c ++ "(" ++ show (ctx_id c) ++ ")" ++
-             " accum=" ++ show accum ++
              "\n" ++ intercalate "\n" (map showNexts ps)
 
     frdumps <- mapM dumpFrame $ getFrames c
@@ -1012,9 +1003,9 @@ run ops = runRunState $ do
   let loop = do
         ctx <- getContext
         case ctx of
-          Ctx {ctx_ops = [Stop], ctx_heap = heap, ctx_accum = v, ctx_susps = susps}
+          Ctx {ctx_ops = [Stop r], ctx_heap = heap, ctx_susps = susps}
             | null susps ->
-              case expunge ci heap v of
+              case expunge ci heap (loadValue r ctx) of
                 VArray vs -> pure vs
                 vv -> error $ "top level not array: " ++ show vv
             | otherwise -> error "run: susps not empty"
@@ -1026,7 +1017,6 @@ run ops = runRunState $ do
            , ctx_heapAddr = 1
            , ctx_frame = Frame { fr_name = "run", fr_vals = M.empty, fr_parent = Nothing }
            , ctx_ops = ops
-           , ctx_accum = VInteger 0
            , ctx_susps = []
            , ctx_stack = []
            , ctx_parent = Nothing
