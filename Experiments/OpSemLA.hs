@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -14,24 +16,51 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.String
 import GHC.Stack
+--import Text.PrettyPrint hiding (semi)
+import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Ex
 import Debug.Trace
 
+-- TODO:
+--  get rid of choice_out
+
 debug, moreDebug, stepFrameDebug :: Bool
+
+{-
+debug = True
+moreDebug = True
+stepDebug = True
+stepFrameDebug = True
+sqDebug = True
+-}
 debug = False
 moreDebug = False
 stepDebug = False
 stepFrameDebug = False
+sqDebug = False
 
 assert :: HasCallStack => String -> Bool -> a -> a
 assert s False _ = error $ "assert: " ++ s
 assert _ True  a = a
+
+assertM :: (HasCallStack, Monad m) => String -> Bool -> m ()
+assertM s False = error $ "assert: " ++ s
+assertM _ True  = pure ()
 
 {- XXX This is what I'd like to do, but I can't figure out how.
 import Control.Monad.Extra(concatMapM)
 -}
 concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f as = concat <$> mapM f as
+
+pp :: (Pretty a) => a -> IO ()
+pp = putStrLn . prettyShow
+
+showListWith :: (a -> String) -> [a] -> String
+showListWith f = ("[" ++) . (++ "]") . intercalate "," . map f
+
+instance (Pretty k, Pretty v) => Pretty (Map k v) where
+  pPrint = pPrint . M.toList
 
 --------------------------------
 --
@@ -193,15 +222,18 @@ newName f = do
   put s{nextTemp = t}
   pure $ f t
 
-newReg :: C Reg
-newReg = do
-  n <- newName tmpName
+newReg' :: String -> C Reg
+newReg' p = do
+  n <- newName $ \ t -> p ++ show t
   s <- get
   put s{tempRegs = n : tempRegs s}
   pure Reg { reg_name = n }
 
-tmpName :: Int -> Name
-tmpName t = "%" ++ show t
+newReg :: C Reg
+newReg = newReg' "%"
+
+newRegSq :: HasCallStack => C Reg
+newRegSq = newReg' "$"
 
 emit :: Op -> C ()
 emit op = modify $ \ s -> s { cops = cops s ++ [op] }
@@ -222,64 +254,103 @@ hackOpt (op : rs) = op : hackOpt rs
 hackOpt [] = []
 -}
 
-expToReg :: Exp -> C Reg
-expToReg (Var n) = pure $ Reg n
-expToReg (Con i) = do t <- newReg; emit $ Atom t (AnInteger i); pure t
-expToReg (Semi e1 e2) = expToReg e1 >> expToReg e2
-expToReg (Where e1 e2) = do
-  r1 <- expToReg e1
-  _ <- expToReg e2
-  pure r1
-expToReg (Alt e1 e2) = do
+data Seq = Seq { sq_choice :: Reg }
+  deriving (Eq, Show)
+
+instance Pretty Seq where
+  pPrint (Seq r) = pPrint r
+
+expToReg :: Seq -> Exp -> C (Seq, Reg)
+expToReg sq (Var n) = pure (sq, Reg n)
+expToReg sq (Con i) = do
   t <- newReg
-  op1 <- sexpToReg t e1
-  op2 <- sexpToReg t e2
-  emit $ Choice [op1, EndOps] [op2, EndOps]
-  pure t
-expToReg (Equal e1 e2) = do
-  r1 <- expToReg e1
-  r2 <- expToReg e2
+  emit $ Atom t (VInteger i)
+  pure (sq, t)
+expToReg sq (Semi e1 e2) = do
+  (sq1, _) <- expToReg sq e1
+  expToReg sq1 e2
+expToReg sq (Where e1 e2) = do
+  (sq1, r1) <- expToReg sq e1
+  (sq2, _)  <- expToReg sq1 e2
+  pure (sq2, r1)
+expToReg sq (Alt e1 e2) = do
+  t <- newReg
+  sq' <- Seq <$> newRegSq
+  op1 <- sexpToReg sq sq' t e1
+  op2 <- sexpToReg sq sq' t e2
+  let rsq = sq_choice sq
+      rsq' = sq_choice sq'
+  emit $ Choice rsq rsq' [op1, EndFrame] [op2, EndFrame]
+  pure (sq', t)
+expToReg sq (Equal e1 e2) = do
+  (sq1, r1) <- expToReg sq e1
+  (sq2, r2) <- expToReg sq1 e2
   emit $ Unify r1 r2
-  pure r1
-expToReg (Set n e) =
-  expToReg $ Equal (Var n) e
-expToReg (SetAny n) =
-  expToReg (Var n)
-expToReg (Array es) = do
-  rs <- mapM expToReg es
+  pure (sq2, r2)
+expToReg sq (Set n e) =
+  expToReg sq $ Equal (Var n) e
+expToReg sq (SetAny n) =
+  expToReg sq (Var n)
+expToReg sq (Array es) = do
+  let f s [] = pure (s, [])
+      f s (x:xs) = do (s', r) <- expToReg s x; (s'', rs) <- f s' xs; pure (s'', r:rs)
+  (sq', rs) <- f sq es
   t <- newReg
   emit $ MkArray t rs
-  pure t
-expToReg (Plus e1 e2) = do
-  r1 <- expToReg e1
-  r2 <- expToReg e2
+  pure (sq', t)
+expToReg sq (Plus e1 e2) = do
+  (sq1, r1) <- expToReg sq e1
+  (sq2, r2) <- expToReg sq1 e2
   t <- newReg
   emit $ Add t r1 r2
-  pure t
-expToReg Fail = do
+  pure (sq2, t)
+expToReg sq Fail = do
   emit Failure
-  newReg                -- we must return something, but this reg will never be set
-expToReg (For e1 e2) = do
-  t <- newReg  -- Final array
-  a <- newReg  -- Accumulate the resulting array here
+  t <- newReg                -- we must return something, but this reg will never be set
+  pure (sq, t)
+expToReg sq (For e1 e2) = do
+  t <- newReg  -- Final result, not instantiated until the array is complete.
+  a <- newReg' "%%"  -- Accumulate the resulting array here
   c <- newReg  -- Domain context
-  o1 <- sexpToOps' (const [EndDomain]) e1
-  o2 <- sexpToOps' (\ v -> [NextFor c a v]) e2
+  lsq <- Seq <$> newReg' "$$" -- Choice sequencing in the loop.  Like 'a', hackily updated.
+#if 0
+  xxxsq <- newRegSq
+  o1 <- sexpToOps' {-dsq-}(Seq xxxsq) (\ sq' _r -> [EndDomain sq']) e1
+  o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
   msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
+  emit $ Assign (sq_choice lsq) (sq_choice sq)
   emit $ Iterate msg c [o1] [o2] [Unify t a, EndOps]
-  pure t
-expToReg (Range e) = do
+  emit $ Atom xxxsq VDummy
+#else
+  dsq <- newSeq
+  o1 <- sexpToOps' dsq (\ sq' _r -> [EndDomain sq']) e1
+  o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
+  msg <- newName (\ n -> "for-ctx" ++ show n)
+  emit $ MkArray a []
+  --emit $ Assign (sq_choice lsq) (sq_choice sq)
+  xsq <- newRegSq
+  emit $ Assign (sq_choice lsq) xsq
+  emit $ Iterate msg c [o1] [o2] [Unify t a, EndOps]
+  emit $ Assign xsq (sq_choice sq)
+#endif
+  pure (lsq, t)
+expToReg sq (Range e) = do
   t <- newReg
-  r <- expToReg e
-  emit $ RangeOp t r
-  pure t
-expToReg (If e1 e2 e3) = do
+  (sq', r) <- expToReg sq e
+  rsq <- newRegSq
+  emit $ RangeOp (sq_choice sq') rsq t r
+  pure (Seq rsq, t)
+expToReg sq (If e1 e2 e3) = do
+  dsq <- newSeq
   t <- newReg
+  -- XXX Use _sq
+  o1 <- sexpToOps' dsq (\ sq' _r -> [EndDomain sq']) e1
+  rosq <- newRegSq
+  let osq = Seq rosq
+  o2 <- sexpToReg sq osq t e2
+  o3 <- sexpToReg sq osq t e3
   c <- newReg
-  o1 <- sexpToOps' (const [EndDomain]) e1
-  o2 <- sexpToReg t e2
-  o3 <- sexpToReg t e3
   msg <- newName (\ n -> "if-ctx" ++ show n)
   -- The o1 sequence has a PushFrame without a matching EndFrame.
   -- The EndDomain instruction expunges this frame and pushes on the
@@ -287,50 +358,61 @@ expToReg (If e1 e2 e3) = do
   -- The success continuation has the EndFrame to pop this.
   -- The failure continuation changes to the parent context, and just pushes the failure ops.
   emit $ Iterate msg c [o1] [o2, EndFrame] [o3, EndOps]
-  pure t
-expToReg (Do e) = do
+  pure (osq, t)
+expToReg sq (Do e) = do
   t <- newReg
-  o <- sexpToReg t e
+  sq' <- Seq <$> newRegSq
+  o <- sexpToReg sq sq' t e
   emit o
-  pure t
-expToReg (Lam n e) = do
-  o <- sexpToOps' (\ r -> [EndFun r]) e
+  pure (sq', t)
+expToReg sq (Lam n e) = do
+  os <- sexpToOps' (Seq $ Reg $ "$" ++ n) (\ osq r -> [EndFun osq r]) e
   t <- newReg
-  emit $ Function t n [o]
-  pure t
+  emit $ Function t n [os]
+  pure (sq, t)
 -- XXX This wrong.  AppS should make sure there is exactly one result
 -- Could use something like
 --    f(a)  -->  if (x:=f[a]) then x else WRONG
-expToReg (AppS e1 e2) = do
-  r1 <- expToReg e1
-  r2 <- expToReg e2
+expToReg sq (AppS e1 e2) = do
+  (sq1, r1) <- expToReg sq e1
+  (sq2, r2) <- expToReg sq1 e2
   t <- newReg
-  emit $ Call t r1 r2
-  pure t
-expToReg (AppI e1 e2) = do
-  r1 <- expToReg e1
-  r2 <- expToReg e2
+  sqr <- Seq <$> newRegSq
+  emit $ Call sq2 sqr t r1 r2
+  pure (sq2, t)
+expToReg sq (AppI e1 e2) = do
+  (sq1, r1) <- expToReg sq e1
+  (sq2, r2) <- expToReg sq1 e2
   t <- newReg
-  emit $ Call t r1 r2
-  pure t
-expToReg Error = do
+  sqr <- Seq <$> newRegSq
+  emit $ Call sq2 sqr t r1 r2
+  pure (sq2, t)
+expToReg sq Error = do
   emit $ ErrorOp "Error"
-  newReg
+  t <- newReg
+  pure (sq, t)
 --expToReg x = error $ show x
 
-sexpToOps' :: (Reg -> [Op]) -> SExp -> C Op
-sexpToOps' ops (Def ns e) = do
+sexpToOps' :: HasCallStack => Seq -> (Seq -> Reg -> [Op]) -> SExp -> C Op
+sexpToOps' sq ops (Def ns e) = do
   olds <- get
   put olds{ cops = [], tempRegs = [] }
-  r <- expToReg e
+  (sq', r) <- expToReg sq e
   s <- get
   put olds{ nextTemp = nextTemp s + 1 }
   let tmps = tempRegs s
       msg = "fr" ++ show (nextTemp s)
-  pure $ PushFrame msg (ns ++ tmps) (cops s ++ ops r)
+  pure $ PushFrame msg (ns ++ tmps) (cops s ++ ops sq' r)
 
-sexpToReg :: Reg -> SExp -> C Op
-sexpToReg t = sexpToOps' $ \ r -> [Unify t r, EndFrame]
+sexpToReg :: HasCallStack => Seq -> Seq -> Reg -> SExp -> C Op
+sexpToReg sq tsq t =
+  sexpToOps' sq $ \ sq' r -> [Unify t r, Assign (sq_choice tsq) (sq_choice sq'), EndFrame]
+
+newSeq :: C Seq
+newSeq = do
+  rsq <- newRegSq
+  emit $ Atom rsq VDummy
+  pure $ Seq rsq
 
 -- The main compiler
 comp :: SExp -> [Op]
@@ -338,8 +420,12 @@ comp e = evalState se cs
   where cs = CompileState{ nextTemp = 0, cops = [], tempRegs = [] }
         se = do
           t <- newReg
-          op <- sexpToReg t e
-          pure $ [PushFrame "comp" [reg_name t] [op, Stop t]]
+          sq <- newSeq
+          osq <- Seq <$> newRegSq
+          op <- sexpToReg sq osq t e
+          is <- gets cops
+          let ops = is ++ [op, Stop osq t]
+          pure $ [PushFrame "comp" [reg_name t, reg_name (sq_choice sq), reg_name (sq_choice osq)] ops]
 
 --------------------------------
 --
@@ -347,66 +433,123 @@ comp e = evalState se cs
 --
 --------------------------------
 
-data Atom
-  = AnInteger Integer
-  deriving (Eq, Show)
-
 data Reg = Reg { reg_name  :: Name }
   deriving (Eq)
+
+instance Pretty Reg where
+  pPrint (Reg n) = text n
 
 --  deriving (Show)
 instance Show Reg where
   show (Reg n) = n
 
 data Op
-  = Atom { op_target :: Reg, op_atom :: Atom }
+  = Atom { target :: Reg, op_atom :: Value }
     -- Set r to this value
 
   | PushFrame String [Name] [Op]   -- The String is only for debugging
   | EndFrame
 
   | Unify Reg Reg  -- r1 = r2
+  | Assign Reg Reg -- r1 := r2, first operand must be uninstantiated
 
   | MkArray { target :: Reg, elts :: [Reg] }
-  | Call { target :: Reg, fun :: Reg, arg :: Reg }
+  | Call { argSq :: Seq, retSq :: Seq, target :: Reg, fun :: Reg, arg :: Reg }
   | Function { target :: Reg, argName :: Name, body :: [Op] }
-  | EndFun Reg
-  | Choice [Op] [Op]
+  | EndFun Seq Reg
+  | Choice { choice_in :: Reg, choice_out :: Reg, choice_left :: [Op], choice_right :: [Op] }
   | EndOps
   | Failure
   | Add { target :: Reg, arg1 :: Reg, arg2 :: Reg }
   | Iterate { it_name :: String, it_context :: Reg, domain :: [Op], success :: [Op], failur :: [Op] }
-  | EndDomain
-  | NoOp
+  | EndDomain Seq
 
   -- NextFor: hacky loop implementation mechanism
   -- The arrAcc is where the resulting array is accumulated.
   -- This reg is never used anywhere else, so the invariant
   -- that a frame value never changes is ignored.
   -- The nx_domain holds the ContextId for the context of the domain.
-  | NextFor { nx_domain :: Reg, arrAcc :: Reg, domValue :: Reg }   -- append domValue to the arrAcc and start next iteration
-  | RangeOp { target :: Reg, arr :: Reg }
+  | NextFor { nx_domain :: Reg, arrAcc :: Reg, domValue :: Reg, isq :: Seq, osq :: Seq }   -- append domValue to the arrAcc and start next iteration
+  | RangeOp { choice_in :: Reg, choice_out :: Reg, target :: Reg, arr :: Reg }
   --- 
   | Dump String
   | ErrorOp String
-  | Stop Reg  -- Just for testing, print the accum and stop
+  | Stop Seq Reg  -- Just for testing, print the accum and stop
   deriving (Eq, Show)
+
+instance Pretty Op where
+  pPrintList _ ops = vcat $ map pPrint ops
+  pPrint (Atom r a) =
+    text "Atom" <+> pPrint r <+> pPrint a
+  pPrint (PushFrame s ns ops) =
+    text "PushFrame" <+> text s <+> brackets (text (intercalate "," ns)) $$
+    nest 2 (pPrint ops)
+  pPrint EndFrame =
+    text "EndFrame"
+  pPrint (Unify r1 r2) =
+    text "Unify" <+> pPrint r1 <+> pPrint r2
+  pPrint (Assign r1 r2) =
+    text "Assign" <+> pPrint r1 <+> pPrint r2
+  pPrint (MkArray r rs) =
+    text "MkArray" <+> pPrint r <+> pPrint rs
+  pPrint (Call r1 r2 r3 r4 r5) =
+    text "Call" <+> pPrint r1 <+> pPrint r2 <+> pPrint r3 <+> pPrint r4 <+> pPrint r5
+  pPrint (Function r1 r2 ops) =
+    text "Function" <+> pPrint r1 <+> pPrint r2 $$
+    nest 2 (pPrint ops)
+  pPrint (EndFun sq r) =
+    text "EndFun" <+> pPrint sq <+> pPrint r
+  pPrint (Choice r1 r2 ops1 ops2) =
+    "Choice" <+> pPrint r1 <+> pPrint r2 $$
+    nest 2 (pPrint ops1) $$
+    text "  -------- second branch" $$
+    nest 2 (pPrint ops2)
+  pPrint EndOps =
+    text "EndOps"
+  pPrint Failure =
+    text "Failure"
+  pPrint (Add r1 r2 r3) =
+    text "Add" <+> pPrint r1 <+> pPrint r2 <+> pPrint r3
+  pPrint (Iterate s c ops1 ops2 ops3) =
+    text "Iterate" <+> text s <+> pPrint c $$
+    nest 2 (pPrint ops1) $$
+    text "  -------- success" $$
+    nest 2 (pPrint ops2) $$
+    text "  -------- failure" $$
+    nest 2 (pPrint ops3)
+  pPrint (EndDomain sq) =
+    text "EndDomain" <+> pPrint sq
+  pPrint (NextFor r1 r2 r3 r4 r5) =
+    text "NextFor" <+> pPrint r1 <+> pPrint r2 <+> pPrint r3 <+> pPrint r4 <+> pPrint r5
+  pPrint (RangeOp r1 r2 r3 r4) =
+    text "RangeOp" <+> pPrint r1 <+> pPrint r2 <+> pPrint r3 <+> pPrint r4
+  pPrint (Dump s) =
+    text "Dump" <+> text (show s)
+  pPrint (ErrorOp s) =
+    text "ErrorOp" <+> text (show s)
+  pPrint (Stop sq r) =
+    text "Stop" <+> pPrint sq <+> pPrint r
 
 -------------------------------------------------
 
 data Value = VInteger Integer
            | VArray [Value]
            | VFun Frame Name [Op]   -- Frame is captured when we build the closure
-           | VHeap HeapId           -- Possibly unsettled logical variable
+           | VHeap String HeapId    -- Possibly unsettled logical variable (String for debugging)
            | VContextId ContextId   -- Only used in 'for' loops
+           | VDummy
   deriving (Eq)
 
 instance Show Value where
   show (VInteger i) = show i
   show VFun{} = "VFun{}"
   show (VArray vs) = "(" ++ intercalate "," (map show vs) ++ ")"
-  show (VHeap h) = "H[" ++ show h ++ "]"
+  show (VHeap s h) = s++"[" ++ show h ++ "]"
   show (VContextId c) = show c
+  show VDummy = "VDummy"
+
+instance Pretty Value where
+  pPrint = text . show
 
 -----
 -- Global execution state
@@ -424,6 +567,8 @@ newtype ContextId = ContextId Int
   deriving (Eq, Ord, Enum)
 instance Show ContextId where
   show (ContextId c) = "C" ++ show c
+instance Pretty ContextId where
+  pPrint = text . show
 
 startRunState :: RunState
 startRunState = RunState { rs_contexts = M.empty, rs_nextContextId = ci, rs_currentContext = ci }
@@ -452,18 +597,23 @@ updateContext :: Context -> R ()
 updateContext ctx =
   modify $ \ rs -> rs{ rs_contexts = M.insert (ctx_id ctx) ctx (rs_contexts rs) }
 
+-- Get a context
+getContext :: ContextId -> R Context
+getContext ci = fromMaybe (error "get") . M.lookup ci <$> gets rs_contexts
+
 -- Get the currently executing context
-getContext :: R Context
-getContext = do
-  rs <- get
-  pure $ fromMaybe (error "get") $ M.lookup (rs_currentContext rs) (rs_contexts rs)
+getCurContext :: R Context
+getCurContext = getContext =<< gets rs_currentContext
 
 -- Set the currently executing context
-setContextId :: ContextId -> R ()
-setContextId ci = modify $ \ rs -> rs{ rs_currentContext = ci }
+setCurContextId :: ContextId -> R ()
+setCurContextId ci = modify $ \ rs -> rs{ rs_currentContext = ci }
 
-modifyContext :: (Context -> Context) -> R ()
-modifyContext f = updateContext =<< (f <$> getContext)
+modifyContext :: ContextId -> (Context -> Context) -> R ()
+modifyContext ci f = updateContext =<< (f <$> getContext ci)
+
+modifyCurContext :: (Context -> Context) -> R ()
+modifyCurContext f = updateContext =<< (f <$> getCurContext)
 
 runRunState :: R a -> a
 runRunState ra = evalState ra startRunState
@@ -508,12 +658,49 @@ data NextContext = ParentContext ContextId [Op] [Op]
                  | NextContext Context
 -}
 
+instance Pretty Context where
+  pPrint Ctx{..} = text "Ctx" $$ nest 2 (vcat
+    [ text "ctx_name =" <+> text ctx_name
+    , text "ctx_id =" <+> text (show ctx_id)
+    , text "ctx_frame =" <+> pPrint ctx_frame
+    , text "ctx_heap =" <+> pPrint ctx_heap
+    , text "ctx_heapAddr =" <+> pPrint ctx_heapAddr
+    , text "ctx_ops =" <+> pPrint ctx_ops
+    , text "ctx_stack =" <+> pPrint ctx_stack
+    , text "ctx_susps =" <+> pPrint ctx_susps
+    , text "ctx_next =" <+> pPrint ctx_next
+    , text "ctx_parent =" <+> pPrint ctx_parent
+    , text "ctx_failure =" <+> pPrint ctx_failure
+    , text "ctx_success =" <+> pPrint ctx_success
+    ])
+
 data StackFrame
-  = ContFrame Frame [Op]     -- end of a PushFrame
-  | ContFun Value Frame [Op] -- Return from a function call,
+  = ContFrame String Frame [Op]     -- end of a PushFrame
+  | ContFun Value Value Frame [Op] -- Return from a function call,
                              -- unifying the result with the value
   | ContOps [Op]             -- end of a join (Alt)
   deriving (Show)
+
+instance Pretty StackFrame where
+  pPrint (ContFrame s fr ops) =
+    text ("ContFrame " ++ s) $$ nest 2 (vcat
+      ["fr =" <+> pPrint fr
+      ,"ops =" <+> pPrint ops
+      ])
+  pPrint (ContFun sq target fr ops) =
+    text "ContFun" $$ nest 2 (vcat
+      ["sq =" <+> pPrint sq
+      ,"target =" <+> pPrint target
+      ,"fr =" <+> pPrint fr
+      ,"ops =" <+> pPrint ops
+      ])
+  pPrint (ContOps ops) =
+    text "ContOps" $$ nest 2 (vcat
+      ["ops =" <+> pPrint ops
+      ])
+
+showStackFrame :: StackFrame -> String
+showStackFrame = head . words . show
 
 data Suspension = Susp
   { susp_waitingFor :: [HeapId]   -- for faster runnable check  XXX not used
@@ -521,17 +708,27 @@ data Suspension = Susp
   }
   deriving (Show)
 
+instance Pretty Suspension where
+  pPrint = text . showSusp -- XXX
+
+showSusp :: Suspension -> String
+showSusp (Susp hs s) = head (words (show s)) ++ show hs
+
 data SuspCont
   = SuspUnify Value Value
   | SuspAdd Value Value Value
-  | SuspCall Value Value Value
-  | SuspDomain ContextId
+  | SuspCall Value Value Value Value Value
+  | SuspDomain Seq ContextId
   | SuspRange Value Value
+  | SuspChoice Value Value Frame [Op] [Op]
   deriving (Show)
 
 addSusp :: [HeapId] -> SuspCont -> R ()
-addSusp hs susp | debug && trace ("addSusp: " ++ show (Susp hs susp)) False = undefined
-addSusp hs susp = modifyContext $ \ ctx -> ctx{ ctx_susps = ctx_susps ctx ++ [Susp hs susp] }
+addSusp hs susp = do
+  when debug $ do
+    ctx <- getCurContext
+    traceM $ "addSusp: ci=" ++ show (ctx_id ctx) ++ " " ++ showSusp (Susp hs susp)
+  modifyCurContext $ \ ctx -> ctx{ ctx_susps = ctx_susps ctx ++ [Susp hs susp] }
 
 -----
 -- Store for logical variables.
@@ -567,15 +764,16 @@ expunge ci heap = value []
     value _ v@VInteger{} = v
     value s (VArray vs) = VArray (map (value s) vs)
     value s (VFun fr n os) = VFun (frame s fr) n os
-    value s v@(VHeap (HeapId ci' h))
-      | h `elem` s = error "WRONG: expunge recursion"
+    value s v@(VHeap _ (HeapId ci' h))
       | ci /= ci' = v
+      | h `elem` s = error $ "WRONG: expunge recursion:\n" ++ show (h, s, heap)
       | otherwise =
           case M.lookup h heap of
             Nothing -> error "expunge: not in heap"
-            Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show h  -- XXX is it wrong
+            Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show (h, ci, heap)  -- XXX is it wrong
             Just (Just v') -> value (h:s) v'
     value _ v@VContextId{} = v
+    value _ VDummy = VDummy
     frame s Frame{..} = Frame{ fr_name = fr_name
                              , fr_parent = assert "expunge" (fr_parent `hasNoHeapIdsFrom` ci) fr_parent
                              , fr_vals = M.map (value s) fr_vals
@@ -606,6 +804,13 @@ data Frame = Frame
   }
   deriving (Eq, Show)
 
+instance Pretty Frame where
+  pPrint Frame{..} = text "Frame" $$ nest 2 (vcat
+    [ text "fr_name =" <+> text fr_name
+    , text "fr_vals =" <+> pPrint fr_vals
+    , sep [text "fr_parent =", nest 2 $ pPrint fr_parent]
+    ])
+
 ctxDump :: Context -> String
 ctxDump ctx = "ctx=" ++ ctx_name ctx ++ ": fr=" ++ fr_name (ctx_frame ctx) ++ "\n"
               ++ "  frame=" ++ show (fr_vals (ctx_frame ctx)) ++ "\n"
@@ -619,11 +824,13 @@ ctxDumps ctx = do
   contexts <- gets rs_contexts
   (s ++) <$> maybe (pure "") ctxDumps ((contexts M.!) <$> ctx_parent ctx)
 
-pushFrame :: [Op] -> Frame -> Context -> Context
+pushFrame :: (HasCallStack) => [Op] -> Frame -> Context -> Context
 -- (pushFrame ops fr ctx) returns ctx' which executes (ops, fr),
 -- returning to ctx's (ops,fr) when that is done.
 pushFrame ops fr ctx =
-  ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
+  let cs = getCallStack callStack
+      line = srcLocStartLine $ snd $ head cs
+  in ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (show line) (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 
 pushOps :: HasCallStack => [Op] -> Context -> Context
 pushOps ops ctx =
@@ -638,14 +845,25 @@ assign r@Reg{..} val ctx =
   let fr = ctx_frame ctx
       heap = ctx_heap ctx
   in  case M.lookup reg_name (fr_vals fr) of
-        Just (VHeap (HeapId ci h)) ->
+        Just (VHeap _ (HeapId ci h)) ->
           assert "assign" (ci == ctx_id ctx) $
           case M.lookup h heap of
             Nothing -> error $ "assign: not in heap " ++ show (r, h)
-            Just Nothing -> ctx{ctx_heap = M.insert h (Just val) heap}
+            Just Nothing -> setHeapAddr h (Just val) ctx
             Just (Just v) -> error $ "assign: heap already set " ++ show (r, h, v)
         Just v -> error $ "assign: already set " ++ show (r, v)
         Nothing -> error $ "assign: not in frame " ++ show r
+
+assignSq :: Value -> Value -> Context -> Context
+assignSq v1 v2 _ | sqDebug && trace ("assignSq: " ++ show v1 ++ " := " ++ show v2) False = undefined
+assignSq v1 v2 ctx | v1 == v2 = ctx
+assignSq (VHeap _ (HeapId ci h)) val ctx =
+  assert "assign" (ci == ctx_id ctx) $
+  case M.lookup h (ctx_heap ctx) of
+    Nothing -> error $ "assignSq: not in heap " ++ show h
+    Just Nothing -> setHeapAddr h (Just val) ctx
+    Just (Just v) -> error $ "assignSq: heap already set " ++ show (h, v)
+assignSq tgt val _ = error $ "assignSq: " ++ show (tgt, val)
 
 newHeapIds :: Int -> Context -> ([HeapAddr], Context)
 newHeapIds n ctx =
@@ -670,12 +888,16 @@ loadValue r ctx = loadValue' (reg_name r) (Just (ctx_frame ctx))
 
 -- Follow VHeap indirections
 follow :: Value -> R Value
-follow v@(VHeap h) = do
+follow = follow' []
+
+follow' :: [HeapId] -> Value -> R Value
+follow' s (VHeap _ h) | h `elem` s = error $ "follow': loop " ++ show (h, s)
+follow' s v@(VHeap _ h) = do
   mv <- getHeap h
   case mv of
-    Just v' -> follow v'
+    Just v' -> follow' (h:s) v'
     _ -> pure v
-follow v = pure v
+follow' _ v = pure v
 
 getHeap :: HeapId -> R (Maybe Value)
 getHeap (HeapId ci h) = do
@@ -686,7 +908,7 @@ unify :: Value -> Value -> R ()
 unify v1 v2 | moreDebug && trace ("unify: " ++ show (v1, v2)) False = undefined
 unify v1 v2 | v1 == v2 = pure ()
             | otherwise = do
-                ctx <- getContext
+                ctx <- getCurContext
                 v1' <- follow v1
                 v2' <- follow v2
                 unify' (ctx_id ctx) v1' v2'
@@ -694,10 +916,10 @@ unify v1 v2 | v1 == v2 = pure ()
 unify' :: ContextId -> Value -> Value -> R ()
 unify' ci v1 v2 | moreDebug && trace ("unify': " ++ show (ci, v1, v2)) False = undefined
 unify' _ v1 v2 | v1 == v2 = pure ()
-unify' ci (VHeap h1) v2 | isFlex h1 ci = setHeap h1 v2
-unify' ci v1 (VHeap h2) | isFlex h2 ci = setHeap h2 v1
-unify' _ v1@(VHeap h1) v2 = suspendUnify h1 v1 v2
-unify' _ v1 v2@(VHeap h2) = suspendUnify h2 v1 v2
+unify' ci (VHeap _ h1) v2 | isFlex h1 ci = setHeap h1 v2
+unify' ci v1 (VHeap _ h2) | isFlex h2 ci = setHeap h2 v1
+unify' _ v1@(VHeap _ h1) v2 = suspendUnify h1 v1 v2
+unify' _ v1 v2@(VHeap _ h2) = suspendUnify h2 v1 v2
 unify' _ (VArray vs1) (VArray vs2)
   | length vs1 /= length vs2 = failure "unify' 1"
   | otherwise = zipWithM_ unify vs1 vs2
@@ -711,21 +933,28 @@ suspendUnify :: HeapId -> Value -> Value -> R ()
 suspendUnify h v1 v2 = addSusp [h] $ SuspUnify v1 v2
 
 -- Set a heap location in the current heap.
+-- Can only be used to instantiate variables, not modifying the heap.
 setHeap :: HeapId -> Value -> R ()
 setHeap h v | moreDebug && trace ("setHeap: " ++ show (h, v)) False = undefined
 setHeap (HeapId ci h) v = do
-  ctx <- getContext
-  assert "setHeap" (ci == ctx_id ctx) $
-   case M.lookup h (ctx_heap ctx) of
+  ctx <- getCurContext
+  assertM "setHeap" (ci == ctx_id ctx)
+  case M.lookup h (ctx_heap ctx) of
     Nothing -> error $ "setHeap: not in heap " ++ show h
     Just (Just vv) -> error $ "setHeap: already set " ++ show (h, vv)
-    Just Nothing -> updateContext ctx{ ctx_heap = M.insert h (Just v) (ctx_heap ctx) }
+    Just Nothing -> modifyCurContext $ setHeapAddr h (Just v)
+
+-- Blindly set the heap contents.  Used for non-monotonic updates.
+setHeapAddr :: HasCallStack => HeapAddr -> Maybe Value -> Context -> Context
+setHeapAddr h mv _ | moreDebug && trace ("setHeapAddr: " ++ show (h, mv)) False = undefined
+setHeapAddr h (Just (VHeap s (HeapId ci h'))) ctx | h == h' && ci == ctx_id ctx = error $ "setHeapAddr: cycle " ++ s
+setHeapAddr h mv ctx = ctx{ ctx_heap = M.insert h mv (ctx_heap ctx) }
 
 -- When the domain fails, backtrack if possible.
 -- When no more backtracking remains, use failure continuation.
 failure :: HasCallStack => String -> R ()
 failure msg = do
-  ctx <- getContext
+  ctx <- getCurContext
   when debug $
     traceM $ "failure: " ++ msg ++ " ctx=" ++ ctx_name ctx ++ " next=" ++ show (isJust (ctx_next ctx))
   case ctx of
@@ -735,8 +964,10 @@ failure msg = do
       assert "failure" (ctx_id ctx == ctx_id nctx) $
       updateContext nctx
     Ctx{ ctx_next = Nothing, ctx_parent = Just pci, ctx_failure = fOps } -> do
-      setContextId pci
-      modifyContext $ \ c -> pushOps fOps c
+      setCurContextId pci
+      modifyCurContext $ \ c -> pushOps fOps c
+      --ctx <- getCurContext
+      --traceM $ "failure: fail branch\n" ++ prettyShow ctx
 
 addOp :: Value -> Value -> Value -> R ()
 addOp dst src1 src2 = do
@@ -744,35 +975,36 @@ addOp dst src1 src2 = do
   src2' <- follow src2
   case (src1', src2') of
     (VInteger i1, VInteger i2) -> unify dst (VInteger $ i1 + i2)
-    (VHeap h1, _) -> addSusp [h1] (SuspAdd dst src1' src2')
-    (_, VHeap h2) -> addSusp [h2] (SuspAdd dst src1' src2')
+    (VHeap _ h1, _) -> addSusp [h1] (SuspAdd dst src1' src2')
+    (_, VHeap _ h2) -> addSusp [h2] (SuspAdd dst src1' src2')
     _ -> failure "addOp"  -- WHNF, but not integers
 
 -- Call f with argument a, but first wait for f to be in WHNF
-callOp :: Value -> Value -> Value -> R ()
-callOp t f a | debug && trace ("callOp " ++ show (t,f,a)) False = undefined
-callOp t f a = do
+callOp :: Value -> Value -> Value -> Value -> Value -> R ()
+callOp _ _ t f a | debug && trace ("callOp " ++ show (t,f,a)) False = undefined
+callOp sqa sqt t f a = do
   f' <- follow f
   case f' of
-    VFun fr n ops -> apply t fr n ops a
+    VFun fr n ops -> apply sqa sqt t fr n ops a
     VArray vs -> do
+      unify sqa sqt
       a' <- follow a
       case a' of
         VInteger (fromInteger -> i) | i >= 0 && i < length vs -> unify t (vs !! i)
                                     | otherwise -> failure "callOp 1"
-        VHeap h -> addSusp [h] (SuspCall t f' a')
+        VHeap _ h -> addSusp [h] (SuspCall sqa sqt t f' a')
         _ -> failure "callOp 2" -- XXX maybe WRONG
-    VHeap h -> addSusp [h] (SuspCall t f' a)
+    VHeap _ h -> addSusp [h] (SuspCall sqa sqt t f' a)
     v -> error $ "Call: not a function/array " ++ show v
 
-apply :: Value -> Frame -> Name -> [Op] -> Value -> R ()
+apply :: Value -> Value -> Value -> Frame -> Name -> [Op] -> Value -> R ()
 -- Does not make a new Context/Heap; 
-apply target fr argName ops arg =
-  modifyContext $ \ ctx ->
+apply sqa sqt target fr argName ops arg =
+  modifyCurContext $ \ ctx ->
   ctx{ ctx_ops   = ops  -- The 'ops' comes from the function closure
-     , ctx_frame = makeFrame "apply" [(argName, arg)] fr
+     , ctx_frame = makeFrame "apply" [(argName, arg), ("$" ++ argName, sqa)] fr
                         -- The 'fr' comes from the function closure
-     , ctx_stack = ContFun target (ctx_frame ctx) (ctx_ops ctx)
+     , ctx_stack = ContFun sqt target (ctx_frame ctx) (ctx_ops ctx)
                    : ctx_stack ctx }
 
 rangeOp :: Value -> Value -> R ()
@@ -780,7 +1012,7 @@ rangeOp t a = do
   a' <- follow a
   case a' of
     VArray vs -> choices t vs
-    VHeap h -> addSusp [h] (SuspRange t a')
+    VHeap _ h -> addSusp [h] (SuspRange t a')
     v -> error $ "rangeOp: not an array " ++ show v
 
 choices :: Value -> [Value] -> R ()
@@ -788,10 +1020,37 @@ choices _ [] = failure "choices"
 choices t [x] = unify t x
 choices _t _xs = undefined  -- should behave like t := (x[0] | x[1] | ...)
 
+choiceOp :: Value -> Value -> Frame -> [Op] -> [Op] -> R ()
+choiceOp sqin sqout fr ops1 ops2 = do
+  sqin' <- follow sqin
+  case sqin' of
+    VHeap _ h -> do
+      when debug $
+        traceM $ "choiceOp: suspending on " ++ show h
+      addSusp [h] (SuspChoice sqin sqout fr ops1 ops2)
+    _ -> do
+      -- unify sqin sqout
+      when debug $ do
+        ctx <- getCurContext
+        traceM $ "choiceOp: cloning\n" ++ prettyShow ctx
+      -- The Choice instruction sequences end with an EndFrame.
+      -- This is the corresponding pushFrame, which run in
+      -- frame where the Choice was originally executed.
+      modifyCurContext $ pushFrame ops1 fr
+      ctx <- getCurContext
+      let
+        -- NB: both ctx1 and ctx2 start with the same heap
+        ctx1 = ctx{ ctx_next = Just ctx2 }
+        ctx2 = ctx{ ctx_ops = ops2
+                  , ctx_name = ctx_name ctx ++ "-next"
+                  }
+      --error $ "ctx1=\n" ++ prettyShow ctx1 ++ "\nctx2=\n" ++ prettyShow ctx2
+      updateContext ctx1
+
 getOp :: R Op
 -- Get the next Op from ctx_ops, and remove it from the list
 getOp = do
-  ctx <- getContext
+  ctx <- getCurContext
   case ctx_ops ctx of
     [] -> error "getOp: no ops"
     op : ops -> do updateContext ctx{ctx_ops = ops}; pure op
@@ -817,7 +1076,7 @@ dumpFrame fr | M.null (fr_vals fr) = pure ""
 dumpFrame fr = do
   let nvs = M.toList (fr_vals fr)
   vs' <- mapM (followDeep . snd) nvs
-  pure $ "  " ++ fr_name fr ++ ": " ++ intercalate ", " (zipWith (\ (n, _) v -> n ++ " :-> " ++ show v) nvs vs') ++ "\n"
+  pure $ "  frame=" ++ fr_name fr ++ ": " ++ intercalate ", " (zipWith (\ (n, _) v -> n ++ " :-> " ++ show v) nvs vs') ++ "\n"
 
 followDeep :: Value -> R Value
 followDeep v = do
@@ -829,7 +1088,7 @@ followDeep v = do
 stepR :: R ()
 stepR = do
   op  <- getOp
-  ctx <- getContext
+  ctx <- getCurContext
   when stepDebug $ do
     traceM $ "stepR ctx=" ++ ctx_name ctx ++ "(" ++ show (ctx_id ctx) ++ ") fr=" ++ fr_name (ctx_frame ctx) ++ ": " ++ take 150 (show op)
 
@@ -851,22 +1110,11 @@ stepR = do
                , ctx_next = Nothing
                }
           pfr = ctx_frame ctx
-      modifyContext $ assign c (VContextId nci)
-      setContextId nci
+      modifyCurContext $ assign c (VContextId nci)
+      setCurContextId nci
       updateContext nctx
 
-    Choice ops1 ops2 -> updateContext ctx1
-      where
-        -- NB: both ctx1 and ctx2 start with the same heap
-        ctx1 = ctx{ ctx_ops = ops1
-                  , ctx_stack = ContOps old_ops : old_stack
-                  , ctx_next = Just ctx2 }
-        ctx2 = ctx{ ctx_ops = ops2
-                  , ctx_stack = ContOps old_ops : old_stack
-                  , ctx_name = ctx_name ctx ++ "-next"
-                  }
-        old_stack = ctx_stack ctx
-        old_ops = ctx_ops ctx
+    Choice rin rout ops1 ops2 -> choiceOp (loadValue rin ctx) (loadValue rout ctx) (ctx_frame ctx) ops1 ops2
 
       -- The domain of an if/for has reached the end.
       -- So we are about to abandon the current context, ctx; in the case of 'for'
@@ -875,77 +1123,103 @@ stepR = do
       --    with the domain frame added.
       -- All traces of the domain heap must be expunged from the
       --    frame, since we are abandoning it.
-    EndDomain | Ctx { ctx_ops = [], ctx_susps = [], ctx_parent = Just pci, ctx_id = ci
-                    , ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
-      setContextId pci  -- Switch to parent context
-      let fr' = fr{ fr_name = fr_name fr ++ "-domain" }
-      modifyContext $ pushFrame sOps (expungeFrame ci heap fr')
-    EndDomain | Ctx{ ctx_ops = [], ctx_susps = susps, ctx_parent = Just pci, ctx_id = ci } <- ctx -> do
-      setContextId pci
-      addSusp (concatMap susp_waitingFor susps) (SuspDomain ci)
+    EndDomain sq | Ctx { ctx_ops = [], ctx_susps = [], ctx_parent = Just pci, ctx_id = ci
+                       , ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
+      vsq <- follow (loadValue (sq_choice sq) ctx)
+      --assertM "EndDomain sq" (vsq == VDummy)
+      setCurContextId pci  -- Switch to parent context
+      let fr' = fr{ fr_name = fr_name fr ++ "-domain", fr_vals = M.filterWithKey notTemp (fr_vals fr) }
+          notTemp k _ = let c = head k in c /= '%' && c /= '$'
+          fr'' = expungeFrame ci heap fr'
+      when debug $ do
+        traceM $ "EndDomain: fr' = " ++ prettyShow fr'
+        traceM $ "           fr'' = " ++ prettyShow fr''
+      modifyCurContext $ pushFrame sOps fr''
+    EndDomain sq | Ctx{ ctx_ops = [], ctx_susps = susps, ctx_parent = Just pci, ctx_id = ci } <- ctx -> do
+      setCurContextId pci
+      addSusp (concatMap susp_waitingFor susps) (SuspDomain sq ci)
 
     PushFrame msg ns ops -> do
       let (hs, ctx') = newHeapIds (length ns) ctx
-          fr = makeFrame msg (zip ns $ map (VHeap . HeapId (ctx_id ctx)) hs) (ctx_frame ctx)
+          fr = makeFrame msg (zipWith (\ n h -> (n, VHeap n $ HeapId (ctx_id ctx) h)) ns hs) (ctx_frame ctx)
       updateContext $ pushFrame ops fr ctx'
 
     -- EndFrame, EndFun, EndOps are always the last instruction in the [Op]
-    EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx ->
-      modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
+    EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame _ fr ops : stk } <- ctx ->
+      modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
     -- The ops for a function lacks the trailing EndFrame.
     -- So we pop it here.
-    EndFun ret | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
-                    , ctx_stack = ContFrame _ _ : ContFun target fr ops : stk
-                    } <- ctx -> do
+    EndFun rsq ret | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
+                         , ctx_stack = ContFrame _ xfr xops : ContFun sqt target fr ops : stk
+                         } <- ctx -> do
+      assertM ("EndFun " ++ show (xfr, xops)) (null xops && fr_name xfr == "apply")
       unify target (loadValue ret ctx)
-      modifyContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
+      unify sqt (loadValue (sq_choice rsq) ctx)
+      modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
     EndOps | Ctx{ ctx_ops = [], ctx_stack = ContOps ops : stk } <- ctx ->
-      modifyContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
+      modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
 
 
     -- NextFor is the last instruction of a PushFrame (of locals),
-    -- so that frame is popped.  The second frame that is popped
-    -- was pushed by EndDomain.
-    NextFor rc ra rv | Ctx{ ctx_ops = []
-                          , ctx_stack = ContFrame _ _ : ContFrame fr ops : stk } <- ctx -> do
+    -- so that frame is popped.  The second frame that is popped,
+    -- and used, is pushed by EndDomain.
+    NextFor rc ra rv lsq osq | Ctx{ ctx_ops = []
+                                  , ctx_stack = ContFrame _ xfr xops : ContFrame _ fr ops : stk } <- ctx -> do
+      -- dctx is the domain context, in case we need to iterate
       let dctx =
             case loadValue rc ctx of
-              VHeap (HeapId _ h) ->
+              VHeap _ (HeapId _ h) ->
                 case M.lookup h (ctx_heap ctx) of
                   Just (Just (VContextId c)) -> c
                   _ -> error "impossible: NextFor 3"
               _ -> error "impossible: NextFor 4"
+      -- Update the sequencing cell
+      case loadValue (sq_choice lsq) ctx of
+        VHeap _ (HeapId ci h) -> do
+          assertM "NextFor lsq" (ci == ctx_id ctx)
+          when (lsq /= osq) $
+            modifyCurContext $ setHeapAddr h (Just $ loadValue (sq_choice osq) ctx)
+        _ -> error "impossible: NextFor 5"
+      -- Find the array being accumulated
       case loadValue ra ctx of
-        VHeap (HeapId _ h) ->
+        VHeap _ (HeapId ci h) -> do
+          assertM "NextFor ra" (ci == ctx_id ctx)
           case M.lookup h (ctx_heap ctx) of
             Just (Just (VArray vs)) -> do
               let va = VArray (vs ++ [loadValue rv ctx])
               when debug $ do
                 vs' <- mapM follow $ vs ++ [loadValue rv ctx]
                 traceM $ "NextFor appends: " ++ show ((vs, loadValue rv ctx), vs')
-                traceM $ "   " ++ show (ctx_stack ctx)
+                traceM $ "   " ++ showListWith showStackFrame (ctx_stack ctx)
               -- Violating heap invariant by updating a WHNF value.
-              updateContext $ ctx{ ctx_heap = M.insert h (Just va) (ctx_heap ctx)
-                                 , ctx_ops = ops
-                                 , ctx_frame = fr
-                                 , ctx_stack = stk
-                                 }
-              setContextId dctx
+              
+              updateContext $
+                setHeapAddr h (Just va) $
+                  ctx{ ctx_ops = ops
+                     , ctx_frame = fr
+                     , ctx_stack = stk
+                     }
+              setCurContextId dctx
+              when debug $
+                traceM $ "  switch to " ++ show dctx
+              ctx <- getCurContext
+              --traceM $ "NextFor:\n" ++ prettyShow ctx
+              --traceM "--------------------"
               failure "NextFor"
             _ -> error "impossible: NextFor 1"
         _ -> error "impossible: NextFor 2"
 
-    RangeOp t r -> rangeOp (loadValue t ctx) (loadValue r ctx)
-    Atom t (AnInteger i) -> modifyContext $ assign t (VInteger i)
-    MkArray t rs -> modifyContext $ assign t (VArray [ loadValue r ctx | r <- rs])
+    RangeOp _sin _sout t r -> rangeOp (loadValue t ctx) (loadValue r ctx)
+    Atom t v -> modifyCurContext $ assign t v
+    MkArray t rs -> modifyCurContext $ assign t (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
+    Assign r1 r2 -> modifyCurContext $ assignSq (loadValue r1 ctx) (loadValue r2 ctx)
     Add t x y -> addOp (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
-    Function t n ops -> modifyContext $ assign t (VFun (ctx_frame ctx) n ops)
-    Call t f a -> callOp (loadValue t ctx) (loadValue f ctx) (loadValue a ctx)
+    Function t n ops -> modifyCurContext $ assign t (VFun (ctx_frame ctx) n ops)
+    Call sqa sqt t f a -> callOp (loadValue (sq_choice sqa) ctx) (loadValue (sq_choice sqt) ctx) (loadValue t ctx) (loadValue f ctx) (loadValue a ctx)
     Failure -> failure "Failure"
-    NoOp -> pure ()
     ErrorOp s -> error $ "ErrorOp: " ++ s
     Dump msg -> do
       s <- ctxDumps ctx
@@ -954,11 +1228,12 @@ stepR = do
     _ -> error $ "stepR op = " ++ show op ++ "\n" ++ show ctx
 
   when stepFrameDebug $ do
-    c <- getContext
+    c <- getCurContext
     ps <- getParents (ctx_id c)
-    let showNexts p = "    " ++ ctx_name p ++ ": " ++ show (map (head . ctx_ops) (getNexts p))
+    let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . take 2 . words . show . head . ctx_ops) (getNexts p)
     traceM $ "  ctx=" ++ ctx_name c ++ "(" ++ show (ctx_id c) ++ ")" ++
-             "\n" ++ intercalate "\n" (map showNexts ps)
+             "\n" ++ intercalate "\n" (map showNexts ps) ++ "\n" ++
+             "  susps=" ++ showListWith showSusp (ctx_susps c)
 
     frdumps <- mapM dumpFrame $ getFrames c
     traceM $ concat $ reverse frdumps
@@ -973,40 +1248,65 @@ stepR = do
 -- or in subcontexts, since we cannot affect supercontexts.
 runSuspensions :: R ()
 runSuspensions = do
-  susps <- concatMapM runSuspension =<< (ctx_susps <$> getContext)
-  ctx' <- getContext
-  updateContext $ ctx'{ ctx_susps = susps }
+  susps <- ctx_susps <$> getCurContext
+  when (debug && not (null susps)) $ do
+    ci <- ctx_id <$> getCurContext
+    traceM $ "runSuspensions: susps=" ++ show ci ++ showListWith showSusp susps
+  trySusps [] susps
+  where
+    trySusps tried [] = modifyCurContext $ \ ctx -> ctx{ ctx_susps = tried }
+    trySusps tried (susp:untried) = do
+      -- Remove the susp we are trying
+      modifyCurContext $ \ ctx -> ctx{ ctx_susps = tried ++ untried }
+      did <- trySuspension susp
+      if did then do
+        -- Something happened, so try again.
+        -- Any modification, e.g., new suspensions or context switch will persist.
+        -- XXX New suspensions will be appended, is that correct?
+        runSuspensions
+       else
+        trySusps (tried ++ [susp]) untried  -- try the next one
 
-runSuspension :: Suspension -> R [Suspension]
-runSuspension susp | debug && trace ("runSuspension " ++ show susp) False = undefined
-runSuspension susp@(Susp hs sc) = do
+trySuspension :: Suspension -> R Bool
+--trySuspension susp | debug && trace ("trySuspension " ++ show susp) False = undefined
+trySuspension susp@(Susp hs sc) = do
   let isWHNF h = isJust <$> getHeap h
   oks <- mapM isWHNF hs
   if or oks then do
-    modifyContext $ \ ctx -> ctx{ ctx_susps = [] }
+    when debug $
+      traceM $ "trySuspension: wake " ++ show susp
     case sc of
       SuspUnify v1 v2   -> unify v1 v2
       SuspAdd v1 v2 v3  -> addOp v1 v2 v3
-      SuspCall v1 v2 v3 -> callOp v1 v2 v3
-      SuspDomain pci -> do
-        pctx <- getContext
-        setContextId pci
-        modifyContext $ \ ctx -> ctx{ ctx_ops = [NoOp, EndDomain], ctx_parent = Just (ctx_id pctx) }
+      SuspCall v1 v2 v3 v4 v5 -> callOp v1 v2 v3 v4 v5
+      SuspDomain sq pci -> do
+        pctx <- getCurContext
+        setCurContextId pci
+        modifyCurContext $ \ c ->
+          assert "trySuspension SuspDomain ops" (null (ctx_ops c)) $
+          c{ ctx_ops = [EndDomain sq] }
+        ctx <- getCurContext
+        assertM "trySuspension SuspDomain parent " (ctx_parent ctx == Just (ctx_id pctx))
+        --traceM $ "trySuspension:\n" ++ prettyShow ctx
       SuspRange v1 v2 -> rangeOp v1 v2
-    ctx_susps <$> getContext
+      SuspChoice sqin sqout fr ops1 ops2 -> choiceOp sqin sqout fr ops1 ops2
+    pure True
    else
-    pure [susp]
+    pure False
 
 run :: [Op] -> [Value]
 run ops = runRunState $ do
   ci <- newContextId
   let loop = do
-        ctx <- getContext
+        ctx <- getCurContext
         case ctx of
-          Ctx {ctx_ops = [Stop r], ctx_heap = heap, ctx_susps = susps}
-            | null susps ->
+          Ctx {ctx_ops = [Stop sq r], ctx_heap = heap, ctx_susps = susps}
+            | null susps -> do
+              vsq <- follow (loadValue (sq_choice sq) ctx)
+              assertM "run: sq" (vsq == VDummy)
               case expunge ci heap (loadValue r ctx) of
                 VArray vs -> pure vs
+                v@VInteger{} -> pure [v]
                 vv -> error $ "top level not array: " ++ show vv
             | otherwise -> error "run: susps not empty"
           _ -> do stepR; loop
@@ -1024,13 +1324,16 @@ run ops = runRunState $ do
            , ctx_failure = [ErrorOp "ctx_failure"]
            , ctx_next = Nothing
            }
-  setContextId ci
+  setCurContextId ci
   updateContext ictx
   loop
 
+adjExp :: Exp -> SExp
+adjExp = addDef . addFor
+  where addFor e = for ("&it" := e) "&it"
+
 compExp :: Exp -> [Op]
-compExp = comp . addDef . addFor
-  where addFor e = for ("$" := e) "$"
+compExp = comp . adjExp
 
 ev :: Exp -> [Value]
 ev = run . compExp
@@ -1209,14 +1512,27 @@ test412 = ok "test412" [(1,1)] $
 
 -- Cascaded forward references
 test413 = ok "test413" [3,7,2,2] $
-         "x" := ("y" ||| 2)  `semi`
-         "y" := (3 ||| "z")  `semi`
-         "z" := 7            `semi`
-         "x"
+  "x" := ("y" ||| 2)  `semi`
+  "y" := (3 ||| "z")  `semi`
+  "z" := 7            `semi`
+  "x"
+
+-- Choice under if
+test414 = ok "test414" [(1,5),(1,6),(2,5),(2,6)] $
+  "x" := 1 `semi`
+  iF ("x" === 1) (1|||2) (3|||4) # (5|||6)
+
+-- Choice under if, must suspend
+test415 = ok "test415" [(1,5),(1,6),(2,5),(2,6)] $
+  iF ("x" === 1) (1|||2) (3|||4) # (5|||6) `wher`
+  "x" := 1
+
+x416 =
+  Array [iF ("x" === 1 # ("y" := "z")) "y" 0, "x" := 1, "z" := 2]
 
 test400s :: IO ()
 test400s = mapM_ testEx
-  [test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413
+  [test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413,test414,test415
   ]
 
 ---------------------
@@ -1261,13 +1577,15 @@ test605 = ok "test605" [(((1,4),(2,4),(3,4)),
                        ((1,5),(2,5),(3,5)))] $
   for ("y" := 4|||5) $ for ("x" := 1|||2|||3) ("x" # "y")
 
-test606 = bug "test606" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
-  for ("x" := 1|||2|||3) ("x" ||| 99)
+test606 = ok "test606" [(88,88),(88,99),(99,88),(99,99)] $
+  for (0|||1) (88 ||| 99)
 
 x606 = for (0|||1) (88 ||| 99)
 x606a = for ("x":=0|||1) (88+"x" ||| 99+"x")
 x606b = for ("x":=0|||1) (iF ("x"===0) (111 ||| 222) (333|||444))
 x606u = Array [111|||222, 333|||444]
+
+x606x = Array [for(1) (iF ("x"===1) 88 99), "x" := 1]
 
 test607 = ok "test607" [(1,2,3)] $
   for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
@@ -1275,12 +1593,13 @@ test607 = ok "test607" [(1,2,3)] $
 test608 = ok "test608" [(2,3,4)] $
   for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
 
+test609 = ok "test609" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
+  for ("x" := 1|||2|||3) ("x" ||| 99)
+
 test600s :: IO ()
 test600s = mapM_ testEx
-  [test601,test602,test603,test604,test605,test606,test607,test608
+  [test601,test602,test603,test604,test605,test606,test607,test608,test609
   ]
-
-x610 = (iF ("x"===0) (1|||2) (3|||4) # (5|||6)) `wher` "x":=1
 
 ---------------------
 -- Functions
