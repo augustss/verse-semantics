@@ -1448,9 +1448,13 @@ test309 = ok "test309" ([]::[()]) $
 test310 = ok "test310" ([]::[()]) $
   ("x" === 4) # ("x" := 3)
 
+-- Deadlock
+test311 = bad "test311" $
+  "y" := iF ("z"===1) (1|||2) (3|||4) `semi` "z":= 5|||6 `semi` ("y" # "z")
+
 test300s :: IO ()
 test300s = mapM_ testEx
-  [test301,test302,test303,test304,test305,test306,test307,test308,test309,test310
+  [test301,test302,test303,test304,test305,test306,test307,test308,test309,test310,test311
   ]
 
 ---------------------
