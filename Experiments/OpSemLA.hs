@@ -21,8 +21,7 @@ import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Ex
 import Debug.Trace
 
-debug, moreDebug, stepFrameDebug :: Bool
-
+debug, moreDebug, stepDebug, stepFrameDebug, sqDebug :: Bool
 {-
 debug = True
 moreDebug = True
@@ -46,9 +45,9 @@ assertM _ True  = pure ()
 
 {- XXX This is what I'd like to do, but I can't figure out how.
 import Control.Monad.Extra(concatMapM)
--}
 concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f as = concat <$> mapM f as
+-}
 
 pp :: (Pretty a) => a -> IO ()
 pp = putStrLn . prettyShow
@@ -585,11 +584,6 @@ newContextId = do
   put rs{ rs_nextContextId = succ ci }
   pure ci
 
--- Remove context from active contexts
-dropContext :: Context -> R ()
-dropContext ctx =
-  modify $ \ rs -> rs{ rs_contexts = M.delete (ctx_id ctx) (rs_contexts rs) }
-
 -- Update a stored context
 updateContext :: Context -> R ()
 updateContext ctx =
@@ -606,9 +600,6 @@ getCurContext = getContext =<< gets rs_currentContext
 -- Set the currently executing context
 setCurContextId :: ContextId -> R ()
 setCurContextId ci = modify $ \ rs -> rs{ rs_currentContext = ci }
-
-modifyContext :: ContextId -> (Context -> Context) -> R ()
-modifyContext ci f = updateContext =<< (f <$> getContext ci)
 
 modifyCurContext :: (Context -> Context) -> R ()
 modifyCurContext f = updateContext =<< (f <$> getCurContext)
