@@ -21,9 +21,6 @@ import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Ex
 import Debug.Trace
 
--- TODO:
---  get rid of choice_out
-
 debug, moreDebug, stepFrameDebug :: Bool
 
 {-
@@ -279,8 +276,7 @@ expToReg sq (Alt e1 e2) = do
   op1 <- sexpToReg sq sq' t e1
   op2 <- sexpToReg sq sq' t e2
   let rsq = sq_choice sq
-      rsq' = sq_choice sq'
-  emit $ Choice rsq rsq' [op1, EndFrame] [op2, EndFrame]
+  emit $ Choice rsq [op1, EndFrame] [op2, EndFrame]
   pure (sq', t)
 expToReg sq (Equal e1 e2) = do
   (sq1, r1) <- expToReg sq e1
@@ -457,7 +453,7 @@ data Op
   | Call { argSq :: Seq, retSq :: Seq, target :: Reg, fun :: Reg, arg :: Reg }
   | Function { target :: Reg, argName :: Name, body :: [Op] }
   | EndFun Seq Reg
-  | Choice { choice_in :: Reg, choice_out :: Reg, choice_left :: [Op], choice_right :: [Op] }
+  | Choice { choice_in :: Reg, choice_left :: [Op], choice_right :: [Op] }
   | EndOps
   | Failure
   | Add { target :: Reg, arg1 :: Reg, arg2 :: Reg }
@@ -499,11 +495,12 @@ instance Pretty Op where
     nest 2 (pPrint ops)
   pPrint (EndFun sq r) =
     text "EndFun" <+> pPrint sq <+> pPrint r
-  pPrint (Choice r1 r2 ops1 ops2) =
-    "Choice" <+> pPrint r1 <+> pPrint r2 $$
+  pPrint (Choice r1 ops1 ops2) =
+    "Choice" <+> pPrint r1 $$
     nest 2 (pPrint ops1) $$
     text "  -------- second branch" $$
-    nest 2 (pPrint ops2)
+    nest 2 (pPrint ops2) $$
+    text "  -------- end Choice"
   pPrint EndOps =
     text "EndOps"
   pPrint Failure =
@@ -516,7 +513,8 @@ instance Pretty Op where
     text "  -------- success" $$
     nest 2 (pPrint ops2) $$
     text "  -------- failure" $$
-    nest 2 (pPrint ops3)
+    nest 2 (pPrint ops3) $$
+    text "  -------- end Iterate"
   pPrint (EndDomain sq) =
     text "EndDomain" <+> pPrint sq
   pPrint (NextFor r1 r2 r3 r4 r5) =
@@ -720,7 +718,7 @@ data SuspCont
   | SuspCall Value Value Value Value Value
   | SuspDomain Seq ContextId
   | SuspRange Reg Reg Frame Reg Value
-  | SuspChoice Value Value Frame [Op] [Op]
+  | SuspChoice Value Frame [Op] [Op]
   deriving (Show)
 
 addSusp :: [HeapId] -> SuspCont -> R ()
@@ -1019,19 +1017,18 @@ choices :: Reg -> Reg -> Frame -> Reg -> [Value] -> R ()
 choices _ _ _ _ [] = failure "choices"
 -- XXX how should sq be treated
 choices sqin sqout fr target xs = do  -- should behave like t := (x[0] | x[1] | ...)
-  let ops = foldr1 (\ x y -> Choice sqin sqout [x, EndFrame] [y, EndFrame]) (map (Atom target) xs)
+  let ops = foldr1 (\ x y -> Choice sqin [x, EndFrame] [y, EndFrame]) (map (Atom target) xs)
   modifyCurContext $ pushFrame [ops, Assign sqout sqin, EndFrame] fr
 
-choiceOp :: Value -> Value -> Frame -> [Op] -> [Op] -> R ()
-choiceOp sqin sqout fr ops1 ops2 = do
+choiceOp :: Value -> Frame -> [Op] -> [Op] -> R ()
+choiceOp sqin fr ops1 ops2 = do
   sqin' <- follow sqin
   case sqin' of
     VHeap _ h -> do
       when debug $
         traceM $ "choiceOp: suspending on " ++ show h
-      addSusp [h] (SuspChoice sqin sqout fr ops1 ops2)
+      addSusp [h] (SuspChoice sqin fr ops1 ops2)
     _ -> do
-      -- unify sqin sqout
       when debug $ do
         ctx <- getCurContext
         traceM $ "choiceOp: cloning\n" ++ prettyShow ctx
@@ -1116,7 +1113,7 @@ stepR = do
       setCurContextId nci
       updateContext nctx
 
-    Choice rin rout ops1 ops2 -> choiceOp (loadValue rin ctx) (loadValue rout ctx) (ctx_frame ctx) ops1 ops2
+    Choice rin ops1 ops2 -> choiceOp (loadValue rin ctx) (ctx_frame ctx) ops1 ops2
 
       -- The domain of an if/for has reached the end.
       -- So we are about to abandon the current context, ctx; in the case of 'for'
@@ -1292,7 +1289,7 @@ trySuspension susp@(Susp hs sc) = do
         assertM "trySuspension SuspDomain parent " (ctx_parent ctx == Just (ctx_id pctx))
         --traceM $ "trySuspension:\n" ++ prettyShow ctx
       SuspRange v1 v2 v3 v4 v5 -> rangeOp v1 v2 v3 v4 v5
-      SuspChoice sqin sqout fr ops1 ops2 -> choiceOp sqin sqout fr ops1 ops2
+      SuspChoice sqin fr ops1 ops2 -> choiceOp sqin fr ops1 ops2
     pure True
    else
     pure False
