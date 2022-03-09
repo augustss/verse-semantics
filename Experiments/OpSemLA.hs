@@ -719,7 +719,7 @@ data SuspCont
   | SuspAdd Value Value Value
   | SuspCall Value Value Value Value Value
   | SuspDomain Seq ContextId
-  | SuspRange Value Value
+  | SuspRange Reg Reg Frame Reg Value
   | SuspChoice Value Value Frame [Op] [Op]
   deriving (Show)
 
@@ -858,7 +858,7 @@ assignSq :: Value -> Value -> Context -> Context
 assignSq v1 v2 _ | sqDebug && trace ("assignSq: " ++ show v1 ++ " := " ++ show v2) False = undefined
 assignSq v1 v2 ctx | v1 == v2 = ctx
 assignSq (VHeap _ (HeapId ci h)) val ctx =
-  assert "assign" (ci == ctx_id ctx) $
+  assert "assignSq" (ci == ctx_id ctx) $
   case M.lookup h (ctx_heap ctx) of
     Nothing -> error $ "assignSq: not in heap " ++ show h
     Just Nothing -> setHeapAddr h (Just val) ctx
@@ -987,7 +987,7 @@ callOp sqa sqt t f a = do
   case f' of
     VFun fr n ops -> apply sqa sqt t fr n ops a
     VArray vs -> do
-      unify sqa sqt
+      modifyCurContext $ assignSq sqt sqa
       a' <- follow a
       case a' of
         VInteger (fromInteger -> i) | i >= 0 && i < length vs -> unify t (vs !! i)
@@ -1007,18 +1007,20 @@ apply sqa sqt target fr argName ops arg =
      , ctx_stack = ContFun sqt target (ctx_frame ctx) (ctx_ops ctx)
                    : ctx_stack ctx }
 
-rangeOp :: Value -> Value -> R ()
-rangeOp t a = do
+rangeOp :: Reg -> Reg -> Frame -> Reg -> Value -> R ()
+rangeOp sqin sqout fr t a = do
   a' <- follow a
   case a' of
-    VArray vs -> choices t vs
-    VHeap _ h -> addSusp [h] (SuspRange t a')
+    VArray vs -> choices sqin sqout fr t vs
+    VHeap _ h -> addSusp [h] (SuspRange sqin sqout fr t a')
     v -> error $ "rangeOp: not an array " ++ show v
 
-choices :: Value -> [Value] -> R ()
-choices _ [] = failure "choices"
-choices t [x] = unify t x
-choices _t _xs = undefined  -- should behave like t := (x[0] | x[1] | ...)
+choices :: Reg -> Reg -> Frame -> Reg -> [Value] -> R ()
+choices _ _ _ _ [] = failure "choices"
+-- XXX how should sq be treated
+choices sqin sqout fr target xs = do  -- should behave like t := (x[0] | x[1] | ...)
+  let ops = foldr1 (\ x y -> Choice sqin sqout [x, EndFrame] [y, EndFrame]) (map (Atom target) xs)
+  modifyCurContext $ pushFrame [ops, Assign sqout sqin, EndFrame] fr
 
 choiceOp :: Value -> Value -> Frame -> [Op] -> [Op] -> R ()
 choiceOp sqin sqout fr ops1 ops2 = do
@@ -1126,7 +1128,7 @@ stepR = do
     EndDomain sq | Ctx { ctx_ops = [], ctx_susps = [], ctx_parent = Just pci, ctx_id = ci
                        , ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
       vsq <- follow (loadValue (sq_choice sq) ctx)
-      --assertM "EndDomain sq" (vsq == VDummy)
+      assertM "EndDomain sq" (vsq == VDummy)
       setCurContextId pci  -- Switch to parent context
       let fr' = fr{ fr_name = fr_name fr ++ "-domain", fr_vals = M.filterWithKey notTemp (fr_vals fr) }
           notTemp k _ = let c = head k in c /= '%' && c /= '$'
@@ -1166,7 +1168,7 @@ stepR = do
     -- so that frame is popped.  The second frame that is popped,
     -- and used, is pushed by EndDomain.
     NextFor rc ra rv lsq osq | Ctx{ ctx_ops = []
-                                  , ctx_stack = ContFrame _ xfr xops : ContFrame _ fr ops : stk } <- ctx -> do
+                                  , ctx_stack = ContFrame _ _xfr _xops : ContFrame _ fr ops : stk } <- ctx -> do
       -- dctx is the domain context, in case we need to iterate
       let dctx =
             case loadValue rc ctx of
@@ -1204,15 +1206,16 @@ stepR = do
               setCurContextId dctx
               when debug $
                 traceM $ "  switch to " ++ show dctx
-              ctx <- getCurContext
+              --ctx <- getCurContext
               --traceM $ "NextFor:\n" ++ prettyShow ctx
               --traceM "--------------------"
               failure "NextFor"
             _ -> error "impossible: NextFor 1"
         _ -> error "impossible: NextFor 2"
 
-    RangeOp _sin _sout t r -> rangeOp (loadValue t ctx) (loadValue r ctx)
-    Atom t v -> modifyCurContext $ assign t v
+    RangeOp sqin sqout t r -> rangeOp sqin sqout (ctx_frame ctx) t (loadValue r ctx)
+    --Atom t v -> modifyCurContext $ assign t v
+    Atom t v -> unify (loadValue t ctx) v
     MkArray t rs -> modifyCurContext $ assign t (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
     Assign r1 r2 -> modifyCurContext $ assignSq (loadValue r1 ctx) (loadValue r2 ctx)
@@ -1288,7 +1291,7 @@ trySuspension susp@(Susp hs sc) = do
         ctx <- getCurContext
         assertM "trySuspension SuspDomain parent " (ctx_parent ctx == Just (ctx_id pctx))
         --traceM $ "trySuspension:\n" ++ prettyShow ctx
-      SuspRange v1 v2 -> rangeOp v1 v2
+      SuspRange v1 v2 v3 v4 v5 -> rangeOp v1 v2 v3 v4 v5
       SuspChoice sqin sqout fr ops1 ops2 -> choiceOp sqin sqout fr ops1 ops2
     pure True
    else
@@ -1395,9 +1398,6 @@ test206 = bad "test206" $
   "x"
 
 test207 = ok "test207" [(3,4)] $
-  3 # doo ("x":= 4)
-
-x207 =
   3 # doo ("x":= 4)
 
 test208 = bad "test208" $
@@ -1527,9 +1527,6 @@ test415 = ok "test415" [(1,5),(1,6),(2,5),(2,6)] $
   iF ("x" === 1) (1|||2) (3|||4) # (5|||6) `wher`
   "x" := 1
 
-x416 =
-  Array [iF ("x" === 1 # ("y" := "z")) "y" 0, "x" := 1, "z" := 2]
-
 test400s :: IO ()
 test400s = mapM_ testEx
   [test401,test402,test403,test404,test405,test406,test407,test408,test409,test410,test411,test412,test413,test414,test415
@@ -1579,13 +1576,6 @@ test605 = ok "test605" [(((1,4),(2,4),(3,4)),
 
 test606 = ok "test606" [(88,88),(88,99),(99,88),(99,99)] $
   for (0|||1) (88 ||| 99)
-
-x606 = for (0|||1) (88 ||| 99)
-x606a = for ("x":=0|||1) (88+"x" ||| 99+"x")
-x606b = for ("x":=0|||1) (iF ("x"===0) (111 ||| 222) (333|||444))
-x606u = Array [111|||222, 333|||444]
-
-x606x = Array [for(1) (iF ("x"===1) 88 99), "x" := 1]
 
 test607 = ok "test607" [(1,2,3)] $
   for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
@@ -1706,17 +1696,11 @@ test800s = mapM_ testEx
 
 test901 = ok "test901" [1] $
   iF (1 === 1) 1 2
-x901 =
-  iF (1 === 1) 1 2
 
 test902 = ok "test902" [2] $
   iF (0 === 1) 1 2
-x902 =
-  iF (0 === 1) 1 2
 
 test903 = ok "test903" [10] $
-  iF ("x" := 10) "x" 2
-x903 =
   iF ("x" := 10) "x" 2
 
 test904 = ok "test904" [2] $
@@ -1746,10 +1730,6 @@ test911 = ok "test911" [1] $
   "y" := iF ("x" === 10) 1 2 `semi`
   "x" := 10 `semi`
   "y"
-x911 =
-  "y" := iF ("x" === 10) 1 2 `semi`
-  "x" := 10 `semi`
-  "y"
 
 test912 = ok "test912" [2] $
   "y" := iF ("x" === 10) 1 2 `semi`
@@ -1760,9 +1740,6 @@ test913 = ok "test913" [1] $
   iF ("x":=1) "x" 20
 
 test914 = ok "test914" [1] $
-  iF ("x" := (1 ||| 2)) 1 20
-
-x914 =
   iF ("x" := (1 ||| 2)) 1 20
 
 test915 = ok "test915" [2] $
@@ -1777,9 +1754,6 @@ test917 = ok "test917" [20] $
 test918 = ok "test918" [3] $
   iF ("x" := (Fail ||| (Fail ||| 3))) "x" 20
 
-x918 =
-  iF ( (Fail ||| (Fail ||| 3))) 10 20
-
 test900s :: IO ()
 test900s = mapM_ testEx
   [test901,test902,test903,test904,test905,test906,test907,test908,test909,test910,test911,test912
@@ -1787,60 +1761,39 @@ test900s = mapM_ testEx
   ]
 
 ---------------------
--- Not yet sorted
+-- Range
 ---------------------
 
-test32 = unimp "test32" [(1,2,3)] $
+test1001 = ok "test1001" [(1,2,3)] $
   for ("x" := Range (Array [1,2,3])) "x"
 
-test33 = unimp "test33" [(102,103,104)] $
+test1002 = ok "test1002" [(102,103,104)] $
   "xs" := for ("x" := 1|||2|||3) ("x" + 1) `semi`
   for ("y" := Range "xs") ("y" + 100)
 
--- The variable x gets Id 2, and so does y.
--- If eval does not resolve all the variables in the Def
--- then the x will wrongly be resolved as 2.
-test34 = bad "test34" $
-  "xs" := Do (Def ["x"] (1 # "x")) `semi`
-  doo ("y" := 2 `semi` Snd "xs")
-
-test35 = unimp "test35" [((1,2),(1,4),(1,5))] $
+test1003 = ok "test1003" [((1,2),(1,4),(1,5))] $
   "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] `semi`
   for ("xy" := Range "xys" `semi` Fst "xy" === 1) "xy"
 
-test36 = unimp "test36" ([]::[()]) $
+test1004 = ok "test1004" ([]::[()]) $
   "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] `semi`
   for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
 
-test37 = unimp "test37" [((2,3),(2,3))] $
+test1005 = ok "test1005" [((2,3),(2,3))] $
   "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] `semi`
   for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
 
--- The t1 used to be t, but shadowing is not allowed.
-test38 = ok "test38" [62,134] $
-  "v" := "t" + 1 `semi`
-  "x" := doo ( "z" := "v" + "t1" `semi` "t1" := 6 `semi` "z" ) `semi`
-  "t" := 55 ||| 127 `semi`
-  "x"
-
--- This test doesn't work, but it should.
-test46 = unimp "test46" [(2,3)] $
+test1006 = ok "test1006" [(2,3)] $
   "a" := for ("x" := Range "xs") ("x" + 1) `semi`
-  "xs" := (1#2) `semi`
+  "xs" := Array[1,2] `semi`
   "a"
 
-testUnsorted :: IO ()
-testUnsorted = mapM_ testEx
-  [test32,test33,test34,test35,test36,test37,test38,test46
+test1000s :: IO ()
+test1000s = mapM_ testEx
+  [test1001,test1002,test1003,test1004,test1005,test1006
   ]
 
 --------
-
-testOpSem :: IO ()
-testOpSem = do
-  test100s
-  test200s
-  test800s
 
 testAll :: IO ()
 testAll = do
@@ -1853,4 +1806,4 @@ testAll = do
   test700s
   test800s
   test900s
-  testUnsorted
+  test1000s
