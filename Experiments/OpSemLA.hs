@@ -1643,7 +1643,7 @@ test708 = ok "test708" [10,11] $
   "f" := lam "v" ("v" ||| "v" + 1) `semi`
   AppI "f" 10
 
-{-
+{- AppS doesn't check for single value
 test709 = bad "test709" $
   "f" := lam "v" ("v" ||| "v" + 1) `semi`
   AppS "f" 10
