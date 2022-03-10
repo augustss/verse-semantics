@@ -5,6 +5,7 @@ module OpSem.Op(
   Reg(..),
   Seq(..),
   Value(..),
+  Closure(..),
   Frame(..),
   ContextId(..),
   HeapAddr,
@@ -143,7 +144,7 @@ instance Pretty Op where
 
 data Value = VInteger Integer
            | VArray [Value]
-           | VFun Frame Name [Op]   -- Frame is captured when we build the closure
+           | VFun Name Closure      -- Frame is captured when we build the closure
            | VContextId ContextId   -- Only used in 'for' loops
            | VDummy
            | VHeap String HeapId    -- Possibly unsettled logical variable (String for debugging)
@@ -151,14 +152,22 @@ data Value = VInteger Integer
 
 instance Show Value where
   show (VInteger i) = show i
-  show VFun{} = "VFun{}"
+  show (VFun n c) = "(VFun " ++ show n ++ show c ++")"
   show (VArray vs) = "(" ++ intercalate "," (map show vs) ++ ")"
   show (VHeap s h) = s++"[" ++ show h ++ "]"
   show (VContextId c) = show c
   show VDummy = "VDummy"
 
 instance Pretty Value where
-  pPrint = text . show
+  pPrint (VFun n c) = sep [text "VFun" <+> pPrint n, nest 2 (pPrint c)]
+  pPrint v = text $ show v
+
+data Closure = Closure Frame [Op]
+  deriving (Show, Eq)
+
+instance Pretty Closure where
+  pPrint (Closure fr ops) =
+    text "Closure" $$ nest 2 (pPrint fr $$ pPrint ops)
 
 --------------------------------
 --

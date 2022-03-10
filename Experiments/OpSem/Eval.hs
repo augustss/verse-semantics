@@ -12,7 +12,6 @@ import GHC.Stack
 import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Debug.Trace
 
-
 import OpSem.Exp ( Name )
 import OpSem.Misc ( assert, assertM, showListWith )
 import OpSem.Op
@@ -223,7 +222,7 @@ expunge ci heap = value []
     -- 's' tracks the HeapIds we have seen already, for loop detection
     value _ v@VInteger{} = v
     value s (VArray vs) = VArray (map (value s) vs)
-    value s (VFun fr n os) = VFun (frame s fr) n os
+    value s (VFun n (Closure fr os)) = VFun n (Closure (frame s fr) os)
     value s v@(VHeap _ (HeapId ci' h))
       | ci /= ci' = v
       | h `elem` s = error $ "WRONG: expunge recursion:\n" ++ show (h, s, heap)
@@ -245,8 +244,8 @@ hasNoHeapIdsFrom _ _ = True
 
 -- As expunge, but for a Frame
 expungeFrame :: HasCallStack => ContextId -> Heap -> Frame -> Frame
-expungeFrame ci heap fr = f $ expunge ci heap (VFun fr "" [])
-  where f (VFun fr' "" []) = fr'
+expungeFrame ci heap fr = f $ expunge ci heap (VFun "" (Closure fr []))
+  where f (VFun "" (Closure fr' [])) = fr'
         f _ = error "impossible"
 
 ctxDump :: Context -> String
@@ -439,7 +438,7 @@ callOp _ _ t f a | debug && trace ("callOp " ++ show (t,f,a)) False = undefined
 callOp sqa sqt t f a = do
   f' <- follow f
   case f' of
-    VFun fr n ops -> apply sqa sqt t fr n ops a
+    VFun n cls -> apply sqa sqt t n cls a
     VArray vs -> do
       modifyCurContext $ assignSq sqt sqa
       a' <- follow a
@@ -451,9 +450,9 @@ callOp sqa sqt t f a = do
     VHeap _ h -> addSusp [h] (SuspCall sqa sqt t f' a)
     v -> error $ "Call: not a function/array " ++ show v
 
-apply :: Value -> Value -> Value -> Frame -> Name -> [Op] -> Value -> R ()
+apply :: Value -> Value -> Value -> Name -> Closure -> Value -> R ()
 -- Does not make a new Context/Heap; 
-apply sqa sqt target fr argName ops arg =
+apply sqa sqt target argName (Closure fr ops) arg =
   modifyCurContext $ \ ctx ->
   ctx{ ctx_ops   = ops  -- The 'ops' comes from the function closure
      , ctx_frame = makeFrame "apply" [(argName, arg), ("$" ++ argName, sqa)] fr
@@ -673,7 +672,7 @@ stepR = do
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
     Assign r1 r2 -> modifyCurContext $ assignSq (loadValue r1 ctx) (loadValue r2 ctx)
     PrimBinOp o t x y -> primBinOp o (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
-    Function t n ops -> modifyCurContext $ assign t (VFun (ctx_frame ctx) n ops)
+    Function t n ops -> modifyCurContext $ assign t (VFun n (Closure (ctx_frame ctx) ops))
     Call sqa sqt t f a -> callOp (loadValue (sq_choice sqa) ctx) (loadValue (sq_choice sqt) ctx) (loadValue t ctx) (loadValue f ctx) (loadValue a ctx)
     Failure -> failure "Failure"
     ErrorOp s -> error $ "ErrorOp: " ++ s
@@ -705,7 +704,7 @@ stepR = do
 runSuspensions :: R ()
 runSuspensions = do
   susps <- ctx_susps <$> getCurContext
-  when (debug && not (null susps)) $ do
+  when (moreDebug && not (null susps)) $ do
     ci <- ctx_id <$> getCurContext
     traceM $ "runSuspensions: susps=" ++ show ci ++ showListWith showSusp susps
   trySusps [] susps
