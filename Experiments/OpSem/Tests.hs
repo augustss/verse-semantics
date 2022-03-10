@@ -354,9 +354,14 @@ test711 = ok "test711" [(999,888,13)] $
       ]) %
   Array ["f" @@ 0, "f" @@ 1, "f" @@ 2]
 
+test712 = ok "test712" [12] $
+  "twice" := (var "f" ==> var "x" ==> "f" @@ ("f" @@ "x")) %
+  "dbl" := var "x" ==> "x" + "x" %
+  "twice" @@ "dbl" @@ 3
+
 test700s :: IO ()
 test700s = mapM_ testEx
-  [test701,test702,test703,test704,test705,test706,test707,test708,test709,test710,test711
+  [test701,test702,test703,test704,test705,test706,test707,test708,test709,test710,test711,test712
   ]
 
 ---------------------

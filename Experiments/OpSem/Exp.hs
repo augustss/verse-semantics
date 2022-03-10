@@ -145,7 +145,7 @@ lam n e = Lam n (addDef e)
 var :: Name -> Exp
 var = SetAny
 
-infix 3 ==>
+infixr 3 ==>
 (==>) :: Exp -> Exp -> Exp
 a ==> b = lam "&x" $ do_ (a === Var "&x" % b)
 
@@ -153,10 +153,10 @@ infixl 9 @@
 (@@) :: Exp -> Exp -> Exp
 (@@) = App
 
--- XXX should bind e locally
 case_ :: Exp -> [Exp] -> Exp
 case_ e arms =
-  if_ ("&x" := foldr (|||) Fail (map (@@ e) arms)) (Var "&x") Fail
+  let_ ("&e" := e) $
+  if_ ("&x" := foldr (|||) Fail (map (@@ Var "&e") arms)) (Var "&x") Fail
 
 -- Application that must not fail
 appS :: Exp -> Exp -> Exp
