@@ -104,7 +104,7 @@ expToReg sq (For e1 e2) = do
   msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
   emit $ Assign (sq_choice lsq) (sq_choice sq)
-  emit $ Iterate msg c [o1] [o2] [Unify t a, EndOps]
+  emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
   emit $ Atom xxxsq VDummy
 #else
   dsq <- newSeq
@@ -115,7 +115,7 @@ expToReg sq (For e1 e2) = do
   --emit $ Assign (sq_choice lsq) (sq_choice sq)
   xsq <- newRegSq
   emit $ Assign (sq_choice lsq) xsq
-  emit $ Iterate msg c [o1] [o2] [Unify t a, EndOps]
+  emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
   emit $ Assign xsq (sq_choice sq)
 #endif
   pure (lsq, t)
@@ -141,7 +141,7 @@ expToReg sq (If e1 e2 e3) = do
   --   in the parent context.
   -- The success continuation has the EndFrame to pop this.
   -- The failure continuation changes to the parent context, and just pushes the failure ops.
-  emit $ Iterate msg c [o1] [o2, EndFrame] [o3, EndOps]
+  emit $ Iterate msg c [o1] [o2, EndFrame] [o3, EndFrame]
   pure (osq, t)
 expToReg sq (Do e) = do
   t <- newReg

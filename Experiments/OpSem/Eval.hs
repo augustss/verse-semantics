@@ -111,9 +111,9 @@ data Context
 
         -- Only relevant when ctx_next = Nothing
         , ctx_parent   :: Maybe ContextId    -- Does not vary
-        , ctx_failure  :: [Op]          -- Do this if the head Op in ctx_ops fails
+        , ctx_failure  :: Closure       -- Do this if the head Op in ctx_ops fails
                                         -- Does not vary
-        , ctx_success  :: [Op]          -- ToDo: could this just be the tail of ctx_ops?
+        , ctx_success  :: Closure       -- ToDo: could this just be the tail of ctx_ops?
                                         -- Does not vary
         -- ToDo: put failure and success into parent
 
@@ -397,9 +397,9 @@ failure msg = do
       -- The nctx has the same context id, just an old heap etc.
       assert "failure" (ctx_id ctx == ctx_id nctx) $
       updateContext nctx
-    Ctx{ ctx_next = Nothing, ctx_parent = Just pci, ctx_failure = fOps } -> do
+    Ctx{ ctx_next = Nothing, ctx_parent = Just pci, ctx_failure = Closure fr fOps } -> do
       setCurContextId pci
-      modifyCurContext $ \ c -> pushOps fOps c
+      modifyCurContext $ \ c -> pushFrame fOps fr c
       --ctx <- getCurContext
       --traceM $ "failure: fail branch\n" ++ prettyShow ctx
 
@@ -556,8 +556,8 @@ stepR = do
                , ctx_heapAddr = 0
                , ctx_susps = []
                , ctx_parent = Just (ctx_id ctx)
-               , ctx_success = s
-               , ctx_failure = f
+               , ctx_success = Closure pfr s
+               , ctx_failure = Closure pfr f
                , ctx_next = Nothing
                }
           pfr = ctx_frame ctx
@@ -575,7 +575,7 @@ stepR = do
       -- All traces of the domain heap must be expunged from the
       --    frame, since we are abandoning it.
     EndDomain sq | Ctx { ctx_ops = [], ctx_susps = [], ctx_parent = Just pci, ctx_id = ci
-                       , ctx_success = sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
+                       , ctx_success = Closure _fr sOps, ctx_frame = fr, ctx_heap = heap } <- ctx -> do
       vsq <- follow (loadValue (sq_choice sq) ctx)
       assertM "EndDomain sq" (vsq == VDummy)
       setCurContextId pci  -- Switch to parent context
@@ -585,6 +585,7 @@ stepR = do
       when debug $ do
         traceM $ "EndDomain: fr' = " ++ prettyShow fr'
         traceM $ "           fr'' = " ++ prettyShow fr''
+      -- XXX We ought to push _fr here, but it seems to work anyway.  Why?
       modifyCurContext $ pushFrame sOps fr''
     EndDomain sq | Ctx{ ctx_ops = [], ctx_susps = susps, ctx_parent = Just pci, ctx_id = ci } <- ctx -> do
       setCurContextId pci
@@ -762,18 +763,19 @@ run ops = runRunState $ do
                 vv -> error $ "top level not array: " ++ show vv
             | otherwise -> error "run: susps not empty"
           _ -> do stepR; loop
+      ifr = Frame { fr_name = "run", fr_vals = M.empty, fr_parent = Nothing }
       ictx =
         Ctx{ ctx_name = "ctx_run"
            , ctx_id = ci
            , ctx_heap = M.empty
            , ctx_heapAddr = 1
-           , ctx_frame = Frame { fr_name = "run", fr_vals = M.empty, fr_parent = Nothing }
+           , ctx_frame = ifr
            , ctx_ops = ops
            , ctx_susps = []
            , ctx_stack = []
            , ctx_parent = Nothing
-           , ctx_success = [ErrorOp "ctx_success"]
-           , ctx_failure = [ErrorOp "ctx_failure"]
+           , ctx_success = Closure ifr [ErrorOp "ctx_success"]
+           , ctx_failure = Closure ifr [ErrorOp "ctx_failure"]
            , ctx_next = Nothing
            }
   setCurContextId ci

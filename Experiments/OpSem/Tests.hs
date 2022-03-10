@@ -437,10 +437,22 @@ test917 = ok "test917" [20] $
 test918 = ok "test918" [3] $
   if_ ("x" := (Fail ||| (Fail ||| 3))) "x" 20
 
+test919 = ok "test919" [7] $
+  "f" := lam "n" (if_ ("n" <=. 0) ("n"+1) ("n"+2)) %
+  "r" := "f" `App` "five" %
+  "five" := 5 %
+  "r"
+
+test920 = ok "test920" [6] $
+  "f" := lam "n" (if_ ("n" <=. 10) ("n"+1) ("n"+2)) %
+  "r" := "f" `App` "five" %
+  "five" := 5 %
+  "r"
+
 test900s :: IO ()
 test900s = mapM_ testEx
   [test901,test902,test903,test904,test905,test906,test907,test908,test909,test910,test911,test912
-  ,test913,test914,test915,test916,test917,test918
+  ,test913,test914,test915,test916,test917,test918,test919,test920
   ]
 
 ---------------------
@@ -514,17 +526,11 @@ test1019 = ok "test1019" [120] $
   "one" := 1 %
   "res"
 
-test1020 = bug "test1020" [120] $
+test1020 = ok "test1020" [120] $
   "res" := "fac" `App` "five" %
   "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `App` ("n" - 1))) %
   "five" := 5 %
   "one" := 1 %
-  "res"
-
-x1020 =
-  "fac" := lam "n" (if_ ("n" <=. 0) 1 2) %
-  "res" := "fac" `App` "five" %
-  "five" := 5 %
   "res"
 
 test1010s :: IO ()
