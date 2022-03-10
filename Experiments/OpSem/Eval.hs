@@ -7,8 +7,7 @@ import Control.Monad.State.Strict
 import Data.Map(Map)
 import qualified Data.Map as M
 import Data.Maybe
-import GHC.Stack
-    ( HasCallStack, SrcLoc(srcLocStartLine), getCallStack, callStack )
+import GHC.Stack ( HasCallStack )
 import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Debug.Trace
 
@@ -145,15 +144,15 @@ instance Pretty Context where
     ])
 
 data StackFrame
-  = ContFrame String Frame [Op]     -- end of a PushFrame
+  = ContFrame Frame [Op]     -- end of a PushFrame
   | ContFun Value Value Frame [Op] -- Return from a function call,
                              -- unifying the result with the value
   | ContOps [Op]             -- end of a join (Alt)
   deriving (Show)
 
 instance Pretty StackFrame where
-  pPrint (ContFrame s fr ops) =
-    text ("ContFrame " ++ s) $$ nest 2 (vcat
+  pPrint (ContFrame fr ops) =
+    text "ContFrame" $$ nest 2 (vcat
       [text "fr =" <+> pPrint fr
       ,text "ops =" <+> pPrint ops
       ])
@@ -265,9 +264,7 @@ pushFrame :: (HasCallStack) => [Op] -> Frame -> Context -> Context
 -- (pushFrame ops fr ctx) returns ctx' which executes (ops, fr),
 -- returning to ctx's (ops,fr) when that is done.
 pushFrame ops fr ctx =
-  let cs = getCallStack callStack
-      line = srcLocStartLine $ snd $ head cs
-  in ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (show line) (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
+  ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 
 pushOps :: HasCallStack => [Op] -> Context -> Context
 pushOps ops ctx =
@@ -599,13 +596,13 @@ stepR = do
       updateContext $ pushFrame ops fr ctx'
 
     -- EndFrame, EndFun, EndOps are always the last instruction in the [Op]
-    EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame _ fr ops : stk } <- ctx ->
+    EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx ->
       modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
     -- The ops for a function lacks the trailing EndFrame.
     -- So we pop it here.
     EndFun rsq ret | Ctx{ ctx_ops   = []   -- EndFun is the last instruction
-                         , ctx_stack = ContFrame _ xfr xops : ContFun sqt target fr ops : stk
+                         , ctx_stack = ContFrame xfr xops : ContFun sqt target fr ops : stk
                          } <- ctx -> do
       assertM ("EndFun " ++ show (xfr, xops)) (null xops && fr_name xfr == "apply")
       unify target (loadValue ret ctx)
@@ -620,7 +617,7 @@ stepR = do
     -- so that frame is popped.  The second frame that is popped,
     -- and used, is pushed by EndDomain.
     NextFor rc ra rv lsq osq | Ctx{ ctx_ops = []
-                                  , ctx_stack = ContFrame _ _xfr _xops : ContFrame _ fr ops : stk } <- ctx -> do
+                                  , ctx_stack = ContFrame _xfr _xops : ContFrame fr ops : stk } <- ctx -> do
       -- dctx is the domain context, in case we need to iterate
       let dctx =
             case loadValue rc ctx of
