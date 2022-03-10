@@ -7,6 +7,7 @@ module OpSem.Exp(
     pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
     (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
     (<.), (<=.), (>.), (>=.),
+    (==>), (@@), case_, let_,
   SExp(..),
   addDef,
   ) where
@@ -52,6 +53,7 @@ data Exp = Var Name
          | For SExp SExp
          | If SExp SExp SExp
          | Do SExp
+         | Let SExp Exp
          | Range Exp     -- :e
          | Lam Name SExp
          | App Exp Exp
@@ -134,11 +136,27 @@ if_ e1 e2 e3 = If (addDef e1) (addDef e2) (addDef e3)
 do_ :: Exp -> Exp
 do_ e = Do (addDef e)
 
+let_ :: Exp -> Exp -> Exp
+let_ e1 e2 = Let (addDef e1) e2
+
 lam :: Name -> Exp -> Exp
 lam n e = Lam n (addDef e)
 
 var :: Name -> Exp
 var = SetAny
+
+infix 3 ==>
+(==>) :: Exp -> Exp -> Exp
+a ==> b = lam "&x" $ do_ (a === Var "&x" % b)
+
+infixl 9 @@
+(@@) :: Exp -> Exp -> Exp
+(@@) = App
+
+-- XXX should bind e locally
+case_ :: Exp -> [Exp] -> Exp
+case_ e arms =
+  if_ ("&x" := foldr (|||) Fail (map (@@ e) arms)) (Var "&x") Fail
 
 -- Application that must not fail
 appS :: Exp -> Exp -> Exp
@@ -158,8 +176,9 @@ findSet (Where e1 e2) = findSet e1 ++ findSet e2
 findSet Alt {}   = []
 findSet Fail     = []
 findSet For {}   = []
-findSet If {}   = []
+findSet If {}    = []
 findSet Do {}    = []
+findSet (Let _ e) = findSet e
 findSet Lam {}   = []
 findSet (App  e1 e2) = findSet e1 ++ findSet e2
 findSet (Equal e1 e2) = findSet e1 ++ findSet e2

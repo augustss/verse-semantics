@@ -91,9 +91,18 @@ test211 = bad "test211" $
 test212 = ok "test212" [(1,2)] $
   "x" := 2 % (do_ ("x1" `where_` "x1" := 1) # "x")
 
+test213 = ok "test213" [(1,3)] $
+  "x" := 1 %
+  "y" := let_ ("x" := 2) ("x" + 1) %
+  ("x" # "y")
+
+test214 = bad "test214" $
+  "y" := let_ ("x" := 2) ("x" + 1) %
+  ("x" # "y")
+
 test200s :: IO ()
 test200s = mapM_ testEx
-  [test201,test202,test203,test204,test205,test206,test207,test208,test209,test210,test211,test212
+  [test201,test202,test203,test204,test205,test206,test207,test208,test209,test210,test211,test212,test213,test214
   ]
 
 ---------------------
@@ -332,9 +341,22 @@ test709 = bad "test709" $
   "f" := lam "v" Fail %
   appS "f" 10
 
+test710 = ok "test710" [5] $
+  "f" := (var "a" # var "b") ==> "a" + "b" %
+  "f" @@ (2 # 3)
+
+test711 = ok "test711" [(999,888,13)] $
+  "f" := lam "n" (
+    case_ ("n" + 1) [
+      1 ==> 999,
+      2 ==> 888,
+      var "x" ==> "x" + 10
+      ]) %
+  Array ["f" @@ 0, "f" @@ 1, "f" @@ 2]
+
 test700s :: IO ()
 test700s = mapM_ testEx
-  [test701,test702,test703,test704,test705,test706,test707,test708,test709
+  [test701,test702,test703,test704,test705,test706,test707,test708,test709,test710,test711
   ]
 
 ---------------------

@@ -60,7 +60,6 @@ data Op
   | Function { target :: Reg, argName :: Name, body :: [Op] }
   | EndFun Seq Reg
   | Choice { choice_in :: Reg, choice_left :: [Op], choice_right :: [Op] }
-  | EndOps
   | Failure
   | PrimBinOp { binOp :: String, target :: Reg, arg1 :: Reg, arg2 :: Reg }
   | Iterate { it_name :: String, it_context :: Reg, domain :: [Op], success :: [Op], failur :: [Op] }
@@ -107,8 +106,6 @@ instance Pretty Op where
     text "  -------- second branch" $$
     nest 2 (pPrint ops2) $$
     text "  -------- end Choice"
-  pPrint EndOps =
-    text "EndOps"
   pPrint Failure =
     text "Failure"
   pPrint (PrimBinOp op r1 r2 r3) =

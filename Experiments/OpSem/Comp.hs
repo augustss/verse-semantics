@@ -149,6 +149,8 @@ expToReg sq (Do e) = do
   o <- sexpToReg sq sq' t e
   emit o
   pure (sq', t)
+expToReg sq (Let (Def ns e1) e2) =
+  expToReg sq (Do (Def ns (e1 `Semi` e2)))
 expToReg sq (Lam n e) = do
   os <- sexpToOps' (Seq $ Reg $ "$" ++ n) (\ osq r -> [EndFun osq r]) e
   t <- newReg

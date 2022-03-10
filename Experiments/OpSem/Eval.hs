@@ -266,11 +266,6 @@ pushFrame :: (HasCallStack) => [Op] -> Frame -> Context -> Context
 pushFrame ops fr ctx =
   ctx{ ctx_ops = ops, ctx_frame = fr, ctx_stack = ContFrame (ctx_frame ctx) (ctx_ops ctx) : ctx_stack ctx }
 
-pushOps :: HasCallStack => [Op] -> Context -> Context
-pushOps ops ctx =
---  assert "pushOps" (not $ null $ ctx_ops ctx) $
-  ctx{ ctx_ops = ops, ctx_stack = ContOps (ctx_ops ctx) : ctx_stack ctx }
-
 assign :: Reg -> Value -> Context -> Context
 -- Preconditions:
 --   * The register is in the current frame
@@ -596,7 +591,7 @@ stepR = do
           fr = makeFrame msg (zipWith (\ n h -> (n, VHeap n $ HeapId (ctx_id ctx) h)) ns hs) (ctx_frame ctx)
       updateContext $ pushFrame ops fr ctx'
 
-    -- EndFrame, EndFun, EndOps are always the last instruction in the [Op]
+    -- EndFrame, EndFun are always the last instruction in the [Op]
     EndFrame | Ctx{ ctx_ops = [], ctx_stack = ContFrame fr ops : stk } <- ctx ->
       modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
 
@@ -609,10 +604,6 @@ stepR = do
       unify target (loadValue ret ctx)
       unify sqt (loadValue (sq_choice rsq) ctx)
       modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_frame = fr, ctx_stack = stk }
-
-    EndOps | Ctx{ ctx_ops = [], ctx_stack = ContOps ops : stk } <- ctx ->
-      modifyCurContext $ \ c -> c{ ctx_ops = ops, ctx_stack = stk }
-
 
     -- NextFor is the last instruction of a PushFrame (of locals),
     -- so that frame is popped.  The second frame that is popped,
