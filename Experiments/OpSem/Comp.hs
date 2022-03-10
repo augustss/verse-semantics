@@ -45,22 +45,6 @@ newRegSq = newReg' "$"
 emit :: Op -> C ()
 emit op = modify $ \ s -> s { cops = cops s ++ [op] }
 
-{-
-hackOpt :: [Op] -> [Op]
-hackOpt [PushFrame _ [n] [Atom {op_target = Reg n', op_atom = a},Load (Reg n''),EndFrame],Store t,EndOps]
-  | n == n', n == n'' = hackOpt [Atom t a, EndOps]
-hackOpt (PushFrame _ [] ops : rs)
-  | last ops == EndFrame = hackOpt (init ops ++ rs)
-hackOpt (PushFrame _ [n] [Atom {op_target = Reg n', op_atom = AnInteger i},Load (Reg n''),EndFrame] : rs)
-  | n == n', n == n'' = LoadInteger i : hackOpt rs
-hackOpt (PushFrame s ns ops : rs) = PushFrame s ns (hackOpt ops) : hackOpt rs
-hackOpt (Function t n ops : rs) = Function t n (hackOpt ops) : hackOpt rs
-hackOpt (Choice ops1 ops2 : rs) = Choice (hackOpt ops1) (hackOpt ops2) : hackOpt rs
-hackOpt (Iterate n c d s f : rs) = Iterate n c (hackOpt d) (hackOpt s) (hackOpt f) : hackOpt rs
-hackOpt (op : rs) = op : hackOpt rs
-hackOpt [] = []
--}
-
 expToReg :: Seq -> Exp -> C (Seq, Reg)
 expToReg sq (Var n) = pure (sq, Reg n)
 expToReg sq (Con i) = do
