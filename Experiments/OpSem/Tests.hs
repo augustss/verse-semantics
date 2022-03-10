@@ -69,27 +69,27 @@ test206 = bad "test206" $
   "x"
 
 test207 = ok "test207" [(3,4)] $
-  3 # doo ("x":= 4)
+  3 # do_ ("x":= 4)
 
 test208 = bad "test208" $
-  "x" # doo ("x":= 4)
+  "x" # do_ ("x":= 4)
 
 -- Check that mutual recursion fails
 test209 = bad "test209" $
-  "x" := "y" `semi` "y" := "x"
+  "x" := "y" % "y" := "x"
 
 test210 = ok "test210" [(1,(2,3))] $
-  "x" := (1 # "y") `semi`
-  "y" := (2 # "z") `semi`
-  "z" := 3 `semi`
+  "x" := (1 # "y") %
+  "y" := (2 # "z") %
+  "z" := 3 %
   "x"
 
 test211 = bad "test211" $
-  "x" := 1 `semi` "x" := 2
+  "x" := 1 % "x" := 2
 
 -- The x1 used to be x, but shadowing is not allowed
 test212 = ok "test212" [(1,2)] $
-  "x" := 2 `semi` (doo ("x1" `wher` "x1" := 1) # "x")
+  "x" := 2 % (do_ ("x1" `where_` "x1" := 1) # "x")
 
 test200s :: IO ()
 test200s = mapM_ testEx
@@ -104,26 +104,26 @@ test301 = ok "test301" [(3,3)] $
   ("x" := 3) # ("x" === 3)
 
 test302 = ok "test302" [3] $
-  ("x" := 1+"y") `semi` "y" := 2 `semi` ("x" === 3)
+  ("x" := 1+"y") % "y" := 2 % ("x" === 3)
 
 test303 = ok "test303" [(3,3)] $
   ("x" === 3) # ("x" := 3)
 
 test304 = ok "test304" [20] $
-  ("a" := Array [10,20,30]) `semi` Sel "a" 1
+  ("a" := Array [10,20,30]) % Sel "a" 1
 
 test305 = ok "test305" [20] $
-  Sel "a" 1 `wher` ("a" := Array [10,20,30])
+  Sel "a" 1 `where_` ("a" := Array [10,20,30])
 
 test306 = ok "test306" ([]::[()]) $
-  ("a" := Array [10,20,30]) `semi` Sel "a" 3
+  ("a" := Array [10,20,30]) % Sel "a" 3
 
 test307 = ok "test307" [(1,1)] $
   "t" := Pair 1 (Fst "t")
 
 -- Test that when evaluating z the x is fully determined.
 test308 = ok "test308" [5] $
-  "x" := "y" `semi` "y" := 5 `semi` "z" := ("x"===5)
+  "x" := "y" % "y" := 5 % "z" := ("x"===5)
 
 test309 = ok "test309" ([]::[()]) $
   ("x" := 3) # ("x" === 4)
@@ -133,7 +133,7 @@ test310 = ok "test310" ([]::[()]) $
 
 -- Deadlock
 test311 = bad "test311" $
-  "y" := iF ("z"===1) (1|||2) (3|||4) `semi` "z":= 5|||6 `semi` ("y" # "z")
+  "y" := if_ ("z"===1) (1|||2) (3|||4) % "z":= 5|||6 % ("y" # "z")
 
 test300s :: IO ()
 test300s = mapM_ testEx
@@ -179,27 +179,27 @@ test410 = ok "test410" [((1,7),1)] $
               (Fst "x" === 1)
 
 test411 = ok "test411" [(1,1)] $
-  "x" := 1 ||| 2 `semi` "y" := ("x" === 1) `semi` ("x" # "y")
+  "x" := 1 ||| 2 % "y" := ("x" === 1) % ("x" # "y")
 
 -- Fails (equalLenient)
 test412 = ok "test412" [(1,1)] $
-  "y" := ("x" === 1) `semi` "x" := 1 ||| 2 `semi` ("x" # "y")
+  "y" := ("x" === 1) % "x" := 1 ||| 2 % ("x" # "y")
 
 -- Cascaded forward references
 test413 = ok "test413" [3,7,2,2] $
-  "x" := ("y" ||| 2)  `semi`
-  "y" := (3 ||| "z")  `semi`
-  "z" := 7            `semi`
+  "x" := ("y" ||| 2)  %
+  "y" := (3 ||| "z")  %
+  "z" := 7            %
   "x"
 
 -- Choice under if
 test414 = ok "test414" [(1,5),(1,6),(2,5),(2,6)] $
-  "x" := 1 `semi`
-  iF ("x" === 1) (1|||2) (3|||4) # (5|||6)
+  "x" := 1 %
+  if_ ("x" === 1) (1|||2) (3|||4) # (5|||6)
 
 -- Choice under if, must suspend
 test415 = ok "test415" [(1,5),(1,6),(2,5),(2,6)] $
-  iF ("x" === 1) (1|||2) (3|||4) # (5|||6) `wher`
+  if_ ("x" === 1) (1|||2) (3|||4) # (5|||6) `where_`
   "x" := 1
 
 test400s :: IO ()
@@ -217,11 +217,11 @@ test501 = bad "test501"
 
 -- Generates an error, as it should
 test502 = bad "test502" $
-  Error `semi` 1
+  Error % 1
 
 -- Generates an error, as it should
 test503 = bad "test504" $
-   (2 # Error) `semi` 1
+   (2 # Error) % 1
 
 test500s :: IO ()
 test500s = mapM_ testEx
@@ -239,11 +239,11 @@ test602 = ok "test602" [(1,2,3)] $
   for ("x" := 1|||2|||3) "x"
 
 test603 = ok "test603" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
-  for ("x" := 1|||2|||3 `semi` "y" := 4|||5) ("x" # "y")
+  for ("x" := 1|||2|||3 % "y" := 4|||5) ("x" # "y")
 
 test604 = ok "test604" [((1,4),(2,4),(3,4)),
                         ((1,5),(2,5),(3,5))] $
-  "y" := 4|||5 `semi` for ("x" := 1|||2|||3) ("x" # "y")
+  "y" := 4|||5 % for ("x" := 1|||2|||3) ("x" # "y")
 
 test605 = ok "test605" [(((1,4),(2,4),(3,4)),
                        ((1,5),(2,5),(3,5)))] $
@@ -253,10 +253,10 @@ test606 = ok "test606" [(88,88),(88,99),(99,88),(99,99)] $
   for (0|||1) (88 ||| 99)
 
 test607 = ok "test607" [(1,2,3)] $
-  for ("x" := 1|||2|||"y" `semi` "y" := "z" `semi` "z" := 3) "x"
+  for ("x" := 1|||2|||"y" % "y" := "z" % "z" := 3) "x"
 
 test608 = ok "test608" [(2,3,4)] $
-  for ("x" := 1|||2|||3) ("y" `wher` "y" := "x" + 1)
+  for ("x" := 1|||2|||3) ("y" `where_` "y" := "x" + 1)
 
 test609 = ok "test609" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
   for ("x" := 1|||2|||3) ("x" ||| 99)
@@ -269,7 +269,7 @@ test610 = ok "test610"
             $
   for ("x" := 10|||20) $
     for ("y" := 30|||40)
-      (("x1"|||"y1") `wher` ("x1" := "x" + 1 `semi` "y1" := "y" + 2))
+      (("x1"|||"y1") `where_` ("x1" := "x" + 1 % "y1" := "y" + 2))
 
 test600s :: IO ()
 test600s = mapM_ testEx
@@ -281,56 +281,55 @@ test600s = mapM_ testEx
 ---------------------
 
 test701 = ok "test701" [5] $
-  "f" := lam "v" ("v" + 1) `semi`
+  "f" := lam "v" ("v" + 1) %
   App "f" 4
 
 test702 = ok "test702" [11] $
-  "w" := 7 `semi`
-  "f" := lam "v" ("w" + "v") `semi`
+  "w" := 7 %
+  "f" := lam "v" ("w" + "v") %
   App "f" 4
 
 test703 = ok "test703" [11] $
-  "f" := lam "v" ("w" + "v") `semi`
-  "w" := 7 `semi`
+  "f" := lam "v" ("w" + "v") %
+  "w" := 7 %
   App "f" 4
 
 test704 = ok "test704" [11] $
-  "f" := lam "v" ("w" + "v") `semi`
-  "w" := 7 `semi`
-  "y" := App "f" "t" `semi`
-  "t" := 4 `semi`
+  "f" := lam "v" ("w" + "v") %
+  "w" := 7 %
+  "y" := App "f" "t" %
+  "t" := 4 %
   "y"
 
 -- f is called before it is defined
 test705 = ok "test705" [11] $
-  "y" := App "f" "t" `semi`
-  "w" := 7 `semi`
-  "t" := 4 `semi`
-  "f" := lam "v" ("w" + "v") `semi`
+  "y" := App "f" "t" %
+  "w" := 7 %
+  "t" := 4 %
+  "f" := lam "v" ("w" + "v") %
   "y"
 
 test706 = ok "test706" [11] $
-  "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
-  "y" := App "f" "t" `semi`
-  "t" := 4 `semi`
+  "f" := do_ ("w" := 7 % lam "v" ("w" + "v")) %
+  "y" := App "f" "t" %
+  "t" := 4 %
   "y"
 
 -- Function defined after it is used;
--- but the call is f[e], so we deadlock
 test707 = ok "test707" [11] $
-  "y" := App "f" "t" `semi`
-  "w" := 7 `semi`
-  "t" := 4 `semi`
-  "f" := lam "v" ("w" + "v") `semi`
+  "y" := App "f" "t" %
+  "w" := 7 %
+  "t" := 4 %
+  "f" := lam "v" ("w" + "v") %
   "y"
 
 test708 = ok "test708" [10,11] $
-  "f" := lam "v" ("v" ||| "v" + 1) `semi`
+  "f" := lam "v" ("v" ||| "v" + 1) %
   App "f" 10
 
 
 test709 = bad "test709" $
-  "f" := lam "v" Fail `semi`
+  "f" := lam "v" Fail %
   appS "f" 10
 
 test700s :: IO ()
@@ -342,32 +341,32 @@ test700s = mapM_ testEx
 -- Unification
 ---------------------
 test801 = ok "test801" [1] $
-  var "x" `semi`
-  "x" === 1 `semi`
+  var "x" %
+  "x" === 1 %
   "x"
 
 test802 = ok "test802" [1] $
-  var "x" `semi`
-  ("x" # 2) === (1 # 2) `semi`
+  var "x" %
+  ("x" # 2) === (1 # 2) %
   "x"
 
 test803 = ok "test803" [(1,2)] $
-  var "x" `semi`
-  var "y" `semi`
+  var "x" %
+  var "y" %
   ("x" # 2) === (1 # "y")
 
 test804 = ok "test804" [1] $
-  "f" := lam "xy" (Fst "xy" === Snd "xy") `semi`
-  var "x" `semi`
-  App "f" ("x" # 1) `semi`
+  "f" := lam "xy" (Fst "xy" === Snd "xy") %
+  var "x" %
+  App "f" ("x" # 1) %
   "x"
 
 test805 = ok "test805" [6] $
-  "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" `semi` "x" + "y" + "z") `semi`
+  "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" % "x" + "y" + "z") %
   App "f" (1 # 2 # 3)
 
 test806 = bad "test806" $
-  var "x" `semi` "x"+1
+  var "x" % "x"+1
 
 test800s :: IO ()
 test800s = mapM_ testEx
@@ -379,64 +378,64 @@ test800s = mapM_ testEx
 ---------------------
 
 test901 = ok "test901" [1] $
-  iF (1 === 1) 1 2
+  if_ (1 === 1) 1 2
 
 test902 = ok "test902" [2] $
-  iF (0 === 1) 1 2
+  if_ (0 === 1) 1 2
 
 test903 = ok "test903" [10] $
-  iF ("x" := 10) "x" 2
+  if_ ("x" := 10) "x" 2
 
 test904 = ok "test904" [2] $
-  iF Fail 1 2
+  if_ Fail 1 2
 
 test905 = ok "test905" [1] $
-  iF ("x" := 1 `semi` "x" === 1) 1 2
+  if_ ("x" := 1 % "x" === 1) 1 2
 
 test906 = ok "test906" [2] $
-  iF ("x" := 1 `semi` "x" === 0) 1 2
+  if_ ("x" := 1 % "x" === 0) 1 2
 
 test907 = ok "test907" [1] $
-  iF ("x" === 1 `semi` "x" := 1) 1 2
+  if_ ("x" === 1 % "x" := 1) 1 2
 
 test908 = ok "test908" [2] $
-  iF ("x" === 0 `semi` "x" := 1) 1 2
+  if_ ("x" === 0 % "x" := 1) 1 2
 
 test909 = ok "test909" [1] $
-  "x" := 10 `semi`
-  iF ("x" === 10) 1 2
+  "x" := 10 %
+  if_ ("x" === 10) 1 2
 
 test910 = ok "test910" [2] $
-  "x" := 0 `semi`
-  iF ("x" === 10) 1 2
+  "x" := 0 %
+  if_ ("x" === 10) 1 2
 
 test911 = ok "test911" [1] $
-  "y" := iF ("x" === 10) 1 2 `semi`
-  "x" := 10 `semi`
+  "y" := if_ ("x" === 10) 1 2 %
+  "x" := 10 %
   "y"
 
 test912 = ok "test912" [2] $
-  "y" := iF ("x" === 10) 1 2 `semi`
-  "x" := 0 `semi`
+  "y" := if_ ("x" === 10) 1 2 %
+  "x" := 0 %
   "y"
 
 test913 = ok "test913" [1] $
-  iF ("x":=1) "x" 20
+  if_ ("x":=1) "x" 20
 
 test914 = ok "test914" [1] $
-  iF ("x" := (1 ||| 2)) 1 20
+  if_ ("x" := (1 ||| 2)) 1 20
 
 test915 = ok "test915" [2] $
-  iF ("x" := (Fail ||| 2)) "x" 20
+  if_ ("x" := (Fail ||| 2)) "x" 20
 
 test916 = ok "test916" [1] $
-  iF ("x" := (1 ||| Fail)) "x" 20
+  if_ ("x" := (1 ||| Fail)) "x" 20
 
 test917 = ok "test917" [20] $
-  iF ("x" := (Fail ||| Fail)) "x" 20
+  if_ ("x" := (Fail ||| Fail)) "x" 20
 
 test918 = ok "test918" [3] $
-  iF ("x" := (Fail ||| (Fail ||| 3))) "x" 20
+  if_ ("x" := (Fail ||| (Fail ||| 3))) "x" 20
 
 test900s :: IO ()
 test900s = mapM_ testEx
@@ -452,29 +451,32 @@ test1001 = ok "test1001" [(1,2,3)] $
   for ("x" := Range (Array [1,2,3])) "x"
 
 test1002 = ok "test1002" [(102,103,104)] $
-  "xs" := for ("x" := 1|||2|||3) ("x" + 1) `semi`
+  "xs" := for ("x" := 1|||2|||3) ("x" + 1) %
   for ("y" := Range "xs") ("y" + 100)
 
 test1003 = ok "test1003" [((1,2),(1,4),(1,5))] $
-  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] `semi`
-  for ("xy" := Range "xys" `semi` Fst "xy" === 1) "xy"
+  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for ("xy" := Range "xys" % Fst "xy" === 1) "xy"
 
 test1004 = ok "test1004" ([]::[()]) $
-  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] `semi`
-  for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
+  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for ("xy" := Range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
 
 test1005 = ok "test1005" [((2,3),(2,3))] $
-  "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] `semi`
-  for ("xy" := Range "xys" `semi` Fst "xy" === 2) ("xy" `wher` Snd "xy" === 3)
+  "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] %
+  for ("xy" := Range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
 
 test1006 = ok "test1006" [(2,3)] $
-  "a" := for ("x" := Range "xs") ("x" + 1) `semi`
-  "xs" := Array[1,2] `semi`
+  "a" := for ("x" := Range "xs") ("x" + 1) %
+  "xs" := Array[1,2] %
   "a"
+
+test1007 = ok "test1007" [2] $
+  if_ (Range (Array [])) 1 2
 
 test1000s :: IO ()
 test1000s = mapM_ testEx
-  [test1001,test1002,test1003,test1004,test1005,test1006
+  [test1001,test1002,test1003,test1004,test1005,test1006,test1007
   ]
 
 --------

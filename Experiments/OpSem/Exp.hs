@@ -5,7 +5,7 @@ module OpSem.Exp(
   Name,
   Exp(..),
     pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
-    (===), (|||), (#), iF, for, semi, wher, var, lam, doo, appS,
+    (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
   SExp(..),
   addDef,
   ) where
@@ -99,23 +99,25 @@ pattern Sel :: Exp -> Integer -> Exp
 pattern Sel e i = App e (Con i)
 
 -- Sequencing, evaluate both and return second
-infixl 1 `semi`
+infixl 1 `semi`, %
 semi :: Exp -> Exp -> Exp
 semi x y = Semi x y
+(%) :: Exp -> Exp -> Exp
+(%) x y = Semi x y
 
 -- Sequencing, evaluate both and return first
-infix 1 `wher`
-wher :: Exp -> Exp -> Exp
-wher x y = Where x y
+infix 1 `where_`
+where_ :: Exp -> Exp -> Exp
+where_ x y = Where x y
 
 for :: Exp -> Exp -> Exp
 for e1 e2 = For (addDef e1) (addDef e2)
 
-iF :: Exp -> Exp -> Exp -> Exp
-iF e1 e2 e3 = If (addDef e1) (addDef e2) (addDef e3)
+if_ :: Exp -> Exp -> Exp -> Exp
+if_ e1 e2 e3 = If (addDef e1) (addDef e2) (addDef e3)
 
-doo :: Exp -> Exp
-doo e = Do (addDef e)
+do_ :: Exp -> Exp
+do_ e = Do (addDef e)
 
 lam :: Name -> Exp -> Exp
 lam n e = Lam n (addDef e)
@@ -125,7 +127,7 @@ var = SetAny
 
 -- Application that must not fail
 appS :: Exp -> Exp -> Exp
-appS f a = iF ("&x" := App f a) (Var "&x") Error
+appS f a = if_ ("&x" := App f a) (Var "&x") Error
 
 -- Add all variables defined in the current scope.
 addDef :: HasCallStack => Exp -> SExp
