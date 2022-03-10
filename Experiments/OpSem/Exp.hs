@@ -46,7 +46,7 @@ data Exp = Var Name
          | Set Name Exp
          | SetAny Name
          | Array [Exp]   -- (e1, ..., en)  aka  array{e1, ..., en}
-         | Plus Exp Exp
+         | PrimBin String Exp Exp  -- primitive binary functions, e.g., +
          | Fail
          | For SExp SExp
          | If SExp SExp SExp
@@ -67,7 +67,7 @@ data SExp     -- A scope-limiting construct
 ---------------------
 
 instance Num Exp where
-  (+) = Plus
+  (+) = PrimBin "+"
   fromInteger = Con
 
 instance IsString Exp where
@@ -151,7 +151,7 @@ findSet (Equal e1 e2) = findSet e1 ++ findSet e2
 findSet (Set x e) = x : findSet e
 findSet (SetAny x) = [x]
 findSet (Array es) = concatMap findSet es
-findSet (Plus e1 e2) = findSet e1 ++ findSet e2
+findSet (PrimBin _ e1 e2) = findSet e1 ++ findSet e2
 findSet (Range e) = findSet e
 findSet Error = []
 

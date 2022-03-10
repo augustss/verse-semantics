@@ -16,16 +16,6 @@ import Debug.Trace
 import OpSem.Exp ( Name )
 import OpSem.Misc ( assert, assertM, showListWith )
 import OpSem.Op
-    ( Op(ErrorOp, Iterate, Choice, PushFrame, EndFrame, EndFun, EndOps,
-         NextFor, RangeOp, Atom, MkArray, Unify, Assign, Add, Function,
-         Call, Failure, Dump, EndDomain, Stop),
-      Reg(..),
-      Seq(sq_choice),
-      Value(..),
-      Frame(..),
-      ContextId(..),
-      HeapId(..),
-      HeapAddr )
 
 debug, moreDebug, stepDebug, stepFrameDebug, sqDebug :: Bool
 {-
@@ -197,7 +187,7 @@ showSusp (Susp hs s) = head (words (show s)) ++ show hs
 
 data SuspCont
   = SuspUnify Value Value
-  | SuspAdd Value Value Value
+  | SuspPrimBin String Value Value Value
   | SuspCall Value Value Value Value Value
   | SuspDomain Seq ContextId
   | SuspRange Reg Reg Frame Reg Value
@@ -417,15 +407,22 @@ failure msg = do
       --ctx <- getCurContext
       --traceM $ "failure: fail branch\n" ++ prettyShow ctx
 
-addOp :: Value -> Value -> Value -> R ()
-addOp dst src1 src2 = do
+primBinOp :: String -> Value -> Value -> Value -> R ()
+primBinOp op dst src1 src2 = do
   src1' <- follow src1
   src2' <- follow src2
   case (src1', src2') of
-    (VInteger i1, VInteger i2) -> unify dst (VInteger $ i1 + i2)
-    (VHeap _ h1, _) -> addSusp [h1] (SuspAdd dst src1' src2')
-    (_, VHeap _ h2) -> addSusp [h2] (SuspAdd dst src1' src2')
-    _ -> failure "addOp"  -- WHNF, but not integers
+    (VHeap _ h1, _) -> addSusp [h1] (SuspPrimBin op dst src1' src2')
+    (_, VHeap _ h2) -> addSusp [h2] (SuspPrimBin op dst src1' src2')
+    (v1, v2) -> primBin op dst v1 v2
+
+primBin :: String -> Value -> Value -> Value -> R ()
+primBin op dst (VInteger i1) (VInteger i2) = do
+  let resInteger = unify dst . VInteger
+  case op of
+    "+" -> resInteger $ i1 + i2
+    _ -> error $ "Unknown primop " ++ op
+primBin op _ _ _ = failure $ "primBin " ++ op
 
 -- Call f with argument a, but first wait for f to be in WHNF
 callOp :: Value -> Value -> Value -> Value -> Value -> R ()
@@ -666,7 +663,7 @@ stepR = do
     MkArray t rs -> modifyCurContext $ assign t (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
     Assign r1 r2 -> modifyCurContext $ assignSq (loadValue r1 ctx) (loadValue r2 ctx)
-    Add t x y -> addOp (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
+    PrimBinOp o t x y -> primBinOp o (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
     Function t n ops -> modifyCurContext $ assign t (VFun (ctx_frame ctx) n ops)
     Call sqa sqt t f a -> callOp (loadValue (sq_choice sqa) ctx) (loadValue (sq_choice sqt) ctx) (loadValue t ctx) (loadValue f ctx) (loadValue a ctx)
     Failure -> failure "Failure"
@@ -727,7 +724,7 @@ trySuspension susp@(Susp hs sc) = do
       traceM $ "trySuspension: wake " ++ show susp
     case sc of
       SuspUnify v1 v2   -> unify v1 v2
-      SuspAdd v1 v2 v3  -> addOp v1 v2 v3
+      SuspPrimBin op v1 v2 v3  -> primBinOp op v1 v2 v3
       SuspCall v1 v2 v3 v4 v5 -> callOp v1 v2 v3 v4 v5
       SuspDomain sq pci -> do
         pctx <- getCurContext

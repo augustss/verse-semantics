@@ -61,7 +61,7 @@ data Op
   | Choice { choice_in :: Reg, choice_left :: [Op], choice_right :: [Op] }
   | EndOps
   | Failure
-  | Add { target :: Reg, arg1 :: Reg, arg2 :: Reg }
+  | PrimBinOp { binOp :: String, target :: Reg, arg1 :: Reg, arg2 :: Reg }
   | Iterate { it_name :: String, it_context :: Reg, domain :: [Op], success :: [Op], failur :: [Op] }
   | EndDomain Seq
 
@@ -110,8 +110,8 @@ instance Pretty Op where
     text "EndOps"
   pPrint Failure =
     text "Failure"
-  pPrint (Add r1 r2 r3) =
-    text "Add" <+> pPrint r1 <+> pPrint r2 <+> pPrint r3
+  pPrint (PrimBinOp op r1 r2 r3) =
+    text "PrimBinOp" <+> pPrint op <+> pPrint r1 <+> pPrint r2 <+> pPrint r3
   pPrint (Iterate s c ops1 ops2 ops3) =
     text "Iterate" <+> text s <+> pPrint c $$
     nest 2 (pPrint ops1) $$

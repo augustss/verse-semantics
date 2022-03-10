@@ -82,11 +82,11 @@ expToReg sq (Array es) = do
   t <- newReg
   emit $ MkArray t rs
   pure (sq', t)
-expToReg sq (Plus e1 e2) = do
+expToReg sq (PrimBin op e1 e2) = do
   (sq1, r1) <- expToReg sq e1
   (sq2, r2) <- expToReg sq1 e2
   t <- newReg
-  emit $ Add t r1 r2
+  emit $ PrimBinOp op t r1 r2
   pure (sq2, t)
 expToReg sq Fail = do
   emit Failure
