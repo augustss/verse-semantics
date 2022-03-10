@@ -479,6 +479,59 @@ test1000s = mapM_ testEx
   [test1001,test1002,test1003,test1004,test1005,test1006,test1007
   ]
 
+---------------------
+-- Arithmetic, comparisons
+---------------------
+
+test1011 = ok "test1011" [10] $
+  6 + 4
+
+test1012 = ok "test1012" [2] $
+  6 - 4
+
+test1013 = ok "test1013" [24] $
+  6 * 4
+
+test1014 = ok "test1014" [1] $
+  6 `div` 4
+
+test1015 = ok "test1015" ([]::[()]) $
+  6 `div` 0
+
+test1016 = ok "test1016" [2] $
+  if_ (6 <. 4) 1 2
+
+test1017 = ok "test1017" [1] $
+  if_ (2 <. 4) 1 2
+
+test1018 = ok "test1018" [120] $
+  "fac" := lam "n" (if_ ("n" <=. 0) 1 ("n" * "fac" `App` ("n" - 1))) %
+  "fac" `App` 5
+
+test1019 = ok "test1019" [120] $
+  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `App` ("n" - 1))) %
+  "res" := "fac" `App` 5 %
+  "one" := 1 %
+  "res"
+
+test1020 = bug "test1020" [120] $
+  "res" := "fac" `App` "five" %
+  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `App` ("n" - 1))) %
+  "five" := 5 %
+  "one" := 1 %
+  "res"
+
+x1020 =
+  "fac" := lam "n" (if_ ("n" <=. 0) 1 2) %
+  "res" := "fac" `App` "five" %
+  "five" := 5 %
+  "res"
+
+test1010s :: IO ()
+test1010s = mapM_ testEx
+  [test1011,test1012,test1013,test1014,test1015,test1016,test1017,test1018,test1019,test1020
+  ]
+
 --------
 
 testAll :: IO ()
@@ -493,3 +546,4 @@ testAll = do
   test800s
   test900s
   test1000s
+  test1010s

@@ -417,10 +417,19 @@ primBinOp op dst src1 src2 = do
     (v1, v2) -> primBin op dst v1 v2
 
 primBin :: String -> Value -> Value -> Value -> R ()
-primBin op dst (VInteger i1) (VInteger i2) = do
-  let resInteger = unify dst . VInteger
+primBin op dst v1@(VInteger i1) (VInteger i2) = do
+  let arith f = unify dst $ VInteger $ i1 `f` i2
+      compar f = if i1 `f` i2 then unify dst v1 else failure "comparison"
   case op of
-    "+" -> resInteger $ i1 + i2
+    "+" -> arith (+)
+    "-" -> arith (-)
+    "*" -> arith (*)
+    "div" | i2 == 0 -> failure "div by 0"
+          | otherwise -> arith div
+    "<" -> compar (<)
+    "<=" -> compar (<=)
+    ">" -> compar (>)
+    ">=" -> compar (>=)
     _ -> error $ "Unknown primop " ++ op
 primBin op _ _ _ = failure $ "primBin " ++ op
 

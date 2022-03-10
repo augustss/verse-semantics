@@ -6,6 +6,7 @@ module OpSem.Exp(
   Exp(..),
     pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
     (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
+    (<.), (<=.), (>.), (>=.),
   SExp(..),
   addDef,
   ) where
@@ -55,12 +56,12 @@ data Exp = Var Name
          | Lam Name SExp
          | App Exp Exp
          | Error
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 data SExp     -- A scope-limiting construct
   = Def [Name]   -- Bring these variables into scope
         Exp      -- In this expression
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 ---------------------
 --      Sugar
@@ -68,10 +69,24 @@ data SExp     -- A scope-limiting construct
 
 instance Num Exp where
   (+) = PrimBin "+"
+  (-) = PrimBin "-"
+  (*) = PrimBin "*"
   fromInteger = Con
+
+instance Real Exp
+instance Enum Exp
+instance Integral Exp where
+  div = PrimBin "div"
 
 instance IsString Exp where
   fromString = Var
+
+infix 4 <., <=., >., >=.
+(<.), (<=.), (>.), (>=.) :: Exp -> Exp -> Exp
+(<.) = PrimBin "<"
+(<=.) = PrimBin "<="
+(>.) = PrimBin ">"
+(>=.) = PrimBin ">="
 
 infixl 4 |||
 (|||) :: Exp -> Exp -> Exp

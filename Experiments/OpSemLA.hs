@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 module OpSemLA(
+  module Ex,
   module OpSem.Comp,
   module OpSem.Eval,
   module OpSem.Exp,
@@ -7,6 +8,7 @@ module OpSemLA(
   module OpSem.Op,
   module OpSem.Tests,
   ) where
+import Ex
 import OpSem.Comp
 import OpSem.Eval
 import OpSem.Exp
