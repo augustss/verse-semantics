@@ -170,17 +170,7 @@ expToReg sq (Lam n e) = do
   t <- newReg
   emit $ Function t n [os]
   pure (sq, t)
--- XXX This wrong.  AppS should make sure there is exactly one result
--- Could use something like
---    f(a)  -->  if (x:=f[a]) then x else WRONG
-expToReg sq (AppS e1 e2) = do
-  (sq1, r1) <- expToReg sq e1
-  (sq2, r2) <- expToReg sq1 e2
-  t <- newReg
-  sqr <- Seq <$> newRegSq
-  emit $ Call sq2 sqr t r1 r2
-  pure (sq2, t)
-expToReg sq (AppI e1 e2) = do
+expToReg sq (App e1 e2) = do
   (sq1, r1) <- expToReg sq e1
   (sq2, r2) <- expToReg sq1 e2
   t <- newReg

@@ -5,7 +5,7 @@ module OpSem.Exp(
   Name,
   Exp(..),
     pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
-    (===), (|||), (#), iF, for, semi, wher, var, lam, doo,
+    (===), (|||), (#), iF, for, semi, wher, var, lam, doo, appS,
   SExp(..),
   addDef,
   ) where
@@ -53,8 +53,7 @@ data Exp = Var Name
          | Do SExp
          | Range Exp     -- :e
          | Lam Name SExp
-         | AppS Exp Exp
-         | AppI Exp Exp
+         | App Exp Exp
          | Error
   deriving (Show)
 
@@ -91,13 +90,13 @@ pattern (:=) :: Name -> Exp -> Exp
 pattern (:=) x e = Set x e
 
 pattern Fst :: Exp -> Exp
-pattern Fst e = AppS e (Con 0)
+pattern Fst e = App e (Con 0)
 pattern Snd :: Exp -> Exp
-pattern Snd e = AppS e (Con 1)
+pattern Snd e = App e (Con 1)
 pattern Pair :: Exp -> Exp -> Exp
 pattern Pair e1 e2 = Array [e1, e2]
 pattern Sel :: Exp -> Integer -> Exp
-pattern Sel e i = AppS e (Con i)
+pattern Sel e i = App e (Con i)
 
 -- Sequencing, evaluate both and return second
 infixl 1 `semi`
@@ -124,6 +123,10 @@ lam n e = Lam n (addDef e)
 var :: Name -> Exp
 var = SetAny
 
+-- Application that must not fail
+appS :: Exp -> Exp -> Exp
+appS f a = iF ("&x" := App f a) (Var "&x") Error
+
 -- Add all variables defined in the current scope.
 addDef :: HasCallStack => Exp -> SExp
 addDef e | xs /= nub xs = error $ "Duplicate := " ++ show (e, xs)
@@ -141,8 +144,7 @@ findSet For {}   = []
 findSet If {}   = []
 findSet Do {}    = []
 findSet Lam {}   = []
-findSet (AppS  e1 e2) = findSet e1 ++ findSet e2
-findSet (AppI  e1 e2) = findSet e1 ++ findSet e2
+findSet (App  e1 e2) = findSet e1 ++ findSet e2
 findSet (Equal e1 e2) = findSet e1 ++ findSet e2
 findSet (Set x e) = x : findSet e
 findSet (SetAny x) = [x]

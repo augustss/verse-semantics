@@ -282,28 +282,28 @@ test600s = mapM_ testEx
 
 test701 = ok "test701" [5] $
   "f" := lam "v" ("v" + 1) `semi`
-  AppS "f" 4
+  App "f" 4
 
 test702 = ok "test702" [11] $
   "w" := 7 `semi`
   "f" := lam "v" ("w" + "v") `semi`
-  AppS "f" 4
+  App "f" 4
 
 test703 = ok "test703" [11] $
   "f" := lam "v" ("w" + "v") `semi`
   "w" := 7 `semi`
-  AppS "f" 4
+  App "f" 4
 
 test704 = ok "test704" [11] $
   "f" := lam "v" ("w" + "v") `semi`
   "w" := 7 `semi`
-  "y" := AppS "f" "t" `semi`
+  "y" := App "f" "t" `semi`
   "t" := 4 `semi`
   "y"
 
 -- f is called before it is defined
 test705 = ok "test705" [11] $
-  "y" := AppS "f" "t" `semi`
+  "y" := App "f" "t" `semi`
   "w" := 7 `semi`
   "t" := 4 `semi`
   "f" := lam "v" ("w" + "v") `semi`
@@ -311,14 +311,14 @@ test705 = ok "test705" [11] $
 
 test706 = ok "test706" [11] $
   "f" := doo ("w" := 7 `semi` lam "v" ("w" + "v")) `semi`
-  "y" := AppS "f" "t" `semi`
+  "y" := App "f" "t" `semi`
   "t" := 4 `semi`
   "y"
 
 -- Function defined after it is used;
 -- but the call is f[e], so we deadlock
 test707 = ok "test707" [11] $
-  "y" := AppI "f" "t" `semi`
+  "y" := App "f" "t" `semi`
   "w" := 7 `semi`
   "t" := 4 `semi`
   "f" := lam "v" ("w" + "v") `semi`
@@ -326,17 +326,16 @@ test707 = ok "test707" [11] $
 
 test708 = ok "test708" [10,11] $
   "f" := lam "v" ("v" ||| "v" + 1) `semi`
-  AppI "f" 10
+  App "f" 10
 
-{- AppS doesn't check for single value
+
 test709 = bad "test709" $
-  "f" := lam "v" ("v" ||| "v" + 1) `semi`
-  AppS "f" 10
--}
+  "f" := lam "v" Fail `semi`
+  appS "f" 10
 
 test700s :: IO ()
 test700s = mapM_ testEx
-  [test701,test702,test703,test704,test705,test706,test707,test708 --,test709
+  [test701,test702,test703,test704,test705,test706,test707,test708,test709
   ]
 
 ---------------------
@@ -360,12 +359,12 @@ test803 = ok "test803" [(1,2)] $
 test804 = ok "test804" [1] $
   "f" := lam "xy" (Fst "xy" === Snd "xy") `semi`
   var "x" `semi`
-  AppS "f" ("x" # 1) `semi`
+  App "f" ("x" # 1) `semi`
   "x"
 
 test805 = ok "test805" [6] $
   "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" `semi` "x" + "y" + "z") `semi`
-  AppS "f" (1 # 2 # 3)
+  App "f" (1 # 2 # 3)
 
 test806 = bad "test806" $
   var "x" `semi` "x"+1

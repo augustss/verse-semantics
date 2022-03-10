@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 -- Grab bag of random stuff.
 module OpSem.Misc(module OpSem.Misc) where
 import Data.List
