@@ -359,9 +359,22 @@ test712 = ok "test712" [12] $
   "dbl" := var "x" ==> "x" + "x" %
   "twice" @@ "dbl" @@ 3
 
+test713 = ok "test712" [16] $
+  "twice" := (var "f" ==> var "x" ==> "f" @@ ("f" @@ "x")) %
+  "dbl" := var "x" ==> "x" + "x" %
+  "twice" @@ "twice" @@ "dbl" @@ 1
+
+test714 = ok "test714" [(2,6,4)] $
+  "map" := ((var "f" # var "xs") ==> for ("x" := Range "xs") ("f" @@ "x")) %
+  "inc" := lam "x" ("x" + "c") %
+  "c" := 1 %
+  "a" := Array [1,5,3] %
+  "map" @@ ("inc" # "a")
+
 test700s :: IO ()
 test700s = mapM_ testEx
-  [test701,test702,test703,test704,test705,test706,test707,test708,test709,test710,test711,test712
+  [test701,test702,test703,test704,test705,test706,test707
+  ,test708,test709,test710,test711,test712,test713,test714
   ]
 
 ---------------------
