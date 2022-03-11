@@ -97,26 +97,20 @@ expToReg sq (For e1 e2) = do
   a <- newReg' "%%"  -- Accumulate the resulting array here
   c <- newReg  -- Domain context
   lsq <- Seq <$> newReg' "$$" -- Choice sequencing in the loop.  Like 'a', hackily updated.
-#if 0
-  xxxsq <- newRegSq
-  o1 <- sexpToOps' {-dsq-}(Seq xxxsq) (\ sq' _r -> [EndDomain sq']) e1
-  o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
-  msg <- newName (\ n -> "for-ctx" ++ show n)
-  emit $ MkArray a []
-  emit $ Assign (sq_choice lsq) (sq_choice sq)
-  emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
-  emit $ Atom xxxsq VDummy
-#else
   dsq <- newSeq
   o1 <- sexpToOps' dsq (\ sq' _r -> [EndDomain sq']) e1
   o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
   msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
-  --emit $ Assign (sq_choice lsq) (sq_choice sq)
+#if 1
   xsq <- newRegSq
   emit $ Assign (sq_choice lsq) xsq
   emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
   emit $ Assign xsq (sq_choice sq)
+#else
+  -- This should work, but doesn't.
+  emit $ Assign (sq_choice lsq) (sq_choice sq)
+  emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
 #endif
   pure (lsq, t)
 expToReg sq (Range e) = do
