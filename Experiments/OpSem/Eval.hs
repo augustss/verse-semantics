@@ -25,7 +25,7 @@ sqDebug = True
 -}
 debug = False
 moreDebug = False
-stepDebug = False
+stepDebug = True
 stepFrameDebug = False
 sqDebug = False
 
@@ -479,8 +479,8 @@ choiceOp sqin fr ops1 ops2 = do
       when debug $ do
         ctx <- getCurContext
         traceM $ "choiceOp: cloning\n" ++ prettyShow ctx
-      -- The Choice instruction sequences end with an EndFrame.
-      -- This is the corresponding pushFrame, which run in
+      -- The two Choice instruction sequences end with an EndFrame.
+      -- This is the corresponding pushFrame, so the ops run in
       -- frame where the Choice was originally executed.
       modifyCurContext $ pushFrame ops1 fr
       ctx <- getCurContext
@@ -490,7 +490,9 @@ choiceOp sqin fr ops1 ops2 = do
         ctx2 = ctx{ ctx_ops = ops2
                   , ctx_name = ctx_name ctx ++ "-next"
                   }
-      --error $ "ctx1=\n" ++ prettyShow ctx1 ++ "\nctx2=\n" ++ prettyShow ctx2
+      let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . take 2 . words . show . head . ctx_ops) (getNexts p)
+      traceM $ "########## " ++ showNexts ctx1
+      --traceM $ "========\nctx1=\n" ++ prettyShow ctx1
       updateContext ctx1
 
 getOp :: R Op
@@ -537,6 +539,9 @@ stepR = do
   ctx <- getCurContext
   when stepDebug $ do
     traceM $ "stepR ctx=" ++ ctx_name ctx ++ "(" ++ show (ctx_id ctx) ++ ") fr=" ++ fr_name (ctx_frame ctx) ++ ": " ++ take 150 (show op)
+    --let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (show . ctx_id) (getNexts p)
+    let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . drop 4 . take 7 . words . show . head . ctx_ops) (getNexts p)
+    traceM $ "::::: " ++ showNexts ctx
 
   case op of
     Iterate n c d s f -> do
@@ -650,6 +655,9 @@ stepR = do
               --ctx <- getCurContext
               --traceM $ "NextFor:\n" ++ prettyShow ctx
               --traceM "--------------------"
+              do
+                c <- getCurContext
+                traceM $ ":: next " ++ show (isJust (ctx_next c))
               failure "NextFor"
             _ -> error "impossible: NextFor 1"
         _ -> error "impossible: NextFor 2"
@@ -657,11 +665,12 @@ stepR = do
     RangeOp sqin sqout t r -> rangeOp sqin sqout (ctx_frame ctx) t (loadValue r ctx)
     --Atom t v -> modifyCurContext $ assign t v
     Atom t v -> unify (loadValue t ctx) v
-    MkArray t rs -> modifyCurContext $ assign t (VArray [ loadValue r ctx | r <- rs])
+    --MkArray t rs -> modifyCurContext $ assign t (VArray [ loadValue r ctx | r <- rs])
+    MkArray t rs -> unify (loadValue t ctx) (VArray [ loadValue r ctx | r <- rs])
     Unify r1 r2 -> unify (loadValue r1 ctx) (loadValue r2 ctx)
     Assign r1 r2 -> modifyCurContext $ assignSq (loadValue r1 ctx) (loadValue r2 ctx)
     PrimBinOp o t x y -> primBinOp o (loadValue t ctx) (loadValue x ctx) (loadValue y ctx)
-    Function t n ops -> modifyCurContext $ assign t (VFun n (Closure (ctx_frame ctx) ops))
+    Function t n ops -> unify (loadValue t ctx) (VFun n (Closure (ctx_frame ctx) ops))
     Call sqa sqt t f a -> callOp (loadValue (sq_choice sqa) ctx) (loadValue (sq_choice sqt) ctx) (loadValue t ctx) (loadValue f ctx) (loadValue a ctx)
     Failure -> failure "Failure"
     ErrorOp s -> error $ "ErrorOp: " ++ s

@@ -45,64 +45,63 @@ newRegSq = newReg' "$"
 emit :: Op -> C ()
 emit op = modify $ \ s -> s { cops = cops s ++ [op] }
 
-expToReg :: Seq -> Exp -> C (Seq, Reg)
-expToReg sq (Var n) = pure (sq, Reg n)
-expToReg sq (Con i) = do
-  t <- newReg
+expToReg :: Seq -> Reg -> Exp -> C Seq
+expToReg sq t (Var n) = do
+  emit $ Unify t (Reg n)
+  pure sq
+expToReg sq t (Con i) = do
   emit $ Atom t (VInteger i)
-  pure (sq, t)
-expToReg sq (Semi e1 e2) = do
-  (sq1, _) <- expToReg sq e1
-  expToReg sq1 e2
-expToReg sq (Where e1 e2) = do
-  (sq1, r1) <- expToReg sq e1
-  (sq2, _)  <- expToReg sq1 e2
-  pure (sq2, r1)
-expToReg sq (Alt e1 e2) = do
-  t <- newReg
+  pure sq
+expToReg sq t (Semi e1 e2) = do
+  t1 <- newReg
+  sq1 <- expToReg sq t1 e1
+  expToReg sq1 t e2
+expToReg sq t (Where e1 e2) = do
+  t2 <- newReg
+  sq1 <- expToReg sq t e1
+  sq2  <- expToReg sq1 t2 e2
+  pure sq2
+expToReg sq t (Alt e1 e2) = do
   sq' <- Seq <$> newRegSq
   op1 <- sexpToReg sq sq' t e1
   op2 <- sexpToReg sq sq' t e2
   let rsq = sq_choice sq
   emit $ Choice rsq [op1, EndFrame] [op2, EndFrame]
-  pure (sq', t)
-expToReg sq (Equal e1 e2) = do
-  (sq1, r1) <- expToReg sq e1
-  (sq2, r2) <- expToReg sq1 e2
-  emit $ Unify r1 r2
-  pure (sq2, r2)
-expToReg sq (Set n e) =
-  expToReg sq $ Equal (Var n) e
-expToReg sq (SetAny n) =
-  expToReg sq (Var n)
-expToReg sq (Array es) = do
+  pure sq'
+expToReg sq t (Equal e1 e2) = do
+  sq1 <- expToReg sq t e1
+  sq2 <- expToReg sq1 t e2
+  pure sq2
+expToReg sq t (Set n e) =
+  expToReg sq t $ Equal (Var n) e
+expToReg sq t (SetAny n) =
+  expToReg sq t (Var n)
+expToReg sq t (Array es) = do
   let f s [] = pure (s, [])
-      f s (x:xs) = do (s', r) <- expToReg s x; (s'', rs) <- f s' xs; pure (s'', r:rs)
+      f s (x:xs) = do r <- newReg; s' <- expToReg s r x; (s'', rs) <- f s' xs; pure (s'', r:rs)
   (sq', rs) <- f sq es
-  t <- newReg
   emit $ MkArray t rs
-  pure (sq', t)
-expToReg sq (PrimBin op e1 e2) = do
-  (sq1, r1) <- expToReg sq e1
-  (sq2, r2) <- expToReg sq1 e2
-  t <- newReg
+  pure sq'
+expToReg sq t (PrimBin op e1 e2) = do
+  r1 <- newReg
+  r2 <- newReg
+  sq1 <- expToReg sq r1 e1
+  sq2 <- expToReg sq1 r2 e2
   emit $ PrimBinOp op t r1 r2
-  pure (sq2, t)
-expToReg sq Fail = do
+  pure sq2
+expToReg sq _ Fail = do
   emit Failure
-  t <- newReg                -- we must return something, but this reg will never be set
-  pure (sq, t)
-expToReg sq (For e1 e2) = do
-  t <- newReg  -- Final result, not instantiated until the array is complete.
+  pure sq
+expToReg sq t (For e1 e2) = do
   a <- newReg' "%%"  -- Accumulate the resulting array here
-  c <- newReg  -- Domain context
+  c <- newReg        -- Domain context
   lsq <- Seq <$> newReg' "$$" -- Choice sequencing in the loop.  Like 'a', hackily updated.
   dsq <- newSeq
   o1 <- sexpToOps' dsq (\ sq' _r -> [EndDomain sq']) e1
   o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
   msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
-#if 1
+#if 0
   xsq <- newRegSq
   emit $ Assign (sq_choice lsq) xsq
   emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
@@ -112,16 +111,15 @@ expToReg sq (For e1 e2) = do
   emit $ Assign (sq_choice lsq) (sq_choice sq)
   emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
 #endif
-  pure (lsq, t)
-expToReg sq (Range e) = do
-  t <- newReg
-  (sq', r) <- expToReg sq e
+  pure lsq
+expToReg sq t (Range e) = do
+  r <- newReg
+  sq' <- expToReg sq r e
   rsq <- newRegSq
   emit $ RangeOp (sq_choice sq') rsq t r
-  pure (Seq rsq, t)
-expToReg sq (If e1 e2 e3) = do
+  pure $ Seq rsq
+expToReg sq t (If e1 e2 e3) = do
   dsq <- newSeq
-  t <- newReg
   -- XXX Use _sq
   o1 <- sexpToOps' dsq (\ sq' _r -> [EndDomain sq']) e1
   rosq <- newRegSq
@@ -136,38 +134,37 @@ expToReg sq (If e1 e2 e3) = do
   -- The success continuation has the EndFrame to pop this.
   -- The failure continuation changes to the parent context, and just pushes the failure ops.
   emit $ Iterate msg c [o1] [o2, EndFrame] [o3, EndFrame]
-  pure (osq, t)
-expToReg sq (Do e) = do
-  t <- newReg
+  pure osq
+expToReg sq t (Do e) = do
   sq' <- Seq <$> newRegSq
   o <- sexpToReg sq sq' t e
   emit o
-  pure (sq', t)
-expToReg sq (Let (Def ns e1) e2) =
-  expToReg sq (Do (Def ns (e1 `Semi` e2)))
-expToReg sq (Lam n e) = do
+  pure sq'
+expToReg sq t (Let (Def ns e1) e2) =
+  expToReg sq t (Do (Def ns (e1 `Semi` e2)))
+expToReg sq t (Lam n e) = do
   os <- sexpToOps' (Seq $ Reg $ "$" ++ n) (\ osq r -> [EndFun osq r]) e
-  t <- newReg
   emit $ Function t n [os]
-  pure (sq, t)
-expToReg sq (App e1 e2) = do
-  (sq1, r1) <- expToReg sq e1
-  (sq2, r2) <- expToReg sq1 e2
-  t <- newReg
+  pure sq
+expToReg sq t (App e1 e2) = do
+  r1 <- newReg
+  r2 <- newReg
+  sq1 <- expToReg sq r1 e1
+  sq2 <- expToReg sq1 r2 e2
   sqr <- Seq <$> newRegSq
   emit $ Call sq2 sqr t r1 r2
-  pure (sq2, t)
-expToReg sq Error = do
+  pure sq2
+expToReg sq _ Error = do
   emit $ ErrorOp "Error"
-  t <- newReg
-  pure (sq, t)
+  pure sq
 --expToReg x = error $ show x
 
 sexpToOps' :: HasCallStack => Seq -> (Seq -> Reg -> [Op]) -> SExp -> C Op
 sexpToOps' sq ops (Def ns e) = do
   olds <- get
   put olds{ cops = [], tempRegs = [] }
-  (sq', r) <- expToReg sq e
+  r <- newReg
+  sq' <- expToReg sq r e
   s <- get
   put olds{ nextTemp = nextTemp s + 1 }
   let tmps = tempRegs s
@@ -203,5 +200,20 @@ adjExp = addDef . addFor
   where addFor e = for ("&it" := e) (Var "&it")
 
 compExp :: Exp -> [Op]
-compExp = comp . adjExp
+compExp = hackOpt . comp . adjExp
 
+hackOpt :: [Op] -> [Op]
+hackOpt (PushFrame _ [n] [Atom {target = Reg n', op_atom = a},Unify t (Reg n''),i@Assign{}, EndFrame] : rs)
+  | n == n', n == n'' = hackOpt (Atom t a : i : rs)
+{-
+hackOpt (PushFrame _ [] ops : rs)
+  | last ops == EndFrame = hackOpt (init ops ++ rs)
+hackOpt (PushFrame _ [n] [Atom {op_target = Reg n', op_atom = AnInteger i},Load (Reg n''),EndFrame] : rs)
+  | n == n', n == n'' = LoadInteger i : hackOpt rs
+-}
+hackOpt (PushFrame s ns ops : rs) = PushFrame s ns (hackOpt ops) : hackOpt rs
+hackOpt (Function t n ops : rs) = Function t n (hackOpt ops) : hackOpt rs
+hackOpt (Choice sq ops1 ops2 : rs) = Choice sq (hackOpt ops1) (hackOpt ops2) : hackOpt rs
+hackOpt (Iterate n c d s f : rs) = Iterate n c (hackOpt d) (hackOpt s) (hackOpt f) : hackOpt rs
+hackOpt (op : rs) = op : hackOpt rs
+hackOpt [] = []
