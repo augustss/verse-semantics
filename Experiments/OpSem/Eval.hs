@@ -25,7 +25,7 @@ sqDebug = True
 -}
 debug = False
 moreDebug = False
-stepDebug = True
+stepDebug = False
 stepFrameDebug = False
 sqDebug = False
 
@@ -491,7 +491,7 @@ choiceOp sqin fr ops1 ops2 = do
                   , ctx_name = ctx_name ctx ++ "-next"
                   }
       let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . take 2 . words . show . head . ctx_ops) (getNexts p)
-      traceM $ "########## " ++ showNexts ctx1
+      --traceM $ "########## " ++ showNexts ctx1
       --traceM $ "========\nctx1=\n" ++ prettyShow ctx1
       updateContext ctx1
 
@@ -540,8 +540,8 @@ stepR = do
   when stepDebug $ do
     traceM $ "stepR ctx=" ++ ctx_name ctx ++ "(" ++ show (ctx_id ctx) ++ ") fr=" ++ fr_name (ctx_frame ctx) ++ ": " ++ take 150 (show op)
     --let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (show . ctx_id) (getNexts p)
-    let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . drop 4 . take 7 . words . show . head . ctx_ops) (getNexts p)
-    traceM $ "::::: " ++ showNexts ctx
+    --let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . drop 4 . take 7 . words . show . head . ctx_ops) (getNexts p)
+    --traceM $ "::::: " ++ showNexts ctx
 
   case op of
     Iterate n c d s f -> do
@@ -657,7 +657,7 @@ stepR = do
               --traceM "--------------------"
               do
                 c <- getCurContext
-                traceM $ ":: next " ++ show (isJust (ctx_next c))
+                when False $ traceM $ ":: next " ++ show (isJust (ctx_next c))
               failure "NextFor"
             _ -> error "impossible: NextFor 1"
         _ -> error "impossible: NextFor 2"

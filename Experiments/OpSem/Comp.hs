@@ -101,7 +101,7 @@ expToReg sq t (For e1 e2) = do
   o2 <- sexpToOps' lsq (\ sq' v -> [NextFor c a v lsq sq']) e2
   msg <- newName (\ n -> "for-ctx" ++ show n)
   emit $ MkArray a []
-#if 0
+#if 1
   xsq <- newRegSq
   emit $ Assign (sq_choice lsq) xsq
   emit $ Iterate msg c [o1] [o2] [Unify t a, EndFrame]
