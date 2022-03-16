@@ -5,7 +5,7 @@
 module OpSem.Tests(module OpSem.Tests) where
 import Ex
 import OpSem.Comp(compExp)
-import OpSem.Exp
+import OpSem.DSL
 import OpSem.Op(Value)
 import OpSem.Eval(run)
 
@@ -41,7 +41,7 @@ test103 = ok "test103" [(5,37)] $
   5 # 37
 
 test104 = ok "test104" [(1,2,3,4)] $
-  Array [1,2,3,4]
+  array [1,2,3,4]
 
 test100s = mapM_ testEx
   [test101,test102,test103,test104
@@ -60,7 +60,7 @@ test203 = ok "test203" [(7,6)] $
   "x"+1 # ("x" := 6)
 
 test204 = ok "test204" [(7,6,6,5)] $
-  Array ["x"+1, "x" := "y", "y" := "z"+1, "z" := 5]
+  array ["x"+1, "x" := "y", "y" := "z"+1, "z" := 5]
 
 test205 = bad "test205" $
   ("x" := 1) # ("x" := 2)
@@ -119,13 +119,13 @@ test303 = ok "test303" [(3,3)] $
   ("x" === 3) # ("x" := 3)
 
 test304 = ok "test304" [20] $
-  ("a" := Array [10,20,30]) % Sel "a" 1
+  ("a" := array [10,20,30]) % Sel "a" 1
 
 test305 = ok "test305" [20] $
-  Sel "a" 1 `where_` ("a" := Array [10,20,30])
+  Sel "a" 1 `where_` ("a" := array [10,20,30])
 
 test306 = ok "test306" ([]::[()]) $
-  ("a" := Array [10,20,30]) % Sel "a" 3
+  ("a" := array [10,20,30]) % Sel "a" 3
 
 test307 = ok "test307" [(1,1)] $
   "t" := Pair 1 (Fst "t")
@@ -222,15 +222,15 @@ test400s = mapM_ testEx
 
 -- Generates an error, as it should
 test501 = bad "test501"
-  Error
+  err
 
 -- Generates an error, as it should
 test502 = bad "test502" $
-  Error % 1
+  err % 1
 
 -- Generates an error, as it should
 test503 = bad "test504" $
-   (2 # Error) % 1
+   (2 # err) % 1
 
 test500s :: IO ()
 test500s = mapM_ testEx
@@ -293,28 +293,28 @@ test600s = mapM_ testEx
 
 test701 = ok "test701" [5] $
   "f" := lam "v" ("v" + 1) %
-  App "f" 4
+  app "f" 4
 
 test702 = ok "test702" [11] $
   "w" := 7 %
   "f" := lam "v" ("w" + "v") %
-  App "f" 4
+  app "f" 4
 
 test703 = ok "test703" [11] $
   "f" := lam "v" ("w" + "v") %
   "w" := 7 %
-  App "f" 4
+  app "f" 4
 
 test704 = ok "test704" [11] $
   "f" := lam "v" ("w" + "v") %
   "w" := 7 %
-  "y" := App "f" "t" %
+  "y" := app "f" "t" %
   "t" := 4 %
   "y"
 
 -- f is called before it is defined
 test705 = ok "test705" [11] $
-  "y" := App "f" "t" %
+  "y" := app "f" "t" %
   "w" := 7 %
   "t" := 4 %
   "f" := lam "v" ("w" + "v") %
@@ -322,13 +322,13 @@ test705 = ok "test705" [11] $
 
 test706 = ok "test706" [11] $
   "f" := do_ ("w" := 7 % lam "v" ("w" + "v")) %
-  "y" := App "f" "t" %
+  "y" := app "f" "t" %
   "t" := 4 %
   "y"
 
 -- Function defined after it is used;
 test707 = ok "test707" [11] $
-  "y" := App "f" "t" %
+  "y" := app "f" "t" %
   "w" := 7 %
   "t" := 4 %
   "f" := lam "v" ("w" + "v") %
@@ -336,11 +336,11 @@ test707 = ok "test707" [11] $
 
 test708 = ok "test708" [10,11] $
   "f" := lam "v" ("v" ||| "v" + 1) %
-  App "f" 10
+  app "f" 10
 
 
 test709 = bad "test709" $
-  "f" := lam "v" Fail %
+  "f" := lam "v" failure %
   appS "f" 10
 
 test710 = ok "test710" [5] $
@@ -354,7 +354,7 @@ test711 = ok "test711" [(999,888,13)] $
       2 ==> 888,
       var "x" ==> "x" + 10
       ]) %
-  Array ["f" @@ 0, "f" @@ 1, "f" @@ 2]
+  array ["f" @@ 0, "f" @@ 1, "f" @@ 2]
 
 test712 = ok "test712" [12] $
   "twice" := (var "f" ==> var "x" ==> "f" @@ ("f" @@ "x")) %
@@ -367,10 +367,10 @@ test713 = ok "test712" [16] $
   "twice" @@ "twice" @@ "dbl" @@ 1
 
 test714 = ok "test714" [(2,6,4)] $
-  "map" := ((var "f" # var "xs") ==> for ("x" := Range "xs") ("f" @@ "x")) %
+  "map" := ((var "f" # var "xs") ==> for ("x" := range "xs") ("f" @@ "x")) %
   "inc" := lam "x" ("x" + "c") %
   "c" := 1 %
-  "a" := Array [1,5,3] %
+  "a" := array [1,5,3] %
   "map" @@ ("inc" # "a")
 
 test700s :: IO ()
@@ -400,12 +400,12 @@ test803 = ok "test803" [(1,2)] $
 test804 = ok "test804" [1] $
   "f" := lam "xy" (Fst "xy" === Snd "xy") %
   var "x" %
-  App "f" ("x" # 1) %
+  app "f" ("x" # 1) %
   "x"
 
 test805 = ok "test805" [6] $
   "f" := lam "xyz" ((var "x" # var "y" # var "z") === "xyz" % "x" + "y" + "z") %
-  App "f" (1 # 2 # 3)
+  app "f" (1 # 2 # 3)
 
 test806 = bad "test806" $
   var "x" % "x"+1
@@ -429,7 +429,7 @@ test903 = ok "test903" [10] $
   if_ ("x" := 10) "x" 2
 
 test904 = ok "test904" [2] $
-  if_ Fail 1 2
+  if_ failure 1 2
 
 test905 = ok "test905" [1] $
   if_ ("x" := 1 % "x" === 1) 1 2
@@ -468,26 +468,26 @@ test914 = ok "test914" [1] $
   if_ ("x" := (1 ||| 2)) 1 20
 
 test915 = ok "test915" [2] $
-  if_ ("x" := (Fail ||| 2)) "x" 20
+  if_ ("x" := (failure ||| 2)) "x" 20
 
 test916 = ok "test916" [1] $
-  if_ ("x" := (1 ||| Fail)) "x" 20
+  if_ ("x" := (1 ||| failure)) "x" 20
 
 test917 = ok "test917" [20] $
-  if_ ("x" := (Fail ||| Fail)) "x" 20
+  if_ ("x" := (failure ||| failure)) "x" 20
 
 test918 = ok "test918" [3] $
-  if_ ("x" := (Fail ||| (Fail ||| 3))) "x" 20
+  if_ ("x" := (failure ||| (failure ||| 3))) "x" 20
 
 test919 = ok "test919" [7] $
   "f" := lam "n" (if_ ("n" <=. 0) ("n"+1) ("n"+2)) %
-  "r" := "f" `App` "five" %
+  "r" := "f" `app` "five" %
   "five" := 5 %
   "r"
 
 test920 = ok "test920" [6] $
   "f" := lam "n" (if_ ("n" <=. 10) ("n"+1) ("n"+2)) %
-  "r" := "f" `App` "five" %
+  "r" := "f" `app` "five" %
   "five" := 5 %
   "r"
 
@@ -498,35 +498,35 @@ test900s = mapM_ testEx
   ]
 
 ---------------------
--- Range
+-- range
 ---------------------
 
 test1001 = ok "test1001" [(1,2,3)] $
-  for ("x" := Range (Array [1,2,3])) "x"
+  for ("x" := range (array [1,2,3])) "x"
 
 test1002 = ok "test1002" [(102,103,104)] $
   "xs" := for ("x" := 1|||2|||3) ("x" + 1) %
-  for ("y" := Range "xs") ("y" + 100)
+  for ("y" := range "xs") ("y" + 100)
 
 test1003 = ok "test1003" [((1,2),(1,4),(1,5))] $
-  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for ("xy" := Range "xys" % Fst "xy" === 1) "xy"
+  "xys" := array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for ("xy" := range "xys" % Fst "xy" === 1) "xy"
 
 test1004 = ok "test1004" ([]::[()]) $
-  "xys" := Array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for ("xy" := Range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
+  "xys" := array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for ("xy" := range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
 
 test1005 = ok "test1005" [((2,3),(2,3))] $
-  "xys" := Array [1#2, 2#3, 1#4, 2#3, 1#5] %
-  for ("xy" := Range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
+  "xys" := array [1#2, 2#3, 1#4, 2#3, 1#5] %
+  for ("xy" := range "xys" % Fst "xy" === 2) ("xy" `where_` Snd "xy" === 3)
 
 test1006 = ok "test1006" [(2,3)] $
-  "a" := for ("x" := Range "xs") ("x" + 1) %
-  "xs" := Array[1,2] %
+  "a" := for ("x" := range "xs") ("x" + 1) %
+  "xs" := array[1,2] %
   "a"
 
 test1007 = ok "test1007" [2] $
-  if_ (Range (Array [])) 1 2
+  if_ (range (array [])) 1 2
 
 test1000s :: IO ()
 test1000s = mapM_ testEx
@@ -559,18 +559,18 @@ test1017 = ok "test1017" [1] $
   if_ (2 <. 4) 1 2
 
 test1018 = ok "test1018" [120] $
-  "fac" := lam "n" (if_ ("n" <=. 0) 1 ("n" * "fac" `App` ("n" - 1))) %
-  "fac" `App` 5
+  "fac" := lam "n" (if_ ("n" <=. 0) 1 ("n" * "fac" `app` ("n" - 1))) %
+  "fac" `app` 5
 
 test1019 = ok "test1019" [120] $
-  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `App` ("n" - 1))) %
-  "res" := "fac" `App` 5 %
+  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `app` ("n" - 1))) %
+  "res" := "fac" `app` 5 %
   "one" := 1 %
   "res"
 
 test1020 = ok "test1020" [120] $
-  "res" := "fac" `App` "five" %
-  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `App` ("n" - 1))) %
+  "res" := "fac" `app` "five" %
+  "fac" := lam "n" (if_ ("n" <=. 0) "one" ("n" * "fac" `app` ("n" - 1))) %
   "five" := 5 %
   "one" := 1 %
   "res"

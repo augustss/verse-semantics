@@ -4,6 +4,7 @@ module OpSem.Comp(comp, compExp) where
 import Control.Monad.State.Strict
 import GHC.Stack ( HasCallStack )
 
+import OpSem.DSL(for)
 import OpSem.Exp
 import OpSem.Op
 
@@ -197,7 +198,7 @@ comp e = evalState se cs
 
 adjExp :: Exp -> SExp
 adjExp = addDef . addFor
-  where addFor e = for ("&it" := e) (Var "&it")
+  where addFor e = for ("&it" `Set` e) (Var "&it")
 
 compExp :: Exp -> [Op]
 compExp = hackOpt . comp . adjExp
