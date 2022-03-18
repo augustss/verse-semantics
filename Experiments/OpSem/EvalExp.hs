@@ -36,7 +36,7 @@ linToHeap h ci fr tgt e =
              LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
   in  (ls_ops ls, ls_heap ls)
 
--- linValue returns Exp as a Value.
+-- linValue throws away the Value from expValue
 linValue :: Heap -> ContextId -> Frame -> Exp -> ([OpX], Heap)
 linValue h ci fr e =
   let ls = execState (expValue e)
@@ -53,6 +53,8 @@ data LState = LState
 
 type L a = State LState a
 
+-- Convert the Exp to a sequence of OpX
+-- and return the Value of it.
 expValue :: Exp -> L Value
 expValue (Var n) = do
   fr <- gets ls_frame
@@ -115,9 +117,12 @@ expValue (App f a) = do
   appToHeap tgt f a
   pure tgt
 expValue Error = do
-  emitOps [ErrorX]
-  newVHeap
+  tgt <- newVHeap
+  emitOps [CallX tgt (VPrimOp "Error") (VArray [])]
+  pure tgt
 
+-- Convert the Exp to a sequence of OpX
+-- and put the result in Target.
 expToHeap :: Target -> Exp -> L ()
 -- optimizations to avoid cell allocation
 expToHeap tgt (Alt e1 e2) = altToHeap tgt e1 e2
@@ -427,10 +432,7 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     VPrimOp sop ->
       case getValue ctx arg of
         VArray vs
-          | Just vs' <- mapM (getWHNF ctx) vs ->
-            case primOp sop vs' of
-              Just v -> unify ctx tgt v
-              Nothing -> Step1Failed
+          | Just vs' <- mapM (getWHNF ctx) vs -> primOpX ctx tgt sop vs'
           | otherwise -> ctx & suspend op
         VHeap{} -> ctx & suspend op
         -- TODO: if the PrimOp has effects, then those effects have to be held.
@@ -523,7 +525,6 @@ step1 ctx op@(RangeX tgt arr) =
     VHeap{} -> ctx & suspend op
     _ -> error "RangeX bar arg"
 step1 _ FailX = Step1Failed
-step1 _ctx ErrorX = error "Error"
 
 -- Create a new uninstantiated heap cell
 allocCell :: Context -> (Context, Value)
@@ -555,6 +556,14 @@ holdEffects :: Context -> Context
 holdEffects ctx = ctx { ctx_hold = True }
 
 -- Execute a PrimOp.
+primOpX :: Context -> Target -> PrimOp -> [Value] -> Step1Result
+primOpX _ _ "Error" _ = error "Error called"
+primOpX ctx tgt sop vs =
+  case primOp sop vs of
+    Just v -> unify ctx tgt v
+    Nothing -> Step1Failed
+
+-- Execute a pure PrimOp.
 -- Nothing indicates that the op failed.
 primOp :: PrimOp -> [Value] -> Maybe Value
 primOp op [v1@(VInteger i1), VInteger i2] = do

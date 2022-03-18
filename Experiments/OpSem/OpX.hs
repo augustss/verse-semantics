@@ -72,7 +72,7 @@ data Context = Ctx
   , ctx_parent :: !(Maybe Context)
   , ctx_next   :: !(Maybe Context)  -- backtrack point
   --, ctx_effects:: ![Effect]         -- allowed effects
-  , ctx_hold   :: !Bool             -- hold all sequential effects XXX use mask?
+  , ctx_hold   :: !Bool             -- hold all sequential effects XXX use a mask
   }
   deriving (Eq, Show)
 
@@ -135,21 +135,31 @@ instance Pretty Value where
 type Target = Value   -- used to indicate the this is the result of an operation
 
 data OpX
-  = UnifyX Value Value
-  | CallX   { targetx :: Target, callx_fun :: Value, callx_arg :: Value }
-  | ChoiceX { choice_left :: [OpX], choice_right :: [OpX] }
-  | IfX     { targetx :: Target
-            , ifx_cond :: Context,
-              ifx_exports :: [(Name, HeapAddr)]
-            , ifx_then :: (Frame, Exp), ifx_else :: (Frame, Exp) }
-
-  | ForX    { targetx :: Target
-            , forx_arr :: [Value]  -- The result of the 'for' is accumulated here.
-            , forx_dom :: Context,
-              forx_exports :: [(Name, HeapAddr)]
-            , forx_body :: (Frame, Exp) }
-  | RangeX  { targetx :: Target, rangex_arr :: Value }
+  = UnifyX  { unifyx_left   :: Value
+            , unifyx_right  :: Value
+            }
+  | CallX   { targetx       :: Target
+            , callx_fun     :: Value
+            , callx_arg     :: Value
+            }
+  | ChoiceX { choicex_left  :: [OpX]
+            , choicex_right :: [OpX]
+            }
+  | IfX     { targetx       :: Target
+            , ifx_cond      :: Context
+            , ifx_exports   :: [(Name, HeapAddr)]
+            , ifx_then      :: (Frame, Exp)
+            , ifx_else      :: (Frame, Exp)  -- XXX This could be [OpX]
+            }
+  | ForX    { targetx       :: Target
+            , forx_arr      :: [Value]  -- The result of the 'for' is accumulated here.
+            , forx_dom      :: Context
+            , forx_exports  :: [(Name, HeapAddr)]
+            , forx_body     :: (Frame, Exp)
+            }
+  | RangeX  { targetx       :: Target
+            , rangex_arr    :: Value
+            }
   | FailX
-  | ErrorX
 
   deriving (Eq, Show)
