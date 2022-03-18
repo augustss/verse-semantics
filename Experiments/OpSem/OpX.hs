@@ -1,12 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
 module OpSem.OpX(
   Frame,
+  emptyFrame,
   ContextId,
   Context(..),
   --Effect(..),
   HeapId(..),
   HeapAddr,
   Heap,
+  emptyHeap,
   Value(..),
   Target,
   OpX(..),
@@ -26,6 +28,9 @@ import OpSem.Exp(Name, Exp)
 --------------------------------
 
 type Frame = M.Map Name Value
+
+emptyFrame :: Frame
+emptyFrame = M.empty
 
 --------------------------------
 --
@@ -53,7 +58,11 @@ instance Show HeapId where
 --------------------------------
 
 type HeapAddr = Int
+
 type Heap = M.Map HeapAddr (Maybe Value)
+
+emptyHeap :: Heap
+emptyHeap = M.empty
 
 --------------------------------
 --

@@ -23,7 +23,7 @@ forDebug = False
 compExp :: Exp -> [OpX]
 compExp e =
   fst $
-  linValue M.empty [] M.empty $
+  linValue emptyHeap [] emptyFrame $
   Do $
   addDef e
 
@@ -228,8 +228,8 @@ mkContext e = do
   -- to create the ContextId for the new Context.
   v <- newVHeap
   let l = case v of VHeap (HeapId _ a) -> a; _ -> undefined
-      (ops, heap) = linValue M.empty ci fr e
       ci = l : pci  -- the new ContextId is the old one with a unique Int prepended
+      (ops, heap) = linValue emptyHeap ci fr e
   pure $ Ctx
       { ctx_id = ci
       , ctx_heap = heap
@@ -241,7 +241,7 @@ mkContext e = do
       , ctx_hold = False
       }
 
--- Run an expression.  Assumes Def has been inserted in the appropriate places.
+-- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
   case step ctx of
@@ -260,12 +260,12 @@ run e =
       , ctx_hold = False
       }
     ci = []
-    addr = 0
-    (ops, heap') = linToHeap heap ci M.empty tgt e
+    (heap, addr) = heapAlloc emptyHeap
+    (ops, heap') = linToHeap heap ci emptyFrame tgt e
     tgt = VHeap (HeapId ci addr)  -- A cell for the result
-    heap = M.singleton addr Nothing
 
 -- Just for Tests.hs
+-- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
 instance Eval Value where
   eval e =
     case run $ for ("&it" `Set` e) (Var "&it") of
@@ -275,7 +275,7 @@ instance Eval Value where
 --------------------------------------------------------------
 
 -- Get rid of all references to heap cells with ContextId ci.
--- Circularities are flagged as an error.
+-- Any circularity is flagged as an error.
 expunge :: HasCallStack => ContextId -> Heap -> Value -> Value
 expunge ci heap = value []
   where
@@ -290,7 +290,7 @@ expunge ci heap = value []
       | otherwise =
           case M.lookup h heap of
             Nothing -> error "expunge: not in heap"
-            Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show (h, ci, heap)
+            Just Nothing -> wrong $ "expunge: uninstantiated " ++ show (h, ci, heap)
             Just (Just v') -> value (h:s) v'
     value _ v@VPrimOp{} = v
     frame s fr = M.map (value s) fr
@@ -302,7 +302,7 @@ getCurrentContexts c = c : maybe [] getCurrentContexts (ctx_parent c)
 -- Follow VHeap indirections that point to instantiated cells.
 getValue :: Context -> Value -> Value
 getValue ctx = follow' []
-  where follow' s (VHeap h) | h `elem` s = error $ "follow': loop " ++ show (h, s)
+  where follow' s (VHeap h) | h `elem` s = wrong $ "follow': loop " ++ show (h, s)
         follow' s v@(VHeap h) =
           case getHeapValue ctx h of
             Just v' -> follow' (h:s) v'
@@ -323,14 +323,14 @@ getHeapValue ctx (HeapId ci h) =
 addResiduals :: [OpX] -> Context -> Context
 addResiduals os c = c{ ctx_done = ctx_done c ++ os }
 
--- Add instructions to execute now.
+-- Add instructions to execute next.
 addOps :: [OpX] -> Context -> Context
 addOps os c = c{ ctx_ops = os ++ ctx_ops c }
 
 setHeap :: Heap -> Context -> Context
 setHeap h c = c{ ctx_heap = h }
 
--- Does the heap pointer refer to a flexible variable.
+-- Does the heap pointer refer to a flexible variable?
 isFlex :: HeapId -> ContextId -> Bool
 isFlex (HeapId c _) ci = c == ci
 
@@ -365,7 +365,8 @@ unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
     unify' (VArray vs1) (VArray vs2)
       | length vs1 /= length vs2 = Step1Failed
       | otherwise = Step1Done $ ctx & addOps (zipWith UnifyX vs1 vs2)
-    unify' VFun{} VFun{} = error "WRONG: comparing functions"
+    unify' VFun{} VFun{} = wrong "comparing functions"
+    unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
     unify' _ _ = Step1Failed
 
 -- Results of taking as many steps as possible.
@@ -380,7 +381,7 @@ data StepResult
 step :: Context -> StepResult
 step = step' False False
 
--- Repeatedly step, keeping track if any actual steps were taken.
+-- Repeatedly call step1, keeping track if any actual steps were taken.
 -- The first flag indicates that a step has happened since the start,
 -- the second flag that a step has happened in the last pass.
 step' :: Bool -> Bool -> Context -> StepResult
@@ -390,8 +391,10 @@ step' _ _ ctx@(Ctx { ctx_done = [], ctx_ops = [] }) =
 step' some did ctx@(Ctx { ctx_done = done, ctx_ops = [] })
   | stepDebug && trace ("step retry " ++ show done) False = undefined
   -- We took some steps in the last pass, retry the (non-empty) residuals again.
+  -- Note: when restarting, effects are no longer held.
   | did = step' some False ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
   -- We took no steps in the last pass, but some since the start.
+  -- Note: when retrying later, effects are no longer held.
   | some = StepNotDone ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
   -- We have taken no steps whatsoever.
   | otherwise = StepNothing
@@ -421,7 +424,7 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
   case getValue ctx fun of
     -- Function closure
     VFun{ vf_arg_name = arg_name, vf_frame = frame, vf_body = body } ->
-      -- Main payload!  Rename body, inline the instructions
+      -- Main payload!  Linearize the body, inline the instructions
       Step1Done $ ctx & addClosure tgt (frame_w_binding, body)
       where
         -- Extend the frame with the argument binding
@@ -432,12 +435,16 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     VPrimOp sop ->
       case getValue ctx arg of
         VArray vs
-          | Just vs' <- mapM (getWHNF ctx) vs -> primOpX ctx tgt sop vs'
-          | otherwise -> ctx & suspend op
-        VHeap{} -> ctx & suspend op
-        -- TODO: if the PrimOp has effects, then those effects have to be held.
+          | Just vs' <- mapM (getWHNF ctx) vs ->
+            primOpX ctx tgt sop vs'
+          | otherwise ->
+            ctx & suspend op
+        VHeap{} ->
+          -- TODO: if the PrimOp has effects, then those effects have to be held.
+          ctx & suspend op
         _ -> error "Bad VPrimOp arg"
 
+    -- Array indexing.
     VArray vals ->
       case getValue ctx arg of
         VInteger idx
@@ -554,7 +561,7 @@ addClosure tgt (frame, body) ctx =
 suspend :: OpX -> Context -> Step1Result
 suspend op ctx = Step1Suspend $ addResiduals [op] ctx
 
--- Hold of all effects.
+-- Hold off all (sequential) effects.
 holdEffects :: Context -> Context
 holdEffects ctx = ctx { ctx_hold = True }
 
