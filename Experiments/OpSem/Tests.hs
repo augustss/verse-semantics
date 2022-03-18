@@ -4,29 +4,31 @@
 {-# LANGUAGE OverloadedStrings #-}
 module OpSem.Tests(module OpSem.Tests) where
 import Ex
-import OpSem.Comp(compExp)
 import OpSem.DSL
-import OpSem.Op(Value)
-import OpSem.Eval(run)
+import OpSem.Exp(eval)
+--import OpSem.Op(Value)
+import OpSem.OpX(Value)
+import OpSem.Eval()
+import OpSem.EvalExp()
 
-ev :: Exp -> [Value]
-ev = run . compExp
+ev :: Exp -> String
+ev = show . (eval :: Exp -> [Value])
 
 ---------------------
 --      Tests
 ---------------------
 
 ok :: (Show a) => String -> a -> Exp -> Ex String
-ok n r e = Ex n (Just $ show r) (show $ ev e)
+ok n r e = Ex n (Just $ show r) (ev e)
 
 bad :: String -> Exp -> Ex String
-bad n e = Ex n Nothing (show $ ev e)
+bad n e = Ex n Nothing (ev e)
 
 bug :: (Show a) => String -> a -> Exp -> Ex String
-bug n _r e = Ex ("bug: " ++ n) Nothing (show $ ev e)
+bug n _r e = Ex ("bug: " ++ n) Nothing (ev e)
 
 unimp :: (Show a) => String -> a -> Exp -> Ex String
-unimp n _r e = Ex ("unimp: " ++ n) Nothing (show $ ev e)
+unimp n _r e = Ex ("unimp: " ++ n) Nothing (ev e)
 
 ---------------------
 -- Simple, single valued tests.
@@ -295,6 +297,10 @@ test701 = ok "test701" [5] $
   "f" := lam "v" ("v" + 1) %
   app "f" 4
 
+x701 =
+  "f" := lam "v" ("v" + 1) %
+  app "f" 4
+
 test702 = ok "test702" [11] $
   "w" := 7 %
   "f" := lam "v" ("w" + "v") %
@@ -420,6 +426,8 @@ test800s = mapM_ testEx
 ---------------------
 
 test901 = ok "test901" [1] $
+  if_ (1 === 1) 1 2
+x901 =
   if_ (1 === 1) 1 2
 
 test902 = ok "test902" [2] $

@@ -4,9 +4,11 @@ module OpSem.Exp(
   Exp(..),
   SExp(..),
   addDef,
+  Eval(..),
   ) where
 import Data.List ( nub )
 import GHC.Stack ( HasCallStack )
+import Text.PrettyPrint.HughesPJClass
 
 --------------------------------
 --
@@ -85,3 +87,8 @@ findSet (PrimBin _ e1 e2) = findSet e1 ++ findSet e2
 findSet (Range e) = findSet e
 findSet Error = []
 
+instance Pretty Exp where
+  pPrint = text . show
+  
+class (Show a) => Eval a where
+  eval :: Exp -> [a]

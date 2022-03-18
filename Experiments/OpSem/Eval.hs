@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 module OpSem.Eval(run) where
@@ -11,7 +12,8 @@ import GHC.Stack ( HasCallStack )
 import Text.PrettyPrint.HughesPJClass hiding (semi)
 import Debug.Trace
 
-import OpSem.Exp ( Name )
+import OpSem.Exp ( Name, Eval(..) )
+import OpSem.Comp ( compExp )
 import OpSem.Misc ( assert, assertM, showListWith )
 import OpSem.Op
 
@@ -490,7 +492,7 @@ choiceOp sqin fr ops1 ops2 = do
         ctx2 = ctx{ ctx_ops = ops2
                   , ctx_name = ctx_name ctx ++ "-next"
                   }
-      let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . take 2 . words . show . head . ctx_ops) (getNexts p)
+      --let showNexts p = "    " ++ ctx_name p ++ ": nexts=" ++ showListWith (unwords . take 2 . words . show . head . ctx_ops) (getNexts p)
       --traceM $ "########## " ++ showNexts ctx1
       --traceM $ "========\nctx1=\n" ++ prettyShow ctx1
       updateContext ctx1
@@ -781,3 +783,6 @@ run ops = runRunState $ do
   setCurContextId ci
   updateContext ictx
   loop
+
+instance Eval Value where
+  eval = run . compExp
