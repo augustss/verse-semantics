@@ -75,7 +75,7 @@ expValue (Alt e1 e2) = do
 expValue (Equal e1 e2) = do
   v1 <- expValue e1
   v2 <- expValue e2
-  emitOps [UnifyX v1 v2]
+  emitOp $ UnifyX v1 v2
   pure v1
 expValue (Set n e) =
   expValue (Equal (Var n) e)
@@ -90,15 +90,15 @@ expValue (PrimBin op e1 e2) = do
   primBinToHeap tgt op e1 e2
   pure tgt
 expValue Fail = do
-  emitOps [FailX]
+  emitOp FailX
   newVHeap
-expValue (For d@(Def ns _) e) = do
+expValue (For d e) = do
   tgt <- newVHeap
-  forToHeap tgt ns d e
+  forToHeap tgt d e
   pure tgt
-expValue (If c@(Def ns _) t e) = do
+expValue (If c t e) = do
   tgt <- newVHeap
-  ifToHeap tgt ns c t e
+  ifToHeap tgt c t e
   pure tgt
 expValue (Do e) =
   sexpValue e
@@ -107,7 +107,7 @@ expValue (Let (Def ns e1) e2) =
 expValue (Range e) = do
   tgt <- newVHeap
   v <- expValue e
-  emitOps [RangeX tgt v]
+  emitOp $ RangeX tgt v
   pure tgt
 expValue (Lam n e) = do
   fr <- gets ls_frame
@@ -118,7 +118,7 @@ expValue (App f a) = do
   pure tgt
 expValue Error = do
   tgt <- newVHeap
-  emitOps [CallX tgt (VPrimOp "Error") (VArray [])]
+  emitOp $ CallX tgt (VPrimOp "Error") (VArray [])
   pure tgt
 
 -- Convert the Exp to a sequence of OpX
@@ -127,47 +127,45 @@ expToHeap :: Target -> Exp -> L ()
 -- optimizations to avoid cell allocation
 expToHeap tgt (Alt e1 e2) = altToHeap tgt e1 e2
 expToHeap tgt (PrimBin op e1 e2) = primBinToHeap tgt op e1 e2
-expToHeap tgt (For d@(Def ns _) e) = forToHeap tgt ns d e
+expToHeap tgt (For d e) = forToHeap tgt d e
 expToHeap tgt (App f a) = appToHeap tgt f a
-expToHeap tgt (If c@(Def ns _) t e) = ifToHeap tgt ns c t e
-expToHeap _ Fail = emitOps [FailX]
+expToHeap tgt (If c t e) = ifToHeap tgt c t e
+expToHeap _ Fail = emitOp FailX
 -- fallback, this always works, even in the cases above
 expToHeap tgt e = do
   v <- expValue e
-  emitOps [UnifyX tgt v]
+  emitOp $ UnifyX tgt v
 
 altToHeap :: Target -> SExp -> SExp -> L ()
 altToHeap tgt e1 e2 = do
   ops1 <- getOpsOf $ expToHeap tgt $ Do e1
   ops2 <- getOpsOf $ expToHeap tgt $ Do e2
-  emitOps [ChoiceX ops1 ops2]
+  emitOp $ ChoiceX ops1 ops2
 
 primBinToHeap :: Target -> PrimOp -> Exp -> Exp -> L ()
 primBinToHeap tgt op e1 e2 = do
   arg <- expValue $ Array [e1, e2]
-  emitOps [CallX tgt (VPrimOp op) arg]
+  emitOp $ CallX tgt (VPrimOp op) arg
 
 appToHeap :: Target -> Exp -> Exp -> L ()
 appToHeap tgt f a = do
   vf <- expValue f
   va <- expValue a
-  emitOps [CallX tgt vf va]
+  emitOp $ CallX tgt vf va
 
-forToHeap :: Target -> [Name] -> SExp -> SExp -> L ()
-forToHeap tgt ns d e = do
-  ci <- gets ls_contextId
+forToHeap :: Target -> SExp -> SExp -> L ()
+forToHeap tgt d@(Def ns _) e = do
   fr <- gets ls_frame
-  ctx <- mkContext ci fr (Do d)
+  ctx <- mkContext (Do d)
   let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOps [ForX tgt [] ctx nas (fr, Do e)]
+  emitOp $ ForX tgt [] ctx nas (fr, Do e)
 
-ifToHeap :: Target -> [Name] -> SExp -> SExp -> SExp -> L ()
-ifToHeap tgt ns c t e = do
-  ci <- gets ls_contextId
+ifToHeap :: Target -> SExp -> SExp -> SExp -> L ()
+ifToHeap tgt c@(Def ns _) t e = do
   fr <- gets ls_frame
-  ctx <- mkContext ci fr (Do c)
+  ctx <- mkContext (Do c)
   let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOps [IfX tgt ctx nas (fr, Do t) (fr, Do e)]
+  emitOp $ IfX tgt ctx nas (fr, Do t) (fr, Do e)
 
 sexpValue :: SExp -> L Value
 sexpValue (Def ns e) = do
@@ -205,9 +203,9 @@ withBinds nvs la = do
   put ls'{ ls_frame = ls_frame ls }
   pure a
 
-emitOps :: [OpX] -> L ()
-emitOps ops =
-  modify $ \ ls -> ls{ ls_ops = ls_ops ls ++ ops }
+emitOp :: OpX -> L ()
+emitOp op =
+  modify $ \ ls -> ls{ ls_ops = ls_ops ls ++ [op] }
 
 -- Execure l and capture the ops it generates.
 getOpsOf :: L () -> L [OpX]
@@ -222,8 +220,10 @@ getOpsOf l = do
 wrong :: HasCallStack => String -> a
 wrong s = error $ "WRONG: " ++ s
 
-mkContext :: ContextId -> Frame -> Exp -> L Context
-mkContext pci fr e = do
+mkContext :: Exp -> L Context
+mkContext e = do
+  pci <- gets ls_contextId
+  fr <- gets ls_frame
   -- This allocates a cell just to get a unique address that can be used
   -- to create the ContextId for the new Context.
   v <- newVHeap
@@ -389,7 +389,7 @@ step' _ _ ctx@(Ctx { ctx_done = [], ctx_ops = [] }) =
   StepDone ctx
 step' some did ctx@(Ctx { ctx_done = done, ctx_ops = [] })
   | stepDebug && trace ("step retry " ++ show done) False = undefined
-  -- We took some steps in the last pass, retry the (non-empty) residuals again
+  -- We took some steps in the last pass, retry the (non-empty) residuals again.
   | did = step' some False ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
   -- We took no steps in the last pass, but some since the start.
   | some = StepNotDone ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
@@ -469,13 +469,13 @@ step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas, ifx_then = 
       Step1Done $
       ctx & holdEffects & addResiduals [op{ ifx_cond = cond' }]
     StepDone cond' ->
-      -- Condition succeeded, run the then branch with the domain frame
+      -- Condition succeeded, run the 'then' branch with the domain frame
       Step1Done $
       ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
       where ext = [ (n, expunge ci (ctx_heap cond') (VHeap (HeapId ci a))) | (n, a) <- nas ]
             ci = ctx_id cond'
     StepFailed ->
-      -- Condition failed, run the else branch
+      -- Condition failed, run the 'else' branch
       Step1Done $
       ctx & addClosure tgt els
     StepNothing ->
@@ -493,7 +493,7 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
     StepDone dom' ->
       -- domain finished, run the body with the domain frame.
       -- The body puts the value in res, which is appended to
-      -- the accumuilating array.
+      -- the accumulating array.
       -- After the body execution we will run the ForX again for the next iteration,
       -- but with the domain updated to the next backtrack point.
       Step1Done $
@@ -505,7 +505,9 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
             (ctx', res) = allocCell ctx
             dom'' = nextIter dom'
     StepFailed ->
-      -- the for loop has finished, so deliver the array
+      -- The for loop has finished, so deliver the array.
+      -- Note: StepFailed is not returned until the are no
+      -- more backtrack points.
       unify ctx tgt (VArray arr)
     StepNothing ->
       -- Nothing happened, just suspend again.
@@ -523,7 +525,8 @@ step1 ctx op@(RangeX tgt arr) =
           ctx &
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ctx & suspend op
-    _ -> error "RangeX bar arg"
+    _ -> error "RangeX bad arg"
+
 step1 _ FailX = Step1Failed
 
 -- Create a new uninstantiated heap cell
