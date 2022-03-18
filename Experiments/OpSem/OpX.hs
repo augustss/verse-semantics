@@ -204,6 +204,4 @@ data OpX
   | RangeX  { targetx       :: Target   -- tgt = :array
             , rangex_arr    :: Value    -- Returns the elts of the array, successively
             }
-  | FailX
-
   deriving (Eq, Show)

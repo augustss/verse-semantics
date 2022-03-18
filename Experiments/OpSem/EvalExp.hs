@@ -86,8 +86,9 @@ expValue (PrimBin op e1 e2) = do
   primBinToHeap tgt op e1 e2
   pure tgt
 expValue Fail = do
-  emitOp FailX
-  newVHeap
+  tgt <- newVHeap
+  emitOp $ RangeX tgt (VArray [])
+  pure tgt
 expValue (For d e) = do
   tgt <- newVHeap
   forToHeap tgt d e
@@ -126,7 +127,6 @@ expToHeap tgt (PrimBin op e1 e2) = primBinToHeap tgt op e1 e2
 expToHeap tgt (For d e) = forToHeap tgt d e
 expToHeap tgt (App f a) = appToHeap tgt f a
 expToHeap tgt (If c t e) = ifToHeap tgt c t e
-expToHeap _ Fail = emitOp FailX
 -- fallback, this always works, even in the cases above
 expToHeap tgt e = do
   v <- expValue e
@@ -580,8 +580,6 @@ step1 ctx op@(RangeX tgt arr) =
     VHeap{} -> ctx & suspend op
     _ -> error "RangeX bad arg"
 
-step1 _ FailX = Step1Failed
-
 -- Create a new uninstantiated heap cell
 allocCell :: Context -> (Context, Value)
 allocCell ctx =
@@ -593,7 +591,7 @@ allocCell ctx =
 nextIter :: Context -> Context
 nextIter ctx =
   assert "nextIter" (null $ ctx_ops ctx) $
-  fromMaybe (ctx{ctx_ops = [FailX]}) $ ctx_next ctx
+  fromMaybe (ctx{ctx_ops = [RangeX undefined (VArray [])]}) $ ctx_next ctx
 
 -- Linearize the Exp with the given Frame and insert
 -- those ops to be executed next.
