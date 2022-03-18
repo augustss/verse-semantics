@@ -488,12 +488,13 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
       -- domain did not finish, so suspend and hold off unknown effects
       Step1Done $
       ctx & holdEffects & addResiduals [op{ forx_dom = dom' }]
-    StepDone dom' -> Step1Done $
+    StepDone dom' ->
       -- domain finished, run the body with the domain frame.
       -- The body puts the value in res, which is appended to
       -- the accumuilating array.
       -- After the body execution we will run the ForX again for the next iteration,
       -- but with the domain updated to the next backtrack point.
+      Step1Done $
       ctx' &
       addOps [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
       addClosure res (extendFrame body_frame ext, body_exp)
