@@ -37,10 +37,16 @@ linToHeap h ci fr tgt e =
   in  (ls_ops ls, ls_heap ls)
 
 -- linValue throws away the Value from expValue
+-- It is used in mkContext, only for 'if' and 'for',
+-- both of which discard the domain value.
 linValue :: Heap -> ContextId -> Frame -> Exp -> ([OpX], Heap)
+-- Takes an Exp, compiles it (on the fly):
+--    replaces identifiers with HeapIds
+--    linearises to [OpX]
+--    executes constructors by building a Value
 linValue h ci fr e =
-  let ls = execState (expValue e)
-             LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
+  let init_ls = LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
+      ls      = execState (expValue e) init_ls
   in  (ls_ops ls, ls_heap ls)
 
 data LState = LState
@@ -140,6 +146,9 @@ altToHeap :: Target -> SExp -> SExp -> L ()
 altToHeap tgt e1 e2 = do
   ops1 <- getOpsOf $ expToHeap tgt $ Do e1
   ops2 <- getOpsOf $ expToHeap tgt $ Do e2
+   -- Could give same Heap to e1 and e2 (they run in alternative worlds)
+   -- but need to return a Heap whose next-free-loc is the max of the two
+   -- But it's easier just to thread the heap from e1 into e2.
   emitOp $ ChoiceX ops1 ops2
 
 primBinToHeap :: Target -> PrimOp -> Exp -> Exp -> L ()
@@ -158,14 +167,18 @@ forToHeap tgt d@(Def ns _) e = do
   fr <- gets ls_frame
   ctx <- mkContext (Do d)
   let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOp $ ForX tgt [] ctx nas (fr, Do e)
+  emitOp $ ForX { targetx = tgt, forx_arr = [],
+                , forx_dom = ctx, forx_exports = nas
+                , forx_body = (fr, e) }
 
 ifToHeap :: Target -> SExp -> SExp -> SExp -> L ()
 ifToHeap tgt c@(Def ns _) t e = do
   fr <- gets ls_frame
   ctx <- mkContext (Do c)
   let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOp $ IfX tgt ctx nas (fr, Do t) (fr, Do e)
+  emitOp $ IfX { targetx = tgt
+               , ifx_cond = ctx, ifx_exports = nas
+               , ifx_then = (fr, t), ifx_else = (fr, e) }
 
 sexpValue :: SExp -> L Value
 sexpValue (Def ns e) = do
@@ -228,7 +241,7 @@ mkContext e = do
   -- to create the ContextId for the new Context.
   v <- newVHeap
   let l = case v of VHeap (HeapId _ a) -> a; _ -> undefined
-      ci = l : pci  -- the new ContextId is the old one with a unique Int prepended
+      ci = l : pci  -- The new ContextId is the old one with a unique Int prepended
       (ops, heap) = linValue emptyHeap ci fr e
   pure $ Ctx
       { ctx_id = ci
@@ -275,6 +288,10 @@ instance Eval Value where
 --------------------------------------------------------------
 
 -- Get rid of all references to heap cells with ContextId ci.
+--
+-- Fails (with WRONG) if the input value reaches any uninstantiated
+-- heap cells.  E.g this is WRONG
+--      if (i:int) then (i=1; i) else 4
 -- Any circularity is flagged as an error.
 expunge :: HasCallStack => ContextId -> Heap -> Value -> Value
 expunge ci heap = value []
@@ -286,10 +303,10 @@ expunge ci heap = value []
     value s (VFun fr n e) = VFun (frame s fr) n e
     value s v@(VHeap (HeapId ci' h))
       | ci /= ci' = v
-      | h `elem` s = error $ "WRONG: expunge recursion:\n" ++ show (h, s, heap)
+      | h `elem` s = wrong $ "expunge recursion:\n" ++ show (h, s, heap)
       | otherwise =
           case M.lookup h heap of
-            Nothing -> error "expunge: not in heap"
+            Nothing -> error "expunge: not in heap"  -- Internal error
             Just Nothing -> wrong $ "expunge: uninstantiated " ++ show (h, ci, heap)
             Just (Just v') -> value (h:s) v'
     value _ v@VPrimOp{} = v
@@ -371,20 +388,56 @@ unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
 
 -- Results of taking as many steps as possible.
 data StepResult
-  = StepDone Context    -- finished successfully
-  | StepNotDone Context -- something happened, but it didn't finish
-  | StepNothing         -- no steps taken
-  | StepFailed          -- failed
+  = StepDone Context    -- Finished successfully; ctx_ops = []
+                        -- use ctx_next for further results
+  | StepNotDone Context -- Something happened, but it didn't finish:
+                        --  (ctx_ops /= []), but they are all stuck
+  | StepNothing         -- No steps taken; degenerate form of StepNotDone
+  | StepFailed          -- Failed; hit FailX
   deriving (Show)
 
+
+{-
+type ParentHeaps = [Heap]
+step :: ParentHeaps -> Context -> StepResult
+-- Makes it clear that the ParentHeaps are not mutated: good!
+
+step :: Context -> StepResult
+-- StepNotDone => a heap mutation took place (in this context's heap),
+--                but all ctx_ops are stuck
+
+-- Precondition: (ctx_ops c) is non-empty
+step c = assert "step" (not (null (ctx_opc c))) (ppr c) $
+         case stepPass c of
+           StepNotDone c' -> case step c' of
+                               StepNothing -> StepNotDone c'
+                               other       -> other
+           StepDone c'    -> StepDone c'
+           StepNothing    -> StepNothing
+           StepFailed     -> StepFailed
+
+stepPass :: Context -> StepResult
+-- StepNotDone => a heap mutation took place (in this context's heap),
+--                so it's worth trying another iteration stepPass
+
+-- ToDo: Localise ctx_done to step'; remove from Context
+--   residual [OpX] becomes an accumulating parameter of step'
+-- Ditto ctx_hold!
+-}
+
 -- Run a Context as far as possible.
+-- Repeatedly exectue the [OpX] in the Context, until
+-- nothing further happens, or the [OpX] is empty
+-- Invariant: input Context has ctx_ops non-empty
 step :: Context -> StepResult
 step = step' False False
 
 -- Repeatedly call step1, keeping track if any actual steps were taken.
 -- The first flag indicates that a step has happened since the start,
 -- the second flag that a step has happened in the last pass.
-step' :: Bool -> Bool -> Context -> StepResult
+step' :: Bool   -- Step has happened since step' was called
+      -> Bool   -- Step has happened in "this pass" of [OpX]
+      -> Context -> StepResult
 step' _ _ ctx@(Ctx { ctx_done = [], ctx_ops = [] }) =
   -- We are done, no ops, no residuals
   StepDone ctx
@@ -410,13 +463,20 @@ step' some did ctx@(Ctx { ctx_ops = op:ops }) =
             Nothing    -> StepFailed
             Just ctx'' -> ctx'' & step' True True
 
+-- Result of exeucting a single OpX
 data Step1Result
-  = Step1Done Context     -- executed the instruction
-  | Step1Suspend Context  -- instruction could not execute, has been residualized
-  | Step1Failed           -- execution failed
+  = Step1Done    Context  -- Completely executed the instruction
+                          -- did not add anything to ctx_done
+  | Step1Suspend Context  -- Instruction could not fully execute,
+                          -- has been residualized into ctx_done
+  | Step1Failed           -- Instruction failed
   deriving (Show)
 
+-- ToDo: is there really a difference between Step1Suspend and Step1Done
+-- Maybe need Step1Nothing?
+
 -- Try to execute a single OpX.
+-- The OpX has already been removed from the ctx_ops
 step1 :: Context -> OpX -> Step1Result
 step1 _ op | stepDebug && trace ("step1 " ++ show op) False = undefined
 step1 ctx (UnifyX v1 v2) = unify ctx v1 v2
@@ -462,11 +522,16 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
 step1 ctx op@(ChoiceX ops1 ops2)
   | ctx_hold ctx = ctx & suspend op
   | otherwise =
-    let ctx2 = ctx & addOps ops2
-        ctx1 = ctx{ ctx_next = Just ctx2 } & addOps ops1
-    in  Step1Done ctx1
+    let ctx1 = ctx & addOps ops1
+        ctx2 = ctx & addOps ops2
+    in  Step1Done (ctx1 { ctx_next = Just ctx2 })
+    -- Make two contexts, one for each branch, prepending ops to the rest of the ops
+    -- And then chain them together, so that we do ctx2 when ctx1 is done.
+    -- NB: ctx1 and ctx2 start from the /same/ Heap;
+    --     this is what implements "backtracking".
 
-step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas, ifx_then = (then_frame, then_exp), ifx_else = els } =
+step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
+                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond (with the parent freshly set)
   case step cond{ ctx_parent = Just ctx } of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
@@ -475,12 +540,17 @@ step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas, ifx_then = 
       -- suspend with the updated condition to reflect the partial work.
       Step1Done $
       ctx & holdEffects & addResiduals [op{ ifx_cond = cond' }]
+
     StepDone cond' ->
       -- Condition succeeded, run the 'then' branch with the domain frame
       Step1Done $
       ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
-      where ext = [ (n, expunge ci (ctx_heap cond') (VHeap (HeapId ci a))) | (n, a) <- nas ]
-            ci = ctx_id cond'
+      where
+         ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
+         ext = [ (n, expunge ci (ctx_heap cond') (VHeap (HeapId ci a)))
+               | (n, a) <- nas ]
+         ci = ctx_id cond'
+
     StepFailed ->
       -- Condition failed, run the 'else' branch
       Step1Done $
@@ -551,8 +621,10 @@ nextIter ctx =
 
 -- Linearize the Exp with the given Frame and insert
 -- those ops to be executed next.
+--
+-- ToDo: collapse with linToHeap?
 addClosure :: Value -> (Frame, Exp) -> Context -> Context
-addClosure tgt (frame, body) ctx = 
+addClosure tgt (frame, body) ctx =
   ctx & setHeap h' & addOps body_opxs
   where
     (body_opxs, h') = linToHeap (ctx_heap ctx) (ctx_id ctx) frame tgt body

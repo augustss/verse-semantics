@@ -64,6 +64,13 @@ type Heap = M.Map HeapAddr (Maybe Value)
 emptyHeap :: Heap
 emptyHeap = M.empty
 
+{-
+data Heap = H HeapId      -- Next free
+              (Map HeapAddr (Mabye Value))
+                 -- Allocated but uninistantiated logical variables
+                 -- map to Nothing
+-}
+
 --------------------------------
 --
 -- Context
@@ -78,12 +85,21 @@ data Context = Ctx
   , ctx_heap   :: !Heap
   , ctx_done   :: ![OpX]
   , ctx_ops    :: ![OpX]
-  , ctx_parent :: !(Maybe Context)
-  , ctx_next   :: !(Maybe Context)  -- backtrack point
+  , ctx_parent :: !(Maybe Context)  -- Used only for the parent's Heap
+                                    -- ToDo: A [Heap] would do
+  , ctx_next   :: !(Maybe Context)  -- Backtrack point, always built by ChoiceX
   --, ctx_effects:: ![Effect]         -- allowed effects
   , ctx_hold   :: !Bool             -- hold all sequential effects XXX use a mask
   }
   deriving (Eq, Show)
+
+{-  ToDo: NEW PLAN
+data Context = Ctx
+  { ctx_heap   :: !Heap
+  , ctx_ops    :: ![OpX]
+  , ctx_next   :: !(Maybe Context)  -- Backtrack point
+  }
+-}
 
 --------------------------------
 --
@@ -103,7 +119,7 @@ data Effect
   | Writes    -- heap write
   -----
   | Interacts -- I/O
-  deriving (Eq, Show)  
+  deriving (Eq, Show)
 -}
 --------------------------------
 --
@@ -137,7 +153,7 @@ instance Pretty Value where
 --------------------------------
 --
 -- OpX
---  
+--
 --
 --------------------------------
 
@@ -156,18 +172,19 @@ data OpX
             }
   | IfX     { targetx       :: Target
             , ifx_cond      :: Context
-            , ifx_exports   :: [(Name, HeapAddr)]
-            , ifx_then      :: (Frame, Exp)
-            , ifx_else      :: (Frame, Exp)  -- XXX This could be [OpX]
+            , ifx_exports   :: [(Name, HeapAddr)]  -- Bound in condition, can be
+                                                   -- used in 'then' branch (only)
+            , ifx_then      :: (Frame, SExp)
+            , ifx_else      :: (Frame, SExp)  -- XXX This could be [OpX]
             }
   | ForX    { targetx       :: Target
             , forx_arr      :: [Value]  -- The result of the 'for' is accumulated here.
             , forx_dom      :: Context
             , forx_exports  :: [(Name, HeapAddr)]
-            , forx_body     :: (Frame, Exp)
+            , forx_body     :: (Frame, SExp)
             }
-  | RangeX  { targetx       :: Target
-            , rangex_arr    :: Value
+  | RangeX  { targetx       :: Target   -- tgt = :array
+            , rangex_arr    :: Value    -- Returns the elts of the array, successively
             }
   | FailX
 
