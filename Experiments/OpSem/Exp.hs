@@ -90,5 +90,8 @@ findSet Error = []
 instance Pretty Exp where
   pPrint = text . show
   
+instance Pretty SExp where
+  pPrint = text . show
+  
 class (Show a) => Eval a where
   eval :: Exp -> [a]

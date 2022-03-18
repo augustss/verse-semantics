@@ -117,7 +117,7 @@ expValue (Range e) = do
   pure tgt
 expValue (Lam n e) = do
   fr <- gets ls_frame
-  pure $ VFun fr n (Do e)
+  pure $ VFun fr n e
 expValue (App f a) = do
   tgt <- newVHeap
   appToHeap tgt f a
@@ -167,7 +167,7 @@ forToHeap tgt d@(Def ns _) e = do
   fr <- gets ls_frame
   ctx <- mkContext (Do d)
   let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOp $ ForX { targetx = tgt, forx_arr = [],
+  emitOp $ ForX { targetx = tgt, forx_arr = []
                 , forx_dom = ctx, forx_exports = nas
                 , forx_body = (fr, e) }
 
@@ -623,11 +623,11 @@ nextIter ctx =
 -- those ops to be executed next.
 --
 -- ToDo: collapse with linToHeap?
-addClosure :: Value -> (Frame, Exp) -> Context -> Context
+addClosure :: Target -> (Frame, SExp) -> Context -> Context
 addClosure tgt (frame, body) ctx =
   ctx & setHeap h' & addOps body_opxs
   where
-    (body_opxs, h') = linToHeap (ctx_heap ctx) (ctx_id ctx) frame tgt body
+    (body_opxs, h') = linToHeap (ctx_heap ctx) (ctx_id ctx) frame tgt (Do body)
 
 -- Residualize the given op and report suspension.
 suspend :: OpX -> Context -> Step1Result

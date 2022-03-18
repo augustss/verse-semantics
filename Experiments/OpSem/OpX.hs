@@ -18,7 +18,7 @@ import Data.List(intercalate)
 import qualified Data.Map as M
 import Text.PrettyPrint.HughesPJClass
 
-import OpSem.Exp(Name, Exp)
+import OpSem.Exp(Name, SExp)
 
 --------------------------------
 --
@@ -132,7 +132,7 @@ data Value = VInteger Integer
            | VPrimOp PrimOp
            | VFun { vf_frame    :: Frame
                   , vf_arg_name :: Name
-                  , vf_body     :: Exp
+                  , vf_body     :: SExp
                   }
            | VHeap HeapId    -- Possibly unsettled logical variable
   deriving (Eq)
@@ -171,7 +171,7 @@ data OpX
             , ifx_exports   :: [(Name, HeapAddr)]  -- Bound in condition, can be
                                                    -- used in 'then' branch (only)
             , ifx_then      :: (Frame, SExp)
-            , ifx_else      :: (Frame, SExp)  -- XXX This could be [OpX]
+            , ifx_else      :: (Frame, SExp)       -- XXX This could be [OpX]
             }
   | CallX   { targetx       :: Target
             , callx_fun     :: Value
@@ -189,5 +189,3 @@ data OpX
   | FailX
 
   deriving (Eq, Show)
-
-
