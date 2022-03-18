@@ -27,15 +27,6 @@ compExp e =
   Do $
   addDef e
 
--- Linearize an Exp into a sequence of OpX.
--- Also execute all 'constructors' and allocate logical variables in the heap.
--- linToHeap places the result of the Exp in tgt.
-linToHeap :: Heap -> ContextId -> Frame -> Value -> Exp -> ([OpX], Heap)
-linToHeap h ci fr tgt e =
-  let ls = execState (expToHeap tgt e)
-             LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
-  in  (ls_ops ls, ls_heap ls)
-
 -- linValue throws away the Value from expValue
 -- It is used in mkContext, only for 'if' and 'for',
 -- both of which discard the domain value.
@@ -257,25 +248,23 @@ mkContext e = do
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
-  case step ctx of
+  case step ctx'' of
     StepFailed -> error "run: StepFailed"
-    StepDone ctx' -> expunge ci (ctx_heap ctx') tgt
+    StepDone rctx -> expunge (ctx_id rctx) (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
-      { ctx_id = ci
-      , ctx_heap = heap'
+      { ctx_id = []
+      , ctx_heap = emptyHeap
       , ctx_done = []
-      , ctx_ops = ops
+      , ctx_ops = []
       , ctx_parent = Nothing
       --, ctx_effects = [Success, Interacts]
       , ctx_next = Nothing
       , ctx_hold = False
       }
-    ci = []
-    (heap, addr) = heapAlloc emptyHeap
-    (ops, heap') = linToHeap heap ci emptyFrame tgt e
-    tgt = VHeap (HeapId ci addr)  -- A cell for the result
+    (ctx', tgt) = ctx & allocCell
+    ctx'' = ctx' & addClosure tgt (emptyFrame, Def [] e)
 
 -- Just for Tests.hs
 -- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
@@ -621,13 +610,13 @@ nextIter ctx =
 
 -- Linearize the Exp with the given Frame and insert
 -- those ops to be executed next.
---
--- ToDo: collapse with linToHeap?
 addClosure :: Target -> (Frame, SExp) -> Context -> Context
 addClosure tgt (frame, body) ctx =
-  ctx & setHeap h' & addOps body_opxs
+  ctx & setHeap (ls_heap ls) & addOps (ls_ops ls)
   where
-    (body_opxs, h') = linToHeap (ctx_heap ctx) (ctx_id ctx) frame tgt (Do body)
+    ls = execState (expToHeap tgt $ Do body) init_ls
+    init_ls = LState{ ls_heap = ctx_heap ctx, ls_frame = frame
+                    , ls_contextId = ctx_id ctx, ls_ops = []}
 
 -- Residualize the given op and report suspension.
 suspend :: OpX -> Context -> Step1Result
