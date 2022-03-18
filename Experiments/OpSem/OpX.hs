@@ -3,11 +3,12 @@ module OpSem.OpX(
   Frame,
   ContextId,
   Context(..),
-  Effect(..),
+  --Effect(..),
   HeapId(..),
   HeapAddr,
   Heap,
   Value(..),
+  Target,
   OpX(..),
   PrimOp,
   ) where
@@ -70,7 +71,7 @@ data Context = Ctx
   , ctx_ops    :: ![OpX]
   , ctx_parent :: !(Maybe Context)
   , ctx_next   :: !(Maybe Context)  -- backtrack point
-  , ctx_effects:: ![Effect]         -- allowed effects
+  --, ctx_effects:: ![Effect]         -- allowed effects
   , ctx_hold   :: !Bool             -- hold all sequential effects XXX use mask?
   }
   deriving (Eq, Show)
@@ -81,6 +82,7 @@ data Context = Ctx
 --  Possible effects
 --
 --------------------------------
+{-
 data Effect
   = Failure   -- 0 results
   | Success   -- 1 result
@@ -93,7 +95,7 @@ data Effect
   -----
   | Interacts -- I/O
   deriving (Eq, Show)  
-
+-}
 --------------------------------
 --
 -- Value
@@ -129,21 +131,24 @@ instance Pretty Value where
 --  
 --
 --------------------------------
+
+type Target = Value   -- used to indicate the this is the result of an operation
+
 data OpX
   = UnifyX Value Value
-  | CallX   { targetx :: Value, callx_fun :: Value, callx_arg :: Value }
+  | CallX   { targetx :: Target, callx_fun :: Value, callx_arg :: Value }
   | ChoiceX { choice_left :: [OpX], choice_right :: [OpX] }
-  | IfX     { targetx :: Value
+  | IfX     { targetx :: Target
             , ifx_cond :: Context,
               ifx_exports :: [(Name, HeapAddr)]
             , ifx_then :: (Frame, Exp), ifx_else :: (Frame, Exp) }
 
-  | ForX    { targetx :: Value
+  | ForX    { targetx :: Target
             , forx_arr :: [Value]  -- The result of the 'for' is accumulated here.
             , forx_dom :: Context,
               forx_exports :: [(Name, HeapAddr)]
             , forx_body :: (Frame, Exp) }
-  | RangeX  { targetx :: Value, rangex_arr :: Value }
+  | RangeX  { targetx :: Target, rangex_arr :: Value }
   | FailX
   | ErrorX
 

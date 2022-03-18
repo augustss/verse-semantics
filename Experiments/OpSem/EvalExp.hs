@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-module OpSem.EvalExp where
+module OpSem.EvalExp(compExp, run) where
 import Control.Monad.State.Strict
 import Data.Function((&))
 import Data.List(find)
@@ -27,12 +27,16 @@ compExp e =
   Do $
   addDef e
 
+-- Linearize an Exp into a sequence of OpX.
+-- Also execute all 'constructors' and allocate logical variables in the heap.
+-- linToHeap places the result of the Exp in tgt.
 linToHeap :: Heap -> ContextId -> Frame -> Value -> Exp -> ([OpX], Heap)
 linToHeap h ci fr tgt e =
   let ls = execState (expToHeap tgt e)
              LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
   in  (ls_ops ls, ls_heap ls)
 
+-- linValue returns Exp as a Value.
 linValue :: Heap -> ContextId -> Frame -> Exp -> ([OpX], Heap)
 linValue h ci fr e =
   let ls = execState (expValue e)
@@ -42,7 +46,7 @@ linValue h ci fr e =
 data LState = LState
   { ls_heap      :: !Heap         -- The heap we are extending
   , ls_frame     :: !Frame        -- The current environment
-  , ls_contextId :: !ContextId    -- ContextId for created HeapId
+  , ls_contextId :: !ContextId    -- ContextId for creating HeapId
   , ls_ops       :: ![OpX]        -- Generated OpXs
   }
   deriving (Show)
@@ -71,7 +75,8 @@ expValue (Equal e1 e2) = do
   v2 <- expValue e2
   emitOps [UnifyX v1 v2]
   pure v1
-expValue (Set n e) = expValue (Equal (Var n) e)
+expValue (Set n e) =
+  expValue (Equal (Var n) e)
 expValue (SetAny n) = do
   fr <- gets ls_frame
   pure $ lookupFrame fr n
@@ -87,22 +92,16 @@ expValue Fail = do
   newVHeap
 expValue (For d@(Def ns _) e) = do
   tgt <- newVHeap
-  ci <- gets ls_contextId
-  fr <- gets ls_frame
-  ctx <- mkContext ci fr (Do d)
-  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOps [ForX tgt [] ctx nas (fr, Do e)]
+  forToHeap tgt ns d e
   pure tgt
 expValue (If c@(Def ns _) t e) = do
   tgt <- newVHeap
-  ci <- gets ls_contextId
-  fr <- gets ls_frame
-  ctx <- mkContext ci fr (Do c)
-  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
-  emitOps [IfX tgt ctx nas (fr, Do t) (fr, Do e)]
+  ifToHeap tgt ns c t e
   pure tgt
-expValue (Do e) = sexpValue e
-expValue (Let (Def ns e1) e2) = expValue (Do (Def ns (e1 `Semi` e2)))
+expValue (Do e) =
+  sexpValue e
+expValue (Let (Def ns e1) e2) =
+  expValue (Do (Def ns (e1 `Semi` e2)))
 expValue (Range e) = do
   tgt <- newVHeap
   v <- expValue e
@@ -119,33 +118,51 @@ expValue Error = do
   emitOps [ErrorX]
   newVHeap
 
-expToHeap :: Value -> Exp -> L ()
+expToHeap :: Target -> Exp -> L ()
 -- optimizations to avoid cell allocation
 expToHeap tgt (Alt e1 e2) = altToHeap tgt e1 e2
 expToHeap tgt (PrimBin op e1 e2) = primBinToHeap tgt op e1 e2
+expToHeap tgt (For d@(Def ns _) e) = forToHeap tgt ns d e
 expToHeap tgt (App f a) = appToHeap tgt f a
+expToHeap tgt (If c@(Def ns _) t e) = ifToHeap tgt ns c t e
 expToHeap _ Fail = emitOps [FailX]
--- fallback
+-- fallback, this always works, even in the cases above
 expToHeap tgt e = do
   v <- expValue e
   emitOps [UnifyX tgt v]
 
-altToHeap :: Value -> SExp -> SExp -> L ()
+altToHeap :: Target -> SExp -> SExp -> L ()
 altToHeap tgt e1 e2 = do
   ops1 <- getOpsOf $ expToHeap tgt $ Do e1
   ops2 <- getOpsOf $ expToHeap tgt $ Do e2
   emitOps [ChoiceX ops1 ops2]
 
-primBinToHeap :: Value -> PrimOp -> Exp -> Exp -> L ()
+primBinToHeap :: Target -> PrimOp -> Exp -> Exp -> L ()
 primBinToHeap tgt op e1 e2 = do
   arg <- expValue $ Array [e1, e2]
   emitOps [CallX tgt (VPrimOp op) arg]
 
-appToHeap :: Value -> Exp -> Exp -> L ()
+appToHeap :: Target -> Exp -> Exp -> L ()
 appToHeap tgt f a = do
   vf <- expValue f
   va <- expValue a
   emitOps [CallX tgt vf va]
+
+forToHeap :: Target -> [Name] -> SExp -> SExp -> L ()
+forToHeap tgt ns d e = do
+  ci <- gets ls_contextId
+  fr <- gets ls_frame
+  ctx <- mkContext ci fr (Do d)
+  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
+  emitOps [ForX tgt [] ctx nas (fr, Do e)]
+
+ifToHeap :: Target -> [Name] -> SExp -> SExp -> SExp -> L ()
+ifToHeap tgt ns c t e = do
+  ci <- gets ls_contextId
+  fr <- gets ls_frame
+  ctx <- mkContext ci fr (Do c)
+  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
+  emitOps [IfX tgt ctx nas (fr, Do t) (fr, Do e)]
 
 sexpValue :: SExp -> L Value
 sexpValue (Def ns e) = do
@@ -159,6 +176,7 @@ lookupFrame fr n =
 extendFrame :: Frame -> [(Name, Value)] -> Frame
 extendFrame fr nvs = foldr (uncurry M.insert) fr nvs
 
+-- Allocate a new uninstantiated cell in the heap.
 heapAlloc :: Heap -> (Heap, HeapAddr)
 heapAlloc h =
   let a | M.null h = 0
@@ -186,6 +204,7 @@ emitOps :: [OpX] -> L ()
 emitOps ops =
   modify $ \ ls -> ls{ ls_ops = ls_ops ls ++ ops }
 
+-- Execure l and capture the ops it generates.
 getOpsOf :: L () -> L [OpX]
 getOpsOf l = do
   ls <- get
@@ -205,18 +224,19 @@ mkContext pci fr e = do
   v <- newVHeap
   let l = case v of VHeap (HeapId _ a) -> a; _ -> undefined
       (ops, heap) = linValue M.empty ci fr e
-      ci = l : pci
+      ci = l : pci  -- the new ContextId is the old one with a unique Int prepended
   pure $ Ctx
       { ctx_id = ci
       , ctx_heap = heap
       , ctx_done = []
       , ctx_ops = ops
       , ctx_parent = Nothing
-      , ctx_effects = [Iterates]
+      --, ctx_effects = [Iterates]
       , ctx_next = Nothing
       , ctx_hold = False
       }
 
+-- Run an expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
   case step ctx of
@@ -230,25 +250,27 @@ run e =
       , ctx_done = []
       , ctx_ops = ops
       , ctx_parent = Nothing
-      , ctx_effects = [Success, Interacts]
+      --, ctx_effects = [Success, Interacts]
       , ctx_next = Nothing
       , ctx_hold = False
       }
     ci = []
     addr = 0
-    (ops, heap') = linToHeap heap ci M.empty tgt e'
-    tgt = VHeap (HeapId ci addr)
+    (ops, heap') = linToHeap heap ci M.empty tgt e
+    tgt = VHeap (HeapId ci addr)  -- A cell for the result
     heap = M.singleton addr Nothing
-    e' = for ("&it" `Set` e) (Var "&it")
 
+-- Just for Tests.hs
 instance Eval Value where
   eval e =
-    case run e of
+    case run $ for ("&it" `Set` e) (Var "&it") of
       VArray vs -> vs
       v -> error $ "run returned " ++ show v
 
 --------------------------------------------------------------
 
+-- Get rid of all references to heap cells with ContextId ci.
+-- Circularities are flagged as an error.
 expunge :: HasCallStack => ContextId -> Heap -> Value -> Value
 expunge ci heap = value []
   where
@@ -263,18 +285,16 @@ expunge ci heap = value []
       | otherwise =
           case M.lookup h heap of
             Nothing -> error "expunge: not in heap"
-            Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show (h, ci, heap)  -- XXX is it wrong?
+            Just Nothing -> error $ "expunge: WRONG: uninstantiated " ++ show (h, ci, heap)
             Just (Just v') -> value (h:s) v'
     value _ v@VPrimOp{} = v
     frame s fr = M.map (value s) fr
 
--- XXX Implement this
-hasNoHeapIdsFrom :: Maybe Frame -> ContextId -> Bool
-hasNoHeapIdsFrom _ _ = True
-
+-- Get all active contexts.
 getCurrentContexts :: Context -> [Context]
 getCurrentContexts c = c : maybe [] getCurrentContexts (ctx_parent c)
 
+-- Follow VHeap indirections that point to instantiated cells.
 getValue :: Context -> Value -> Value
 getValue ctx = follow' []
   where follow' s (VHeap h) | h `elem` s = error $ "follow': loop " ++ show (h, s)
@@ -294,36 +314,40 @@ getHeapValue ctx (HeapId ci h) =
   in
     fromMaybe (error "getHeapValue 2") $ M.lookup h (ctx_heap hctx)
 
+-- Add instructions to retry later.
 addResiduals :: [OpX] -> Context -> Context
 addResiduals os c = c{ ctx_done = ctx_done c ++ os }
 
+-- Add instructions to execute now.
 addOps :: [OpX] -> Context -> Context
 addOps os c = c{ ctx_ops = os ++ ctx_ops c }
 
 setHeap :: Heap -> Context -> Context
 setHeap h c = c{ ctx_heap = h }
 
+-- Does the heap pointer refer to a flexible variable.
 isFlex :: HeapId -> ContextId -> Bool
 isFlex (HeapId c _) ci = c == ci
 
+-- Get actual values.
 getWHNF :: Context -> Value -> Maybe Value
 getWHNF ctx v =
   case getValue ctx v of
     VHeap{} -> Nothing
     v' -> Just v'
 
+-- Set an (uninstantiated) logical variable.
 setHeapCell :: HeapId -> Value -> Context -> Context
 setHeapCell (HeapId ci h) v ctx =
   assert "setHeapCell" (ci == ctx_id ctx) $
   case M.lookup h (ctx_heap ctx) of
     Nothing -> error $ "setHeap: not in heap " ++ show h
     Just (Just vv) -> error $ "setHeap: already set " ++ show (h, vv)
-    Just Nothing -> ctx & setHeapAddr h (Just v)
+    Just Nothing -> ctx{ ctx_heap = M.insert h (Just v) (ctx_heap ctx) }
 
--- Blindly set the heap contents.
-setHeapAddr :: HasCallStack => HeapAddr -> Maybe Value -> Context -> Context
-setHeapAddr h mv ctx = ctx{ ctx_heap = M.insert h mv (ctx_heap ctx) }
-
+-- Unify two values.
+--   Will set flexible variables.
+--   Will suspend on inflexible variables.
 unify :: Context -> Value -> Value -> Step1Result
 unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
   where
@@ -339,6 +363,7 @@ unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
     unify' VFun{} VFun{} = error "WRONG: comparing functions"
     unify' _ _ = Step1Failed
 
+-- Results of taking as many steps as possible.
 data StepResult
   = StepDone Context    -- finished successfully
   | StepNotDone Context -- something happened, but it didn't finish
@@ -374,17 +399,16 @@ step' some did ctx@(Ctx { ctx_ops = op:ops }) =
         Step1Failed        ->
           -- Evaluation failed, backtrack if possible.
           case ctx_next ctx' of
-            Nothing -> StepFailed
+            Nothing    -> StepFailed
             Just ctx'' -> ctx'' & step' True True
 
 data Step1Result
   = Step1Done Context     -- executed the instruction
-  | Step1Suspend Context  -- instruction could not execute
+  | Step1Suspend Context  -- instruction could not execute, has been residualized
   | Step1Failed           -- execution failed
   deriving (Show)
 
--- Try to execute a single OpX, return the new Context if
--- it is possible, or Nothing if the op needs to suspend.
+-- Try to execute a single OpX.
 step1 :: Context -> OpX -> Step1Result
 step1 _ op | stepDebug && trace ("step1 " ++ show op) False = undefined
 step1 ctx (UnifyX v1 v2) = unify ctx v1 v2
@@ -392,10 +416,10 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
   case getValue ctx fun of
     -- Function closure
     VFun{ vf_arg_name = arg_name, vf_frame = frame, vf_body = body } ->
-      --trace ("adding VFun " ++ show body_opxs) $
-      -- Main payload!   Rename body, inline the instructions
+      -- Main payload!  Rename body, inline the instructions
       Step1Done $ ctx & addClosure tgt (frame_w_binding, body)
       where
+        -- Extend the frame with the argument binding
         frame_w_binding = extendFrame frame [(arg_name, arg)]
 
     -- Primitive function, always with an array argument.
@@ -409,6 +433,7 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
               Nothing -> Step1Failed
           | otherwise -> ctx & suspend op
         VHeap{} -> ctx & suspend op
+        -- TODO: if the PrimOp has effects, then those effects have to be held.
         _ -> error "Bad VPrimOp arg"
 
     VArray vals ->
@@ -421,8 +446,8 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         VHeap {} -> ctx & suspend op
         _        -> wrong "Bad index in array indexing"
 
-    -- XXX need to hold all effects here
     VHeap {} -> ctx & holdEffects & suspend op  -- Unknown effects in the function
+
     _        -> wrong "Bad function in CallX"
 
 step1 ctx op@(ChoiceX ops1 ops2)
@@ -433,23 +458,42 @@ step1 ctx op@(ChoiceX ops1 ops2)
     in  Step1Done ctx1
 
 step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas, ifx_then = (then_frame, then_exp), ifx_else = els } =
+  -- Run the cond (with the parent freshly set)
   case step cond{ ctx_parent = Just ctx } of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
-    StepNotDone cond' -> Step1Done $
-      -- domain did not finish, so suspend and hold off unknown effects
+    StepNotDone cond' ->
+      -- cond did not finish, so suspend and hold off unknown effects.
+      -- suspend with the updated condition to reflect the partial work.
+      Step1Done $
       ctx & holdEffects & addResiduals [op{ ifx_cond = cond' }]
-    StepDone cond' -> Step1Done $ ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
+    StepDone cond' ->
+      -- Condition succeeded, run the then branch with the domain frame
+      Step1Done $
+      ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
       where ext = [ (n, expunge ci (ctx_heap cond') (VHeap (HeapId ci a))) | (n, a) <- nas ]
             ci = ctx_id cond'
-    StepFailed -> Step1Done $ ctx & addClosure tgt els
-    StepNothing -> ctx & holdEffects & suspend op
+    StepFailed ->
+      -- Condition failed, run the else branch
+      Step1Done $
+      ctx & addClosure tgt els
+    StepNothing ->
+      -- Nothing happened, just suspend again.
+      ctx & holdEffects & suspend op
+
 step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
+  -- Run the domain (with the parent freshly set)
   case step dom{ ctx_parent = Just ctx } of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
-    StepNotDone dom' -> Step1Done $
+    StepNotDone dom' ->
       -- domain did not finish, so suspend and hold off unknown effects
+      Step1Done $
       ctx & holdEffects & addResiduals [op{ forx_dom = dom' }]
     StepDone dom' -> Step1Done $
+      -- domain finished, run the body with the domain frame.
+      -- The body puts the value in res, which is appended to
+      -- the accumuilating array.
+      -- After the body execution we will run the ForX again for the next iteration,
+      -- but with the domain updated to the next backtrack point.
       ctx' &
       addOps [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
       addClosure res (extendFrame body_frame ext, body_exp)
@@ -457,43 +501,60 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
             ci = ctx_id dom'
             (ctx', res) = allocCell ctx
             dom'' = nextIter dom'
-    StepFailed -> unify ctx tgt (VArray arr)  -- the for loop has finished, so deliver the array
-    StepNothing -> ctx & holdEffects & suspend op
+    StepFailed ->
+      -- the for loop has finished, so deliver the array
+      unify ctx tgt (VArray arr)
+    StepNothing ->
+      -- Nothing happened, just suspend again.
+      ctx & holdEffects & suspend op
+
 step1 ctx op@(RangeX tgt arr) =
   case getValue ctx arr of
     VArray vs ->
       case vs of
         []  -> Step1Failed
         [v] -> unify ctx tgt v
-        _   -> Step1Done $ ctx & addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
+        _   ->
+          -- Create nested ChoiceX for all the array values.
+          Step1Done $
+          ctx &
+          addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ctx & suspend op
     _ -> error "RangeX bar arg"
 step1 _ FailX = Step1Failed
 step1 _ctx ErrorX = error "Error"
 
+-- Create a new uninstantiated heap cell
 allocCell :: Context -> (Context, Value)
 allocCell ctx =
   let (h, a) = heapAlloc (ctx_heap ctx)
   in  (ctx{ ctx_heap = h }, VHeap $ HeapId (ctx_id ctx) a)
 
--- Move to next iteration.  If there is no backtrack point, make the next iteration just fail.
+-- Move to next iteration.
+-- If there is no backtrack point, make the next iteration just fail.
 nextIter :: Context -> Context
 nextIter ctx =
   assert "nextIter" (null $ ctx_ops ctx) $
   fromMaybe (ctx{ctx_ops = [FailX]}) $ ctx_next ctx
 
+-- Linearize the Exp with the given Frame and insert
+-- those ops to be executed next.
 addClosure :: Value -> (Frame, Exp) -> Context -> Context
 addClosure tgt (frame, body) ctx = 
   ctx & setHeap h' & addOps body_opxs
   where
     (body_opxs, h') = linToHeap (ctx_heap ctx) (ctx_id ctx) frame tgt body
 
+-- Residualize the given op and report suspension.
 suspend :: OpX -> Context -> Step1Result
 suspend op ctx = Step1Suspend $ addResiduals [op] ctx
 
+-- Hold of all effects.
 holdEffects :: Context -> Context
 holdEffects ctx = ctx { ctx_hold = True }
 
+-- Execute a PrimOp.
+-- Nothing indicates that the op failed.
 primOp :: PrimOp -> [Value] -> Maybe Value
 primOp op [v1@(VInteger i1), VInteger i2] = do
   let arith f = Just $ VInteger $ i1 `f` i2
