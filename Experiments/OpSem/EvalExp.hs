@@ -23,27 +23,26 @@ forDebug = False
 compExp :: Exp -> [OpX]
 compExp e =
   fst $
-  linValue emptyHeap [] emptyFrame $
+  linValue (mkHeap []) emptyFrame $
   Do $
   addDef e
 
 -- linValue throws away the Value from expValue
 -- It is used in mkContext, only for 'if' and 'for',
 -- both of which discard the domain value.
-linValue :: Heap -> ContextId -> Frame -> Exp -> ([OpX], Heap)
+linValue :: Heap -> Frame -> Exp -> ([OpX], Heap)
 -- Takes an Exp, compiles it (on the fly):
 --    replaces identifiers with HeapIds
 --    linearises to [OpX]
 --    executes constructors by building a Value
-linValue h ci fr e =
-  let init_ls = LState{ ls_heap = h, ls_frame = fr, ls_contextId = ci, ls_ops = []}
+linValue h fr e =
+  let init_ls = LState{ ls_heap = h, ls_frame = fr, ls_ops = []}
       ls      = execState (expValue e) init_ls
   in  (ls_ops ls, ls_heap ls)
 
 data LState = LState
   { ls_heap      :: !Heap         -- The heap we are extending
   , ls_frame     :: !Frame        -- The current environment
-  , ls_contextId :: !ContextId    -- ContextId for creating HeapId
   , ls_ops       :: ![OpX]        -- Generated OpXs
   }
   deriving (Show)
@@ -157,7 +156,7 @@ forToHeap :: Target -> SExp -> SExp -> L ()
 forToHeap tgt d@(Def ns _) e = do
   fr <- gets ls_frame
   ctx <- mkContext (Do d)
-  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
+  let nas = zip ns (keysHeap (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
   emitOp $ ForX { targetx = tgt, forx_arr = []
                 , forx_dom = ctx, forx_exports = nas
                 , forx_body = (fr, e) }
@@ -166,7 +165,7 @@ ifToHeap :: Target -> SExp -> SExp -> SExp -> L ()
 ifToHeap tgt c@(Def ns _) t e = do
   fr <- gets ls_frame
   ctx <- mkContext (Do c)
-  let nas = zip ns (M.keys (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
+  let nas = zip ns (keysHeap (ctx_heap ctx))  -- Uses the fact that ns are the first variables allocated
   emitOp $ IfX { targetx = tgt
                , ifx_cond = ctx, ifx_exports = nas
                , ifx_then = (fr, t), ifx_else = (fr, e) }
@@ -183,20 +182,12 @@ lookupFrame fr n =
 extendFrame :: Frame -> [(Name, Value)] -> Frame
 extendFrame fr nvs = foldr (uncurry M.insert) fr nvs
 
--- Allocate a new uninstantiated cell in the heap.
-heapAlloc :: Heap -> (Heap, HeapAddr)
-heapAlloc h =
-  let a | M.null h = 0
-        | otherwise = fst (M.findMax h) + 1
-  in  (M.insert a Nothing h, a)
-
 newVHeap :: L Value
 newVHeap = do
   ls <- get
-  let (h, a) = heapAlloc (ls_heap ls)
-      ci = ls_contextId ls
+  let (h, a) = allocHeap (ls_heap ls)
   put $ ls { ls_heap = h }
-  pure $ VHeap $ HeapId ci a
+  pure $ VHeap a
 
 withBinds :: [(Name, Value)] -> L a -> L a
 withBinds nvs la = do
@@ -226,17 +217,16 @@ wrong s = error $ "WRONG: " ++ s
 
 mkContext :: Exp -> L Context
 mkContext e = do
-  pci <- gets ls_contextId
+  pci <- gets $ idHeap . ls_heap
   fr <- gets ls_frame
   -- This allocates a cell just to get a unique address that can be used
   -- to create the ContextId for the new Context.
   v <- newVHeap
   let l = case v of VHeap (HeapId _ a) -> a; _ -> undefined
       ci = l : pci  -- The new ContextId is the old one with a unique Int prepended
-      (ops, heap) = linValue emptyHeap ci fr e
+      (ops, heap) = linValue (mkHeap ci) fr e
   pure $ Ctx
-      { ctx_id = ci
-      , ctx_heap = heap
+      { ctx_heap = heap
       , ctx_done = []
       , ctx_ops = ops
       , ctx_parent = Nothing
@@ -250,12 +240,11 @@ run :: Exp -> Value
 run e =
   case step ctx'' of
     StepFailed -> error "run: StepFailed"
-    StepDone rctx -> expunge (ctx_id rctx) (ctx_heap rctx) tgt
+    StepDone rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
-      { ctx_id = []
-      , ctx_heap = emptyHeap
+      { ctx_heap = mkHeap []
       , ctx_done = []
       , ctx_ops = []
       , ctx_parent = Nothing
@@ -282,9 +271,10 @@ instance Eval Value where
 -- heap cells.  E.g this is WRONG
 --      if (i:int) then (i=1; i) else 4
 -- Any circularity is flagged as an error.
-expunge :: HasCallStack => ContextId -> Heap -> Value -> Value
-expunge ci heap = value []
+expunge :: HasCallStack => Heap -> Value -> Value
+expunge heap = value []
   where
+    ci = idHeap heap
     value :: [HeapAddr] -> Value -> Value
     -- 's' tracks the HeapIds we have seen already, for loop detection
     value _ v@VInteger{} = v
@@ -294,10 +284,9 @@ expunge ci heap = value []
       | ci /= ci' = v
       | h `elem` s = wrong $ "expunge recursion:\n" ++ show (h, s, heap)
       | otherwise =
-          case M.lookup h heap of
-            Nothing -> error "expunge: not in heap"  -- Internal error
-            Just Nothing -> wrong $ "expunge: uninstantiated " ++ show (h, ci, heap)
-            Just (Just v') -> value (h:s) v'
+          case lookupHeap h heap of
+            Nothing -> wrong $ "expunge: uninstantiated " ++ show (h, ci, heap)
+            Just v' -> value (h:s) v'
     value _ v@VPrimOp{} = v
     frame s fr = M.map (value s) fr
 
@@ -321,9 +310,9 @@ getHeapValue :: Context -> HeapId -> Maybe Value
 getHeapValue ctx (HeapId ci h) =
   let
     ctxs = getCurrentContexts ctx
-    hctx = fromMaybe (error "getHeapValue 1") $ find ((== ci) . ctx_id) ctxs
+    hctx = fromMaybe (error "getHeapValue 1") $ find ((== ci) . idHeap . ctx_heap) ctxs
   in
-    fromMaybe (error "getHeapValue 2") $ M.lookup h (ctx_heap hctx)
+    lookupHeap h (ctx_heap hctx)
 
 -- Add instructions to retry later.
 addResiduals :: [OpX] -> Context -> Context
@@ -350,11 +339,10 @@ getWHNF ctx v =
 -- Set an (uninstantiated) logical variable.
 setHeapCell :: HeapId -> Value -> Context -> Context
 setHeapCell (HeapId ci h) v ctx =
-  assert "setHeapCell" (ci == ctx_id ctx) $
-  case M.lookup h (ctx_heap ctx) of
-    Nothing -> error $ "setHeap: not in heap " ++ show h
-    Just (Just vv) -> error $ "setHeap: already set " ++ show (h, vv)
-    Just Nothing -> ctx{ ctx_heap = M.insert h (Just v) (ctx_heap ctx) }
+  assert "setHeapCell" (ci == idHeap (ctx_heap ctx)) $
+  case lookupHeap h (ctx_heap ctx) of
+    Just vv -> error $ "setHeap: already set " ++ show (h, vv)
+    Nothing -> ctx{ ctx_heap = insertHeap h (Just v) (ctx_heap ctx) }
 
 -- Unify two values.
 --   Will set flexible variables.
@@ -362,10 +350,11 @@ setHeapCell (HeapId ci h) v ctx =
 unify :: Context -> Value -> Value -> Step1Result
 unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
   where
+    ci = idHeap (ctx_heap ctx)
     unify' :: Value -> Value -> Step1Result
     unify' v1 v2 | v1 == v2 = Step1Done ctx
-    unify' (VHeap h1) v2 | isFlex h1 (ctx_id ctx) = Step1Done $ ctx & setHeapCell h1 v2
-    unify' v1 (VHeap h2) | isFlex h2 (ctx_id ctx) = Step1Done $ ctx & setHeapCell h2 v1
+    unify' (VHeap h1) v2 | isFlex h1 ci = Step1Done $ ctx & setHeapCell h1 v2
+    unify' v1 (VHeap h2) | isFlex h2 ci = Step1Done $ ctx & setHeapCell h2 v1
     unify' v1@(VHeap _) v2 = ctx & suspend (UnifyX v1 v2)
     unify' v1 v2@(VHeap _) = ctx & suspend (UnifyX v1 v2)
     unify' (VArray vs1) (VArray vs2)
@@ -536,9 +525,8 @@ step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
-         ext = [ (n, expunge ci (ctx_heap cond') (VHeap (HeapId ci a)))
+         ext = [ (n, expunge (ctx_heap cond') (VHeap a))
                | (n, a) <- nas ]
-         ci = ctx_id cond'
 
     StepFailed ->
       -- Condition failed, run the 'else' branch
@@ -566,8 +554,7 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
       ctx' &
       addOps [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
       addClosure res (extendFrame body_frame ext, body_exp)
-      where ext = [ (n, expunge ci (ctx_heap dom') (VHeap (HeapId ci a))) | (n, a) <- nas ]
-            ci = ctx_id dom'
+      where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
             (ctx', res) = allocCell ctx
             dom'' = nextIter dom'
     StepFailed ->
@@ -598,8 +585,8 @@ step1 _ FailX = Step1Failed
 -- Create a new uninstantiated heap cell
 allocCell :: Context -> (Context, Value)
 allocCell ctx =
-  let (h, a) = heapAlloc (ctx_heap ctx)
-  in  (ctx{ ctx_heap = h }, VHeap $ HeapId (ctx_id ctx) a)
+  let (h, a) = allocHeap (ctx_heap ctx)
+  in  (ctx{ ctx_heap = h }, VHeap a)
 
 -- Move to next iteration.
 -- If there is no backtrack point, make the next iteration just fail.
@@ -615,8 +602,7 @@ addClosure tgt (frame, body) ctx =
   ctx & setHeap (ls_heap ls) & addOps (ls_ops ls)
   where
     ls = execState (expToHeap tgt $ Do body) init_ls
-    init_ls = LState{ ls_heap = ctx_heap ctx, ls_frame = frame
-                    , ls_contextId = ctx_id ctx, ls_ops = []}
+    init_ls = LState{ ls_heap = ctx_heap ctx, ls_frame = frame, ls_ops = []}
 
 -- Residualize the given op and report suspension.
 suspend :: OpX -> Context -> Step1Result

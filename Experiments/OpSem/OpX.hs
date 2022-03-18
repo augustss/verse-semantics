@@ -8,7 +8,7 @@ module OpSem.OpX(
   HeapId(..),
   HeapAddr,
   Heap,
-  emptyHeap,
+  mkHeap, lookupHeap, insertHeap, allocHeap, keysHeap, idHeap,
   Value(..),
   Target,
   OpX(..),
@@ -16,6 +16,7 @@ module OpSem.OpX(
   ) where
 import Data.List(intercalate)
 import qualified Data.Map as M
+import GHC.Stack
 import Text.PrettyPrint.HughesPJClass
 
 import OpSem.Exp(Name, SExp)
@@ -59,17 +60,35 @@ instance Show HeapId where
 
 type HeapAddr = Int
 
-type Heap = M.Map HeapAddr (Maybe Value)
+data Heap = Heap
+  { heap_next     :: !HeapId    -- Next free heap cell
+  , heap_contents :: !(M.Map HeapAddr (Maybe Value))
+                     -- Allocated but uninistantiated logical variables
+                     -- map to Nothing.
+  }
+  deriving (Show, Eq)
 
-emptyHeap :: Heap
-emptyHeap = M.empty
+-- Create an empty heap
+mkHeap :: ContextId -> Heap
+mkHeap ci = Heap{ heap_next = HeapId ci 0, heap_contents = M.empty }
 
-{-
-data Heap = H HeapId      -- Next free
-              (Map HeapAddr (Mabye Value))
-                 -- Allocated but uninistantiated logical variables
-                 -- map to Nothing
--}
+lookupHeap :: HasCallStack => HeapAddr -> Heap -> Maybe Value
+lookupHeap a h =
+  case M.lookup a (heap_contents h) of
+    Nothing -> error $ "lookupHeap: not set " ++ show a
+    Just mv -> mv
+
+insertHeap :: HeapAddr -> Maybe Value -> Heap -> Heap
+insertHeap a mv h = h{ heap_contents = M.insert a mv (heap_contents h) }
+
+allocHeap :: Heap -> (Heap, HeapId)
+allocHeap (Heap h@(HeapId ci a) m) = (Heap (HeapId ci (a+1)) (M.insert a Nothing m), h)
+
+keysHeap :: Heap -> [HeapId]
+keysHeap (Heap (HeapId ci _) m) = [ HeapId ci a | a <- M.keys m ]
+
+idHeap :: Heap -> ContextId
+idHeap (Heap (HeapId ci _) _) = ci
 
 --------------------------------
 --
@@ -81,8 +100,7 @@ data Heap = H HeapId      -- Next free
 type ContextId = [Int] -- XXX
 
 data Context = Ctx
-  { ctx_id     :: ![Int]
-  , ctx_heap   :: !Heap
+  { ctx_heap   :: !Heap
   , ctx_done   :: ![OpX]
   , ctx_ops    :: ![OpX]
   , ctx_parent :: !(Maybe Context)  -- Used only for the parent's Heap
@@ -168,7 +186,7 @@ data OpX
             }
   | IfX     { targetx       :: Target
             , ifx_cond      :: Context
-            , ifx_exports   :: [(Name, HeapAddr)]  -- Bound in condition, can be
+            , ifx_exports   :: [(Name, HeapId)]    -- Bound in condition, can be
                                                    -- used in 'then' branch (only)
             , ifx_then      :: (Frame, SExp)
             , ifx_else      :: (Frame, SExp)       -- XXX This could be [OpX]
@@ -180,7 +198,7 @@ data OpX
   | ForX    { targetx       :: Target
             , forx_arr      :: [Value]  -- The result of the 'for' is accumulated here.
             , forx_dom      :: Context
-            , forx_exports  :: [(Name, HeapAddr)]
+            , forx_exports  :: [(Name, HeapId)]
             , forx_body     :: (Frame, SExp)
             }
   | RangeX  { targetx       :: Target   -- tgt = :array
