@@ -163,10 +163,6 @@ data OpX
   = UnifyX  { unifyx_left   :: Value
             , unifyx_right  :: Value
             }
-  | CallX   { targetx       :: Target
-            , callx_fun     :: Value
-            , callx_arg     :: Value
-            }
   | ChoiceX { choicex_left  :: [OpX]
             , choicex_right :: [OpX]
             }
@@ -176,6 +172,10 @@ data OpX
                                                    -- used in 'then' branch (only)
             , ifx_then      :: (Frame, SExp)
             , ifx_else      :: (Frame, SExp)  -- XXX This could be [OpX]
+            }
+  | CallX   { targetx       :: Target
+            , callx_fun     :: Value
+            , callx_arg     :: Value
             }
   | ForX    { targetx       :: Target
             , forx_arr      :: [Value]  -- The result of the 'for' is accumulated here.
@@ -189,3 +189,5 @@ data OpX
   | FailX
 
   deriving (Eq, Show)
+
+
