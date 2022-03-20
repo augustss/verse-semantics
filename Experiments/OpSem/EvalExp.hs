@@ -137,7 +137,7 @@ altToHeap tgt e1 e2 = do
   ops1 <- getOpsOf $ expToHeap tgt $ Do e1
   ops2 <- getOpsOf $ expToHeap tgt $ Do e2
    -- Could give same Heap to e1 and e2 (they run in alternative worlds)
-   -- but need to return a Heap whose next-free-loc is the max of the two
+   -- but need to return a Heap whose next-free-loc is the max of the two.
    -- But it's easier just to thread the heap from e1 into e2.
   emitOp $ ChoiceX ops1 ops2
 
@@ -232,7 +232,6 @@ mkContext e = do
       , ctx_parent = Nothing
       --, ctx_effects = [Iterates]
       , ctx_next = Nothing
-      , ctx_hold = False
       }
 
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
@@ -250,10 +249,9 @@ run e =
       , ctx_parent = Nothing
       --, ctx_effects = [Success, Interacts]
       , ctx_next = Nothing
-      , ctx_hold = False
       }
     (ctx', tgt) = ctx & allocCell
-    ctx'' = ctx' & addClosure tgt (emptyFrame, Def [] e)
+    ctx'' = ctx' & addClosureCtx tgt (emptyFrame, Def [] e)
 
 -- Just for Tests.hs
 -- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
@@ -315,12 +313,15 @@ getHeapValue ctx (HeapId ci h) =
     lookupHeap h (ctx_heap hctx)
 
 -- Add instructions to retry later.
-addResiduals :: [OpX] -> Context -> Context
-addResiduals os c = c{ ctx_done = ctx_done c ++ os }
+addResiduals :: [OpX] -> StepState -> StepState
+addResiduals os ss = ss{ ss_suspended = reverse os ++ ss_suspended ss }
 
 -- Add instructions to execute next.
-addOps :: [OpX] -> Context -> Context
-addOps os c = c{ ctx_ops = os ++ ctx_ops c }
+addOps :: [OpX] -> StepState -> StepState
+addOps os ss = ss{ ss_context = addOpsCtx os (ss_context ss) }
+
+addOpsCtx :: [OpX] -> Context -> Context
+addOpsCtx os c = c{ ctx_ops = os ++ ctx_ops c }
 
 setHeap :: Heap -> Context -> Context
 setHeap h c = c{ ctx_heap = h }
@@ -337,8 +338,11 @@ getWHNF ctx v =
     v' -> Just v'
 
 -- Set an (uninstantiated) logical variable.
-setHeapCell :: HeapId -> Value -> Context -> Context
-setHeapCell (HeapId ci h) v ctx =
+setHeapCell :: HeapId -> Value -> StepState -> StepState
+setHeapCell h v ss = ss{ ss_context = setHeapCellCtx h v (ss_context ss) }
+
+setHeapCellCtx :: HeapId -> Value -> Context -> Context
+setHeapCellCtx (HeapId ci h) v ctx =
   assert "setHeapCell" (ci == idHeap (ctx_heap ctx)) $
   case lookupHeap h (ctx_heap ctx) of
     Just vv -> error $ "setHeap: already set " ++ show (h, vv)
@@ -347,33 +351,23 @@ setHeapCell (HeapId ci h) v ctx =
 -- Unify two values.
 --   Will set flexible variables.
 --   Will suspend on inflexible variables.
-unify :: Context -> Value -> Value -> Step1Result
-unify ctx av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
+unify :: StepState -> Value -> Value -> Step1Result
+unify ss av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
   where
+    ctx = ss_context ss
     ci = idHeap (ctx_heap ctx)
     unify' :: Value -> Value -> Step1Result
-    unify' v1 v2 | v1 == v2 = Step1Done ctx
-    unify' (VHeap h1) v2 | isFlex h1 ci = Step1Done $ ctx & setHeapCell h1 v2
-    unify' v1 (VHeap h2) | isFlex h2 ci = Step1Done $ ctx & setHeapCell h2 v1
-    unify' v1@(VHeap _) v2 = ctx & suspend (UnifyX v1 v2)
-    unify' v1 v2@(VHeap _) = ctx & suspend (UnifyX v1 v2)
+    unify' v1 v2 | v1 == v2 = Step1Done ss
+    unify' (VHeap h1) v2 | isFlex h1 ci = Step1Done $ ss & setHeapCell h1 v2
+    unify' v1 (VHeap h2) | isFlex h2 ci = Step1Done $ ss & setHeapCell h2 v1
+    unify' v1@(VHeap _) v2 = ss & suspend (UnifyX v1 v2)
+    unify' v1 v2@(VHeap _) = ss & suspend (UnifyX v1 v2)
     unify' (VArray vs1) (VArray vs2)
       | length vs1 /= length vs2 = Step1Failed
-      | otherwise = Step1Done $ ctx & addOps (zipWith UnifyX vs1 vs2)
+      | otherwise = Step1Done $ ss & addOps (zipWith UnifyX vs1 vs2)
     unify' VFun{} VFun{} = wrong "comparing functions"
     unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
     unify' _ _ = Step1Failed
-
--- Results of taking as many steps as possible.
-data StepResult
-  = StepDone Context    -- Finished successfully; ctx_ops = []
-                        -- use ctx_next for further results
-  | StepNotDone Context -- Something happened, but it didn't finish:
-                        --  (ctx_ops /= []), but they are all stuck
-  | StepNothing         -- No steps taken; degenerate form of StepNotDone
-  | StepFailed          -- Failed; hit FailX
-  deriving (Show)
-
 
 {-
 type ParentHeaps = [Heap]
@@ -403,11 +397,7 @@ stepPass :: Context -> StepResult
 -- Ditto ctx_hold!
 -}
 
--- Run a Context as far as possible.
--- Repeatedly exectue the [OpX] in the Context, until
--- nothing further happens, or the [OpX] is empty
--- Invariant: input Context has ctx_ops non-empty
-step :: Context -> StepResult
+{-
 step = step' False False
 
 -- Repeatedly call step1, keeping track if any actual steps were taken.
@@ -440,12 +430,63 @@ step' some did ctx@(Ctx { ctx_ops = op:ops }) =
           case ctx_next ctx' of
             Nothing    -> StepFailed
             Just ctx'' -> ctx'' & step' True True
+-}
+
+-- Results of taking as many steps as possible.
+data StepResult
+  = StepDone Context    -- Finished successfully; ctx_ops = []
+                        -- use ctx_next for further results
+  | StepNotDone Context -- Something happened, but it didn't finish:
+                        --  (ctx_ops /= []), but they are all stuck
+  | StepNothing         -- No steps taken; degenerate form of StepNotDone
+  | StepFailed          -- Failed; hit FailX
+  deriving (Show)
+
+-- Run a Context as far as possible.
+-- Repeatedly exectue the [OpX] in the Context, until
+-- nothing further happens, or the [OpX] is empty
+-- Invariant: input Context has ctx_ops non-empty
+step :: Context -> StepResult
+step ctx =
+  case stepPass StepState{ ss_suspended = [], ss_hold = False, ss_any = False, ss_context = ctx } of
+    StepNotDone ctx' -> step ctx'
+    res -> res
+
+-- StepState is the state while executing stepPass.
+-- At any point a valid Context can be gotten by
+-- ss_context{ ctx_ops = reverse ss_suspended ++ ctx_ops ss_context }
+data StepState = StepState
+  { ss_suspended  :: ![OpX]          -- suspended instructions, in reverse order
+  , ss_hold       :: !Bool           -- effects held
+  , ss_any        :: !Bool           -- something has changed
+  , ss_context    :: !Context        -- executing context
+  }
+  deriving (Show)
+
+-- Make one pass over the ctx_ops.
+stepPass :: StepState -> StepResult
+stepPass StepState{ ss_suspended = done, ss_any = anyStep, ss_context = ctx@Ctx{ ctx_ops = [] } }
+  | null done   = StepDone ctx
+  | not anyStep = StepNothing
+  | otherwise   = StepNotDone ctx{ ctx_ops = reverse done }
+stepPass ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
+  -- Take a single step
+  let ctx' = ctx{ ctx_ops = ops }
+      ss' = ss{ ss_context = ctx' }
+  in  case step1 ss' op of
+        Step1Suspend ss'' -> stepPass ss''
+        Step1Done ss''    -> stepPass ss''{ ss_any = True }
+        Step1Failed      ->
+          -- Evaluation failed, backtrack if possible.
+          case ctx_next ctx' of
+            Nothing    -> StepFailed
+            Just ctx'' -> stepPass ss'{ ss_context = ctx'', ss_any = True }
 
 -- Result of exeucting a single OpX
 data Step1Result
-  = Step1Done    Context  -- Completely executed the instruction
+  = Step1Done    StepState  -- Completely executed the instruction
                           -- did not add anything to ctx_done
-  | Step1Suspend Context  -- Instruction could not fully execute,
+  | Step1Suspend StepState  -- Instruction could not fully execute,
                           -- has been residualized into ctx_done
   | Step1Failed           -- Instruction failed
   deriving (Show)
@@ -455,15 +496,16 @@ data Step1Result
 
 -- Try to execute a single OpX.
 -- The OpX has already been removed from the ctx_ops
-step1 :: Context -> OpX -> Step1Result
+step1 :: StepState -> OpX -> Step1Result
 step1 _ op | stepDebug && trace ("step1 " ++ show op) False = undefined
-step1 ctx (UnifyX v1 v2) = unify ctx v1 v2
-step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
+step1 ss (UnifyX v1 v2) = unify ss v1 v2
+step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
+  let ctx = ss_context ss in
   case getValue ctx fun of
     -- Function closure
     VFun{ vf_arg_name = arg_name, vf_frame = frame, vf_body = body } ->
       -- Main payload!  Linearize the body, inline the instructions
-      Step1Done $ ctx & addClosure tgt (frame_w_binding, body)
+      Step1Done $ ss & addClosure tgt (frame_w_binding, body)
       where
         -- Extend the frame with the argument binding
         frame_w_binding = extendFrame frame [(arg_name, arg)]
@@ -474,12 +516,12 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
       case getValue ctx arg of
         VArray vs
           | Just vs' <- mapM (getWHNF ctx) vs ->
-            primOpX ctx tgt sop vs'
+            primOpX ss tgt sop vs'
           | otherwise ->
-            ctx & suspend op
+            ss & suspend op
         VHeap{} ->
           -- TODO: if the PrimOp has effects, then those effects have to be held.
-          ctx & suspend op
+          ss & suspend op
         _ -> error "Bad VPrimOp arg"
 
     -- Array indexing.
@@ -487,42 +529,44 @@ step1 ctx op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
       case getValue ctx arg of
         VInteger idx
           | i >= 0 && i < length vals -> 
-            Step1Done $ ctx & addOps [UnifyX tgt (vals!!i)]
+            Step1Done $ ss & addOps [UnifyX tgt (vals!!i)]
           | otherwise -> Step1Failed
           where i = fromInteger idx
-        VHeap {} -> ctx & suspend op
+        VHeap {} -> ss & suspend op
         _        -> wrong "Bad index in array indexing"
 
-    VHeap {} -> ctx & holdEffects & suspend op  -- Unknown effects in the function
+    VHeap {} -> ss & holdEffects & suspend op  -- Unknown effects in the function
 
     _        -> wrong "Bad function in CallX"
 
-step1 ctx op@(ChoiceX ops1 ops2)
-  | ctx_hold ctx = ctx & suspend op
+step1 ss op@(ChoiceX ops1 ops2)
+  | ss_hold ss = ss & suspend op
   | otherwise =
-    let ctx1 = ctx & addOps ops1
-        ctx2 = ctx & addOps ops2
-    in  Step1Done (ctx1 { ctx_next = Just ctx2 })
+    let ctx  = ss_context ss
+        ctx1 = ctx & addOpsCtx ops1
+        ctx2 = ctx & addOpsCtx ops2
+    in  Step1Done ss{ ss_context = ctx1{ ctx_next = Just ctx2 } }
     -- Make two contexts, one for each branch, prepending ops to the rest of the ops
     -- And then chain them together, so that we do ctx2 when ctx1 is done.
     -- NB: ctx1 and ctx2 start from the /same/ Heap;
     --     this is what implements "backtracking".
 
-step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
+step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                 , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond (with the parent freshly set)
+  let ctx = ss_context ss in
   case step cond{ ctx_parent = Just ctx } of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepNotDone cond' ->
       -- cond did not finish, so suspend and hold off unknown effects.
       -- suspend with the updated condition to reflect the partial work.
       Step1Done $
-      ctx & holdEffects & addResiduals [op{ ifx_cond = cond' }]
+      ss & holdEffects & addResiduals [op{ ifx_cond = cond' }]
 
     StepDone cond' ->
       -- Condition succeeded, run the 'then' branch with the domain frame
       Step1Done $
-      ctx & addClosure tgt (extendFrame then_frame ext, then_exp)
+      ss & addClosure tgt (extendFrame then_frame ext, then_exp)
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
          ext = [ (n, expunge (ctx_heap cond') (VHeap a))
@@ -531,19 +575,20 @@ step1 ctx op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
     StepFailed ->
       -- Condition failed, run the 'else' branch
       Step1Done $
-      ctx & addClosure tgt els
+      ss & addClosure tgt els
     StepNothing ->
       -- Nothing happened, just suspend again.
-      ctx & holdEffects & suspend op
+      ss & holdEffects & suspend op
 
-step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
+step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain (with the parent freshly set)
+  let ctx = ss_context ss in
   case step dom{ ctx_parent = Just ctx } of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepNotDone dom' ->
       -- domain did not finish, so suspend and hold off unknown effects
       Step1Done $
-      ctx & holdEffects & addResiduals [op{ forx_dom = dom' }]
+      ss & holdEffects & addResiduals [op{ forx_dom = dom' }]
     StepDone dom' ->
       -- domain finished, run the body with the domain frame.
       -- The body puts the value in res, which is appended to
@@ -551,9 +596,11 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
       -- After the body execution we will run the ForX again for the next iteration,
       -- but with the domain updated to the next backtrack point.
       Step1Done $
-      ctx' &
-      addOps [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
-      addClosure res (extendFrame body_frame ext, body_exp)
+      ss{ ss_context =
+            ctx' &
+            addOpsCtx [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
+            addClosureCtx res (extendFrame body_frame ext, body_exp)
+        }
       where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
             (ctx', res) = allocCell ctx
             dom'' = nextIter dom'
@@ -561,23 +608,24 @@ step1 ctx op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports =
       -- The for loop has finished, so deliver the array.
       -- Note: StepFailed is not returned until the are no
       -- more backtrack points.
-      unify ctx tgt (VArray arr)
+      unify ss tgt (VArray arr)
     StepNothing ->
       -- Nothing happened, just suspend again.
-      ctx & holdEffects & suspend op
+      ss & holdEffects & suspend op
 
-step1 ctx op@(RangeX tgt arr) =
+step1 ss op@(RangeX tgt arr) =
+  let ctx = ss_context ss in
   case getValue ctx arr of
     VArray vs ->
       case vs of
         []  -> Step1Failed
-        [v] -> unify ctx tgt v
+        [v] -> unify ss tgt v
         _   ->
           -- Create nested ChoiceX for all the array values.
           Step1Done $
-          ctx &
+          ss &
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
-    VHeap{} -> ctx & suspend op
+    VHeap{} -> ss & suspend op
     _ -> error "RangeX bad arg"
 
 -- Create a new uninstantiated heap cell
@@ -595,27 +643,30 @@ nextIter ctx =
 
 -- Linearize the Exp with the given Frame and insert
 -- those ops to be executed next.
-addClosure :: Target -> (Frame, SExp) -> Context -> Context
-addClosure tgt (frame, body) ctx =
-  ctx & setHeap (ls_heap ls) & addOps (ls_ops ls)
+addClosure :: Target -> (Frame, SExp) -> StepState -> StepState
+addClosure tgt cl ss = ss{ ss_context = addClosureCtx tgt cl (ss_context ss) }
+
+addClosureCtx :: Target -> (Frame, SExp) -> Context -> Context
+addClosureCtx tgt (frame, body) ctx =
+  ctx & setHeap (ls_heap ls) & addOpsCtx (ls_ops ls)
   where
     ls = execState (expToHeap tgt $ Do body) init_ls
     init_ls = LState{ ls_heap = ctx_heap ctx, ls_frame = frame, ls_ops = []}
 
 -- Residualize the given op and report suspension.
-suspend :: OpX -> Context -> Step1Result
-suspend op ctx = Step1Suspend $ addResiduals [op] ctx
+suspend :: OpX -> StepState -> Step1Result
+suspend op ss = Step1Suspend $ addResiduals [op] ss
 
 -- Hold off all (sequential) effects.
-holdEffects :: Context -> Context
-holdEffects ctx = ctx { ctx_hold = True }
+holdEffects :: StepState -> StepState
+holdEffects ss = ss { ss_hold = True }
 
 -- Execute a PrimOp.
-primOpX :: Context -> Target -> PrimOp -> [Value] -> Step1Result
+primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
 primOpX _ _ "Error" _ = error "Error called"
-primOpX ctx tgt sop vs =
+primOpX ss tgt sop vs =
   case primOp sop vs of
-    Just v -> unify ctx tgt v
+    Just v -> unify ss tgt v
     Nothing -> Step1Failed
 
 -- Execute a pure PrimOp.

@@ -106,8 +106,7 @@ data Context = Ctx
   , ctx_parent :: !(Maybe Context)  -- Used only for the parent's Heap
                                     -- ToDo: A [Heap] would do
   , ctx_next   :: !(Maybe Context)  -- Backtrack point, always built by ChoiceX
-  --, ctx_effects:: ![Effect]         -- allowed effects
-  , ctx_hold   :: !Bool             -- hold all sequential effects XXX use a mask
+  --, ctx_effects:: ![Effects]         -- allowed effects, used as a stack
   }
   deriving (Eq, Show)
 
@@ -137,7 +136,9 @@ data Effect
   | Writes    -- heap write
   -----
   | Interacts -- I/O
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
+
+type Effects = S.Set Effect
 -}
 --------------------------------
 --
