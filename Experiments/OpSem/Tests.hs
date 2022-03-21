@@ -5,12 +5,15 @@
 module OpSem.Tests(module OpSem.Tests) where
 import Ex
 import OpSem.DSL
-import OpSem.Exp(eval)
+import OpSem.Exp(eval, evalMany)
 import OpSem.OpX(Value)
 import OpSem.EvalExp()
 
 ev :: Exp -> String
-ev = show . (eval :: Exp -> [Value])
+ev = show . (eval :: Exp -> Value)
+
+evm :: Exp -> String
+evm = show . (evalMany :: Exp -> [Value])
 
 ---------------------
 --      Tests
@@ -18,6 +21,9 @@ ev = show . (eval :: Exp -> [Value])
 
 ok :: (Show a) => String -> a -> Exp -> Ex String
 ok nm rr e = Ex nm (Just $ show rr) (ev e)
+
+okm :: (Show a) => String -> a -> Exp -> Ex String
+okm nm rr e = Ex nm (Just $ show rr) (evm e)
 
 bad :: String -> Exp -> Ex String
 bad nm e = Ex nm Nothing (ev e)
@@ -63,16 +69,16 @@ inc = "inc"
 ---------------------
 -- Simple, single valued tests.
 ---------------------
-test101 = ok "test101" [5] $
+test101 = ok "test101" 5 $
   5
 
-test102 = ok "test102" [42] $
+test102 = ok "test102" 42 $
   5 + 37
 
-test103 = ok "test103" [(5,37)] $
+test103 = ok "test103" (5,37) $
   5 # 37
 
-test104 = ok "test104" [(1,2,3,4)] $
+test104 = ok "test104" (1,2,3,4) $
   array [1,2,3,4]
 
 test100s = mapM_ testEx
@@ -82,16 +88,16 @@ test100s = mapM_ testEx
 ---------------------
 -- Variable scopes
 ---------------------
-test201 = ok "test201" [(5,5)] $
+test201 = ok "test201" (5,5) $
   (x := 5) # x
 
-test202 = ok "test202" [(5,5)] $
+test202 = ok "test202" (5,5) $
   x # (x := 5)
 
-test203 = ok "test203" [(7,6)] $
+test203 = ok "test203" (7,6) $
   x+1 # (x := 6)
 
-test204 = ok "test204" [(7,6,6,5)] $
+test204 = ok "test204" (7,6,6,5) $
   array [x+1, x := y, y := z+1, z := 5]
 
 test205 = bad "test205" $
@@ -100,7 +106,7 @@ test205 = bad "test205" $
 test206 = bad "test206" $
   x
 
-test207 = ok "test207" [(3,4)] $
+test207 = ok "test207" (3,4) $
   3 # do_ (x:= 4)
 
 test208 = bad "test208" $
@@ -110,7 +116,7 @@ test208 = bad "test208" $
 test209 = bad "test209" $
   x := y % y := x
 
-test210 = ok "test210" [(1,(2,3))] $
+test210 = ok "test210" (1,(2,3)) $
   x := (1 # y) %
   y := (2 # z) %
   z := 3 %
@@ -121,10 +127,10 @@ test211 = bad "test211" $
   x := 2
 
 -- The x1 used to be x, but shadowing is not allowed
-test212 = ok "test212" [(1,2)] $
+test212 = ok "test212" (1,2) $
   x := 2 % (do_ (x1 `where_` x1 := 1) # x)
 
-test213 = ok "test213" [(1,3)] $
+test213 = ok "test213" (1,3) $
   x := 1 %
   y := let_ (x := 2) (x + 1) %
   (x # y)
@@ -142,39 +148,39 @@ test200s = mapM_ testEx
 -- 0/1 results
 ---------------------
 
-test301 = ok "test301" [(3,3)] $
+test301 = okm "test301" [(3,3)] $
   (x := 3) # (x === 3)
 
-test302 = ok "test302" [3] $
+test302 = okm "test302" [3] $
   (x := 1+y) %
   y := 2 %
   (x === 3)
 
-test303 = ok "test303" [(3,3)] $
+test303 = okm "test303" [(3,3)] $
   (x === 3) # (x := 3)
 
-test304 = ok "test304" [20] $
+test304 = okm "test304" [20] $
   (a := array [10,20,30]) %
   Sel a 1
 
-test305 = ok "test305" [20] $
+test305 = okm "test305" [20] $
   Sel a 1 `where_` (a := array [10,20,30])
 
-test306 = ok "test306" ([]::[()]) $
+test306 = okm "test306" ([]::[()]) $
   (a := array [10,20,30]) %
   Sel a 3
 
-test307 = ok "test307" [(1,1)] $
+test307 = okm "test307" [(1,1)] $
   t := 1 # Fst t
 
 -- Test that when evaluating z the x is fully determined.
-test308 = ok "test308" [5] $
+test308 = okm "test308" [5] $
   x := y % y := 5 % z := (x===5)
 
-test309 = ok "test309" ([]::[()]) $
+test309 = okm "test309" ([]::[()]) $
   (x := 3) # (x === 4)
 
-test310 = ok "test310" ([]::[()]) $
+test310 = okm "test310" ([]::[()]) $
   (x === 4) # (x := 3)
 
 -- Deadlock
@@ -190,63 +196,63 @@ test300s = mapM_ testEx
 -- Multi-valued
 ---------------------
 
-test401 = ok "test401" [1,2] $
+test401 = okm "test401" [1,2] $
   1 ||| 2
 
-test402 = ok "test402" [2,3,3,4] $
+test402 = okm "test402" [2,3,3,4] $
   (1 ||| 2) + (1 ||| 2)
 
-test403 = ok "test403" [2,4] $
+test403 = okm "test403" [2,4] $
   (x := 1 ||| 2) + x
 
 -- Should fail, since variables in ||| do not escape
 test404 = bad "test404" $
   ((x := 1) ||| 2) + x
 
-test405 = ok "test405" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
+test405 = okm "test405" [(4,(1,3)),(5,(1,4)),(5,(2,3)),(6,(2,4))] $
   (x := 1 ||| 2) + (y := 3 ||| 4) # (x # y)
 
-test406 = ok "test406" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
+test406 = okm "test406" [(2,(1,1)),(5,(1,4)),(4,(2,2)),(6,(2,4))] $
   (x := 1 ||| 2) + (y := x ||| 4) # (x # y)
 
-test407 = ok "test407" [4] $
+test407 = okm "test407" [4] $
   (x := 1 ||| 2) + (x === 2)
 
-test408 = ok "test408" [(1,1),(2,2)] $
+test408 = okm "test408" [(1,1),(2,2)] $
   x # (x := 1 ||| 2)
 
-test409 = ok "test409" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
+test409 = okm "test409" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
   (y := (7 ||| x)) # (x # (x := (1 ||| 2)))
 
 -- x's value should not be delayed, because x's RHS has no depenedncies
-test410 = ok "test410" [((1,7),1)] $
+test410 = okm "test410" [((1,7),1)] $
   (x := ((1 # 7) ||| (y # (y := 2)))) # (Fst x === 1)
 
-test411 = ok "test411" [(1,1)] $
+test411 = okm "test411" [(1,1)] $
   x := 1 ||| 2 %
   y := (x === 1) %
   (x # y)
 
 -- Fails (equalLenient)
-test412 = ok "test412" [(1,1)] $
+test412 = okm "test412" [(1,1)] $
   y := (x === 1) %
   x := 1 ||| 2 %
   (x # y)
 
 -- Cascaded forward references
-test413 = ok "test413" [3,7,2,2] $
+test413 = okm "test413" [3,7,2,2] $
   x := (y ||| 2) %
   y := (3 ||| z) %
   z := 7 %
   x
 
 -- Choice under if
-test414 = ok "test414" [(1,5),(1,6),(2,5),(2,6)] $
+test414 = okm "test414" [(1,5),(1,6),(2,5),(2,6)] $
   x := 1 %
   if_ (x === 1) (1|||2) (3|||4) # (5|||6)
 
 -- Choice under if, must suspend
-test415 = ok "test415" [(1,5),(1,6),(2,5),(2,6)] $
+test415 = okm "test415" [(1,5),(1,6),(2,5),(2,6)] $
   if_ (x === 1) (1|||2) (3|||4) # (5|||6) `where_`
   x := 1
 
@@ -280,45 +286,45 @@ test500s = mapM_ testEx
 -- for
 ---------------------
 
-test601 = ok "test601" [(5,5,5)] $
+test601 = ok "test601" (5,5,5) $
   for (1|||2|||3) 5
 
-test602 = ok "test602" [(1,2,3)] $
+test602 = ok "test602" (1,2,3) $
   for (x := 1|||2|||3) x
 
-test603 = ok "test603" [((1,4),(1,5),(2,4),(2,5),(3,4),(3,5))] $
+test603 = ok "test603" ((1,4),(1,5),(2,4),(2,5),(3,4),(3,5)) $
   for (x := 1|||2|||3 % y := 4|||5)
     (x # y)
 
-test604 = ok "test604" [((1,4),(2,4),(3,4)),
-                        ((1,5),(2,5),(3,5))] $
+test604 = okm "test604" [((1,4),(2,4),(3,4)),
+                         ((1,5),(2,5),(3,5))] $
   y := 4|||5 %
   for (x := 1|||2|||3)
     (x # y)
 
-test605 = ok "test605" [(((1,4),(2,4),(3,4)),
-                       ((1,5),(2,5),(3,5)))] $
+test605 = ok "test605" (((1,4),(2,4),(3,4)),
+                       ((1,5),(2,5),(3,5))) $
   for (y := 4|||5) $
     for (x := 1|||2|||3)
       (x # y)
 
-test606 = ok "test606" [(88,88),(88,99),(99,88),(99,99)] $
+test606 = okm "test606" [(88,88),(88,99),(99,88),(99,99)] $
   for (0|||1)
     (88 ||| 99)
 
-test607 = ok "test607" [(1,2,3)] $
+test607 = ok "test607" (1,2,3) $
   for (x := 1|||2|||y % y := z % z := 3)
     x
 
-test608 = ok "test608" [(2,3,4)] $
+test608 = ok "test608" (2,3,4) $
   for (x := 1|||2|||3)
     (y `where_` y := x + 1)
 
-test609 = ok "test609" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
+test609 = okm "test609" [(1,2,3),(1,2,99),(1,99,3),(1,99,99),(99,2,3),(99,2,99),(99,99,3),(99,99,99)] $
   for (x := 1|||2|||3)
     (x ||| 99)
 
-test610 = ok "test610"
+test610 = okm "test610"
             [((11,11),(21,21)),((11,11),(21,42)),((11,11),(32,21)),((11,11),(32,42))
             ,((11,42),(21,21)),((11,42),(21,42)),((11,42),(32,21)),((11,42),(32,42))
             ,((32,11),(21,21)),((32,11),(21,42)),((32,11),(32,21)),((32,11),(32,42))
@@ -337,25 +343,21 @@ test600s = mapM_ testEx
 -- Functions
 ---------------------
 
-test701 = ok "test701" [5] $
+test701 = ok "test701" 5 $
   f := var v ==> (v + 1) %
   f @@ 4
 
-x701 =
-  f := var v ==> (v + 1) %
-  f @@ 4
-
-test702 = ok "test702" [11] $
+test702 = ok "test702" 11 $
   w := 7 %
   f := var v ==> (w + v) %
   f @@ 4
 
-test703 = ok "test703" [11] $
+test703 = ok "test703" 11 $
   f := var v ==> (w + v) %
   w := 7 %
   f @@ 4
 
-test704 = ok "test704" [11] $
+test704 = ok "test704" 11 $
   f := var v ==> (w + v) %
   w := 7 %
   y := f @@ t %
@@ -363,28 +365,28 @@ test704 = ok "test704" [11] $
   y
 
 -- f is called before it is defined
-test705 = ok "test705" [11] $
+test705 = ok "test705" 11 $
   y := f @@ t %
   w := 7 %
   t := 4 %
   f := var v ==> (w + v) %
   y
 
-test706 = ok "test706" [11] $
+test706 = ok "test706" 11 $
   f := do_ (w := 7 % var v ==> (w + v)) %
   y := f @@ t %
   t := 4 %
   y
 
 -- Function defined after it is used;
-test707 = ok "test707" [11] $
+test707 = ok "test707" 11 $
   y := f @@ t %
   w := 7 %
   t := 4 %
   f := var v ==> (w + v) %
   y
 
-test708 = ok "test708" [10,11] $
+test708 = okm "test708" [10,11] $
   f := var v ==> (v ||| v + 1) %
   f @@ 10
 
@@ -393,11 +395,11 @@ test709 = bad "test709" $
   f := var v ==> failure %
   appS f 10
 
-test710 = ok "test710" [5] $
+test710 = ok "test710" 5 $
   f := (var a # var b) ==> a + b %
   f @@ (2 # 3)
 
-test711 = ok "test711" [(999,888,13)] $
+test711 = ok "test711" (999,888,13) $
   f := var n ==> (
     case_ (n + 1) [
       1 ==> 999,
@@ -406,17 +408,17 @@ test711 = ok "test711" [(999,888,13)] $
       ]) %
   array [f @@ 0, f @@ 1, f @@ 2]
 
-test712 = ok "test712" [12] $
+test712 = ok "test712" 12 $
   twice := (var f ==> var x ==> f @@ (f @@ x)) %
   dbl := var x ==> x + x %
   twice @@ dbl @@ 3
 
-test713 = ok "test712" [16] $
+test713 = ok "test713" 16 $
   twice := (var f ==> var x ==> f @@ (f @@ x)) %
   dbl := var x ==> x + x %
   twice @@ twice @@ dbl @@ 1
 
-test714 = ok "test714" [(2,6,4)] $
+test714 = ok "test714" (2,6,4) $
   map_ := ((var f # var xs) ==> for (x := range xs) (f @@ x)) %
   inc := lam x (x + c) %
   c := 1 %
@@ -432,28 +434,28 @@ test700s = mapM_ testEx
 ---------------------
 -- Unification
 ---------------------
-test801 = ok "test801" [1] $
+test801 = okm "test801" [1] $
   var x %
   x === 1 %
   x
 
-test802 = ok "test802" [1] $
+test802 = okm "test802" [1] $
   var x %
   (x # 2) === (1 # 2) %
   x
 
-test803 = ok "test803" [(1,2)] $
+test803 = okm "test803" [(1,2)] $
   var x %
   var y %
   (x # 2) === (1 # y)
 
-test804 = ok "test804" [1] $
+test804 = okm "test804" [1] $
   f := lam xy (Fst xy === Snd xy) %
   var x %
   f @@ (x # 1) %
   x
 
-test805 = ok "test805" [6] $
+test805 = okm "test805" [6] $
   f := lam xyz ((var x # var y # var z) === xyz % x + y + z) %
   f @@ (1 # 2 # 3)
 
@@ -469,75 +471,73 @@ test800s = mapM_ testEx
 -- Conditional
 ---------------------
 
-test901 = ok "test901" [1] $
-  if_ (1 === 1) 1 2
-x901 =
+test901 = ok "test901" 1 $
   if_ (1 === 1) 1 2
 
-test902 = ok "test902" [2] $
+test902 = ok "test902" 2 $
   if_ (0 === 1) 1 2
 
-test903 = ok "test903" [10] $
+test903 = ok "test903" 10 $
   if_ (x := 10) x 2
 
-test904 = ok "test904" [2] $
+test904 = ok "test904" 2 $
   if_ failure 1 2
 
-test905 = ok "test905" [1] $
+test905 = ok "test905" 1 $
   if_ (x := 1 % x === 1) 1 2
 
-test906 = ok "test906" [2] $
+test906 = ok "test906" 2 $
   if_ (x := 1 % x === 0) 1 2
 
-test907 = ok "test907" [1] $
+test907 = ok "test907" 1 $
   if_ (x === 1 % x := 1) 1 2
 
-test908 = ok "test908" [2] $
+test908 = ok "test908" 2 $
   if_ (x === 0 % x := 1) 1 2
 
-test909 = ok "test909" [1] $
+test909 = ok "test909" 1 $
   x := 10 %
   if_ (x === 10) 1 2
 
-test910 = ok "test910" [2] $
+test910 = ok "test910" 2 $
   x := 0 %
   if_ (x === 10) 1 2
 
-test911 = ok "test911" [1] $
+test911 = ok "test911" 1 $
   y := if_ (x === 10) 1 2 %
   x := 10 %
   y
 
-test912 = ok "test912" [2] $
+test912 = ok "test912" 2 $
   y := if_ (x === 10) 1 2 %
   x := 0 %
   y
 
-test913 = ok "test913" [1] $
+test913 = ok "test913" 1 $
   if_ (x:=1) x 20
 
-test914 = ok "test914" [1] $
+test914 = ok "test914" 1 $
   if_ (x := (1 ||| 2)) 1 20
 
-test915 = ok "test915" [2] $
+test915 = ok "test915" 2 $
   if_ (x := (failure ||| 2)) x 20
 
-test916 = ok "test916" [1] $
+test916 = ok "test916" 1 $
   if_ (x := (1 ||| failure)) x 20
 
-test917 = ok "test917" [20] $
+test917 = ok "test917" 20 $
   if_ (x := (failure ||| failure)) x 20
 
-test918 = ok "test918" [3] $
+test918 = ok "test918" 3 $
   if_ (x := (failure ||| (failure ||| 3))) x 20
 
-test919 = ok "test919" [7] $
+test919 = ok "test919" 7 $
   f := var n ==> (if_ (n <=. 0) (n+1) (n+2)) %
   r := f @@ five %
   five := 5 %
   r
 
-test920 = ok "test920" [6] $
+test920 = ok "test920" 6 $
   f := var n ==> (if_ (n <=. 10) (n+1) (n+2)) %
   r := f @@ five %
   five := 5 %
@@ -553,37 +553,37 @@ test900s = mapM_ testEx
 -- range
 ---------------------
 
-test1001 = ok "test1001" [(1,2,3)] $
+test1001 = ok "test1001" (1,2,3) $
   for (x := range (array [1,2,3]))
     x
 
-test1002 = ok "test1002" [(102,103,104)] $
+test1002 = ok "test1002" (102,103,104) $
   xs := for (x := 1|||2|||3)
     (x + 1) %
   for (y := range xs)
     (y + 100)
 
-test1003 = ok "test1003" [((1,2),(1,4),(1,5))] $
+test1003 = ok "test1003" ((1,2),(1,4),(1,5)) $
   xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
   for (xy := range xys % Fst xy === 1)
     xy
 
-test1004 = ok "test1004" ([]::[()]) $
+test1004 = okm "test1004" ([]::[()]) $
   xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
   for (xy := range xys % Fst xy === 2)
     (xy `where_` Snd xy === 3)
 
-test1005 = ok "test1005" [((2,3),(2,3))] $
+test1005 = okm "test1005" [((2,3),(2,3))] $
   xys := array [1#2, 2#3, 1#4, 2#3, 1#5] %
   for (xy := range xys % Fst xy === 2)
     (xy `where_` Snd xy === 3)
 
-test1006 = ok "test1006" [(2,3)] $
+test1006 = ok "test1006" (2,3) $
   a := for (x := range xs) (x + 1) %
   xs := array[1,2] %
   a
 
-test1007 = ok "test1007" [2] $
+test1007 = ok "test1007" 2 $
   if_ (range (array [])) 1 2
 
 test1000s :: IO ()
@@ -595,48 +595,48 @@ test1000s = mapM_ testEx
 -- Arithmetic, comparisons
 ---------------------
 
-test1011 = ok "test1011" [10] $
+test1011 = ok "test1011" 10 $
   6 + 4
 
-test1012 = ok "test1012" [2] $
+test1012 = ok "test1012" 2 $
   6 - 4
 
-test1013 = ok "test1013" [24] $
+test1013 = ok "test1013" 24 $
   6 * 4
 
-test1014 = ok "test1014" [1] $
+test1014 = okm "test1014" [1] $
   6 `div` 4
 
-test1015 = ok "test1015" ([]::[()]) $
+test1015 = okm "test1015" ([]::[()]) $
   6 `div` 0
 
-test1016 = ok "test1016" [2] $
+test1016 = ok "test1016" 2 $
   if_ (6 <. 4) 1 2
 
-test1017 = ok "test1017" [1] $
+test1017 = ok "test1017" 1 $
   if_ (2 <. 4) 1 2
 
-test1018 = ok "test1018" [120] $
+test1018 = ok "test1018" 120 $
   fac := var n ==> (if_ (n <=. 0) 1 (n * fac @@ (n - 1))) %
   fac @@ 5
 
-test1019 = ok "test1019" [120] $
+test1019 = ok "test1019" 120 $
   fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
   res := fac @@ 5 %
   one := 1 %
   res
 
-test1020 = ok "test1020" [120] $
+test1020 = ok "test1020" 120 $
   res := fac @@ five %
   fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
   five := 5 %
   one := 1 %
   res
 
-test1021 = ok "test1021" [-10] $
+test1021 = ok "test1021" (-10) $
   negate 10
 
-test1022 = ok "test1021" [10] $
+test1022 = ok "test1021" 10 $
   abs (10 - 20)
 
 test1010s :: IO ()
@@ -644,6 +644,13 @@ test1010s = mapM_ testEx
   [test1011,test1012,test1013,test1014,test1015,test1016,test1017,test1018,test1019
   ,test1020,test1021,test1022
   ]
+
+---------------------
+-- Print
+---------------------
+
+test1101 = ok "test1101" () $
+  print_ 99
 
 --------
 

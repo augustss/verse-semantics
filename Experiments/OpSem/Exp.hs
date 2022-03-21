@@ -100,4 +100,5 @@ instance Pretty SExp where
   pPrint = text . show
   
 class (Show a) => Eval a where
-  eval :: Exp -> [a]
+  evalMany :: Exp -> [a]
+  eval :: Exp -> a

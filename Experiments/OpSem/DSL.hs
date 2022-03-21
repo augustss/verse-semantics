@@ -10,7 +10,7 @@ module OpSem.DSL(
   (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
   (<.), (<=.), (>.), (>=.),
   (==>), (@@), case_, let_,
-  range, array, app, failure, err,
+  range, array, app, failure, err, print_,
   ) where
 import Data.String ( IsString(..) )
 import OpSem.Error
@@ -134,3 +134,6 @@ failure = Fail
 
 err :: Exp
 err = Error
+
+print_ :: Exp -> Exp
+print_ = PrimUn "print"

@@ -8,7 +8,7 @@ import Data.Maybe
 import GHC.Stack(HasCallStack)
 import Debug.Trace
 
-import OpSem.DSL(for)
+import OpSem.DSL(for, do_)
 import OpSem.Error
 import OpSem.Exp
 import OpSem.Misc
@@ -260,10 +260,11 @@ run e =
 -- Just for Tests.hs
 -- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
 instance Eval Value where
-  eval e =
+  evalMany e =
     case run $ for ("&it" `Set` e) (Var "&it") of
       VArray vs -> vs
       v -> internalError $ "run returned " ++ show v
+  eval e = run (do_ e)
 
 --------------------------------------------------------------
 
