@@ -10,6 +10,8 @@ import Data.List ( nub )
 import GHC.Stack ( HasCallStack )
 import Text.PrettyPrint.HughesPJClass
 
+import OpSem.Error
+
 --------------------------------
 --
 -- Code
@@ -53,6 +55,7 @@ data Exp = Var Name
          | Lam Name SExp
          | App Exp Exp
          | Error
+         | Wrong
   deriving (Show, Eq, Ord)
 
 data SExp     -- A scope-limiting construct
@@ -62,7 +65,7 @@ data SExp     -- A scope-limiting construct
 
 -- Add all variables defined in the current scope.
 addDef :: HasCallStack => Exp -> SExp
-addDef e | xs /= nub xs = error $ "Duplicate := " ++ show (e, xs)
+addDef e | xs /= nub xs = wrong $ "Duplicate := " ++ show (e, xs)
          | otherwise = Def xs e
   where xs = findSet e
 
@@ -86,6 +89,7 @@ findSet (Array es) = concatMap findSet es
 findSet (PrimBin _ e1 e2) = findSet e1 ++ findSet e2
 findSet (Range e) = findSet e
 findSet Error = []
+findSet Wrong = []
 
 instance Pretty Exp where
   pPrint = text . show

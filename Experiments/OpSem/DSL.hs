@@ -108,7 +108,7 @@ case_ e arms =
 
 -- Application that must not fail
 appS :: Exp -> Exp -> Exp
-appS f a = if_ ("&x" := App f a) (Var "&x") Error
+appS f a = if_ ("&x" := App f a) (Var "&x") Wrong
 
 range :: Exp -> Exp
 range = Range

@@ -23,6 +23,7 @@ import Data.Maybe(fromMaybe)
 import GHC.Stack
 import Text.PrettyPrint.HughesPJClass
 
+import OpSem.Error
 import OpSem.Exp(Name, SExp)
 
 --------------------------------
@@ -82,7 +83,7 @@ mkHeap ci = Heap{ heap_next = HeapId ci 0, heap_contents = M.empty }
 lookupHeap :: HasCallStack => HeapAddr -> Heap -> Maybe Value
 lookupHeap a h =
   case M.lookup a (heap_contents h) of
-    Nothing -> error $ "lookupHeap: not in heap " ++ show a
+    Nothing -> internalError $ "lookupHeap: not in heap " ++ show a
     Just mv -> mv
 
 -- Insert a Value in the Heap.
@@ -106,7 +107,7 @@ idHeap (Heap (HeapId ci _) _) = ci
 getHeapValue :: Heaps -> HeapId -> Maybe Value
 getHeapValue heaps (HeapId ci h) =
   let
-    heap = fromMaybe (error $ "getHeapValue: " ++ show ci) $
+    heap = fromMaybe (internalError $ "getHeapValue: " ++ show ci) $
              find ((== ci) . idHeap) heaps
   in
     lookupHeap h heap

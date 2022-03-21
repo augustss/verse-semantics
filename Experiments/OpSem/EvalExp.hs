@@ -9,6 +9,7 @@ import GHC.Stack(HasCallStack)
 import Debug.Trace
 
 import OpSem.DSL(for)
+import OpSem.Error
 import OpSem.Exp
 import OpSem.Misc
 import OpSem.OpX
@@ -116,6 +117,10 @@ expValue Error = do
   tgt <- newVHeap
   emitOp $ CallX tgt (VPrimOp "Error") (VArray [])
   pure tgt
+expValue Wrong = do
+  tgt <- newVHeap
+  emitOp $ CallX tgt (VPrimOp "Wrong") (VArray [])
+  pure tgt
 
 -- Convert the Exp to a sequence of OpX
 -- and put the result in Target.
@@ -211,9 +216,6 @@ getOpsOf l = do
   put ls'{ ls_ops = ls_ops ls }
   pure $ ls_ops ls'
 
-wrong :: HasCallStack => String -> a
-wrong s = error $ "WRONG: " ++ s
-
 mkContext :: Exp -> L Context
 mkContext e = do
   pci <- gets $ idHeap . ls_heap
@@ -233,7 +235,7 @@ mkContext e = do
 run :: Exp -> Value
 run e =
   case step [] ctx'' of
-    StepFailed -> error "run: StepFailed"
+    StepFailed -> wrong "run: StepFailed"
     StepDone rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
@@ -252,7 +254,7 @@ instance Eval Value where
   eval e =
     case run $ for ("&it" `Set` e) (Var "&it") of
       VArray vs -> vs
-      v -> error $ "run returned " ++ show v
+      v -> internalError $ "run returned " ++ show v
 
 --------------------------------------------------------------
 
@@ -324,7 +326,7 @@ setHeapCellCtx :: HeapId -> Value -> Context -> Context
 setHeapCellCtx (HeapId ci h) v ctx =
   assert "setHeapCell" (ci == idHeap (ctx_heap ctx)) $
   case lookupHeap h (ctx_heap ctx) of
-    Just vv -> error $ "setHeap: already set " ++ show (h, vv)
+    Just vv -> internalError $ "setHeap: already set " ++ show (h, vv)
     Nothing -> ctx{ ctx_heap = insertHeap h (Just v) (ctx_heap ctx) }
 
 -- Unify two values.
@@ -438,7 +440,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         VHeap{} ->
           -- TODO: if the PrimOp has effects, then those effects have to be held.
           ss & suspend op
-        _ -> error "Bad VPrimOp arg"
+        _ -> internalError "Bad VPrimOp arg"
 
     -- Array indexing.
     VArray vals ->
@@ -539,7 +541,7 @@ step1 ss op@(RangeX tgt arr) =
           ss &
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ss & suspend op
-    _ -> error "RangeX bad arg"
+    _ -> wrong "RangeX bad arg"
 
 getAllHeaps :: StepState -> Heaps
 getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
@@ -579,7 +581,8 @@ holdEffects ss = ss { ss_hold = True }
 
 -- Execute a PrimOp.
 primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
-primOpX _ _ "Error" _ = error "Error called"
+primOpX _ _ "Error" _ = explicitError "Error called"
+primOpX _ _ "Wrong" _ = wrong "called"
 primOpX ss tgt sop vs =
   case primOp sop vs of
     Just v -> unify ss tgt v
@@ -601,5 +604,5 @@ primOp op [v1@(VInteger i1), VInteger i2] = do
     "<=" -> compar (<=)
     ">"  -> compar (>)
     ">=" -> compar (>=)
-    _    -> error $ "Unknown primop " ++ op
+    _    -> internalError $ "Unknown primop " ++ op
 primOp _ _ = Nothing

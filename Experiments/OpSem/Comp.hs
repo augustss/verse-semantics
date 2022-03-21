@@ -158,6 +158,9 @@ expToReg sq t (App e1 e2) = do
 expToReg sq _ Error = do
   emit $ ErrorOp "Error"
   pure sq
+expToReg sq _ Wrong = do
+  emit $ ErrorOp "Wrong"
+  pure sq
 --expToReg x = error $ show x
 
 sexpToOps' :: HasCallStack => Seq -> (Seq -> Reg -> [Op]) -> SExp -> C Op
