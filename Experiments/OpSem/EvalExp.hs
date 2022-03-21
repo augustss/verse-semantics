@@ -115,11 +115,11 @@ expValue (App f a) = do
   pure tgt
 expValue Error = do
   tgt <- newVHeap
-  emitOp $ CallX tgt (VPrimOp "Error") (VArray [])
+  emitOp $ CallX tgt (VPrimOp [] "Error") (VArray [])
   pure tgt
 expValue Wrong = do
   tgt <- newVHeap
-  emitOp $ CallX tgt (VPrimOp "Wrong") (VArray [])
+  emitOp $ CallX tgt (VPrimOp [] "Wrong") (VArray [])
   pure tgt
 
 -- Convert the Exp to a sequence of OpX
@@ -148,7 +148,7 @@ altToHeap tgt e1 e2 = do
 primBinToHeap :: Target -> PrimOp -> Exp -> Exp -> L ()
 primBinToHeap tgt op e1 e2 = do
   arg <- expValue $ Array [e1, e2]
-  emitOp $ CallX tgt (VPrimOp op) arg
+  emitOp $ CallX tgt (VPrimOp (opEffects op) op) arg
 
 appToHeap :: Target -> Exp -> Exp -> L ()
 appToHeap tgt f a = do
@@ -431,16 +431,17 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
 
     -- Primitive function, always with an array argument.
     -- primOpX requires all array elements in WHNF.
-    VPrimOp sop ->
+    VPrimOp effs sop
+      | any (isHeldEffect ss) effs -> ss & suspendPrim sop op
+      | otherwise ->
       case getValue ss arg of
         VArray vs
           | Just vs' <- mapM (getWHNF ss) vs ->
             primOpX ss tgt sop vs'
           | otherwise ->
-            ss & suspend op
+            ss & suspendPrim sop op
         VHeap{} ->
-          -- TODO: if the PrimOp has effects, then those effects have to be held.
-          ss & suspend op
+          ss & suspendPrim sop op
         _ -> internalError "Bad VPrimOp arg"
 
     -- Array indexing.
@@ -454,12 +455,12 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         VHeap {} -> ss & suspend op
         _        -> wrong "Bad index in array indexing"
 
-    VHeap {} -> ss & holdEffects & suspend op  -- Unknown effects in the function
+    VHeap {} -> ss & holdAllEffects & suspend op  -- Unknown effects in the function
 
     _        -> wrong "Bad function in CallX"
 
 step1 ss op@(ChoiceX ops1 ops2)
-  | isHeldEffect Iterates ss = ss & suspend op
+  | isHeldEffect ss Iterates = ss & suspend op
   | otherwise =
     let ctx  = ss_context ss
         ctx1 = ctx & addOpsCtx ops1
@@ -479,7 +480,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       -- cond did not finish, so suspend and hold off unknown effects.
       -- Suspend with the updated condition to reflect the partial work.
       Step1Done $
-      ss & holdEffects & addResiduals [op{ ifx_cond = cond' }]
+      ss & holdAllEffects & addResiduals [op{ ifx_cond = cond' }]
 
     StepDone cond' ->
       -- Condition succeeded, run the 'then' branch with the domain frame.
@@ -496,7 +497,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       ss & addClosure tgt els
     StepNothing ->
       -- Nothing happened, just suspend again.
-      ss & holdEffects & suspend op
+      ss & holdAllEffects & suspend op
 
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
                 , forx_exports = nas, forx_body = (body_frame, body_exp) } =
@@ -506,7 +507,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
     StepNotDone dom' ->
       -- domain did not finish, so suspend and hold off unknown effects
       Step1Done $
-      ss & holdEffects & addResiduals [op{ forx_dom = dom' }]
+      ss & holdAllEffects & addResiduals [op{ forx_dom = dom' }]
     StepDone dom' ->
       -- domain finished, run the body with the domain frame.
       -- The body puts the value in res, which is appended to
@@ -529,7 +530,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
       unify ss tgt (VArray arr)
     StepNothing ->
       -- Nothing happened, just suspend again.
-      ss & holdEffects & suspend op
+      ss & holdAllEffects & suspend op
 
 step1 ss op@(RangeX tgt arr) =
   case getValue ss arr of
@@ -545,9 +546,8 @@ step1 ss op@(RangeX tgt arr) =
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
 
-isHeldEffect :: Effect -> StepState -> Bool
---isUnheldEffect eff ss | trace ("isUnheldEffect: " ++ show (eff, ss)) False = undefined
-isHeldEffect eff ss = not $ memberEffect eff (ss_effects ss)
+isHeldEffect :: StepState -> Effect -> Bool
+isHeldEffect ss eff = not $ memberEffect eff (ss_effects ss)
 
 -- Set the correct effects for a sub-context
 setSubEffects :: StepState -> Context -> Context
@@ -587,9 +587,19 @@ addClosureCtx tgt (frame, body) ctx =
 suspend :: OpX -> StepState -> Step1Result
 suspend op ss = Step1Suspend $ addResiduals [op] ss
 
+-- Suspend a PrimOp, this needs to suspend effects
+-- that don't commute.
+suspendPrim :: PrimOp -> OpX -> StepState -> Step1Result
+suspendPrim sop op ss =
+  ss & holdEffects (opEffects sop) & suspend op
+
+-- Hold off all effects that don't commute with the given effects
+holdEffects :: [Effect] -> StepState -> StepState
+holdEffects effs ss = ss { ss_effects = commutesWithEffects effs (ss_effects ss) }
+
 -- Hold off all (sequential) effects.
-holdEffects :: StepState -> StepState
-holdEffects ss = ss { ss_effects = commutativeEffects (ss_effects ss) }
+holdAllEffects :: StepState -> StepState
+holdAllEffects ss = ss { ss_effects = commutativeEffects (ss_effects ss) }
 
 -- Execute a PrimOp.
 primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
@@ -618,3 +628,18 @@ primOp op [v1@(VInteger i1), VInteger i2] = do
     ">=" -> compar (>=)
     _    -> internalError $ "Unknown primop " ++ op
 primOp _ _ = Nothing
+
+opEffects :: PrimOp -> [Effect]
+opEffects "+" = []
+opEffects "-" = []
+opEffects "*" = []
+opEffects "div" = [Decides]
+opEffects "<" = [Decides]
+opEffects "<=" = [Decides]
+opEffects ">" = [Decides]
+opEffects ">=" = [Decides]
+opEffects "read" = [Reads]
+opEffects "write" = [Writes]
+opEffects "new_" = [Allocates]
+opEffects "print" = [Interacts]
+opEffects s = internalError $ "opEffects: " ++ s

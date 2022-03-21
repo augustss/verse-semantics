@@ -7,7 +7,8 @@ module OpSem.OpX(
   Context(..),
   Effect(..),
   Effects,
-  memberEffect, topLevelEffects, subContextEffects, commutativeEffects, noEffects,
+  memberEffect, topLevelEffects, subContextEffects,
+  commutesWithEffects, commutativeEffects, noEffects,
   HeapId(..),
   HeapAddr,
   Heap, Heaps,
@@ -159,7 +160,9 @@ data Effect
 type Effects = S.Set Effect
 
 memberEffect :: Effect -> Effects -> Bool
-memberEffect = S.member
+memberEffect Failure effs = any (`S.member` effs) [Decides, Iterates]
+memberEffect Decides effs = any (`S.member` effs) [Iterates]
+memberEffect f effs = S.member f effs
 
 -- The top level can use the store (read/write, etc)
 topLevelEffects :: Effects
@@ -180,6 +183,13 @@ commutativeEffects :: Effects -> Effects
 commutativeEffects effs =
   effs `S.intersection` S.fromList [Allocates]  -- XXX Succeeds?
 
+commutesWithEffects :: [Effect] -> Effects -> Effects
+commutesWithEffects fs effs = foldr commutes effs fs
+  where
+    commutes :: Effect -> Effects -> Effects
+    -- XXX approximate by saying "nothing" commutes
+    commutes _ x = commutativeEffects x
+
 noEffects :: Effects
 noEffects = S.empty
 
@@ -191,7 +201,7 @@ noEffects = S.empty
 --------------------------------
 data Value = VInteger Integer
            | VArray [Value]
-           | VPrimOp PrimOp
+           | VPrimOp [Effect] PrimOp
            | VFun { vf_frame    :: Frame
                   , vf_arg_name :: Name
                   , vf_body     :: SExp
@@ -204,7 +214,7 @@ type PrimOp = String
 instance Show Value where
   show (VInteger i) = show i
   show (VArray vs) = "(" ++ intercalate "," (map show vs) ++ ")"
-  show (VPrimOp o) = "Prim" ++ o
+  show (VPrimOp _ o) = "Prim" ++ o
   show (VFun f n e) = "(VFun " ++ show f ++ " " ++ show n ++ " (" ++ show e ++"))"
   show (VHeap h) = "[" ++ show h ++ "]"
 
