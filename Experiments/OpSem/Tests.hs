@@ -633,9 +633,16 @@ test1020 = ok "test1020" [120] $
   one := 1 %
   res
 
+test1021 = ok "test1021" [-10] $
+  negate 10
+
+test1022 = ok "test1021" [10] $
+  abs (10 - 20)
+
 test1010s :: IO ()
 test1010s = mapM_ testEx
-  [test1011,test1012,test1013,test1014,test1015,test1016,test1017,test1018,test1019,test1020
+  [test1011,test1012,test1013,test1014,test1015,test1016,test1017,test1018,test1019
+  ,test1020,test1021,test1022
   ]
 
 --------

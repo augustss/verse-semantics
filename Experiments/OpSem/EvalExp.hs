@@ -85,6 +85,10 @@ expValue (PrimBin op e1 e2) = do
   tgt <- newVHeap
   primBinToHeap tgt op e1 e2
   pure tgt
+expValue (PrimUn op e1) = do
+  tgt <- newVHeap
+  primUnToHeap tgt op e1
+  pure tgt
 expValue Fail = do
   tgt <- newVHeap
   emitOp FailX
@@ -148,6 +152,11 @@ altToHeap tgt e1 e2 = do
 primBinToHeap :: Target -> PrimOp -> Exp -> Exp -> L ()
 primBinToHeap tgt op e1 e2 = do
   arg <- expValue $ Array [e1, e2]
+  emitOp $ CallX tgt (VPrimOp (opEffects op) op) arg
+
+primUnToHeap :: Target -> PrimOp -> Exp -> L ()
+primUnToHeap tgt op e1 = do
+  arg <- expValue e1
   emitOp $ CallX tgt (VPrimOp (opEffects op) op) arg
 
 appToHeap :: Target -> Exp -> Exp -> L ()
@@ -429,7 +438,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         -- Extend the frame with the argument binding
         frame_w_binding = extendFrame frame [(arg_name, arg)]
 
-    -- Primitive function, always with an array argument.
+    -- Primitive function.
     -- primOpX requires all array elements in WHNF.
     VPrimOp effs sop
       | any (isHeldEffect ss) effs -> ss & suspendPrim sop op
@@ -442,7 +451,8 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
             ss & suspendPrim sop op
         VHeap{} ->
           ss & suspendPrim sop op
-        _ -> internalError "Bad VPrimOp arg"
+        v -> primOpX ss tgt sop [v]
+--        _ -> internalError "Bad VPrimOp arg"
 
     -- Array indexing.
     VArray vals ->
@@ -627,12 +637,20 @@ primOp op [v1@(VInteger i1), VInteger i2] = do
     ">"  -> compar (>)
     ">=" -> compar (>=)
     _    -> internalError $ "Unknown primop " ++ op
+primOp op [VInteger i] = do
+  let arith f = Just $ VInteger $ f i
+  case op of
+    "negate" -> arith negate
+    "abs" -> arith abs
+    _    -> internalError $ "Unknown primop " ++ op
 primOp _ _ = Nothing
 
 opEffects :: PrimOp -> [Effect]
 opEffects "+" = []
 opEffects "-" = []
 opEffects "*" = []
+opEffects "negate" = []
+opEffects "abs" = []
 opEffects "div" = [Decides]
 opEffects "<" = [Decides]
 opEffects "<=" = [Decides]

@@ -24,6 +24,8 @@ instance Num Exp where
   (+) = PrimBin "+"
   (-) = PrimBin "-"
   (*) = PrimBin "*"
+  negate = PrimUn "negate"
+  abs = PrimUn "abs"
   fromInteger = Con
 
 instance Real Exp
