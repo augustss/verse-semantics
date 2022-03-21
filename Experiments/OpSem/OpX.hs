@@ -5,7 +5,9 @@ module OpSem.OpX(
   emptyFrame,
   ContextId,
   Context(..),
-  --Effect(..),
+  Effect(..),
+  Effects,
+  memberEffect, topLevelEffects, subContextEffects, commutativeEffects, noEffects,
   HeapId(..),
   HeapAddr,
   Heap, Heaps,
@@ -19,6 +21,7 @@ module OpSem.OpX(
   ) where
 import Data.List(intercalate, find)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe(fromMaybe)
 import GHC.Stack
 import Text.PrettyPrint.HughesPJClass
@@ -125,7 +128,7 @@ data Context = Ctx
   { ctx_heap   :: !Heap
   , ctx_ops    :: ![OpX]
   , ctx_next   :: !(Maybe Context)  -- Backtrack point, always built by ChoiceX
-  --, ctx_effects:: ![Effects]         -- allowed effects, used as a stack
+  , ctx_effects:: !Effects          -- allowed effects
   }
   deriving (Eq, Show)
 
@@ -133,24 +136,53 @@ data Context = Ctx
 --
 -- Effect
 --  Possible effects
---
+--  This is a bit of a mish-mash of actual effects
+--  and sets of effects
 --------------------------------
-{-
 data Effect
   = Failure   -- 0 results
-  | Success   -- 1 result
+  | Succeeds  -- 1 result
   | Decides   -- 0/1 results
   | Iterates  -- 0..n results
   -----
   | Allocates -- heap allocation
   | Reads     -- heap read
   | Writes    -- heap write
+  | Transacts -- = { Allocates, Reads, Writes }
+  -----
+  | Total     -- = { }, i.e., no effects
+  | Pure      -- = { Diverges }, may diverge
   -----
   | Interacts -- I/O
   deriving (Eq, Ord, Show)
 
 type Effects = S.Set Effect
--}
+
+memberEffect :: Effect -> Effects -> Bool
+memberEffect = S.member
+
+-- The top level can use the store (read/write, etc)
+topLevelEffects :: Effects
+topLevelEffects = S.fromList [Interacts] `S.union` storeEffects
+
+-- Effects on the store
+storeEffects :: Effects
+storeEffects = S.fromList [Allocates, Reads, Writes, Transacts]
+
+-- In a subcontext we inherit the store effects and add iteration
+subContextEffects :: Effects -> Effects
+subContextEffects effs =
+  S.singleton Iterates `S.union` (storeEffects `S.intersection` effs)
+
+-- Limit effects to those that commute with every other effect.
+-- Used when we need to suspend unknown effects.
+commutativeEffects :: Effects -> Effects
+commutativeEffects effs =
+  effs `S.intersection` S.fromList [Allocates]  -- XXX Succeeds?
+
+noEffects :: Effects
+noEffects = S.empty
+
 --------------------------------
 --
 -- Value

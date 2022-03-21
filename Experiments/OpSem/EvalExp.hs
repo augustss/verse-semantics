@@ -227,7 +227,7 @@ mkContext e = do
   pure $ Ctx
       { ctx_heap = heap
       , ctx_ops = ops
-      --, ctx_effects = [Iterates]
+      , ctx_effects = noEffects  -- placeholder
       , ctx_next = Nothing
       }
 
@@ -242,7 +242,7 @@ run e =
     ctx = Ctx
       { ctx_heap = mkHeap 0
       , ctx_ops = []
-      --, ctx_effects = [Success, Interacts]
+      , ctx_effects = topLevelEffects
       , ctx_next = Nothing
       }
     (ctx', tgt) = ctx & allocCell
@@ -365,8 +365,8 @@ data StepResult
 -- Invariant: input Context has ctx_ops non-empty
 step :: Heaps -> Context -> StepResult
 step phs ctx =
-  case stepPass StepState{ ss_suspended = [], ss_hold = False, ss_any = False
-                         , ss_context = ctx, ss_heaps = phs } of
+  case stepPass StepState{ ss_suspended = [], ss_effects = ctx_effects ctx
+                         , ss_any = False, ss_context = ctx, ss_heaps = phs } of
     StepNotDone ctx' -> step phs ctx'
     res -> res
 
@@ -375,10 +375,10 @@ step phs ctx =
 -- ss_context{ ctx_ops = reverse ss_suspended ++ ctx_ops ss_context }
 data StepState = StepState
   { ss_suspended  :: ![OpX]          -- suspended instructions, in reverse order
-  , ss_hold       :: !Bool           -- effects held
   , ss_any        :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
   , ss_heaps      :: !Heaps          -- all the heaps in outer contexts
+  , ss_effects    :: !Effects        -- currently allowed effects
   }
   deriving (Show)
 
@@ -416,7 +416,8 @@ data Step1Result
 -- Try to execute a single OpX.
 -- The OpX has already been removed from the ctx_ops
 step1 :: StepState -> OpX -> Step1Result
-step1 _ op | stepDebug && trace ("step1 " ++ show op) False = undefined
+step1 ss op | stepDebug && trace ("step1 ctxId=" ++ show (idHeap (ctx_heap (ss_context ss))) ++
+                                 {-" effs=" ++ show (ss_effects ss) ++ -} ": " ++ show op) False = undefined
 step1 ss (UnifyX v1 v2) = unify ss v1 v2
 step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
   case getValue ss fun of
@@ -458,7 +459,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     _        -> wrong "Bad function in CallX"
 
 step1 ss op@(ChoiceX ops1 ops2)
-  | ss_hold ss = ss & suspend op
+  | isHeldEffect Iterates ss = ss & suspend op
   | otherwise =
     let ctx  = ss_context ss
         ctx1 = ctx & addOpsCtx ops1
@@ -472,7 +473,7 @@ step1 ss op@(ChoiceX ops1 ops2)
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond, with all the outer heaps
-  case step (getAllHeaps ss) cond of
+  case step (getAllHeaps ss) (setSubEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepNotDone cond' ->
       -- cond did not finish, so suspend and hold off unknown effects.
@@ -497,9 +498,10 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       -- Nothing happened, just suspend again.
       ss & holdEffects & suspend op
 
-step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
+step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
+                , forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain, with all the outer heaps
-  case step (getAllHeaps ss) dom of
+  case step (getAllHeaps ss) (setSubEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepNotDone dom' ->
       -- domain did not finish, so suspend and hold off unknown effects
@@ -543,6 +545,16 @@ step1 ss op@(RangeX tgt arr) =
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
 
+isHeldEffect :: Effect -> StepState -> Bool
+--isUnheldEffect eff ss | trace ("isUnheldEffect: " ++ show (eff, ss)) False = undefined
+isHeldEffect eff ss = not $ memberEffect eff (ss_effects ss)
+
+-- Set the correct effects for a sub-context
+setSubEffects :: StepState -> Context -> Context
+setSubEffects ss ctx =
+  --trace ("setSubEffects: " ++ show (subContextEffects (ctx_effects (ss_context ss)))) $
+  ctx{ ctx_effects = subContextEffects (ctx_effects (ss_context ss)) }
+
 getAllHeaps :: StepState -> Heaps
 getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
 
@@ -577,7 +589,7 @@ suspend op ss = Step1Suspend $ addResiduals [op] ss
 
 -- Hold off all (sequential) effects.
 holdEffects :: StepState -> StepState
-holdEffects ss = ss { ss_hold = True }
+holdEffects ss = ss { ss_effects = commutativeEffects (ss_effects ss) }
 
 -- Execute a PrimOp.
 primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
