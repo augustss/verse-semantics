@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module OpSem.DSL(
   Exp,
   pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
@@ -11,6 +13,7 @@ module OpSem.DSL(
   range, array, app, failure, err,
   ) where
 import Data.String ( IsString(..) )
+import OpSem.Error
 import OpSem.Exp
 
 ---------------------
@@ -51,8 +54,10 @@ infixl 5 ===
 (===) = Equal
 
 infix 2 :=
-pattern (:=) :: Name -> Exp -> Exp
-pattern (:=) x e = Set x e
+pattern (:=) :: Exp -> Exp -> Exp
+pattern (:=) x e <- Set (Var -> x) e
+  where (:=) (Var x) e = Set x e
+        (:=) _ _ = internalError ":="
 
 pattern Fst :: Exp -> Exp
 pattern Fst e = App e (Con 0)
@@ -87,14 +92,17 @@ do_ e = Do (addDef e)
 let_ :: Exp -> Exp -> Exp
 let_ e1 e2 = Let (addDef e1) e2
 
-lam :: Name -> Exp -> Exp
-lam n e = Lam n (addDef e)
+lam :: Exp -> Exp -> Exp
+lam (Var n) e = Lam n (addDef e)
+lam _ _ = internalError "lam"
 
-var :: Name -> Exp
-var = SetAny
+var :: Exp -> Exp
+var (Var n) = SetAny n
+var _ = internalError "var"
 
 infixr 3 ==>
 (==>) :: Exp -> Exp -> Exp
+a@(Var _) ==> b = lam a b
 a ==> b = lam "&x" $ do_ (a === Var "&x" % b)
 
 infixl 9 @@
