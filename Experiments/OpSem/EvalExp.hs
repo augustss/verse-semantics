@@ -23,7 +23,7 @@ forDebug = False
 compExp :: Exp -> [OpX]
 compExp e =
   fst $
-  linValue (mkHeap []) emptyFrame $
+  linValue (mkHeap 0) emptyFrame $
   Do $
   addDef e
 
@@ -221,9 +221,7 @@ mkContext e = do
   fr <- gets ls_frame
   -- This allocates a cell just to get a unique address that can be used
   -- to create the ContextId for the new Context.
-  v <- newVHeap
-  let l = case v of VHeap (HeapId _ a) -> a; _ -> undefined
-      ci = l : pci  -- The new ContextId is the old one with a unique Int prepended
+  let ci = succ pci  -- The new ContextId is the old one + 1
       (ops, heap) = linValue (mkHeap ci) fr e
   pure $ Ctx
       { ctx_heap = heap
@@ -241,7 +239,7 @@ run e =
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
-      { ctx_heap = mkHeap []
+      { ctx_heap = mkHeap 0
       , ctx_ops = []
       --, ctx_effects = [Success, Interacts]
       , ctx_next = Nothing

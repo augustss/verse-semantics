@@ -99,7 +99,7 @@ idHeap (Heap (HeapId ci _) _) = ci
 --  A Context holds all the state for a local execution.
 --
 --------------------------------
-type ContextId = [Int] -- XXX
+type ContextId = Int
 
 data Context = Ctx
   { ctx_heap   :: !Heap
