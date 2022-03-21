@@ -243,9 +243,9 @@ mkContext e = do
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
-  case step [] ctx'' of
+  case step [] emptyStore ctx'' of
     StepFailed -> wrong "run: StepFailed"
-    StepDone rctx -> expunge (ctx_heap rctx) tgt
+    StepDone _ rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
@@ -291,6 +291,7 @@ expunge heap = value []
             Nothing -> wrong $ "expunge: uninstantiated " ++ show (h, ci, heap)
             Just v' -> value (h:s) v'
     value _ v@VPrimOp{} = v
+    value _ v@VRef{} = v
     frame s fr = M.map (value s) fr
 
 -- Follow VHeap indirections that point to instantiated cells.
@@ -361,23 +362,23 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
 
 -- Results of taking as many steps as possible.
 data StepResult
-  = StepDone Context    -- Finished successfully; ctx_ops = []
-                        -- use ctx_next for further results
-  | StepNotDone Context -- Something happened, but it didn't finish:
-                        --  (ctx_ops /= []), but they are all stuck
-  | StepNothing         -- No steps taken; degenerate form of StepNotDone
-  | StepFailed          -- Failed; hit FailX
+  = StepDone Store Context    -- Finished successfully; ctx_ops = []
+                              -- use ctx_next for further results
+  | StepNotDone Store Context -- Something happened, but it didn't finish:
+                              --  (ctx_ops /= []), but they are all stuck
+  | StepNothing               -- No steps taken; degenerate form of StepNotDone
+  | StepFailed                -- Failed; hit FailX
   deriving (Show)
 
 -- Run a Context as far as possible.
 -- Repeatedly execute the [OpX] in the Context, until
 -- nothing further happens, or the [OpX] is empty
 -- Invariant: input Context has ctx_ops non-empty
-step :: Heaps -> Context -> StepResult
-step phs ctx =
+step :: Heaps -> Store -> Context -> StepResult
+step phs st ctx =
   case stepPass StepState{ ss_suspended = [], ss_effects = ctx_effects ctx
-                         , ss_any = False, ss_context = ctx, ss_heaps = phs } of
-    StepNotDone ctx' -> step phs ctx'
+                         , ss_any = False, ss_context = ctx, ss_heaps = phs, ss_store = st } of
+    StepNotDone st' ctx' -> step phs st' ctx'
     res -> res
 
 -- StepState is the state while executing stepPass.
@@ -389,15 +390,16 @@ data StepState = StepState
   , ss_context    :: !Context        -- executing context
   , ss_heaps      :: !Heaps          -- all the heaps in outer contexts
   , ss_effects    :: !Effects        -- currently allowed effects
+  , ss_store      :: !Store          -- refcell storage
   }
   deriving (Show)
 
 -- Make one pass over the ctx_ops.
 stepPass :: StepState -> StepResult
-stepPass StepState{ ss_suspended = done, ss_any = anyStep, ss_context = ctx@Ctx{ ctx_ops = [] } }
-  | null done   = StepDone ctx
+stepPass StepState{ ss_suspended = done, ss_any = anyStep, ss_store = st, ss_context = ctx@Ctx{ ctx_ops = [] } }
+  | null done   = StepDone st ctx
   | not anyStep = StepNothing
-  | otherwise   = StepNotDone ctx{ ctx_ops = reverse done }
+  | otherwise   = StepNotDone st ctx{ ctx_ops = reverse done }
 stepPass ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   -- Take a single step
   let ctx' = ctx{ ctx_ops = ops }
@@ -486,18 +488,18 @@ step1 ss op@(ChoiceX ops1 ops2)
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond, with all the outer heaps
-  case step (getAllHeaps ss) (setSubEffects ss cond) of
+  case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
-    StepNotDone cond' ->
+    StepNotDone _st _cond ->
       -- cond did not finish, so suspend and hold off unknown effects.
-      -- Suspend with the updated condition to reflect the partial work.
-      Step1Done $
-      ss & holdAllEffects & addResiduals [op{ ifx_cond = cond' }]
+      ss & holdAllEffects & suspend op
 
-    StepDone cond' ->
+    StepDone st' cond' ->
       -- Condition succeeded, run the 'then' branch with the domain frame.
       Step1Done $
-      ss & addClosure tgt (extendFrame then_frame ext, then_exp)
+      ss &
+      addClosure tgt (extendFrame then_frame ext, then_exp) &
+      setStore (expungeStore (ctx_heap cond') st')
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
          ext = [ (n, expunge (ctx_heap cond') (VHeap a))
@@ -514,13 +516,12 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
                 , forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain, with all the outer heaps
-  case step (getAllHeaps ss) (setSubEffects ss adom) of
+  case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
-    StepNotDone dom' ->
+    StepNotDone _st _dom ->
       -- domain did not finish, so suspend and hold off unknown effects
-      Step1Done $
-      ss & holdAllEffects & addResiduals [op{ forx_dom = dom' }]
-    StepDone dom' ->
+      ss & holdAllEffects & suspend op
+    StepDone st' dom' ->
       -- domain finished, run the body with the domain frame.
       -- The body puts the value in res, which is appended to
       -- the accumulating array.
@@ -531,7 +532,8 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
             ctx' &
             addOpsCtx [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
             addClosureCtx res (extendFrame body_frame ext, body_exp)
-        }
+        } &
+      setStore (expungeStore (ctx_heap dom') st')
       where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
             (ctx', res) = allocCell $ ss_context ss  -- allocate a result cell in parent context
             dom'' = nextIter dom'
@@ -557,6 +559,12 @@ step1 ss op@(RangeX tgt arr) =
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
+
+setStore :: Store -> StepState -> StepState
+setStore st ss = ss{ ss_store = st }
+
+expungeStore :: Heap -> Store -> Store
+expungeStore h st = mapStore (expunge h) st
 
 isHeldEffect :: StepState -> Effect -> Bool
 isHeldEffect ss eff = not $ memberEffect eff (ss_effects ss)
@@ -622,10 +630,23 @@ primOpX ss tgt "print" vs =
   let vs' = map (expunge $ ctx_heap $ ss_context ss) vs
   in  trace ("print: " ++ show vs') $
       unify ss tgt (VArray [])
+primOpX ss tgt "new_" [v] =
+  let (ss', ref) = newRefCell v ss
+  in  unify ss' tgt (VRef ref)
+primOpX ss tgt "read" [VRef r] =
+  unify ss tgt (readStore r (ss_store ss))
+primOpX ss tgt "write" [VRef r, v] =  -- XXX probably don't need v in WHNF
+  let st = writeStore r v (ss_store ss)
+  in  unify (setStore st ss) tgt (VArray [])
 primOpX ss tgt sop vs =
   case primOp sop vs of
     Just v -> unify ss tgt v
     Nothing -> Step1Failed
+
+newRefCell :: Value -> StepState -> (StepState, Ref)
+newRefCell v ss =
+  let (st, r) = newStore v (ss_store ss)
+  in  (ss{ ss_store = st }, r)
 
 -- Execute a pure PrimOp.
 -- Nothing indicates that the op failed.

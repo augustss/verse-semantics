@@ -19,6 +19,9 @@ module OpSem.OpX(
   OpX(..),
   pattern FailX,
   PrimOp,
+  Ref,
+  Store,
+  emptyStore, newStore, readStore, writeStore, mapStore,
   ) where
 import Data.List(intercalate, find)
 import qualified Data.Map as M
@@ -135,6 +138,34 @@ data Context = Ctx
 
 --------------------------------
 --
+-- Store
+--  The Store holds the values for ref cells.
+--
+--------------------------------
+
+type Ref = Int
+
+data Store = Store !Ref !(M.Map Ref Value)
+  deriving (Eq, Show)
+
+emptyStore :: Store
+emptyStore = Store 0 M.empty
+
+newStore :: Value -> Store -> (Store, Ref)
+newStore v (Store r m) = (Store (r+1) (M.insert r v m), r)
+
+readStore :: Ref -> Store -> Value
+readStore r (Store _ m) =
+  fromMaybe (internalError "readStore") $ M.lookup r m
+
+writeStore :: Ref -> Value -> Store -> Store
+writeStore r v (Store n m) = Store n (M.insert r v m)
+
+mapStore :: (Value -> Value) -> Store -> Store
+mapStore f (Store r m) = Store r (M.map f m)
+
+--------------------------------
+--
 -- Effect
 --  Possible effects
 --  This is a bit of a mish-mash of actual effects
@@ -206,7 +237,8 @@ data Value = VInteger Integer
                   , vf_arg_name :: Name
                   , vf_body     :: SExp
                   }
-           | VHeap HeapId    -- Possibly unsettled logical variable
+           | VRef Ref        -- pointer to a cell in the Store
+           | VHeap HeapId    -- possibly unsettled logical variable
   deriving (Eq)
 
 type PrimOp = String
@@ -216,6 +248,7 @@ instance Show Value where
   show (VArray vs) = "(" ++ intercalate "," (map show vs) ++ ")"
   show (VPrimOp _ o) = "Prim" ++ o
   show (VFun f n e) = "(VFun " ++ show f ++ " " ++ show n ++ " (" ++ show e ++"))"
+  show (VRef r) = "(VRef " ++ show r ++ ")"
   show (VHeap h) = "[" ++ show h ++ "]"
 
 instance Pretty Value where

@@ -37,7 +37,7 @@ unimp nm _r e = Ex ("unimp: " ++ nm) Nothing (ev e)
 ---------------------
 -- Some variables to make the tests look nicer.
 ---------------------
-x, y, z, x1, y1, xs, xy, xys, xyz, a, b, c, f, r, t, n, v, w
+x, y, z, x1, y1, xs, xy, xys, xyz, a, b, c, f, i, r, t, n, v, w
   , twice, dbl, fac, res, one, five, map_, inc :: Exp
 x = "x"
 x1 = "x1"
@@ -52,6 +52,7 @@ a = "a"
 b = "b"
 c = "c"
 f = "f"
+i = "i"
 n = "n"
 t = "t"
 r = "r"
@@ -595,75 +596,130 @@ test1000s = mapM_ testEx
 -- Arithmetic, comparisons
 ---------------------
 
-test1011 = ok "test1011" 10 $
+test1101 = ok "test1101" 10 $
   6 + 4
 
-test1012 = ok "test1012" 2 $
+test1102 = ok "test1102" 2 $
   6 - 4
 
-test1013 = ok "test1013" 24 $
+test1103 = ok "test1103" 24 $
   6 * 4
 
-test1014 = okm "test1014" [1] $
+test1104 = okm "test1104" [1] $
   6 `div` 4
 
-test1015 = okm "test1015" ([]::[()]) $
+test1105 = okm "test1105" ([]::[()]) $
   6 `div` 0
 
-test1016 = ok "test1016" 2 $
+test1106 = ok "test1106" 2 $
   if_ (6 <. 4) 1 2
 
-test1017 = ok "test1017" 1 $
+test1107 = ok "test1107" 1 $
   if_ (2 <. 4) 1 2
 
-test1018 = ok "test1018" 120 $
+test1108 = ok "test1108" 120 $
   fac := var n ==> (if_ (n <=. 0) 1 (n * fac @@ (n - 1))) %
   fac @@ 5
 
-test1019 = ok "test1019" 120 $
+test1109 = ok "test1109" 120 $
   fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
   res := fac @@ 5 %
   one := 1 %
   res
 
-test1020 = ok "test1020" 120 $
+test1110 = ok "test1110" 120 $
   res := fac @@ five %
   fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
   five := 5 %
   one := 1 %
   res
 
-test1021 = ok "test1021" (-10) $
+test1111 = ok "test1111" (-10) $
   negate 10
 
-test1022 = ok "test1021" 10 $
+test1112 = ok "test1112" 10 $
   abs (10 - 20)
 
-test1010s :: IO ()
-test1010s = mapM_ testEx
-  [test1011,test1012,test1013,test1014,test1015,test1016,test1017,test1018,test1019
-  ,test1020,test1021,test1022
+test1100s :: IO ()
+test1100s = mapM_ testEx
+  [test1101,test1102,test1103,test1104,test1105,test1106,test1107,test1108,test1109
+  ,test1110,test1111,test1112
   ]
 
 ---------------------
 -- Print
 ---------------------
 
-test1101 = ok "test1101" () $
+-- XXX These tests print using trace, so they are hard to test correctly.
+
+test1201 = ok "test1201" () $
   print_ 99
 
-test1102 = ok "test1102" () $
+test1202 = ok "test1202" 88 $
   print_ x %
   print_ 99 %
   x := 88
 
-test1103 = ok "test1103" () $
+test1203 = ok "test1203" 88 $
   print_ x %
   for(y:=1|||2|||3) (print_ y) %
   x := 88
 
-test1104 = bad "test1104" $
+test1204 = bad "test1204" $
   if_ (print_ 1) 1 2
+
+test1200s :: IO ()
+test1200s = do
+  putStrLn "Expect print: [99]; print [88],print [99]; print [88],print [1],print [2],print [3]"
+  mapM_ testEx
+    [test1201,test1202,test1203,test1204
+    ]
+
+---------------------
+-- Ref cells
+---------------------
+
+test1301 = ok "test1301" 2 $
+  r := new_ 2 %
+  (r^.)
+
+test1302 = ok "test1302" (2,3) $
+  r := new_ 2 %
+  x := (r^.) %
+  r ^:= x+1 %
+  y := (r^.) %
+  (x # y)
+
+test1303 = ok "test1303" 2 $
+  r := new_ 0 %
+  if_ (1 === 1) (r ^:= 2) (r ^:= 3) %
+  (r^.)
+
+test1304 = ok "test1304" 6 $
+  r := new_ 0 %
+  for (i := 1|||2|||3)
+    (x := (r^.) % r ^:= x + i) %
+  (r^.)
+
+test1305 = ok "test1305" 2 $
+  r := new_ 0 %
+  for (i := 1|||2|||3 %
+       r ^:= i %
+       i === 2)
+    0 %
+  (r^.)
+
+test1306 = ok "test1306" (2,3) $
+  x := (r^.) %
+  r ^:= x+1 %
+  y := (r^.) %
+  r := new_ 2 %
+  (x # y)
+
+test1300s :: IO ()
+test1300s = mapM_ testEx
+  [test1301,test1302,test1303,test1304,test1305,test1306
+  ]
 
 --------
 
@@ -679,4 +735,7 @@ testAll = do
   test800s
   test900s
   test1000s
-  test1010s
+  test1100s
+  test1200s
+  test1300s
+

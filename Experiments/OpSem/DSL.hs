@@ -11,6 +11,7 @@ module OpSem.DSL(
   (<.), (<=.), (>.), (>=.),
   (==>), (@@), case_, let_,
   range, array, app, failure, err, print_,
+  new_, (^.), (^:=),
   ) where
 import Data.String ( IsString(..) )
 import OpSem.Error
@@ -137,3 +138,14 @@ err = Error
 
 print_ :: Exp -> Exp
 print_ = PrimUn "print"
+
+new_ :: Exp -> Exp
+new_ = PrimUn "new_"
+
+infix 9 ^.
+(^.) :: Exp -> Exp
+(^.) = PrimUn "read"
+
+infix 2 ^:=
+(^:=) :: Exp -> Exp -> Exp
+(^:=) = PrimBin "write"
