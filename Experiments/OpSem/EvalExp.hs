@@ -442,6 +442,8 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     -- Primitive function.
     -- primOpX requires all array elements in WHNF.
     VPrimOp effs sop
+      | not (all (`memberEffect` ctx_effects (ss_context ss)) (opEffects sop))
+        -> wrong $ "effect not allowed for " ++ show sop
       | any (isHeldEffect ss) effs -> ss & suspendPrim sop op
       | otherwise ->
       case getValue ss arg of
@@ -453,7 +455,6 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         VHeap{} ->
           ss & suspendPrim sop op
         v -> primOpX ss tgt sop [v]
---        _ -> internalError "Bad VPrimOp arg"
 
     -- Array indexing.
     VArray vals ->
@@ -616,6 +617,11 @@ holdAllEffects ss = ss { ss_effects = commutativeEffects (ss_effects ss) }
 primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
 primOpX _ _ "Error" _ = explicitError "Error called"
 primOpX _ _ "Wrong" _ = wrong "called"
+primOpX ss tgt "print" vs =
+  -- XXX for now, just trace
+  let vs' = map (expunge $ ctx_heap $ ss_context ss) vs
+  in  trace ("print: " ++ show vs') $
+      unify ss tgt (VArray [])
 primOpX ss tgt sop vs =
   case primOp sop vs of
     Just v -> unify ss tgt v

@@ -652,6 +652,19 @@ test1010s = mapM_ testEx
 test1101 = ok "test1101" () $
   print_ 99
 
+test1102 = ok "test1102" () $
+  print_ x %
+  print_ 99 %
+  x := 88
+
+test1103 = ok "test1103" () $
+  print_ x %
+  for(y:=1|||2|||3) (print_ y) %
+  x := 88
+
+test1104 = bad "test1104" $
+  if_ (print_ 1) 1 2
+
 --------
 
 testAll :: IO ()
