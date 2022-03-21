@@ -87,7 +87,7 @@ expValue (PrimBin op e1 e2) = do
   pure tgt
 expValue Fail = do
   tgt <- newVHeap
-  emitOp $ RangeX tgt (VArray [])
+  emitOp FailX
   pure tgt
 expValue (For d e) = do
   tgt <- newVHeap
@@ -567,7 +567,7 @@ allocCell ctx =
 nextIter :: Context -> Context
 nextIter ctx =
   assert "nextIter" (null $ ctx_ops ctx) $
-  fromMaybe (ctx{ctx_ops = [RangeX undefined (VArray [])]}) $ ctx_next ctx
+  fromMaybe (ctx{ctx_ops = [FailX]}) $ ctx_next ctx
 
 -- Linearize the Exp with the given Frame and insert
 -- those ops to be executed next.

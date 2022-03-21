@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE PatternSynonyms #-}
 module OpSem.OpX(
   Frame,
   emptyFrame,
@@ -12,6 +13,7 @@ module OpSem.OpX(
   Value(..),
   Target,
   OpX(..),
+  pattern FailX,
   PrimOp,
   ) where
 import Data.List(intercalate)
@@ -197,3 +199,7 @@ data OpX
             , rangex_arr    :: Value    -- Returns the elts of the array, successively
             }
   deriving (Eq, Show)
+
+-- An OpX that is guaranteed to fail.
+pattern FailX :: OpX
+pattern FailX = UnifyX (VInteger 0) (VInteger 1)
