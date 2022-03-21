@@ -3,7 +3,6 @@
 module OpSem.EvalExp(compExp, run) where
 import Control.Monad.State.Strict
 import Data.Function((&))
-import Data.List(find)
 import qualified Data.Map as M
 import Data.Maybe
 import GHC.Stack(HasCallStack)
@@ -287,20 +286,10 @@ getValue :: StepState -> Value -> Value
 getValue ss = follow' []
   where follow' s (VHeap h) | h `elem` s = wrong $ "follow': loop " ++ show (h, s)
         follow' s v@(VHeap h) =
-          case getHeapValue ss h of
+          case getHeapValue (getAllHeaps ss) h of
             Just v' -> follow' (h:s) v'
             _ -> v
         follow' _ v = v
-
--- Find the heap contents at the given HeapId.
--- Looks up the parent chain for heaps.
-getHeapValue :: StepState -> HeapId -> Maybe Value
-getHeapValue ss (HeapId ci h) =
-  let
-    heaps = ctx_heap (ss_context ss) : ss_heaps ss
-    heap = fromMaybe (error "getHeapValue 1") $ find ((== ci) . idHeap) heaps
-  in
-    lookupHeap h heap
 
 -- Add instructions to retry later.
 addResiduals :: [OpX] -> StepState -> StepState
@@ -372,7 +361,7 @@ data StepResult
 -- Repeatedly exectue the [OpX] in the Context, until
 -- nothing further happens, or the [OpX] is empty
 -- Invariant: input Context has ctx_ops non-empty
-step :: ParentHeaps -> Context -> StepResult
+step :: Heaps -> Context -> StepResult
 step phs ctx =
   case stepPass StepState{ ss_suspended = [], ss_hold = False, ss_any = False
                          , ss_context = ctx, ss_heaps = phs } of
@@ -387,7 +376,7 @@ data StepState = StepState
   , ss_hold       :: !Bool           -- effects held
   , ss_any        :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
-  , ss_heaps      :: !ParentHeaps    -- all the heaps in outer contexts
+  , ss_heaps      :: !Heaps    -- all the heaps in outer contexts
   }
   deriving (Show)
 
@@ -553,7 +542,7 @@ step1 ss op@(RangeX tgt arr) =
     VHeap{} -> ss & suspend op
     _ -> error "RangeX bad arg"
 
-getAllHeaps :: StepState -> ParentHeaps
+getAllHeaps :: StepState -> Heaps
 getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
 
 -- Create a new uninstantiated heap cell

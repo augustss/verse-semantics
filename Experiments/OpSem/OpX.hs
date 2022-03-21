@@ -8,16 +8,18 @@ module OpSem.OpX(
   --Effect(..),
   HeapId(..),
   HeapAddr,
-  Heap, ParentHeaps,
+  Heap, Heaps,
   mkHeap, lookupHeap, insertHeap, allocHeap, keysHeap, idHeap,
+  getHeapValue,
   Value(..),
   Target,
   OpX(..),
   pattern FailX,
   PrimOp,
   ) where
-import Data.List(intercalate)
+import Data.List(intercalate, find)
 import qualified Data.Map as M
+import Data.Maybe(fromMaybe)
 import GHC.Stack
 import Text.PrettyPrint.HughesPJClass
 
@@ -70,7 +72,7 @@ data Heap = Heap
   }
   deriving (Show, Eq)
 
-type ParentHeaps = [Heap]
+type Heaps = [Heap]
 
 -- Create an empty heap
 mkHeap :: ContextId -> Heap
@@ -93,6 +95,16 @@ keysHeap (Heap (HeapId ci _) m) = [ HeapId ci a | a <- M.keys m ]
 
 idHeap :: Heap -> ContextId
 idHeap (Heap (HeapId ci _) _) = ci
+
+-- Find the heap contents at the given HeapId.
+-- Looks up the parent chain for heaps.
+getHeapValue :: Heaps -> HeapId -> Maybe Value
+getHeapValue heaps (HeapId ci h) =
+  let
+    heap = fromMaybe (error $ "getHeapValue: " ++ show ci) $
+             find ((== ci) . idHeap) heaps
+  in
+    lookupHeap h heap
 
 --------------------------------
 --
