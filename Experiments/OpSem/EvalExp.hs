@@ -261,7 +261,7 @@ instance Eval Value where
 -- Fails (with WRONG) if the input value reaches any uninstantiated
 -- heap cells.  E.g this is WRONG
 --      if (i:int) then (i=1; i) else 4
--- Any circularity is flagged as an error.
+-- Any circularity is flagged as WRONG.
 expunge :: HasCallStack => Heap -> Value -> Value
 expunge heap = value []
   where
@@ -309,7 +309,7 @@ setHeap h c = c{ ctx_heap = h }
 isFlex :: HeapId -> ContextId -> Bool
 isFlex (HeapId c _) ci = c == ci
 
--- Get actual values.
+-- Get an actual value.
 getWHNF :: StepState -> Value -> Maybe Value
 getWHNF ss v =
   case getValue ss v of
@@ -358,7 +358,7 @@ data StepResult
   deriving (Show)
 
 -- Run a Context as far as possible.
--- Repeatedly exectue the [OpX] in the Context, until
+-- Repeatedly execute the [OpX] in the Context, until
 -- nothing further happens, or the [OpX] is empty
 -- Invariant: input Context has ctx_ops non-empty
 step :: Heaps -> Context -> StepResult
@@ -376,7 +376,7 @@ data StepState = StepState
   , ss_hold       :: !Bool           -- effects held
   , ss_any        :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
-  , ss_heaps      :: !Heaps    -- all the heaps in outer contexts
+  , ss_heaps      :: !Heaps          -- all the heaps in outer contexts
   }
   deriving (Show)
 
@@ -402,10 +402,10 @@ stepPass ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
 -- Result of exeucting a single OpX
 data Step1Result
   = Step1Done    StepState  -- Completely executed the instruction
-                            -- did not add anything to ss_suspended
+                            -- did not add anything to ss_suspended.
   | Step1Suspend StepState  -- Instruction could not fully execute,
-                            -- has been residualized into ss_suspended
-  | Step1Failed             -- Instruction failed
+                            -- has been residualized into ss_suspended.
+  | Step1Failed             -- Instruction failed.
   deriving (Show)
 
 -- ToDo: is there really a difference between Step1Suspend and Step1Done
@@ -427,7 +427,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         frame_w_binding = extendFrame frame [(arg_name, arg)]
 
     -- Primitive function, always with an array argument.
-    -- Requires all array elements in WHNF.
+    -- primOpX requires all array elements in WHNF.
     VPrimOp sop ->
       case getValue ss arg of
         VArray vs
@@ -469,17 +469,17 @@ step1 ss op@(ChoiceX ops1 ops2)
 
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
-  -- Run the cond (with the parent freshly set)
+  -- Run the cond, with all the outer heaps
   case step (getAllHeaps ss) cond of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepNotDone cond' ->
       -- cond did not finish, so suspend and hold off unknown effects.
-      -- suspend with the updated condition to reflect the partial work.
+      -- Suspend with the updated condition to reflect the partial work.
       Step1Done $
       ss & holdEffects & addResiduals [op{ ifx_cond = cond' }]
 
     StepDone cond' ->
-      -- Condition succeeded, run the 'then' branch with the domain frame
+      -- Condition succeeded, run the 'then' branch with the domain frame.
       Step1Done $
       ss & addClosure tgt (extendFrame then_frame ext, then_exp)
       where
@@ -496,8 +496,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       ss & holdEffects & suspend op
 
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
-  -- Run the domain (with the parent freshly set)
-  let ctx = ss_context ss in
+  -- Run the domain, with all the outer heaps
   case step (getAllHeaps ss) dom of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepNotDone dom' ->
@@ -517,7 +516,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = 
             addClosureCtx res (extendFrame body_frame ext, body_exp)
         }
       where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
-            (ctx', res) = allocCell ctx
+            (ctx', res) = allocCell $ ss_context ss  -- allocate a result cell in parent context
             dom'' = nextIter dom'
     StepFailed ->
       -- The for loop has finished, so deliver the array.

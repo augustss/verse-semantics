@@ -58,6 +58,8 @@ instance Show HeapId where
 --
 -- Heap
 --  A Heap maps a HeapAddr to its Value within a particular Heap.
+--  Each Heap cell corresponds to a logical variable.
+--  Uninstantiated logical variables map to Nothing.
 --  There is one Heap in each Context.
 --
 --------------------------------
@@ -67,8 +69,6 @@ type HeapAddr = Int
 data Heap = Heap
   { heap_next     :: !HeapId    -- Next free heap cell
   , heap_contents :: !(M.Map HeapAddr (Maybe Value))
-                     -- Allocated but uninistantiated logical variables
-                     -- map to Nothing.
   }
   deriving (Show, Eq)
 
@@ -78,26 +78,31 @@ type Heaps = [Heap]
 mkHeap :: ContextId -> Heap
 mkHeap ci = Heap{ heap_next = HeapId ci 0, heap_contents = M.empty }
 
+-- Find the contents of a Heap cell.
 lookupHeap :: HasCallStack => HeapAddr -> Heap -> Maybe Value
 lookupHeap a h =
   case M.lookup a (heap_contents h) of
-    Nothing -> error $ "lookupHeap: not set " ++ show a
+    Nothing -> error $ "lookupHeap: not in heap " ++ show a
     Just mv -> mv
 
+-- Insert a Value in the Heap.
 insertHeap :: HeapAddr -> Maybe Value -> Heap -> Heap
 insertHeap a mv h = h{ heap_contents = M.insert a mv (heap_contents h) }
 
+-- Allocate a new heap cell.
 allocHeap :: Heap -> (Heap, HeapId)
 allocHeap (Heap h@(HeapId ci a) m) = (Heap (HeapId ci (a+1)) (M.insert a Nothing m), h)
 
+-- Get all HeapId for a Heap.
 keysHeap :: Heap -> [HeapId]
 keysHeap (Heap (HeapId ci _) m) = [ HeapId ci a | a <- M.keys m ]
 
+-- The unique Heap identifier.
 idHeap :: Heap -> ContextId
 idHeap (Heap (HeapId ci _) _) = ci
 
 -- Find the heap contents at the given HeapId.
--- Looks up the parent chain for heaps.
+-- Looks in all the Heaps.
 getHeapValue :: Heaps -> HeapId -> Maybe Value
 getHeapValue heaps (HeapId ci h) =
   let
