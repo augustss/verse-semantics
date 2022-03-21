@@ -169,7 +169,7 @@ mapStore f (Store r m) = Store r (M.map f m)
 -- Effect
 --  Possible effects
 --  This is a bit of a mish-mash of actual effects
---  and sets of effects
+--  and sets of effects.
 --------------------------------
 data Effect
   = Failure   -- 0 results

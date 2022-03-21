@@ -14,6 +14,14 @@ import OpSem.Exp
 import OpSem.Misc
 import OpSem.OpX
 
+-- ToDo:
+--  Check that ChoiceX has Iterates
+--  Check that failure has Failure/Decides/Iterates
+--  Add opcodes PushEffect/PopEffect to limit allowed effects
+--  Add VString
+--  Add VDouble?
+--  Replace VInteger by VRational?
+
 stepDebug, ifDebug, forDebug :: Bool
 stepDebug = False
 ifDebug = False
