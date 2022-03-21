@@ -6,9 +6,7 @@ module OpSem.Tests(module OpSem.Tests) where
 import Ex
 import OpSem.DSL
 import OpSem.Exp(eval)
---import OpSem.Op(Value)
 import OpSem.OpX(Value)
-import OpSem.Eval()
 import OpSem.EvalExp()
 
 ev :: Exp -> String
