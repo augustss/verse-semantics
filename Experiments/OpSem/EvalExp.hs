@@ -15,6 +15,7 @@ import OpSem.Misc
 import OpSem.OpX
 
 -- ToDo:
+--  step returns the wrong result if one pass is NotDone and the next is Nothing
 --  Check that ChoiceX has Iterates
 --  Check that failure has Failure/Decides/Iterates
 --  Add opcodes PushEffect/PopEffect to limit allowed effects
