@@ -227,9 +227,7 @@ mkContext e = do
       (ops, heap) = linValue (mkHeap ci) fr e
   pure $ Ctx
       { ctx_heap = heap
-      , ctx_done = []
       , ctx_ops = ops
-      , ctx_parent = Nothing
       --, ctx_effects = [Iterates]
       , ctx_next = Nothing
       }
@@ -237,16 +235,14 @@ mkContext e = do
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
-  case step ctx'' of
+  case step [] ctx'' of
     StepFailed -> error "run: StepFailed"
     StepDone rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
       { ctx_heap = mkHeap []
-      , ctx_done = []
       , ctx_ops = []
-      , ctx_parent = Nothing
       --, ctx_effects = [Success, Interacts]
       , ctx_next = Nothing
       }
@@ -288,29 +284,25 @@ expunge heap = value []
     value _ v@VPrimOp{} = v
     frame s fr = M.map (value s) fr
 
--- Get all active contexts.
-getCurrentContexts :: Context -> [Context]
-getCurrentContexts c = c : maybe [] getCurrentContexts (ctx_parent c)
-
 -- Follow VHeap indirections that point to instantiated cells.
-getValue :: Context -> Value -> Value
-getValue ctx = follow' []
+getValue :: StepState -> Value -> Value
+getValue ss = follow' []
   where follow' s (VHeap h) | h `elem` s = wrong $ "follow': loop " ++ show (h, s)
         follow' s v@(VHeap h) =
-          case getHeapValue ctx h of
+          case getHeapValue ss h of
             Just v' -> follow' (h:s) v'
             _ -> v
         follow' _ v = v
 
 -- Find the heap contents at the given HeapId.
 -- Looks up the parent chain for heaps.
-getHeapValue :: Context -> HeapId -> Maybe Value
-getHeapValue ctx (HeapId ci h) =
+getHeapValue :: StepState -> HeapId -> Maybe Value
+getHeapValue ss (HeapId ci h) =
   let
-    ctxs = getCurrentContexts ctx
-    hctx = fromMaybe (error "getHeapValue 1") $ find ((== ci) . idHeap . ctx_heap) ctxs
+    heaps = ctx_heap (ss_context ss) : ss_heaps ss
+    heap = fromMaybe (error "getHeapValue 1") $ find ((== ci) . idHeap) heaps
   in
-    lookupHeap h (ctx_heap hctx)
+    lookupHeap h heap
 
 -- Add instructions to retry later.
 addResiduals :: [OpX] -> StepState -> StepState
@@ -331,9 +323,9 @@ isFlex :: HeapId -> ContextId -> Bool
 isFlex (HeapId c _) ci = c == ci
 
 -- Get actual values.
-getWHNF :: Context -> Value -> Maybe Value
-getWHNF ctx v =
-  case getValue ctx v of
+getWHNF :: StepState -> Value -> Maybe Value
+getWHNF ss v =
+  case getValue ss v of
     VHeap{} -> Nothing
     v' -> Just v'
 
@@ -352,10 +344,9 @@ setHeapCellCtx (HeapId ci h) v ctx =
 --   Will set flexible variables.
 --   Will suspend on inflexible variables.
 unify :: StepState -> Value -> Value -> Step1Result
-unify ss av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
+unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
   where
-    ctx = ss_context ss
-    ci = idHeap (ctx_heap ctx)
+    ci = idHeap $ ctx_heap $ ss_context ss
     unify' :: Value -> Value -> Step1Result
     unify' v1 v2 | v1 == v2 = Step1Done ss
     unify' (VHeap h1) v2 | isFlex h1 ci = Step1Done $ ss & setHeapCell h1 v2
@@ -368,69 +359,6 @@ unify ss av1 av2 = unify' (getValue ctx av1) (getValue ctx av2)
     unify' VFun{} VFun{} = wrong "comparing functions"
     unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
     unify' _ _ = Step1Failed
-
-{-
-type ParentHeaps = [Heap]
-step :: ParentHeaps -> Context -> StepResult
--- Makes it clear that the ParentHeaps are not mutated: good!
-
-step :: Context -> StepResult
--- StepNotDone => a heap mutation took place (in this context's heap),
---                but all ctx_ops are stuck
-
--- Precondition: (ctx_ops c) is non-empty
-step c = assert "step" (not (null (ctx_opc c))) (ppr c) $
-         case stepPass c of
-           StepNotDone c' -> case step c' of
-                               StepNothing -> StepNotDone c'
-                               other       -> other
-           StepDone c'    -> StepDone c'
-           StepNothing    -> StepNothing
-           StepFailed     -> StepFailed
-
-stepPass :: Context -> StepResult
--- StepNotDone => a heap mutation took place (in this context's heap),
---                so it's worth trying another iteration stepPass
-
--- ToDo: Localise ctx_done to step'; remove from Context
---   residual [OpX] becomes an accumulating parameter of step'
--- Ditto ctx_hold!
--}
-
-{-
-step = step' False False
-
--- Repeatedly call step1, keeping track if any actual steps were taken.
--- The first flag indicates that a step has happened since the start,
--- the second flag that a step has happened in the last pass.
-step' :: Bool   -- Step has happened since step' was called
-      -> Bool   -- Step has happened in "this pass" of [OpX]
-      -> Context -> StepResult
-step' _ _ ctx@(Ctx { ctx_done = [], ctx_ops = [] }) =
-  -- We are done, no ops, no residuals
-  StepDone ctx
-step' some did ctx@(Ctx { ctx_done = done, ctx_ops = [] })
-  | stepDebug && trace ("step retry " ++ show done) False = undefined
-  -- We took some steps in the last pass, retry the (non-empty) residuals again.
-  -- Note: when restarting, effects are no longer held.
-  | did = step' some False ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
-  -- We took no steps in the last pass, but some since the start.
-  -- Note: when retrying later, effects are no longer held.
-  | some = StepNotDone ctx{ ctx_done = [], ctx_ops = done, ctx_hold = False }
-  -- We have taken no steps whatsoever.
-  | otherwise = StepNothing
-step' some did ctx@(Ctx { ctx_ops = op:ops }) =
-  -- Take a single step
-  let ctx' = ctx{ ctx_ops = ops }
-  in  case step1 ctx' op of
-        Step1Suspend ctx'' -> ctx'' & step' some did
-        Step1Done ctx''    -> ctx'' & step' True True
-        Step1Failed        ->
-          -- Evaluation failed, backtrack if possible.
-          case ctx_next ctx' of
-            Nothing    -> StepFailed
-            Just ctx'' -> ctx'' & step' True True
--}
 
 -- Results of taking as many steps as possible.
 data StepResult
@@ -446,10 +374,11 @@ data StepResult
 -- Repeatedly exectue the [OpX] in the Context, until
 -- nothing further happens, or the [OpX] is empty
 -- Invariant: input Context has ctx_ops non-empty
-step :: Context -> StepResult
-step ctx =
-  case stepPass StepState{ ss_suspended = [], ss_hold = False, ss_any = False, ss_context = ctx } of
-    StepNotDone ctx' -> step ctx'
+step :: ParentHeaps -> Context -> StepResult
+step phs ctx =
+  case stepPass StepState{ ss_suspended = [], ss_hold = False, ss_any = False
+                         , ss_context = ctx, ss_heaps = phs } of
+    StepNotDone ctx' -> step phs ctx'
     res -> res
 
 -- StepState is the state while executing stepPass.
@@ -460,6 +389,7 @@ data StepState = StepState
   , ss_hold       :: !Bool           -- effects held
   , ss_any        :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
+  , ss_heaps      :: !ParentHeaps    -- all the heaps in outer contexts
   }
   deriving (Show)
 
@@ -485,10 +415,10 @@ stepPass ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
 -- Result of exeucting a single OpX
 data Step1Result
   = Step1Done    StepState  -- Completely executed the instruction
-                          -- did not add anything to ctx_done
+                            -- did not add anything to ss_suspended
   | Step1Suspend StepState  -- Instruction could not fully execute,
-                          -- has been residualized into ctx_done
-  | Step1Failed           -- Instruction failed
+                            -- has been residualized into ss_suspended
+  | Step1Failed             -- Instruction failed
   deriving (Show)
 
 -- ToDo: is there really a difference between Step1Suspend and Step1Done
@@ -500,8 +430,7 @@ step1 :: StepState -> OpX -> Step1Result
 step1 _ op | stepDebug && trace ("step1 " ++ show op) False = undefined
 step1 ss (UnifyX v1 v2) = unify ss v1 v2
 step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
-  let ctx = ss_context ss in
-  case getValue ctx fun of
+  case getValue ss fun of
     -- Function closure
     VFun{ vf_arg_name = arg_name, vf_frame = frame, vf_body = body } ->
       -- Main payload!  Linearize the body, inline the instructions
@@ -513,9 +442,9 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     -- Primitive function, always with an array argument.
     -- Requires all array elements in WHNF.
     VPrimOp sop ->
-      case getValue ctx arg of
+      case getValue ss arg of
         VArray vs
-          | Just vs' <- mapM (getWHNF ctx) vs ->
+          | Just vs' <- mapM (getWHNF ss) vs ->
             primOpX ss tgt sop vs'
           | otherwise ->
             ss & suspend op
@@ -526,7 +455,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
 
     -- Array indexing.
     VArray vals ->
-      case getValue ctx arg of
+      case getValue ss arg of
         VInteger idx
           | i >= 0 && i < length vals -> 
             Step1Done $ ss & addOps [UnifyX tgt (vals!!i)]
@@ -552,10 +481,9 @@ step1 ss op@(ChoiceX ops1 ops2)
     --     this is what implements "backtracking".
 
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
-                , ifx_then = (then_frame, then_exp), ifx_else = els } =
+               , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond (with the parent freshly set)
-  let ctx = ss_context ss in
-  case step cond{ ctx_parent = Just ctx } of
+  case step (getAllHeaps ss) cond of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepNotDone cond' ->
       -- cond did not finish, so suspend and hold off unknown effects.
@@ -583,7 +511,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain (with the parent freshly set)
   let ctx = ss_context ss in
-  case step dom{ ctx_parent = Just ctx } of
+  case step (getAllHeaps ss) dom of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepNotDone dom' ->
       -- domain did not finish, so suspend and hold off unknown effects
@@ -614,8 +542,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = dom, forx_exports = 
       ss & holdEffects & suspend op
 
 step1 ss op@(RangeX tgt arr) =
-  let ctx = ss_context ss in
-  case getValue ctx arr of
+  case getValue ss arr of
     VArray vs ->
       case vs of
         []  -> Step1Failed
@@ -627,6 +554,9 @@ step1 ss op@(RangeX tgt arr) =
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ss & suspend op
     _ -> error "RangeX bad arg"
+
+getAllHeaps :: StepState -> ParentHeaps
+getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
 
 -- Create a new uninstantiated heap cell
 allocCell :: Context -> (Context, Value)

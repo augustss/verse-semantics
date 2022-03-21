@@ -7,7 +7,7 @@ module OpSem.OpX(
   --Effect(..),
   HeapId(..),
   HeapAddr,
-  Heap,
+  Heap, ParentHeaps,
   mkHeap, lookupHeap, insertHeap, allocHeap, keysHeap, idHeap,
   Value(..),
   Target,
@@ -68,6 +68,8 @@ data Heap = Heap
   }
   deriving (Show, Eq)
 
+type ParentHeaps = [Heap]
+
 -- Create an empty heap
 mkHeap :: ContextId -> Heap
 mkHeap ci = Heap{ heap_next = HeapId ci 0, heap_contents = M.empty }
@@ -101,22 +103,11 @@ type ContextId = [Int] -- XXX
 
 data Context = Ctx
   { ctx_heap   :: !Heap
-  , ctx_done   :: ![OpX]
   , ctx_ops    :: ![OpX]
-  , ctx_parent :: !(Maybe Context)  -- Used only for the parent's Heap
-                                    -- ToDo: A [Heap] would do
   , ctx_next   :: !(Maybe Context)  -- Backtrack point, always built by ChoiceX
   --, ctx_effects:: ![Effects]         -- allowed effects, used as a stack
   }
   deriving (Eq, Show)
-
-{-  ToDo: NEW PLAN
-data Context = Ctx
-  { ctx_heap   :: !Heap
-  , ctx_ops    :: ![OpX]
-  , ctx_next   :: !(Maybe Context)  -- Backtrack point
-  }
--}
 
 --------------------------------
 --
