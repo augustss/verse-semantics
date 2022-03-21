@@ -17,7 +17,7 @@ ev = show . (eval :: Exp -> [Value])
 ---------------------
 
 ok :: (Show a) => String -> a -> Exp -> Ex String
-ok nm r e = Ex nm (Just $ show r) (ev e)
+ok nm rr e = Ex nm (Just $ show rr) (ev e)
 
 bad :: String -> Exp -> Ex String
 bad nm e = Ex nm Nothing (ev e)
@@ -31,22 +31,34 @@ unimp nm _r e = Ex ("unimp: " ++ nm) Nothing (ev e)
 ---------------------
 -- Some variables to make the tests look nicer.
 ---------------------
-x, y, z, x1, y1, xs, xy, xyz, a, b, f, t, n, v, w :: Exp
+x, y, z, x1, y1, xs, xy, xys, xyz, a, b, c, f, r, t, n, v, w
+  , twice, dbl, fac, res, one, five, map_, inc :: Exp
 x = "x"
 x1 = "x1"
 xs = "xs"
 xy = "xy"
+xys = "xys"
 xyz = "xyz"
 y = "y"
 y1 = "y1"
 z = "z"
 a = "a"
 b = "b"
+c = "c"
 f = "f"
 n = "n"
 t = "t"
+r = "r"
 v = "v"
 w = "w"
+twice = "twice"
+dbl = "dbl"
+fac = "fac"
+res = "res"
+one = "one"
+five = "five"
+map_ = "map"
+inc = "inc"
 
 ---------------------
 -- Simple, single valued tests.
@@ -395,21 +407,21 @@ test711 = ok "test711" [(999,888,13)] $
   array [f @@ 0, f @@ 1, f @@ 2]
 
 test712 = ok "test712" [12] $
-  "twice" := (var f ==> var x ==> f @@ (f @@ x)) %
-  "dbl" := var x ==> x + x %
-  "twice" @@ "dbl" @@ 3
+  twice := (var f ==> var x ==> f @@ (f @@ x)) %
+  dbl := var x ==> x + x %
+  twice @@ dbl @@ 3
 
 test713 = ok "test712" [16] $
-  "twice" := (var f ==> var x ==> f @@ (f @@ x)) %
-  "dbl" := var x ==> x + x %
-  "twice" @@ "twice" @@ "dbl" @@ 1
+  twice := (var f ==> var x ==> f @@ (f @@ x)) %
+  dbl := var x ==> x + x %
+  twice @@ twice @@ dbl @@ 1
 
 test714 = ok "test714" [(2,6,4)] $
-  "map" := ((var f # var xs) ==> for (x := range xs) (f @@ x)) %
-  "inc" := lam x (x + "c") %
-  "c" := 1 %
+  map_ := ((var f # var xs) ==> for (x := range xs) (f @@ x)) %
+  inc := lam x (x + c) %
+  c := 1 %
   a := array [1,5,3] %
-  "map" @@ ("inc" # a)
+  map_ @@ (inc # a)
 
 test700s :: IO ()
 test700s = mapM_ testEx
@@ -521,15 +533,15 @@ test918 = ok "test918" [3] $
 
 test919 = ok "test919" [7] $
   f := var n ==> (if_ (n <=. 0) (n+1) (n+2)) %
-  "r" := f @@ "five" %
-  "five" := 5 %
-  "r"
+  r := f @@ five %
+  five := 5 %
+  r
 
 test920 = ok "test920" [6] $
   f := var n ==> (if_ (n <=. 10) (n+1) (n+2)) %
-  "r" := f @@ "five" %
-  "five" := 5 %
-  "r"
+  r := f @@ five %
+  five := 5 %
+  r
 
 test900s :: IO ()
 test900s = mapM_ testEx
@@ -552,18 +564,18 @@ test1002 = ok "test1002" [(102,103,104)] $
     (y + 100)
 
 test1003 = ok "test1003" [((1,2),(1,4),(1,5))] $
-  "xys" := array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for (xy := range "xys" % Fst xy === 1)
+  xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for (xy := range xys % Fst xy === 1)
     xy
 
 test1004 = ok "test1004" ([]::[()]) $
-  "xys" := array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for (xy := range "xys" % Fst xy === 2)
+  xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
+  for (xy := range xys % Fst xy === 2)
     (xy `where_` Snd xy === 3)
 
 test1005 = ok "test1005" [((2,3),(2,3))] $
-  "xys" := array [1#2, 2#3, 1#4, 2#3, 1#5] %
-  for (xy := range "xys" % Fst xy === 2)
+  xys := array [1#2, 2#3, 1#4, 2#3, 1#5] %
+  for (xy := range xys % Fst xy === 2)
     (xy `where_` Snd xy === 3)
 
 test1006 = ok "test1006" [(2,3)] $
@@ -605,21 +617,21 @@ test1017 = ok "test1017" [1] $
   if_ (2 <. 4) 1 2
 
 test1018 = ok "test1018" [120] $
-  "fac" := var n ==> (if_ (n <=. 0) 1 (n * "fac" @@ (n - 1))) %
-  "fac" @@ 5
+  fac := var n ==> (if_ (n <=. 0) 1 (n * fac @@ (n - 1))) %
+  fac @@ 5
 
 test1019 = ok "test1019" [120] $
-  "fac" := lam n (if_ (n <=. 0) "one" (n * "fac" @@ (n - 1))) %
-  "res" := "fac" @@ 5 %
-  "one" := 1 %
-  "res"
+  fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
+  res := fac @@ 5 %
+  one := 1 %
+  res
 
 test1020 = ok "test1020" [120] $
-  "res" := "fac" @@ "five" %
-  "fac" := lam n (if_ (n <=. 0) "one" (n * "fac" @@ (n - 1))) %
-  "five" := 5 %
-  "one" := 1 %
-  "res"
+  res := fac @@ five %
+  fac := var n ==> (if_ (n <=. 0) one (n * fac @@ (n - 1))) %
+  five := 5 %
+  one := 1 %
+  res
 
 test1010s :: IO ()
 test1010s = mapM_ testEx
