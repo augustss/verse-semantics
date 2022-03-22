@@ -18,6 +18,7 @@ import OpSem.OpX
 --  Check that ChoiceX has Iterates
 --  Check that failure has Failure/Decides/Iterates
 --  Add opcodes PushEffect/PopEffect to limit allowed effects
+--  Don't use trace for Print
 --  Use n-ary ChoiceX?
 --  Add VString
 --  Add VDouble?
