@@ -198,8 +198,8 @@ type Effects = S.Set Effect
 memberEffect :: Effect -> Effects -> Bool
 -- (memberEffect e es) returns True if effect 'e'
 -- is allowed by effects 'es'
-memberEffect Failure effs = any (`S.member` effs) [Decides, Iterates]
-memberEffect Decides effs = WRONG any (`S.member` effs) [Iterates]
+memberEffect Failure effs | any (`S.member` effs) [Decides, Iterates] = True
+memberEffect Decides effs | any (`S.member` effs) [Iterates] = True
 memberEffect f effs = S.member f effs
 
 -- The top level can use the store (read/write, etc)
@@ -209,7 +209,7 @@ topLevelEffects = S.fromList [Interacts] `S.union` storeEffects
 
 -- Effects on the store
 storeEffects :: Effects
-storeEffects = S.fromList [Allocates, Reads, Writes, Transacts]
+storeEffects = S.fromList [Allocates, Reads, Writes]
 
 -- In a subcontext we inherit the store effects and add iteration
 subContextEffects :: Effects -> Effects
