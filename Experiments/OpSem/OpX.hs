@@ -132,7 +132,7 @@ data Context = Ctx
   { ctx_heap   :: !Heap
   , ctx_ops    :: ![OpX]
   , ctx_next   :: !(Maybe Context)  -- Backtrack point, always built by ChoiceX
-  , ctx_effects:: !Effects          -- allowed effects
+  , ctx_effects:: !Effects          -- Allowed effects (at birth of the Context)
   }
   deriving (Eq, Show)
 
@@ -173,29 +173,37 @@ mapStore f (Store r m) = Store r (M.map f m)
 --------------------------------
 data Effect
   = Failure   -- 0 results
-  | Succeeds  -- 1 result
   | Decides   -- 0/1 results
   | Iterates  -- 0..n results
+
   -----
   | Allocates -- heap allocation
   | Reads     -- heap read
   | Writes    -- heap write
+
+  -----
+  | Interacts -- I/O
+
+{- ---- Later ---------
+  | Succeeds  -- 1 result
   | Transacts -- = { Allocates, Reads, Writes }
   -----
   | Total     -- = { }, i.e., no effects
   | Pure      -- = { Diverges }, may diverge
-  -----
-  | Interacts -- I/O
+--------------------  -}
   deriving (Eq, Ord, Show)
 
 type Effects = S.Set Effect
 
 memberEffect :: Effect -> Effects -> Bool
+-- (memberEffect e es) returns True if effect 'e'
+-- is allowed by effects 'es'
 memberEffect Failure effs = any (`S.member` effs) [Decides, Iterates]
-memberEffect Decides effs = any (`S.member` effs) [Iterates]
+memberEffect Decides effs = WRONG any (`S.member` effs) [Iterates]
 memberEffect f effs = S.member f effs
 
 -- The top level can use the store (read/write, etc)
+-- But you cannot fail, nor produce multiple results.
 topLevelEffects :: Effects
 topLevelEffects = S.fromList [Interacts] `S.union` storeEffects
 

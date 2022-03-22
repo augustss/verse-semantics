@@ -370,31 +370,42 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
     unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
     unify' _ _ = Step1Failed
 
--- Results of taking as many steps as possible.
+---------------------------------------------------------------
+--
+--                Taking a step
+-- 
+---------------------------------------------------------------
+
+-- StepResult: Results of taking as many steps as possible.
 data StepResult
-  = StepDone Store Context    -- Finished successfully; ctx_ops = []
-                              -- use ctx_next for further results.
-  | StepNotDone Store Context -- Something happened, but it didn't finish:
-                              --  (ctx_ops /= []), but they are all stuck.
-  | StepNothing               -- No steps taken; degenerate form of StepNotDone
+  = StepDone Store Context    -- Some progress; if ctx_ops = [] we are done,
+                              --   if not, try again
+  | StepNothing               -- No steps taken
   | StepFailed                -- Failed; hit FailX
   deriving (Show)
+
+done :: Context -> Bool
+-- True when the context has no remaining instructions
+done ctx = not (null (ctx_ops ctx))
 
 -- Run a Context as far as possible.
 -- Repeatedly execute the [OpX] in the Context, until
 -- nothing further happens, or the [OpX] is empty.
 -- Invariant: input Context has ctx_ops non-empty
+--
+-- The outer Heaps are passed in, but they are read-only
+-- so they are not returned in StepResult
 step :: Heaps -> Store -> Context -> StepResult
 step phs ast actx =
   case stepPass phs ast actx of
-    StepNotDone st' ctx' -> step' st' ctx'
+    StepNotDone st' ctx' | not (done ctx') -> step' st' ctx'
     res -> res
   where
     -- Called when some steps have happened.
     step' st ctx =
       case stepPass phs st ctx of
         StepNothing -> StepNotDone st ctx
-        StepNotDone st' ctx' -> step' st' ctx'
+        StepNotDone st' ctx' | not (done ctx') -> step' st' ctx'
         res -> res
 
 -- StepState is the state while executing stepPass.
@@ -404,9 +415,12 @@ data StepState = StepState
   { ss_suspended  :: ![OpX]          -- suspended instructions, in reverse order
   , ss_anyStep    :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
-  , ss_heaps      :: !Heaps          -- all the heaps in outer contexts
   , ss_effects    :: !Effects        -- currently allowed effects
   , ss_store      :: !Store          -- refcell storage
+
+  -- This field is never mutated; it's just in the "state"
+  -- because it reduces the number of arguments etc.
+  , ss_heaps      :: !Heaps          -- all the heaps in outer contexts
   }
   deriving (Show)
 
@@ -420,10 +434,13 @@ stepPass phs st ctx = stepPass' startState
                , ss_heaps = phs, ss_store = st }
 
 stepPass' :: StepState -> StepResult
-stepPass' StepState{ ss_suspended = done, ss_anyStep = anyStep, ss_store = st, ss_context = ctx@Ctx{ ctx_ops = [] } }
-  | null done   = StepDone st ctx
+stepPass' StepState{ ss_suspended = done, ss_anyStep = anyStep
+                   , ss_store = st
+                   , ss_context = ctx@Ctx{ ctx_ops = [] } }
+  -- We have run out of ctx_ops
   | not anyStep = StepNothing
-  | otherwise   = StepNotDone st ctx{ ctx_ops = reverse done }
+  | otherwise   = StepDone st ctx{ ctx_ops = reverse done }
+
 stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   -- Take a single step
   let ctx' = ctx{ ctx_ops = ops }
@@ -431,7 +448,7 @@ stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   in  case step1 ss' op of
         Step1Suspend ss'' -> stepPass' ss''
         Step1Done ss''    -> stepPass' ss''{ ss_anyStep = True }
-        Step1Failed      ->
+        Step1Failed       ->
           -- Evaluation failed, backtrack if possible.
           case ctx_next ctx' of
             Nothing    -> StepFailed
@@ -592,13 +609,29 @@ expungeStore :: Heap -> Store -> Store
 expungeStore h st = mapStore (expunge h) st
 
 isHeldEffect :: StepState -> Effect -> Bool
+-- (isHeldEffect ss e) returns True if we are
+-- NOT free to perform effect 'e' in state 'ss'
 isHeldEffect ss eff = not $ memberEffect eff (ss_effects ss)
 
--- Set the correct effects for a sub-context
+-- Set the correct effects for a sub-context;
+-- specifically in the domain of an 'if' or 'for'
 setSubEffects :: StepState -> Context -> Context
 setSubEffects ss ctx =
   --trace ("setSubEffects: " ++ show (subContextEffects (ctx_effects (ss_context ss)))) $
-  ctx{ ctx_effects = subContextEffects (ctx_effects (ss_context ss)) }
+  ctx{ ctx_effects = subContextEffects (ctx_effects (ssa_context ss)) }
+    -- How do we compute the effects allowable in the sub-context?
+    -- Do we want the *current* effects mask, or the *birth* effects mask of the context?
+    -- We can't just use "current", because
+    --     x := if <cond> then...   -- Disables choice if <cond> is stuck
+    --     y := for (i:=1..n)       -- Want to allow choice in the domain
+    -- We want birth effects of the context, but what about side effects on
+    --    mutable variables? Something about global vs local effects?a
+
+
+{-   x := (p^ := p^ + 1 | p^ := p^ * 2)
+     -- Effects all happen, left to right
+     -- Check with Tim
+-}
 
 getAllHeaps :: StepState -> Heaps
 getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
