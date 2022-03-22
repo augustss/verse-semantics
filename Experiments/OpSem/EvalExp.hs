@@ -255,7 +255,7 @@ run :: Exp -> Value
 run e =
   case step [] emptyStore ctx'' of
     StepFailed -> wrong "run: StepFailed"
-    StepDone _ rctx -> expunge (ctx_heap rctx) tgt
+    StepDone _ rctx | completed rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
@@ -379,14 +379,14 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
 -- StepResult: Results of taking as many steps as possible.
 data StepResult
   = StepDone Store Context    -- Some progress; if ctx_ops = [] we are done,
-                              --   if not, try again
-  | StepNothing               -- No steps taken
-  | StepFailed                -- Failed; hit FailX
+                              --   if not, try again later
+  | StepNothing               -- No steps taken, try again later
+  | StepFailed                -- Failed
   deriving (Show)
 
-done :: Context -> Bool
 -- True when the context has no remaining instructions
-done ctx = not (null (ctx_ops ctx))
+completed :: Context -> Bool
+completed = null . ctx_ops
 
 -- Run a Context as far as possible.
 -- Repeatedly execute the [OpX] in the Context, until
@@ -398,14 +398,14 @@ done ctx = not (null (ctx_ops ctx))
 step :: Heaps -> Store -> Context -> StepResult
 step phs ast actx =
   case stepPass phs ast actx of
-    StepNotDone st' ctx' | not (done ctx') -> step' st' ctx'
+    StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
     res -> res
   where
     -- Called when some steps have happened.
     step' st ctx =
       case stepPass phs st ctx of
-        StepNothing -> StepNotDone st ctx
-        StepNotDone st' ctx' | not (done ctx') -> step' st' ctx'
+        StepNothing -> StepDone st ctx
+        StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
         res -> res
 
 -- StepState is the state while executing stepPass.
@@ -531,9 +531,8 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
   -- Run the cond, with all the outer heaps
   case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
-    StepNotDone _st _cond ->
+    StepDone _st cond' | not (completed cond') ->
       -- cond did not finish, so suspend and hold off unknown effects.
-      -- XXX Can we use _st and _cond???
       ss & holdAllEffects & suspend op
 
     StepDone st' cond' ->
@@ -560,7 +559,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
   -- Run the domain, with all the outer heaps
   case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
-    StepNotDone _st _dom ->
+    StepDone _st dom' | not (completed dom') ->
       -- domain did not finish, so suspend and hold off unknown effects
       ss & holdAllEffects & suspend op
     StepDone st' dom' ->
@@ -618,7 +617,7 @@ isHeldEffect ss eff = not $ memberEffect eff (ss_effects ss)
 setSubEffects :: StepState -> Context -> Context
 setSubEffects ss ctx =
   --trace ("setSubEffects: " ++ show (subContextEffects (ctx_effects (ss_context ss)))) $
-  ctx{ ctx_effects = subContextEffects (ctx_effects (ssa_context ss)) }
+  ctx{ ctx_effects = subContextEffects (ctx_effects (ss_context ss)) }
     -- How do we compute the effects allowable in the sub-context?
     -- Do we want the *current* effects mask, or the *birth* effects mask of the context?
     -- We can't just use "current", because
