@@ -6,7 +6,8 @@
 {-# LANGUAGE ViewPatterns #-}
 module OpSem.DSL(
   Exp,
-  pattern (:=), pattern Fst, pattern Snd, pattern Pair, pattern Sel,
+  pattern (:=),
+  fst_, snd_,
   (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
   (<.), (<=.), (>.), (>=.),
   (==>), (@@), case_, let_,
@@ -50,7 +51,7 @@ x ||| y = Alt (addDef x) (addDef y)
 
 infixl 3 #
 (#) :: Exp -> Exp -> Exp
-(#) = Pair
+x # y = Array [x, y]
 
 infixl 5 ===
 (===) :: Exp -> Exp -> Exp
@@ -62,14 +63,10 @@ pattern (:=) x e <- Set (Var -> x) e
   where (:=) (Var x) e = Set x e
         (:=) _ _ = internalError ":="
 
-pattern Fst :: Exp -> Exp
-pattern Fst e = App e (Con 0)
-pattern Snd :: Exp -> Exp
-pattern Snd e = App e (Con 1)
-pattern Pair :: Exp -> Exp -> Exp
-pattern Pair e1 e2 = Array [e1, e2]
-pattern Sel :: Exp -> Integer -> Exp
-pattern Sel e i = App e (Con i)
+fst_ :: Exp -> Exp
+fst_ e = App e (Con 0)
+snd_ :: Exp -> Exp
+snd_ e = App e (Con 1)
 
 -- Sequencing, evaluate both and return second
 infixl 1 `semi`, %

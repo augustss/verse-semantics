@@ -153,26 +153,26 @@ test301 = okm "test301" [(3,3)] $
   (x := 3) # (x === 3)
 
 test302 = okm "test302" [3] $
-  (x := 1+y) %
+  x := 1+y %
   y := 2 %
-  (x === 3)
+  x === 3
 
 test303 = okm "test303" [(3,3)] $
   (x === 3) # (x := 3)
 
 test304 = okm "test304" [20] $
-  (a := array [10,20,30]) %
-  Sel a 1
+  a := array [10,20,30] %
+  a @@ 1
 
 test305 = okm "test305" [20] $
-  Sel a 1 `where_` (a := array [10,20,30])
+  a @@ 1 `where_` (a := array [10,20,30])
 
 test306 = okm "test306" ([]::[()]) $
-  (a := array [10,20,30]) %
-  Sel a 3
+  a := array [10,20,30] %
+  a @@ 3
 
 test307 = okm "test307" [(1,1)] $
-  t := 1 # Fst t
+  t := 1 # fst_ t
 
 -- Test that when evaluating z the x is fully determined.
 test308 = okm "test308" [5] $
@@ -186,7 +186,9 @@ test310 = okm "test310" ([]::[()]) $
 
 -- Deadlock
 test311 = bad "test311" $
-  y := if_ (z===1) (1|||2) (3|||4) % z:= 5|||6 % (y # z)
+  y := if_ (z===1) (1|||2) (3|||4) %
+  z:= 5|||6 %
+  (y # z)
 
 test300s :: IO ()
 test300s = mapM_ testEx
@@ -227,7 +229,7 @@ test409 = okm "test409" [(7,(1,1)),(7,(2,2)),(1,(1,1)),(2,(2,2))] $
 
 -- x's value should not be delayed, because x's RHS has no depenedncies
 test410 = okm "test410" [((1,7),1)] $
-  (x := ((1 # 7) ||| (y # (y := 2)))) # (Fst x === 1)
+  (x := ((1 # 7) ||| (y # (y := 2)))) # (fst_ x === 1)
 
 test411 = okm "test411" [(1,1)] $
   x := 1 ||| 2 %
@@ -242,8 +244,8 @@ test412 = okm "test412" [(1,1)] $
 
 -- Cascaded forward references
 test413 = okm "test413" [3,7,2,2] $
-  x := (y ||| 2) %
-  y := (3 ||| z) %
+  x := y ||| 2 %
+  y := 3 ||| z %
   z := 7 %
   x
 
@@ -254,8 +256,7 @@ test414 = okm "test414" [(1,5),(1,6),(2,5),(2,6)] $
 
 -- Choice under if, must suspend
 test415 = okm "test415" [(1,5),(1,6),(2,5),(2,6)] $
-  if_ (x === 1) (1|||2) (3|||4) # (5|||6) `where_`
-  x := 1
+  if_ (x === 1) (1|||2) (3|||4) # (5|||6) `where_` x := 1
 
 test400s :: IO ()
 test400s = mapM_ testEx
@@ -288,10 +289,12 @@ test500s = mapM_ testEx
 ---------------------
 
 test601 = ok "test601" (5,5,5) $
-  for (1|||2|||3) 5
+  for (1|||2|||3)
+    5
 
 test602 = ok "test602" (1,2,3) $
-  for (x := 1|||2|||3) x
+  for (x := 1|||2|||3)
+    x
 
 test603 = ok "test603" ((1,4),(1,5),(2,4),(2,5),(3,4),(3,5)) $
   for (x := 1|||2|||3 % y := 4|||5)
@@ -333,7 +336,7 @@ test610 = okm "test610"
             $
   for (x := 10|||20) $
     for (y := 30|||40)
-      ((x1|||y1) `where_` (x1 := x + 1 % y1 := y + 2))
+      (x1|||y1 `where_` (x1 := x + 1 % y1 := y + 2))
 
 test600s :: IO ()
 test600s = mapM_ testEx
@@ -345,21 +348,21 @@ test600s = mapM_ testEx
 ---------------------
 
 test701 = ok "test701" 5 $
-  f := var v ==> (v + 1) %
+  f := var v ==> v + 1 %
   f @@ 4
 
 test702 = ok "test702" 11 $
   w := 7 %
-  f := var v ==> (w + v) %
+  f := var v ==> w + v %
   f @@ 4
 
 test703 = ok "test703" 11 $
-  f := var v ==> (w + v) %
+  f := var v ==> w + v %
   w := 7 %
   f @@ 4
 
 test704 = ok "test704" 11 $
-  f := var v ==> (w + v) %
+  f := var v ==> w + v %
   w := 7 %
   y := f @@ t %
   t := 4 %
@@ -384,13 +387,12 @@ test707 = ok "test707" 11 $
   y := f @@ t %
   w := 7 %
   t := 4 %
-  f := var v ==> (w + v) %
+  f := var v ==> w + v %
   y
 
 test708 = okm "test708" [10,11] $
   f := var v ==> (v ||| v + 1) %
   f @@ 10
-
 
 test709 = bad "test709" $
   f := var v ==> failure %
@@ -401,12 +403,12 @@ test710 = ok "test710" 5 $
   f @@ (2 # 3)
 
 test711 = ok "test711" (999,888,13) $
-  f := var n ==> (
+  f := var n ==>
     case_ (n + 1) [
       1 ==> 999,
       2 ==> 888,
       var x ==> x + 10
-      ]) %
+      ] %
   array [f @@ 0, f @@ 1, f @@ 2]
 
 test712 = ok "test712" 12 $
@@ -451,13 +453,13 @@ test803 = okm "test803" [(1,2)] $
   (x # 2) === (1 # y)
 
 test804 = okm "test804" [1] $
-  f := lam xy (Fst xy === Snd xy) %
+  f := var xy ==> (fst_ xy === snd_ xy) %
   var x %
   f @@ (x # 1) %
   x
 
 test805 = okm "test805" [6] $
-  f := lam xyz ((var x # var y # var z) === xyz % x + y + z) %
+  f := var xyz ==> ((var x # var y # var z) === xyz % x + y + z) %
   f @@ (1 # 2 # 3)
 
 test806 = bad "test806" $
@@ -566,18 +568,18 @@ test1002 = ok "test1002" (102,103,104) $
 
 test1003 = ok "test1003" ((1,2),(1,4),(1,5)) $
   xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for (xy := range xys % Fst xy === 1)
+  for (xy := range xys % fst_ xy === 1)
     xy
 
 test1004 = okm "test1004" ([]::[()]) $
   xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
-  for (xy := range xys % Fst xy === 2)
-    (xy `where_` Snd xy === 3)
+  for (xy := range xys % fst_ xy === 2)
+    (xy `where_` snd_ xy === 3)
 
 test1005 = okm "test1005" [((2,3),(2,3))] $
   xys := array [1#2, 2#3, 1#4, 2#3, 1#5] %
-  for (xy := range xys % Fst xy === 2)
-    (xy `where_` Snd xy === 3)
+  for (xy := range xys % fst_ xy === 2)
+    (xy `where_` snd_ xy === 3)
 
 test1006 = ok "test1006" (2,3) $
   a := for (x := range xs) (x + 1) %
@@ -698,7 +700,8 @@ test1303 = ok "test1303" 2 $
 test1304 = ok "test1304" 6 $
   r := new_ 0 %
   for (i := 1|||2|||3)
-    (x := (r^.) % r ^:= x + i) %
+    (x := (r^.) %
+     r ^:= x + i) %
   (r^.)
 
 test1305 = ok "test1305" 2 $
