@@ -356,22 +356,31 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
   where
     ci = idHeap $ ctx_heap $ ss_context ss
     unify' :: Value -> Value -> Step1Result
-    unify' v1 v2 | v1 == v2 = Step1Done ss
-    unify' (VHeap h1) v2 | isFlex h1 ci = Step1Done $ ss & setHeapCell h1 v2
-    unify' v1 (VHeap h2) | isFlex h2 ci = Step1Done $ ss & setHeapCell h2 v1
+    unify' v1 v2 | v1 == v2 = ss & done
+    unify' (VHeap h1) v2 | isFlex h1 ci = ss & setHeapCell h1 v2 & done
+    unify' v1 (VHeap h2) | isFlex h2 ci = ss & setHeapCell h2 v1 & done
     unify' v1@(VHeap _) v2 = ss & suspend (UnifyX v1 v2)
     unify' v1 v2@(VHeap _) = ss & suspend (UnifyX v1 v2)
     unify' (VArray vs1) (VArray vs2)
       | length vs1 /= length vs2 = failure ss
-      | otherwise = Step1Done $ ss & addOps (zipWith UnifyX vs1 vs2)
+      | otherwise = ss & addOps (zipWith UnifyX vs1 vs2) & done
     unify' VFun{} VFun{} = wrong "comparing functions"
     unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
     unify' _ _ = failure ss
 
+-- The op failed.
 failure :: StepState -> Step1Result
 failure ss
   | not $ allowedEffects ss [Failure] = wrong $ "effect not allowed: failure"
   | otherwise = Step1Failed
+
+-- The has finished/
+done :: StepState -> Step1Result
+done = Step1Done
+
+-- Residualize the given op and report suspension.
+suspend :: OpX -> StepState -> Step1Result
+suspend op ss = Step1Suspend $ addResiduals [op] ss
 
 ---------------------------------------------------------------
 --
@@ -437,12 +446,12 @@ stepPass phs st ctx = stepPass' startState
                , ss_heaps = phs, ss_store = st }
 
 stepPass' :: StepState -> StepResult
-stepPass' StepState{ ss_suspended = done, ss_anyStep = anyStep
+stepPass' StepState{ ss_suspended = susp, ss_anyStep = anyStep
                    , ss_store = st
                    , ss_context = ctx@Ctx{ ctx_ops = [] } }
   -- We have run out of ctx_ops
   | not anyStep = StepNothing
-  | otherwise   = StepDone st ctx{ ctx_ops = reverse done }
+  | otherwise   = StepDone st ctx{ ctx_ops = reverse susp }
 
 stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   -- Take a single step
@@ -480,7 +489,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     -- Function closure
     VFun{ vf_arg_name = arg_name, vf_frame = frame, vf_body = body } ->
       -- Main payload!  Linearize the body, inline the instructions
-      Step1Done $ ss & addClosure tgt (frame_w_binding, body)
+      ss & addClosure tgt (frame_w_binding, body) & done
       where
         -- Extend the frame with the argument binding
         frame_w_binding = extendFrame frame [(arg_name, arg)]
@@ -506,7 +515,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
       case getValue ss arg of
         VInteger idx
           | i >= 0 && i < length vals -> 
-            Step1Done $ ss & addOps [UnifyX tgt (vals!!i)]
+            ss & addOps [UnifyX tgt (vals!!i)] & done
           | otherwise -> failure ss
           where i = fromInteger idx
         VHeap {} -> ss & suspend op
@@ -523,7 +532,7 @@ step1 ss op@(ChoiceX ops1 ops2)
     let ctx  = ss_context ss
         ctx1 = ctx & addOpsCtx ops1
         ctx2 = ctx & addOpsCtx ops2
-    in  Step1Done ss{ ss_context = ctx1{ ctx_next = Just ctx2 } }
+    in  done ss{ ss_context = ctx1{ ctx_next = Just ctx2 } }
     -- Make two contexts, one for each branch, prepending ops to the rest of the ops
     -- And then chain them together, so that we do ctx2 when ctx1 is done.
     -- NB: ctx1 and ctx2 start from the /same/ Heap;
@@ -540,10 +549,10 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 
     StepDone st' cond' ->
       -- Condition succeeded, run the 'then' branch with the domain frame.
-      Step1Done $
       ss &
         addClosure tgt (extendFrame then_frame ext, then_exp) &
-        setStore (expungeStore (ctx_heap cond') st')
+        setStore (expungeStore (ctx_heap cond') st') &
+        done
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
          ext = [ (n, expunge (ctx_heap cond') (VHeap a))
@@ -551,8 +560,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 
     StepFailed ->
       -- Condition failed, run the 'else' branch
-      Step1Done $
-      ss & addClosure tgt els
+      ss & addClosure tgt els & done
     StepNothing ->
       -- Nothing happened, just suspend again.
       ss & holdAllEffects & suspend op
@@ -571,13 +579,13 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
       -- the accumulating array.
       -- After the body execution we will run the ForX again for the next iteration,
       -- but with the domain updated to the next backtrack point.
-      Step1Done $
       ss{ ss_context =
             ctx' &
             addOpsCtx [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
             addClosureCtx res (extendFrame body_frame ext, body_exp)
         } &
-        setStore (expungeStore (ctx_heap dom') st')
+        setStore (expungeStore (ctx_heap dom') st') &
+        done
       where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
             (ctx', res) = allocCell $ ss_context ss  -- allocate a result cell in parent context
             dom'' = nextIter dom'
@@ -598,9 +606,9 @@ step1 ss op@(RangeX tgt arr) =
         [v] -> unify ss tgt v
         _   ->
           -- Create nested ChoiceX for all the array values.
-          Step1Done $
           ss &
-          addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
+            addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs] &
+            done
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
 
@@ -665,10 +673,6 @@ addClosureCtx tgt (frame, body) ctx =
   where
     ls = execState (expToHeap tgt $ Do body) init_ls
     init_ls = LState{ ls_heap = ctx_heap ctx, ls_frame = frame, ls_ops = []}
-
--- Residualize the given op and report suspension.
-suspend :: OpX -> StepState -> Step1Result
-suspend op ss = Step1Suspend $ addResiduals [op] ss
 
 -- Suspend a PrimOp, this needs to suspend effects
 -- that don't commute.
