@@ -667,14 +667,11 @@ test1203 = ok "test1203" 88 $
   for(y:=1|||2|||3) (print_ y) %
   x := 88
 
-test1204 = bad "test1204" $
-  if_ (print_ 1) 1 2
-
 test1200s :: IO ()
 test1200s = do
   putStrLn "Expect print: [99]; print [88],print [99]; print [88],print [1],print [2],print [3]"
   mapM_ testEx
-    [test1201,test1202,test1203,test1204
+    [test1201,test1202,test1203
     ]
 
 ---------------------
@@ -724,6 +721,27 @@ test1300s = mapM_ testEx
   [test1301,test1302,test1303,test1304,test1305,test1306
   ]
 
+---------------------
+-- Illegal effects
+---------------------
+
+-- Top level failure
+test1401 = bad "test1401" $
+  0 === 1
+
+-- Top level choice
+test1402 = bad "test1402" $
+  0 ||| 1
+
+-- IO in condition
+test1403 = bad "test1403" $
+  if_ (print_ 1) 1 2
+
+test1400s :: IO ()
+test1400s = mapM_ testEx
+  [test1401,test1402,test1403
+  ]
+
 --------
 
 testAll :: IO ()
@@ -741,4 +759,4 @@ testAll = do
   test1100s
   test1200s
   test1300s
-
+  test1400s

@@ -15,8 +15,6 @@ import OpSem.Misc
 import OpSem.OpX
 
 -- ToDo:
---  Check that ChoiceX has Iterates
---  Check that failure has Failure/Decides/Iterates
 --  Add opcodes PushEffect/PopEffect to limit allowed effects
 --  Don't use trace for Print
 --  Use n-ary ChoiceX?
@@ -364,11 +362,16 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
     unify' v1@(VHeap _) v2 = ss & suspend (UnifyX v1 v2)
     unify' v1 v2@(VHeap _) = ss & suspend (UnifyX v1 v2)
     unify' (VArray vs1) (VArray vs2)
-      | length vs1 /= length vs2 = Step1Failed
+      | length vs1 /= length vs2 = failure ss
       | otherwise = Step1Done $ ss & addOps (zipWith UnifyX vs1 vs2)
     unify' VFun{} VFun{} = wrong "comparing functions"
     unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
-    unify' _ _ = Step1Failed
+    unify' _ _ = failure ss
+
+failure :: StepState -> Step1Result
+failure ss
+  | not $ allowedEffects ss [Failure] = wrong $ "effect not allowed: failure"
+  | otherwise = Step1Failed
 
 ---------------------------------------------------------------
 --
@@ -485,8 +488,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     -- Primitive function.
     -- primOpX requires all array elements in WHNF.
     VPrimOp effs sop
-      | not (all (`memberEffect` ctx_effects (ss_context ss)) (opEffects sop))
-        -> wrong $ "effect not allowed for " ++ show sop
+      | not $ allowedEffects ss (opEffects sop) -> wrong $ "effect not allowed for " ++ show sop
       | any (isHeldEffect ss) effs -> ss & suspendPrim sop op
       | otherwise ->
       case getValue ss arg of
@@ -505,7 +507,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
         VInteger idx
           | i >= 0 && i < length vals -> 
             Step1Done $ ss & addOps [UnifyX tgt (vals!!i)]
-          | otherwise -> Step1Failed
+          | otherwise -> failure ss
           where i = fromInteger idx
         VHeap {} -> ss & suspend op
         _        -> wrong "Bad index in array indexing"
@@ -515,6 +517,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     _        -> wrong "Bad function in CallX"
 
 step1 ss op@(ChoiceX ops1 ops2)
+  | not $ allowedEffects ss [Iterates] = wrong $ "effect not allowed for ChoiceX"
   | isHeldEffect ss Iterates = ss & suspend op
   | otherwise =
     let ctx  = ss_context ss
@@ -539,8 +542,8 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
       -- Condition succeeded, run the 'then' branch with the domain frame.
       Step1Done $
       ss &
-      addClosure tgt (extendFrame then_frame ext, then_exp) &
-      setStore (expungeStore (ctx_heap cond') st')
+        addClosure tgt (extendFrame then_frame ext, then_exp) &
+        setStore (expungeStore (ctx_heap cond') st')
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
          ext = [ (n, expunge (ctx_heap cond') (VHeap a))
@@ -574,7 +577,7 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
             addOpsCtx [op{ forx_arr = arr ++ [res], forx_dom = dom'' }] &
             addClosureCtx res (extendFrame body_frame ext, body_exp)
         } &
-      setStore (expungeStore (ctx_heap dom') st')
+        setStore (expungeStore (ctx_heap dom') st')
       where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
             (ctx', res) = allocCell $ ss_context ss  -- allocate a result cell in parent context
             dom'' = nextIter dom'
@@ -591,7 +594,7 @@ step1 ss op@(RangeX tgt arr) =
   case getValue ss arr of
     VArray vs ->
       case vs of
-        []  -> Step1Failed
+        []  -> failure ss
         [v] -> unify ss tgt v
         _   ->
           -- Create nested ChoiceX for all the array values.
@@ -600,6 +603,9 @@ step1 ss op@(RangeX tgt arr) =
           addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs]
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
+
+allowedEffects :: StepState -> [Effect] -> Bool
+allowedEffects ss es = all (`memberEffect` ctx_effects (ss_context ss)) es
 
 setStore :: Store -> StepState -> StepState
 setStore st ss = ss{ ss_store = st }
@@ -698,7 +704,7 @@ primOpX ss tgt "write" [VRef r, v] =  -- XXX probably don't need v in WHNF
 primOpX ss tgt sop vs =
   case primOp sop vs of
     Just v -> unify ss tgt v
-    Nothing -> Step1Failed
+    Nothing -> failure ss
 
 newRefCell :: Value -> StepState -> (StepState, Ref)
 newRefCell v ss =
