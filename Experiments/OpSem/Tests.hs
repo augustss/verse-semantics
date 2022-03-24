@@ -344,9 +344,13 @@ test610 = okm "test610"
     for (y := 30|||40)
       (x1|||y1 `where_` (x1 := x + 1 % y1 := y + 2))
 
+test611 = okm "test611" [(5,1),(5,2),(6,3),(6,4)] $
+  (z:=5|||6) # if_ (z===5) (1|||2) (3|||4)
+
 test600s :: IO ()
 test600s = mapM_ testEx
   [test601,test602,test603,test604,test605,test606,test607,test608,test609,test610
+  ,test611
   ]
 
 ---------------------
