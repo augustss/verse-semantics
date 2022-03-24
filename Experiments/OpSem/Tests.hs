@@ -725,9 +725,16 @@ test1307 = ok "test1307" (2,3) $
   r := new_ z %
   (x # y)
 
+test1308 = ok "test1308" 1 $
+  r := new_ 0 %
+  if_ (x === 0) (r ^:= 1) (r ^:= 2) %
+  z := if_ (y := (r^.)) y 999 %
+  x := 0 %
+  z
+
 test1300s :: IO ()
 test1300s = mapM_ testEx
-  [test1301,test1302,test1303,test1304,test1305,test1306,test1307
+  [test1301,test1302,test1303,test1304,test1305,test1306,test1307,test1308
   ]
 
 ---------------------

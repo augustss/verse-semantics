@@ -251,7 +251,7 @@ mkContext e = do
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
 run :: Exp -> Value
 run e =
-  case step [] emptyStore ctx'' of
+  case step noEffects [] emptyStore ctx'' of
     StepFailed -> wrong "run: StepFailed"
     StepDone _ rctx | completed rctx -> expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
@@ -407,15 +407,18 @@ completed = null . ctx_ops
 --
 -- The outer Heaps are passed in, but they are read-only
 -- so they are not returned in StepResult
-step :: Heaps -> Store -> Context -> StepResult
-step phs ast actx =
-  case stepPass phs ast actx of
+--
+-- The currenly held effects are passed in so this sub-computation
+-- can hold those as well.
+step :: Effects -> Heaps -> Store -> Context -> StepResult
+step held phs ast actx =
+  case stepPass held phs ast actx of
     StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
     res -> res
   where
     -- Called when some steps have happened.
     step' st ctx =
-      case stepPass phs st ctx of
+      case stepPass held phs st ctx of
         StepNothing -> StepDone st ctx
         StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
         res -> res
@@ -437,21 +440,30 @@ data StepState = StepState
   deriving (Show)
 
 -- Make one pass over the ctx_ops.
-stepPass :: Heaps -> Store -> Context -> StepResult
-stepPass phs st ctx = stepPass' startState
+stepPass :: Effects -> Heaps -> Store -> Context -> StepResult
+stepPass held phs st ctx = stepPass' startState
   where
     startState =
-      StepState{ ss_suspended = [], ss_held = noEffects
+      StepState{ ss_suspended = [], ss_held = globalEffects held
+               , ss_allowed = [ctx_effects ctx]
                , ss_anyStep = False, ss_context = ctx
                , ss_heaps = phs, ss_store = st }
 
 stepPass' :: StepState -> StepResult
 stepPass' StepState{ ss_suspended = susp, ss_anyStep = anyStep
-                   , ss_store = st
+                   , ss_store = st, ss_allowed = fss
                    , ss_context = ctx@Ctx{ ctx_ops = [] } }
   -- We have run out of ctx_ops
+  | length fss /= 1 = internalError "bad effect stack"
   | not anyStep = StepNothing
   | otherwise   = StepDone st ctx{ ctx_ops = reverse susp }
+
+-- Remove an adjacent pair of PushEffectsX&PopEffects.
+-- These instruction remain in the suspended stream until they meet up
+-- like this, since they must execute on every pass to maintain allowed effects.
+stepPass' ss@StepState{ ss_context =
+                        ctx@Ctx { ctx_ops = PushEffectsX _:PopEffectsX:ops } } =
+  stepPass' ss{ ss_context = ctx{ctx_ops = ops} }
 
 stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   -- Take a single step
@@ -541,7 +553,7 @@ step1 ss op@(ChoiceX ops1 ops2)
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond, with all the outer heaps
-  case step (getAllHeaps ss) (ss_store ss) (setIterEffects ss cond) of
+  case step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepDone _st cond' | not (completed cond') ->
       -- cond did not finish, so suspend and hold off unknown effects.
@@ -568,7 +580,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
                 , forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain, with all the outer heaps
-  case step (getAllHeaps ss) (ss_store ss) (setIterEffects ss adom) of
+  case step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepDone _st dom' | not (completed dom') ->
       -- domain did not finish, so suspend and hold off unknown effects

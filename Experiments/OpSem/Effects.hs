@@ -3,6 +3,8 @@ module OpSem.Effects(
   Effects,
   memberEffect, topLevelEffects, iterContextEffects,
   nonCommutativeEffects, nonCommutativeWithEffects, noEffects,
+  globalEffects,
+  mkEffects,
   ) where
 import Data.List
 
@@ -59,6 +61,9 @@ memberEffect Failure (E fs) = not $ null $ intersect fs [Failure, Decides, Itera
 memberEffect Decides (E fs) = not $ null $ intersect fs [Decides, Iterates]
 memberEffect f (E fs) = f `elem` fs
 
+globalEffects :: Effects -> Effects
+globalEffects (E fs) = E $ filter (not . isLocalEffect) fs
+
 -- The top level can use the store (read/write, etc)
 -- But you cannot fail, nor produce multiple results.
 topLevelEffects :: Effects
@@ -93,3 +98,6 @@ nonCommutativeWithEffects fs = E $ foldr union [] $ map nonComm fs
 
 noEffects :: Effects
 noEffects = E []
+
+mkEffects :: [Effect] -> Effects
+mkEffects = E . nub
