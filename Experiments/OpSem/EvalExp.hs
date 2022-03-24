@@ -427,7 +427,7 @@ data StepState = StepState
   { ss_suspended  :: ![OpX]          -- suspended instructions, in reverse order
   , ss_anyStep    :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
-  , ss_effects    :: !Effects        -- currently allowed effects
+  , ss_held       :: !Effects        -- currently held effects
   , ss_store      :: !Store          -- refcell storage
 
   -- This field is never mutated; it's just in the "state"
@@ -441,7 +441,7 @@ stepPass :: Heaps -> Store -> Context -> StepResult
 stepPass phs st ctx = stepPass' startState
   where
     startState =
-      StepState{ ss_suspended = [], ss_effects = ctx_effects ctx
+      StepState{ ss_suspended = [], ss_held = noEffects
                , ss_anyStep = False, ss_context = ctx
                , ss_heaps = phs, ss_store = st }
 
@@ -482,7 +482,7 @@ data Step1Result
 -- The OpX has already been removed from the ctx_ops
 step1 :: StepState -> OpX -> Step1Result
 step1 ss op | stepDebug && trace ("step1 ctxId=" ++ show (idHeap (ctx_heap (ss_context ss))) ++
-                                 {-" effs=" ++ show (ss_effects ss) ++ -} ": " ++ show op) False = undefined
+                                 " held=" ++ show (ss_held ss) ++ ": " ++ show op) False = undefined
 step1 ss (UnifyX v1 v2) = unify ss v1 v2
 step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
   case getValue ss fun of
@@ -541,7 +541,7 @@ step1 ss op@(ChoiceX ops1 ops2)
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond, with all the outer heaps
-  case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss cond) of
+  case step (getAllHeaps ss) (ss_store ss) (setIterEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepDone _st cond' | not (completed cond') ->
       -- cond did not finish, so suspend and hold off unknown effects.
@@ -568,7 +568,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
                 , forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain, with all the outer heaps
-  case step (getAllHeaps ss) (ss_store ss) (setSubEffects ss adom) of
+  case step (getAllHeaps ss) (ss_store ss) (setIterEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepDone _st dom' | not (completed dom') ->
       -- domain did not finish, so suspend and hold off unknown effects
@@ -624,16 +624,16 @@ expungeStore h st = mapStore (expunge h) st
 isHeldEffect :: StepState -> Effect -> Bool
 -- (isHeldEffect ss e) returns True if we are
 -- NOT free to perform effect 'e' in state 'ss'
-isHeldEffect ss eff = not $ memberEffect eff (ss_effects ss)
+isHeldEffect ss eff = memberEffect eff (ss_held ss)
 
--- Set the correct effects for a sub-context;
+-- Set the correct effects for an iteration sub-context;
 -- specifically in the domain of an 'if' or 'for'
-setSubEffects :: StepState -> Context -> Context
-setSubEffects ss ctx =
+setIterEffects :: StepState -> Context -> Context
+setIterEffects ss ctx =
   --trace ("setSubEffects: " ++ show (subContextEffects (ctx_effects (ss_context ss)))) $
-  ctx{ ctx_effects = subContextEffects (ctx_effects (ss_context ss)) }
+  ctx{ ctx_effects = iterContextEffects (ctx_effects (ss_context ss)) }
     -- How do we compute the effects allowable in the sub-context?
-    -- Do we want the *current* effects mask, or the *birth* effects mask of the context?
+    -- Do we want the *current* allowed effects, or the *birth* effects mask of the context?
     -- We can't just use "current", because
     --     x := if <cond> then...   -- Disables choice if <cond> is stuck
     --     y := for (i:=1..n)       -- Want to allow choice in the domain
@@ -680,13 +680,13 @@ suspendPrim :: PrimOp -> OpX -> StepState -> Step1Result
 suspendPrim sop op ss =
   ss & holdEffects (opEffects sop) & suspend op
 
--- Hold off all effects that don't commute with the given effects
+-- Hold off all effects that don't commute with the given effects.
 holdEffects :: [Effect] -> StepState -> StepState
-holdEffects effs ss = ss { ss_effects = commutesWithEffects effs (ss_effects ss) }
+holdEffects fs ss = ss { ss_held = nonCommutativeWithEffects fs }
 
 -- Hold off all (sequential) effects.
 holdAllEffects :: StepState -> StepState
-holdAllEffects ss = ss { ss_effects = commutativeEffects (ss_effects ss) }
+holdAllEffects ss = ss { ss_held = nonCommutativeEffects }
 
 -- Execute a PrimOp.
 primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result

@@ -716,9 +716,18 @@ test1306 = ok "test1306" (2,3) $
   r := new_ 2 %
   (x # y)
 
+test1307 = ok "test1307" (2,3) $
+  t := new_ 2 %
+  x := (r^.) %
+  r ^:= x+1 %
+  y := (r^.) %
+  z := (t^.) %
+  r := new_ z %
+  (x # y)
+
 test1300s :: IO ()
 test1300s = mapM_ testEx
-  [test1301,test1302,test1303,test1304,test1305,test1306
+  [test1301,test1302,test1303,test1304,test1305,test1306,test1307
   ]
 
 ---------------------

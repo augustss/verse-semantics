@@ -1,10 +1,14 @@
 module OpSem.Effects(
   Effect(..),
   Effects,
-  memberEffect, topLevelEffects, subContextEffects,
-  commutesWithEffects, commutativeEffects, noEffects,
+  memberEffect, topLevelEffects, iterContextEffects,
+  nonCommutativeEffects, nonCommutativeWithEffects, noEffects,
   ) where
-import qualified Data.Set as S
+import Data.List
+
+-- TODO:
+--  * think carefully about what effects commute
+--  * include divergence as an effect
 
 --------------------------------
 --
@@ -33,43 +37,59 @@ data Effect
   | Total     -- = { }, i.e., no effects
   | Pure      -- = { Diverges }, may diverge
 --------------------  -}
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
-type Effects = S.Set Effect
+newtype Effects = E { unE :: [Effect] }
+  deriving (Eq)
+
+instance Show Effects where
+  showsPrec p (E fs) = showsPrec p fs
+
+-- Is the effect local to the current context?
+isLocalEffect :: Effect -> Bool
+isLocalEffect f = f `elem` [Failure, Decides, Iterates]
+
+isUndoable :: Effect -> Bool
+isUndoable f = f `notElem` [Interacts]
 
 memberEffect :: Effect -> Effects -> Bool
 -- (memberEffect e es) returns True if effect 'e'
 -- is allowed by effects 'es'
-memberEffect Failure effs | any (`S.member` effs) [Decides, Iterates] = True
-memberEffect Decides effs | any (`S.member` effs) [Iterates] = True
-memberEffect f effs = S.member f effs
+memberEffect Failure (E fs) = not $ null $ intersect fs [Failure, Decides, Iterates]
+memberEffect Decides (E fs) = not $ null $ intersect fs [Decides, Iterates]
+memberEffect f (E fs) = f `elem` fs
 
 -- The top level can use the store (read/write, etc)
 -- But you cannot fail, nor produce multiple results.
 topLevelEffects :: Effects
-topLevelEffects = S.fromList [Interacts] `S.union` storeEffects
+topLevelEffects = E $ [Interacts] `union` storeEffects
 
 -- Effects on the store
-storeEffects :: Effects
-storeEffects = S.fromList [Allocates, Reads, Writes]
+storeEffects :: [Effect]
+storeEffects = [Allocates, Reads, Writes]
 
--- In a subcontext we inherit the store effects and add iteration
-subContextEffects :: Effects -> Effects
-subContextEffects effs =
-  S.singleton Iterates `S.union` (storeEffects `S.intersection` effs)
+-- In an iteration subcontext we inherit the global effects and add iteration.
+iterContextEffects :: Effects -> Effects
+iterContextEffects (E fs) = E $ [Iterates] `union` filter ok fs
+  where ok f = not (isLocalEffect f) && isUndoable f
 
--- Limit effects to those that commute with every other effect.
+-- Effects to those that commute with every other effect.
 -- Used when we need to suspend unknown effects.
-commutativeEffects :: Effects -> Effects
-commutativeEffects effs =
-  effs `S.intersection` S.fromList [Allocates]  -- XXX Succeeds?
+-- Currently, only Allocates commutes with everything.
+nonCommutativeEffects :: Effects
+nonCommutativeEffects = E
+  [ Failure, Decides, Iterates, Reads, Writes, Interacts ]
 
-commutesWithEffects :: [Effect] -> Effects -> Effects
-commutesWithEffects fs effs = foldr commutes effs fs
+-- Return all the effects that don't commute with fs.
+-- Use when holding effects fs.
+nonCommutativeWithEffects :: [Effect] -> Effects
+nonCommutativeWithEffects fs = E $ foldr union [] $ map nonComm fs
   where
-    commutes :: Effect -> Effects -> Effects
-    -- XXX approximate by saying "nothing" commutes
-    commutes _ x = commutativeEffects x
+    comm Reads = allEffects \\ [Writes]  -- Reads commute with everything except Writes
+    comm Allocates = allEffects          -- Allocates commutes with everything
+    comm _ = []                          -- Nothing else commutes
+    nonComm f = allEffects \\ comm f
+    allEffects = [minBound .. maxBound]      
 
 noEffects :: Effects
-noEffects = S.empty
+noEffects = E []
