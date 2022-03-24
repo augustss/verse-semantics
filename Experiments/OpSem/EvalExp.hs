@@ -15,7 +15,6 @@ import OpSem.Misc
 import OpSem.OpX
 
 -- ToDo:
---  Add opcodes PushEffect/PopEffect to limit allowed effects
 --  Don't use trace for Print
 --  Use n-ary ChoiceX?
 --  Add VString
