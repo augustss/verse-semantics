@@ -19,7 +19,6 @@ import OpSem.Misc
 import OpSem.OpX
 
 -- ToDo:
---  Don't use trace for Print
 --  Use n-ary ChoiceX?
 --  Add VString
 --  Add VDouble?
