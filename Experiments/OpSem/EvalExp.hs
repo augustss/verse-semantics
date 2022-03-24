@@ -1,7 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module OpSem.EvalExp(run, compExp) where
+import Control.Monad.Identity
 import Control.Monad.State.Strict
+import Control.Monad.Writer(Writer, tell, runWriter)
 import Data.Function((&))
 import qualified Data.Map as M
 import Data.Maybe
@@ -30,11 +34,12 @@ forDebug = False
 ----------------------------------------------------------
 
 -- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
-run :: Exp -> Value
-run e =
-  case step noEffects [] emptyStore ctx'' of
+run :: (MonadOutput m) => Exp -> m Value
+run e = do
+  res <- step noEffects [] emptyStore ctx''
+  case res of
     StepFailed -> internalError "run: StepFailed"
-    StepDone _ rctx | completed rctx -> expunge (ctx_heap rctx) tgt
+    StepDone _ rctx | completed rctx -> pure $ expunge (ctx_heap rctx) tgt
     _ -> wrong "run: deadlock"
   where
     ctx = Ctx
@@ -45,6 +50,26 @@ run e =
       }
     (ctx', tgt) = ctx & allocCell
     ctx'' = ctx' & addClosureCtx tgt (emptyFrame, Def [] e)
+
+----------------------------------------------------------
+
+-- Running code has to be in a monad that allows output,
+-- since we have a Print PrimOp.
+
+class (Monad m) => MonadOutput m where
+  output :: String -> m ()
+
+-- IO can do real output
+instance MonadOutput IO where
+  output = putStrLn
+
+-- For pure evaluation we just error on output
+instance MonadOutput Identity where
+  output _ = internalError "output not allowed"
+
+-- We can accumulate the output in a Writer monad.
+instance MonadOutput (Writer [String]) where
+  output s = tell [s]
 
 ----------------------------------------------------------
 
@@ -343,11 +368,11 @@ setHeapCellCtx (HeapId ci h) v ctx =
 -- Unify two values.
 --   Will set flexible variables.
 --   Will suspend on inflexible variables.
-unify :: StepState -> Value -> Value -> Step1Result
+unify :: forall m . (MonadOutput m) => StepState -> Value -> Value -> m Step1Result
 unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
   where
     ci = idHeap $ ctx_heap $ ss_context ss
-    unify' :: Value -> Value -> Step1Result
+    unify' :: Value -> Value -> m Step1Result
     unify' v1 v2 | v1 == v2 = ss & done
     unify' (VHeap h1) v2 | isFlex h1 ci = ss & setHeapCell h1 v2 & done
     unify' v1 (VHeap h2) | isFlex h2 ci = ss & setHeapCell h2 v1 & done
@@ -361,18 +386,18 @@ unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
     unify' _ _ = failure ss
 
 -- The op failed.
-failure :: StepState -> Step1Result
+failure :: (MonadOutput m) => StepState -> m Step1Result
 failure ss
   | not $ allowedEffects ss [Failure] = wrong $ "effect not allowed: failure"
-  | otherwise = Step1Failed
+  | otherwise = pure Step1Failed
 
--- The has finished/
-done :: StepState -> Step1Result
-done = Step1Done
+-- The op has finished.
+done :: (MonadOutput m) => StepState -> m Step1Result
+done = pure . Step1Done
 
 -- Residualize the given op and report suspension.
-suspend :: OpX -> StepState -> Step1Result
-suspend op ss = Step1Suspend $ addResiduals [op] ss
+suspend :: (MonadOutput m) => OpX -> StepState -> m Step1Result
+suspend op ss = pure $ Step1Suspend $ addResiduals [op] ss
 
 ---------------------------------------------------------------
 --
@@ -402,18 +427,18 @@ completed = null . ctx_ops
 --
 -- The currenly held effects are passed in so this sub-computation
 -- can hold those as well.
-step :: Effects -> Heaps -> Store -> Context -> StepResult
+step :: (MonadOutput m) => Effects -> Heaps -> Store -> Context -> m StepResult
 step held phs ast actx =
-  case stepPass held phs ast actx of
+  stepPass held phs ast actx >>= \case
     StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
-    res -> res
+    res -> pure res
   where
     -- Called when some steps have happened.
     step' st ctx =
-      case stepPass held phs st ctx of
-        StepNothing -> StepDone st ctx
+      stepPass held phs st ctx >>= \case
+        StepNothing -> pure $ StepDone st ctx
         StepDone st' ctx' | not (completed ctx') -> step' st' ctx'
-        res -> res
+        res -> pure res
 
 -- StepState is the state while executing stepPass.
 -- At any point a valid Context can be obtained by
@@ -433,7 +458,7 @@ data StepState = StepState
   deriving (Show)
 
 -- Make one pass over the ctx_ops.
-stepPass :: Effects -> Heaps -> Store -> Context -> StepResult
+stepPass :: (MonadOutput m) => Effects -> Heaps -> Store -> Context -> m StepResult
 stepPass held phs st ctx = stepPass' startState
   where
     startState =
@@ -442,14 +467,14 @@ stepPass held phs st ctx = stepPass' startState
                , ss_anyStep = False, ss_context = ctx
                , ss_heaps = phs, ss_store = st }
 
-stepPass' :: StepState -> StepResult
+stepPass' :: (MonadOutput m) => StepState -> m StepResult
 stepPass' StepState{ ss_suspended = susp, ss_anyStep = anyStep
                    , ss_store = st, ss_allowed = fss
                    , ss_context = ctx@Ctx{ ctx_ops = [] } }
   -- We have run out of ctx_ops
   | length fss /= 1 = internalError "bad effect stack"
-  | not anyStep = StepNothing
-  | otherwise   = StepDone st ctx{ ctx_ops = reverse susp }
+  | not anyStep = pure StepNothing
+  | otherwise   = pure $ StepDone st ctx{ ctx_ops = reverse susp }
 
 -- Remove an adjacent pair of PushEffectsX&PopEffects.
 -- These instruction remain in the suspended stream until they meet up
@@ -463,17 +488,17 @@ stepPass' ss@StepState{ ss_context =
       else
         wrong $ "effects not allowed " ++ show es
 
-stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
+stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } = do
   -- Take a single step
   let ctx' = ctx{ ctx_ops = ops }
       ss' = ss{ ss_context = ctx' }
-  in  case step1 ss' op of
+  step1 ss' op >>= \case
         Step1Suspend ss'' -> stepPass' ss''
         Step1Done ss''    -> stepPass' ss''{ ss_anyStep = True }
         Step1Failed       ->
           -- Evaluation failed, backtrack if possible.
           case ctx_next ctx' of
-            Nothing    -> StepFailed
+            Nothing    -> pure StepFailed
             Just ctx'' -> stepPass' ss'{ ss_context = ctx'', ss_anyStep = True }
 
 -- Result of exeucting a single OpX
@@ -490,7 +515,7 @@ data Step1Result
 
 -- Try to execute a single OpX.
 -- The OpX has already been removed from the ctx_ops
-step1 :: StepState -> OpX -> Step1Result
+step1 :: (MonadOutput m) => StepState -> OpX -> m Step1Result
 step1 ss op | stepDebug && trace ("step1 ctxId=" ++ show (idHeap (ctx_heap (ss_context ss))) ++
                                  " held=" ++ show (ss_held ss) ++ ": " ++ show op) False = undefined
 step1 ss (UnifyX v1 v2) = unify ss v1 v2
@@ -551,7 +576,8 @@ step1 ss op@(ChoiceX ops1 ops2)
 step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
                , ifx_then = (then_frame, then_exp), ifx_else = els } =
   -- Run the cond, with all the outer heaps
-  case step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss cond) of
+  case runIdentity $
+       step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss cond) of
     res | ifDebug && trace ("IfX evals " ++ show res) False -> undefined
     StepDone _st cond' | not (completed cond') ->
       -- cond did not finish, so suspend and hold off unknown effects.
@@ -578,7 +604,8 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
 step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
                 , forx_exports = nas, forx_body = (body_frame, body_exp) } =
   -- Run the domain, with all the outer heaps
-  case step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss adom) of
+  case runIdentity $
+       step (ss_held ss) (getAllHeaps ss) (ss_store ss) (setIterEffects ss adom) of
     res | forDebug && trace ("ForX evals " ++ show res) False -> undefined
     StepDone _st dom' | not (completed dom') ->
       -- domain did not finish, so suspend and hold off unknown effects
@@ -703,7 +730,7 @@ addClosureCtx tgt (frame, body) ctx =
 
 -- Suspend a PrimOp, this needs to suspend effects
 -- that don't commute.
-suspendPrim :: PrimOp -> OpX -> StepState -> Step1Result
+suspendPrim :: (MonadOutput m) => PrimOp -> OpX -> StepState -> m Step1Result
 suspendPrim sop op ss =
   ss & holdEffects (opEffects sop) & suspend op
 
@@ -716,22 +743,22 @@ holdAllEffects :: StepState -> StepState
 holdAllEffects ss = ss { ss_held = nonCommutativeEffects }
 
 -- Execute a PrimOp.
-primOpX :: StepState -> Target -> PrimOp -> [Value] -> Step1Result
+primOpX :: (MonadOutput m) => StepState -> Target -> PrimOp -> [Value] -> m Step1Result
 primOpX _ _ "Error" _ = explicitError "Error called"
 primOpX _ _ "Wrong" _ = wrong "called"
-primOpX ss tgt "print" vs =
+primOpX ss tgt "print" vs = do
   -- XXX for now, just trace
   let vs' = map (expunge $ ctx_heap $ ss_context ss) vs
-  in  trace ("print: " ++ show vs') $
-      unify ss tgt (VArray [])
-primOpX ss tgt "new_" [v] =
+  output (show vs')
+  unify ss tgt (VArray [])
+primOpX ss tgt "new_" [v] = do
   let (ss', ref) = newRefCell v ss
-  in  unify ss' tgt (VRef ref)
+  unify ss' tgt (VRef ref)
 primOpX ss tgt "read" [VRef r] =
   unify ss tgt (readStore r (ss_store ss))
-primOpX ss tgt "write" [VRef r, v] =  -- XXX probably don't need v in WHNF
+primOpX ss tgt "write" [VRef r, v] = do -- XXX probably don't need v in WHNF
   let st = writeStore r v (ss_store ss)
-  in  unify (setStore st ss) tgt (VArray [])
+  unify (setStore st ss) tgt (VArray [])
 primOpX ss tgt sop vs =
   case primOp sop vs of
     Just v -> unify ss tgt v
@@ -781,8 +808,8 @@ compExp e =
 -- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
 instance Eval Value where
   evalMany e =
-    case run $ for ("&it" `Set` e) (Var "&it") of
+    case runIdentity $ run $ for ("&it" `Set` e) (Var "&it") of
       VArray vs -> vs
       v -> internalError $ "run returned " ++ show v
-  eval e = run (do_ e)
-
+  eval e = runIdentity $ run $ do_ e
+  evalIO e = runWriter $ run $ do_ e

@@ -5,7 +5,7 @@
 module OpSem.Tests(module OpSem.Tests) where
 import Ex
 import OpSem.DSL
-import OpSem.Exp(Exp(Var),eval, evalMany)
+import OpSem.Exp(Exp(Var),eval, evalMany, evalIO)
 import OpSem.OpX(Value)
 import OpSem.EvalExp()
 
@@ -14,6 +14,9 @@ ev = show . (eval :: Exp -> Value)
 
 evm :: Exp -> String
 evm = show . (evalMany :: Exp -> [Value])
+
+evp :: Exp -> String
+evp = show . (evalIO :: Exp -> (Value, [String]))
 
 ---------------------
 --      Tests
@@ -24,6 +27,9 @@ ok nm rr e = Ex nm (Just $ show rr) (ev e)
 
 okm :: (Show a) => String -> a -> Exp -> Ex String
 okm nm rr e = Ex nm (Just $ show rr) (evm e)
+
+okp :: (Show a) => String -> a -> Exp -> Ex String
+okp nm rr e = Ex nm (Just $ show rr) (evp e)
 
 bad :: String -> Exp -> Ex String
 bad nm e = Ex nm Nothing (ev e)
@@ -654,22 +660,21 @@ test1100s = mapM_ testEx
 
 -- XXX These tests print using trace, so they are hard to test correctly.
 
-test1201 = ok "test1201" () $
+test1201 = okp "test1201" ((),["[99]"]) $
   print_ 99
 
-test1202 = ok "test1202" 88 $
+test1202 = okp "test1202" (88,["[88]","[99]"]) $
   print_ x %
   print_ 99 %
   x := 88
 
-test1203 = ok "test1203" 88 $
+test1203 = okp "test1203" (88,["[88]","[1]","[2]","[3]"]) $
   print_ x %
   for(y:=1|||2|||3) (print_ y) %
   x := 88
 
 test1200s :: IO ()
 test1200s = do
-  putStrLn "Expect print: [99]; print [88],print [99]; print [88],print [1],print [2],print [3]"
   mapM_ testEx
     [test1201,test1202,test1203
     ]

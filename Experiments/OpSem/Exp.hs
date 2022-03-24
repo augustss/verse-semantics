@@ -105,3 +105,4 @@ instance Pretty SExp where
 class (Show a) => Eval a where
   evalMany :: Exp -> [a]
   eval :: Exp -> a
+  evalIO :: Exp -> (a, [String])
