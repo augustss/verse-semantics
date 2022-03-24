@@ -738,7 +738,7 @@ test1300s = mapM_ testEx
   ]
 
 ---------------------
--- Illegal effects
+-- (Il)legal effects
 ---------------------
 
 -- Top level failure
@@ -753,9 +753,35 @@ test1402 = bad "test1402" $
 test1403 = bad "test1403" $
   if_ (print_ 1) 1 2
 
+-- Reduce effects to allowed ones.
+test1404 = ok "test1404" 5 $
+  withEffects [Allocates, Reads] $
+    1+4
+
+-- Reduce effects to allowed ones.
+test1405 = ok "test1405" 5 $
+  withEffects [Allocates, Reads] $
+    r := new_ 5 %
+    (r^.)
+
+-- Try removed effects
+test1406 = bad "test1406" $
+  withEffects [] $
+    print_ 10
+
+-- Try removed effects
+test1407 = bad "test1407" $
+  withEffects [Interacts] $
+    new_ 0
+
+-- Unallowed reduce
+test1408 = bad "test1408" $
+  withEffects [Decides] $
+    5
+
 test1400s :: IO ()
 test1400s = mapM_ testEx
-  [test1401,test1402,test1403
+  [test1401,test1402,test1403,test1404,test1405,test1406,test1407,test1408
   ]
 
 --------

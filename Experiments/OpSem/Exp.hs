@@ -10,6 +10,7 @@ import Data.List ( nub )
 import GHC.Stack ( HasCallStack )
 import Text.PrettyPrint.HughesPJClass
 
+import OpSem.Effects(Effect)
 import OpSem.Error
 
 --------------------------------
@@ -55,6 +56,7 @@ data Exp = Var Name
          | Range Exp     -- :e
          | Lam Name SExp
          | App Exp Exp
+         | WithEffects [Effect] Exp
          | Error
          | Wrong
   deriving (Show, Eq, Ord)
@@ -90,6 +92,7 @@ findSet (Array es) = concatMap findSet es
 findSet (PrimBin _ e1 e2) = findSet e1 ++ findSet e2
 findSet (PrimUn _ e1) = findSet e1
 findSet (Range e) = findSet e
+findSet (WithEffects _ e) = findSet e
 findSet Error = []
 findSet Wrong = []
 

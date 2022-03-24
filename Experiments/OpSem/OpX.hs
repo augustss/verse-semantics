@@ -228,6 +228,11 @@ data OpX
   | RangeX  { targetx       :: Target   -- tgt = :array
             , rangex_arr    :: Value    -- Returns the elts of the array, successively
             }
+  | PushEffectsX {  -- Ensure that the given effects are allowed, and then limit the
+                    -- effects to that set until PopEffectsX.
+            push_effects    :: [Effect]
+            }
+  | PopEffectsX
   deriving (Eq, Show)
 
 -- An OpX that is guaranteed to fail.

@@ -125,6 +125,11 @@ expValue (App f a) = do
   tgt <- newVHeap
   appToHeap tgt f a
   pure tgt
+expValue (WithEffects effs e) = do
+  emitOp $ PushEffectsX effs
+  r <- expValue e
+  emitOp PopEffectsX
+  pure r
 expValue Error = do
   tgt <- newVHeap
   emitOp $ CallX tgt (VPrimOp [] "Error") (VArray [])
@@ -431,6 +436,7 @@ data StepState = StepState
   , ss_anyStep    :: !Bool           -- something has changed
   , ss_context    :: !Context        -- executing context
   , ss_held       :: !Effects        -- currently held effects
+  , ss_allowed    :: ![Effects]      -- stack of allowed effects maintained by push&pop
   , ss_store      :: !Store          -- refcell storage
 
   -- This field is never mutated; it's just in the "state"
@@ -462,8 +468,13 @@ stepPass' StepState{ ss_suspended = susp, ss_anyStep = anyStep
 -- These instruction remain in the suspended stream until they meet up
 -- like this, since they must execute on every pass to maintain allowed effects.
 stepPass' ss@StepState{ ss_context =
-                        ctx@Ctx { ctx_ops = PushEffectsX _:PopEffectsX:ops } } =
-  stepPass' ss{ ss_context = ctx{ctx_ops = ops} }
+                        ctx@Ctx { ctx_ops = PushEffectsX es:PopEffectsX:ops } } =
+  assert "PushEffectsX" (not (null (ss_allowed ss))) $
+  let fs = head (ss_allowed ss)
+  in  if all (`memberEffect` fs) es then
+        stepPass' ss{ ss_context = ctx{ctx_ops = ops}, ss_anyStep = True }
+      else
+        wrong $ "effects not allowed " ++ show es
 
 stepPass' ss@StepState{ ss_context = ctx@Ctx { ctx_ops = op:ops } } =
   -- Take a single step
@@ -509,7 +520,7 @@ step1 ss op@CallX{ targetx = tgt, callx_fun = fun, callx_arg = arg } =
     -- Primitive function.
     -- primOpX requires all array elements in WHNF.
     VPrimOp effs sop
-      | not $ allowedEffects ss (opEffects sop) -> wrong $ "effect not allowed for " ++ show sop
+      | not $ allowedEffects ss effs -> wrong $ "effect not allowed for " ++ show sop
       | any (isHeldEffect ss) effs -> ss & suspendPrim sop op
       | otherwise ->
       case getValue ss arg of
@@ -624,8 +635,25 @@ step1 ss op@(RangeX tgt arr) =
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
 
+step1 ss op@(PushEffectsX es) =
+  assert "PushEffectsX" (not (null (ss_allowed ss))) $
+  let fs = head (ss_allowed ss)
+      ss' = ss{ ss_allowed = mkEffects es : ss_allowed ss }
+  in  if all (`memberEffect` fs) es then
+        -- All the effects are allowed, so use them.
+        ss' & addResiduals [op] & done
+      else
+        wrong $ "effects not allowed " ++ show op
+
+step1 ss op@PopEffectsX =
+  -- Pop the stack of allowed effects, but put the op
+  -- back so it can be eliminated together with the PushEffectsX
+  assert "PopEffectsX" (not (null (ss_allowed ss))) $
+  let ss' = ss{ ss_allowed = tail (ss_allowed ss) }
+  in  ss' & addResiduals [op] & done
+
 allowedEffects :: StepState -> [Effect] -> Bool
-allowedEffects ss es = all (`memberEffect` ctx_effects (ss_context ss)) es
+allowedEffects ss es = all (`memberEffect` head (ss_allowed ss)) es
 
 setStore :: Store -> StepState -> StepState
 setStore st ss = ss{ ss_store = st }

@@ -13,8 +13,10 @@ module OpSem.DSL(
   (==>), (@@), case_, let_,
   range, array, app, failure, err, print_,
   new_, (^.), (^:=),
+  withEffects, Effect(..),
   ) where
 import Data.String ( IsString(..) )
+import OpSem.Effects(Effect(..))
 import OpSem.Error
 import OpSem.Exp
 
@@ -146,3 +148,6 @@ infix 9 ^.
 infix 2 ^:=
 (^:=) :: Exp -> Exp -> Exp
 (^:=) = PrimBin "write"
+
+withEffects :: [Effect] -> Exp -> Exp
+withEffects = WithEffects
