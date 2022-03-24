@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-module OpSem.EvalExp(compExp, run) where
+module OpSem.EvalExp(run, compExp) where
 import Control.Monad.State.Strict
 import Data.Function((&))
 import qualified Data.Map as M
@@ -21,18 +21,32 @@ import OpSem.OpX
 --  Add VDouble?
 --  Replace VInteger by VRational?
 
+-- Debugging flags
 stepDebug, ifDebug, forDebug :: Bool
 stepDebug = False
 ifDebug = False
 forDebug = False
 
--- For debugging
-compExp :: Exp -> [OpX]
-compExp e =
-  fst $
-  linValue (mkHeap 0) emptyFrame $
-  Do $
-  addDef e
+----------------------------------------------------------
+
+-- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
+run :: Exp -> Value
+run e =
+  case step noEffects [] emptyStore ctx'' of
+    StepFailed -> internalError "run: StepFailed"
+    StepDone _ rctx | completed rctx -> expunge (ctx_heap rctx) tgt
+    _ -> wrong "run: deadlock"
+  where
+    ctx = Ctx
+      { ctx_heap = mkHeap 0
+      , ctx_ops = []
+      , ctx_effects = topLevelEffects
+      , ctx_next = Nothing
+      }
+    (ctx', tgt) = ctx & allocCell
+    ctx'' = ctx' & addClosureCtx tgt (emptyFrame, Def [] e)
+
+----------------------------------------------------------
 
 -- linValue throws away the Value from expValue
 -- It is used in mkContext, only for 'if' and 'for',
@@ -251,32 +265,6 @@ mkContext e = do
       , ctx_effects = noEffects  -- placeholder
       , ctx_next = Nothing
       }
-
--- Run a closed expression.  Assumes Def has been inserted in the appropriate places.
-run :: Exp -> Value
-run e =
-  case step noEffects [] emptyStore ctx'' of
-    StepFailed -> wrong "run: StepFailed"
-    StepDone _ rctx | completed rctx -> expunge (ctx_heap rctx) tgt
-    _ -> wrong "run: deadlock"
-  where
-    ctx = Ctx
-      { ctx_heap = mkHeap 0
-      , ctx_ops = []
-      , ctx_effects = topLevelEffects
-      , ctx_next = Nothing
-      }
-    (ctx', tgt) = ctx & allocCell
-    ctx'' = ctx' & addClosureCtx tgt (emptyFrame, Def [] e)
-
--- Just for Tests.hs
--- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
-instance Eval Value where
-  evalMany e =
-    case run $ for ("&it" `Set` e) (Var "&it") of
-      VArray vs -> vs
-      v -> internalError $ "run returned " ++ show v
-  eval e = run (do_ e)
 
 --------------------------------------------------------------
 
@@ -779,19 +767,22 @@ primOp op [VInteger i] = do
     _    -> internalError $ "Unknown primop " ++ op
 primOp _ _ = Nothing
 
-opEffects :: PrimOp -> [Effect]
-opEffects "+" = []
-opEffects "-" = []
-opEffects "*" = []
-opEffects "negate" = []
-opEffects "abs" = []
-opEffects "div" = [Decides]
-opEffects "<" = [Decides]
-opEffects "<=" = [Decides]
-opEffects ">" = [Decides]
-opEffects ">=" = [Decides]
-opEffects "read" = [Reads]
-opEffects "write" = [Writes]
-opEffects "new_" = [Allocates]
-opEffects "print" = [Interacts]
-opEffects s = internalError $ "opEffects: " ++ s
+----------------------------------------------------------
+-- For debugging
+compExp :: Exp -> [OpX]
+compExp e =
+  fst $
+  linValue (mkHeap 0) emptyFrame $
+  Do $
+  addDef e
+
+----------------------------------------------------------
+-- Just for Tests.hs
+-- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
+instance Eval Value where
+  evalMany e =
+    case run $ for ("&it" `Set` e) (Var "&it") of
+      VArray vs -> vs
+      v -> internalError $ "run returned " ++ show v
+  eval e = run (do_ e)
+

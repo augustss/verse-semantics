@@ -19,6 +19,7 @@ module OpSem.OpX(
   Store,
   emptyStore, newStore, readStore, writeStore, mapStore,
   module OpSem.Effects,
+  opEffects,
   ) where
 import Data.List(intercalate, find)
 import qualified Data.Map as M
@@ -238,3 +239,22 @@ data OpX
 -- An OpX that is guaranteed to fail.
 pattern FailX :: OpX
 pattern FailX = UnifyX (VInteger 0) (VInteger 1)
+
+-- The effects of the PrimOps
+opEffects :: PrimOp -> [Effect]
+opEffects "+" = []
+opEffects "-" = []
+opEffects "*" = []
+opEffects "negate" = []
+opEffects "abs" = []
+opEffects "div" = [Decides]
+opEffects "<" = [Decides]
+opEffects "<=" = [Decides]
+opEffects ">" = [Decides]
+opEffects ">=" = [Decides]
+opEffects "read" = [Reads]
+opEffects "write" = [Writes]
+opEffects "new_" = [Allocates]
+opEffects "print" = [Interacts]
+opEffects s = internalError $ "opEffects: " ++ s
+
