@@ -779,9 +779,18 @@ test1408 = bad "test1408" $
   withEffects [Decides] $
     5
 
+test1409 = ok "test1409" 5 $
+  f := var x ==> withEffects [] (x + 1) %
+  if_ (y := f @@ 4) y 999
+
+test1410 = bad "test1410" $
+  f := var x ==> withEffects [Decides] (x + 1) %
+  f @@ 4
+
 test1400s :: IO ()
 test1400s = mapM_ testEx
-  [test1401,test1402,test1403,test1404,test1405,test1406,test1407,test1408
+  [test1401,test1402,test1403,test1404,test1405,test1406,test1407
+  ,test1408,test1409,test1410
   ]
 
 --------
