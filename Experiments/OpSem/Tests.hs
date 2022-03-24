@@ -5,7 +5,7 @@
 module OpSem.Tests(module OpSem.Tests) where
 import Ex
 import OpSem.DSL
-import OpSem.Exp(eval, evalMany)
+import OpSem.Exp(Exp(Var),eval, evalMany)
 import OpSem.OpX(Value)
 import OpSem.EvalExp()
 
@@ -39,33 +39,33 @@ unimp nm _r e = Ex ("unimp: " ++ nm) Nothing (ev e)
 ---------------------
 x, y, z, x1, y1, xs, xy, xys, xyz, a, b, c, f, i, r, t, n, v, w
   , twice, dbl, fac, res, one, five, map_, inc :: Exp
-x = "x"
-x1 = "x1"
-xs = "xs"
-xy = "xy"
-xys = "xys"
-xyz = "xyz"
-y = "y"
-y1 = "y1"
-z = "z"
-a = "a"
-b = "b"
-c = "c"
-f = "f"
-i = "i"
-n = "n"
-t = "t"
-r = "r"
-v = "v"
-w = "w"
-twice = "twice"
-dbl = "dbl"
-fac = "fac"
-res = "res"
-one = "one"
-five = "five"
-map_ = "map"
-inc = "inc"
+x = Var "x"
+x1 = Var "x1"
+xs = Var "xs"
+xy = Var "xy"
+xys = Var "xys"
+xyz = Var "xyz"
+y = Var "y"
+y1 = Var "y1"
+z = Var "z"
+a = Var "a"
+b = Var "b"
+c = Var "c"
+f = Var "f"
+i = Var "i"
+n = Var "n"
+t = Var "t"
+r = Var "r"
+v = Var "v"
+w = Var "w"
+twice = Var "twice"
+dbl = Var "dbl"
+fac = Var "fac"
+res = Var "res"
+one = Var "one"
+five = Var "five"
+map_ = Var "map"
+inc = Var "inc"
 
 ---------------------
 -- Simple, single valued tests.
