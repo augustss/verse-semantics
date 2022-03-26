@@ -10,7 +10,7 @@ module OpSem.OpX(
   Heap, Heaps,
   mkHeap, lookupHeap, insertHeap, allocHeap, keysHeap, idHeap,
   getHeapValue,
-  Value(..),
+  Value(..), VType,
   Target,
   OpX(..),
   pattern FailX,
@@ -168,6 +168,12 @@ mapStore f (Store r m) = Store r (M.map f m)
 --  A Value is a WHNF or an uninstantiated logical variables.
 --
 --------------------------------
+-- The VHeap constructor represents a logical variable that
+-- may or may not be instantiated.
+-- *  when the HeapId points to Nothing the [VType] list are
+--    type constraints that have to hold (as introduced by (x:int).
+-- *  when the HeapId points to a (Just v) then the [VType] list
+--    is unused, even if v is another VHeap.
 data Value = VInteger Integer
            | VArray [Value]
            | VPrimOp [Effect] PrimOp
@@ -175,9 +181,11 @@ data Value = VInteger Integer
                   , vf_arg_name :: Name
                   , vf_body     :: SExp
                   }
-           | VRef Ref        -- pointer to a cell in the Store
-           | VHeap HeapId    -- possibly unsettled logical variable
+           | VRef Ref                -- pointer to a cell in the Store
+           | VHeap [VType] HeapId    -- possibly unsettled logical variable
   deriving (Eq)
+
+type VType = Value  -- Only VFun or VPrimOp
 
 type PrimOp = String
 
@@ -187,7 +195,8 @@ instance Show Value where
   show (VPrimOp _ o) = "Prim" ++ o
   show (VFun f n e) = "(VFun " ++ show f ++ " " ++ show n ++ " (" ++ show e ++"))"
   show (VRef r) = "(VRef " ++ show r ++ ")"
-  show (VHeap h) = "[" ++ show h ++ "]"
+--  show (VHeap [] (HeapId c h)) = "H" ++ show c ++ "." ++ show h
+  show (VHeap ts (HeapId c h)) = "H" ++ show c ++ "." ++ show h ++ "{" ++ show ts ++ "}"
 
 instance Pretty Value where
   pPrint (VFun _f n c) = sep [text "VFun" <+> pPrint n, nest 2 (pPrint c)]
@@ -256,5 +265,5 @@ opEffects "read" = [Reads]
 opEffects "write" = [Writes]
 opEffects "new_" = [Allocates]
 opEffects "print" = [Interacts]
+opEffects "int" = [Decides]
 opEffects s = internalError $ "opEffects: " ++ s
-

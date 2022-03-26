@@ -47,7 +47,8 @@ data Exp = Var Name
          | SetAny Name
          | Array [Exp]   -- (e1, ..., en)  aka  array{e1, ..., en}
          | PrimBin String Exp Exp  -- primitive binary functions, e.g., +
-         | PrimUn String Exp  -- primitive unary functions, e.g., +
+         | PrimUn String Exp  -- primitive unary functions, e.g., abs
+         | PrimNil String  -- primitive nilary functions, e.g., int
          | Fail
          | For SExp SExp
          | If SExp SExp SExp
@@ -91,6 +92,7 @@ findSet (SetAny x) = [x]
 findSet (Array es) = concatMap findSet es
 findSet (PrimBin _ e1 e2) = findSet e1 ++ findSet e2
 findSet (PrimUn _ e1) = findSet e1
+findSet (PrimNil _) = []
 findSet (Range e) = findSet e
 findSet (WithEffects _ e) = findSet e
 findSet Error = []

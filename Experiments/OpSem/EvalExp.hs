@@ -7,12 +7,13 @@ import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Control.Monad.Writer(Writer, tell, runWriter)
 import Data.Function((&))
+import Data.List((\\), union)
 import qualified Data.Map as M
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 import Debug.Trace
 
-import OpSem.DSL(for, do_)
+import OpSem.DSL(for1, do_)
 import OpSem.Error
 import OpSem.Exp
 import OpSem.Misc
@@ -29,6 +30,9 @@ stepDebug, ifDebug, forDebug :: Bool
 stepDebug = False
 ifDebug = False
 forDebug = False
+
+subsetOf :: (Eq a) => [a] -> [a] -> Bool
+subsetOf xs ys = null $ xs \\ ys
 
 ----------------------------------------------------------
 
@@ -47,7 +51,7 @@ run e = do
       , ctx_effects = topLevelEffects
       , ctx_next = Nothing
       }
-    (ctx', tgt) = ctx & allocCell
+    (ctx', tgt) = ctx & allocCellCtx []
     ctx'' = ctx' & addClosureCtx tgt (emptyFrame, Def [] e)
 
 ----------------------------------------------------------
@@ -134,6 +138,8 @@ expValue (PrimUn op e1) = do
   tgt <- newVHeap
   primUnToHeap tgt op e1
   pure tgt
+expValue (PrimNil op) = do
+  pure $ VPrimOp (opEffects op) op
 expValue Fail = do
   tgt <- newVHeap
   emitOp FailX
@@ -250,7 +256,7 @@ newVHeap = do
   ls <- get
   let (h, a) = allocHeap (ls_heap ls)
   put $ ls { ls_heap = h }
-  pure $ VHeap a
+  pure $ VHeap [] a
 
 withBinds :: [(Name, Value)] -> L a -> L a
 withBinds nvs la = do
@@ -307,7 +313,7 @@ expunge heap = value []
     value _ v@VInteger{} = v
     value s (VArray vs) = VArray (map (value s) vs)
     value s (VFun fr n e) = VFun (frame s fr) n e
-    value s v@(VHeap (HeapId ci' h))
+    value s v@(VHeap _ (HeapId ci' h))
       | ci /= ci' = v
       | h `elem` s = wrong $ "expunge recursion:\n" ++ show (h, s, heap)
       | otherwise =
@@ -321,8 +327,8 @@ expunge heap = value []
 -- Follow VHeap indirections that point to instantiated cells.
 getValue :: StepState -> Value -> Value
 getValue ss = follow' []
-  where follow' s (VHeap h) | h `elem` s = wrong $ "follow': loop " ++ show (h, s)
-        follow' s v@(VHeap h) =
+  where follow' s (VHeap _ h) | h `elem` s = wrong $ "follow': loop " ++ show (h, s)
+        follow' s v@(VHeap _ h) =
           case getHeapValue (getAllHeaps ss) h of
             Just v' -> follow' (h:s) v'
             _ -> v
@@ -342,10 +348,6 @@ addOpsCtx os c = c{ ctx_ops = os ++ ctx_ops c }
 setHeap :: Heap -> Context -> Context
 setHeap h c = c{ ctx_heap = h }
 
--- Does the heap pointer refer to a flexible variable?
-isFlex :: HeapId -> ContextId -> Bool
-isFlex (HeapId c _) ci = c == ci
-
 -- Get an actual value.
 getWHNF :: StepState -> Value -> Maybe Value
 getWHNF ss v =
@@ -355,6 +357,7 @@ getWHNF ss v =
 
 -- Set an (uninstantiated) logical variable.
 setHeapCell :: HeapId -> Value -> StepState -> StepState
+--setHeapCell h v _ | trace ("setHeapCell: " ++ show (h, v)) False = undefined
 setHeapCell h v ss = ss{ ss_context = setHeapCellCtx h v (ss_context ss) }
 
 setHeapCellCtx :: HeapId -> Value -> Context -> Context
@@ -368,21 +371,78 @@ setHeapCellCtx (HeapId ci h) v ctx =
 --   Will set flexible variables.
 --   Will suspend on inflexible variables.
 unify :: forall m . (MonadOutput m) => StepState -> Value -> Value -> m Step1Result
+--unify _ av1 av2 | trace ("unify " ++ show (av1, av2)) False = undefined
 unify ss av1 av2 = unify' (getValue ss av1) (getValue ss av2)
   where
-    ci = idHeap $ ctx_heap $ ss_context ss
     unify' :: Value -> Value -> m Step1Result
+    --unify' v1 v2 | trace ("unify' " ++ show (v1, v2)) False = undefined
     unify' v1 v2 | v1 == v2 = ss & done
-    unify' (VHeap h1) v2 | isFlex h1 ci = ss & setHeapCell h1 v2 & done
-    unify' v1 (VHeap h2) | isFlex h2 ci = ss & setHeapCell h2 v1 & done
-    unify' v1@(VHeap _) v2 = ss & suspend (UnifyX v1 v2)
-    unify' v1 v2@(VHeap _) = ss & suspend (UnifyX v1 v2)
+    unify' (VHeap ts1 h1) v2 | Just ss' <- unifyVar ts1 h1 v2 = ss'
+    unify' v1 (VHeap ts2 h2) | Just ss' <- unifyVar ts2 h2 v1 = ss'
+    unify' v1@(VHeap _ _) v2 = ss & suspend (UnifyX v1 v2)
+    unify' v1 v2@(VHeap _ _) = ss & suspend (UnifyX v1 v2)
     unify' (VArray vs1) (VArray vs2)
       | length vs1 /= length vs2 = failure ss
       | otherwise = ss & addOps (zipWith UnifyX vs1 vs2) & done
-    unify' VFun{} VFun{} = wrong "comparing functions"
-    unify' VPrimOp{} VPrimOp{} = wrong "comparing primops"
+    unify' v1 v2 | isFcn v1 && isFcn v2 = wrong "comparing functions"
     unify' _ _ = failure ss
+
+    isFcn VFun{} = True
+    isFcn VPrimOp{} = True
+    isFcn _ = False
+
+    -- Does the heap pointer refer to a flexible variable?
+    isRigid :: HeapId -> Bool
+    isRigid (HeapId c _) = c /= ci
+    ci = idHeap $ ctx_heap $ ss_context ss
+
+    unifyVar :: [VType] -> HeapId -> Value -> Maybe (m Step1Result)
+    --unifyVar ts h v | trace ("unifyVar: " ++ show (ts, h, v)) False = undefined
+    -- Cannot unify rigid variables.
+    unifyVar _ h _ | isRigid h = Nothing
+    -- Without constraints, just point to the value.
+    unifyVar [] h v = Just $ ss & setHeapCell h v & done
+    unifyVar ts h v@(VHeap ts' h') | isRigid h' = Just $
+      -- Unifying a flexible variable with a rigid one.
+      -- If the rigid one has at least the same type constraints, then
+      -- just instantiate, if it doesn't then we have to suspend.
+      if ts `subsetOf` ts' then
+        ss & setHeapCell h v & done
+      else
+        ss & suspend (UnifyX (VHeap ts h) v)
+                                   | otherwise = Just $
+      -- Unifying two flexible variables.  There are 3 cases:
+      --  * the first type constraints are a subset of the second
+      --  * the second type constraints are a subset of the first
+      --  * the constraints are unrelated
+      -- In the third case we create a new type variable that has all
+      -- of the constraints, and the original two variables will point
+      -- to the new one
+      case () of
+        _ | ts `subsetOf` ts' -> ss & setHeapCell h v & done
+        _ | ts' `subsetOf` ts -> ss & setHeapCell h' (VHeap ts h) & done
+        _ | otherwise ->
+          let (ss', nv) = allocCell (ts `union` ts') ss
+          in  ss' &
+              setHeapCell h nv &
+              setHeapCell h' nv &
+              done
+    -- Unifying a variable with a value.  Make sure all type constraints
+    -- are satisfied.
+    unifyVar ts h v =
+      let addTest t ss' =
+            let (ss'', tgt) = allocCell [] ss'
+            in  addOps [CallX { targetx = tgt, callx_fun = t, callx_arg = v }] ss''
+      in  Just $
+          foldr addTest ss ts &
+          setHeapCell h v &
+          done
+
+    -- Unifying two type flexible type variables, bithing with constraints.
+    -- Make them both point to a new variable that 
+{-
+ | isFlex h1 ci = 
+-}
 
 -- The op failed.
 failure :: (MonadOutput m) => StepState -> m Step1Result
@@ -590,7 +650,7 @@ step1 ss op@IfX{ targetx = tgt, ifx_cond = cond, ifx_exports = nas
         done
       where
          ext :: [(Name, Value)] -- The Values have no references to the Heap of cond'
-         ext = [ (n, expunge (ctx_heap cond') (VHeap a))
+         ext = [ (n, expunge (ctx_heap cond') (VHeap [] a))
                | (n, a) <- nas ]
 
     StepFailed ->
@@ -622,8 +682,8 @@ step1 ss op@ForX{ targetx = tgt, forx_arr = arr, forx_dom = adom
         } &
         setStore (expungeStore (ctx_heap dom') st') &
         done
-      where ext = [ (n, expunge (ctx_heap dom') (VHeap a)) | (n, a) <- nas ]
-            (ctx', res) = allocCell $ ss_context ss  -- allocate a result cell in parent context
+      where ext = [ (n, expunge (ctx_heap dom') (VHeap [] a)) | (n, a) <- nas ]
+            (ctx', res) = allocCellCtx [] $ ss_context ss  -- allocate a result cell in parent context
             dom'' = nextIter dom'
     StepFailed ->
       -- The for loop has finished, so deliver the array.
@@ -645,6 +705,12 @@ step1 ss op@(RangeX tgt arr) =
           ss &
             addOps [foldr1 (\ op1 op2 -> ChoiceX [op1] [op2]) $ map (UnifyX tgt) vs] &
             done
+    v@VFun{} ->
+      let (ss', t) = allocCell [v] ss
+      in  unify ss' tgt t
+    v@VPrimOp{} ->
+      let (ss', t) = allocCell [v] ss
+      in  unify ss' tgt t
     VHeap{} -> ss & suspend op
     _ -> wrong "RangeX bad arg"
 
@@ -703,10 +769,15 @@ getAllHeaps :: StepState -> Heaps
 getAllHeaps ss = ctx_heap (ss_context ss) : ss_heaps ss
 
 -- Create a new uninstantiated heap cell
-allocCell :: Context -> (Context, Value)
-allocCell ctx =
+allocCell :: [VType] -> StepState -> (StepState, Value)
+allocCell ts ss =
+  let (ctx, v) = allocCellCtx ts (ss_context ss)
+  in  (ss{ ss_context = ctx }, v)
+
+allocCellCtx :: [VType] -> Context -> (Context, Value)
+allocCellCtx ts ctx =
   let (h, a) = allocHeap (ctx_heap ctx)
-  in  (ctx{ ctx_heap = h }, VHeap a)
+  in  (ctx{ ctx_heap = h }, VHeap ts a)
 
 -- Move to next iteration.
 -- If there is no backtrack point, make the next iteration just fail.
@@ -771,6 +842,10 @@ newRefCell v ss =
 -- Execute a pure PrimOp.
 -- Nothing indicates that the op failed.
 primOp :: PrimOp -> [Value] -> Maybe Value
+primOp "int" vs =
+  case vs of
+    [v@VInteger{}] -> Just v
+    _ -> Nothing
 primOp op [v1@(VInteger i1), VInteger i2] = do
   let arith f = Just $ VInteger $ i1 `f` i2
       compar f = if i1 `f` i2 then Just v1 else Nothing
@@ -807,7 +882,7 @@ compExp e =
 -- eval accepts a multivalued expression, so wrap it in a 'for' to get an array.
 instance Eval Value where
   evalMany e =
-    case runIdentity $ run $ for ("&it" `Set` e) (Var "&it") of
+    case runIdentity $ run $ for1 e of
       VArray vs -> vs
       v -> internalError $ "run returned " ++ show v
   eval e = runIdentity $ run $ do_ e

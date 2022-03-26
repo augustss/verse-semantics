@@ -8,12 +8,14 @@ module OpSem.DSL(
   Exp,
   pattern (:=),
   fst_, snd_,
-  (===), (|||), (#), (%), if_, for, semi, where_, var, lam, do_, appS,
+  (===), (|||), (#), (%), if_, for, for1, semi, where_, var, lam, do_, appS,
   (<.), (<=.), (>.), (>=.),
   (==>), (@@), case_, let_,
   range, array, app, failure, err, print_,
   new_, (^.), (^:=),
   withEffects, Effect(..),
+  (.:),
+  int,
   ) where
 import Data.String ( IsString(..) )
 import OpSem.Effects(Effect(..))
@@ -85,6 +87,9 @@ where_ x y = Where x y
 for :: Exp -> Exp -> Exp
 for e1 e2 = For (addDef e1) (addDef e2)
 
+for1 :: Exp -> Exp
+for1 e = for ("&it" `Set` e) (Var "&it")
+
 if_ :: Exp -> Exp -> Exp -> Exp
 if_ e1 e2 e3 = If (addDef e1) (addDef e2) (addDef e3)
 
@@ -151,3 +156,10 @@ infix 2 ^:=
 
 withEffects :: [Effect] -> Exp -> Exp
 withEffects = WithEffects
+
+int :: Exp
+int = PrimNil "int"
+
+infix 2 .:
+(.:) :: Exp -> Exp -> Exp
+x .: t = x := Range t

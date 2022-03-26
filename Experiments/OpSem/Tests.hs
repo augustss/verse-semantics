@@ -40,6 +40,10 @@ bug nm _r e = Ex ("bug: " ++ nm) Nothing (ev e)
 unimp :: (Show a) => String -> a -> Exp -> Ex String
 unimp nm _r e = Ex ("unimp: " ++ nm) Nothing (ev e)
 
+-- Monomorphic empty list so it can be printed.
+nil :: [()]
+nil = []
+
 ---------------------
 -- Some variables to make the tests look nicer.
 ---------------------
@@ -173,7 +177,7 @@ test304 = okm "test304" [20] $
 test305 = okm "test305" [20] $
   a @@ 1 `where_` (a := array [10,20,30])
 
-test306 = okm "test306" ([]::[()]) $
+test306 = okm "test306" nil $
   a := array [10,20,30] %
   a @@ 3
 
@@ -184,10 +188,10 @@ test307 = okm "test307" [(1,1)] $
 test308 = okm "test308" [5] $
   x := y % y := 5 % z := (x===5)
 
-test309 = okm "test309" ([]::[()]) $
+test309 = okm "test309" nil $
   (x := 3) # (x === 4)
 
-test310 = okm "test310" ([]::[()]) $
+test310 = okm "test310" nil $
   (x === 4) # (x := 3)
 
 -- Deadlock
@@ -563,7 +567,7 @@ test900s = mapM_ testEx
   ]
 
 ---------------------
--- range
+-- Range
 ---------------------
 
 test1001 = ok "test1001" (1,2,3) $
@@ -581,7 +585,7 @@ test1003 = ok "test1003" ((1,2),(1,4),(1,5)) $
   for (xy := range xys % fst_ xy === 1)
     xy
 
-test1004 = okm "test1004" ([]::[()]) $
+test1004 = okm "test1004" nil $
   xys := array [1#2, 2#3, 1#4, 2#4, 1#5] %
   for (xy := range xys % fst_ xy === 2)
     (xy `where_` snd_ xy === 3)
@@ -599,9 +603,25 @@ test1006 = ok "test1006" (2,3) $
 test1007 = ok "test1007" 2 $
   if_ (range (array [])) 1 2
 
+test1008 = ok "test1008" 5 $
+  if_ (x .: int % x === 5)
+    x
+    999
+
+test1009 = ok "test1009" ((5,6),()) $
+  f := (x .: int) ==> x + 1 %
+  for1(f @@ (4|||5)) # for1(f @@ array[])
+
+test1010 = ok "test1010" (5,6) $
+  let nat = Var "nat" in
+  nat := (x .: int) ==> x >=. 0 %
+  f := (x .: nat) ==> x + 1 %
+  for1(f @@ (4|||(-1)|||5))
+
 test1000s :: IO ()
 test1000s = mapM_ testEx
   [test1001,test1002,test1003,test1004,test1005,test1006,test1007
+  ,test1008,test1009,test1010
   ]
 
 ---------------------
@@ -620,7 +640,7 @@ test1103 = ok "test1103" 24 $
 test1104 = okm "test1104" [1] $
   6 `div` 4
 
-test1105 = okm "test1105" ([]::[()]) $
+test1105 = okm "test1105" nil $
   6 `div` 0
 
 test1106 = ok "test1106" 2 $
