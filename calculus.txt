@@ -1,0 +1,145 @@
+The Verse calculus
+~~~~~~~~~~~~~~~~~~
+Using ideas from "The call by need lambda calculus"
+by Ariola et al.
+
+Key ideas:
+
+* A 'se' has NONE and ||, which don't occur in source programs
+  (nor does 'def' for that matter). This models the sequence of
+  values produced by an expression, complete with an enclosing
+  heap.
+
+* Rules B1, B2 "float" a binding up to the definition site,
+  when (and only when) the unification binds a variable to
+  a head-normal form.
+
+* Rule (S1) substitutes x=v value wherever x occurs
+
+* Rule (C2) duplicates the heap H and evaluation context E
+  Evaluation context E ensures that there are only choice-free
+  expressions to the left.
+
+* Conditionals:
+  - Rule (K1) picks the 'else' branch if the condition fails
+  - Rules (K2,K3) takes the first success, and wraps its heap
+    around the 'then' branch, using 'do'.
+
+---------------------------
+-- Syntax
+---------------------------
+
+e ::= a                        Atoms
+   |  (e,e)                    Pairs
+   |  op(e)
+   |  se | se                  Choice
+   |  FAIL
+   |  if se then e1 else e2    Conditional
+   |  do se                    Local bindings
+
+op ::= add | semi | unify
+
+-- v: values
+v ::= a | (v1,v2)    Values
+
+-- ce: expressions that do not block choice
+ce ::= a | (ce1,ce2) | op(ce) | do (def h in ce)
+
+se ::= def h in e
+   |   NONE
+   |   se1 || se2         Successive values
+
+h ::= emp | x,h | x=v,h   Heap
+
+a :: = k | x         Atoms
+
+
+------------------------------
+--         Contexts
+------------------------------
+
+-- A heap with a hole
+H   ::= <>,h | emp
+
+-- An 'e' with an 'e' hole, but
+-- not going inside any se's
+S ::= <>            Expression hole
+   |  (S,e)
+   |  (e,S)
+   |  op(S)
+
+-- E: expressions where choice is active
+E ::= (E,e)
+    | (ce,E)
+    | op(E)
+
+-- C: an arbitrary e context
+C ::= <>           Expression hole
+   |  (C,e)
+   |  (e,C)
+   |  op(C)
+   |  (def H in C) | se
+   |  se | (def H in C)
+   |  if C then e2 else e3
+   |  if e1 then C else e3
+   |  if e1 then e2 else C
+   |  do (def H in C)
+
+
+--------------------------------
+Rewrite rules on 'se'
+
+-- NONE cancellation
+(X1) NONE || se  --> se
+(X2) || NONE  --> se
+
+-- Choice and failure
+(C1) def H[x] in S[FAIL]    -->  NONE
+(C2) def H in E[ e1 | e2 ]  -->  (def H in E[e1]) || (def H in E[e2])
+
+-- Bind in the heap
+(B1) def H[x] in S[unify(x,k)]        -->  def H[x=k] in S[k]
+(B2) def H[x] in S[unify(x,(e1,e2))]  -->  def H[ x1, x2, x=(x1,x2) ]
+                                      in S[(x1=e1,x2=e2)]
+
+-- Garbage collection
+(GC1) def H[x] in e            -->  def H[] in e    x not free in e
+(GC2) def H[x=v] in e          -->  def H[] in e    x not free in e
+
+-- Substitution: as deep as you like
+(S1) def H[x=v] in C[x]  -->  def H[x=v] in C[v]
+
+
+
+-------------------------------
+Rewrite rules on 'e'
+
+-- Unification
+(U1) unify(e,x)              --> unify(x,e)
+(U2) unify((e1,e2),(e3,e4))  --> semi( unify(e1,e3), unify(e2,e4) )
+(U3) unify(k,k)              --> k
+(U4) unify(k1,k2)            --> FAIL      if k1 /= k2
+
+(P1) add(k1,k2) --> k1+k2
+
+(S1) semi(k,e)        --> e
+(S2) semi((e1,e2),e)  --> e
+
+-- Conditionals
+(K1) if NONE                then e1 else e2  -->  e2
+(K2) if (def H in v)        then e1 else e2  -->  do (def H in e1)
+(K3) if (def H in v || se2) then e1 else e2  -->  do (def H in e1)
+
+-- Do: discard when expunging is complete
+(D1) do (def emp in e)  -->  e
+
+
+
+--------------------------
+Interesting example:
+(x=3; y) = (if (x=3) then 5 else 5)
+
+
+
+
+
