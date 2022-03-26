@@ -618,10 +618,27 @@ test1010 = ok "test1010" (5,6) $
   f := (x .: nat) ==> x + 1 %
   for1(f @@ (4|||(-1)|||5))
 
+test1011 = ok "test1011" 5 $
+  if_ (x .: int % x === y)
+    x
+    999 `where_`
+  y := 5
+
+test1012 = ok "test1012" 999 $
+  if_ (x .: int % x === y)
+    x
+    999 `where_`
+  y := (1 # 2)
+
+-- Should this work?
+test1013 = bug "test1013" [5] $
+  f := ((x .: int) <. 5) ==> x + 1 %
+  f @@ 4
+
 test1000s :: IO ()
 test1000s = mapM_ testEx
   [test1001,test1002,test1003,test1004,test1005,test1006,test1007
-  ,test1008,test1009,test1010
+  ,test1008,test1009,test1010,test1011,test1012
   ]
 
 ---------------------
