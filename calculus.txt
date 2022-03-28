@@ -2,6 +2,7 @@ The Verse calculus
 ~~~~~~~~~~~~~~~~~~
 Using ideas from "The call by need lambda calculus"
 by Ariola et al.
+https://www.researchgate.net/publication/2597124_A_Call-By-Need_Lambda_Calculus
 
 Key ideas:
 
@@ -58,15 +59,18 @@ e ::= a                        Atoms
    |  if se then e1 else e2    Conditional
    |  for se in e              For-loop
    |  do se                    Local bindings
+   |  x => se
 
-op ::= add | semi | unify
+op ::= add | semi | unify | apply
 
 -- v: values
-v ::= a | (v1,v2)    Values
-a :: = k | x         Atoms
+v ::= a | (v1,v2) | x => se    Values
+a ::= k | x                    Atoms
 
 -- ce: choice-free expressions, that do not block choice
-ce ::= a | (ce1,ce2) | op(ce) | do (def h in ce)
+ce ::= a | (ce1,ce2)
+     | do (def h in ce) | x=>se
+     | op(ce)     if op /= apply
 
 se ::= def h in e
    |   NONE
@@ -75,6 +79,10 @@ se ::= def h in e
 h ::= emp | h1,h2         Heaps
     | x
     | x=k | x=(v1,v2)
+
+Notation:
+   e1 ~ e2    unify(e1,e2)
+   e1 ; e2    semi(e1,e2)
 
 
 ------------------------------
@@ -97,21 +105,7 @@ E ::= (E,e)
     | (ce,E)
     | op(E)
 
--- C: an arbitrary e context
--- Used for substitution
-C ::= <>           Expression hole
-   |  (C,e)
-   |  (e,C)
-   |  op(C)
-   |  HC | se
-   |  se | HC
-   |  do HC
-   |  if HC then e2 else e3
-      -- No point in substituting into e2, e3
-      -- until the condition is resolved
-   |  for HC in e
-
-HC ::= def h in C
+HC(fvs) ::= def h in C(x)    fvs not in bv(h)
 
 ------------------------------
 --         Rewrite rules on 'se'
@@ -124,6 +118,11 @@ HC ::= def h in C
 -- Choice and failure
 (C1) def H[x] in S[FAIL]    -->  NONE
 (C2) def H in E[ e1 | e2 ]  -->  (def H in E[e1]) || (def H in E[e2])
+
+-- Lambda and application
+(L1) apply( x => def h in e1, e2 )   --> do (h, x) in (x ~ e2; e1)
+                                         x not free in e2
+                                         (alpha-rename to make this true)
 
 -- Bind in the heap
 (B1a) def H[x] in S[unify(x,k)]       -->  def H[x=k] in S[k]
@@ -169,8 +168,14 @@ If we want (x=y) in h, then unify(x,x) --> x
 (GC2) def H[x=v] in e       -->  def H[] in e    x not free in e or H
 
 -- Substitution: as deep as you like
-(S1) def H[x=v] in C[x]  -->  def H[x=v] in C[v]
+(S1a) def H[x=v] in e  -->  def H[x=v] in e[v/x]
+                            Capture-avoiding substition
+   Cannot drop the binding because x could occur in H
 
+Alternatively
+(S1b) def H[x=v] in e  -->  (def H[emp] in e)[v/x]
+                            Capture-avoiding substition
+    Advantage: no need for GC
 
 
 ------------------------------
