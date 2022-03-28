@@ -635,6 +635,11 @@ test1013 = bug "test1013" [5] $
   f := ((x .: int) <. 5) ==> x + 1 %
   f @@ 4
 
+-- Should this work?
+test1014 = bug "test1014" [5] $
+  f := (x := (range int <. 5)) ==> x + 1 %
+  f @@ 4
+
 test1000s :: IO ()
 test1000s = mapM_ testEx
   [test1001,test1002,test1003,test1004,test1005,test1006,test1007
