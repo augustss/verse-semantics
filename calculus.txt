@@ -34,6 +34,18 @@ LA: Maybe by a pass before we use the rewrite rules?
   Here the (x+1=3) is stuck, but we can still carry on to see
   x=k. If k is 2, we'll succeed; if not we'll fail.
 
+* In this semantics
+     def { x=y, y=x } in x
+  will never arise -- rule B1 will never make bindings x=y
+
+  This:   (x=y, y=x, x=3)
+  
+
+Questions:
+
+* Are cycles WRONG (excluded by verifier) or an unchecked
+  runtime error (like divergence)
+
 ---------------------------
 -- Syntax
 ---------------------------
@@ -51,6 +63,7 @@ op ::= add | semi | unify
 
 -- v: values
 v ::= a | (v1,v2)    Values
+a :: = k | x         Atoms
 
 -- ce: choice-free expressions, that do not block choice
 ce ::= a | (ce1,ce2) | op(ce) | do (def h in ce)
@@ -59,9 +72,9 @@ se ::= def h in e
    |   NONE
    |   se1 || se2         Successive values
 
-h ::= emp | h1,h2 | x | x=v   Heap
-
-a :: = k | x         Atoms
+h ::= emp | h1,h2         Heaps
+    | x
+    | x=k | x=(v1,v2)
 
 
 ------------------------------
@@ -106,21 +119,54 @@ HC ::= def h in C
 
 -- NONE cancellation
 (X1) NONE || se  --> se
-(X2) || NONE  --> se
+(X2) se || NONE  --> se
 
 -- Choice and failure
 (C1) def H[x] in S[FAIL]    -->  NONE
 (C2) def H in E[ e1 | e2 ]  -->  (def H in E[e1]) || (def H in E[e2])
 
 -- Bind in the heap
-(B1) def H[x] in S[unify(x,k)]        -->  def H[x=k] in S[k]
-(B2) def H[x] in S[unify(x,(e1,e2))]  -->  def H[ x1, x2, x=(x1,x2) ]
-                                      in S[(x1=e1,x2=e2)]
+(B1a) def H[x] in S[unify(x,k)]       -->  def H[x=k] in S[k]
+(B1b) def H[x] in S[unify(k,x)]       -->  def H[x=k] in S[k]
+(B2a) def H[x] in S[unify(x,(e1,e2))] -->  def H[ x1, x2, x=(x1,x2) ]
+                                           in S[unify(x, (e1,e2))]
+                                           (bv(H[x]) not free in e1, e2, and
+                                            x1,x2 fresh for H, S, e1, e2)
+(B2b) def H[x] in S[unify((e1,e2),x)] -->  def H[x] in S[unify(x,(e1,e2))]
+
+------------
+-- Occurs check
+--  Without the occurs check in B2a, we loop thus: --
+{x}  x ~ (1,x)    B2a -->  {x1, x2, x=(x1,x2)}    (x ~ (17,x))
+                  S1  -->  {x1, x2, x=(x1,x2)}    ((x1,x2) ~ (17,x))
+                  U2  -->  {x1, x2, x=(x1,x2)}    (x1~17, x2~x)
+                  B2a -->  {x1=17, x2, x=(x1,x2)} (x1, x2~x)
+                  S1  -->  {x1=17, x2, x=(x1,x2)} (17, x2~(x1,x2))
+
+More complicated heap:
+  x = (y,4)
+  y = (x,3)
+To avoid this, we apply S1 until bv(H[x]) not free in e1,e2 is satisfied
+
+------------
+
+-- To ask Tim:
+-- In verse, this is stuck
+--    if (x=y) then(x=3); y
+-- But what about this?  We think this gets stuck
+--    x=y; if (x=y) then 3 else 4; 3
+-- But what about this?  We think this should work
+--    x=y; if (x=y) then 3 else 4; x=3
+-- But what about this?  We think aren't sure, but we think stuck.
+--    Works in the implementation
+--    x=y; if (x=y) then (x=3) else 4
+
+If we want (x=y) in h, then unify(x,x) --> x
+-------------------------
 
 -- Garbage collection
-(GC1) def h in e            -->  def H[] in e    x not free in e
-LA:   def H[x] in e ... ?
-(GC2) def H[x=v] in e       -->  def H[] in e    x not free in e
+(GC1) def H[x]   in e       -->  def H[] in e    x not free in e or H
+(GC2) def H[x=v] in e       -->  def H[] in e    x not free in e or H
 
 -- Substitution: as deep as you like
 (S1) def H[x=v] in C[x]  -->  def H[x=v] in C[v]
@@ -132,19 +178,15 @@ LA:   def H[x] in e ... ?
 ------------------------------
 
 -- Unification
-(U1) unify(e,x)              --> unify(x,e)
-(U2) unify((e1,e2),(e3,e4))  --> semi( unify(e1,e3), unify(e2,e4) )
-LA:                              ( unify(e1,e3), unify(e2,e4) )
+(U2) unify((e1,e2),(e3,e4))  --> ( unify(e1,e3), unify(e2,e4) )
 (U3) unify(k,k)              --> k
 (U4) unify(k1,k2)            --> FAIL      if k1 /= k2
-LA:  unify((e1,e2),k)        --> FAIL
-LA:  unify(k,(e1,e2))        --> FAIL
+(U5) unify((e1,e2),k)        --> FAIL
+(U6) unify(k,(e1,e2))        --> FAIL
 
 (P1) add(k1,k2) --> k1+k2
 
-(S1) semi(k,e)        --> e
-(S2) semi((e1,e2),e)  --> e
-LA:                       semi(semi(e1,e2),e)
+(S1) semi(v,e)        --> e
 
 -- Conditionals
 (K1) if NONE                then e1 else e2  -->  e2
