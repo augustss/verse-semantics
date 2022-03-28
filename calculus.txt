@@ -9,6 +9,8 @@ Key ideas:
   (nor does 'def' for that matter). This models the sequence of
   values produced by an expression, complete with an enclosing
   heap.
+LA: Where does 'def' come from?  I don't see it being introduced anywhere.
+LA: Maybe by a pass before we use the rewrite rules?
 
 * Rules B1, B2 "float" a binding up to the definition site,
   when (and only when) the unification binds a variable to
@@ -117,6 +119,7 @@ HC ::= def h in C
 
 -- Garbage collection
 (GC1) def h in e            -->  def H[] in e    x not free in e
+LA:   def H[x] in e ... ?
 (GC2) def H[x=v] in e       -->  def H[] in e    x not free in e
 
 -- Substitution: as deep as you like
@@ -131,13 +134,17 @@ HC ::= def h in C
 -- Unification
 (U1) unify(e,x)              --> unify(x,e)
 (U2) unify((e1,e2),(e3,e4))  --> semi( unify(e1,e3), unify(e2,e4) )
+LA:                              ( unify(e1,e3), unify(e2,e4) )
 (U3) unify(k,k)              --> k
 (U4) unify(k1,k2)            --> FAIL      if k1 /= k2
+LA:  unify((e1,e2),k)        --> FAIL
+LA:  unify(k,(e1,e2))        --> FAIL
 
 (P1) add(k1,k2) --> k1+k2
 
 (S1) semi(k,e)        --> e
 (S2) semi((e1,e2),e)  --> e
+LA:                       semi(semi(e1,e2),e)
 
 -- Conditionals
 (K1) if NONE                then e1 else e2  -->  e2
@@ -148,6 +155,7 @@ HC ::= def h in C
 (F1) for (def h1 in v1 || ... || def hn in vn) in e
      -->
      (do (def h1 in e), ..., do (def hn in e))
+LA:  uses n-ary (,), maybe use nested (,) and ()
 
 -- Do: discard when expunging is complete
 (D1) do (def emp in e)      -->  e
