@@ -1,0 +1,178 @@
+\documentclass[acmsmall,screen]{acmart}\settopmatter{}
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include calculus.fmt
+%format e_1
+%format e_2
+%format e_3
+%format e_x
+%format e_y
+
+\usepackage{framed}
+\usepackage{ amssymb }
+\usepackage{cleveref}   % \Cref etc
+
+% Names of rules
+\newcommand{\rulename}[1]{\textsc{#1}}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+
+% Hole in context
+\newcommand{\hole}{\square}
+
+\newcommand{\hexp}{h-expression}
+\newcommand{\Hexp}{H-expression}
+
+\newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
+\newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
+
+\begin{document}
+
+\title{The Verse calculus}
+
+\section{Warm up 1: the call-by-name lambda calculus}
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lrcl}
+    \text{Constants} & k \\
+    \text{Variables} & x,y,z \\
+    \text{Expressions} & e  & ::=  & k \mid x \mid e_1 \; e_2 \mid \lambda x. e \mid e_1 \oplus e_2 \\
+    \text{Evaluation contexts} & E & ::= & \hole \mid E\; e \mid E \oplus e \mid k \oplus E
+    \end{array} \\
+    \\
+    \textbf{Axioms}  \\
+    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto e_2[x:=e_1] \\
+    \rulename{delta}\qquad k_1 \oplus k_2 \movesto k_1 + k_2 \\
+   \end{array}
+   $$
+\caption{The call-by-name lambda calculus} \label{fig:call-by-name}
+\end{figurebox}
+
+We start with the call-by-name lambda calculus: see \Cref{fig:call-by-name}.
+Key points:
+\begin{itemize}
+\item \emph{Expressions.} We give the syntax of \emph{expressions} in BNF.
+\item \emph{Axioms.} There is just one axiom, \rulename{beta}.
+You can apply an axiom anywhere in an expression, in either direction but typically left-to-right.
+\item \emph{Substitution.} The notation $e_2[x:=e_1]$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
+  each occurrence of $x$ in $e_1$ with $e_2$.
+\item \emph{Evaluation contexts}.  An evaluation context $E$ is an expression with a single ``hole'' in it,
+  denoted $\hole$. The notation $E[e]$ means the evaluation context $E$ with its hole filled with $e$.
+\item \emph{Primitive operations.} In this little calculus we have added numeric constants $k$, and a single primtive operation $e_1 \oplus e_2$.  The \rulename{delta} rule allows us to replace the expression $3 \oplus 5$, say, with $8$.
+\end{itemize}
+You can apply an axiom anywhere in an exrpression, but an \emph{evaluation strategy} says where to apply the axiom in a program.   (A program $p$ is just a closed expression.) One evaluation strategy is \emph{normal order reduction} which says this:
+\begin{itemize}
+\item Given a program $p$, find an evaluation context $E$ and expression $e$ such that $p = E[e]$, and $e \movesto e'$.  (Theorem: if there is such a $E$ and $e$, they are unique.)  Then $p \movesto E[e']$.
+\end{itemize}
+The evaluation context specifies that the leftmost outermost redex should reduce first.
+For example, in the syntax of $E$, you can see we will only evaluate inside the right
+hand argument of $\oplus$ if the left-hand argument
+has been reduced to a constant $k$.
+
+\section{Warm up 2: the call-by-need lambda calculus}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lrcl}
+    \text{Constants} & k \\
+    \text{Variables} & x,y,z \\
+      \text{Expressions} & e  & ::=  & k \mid x \mid e_1 \; e_2 \mid \lambda x. e
+            \mid  e_1 \oplus e_2 \mid |let x = e_1 in e_2| \\
+      \text{Values} & v & ::= & k \mid x \mid \lambda x.e  \\
+      \text{Evaluation contexts} & E & ::= & \hole \mid E\; e \mid E \oplus e \mid k \oplus E
+           \mid |let x=E in E[x]|
+    \end{array} \\
+    \\
+    \textbf{Axioms}  \\
+    \begin{array}{lrcl}
+    \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
+    \rulename{let-v} & |let x = v in e| & \movesto & e[x:=v] \\
+    \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)| \\
+    \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
+                       & |let y = e_y in let x = e_x in e| \\
+    \rulename{delta} &  k_1 \oplus k_2 & \movesto & k_1 + k_2 \\
+    \end{array}
+   \end{array}
+   $$
+\caption{The call-by-need lambda calculus} \label{fig:call-by-need}
+\end{figurebox}
+
+The problem with the call-by-name lambda calculus is that \rulename{beta} duplicates $e_2$, which may
+duplicate an arbitary amount of work.  A lazy evaluator uses a ``heap'' to share that work, by allocating a closure for the argument $e_2$ and duplicating a pointer to that closure.   This is all very operational.
+Happily, \citet{Ariola-ta-all} showed to express the sharing \emph{in the calculus} rather than by executing it on some abstract machine.  \Cref{fig:call-by-need} tells the story.
+
+\begin{itemize}
+\item We add a new form of expression, |(let x=e_x in e)|.  This will model the heap.
+\item The \rulename{beta} rule does not duplicate the argument expression $e_2$; instead it simply builds a |let| expression.
+\item The \rulename{let-v} rule substitutes for $x$, \emph{but only when the right hand side is a value $v$}. Once the right hand side is a value, no work will be duplicated by this substitution.
+\item Rules \rulename{let-c} and \rulename{let-a} move lets out of the way so that they do not impede
+  \rulename{beta} and \rulename{let-v}.
+\item As before, an evaluation context $E$ is intended to indentify the next redex to reduce.
+  The new case is the last one:
+  in a let-expression |let x=e_x in e_b|, if the next thing to evalute in $e_b$ is $x$ (thus $e_b = E[x]$,
+  then we must find the next redex in $e_x$.
+\end{itemize}
+For example, here is a possible reduction sequence:
+$$
+\begin{array}{rrl}
+  \multicolumn{3}{l}{|(lambda x dot x+x) (3+4)|} \\
+  \rulename{beta} & \movesto & |let x = 3+4 in x+x| \\
+  \rulename{delta} & \movesto & |let x=7 in x+x| \\
+  \rulename{let-v} & \movesto & |7+7| \\
+  \rulename{delta} & \movesto & |14|
+\end{array}
+$$
+
+% ---------------------------------
+\section{Verse}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lrcl}
+    \text{Constants} & k \\
+    \text{Variables} & x,y,z \\
+    \text{Primops} & op  & ::= & |add| \mid |semi| \mid |unify| \mid |apply | \\
+    \text{Atoms} & a  & ::=  & k \mid x \\
+    \text{Expressions} & e  & ::=  & a \mid (e_1, \ldots, e_n) \mid |x => e|
+                                       \mid |he choice he| \\
+      \text{Values} & v & ::= & a \mid (v_1, \ldots, v_n) \mid |x => e|  \\
+    \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \\
+    \text{Heaps} & h & ::= & \epsilon \mid h_1 , h_2 \mid x \mid x=v \\
+      \text{Evaluation contexts} & E & ::= & \hole \mid E\; e \mid E \oplus e \mid k \oplus E
+           \mid |let x=E in E[x]|
+    \end{array} \\
+    \\
+    \textbf{Shorthand} \\
+    \begin{array}{rcl}
+      e_1 ; e_e & \text{means} & semi( e_1, e_2 ) \\
+      e_1 \sim e_2 & \text{means} & unify( e_1, e_2 ) \\
+      e_1 \oplus e_2 & \text{means} & add( e_1, e_2 ) \\
+      e_1(e_2) & \text{means} & apply( e_1, e_2 ) \\
+     \end{array} \\
+    \\
+    \textbf{Axioms}  \\
+    \begin{array}{lrcl}
+    \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
+    \rulename{let-v} & |let x = v in e| & \movesto & e[x:=v] \\
+    \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)| \\
+    \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
+                       & |let y = e_y in let x = e_x in e| \\
+    \rulename{delta} &  k_1 \oplus k_2 & \movesto & k_1 + k_2 \\
+    \end{array}
+   \end{array}
+   $$
+\caption{The Verse calculus} \label{fig:verse}
+\end{figurebox}
+
+\end{document}
+
