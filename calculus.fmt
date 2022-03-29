@@ -13,6 +13,53 @@
 %format dots = "\cdots"
 %format dollar = "\$"
 %format choice = "[ \! ]"
+%format hchoice = "\|"
 %format he = "he"
 %format def = "\textbf{def}"
+%format none = "\textbf{none}"
+%format fail = "\textbf{fail}"
+%format do = "\textbf{do}"
+%format if = "\textbf{if}"
+%format then = "\textbf{then}"
+%format else = "\textbf{else}"
+%format for = "\textbf{for}"
+%format dots = "\ldots"
+%format hnf = "\hnf"
+%format emp = "\epsilon"
+%format plus = "\oplus"
+%format == = "\sim"
+%format ^ = " "
 
+
+%format x_1
+%format x_2
+%format x_3
+%format x_n
+
+%format k_1
+%format k_2
+
+%format e_1
+%format e_2
+%format e_3
+%format e_n
+%format e_x
+%format e_y
+
+%format h_1
+%format h_2
+%format h_3
+%format h_n
+
+%format v_1
+%format v_2
+%format v_3
+%format v_n
+
+%format he_1
+%format he_2
+%format he_3
+%format ce_1
+%format ce_2
+%format ce_3
+%format ce_n
