@@ -31,6 +31,11 @@
 \newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
 \newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
 
+% Example environment
+\newcounter{example}
+\newenvironment{example}[1][]{\refstepcounter{example}\par\medskip
+   \noindent\textbf{Example~\theexample. #1} \rmfamily}{\medskip}
+
 \begin{document}
 
 \title{The Verse calculus}
@@ -69,7 +74,12 @@ You can apply an axiom anywhere in an expression, in either direction but typica
   denoted $\hole$. The notation $E[e]$ means the evaluation context $E$ with its hole filled with $e$.
 \item \emph{Primitive operations.} In this little calculus we have added numeric constants $k$, and a single primtive operation $e_1 \oplus e_2$.  The \rulename{delta} rule allows us to replace the expression $3 \oplus 5$, say, with $8$.
 \end{itemize}
-You can apply an axiom anywhere in an exrpression, but an \emph{evaluation strategy} says where to apply the axiom in a program.   (A program $p$ is just a closed expression.) One evaluation strategy is \emph{normal order reduction} which says this:
+It is fine to apply an axiom anywhere in an expression including, say, to a sub-expression inside a lambda.
+Using an axiom left-to-right is called a \emph{reduction}, and the sub-expression being rewritten is
+called the \emph{redex}.
+
+However, to \emph{execute a program}, we want to be selective about which redex we choose to reduce first.
+(A program $p$ is just a closed expression.) That choice is made by an \emph{evaluation strategy}.  One evaluation strategy, is \emph{normal order reduction} which says this:
 \begin{itemize}
 \item Given a program $p$, find an evaluation context $E$ and expression $e$ such that $p = E[e]$, and $e \movesto e'$.  (Theorem: if there is such a $E$ and $e$, they are unique.)  Then $p \movesto E[e']$.
 \end{itemize}
@@ -154,7 +164,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Constants} & k \\
     \text{Variables} & x,y,z \\
     \text{Primops} & op  & ::= & cop \mid |apply | \\
-    \text{Choice-free primops} & cop  & ::= & |add| \mid |semi| \mid |unify| \\
+    \text{Choice-free primops} & cop  & ::= & |gr| \mid |add| \mid |semi| \mid |unify| \\
     \text{Expressions} & e  & ::=  & x \mid k \mid |(e_1, dots, e_n)| \mid |x => he| \mid |op^(e)| \\
     &&\mid & |he_1 choice he_2| \mid |fail| \\
     &&\mid & |if he then e_1 else e_2| \mid |for he in e|  \\
@@ -162,10 +172,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Values} & v & ::= & x  \mid \hnf \\
     \text{Choice-free expressions} & ce  & ::=  & x \mid k \mid |(ce_1, dots, ce_n)| \mid |x => he| \mid cop(ce) \\
     \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \mid |none| \mid |he_1 hchoice he_2| \\
-    \text{Heaps} & h & ::= & \epsilon \mid h_1 , h_2 \mid x \mid x=v \\
-    \text{Heap values} & hv & ::= & \epsilon \mid hv_1 , hv_2 \mid x=v \\
-    \text{Evaluation contexts} & E & ::= & \hole \mid (E,e) \mid (e,E) \mid op(E) \\
-    \text{Choice contexts} & CE & ::= & \hole \mid (CE,e) \mid (ce,CE) \mid op(CE) \\
+    \text{Heaps} & h & ::= & \epsilon \mid h_1 , h_2 \mid x \mid x:=v \\
+    \text{Heap values} & hv & ::= & \epsilon \mid hv_1 , hv_2 \mid x:=v \\
+    \text{Evaluation contexts} & E & ::= & \hole \mid |(e_1,dots,E,dots,e_n)| \mid |op^(E)| \\
+    \text{Choice contexts} & CE & ::= & \hole \mid |(ce_1,dots,ce_m,CE,e_1,dots,e_n)| \mid |op^(CE)| \\
     \text{Left choice context} & LHE & ::= & \hole \mid |LHE hchoice he| \\
     \end{array} \\
     \\
@@ -193,21 +203,21 @@ The |let| construct cleverly models the heap, maintaining sharing.
     & \begin{array}[t]{@@{}l}
         |(def H in CE^[do he_1]) hchoice| \\  |(def H in CE^[do he_2])|
         \end{array}\\[5mm]
-    \rulename{B1} & |def H^[x] in E^[x=k]| & \movesto & |def H^[x=k] in E^[k]| \\
+    \rulename{B1} & |def H^[x] in E^[x:=k]| & \movesto & |def H^[x:=k] in E^[k]| \\
     \rulename{B2} & |def H^[x] in E^[x==(e_1,e_2)]| & \movesto
     & \begin{array}[t]{@@{}l}
-          |def H^[x_1,x_2,x=(x_1,x_2)]| \\
+          |def H^[x_1,x_2,x:=(x_1,x_2)]| \\
           |in E^[(x_1==e_1,x_2==e_2)]]|
         \end{array} \\
     \multicolumn{4}{c}{\text{if}\;
            \boundvars{H[x]} \disjoint \freevars{e_1,e_2} \quad \text{and} \quad
            x_1,x_2 \disjoint \freevars{H[x],e_1,e_2} } \\[1mm]
-    \rulename{S1} & |def H^[x=v] in e| & \movesto & |(def H^[emp] in e)|[x:=v]
+    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[emp] in e)|[x:=v]
     \end{array} \\
     \\
     \textbf{Axioms for expressions}  \\
     \begin{array}{lrcl}
-    \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x=e_2; e_1))| \\
+    \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
     \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{P2} & |v ; e| & \movesto & |e| \\
     \rulename{P3} & |hnf == x| & \movesto & |x == hnf| \\[2mm]
@@ -234,5 +244,108 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \caption{The Verse calculus: axioms} \label{fig:verse-axioms}
 \end{figurebox}
 
+\subsection{Expressions and values}
+
+An expression |e| has syntax given in \Cref{fig:verse-syntax}.
+Constants |k| are simply integers in this presentation, and come equipped with
+some primitive operations |op|.  To avoid clutter, we provide only two representative
+operations, |add^(e_1,e_2)| for integer addition, and |gr^(e_1,e_2)| for integer comparison.
+
+\paragraph{Tuples and arrays.}
+All functions (including |add| and |gr|) take a single argument, but that
+argument can be a tuple, say |(e_1,e_2)|. In Verse, tuples and arrays are the same data structure;
+a tuple is just an array whose size is statically known.
+The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| constructs an array.
+We discuss |for| in \Cref{sec:for}.
+
+\paragraph{Unification and sequencing.}
+Unification |unify^(e_1,e_2)| and sequencing |semi^(e_1,e_2)| are two other primitive operations.
+We often allow ourselves to write them with infix shorthand, |(e_1 == e_2)| and |(e_1; e_2)| respectively.
+
+\paragraph{Lambda and application.}  Lambda abstractions are written |(x => he)|, and are applied
+with the primitive operation |apply(e_1,e_2)|.
+
+\paragraph{Choice.}
+In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
+zero results; the expression |(he_1 choice he_2)| yields all the results of |he_1| and then all the results
+of |he_2|.
+
+\paragraph{Values.}
+A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
+The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, or a lambda |(x => e)|.
+
+\subsection{\Hexp{}s and heaps}
+
+A \hexp{} has the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
+\Cref{fig:verse-syntax}.  A heap is just a collection of \emph{bindings}, which take one of two forms:
+\begin{itemize}
+\item A binding |x| simply introduces the variable |x|, without giving it a value.
+\item A binding |x:=v| binds the variable |x| to the value |v|.
+\end{itemize}
+A particular heap has at most one binding for a variable |x|.
+When a heap is born, all its bindings are variable introductions |x|; as execution progresses some of
+these variables get a value |x:=v|.  Once a variable gets value, that value never changes: it is immutable.
+
+A binding in a heap may refer to another binding; but the bindings are never recursive.
+Here are some example heaps, with an indication of whether they are well formed:
+\begin{center}
+\begin{tabular}{rl}
+  |(x:=1, y:=2)| & OK \\
+  |(x:=y, y:=2)| & OK \\
+  |(x:=(1,x))|   & Not OK: recursive \\
+  |(x:=(y1,y2), y1, y2:=4)| & OK \\
+  |(x:=add^(1,2))| & Syntactically invalid; only values are allowed
+\end{tabular}
+\end{center}
+
+\subsection{Examples}
+
+\begin{example}
+  $$\begin{array}{rcl}
+    \multicolumn{3}{l}{|def (x,y) in x==3; y==add^(x,1)|} \\
+    \rulename{B1} & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
+    \rulename{P2} & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
+    \rulename{S1} & \movesto & |def (y) in y==add^(3,1)| \\
+    \rulename{P1} & \movesto & |def (y) in y==4| \\
+    \rulename{B1} & \movesto & |def (y:=4) in 4| \\
+    \rulename{S1} & \movesto & |def emp in 4|
+    \end{array}$$
+\end{example}
+
+\begin{example}
+  $$\begin{array}{rcl}
+    \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); x==3; y|} \\
+    \rulename{B1} & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
+    \rulename{S1} & \movesto & |def (y) in y==add^(3,1); 3; y| \\
+    \rulename{P1} & \movesto & |def (y) in y==4; 3; y| \\
+    \rulename{B1} & \movesto & |def (y:=4) in 4; 3; y| \\
+    \rulename{P2}(twice) & \movesto & |def (y:=4) in y| \\
+    \rulename{S1} & \movesto & |def emp in 4|
+    \end{array}$$
+  The evaluation of |add^(x,1)| is stuck, and hence so is the unification
+  |(y==add^(x,1))|.  But the evaluation context $E$ allows us to apply rule \rulename{B1}
+  in the \emph{second} argument of |semi|, which gives a value to |x| in the heap.
+  That allows the |add| to proceed.  So ``later'' instructions can unblock ``earlier'' ones.
+\end{example}
+
+\begin{example}
+  $$\begin{array}{rcl}
+    \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); ((x==3) choice (x==4))|} \\
+    \rulename{C2} & \movesto & |(def (x,y) in y==add^(x,1); x==3) hchoice| \\
+    & & |(def (x,y) in y==add^(x,1); x==4)| \\
+    \rulename{B1} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) hchoice| \\
+    & & |(def (x:=4,y) in y==add^(x,1); 4)| \\
+    \rulename{S1} (twice) & \movesto & |(def (y) in y==add^(3,1); 3) hchoice| \\
+    & & |(def (y) in y==add^(4,1); 4)| \\
+    \rulename{P1} (twice) & \movesto & |(def (y) in y==4; 3) hchoice (def (y) in y==5; 4)| \\
+    \rulename{B1}(twice) & \movesto & |(def (y:=4) in 4; 3) hchoice (def (y:=5) in 5; 4)| \\
+    \rulename{P2}(twice) & \movesto & |(def (y:=4) in 3) hchoice (def (y:=5) in 4)| \\
+    \rulename{S1}(twice) & \movesto & |(def emp in 3) hchoice (def emp in 4)| \\
+    \end{array}$$
+  As before, the unification |y==add^(x,1)| is stuck until we get a value for |x|.
+  But this time we get two different values for |x| in the two branches of the choice.
+  The crucial rule \rulename{C2} duplicates the heap and the expression that surround
+  the choice, allowing execution to proceed entirely independently in the two copies.
+\end{example}
 \end{document}
 

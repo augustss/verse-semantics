@@ -27,14 +27,19 @@
 %format hnf = "\hnf"
 %format emp = "\epsilon"
 %format plus = "\oplus"
-%format == = "\sim"
+%format == = "="
+%format := = "\mapsto"
 %format ^ = " "
-
+%format ; = ";\;"
+%format , = ",\,"
 
 %format x_1
 %format x_2
 %format x_3
 %format x_n
+
+%format y1
+%format y2
 
 %format k_1
 %format k_2
@@ -63,3 +68,4 @@
 %format ce_2
 %format ce_3
 %format ce_n
+%format ce_m
