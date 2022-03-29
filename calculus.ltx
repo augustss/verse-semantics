@@ -88,7 +88,7 @@ For example, in the syntax of $E$, you can see we will only evaluate inside the 
 hand argument of $\oplus$ if the left-hand argument
 has been reduced to a constant $k$.
 
-\section{Warm up 2: the call-by-need lambda calculus}
+\section{Warm up 2: the call-by-need lambda calculus} \label{sec:call-by-need}
 
 \begin{figurebox}
   $$
@@ -218,6 +218,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textbf{Axioms for expressions}  \\
     \begin{array}{lrcl}
     \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
+    \rulename{D1} & |do (def emp in e)| \movesto & e \\
     \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{P2} & |v ; e| & \movesto & |e| \\
     \rulename{P3} & |hnf == x| & \movesto & |x == hnf| \\[2mm]
@@ -282,6 +283,8 @@ A \hexp{} has the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax 
 \item A binding |x| simply introduces the variable |x|, without giving it a value.
 \item A binding |x:=v| binds the variable |x| to the value |v|.
 \end{itemize}
+These heaps play the role of |let| expressions in the call by need lambda calculus (\Cref{sec:call-by-need}).
+
 A particular heap has at most one binding for a variable |x|.
 When a heap is born, all its bindings are variable introductions |x|; as execution progresses some of
 these variables get a value |x:=v|.  Once a variable gets value, that value never changes: it is immutable.
