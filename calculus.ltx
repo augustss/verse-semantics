@@ -28,6 +28,9 @@
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}
 
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+
 \newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
 \newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
 
@@ -155,6 +158,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
 % ---------------------------------
 \section{Verse}
+\lennart{\textbf{do} is missing}
+\lennart{\textbf{H} is missing}
+\lennart{Heaps use both the notation := and a little arrow.}
 
 \begin{figurebox}
   $$
@@ -194,6 +200,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
 \caption{The Verse calculus: syntax} \label{fig:verse-syntax}
 \end{figurebox}
+
+\lennart{Do you really mean \textbf{H} in C1, C2?}
+
+\lennart{There are no reduction rules for {\it h} and {\it hv}}
 
 \begin{figurebox}
   $$
