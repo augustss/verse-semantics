@@ -46,7 +46,8 @@
         (in-hole E (let [x_2 e_2] (let [x_1 e_1] e_3)))
         "let-A")
    (--> (in-hole E (+ k_1 k_2))
-        (in-hole E (add k_1 k_2)))
+        (in-hole E (add k_1 k_2))
+        "delta")
    ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -68,4 +69,4 @@
 
 (define test1 (term (+ 1 2)))
 (define test2 (term ((λ x (+ x 1)) 2)))
-(define test3 (term ((λ x (+ x x)) (+ 1 2))))
+(define test3 (term ((λ x (+ x x)) (+ 3 4))))
