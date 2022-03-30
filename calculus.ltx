@@ -79,7 +79,15 @@ You can apply an axiom anywhere in an expression, in either direction but typica
 \end{itemize}
 It is fine to apply an axiom anywhere in an expression including, say, to a sub-expression inside a lambda.
 Using an axiom left-to-right is called a \emph{reduction}, and the sub-expression being rewritten is
-called the \emph{redex}.
+called the \emph{redex}.  For example, the expression $(\lambda x. x+(1+4)) (5+3)$ can reduce in three different ways:
+$$
+\begin{array}{rll}
+  \multicolumn{3}{l}{(\lambda x. x+(1+4)) (5+3)} \\
+  \rightarrow & (5+3)+(1+4) & \text{By \rulename{beta}} \\
+  or\; \rightarrow & (\lambda x. x+5) (5+3) & \text{simplify $1+4$} \\
+  or\; \rightarrow & (\lambda x. x+(1+4)) 8 & \text{simplify $5+3$} \\
+\end{array}
+$$
 
 However, to \emph{execute a program}, we want to be selective about which redex we choose to reduce first.
 (A program $p$ is just a closed expression.) That choice is made by an \emph{evaluation strategy}.  One evaluation strategy, is \emph{normal order reduction} which says this:
