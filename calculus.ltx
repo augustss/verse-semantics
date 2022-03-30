@@ -163,18 +163,19 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \text{Constants} & k \\
     \text{Variables} & x,y,z \\
+    \text{Programs} & p  & ::=  & he \\
+    \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \mid |none| \mid |he_1 hchoice he_2| \\
     \text{Expressions} & e  & ::=  & x \mid k \mid |(e_1, dots, e_n)| \mid |x => he| \mid |op^(e)| \\
     &&\mid & |he_1 choice he_2| \mid |fail| \\
     &&\mid & |if he then e_1 else e_2| \mid |for he in e|  \\
     &&\mid & |do he| \\
-    \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \mid |none| \mid |he_1 hchoice he_2| \\
     \text{Primops} & op  & ::= & cop \mid |apply | \\
     \text{Choice-free primops} & cop  & ::= & |gr| \mid |add| \mid |semi| \mid |unify| \\
     \text{Head values} & \hnf & ::= & k \mid (v_1, \ldots, v_n) \mid |x => he|  \\
     \text{Values} & v & ::= & x  \mid \hnf \\
     \text{Choice-free expressions} & ce  & ::=  & x \mid k \mid |(ce_1, dots, ce_n)| \mid |x => he| \mid cop(ce) \\
     \text{Heaps} & h & ::= & \epsilon \mid h_1 , h_2 \mid x \mid x:=v \\
-    \text{Heap values} & hv & ::= & \epsilon \mid hv_1 , hv_2 \mid x:=v \\
+%    \text{Heap values} & hv & ::= & \epsilon \mid hv_1 , hv_2 \mid x:=v \\
  \\
     \text{Evaluation contexts} & E & ::= & \hole \mid |(e_1,dots,E,dots,e_n)| \mid |op^(E)| \\
     \text{Choice contexts} & CE & ::= & \hole \mid |(ce_1,dots,ce_m,CE,e_1,dots,e_n)| \mid |op^(CE)| \\
@@ -184,10 +185,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      e_1 ; e_e & \text{means} & semi( e_1, e_2 ) \\
-      e_1 \sim e_2 & \text{means} & |unify( e_1, e_2 )| \\
-      e_1 \oplus e_2 & \text{means} & |add( e_1, e_2 )| \\
-      e_1(e_2) & \text{means} & |apply( e_1, e_2 )| \\
+      |e_1 ; e_2| & \text{means} & |semi^( e_1, e_2 )| \\
+      |e_1 == e_2| & \text{means} & |unify^( e_1, e_2 )| \\
+      e_1 \oplus e_2 & \text{means} & |add^( e_1, e_2 )| \\
+      |e_1^(e_2)| & \text{means} & |apply^( e_1, e_2 )| \\
      \end{array} \\
   \end{array}
   $$
@@ -220,11 +221,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\
     \textbf{Axioms for expressions}  \\
     \begin{array}{lrcl}
-    \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
-    \rulename{D1} & |do (def emp in e)| \movesto & e \\
     \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{P2} & |v ; e| & \movesto & |e| \\
     \rulename{P3} & |hnf == x| & \movesto & |x == hnf| \\[2mm]
+    \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\[2mm]
     \rulename{K1} & |if none then e_1 else e_2| & \movesto & e_2 \\
     \rulename{K2} & |if LHE^[def h in v] then e_1 else e_2| & \movesto & |do (def h in e_1)| \\[2mm]
     \rulename{F1} & \begin{array}[t]{@@{}l}
@@ -310,9 +310,17 @@ Here are some example heaps, with an indication of whether they are well formed:
 \subsection{Notes}
 
 \begin{itemize}
-\item \rulename{S1} does not discard the heap binding, because it may be needed,
-  in \rulename{K2} and \rulename{F1}.  We could also use a rule that substitutes
-  in just one place (a la Ariola)
+\item \emph{Substitution.}
+  \begin{itemize}
+    \item \rulename{S1} does not discard the heap binding, because it may be needed,
+      in \rulename{K2} and \rulename{F1}.  We could also use a rule that substitutes
+     in just one place (a la Ariola)
+   \item The heap always binds a variable to a \emph{value}, and values can freely
+     be duplicated without duplicating work, so substitution does not duplicate work.
+   \end{itemize}
+\item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
+  in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
+
 \end{itemize}
 
 \subsection{Examples}
