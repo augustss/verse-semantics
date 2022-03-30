@@ -82,10 +82,10 @@ Using an axiom left-to-right is called a \emph{reduction}, and the sub-expressio
 called the \emph{redex}.  For example, the expression $(\lambda x. x+(1+4)) (5+3)$ can reduce in three different ways:
 $$
 \begin{array}{rll}
-  \multicolumn{3}{l}{(\lambda x. x+(1+4)) (5+3)} \\
+  \multicolumn{3}{l}{(\lambda x. x+(1+4))\; (5+3)} \\
   \rightarrow & (5+3)+(1+4) & \text{By \rulename{beta}} \\
-  or\; \rightarrow & (\lambda x. x+5) (5+3) & \text{simplify $1+4$} \\
-  or\; \rightarrow & (\lambda x. x+(1+4)) 8 & \text{simplify $5+3$} \\
+  or\; \rightarrow & (\lambda x. x+5)\; (5+3) & \text{simplify $1+4$} \\
+  or\; \rightarrow & (\lambda x. x+(1+4))\; 8 & \text{simplify $5+3$} \\
 \end{array}
 $$
 
