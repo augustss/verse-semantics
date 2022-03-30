@@ -163,20 +163,23 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \text{Constants} & k \\
     \text{Variables} & x,y,z \\
-    \text{Primops} & op  & ::= & cop \mid |apply | \\
-    \text{Choice-free primops} & cop  & ::= & |gr| \mid |add| \mid |semi| \mid |unify| \\
     \text{Expressions} & e  & ::=  & x \mid k \mid |(e_1, dots, e_n)| \mid |x => he| \mid |op^(e)| \\
     &&\mid & |he_1 choice he_2| \mid |fail| \\
     &&\mid & |if he then e_1 else e_2| \mid |for he in e|  \\
+    &&\mid & |do he| \\
+    \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \mid |none| \mid |he_1 hchoice he_2| \\
+    \text{Primops} & op  & ::= & cop \mid |apply | \\
+    \text{Choice-free primops} & cop  & ::= & |gr| \mid |add| \mid |semi| \mid |unify| \\
     \text{Head values} & \hnf & ::= & k \mid (v_1, \ldots, v_n) \mid |x => he|  \\
     \text{Values} & v & ::= & x  \mid \hnf \\
     \text{Choice-free expressions} & ce  & ::=  & x \mid k \mid |(ce_1, dots, ce_n)| \mid |x => he| \mid cop(ce) \\
-    \text{\Hexp{}s} & |he|  & ::=  & |def h in e| \mid |none| \mid |he_1 hchoice he_2| \\
     \text{Heaps} & h & ::= & \epsilon \mid h_1 , h_2 \mid x \mid x:=v \\
     \text{Heap values} & hv & ::= & \epsilon \mid hv_1 , hv_2 \mid x:=v \\
+ \\
     \text{Evaluation contexts} & E & ::= & \hole \mid |(e_1,dots,E,dots,e_n)| \mid |op^(E)| \\
     \text{Choice contexts} & CE & ::= & \hole \mid |(ce_1,dots,ce_m,CE,e_1,dots,e_n)| \mid |op^(CE)| \\
     \text{Left choice context} & LHE & ::= & \hole \mid |LHE hchoice he| \\
+    \text{Heap context} & H & ::= & \hole \mid H,h \mid h,H
     \end{array} \\
     \\
     \textbf{Shorthand} \\
@@ -197,12 +200,12 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textbf{Axioms for \hexp{}s}  \\
     \begin{array}{lrcl}
     \rulename{X1} & |none hchoice he| & \movesto & he \\
-    \rulename{X2} & |he hchoice none| & \movesto & he \\[1mm]
-    \rulename{C1} & |def H in CE^[fail]| & \movesto & |none| \\
+    \rulename{X2} & |he hchoice none| & \movesto & he \\[3mm]
+    \rulename{C1} & |def H in E^[fail]| & \movesto & |none| \\
     \rulename{C2} & |def H in CE^[he_1 choice he_2]| & \movesto
     & \begin{array}[t]{@@{}l}
         |(def H in CE^[do he_1]) hchoice| \\  |(def H in CE^[do he_2])|
-        \end{array}\\[5mm]
+        \end{array}\\[7mm]
     \rulename{B1} & |def H^[x] in E^[x:=k]| & \movesto & |def H^[x:=k] in E^[k]| \\
     \rulename{B2} & |def H^[x] in E^[x==(e_1,e_2)]| & \movesto
     & \begin{array}[t]{@@{}l}
@@ -211,8 +214,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
         \end{array} \\
     \multicolumn{4}{c}{\text{if}\;
            \boundvars{H[x]} \disjoint \freevars{e_1,e_2} \quad \text{and} \quad
-           x_1,x_2 \disjoint \freevars{H[x],e_1,e_2} } \\[1mm]
-    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[emp] in e)|[x:=v]
+           x_1,x_2 \disjoint \freevars{H[x],e_1,e_2} } \\[4mm]
+    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)|
     \end{array} \\
     \\
     \textbf{Axioms for expressions}  \\
@@ -236,7 +239,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |(do (def h_1 in e)| \\
       | , dots ,| \\
       | do (def h_n in e))|
-      \end{array}
+    \end{array} \\
+    \\
+    \rulename{D1} & |do (def h in e)| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$}
+    
         \end{array} \\
     \\
     
@@ -300,6 +306,14 @@ Here are some example heaps, with an indication of whether they are well formed:
   |(x:=add^(1,2))| & Syntactically invalid; only values are allowed
 \end{tabular}
 \end{center}
+
+\subsection{Notes}
+
+\begin{itemize}
+\item \rulename{S1} does not discard the heap binding, because it may be needed,
+  in \rulename{K2} and \rulename{F1}.  We could also use a rule that substitutes
+  in just one place (a la Ariola)
+\end{itemize}
 
 \subsection{Examples}
 
