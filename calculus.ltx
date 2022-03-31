@@ -269,9 +269,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array} \\
     \\[-2mm]
     \rulename{L1} & |apply^(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
-    \rulename{L2} & |apply^((e_1,dots,e_k,dots,e_n), k)| & \movesto &
+    \rulename{L2} & |apply^((e_1,dots,e_i,dots,e_n), k)| & \movesto &
     \begin{array}[t]{@@{}ll}
-           |e_k| & \text{if $1 \leq k \leq n$} \\
+           |e_i| & \text{if $1 \leq i \leq n$} \\
            |fail| & \text{otherwise}
            \end{array}\\[4mm]
     \rulename{K1} & |if none then e_1 else e_2| & \movesto & e_2 \\
