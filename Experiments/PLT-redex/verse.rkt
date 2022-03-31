@@ -131,10 +131,17 @@
    (--> (def (in-hole H (var x)) (in-hole E (unify (array x k))))
         (def (in-hole H (:= x k)) (in-hole E k))
         "B1")
+   (--> (def (in-hole H (var x)) (in-hole E (unify (array k x))))
+        (def (in-hole H (:= x k)) (in-hole E k))
+        "B2")
    (--> (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
         (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole E (array (= x_s e) ...)))
         (fresh ((x_s ...) (e ...)))
-        "B2")
+        "B3")
+   (--> (def (in-hole H (var x)) (in-hole E (unify (array (array e ...) x))))
+        (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole E (array (= x_s e) ...)))
+        (fresh ((x_s ...) (e ...)))
+        "B4")
    (--> (def (in-hole H (:= x v)) e)
         (def (in-hole H (heap)) (substitute e x v))
         "S1")
@@ -157,10 +164,16 @@
            (term (def (heap (var a)) (= a 5)))
            (term (def (heap (:= a 5)) 5)))
   (test--> he-axioms ;; B2
+           (term (def (heap (var a)) (= 5 a)))
+           (term (def (heap (:= a 5)) 5)))
+  (test--> he-axioms ;; B3
            (term (def (heap (var a)) (= a (array 1 2 3))))
            (term (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
-                      (array (= x_s 1) (= x_s1 2) (= x_s2 3))))
-           )
+                      (array (= x_s 1) (= x_s1 2) (= x_s2 3)))))
+  (test--> he-axioms ;; B4
+           (term (def (heap (var a)) (= (array 1 2 3) a)))
+           (term (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
+                      (array (= x_s 1) (= x_s1 2) (= x_s2 3)))))
   (test--> he-axioms ;; S1
            (term (def (:= x 5) x))
            (term (def (heap) 5)))
@@ -187,6 +200,14 @@
    (--> (semi (array v e))
         e
         "P2")
+   (--> (unify (array (array e_1 ...) (array e_2 ...)))
+        (array (= e_1 e_2) ...)
+        (side-condition (equal? (length (term (e_1 ...))) (length (term (e_2 ...)))))
+        "U1")
+   (--> (unify (array (array e_1 ...) (array e_2 ...)))
+        fail
+        (side-condition (not (equal? (length (term (e_1 ...))) (length (term (e_2 ...))))))
+        "U1F")
    ))
 
 (define-metafunction verse
@@ -200,6 +221,12 @@
   (test--> e-axioms ;; P2
            (term (seq 5 (++ x y)))
            (term (++ x y)))
+  (test--> e-axioms ;; U1
+           (term (= (array x 1 2) (array 3 y 2)))
+           (term (array (= x 3) (= 1 y) (= 2 2))))
+  (test--> e-axioms ;; U1F
+           (term (= (array x 1 2) (array 3 y 2 4)))
+           (term fail))
   )
 
 (module+ test
