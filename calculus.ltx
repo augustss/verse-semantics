@@ -220,10 +220,13 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \end{figurebox}
 
 \lennart{The double bar in 'he' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
+\simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 
-\lennart{Rule B2 only deals with binary arrays rather than n-ary.}
+\lennart{Rule B2 only deals with binary arrays rather than n-ary.} \simon{fixed}
 
 \lennart{Why don't you drop the heap binding in S1?}
+\simon{Aha!  That's important.  See first bullet in Section 3.3.}
+
 
 \begin{figurebox}
   $$
@@ -234,18 +237,16 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{X2} & |he hchoice none| & \movesto & he \\[3mm]
     \rulename{C1} & |def h in E^[fail]| & \movesto & |none| \\
     \rulename{C2} & |def h in CE^[e_1 choice e_2]| & \movesto
+    &     |(def h in CE^[e_1]) hchoice (def h in CE^[e_2])| \\[2mm]
+    \rulename{B1} & |def H^[x] in E^[x==v]| & \movesto & |def H^[x:=v] in E^[v]| \quad \text{if $x \not\in \freevars{v}$}\\
+    \rulename{B2} & |def H^[x] in E^[v==x]| & \movesto & |def H^[x:=v] in E^[v]| \quad \text{if $x \not\in \freevars{v}$}\\
+    \rulename{B3} & |def H^[x] in E^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in E^[x==(e_1,dots,e_n)]| \\
+    \rulename{B4} & |def H^[x] in E^[x==(e_1,dots,e_n)]| & \movesto
     & \begin{array}[t]{@@{}l}
-        |(def h in CE^[e_1]) hchoice| \\  |(def h in CE^[e_2])|
-        \end{array}\\[7mm]
-    \rulename{B1} & |def H^[x] in E^[x==k]| & \movesto & |def H^[x:=k] in E^[k]| \\
-    \rulename{B2} & |def H^[x] in E^[x==(e_1,e_2)]| & \movesto
-    & \begin{array}[t]{@@{}l}
-          |def H^[x_1,x_2,x:=(x_1,x_2)]| \\
-          |in E^[(x_1==e_1,x_2==e_2)]]|
-        \end{array} \\
-    \multicolumn{4}{c}{\text{if}\;
-           \boundvars{H[x]} \disjoint \freevars{e_1,e_2} \quad \text{and} \quad
-           x_1,x_2 \disjoint \freevars{H[x],e_1,e_2} } \\[4mm]
+          |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
+          |in E^[(x_1==e_1,dots,x_n==e_n)]]| \\
+          \text{if}\; x_i \not\in \freevars{|H^[x],e_1,dots,e_n|}
+        \end{array} \\ \\[-2mm]
     \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)|
     \end{array} \\
     \\
@@ -253,10 +254,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{P2} & |v ; e| & \movesto & |e| \\[2mm]
-    \rulename{U1} & |hnf == x| & \movesto & |x == hnf| \\
-    \rulename{U2} & |(e_1,dots,e_n) == (e1',dots,e_n')| & \movesto & |(e_1==e1',dots,e_n=e_n')| \\
-    \rulename{U3} & |v_1 == v_2| & \movesto & |fail| \quad\text{if $v_1 \not= v_2$} \\[2mm]
-    \rulename{L1} & |apply(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\[2mm]
+    \rulename{U1} & |(e_1,dots,e_n) == (e1',dots,e_n')| & \movesto & |(e_1==e1',dots,e_n=e_n')| \\
+    \rulename{U2} & |v_1 == v_2| & \movesto & v_1 \quad\text{if $v_1 = v_2$} \\
+    \rulename{U3} & |hnf_1 == hnf_2| & \movesto & |fail| \quad\text{if $|hnf_1| \not= |hnf_2|$ and \rulename{U1} does not apply} \\[2mm]
+    \rulename{L1} & |apply^(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
+    \rulename{L2} & |apply^((e_1,dots,e_k,dots,e_n), k)| & \movesto &
+    \begin{array}[t]{@@{}ll}
+           |e_k| & \text{if $1 \leq k \leq n$} \\
+           |fail| & \text{otherwise}
+           \end{array}\\[4mm]
     \rulename{K1} & |if none then e_1 else e_2| & \movesto & e_2 \\
     \rulename{K2} & |if L^[def h in v] then e_1 else e_2| & \movesto & |do (def h in e_1)| \\[2mm]
     \rulename{F1} & \begin{array}[t]{@@{}l}
@@ -360,14 +366,65 @@ Here are some example heaps, with an indication of whether they are well formed:
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
   allow a \hexp{} to return an unbound logical variable.
-\item Note that evaluation context $E$, used in rules \rulename{B1}, \rulename{B2} and \rulename{C1},
-  a does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
-  to |none| by \rulename{C1}; and |def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{B1}
-\item Nor does $E$ look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
-  not unify |x| via \rulename{B1}; only variables bound in the innermost enclosing \hexp{} can be unified.
 \item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
   in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
 \end{itemize}
+
+\subsection{Unification}
+
+Rules \rulename{U1}, \rulename{U2} and \rulename{U3} do conventional unification, decomposing
+tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
+|(3==3) + 7| reduces to |10|.
+
+In rule \rulename{U2} there are two uses of ``$=$'', but they are different!  The ``|v_1 == v_2|''
+on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)|. In contrast
+the ``$v_1 = v_2$'' in the side-condition is ``real'' equality: it means that |v_1| and |v_2| are identical syntax trees.
+
+Rules \rulename{B1}-\rulename{B4} come into play when variables are involved. For example
+\rulename{B1} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
+we may unify |x| with a value |v|, and replace the unbound |x| in the heap with the bound |x := v|, thus |H^[x:=v]|.
+
+Crucially, note that $E$ does not look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
+not unify |x| via \rulename{B1}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
+Nor does $E$ look inside choices.  For example,
+|def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{B1}.
+
+Rules \rulename{B1} and \rulename{B2} includes an ``occurs check'', which ensures we never
+get cycles in the heap.
+
+\subsection{Choice and failure}
+
+Rule \rulename{C2} is the crucial one: it duplicates the entire |def| context.  But note the
+\emph{choice-free} context |CE|!  For example, the expression
+$$
+|def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); (x,y)|
+$$
+should yield the values |(3,9)|, |(3,2)|, |(4,9)|, |(4,2)|, in that order.
+To get the order right, we must apply \rulename{C2} to the first choice |(3 choice 4)| first, and only
+then to the second |(9 choice 2)|.  This is achieved by using |CE| in \rulename{C2} to ensure that only the
+\emph{leftmost} choice can be chosen.
+
+Rule \rulename{C1} collapes an entire |def| to |none| if we encounter |fail|.  It uses the |E| evaluation
+context, which looks more deeply into an expression than does |CE|.  For example
+$$
+|def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y)|
+$$
+can fail immediately; we don't need to perform the choices for |x| and |y| first, because they will all fail.
+The use of |E| also means that a |def h in (2, fail plus 3, 7)| will collapse to |none| by \rulename{C1};
+we do not need rules
+like $|fail plus e| \movesto |fail|$.
+
+But note that $E$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
+to |none| by \rulename{C1}.
+
+\subsection{Functions and application}
+
+Rule \rulename{L1} is a rather simple and beautiful $beta$-reduction rule.
+Notice that |apply| is one of the primitive functions in $cop$.
+
+A tuples/array behaves like a (finite) function, and can be applied to a numeric value
+in \rulename{L2} to index it.
+
 
 \subsection{Source Verse}
 

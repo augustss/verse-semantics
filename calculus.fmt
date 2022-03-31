@@ -38,6 +38,9 @@
 %format x_3
 %format x_n
 
+%format hnf_1
+%format hnf_2
+
 %format y1
 %format y2
 
@@ -52,6 +55,7 @@
 %format e_n'
 %format e_x
 %format e_y
+%format e_k
 
 %format h_1
 %format h_2
