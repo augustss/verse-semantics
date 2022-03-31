@@ -30,7 +30,8 @@
         (in-hole E (subst x e_2 e_1))
         "beta")
    (--> (in-hole E (+ k_1 k_2))
-        (in-hole E (add k_1 k_2)))
+        (in-hole E (add k_1 k_2))
+        "delta")
    ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
