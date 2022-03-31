@@ -52,6 +52,7 @@
 %format e_2
 %format e_3
 %format e_n
+%format e_m
 %format e_n'
 %format e_x
 %format e_y

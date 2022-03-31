@@ -223,7 +223,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 \lennart{You could mention in the text that it is associative.}
 
-\lennart{I'm not happy about U2, U3.  I'd rather spell out in detail what unifies and what fails, and the rest get stuck.  I'll do that for Redex.}
+\lennart{I'm not happy about U2, U3.  I'd rather spell out in detail what unifies and what fails, and the rest get stuck.  I'll do that for Redex.} \simon{OK, done}
 
 
 \begin{figurebox}
@@ -232,7 +232,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textbf{Axioms for \hexp{}s}  \\
     \begin{array}{lrcl}
     \rulename{X1} & |none hchoice he| & \movesto & he \\
-    \rulename{X2} & |he hchoice none| & \movesto & he \\[3mm]
+    \rulename{X2} & |he hchoice none| & \movesto & he \\[2mm]
     \rulename{C1} & |def h in E^[fail]| & \movesto & |none| \\
     \rulename{C2} & |def h in CE^[e_1 choice e_2]| & \movesto
     &     |(def h in CE^[e_1]) hchoice (def h in CE^[e_2])| \\[2mm]
@@ -247,14 +247,27 @@ The |let| construct cleverly models the heap, maintaining sharing.
         \end{array} \\ \\[-2mm]
     \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)|
     \end{array} \\
-    \\
+    \\[-3mm]
     \textbf{Axioms for expressions}  \\
     \begin{array}{lrcl}
     \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{P2} & |v ; e| & \movesto & |e| \\[2mm]
-    \rulename{U1} & |(e_1,dots,e_n) == (e1',dots,e_n')| & \movesto & |(e_1==e1',dots,e_n=e_n')| \\
-    \rulename{U2} & |v_1 == v_2| & \movesto & v_1 \quad\text{if $v_1 = v_2$} \\
-    \rulename{U3} & |hnf_1 == hnf_2| & \movesto & |fail| \quad\text{if $|hnf_1| \not= |hnf_2|$ and \rulename{U1} does not apply} \\[2mm]
+    \rulename{U1} & |x == x| & \movesto & |x| \\
+    \rulename{U2} & |k_1 == k_2| & \movesto
+    & \begin{array}[t]{@@{}ll}
+        |k_1| & \text{if $k_1=k_2$} \\
+        |fail| & \text{otherwise}
+      \end{array} \\
+    \rulename{U3} & |k == (e_1,dots,e_n) | & \movesto & |fail| \\
+    \rulename{U4} & |(e_1,dots,e_n) == k | & \movesto & |fail| \\
+    \rulename{U5} & |(x => e_1) == e_2| & \movesto & |fail| \\
+    \rulename{U6} & |e_1 == (x => e_2)| & \movesto & |fail| \\
+    \rulename{U7} & |(e_1,dots,e_m) == (e1',dots,e_n')| & \movesto
+    & \begin{array}[t]{@@{}ll}
+        |(e_1==e1',dots,e_n=e_n')| & \text{if $m=n$} \\
+        |fail| & \text{otherwise}
+      \end{array} \\
+    \\[-2mm]
     \rulename{L1} & |apply^(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
     \rulename{L2} & |apply^((e_1,dots,e_k,dots,e_n), k)| & \movesto &
     \begin{array}[t]{@@{}ll}
@@ -281,9 +294,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{D2} & |do (he_1 hchoice he_2)| & \movesto & |(do he_1) choice (do he_2)|\\
     \rulename{D3} & |do none| & \movesto & |fail|\\
 
-        \end{array} \\
-    \\
-
+        \end{array}
    \end{array}
    $$
 \caption{The Verse calculus: axioms} \label{fig:verse-axioms}
@@ -370,13 +381,14 @@ Here are some example heaps, with an indication of whether they are well formed:
 
 \subsection{Unification}
 
-Rules \rulename{U1}, \rulename{U2} and \rulename{U3} do conventional unification, decomposing
+Rules \rulename{U1}-\rulename{U2} do conventional unification, decomposing
 tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
 |(3==3) + 7| reduces to |10|.
 
-In rule \rulename{U2} there are two uses of ``$=$'', but they are different!  The ``|v_1 == v_2|''
+In rule \rulename{U2} there are two uses of ``$=$'', but they are different!  The ``|k_1 == k_2|''
 on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)|. In contrast
-the ``$v_1 = v_2$'' in the side-condition is ``real'' equality: it means that |v_1| and |v_2| are identical syntax trees.
+the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
+same constant.
 
 Rules \rulename{B1}-\rulename{B4} come into play when variables are involved. For example
 \rulename{B1} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
