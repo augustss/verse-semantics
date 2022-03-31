@@ -53,9 +53,11 @@
   = : e e -> e
   [(= e_1 e_2) (unify (array e_1 e_2))]
   )
+;LA: I would like to name this +, but then the actual + in
+;    meta-function plus refers to the wrong thing.
 (define-metafunction verse
-  + : e e -> e
-  [(+ e_1 e_2) (add (array e_1 e_2))]
+  ++ : e e -> e
+  [(++ e_1 e_2) (add (array e_1 e_2))]
   )
 (define-metafunction verse
   > : e e -> e
@@ -173,6 +175,32 @@
 ;;;   (--> (heap h_1 ... (heap h_2 ...) h_3 ...)
 ;;;        (heap h_1 ... h_2 ... h_3 ...)
 ;;;        "heap-merge")))
+
+; Axioms for expressions
+(define e-axioms
+  (reduction-relation
+   verse+E
+   #:domain e
+   (--> (add (array k_1 k_2))
+        (plus k_1 k_2)
+        "P1")
+   (--> (semi (array v e))
+        e
+        "P2")
+   ))
+
+(define-metafunction verse
+  plus : k k -> k
+  [(plus k_1 k_2) ,(+ (term k_1) (term k_2))])
+
+(module+ test
+  (test--> e-axioms ;; P1
+           (term (++ 3 4))
+           (term 7))
+  (test--> e-axioms ;; P2
+           (term (seq 5 (++ x y)))
+           (term (++ x y)))
+  )
 
 (module+ test
   (test-results))
