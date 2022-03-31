@@ -171,10 +171,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
 % ---------------------------------
 \section{Verse}
-\lennart{\textbf{do} is missing}
-\lennart{\textbf{H} is missing}
-\lennart{Heaps use both the notation := and a little arrow.}
-\simon{All fixed I think}
 
 \begin{figurebox}
   $$
@@ -223,11 +219,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \caption{The Verse calculus: syntax} \label{fig:verse-syntax}
 \end{figurebox}
 
-\lennart{Do you really mean \textbf{H} in C1, C2?} \simon{fixed}
+\lennart{The double bar in 'he' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
 
-\lennart{There are no reduction rules for {\it h} and {\it hv}} \simon{Indeed, that is deliberate}
+\lennart{Rule B2 only deals with binary arrays rather than n-ary.}
 
-\lennart{The B1 rule looks weird, E[x:=k].  Expressions do not have x:=k.} \simon{fixed}
+\lennart{Why don't you drop the heap binding in S1?}
 
 \begin{figurebox}
   $$
