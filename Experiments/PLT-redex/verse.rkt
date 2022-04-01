@@ -120,20 +120,21 @@
    (where (x_1 ...) (fvs-e e_1))
    (where (x_2 ...) (fvs-e e_2))]
   [(fvs-e fail) ()]
-  [(fvs-e (if (def h e_1) e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
-   (where (x_1 ...) (subtract (fvs-e e_1) (bvs-h h)))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-h h)))
+  [(fvs-e (if he_1 e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
+   (where (x_1 ...) (fvs-he he_1))
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-he he_1)))
    (where (x_3 ...) (fvs-e e_3))]
-  [(fvs-e (for (def h e_1) e_2)) (x_1 ... x_2 ...)
-   (where (x_1 ...) (subtract (fvs-e e_1) (bvs-h h)))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-h h)))]
+  [(fvs-e (for he_1 e_2)) (x_1 ... x_2 ...)
+   (where (x_1 ...) (fvs-he he_1))
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-he he_1)))]
+  [(fvs-e (do he)) (fvs-he he)]
   )
 (define-metafunction verse
   fvs-he : he -> (x ...)
   [(fvs-he (def h e)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-h h))
    (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
-  [(fvs-he (dbar he ...)) ((x ... ...))
+  [(fvs-he (dbar he ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-he he) ...))]
   )
 (define-metafunction verse
@@ -467,6 +468,12 @@
   (test-->> e-he-axioms
             (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
             (term (array 2 3)))
+  (test-->> e-he-axioms
+            (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y)))))
+            (term 111))
+  (test-->> e-he-axioms
+            (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y)))))
+            (term 222))
   )
 (module+ test
   (test-results))
