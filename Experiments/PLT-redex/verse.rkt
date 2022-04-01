@@ -5,7 +5,7 @@
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
   (op ::= cop apply)
-  (cop ::= gt add semi unify)
+  (cop ::= gt add semi unify index)
   (he ::=
       (def h e)
       (dbar he ...))
@@ -355,6 +355,14 @@
         "L1")
    ;; TODO L2
    ;; L2 needs more cleverness than is in the paper.
+   (==> (apply (array (array e_1 ...) e_2))
+        (do (def (var i) (seq (seq (= i e_2) (= 1 (alts (count (e_1 ...))))) (index (array (array e_1 ...) i)))))
+        (fresh i)
+        "L2")
+   (==> (index (array (array e ...) k))
+        (nth (e ...) k)
+        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
+        "I1")
    (==> (if (dbar) e_1 e_2)
         e_2
         "K1")
@@ -378,6 +386,24 @@
   [(--> (in-hole XE-E_1 a) (in-hole XE-E_1 b))
    (==> a b)]
   ))
+
+(define-metafunction verse+E
+  count : (e ...) -> (k ...)
+  [(count (e ...))
+          ,(range (length (term (e ...))))]
+  )
+
+(define-metafunction verse+E
+  nth : (e ...) k -> e
+  [(nth (e ...) k) ,(list-ref (term (e ...)) (term k))]
+  )
+
+(define-metafunction verse+E
+  alts : (e ...) -> e
+  [(alts ()) fail]
+  [(alts (e)) e]
+  [(alts (e_1 e_2 ...)) (bar e_1 (alts (e_2 ...)))]
+  )
 
 (define e-he-axioms
   (union-reduction-relations e-axioms he-axioms))
@@ -474,6 +500,10 @@
   (test-->> e-he-axioms
             (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y)))))
             (term 222))
+  ; This test is incredibly slow because of the many reduction paths.
+  ;(test-->> e-he-axioms
+  ;          (term (@ (array 1 2) 1))
+  ;          2)
   )
 
 ; Nice examples
