@@ -188,9 +188,34 @@
   (H ::=
      hole
      (heap h ... H h ...))
-  )
 
-; Compute the head of a value, just for unifica
+  ;; The X contexts are a work-around for compatible-closure not working.
+  ;;
+  ;; XH-HE and XH-E will find a 'he' hole that can reduce.
+  ;; Not reducing under lambda, nor in if/for bodies.
+  (XH-HE ::=
+         hole
+         (dbar he ... XH-HE he ...)
+         (def h XH-E))
+  (XH-E ::=
+        (array e ... XH-E e ...)
+        (op XH-E)
+        (if XH-HE e e)
+        (for XH-HE e)
+        (do XH-HE))
+  ;; XE-HE and XE-E will find an 'e' hole that can reduce.
+  ;; Not reducing under lambda, nor in if/for bodies.
+  (XE-HE ::=
+         (dbar he ... XE-HE he ...)
+         (def h XE-E))
+  (XE-E ::=
+        hole
+        (array e ... XE-E e ...)
+        (op XE-E)
+        (if XE-HE e e)
+        (for XE-HE e)
+        (do XE-HE))  
+  )
 
 (module+ test
   (test-match verse+E (in-hole H x) (term (heap b (:= a 1))))
@@ -203,44 +228,52 @@
 (define he-axioms
   (reduction-relation
    verse+E
-   #:domain he
-   (--> (dbar he_1 ... (dbar he_2 ...) he_3 ...)
+   #:domain e
+   (==> (dbar he_1 ... (dbar he_2 ...) he_3 ...)
         (dbar he_1 ... he_2 ... he_3 ...)
         "Xa")
-   (--> (dbar he)
+   (==> (dbar he)
         he
         "Xb")
-   (--> (def h (in-hole CE fail))
+   (==> (def h (in-hole CE fail))
         (dbar)
         "C1")
-   (--> (def h (in-hole CE (bar e_1 e_2)))
+   (==> (def h (in-hole CE (bar e_1 e_2)))
         (dbar (def h (in-hole CE e_1))
               (def h (in-hole CE e_2)))
         "C2")
-   (--> (def (in-hole H (var x)) (in-hole E (unify (array x v))))
+   (==> (def (in-hole H (var x)) (in-hole E (unify (array x v))))
         (def (in-hole H (:= x v)) (in-hole E v))
         (side-condition (disjoint (term (svs (in-hole H (:= x v)))) (term (fvs-v v))))
         "B1")
-   (--> (def (in-hole H (var x)) (in-hole E (unify (array v x))))
+   (==> (def (in-hole H (var x)) (in-hole E (unify (array v x))))
         (def (in-hole H (:= x v)) (in-hole E v))
         (side-condition (disjoint (term (svs (in-hole H (:= x v)))) (term (fvs-v v))))
         "B2")
-   (--> (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
+   (==> (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
         (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole E (array (= x_s e) ...)))
         (fresh ((x_s ...) (e ...)))
         "B3")
-   (--> (def (in-hole H (var x)) (in-hole E (unify (array (array e ...) x))))
+   (==> (def (in-hole H (var x)) (in-hole E (unify (array (array e ...) x))))
         (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
         "B4")
-   (--> (def (in-hole H (:= x v)) e)
-        (def (in-hole H (heap)) (substitute e x v))
+   (==> (def (in-hole H (:= x v)) e)
+        (def (in-hole H (:= x v)) (substitute e x v))
+        (side-condition (member (term x) (term (fvs-e e))))
         "S1")
-   ))
+  
+  with
+  [(--> (in-hole XH-E_1 a) (in-hole XH-E_1 b))
+   (==> a b)]
+  ))
+
+(define he-axioms-closure
+  (compatible-closure he-axioms verse+E he))
 
 (define (disjoint l1 l2)
   (null? (set-intersect l1 l2)))
   
-(module+ test
+(module+ bad-test
   (test--> he-axioms ;; X-1
            (term (dbar (def (heap) 1) (dbar) (def (heap) 2)))
            (term (dbar (def (heap) 1) (def (heap) 2))))
@@ -274,7 +307,7 @@
            (term (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
   (test--> he-axioms ;; S1
            (term (def (:= x 5) x))
-           (term (def (heap) 5)))
+           (term (def (:= x 5) 5)))
   )
 
 ;; Flatten the heap structure.
@@ -292,54 +325,66 @@
   (reduction-relation
    verse+E
    #:domain e
-   (--> (add (array k_1 k_2))
+   (==> (add (array k_1 k_2))
         (plus k_1 k_2)
         "P1")
-   (--> (semi (array v e))
+   (==> (semi (array v e))
         e
         "P2")
-   (--> (unify (array x_1 x_1))
+   (==> (unify (array x_1 x_1))
         x_1
         "U1")
-   (--> (unify (array k_1 k_1))
+   (==> (unify (array k_1 k_1))
         k_1
         "U2")
-   (--> (unify (array (array e_1 ...) (array e_2 ...)))
+   (==> (unify (array (array e_1 ...) (array e_2 ...)))
         (array (= e_1 e_2) ...)
         (side-condition (equal? (length (term (e_1 ...))) (length (term (e_2 ...)))))
         "U7")
-   (--> (unify (array hnf_1 hnf_2))
+   (==> (unify (array hnf_1 hnf_2))
         fail
         (side-condition (not (equal? (term (head hnf_1)) (term (head hnf_2)))))
         "UF")
-   (--> (apply (array (=> x (def h e_1)) e_2))
+   (==> (apply (array (=> x (def h e_1)) e_2))
         (do (def (heap h (var x)) (seq (= x e_2) e_1)))
         "L1")
    ;; TODO L2
    ;; L2 needs more cleverness than is in the paper.
-   (--> (if (dbar) e_1 e_2)
+   (==> (if (dbar) e_1 e_2)
         e_2
         "K1")
-   (--> (if (in-hole L (def h v)) e_1 e_2)
+   (==> (if (in-hole L (def h v)) e_1 e_2)
         (do (def h e_1))
         "K2")
-   (--> (for (dbar (def h v) ...) e)
+   (==> (for (dbar (def h v) ...) e)
         (array (do (def h e)) ...)
         "F1")
-   (--> (do (def h e))
+   (==> (do (def h e))
         e
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
         "D1")
-   (--> (do (dbar he_1 he_2 ...))
+   (==> (do (dbar he_1 he_2 ...))
         (bar (do he_1) (do (dbar he_2 ...)))
         "D2")
-   (--> (do (dbar))
+   (==> (do (dbar))
         fail
         "D3")
-   ))
+  with
+  [(--> (in-hole XE-E_1 a) (in-hole XE-E_1 b))
+   (==> a b)]
+  ))
+
+(define e-he-axioms
+  (union-reduction-relations e-axioms he-axioms))
+
+; LA: This should have worked, but it doesn't.
+; I've contacted Robby Findlert for help.
+
+(define axioms
+  (compatible-closure e-he-axioms verse+E e))
 
 ; Throw away all information about nested values.
-; It doesn't matter what it returns as long as the different hnfs get different results.
+; It doesn't matter what it returns as long as the different hnf heads get different results.
 ; Note: constants are all considered to be different.
 (define-metafunction verse
   head : hnf -> hnf
@@ -408,5 +453,16 @@
            (term fail))
   )
 
+(module+ test
+  (test-->> e-he-axioms
+            (term (do (def (:= x 1) x)))
+            1)
+  (test-->> e-he-axioms
+            (term (do (def (var x) (seq (= 6 x) (++ x 1)))))
+            (term 7))
+  (test-->> e-he-axioms
+            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
+            (term (array 2 3)))
+  )
 (module+ test
   (test-results))
