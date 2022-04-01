@@ -187,7 +187,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     &&\vb & |if he then e_1 else e_2| \vb |for he in e|  \\
     &&\vb & |do he| \\
     \text{Primops} & op  & ::= & cop \vb |apply | \\
-    \text{Choice-free primops} & cop  & ::= & |gr| \vb |add| \vb |semi| \vb |unify| \\
+    \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \vb |semi| \vb |unify| \\
     \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => he|  \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Choice-free exprs} & ce  & ::=  & x \vb k \vb |(ce_1, dots, ce_n)| \vb |x => he| \vb cop(ce) \\
@@ -264,7 +264,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
           |in E^[(x_1==e_1,dots,x_n==e_n)]]| \\
           \text{if}\; x_i \not\in \freevars{|H^[x],e_1,dots,e_n|}
         \end{array} \\ \\[-2mm]
-    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)|
+    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)| \\
+                  &&& \text{if $x \in \freevars{e}$}
     \end{array} \\
     \\[-3mm]
     \textbf{Axioms for expressions}  \\
@@ -323,10 +324,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
 An expression |e| has syntax given in \Cref{fig:verse-syntax}.
 Constants |k| are simply integers in this presentation, and come equipped with
 some primitive operations |op|.  To avoid clutter, we provide only two representative
-operations, |add^(e_1,e_2)| for integer addition, and |gr^(e_1,e_2)| for integer comparison.
+operations, |add^(e_1,e_2)| for integer addition, and |gt^(e_1,e_2)| for integer comparison.
 
 \paragraph{Tuples and arrays.}
-All functions (including |add| and |gr|) take a single argument, but that
+All functions (including |add| and |gt|) take a single argument, but that
 argument can be a tuple, say |(e_1,e_2)|. In Verse, tuples and arrays are the same data structure;
 a tuple is just an array whose size is statically known.
 The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| constructs an array.
