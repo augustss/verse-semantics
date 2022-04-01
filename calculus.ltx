@@ -233,7 +233,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 \lennart{You could mention in the text that it is associative.}
 
-\lennart{I'm not happy about U2, U3.  I'd rather spell out in detail what unifies and what fails, and the rest get stuck.  I'll do that for Redex.} \simon{OK, done}
+\lennart{Rule S1 needs a side condition that x is in fvs(e), otherwise it's applicable over and over (found by Redex).}
 
 
 \begin{figurebox}
