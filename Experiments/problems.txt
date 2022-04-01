@@ -1,0 +1,54 @@
+        How to write this function?
+        f(x:int):=x+1
+        
+
+-----
+
+        int[a:any]=123; Print(a)
+        # prints 123
+        # but what happens if we introduce the overload
+        #   int(x:float):int = round(x)
+
+
+-----
+        test(S00){f(x:= (:prefix'-')) := {x};
+                  Print(f(3))}
+        OK: prints -3
+
+        test(S00){f(x:= (:prefix'-') where x = (:nat)) := {x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        R20: Runtime fails where disallowed
+
+        test(S00){f(x:= (:nat) where x = (:prefix'-')) := {x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        X00: Conditional-condition
+
+        test(S00){f(x:= (:any) where x = (:nat)) := {x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        OK
+        
+        test(S00){f(x:= (:any) where x = (:prefix'-')) := {x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        X00: Conditional-condition
+
+        test(S00){f(x where x := (:nat)):={x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        OK
+
+        test(S00){f(x where x := (:prefix'-')):={x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        X00
+
+        test(S00){f((1,x)[1] where x := (:nat)):={x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        OK
+
+        test(S00){snd(x:int, y:int):={y};
+                  f(snd(1,x) where x := (:nat)):={x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        OK
+        
+        test(S00){f((x:int)+1):={x};
+                  if (a:=f[3]) then Print(a) else Print("no")}
+        V00: Unable to verify
+        
