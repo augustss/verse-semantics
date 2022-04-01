@@ -14,7 +14,7 @@
 \newcommand{\vb}{\; \mid \;}
 
 % Names of rules
-\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\rulename}[1]{\textsc{\small #1}}
 
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
@@ -194,8 +194,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \vb |x:=v| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
-    \text{Evaluation contexts} & E & ::= & \hole \vb |(e_1,dots,E,dots,e_n)| \vb |op^(E)| \\
-    \text{Choice contexts} & CE & ::= & \hole \vb |(ce_1,dots,ce_m,CE,e_1,dots,e_n)| \vb |op^(CE)| \\
+    \text{Execution contexts} & X & ::= & \hole \vb |(e_1,dots,X,dots,e_n)| \vb |op^(X)| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |(ce_1,dots,ce_m,CX,e_1,dots,e_n)| \vb |op^(CX)| \\
     \text{Left choice context} & L & ::= & \hole \vb |L hchoice he| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
@@ -240,38 +240,86 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \begin{figurebox}
   $$
   \begin{array}{l}
-    \textbf{Axioms for \hexp{}s}  \\
+    \multicolumn{1}{c}{\textbf{Axioms for \hexp{}s, $he$}}  \\
     \begin{array}{lrcl}
+    \multicolumn{4}{l}{\textit{Substitution}} \\
+    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)| \\[2mm]
+                  &&& \text{if $x \in \freevars{e}$} \\
+    \multicolumn{4}{l}{\textit{Choice}} \\
     \rulename{X1} & |none hchoice he| & \movesto & he \\
     \rulename{X2} & |he hchoice none| & \movesto & he \\[2mm]
-    \rulename{C1} & |def h in E^[fail]| & \movesto & |none| \\
-    \rulename{C2} & |def h in CE^[e_1 choice e_2]| & \movesto
-    &     |(def h in CE^[e_1]) hchoice (def h in CE^[e_2])| \\[2mm]
-    \rulename{B1} & |def H^[x] in E^[x==v]| & \movesto
+    \rulename{C1} & |def h in X^[fail]| & \movesto & |none| \\
+    \rulename{C2} & |def h in CX^[e_1 choice e_2]| & \movesto
+    &     |(def h in CX^[e_1]) hchoice (def h in CX^[e_2])| \\[4mm]
+    \multicolumn{4}{c}{\textbf{Axioms for expressions, $e$}}  \\
+    \multicolumn{4}{l}{\textit{Primitive operations}} \\
+    \rulename{P-seq} & |v ; e| & \movesto & |e| \\
+    \rulename{P-add} & |add^(k_1 ,k_2)| & \movesto & k_1+k_2 \\
+    \rulename{P-gt} & |gt^(k_1,k_2)| & \movesto &
+    \begin{array}[t]{@@{}ll}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{array} \\[2mm]
+    \multicolumn{4}{l}{\textit{Lambda and application}} \\
+    \rulename{app-lam} & |apply^(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
+    \rulename{app-arr} & |apply^((e_1,dots,e_i,dots,e_n), k)| & \movesto &
+    \begin{array}[t]{@@{}ll}
+           |e_i| & \text{if $1 \leq i \leq n$} \\
+           |fail| & \text{otherwise}
+           \end{array}\\[4mm]
+    \multicolumn{4}{l}{\textit{Conditionals}} \\
+    \rulename{K1} & |if none then e_1 else e_2| & \movesto & e_2 \\
+    \rulename{K2} & |if L^[def h in v] then e_1 else e_2| & \movesto & |do (def h in e_1)| \\[2mm]
+    \multicolumn{4}{l}{\textit{For-loops}} \\
+    \rulename{F1} & \begin{array}[t]{@@{}l}
+      |for| \begin{array}[t]{l}
+        |(def h_1 in v_1)| \\
+        |hchoice dots hchoice| \\
+        |(def h_n in v_n)|
+        \end{array} \\
+      |in e|
+    \end{array} & \movesto &
+    \begin{array}[t]{@@{}l}
+      |(do (def h_1 in e)| \\
+      | , dots ,| \\
+      | do (def h_n in e))|
+    \end{array} \\
+    \multicolumn{4}{l}{\textit{Do-blocks}} \\
+    \rulename{D1} & |do (def h in e)| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvarsi{h}$} \\
+    \rulename{D2} & |do (he_1 hchoice he_2)| & \movesto & |(do he_1) choice (do he_2)|\\
+    \rulename{D3} & |do none| & \movesto & |fail|\\
+
+        \end{array}
+   \end{array}
+   $$
+\caption{The Verse calculus: general axioms} \label{fig:general-axioms}
+\end{figurebox}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \textbf{Axioms for \hexp{}s}  \\
+    \begin{array}{lrcl}
+    \rulename{B1} & |def H^[x] in X^[x==v]| & \movesto
     & \begin{array}[t]{@@{}l}
-        |def H^[x:=v] in E^[v]| \\
+        |def H^[x:=v] in X^[v]| \\
         \text{if $x,\boundvars{H[x]} \disjoint \freevars{v}$}
         \end{array} \\
-    \rulename{B2} & |def H^[x] in E^[v==x]| & \movesto
+    \rulename{B2} & |def H^[x] in X^[v==x]| & \movesto
     & \begin{array}[t]{@@{}l}
-        |def H^[x:=v] in E^[v]| \\
+        |def H^[x:=v] in X^[v]| \\
         \text{if $x,\boundvars{H[x]} \disjoint \freevars{v}$}
         \end{array} \\
-    \rulename{B3} & |def H^[x] in E^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in E^[x==(e_1,dots,e_n)]| \\
-    \rulename{B4} & |def H^[x] in E^[x==(e_1,dots,e_n)]| & \movesto
+    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
+    \rulename{B4} & |def H^[x] in X^[x==(e_1,dots,e_n)]| & \movesto
     & \begin{array}[t]{@@{}l}
           |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
-          |in E^[(x_1==e_1,dots,x_n==e_n)]]| \\
+          |in X^[(x_1==e_1,dots,x_n==e_n)]]| \\
           \text{if}\; x_i \not\in \freevars{|H^[x],e_1,dots,e_n|}
-        \end{array} \\ \\[-2mm]
-    \rulename{S1} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)| \\
-                  &&& \text{if $x \in \freevars{e}$}
-    \end{array} \\
-    \\[-3mm]
+        \end{array} 
+    \end{array} \\ \\[-2mm]
     \textbf{Axioms for expressions}  \\
     \begin{array}{lrcl}
-    \rulename{P1} & |add(k_1 ,k_2)| & \movesto & k_1+k_2 \\
-    \rulename{P2} & |v ; e| & \movesto & |e| \\[2mm]
     \rulename{U1} & |x == x| & \movesto & |x| \\
     \rulename{U2} & |k_1 == k_2| & \movesto
     & \begin{array}[t]{@@{}ll}
@@ -286,37 +334,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     & \begin{array}[t]{@@{}ll}
         |(e_1==e1',dots,e_n=e_n')| & \text{if $m=n$} \\
         |fail| & \text{otherwise}
-      \end{array} \\
-    \\[-2mm]
-    \rulename{L1} & |apply^(x => def h in e_1, e_2)| & \movesto & |do (def (h,x) in (x==e_2; e_1))| \\
-    \rulename{L2} & |apply^((e_1,dots,e_i,dots,e_n), k)| & \movesto &
-    \begin{array}[t]{@@{}ll}
-           |e_i| & \text{if $1 \leq i \leq n$} \\
-           |fail| & \text{otherwise}
-           \end{array}\\[4mm]
-    \rulename{K1} & |if none then e_1 else e_2| & \movesto & e_2 \\
-    \rulename{K2} & |if L^[def h in v] then e_1 else e_2| & \movesto & |do (def h in e_1)| \\[2mm]
-    \rulename{F1} & \begin{array}[t]{@@{}l}
-      |for| \begin{array}[t]{l}
-        |(def h_1 in v_1)| \\
-        |hchoice dots hchoice| \\
-        |(def h_n in v_n)|
-        \end{array} \\
-      |in e|
-    \end{array} & \movesto &
-    \begin{array}[t]{@@{}l}
-      |(do (def h_1 in e)| \\
-      | , dots ,| \\
-      | do (def h_n in e))|
-    \end{array} \\
-    \rulename{D1} & |do (def h in e)| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvarsi{h}$} \\
-    \rulename{D2} & |do (he_1 hchoice he_2)| & \movesto & |(do he_1) choice (do he_2)|\\
-    \rulename{D3} & |do none| & \movesto & |fail|\\
-
-        \end{array}
+      \end{array}
+     \end{array}
    \end{array}
    $$
-\caption{The Verse calculus: axioms} \label{fig:verse-axioms}
+\caption{The Verse calculus: unification axioms} \label{fig:unification-axioms}
 \end{figurebox}
 
 \subsection{Expressions and values}
@@ -389,6 +411,8 @@ Here are some example heaps, with an indication of whether they are well formed:
      in just one place (a la Ariola)
    \item The heap always binds a variable to a \emph{value}, and values can freely
      be duplicated without duplicating work, so \rulename{S1} does not duplicate work.
+   \item The side condition $x \in \freevars{e}$ is present solely to avoid \rulename{S1} being
+     \emph{always} applicable, albeit vacuously.
    \end{itemize}
 \item Rule \rulename{D1}. To achieve $\freevars{e} \disjoint \boundvarsi{h}$, use \rulename{S1}
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
@@ -413,9 +437,9 @@ Rules \rulename{B1}-\rulename{B4} come into play when variables are involved. Fo
 \rulename{B1} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
 we may unify |x| with a value |v|, and replace the unbound |x| in the heap with the bound |x := v|, thus |H^[x:=v]|.
 
-Crucially, note that $E$ does not look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
+Crucially, note that $X$ does not look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
 not unify |x| via \rulename{B1}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
-Nor does $E$ look inside choices.  For example,
+Nor does $X$ look inside choices.  For example,
 |def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{B1}.
 
 Rules \rulename{B1} and \rulename{B2} includes an ``occurs check'', which ensures we never
@@ -424,35 +448,35 @@ get cycles in the heap.
 \subsection{Choice and failure}
 
 Rule \rulename{C2} is the crucial one: it duplicates the entire |def| context.  But note the
-\emph{choice-free} context |CE|!  For example, the expression
+\emph{choice-free} context |CX|!  For example, the expression
 $$
 |def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); (x,y)|
 $$
 should yield the values |(3,9)|, |(3,2)|, |(4,9)|, |(4,2)|, in that order.
 To get the order right, we must apply \rulename{C2} to the first choice |(3 choice 4)| first, and only
-then to the second |(9 choice 2)|.  This is achieved by using |CE| in \rulename{C2} to ensure that only the
+then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{C2} to ensure that only the
 \emph{leftmost} choice can be chosen.
 
-Rule \rulename{C1} collapes an entire |def| to |none| if we encounter |fail|.  It uses the |E| evaluation
-context, which looks more deeply into an expression than does |CE|.  For example
+Rule \rulename{C1} collapes an entire |def| to |none| if we encounter |fail|.  It uses the |X| evaluation
+context, which looks more deeply into an expression than does |CX|.  For example
 $$
 |def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y)|
 $$
 can fail immediately; we don't need to perform the choices for |x| and |y| first, because they will all fail.
-The use of |E| also means that a |def h in (2, fail plus 3, 7)| will collapse to |none| by \rulename{C1};
+The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |none| by \rulename{C1};
 we do not need rules
 like $|fail plus e| \movesto |fail|$.
 
-But note that $E$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
+But note that $X$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
 to |none| by \rulename{C1}.
 
 \subsection{Functions and application}
 
-Rule \rulename{L1} is a rather simple and beautiful $beta$-reduction rule.
+Rule \rulename{app-lam} is a rather simple and beautiful $\beta$-reduction rule.
 Notice that |apply| is one of the primitive functions in $cop$.
 
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
-in \rulename{L2} to index it.
+in \rulename{app-arr} to index it.
 
 
 \subsection{Source Verse}
@@ -490,7 +514,7 @@ In the arms of a choice |e_1 choice e_2)| we add a |do (def h in e_1)| around |e
     \rulename{S1} & \movesto & |def (x:=3,y:=4) in 4|
     \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
-  |(y==add^(x,1))|.  But the evaluation context $E$ allows us to apply rule \rulename{B1}
+  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{B1}
   in the \emph{second} argument of |semi|, which gives a value to |x| in the heap.
   That allows the |add| to proceed.  So ``later'' instructions can unblock ``earlier'' ones.
 \end{example}

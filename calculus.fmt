@@ -37,6 +37,8 @@
 %format ^ = " "
 %format ; = ";\;"
 %format , = ",\,"
+%format X = "X"
+%format CX = "CX"
 
 %format x_1
 %format x_2
