@@ -272,42 +272,46 @@
 
 (define (disjoint l1 l2)
   (null? (set-intersect l1 l2)))
-  
-(module+ bad-test
+
+(module+ test
+  (require syntax/parse/define)
+  ; The he-axioms no longer operate on 'he', but 'e'.
+  ; The term-do macro will wrap each 'he' in a 'do' to make it an 'e'.
+  (define-syntax-parse-rule (term-do t) (term (do t)))
   (test--> he-axioms ;; X-1
-           (term (dbar (def (heap) 1) (dbar) (def (heap) 2)))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
+           (term-do (dbar (def (heap) 1) (dbar) (def (heap) 2)))
+           (term-do (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; X-2
-           (term (dbar (def (heap) 1) (dbar (def (heap) 2))))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
+           (term-do (dbar (def (heap) 1) (dbar (def (heap) 2))))
+           (term-do (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; C1
-           (term (def (heap (var x) (var y)) fail))
-           (term (dbar)))
+           (term-do (def (heap (var x) (var y)) fail))
+           (term-do (dbar)))
   (test--> he-axioms ;; C2
-           (term (def (heap) (bar 1 2)))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
+           (term-do (def (heap) (bar 1 2)))
+           (term-do (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; B1-1
-           (term (def (heap (var a)) (= a 5)))
-           (term (def (heap (:= a 5)) 5)))
+           (term-do (def (heap (var a)) (= a 5)))
+           (term-do (def (heap (:= a 5)) 5)))
   (test--> he-axioms ;; B1-2
-           (term (def (heap (var a)) (= a b)))
-           (term (def (heap (:= a b)) b)))  
+           (term-do (def (heap (var a)) (= a b)))
+           (term-do (def (heap (:= a b)) b)))  
   (test-equal ;; B1-3  do NOT allow circularity
-           (apply-reduction-relation he-axioms (term (def (heap (var a)) (= a a))))
+           (apply-reduction-relation he-axioms (term-do (def (heap (var a)) (= a a))))
            '())
   (test--> he-axioms ;; B2
-           (term (def (heap (var a)) (= 5 a)))
-           (term (def (heap (:= a 5)) 5)))
+           (term-do (def (heap (var a)) (= 5 a)))
+           (term-do (def (heap (:= a 5)) 5)))
   (test--> he-axioms ;; B3
-           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4)))))
-           (term (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
+           (term-do (def (heap (var a)) (= a (array 1 2 (++ 3 4)))))
+           (term-do (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
                       (array (= x_s 1) (= x_s1 2) (= x_s2 (++ 3 4))))))
   (test--> he-axioms ;; B4
-           (term (def (heap (var a)) (= (array 1 2 (++ 3 4)) a)))
-           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
+           (term-do (def (heap (var a)) (= (array 1 2 (++ 3 4)) a)))
+           (term-do (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
   (test--> he-axioms ;; S1
-           (term (def (:= x 5) x))
-           (term (def (:= x 5) 5)))
+           (term-do (def (:= x 5) x))
+           (term-do (def (:= x 5) 5)))
   )
 
 ;; Flatten the heap structure.
