@@ -475,5 +475,10 @@
             (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y)))))
             (term 222))
   )
+
+; Nice examples
+; (traces e-he-axioms (term (do (def (:= x 1) x))))
+; (traces e-he-axioms (term (for (def (var x) (= x (bar 1 2))) (++ x 1))))
+
 (module+ test
   (test-results))
