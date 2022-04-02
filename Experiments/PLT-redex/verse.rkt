@@ -2,6 +2,7 @@
 (require redex)
 
 (define-language verse
+  (p ::= he)
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
   (op ::= cop apply)
@@ -229,7 +230,7 @@
 (define he-axioms
   (reduction-relation
    verse+E
-   #:domain e
+   #:domain he
    (==> (dbar he_1 ... (dbar he_2 ...) he_3 ...)
         (dbar he_1 ... he_2 ... he_3 ...)
         "Xa")
@@ -264,7 +265,7 @@
         "S1")
   
   with
-  [(--> (in-hole XH-E_1 a) (in-hole XH-E_1 b))
+  [(--> (in-hole XH-HE_1 a) (in-hole XH-HE_1 b))
    (==> a b)]
   ))
 
@@ -275,44 +276,40 @@
   (null? (set-intersect l1 l2)))
 
 (module+ test
-  (require syntax/parse/define)
-  ; The he-axioms no longer operate on 'he', but 'e'.
-  ; The term-do macro will wrap each 'he' in a 'do' to make it an 'e'.
-  (define-syntax-parse-rule (term-do t) (term (do t)))
   (test--> he-axioms ;; X-1
-           (term-do (dbar (def (heap) 1) (dbar) (def (heap) 2)))
-           (term-do (dbar (def (heap) 1) (def (heap) 2))))
+           (term (dbar (def (heap) 1) (dbar) (def (heap) 2)))
+           (term (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; X-2
-           (term-do (dbar (def (heap) 1) (dbar (def (heap) 2))))
-           (term-do (dbar (def (heap) 1) (def (heap) 2))))
+           (term (dbar (def (heap) 1) (dbar (def (heap) 2))))
+           (term (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; C1
-           (term-do (def (heap (var x) (var y)) fail))
-           (term-do (dbar)))
+           (term (def (heap (var x) (var y)) fail))
+           (term (dbar)))
   (test--> he-axioms ;; C2
-           (term-do (def (heap) (bar 1 2)))
-           (term-do (dbar (def (heap) 1) (def (heap) 2))))
+           (term (def (heap) (bar 1 2)))
+           (term (dbar (def (heap) 1) (def (heap) 2))))
   (test--> he-axioms ;; B1-1
-           (term-do (def (heap (var a)) (= a 5)))
-           (term-do (def (heap (:= a 5)) 5)))
+           (term (def (heap (var a)) (= a 5)))
+           (term (def (heap (:= a 5)) 5)))
   (test--> he-axioms ;; B1-2
-           (term-do (def (heap (var a)) (= a b)))
-           (term-do (def (heap (:= a b)) b)))  
+           (term (def (heap (var a)) (= a b)))
+           (term (def (heap (:= a b)) b)))  
   (test-equal ;; B1-3  do NOT allow circularity
-           (apply-reduction-relation he-axioms (term-do (def (heap (var a)) (= a a))))
+           (apply-reduction-relation he-axioms (term (def (heap (var a)) (= a a))))
            '())
   (test--> he-axioms ;; B2
-           (term-do (def (heap (var a)) (= 5 a)))
-           (term-do (def (heap (:= a 5)) 5)))
+           (term (def (heap (var a)) (= 5 a)))
+           (term (def (heap (:= a 5)) 5)))
   (test--> he-axioms ;; B3
-           (term-do (def (heap (var a)) (= a (array 1 2 (++ 3 4)))))
-           (term-do (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
+           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4)))))
+           (term (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
                       (array (= x_s 1) (= x_s1 2) (= x_s2 (++ 3 4))))))
   (test--> he-axioms ;; B4
-           (term-do (def (heap (var a)) (= (array 1 2 (++ 3 4)) a)))
-           (term-do (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
+           (term (def (heap (var a)) (= (array 1 2 (++ 3 4)) a)))
+           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
   (test--> he-axioms ;; S1
-           (term-do (def (:= x 5) x))
-           (term-do (def (:= x 5) 5)))
+           (term (def (:= x 5) x))
+           (term (def (:= x 5) 5)))
   )
 
 ;; Flatten the heap structure.
@@ -329,7 +326,7 @@
 (define e-axioms
   (reduction-relation
    verse+E
-   #:domain e
+   #:domain he
    (==> (add (array k_1 k_2))
         (plus k_1 k_2)
         "P1")
@@ -356,7 +353,7 @@
    ;; TODO L2
    ;; L2 needs more cleverness than is in the paper.
    (==> (apply (array (array e_1 ...) e_2))
-        (do (def (var i) (seq (seq (= i e_2) (= 1 (alts (count (e_1 ...))))) (index (array (array e_1 ...) i)))))
+        (do (def (var i) (seq (seq (= i e_2) (= i (alts (count (e_1 ...))))) (index (array (array e_1 ...) i)))))
         (fresh i)
         "L2")
    (==> (index (array (array e ...) k))
@@ -383,7 +380,7 @@
         fail
         "D3")
   with
-  [(--> (in-hole XE-E_1 a) (in-hole XE-E_1 b))
+  [(--> (in-hole XE-HE_1 a) (in-hole XE-HE_1 b))
    (==> a b)]
   ))
 
@@ -405,14 +402,14 @@
   [(alts (e_1 e_2 ...)) (bar e_1 (alts (e_2 ...)))]
   )
 
-(define e-he-axioms
+(define p-axioms
   (union-reduction-relations e-axioms he-axioms))
 
 ; LA: This should have worked, but it doesn't.
 ; I've contacted Robby Findlert for help.
 
 (define axioms
-  (compatible-closure e-he-axioms verse+E e))
+  (compatible-closure p-axioms verse+E e))
 
 ; Throw away all information about nested values.
 ; It doesn't matter what it returns as long as the different hnf heads get different results.
@@ -429,77 +426,82 @@
   [(plus k_1 k_2) ,(+ (term k_1) (term k_2))])
 
 (module+ test
+  (require syntax/parse/define)
+  ; The he-axioms no longer operate on 'he', but 'e'.
+  ; The term-def macro will wrap each 'he' in a 'do' to make it an 'e'.
+  (define-syntax-parse-rule (term-def t) (term (def (heap) t)))
   (test--> e-axioms ;; P1
-           (term (++ 3 4))
-           (term 7))
+           (term-def (++ 3 4))
+           (term-def 7))
   (test--> e-axioms ;; P2
-           (term (seq 5 (++ x y)))
-           (term (++ x y)))
+           (term-def (seq 5 (++ x y)))
+           (term-def (++ x y)))
   (test--> e-axioms ;; U1
-           (term (= x x))
-           (term x))
+           (term-def (= x x))
+           (term-def x))
   (test--> e-axioms ;; U2
-           (term (= 5 5))
-           (term 5))
+           (term-def (= 5 5))
+           (term-def 5))
   (test--> e-axioms ;; UF
-           (term (= 5 6))
-           (term fail))
+           (term-def (= 5 6))
+           (term-def fail))
   (test--> e-axioms ;; U7
-           (term (= (array x 1 2) (array 3 y 2)))
-           (term (array (= x 3) (= 1 y) (= 2 2))))
+           (term-def (= (array x 1 2) (array 3 y 2)))
+           (term-def (array (= x 3) (= 1 y) (= 2 2))))
   (test--> e-axioms ;; UF
-           (term (= (array x 1 2) (array 3 y 2 4)))
-           (term fail))
+           (term-def (= (array x 1 2) (array 3 y 2 4)))
+           (term-def fail))
   (test--> e-axioms ;; UF
-           (term (= 5 (array 1 2 3)))
-           (term fail))
+           (term-def (= 5 (array 1 2 3)))
+           (term-def fail))
 ; This test gets unique variables that cannot be predicted.
 ; We need to check alpha equivalence instead.
 ;  (test--> e-axioms ;; L1
-;           (term (@ (=> x (def (heap) (++ x 1))) (++ 3 4)))
-;           (term 0))
+;           (term-def (@ (=> x (def (heap) (++ x 1))) (++ 3 4)))
+;           (term-def 0))
   (test--> e-axioms ;; K1
-           (term (if (dbar) 1 2))
-           (term 2))
+           (term-def (if (dbar) 1 2))
+           (term-def 2))
   (test--> e-axioms ;; K2-1
-           (term (if (def (heap) 3) 1 2))
-           (term (do (def (heap) 1))))
+           (term-def (if (def (heap) 3) 1 2))
+           (term-def (do (def (heap) 1))))
   (test--> e-axioms ;; K2-2
-           (term (if (dbar (def (heap) 3)) 1 2))
-           (term (do (def (heap) 1))))
+           (term-def (if (dbar (def (heap) 3)) 1 2))
+           (term-def (do (def (heap) 1))))
   (test--> e-axioms ;; F1
-           (term (for (dbar (def (var x) 1) (def (var y) 2)) 5))
-           (term (array (do (def (var x) 5)) (do (def (var y) 5)))))
+           (term-def (for (dbar (def (var x) 1) (def (var y) 2)) 5))
+           (term-def (array (do (def (var x) 5)) (do (def (var y) 5)))))
   (test--> e-axioms ;; D1-1
-           (term (do (def (heap) 5)))
-           (term 5))
+           (term-def (do (def (heap) 5)))
+           (term-def 5))
   (test--> e-axioms ;; D1-2
-           (term (do (def (var x) y)))
-           (term y))
+           (term-def (do (def (var x) y)))
+           (term-def y))
   (test--> e-axioms ;; D2
-           (term (do (dbar (def (heap) 1) (def (heap) 2))))
-           (term (bar (do (def (heap) 1)) (do (dbar (def (heap) 2))))))
+           (term-def (do (dbar (def (heap) 1) (def (heap) 2))))
+           (term-def (bar (do (def (heap) 1)) (do (dbar (def (heap) 2))))))
   (test--> e-axioms ;; D3
-           (term (do (dbar)))
-           (term fail))
+           (term-def (do (dbar)))
+           (term-def fail))
   )
 
+;; TODO: add a single reduction rule for p that strips the top level def.
 (module+ test
-  (test-->> e-he-axioms
-            (term (do (def (:= x 1) x)))
-            1)
-  (test-->> e-he-axioms
-            (term (do (def (var x) (seq (= 6 x) (++ x 1)))))
-            (term 7))
-  (test-->> e-he-axioms
-            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
-            (term (array 2 3)))
-  (test-->> e-he-axioms
-            (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y)))))
-            (term 111))
-  (test-->> e-he-axioms
-            (term (do (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y)))))
-            (term 222))
+  (test-->> p-axioms
+            (term (def (:= x 1) x))
+            (term (def (:= x 1) 1)))
+  (test-->> p-axioms
+            (term (def (var x) (seq (= 6 x) (++ x 1))))
+            (term (def (:= x 6) 7)))
+  (test-->> p-axioms
+            (term (def (heap) (for (def (var x) (= x (bar 1 2))) (++ x 1))))
+            (term (def (heap) (array 2 3))))
+  (test-->> p-axioms
+            (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y))))
+            (term (def (heap (:= x 1) (:= y 111)) 111)))
+  (test-->> p-axioms
+            (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
+            (term (def (heap (:= x 2) (:= y 222)) 222)))
   ; This test is incredibly slow because of the many reduction paths.
   ;(test-->> e-he-axioms
   ;          (term (@ (array 1 2) 1))
@@ -507,8 +509,8 @@
   )
 
 ; Nice examples
-; (traces e-he-axioms (term (do (def (:= x 1) x))))
-; (traces e-he-axioms (term (for (def (var x) (= x (bar 1 2))) (++ x 1))))
+; (traces p-axioms (term (do (def (:= x 1) x))))
+; (traces p-axioms (term (for (def (var x) (= x (bar 1 2))) (++ x 1))))
 
 (module+ test
   (test-results))
