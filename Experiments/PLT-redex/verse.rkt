@@ -3,10 +3,6 @@
 
 (define-language verse
   (p ::= he)
-  (k ::= number)
-  (x ::= variable-not-otherwise-mentioned)
-  (op ::= cop apply)
-  (cop ::= gt add semi unify index)
   (he ::=
       (def h e)
       (dbar he ...))
@@ -22,6 +18,8 @@
      (for he e)
      (do he)
      )
+  (op ::= cop apply)
+  (cop ::= gt add semi unify index)
   (hnf ::=
        k
        (array v ...)
@@ -37,6 +35,8 @@
      (heap h ...)
      (var x)
      (:= x v))
+  (k ::= number)
+  (x ::= variable-not-otherwise-mentioned)
   #:binding-forms
   (=> x he #:refers-to x)
   ; TODO Test the def binding form.
@@ -61,8 +61,8 @@
   [(++ e_1 e_2) (add (array e_1 e_2))]
   )
 (define-metafunction verse
-  > : e e -> e
-  [(> e_1 e_2) (gt (array e_1 e_2))]
+  >> : e e -> e
+  [(>> e_1 e_2) (gt (array e_1 e_2))]
   )
 (define-metafunction verse
   @ : e e -> e
@@ -83,30 +83,30 @@
   [(subtract (x_1 ...) (x_2 x_3 ...))
    (subtract (x_1 ...) (x_3 ...))])
 
-; Variables defined in a he
+; Variables defined in a 'he'
 (define-metafunction verse
-  bvs-he : he -> (x ...)
-  [(bvs-he (def h e)) (bvs-h h)]
-  [(bvs-he (dbar he ...)) (x ... ...)
-   (where ((x ...) ...) ((bvs-he he) ...))]
+  bvis-he : he -> (x ...)
+  [(bvis-he (def h e)) (bvis-h h)]
+  [(bvis-he (dbar he ...)) (x ... ...)
+   (where ((x ...) ...) ((bvis-he he) ...))]
   )
 ; Variables that are bound in a heap
 (define-metafunction verse
-  bvs-h : h -> (x ...)
-  [(bvs-h (var x)) (x)]
-  [(bvs-h (:= x v)) (x)]
-  [(bvs-h (heap h ...))
+  bvis-h : h -> (x ...)
+  [(bvis-h (var x)) (x)]
+  [(bvis-h (:= x v)) (x)]
+  [(bvis-h (heap h ...))
    (x ... ...)
-   (where ((x ...) ...) ((bvs-h h) ...))]
+   (where ((x ...) ...) ((bvis-h h) ...))]
   )
 ; Variables that have values (i.e., that are set) in the heap.
 (define-metafunction verse
-  svs : h -> (x ...)
-  [(svs (var x)) ()]
-  [(svs (:= x v)) (x)]
-  [(svs (heap h ...))
+  bvs : h -> (x ...)
+  [(bvs (var x)) ()]
+  [(bvs (:= x v)) (x)]
+  [(bvs (heap h ...))
    (x ... ...)
-   (where ((x ...) ...) ((svs h) ...))]
+   (where ((x ...) ...) ((bvs h) ...))]
   )
 
 (define-metafunction verse
@@ -123,18 +123,18 @@
   [(fvs-e fail) ()]
   [(fvs-e (if he_1 e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
    (where (x_1 ...) (fvs-he he_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-he he_1)))
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvis-he he_1)))
    (where (x_3 ...) (fvs-e e_3))]
   [(fvs-e (for he_1 e_2)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-he he_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-he he_1)))]
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvis-he he_1)))]
   [(fvs-e (do he)) (fvs-he he)]
   )
 (define-metafunction verse
   fvs-he : he -> (x ...)
   [(fvs-he (def h e)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-h h))
-   (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
+   (where (x_2 ...) (subtract (fvs-e e) (bvis-h h)))]
   [(fvs-he (dbar he ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-he he) ...))]
   )
@@ -156,10 +156,10 @@
   (test-match verse he (term (def (heap (var x)) (= x k))))
   (test-match verse h (term (:= a 2)))
   (test-match verse h (term (heap (var x) (:= y 1) (heap) (heap (var z)))))
-  (test-equal (term (bvs-h (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (x y z)))
-  (test-equal (term (svs (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (y)))
-  (test-equal (term (bvs-he (def (var x) 0))) (term (x)))
-  (test-equal (term (bvs-he (dbar
+  (test-equal (term (bvis-h (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (x y z)))
+  (test-equal (term (bvs (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (y)))
+  (test-equal (term (bvis-he (def (var x) 0))) (term (x)))
+  (test-equal (term (bvis-he (dbar
                              (def (heap (var x) (:= y 1)) 0)
                              (def (var z) 1))))
               (term (x y z)))
@@ -176,14 +176,14 @@
   )
 
 (define-extended-language verse+E verse
-  (E ::=
+  (X ::=
      hole
-     (array e ... E e ...)
-     (op E))
-  (CE ::=
+     (array e ... X e ...)
+     (op X))
+  (CX ::=
       hole
-      (array ce ... CE e ...)
-      (op CE))
+      (array ce ... CX e ...)
+      (op CX))
   (L ::=
        hole
        (dbar L he ...))
@@ -223,7 +223,7 @@
   (test-match verse+E (in-hole H x) (term (heap b (:= a 1))))
   ; Sadly, no meta-function expansion in patterns.
   ; (test-match verse+E (in-hole E (= x k)) (term (= a 5)))
-  (test-match verse+E (in-hole E (unify (array x k))) (term (= a 5)))
+  (test-match verse+E (in-hole X (unify (array x k))) (term (= a 5)))
   )
 
 ;; Axioms for h-expressions
@@ -231,38 +231,38 @@
   (reduction-relation
    verse+E
    #:domain he
+   (==> (def (in-hole H (:= x v)) e)
+        (def (in-hole H (:= x v)) (substitute e x v))
+        (side-condition (member (term x) (term (fvs-e e))))
+        "S1")
    (==> (dbar he_1 ... (dbar he_2 ...) he_3 ...)
         (dbar he_1 ... he_2 ... he_3 ...)
         "Xa")
    (==> (dbar he)
         he
         "Xb")
-   (==> (def h (in-hole CE fail))
+   (==> (def h (in-hole CX fail))
         (dbar)
         "C1")
-   (==> (def h (in-hole CE (bar e_1 e_2)))
-        (dbar (def h (in-hole CE e_1))
-              (def h (in-hole CE e_2)))
+   (==> (def h (in-hole CX (bar e_1 e_2)))
+        (dbar (def h (in-hole CX e_1))
+              (def h (in-hole CX e_2)))
         "C2")
-   (==> (def (in-hole H (var x)) (in-hole E (unify (array x v))))
-        (def (in-hole H (:= x v)) (in-hole E v))
-        (side-condition (disjoint (term (svs (in-hole H (:= x v)))) (term (fvs-v v))))
+   (==> (def (in-hole H (var x)) (in-hole X (unify (array x v))))
+        (def (in-hole H (:= x v)) (in-hole X v))
+        (side-condition (disjoint (term (bvs (in-hole H (:= x v)))) (term (fvs-v v))))
         "B1")
-   (==> (def (in-hole H (var x)) (in-hole E (unify (array v x))))
-        (def (in-hole H (:= x v)) (in-hole E v))
-        (side-condition (disjoint (term (svs (in-hole H (:= x v)))) (term (fvs-v v))))
+   (==> (def (in-hole H (var x)) (in-hole X (unify (array v x))))
+        (def (in-hole H (:= x v)) (in-hole X v))
+        (side-condition (disjoint (term (bvs (in-hole H (:= x v)))) (term (fvs-v v))))
         "B2")
-   (==> (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
-        (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole E (array (= x_s e) ...)))
+   (==> (def (in-hole H (var x)) (in-hole X (unify (array x (array e ...)))))
+        (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole X (array (= x_s e) ...)))
         (fresh ((x_s ...) (e ...)))
         "B3")
-   (==> (def (in-hole H (var x)) (in-hole E (unify (array (array e ...) x))))
-        (def (in-hole H (var x)) (in-hole E (unify (array x (array e ...)))))
+   (==> (def (in-hole H (var x)) (in-hole X (unify (array (array e ...) x))))
+        (def (in-hole H (var x)) (in-hole X (unify (array x (array e ...)))))
         "B4")
-   (==> (def (in-hole H (:= x v)) e)
-        (def (in-hole H (:= x v)) (substitute e x v))
-        (side-condition (member (term x) (term (fvs-e e))))
-        "S1")
   
   with
   [(--> (in-hole XH-HE_1 a) (in-hole XH-HE_1 b))
@@ -327,12 +327,50 @@
   (reduction-relation
    verse+E
    #:domain he
+   (==> (semi (array v ... e))
+        e
+        "Pseq")
    (==> (add (array k_1 k_2))
         (plus k_1 k_2)
-        "P1")
-   (==> (semi (array v e))
+        "Padd")
+   (==> (gt (array k_1 k_2))
+        k_1
+        (side-condition (> (term k_1) (term k_2)))
+        "Pgt1")
+   (==> (gt (array k_1 k_2))
+        fail
+        (side-condition (not (> (term k_1) (term k_2))))
+        "Pgt2")
+   (==> (apply (array (=> x (def h e_1)) e_2))
+        (do (def (heap h (var x)) (seq (= x e_2) e_1)))
+        "App-lam")
+   (==> (apply (array (array e_1 ...) e_2))
+        (do (def (var i) (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
+        (fresh i)
+        "App-arr")
+   (==> (index (array (array e ...) k))
+        (nth (e ...) k)
+        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
+        "Idx")
+   (==> (if (dbar) e_1 e_2)
+        e_2
+        "K1")
+   (==> (if (in-hole L (def h v)) e_1 e_2)
+        (do (def h e_1))
+        "K2")
+   (==> (for (dbar (def h v) ...) e)
+        (array (do (def h e)) ...)
+        "F1")
+   (==> (do (def h e))
         e
-        "P2")
+        (side-condition (disjoint (term (fvs-e e)) (term (bvis-h h))))
+        "D1")
+   (==> (do (dbar he_1 he_2 ...))
+        (bar (do he_1) (do (dbar he_2 ...)))
+        "D2")
+   (==> (do (dbar))
+        fail
+        "D3")
    (==> (unify (array x_1 x_1))
         x_1
         "U1")
@@ -347,38 +385,6 @@
         fail
         (side-condition (not (equal? (term (head hnf_1)) (term (head hnf_2)))))
         "UF")
-   (==> (apply (array (=> x (def h e_1)) e_2))
-        (do (def (heap h (var x)) (seq (= x e_2) e_1)))
-        "L1")
-   ;; TODO L2
-   ;; L2 needs more cleverness than is in the paper.
-   (==> (apply (array (array e_1 ...) e_2))
-        (do (def (var i) (seq (seq (= i e_2) (= i (alts (count (e_1 ...))))) (index (array (array e_1 ...) i)))))
-        (fresh i)
-        "L2")
-   (==> (index (array (array e ...) k))
-        (nth (e ...) k)
-        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
-        "I1")
-   (==> (if (dbar) e_1 e_2)
-        e_2
-        "K1")
-   (==> (if (in-hole L (def h v)) e_1 e_2)
-        (do (def h e_1))
-        "K2")
-   (==> (for (dbar (def h v) ...) e)
-        (array (do (def h e)) ...)
-        "F1")
-   (==> (do (def h e))
-        e
-        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
-        "D1")
-   (==> (do (dbar he_1 he_2 ...))
-        (bar (do he_1) (do (dbar he_2 ...)))
-        "D2")
-   (==> (do (dbar))
-        fail
-        "D3")
   with
   [(--> (in-hole XE-HE_1 a) (in-hole XE-HE_1 b))
    (==> a b)]
@@ -504,7 +510,7 @@
             (term (def (heap (:= x 2) (:= y 222)) 222)))
   ; This test is incredibly slow because of the many reduction paths.
   ;(test-->> e-he-axioms
-  ;          (term (@ (array 1 2) 1))
+  ;          (term (def (heap) (@ (array 1 2) 1))))
   ;          2)
   )
 
@@ -514,3 +520,8 @@
 
 (module+ test
   (test-results))
+
+
+; swap := t => def {x,y} in t = (x,y); (y,x)
+; (define t-lam (term (=> t (def (heap (var x) (var y)) (seq (= t (array x y)) (array y x))))))
+; (define t-arg (term (def (var p) (seq (= (@ ,t-lam p) (array 2 3)) p))))
