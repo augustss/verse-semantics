@@ -70,7 +70,10 @@
 %format h_3
 %format h_n
 
+%format v_0
 %format v_1
+%format v_i
+%format v_k
 %format v_2
 %format v_3
 %format v_n
