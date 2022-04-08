@@ -1,5 +1,7 @@
 \documentclass[acmsmall,screen]{acmart}\settopmatter{}
 
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
@@ -7,6 +9,7 @@
 %include calculus.fmt
 
 \usepackage{framed}
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 \usepackage{ amssymb }
 \usepackage{cleveref}   % \Cref etc
 
