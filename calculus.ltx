@@ -30,9 +30,6 @@
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
 
-\newcommand{\hexp}{h-expression}
-\newcommand{\Hexp}{H-expression}
-
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\simon}[1]{{\color{red} [{SPJ}: #1]}}
@@ -244,9 +241,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 \lennart{You could mention in the text that it is associative.}
 
-\lennart{Rule subst needs a side condition that x is in fvs(e), otherwise it's applicable over and over (found by Redex).}
-
-\lennart{I don't see a rule that does fail propagation.}
+\lennart{I don't see a rule that does fail propagation.}\simon{Are you still puzzled?}
 
 \begin{figurebox}
   $$
@@ -305,7 +300,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |def h_n in e)|
     \end{array} \\
     \multicolumn{4}{l}{\textit{Do-blocks}} \\
-    \rulename{do-def} & |def h in e| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$} \\
+    \rulename{def-elim} & |def h in e| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$} \\
 
     \end{array}
    \end{array}
@@ -317,18 +312,18 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcl}
-    \rulename{B1} & |def H^[x] in X^[x==v]| & \movesto
+    \rulename{b-val} & |def H^[x] in X^[x==v]| & \movesto
     & \begin{array}[t]{@@{}l}
         |def H^[x:=v] in X^[v]| \\
         \text{if $x,\valvars{H[x]} \disjoint \freevars{v}$}
         \end{array} \\
-    \rulename{B2} & |def H^[x] in X^[v==x]| & \movesto
+    \rulename{b-val-r} & |def H^[x] in X^[v==x]| & \movesto
     & \begin{array}[t]{@@{}l}
         |def H^[x:=v] in X^[v]| \\
         \text{if $x,\valvars{H[x]} \disjoint \freevars{v}$}
         \end{array} \\
-    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
-    \rulename{B4} & |def H^[x] in X^[x==(e_1,dots,e_n)]| & \movesto
+    \rulename{b-swap} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
+    \rulename{b-tuple} & |def H^[x] in X^[x==(e_1,dots,e_n)]| & \movesto
     & \begin{array}[t]{@@{}l}
           |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
           |in X^[(x_1==e_1,dots,x_n==e_n)]]| \\
@@ -376,25 +371,26 @@ We discuss |for| in \Cref{sec:for}.
 Unification |unify^(e_1,e_2)| and sequencing |semi^(e_1,e_2)| are two other primitive operations.
 We often allow ourselves to write them with infix shorthand, |(e_1 == e_2)| and |(e_1; e_2)| respectively.
 
-\paragraph{Lambda and application.}  Lambda abstractions are written |(x => he)|, and are applied
+\paragraph{Lambda and application.}  Lambda abstractions are written |(x => e)|, and are applied
 with the primitive operation |apply(e_1,e_2)|.
 
 \paragraph{Choice.}
 In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
-zero results; the expression |(he_1 choice he_2)| yields all the results of |he_1| and then all the results
-of |he_2|.
+zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
+of |e_2|.
 
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, or a lambda |(x => e)|.
 
-\subsection{\Hexp{}s and heaps}
+\subsection{Heaps}
 
-A \hexp{} has the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
-\Cref{fig:verse-syntax}.  A heap is just a collection of \emph{bindings}, which take one of two forms:
+An expression can take the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
+\Cref{fig:verse-syntax}.  A heap is just a collection of zero or more \emph{bindings}, each of
+which take one of two forms:
 \begin{itemize}
-\item A binding |x| simply introduces the variable |x|, without giving it a value.
-\item A binding |x:=v| binds the variable |x| to the value |v|.
+\item A binding |x| simply \emph{introduces} the variable |x|, without giving it a value.
+\item A binding |x:=v| \emph{binds} the variable |x| to the value |v|.
 \end{itemize}
 These heaps play the role of |let| expressions in the call by need lambda calculus (\Cref{sec:call-by-need}).
 
@@ -424,24 +420,24 @@ Here are some example heaps, with an indication of whether they are well formed:
 \item \emph{Substitution, rule \rulename{subst}.}
   \begin{itemize}
     \item \rulename{subst} does not discard the heap binding, because it may be needed,
-      in \rulename{if-true} and \rulename{for}.  We could also use a rule that substitutes
+      in \rulename{if-true} and \rulename{for}.  We could instead use a rule that substitutes
      in just one place (a la Ariola)
    \item The heap always binds a variable to a \emph{value}, and values can freely
      be duplicated without duplicating work, so \rulename{subst} does not duplicate work.
    \item The side condition $x \in \freevars{e}$ is present solely to avoid \rulename{subst} being
      \emph{always} applicable, albeit vacuously.
    \end{itemize}
-\item Rule \rulename{do-def}. To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
+\item \emph{Rule \rulename{def-elim}.} To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
-  allow a \hexp{} to return an unbound logical variable.
-\item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
-  in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
+  allow an expression to return an unbound logical variable.
 \end{itemize}
+\simon{What if the heap bound a variable to an \emph{expression}, like
+in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.}
 
 \subsection{Unification}
 
-Rules \rulename{uvar}-\rulename{uconst} do conventional unification, decomposing
+Rules \rulename{uvar}\ldots \rulename{uconst} do conventional unification, decomposing
 tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
 |(3==3) + 7| reduces to |10|.
 
@@ -450,16 +446,17 @@ on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
-Rules \rulename{B1}-\rulename{B4} come into play when variables are involved. For example
-\rulename{B1} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
+Rules \rulename{b-val}\ldots \rulename{b-tuple} come into play when variables are involved. For example
+\rulename{b-val} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
 we may unify |x| with a value |v|, and replace the unbound |x| in the heap with the bound |x := v|, thus |H^[x:=v]|.
 
-Crucially, note that $X$ does not look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
-not unify |x| via \rulename{B1}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
+Crucially, in rule \rulename{b-val}, note that $X$ does not look inside |if|, |for|, or choice.
+For example |def (x) in (if(x==3) then e_1 else e_2)| does
+not unify |x| via \rulename{b-val}; only variables bound by the \emph{innermost enclosing |def|} can be unified.
 Nor does $X$ look inside choices.  For example,
-|def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{B1}.
+|def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{b-val}.
 
-Rules \rulename{B1} and \rulename{B2} includes an ``occurs check'', which ensures we never
+Rules \rulename{b-val} and \rulename{b-val-r} includes an ``occurs check'', which ensures we never
 get cycles in the heap.
 
 \subsection{Choice and failure}
@@ -499,39 +496,34 @@ in \rulename{app-arr} to index it.
 \subsection{Source Verse}
 
 In the Verse source language we do not write explicit |def|s. Instead, they are added
-by a simple preprocessing step, that introduces a variable |x| in the innermost
-|def| that encloses all its uses.
-\simon{It's hard to say more until we say more about Source Verse.}
-
-In the arms of a choice |e_1 choice e_2)| we add a |do (def h in e_1)| around |e_1| if
-|e_1| introduces any new variables; and similarly |e_2|.
-\simon{This was a nice little simplification.}
+by a simple preprocessing step, that introduces a |def| at each scope-limiting construct
+in which new variables come into scope.  The scope-limiting constructs are: |if|, |for|, and choice |(choice)|.
 
 \subsection{Examples}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in x==3; y==add^(x,1)|} \\
-    \rulename{B1} & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
+    \rulename{b-val} & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
     \rulename{p-seq} & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1)| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4| \\
-    \rulename{B1} & \movesto & |def (x:=3,y:=4) in 4| \\
+    \rulename{b-val} & \movesto & |def (x:=3,y:=4) in 4| \\
     \end{array}$$
 \end{example}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); x==3; y|} \\
-    \rulename{B1} & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
+    \rulename{b-val} & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1); 3; y| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4; 3; y| \\
-    \rulename{B1} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
+    \rulename{b-val} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
     \rulename{p-seq}(twice) & \movesto & |def (x:=3,y:=4) in y| \\
     \rulename{subst} & \movesto & |def (x:=3,y:=4) in 4|
     \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
-  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{B1}
+  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{b-val}
   in the \emph{second} argument of |semi|, which gives a value to |x| in the heap.
   That allows the |add| to proceed.  So ``later'' instructions can unblock ``earlier'' ones.
 \end{example}
@@ -541,12 +533,12 @@ In the arms of a choice |e_1 choice e_2)| we add a |do (def h in e_1)| around |e
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); ((x==3) choice (x==77))|} \\
     \rulename{choose} & \movesto & |(def (x,y) in y==add^(x,1); x==3) hchoice| \\
     & & |(def (x,y) in y==add^(x,1); x==77)| \\
-    \rulename{B1} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) hchoice| \\
+    \rulename{b-val} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) hchoice| \\
     & & |(def (x:=77,y) in y==add^(x,1); 77)| \\
     \rulename{subst} (twice) & \movesto & |(def (x:=3,y) in y==add^(3,1); 3) hchoice| \\
     & & |(def (x:=77,y) in y==add^(77,1); 77)| \\
     \rulename{p-add} (twice) & \movesto & |(def (x:=3,y) in y==4; 3) hchoice (def (x:=77,y) in y==78; 77)| \\
-    \rulename{B1}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) hchoice (def (x:=77,y:=78) in 78; 77)| \\
+    \rulename{b-val}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) hchoice (def (x:=77,y:=78) in 78; 77)| \\
     \rulename{p-seq}(twice) & \movesto & |(def (x:=3,y:=4) in 3) hchoice (def (x:=77,y:=78) in 77)| \\
     \end{array}$$
   As before, the unification |y==add^(x,1)| is stuck until we get a value for |x|.
