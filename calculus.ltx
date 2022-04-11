@@ -184,29 +184,28 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & e \\
-    \text{Expressions} & e,r,s  & ::=  & x \vb k \vb |(e_1, dots, e_n)| \vb |x => e| \vb |op^(e)| \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)| \\
     &&\vb & |e_1 choice e_2| \vb |fail| \\
     &&\vb & |if e then e_1 else e_2| \vb |for e in e|  \\
     &&\vb & |def h in e| \\
-    \text{Primops} & op  & ::= & cop \vb |apply | \\
-    \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \vb |semi| \vb |unify| \\
-    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e|  \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Choice-free exprs} & ce  & ::=  & x \vb k \vb |(ce_1, dots, ce_n)| \vb |x => e| \vb cop(ce) \\
+    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e|  \\
+    \text{Primops} & op  & ::= & cop \vb |apply | \\
+    \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \vb |x:=v| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
-    \text{Execution contexts} & X & ::= & \hole \vb |(e_1,dots,X,dots,e_n)| \vb |op^(X)| \vb |def h in X | \\
-    \text{Choice contexts} & CX & ::= & \hole \vb |(ce_1,dots,ce_m,CX,e_1,dots,e_n)| \vb |op^(CX)| \\
-    &&\vb & |def h in CX| \\
+ \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    && \vb & |op^(X)| \vb |def h in X | \\
+ \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
+    &&\vb & |op^(CX)| \vb |def h in CX| \\
     \text{Left choice context} & L & ::= & \hole \vb |L choice e| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      |e_1 ; e_2| & \text{means} & |semi^( e_1, e_2 )| \\
-      |e_1 == e_2| & \text{means} & |unify^( e_1, e_2 )| \\
       e_1 \oplus e_2 & \text{means} & |add^( e_1, e_2 )| \\
       |e_1^(e_2)| & \text{means} & |apply^( e_1, e_2 )| \\
      \end{array} \\
@@ -276,13 +275,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\
     \textit{Floating} \\
     \begin{array}{lrcl}
-    \rulename{float-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
-    \rulename{float-arr} & |(v_1, dots, e, e_1, dots)| & \movesto
-    & \begin{array}[t]{@@{}l}
-          |def x in x == e ; (v_1, dots, x, e_1, dots)| \\
-          \text{if |e| is not a value}
-      \end{array}
+    \rulename{op-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
+    \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+    \rulename{unify-seqr} & |e_1 == (e_2 ; e_3)| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \end{array} \\
+    \\[-2mm]
     \textit{Lambda and application} \\
     \begin{array}{rcll}
     \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
@@ -308,9 +305,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |in e|
     \end{array} & \movesto &
     \begin{array}[t]{@@{}l}
-      |(def h_1 in e| \\
-      | , dots ,| \\
-      |def h_n in e)|
+      |def x_1,dots x_n in| \\
+      |(x_1= def h_1 in e);  dots (x_n= def h_n in e);| \\
+      |(x_1,dots,x_n)|
     \end{array} \\
     \end{array} \\
     \\[-2mm]
