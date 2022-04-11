@@ -279,7 +279,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
     \end{array} \\
-p    \\[-2mm]
+    \\[-2mm]
     \textit{Lambda and application} \\
     \begin{array}{rcll}
     \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
