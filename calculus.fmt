@@ -32,6 +32,7 @@
 %format hnf = "\hnf"
 %format emp = "\epsilon"
 %format plus = "\oplus"
+%format hole = "\hole"
 %format == = "="
 %format := = "\mapsto"
 %format ^ = " "

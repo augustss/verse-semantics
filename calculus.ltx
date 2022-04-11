@@ -184,8 +184,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & e \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)| \\
-    &&\vb & |e_1 choice e_2| \vb |fail| \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)|
+     \vb |e_1 choice e_2| \vb |fail| \\
     &&\vb & |if e then e_1 else e_2| \vb |for e in e|  \\
     &&\vb & |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
@@ -279,7 +279,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
     \end{array} \\
-    \\[-2mm]
+p    \\[-2mm]
     \textit{Lambda and application} \\
     \begin{array}{rcll}
     \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
@@ -313,7 +313,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\[-2mm]
     \textit{Do-blocks} \\
     \begin{array}{rcll}
-    \rulename{do-def} & |def h in e| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$} \\
+    \rulename{do-def} & |X^[def h in e]| & \movesto & |X^[e]| \qquad \text{if $|X| \not= \hole$ and $\freevars{e} \disjoint \boundvars{h}$} \\
     \end{array}
    \end{array}
    $$
