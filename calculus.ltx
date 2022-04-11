@@ -252,7 +252,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}{l}
     \textit{Substitution} \\
     \begin{array}{lrcl}
-    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)| \\
+    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e^[x subst v])| \\
                   &&& \text{if $x \in \freevars{e}$} \\[2mm]
     \end{array} \\
     \textit{Choice} \\
@@ -324,25 +324,38 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcl}
-    \rulename{bindl} & |def H^[x] in X^[x==v]| & \movesto
+    \rulename{bind} & |def H^[x] in X^[x==v]| & \movesto
     & \begin{array}[t]{@@{}l}
         |def H^[x:=v] in X^[v]| \\
         \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
         \end{array} \\
-    \rulename{bindr} & |def H^[x] in X^[v==x]| & \movesto
-    & \begin{array}[t]{@@{}l}
-        |def H^[x:=v] in X^[v]| \\
-        \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
-        \end{array} \\
-    \rulename{promote} & \begin{array}[t]{@@{}l}
-      |def H^[x] in| \\
-      |X^[x==(v_1,dots,v_i,dots,v_n)]|
-      \end{array} & \movesto
-    & \begin{array}[t]{@@{}l}
-        |def X^[x,y] in| \\ |X^[y=v_i; x==(v_1,dots,y,dots,v_n)]| \\
-        \text{if $\neg (\freevars{v_i} \disjoint \boundvars{X})$}) \\
-        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[(v_1,dots,v_n)]|} \\
+%    \rulename{bindr} & |def H^[x] in X^[v==x]| & \movesto
+%    & \begin{array}[t]{@@{}l}
+%       |def H^[x:=v] in X^[v]| \\
+%        \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
+%        \end{array} \\
+%    \rulename{promote} & \begin{array}[t]{@@{}l}
+%      |def H^[x] in| \\
+%      |X^[x==(v_1,dots,v_i,dots,v_n)]|
+%      \end{array} & \movesto
+%    & \begin{array}[t]{@@{}l}
+%        |def H^[x,y] in| \\ |X^[y=v_i; x==(v_1,dots,y,dots,v_n)]| \\
+%        \text{if $\neg (\freevars{v_i} \disjoint \boundvars{X})$}) \\
+%        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[(v_1,dots,v_n)]|} \\
+%      \end{array}\\
+    \rulename{promote} & |def H^[x] in X^[x=v]| 
+       & \movesto
+    &  \begin{array}[t]{@@{}l}
+        |def H^[x,y] in X^[y=z; x==v^[z subst y]]| \\
+        \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
+        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
+    \rulename{swap} & |def H^[x] in X^[v==x]| & \movesto &
+    \begin{array}[t]{@@{}l}
+       |def H^[x] in X^[x==v]| \\
+       \text{unless $v$ is a variable $y \in \boundvars{X}$}
+       \end{array}\\
+
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
 %    & \begin{array}[t]{@@{}l}
 %          |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
@@ -357,7 +370,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     & \begin{array}[t]{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
-      \end{array} \\
+      \end{array} \\a
     \rulename{U3} & |k == (e_1,dots,e_n) | & \movesto & |fail| \\
     \rulename{U4} & |(e_1,dots,e_n) == k | & \movesto & |fail| \\
     \rulename{U5} & |(x => e) == hnf| & \movesto & |fail| \\

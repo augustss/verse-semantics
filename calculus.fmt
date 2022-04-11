@@ -33,6 +33,7 @@
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"
+%format subst = "\!:=\!"
 %format == = "="
 %format := = "\mapsto"
 %format ^ = " "
