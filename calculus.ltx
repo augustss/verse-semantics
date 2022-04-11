@@ -386,13 +386,13 @@ We discuss |for| in \Cref{sec:for}.
 Unification |unify^(e_1,e_2)| and sequencing |semi^(e_1,e_2)| are two other primitive operations.
 We often allow ourselves to write them with infix shorthand, |(e_1 == e_2)| and |(e_1; e_2)| respectively.
 
-\paragraph{Lambda and application.}  Lambda abstractions are written |(x => he)|, and are applied
+\paragraph{Lambda and application.}  Lambda abstractions are written |(x => e)|, and are applied
 with the primitive operation |apply(e_1,e_2)|.
 
 \paragraph{Choice.}
 In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
-zero results; the expression |(he_1 choice he_2)| yields all the results of |he_1| and then all the results
-of |he_2|.
+zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
+of |e_2|.
 
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
