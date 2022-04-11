@@ -277,7 +277,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{op-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
-    \rulename{unify-seqr} & |e_1 == (e_2 ; e_3)| & \movesto & |e_2 ; (e_1 == e_3)| \\
+    \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
     \end{array} \\
     \\[-2mm]
     \textit{Lambda and application} \\
