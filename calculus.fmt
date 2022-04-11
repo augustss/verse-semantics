@@ -82,6 +82,7 @@
 %format v_3
 %format v_n
 %format v_n'
+%format v_m'
 
 %format he_1
 %format he_2
