@@ -376,13 +376,13 @@ The |let| construct cleverly models the heap, maintaining sharing.
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
       \end{array} \\
-    \rulename{U3} & |k == (e_1,dots,e_n) | & \movesto & |fail| \\
-    \rulename{U4} & |(e_1,dots,e_n) == k | & \movesto & |fail| \\
+    \rulename{U3} & |k == (v_1,dots,v_n) | & \movesto & |fail| \\
+    \rulename{U4} & |(v_1,dots,v_n) == k | & \movesto & |fail| \\
     \rulename{U5} & |(x => e) == hnf| & \movesto & |fail| \\
     \rulename{U6} & |hnf == (x => e)| & \movesto & |fail| \\
-    \rulename{U7} & |(e_1,dots,e_m) == (e1',dots,e_n')| & \movesto
+    \rulename{U7} & |(v_1,dots,v_m) == (v1',dots,v_n')| & \movesto
     & \begin{array}[t]{@@{}ll}
-        |(e_1==e1',dots,e_n=e_n')| & \text{if $m=n$} \\
+        |(v_1==v1',dots,v_n=v_n')| & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{array}
      \end{array}
