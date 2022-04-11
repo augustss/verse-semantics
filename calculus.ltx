@@ -483,17 +483,39 @@ on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
-Rules \rulename{B1}-\rulename{B4} come into play when variables are involved. For example
-\rulename{B1} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
+Rules \rulename{bind}, \rulename{promote}, and \rulename{swap} come into play when variables are involved.
+First, \rulename{bind} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
 we may unify |x| with a value |v|, and replace the unbound |x| in the heap with the bound |x := v|, thus |H^[x:=v]|.
-
-Crucially, note that $X$ does not look inside \hexp{}s. For example |def (x) in (if(x==3) then e_1 else e_2)| does
-not unify |x| via \rulename{B1}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
-Nor does $X$ look inside choices.  For example,
-|def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{B1}.
-
-Rules \rulename{B1} and \rulename{B2} includes an ``occurs check'', which ensures we never
+The side conditions ensure
+\begin{itemize}
+    \item $\freevars{v} \disjoint \boundvars{X}$ ensures that |v| does not mention a variable
+      bound by the context |X|; if the rule fired, the right hand side would be ill-scoped.
+    \item $\freevars{v} \disjoint \{x\}$ ensures that |v| does not mention |x| itself -- the ``occurs check''.
+    \item $\freevars{v} \disjoint \valvars{|H^[x]|}$ ensures that we have fully applied rule \rulename{subst};
+      without this there might be a hidden occurs-check error.  For example in this case:
+      $$ |def (x, y:=x) in (x=y)| $$
+      we must not fire rule \rulename{bind}.
+\end{itemize}
+Together, the latter two side conditions ensure that we never
 get cycles in the heap.
+
+Crucially, note that $X$ does not look inside |if|, |for|, or choice (|choice|).
+For example
+$$ |def x in (if(x==3) then e_1 else e_2)| $$
+does
+not unify |x| via \rulename{bind}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
+Nor does $X$ look inside choices.  For example,
+|def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
+
+Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
+First, rule\rulename{swap} swaps |(v=x)| to |(x=v)|, which directly fits rule \rulename{bind}.
+We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence the side condition.
+
+\rulename{promote} is subtle, and deals with a case like
+    $$ |def x in dots(def y in dots(x==(3,y))dots)dots| $$
+
+
+
 
 \subsection{Choice and failure}
 
