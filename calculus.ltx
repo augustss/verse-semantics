@@ -358,7 +358,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{swap} & |def H^[x] in X^[v==x]| & \movesto &
     \begin{array}[t]{@@{}l}
        |def H^[x] in X^[x==v]| \\
-       \text{unless $v$ is a variable $y \in \boundvars{X}$}
+       \text{unless $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
        \end{array}\\
 
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
