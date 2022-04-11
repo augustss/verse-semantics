@@ -226,12 +226,17 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \end{array}
    \\ \\
   \textbf{Bound variables $\boundvars{X}$ of a context} \\
-  \begin{array}{rcl}
+  \begin{array}[t]{rcl}
     \boundvars{ \hole } & = & \emptyset \\
     \boundvars{ |def h in X| } & = & \boundvars{h} \cup \boundvars{X} \\
     \boundvars{ |op^(X)| } & = & \boundvars{X} \\
-    \boundvars{ |(e_1, dots, X, dots, e_n)|} & = & \boundvars{X} \\
-  \end{array}\\
+  \end{array}\qquad
+  \begin{array}[t]{rcl}
+    \boundvars{ |X==e| } & = & \boundvars{X} \\
+    \boundvars{ |e==X| } & = & \boundvars{X} \\
+    \boundvars{ |X;e| } & = & \boundvars{X} \\
+    \boundvars{ |e;X| } & = & \boundvars{X}
+  \end{array}
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
   \end{array}
