@@ -119,8 +119,8 @@ has been reduced to a constant $k$.
       \text{Expressions} & e  & ::=  & k \vb x \vb e_1 \; e_2 \vb \lambda x. e
             \vb  e_1 \oplus e_2 \vb |let x = e_1 in e_2| \\
       \text{Values} & v & ::= & k \vb x \vb \lambda x.e  \\
-      \text{Evaluation contexts} & E & ::= & \hole \vb E\; e \vb E \oplus e \vb k \oplus E
-           \vb |let x=E in E[x]|
+      \text{Evaluation contexts} & E & ::= & \hole \vb E\; e \vb E \oplus e \vb k \oplus E \\
+      && \vb & |let x=e in E| \vb |let x=E in E^[x]|
     \end{array} \\
     \\
     \textbf{Axioms}  \\
