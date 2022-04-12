@@ -34,22 +34,18 @@
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
   #:binding-forms
-  (=> x he #:refers-to x)
-  ; TODO Test the def binding form.
+  (=> x e #:refers-to x)
+  ; TODO Test the def binding form. 
   ; It's rather complex and fresh variables make testing harder.
   ; Comment it out for the moment:
-;  (heap h ...) #:exports (shadow h ...)
-;  (:= x v) #:exports x
-;  (var x) #:exports x
-;  (def h e #:refers-to h)
+  (heap h ...) #:exports (shadow h ...)
+  (:= x v) #:exports x
+  (var x) #:exports x
+  (def h e #:refers-to h)
 ;  (if (def h e #:refers-to h) e #:refers-to h e)
-;  (for (def h e #:refers-to h) e #:refers-to h)
+;  (for (def h e) e #:refers-to h)
   )
 
-;(define-metafunction verse
-;  = : e e -> e
-;  [(= e_1 e_2) (unify (array e_1 e_2))]
-;  )
 ;LA: I would like to name this +, but then the actual + in
 ;    meta-function plus refers to the wrong thing.
 (define-metafunction verse
