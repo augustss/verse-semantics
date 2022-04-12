@@ -64,7 +64,7 @@
     \end{array} \\
     \\
     \textbf{Axioms}  \\
-    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto e_1[x:=e_2] \\
+    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |e_1^[x subst e_2]| \\
     \rulename{delta}\qquad k_1 \oplus k_2 \movesto k_1 + k_2 \\
    \end{array}
    $$
@@ -77,7 +77,7 @@ Key points:
 \item \emph{Expressions.} We give the syntax of \emph{expressions} in BNF.
 \item \emph{Axioms.} There is just one axiom, \rulename{beta}.
 You can apply an axiom anywhere in an expression, in either direction but typically left-to-right.
-\item \emph{Substitution.} The notation $e_2[x:=e_1]$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
+\item \emph{Substitution.} The notation $|e_2[x subst e_1]|$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
   each occurrence of $x$ in $e_1$ with $e_2$.
 \item \emph{Evaluation contexts}.  An evaluation context $E$ is an expression with a single ``hole'' in it,
   denoted $\hole$. The notation $E[e]$ means the evaluation context $E$ with its hole filled with $e$.
@@ -126,7 +126,7 @@ has been reduced to a constant $k$.
     \textbf{Axioms}  \\
     \begin{array}{lrcl}
     \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
-    \rulename{let-v} & |let x = v in e| & \movesto & e[x:=v] \\
+    \rulename{let-v} & |let x = v in e| & \movesto & |e^[x subst v]| \\
     \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)|\quad
         \text{if $y \not\in \freevars{e_2}$} \\
     \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
@@ -351,14 +351,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{promote} & |def H^[x] in X^[x=v]| 
        & \movesto
     &  \begin{array}[t]{@@{}l}
-        |def H^[x,y] in X^[y=z; x==v^[z subst y]]| \\
+        |def H^[x,y] in X^[x==v^[z subst y]; z==y]| \\
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
         \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
-    \rulename{swap} & |def H^[x] in X^[v==x]| & \movesto &
+    \rulename{swap} & |def H^[x] in X^[hnf==x]| & \movesto &
     \begin{array}[t]{@@{}l}
-       |def H^[x] in X^[x==v]| \\
-       \text{unless $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
+       |def H^[x] in X^[x==hnf]| \\
+%       \text{unless $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
+%       \text{if $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
        \end{array}\\
 
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
@@ -508,14 +509,19 @@ Nor does $X$ look inside choices.  For example,
 |def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
 
 Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
-First, rule\rulename{swap} swaps |(v=x)| to |(x=v)|, which directly fits rule \rulename{bind}.
-We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence the side condition.
+First, rule \rulename{swap} swaps |(hnf=x)| to |(hnf=v)|, which directly fits rule \rulename{bind}.
+We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
+using |hnf| rather than |v| in this rule.
 
 \rulename{promote} is subtle, and deals with a case like
-    $$ |def x in dots(def y in dots(x==(3,y))dots)dots| $$
-
-
-
+    $$ |def x in dots(def z in dots(x==(3,z))dots)dots| $$
+We can't use \rulename{bind} directly, because it would be ill-scoped to add |x:=(3,z)|
+to the outermost |def|. Instead we invent a fresh variable |y| (bound as a sibling to |x|),
+substitute it for |z| in |v|, and unify it with |z|, thus
+    $$ |def x,y in dots(def z in dots(x==(3,y); z=y)dots)dots| $$
+Now  \rulename{bind} can bind bind |x| to |(3,y)|:
+    $$ |def x:=(3,y),y in dots(def z in dots(z=y)dots)dots| $$
+and all is well.
 
 \subsection{Choice and failure}
 
