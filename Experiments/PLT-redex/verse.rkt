@@ -38,12 +38,12 @@
   ; TODO Test the def binding form.
   ; It's rather complex and fresh variables make testing harder.
   ; Comment it out for the moment:
-  ;;; (heap h ...) #:exports (shadow h ...)
-  ;;; (:= x v) #:exports x
-  ;;; (var x) #:exports x
-  ;;; (def h e #:refers-to h)
-  ;;; (if (def h e #:refers-to h) e #:refers-to h e)
-  ;;; (for (def h e #:refers-to h) e #:refers-to h)
+;  (heap h ...) #:exports (shadow h ...)
+;  (:= x v) #:exports x
+;  (var x) #:exports x
+;  (def h e #:refers-to h)
+;  (if (def h e #:refers-to h) e #:refers-to h e)
+;  (for (def h e #:refers-to h) e #:refers-to h)
   )
 
 ;(define-metafunction verse
@@ -350,7 +350,7 @@
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
    (==> (def (in-hole H (var x)) (in-hole X (= x v)))
-        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x v))))
+        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
