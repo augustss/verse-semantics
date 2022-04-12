@@ -350,7 +350,7 @@
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
    (==> (def (in-hole H (var x)) (in-hole X (= x v)))
-        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
+        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x v))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
@@ -475,7 +475,7 @@
            (term (if (def (heap) 3) 1 2))
            (term (def (heap) 1)))
   (test--> e-axioms ;; If-true-2
-           (term (if (bar (def (heap) 3)) 1 2))
+           (term (if (bar (def (heap) 3) (def (heap) 4)) 1 2))
            (term (def (heap) 1)))
   ;; For-loops
   (test--> e-axioms ;; For-1
@@ -500,7 +500,7 @@
            '())
   (test--> e-axioms
            (term (def (var a) (def (var b) (= a (arr 1 b)))))
-           (term (def (heap (var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 y)))))))
+           (term (def (heap (var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 b)))))))
 ;  (test--> e-axioms ;; Swap
 ;           (term (def (heap (var a)) (= 5 a)))
 ;           (term (def (heap (var a)) (= a 5))))
@@ -528,7 +528,7 @@
   )
 
 
-;; Axioms for expressions
+;;; This contains code that will be used when apply unifies its argument with the domain.
 ;(define e-axioms
 ;  (reduction-relation
 ;   verse+E
@@ -557,6 +557,7 @@
 ;  )
 ;
 
+;; This rule gets rid of an unused def at the top level of a program.
 (define top-def
   (reduction-relation
    verse+E
