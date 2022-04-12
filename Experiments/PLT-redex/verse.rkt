@@ -347,13 +347,15 @@
    (==> (def (in-hole H (var x)) (in-hole X (= x v)))
         (def (in-hole H (:= x v)) (in-hole X v))
         (side-condition (disjoint (term (fvs-v v)) (term (vvs (in-hole H (:= x v))))))
-        (side-condition (disjoint (term (fvs-v v)) (term (bvs-X (in-hole X hole)))))
+        (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
-;   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
-;        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= y z) (= x (substitute v z y)))))
-;        ;; XXX z \in (fvs-v v) and z \in (bvs-X X)
-;        (fresh y)
-;        "Promote")
+   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
+        ;; z \in (fvs-v v) and z \in (bvs-X X)
+        (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
+        ; (side-condition (not (redex-match? verse x v)))
+        (fresh y)
+        "Promote")
 ;   (==> (def (in-hole H (var x)) (in-hole X (= v x)))
 ;        (def (in-hole H (var x)) (in-hole X (= x v)))
 ;        (side-condition (not (member (term v) (term (vvs (in-hole H (var x)))))))
@@ -403,6 +405,11 @@
   [(head k) k]
   [(head (arr v ...)) (arr ,(length (term (v ...))))]
   [(head (=> x he)) (=> a (def (heap) 0))]
+  )
+
+(define-metafunction verse
+  intersect : (x ...) (x ...) -> (x ..._)
+  [(intersect (x_1 ...) (x_2 ...)) ,(set-intersect (term (x_1 ...)) (term (x_2 ...)))]
   )
 
 (define (disjoint l1 l2)
@@ -491,6 +498,9 @@
   (test-equal ;; Bind-3  do NOT allow circularity
            (apply-reduction-relation e-axioms (term (def (heap (var a)) (= a a))))
            '())
+  (test--> e-axioms
+           (term (def (var a) (def (var b) (= a (arr 1 b)))))
+           (term (def (heap (var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 y)))))))
 ;  (test--> e-axioms ;; Swap
 ;           (term (def (heap (var a)) (= 5 a)))
 ;           (term (def (heap (var a)) (= a 5))))
@@ -578,15 +588,29 @@
             (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
             (term 222))
 ; SLOW
-  (test-->> p-axioms
-            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
-            (term (array 2 3)))
+;  (test-->> p-axioms
+;            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
+;            (term (array 2 3)))
   (test-->> p-axioms
             (term (@ (array 1 2) 1))
             (term 2))
   (test-->> p-axioms
             (term (@ (=> x (++ x 1)) (++ 2 3)))
             (term 6))
+  )
+
+(module+ test
+  (test-->> p-axioms ;; Example-1
+            (term (def (heap (var x) (var y)) (seq (= x 3) (= y (++ x 1)))))
+            (term 4))
+  (test-->> p-axioms ;; Example-2
+            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
+            (term 4))
+  (test-->> p-axioms ;; Example-2
+            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
+            (term (bar
+                   (def (heap (:= x 3) (:= y 4)) 3)
+                   (def (heap (:= x 77) (:= y 78)) 77))))
   )
 
 (module+ test
