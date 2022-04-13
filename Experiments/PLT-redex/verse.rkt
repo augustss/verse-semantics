@@ -2,35 +2,31 @@
 (require redex)
 
 (define-language verse
-  (p ::= he)
-  (he ::=
-      (def h e)
-      (dbar he ...))
+  (p ::= e)
   (e ::=
-     x
-     k
-     (array e ...)
-     (=> x he)
+     v
+     (= e e)
+     (seq e ...)
      (op e)
-     (bar e e)
-     fail
-     (if he e e)
-     (for he e)
-     (do he)
+     (bar e ...)
+     (if e e e)
+     (for e e)
+     (def h e)
      )
   (op ::= cop apply)
-  (cop ::= gt add semi unify index)
+  (cop ::= gt add mul)
   (hnf ::=
        k
-       (array v ...)
-       (=> x he))
+       (arr v ...)
+       (=> x e)
+       )
   (v ::= x hnf)
   (ce ::=
-      x
-      k
-      (array ce ...)
-      (=> x he)
-      (cop ce))
+      v
+      (= ce ce)
+      (seq ce ...)
+      (cop ce)
+      )
   (h ::=
      (heap h ...)
      (var x)
@@ -38,27 +34,28 @@
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
   #:binding-forms
-  (=> x he #:refers-to x)
-  ; TODO Test the def binding form.
+  (=> x e #:refers-to x)
+  ; TODO Test the def binding form. 
   ; It's rather complex and fresh variables make testing harder.
   ; Comment it out for the moment:
-  ;;; (heap h ...) #:exports (shadow h ...)
-  ;;; (:= x v) #:exports x
-  ;;; (var x) #:exports x
-  ;;; (def h e #:refers-to h)
-  ;;; (if (def h e #:refers-to h) e #:refers-to h e)
-  ;;; (for (def h e #:refers-to h) e #:refers-to h)
+; XXX According to Robby Findler there is probably no way to make this work.
+;  (heap h ...) #:exports (shadow h ...)
+;  (:= x v) #:exports x
+;  (var x) #:exports x
+;  (def h e #:refers-to h)
+;  (if (def h e #:refers-to h) e #:refers-to h e)
+;  (for (def h e) e #:refers-to h)
   )
 
-(define-metafunction verse
-  = : e e -> e
-  [(= e_1 e_2) (unify (array e_1 e_2))]
-  )
 ;LA: I would like to name this +, but then the actual + in
 ;    meta-function plus refers to the wrong thing.
 (define-metafunction verse
   ++ : e e -> e
   [(++ e_1 e_2) (add (array e_1 e_2))]
+  )
+(define-metafunction verse
+  ** : e e -> e
+  [(** e_1 e_2) (mul (array e_1 e_2))]
   )
 (define-metafunction verse
   >> : e e -> e
@@ -68,10 +65,44 @@
   @ : e e -> e
   [(@ e_1 e_2) (apply (array e_1 e_2))]
   )
+;(define-metafunction verse
+;  seq : e ... -> e
+;  [(seq e ...) (semi (array e ...))]
+;  )
+
+
+;; Arrays are in ANF form, the array metafunction
+;; does this conversion.
+;; Inventing new variables can only(?) be done in rules
+;; so we introduce a sublanguage with some rules to do the conversion.
 (define-metafunction verse
-  seq : e ... -> e
-  [(seq e ...) (semi (array e ...))]
+  array : e ... -> e
+  [(array v ...) (arr v ...)]
+  [(array e ...) ,(anf-array (term (xarray () () () (e ...))))]
   )
+
+(define-extended-language verse+xarray verse
+  (ex ::= (xarray (h ...) (e ...) (v ...) (e ...))))
+(define anf-array-red
+  (reduction-relation
+   verse+xarray
+   ; #:domain ex
+   ; #:codomain e
+   (--> (xarray (h ...) (e ...) (v ...) ())
+        (def (heap h ...) (seq e ... (arr v ...))))
+   (--> (xarray (h ...) (e_1 ...) (v_1 ...) (v_2 e_2 ...))
+        (xarray (h ...) (e_1 ...) (v_1 ... v_2) (e_2 ...)))
+   (--> (xarray (h ...) (e_1 ...) (v_1 ...) (e_2 e_3 ...))
+        (xarray (h ... (var t)) (e_1 ... (= t e_2)) (v_1 ... t) (e_3 ...))
+        (side-condition (not (redex-match verse v (term e_2))))
+        (fresh t))
+   ))
+(define (anf-array a)
+  (let ((b (car (apply-reduction-relation anf-array-red a))))
+    (if
+     (redex-match? verse+xarray ex b)
+     (anf-array b)
+     b)))
 
 ; Subtract the second list from the first (as sets).
 (define-metafunction verse
@@ -83,60 +114,52 @@
   [(subtract (x_1 ...) (x_2 x_3 ...))
    (subtract (x_1 ...) (x_3 ...))])
 
-; Variables defined in a 'he'
 (define-metafunction verse
-  bvis-he : he -> (x ...)
-  [(bvis-he (def h e)) (bvis-h h)]
-  [(bvis-he (dbar he ...)) (x ... ...)
-   (where ((x ...) ...) ((bvis-he he) ...))]
+  bvs-e : e -> (x ...)
+  [(bvs-e (def h e)) (bvs-h h)]
+  [(bvs-e e) ()]
   )
+
 ; Variables that are bound in a heap
 (define-metafunction verse
-  bvis-h : h -> (x ...)
-  [(bvis-h (var x)) (x)]
-  [(bvis-h (:= x v)) (x)]
-  [(bvis-h (heap h ...))
+  bvs-h : h -> (x ...)
+  [(bvs-h (var x)) (x)]
+  [(bvs-h (:= x v)) (x)]
+  [(bvs-h (heap h ...))
    (x ... ...)
-   (where ((x ...) ...) ((bvis-h h) ...))]
+   (where ((x ...) ...) ((bvs-h h) ...))]
   )
 ; Variables that have values (i.e., that are set) in the heap.
 (define-metafunction verse
-  bvs : h -> (x ...)
-  [(bvs (var x)) ()]
-  [(bvs (:= x v)) (x)]
-  [(bvs (heap h ...))
+  vvs : h -> (x ...)
+  [(vvs (var x)) ()]
+  [(vvs (:= x v)) (x)]
+  [(vvs (heap h ...))
    (x ... ...)
-   (where ((x ...) ...) ((bvs h) ...))]
+   (where ((x ...) ...) ((vvs h) ...))]
   )
 
 (define-metafunction verse
   fvs-e : e -> (x ...)
-  [(fvs-e x) (x)]
-  [(fvs-e k) ()]
-  [(fvs-e (array e ...)) (x ... ...)
-   (where ((x ...) ...) ((fvs-e e) ...))]
-  [(fvs-e (=> x he)) (subtract (fvs-he he) (x))]
-  [(fvs-e (op e)) (fvs-e e)]
-  [(fvs-e (bar e_1 e_2)) (x_1 ... x_2 ...)
+  [(fvs-e v) (fvs-v v)]
+  [(fvs-e (= e_1 e_2)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-e e_1))
    (where (x_2 ...) (fvs-e e_2))]
-  [(fvs-e fail) ()]
-  [(fvs-e (if he_1 e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
-   (where (x_1 ...) (fvs-he he_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvis-he he_1)))
+  [(fvs-e (seq e ...)) (x ... ...)
+   (where ((x ...) ...) ((fvs-e e) ...))]
+  [(fvs-e (op e)) (fvs-e e)]
+  [(fvs-e (bar e ...)) (x ... ...)
+   (where ((x ...) ...) ((fvs-e e) ...))]
+  [(fvs-e (if e_1 e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
+   (where (x_1 ...) (fvs-e e_1))
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-e e_1)))
    (where (x_3 ...) (fvs-e e_3))]
-  [(fvs-e (for he_1 e_2)) (x_1 ... x_2 ...)
-   (where (x_1 ...) (fvs-he he_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvis-he he_1)))]
-  [(fvs-e (do he)) (fvs-he he)]
-  )
-(define-metafunction verse
-  fvs-he : he -> (x ...)
-  [(fvs-he (def h e)) (x_1 ... x_2 ...)
+  [(fvs-e (for e_1 e_2)) (x_1 ... x_2 ...)
+   (where (x_1 ...) (fvs-e e_1))
+   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-e e_1)))]
+  [(fvs-e (def h e)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-h h))
-   (where (x_2 ...) (subtract (fvs-e e) (bvis-h h)))]
-  [(fvs-he (dbar he ...)) (x ... ...)
-   (where ((x ...) ...) ((fvs-he he) ...))]
+   (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
   )
 (define-metafunction verse
   fvs-h : h -> (x ...)
@@ -148,29 +171,37 @@
    
 (define-metafunction verse
   fvs-v : v -> (x ...)
-  [(fvs-v v) (fvs-e v)])
+  [(fvs-v x) (x)]
+  [(fvs-v k) ()]
+  [(fvs-v (arr v ...)) (x ... ...)
+   (where ((x ...) ...) ((fvs-v v) ...))]
+  [(fvs-v (=> x e)) (subtract (fvs-e e) (x))]
+  )
 
 (module+ test
-  (test-match verse he (term (def (heap) 0)))
-  (test-match verse he (term (dbar (def (heap) 0) (def (heap) 1))))
-  (test-match verse he (term (def (heap (var x)) (= x k))))
+  (test-match verse e (term (def (heap) 0)))
+  (test-match verse e (term (bar (def (heap) 0) (def (heap) 1))))
+  (test-match verse e (term (def (heap (var x)) (= x k))))
   (test-match verse h (term (:= a 2)))
   (test-match verse h (term (heap (var x) (:= y 1) (heap) (heap (var z)))))
-  (test-equal (term (bvis-h (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (x y z)))
-  (test-equal (term (bvs (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (y)))
-  (test-equal (term (bvis-he (def (var x) 0))) (term (x)))
-  (test-equal (term (bvis-he (dbar
-                             (def (heap (var x) (:= y 1)) 0)
-                             (def (var z) 1))))
-              (term (x y z)))
+  (test-equal (term (bvs-h (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (x y z)))
+  (test-equal (term (vvs (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (y)))
+  (test-equal (term (bvs-e (def (var x) 0))) (term (x)))
+;  (test-equal (term (bvs-e (bar
+;                             (def (heap (var x) (:= y 1)) 0)
+;                             (def (var z) 1))))
+;              (term (x y z)))
   (test-equal (term (fvs-e x)) (term (x)))
+  (test-equal (term (fvs-e 5)) (term ()))
+  (test-equal (term (fvs-e (= x y))) (term (x y)))
+  (test-equal (term (fvs-e (seq (@ f x) (@ g x)))) (term (f x g x)))
   (test-equal (term (fvs-e (array (@ f x) (@ g x)))) (term (f x g x)))
   (test-equal (term (fvs-e (bar x (@ f y)))) (term (x f y)))
   (test-equal (term (fvs-e (=> x (def (heap) (@ f x))))) (term (f)))
-  (test-equal (term (fvs-he (def (var x) (@ f x)))) (term (f)))
-  (test-equal (term (fvs-he (def (:= x y) (@ x z)))) (term (y z)))
+  (test-equal (term (fvs-e (def (var x) (@ f x)))) (term (f)))
+  (test-equal (term (fvs-e (def (:= x y) (@ x z)))) (term (y z)))
   (test-equal (term (fvs-h (heap (var x) (:= y z)))) (term (z)))
-  (test-equal (term (fvs-v (=> x (def (var y) (array x y z))))) (term (z)))
+  (test-equal (term (fvs-e (=> x (def (var y) (array x y z))))) (term (z)))
   (test-equal (term (fvs-e (if (def (var x) x) (++ x y) z))) (term (y z)))
   (test-equal (term (fvs-e (for (def (var x) (@ x y)) (@ x z)))) (term (y z)))
   )
@@ -178,350 +209,437 @@
 (define-extended-language verse+E verse
   (X ::=
      hole
-     (array e ... X e ...)
-     (op X))
+     (= X e)
+     (= e X)
+     (seq e ... X e ...)
+     (op X)
+     (def h X)
+     )
   (CX ::=
       hole
-      (array ce ... CX e ...)
-      (op CX))
+      (= CX e)
+      (= e CX)
+      (seq e ... CX e ...)
+      (op CX)
+      (def h CX)
+      )
   (L ::=
        hole
-       (dbar L he ...))
+       (bar L e ...))
   (H ::=
      hole
      (heap h ... H h ...))
-
-  ;; The X contexts are a work-around for compatible-closure not working.
-  ;;
-  ;; XH-HE and XH-E will find a 'he' hole that can reduce.
+  ;; E will find an 'e' hole that can reduce.
   ;; Not reducing under lambda, nor in if/for bodies.
-  (XH-HE ::=
-         hole
-         (dbar he ... XH-HE he ...)
-         (def h XH-E))
-  (XH-E ::=
-        (array e ... XH-E e ...)
-        (op XH-E)
-        (if XH-HE e e)
-        (for XH-HE e)
-        (do XH-HE))
-  ;; XE-HE and XE-E will find an 'e' hole that can reduce.
-  ;; Not reducing under lambda, nor in if/for bodies.
-  (XE-HE ::=
-         (dbar he ... XE-HE he ...)
-         (def h XE-E))
-  (XE-E ::=
+  (E ::=
         hole
-        (array e ... XE-E e ...)
-        (op XE-E)
-        (if XE-HE e e)
-        (for XE-HE e)
-        (do XE-HE))  
+        (= E e)
+        (= e E)
+        (seq e ... E e ...)
+        (op E)
+        (if E e e)
+        (for E e)
+        (bar e ... E e ...)
+        (def h E)
+        )  
   )
+
+(define-metafunction verse+E
+  bvs-X : X -> (x ...)
+  [(bvs-X hole) ()]
+  [(bvs-X (def h X)) (x_1 ... x_2 ...)
+   (where (x_1 ...) (bvs-h h))
+   (where (x_2 ...) (bvs-X X))]
+  [(bvs-X (= X e)) (bvs-X X)]
+  [(bvs-X (= e X)) (bvs-X X)]
+  [(bvs-X (seq e_1 ... X e_2 ...)) (bvs-X X)]
+  [(bvs-X (op X)) (bvs-X X)]
+  )
+   
 
 (module+ test
   (test-match verse+E (in-hole H x) (term (heap b (:= a 1))))
-  ; Sadly, no meta-function expansion in patterns.
-  ; (test-match verse+E (in-hole E (= x k)) (term (= a 5)))
-  (test-match verse+E (in-hole X (unify (array x k))) (term (= a 5)))
+  (test-match verse+E (in-hole X (= x k)) (term (= a 5)))
   )
 
 ;; Axioms for h-expressions
-(define he-axioms
-  (reduction-relation
-   verse+E
-   #:domain he
-   (==> (def (in-hole H (:= x v)) e)
-        (def (in-hole H (:= x v)) (substitute e x v))
-        (side-condition (member (term x) (term (fvs-e e))))
-        "S1")
-   (==> (dbar he_1 ... (dbar he_2 ...) he_3 ...)
-        (dbar he_1 ... he_2 ... he_3 ...)
-        "Xa")
-   (==> (dbar he)
-        he
-        "Xb")
-   (==> (def h (in-hole CX fail))
-        (dbar)
-        "C1")
-   (==> (def h (in-hole CX (bar e_1 e_2)))
-        (dbar (def h (in-hole CX e_1))
-              (def h (in-hole CX e_2)))
-        "C2")
-   (==> (def (in-hole H (var x)) (in-hole X (unify (array x v))))
-        (def (in-hole H (:= x v)) (in-hole X v))
-        (side-condition (disjoint (term (bvs (in-hole H (:= x v)))) (term (fvs-v v))))
-        "B1")
-   (==> (def (in-hole H (var x)) (in-hole X (unify (array v x))))
-        (def (in-hole H (:= x v)) (in-hole X v))
-        (side-condition (disjoint (term (bvs (in-hole H (:= x v)))) (term (fvs-v v))))
-        "B2")
-   (==> (def (in-hole H (var x)) (in-hole X (unify (array x (array e ...)))))
-        (def (in-hole H (heap (:= x (array x_s ...)) (var x_s) ...)) (in-hole X (array (= x_s e) ...)))
-        (fresh ((x_s ...) (e ...)))
-        "B3")
-   (==> (def (in-hole H (var x)) (in-hole X (unify (array (array e ...) x))))
-        (def (in-hole H (var x)) (in-hole X (unify (array x (array e ...)))))
-        "B4")
-  
-  with
-  [(--> (in-hole XH-HE_1 a) (in-hole XH-HE_1 b))
-   (==> a b)]
-  ))
-
-(define he-axioms-closure
-  (compatible-closure he-axioms verse+E he))
-
-(define (disjoint l1 l2)
-  (null? (set-intersect l1 l2)))
-
-(module+ test
-  (test--> he-axioms ;; X-1
-           (term (dbar (def (heap) 1) (dbar) (def (heap) 2)))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
-  (test--> he-axioms ;; X-2
-           (term (dbar (def (heap) 1) (dbar (def (heap) 2))))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
-  (test--> he-axioms ;; C1
-           (term (def (heap (var x) (var y)) fail))
-           (term (dbar)))
-  (test--> he-axioms ;; C2
-           (term (def (heap) (bar 1 2)))
-           (term (dbar (def (heap) 1) (def (heap) 2))))
-  (test--> he-axioms ;; B1-1
-           (term (def (heap (var a)) (= a 5)))
-           (term (def (heap (:= a 5)) 5)))
-  (test--> he-axioms ;; B1-2
-           (term (def (heap (var a)) (= a b)))
-           (term (def (heap (:= a b)) b)))  
-  (test-equal ;; B1-3  do NOT allow circularity
-           (apply-reduction-relation he-axioms (term (def (heap (var a)) (= a a))))
-           '())
-  (test--> he-axioms ;; B2
-           (term (def (heap (var a)) (= 5 a)))
-           (term (def (heap (:= a 5)) 5)))
-  (test--> he-axioms ;; B3
-           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4)))))
-           (term (def (heap (heap (:= a (array x_s x_s1 x_s2)) (var x_s) (var x_s1) (var x_s2)))
-                      (array (= x_s 1) (= x_s1 2) (= x_s2 (++ 3 4))))))
-  (test--> he-axioms ;; B4
-           (term (def (heap (var a)) (= (array 1 2 (++ 3 4)) a)))
-           (term (def (heap (var a)) (= a (array 1 2 (++ 3 4))))))
-  (test--> he-axioms ;; S1
-           (term (def (:= x 5) x))
-           (term (def (:= x 5) 5)))
-  )
-
-;; Flatten the heap structure.
-;; Not really needed.
-;;;(define h-axioms
-;;;  (reduction-relation
-;;;   verse
-;;;   #:domain h
-;;;   (--> (heap h_1 ... (heap h_2 ...) h_3 ...)
-;;;        (heap h_1 ... h_2 ... h_3 ...)
-;;;        "heap-merge")))
-
-; Axioms for expressions
 (define e-axioms
   (reduction-relation
    verse+E
-   #:domain he
-   (==> (semi (array v ... e))
-        e
-        "Pseq")
-   (==> (add (array k_1 k_2))
+   #:domain e
+   ;; Substitution
+   (==> (def (in-hole H (:= x v)) e)
+        (def (in-hole H (:= x v)) (substitute e x v))
+        (side-condition (member (term x) (term (fvs-e e))))
+        "Subst")
+   ;; Choice
+   (==> (bar e_1 ... (bar e_2 ...) e_3 ...)
+        (bar e_1 ... e_2 ... e_3 ...)
+        "Bar-assoc")
+;   (==> (bar e)
+;        e
+;        "Bar-sing")
+   (==> (in-hole X (bar))
+        (bar)
+        (side-condition (not (equal? (term X) (term hole))))
+        "Fail")
+   (==> (in-hole CX (bar e ...))
+        (bar (in-hole CX e) ...)
+        (side-condition (not (equal? (term CX) (term hole))))
+        "Choose")
+   ;; Primitive operations
+   (==> (add (arr k_1 k_2))
         (plus k_1 k_2)
-        "Padd")
-   (==> (gt (array k_1 k_2))
+        "P-add")
+   (==> (mul (arr k_1 k_2))
+        (times k_1 k_2)
+        "P-mul")
+   (==> (gt (arr k_1 k_2))
         k_1
         (side-condition (> (term k_1) (term k_2)))
-        "Pgt1")
-   (==> (gt (array k_1 k_2))
-        fail
+        "P-gt1")
+   (==> (gt (arr k_1 k_2))
+        (bar)
         (side-condition (not (> (term k_1) (term k_2))))
-        "Pgt2")
-   (==> (apply (array (=> x (def h e_1)) e_2))
-        (do (def (heap h (var x)) (seq (= x e_2) e_1)))
-        "App-lam")
-   (==> (apply (array (array e_1 ...) e_2))
-        (do (def (var i) (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
-        (fresh i)
-        "App-arr")
-   (==> (index (array (array e ...) k))
-        (nth (e ...) k)
-        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
-        "Idx")
-   (==> (if (dbar) e_1 e_2)
-        e_2
-        "K1")
-   (==> (if (in-hole L (def h v)) e_1 e_2)
-        (do (def h e_1))
-        "K2")
-   (==> (for (dbar (def h v) ...) e)
-        (array (do (def h e)) ...)
-        "F1")
-   (==> (do (def h e))
+        "P-gt2")
+   ;; Sequencing
+   (==> (seq v ... e)
         e
-        (side-condition (disjoint (term (fvs-e e)) (term (bvis-h h))))
-        "D1")
-   (==> (do (dbar he_1 he_2 ...))
-        (bar (do he_1) (do (dbar he_2 ...)))
-        "D2")
-   (==> (do (dbar))
-        fail
-        "D3")
-   (==> (unify (array x_1 x_1))
+        "Seq")
+   (==> (op (seq e_1 e_2))
+        (seq e_1 (op e_2))
+        "Op-seq")
+   (==> (= (seq e_1 e_2) e_3)
+        (seq e_1 (= e_2 e_3))
+        "Unify-seql")
+   (==> (= v_1 (seq e_2 e_3))
+        (seq e_2 (= v_1 e_3))
+        "Unify-seqr")
+   ;; Lambda and applications
+   (==> (apply (arr (=> x e_1) e_2))
+        (def (var t) (seq (= t e_2) (substitute e_1 x t)))
+        (fresh t)
+        "App-lam")
+   (==> (apply (arr (arr v ...) k))
+        (nth (v ...) k)
+        (side-condition (and (>= (term k) 0) (< (term k) (length (term (v ...))))))
+        "App-arr1")
+   (==> (apply (arr (arr v ...) k))
+        (bar)
+        (side-condition (not (and (>= (term k) 0) (< (term k) (length (term (v ...)))))))
+        "App-arr2")
+
+   ;; Conditionals
+   (==> (if (bar) e_1 e_2)
+        e_2
+        "If-false")
+   (==> (if (in-hole L (def h v)) e_1 e_2)
+        (def h e_1)
+        "If-true")
+   ;; For-loops
+   (==> (for (bar (def h v) ...) e)
+        (def (heap (var t) ...) (seq (= t (def h e)) ... (arr t ...)))
+        (fresh ((t ...) (h ...)))
+        "For")
+   ;; Do blocks
+   (==> (in-hole X (def h e))
+        (in-hole X e)
+        (side-condition (not (equal? (term X) (term hole))))
+        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
+        "Do-def")
+   ;; Unification
+   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H (:= x v)) (in-hole X v))
+        (side-condition (disjoint (term (fvs-v v)) (term (vvs (in-hole H (:= x v))))))
+        (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
+        "Bind")
+   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
+        ;; z \in (fvs-v v) and z \in (bvs-X X)
+        (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
+        ; (side-condition (not (redex-match? verse x v)))
+        (fresh y)
+        "Promote")
+;   (==> (def (in-hole H (var x)) (in-hole X (= v x)))
+;        (def (in-hole H (var x)) (in-hole X (= x v)))
+;        (side-condition (not (member (term v) (term (vvs (in-hole H (var x)))))))
+;        (side-condition (not (member (term v) (term (bvs-X X)))))
+;        (side-condition (not (redex-match? verse x (term v))))
+;        "Swap")
+   (==> (= v x)
+        (= x v)
+        (side-condition (not (redex-match? verse x (term v))))
+        "Swap")
+   (==> (= x_1 x_1)
         x_1
-        "U1")
-   (==> (unify (array k_1 k_1))
+        "Uvar")
+   (==> (= k_1 k_1)
         k_1
-        "U2")
-   (==> (unify (array (array e_1 ...) (array e_2 ...)))
-        (array (= e_1 e_2) ...)
-        (side-condition (equal? (length (term (e_1 ...))) (length (term (e_2 ...)))))
-        "U7")
-   (==> (unify (array hnf_1 hnf_2))
-        fail
+        "Ucon")
+   (==> (= (arr v_1 ...) (arr v_2 ...))
+        (seq (= v_1 v_2) ... (arr v_1 ...))
+        (side-condition (equal? (length (term (v_1 ...))) (length (term (v_2 ...)))))
+        "Utup")
+   (==> (= hnf_1 hnf_2)
+        (bar)
         (side-condition (not (equal? (term (head hnf_1)) (term (head hnf_2)))))
-        "UF")
+        "UX")
+  
   with
-  [(--> (in-hole XE-HE_1 a) (in-hole XE-HE_1 b))
+  [(--> a b)
+   ;; WAS (--> (in-hole XE-E a) (in-hole XE-E b))
    (==> a b)]
   ))
 
-(define-metafunction verse+E
-  count : (e ...) -> (k ...)
-  [(count (e ...))
-          ,(range (length (term (e ...))))]
-  )
-
-(define-metafunction verse+E
-  nth : (e ...) k -> e
-  [(nth (e ...) k) ,(list-ref (term (e ...)) (term k))]
-  )
-
-(define-metafunction verse+E
-  alts : (e ...) -> e
-  [(alts ()) fail]
-  [(alts (e)) e]
-  [(alts (e_1 e_2 ...)) (bar e_1 (alts (e_2 ...)))]
-  )
-
-(define p-axioms
-  (union-reduction-relations e-axioms he-axioms))
-
-; LA: This should have worked, but it doesn't.
-; I've contacted Robby Findlert for help.
-
-(define axioms
-  (compatible-closure p-axioms verse+E e))
-
-; Throw away all information about nested values.
-; It doesn't matter what it returns as long as the different hnf heads get different results.
-; Note: constants are all considered to be different.
-(define-metafunction verse
-  head : hnf -> hnf
-  [(head k) k]
-  [(head (array e ...)) (array ,(length (term (e ...))))]
-  [(head (=> x he)) (=> a (def (heap) 0))]
-  )
+(define aaa (term (def (var a) (seq (= 6 a) (++ a 1)))))
+;(define ppp (term (def (in-hole H (var x)) (in-hole X (= x v)))))
+;(define bbb (redex-match verse+E ppp aaa))
 
 (define-metafunction verse
   plus : k k -> k
   [(plus k_1 k_2) ,(+ (term k_1) (term k_2))])
 
-(module+ test
-  (require syntax/parse/define)
-  ; The he-axioms no longer operate on 'he', but 'e'.
-  ; The term-def macro will wrap each 'he' in a 'do' to make it an 'e'.
-  (define-syntax-parse-rule (term-def t) (term (def (heap) t)))
-  (test--> e-axioms ;; P1
-           (term-def (++ 3 4))
-           (term-def 7))
-  (test--> e-axioms ;; P2
-           (term-def (seq 5 (++ x y)))
-           (term-def (++ x y)))
-  (test--> e-axioms ;; U1
-           (term-def (= x x))
-           (term-def x))
-  (test--> e-axioms ;; U2
-           (term-def (= 5 5))
-           (term-def 5))
-  (test--> e-axioms ;; UF
-           (term-def (= 5 6))
-           (term-def fail))
-  (test--> e-axioms ;; U7
-           (term-def (= (array x 1 2) (array 3 y 2)))
-           (term-def (array (= x 3) (= 1 y) (= 2 2))))
-  (test--> e-axioms ;; UF
-           (term-def (= (array x 1 2) (array 3 y 2 4)))
-           (term-def fail))
-  (test--> e-axioms ;; UF
-           (term-def (= 5 (array 1 2 3)))
-           (term-def fail))
-; This test gets unique variables that cannot be predicted.
-; We need to check alpha equivalence instead.
-;  (test--> e-axioms ;; L1
-;           (term-def (@ (=> x (def (heap) (++ x 1))) (++ 3 4)))
-;           (term-def 0))
-  (test--> e-axioms ;; K1
-           (term-def (if (dbar) 1 2))
-           (term-def 2))
-  (test--> e-axioms ;; K2-1
-           (term-def (if (def (heap) 3) 1 2))
-           (term-def (do (def (heap) 1))))
-  (test--> e-axioms ;; K2-2
-           (term-def (if (dbar (def (heap) 3)) 1 2))
-           (term-def (do (def (heap) 1))))
-  (test--> e-axioms ;; F1
-           (term-def (for (dbar (def (var x) 1) (def (var y) 2)) 5))
-           (term-def (array (do (def (var x) 5)) (do (def (var y) 5)))))
-  (test--> e-axioms ;; D1-1
-           (term-def (do (def (heap) 5)))
-           (term-def 5))
-  (test--> e-axioms ;; D1-2
-           (term-def (do (def (var x) y)))
-           (term-def y))
-  (test--> e-axioms ;; D2
-           (term-def (do (dbar (def (heap) 1) (def (heap) 2))))
-           (term-def (bar (do (def (heap) 1)) (do (dbar (def (heap) 2))))))
-  (test--> e-axioms ;; D3
-           (term-def (do (dbar)))
-           (term-def fail))
+(define-metafunction verse
+  times : k k -> k
+  [(times k_1 k_2) ,(* (term k_1) (term k_2))])
+
+(define-metafunction verse
+  nth : (e ...) k -> e
+  [(nth (e ...) k) ,(list-ref (term (e ...)) (term k))]
   )
 
-;; TODO: add a single reduction rule for p that strips the top level def.
+(define-metafunction verse
+  head : hnf -> hnf
+  [(head k) k]
+  [(head (arr v ...)) (arr ,(length (term (v ...))))]
+  [(head (=> x he)) (=> a (def (heap) 0))]
+  )
+
+(define-metafunction verse
+  intersect : (x ...) (x ...) -> (x ..._)
+  [(intersect (x_1 ...) (x_2 ...)) ,(set-intersect (term (x_1 ...)) (term (x_2 ...)))]
+  )
+
+(define (disjoint l1 l2)
+  (null? (set-intersect l1 l2)))
+
+(module+ test
+  (define e-axioms-coverage (make-coverage e-axioms))
+  (relation-coverage (list e-axioms-coverage))
+  )
+
+(module+ test
+  ;; Substitution
+  (test--> e-axioms ;; Subst
+           (term (def (:= x 5) x))
+           (term (def (:= x 5) 5)))
+  ;; Choice
+  (test--> e-axioms ;; Bar-assoc-1
+           (term (bar 1 (bar) 2))
+           (term (bar 1 2)))
+  (test--> e-axioms ;; Bar-assoc-2
+           (term (bar 1 (bar 2)))
+           (term (bar 1 2)))
+  (test--> e-axioms ;; Fail
+           (term (def (heap (var x) (var y)) (bar)))
+           (term (bar)))
+  (test--> e-axioms ;; Choice
+           (term (def (heap) (bar 1 2)))
+           (term (bar (def (heap) 1) (def (heap) 2))))
+  ;; Primitive operations
+  (test--> e-axioms ;; P-add
+           (term (++ 3 4))
+           (term 7))
+  (test--> e-axioms ;; P-mul
+           (term (** 3 4))
+           (term 12))
+  (test--> e-axioms ;; P-gt1
+           (term (>> 5 4))
+           (term 5))
+  (test--> e-axioms ;; P-gt2
+           (term (>> 3 4))
+           (term (bar)))
+  ;; Floating
+  (test--> e-axioms ;; Seq
+           (term (seq 5 10))
+           (term 10))
+  (test--> e-axioms ;; Op-seq
+           (term (add (seq x y)))
+           (term (seq x (add y))))
+  (test--> e-axioms ;; Unify-seql
+           (term (= (seq x y) z))
+           (term (seq x (= y z))))
+  (test--> e-axioms ;; Unify-seqr
+           (term (= x (seq y z)))
+           (term (seq y (= x z))))
+  ;; Lambda and applications
+  (test--> e-axioms ;; App-lam
+           (term (@ (=> a (++ a 1)) 5))
+           (term (def (var t) (seq (= t 5) (++ t 1)))))
+  (test--> e-axioms ;; App-arr1
+           (term (@ (array 10 20 30 40) 2))
+           (term 30))
+  (test--> e-axioms ;; App-arr2
+           (term (@ (array 10 20 30 40) 5))
+           (term (bar)))
+  ;; Conditionals
+  (test--> e-axioms ;; If-false
+           (term (if (bar) 1 2))
+           (term 2))
+  (test--> e-axioms ;; If-true-1
+           (term (if (def (heap) 3) 1 2))
+           (term (def (heap) 1)))
+  (test--> e-axioms ;; If-true-2
+           (term (if (bar (def (heap) 3) (def (heap) 4)) 1 2))
+           (term (def (heap) 1)))
+  ;; For-loops
+  (test--> e-axioms ;; For-1
+           (term (for (bar) 0))
+           (term (def (heap) (seq (arr)))))
+  (test--> e-axioms ;; For-2
+           (term (for (bar (def (var x) 5)) 0))
+           (term (def (heap (var t)) (seq (= t (def (var x) 0)) (arr t)))))
+  ;; Do blocks
+  (test--> e-axioms ;; Do-def
+           (term (add (def (:= x 1) y)))
+           (term (add y)))
+  ;; Unification
+  (test--> e-axioms ;; Bind-1
+           (term (def (heap (var a)) (= a 5)))
+           (term (def (heap (:= a 5)) 5)))
+  (test--> e-axioms ;; Bind-2
+           (term (def (heap (var a)) (= a b)))
+           (term (def (heap (:= a b)) b)))  
+  (test-equal ;; Bind-3  do NOT allow circularity
+           (apply-reduction-relation e-axioms (term (def (heap (var a)) (= a a))))
+           '())
+  (test--> e-axioms
+           (term (def (var a) (def (var b) (= a (arr 1 b)))))
+           (term (def (heap (var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 b)))))))
+;  (test--> e-axioms ;; Swap
+;           (term (def (heap (var a)) (= 5 a)))
+;           (term (def (heap (var a)) (= a 5))))
+  (test--> e-axioms ;; Swap
+           (term (= 5 a))
+           (term (= a 5)))
+  (test--> e-axioms ;; Uvar
+           (term (= x x))
+           (term x))
+  (test--> e-axioms ;; Ucon
+           (term (= 5 5))
+           (term 5))
+  (test--> e-axioms ;; Utup
+           (term (= (arr x 1 2) (arr 3 y 2)))
+           (term (seq (= x 3) (= 1 y) (= 2 2) (arr x 1 2))))
+  (test--> e-axioms ;; UX
+           (term (= 5 6))
+           (term (bar)))
+  (test--> e-axioms ;; UX
+           (term (= (arr x 1 2) (arr 3 y 2 4)))
+           (term (bar)))
+  (test--> e-axioms ;; UX
+           (term (= 5 (array 1 2 3)))
+           (term (bar)))
+  )
+
+
+;;; This contains code that will be used when apply unifies its argument with the domain.
+;(define e-axioms
+;  (reduction-relation
+;   verse+E
+;   #:domain he
+;   (==> (apply (array (array e_1 ...) e_2))
+;        (do (def (var i) (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
+;        (fresh i)
+;        "App-arr")
+;   (==> (index (array (array e ...) k))
+;        (nth (e ...) k)
+;        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
+;        "Idx")
+;  ))
+;
+;(define-metafunction verse+E
+;  count : (e ...) -> (k ...)
+;  [(count (e ...))
+;          ,(range (length (term (e ...))))]
+;  )
+;
+;(define-metafunction verse+E
+;  alts : (e ...) -> e
+;  [(alts ()) fail]
+;  [(alts (e)) e]
+;  [(alts (e_1 e_2 ...)) (bar e_1 (alts (e_2 ...)))]
+;  )
+;
+
+;; This rule gets rid of an unused def at the top level of a program.
+(define top-def
+  (reduction-relation
+   verse+E
+   #:domain e
+   (--> (def h e)
+        e
+        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
+        "Top-def")
+   ))
+   
+
+(define e-axioms*
+  (context-closure e-axioms verse+E E))
+
+(define p-axioms
+  (union-reduction-relations e-axioms* top-def))
+
 (module+ test
   (test-->> p-axioms
             (term (def (:= x 1) x))
-            (term (def (:= x 1) 1)))
+            (term 1))
   (test-->> p-axioms
             (term (def (var x) (seq (= 6 x) (++ x 1))))
-            (term (def (:= x 6) 7)))
-  (test-->> p-axioms
-            (term (def (heap) (for (def (var x) (= x (bar 1 2))) (++ x 1))))
-            (term (def (heap) (array 2 3))))
+            (term 7))
   (test-->> p-axioms
             (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y))))
-            (term (def (heap (:= x 1) (:= y 111)) 111)))
+            (term 111))
   (test-->> p-axioms
             (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
-            (term (def (heap (:= x 2) (:= y 222)) 222)))
-  ; This test is incredibly slow because of the many reduction paths.
-  ;(test-->> e-he-axioms
-  ;          (term (def (heap) (@ (array 1 2) 1))))
-  ;          2)
+            (term 222))
+; Using test-->> is better, but very slow.
+  (test-->>E p-axioms
+            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
+            (term (array 2 3)))
+  (test-->> p-axioms
+            (term (@ (array 1 2) 1))
+            (term 2))
+  (test-->> p-axioms
+            (term (@ (=> x (++ x 1)) (++ 2 3)))
+            (term 6))
   )
 
-; Nice examples
-; (traces p-axioms (term (do (def (:= x 1) x))))
-; (traces p-axioms (term (for (def (var x) (= x (bar 1 2))) (++ x 1))))
+(module+ test
+  (test-->> p-axioms ;; Example-1
+            (term (def (heap (var x) (var y)) (seq (= x 3) (= y (++ x 1)))))
+            (term 4))
+  (test-->> p-axioms ;; Example-2
+            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
+            (term 4))
+  (test-->> p-axioms ;; Example-3
+            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
+            (term (bar
+                   (def (heap (:= x 3) (:= y 4)) 3)
+                   (def (heap (:= x 77) (:= y 78)) 77))))
+; XXX Recursive definitions don't work.  We getr stuck in the SUBST rule.
+; Maybe a fix rule, (--> (fix e) (@ e (fix e)))
+; Or (--> (fix (=> x e)) (substitute e x (fix (=> x e))))
+;  (test-->>E p-axioms ;; factorial
+;    (term
+;     (def (heap (var fac) (var fac1) (var fac2))
+;       (seq
+;        (= fac (=> n (if (def (heap) (>> n 0)) (** n (@ fac (++ n -1))) 1)))
+;        (@ fac 3))))
+;    (term 6))
+  )
 
 (module+ test
-  (test-results))
-
-
-; swap := t => def {x,y} in t = (x,y); (y,x)
-; (define t-lam (term (=> t (def (heap (var x) (var y)) (seq (= t (array x y)) (array y x))))))
-; (define t-arg (term (def (var p) (seq (= (@ ,t-lam p) (array 2 3)) p))))
+  (covered-cases e-axioms-coverage)
+  (test-results)
+  )
