@@ -556,6 +556,34 @@ Notice that |apply| is one of the primitive functions in $cop$.
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
 in \rulename{app-arr} to index it.
 
+\subsection{Conditionals}
+
+In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
+it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values).
+For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
+the |if| returns |e_1|, otherwise it returns |e_2|.
+
+Comparision operators succed or fail, rather than returning a Boolean
+(as in most languages). For example |(x>3)| suceeds if |x| is greater
+than 3, returning |x|; and fails if not.
+
+It is very important that in a conditional |(if (x=3) then ...)| we
+treat |x| as ``rigid'': the conditional is intended to \emph{test}
+|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
+does not look inside the condition of an |if| (look at the syntax of context |X| used in that rule.
+
+\subsection{The Equality Principle}
+
+Verse cleaves to the following principle.
+
+\begin{quote}
+\textbf{The Equality Principle (EP)}.
+For any choice-free, side-effect-free expression |e|, and values |v_1| and |v_2|,
+if |(e = v_1)| is inhabited, and |(e = v_2)| is inhabited, then |v_1|=|v_2|.
+\end{quote}
+For example suppose |misBehaves = t => def{x} in x|, so that (if we are not careful) the call |misBehaves()| returns
+a fresh, unbound logical variable.  Now |(misBehaves() = 3)| and |(misBehaves() = 4)| will both succeed (be inhabited),
+but 3 is not equal to 4.  So this wouldn't satisfy the EP.
 
 \subsection{Source Verse}
 
