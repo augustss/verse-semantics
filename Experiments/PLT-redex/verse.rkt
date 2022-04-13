@@ -648,7 +648,7 @@
                    (def r (heap (:= x 77) (:= y 78)) 77))))
   (test-->>E p-axioms ;; simple recusion
              (term
-              (def r (:= f (rec g (=> n (if (= n 0) 0 (++ n -1)))))
+              (def r (:= f (rec g (=> n (if (def i (heap) (= n 0)) 0 (++ n -1)))))
                 (@ f 1)))
              (term 0))
   (test-->>E p-axioms ;; factorial
