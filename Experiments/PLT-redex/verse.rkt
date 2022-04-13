@@ -19,6 +19,7 @@
        k
        (arr v ...)
        (=> x e)
+       (rec x e)  ;; rec x e = fix (x => e)
        )
   (v ::= x hnf)
   (ce ::=
@@ -43,6 +44,7 @@
   ;; Most rules just match with (def q ...) and work for both,
   ;; but the binding forms distinguish the two.
   (=> x e #:refers-to x)
+  (rec x e #:refers-to x)
   (heap h ...) #:exports (shadow h ...)
   (:= x v) #:exports x
   x #:exports x
@@ -181,6 +183,7 @@
   [(fvs-v (arr v ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-v v) ...))]
   [(fvs-v (=> x e)) (subtract (fvs-e e) (x))]
+  [(fvs-v (rec x e)) (subtract (fvs-e e) (x))]
   )
 
 (module+ test
@@ -324,6 +327,10 @@
         (def r t (seq (= t e_2) (substitute e_1 x t)))
         (fresh t)
         "App-lam")
+   (==> (apply (arr (rec x e_1) e_2))
+        (apply (arr (substitute e_1 x (rec x e_1)) e_2))
+        (fresh t)
+        "App-rec")
    (==> (apply (arr (arr v ...) k))
         (nth (v ...) k)
         (side-condition (and (>= (term k) 0) (< (term k) (length (term (v ...))))))
@@ -485,6 +492,9 @@
   (test--> e-axioms ;; App-lam
            (term (@ (=> a (++ a 1)) 5))
            (term (def r t (seq (= t 5) (++ t 1)))))
+  (atest--> e-axioms ;; App-rec
+           (term (@ (rec a (=> n (arr a n))) 5))
+           (term (@ (=> n (arr (rec a (=> n (arr a n))) n)) 5)))
   (test--> e-axioms ;; App-arr1
            (term (@ (array 10 20 30 40) 2))
            (term 30))
@@ -636,25 +646,18 @@
             (term (bar
                    (def r (heap (:= x 3) (:= y 4)) 3)
                    (def r (heap (:= x 77) (:= y 78)) 77))))
-; XXX Recursive definitions don't work.  We getr stuck in the SUBST rule.
-; Maybe a fix rule, (--> (fix e) (@ e (fix e)))
-; Or (--> (fix (=> x e)) (substitute e x (fix (=> x e))))
-;  (test-->>E p-axioms ;; factorial
-;    (term
-;     (def r (heap fac)
-;       (seq
-;        (= fac (=> n (if (def i (heap) (>> n 0)) (** n (@ fac (++ n -1))) 1)))
-;        (@ fac 3))))
-;    (term 6))
+  (test-->>E p-axioms ;; simple recusion
+             (term
+              (def r (:= f (rec g (=> n (if (= n 0) 0 (++ n -1)))))
+                (@ f 1)))
+             (term 0))
   (test-->>E p-axioms ;; factorial
-    (term
-     (def r (heap fac fac1 fac2)
-       (seq
-        (= fac2 (=> n n))
-        (= fac1 (=> n (if (def i (heap) (>> n 0)) (** n (@ fac2 (++ n -1))) 1)))
-        (= fac (=> n (if (def i (heap) (>> n 0)) (** n (@ fac1 (++ n -1))) 1)))
-        (@ fac 3))))
-    (term 6))
+             (term
+              (def r (heap fac)
+                (seq
+                 (= fac (rec f (=> n (if (def i (heap) (>> n 0)) (** n (@ f (++ n -1))) 1))))
+                 (@ fac 3))))
+             (term 6))
   )
 
 (module+ test
