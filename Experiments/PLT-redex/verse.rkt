@@ -29,7 +29,7 @@
       )
   (h ::=
      (heap h ...)
-     (var x)
+     x
      (:= x v))
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
@@ -41,7 +41,7 @@
 ; XXX According to Robby Findler there is probably no way to make this work.
 ;  (heap h ...) #:exports (shadow h ...)
 ;  (:= x v) #:exports x
-;  (var x) #:exports x
+;  x #:exports x
 ;  (def h e #:refers-to h)
 ;  (if (def h e #:refers-to h) e #:refers-to h e)
 ;  (for (def h e) e #:refers-to h)
@@ -93,7 +93,7 @@
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (v_2 e_2 ...))
         (xarray (h ...) (e_1 ...) (v_1 ... v_2) (e_2 ...)))
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (e_2 e_3 ...))
-        (xarray (h ... (var t)) (e_1 ... (= t e_2)) (v_1 ... t) (e_3 ...))
+        (xarray (h ... t) (e_1 ... (= t e_2)) (v_1 ... t) (e_3 ...))
         (side-condition (not (redex-match verse v (term e_2))))
         (fresh t))
    ))
@@ -123,7 +123,7 @@
 ; Variables that are bound in a heap
 (define-metafunction verse
   bvs-h : h -> (x ...)
-  [(bvs-h (var x)) (x)]
+  [(bvs-h x) (x)]
   [(bvs-h (:= x v)) (x)]
   [(bvs-h (heap h ...))
    (x ... ...)
@@ -132,7 +132,7 @@
 ; Variables that have values (i.e., that are set) in the heap.
 (define-metafunction verse
   vvs : h -> (x ...)
-  [(vvs (var x)) ()]
+  [(vvs x) ()]
   [(vvs (:= x v)) (x)]
   [(vvs (heap h ...))
    (x ... ...)
@@ -163,7 +163,7 @@
   )
 (define-metafunction verse
   fvs-h : h -> (x ...)
-  [(fvs-h (var x)) ()]
+  [(fvs-h x) ()]
   [(fvs-h (:= x v)) (fvs-v v)]
   [(fvs-h (heap h ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-h h) ...))]
@@ -181,15 +181,15 @@
 (module+ test
   (test-match verse e (term (def (heap) 0)))
   (test-match verse e (term (bar (def (heap) 0) (def (heap) 1))))
-  (test-match verse e (term (def (heap (var x)) (= x k))))
+  (test-match verse e (term (def (heap x) (= x k))))
   (test-match verse h (term (:= a 2)))
-  (test-match verse h (term (heap (var x) (:= y 1) (heap) (heap (var z)))))
-  (test-equal (term (bvs-h (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (x y z)))
-  (test-equal (term (vvs (heap (var x) (:= y 1) (heap (var z)) (heap)))) (term (y)))
-  (test-equal (term (bvs-e (def (var x) 0))) (term (x)))
+  (test-match verse h (term (heap x (:= y 1) (heap) (heap z))))
+  (test-equal (term (bvs-h (heap x (:= y 1) (heap z) (heap)))) (term (x y z)))
+  (test-equal (term (vvs (heap x (:= y 1) (heap z) (heap)))) (term (y)))
+  (test-equal (term (bvs-e (def x 0))) (term (x)))
 ;  (test-equal (term (bvs-e (bar
-;                             (def (heap (var x) (:= y 1)) 0)
-;                             (def (var z) 1))))
+;                             (def (heap x (:= y 1)) 0)
+;                             (def z 1))))
 ;              (term (x y z)))
   (test-equal (term (fvs-e x)) (term (x)))
   (test-equal (term (fvs-e 5)) (term ()))
@@ -198,12 +198,12 @@
   (test-equal (term (fvs-e (array (@ f x) (@ g x)))) (term (f x g x)))
   (test-equal (term (fvs-e (bar x (@ f y)))) (term (x f y)))
   (test-equal (term (fvs-e (=> x (def (heap) (@ f x))))) (term (f)))
-  (test-equal (term (fvs-e (def (var x) (@ f x)))) (term (f)))
+  (test-equal (term (fvs-e (def x (@ f x)))) (term (f)))
   (test-equal (term (fvs-e (def (:= x y) (@ x z)))) (term (y z)))
-  (test-equal (term (fvs-h (heap (var x) (:= y z)))) (term (z)))
-  (test-equal (term (fvs-e (=> x (def (var y) (array x y z))))) (term (z)))
-  (test-equal (term (fvs-e (if (def (var x) x) (++ x y) z))) (term (y z)))
-  (test-equal (term (fvs-e (for (def (var x) (@ x y)) (@ x z)))) (term (y z)))
+  (test-equal (term (fvs-h (heap x (:= y z)))) (term (z)))
+  (test-equal (term (fvs-e (=> x (def y (array x y z))))) (term (z)))
+  (test-equal (term (fvs-e (if (def x x) (++ x y) z))) (term (y z)))
+  (test-equal (term (fvs-e (for (def x (@ x y)) (@ x z)))) (term (y z)))
   )
 
 (define-extended-language verse+E verse
@@ -317,7 +317,7 @@
         "Unify-seqr")
    ;; Lambda and applications
    (==> (apply (arr (=> x e_1) e_2))
-        (def (var t) (seq (= t e_2) (substitute e_1 x t)))
+        (def t (seq (= t e_2) (substitute e_1 x t)))
         (fresh t)
         "App-lam")
    (==> (apply (arr (arr v ...) k))
@@ -338,7 +338,7 @@
         "If-true")
    ;; For-loops
    (==> (for (bar (def h v) ...) e)
-        (def (heap (var t) ...) (seq (= t (def h e)) ... (arr t ...)))
+        (def (heap t ...) (seq (= t (def h e)) ... (arr t ...)))
         (fresh ((t ...) (h ...)))
         "For")
    ;; Do blocks
@@ -348,21 +348,21 @@
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
         "Do-def")
    ;; Unification
-   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
+   (==> (def (in-hole H x) (in-hole X (= x v)))
         (def (in-hole H (:= x v)) (in-hole X v))
         (side-condition (disjoint (term (fvs-v v)) (term (vvs (in-hole H (:= x v))))))
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
-   (==> (def (in-hole H (var x)) (in-hole X (= x v)))
-        (def (in-hole H (heap (var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
+   (==> (def (in-hole H x) (in-hole X (= x v)))
+        (def (in-hole H (heap x y)) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
         (fresh y)
         "Promote")
-;   (==> (def (in-hole H (var x)) (in-hole X (= v x)))
-;        (def (in-hole H (var x)) (in-hole X (= x v)))
-;        (side-condition (not (member (term v) (term (vvs (in-hole H (var x)))))))
+;   (==> (def (in-hole H x) (in-hole X (= v x)))
+;        (def (in-hole H x) (in-hole X (= x v)))
+;        (side-condition (not (member (term v) (term (vvs (in-hole H x))))))
 ;        (side-condition (not (member (term v) (term (bvs-X X)))))
 ;        (side-condition (not (redex-match? verse x (term v))))
 ;        "Swap")
@@ -390,10 +390,6 @@
    ;; WAS (--> (in-hole XE-E a) (in-hole XE-E b))
    (==> a b)]
   ))
-
-(define aaa (term (def (var a) (seq (= 6 a) (++ a 1)))))
-;(define ppp (term (def (in-hole H (var x)) (in-hole X (= x v)))))
-;(define bbb (redex-match verse+E ppp aaa))
 
 (define-metafunction verse
   plus : k k -> k
@@ -441,7 +437,7 @@
            (term (bar 1 (bar 2)))
            (term (bar 1 2)))
   (test--> e-axioms ;; Fail
-           (term (def (heap (var x) (var y)) (bar)))
+           (term (def (heap x y) (bar)))
            (term (bar)))
   (test--> e-axioms ;; Choice
            (term (def (heap) (bar 1 2)))
@@ -475,7 +471,7 @@
   ;; Lambda and applications
   (test--> e-axioms ;; App-lam
            (term (@ (=> a (++ a 1)) 5))
-           (term (def (var t) (seq (= t 5) (++ t 1)))))
+           (term (def t (seq (= t 5) (++ t 1)))))
   (test--> e-axioms ;; App-arr1
            (term (@ (array 10 20 30 40) 2))
            (term 30))
@@ -497,28 +493,28 @@
            (term (for (bar) 0))
            (term (def (heap) (seq (arr)))))
   (test--> e-axioms ;; For-2
-           (term (for (bar (def (var x) 5)) 0))
-           (term (def (heap (var t)) (seq (= t (def (var x) 0)) (arr t)))))
+           (term (for (bar (def x 5)) 0))
+           (term (def (heap t) (seq (= t (def x 0)) (arr t)))))
   ;; Do blocks
   (test--> e-axioms ;; Do-def
            (term (add (def (:= x 1) y)))
            (term (add y)))
   ;; Unification
   (test--> e-axioms ;; Bind-1
-           (term (def (heap (var a)) (= a 5)))
+           (term (def (heap a) (= a 5)))
            (term (def (heap (:= a 5)) 5)))
   (test--> e-axioms ;; Bind-2
-           (term (def (heap (var a)) (= a b)))
+           (term (def (heap a) (= a b)))
            (term (def (heap (:= a b)) b)))  
   (test-equal ;; Bind-3  do NOT allow circularity
-           (apply-reduction-relation e-axioms (term (def (heap (var a)) (= a a))))
+           (apply-reduction-relation e-axioms (term (def (heap a) (= a a))))
            '())
   (test--> e-axioms
-           (term (def (var a) (def (var b) (= a (arr 1 b)))))
-           (term (def (heap (var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 b)))))))
+           (term (def a (def b (= a (arr 1 b)))))
+           (term (def (heap a y) (def b (seq (= b y) (= a (arr 1 b)))))))
 ;  (test--> e-axioms ;; Swap
-;           (term (def (heap (var a)) (= 5 a)))
-;           (term (def (heap (var a)) (= a 5))))
+;           (term (def (heap a) (= 5 a)))
+;           (term (def (heap a) (= a 5))))
   (test--> e-axioms ;; Swap
            (term (= 5 a))
            (term (= a 5)))
@@ -549,7 +545,7 @@
 ;   verse+E
 ;   #:domain he
 ;   (==> (apply (array (array e_1 ...) e_2))
-;        (do (def (var i) (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
+;        (do (def i (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
 ;        (fresh i)
 ;        "App-arr")
 ;   (==> (index (array (array e ...) k))
@@ -595,17 +591,17 @@
             (term (def (:= x 1) x))
             (term 1))
   (test-->> p-axioms
-            (term (def (var x) (seq (= 6 x) (++ x 1))))
+            (term (def x (seq (= 6 x) (++ x 1))))
             (term 7))
   (test-->> p-axioms
-            (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y))))
+            (term (def (heap x y) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 1) y))))
             (term 111))
   (test-->> p-axioms
-            (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
+            (term (def (heap x y) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
             (term 222))
 ; Using test-->> is better, but very slow.
   (test-->>E p-axioms
-            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
+            (term (for (def x (= x (bar 1 2))) (++ x 1)))
             (term (array 2 3)))
   (test-->> p-axioms
             (term (@ (array 1 2) 1))
@@ -617,13 +613,13 @@
 
 (module+ test
   (test-->> p-axioms ;; Example-1
-            (term (def (heap (var x) (var y)) (seq (= x 3) (= y (++ x 1)))))
+            (term (def (heap x y) (seq (= x 3) (= y (++ x 1)))))
             (term 4))
   (test-->> p-axioms ;; Example-2
-            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
+            (term (def (heap x y) (seq (= y (++ x 1)) (= x 3) y)))
             (term 4))
   (test-->> p-axioms ;; Example-3
-            (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
+            (term (def (heap x y) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
             (term (bar
                    (def (heap (:= x 3) (:= y 4)) 3)
                    (def (heap (:= x 77) (:= y 78)) 77))))
@@ -632,7 +628,7 @@
 ; Or (--> (fix (=> x e)) (substitute e x (fix (=> x e))))
 ;  (test-->>E p-axioms ;; factorial
 ;    (term
-;     (def (heap (var fac) (var fac1) (var fac2))
+;     (def (heap fac)
 ;       (seq
 ;        (= fac (=> n (if (def (heap) (>> n 0)) (** n (@ fac (++ n -1))) 1)))
 ;        (@ fac 3))))
