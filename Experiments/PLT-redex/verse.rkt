@@ -14,7 +14,7 @@
      (def h e)
      )
   (op ::= cop apply)
-  (cop ::= gt add)
+  (cop ::= gt add mul)
   (hnf ::=
        k
        (arr v ...)
@@ -38,10 +38,11 @@
   ; TODO Test the def binding form. 
   ; It's rather complex and fresh variables make testing harder.
   ; Comment it out for the moment:
-  (heap h ...) #:exports (shadow h ...)
-  (:= x v) #:exports x
-  (var x) #:exports x
-  (def h e #:refers-to h)
+; XXX According to Robby Findler there is probably no way to make this work.
+;  (heap h ...) #:exports (shadow h ...)
+;  (:= x v) #:exports x
+;  (var x) #:exports x
+;  (def h e #:refers-to h)
 ;  (if (def h e #:refers-to h) e #:refers-to h e)
 ;  (for (def h e) e #:refers-to h)
   )
@@ -51,6 +52,10 @@
 (define-metafunction verse
   ++ : e e -> e
   [(++ e_1 e_2) (add (array e_1 e_2))]
+  )
+(define-metafunction verse
+  ** : e e -> e
+  [(** e_1 e_2) (mul (array e_1 e_2))]
   )
 (define-metafunction verse
   >> : e e -> e
@@ -286,6 +291,9 @@
    (==> (add (arr k_1 k_2))
         (plus k_1 k_2)
         "P-add")
+   (==> (mul (arr k_1 k_2))
+        (times k_1 k_2)
+        "P-mul")
    (==> (gt (arr k_1 k_2))
         k_1
         (side-condition (> (term k_1) (term k_2)))
@@ -392,6 +400,10 @@
   [(plus k_1 k_2) ,(+ (term k_1) (term k_2))])
 
 (define-metafunction verse
+  times : k k -> k
+  [(times k_1 k_2) ,(* (term k_1) (term k_2))])
+
+(define-metafunction verse
   nth : (e ...) k -> e
   [(nth (e ...) k) ,(list-ref (term (e ...)) (term k))]
   )
@@ -411,6 +423,10 @@
 (define (disjoint l1 l2)
   (null? (set-intersect l1 l2)))
 
+(module+ test
+  (define e-axioms-coverage (make-coverage e-axioms))
+  (relation-coverage (list e-axioms-coverage))
+  )
 
 (module+ test
   ;; Substitution
@@ -434,6 +450,9 @@
   (test--> e-axioms ;; P-add
            (term (++ 3 4))
            (term 7))
+  (test--> e-axioms ;; P-mul
+           (term (** 3 4))
+           (term 12))
   (test--> e-axioms ;; P-gt1
            (term (>> 5 4))
            (term 5))
@@ -584,10 +603,10 @@
   (test-->> p-axioms
             (term (def (heap (var x) (var y)) (seq (= y (if (def (heap) (= x 1)) 111 222)) (seq (= x 2) y))))
             (term 222))
-; SLOW
-;  (test-->> p-axioms
-;            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
-;            (term (array 2 3)))
+; Using test-->> is better, but very slow.
+  (test-->>E p-axioms
+            (term (for (def (var x) (= x (bar 1 2))) (++ x 1)))
+            (term (array 2 3)))
   (test-->> p-axioms
             (term (@ (array 1 2) 1))
             (term 2))
@@ -603,12 +622,24 @@
   (test-->> p-axioms ;; Example-2
             (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
             (term 4))
-  (test-->> p-axioms ;; Example-2
+  (test-->> p-axioms ;; Example-3
             (term (def (heap (var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
             (term (bar
                    (def (heap (:= x 3) (:= y 4)) 3)
                    (def (heap (:= x 77) (:= y 78)) 77))))
+; XXX Recursive definitions don't work.  We getr stuck in the SUBST rule.
+; Maybe a fix rule, (--> (fix e) (@ e (fix e)))
+; Or (--> (fix (=> x e)) (substitute e x (fix (=> x e))))
+;  (test-->>E p-axioms ;; factorial
+;    (term
+;     (def (heap (var fac) (var fac1) (var fac2))
+;       (seq
+;        (= fac (=> n (if (def (heap) (>> n 0)) (** n (@ fac (++ n -1))) 1)))
+;        (@ fac 3))))
+;    (term 6))
   )
 
 (module+ test
-  (test-results))
+  (covered-cases e-axioms-coverage)
+  (test-results)
+  )
