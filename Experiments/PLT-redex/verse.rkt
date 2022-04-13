@@ -46,8 +46,8 @@
   (heap h ...) #:exports (shadow h ...)
   (:= x v) #:exports x
   x #:exports x
-  (def r h e #:refers-to h)             ;; h variables just bound in e
-  (def i h e #:refers-to h) #:exports h ;; h variables accessible
+  (def r h #:refers-to h e #:refers-to h)             ;; h variables just bound in e
+  (def i h #:refers-to h e #:refers-to h) #:exports h ;; h variables accessible
   (if e_1 e_2 #:refers-to e_1 e_3)
   (for e_1 e_2 #:refers-to e_1)
   )
@@ -646,6 +646,15 @@
 ;        (= fac (=> n (if (def i (heap) (>> n 0)) (** n (@ fac (++ n -1))) 1)))
 ;        (@ fac 3))))
 ;    (term 6))
+  (test-->>E p-axioms ;; factorial
+    (term
+     (def r (heap fac fac1 fac2)
+       (seq
+        (= fac2 (=> n n))
+        (= fac1 (=> n (if (def i (heap) (>> n 0)) (** n (@ fac2 (++ n -1))) 1)))
+        (= fac (=> n (if (def i (heap) (>> n 0)) (** n (@ fac1 (++ n -1))) 1)))
+        (@ fac 3))))
+    (term 6))
   )
 
 (module+ test
