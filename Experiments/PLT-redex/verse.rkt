@@ -50,6 +50,9 @@
   x #:exports x
   (def r h #:refers-to h e #:refers-to h)             ;; h variables just bound in e
   (def i h #:refers-to h e #:refers-to h) #:exports h ;; h variables accessible
+  ; XXX I don't know how to encode the fact that all (def i h ...) in a 'for'
+  ; should bind the same variables.  Instead, the 'for' loop does not respect bindings properly.
+  ;(bar (def i h e_1 #:refers-to h) e_2 ...) #:exports h
   (if e_1 e_2 #:refers-to e_1 e_3)
   (for e_1 e_2 #:refers-to e_1)
   )
@@ -341,23 +344,42 @@
         "App-arr2")
 
    ;; Conditionals
+   ;; If-true2 only needed when the 'if' does not have a 'def'
    (==> (if (bar) e_1 e_2)
         e_2
         "If-false")
    (==> (if (in-hole L (def i h v)) e_1 e_2)
         (def r h e_1)
-        "If-true")
+        "If-true1")
+   (==> (if (in-hole L v) e_1 e_2) ;; missing def
+        e_1
+        "If-true2")
    ;; For-loops
+   ;; For2 only needed when the 'for' does not have a 'def'
+   ;; For3 only needed when the 'for' does not have a 'bar'
+   ;; For4 only needed when the 'for' does not have a 'bar' nor 'def'
    (==> (for (bar (def i h v) ...) e)
         (def r (heap t ...) (seq (= t (def r h e)) ... (arr t ...)))
-        (fresh ((t ...) (h ...)))
-        "For")
-   ;; Do blocks
+        (fresh ((t ...) (v ...)))
+        "For1")
+   (==> (for (bar v ...) e) ;; missing def
+        (def r (heap t ...) (seq (= t e) ... (arr t ...)))
+        (fresh ((t ...) (v ...)))
+        "For2")
+   (==> (for (def i h v) e)
+        (def r (heap t) (seq (= t (def r h e)) (arr t)))
+        (fresh t)
+        "For3")
+   (==> (for v e)
+        (def r (heap t) (seq (= t e) (arr t)))
+        (fresh t)
+        "For4")
+   ;; Def blocks
    (==> (in-hole X (def q h e))
         (in-hole X e)
         (side-condition (not (equal? (term X) (term hole))))
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
-        "Do-def")
+        "Def-elim")
 ;   (==> (def r e)
 ;        e
 ;        (side-condition (not (equal? (term X) (term hole))))
@@ -505,19 +527,31 @@
   (test--> e-axioms ;; If-false
            (term (if (bar) 1 2))
            (term 2))
-  (test--> e-axioms ;; If-true-1
+  (test--> e-axioms ;; If-true1-1
            (term (if (def i (heap) 3) 1 2))
            (term (def r (heap) 1)))
-  (test--> e-axioms ;; If-true-2
+  (test--> e-axioms ;; If-true1-2
            (term (if (bar (def i (heap) 3) (def i (heap) 4)) 1 2))
            (term (def r (heap) 1)))
+  (test--> e-axioms ;; If-true2
+           (term (if 3 1 2))
+           (term 1))
   ;; For-loops
-  (test--> e-axioms ;; For-1
+  (test--> e-axioms ;; For1-1
            (term (for (bar) 0))
            (term (def r (heap) (seq (arr)))))
-  (test--> e-axioms ;; For-2
+  (test--> e-axioms ;; For1-2
            (term (for (bar (def i x 5)) 0))
            (term (def r (heap t) (seq (= t (def r x 0)) (arr t)))))
+  (test--> e-axioms ;; For2
+           (term (for (bar 5) 0))
+           (term (def r (heap t) (seq (= t 0) (arr t)))))
+  (atest--> e-axioms ;; For3
+           (term (for (def i x 5) 0))
+           (term (def r (heap t) (seq (= t (def r x 0)) (arr t)))))
+  (test--> e-axioms ;; For4
+           (term (for 5 0))
+           (term (def r (heap t) (seq (= t 0) (arr t)))))
   ;; Do blocks
   (test--> e-axioms ;; Do-def
            (term (add (def r (:= x 1) y)))
