@@ -14,7 +14,7 @@
      (def q h e)  ;; See comment for binding forms.
      )
   (op ::= cop apply)
-  (cop ::= gt add mul)
+  (cop ::= gt add mul int)
   (hnf ::=
        k
        (arr v ...)
@@ -313,6 +313,14 @@
         (bar)
         (side-condition (not (> (term k_1) (term k_2))))
         "P-gt2")
+   (==> (int k)
+        k
+        "P-int1")
+   (==> (int v)
+        (bar)
+        (side-condition (not (redex-match? verse k (term v))))
+        "P-int2")
+   ;; Sequencing
    (==> (seq v ... e)
         e
         "Seq")
@@ -496,6 +504,12 @@
            (term 5))
   (test--> e-axioms ;; P-gt2
            (term (>> 3 4))
+           (term (bar)))
+  (test--> e-axioms ;; P-int1
+           (term (int 5))
+           (term 5))
+  (test--> e-axioms ;; P-int2
+           (term (int (arr 5)))
            (term (bar)))
   ;; Floating
   (test-->> e-axioms ;; Seq
@@ -692,6 +706,35 @@
                  (= fac (rec f (=> n (if (>> n 0) (** n (@ f (++ n -1))) 1))))
                  (@ fac 3))))
              (term 6))
+  (test-->>E p-axioms
+             (term
+              (def r (heap even-odd) ; even odd)
+                (seq
+                 (= even-odd
+                    (rec f
+                      (array
+                       (=> n (if (= n 0) ;; function even
+                                 0       ;; 0 indicates even
+                                 (@ (@ f 1) (++ n -1)) ;; call odd
+                                 ))
+                       (=> n (if (= n 0) ;; function odd
+                                 1       ;; 1 indicates odd
+                                 (@ (@ f 0) (++ n -1)) ;; call even
+                                 ))
+                       ))
+                    )
+; Too slow
+;                 (= even (@ even-odd 0))
+;                 (= odd (@ even-odd 1))
+;                 (array (@ even 0) (@ odd 1) (@ even 2))
+                 (@ (@ even-odd 0) 2)
+                 ))
+              )
+             ;(term (arr 0 1 0))
+             (term 0)
+             )
+                             
+                                       
   )
 
 (module+ test
