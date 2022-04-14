@@ -189,7 +189,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     &&\vb & |if e then e_1 else e_2| \vb |for e in e|  \\
     &&\vb & |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e|  \\
+    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e| \vb |rec f e|  \\
     \text{Primops} & op  & ::= & cop \vb |apply | \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
@@ -288,6 +288,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Lambda and application} \\
     \begin{array}{rcll}
     \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
+    \rulename{app-rec} & |apply^(rec f e_1, e_2)| & \movesto & |apply^(e_1^[f subst rec f e_1], e_2)| \\
     \rulename{app-arr} & |apply^((v_0,dots,v_k,dots,v_n), k)| & \movesto &
     \begin{array}[t]{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\

@@ -28,6 +28,7 @@
 %format add = "\textbf{add}"
 %format semi = "\textbf{seq}"
 %format gt = "\textbf{gt}"
+%format rec = "\textbf{rec}"
 %format dots = ".."
 %format hnf = "\hnf"
 %format emp = "\epsilon"
