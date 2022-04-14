@@ -186,7 +186,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |if e then e_1 else e_2| \vb |for e in e|  \\
+    &&\vb & |if e_1 then e_2 else e_3| \vb |for e_1 in e_2|  \\
     &&\vb & |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e| \vb |rec f e|  \\
@@ -253,7 +253,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}{l}
     \textit{Substitution} \\
     \begin{array}{lrcl}
-    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e^[x subst v])| \\
+    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |def H^[x:=v] in e^[x subst v]| \\
                   &&& \text{if $x \in \freevars{e}$} \\[2mm]
     \end{array} \\
     \textit{Choice} \\
@@ -600,7 +600,7 @@ by a simple preprocessing step, that introduces a variable |x| in the innermost
 |def| that encloses all its uses.
 \simon{It's hard to say more until we say more about Source Verse.}
 
-In the arms of a choice |e_1 choice e_2)| we add a |def h in e_1| around |e_1| if
+In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| if
 |e_1| introduces any new variables; and similarly |e_2|.
 \simon{This was a nice little simplification.}
 
