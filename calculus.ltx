@@ -244,13 +244,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \caption{The Verse calculus: syntax} \label{fig:verse-syntax}
 \end{figurebox}
 
-\lennart{The double bar in 'he' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
+\lennart{The bar in 'e' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
 \simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 \lennart{You could mention in the text that it is associative.}
-
-\lennart{Rule subst needs a side condition that x is in fvs(e), otherwise it's applicable over and over (found by Redex).}
-
-\lennart{I don't see a rule that does fail propagation.}
 
 \begin{figurebox}
   $$
@@ -408,20 +404,25 @@ The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| construct
 We discuss |for| in \Cref{sec:for}.
 
 \paragraph{Unification and sequencing.}
-Unification |unify^(e_1,e_2)| and sequencing |semi^(e_1,e_2)| are two other primitive operations.
-We often allow ourselves to write them with infix shorthand, |(e_1 == e_2)| and |(e_1; e_2)| respectively.
+Unification and sequencing are part of the expressions language.
+They are written |(e_1 == e_2)| and |(e_1; e_2)| respectively.
+Both of these operators are associative.
 
 \paragraph{Lambda and application.}  Lambda abstractions are written |(x => e)|, and are applied
 with the primitive operation |apply(e_1,e_2)|.
 
+\paragraph{Recursion}
+Recursion is encoded as a special fixpoint operator |rec f e|, with the meaning that |rec f e == fix (f => e)|.
+
 \paragraph{Choice.}
 In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
 zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
-of |e_2|.
+of |e_2|.  The choice operator is associative.
 
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
-The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, or a lambda |(x => e)|.
+The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
+or a recursive definition |rec f e|.
 
 \subsection{\Hexp{}s and heaps}
 
@@ -449,6 +450,8 @@ Here are some example heaps, with an indication of whether they are well formed:
   |(x:=(1,x))|   & Not OK: recursive \\
   |(x:=(y1,y2), y1, y2:=4)| & OK \\
   |(x:=add^(1,2))| & Syntactically invalid; only values are allowed \\
+  |(f:= n => f(n)| & Not OK: recursive \\
+  |(f:= rec g (n => g(n))| & OK \\
   \hline
 \end{tabular}
 \end{center}
@@ -466,7 +469,7 @@ Here are some example heaps, with an indication of whether they are well formed:
    \item The side condition $x \in \freevars{e}$ is present solely to avoid \rulename{subst} being
      \emph{always} applicable, albeit vacuously.
    \end{itemize}
-\item Rule \rulename{do-def}. To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
+\item Rule \rulename{def-elim}. To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
   allow a \hexp{} to return an unbound logical variable.
@@ -476,12 +479,12 @@ Here are some example heaps, with an indication of whether they are well formed:
 
 \subsection{Unification}
 
-Rules \rulename{uvar}-\rulename{ucon} do conventional unification, decomposing
+Rules \rulename{uvar}-\rulename{ucon}-\rulename{utup} do conventional unification, decomposing
 tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
 |(3==3) + 7| reduces to |10|.
 
 In rule \rulename{ucon} there are two uses of ``$=$'', but they are different!  The ``|k_1 == k_2|''
-on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)|. In contrast
+on the LHS is part of the syntax of Verse. In contrast
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
@@ -510,7 +513,7 @@ Nor does $X$ look inside choices.  For example,
 |def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
 
 Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
-First, rule \rulename{swap} swaps |(hnf=x)| to |(hnf=v)|, which directly fits rule \rulename{bind}.
+First, rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)|, which directly fits rule \rulename{bind}.
 We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
 using |hnf| rather than |v| in this rule.
 
@@ -536,18 +539,17 @@ To get the order right, we must apply \rulename{choose} to the first choice |(3 
 then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{choose} to ensure that only the
 \emph{leftmost} choice can be chosen.
 
-Rule \rulename{fail} collapes an entire |def| to |none| if we encounter |fail|.  It uses the |X| evaluation
+Rule \rulename{fail} collapes an expression with a nexted |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
 $$
 |def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y)|
 $$
 can fail immediately; we don't need to perform the choices for |x| and |y| first, because they will all fail.
-The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |none| by \rulename{fail};
-we do not need rules
-like $|fail plus e| \movesto |fail|$.
+The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |fail| by \rulename{fail};
+we do not need rules like $|fail plus e| \movesto |fail|$.
 
 But note that $X$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
-to |none| by \rulename{fail}.
+to |fail| by \rulename{fail}.
 
 \subsection{Functions and application}
 
@@ -557,6 +559,9 @@ Notice that |apply| is one of the primitive functions in $cop$.
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
 in \rulename{app-arr} to index it.
 
+A recursive definition gets unrolled one step when it is used in the function position of |apply| by rule \rulename{app-rec}.
+If the body of the recursive definition is a function then reduction will eventually proceed.
+
 \subsection{Conditionals}
 
 In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
@@ -564,14 +569,14 @@ it tests whether its condition succeeds (i.e. returns one or more values) or fai
 For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
 the |if| returns |e_1|, otherwise it returns |e_2|.
 
-Comparision operators succed or fail, rather than returning a Boolean
+Comparision operators succeed or fail, rather than returning a Boolean
 (as in most languages). For example |(x>3)| suceeds if |x| is greater
 than 3, returning |x|; and fails if not.
 
 It is very important that in a conditional |(if (x=3) then ...)| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
 |x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
-does not look inside the condition of an |if| (look at the syntax of context |X| used in that rule.
+does not look inside the condition of an |if| (look at the syntax of context |X| used in that rule).
 
 \subsection{The Equality Principle}
 
@@ -586,6 +591,8 @@ For example suppose |misBehaves = t => def{x} in x|, so that (if we are not care
 a fresh, unbound logical variable.  Now |(misBehaves() = 3)| and |(misBehaves() = 4)| will both succeed (be inhabited),
 but 3 is not equal to 4.  So this wouldn't satisfy the EP.
 
+Another way of putting this is that |=| behaves as an equivalence relation in Verse.
+
 \subsection{Source Verse}
 
 In the Verse source language we do not write explicit |def|s. Instead, they are added
@@ -593,7 +600,7 @@ by a simple preprocessing step, that introduces a variable |x| in the innermost
 |def| that encloses all its uses.
 \simon{It's hard to say more until we say more about Source Verse.}
 
-In the arms of a choice |e_1 choice e_2)| we add a |do (def h in e_1)| around |e_1| if
+In the arms of a choice |e_1 choice e_2)| we add a |def h in e_1| around |e_1| if
 |e_1| introduces any new variables; and similarly |e_2|.
 \simon{This was a nice little simplification.}
 
@@ -602,42 +609,42 @@ In the arms of a choice |e_1 choice e_2)| we add a |do (def h in e_1)| around |e
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in x==3; y==add^(x,1)|} \\
-    \rulename{B1} & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
-    \rulename{p-seq} & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
+    \rulename{seq}   & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1)| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4| \\
-    \rulename{B1} & \movesto & |def (x:=3,y:=4) in 4| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y:=4) in 4| \\
     \end{array}$$
 \end{example}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); x==3; y|} \\
-    \rulename{B1} & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1); 3; y| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4; 3; y| \\
-    \rulename{B1} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
+    \rulename{bind} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
     \rulename{p-seq}(twice) & \movesto & |def (x:=3,y:=4) in y| \\
     \rulename{subst} & \movesto & |def (x:=3,y:=4) in 4|
     \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
-  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{B1}
-  in the \emph{second} argument of |semi|, which gives a value to |x| in the heap.
+  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{bind}
+  in the \emph{second} argument of sequencing, which gives a value to |x| in the heap.
   That allows the |add| to proceed.  So ``later'' instructions can unblock ``earlier'' ones.
 \end{example}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); ((x==3) choice (x==77))|} \\
-    \rulename{choose} & \movesto & |(def (x,y) in y==add^(x,1); x==3) hchoice| \\
+    \rulename{choose} & \movesto & |(def (x,y) in y==add^(x,1); x==3) choice| \\
     & & |(def (x,y) in y==add^(x,1); x==77)| \\
-    \rulename{B1} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) hchoice| \\
+    \rulename{bind} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) choice| \\
     & & |(def (x:=77,y) in y==add^(x,1); 77)| \\
-    \rulename{subst} (twice) & \movesto & |(def (x:=3,y) in y==add^(3,1); 3) hchoice| \\
+    \rulename{subst} (twice) & \movesto & |(def (x:=3,y) in y==add^(3,1); 3) choice| \\
     & & |(def (x:=77,y) in y==add^(77,1); 77)| \\
-    \rulename{p-add} (twice) & \movesto & |(def (x:=3,y) in y==4; 3) hchoice (def (x:=77,y) in y==78; 77)| \\
-    \rulename{B1}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) hchoice (def (x:=77,y:=78) in 78; 77)| \\
-    \rulename{p-seq}(twice) & \movesto & |(def (x:=3,y:=4) in 3) hchoice (def (x:=77,y:=78) in 77)| \\
+    \rulename{p-add} (twice) & \movesto & |(def (x:=3,y) in y==4; 3) choice (def (x:=77,y) in y==78; 77)| \\
+    \rulename{bind}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) choice (def (x:=77,y:=78) in 78; 77)| \\
+    \rulename{seq}(twice) & \movesto & |(def (x:=3,y:=4) in 3) choice (def (x:=77,y:=78) in 77)| \\
     \end{array}$$
   As before, the unification |y==add^(x,1)| is stuck until we get a value for |x|.
   But this time we get two different values for |x| in the two branches of the choice.
