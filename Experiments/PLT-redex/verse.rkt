@@ -733,8 +733,14 @@
              ;(term (arr 0 1 0))
              (term 0)
              )
-                             
-                                       
+  (test-->>E p-axioms
+            (term
+             (def r (heap adder inc)
+               (seq
+                (= adder (=> n (=> k (++ n k))))
+                (= inc (@ adder 1))
+                (array (@ inc 2) (@ inc 42)))))
+            (term (arr 3 43)))         
   )
 
 (module+ test
