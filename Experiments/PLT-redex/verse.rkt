@@ -856,6 +856,10 @@
         (let ((x (car xs)))
           (cons x (apply-reduction-relation-trace-one (cadr x)))))))
 
+(define (red e)
+  (cons (list "START" e)
+        (apply-reduction-relation-trace-one e)))
+
 (module+ test
   (covered-cases e-axioms-coverage)
   (test-results)
