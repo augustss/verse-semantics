@@ -1,5 +1,6 @@
 #lang racket
 (require redex)
+; (check-redundancy #t)
 
 (define-language verse
   (p ::= e)
@@ -12,6 +13,7 @@
      (if e e e)
      (for e e)
      (def q h e)  ;; See comment for binding forms.
+     wrong
      )
   (op ::= cop apply)
   (cop ::= gt add mul int)
@@ -103,9 +105,9 @@
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (v_2 e_2 ...))
         (xarray (h ...) (e_1 ...) (v_1 ... v_2) (e_2 ...)))
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (e_2 e_3 ...))
-        (xarray (h ... t) (e_1 ... (= t e_2)) (v_1 ... t) (e_3 ...))
+        (xarray (h ... a) (e_1 ... (= a e_2)) (v_1 ... a) (e_3 ...))
         (side-condition (not (redex-match verse v (term e_2))))
-        (fresh t))
+        (fresh a))
    ))
 (define (anf-array a)
   (let ((b (car (apply-reduction-relation anf-array-red a))))
@@ -170,6 +172,7 @@
   [(fvs-e (def q h e)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-h h))
    (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
+  [(fvs-e wrong) ()]
   )
 (define-metafunction verse
   fvs-h : h -> (x ...)
@@ -279,162 +282,157 @@
    verse+E
    #:domain e
    ;; Substitution
-   (==> (def q (in-hole H (:= x v)) e)
+   (--> (def q (in-hole H (:= x v)) e)
         (def q (in-hole H (:= x v)) (substitute e x v))
         (side-condition (member (term x) (term (fvs-e e))))
         "Subst")
    ;; Choice
-   (==> (bar e_1 ... (bar e_2 ...) e_3 ...)
+   (--> (bar e_1 ... (bar e_2 ...) e_3 ...)
         (bar e_1 ... e_2 ... e_3 ...)
         "Bar-assoc")
-;   (==> (bar e)
+;   (--> (bar e)
 ;        e
 ;        "Bar-sing")
-   (==> (in-hole X (bar))
+   (--> (in-hole X (bar))
         (bar)
         (side-condition (not (equal? (term X) (term hole))))
         "Fail")
-   (==> (in-hole CX (bar e ...))
+   (--> (in-hole CX (bar e ...))
         (bar (in-hole CX e) ...)
         (side-condition (not (equal? (term CX) (term hole))))
         "Choose")
    ;; Primitive operations
-   (==> (add (arr k_1 k_2))
+   (--> (add (arr k_1 k_2))
         (plus k_1 k_2)
         "P-add")
-   (==> (mul (arr k_1 k_2))
+   (--> (mul (arr k_1 k_2))
         (times k_1 k_2)
         "P-mul")
-   (==> (gt (arr k_1 k_2))
+   (--> (gt (arr k_1 k_2))
         k_1
         (side-condition (> (term k_1) (term k_2)))
         "P-gt1")
-   (==> (gt (arr k_1 k_2))
+   (--> (gt (arr k_1 k_2))
         (bar)
         (side-condition (not (> (term k_1) (term k_2))))
         "P-gt2")
-   (==> (int k)
+   (--> (int k)
         k
         "P-int1")
-   (==> (int v)
+   (--> (int v)
         (bar)
         (side-condition (not (redex-match? verse k (term v))))
         "P-int2")
    ;; Sequencing
-   (==> (seq v ... e)
+   (--> (seq v ... e)
         e
         "Seq")
-   (==> (op (seq e_1 e_2))
+   (--> (op (seq e_1 e_2))
         (seq e_1 (op e_2))
         "Op-seq")
-   (==> (= (seq e_1 e_2) e_3)
+   (--> (= (seq e_1 e_2) e_3)
         (seq e_1 (= e_2 e_3))
         "Unify-seql")
-   (==> (= v_1 (seq e_2 e_3))
+   (--> (= v_1 (seq e_2 e_3))
         (seq e_2 (= v_1 e_3))
         "Unify-seqr")
    ;; Lambda and applications
-   (==> (apply (arr (=> x e_1) e_2))
+   (--> (apply (arr (=> x e_1) e_2))
         (def r t (seq (= t e_2) (substitute e_1 x t)))
         (fresh t)
         "App-lam")
-   (==> (apply (arr (rec x e_1) e_2))
+   (--> (apply (arr (rec x e_1) e_2))
         (apply (arr (substitute e_1 x (rec x e_1)) e_2))
         (fresh t)
         "App-rec")
-   (==> (apply (arr (arr v ...) k))
+   (--> (apply (arr (arr v ...) k))
         (nth (v ...) k)
         (side-condition (and (>= (term k) 0) (< (term k) (length (term (v ...))))))
         "App-arr1")
-   (==> (apply (arr (arr v ...) k))
+   (--> (apply (arr (arr v ...) k))
         (bar)
         (side-condition (not (and (>= (term k) 0) (< (term k) (length (term (v ...)))))))
         "App-arr2")
 
    ;; Conditionals
    ;; If-true2 only needed when the 'if' does not have a 'def'
-   (==> (if (bar) e_1 e_2)
+   (--> (if (bar) e_1 e_2)
         e_2
         "If-false")
-   (==> (if (in-hole L (def i h v)) e_1 e_2)
+   (--> (if (in-hole L (def i h v)) e_1 e_2)
         (def r h e_1)
         "If-true1")
-   (==> (if (in-hole L v) e_1 e_2) ;; missing def
+   (--> (if (in-hole L v) e_1 e_2) ;; missing def
         e_1
         "If-true2")
    ;; For-loops
    ;; For2 only needed when the 'for' does not have a 'def'
    ;; For3 only needed when the 'for' does not have a 'bar'
    ;; For4 only needed when the 'for' does not have a 'bar' nor 'def'
-   (==> (for (bar (def i h v) ...) e)
+   (--> (for (bar (def i h v) ...) e)
         (def r (heap t ...) (seq (= t (def r h e)) ... (arr t ...)))
         (fresh ((t ...) (v ...)))
         "For1")
-   (==> (for (bar v ...) e) ;; missing def
+   (--> (for (bar v ...) e) ;; missing def
         (def r (heap t ...) (seq (= t e) ... (arr t ...)))
         (fresh ((t ...) (v ...)))
         "For2")
-   (==> (for (def i h v) e)
+   (--> (for (def i h v) e)
         (def r (heap t) (seq (= t (def r h e)) (arr t)))
         (fresh t)
         "For3")
-   (==> (for v e)
+   (--> (for v e)
         (def r (heap t) (seq (= t e) (arr t)))
         (fresh t)
         "For4")
    ;; Def blocks
-   (==> (in-hole X (def q h e))
+   (--> (in-hole X (def q h e))
         (in-hole X e)
         (side-condition (not (equal? (term X) (term hole))))
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
         "Def-elim")
-;   (==> (def r e)
+;   (--> (def r e)
 ;        e
 ;        (side-condition (not (equal? (term X) (term hole))))
 ;        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
 ;        "Do-def")
    ;; Unification
-   (==> (def q (in-hole H x) (in-hole X (= x v)))
+   (--> (def q (in-hole H x) (in-hole X (= x v)))
         (def q (in-hole H (:= x v)) (in-hole X v))
         (side-condition (disjoint (term (fvs-v v)) (term (vvs (in-hole H (:= x v))))))
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
-   (==> (def q (in-hole H x) (in-hole X (= x v)))
+   (--> (def q (in-hole H x) (in-hole X (= x v)))
         (def q (in-hole H (heap x y)) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
         (fresh y)
         "Promote")
-;   (==> (def q (in-hole H x) (in-hole X (= v x)))
+;   (--> (def q (in-hole H x) (in-hole X (= v x)))
 ;        (def q (in-hole H x) (in-hole X (= x v)))
 ;        (side-condition (not (member (term v) (term (vvs (in-hole H x))))))
 ;        (side-condition (not (member (term v) (term (bvs-X X)))))
 ;        (side-condition (not (redex-match? verse x (term v))))
 ;        "Swap")
-   (==> (= v x)
+   (--> (= v x)
         (= x v)
         (side-condition (not (redex-match? verse x (term v))))
         "Swap")
-   (==> (= x_1 x_1)
+   (--> (= x_1 x_1)
         x_1
         "Uvar")
-   (==> (= k_1 k_1)
+   (--> (= k_1 k_1)
         k_1
         "Ucon")
-   (==> (= (arr v_1 ...) (arr v_2 ...))
+   (--> (= (arr v_1 ...) (arr v_2 ...))
         (seq (= v_1 v_2) ... (arr v_1 ...))
         (side-condition (equal? (length (term (v_1 ...))) (length (term (v_2 ...)))))
         "Utup")
-   (==> (= hnf_1 hnf_2)
+   (--> (= hnf_1 hnf_2)
         (bar)
         (side-condition (not (equal? (term (head hnf_1)) (term (head hnf_2)))))
-        "UX")
-  
-  with
-  [(--> a b)
-   ;; WAS (--> (in-hole XE-E a) (in-hole XE-E b))
-   (==> a b)]
+        "UX")  
   ))
 
 (define-metafunction verse
@@ -469,6 +467,68 @@
   (define e-axioms-coverage (make-coverage e-axioms))
   (relation-coverage (list e-axioms-coverage))
   )
+
+(define (bad-num? v)
+  (not (or (redex-match? verse k v) (redex-match? verse x v))))
+
+;; Axioms covering WRONG
+(define w-axioms
+  (reduction-relation
+   verse+E
+   #:domain e
+   ;; Ill-typed expressions that generate WRONG
+   (--> (add (arr v_1 v_2))
+        wrong
+        (side-condition (or (bad-num? (term v_1)) (bad-num? (term v_2))))
+        "P-add-wrong")
+   (--> (mul (arr v_1 v_2))
+        wrong
+        (side-condition (or (bad-num? (term v_1)) (bad-num? (term v_2))))
+        "P-mul-wrong")
+   (--> (gt (arr v_1 v_2))
+        wrong
+        (side-condition (or (bad-num? (term v_1)) (bad-num? (term v_2))))
+        "P-gt-wrong")
+   (--> (apply (arr k e))
+        wrong
+        "App-wrong")
+; Propagation of WRONG conflicts with propagation of FAIL
+;   ;; Propagation of WRONG
+;   (--> (arr v_1 ... wrong v_2 ...)
+;        wrong
+;        "Arr-wrong")
+;   (--> (op wrong)
+;        wrong
+;        "Op-wrong")
+;   (--> (= wrong e)
+;        wrong
+;        "UnifyL-wrong")
+;   (--> (= e wrong)
+;        wrong
+;        "UnifyR-wrong")
+;   (--> (bar wrong e ...)  ;; XXX wrong anywhere?
+;        wrong
+;        "Choice-wrong")
+;   (--> (seq e_1 ... wrong e_2 ...) ;; This will conflict with fail!
+;        wrong
+;        "Seq-wrong")
+;   (--> (def h wrong)
+;        wrong
+;        "Def-wrong")
+   ;; FAIL propagation happens in an X context.
+   ;; if/for are not part of X, so they can propagate
+   (--> (if wrong e_1 e_2)
+        wrong
+        "If-wrong")
+   (--> (for wrong e)
+        wrong
+        "For-wrong")
+  )
+)
+
+;; Is there a wrong in a position that needs reduction?
+(define (wrong-expr? e)
+  (redex-match? verse+E (in-hole E wrong) e))
 
 (define (alpha? a b) (alpha-equivalent? verse a b))
 (define (atest--> l a b) (test--> l #:equiv alpha? a b))
@@ -615,11 +675,11 @@
 ;  (reduction-relation
 ;   verse+E
 ;   #:domain he
-;   (==> (apply (array (array e_1 ...) e_2))
+;   (--> (apply (array (array e_1 ...) e_2))
 ;        (do (def i (seq (= i e_2) (= i (alts (count (e_1 ...)))) (index (array (array e_1 ...) i)))))
 ;        (fresh i)
 ;        "App-arr")
-;   (==> (index (array (array e ...) k))
+;   (--> (index (array (array e ...) k))
 ;        (nth (e ...) k)
 ;        (side-condition (and (>= (term k)) (< (term k) (length (term (e ...))))))
 ;        "Idx")
@@ -652,7 +712,7 @@
    
 
 (define e-axioms*
-  (context-closure e-axioms verse+E E))
+  (context-closure (union-reduction-relations e-axioms w-axioms) verse+E E))
 
 (define p-axioms
   (union-reduction-relations e-axioms* top-def))
@@ -742,6 +802,51 @@
                 (array (@ inc 2) (@ inc 42)))))
             (term (arr 3 43)))         
   )
+
+(module+ test
+  (test--> w-axioms ;; P-add-wrong-1
+           (term (++ (arr) 1))
+           (term wrong))
+  (test--> w-axioms ;; P-add-wrong-2
+           (term (++ 1 (arr)))
+           (term wrong))
+  (test--> w-axioms ;; P-mul-wrong-1
+           (term (** (arr) 1))
+           (term wrong))
+  (test--> w-axioms ;; P-mul-wrong-2
+           (term (** 1 (arr)))
+           (term wrong))
+  (test--> w-axioms ;; P-gt-wrong-1
+           (term (>> (arr) 1))
+           (term wrong))
+  (test--> w-axioms ;; P-gt-wrong-2
+           (term (++ 1 (arr)))
+           (term wrong))
+  (test--> w-axioms ;; App-wrong
+           (term (@ 1 2))
+           (term wrong))
+  (test--> w-axioms
+           (term (if wrong 1 2))
+           (term wrong))
+  (test--> w-axioms
+           (term (for wrong 1))
+           (term wrong))
+;  (test--> w-axioms ;; Arr-wrong
+;           (term (arr 1 2 wrong 3))
+;           (term wrong))
+;  (test--> w-axioms ;; Op-wrong
+;           (term (add wrong))
+;           (term wrong))
+;  (test--> w-axioms ;; UnifyL-wrong
+;           (term (= wrong 2))
+;           (term wrong))
+;  (test--> w-axioms ;; UnifyR-wrong
+;           (term (= 2 wrong))
+;           (term wrong))
+  (test-->> p-axioms
+            (term (if (@ (++ 1 2) 3) 4 5))
+            (term wrong))
+)
 
 (module+ test
   (covered-cases e-axioms-coverage)
