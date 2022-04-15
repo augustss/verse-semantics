@@ -380,6 +380,12 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \begin{figurebox}
   $$
   \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+    \end{array} \\
+    \\
+    \textbf{Axiom extension} \\
     \begin{array}{lrcll}
     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
