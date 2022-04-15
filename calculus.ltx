@@ -176,6 +176,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 % ---------------------------------
 \section{Verse}
 
+\lennart{Should if/for with choice free bodies be considered choice free?}
+
 \begin{figurebox}
   $$
   \begin{array}{l}
@@ -331,20 +333,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
         |def H^[x:=v] in X^[v]| \\
         \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
         \end{array} \\
-%    \rulename{bindr} & |def H^[x] in X^[v==x]| & \movesto
-%    & \begin{array}[t]{@@{}l}
-%       |def H^[x:=v] in X^[v]| \\
-%        \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
-%        \end{array} \\
-%    \rulename{promote} & \begin{array}[t]{@@{}l}
-%      |def H^[x] in| \\
-%      |X^[x==(v_1,dots,v_i,dots,v_n)]|
-%      \end{array} & \movesto
-%    & \begin{array}[t]{@@{}l}
-%        |def H^[x,y] in| \\ |X^[y=v_i; x==(v_1,dots,y,dots,v_n)]| \\
-%        \text{if $\neg (\freevars{v_i} \disjoint \boundvars{X})$}) \\
-%        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[(v_1,dots,v_n)]|} \\
-%      \end{array}\\
     \rulename{promote} & |def H^[x] in X^[x=v]| 
        & \movesto
     &  \begin{array}[t]{@@{}l}
@@ -387,6 +375,21 @@ The |let| construct cleverly models the heap, maintaining sharing.
    \end{array}
    $$
 \caption{The Verse calculus: unification axioms} \label{fig:unification-axioms}
+\end{figurebox}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \begin{array}{lrcll}
+    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
+    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
+    \rulename{app-wrong} & |apply^(k,e) | & \movesto & |wrong| \\
+    \rulename{if-wrong} & |if wrong then e_1 else e_2| & \movesto & |wrong| \\
+    \rulename{for-wrong} & |for wrong in e| & \movesto & |wrong| \\
+     \end{array}
+   \end{array}
+   $$
+\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
 \end{figurebox}
 
 \subsection{Expressions and values}
@@ -455,6 +458,22 @@ Here are some example heaps, with an indication of whether they are well formed:
   \hline
 \end{tabular}
 \end{center}
+
+\subsection{|wrong|}
+Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in an |apply|.
+There are no general reduction rules to propagate |wrong|, instead the reduction gets stuck.
+
+\subsection{Confluence}
+We have the following conjecture: the Verse reduction rules are confluent in the following sense.
+\begin{quote}
+  Using the reduction rules repeatedly will
+  \begin{itemize}
+  \item terminate with a term in |hnf|.  This is a successful evaluation.
+  \item terminate with a term in |X^[wrong]|.  This is an illegal program.
+  \item not terminate.
+  \end{itemize}
+  All successful evaluations will produce the same |hnf| (up to $\alpha,\beta,\eta$-equivalence?).
+\end{quote}
 
 \subsection{Notes on the rewrite rules}
 
