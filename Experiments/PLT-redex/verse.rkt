@@ -848,6 +848,14 @@
             (term wrong))
 )
 
+;; Return a list of one reduction path tagged with rule names.
+(define (apply-reduction-relation-trace-one e)
+  (let ((xs (apply-reduction-relation/tag-with-names p-axioms e)))
+    (if (null? xs)
+        xs
+        (let ((x (car xs)))
+          (cons x (apply-reduction-relation-trace-one (cadr x)))))))
+
 (module+ test
   (covered-cases e-axioms-coverage)
   (test-results)
