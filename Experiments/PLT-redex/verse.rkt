@@ -16,7 +16,7 @@
      wrong
      )
   (op ::= cop apply)
-  (cop ::= gt add mul int)
+  (cop ::= gt add sub mul int)
   (hnf ::=
        k
        (arr v ...)
@@ -64,6 +64,10 @@
 (define-metafunction verse
   ++ : e e -> e
   [(++ e_1 e_2) (add (array e_1 e_2))]
+  )
+(define-metafunction verse
+  -- : e e -> e
+  [(-- e_1 e_2) (sub (array e_1 e_2))]
   )
 (define-metafunction verse
   ** : e e -> e
@@ -305,6 +309,9 @@
    (--> (add (arr k_1 k_2))
         (plus k_1 k_2)
         "P-add")
+   (--> (sub (arr k_1 k_2))
+        (minus k_1 k_2)
+        "P-sub")
    (--> (mul (arr k_1 k_2))
         (times k_1 k_2)
         "P-mul")
@@ -438,6 +445,10 @@
 (define-metafunction verse
   plus : k k -> k
   [(plus k_1 k_2) ,(+ (term k_1) (term k_2))])
+
+(define-metafunction verse
+  minus : k k -> k
+  [(minus k_1 k_2) ,(- (term k_1) (term k_2))])
 
 (define-metafunction verse
   times : k k -> k
@@ -715,7 +726,7 @@
   (context-closure (union-reduction-relations e-axioms w-axioms) verse+E E))
 
 (define p-axioms
-  (union-reduction-relations e-axioms* top-def))
+  (union-reduction-relations top-def e-axioms*))
 
 (module+ test
   (test-->> p-axioms
@@ -859,6 +870,11 @@
 (define (red e)
   (cons (list "START" e)
         (apply-reduction-relation-trace-one e)))
+
+(define (redout fn e)
+  (let ((out (open-output-file fn #:exists 'truncate)))
+    (print (red e) out)
+    (close-output-port out)))
 
 (module+ test
   (covered-cases e-axioms-coverage)
