@@ -676,5 +676,100 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| 
   The crucial rule \rulename{choose} duplicates the heap and the expression that surround
   the choice, allowing execution to proceed entirely independently in the two copies.
 \end{example}
-\end{document}
 
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|apply^(x => add^(x, 1), 2)|} \\
+    \rulename{app-lam} & \movesto & |def t in t == 2; add^(t, 1)| \\
+    \rulename{bind} & \movesto & |def t:=2 in 2; add^(t, 1)| \\
+    \rulename{seq} & \movesto & |def t:=2 in add^(t, 1)| \\
+    \rulename{subst} & \movesto & |def t:=2 in add^(2, 1)| \\
+    \rulename{p-add} & \movesto & |def t:=2 in 3| \\
+    \rulename{top-def} & \movesto & |3| \\
+  \end{array}$$
+\end{example}
+A simple $\beta$-reduction.
+Note that the name $x$ has been $alpha$-converted to a fresh variable $t$ to avoid accidental capture.
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def x:=3 in if gt^(x, 2) then add^(x, 1) else 0|} \\
+    \rulename{subst} & \movesto & |def x:=3 in if gt^(3, 2) then add^(3, 1) else 0| \\
+    \rulename{p-gt} & \movesto & |def x:=3 in if 3 then add^(3, 1) else 0| \\
+    \rulename{if-true} & \movesto & |def x:=3 in add^(3, 1)| \\
+    \rulename{p-add} & \movesto & |def x:=3 in 4| \\
+    \rulename{top-def} & \movesto & |4| \\
+  \end{array}$$
+\end{example}
+
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def fcn in fcn == (rec f F); apply^(fcn, 2)|} \\
+    \rulename{bind} & \movesto & |def fcn:=rec f F in rec f F; apply^(fcn, 2)| \\
+    \rulename{seq} & \movesto & |def fcn:=rec f F in apply^(fcn, 2)| \\
+    \rulename{subst} & \movesto & |def fcn:=rec f F in apply^(rec f F, 2)| \\
+    \rulename{top-def} & \movesto & |apply^(rec f F, 2)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 2)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 2; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=2 in 2; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=2 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=2 in if 2 == 0 then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 2 == 0 then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if fail then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{if-false} & \movesto & |apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{p-sub} & \movesto & |apply^(def a in a == 1; (rec f F, a))| \\
+    \rulename{bind} & \movesto & |apply^(def a:=1 in 1; (rec f F, a))| \\
+    \rulename{seq} & \movesto & |apply^(def a:=1 in (rec f F, a))| \\
+    \rulename{subst} & \movesto & |apply^(def a:=1 in (rec f F, 1))| \\
+    \rulename{def-elim} & \movesto & |apply^(rec f F, 1)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 1)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 1; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=1 in 1; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=1 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=1 in if 1 == 0 then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 1 == 0 then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if fail then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{if-false} & \movesto & |apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{p-sub} & \movesto & |apply^(def a in a == 0; (rec f F, a))| \\
+    \rulename{bind} & \movesto & |apply^(def a:=0 in 0; (rec f F, a))| \\
+    \rulename{seq} & \movesto & |apply^(def a:=0 in (rec f F, a))| \\
+    \rulename{subst} & \movesto & |apply^(def a:=0 in (rec f F, 0))| \\
+    \rulename{def-elim} & \movesto & |apply^(rec f F, 0)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 0)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 0; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=0 in 0; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=0 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=0 in if 0 == 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 0 == 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{if-true} & \movesto & |0| \\
+  \end{array}$$
+\end{example}
+To save space we have used the abbreviation |F| for the expression \newline
+|(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (f, a))))|.
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|for def x in x == (1 choice  2) in add^(x, 1)|} \\
+    \rulename{choose} & \movesto & |for def x in x == 1 choice  x == 2 in add^(x, 1)| \\
+    \rulename{choose} & \movesto & |for (def x in x == 1) choice  (def x in x == 2) in add^(x, 1)| \\
+    \rulename{bind} & \movesto & |for (def x:=1 in 1) choice  (def x in x == 2) in add^(x, 1)| \\
+    \rulename{bind} & \movesto & |for (def x:=1 in 1) choice  (def x:=2 in 2) in add^(x, 1)| \\
+    \rulename{for} & \movesto & |def t1, t2 in t1 == (def x:=1 in add^(x, 1)); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1, t2 in t1 == (def x:=1 in add^(1, 1)); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{def-elim} & \movesto & |def t1, t2 in t1 == add^(1, 1); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{p-add} & \movesto & |def t1, t2 in t1 == 2; t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{bind} & \movesto & |def t1:=2, t2 in 2; t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2 in 2; t2 == (def x:=2 in add^(2, 1)); (t1, t2)| \\
+    \rulename{def-elim} & \movesto & |def t1:=2, t2 in 2; t2 == add^(2, 1); (t1, t2)| \\
+    \rulename{p-add} & \movesto & |def t1:=2, t2 in 2; t2 == 3; (t1, t2)| \\
+    \rulename{bind} & \movesto & |def t1:=2, t2:=3 in 2; 3; (t1, t2)| \\
+    \rulename{seq} & \movesto & |def t1:=2, t2:=3 in (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2:=3 in (t1, 3)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2:=3 in (2, 3)| \\
+    \rulename{top-def} & \movesto & |(2, 3)| \\
+  \end{array}$$
+\end{example}
+
+\end{document}
