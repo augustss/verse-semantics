@@ -23,6 +23,8 @@
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
 %format apply = "\textbf{apply}"
+% only used in comments, but still prettier this way:
+%format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
 %format semi = "\textbf{seq}"
