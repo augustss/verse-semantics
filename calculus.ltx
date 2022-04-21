@@ -426,6 +426,7 @@ with the primitive operation |apply(e_1,e_2)|.
 \paragraph{Recursion}
 Recursion is encoded as a special fixpoint operator |rec f e|, with the meaning that |rec f e == fix (f => e)|.
 \joachim{Out of curiosity: Why this? Could we use |fix v| instead, with |apply(fix v, e)| $\movesto$ |apply(apply(v,fix v), e)|? Or could we even make |fix| a primitive operation, with |fix(v)| $\movesto$ |apply(v, fix v)|? (I guess the latter isn't good because we want |fix f| to be a value)}
+\lennart{No deep reason.  I thought this looked nicer.}
 
 \paragraph{Choice.}
 In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
@@ -472,9 +473,13 @@ Here are some example heaps, with an indication of whether they are well formed:
 \subsection{|wrong|}
 Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in an |apply|.
 There are no general reduction rules to propagate |wrong|, instead the reduction gets stuck.
-\joachim{I’m a bit confused, there are a few incomplete rules to propagate wrong in \ref{fig:wrong-axioms}. In particular, I’d be curious about |fail; wrong|. But also about |if v choice wrong|. }
+\joachim{I'm a bit confused, there are a few incomplete rules to propagate wrong in \ref{fig:wrong-axioms}. In particular, I'd be curious about |fail; wrong|. But also about |if v choice wrong|. }
+\lennart{We need to think more about |wrong|.  You can make case for |fail; wrong| being |fail|.
+  Consider |int[x]; x+1|, if the type test fails we don't care about |x+1|.}
+\lennart{We can remove the axioms that propagate |wrong| at all.  I just put those two in, because they don't interfere with |fail|.}
 
 \joachim{Also, due to \rulename{fail}, we have |wrong; fail| $\movesto$ |fail|, that does not look right. Probably |e;X| should not be an execution context.}
+\lennart{No, |e;X| must be an execution context.  Consider |def x in x+1; x = 2|, we must do the |x = 2| before we can do |x+1|.}
 
 \subsection{Confluence}
 We have the following conjecture: the Verse reduction rules are confluent in the following sense.
@@ -499,7 +504,8 @@ unique redex for the next reduction.
 Instead we settle for an evaluation context that is ambiguous and allows many different redexes, figure \ref{fig:verse-eval}.
 It allows evaluation almost everywhere, with exception of under a $\lambda$, branches of an |if|, and body of a |for|.
 The reason to disallow these is that we do not know if they are needed.
-\joachim{The same applies to the second expression in $e_1; e_2$, doesn’t it? Oh, and |e_1 choice e_2|, becuase in an |if| context the second may not be needed.}
+\joachim{The same applies to the second expression in $e_1; e_2$, doesn't it? Oh, and |e_1 choice e_2|, becuase in an |if| context the second may not be needed.}
+\lennart{Yes, there are several ways where some paths terminate, and others don't.  I don't know what to do about it.}
 
 \begin{figurebox}
   $$
@@ -534,7 +540,9 @@ Can it be made safe by a better treatment of |e choice E|?
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
   allow a \hexp{} to return an unbound logical variable.
-  \joachim{I am worried about the side condition $|X| \not= \hole$. We say the rules can be applied anywhere, so this side conditions means this rule applies anywhere that’s nested at least one level. But then we have non-confluence: |for (1; def (x:=2) in 3) x| can reduce to |for (def (x:=2) in 3) x| $\movesto$ |def (x:=2) x| $\movesto$ |def (x:=2) 2| $\movesto$ |2|, or it can move to |for (1; 3) x| which is pretty bogus already. Maybe |def| should not be allowed in that position in the first place? Then we should maybe clarify that? (A different production $de$ that allows |def|, choice and defless-expressions that only appears in |if|, |for| and the top-level? But then we couldn’t use |def| on the RHS of rules easily… hmm)}
+  \joachim{I am worried about the side condition $|X| \not= \hole$. We say the rules can be applied anywhere, so this side conditions means this rule applies anywhere that's nested at least one level. But then we have non-confluence: |for (1; def (x:=2) in 3) x| can reduce to |for (def (x:=2) in 3) x| $\movesto$ |def (x:=2) x| $\movesto$ |def (x:=2) 2| $\movesto$ |2|, or it can move to |for (1; 3) x| which is pretty bogus already. Maybe |def| should not be allowed in that position in the first place? Then we should maybe clarify that? (A different production $de$ that allows |def|, choice and defless-expressions that only appears in |if|, |for| and the top-level? But then we couldn't use |def| on the RHS of rules easily ... hmm)}
+  \lennart{The |def|s in a program are not inserted by the programmer; they are inserted by a program transformation.
+    So we probably need to have some invariant on where they are allowed, and make sure the rules obey the invariant.}
 \item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
   in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
 \end{itemize}
@@ -601,7 +609,7 @@ To get the order right, we must apply \rulename{choose} to the first choice |(3 
 then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{choose} to ensure that only the
 \emph{leftmost} choice can be chosen.
 
-%\joachim{I did not initially manage to understand why |apply v; hole| is not a choice context, i.e. why we need |cop| and |op|. I also tried to combine the two in Redex, in case a failing test would enlighten me, but none did. Can someone add an example? … Ah, maybe the crucial property of a choice-free expression is that it is guaranteed to \emph{evaluate} to at most a single value (It still allows to evaluate to |fail|). Ok, makes sense now. I’l leave this note here and add an example later.}
+%\joachim{I did not initially manage to understand why |apply v; hole| is not a choice context, i.e. why we need |cop| and |op|. I also tried to combine the two in Redex, in case a failing test would enlighten me, but none did. Can someone add an example? Ah, maybe the crucial property of a choice-free expression is that it is guaranteed to \emph{evaluate} to at most a single value (It still allows to evaluate to |fail|). Ok, makes sense now. I'll leave this note here and add an example later.}
 
 Rule \rulename{fail} collapes an expression with a nexted |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
