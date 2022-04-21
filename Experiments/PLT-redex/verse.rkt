@@ -407,7 +407,7 @@
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
    (--> (def q (in-hole H x) (in-hole X (= x v)))
-        (def q (in-hole H (x y)) (in-hole X (seq (= x_1 y) (= x (substitute v z y)))))
+        (def q (in-hole H (x y)) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
@@ -657,7 +657,7 @@
            '())
   (atest--> e-axioms
            (term (def r a (def r b (= a (arr 1 b)))))
-           (term (def r (a y) (def r b (seq (= b y) (= a (arr 1 b)))))))
+           (term (def r (a y) (def r b (seq (= b y) (= a (arr 1 y)))))))
 ;  (test--> e-axioms ;; Swap
 ;           (term (def r (a) (= 5 a)))
 ;           (term (def r (a) (= a 5))))
