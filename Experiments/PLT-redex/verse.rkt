@@ -41,7 +41,7 @@
   ;; The binding forms require non-overlapping patterns
   ;; (according to Robby Findler).
   ;; The def construct binds differently in an if/for and otherwise.
-  ;; To accound for the (def r ...) is used for regular defs
+  ;; To account for this (def r ...) is used for regular defs
   ;; and (def i ...) for defs in an if/for.
   ;; Most rules just match with (def q ...) and work for both,
   ;; but the binding forms distinguish the two.
@@ -81,11 +81,6 @@
   @ : e e -> e
   [(@ e_1 e_2) (apply (array e_1 e_2))]
   )
-;(define-metafunction verse
-;  seq : e ... -> e
-;  [(seq e ...) (semi (array e ...))]
-;  )
-
 
 ;; Arrays are in ANF form, the array metafunction
 ;; does this conversion.
@@ -130,13 +125,14 @@
   [(subtract (x_1 ...) (x_2 x_3 ...))
    (subtract (x_1 ...) (x_3 ...))])
 
+; Bound variables from a leading def.
 (define-metafunction verse
   bvs-e : e -> (x ...)
   [(bvs-e (def i h e)) (bvs-h h)]
   [(bvs-e e) ()]
   )
 
-; Variables that are bound in a heap
+; Variables that are bound in a heap.
 (define-metafunction verse
   bvs-h : h -> (x ...)
   [(bvs-h x) (x)]
@@ -145,6 +141,7 @@
    (x ... ...)
    (where ((x ...) ...) ((bvs-h h) ...))]
   )
+
 ; Variables that have values (i.e., that are set) in the heap.
 (define-metafunction verse
   vvs : h -> (x ...)
@@ -155,6 +152,7 @@
    (where ((x ...) ...) ((vvs h) ...))]
   )
 
+; Free variables in e.
 (define-metafunction verse
   fvs-e : e -> (x ...)
   [(fvs-e v) (fvs-v v)]
@@ -178,6 +176,7 @@
    (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
   [(fvs-e wrong) ()]
   )
+; Free variables in h
 (define-metafunction verse
   fvs-h : h -> (x ...)
   [(fvs-h x) ()]
@@ -185,7 +184,7 @@
   [(fvs-h (h ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-h h) ...))]
   )
-   
+  ; Free variables in v 
 (define-metafunction verse
   fvs-v : v -> (x ...)
   [(fvs-v x) (x)]
@@ -262,6 +261,7 @@
         )  
   )
 
+; Bound variables in an X.
 (define-metafunction verse+E
   bvs-X : X -> (x ...)
   [(bvs-X hole) ()]
@@ -331,6 +331,8 @@
         (side-condition (not (redex-match? verse k (term v))))
         "P-int2")
    ;; Sequencing
+   ;; TODO: This rule could be more generous and remove all vs the sequence.
+   ;; It shouldn'e make any difference, but would give smaller terms.
    (--> (seq v ... e)
         e
         "Seq")
@@ -398,11 +400,6 @@
         (side-condition (not (equal? (term X) (term hole))))
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
         "Def-elim")
-;   (--> (def r e)
-;        e
-;        (side-condition (not (equal? (term X) (term hole))))
-;        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
-;        "Do-def")
    ;; Unification
    (--> (def q (in-hole H x) (in-hole X (= x v)))
         (def q (in-hole H (:= x v)) (in-hole X v))
@@ -422,9 +419,9 @@
 ;        (side-condition (not (member (term v) (term (bvs-X X)))))
 ;        (side-condition (not (redex-match? verse x (term v))))
 ;        "Swap")
-   (--> (= v x)
-        (= x v)
-        (side-condition (not (redex-match? verse x (term v))))
+   ;; This SWAP rule is more generous than the one in the paper.
+   (--> (= hnf x)
+        (= x hnf)
         "Swap")
    (--> (= x_1 x_1)
         x_1
@@ -459,11 +456,18 @@
   [(nth (e ...) k) ,(list-ref (term (e ...)) (term k))]
   )
 
+;; Take a hnf and turn it into a new hnf that can be used
+;; to tell different kinds of hnfs apart.  This used for the fail
+;; case in unification.
+;; Mapping:
+;;  k -> k
+;;  (arr ...) -> (arr length-of-array)
+;;  (=> ...) -> (=> a 0)
 (define-metafunction verse
   head : hnf -> hnf
   [(head k) k]
   [(head (arr v ...)) (arr ,(length (term (v ...))))]
-  [(head (=> x he)) (=> a 0)]
+  [(head (=> x e)) (=> a 0)]
   )
 
 (define-metafunction verse
