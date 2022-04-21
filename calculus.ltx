@@ -481,6 +481,31 @@ We have the following conjecture: the Verse reduction rules are confluent in the
   All successful evaluations will produce the same |hnf| (up to $\alpha,\beta,\eta$-equivalence?).
 \end{quote}
 
+\subsection{Evaluation strategy}
+The axioms given in figures \ref{fig:general-axioms}, \ref{fig:unification-axioms}, and \ref{fig:wrong-axioms}
+can be used anywhere in a program.
+This is similar to how the axioms for the $\lambda$-calculus in figure \ref{fig:call-by-name} can be applied anywhere.
+In figure \ref{fig:call-by-name} we introduces an evaluation context |E| to force a particular evaluation order.
+
+We would like to have a similar |E| for Verse, but it seems difficult to find one that always identifies a
+unique redex for the next reduction.
+Instead we settle for an evaluation context that is ambiguous and allows many different redexes, figure \ref{fig:verse-eval}.
+It allows evaluation almost everywhere, with exception of under a $\lambda$, branches of an |if|, and body of a |for|.
+The reason to disallow these is that we do not know if they are needed.
+
+\begin{figurebox}
+  $$
+    \begin{array}{lrcl}
+      \text{Evaluation context} &
+         E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
+      && \vb & |op^(E)| \vb |def h in E | \\
+      && \vb & |if E then e else e| \vb |for E in e| \\
+    \end{array}
+  $$
+\caption{The Verse calculus: evaluation} \label{fig:verse-eval}
+\end{figurebox}
+
+
 \subsection{Notes on the rewrite rules}
 
 \begin{itemize}
