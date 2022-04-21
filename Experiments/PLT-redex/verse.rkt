@@ -232,11 +232,11 @@
      (op X)
      (def q h X)
      )
-  (CX ::= ;; JB: Shouldn't this be ce in most places here?
+  (CX ::=
       hole
       (= CX e)
-      (= e CX)
-      (seq e ... CX e ...)
+      (= ce CX)
+      (seq ce ... CX e ...)
       (op CX)
       (def q h CX)
       )
