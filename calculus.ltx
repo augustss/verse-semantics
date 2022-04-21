@@ -30,6 +30,9 @@
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
 
+\newcommand{\hexp}{h-expression}
+\newcommand{\Hexp}{H-expression}
+
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\simon}[1]{{\color{red} [{SPJ}: #1]}}
@@ -61,7 +64,7 @@
     \end{array} \\
     \\
     \textbf{Axioms}  \\
-    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto e_1[x:=e_2] \\
+    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |e_1^[x subst e_2]| \\
     \rulename{delta}\qquad k_1 \oplus k_2 \movesto k_1 + k_2 \\
    \end{array}
    $$
@@ -74,7 +77,7 @@ Key points:
 \item \emph{Expressions.} We give the syntax of \emph{expressions} in BNF.
 \item \emph{Axioms.} There is just one axiom, \rulename{beta}.
 You can apply an axiom anywhere in an expression, in either direction but typically left-to-right.
-\item \emph{Substitution.} The notation $e_2[x:=e_1]$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
+\item \emph{Substitution.} The notation $|e_2[x subst e_1]|$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
   each occurrence of $x$ in $e_1$ with $e_2$.
 \item \emph{Evaluation contexts}.  An evaluation context $E$ is an expression with a single ``hole'' in it,
   denoted $\hole$. The notation $E[e]$ means the evaluation context $E$ with its hole filled with $e$.
@@ -116,14 +119,14 @@ has been reduced to a constant $k$.
       \text{Expressions} & e  & ::=  & k \vb x \vb e_1 \; e_2 \vb \lambda x. e
             \vb  e_1 \oplus e_2 \vb |let x = e_1 in e_2| \\
       \text{Values} & v & ::= & k \vb x \vb \lambda x.e  \\
-      \text{Evaluation contexts} & E & ::= & \hole \vb E\; e \vb E \oplus e \vb k \oplus E
-           \vb |let x=E in E[x]|
+      \text{Evaluation contexts} & E & ::= & \hole \vb E\; e \vb E \oplus e \vb k \oplus E \\
+      && \vb & |let x=e in E| \vb |let x=E in E^[x]|
     \end{array} \\
     \\
     \textbf{Axioms}  \\
     \begin{array}{lrcl}
     \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
-    \rulename{let-v} & |let x = v in e| & \movesto & e[x:=v] \\
+    \rulename{let-v} & |let x = v in e| & \movesto & |e^[x subst v]| \\
     \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)|\quad
         \text{if $y \not\in \freevars{e_2}$} \\
     \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
@@ -173,6 +176,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 % ---------------------------------
 \section{Verse}
 
+\lennart{Should if/for with choice free bodies be considered choice free?}
+
 \begin{figurebox}
   $$
   \begin{array}{l}
@@ -181,29 +186,28 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & e \\
-    \text{Expressions} & e,r,s  & ::=  & x \vb k \vb |(e_1, dots, e_n)| \vb |x => e| \vb |op^(e)| \\
-    &&\vb & |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |if e then e_1 else e_2| \vb |for e in e|  \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)|
+     \vb |e_1 choice e_2| \vb |fail| \\
+    &&\vb & |if e_1 then e_2 else e_3| \vb |for e_1 in e_2|  \\
     &&\vb & |def h in e| \\
-    \text{Primops} & op  & ::= & cop \vb |apply | \\
-    \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \vb |semi| \vb |unify| \\
-    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e|  \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Choice-free exprs} & ce  & ::=  & x \vb k \vb |(ce_1, dots, ce_n)| \vb |x => e| \vb cop(ce) \\
+    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e| \vb |rec f e|  \\
+    \text{Primops} & op  & ::= & cop \vb |apply | \\
+    \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \vb |x:=v| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
-    \text{Execution contexts} & X & ::= & \hole \vb |(e_1,dots,X,dots,e_n)| \vb |op^(X)| \vb |def h in X | \\
-    \text{Choice contexts} & CX & ::= & \hole \vb |(ce_1,dots,ce_m,CX,e_1,dots,e_n)| \vb |op^(CX)| \\
-    &&\vb & |def h in CX| \\
+ \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    && \vb & |op^(X)| \vb |def h in X | \\
+ \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
+    &&\vb & |op^(CX)| \vb |def h in CX| \\
     \text{Left choice context} & L & ::= & \hole \vb |L choice e| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      |e_1 ; e_2| & \text{means} & |semi^( e_1, e_2 )| \\
-      |e_1 == e_2| & \text{means} & |unify^( e_1, e_2 )| \\
       e_1 \oplus e_2 & \text{means} & |add^( e_1, e_2 )| \\
       |e_1^(e_2)| & \text{means} & |apply^( e_1, e_2 )| \\
      \end{array} \\
@@ -224,12 +228,17 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \end{array}
    \\ \\
   \textbf{Bound variables $\boundvars{X}$ of a context} \\
-  \begin{array}{rcl}
+  \begin{array}[t]{rcl}
     \boundvars{ \hole } & = & \emptyset \\
     \boundvars{ |def h in X| } & = & \boundvars{h} \cup \boundvars{X} \\
     \boundvars{ |op^(X)| } & = & \boundvars{X} \\
-    \boundvars{ |(e_1, dots, X, dots, e_n)|} & = & \boundvars{X} \\
-  \end{array}\\
+  \end{array}\qquad
+  \begin{array}[t]{rcl}
+    \boundvars{ |X==e| } & = & \boundvars{X} \\
+    \boundvars{ |e==X| } & = & \boundvars{X} \\
+    \boundvars{ |X;e| } & = & \boundvars{X} \\
+    \boundvars{ |e;X| } & = & \boundvars{X}
+  \end{array}
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
   \end{array}
@@ -237,55 +246,60 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \caption{The Verse calculus: syntax} \label{fig:verse-syntax}
 \end{figurebox}
 
-\lennart{The double bar in 'he' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
+\lennart{The bar in 'e' is binary, but in 'for' you use it in an n-ary way.  You'll have to do something about associativity for this to work.  In PLT-redex I'm making it n-ary.  I'm also making heap construction n-ary.}
 \simon{Yes, it's a little sloppy.  I'm not sure it matters for the paper.}
 \lennart{You could mention in the text that it is associative.}
-
-\lennart{I don't see a rule that does fail propagation.}\simon{Are you still puzzled?}
 
 \begin{figurebox}
   $$
   \begin{array}{l}
+    \textit{Substitution} \\
     \begin{array}{lrcl}
-    \multicolumn{4}{l}{\textit{Substitution}} \\
-    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |(def H^[x:=v] in e|[x:=v]|)| \\
+    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |def H^[x:=v] in e^[x subst v]| \\
                   &&& \text{if $x \in \freevars{e}$} \\[2mm]
-    \multicolumn{4}{l}{\textit{Choice}} \\
-    \rulename{none-l} & |fail choice e| & \movesto & e \\
-    \rulename{none-r} & |e choice fail| & \movesto & e \\
-    \rulename{fail} & |X^[fail]| & \movesto & |fail| \\
-    \rulename{choose} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]|
+    \end{array} \\
+    \textit{Choice} \\
+    \begin{array}{lrcll}
+    \rulename{fail-l} & |fail choice e| & \movesto & e \\
+    \rulename{fail-r} & |e choice fail| & \movesto & e \\
+    \rulename{fail} & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \not= \hole \\
+    \rulename{choose} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| & \text{if}~|CX| \not= \hole
     \end{array} \\
     \\
+    \textit{Primitive operations} \\
     \begin{array}{lrcl}
-    \multicolumn{4}{l}{\textit{Primitive operations}} \\
-    \rulename{p-seq} & |v ; e| & \movesto & |e| \\
     \rulename{p-add} & |add^(k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{p-gt} & |gt^(k_1,k_2)| & \movesto &
     \begin{array}[t]{@@{}ll}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array} \\[2mm]
-    \multicolumn{4}{l}{\textit{Floating}} \\
-    \rulename{float-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
-    \rulename{float-arr} & |(v_1, dots, e, e_1, dots)| & \movesto
-    & \begin{array}[t]{@@{}l}
-          |def x in x == e ; (v_1, dots, x, e_1, dots)| \\
-          \text{if |e| is not a value}
-      \end{array}
     \end{array} \\
+    \textit{Sequencing} \\
+    \begin{array}{lrcl}
+    \rulename{seq} & |v ; e| & \movesto & |e| \\
+    \rulename{op-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
+    \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+    \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+    \end{array} \\
+    \\[-2mm]
+    \textit{Lambda and application} \\
     \begin{array}{rcll}
-    \multicolumn{4}{l}{\textit{Lambda and application}} \\
     \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
+    \rulename{app-rec} & |apply^(rec f e_1, e_2)| & \movesto & |apply^(e_1^[f subst rec f e_1], e_2)| \\
     \rulename{app-arr} & |apply^((v_0,dots,v_k,dots,v_n), k)| & \movesto &
     \begin{array}[t]{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\
            |fail| & \text{otherwise}
            \end{array}\\[4mm]
-    \multicolumn{4}{l}{\textit{Conditionals}} \\
-    \rulename{if-false} & |if none then e_1 else e_2| & \movesto & e_2 \\
+    \end{array} \\
+    \textit{Conditionals} \\
+    \begin{array}{rcll}
+    \rulename{if-false} & |if fail then e_1 else e_2| & \movesto & e_2 \\
     \rulename{if-true} & |if L^[def h in v] then e_1 else e_2| & \movesto & |def h in e_1| \\[2mm]
-    \multicolumn{4}{l}{\textit{For-loops}} \\
+    \end{array} \\
+    \textit{For-loops} \\
+    \begin{array}{rcll}
     \rulename{for} & \begin{array}[t]{@@{}l}
       |for| \begin{array}[t]{l}
         |(def h_1 in v_1)| \\
@@ -295,13 +309,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |in e|
     \end{array} & \movesto &
     \begin{array}[t]{@@{}l}
-      |(def h_1 in e| \\
-      | , dots ,| \\
-      |def h_n in e)|
+      |def x_1,dots x_n in| \\
+      |(x_1= def h_1 in e);  dots (x_n= def h_n in e);| \\
+      |(x_1,dots,x_n)|
     \end{array} \\
-    \multicolumn{4}{l}{\textit{Do-blocks}} \\
-    \rulename{def-elim} & |def h in e| & \movesto & e \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$} \\
-
+    \end{array} \\
+    \\[-2mm]
+    \textit{Def-blocks} \\
+    \begin{array}{rcll}
+    \rulename{def-elim} & |X^[def h in e]| & \movesto & |X^[e]| \qquad \text{if $|X| \not= \hole$ and $\freevars{e} \disjoint \boundvars{h}$} \\
     \end{array}
    \end{array}
    $$
@@ -312,45 +328,74 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcl}
-    \rulename{b-val} & |def H^[x] in X^[x==v]| & \movesto
+    \rulename{bind} & |def H^[x] in X^[x==v]| & \movesto
     & \begin{array}[t]{@@{}l}
         |def H^[x:=v] in X^[v]| \\
-        \text{if $x,\valvars{H[x]} \disjoint \freevars{v}$}
+        \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
         \end{array} \\
-    \rulename{b-val-r} & |def H^[x] in X^[v==x]| & \movesto
-    & \begin{array}[t]{@@{}l}
-        |def H^[x:=v] in X^[v]| \\
-        \text{if $x,\valvars{H[x]} \disjoint \freevars{v}$}
-        \end{array} \\
-    \rulename{b-swap} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
-    \rulename{b-tuple} & |def H^[x] in X^[x==(e_1,dots,e_n)]| & \movesto
-    & \begin{array}[t]{@@{}l}
-          |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
-          |in X^[(x_1==e_1,dots,x_n==e_n)]]| \\
-          \text{if}\; x_i \not\in \freevars{|H^[x]|,|X^[(e_1,dots,e_n)]|} \\
-          \text{and}\; x_i \not\in \boundvars{X}
-        \end{array} 
+    \rulename{promote} & |def H^[x] in X^[x=v]| 
+       & \movesto
+    &  \begin{array}[t]{@@{}l}
+        |def H^[x,y] in X^[x==v^[z subst y]; z==y]| \\
+        \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
+        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
+      \end{array}\\
+    \rulename{swap} & |def H^[x] in X^[hnf==x]| & \movesto &
+    \begin{array}[t]{@@{}l}
+       |def H^[x] in X^[x==hnf]| \\
+%       \text{unless $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
+%       \text{if $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
+       \end{array}\\
+
+%    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
+%    & \begin{array}[t]{@@{}l}
+%          |def H^[x_1,dots,x_n,x:=(x_1,dots,x_n)]| \\
+%          |in X^[(x_1==e_1,dots,x_n==e_n)]]| \\
+%          \text{if}\; x_i \not\in \freevars{|H^[x]|,|X^[(e_1,dots,e_n)]|} \\
+%          \text{and}\; x_i \not\in \boundvars{X}
+%        \end{array} 
     \end{array} \\ \\[-2mm]
     \begin{array}{lrcl}
     \rulename{uvar} & |x == x| & \movesto & |x| \\
-    \rulename{uconst} & |k_1 == k_2| & \movesto
+    \rulename{ucon} & |k_1 == k_2| & \movesto
     & \begin{array}[t]{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
       \end{array} \\
-    \rulename{U3} & |k == (e_1,dots,e_n) | & \movesto & |fail| \\
-    \rulename{U4} & |(e_1,dots,e_n) == k | & \movesto & |fail| \\
-    \rulename{U5} & |(x => e) == hnf| & \movesto & |fail| \\
-    \rulename{U6} & |hnf == (x => e)| & \movesto & |fail| \\
-    \rulename{U7} & |(e_1,dots,e_m) == (e1',dots,e_n')| & \movesto
+    \rulename{utup} & |(v_1,dots,v_m) == (v1',dots,v_n')| & \movesto
     & \begin{array}[t]{@@{}ll}
-        |(e_1==e1',dots,e_n=e_n')| & \text{if $m=n$} \\
+        |v_1==v1';dots;v_m=v_m'; (v_1,dots,v_m)| & \text{if $m=n$} \\
         |fail| & \text{otherwise}
-      \end{array}
+      \end{array}\\
+    \rulename{ux1} & |k == (v_1,dots,v_n) | & \movesto & |fail| \\
+    \rulename{ux2} & |(v_1,dots,v_n) == k | & \movesto & |fail| \\
+    \rulename{ux3} & |(x => e) == hnf| & \movesto & |fail| \\
+    \rulename{ux4} & |hnf == (x => e)| & \movesto & |fail|
      \end{array}
    \end{array}
    $$
 \caption{The Verse calculus: unification axioms} \label{fig:unification-axioms}
+\end{figurebox}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+    \end{array} \\
+    \\
+    \textbf{Axiom extension} \\
+    \begin{array}{lrcll}
+    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
+    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
+    \rulename{app-wrong} & |apply^(k,v) | & \movesto & |wrong| \\
+    \rulename{if-wrong} & |if wrong then e_1 else e_2| & \movesto & |wrong| \\
+    \rulename{for-wrong} & |for wrong in e| & \movesto & |wrong| \\
+     \end{array}
+   \end{array}
+   $$
+\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
 \end{figurebox}
 
 \subsection{Expressions and values}
@@ -368,29 +413,33 @@ The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| construct
 We discuss |for| in \Cref{sec:for}.
 
 \paragraph{Unification and sequencing.}
-Unification |unify^(e_1,e_2)| and sequencing |semi^(e_1,e_2)| are two other primitive operations.
-We often allow ourselves to write them with infix shorthand, |(e_1 == e_2)| and |(e_1; e_2)| respectively.
+Unification and sequencing are part of the expressions language.
+They are written |(e_1 == e_2)| and |(e_1; e_2)| respectively.
+Both of these operators are associative.
 
 \paragraph{Lambda and application.}  Lambda abstractions are written |(x => e)|, and are applied
 with the primitive operation |apply(e_1,e_2)|.
 
+\paragraph{Recursion}
+Recursion is encoded as a special fixpoint operator |rec f e|, with the meaning that |rec f e == fix (f => e)|.
+
 \paragraph{Choice.}
 In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
 zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
-of |e_2|.
+of |e_2|.  The choice operator is associative.
 
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
-The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, or a lambda |(x => e)|.
+The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
+or a recursive definition |rec f e|.
 
-\subsection{Heaps}
+\subsection{\Hexp{}s and heaps}
 
-An expression can take the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
-\Cref{fig:verse-syntax}.  A heap is just a collection of zero or more \emph{bindings}, each of
-which take one of two forms:
+A \hexp{} has the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
+\Cref{fig:verse-syntax}.  A heap is just a collection of \emph{bindings}, which take one of two forms:
 \begin{itemize}
-\item A binding |x| simply \emph{introduces} the variable |x|, without giving it a value.
-\item A binding |x:=v| \emph{binds} the variable |x| to the value |v|.
+\item A binding |x| simply introduces the variable |x|, without giving it a value.
+\item A binding |x:=v| binds the variable |x| to the value |v|.
 \end{itemize}
 These heaps play the role of |let| expressions in the call by need lambda calculus (\Cref{sec:call-by-need}).
 
@@ -410,9 +459,27 @@ Here are some example heaps, with an indication of whether they are well formed:
   |(x:=(1,x))|   & Not OK: recursive \\
   |(x:=(y1,y2), y1, y2:=4)| & OK \\
   |(x:=add^(1,2))| & Syntactically invalid; only values are allowed \\
+  |(f:= n => f(n)| & Not OK: recursive \\
+  |(f:= rec g (n => g(n))| & OK \\
   \hline
 \end{tabular}
 \end{center}
+
+\subsection{|wrong|}
+Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in an |apply|.
+There are no general reduction rules to propagate |wrong|, instead the reduction gets stuck.
+
+\subsection{Confluence}
+We have the following conjecture: the Verse reduction rules are confluent in the following sense.
+\begin{quote}
+  Using the reduction rules repeatedly will
+  \begin{itemize}
+  \item terminate with a term in |hnf|.  This is a successful evaluation.
+  \item terminate with a term in |X^[wrong]|.  This is an illegal program.
+  \item not terminate.
+  \end{itemize}
+  All successful evaluations will produce the same |hnf| (up to $\alpha,\beta,\eta$-equivalence?).
+\end{quote}
 
 \subsection{Notes on the rewrite rules}
 
@@ -420,44 +487,70 @@ Here are some example heaps, with an indication of whether they are well formed:
 \item \emph{Substitution, rule \rulename{subst}.}
   \begin{itemize}
     \item \rulename{subst} does not discard the heap binding, because it may be needed,
-      in \rulename{if-true} and \rulename{for}.  We could instead use a rule that substitutes
+      in \rulename{if-true} and \rulename{for}.  We could also use a rule that substitutes
      in just one place (a la Ariola)
    \item The heap always binds a variable to a \emph{value}, and values can freely
      be duplicated without duplicating work, so \rulename{subst} does not duplicate work.
    \item The side condition $x \in \freevars{e}$ is present solely to avoid \rulename{subst} being
      \emph{always} applicable, albeit vacuously.
    \end{itemize}
-\item \emph{Rule \rulename{def-elim}.} To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
+\item Rule \rulename{def-elim}. To achieve $\freevars{e} \disjoint \boundvars{h}$, use \rulename{subst}
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
-  allow an expression to return an unbound logical variable.
+  allow a \hexp{} to return an unbound logical variable.
+\item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
+  in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
 \end{itemize}
-\simon{What if the heap bound a variable to an \emph{expression}, like
-in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.}
 
 \subsection{Unification}
 
-Rules \rulename{uvar}\ldots \rulename{uconst} do conventional unification, decomposing
+Rules \rulename{uvar}-\rulename{ucon}-\rulename{utup} do conventional unification, decomposing
 tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
 |(3==3) + 7| reduces to |10|.
 
-In rule \rulename{uconst} there are two uses of ``$=$'', but they are different!  The ``|k_1 == k_2|''
-on the LHS is part of the syntax of Verse, and is shorthand for |unify^(v_1,v_2)|. In contrast
+In rule \rulename{ucon} there are two uses of ``$=$'', but they are different!  The ``|k_1 == k_2|''
+on the LHS is part of the syntax of Verse. In contrast
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
-Rules \rulename{b-val}\ldots \rulename{b-tuple} come into play when variables are involved. For example
-\rulename{b-val} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
+Rules \rulename{bind}, \rulename{promote}, and \rulename{swap} come into play when variables are involved.
+First, \rulename{bind} says that when |x| is in scope, \emph{and does not already have a value in the heap} (hence |H^[x]| not |H^[x := v]|),
 we may unify |x| with a value |v|, and replace the unbound |x| in the heap with the bound |x := v|, thus |H^[x:=v]|.
-
-Crucially, in rule \rulename{b-val}, note that $X$ does not look inside |if|, |for|, or choice.
-For example |def (x) in (if(x==3) then e_1 else e_2)| does
-not unify |x| via \rulename{b-val}; only variables bound by the \emph{innermost enclosing |def|} can be unified.
-Nor does $X$ look inside choices.  For example,
-|def (x) in (x==2 choice x==3)| does not unify |x| via \rulename{b-val}.
-
-Rules \rulename{b-val} and \rulename{b-val-r} includes an ``occurs check'', which ensures we never
+The side conditions ensure
+\begin{itemize}
+    \item $\freevars{v} \disjoint \boundvars{X}$ ensures that |v| does not mention a variable
+      bound by the context |X|; if the rule fired, the right hand side would be ill-scoped.
+    \item $\freevars{v} \disjoint \{x\}$ ensures that |v| does not mention |x| itself -- the ``occurs check''.
+    \item $\freevars{v} \disjoint \valvars{|H^[x]|}$ ensures that we have fully applied rule \rulename{subst};
+      without this there might be a hidden occurs-check error.  For example in this case:
+      $$ |def (x, y:=x) in (x=y)| $$
+      we must not fire rule \rulename{bind}.
+\end{itemize}
+Together, the latter two side conditions ensure that we never
 get cycles in the heap.
+
+Crucially, note that $X$ does not look inside |if|, |for|, or choice (|choice|).
+For example
+$$ |def x in (if(x==3) then e_1 else e_2)| $$
+does
+not unify |x| via \rulename{bind}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
+Nor does $X$ look inside choices.  For example,
+|def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
+
+Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
+First, rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)|, which directly fits rule \rulename{bind}.
+We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
+using |hnf| rather than |v| in this rule.
+
+\rulename{promote} is subtle, and deals with a case like
+    $$ |def x in dots(def z in dots(x==(3,z))dots)dots| $$
+We can't use \rulename{bind} directly, because it would be ill-scoped to add |x:=(3,z)|
+to the outermost |def|. Instead we invent a fresh variable |y| (bound as a sibling to |x|),
+substitute it for |z| in |v|, and unify it with |z|, thus
+    $$ |def x,y in dots(def z in dots(x==(3,y); z=y)dots)dots| $$
+Now  \rulename{bind} can bind bind |x| to |(3,y)|:
+    $$ |def x:=(3,y),y in dots(def z in dots(z=y)dots)dots| $$
+and all is well.
 
 \subsection{Choice and failure}
 
@@ -471,18 +564,17 @@ To get the order right, we must apply \rulename{choose} to the first choice |(3 
 then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{choose} to ensure that only the
 \emph{leftmost} choice can be chosen.
 
-Rule \rulename{fail} collapes an entire |def| to |none| if we encounter |fail|.  It uses the |X| evaluation
+Rule \rulename{fail} collapes an expression with a nexted |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
 $$
 |def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y)|
 $$
 can fail immediately; we don't need to perform the choices for |x| and |y| first, because they will all fail.
-The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |none| by \rulename{fail};
-we do not need rules
-like $|fail plus e| \movesto |fail|$.
+The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |fail| by \rulename{fail};
+we do not need rules like $|fail plus e| \movesto |fail|$.
 
 But note that $X$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
-to |none| by \rulename{fail}.
+to |fail| by \rulename{fail}.
 
 \subsection{Functions and application}
 
@@ -492,59 +584,192 @@ Notice that |apply| is one of the primitive functions in $cop$.
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
 in \rulename{app-arr} to index it.
 
+A recursive definition gets unrolled one step when it is used in the function position of |apply| by rule \rulename{app-rec}.
+If the body of the recursive definition is a function then reduction will eventually proceed.
+
+\subsection{Conditionals}
+
+In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
+it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values).
+For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
+the |if| returns |e_1|, otherwise it returns |e_2|.
+
+Comparision operators succeed or fail, rather than returning a Boolean
+(as in most languages). For example |(x>3)| suceeds if |x| is greater
+than 3, returning |x|; and fails if not.
+
+It is very important that in a conditional |(if (x=3) then ...)| we
+treat |x| as ``rigid'': the conditional is intended to \emph{test}
+|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
+does not look inside the condition of an |if| (look at the syntax of context |X| used in that rule).
+
+\subsection{The Equality Principle}
+
+Verse cleaves to the following principle.
+
+\begin{quote}
+\textbf{The Equality Principle (EP)}.
+For any choice-free, side-effect-free expression |e|, and values |v_1| and |v_2|,
+if |(e = v_1)| is inhabited, and |(e = v_2)| is inhabited, then |v_1|=|v_2|.
+\end{quote}
+For example suppose |misBehaves = t => def{x} in x|, so that (if we are not careful) the call |misBehaves()| returns
+a fresh, unbound logical variable.  Now |(misBehaves() = 3)| and |(misBehaves() = 4)| will both succeed (be inhabited),
+but 3 is not equal to 4.  So this wouldn't satisfy the EP.
+
+Another way of putting this is that |=| behaves as an equivalence relation in Verse.
 
 \subsection{Source Verse}
 
 In the Verse source language we do not write explicit |def|s. Instead, they are added
-by a simple preprocessing step, that introduces a |def| at each scope-limiting construct
-in which new variables come into scope.  The scope-limiting constructs are: |if|, |for|, and choice |(choice)|.
+by a simple preprocessing step, that introduces a variable |x| in the innermost
+|def| that encloses all its uses.
+\simon{It's hard to say more until we say more about Source Verse.}
+
+In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| if
+|e_1| introduces any new variables; and similarly |e_2|.
+\simon{This was a nice little simplification.}
 
 \subsection{Examples}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in x==3; y==add^(x,1)|} \\
-    \rulename{b-val} & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
-    \rulename{p-seq} & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
+    \rulename{seq}   & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1)| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4| \\
-    \rulename{b-val} & \movesto & |def (x:=3,y:=4) in 4| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y:=4) in 4| \\
     \end{array}$$
 \end{example}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); x==3; y|} \\
-    \rulename{b-val} & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
+    \rulename{bind}  & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
     \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1); 3; y| \\
     \rulename{p-add} & \movesto & |def (x:=3,y) in y==4; 3; y| \\
-    \rulename{b-val} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
+    \rulename{bind} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
     \rulename{p-seq}(twice) & \movesto & |def (x:=3,y:=4) in y| \\
     \rulename{subst} & \movesto & |def (x:=3,y:=4) in 4|
     \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
-  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{b-val}
-  in the \emph{second} argument of |semi|, which gives a value to |x| in the heap.
+  |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{bind}
+  in the \emph{second} argument of sequencing, which gives a value to |x| in the heap.
   That allows the |add| to proceed.  So ``later'' instructions can unblock ``earlier'' ones.
 \end{example}
 
 \begin{example}
   $$\begin{array}{rcl}
     \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); ((x==3) choice (x==77))|} \\
-    \rulename{choose} & \movesto & |(def (x,y) in y==add^(x,1); x==3) hchoice| \\
+    \rulename{choose} & \movesto & |(def (x,y) in y==add^(x,1); x==3) choice| \\
     & & |(def (x,y) in y==add^(x,1); x==77)| \\
-    \rulename{b-val} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) hchoice| \\
+    \rulename{bind} (twice) & \movesto & |(def (x:=3,y) in y==add^(x,1); 3) choice| \\
     & & |(def (x:=77,y) in y==add^(x,1); 77)| \\
-    \rulename{subst} (twice) & \movesto & |(def (x:=3,y) in y==add^(3,1); 3) hchoice| \\
+    \rulename{subst} (twice) & \movesto & |(def (x:=3,y) in y==add^(3,1); 3) choice| \\
     & & |(def (x:=77,y) in y==add^(77,1); 77)| \\
-    \rulename{p-add} (twice) & \movesto & |(def (x:=3,y) in y==4; 3) hchoice (def (x:=77,y) in y==78; 77)| \\
-    \rulename{b-val}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) hchoice (def (x:=77,y:=78) in 78; 77)| \\
-    \rulename{p-seq}(twice) & \movesto & |(def (x:=3,y:=4) in 3) hchoice (def (x:=77,y:=78) in 77)| \\
+    \rulename{p-add} (twice) & \movesto & |(def (x:=3,y) in y==4; 3) choice (def (x:=77,y) in y==78; 77)| \\
+    \rulename{bind}(twice) & \movesto & |(def (x:=3,y:=4) in 4; 3) choice (def (x:=77,y:=78) in 78; 77)| \\
+    \rulename{seq}(twice) & \movesto & |(def (x:=3,y:=4) in 3) choice (def (x:=77,y:=78) in 77)| \\
     \end{array}$$
   As before, the unification |y==add^(x,1)| is stuck until we get a value for |x|.
   But this time we get two different values for |x| in the two branches of the choice.
   The crucial rule \rulename{choose} duplicates the heap and the expression that surround
   the choice, allowing execution to proceed entirely independently in the two copies.
 \end{example}
-\end{document}
 
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|apply^(x => add^(x, 1), 2)|} \\
+    \rulename{app-lam} & \movesto & |def t in t == 2; add^(t, 1)| \\
+    \rulename{bind} & \movesto & |def t:=2 in 2; add^(t, 1)| \\
+    \rulename{seq} & \movesto & |def t:=2 in add^(t, 1)| \\
+    \rulename{subst} & \movesto & |def t:=2 in add^(2, 1)| \\
+    \rulename{p-add} & \movesto & |def t:=2 in 3| \\
+    \rulename{top-def} & \movesto & |3| \\
+  \end{array}$$
+\end{example}
+A simple $\beta$-reduction.
+Note that the name $x$ has been $alpha$-converted to a fresh variable $t$ to avoid accidental capture.
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def x:=3 in if gt^(x, 2) then add^(x, 1) else 0|} \\
+    \rulename{subst} & \movesto & |def x:=3 in if gt^(3, 2) then add^(3, 1) else 0| \\
+    \rulename{p-gt} & \movesto & |def x:=3 in if 3 then add^(3, 1) else 0| \\
+    \rulename{if-true} & \movesto & |def x:=3 in add^(3, 1)| \\
+    \rulename{p-add} & \movesto & |def x:=3 in 4| \\
+    \rulename{top-def} & \movesto & |4| \\
+  \end{array}$$
+\end{example}
+
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def fcn in fcn == (rec f F); apply^(fcn, 2)|} \\
+    \rulename{bind} & \movesto & |def fcn:=rec f F in rec f F; apply^(fcn, 2)| \\
+    \rulename{seq} & \movesto & |def fcn:=rec f F in apply^(fcn, 2)| \\
+    \rulename{subst} & \movesto & |def fcn:=rec f F in apply^(rec f F, 2)| \\
+    \rulename{top-def} & \movesto & |apply^(rec f F, 2)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 2)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 2; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=2 in 2; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=2 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=2 in if 2 == 0 then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 2 == 0 then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if fail then 0 else apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{if-false} & \movesto & |apply^(def a in a == sub^(2, 1); (rec f F, a))| \\
+    \rulename{p-sub} & \movesto & |apply^(def a in a == 1; (rec f F, a))| \\
+    \rulename{bind} & \movesto & |apply^(def a:=1 in 1; (rec f F, a))| \\
+    \rulename{seq} & \movesto & |apply^(def a:=1 in (rec f F, a))| \\
+    \rulename{subst} & \movesto & |apply^(def a:=1 in (rec f F, 1))| \\
+    \rulename{def-elim} & \movesto & |apply^(rec f F, 1)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 1)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 1; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=1 in 1; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=1 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=1 in if 1 == 0 then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 1 == 0 then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if fail then 0 else apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{if-false} & \movesto & |apply^(def a in a == sub^(1, 1); (rec f F, a))| \\
+    \rulename{p-sub} & \movesto & |apply^(def a in a == 0; (rec f F, a))| \\
+    \rulename{bind} & \movesto & |apply^(def a:=0 in 0; (rec f F, a))| \\
+    \rulename{seq} & \movesto & |apply^(def a:=0 in (rec f F, a))| \\
+    \rulename{subst} & \movesto & |apply^(def a:=0 in (rec f F, 0))| \\
+    \rulename{def-elim} & \movesto & |apply^(rec f F, 0)| \\
+    \rulename{app-rec} & \movesto & |apply^(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (rec f F, a))), 0)| \\
+    \rulename{app-lam} & \movesto & |def t in t == 0; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{bind} & \movesto & |def t:=0 in 0; if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{seq} & \movesto & |def t:=0 in if t == 0 then 0 else apply^(def a in a == sub^(t, 1); (rec f F, a))| \\
+    \rulename{subst} & \movesto & |def t:=0 in if 0 == 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{top-def} & \movesto & |if 0 == 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{ucon} & \movesto & |if 0 then 0 else apply^(def a in a == sub^(0, 1); (rec f F, a))| \\
+    \rulename{if-true} & \movesto & |0| \\
+  \end{array}$$
+\end{example}
+To save space we have used the abbreviation |F| for the expression \newline
+|(n => (if n == 0 then 0 else apply^(def a in a == sub^(n, 1); (f, a))))|.
+
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|for def x in x == (1 choice  2) in add^(x, 1)|} \\
+    \rulename{choose} & \movesto & |for def x in x == 1 choice  x == 2 in add^(x, 1)| \\
+    \rulename{choose} & \movesto & |for (def x in x == 1) choice  (def x in x == 2) in add^(x, 1)| \\
+    \rulename{bind} & \movesto & |for (def x:=1 in 1) choice  (def x in x == 2) in add^(x, 1)| \\
+    \rulename{bind} & \movesto & |for (def x:=1 in 1) choice  (def x:=2 in 2) in add^(x, 1)| \\
+    \rulename{for} & \movesto & |def t1, t2 in t1 == (def x:=1 in add^(x, 1)); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1, t2 in t1 == (def x:=1 in add^(1, 1)); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{def-elim} & \movesto & |def t1, t2 in t1 == add^(1, 1); t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{p-add} & \movesto & |def t1, t2 in t1 == 2; t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{bind} & \movesto & |def t1:=2, t2 in 2; t2 == (def x:=2 in add^(x, 1)); (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2 in 2; t2 == (def x:=2 in add^(2, 1)); (t1, t2)| \\
+    \rulename{def-elim} & \movesto & |def t1:=2, t2 in 2; t2 == add^(2, 1); (t1, t2)| \\
+    \rulename{p-add} & \movesto & |def t1:=2, t2 in 2; t2 == 3; (t1, t2)| \\
+    \rulename{bind} & \movesto & |def t1:=2, t2:=3 in 2; 3; (t1, t2)| \\
+    \rulename{seq} & \movesto & |def t1:=2, t2:=3 in (t1, t2)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2:=3 in (t1, 3)| \\
+    \rulename{subst} & \movesto & |def t1:=2, t2:=3 in (2, 3)| \\
+    \rulename{top-def} & \movesto & |(2, 3)| \\
+  \end{array}$$
+\end{example}
+
+\end{document}

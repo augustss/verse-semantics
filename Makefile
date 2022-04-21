@@ -2,6 +2,8 @@ LATEX=pdflatex -halt-on-error
 calculus.pdf: calculus.ltx calculus.fmt
 	lhs2TeX calculus.ltx > calculus.tex
 	$(LATEX) calculus
+	$(LATEX) calculus
+	$(LATEX) calculus
 
 verse.pdf:	verse.tex
 	$(LATEX) verse.tex

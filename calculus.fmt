@@ -27,10 +27,14 @@
 %format add = "\textbf{add}"
 %format semi = "\textbf{seq}"
 %format gt = "\textbf{gt}"
+%format rec = "\textbf{rec}"
+%format wrong = "\textbf{wrong}"
 %format dots = ".."
 %format hnf = "\hnf"
 %format emp = "\epsilon"
 %format plus = "\oplus"
+%format hole = "\hole"
+%format subst = "\!:=\!"
 %format == = "="
 %format := = "\mapsto"
 %format ^ = " "
@@ -71,11 +75,15 @@
 
 %format v_0
 %format v_1
+%format v1'
 %format v_i
 %format v_k
+%format v_m
 %format v_2
 %format v_3
 %format v_n
+%format v_n'
+%format v_m'
 
 %format he_1
 %format he_2
