@@ -10,3 +10,4 @@ verse.pdf:	verse.tex
 
 clean:
 	rm -f verse.aux verse.log verse.out verse.pdf
+	rm -f calculus.tex calculus.aux calculus.log calculus.out calculus.pdf
