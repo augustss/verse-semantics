@@ -338,7 +338,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{promote} & |def H^[x] in X^[x=v]| 
        & \movesto
     &  \begin{array}[t]{@@{}l}
-        |def H^[x,y] in X^[x==v^[z subst y]; z==y]| \\
+        |def H^[x,y] in X^[z==y; x==v^[z subst y]]| \\
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
         \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
