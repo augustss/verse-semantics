@@ -498,13 +498,16 @@ The reason to disallow these is that we do not know if they are needed.
     \begin{array}{lrcl}
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
-      && \vb & |op^(E)| \vb |def h in E | \\
+      && \vb & |op^(E)| \vb |def h in E| \vb |E choice e| \vb |e choice E| \\
       && \vb & |if E then e else e| \vb |for E in e| \\
     \end{array}
   $$
 \caption{The Verse calculus: evaluation} \label{fig:verse-eval}
 \end{figurebox}
 
+\lennart{This |E| is not satisfactory since some paths terminate and others do not, e.g. |if 1 choice loop() then ...|.
+Can it be made safe by a better treatment of |e choice E|?
+}
 
 \subsection{Notes on the rewrite rules}
 
