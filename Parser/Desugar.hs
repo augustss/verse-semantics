@@ -47,7 +47,7 @@ desugarS = expr
     exprOf (BExprs es) = Seq es
 
     call p (Ident l s) e = con (Variable (Ident l (p ++ "'" ++ s ++ "'"))) e
-      where con | s `elem` ["/"] = Index
+      where con | s `elem` ["/","=","<>","<",">","<=",">="] = Index
                 | otherwise = Call
 
 newIdent :: String -> D Ident
