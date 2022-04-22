@@ -3,13 +3,13 @@
 {- x# LANGUAGE ViewPatterns # -}
 
 module Expr(
+  Loc, noLoc,
   Ident(..),
   Expr(..),
   Block(..),
   Eff,
   Op,
   arrayS,
-  SourcePos, initialPos,
   ) where
 
 import Data.Data (Data)
@@ -21,7 +21,11 @@ import Text.Megaparsec (SourcePos, initialPos)
 
 import Error
 
-data Ident = Ident SourcePos String
+type Loc = SourcePos
+noLoc :: Loc
+noLoc = initialPos ""
+
+data Ident = Ident Loc String
   deriving (Eq, Ord{-, Show-}, Data)
 
 instance Show Ident where
@@ -166,7 +170,9 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inl "*"       9
       , inl "/"       9
       , inn "post^"  10
+      , inn "post?"  10
       , inn "pre:"   11
+      , inn "pre!"   11
       , inn "macro"  12
       , inl "()"     13
       ]

@@ -124,11 +124,11 @@ seqS es = Seq es
 pIf :: P Expr
 pIf = pKeyword "if" *> (
   (mkIf <$> pParens pExprSeq1 <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
-  <|>
+   <|>
   (If1 <$> pBlockM)
   )
   where
-    mkIf _ Nothing Nothing = syntaxError "if(e) must have a then and/or else"
+    mkIf _ Nothing Nothing = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
     mkIf e1 (Just e2) Nothing   = If2  e1 e2
     mkIf e1 Nothing   (Just e3) = If2E e1 e3
     mkIf e1 (Just e2) (Just e3) = If3  e1 e2 e3
@@ -160,8 +160,8 @@ pExpr2 = makeExprParser pExpr1 operatorTable
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
-  [ [preOp ":"],
-    [postOp "^"],
+  [ [preOp ":", preOp "!"],
+    [postOp "^", postOp "?"],
     [op InfixL "*", op InfixL "/"],
     [op InfixL "+", op InfixL "-"],
     [op InfixR "|", op InfixR "->", op InfixN ".."],
