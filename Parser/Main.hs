@@ -17,6 +17,8 @@ tryIt iob aiob ioa = do
       iob
     Right a -> aiob a
 
+-------------------
+
 main :: IO ()
 main = runCommand command
 
@@ -33,7 +35,7 @@ command = Command
       , Cmd "print [EXPR]"   "Pretty print [last] expression" cPrint
       ]
   , c_exec = cParseLine
-  , c_help = "Enter an EXPR to parse or\na command:"
+  , c_help = helpMsg
   , c_greet = "Verse parser testing."
   , c_bye = "Bye!"
   , c_prompt = "> "
@@ -63,7 +65,7 @@ withLastExpr :: (Expr -> CState -> IO CState) -> Run CState
 withLastExpr cmd line s = do
   s' <- if null line then pure s else cParseLine line s
   case lastExpr s' of
-    Nothing -> do putStrLn "No current expression"; pure s'
+    Nothing -> do putStrLn "No last expression"; pure s'
     Just e -> cmd e s'
 
 cDesugar :: Run CState
@@ -85,3 +87,16 @@ cPrint =
   withLastExpr $ \ e s -> do
     pp e
     pure s
+
+helpMsg :: String
+helpMsg = "\
+\Enter an EXPR to parse or a command.\n\
+\Many commands operate on the last printed expression.\n\
+\Try\n\
+\  > 1+2\n\
+\  > :show\n\
+\  > :desugar\n\
+\  > :show\n\
+\Commands:\
+\"
+
