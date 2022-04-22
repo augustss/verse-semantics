@@ -130,7 +130,7 @@ has been reduced to a constant $k$.
     \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
     \rulename{let-v} & |let x = v in e| & \movesto & |e^[x subst v]| \\
     \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)|\quad
-        \text{if $y \not\in \freevars{e_2}$} \\
+        \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
                      & |let y = e_y in let x = e_x in e| \\
     &&& \text{if $y \not\in \freevars{e}$} \\
@@ -287,7 +287,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\[-2mm]
     \textit{Lambda and application} \\
     \begin{array}{rcll}
-    \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)| \\
+      \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)|
+          \quad \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{app-rec} & |apply^(rec f e_1, e_2)| & \movesto & |apply^(e_1^[f subst rec f e_1], e_2)| \\
     \rulename{app-arr} & |apply^((v_0,dots,v_k,dots,v_n), k)| & \movesto &
     \begin{array}[t]{@@{}ll}
@@ -389,8 +390,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\
     \textbf{Axiom extension} \\
     \begin{array}{lrcll}
-    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
-    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $hnf_1 \neq k$ or $hnf_2 \neq k$} \\
+    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{app-wrong} & |apply^(k,v) | & \movesto & |wrong| \\
     \rulename{if-wrong} & |if wrong then e_1 else e_2| & \movesto & |wrong| \\
     \rulename{for-wrong} & |for wrong in e| & \movesto & |wrong| \\
