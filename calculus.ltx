@@ -194,7 +194,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     &&\vb & |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e| \vb |rec f e|  \\
-    \text{Primops} & op  & ::= & cop \vb |apply | \\
+    \text{Primops} & op  & ::= & cop \vb |apply| \vb |range| \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \vb |x:=v| \\
@@ -260,6 +260,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{subst} & |def H^[x:=v] in e| & \movesto & |def H^[x:=v] in e^[x subst v]| \\
                   &&& \text{if $x \in \freevars{e}$} \\[2mm]
     \end{array} \\
+
     \textit{Choice} \\
     \begin{array}{lrcll}
     \rulename{fail-l} & |fail choice e| & \movesto & e \\
@@ -268,6 +269,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{choose} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| & \text{if}~|CX| \not= \hole
     \end{array} \\
     \\
+
     \textit{Primitive operations} \\
     \begin{array}{lrcl}
     \rulename{p-add} & |add^(k_1 ,k_2)| & \movesto & k_1+k_2 \\
@@ -277,6 +279,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |fail| & \text{otherwise}
       \end{array} \\[2mm]
     \end{array} \\
+
     \textit{Sequencing} \\
     \begin{array}{lrcl}
     \rulename{seq} & |v ; e| & \movesto & |e| \\
@@ -285,6 +288,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
     \end{array} \\
     \\[-2mm]
+
     \textit{Lambda and application} \\
     \begin{array}{rcll}
       \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)|
@@ -296,11 +300,19 @@ The |let| construct cleverly models the heap, maintaining sharing.
            |fail| & \text{otherwise}
            \end{array}\\[4mm]
     \end{array} \\
+
+    \textit{Range} \\
+    \begin{array}{lrcl}
+    \rulename{range-arr} & |range^(v_1, dots, v_n)| & \movesto & |v_1 choice dots choice v_n| \\
+    \end{array} \\
+    \\[-2mm]
+
     \textit{Conditionals} \\
     \begin{array}{rcll}
     \rulename{if-false} & |if fail then e_1 else e_2| & \movesto & e_2 \\
     \rulename{if-true} & |if L^[v] then e_1 else e_2| & \movesto & |apply^(e_1,v)| \\[2mm]
     \end{array} \\
+
     \textit{For-loops} \\
     \begin{array}{rcll}
     \rulename{for} & \begin{array}[t]{@@{}l}
