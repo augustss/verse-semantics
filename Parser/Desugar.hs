@@ -1,4 +1,4 @@
-module Desugar where
+module Desugar(desugar) where
 import Control.Monad.State.Strict
 import Data.Maybe
 

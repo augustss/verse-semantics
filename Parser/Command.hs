@@ -63,8 +63,8 @@ runCommand Command{..} = do
           pure (False, s')
   repl rpl
 
-testCommand :: Command Int
-testCommand = Command
+_testCommand :: Command Int
+_testCommand = Command
   { c_commands = [Cmd "hello" "Greet" $ \ s i -> do putStrLn ("Hello " ++ s); pure i
                  ,Cmd "increment" "Increment state" $ \ _ i -> pure (i+1)
                  ]

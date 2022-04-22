@@ -1,4 +1,4 @@
-module Parse where
+module Parse(parseDie, pFile) where
 
 import Control.Monad
 import Control.Monad.Combinators.Expr
@@ -62,8 +62,8 @@ pDecimal :: P Integer
 pDecimal = L.decimal <* skip
 
 -- XXX Needs works
-pString :: P String
-pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
+--pString :: P String
+--pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
 
 pOp :: String -> P String
 pOp ":" = pOp' ":" "="
@@ -229,8 +229,8 @@ parseDie p fn file =
     Left err -> error $ errorBundlePretty err
     Right x -> x
 
-testp :: P a -> String -> a
-testp p = parseDie p "<string>"
+_testp :: P a -> String -> a
+_testp p = parseDie p "<string>"
 
-parseString :: String -> Expr
-parseString = parseDie pFile "<string>"
+_parseString :: String -> Expr
+_parseString = parseDie pFile "<string>"
