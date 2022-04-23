@@ -507,10 +507,10 @@ We have the following conjecture: the Verse reduction rules are confluent in the
   Using the reduction rules repeatedly will
   \begin{itemize}
   \item terminate with a term in |hnf|.  This is a successful evaluation.
-  \item terminate with a term in |X^[wrong]|.  This is an illegal program.
+  \item terminate without a term in |hnf|, i.e., get stuck.
   \item not terminate.
   \end{itemize}
-  All successful evaluations will produce the same |hnf| (up to $\alpha,\beta,\eta$-equivalence?).
+  All successful evaluations will produce the same |hnf| (up to $\alpha,\beta$-equivalence?).
 \end{quote}
 
 \subsection{Evaluation strategy}
@@ -524,7 +524,7 @@ unique redex for the next reduction.
 Instead we settle for an evaluation context that is ambiguous and allows many different redexes, figure \ref{fig:verse-eval}.
 It allows evaluation almost everywhere, with exception of under a $\lambda$, branches of an |if|, and body of a |for|.
 The reason to disallow these is that we do not know if they are needed.
-\joachim{The same applies to the second expression in $e_1; e_2$, doesn't it? Oh, and |e_1 choice e_2|, becuase in an |if| context the second may not be needed.}
+\joachim{The same applies to the second expression in $e_1; e_2$, doesn't it? Oh, and |e_1 choice e_2|, because in an |if| context the second may not be needed.}
 \lennart{Yes, there are several ways where some paths terminate, and others don't.  I don't know what to do about it.}
 
 \begin{figurebox}
