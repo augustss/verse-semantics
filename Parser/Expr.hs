@@ -26,7 +26,10 @@ noLoc :: Loc
 noLoc = initialPos ""
 
 data Ident = Ident Loc String
-  deriving (Eq, Ord{-, Show-}, Data)
+  deriving ({-Eq, Ord, Show,-} Data)
+
+instance Eq Ident where x == y  =  compare x y == EQ
+instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 
 instance Show Ident where
   show (Ident _ s) = show s
