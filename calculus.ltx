@@ -304,14 +304,14 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{rcll}
     \rulename{for-0} & |for fail in e| \movesto & |()| \\
 %%    \rulename{for-1} & |for v in e| \movesto & |def f in f == e; apply^(f,v)| \\
-    \rulename{for-n} & \begin{array}[t]{@@{}l}
-      |for v_1 choice (v_2 choice dots choice v_n)| \\
-      |in e|
-    \end{array} & \movesto &
+    \rulename{for-n} &
+      |for v_1 choice dots choice v_n in e|
+    & \movesto &
     \begin{array}[t]{@@{}l}
       |def f,x_1,dots x_n in| \\
-      |(f == e; x_1 == apply^(f, v_1)); dots (x_n == apply^(f,v_n));| \\
-      |(x_1,dots,x_n)|
+      |f == e; x_1 == apply^(f, v_1); dots x_n == apply^(f,v_n);| \\
+      |(x_1,dots,x_n)| \\
+      \text{if $\{f, x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
     \end{array} \\
     \end{array} \\
     \\[-2mm]
