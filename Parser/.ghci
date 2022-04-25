@@ -1,6 +1,4 @@
 :set -Wall
--- :set -package text
 :set -package megaparsec
-:set -package epicgames
 :set -package parser-combinators
 :set -package haskeline

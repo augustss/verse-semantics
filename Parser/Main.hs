@@ -2,7 +2,7 @@
 import Control.Exception
 import Control.Monad
 
-import Epic.Print
+import Print
 import Desugar
 import Expr
 import Parse

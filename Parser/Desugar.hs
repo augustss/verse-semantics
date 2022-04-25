@@ -4,7 +4,7 @@ import Data.Maybe
 
 import Expr
 import Error
-import Epic.Print
+import Print
 
 desugar :: Expr -> Expr
 desugar = flip evalState 1 . desugarS

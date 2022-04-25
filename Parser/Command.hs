@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- Simple Gofer/Hugs/ghci style command interpreter.
 module Command(Command(..), Cmd(..), Run, runCommand) where
 import Data.Char

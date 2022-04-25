@@ -15,7 +15,7 @@ module Expr(
 import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
-import Epic.Print
+import Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos)
 
