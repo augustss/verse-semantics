@@ -197,7 +197,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Primops} & op  & ::= & cop \vb |apply| \vb |range| \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
-    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \vb |x:=v| \\
+    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
  \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
@@ -210,23 +210,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      e_1 \oplus e_2 & \text{means} & |add^( e_1, e_2 )| \\
-      |e_1^(e_2)| & \text{means} & |apply^( e_1, e_2 )| \\
+      v_1 \oplus v_2 & \text{means} & |add^( v_1, v_2 )| \\
+      |v_1^(v_2)| & \text{means} & |apply^( v_1, v_2 )| \\
      \end{array} \\
   \\
-  \textbf{Bound variables $\boundvars{h}$, and value variables $\valvars{h}$, of a heap} \\
+  \textbf{Bound variables $\boundvars{h}$ of a heap} \\
   \begin{array}{rcl}
     \boundvars{ |emp| } & = & \emptyset \\
     \boundvars{ |h_1 , h_2| } & = & \boundvars{h_1} \cup \boundvars{h_2} \\
-    \boundvars{ |x:=v| } & = & \{x\} \\
     \boundvars{ |x| } & = & \{x\}
-  \end{array}
-  \qquad
-  \begin{array}{rcl}
-    \valvars{ |emp| } & = & \emptyset \\
-    \valvars{ |h_1 , h_2| } & = & \valvars{h_1} \cup \valvars{h_2} \\
-    \valvars{ |x:=v| } & = & \{x\} \\
-    \valvars{ |x| } & = & \emptyset
   \end{array}
    \\ \\
   \textbf{Bound variables $\boundvars{X}$ of a context} \\
@@ -255,12 +247,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \begin{figurebox}
   $$
   \begin{array}{l}
-    \textit{Substitution} \\
-    \begin{array}{lrcl}
-    \rulename{subst} & |def H^[x:=v] in e| & \movesto & |def H^[x:=v] in e^[x subst v]| \\
-                  &&& \text{if $x \in \freevars{e}$} \\[2mm]
-    \end{array} \\
-
     \textit{Choice} \\
     \begin{array}{lrcll}
     \rulename{fail-l} & |fail choice e| & \movesto & e \\
@@ -311,37 +297,31 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Conditionals} \\
     \begin{array}{rcll}
     \rulename{if-false} & |if fail then e_1 else e_2| & \movesto & e_2 \\
-    \rulename{if-true} & |if L^[v] then e_1 else e_2| & \movesto & |apply^(e_1,v)| \\[2mm]
+    \rulename{if-true} & |if L^[v] then e_1 else e_2| & \movesto & |def f in f==e_1; apply^(f,v)| \\[2mm]
     \end{array} \\
 
     \textit{For-loops} \\
     \begin{array}{rcll}
-    \rulename{for} & \begin{array}[t]{@@{}l}
-      |for| |(v_1 choice dots choice v_n)| \\
+    \rulename{for-0} & |for fail in e| \movesto & |()| \\
+%%    \rulename{for-1} & |for v in e| \movesto & |def f in f == e; apply^(f,v)| \\
+    \rulename{for-n} & \begin{array}[t]{@@{}l}
+      |for v_1 choice (v_2 choice dots choice v_n)| \\
       |in e|
     \end{array} & \movesto &
     \begin{array}[t]{@@{}l}
-      |def x_1,dots x_n in| \\
-      |(x_1= apply^(e, v_1));  dots (x_n= apply^(e,v_n));| \\
+      |def f,x_1,dots x_n in| \\
+      |(f == e; x_1 == apply^(f, v_1)); dots (x_n == apply^(f,v_n));| \\
       |(x_1,dots,x_n)|
     \end{array} \\
     \end{array} \\
     \\[-2mm]
     \textit{Def-blocks} \\
     \begin{array}{rcll}
-    \rulename{def-elim} & |def h in e| & \movesto & |e| \qquad \text{if $\freevars{e} \disjoint \boundvars{h}$} \\
+    \rulename{def-elim} & |def emp in e| & \movesto & |e| \\
     \end{array}
    \end{array}
    $$
   \caption{The Verse calculus: general axioms} \label{fig:general-axioms}
-  \lennart{\rulename{def-elim} should probably have a side condition so that if |h| has unbound variables it gets stuck.}\\
-  \lennart{Possible simplifying changes:
-    \begin{itemize}
-    \item Make \rulename{subst} update |H| and remove the binding.
-    \item Make \rulename{def-elim} only eliminate empty heaps.  Then we will, appropriately, get stuck on unbound variables.
-    \item Merge \rulename{subst} and \rulename{bind}.
-    \end{itemize}
-    }
 \end{figurebox}
 
 \begin{figurebox}
@@ -350,8 +330,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \rulename{bind} & |def H^[x] in X^[x==v]| & \movesto
     & \begin{array}[t]{@@{}l}
-        |def H^[x:=v] in X^[v]| \\
-        \text{if $\freevars{v} \disjoint (x,\valvars{|H^[x]|},\boundvars{X})$ }
+        |def H^[emp] in (X^[v])[x subst v]| \\
+        \text{if $\freevars{v} \disjoint (x,\boundvars{X})$ }
         \end{array} \\
     \rulename{promote} & |def H^[x] in X^[x=v]| 
        & \movesto
@@ -360,12 +340,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
         \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
-    \rulename{swap} & |def H^[x] in X^[hnf==x]| & \movesto &
-    \begin{array}[t]{@@{}l}
-       |def H^[x] in X^[x==hnf]| \\
-%       \text{unless $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
-%       \text{if $v$ is $y \in (\valvars{H[x]},\boundvars{X})$}
-       \end{array}\\
+    \rulename{swap} & |hnf==x| & \movesto & |x==hnf| \\
 
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
 %    & \begin{array}[t]{@@{}l}
