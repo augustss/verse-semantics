@@ -143,7 +143,12 @@ scopeCheck e = e -- XXX
 
 insDef :: ([Ident], Expr) -> Expr
 insDef (is, e) | anySame is = error $ "Multiple definition " ++ prettyShow is
-               | otherwise = Def is (BExpr e)
+               | otherwise = def is (BExpr e)
+
+def :: [Ident] -> Block -> Expr
+def [] (BExpr e) = e
+def [] (BExprs es) = Seq es
+def is e = Def is e
 
 scopeExpr :: Expr -> ([Ident], Expr)
 scopeExpr e@LitInt{} = ([], e)
@@ -167,13 +172,13 @@ scopeExpr (If3 e1 e2 e3) = ([], If3 e1'' e2'' e3')
   where (xs, e1') = scopeExpr e1
         e2' = scopeDefB e2
         e3' = scopeDefB e3
-        e1'' = Def xs $ BExprs [e1', exs]
+        e1'' = def xs $ BExprs [e1', exs]
         e2'' = BExpr $ Function exs [] e2'
         exs = Array (BExprs (map Variable xs))
 scopeExpr (For2 e1 e2) = ([], For2 e1'' e2'')
   where (xs, e1') = scopeExpr e1
         e2' = scopeDefB e2
-        e1'' = Def xs $ BExprs [e1', exs]
+        e1'' = def xs $ BExprs [e1', exs]
         e2'' = BExpr $ Function exs [] e2'
         exs = Array (BExprs (map Variable xs))
 scopeExpr (Let _e _b) = unimplemented
