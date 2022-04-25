@@ -1,10 +1,17 @@
-module Desugar(desugar) where
+module Desugar(desugar, scope) where
+import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 import Data.Maybe
 
 import Expr
 import Error
-import Print
+import Print hiding (first)
+
+anySame :: (Eq a) => [a] -> Bool
+anySame [] = False
+anySame (x:xs) = x `elem` xs || anySame xs
+
+--------
 
 desugar :: Expr -> Expr
 desugar = flip evalState 1 . desugarS
@@ -45,6 +52,7 @@ desugarS = expr
       where tAny i = InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))
     expr (Case2 e1 e2) = desugarCase e1 e2
     expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> block e2
+    expr Def{} = impossible
 
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
@@ -116,3 +124,66 @@ desugarFunDef l (Call f a) as e = desugarFunDef l f [] $ Function a (reverse as)
 desugarFunDef l (Variable f) [] e = define l f <$> desugarS e
 desugarFunDef _ Variable{} _ _ = internalError
 desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
+
+--------------------
+
+-- Insert defs
+scope :: Expr -> Expr
+scope = scopeCheck . scopeDef
+
+scopeDef :: Expr -> Expr
+scopeDef = insDef . scopeExpr
+
+scopeDefB :: Block -> Block
+scopeDefB (BExpr e) = BExpr $ scopeDef e
+scopeDefB (BExprs es) = BExpr $ scopeDef $ Seq es
+
+scopeCheck :: Expr -> Expr
+scopeCheck e = e -- XXX
+
+insDef :: ([Ident], Expr) -> Expr
+insDef (is, e) | anySame is = error $ "Multiple definition " ++ prettyShow is
+               | otherwise = Def is (BExpr e)
+
+scopeExpr :: Expr -> ([Ident], Expr)
+scopeExpr e@LitInt{} = ([], e)
+scopeExpr e@LitRat{} = ([], e)
+scopeExpr e@Variable{} = ([], e)
+scopeExpr (Array b) = second Array $ scopeBlock b
+scopeExpr (Seq es) = second Seq $ scopeExprs es
+scopeExpr (Call e1 e2) = (is1 ++ is2, Call e1' e2') where (is1, e1') = scopeExpr e1; (is2, e2') = scopeExpr e2
+scopeExpr (Index e1 e2) = (is1 ++ is2, Index e1' e2') where (is1, e1') = scopeExpr e1; (is2, e2') = scopeExpr e2
+scopeExpr (EffAttr e r) = (is, EffAttr e' r) where (is, e') = scopeExpr e
+--scopeExpr (PrefixOp op e) = (is, PrefixOp e') where (is, e') = scopeExpr e
+--scopeExpr (PostfixOp e r) = (is, PostfixOp e' r) where (is, e') = scopeExpr e
+scopeExpr (InfixOp (Variable x) (Ident l ":=") e) = (x:xs, e'')
+  where (xs, e') = scopeExpr e
+        e'' = Index (Variable (Ident l "in'='")) (Array (BExprs [Variable x, e']))
+--scopeExpr (InfixOp e1 (Ident l "|") e2) = ([], In XXXX
+--scopeExpr InfixOp
+--scopeExpr If1
+--scopeExpr If2
+scopeExpr (If3 e1 e2 e3) = ([], If3 e1'' e2'' e3')
+  where (xs, e1') = scopeExpr e1
+        e2' = scopeDefB e2
+        e3' = scopeDefB e3
+        e1'' = Def xs $ BExprs [e1', exs]
+        e2'' = BExpr $ Function exs [] e2'
+        exs = Array (BExprs (map Variable xs))
+scopeExpr (For2 e1 e2) = ([], For2 e1'' e2'')
+  where (xs, e1') = scopeExpr e1
+        e2' = scopeDefB e2
+        e1'' = Def xs $ BExprs [e1', exs]
+        e2'' = BExpr $ Function exs [] e2'
+        exs = Array (BExprs (map Variable xs))
+scopeExpr (Let _e _b) = unimplemented
+scopeExpr (Do _b) = unimplemented
+scopeExpr (Function p r e) = ([], Function p r $ scopeDefB e)
+scopeExpr _ = impossible
+
+scopeBlock :: Block -> ([Ident], Block)
+scopeBlock (BExpr e) = second BExpr $ scopeExpr e
+scopeBlock (BExprs es) = second BExprs $ scopeExprs es
+
+scopeExprs :: [Expr] -> ([Ident], [Expr])
+scopeExprs es = first concat $ unzip $ map scopeExpr es

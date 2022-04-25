@@ -31,6 +31,7 @@ command = Command
   { c_commands =
       [ Cmd "read FILE"      "Parse a file"                   cRead
       , Cmd "desugar [EXPR]" "Desugar [last] expression"      cDesugar
+      , Cmd "scope [EXPR]"   "Insert defs"                    cScope
       , Cmd "show [EXPR]"    "Show [last] expression"         cShow
       , Cmd "print [EXPR]"   "Pretty print [last] expression" cPrint
       ]
@@ -73,6 +74,14 @@ cDesugar =
   withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $ do
       let e' = desugar e
+      pp e'
+      pure e'
+
+cScope :: Run CState
+cScope =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+      let e' = scope e
       pp e'
       pure e'
 

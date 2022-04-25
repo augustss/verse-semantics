@@ -60,6 +60,8 @@ data Expr
   | Case1 Block               -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function Expr [Eff] Block -- function(e)<eff>{e}
+  -- Only after scope extrusion
+  | Def [Ident] Block         -- def xs in e
   deriving (Eq, Ord, Show, Data)
 
 type Eff = Ident
@@ -80,7 +82,7 @@ instance Pretty Expr where
       ppA e = ppr 0 e
       ppB b@BExprs{} = ppr 0 b
       ppB (BExpr e) = braces (ppr 0 e)
-      ppEs = fsep . punctuate comma . map (ppr 1)
+      ppEs xs = fsep . punctuate comma . map (ppr 1) $ xs
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
       ppOp = ppr 0
@@ -134,6 +136,8 @@ instance Pretty Expr where
                                            indent $ ppr 0 bs ]
           Function a es b -> maybeParens (p > 0) $ text "fn" <> parens (pPrintL l a) <> effs <> ppr 0 b
             where effs = mconcat (map (\ e -> text "<" <> pPrintL l e <> text ">") es)
+          Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
+                                                  text "in" <+> ppr 0 e ]
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)

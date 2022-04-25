@@ -3,7 +3,7 @@ module Print(
   module Text.PrettyPrint.HughesPJClass,
   module Print,
   ) where
-import Text.PrettyPrint.HughesPJ
+import Text.PrettyPrint.HughesPJ hiding(first)
 import Text.PrettyPrint.HughesPJClass
 
 indent :: Doc -> Doc
