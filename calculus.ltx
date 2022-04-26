@@ -890,9 +890,31 @@ To save space we have used the abbreviation |F| for the expression \newline
 
 \begin{figure}
 $$
-\begin{array}{rcl}
+\begin{array}{rcll}
+  |De k| & = & |k| \\
+  |De x| & = & |x| \\
+  |De (e_1, dots e_n)| & = & |De (e_1), dots De (e_n)| \\
+  |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
+  |De (e_1[e_2])| & = & |(De e_1)[De e_2]| \\
+  |De (e_1(e_2))| & = & |De succeeds[e_1[e_2]]| \\
+  |De (if{e})| & = & |De (if(e) else ())| \\
+  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else ())| \\
+  |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & |x| fresh \\
+  |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
+  |De !e| & = & |De i(f e then :() else ())| \\
+  |De :e| & = & |: De e| \\
+  |De (sop e)| & = & |De (prefix'sop'(e))| \\
+  |De (fop e)| & = & |De (prefix'fop'[e])| \\
+  |De (e sop)| & = & |De (postfix'sop'(e))| \\
+  |De (e fop)| & = & |De (postfix'fop'[e])| \\
+  |De (e_1 => e_2)| & = & |De (function(e_1){e_2})| \\
+  |De (l := e)| & = & |xxxx| \\
+  |De (l : e)| & = & |De (l := :e)| \\
+  |De (e_1 \&\& e_2)| & = & |De (e_1; e_2)| \\
+  |De (e_1 vb vb e_2)| & = & |De (if(e_1) else e_2)| \\
+  |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
+
   |De (e_1 `choice` e_2)| & = |De e_1 `choice` De e_2| \\
-  |De (e_1 ; e_2)| & = |De e_1 ; De e_2| \\
 \end{array}
 $$
 \caption{Desugaring} \label{fig:pat-sugar}
