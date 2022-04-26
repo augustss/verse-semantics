@@ -523,7 +523,7 @@ We have the following conjecture: the Verse reduction rules are confluent in the
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
 can be used anywhere in a program.
 This is similar to how the axioms for the $\lambda$-calculus in figure \ref{fig:call-by-name} can be applied anywhere.
-In figure \ref{fig:call-by-name} we introduces an evaluation context |E| to force a particular evaluation order.
+In figure \ref{fig:verse-eval} we introduce an evaluation context |E| to force a particular evaluation order.
 
 We would like to have a similar |E| for Verse, but it seems difficult to find one that always identifies a
 unique redex for the next reduction.
@@ -566,9 +566,6 @@ Can it be made safe by a better treatment of |e choice E|?
   to substitute out the heap bindings.  This can only get stuck if $h$ has a variable introduction |x|,
   and |x| is mentioned in |e|.  It's fine to get stuck: Verse does not
   allow a \hexp{} to return an unbound logical variable.
-  \joachim{I am worried about the side condition $|X| \not= \hole$. We say the rules can be applied anywhere, so this side conditions means this rule applies anywhere that's nested at least one level. But then we have non-confluence: |for (1; def (x:=2) in 3) x| can reduce to |for (def (x:=2) in 3) x| $\movesto$ |def (x:=2) x| $\movesto$ |def (x:=2) 2| $\movesto$ |2|, or it can move to |for (1; 3) x| which is pretty bogus already. Maybe |def| should not be allowed in that position in the first place? Then we should maybe clarify that? (A different production $de$ that allows |def|, choice and defless-expressions that only appears in |if|, |for| and the top-level? But then we couldn't use |def| on the RHS of rules easily ... hmm)}
-  \lennart{The |def|s in a program are not inserted by the programmer; they are inserted by a program transformation.
-    So we probably need to have some invariant on where they are allowed, and make sure the rules obey the invariant.}
 \item \emph{Heaps.}  ToDo: what if the heap bound a variable to an expression, like
   in the call-by-need lambda-calculus?  Would that have any merit?  I suspect not.
 \end{itemize}
