@@ -1,4 +1,6 @@
+%format De (x) = "\De{" x "}"
 %format applyx a (b) = a "(" b ")"
+
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format at = "\, @\!\!"
@@ -12,7 +14,10 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
+
 %format choice = "[ \! ]"
+%format `choice` = "\mathop{[ \! ]}"
+
 %format hchoice = "\|"
 %format he = "he"
 %format def = "\textbf{def}"

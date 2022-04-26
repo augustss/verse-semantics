@@ -898,7 +898,8 @@ To save space we have used the abbreviation |F| for the expression \newline
 \begin{figure}
 $$
 \begin{array}{rcl}
-  \De{|e_1 choice e_2|} & = & \De{e_1}| choice |\De{e_2} \\
+  |De (e_1 `choice` e_2)| & = |De e_1 `choice` De e_2| \\
+  |De (e_1 ; e_2)| & = |De e_1 ; De e_2| \\
 \end{array}
 $$
 \caption{Desugaring} \label{fig:pat-sugar}
