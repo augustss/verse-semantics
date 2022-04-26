@@ -610,7 +610,7 @@ using |hnf| rather than |v| in this rule.
     $$ |def x in dots x dots(def z in dots(x==(3,z))dots)dots| $$
 We can't use \rulename{bind} directly, because it would be ill-scoped to add |x:=(3,z)|
 to the outermost |def|. Instead we invent a fresh variable |y| (bound as a sibling to |x|),
-substitute it for |z| in |v|, and unify it with |z|, thus
+substitute it for |z| in |v| to prevent this rule from applying again, and unify it with |z|, thus
     $$ |def x,y in dots x dots(def z in dots(z=y; x==(3,y))dots)dots| $$
 Now  \rulename{bind} can substitute |(3,y)| for |x|:
     $$ |def y in dots (3,y) dots(def z in dots(z=y;(3,y))dots)dots| $$
