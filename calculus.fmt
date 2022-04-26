@@ -1,3 +1,4 @@
+%format applyx a (b) = a "(" b ")"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format at = "\, @\!\!"
@@ -32,6 +33,8 @@
 %format rec = "\textbf{rec}"
 %format range = "\textbf{range}"
 %format wrong = "\textbf{wrong}"
+%format int = "\textbf{int}"
+%format string = "\textbf{string}"
 %format dots = ".."
 %format hnf = "\hnf"
 %format emp = "\epsilon"

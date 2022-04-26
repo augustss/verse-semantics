@@ -12,9 +12,28 @@
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 \usepackage{ amssymb }
 \usepackage{cleveref}   % \Cref etc
+\usepackage{ stmaryrd }
+
 
 \renewcommand{\arraystretch}{1.1}
 \newcommand{\vb}{\; \mid \;}
+
+% Get rid of this lot -------------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+\newif\ifmatch
+\matchtrue
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
+\else
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
+% ---------------------------------------
+
+% Desugaring
+\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -185,33 +204,34 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}{l}
     \textbf{Syntax} \\
     \begin{array}{lrcl}
-    \text{Constants} & k \\
+    \text{Integer constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & e \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |op^(e)|
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
     &&\vb & |if e_1 then e_2 else e_3| \vb |for e_1 in e_2|  \\
     &&\vb & |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb (v_1, \ldots, v_n) \vb |x => e| \vb |rec f e|  \\
-    \text{Primops} & op  & ::= & cop \vb |apply| \vb |range| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
+    \text{Primops} & op  & ::= & cop \vb |range| \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb cop(ce) \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
-    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
+    \text{Types} & ty & ::= & |int| \vb |string| \vb |type(v)| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |applyx cop ce| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
+    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\a
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
  \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    && \vb & |op^(X)| \vb |def h in X | \\
+    && \vb & |applyx X e| \vb |applyx e X| \vb |def h in X | \\
  \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
-    &&\vb & |op^(CX)| \vb |def h in CX| \\
+    &&\vb & |applyx CX e| \vb |applyx e CX| \vb |def h in CX| \\
     \text{Left choice context} & L & ::= & \hole \vb |L choice e| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      v_1 \oplus v_2 & \text{means} & |add^( v_1, v_2 )| \\
-      |v_1^(v_2)| & \text{means} & |apply^( v_1, v_2 )| \\
+      v_1 \oplus v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
+      v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
      \end{array} \\
   \\
   \textbf{Bound variables $\boundvars{h}$ of a heap} \\
@@ -265,6 +285,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array} \\[2mm]
+    \rulename{p-int} & |applyx int v| & \movesto &
+    \begin{array}[t]{@@{}ll}
+      |v| & \text{if $v$ is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array} \\[2mm]
     \end{array} \\
 
     \textit{Sequencing} \\
@@ -278,10 +303,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \textit{Lambda and application} \\
     \begin{array}{rcll}
-      \rulename{app-lam} & |apply^(x => e_1, e_2)| & \movesto & |def x in (x==e_2; e_1)|
+      \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x in (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
-    \rulename{app-rec} & |apply^(rec f e_1, e_2)| & \movesto & |apply^(e_1^[f subst rec f e_1], e_2)| \\
-    \rulename{app-arr} & |apply^((v_0,dots,v_k,dots,v_n), k)| & \movesto &
+    \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
+    \rulename{app-type} & |(type(v))(e)| & \movesto & |applyx v e| \\
+    \rulename{app-arr} & |(v_0,dots,v_k,dots,v_n)(k)| & \movesto &
     \begin{array}[t]{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\
            |fail| & \text{otherwise}
@@ -297,21 +323,20 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Conditionals} \\
     \begin{array}{rcll}
     \rulename{if-false} & |if fail then e_1 else e_2| & \movesto & e_2 \\
-    \rulename{if-true} & |if L^[v] then e_1 else e_2| & \movesto & |def f in f==e_1; apply^(f,v)| \\[2mm]
+    \rulename{if-true} & |if L^[v] then e_1 else e_2| & \movesto & |applyx e_1 v| \\[2mm]
     \end{array} \\
 
     \textit{For-loops} \\
     \begin{array}{rcll}
     \rulename{for-0} & |for fail in e| \movesto & |()| \\
-%%    \rulename{for-1} & |for v in e| \movesto & |def f in f == e; apply^(f,v)| \\
+%%    \rulename{for-1} & |for v in e| \movesto & |def f in f == e; applyx f v| \\
     \rulename{for-n} &
       |for v_1 choice dots choice v_n in e|
     & \movesto &
     \begin{array}[t]{@@{}l}
-      |def f,x_1,dots x_n in| \\
-      |f == e; x_1 == apply^(f, v_1); dots x_n == apply^(f,v_n);| \\
-      |(x_1,dots,x_n)| \\
-      \text{if $\{f, x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
+      |def x_1,dots x_n in| \\
+      |x_1 == applyx e v_1; dots x_n == applyx e v_n; (x_1,dots,x_n)| \\
+      \text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
     \end{array} \\
     \end{array} \\
     \\[-2mm]
@@ -340,7 +365,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
         \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
-    \rulename{swap} & |hnf==x| & \movesto & |x==hnf| \\
 
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
 %    & \begin{array}[t]{@@{}l}
@@ -351,7 +375,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
 %        \end{array} 
     \end{array} \\ \\[-2mm]
     \begin{array}{lrcl}
+    \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
     \rulename{uvar} & |x == x| & \movesto & |x| \\
+    \rulename{utype} & |x == applyx range ty| & \movesto & |applyx ty x; x| \\
     \rulename{ucon} & |k_1 == k_2| & \movesto
     & \begin{array}[t]{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
@@ -364,41 +390,39 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array}\\
     \rulename{ux1} & |k == (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |(v_1,dots,v_n) == k | & \movesto & |fail| \\
-    \rulename{ux3} & |(x => e) == hnf| & \movesto & |fail| \\
-    \rulename{ux4} & |hnf == (x => e)| & \movesto & |fail|
+    \rulename{ux3} & |(x => e) == hnf| & \movesto & |fail|  \qquad \text{(or stuck?)}\\
+    \rulename{ux4} & |hnf == (x => e)| & \movesto & |fail|  \qquad \text{(or stuck?)}
      \end{array}
    \end{array}
    $$
 \caption{The Verse calculus: unification axioms} \label{fig:unification-axioms}
-\lennart{Remove contexts from \rulename{swap}?}
-\lennart{Make unification of two lambdas |wrong|.}
 \end{figurebox}
 
-\begin{figurebox}
-  $$
-  \begin{array}{l}
-    \textbf{Syntax extension} \\
-    \begin{array}{lrcl}
-      \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
-    \end{array} \\
-    \\
-    \textbf{Axiom extension} \\
-    \begin{array}{lrcll}
-    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-    \rulename{app-wrong} & |apply^(k,v) | & \movesto & |wrong| \\
-    \textit{Propagation} \\
-    \rulename{seq-wrong-l} & |wrong; v| & \movesto & |wrong| \\
-    \rulename{seq-wrong-b} & |wrong; wrong| & \movesto & |wrong| \\
-    \rulename{choice-wrong-l} & |wrong choice v| & \movesto & |wrong| \\
-    \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
-    \rulename{if-wrong} & |if wrong then e_1 else e_2| & \movesto & |wrong| \\
-    \rulename{for-wrong} & |for v_1 choice dots v_n choice wrong in e| & \movesto & |wrong| \\
-     \end{array}
-   \end{array}
-   $$
-\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
-\end{figurebox}
+% \begin{figurebox}
+%   $$
+%   \begin{array}{l}
+%     \textbf{Syntax extension} \\
+%     \begin{array}{lrcl}
+%       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+%     \end{array} \\
+%     \\
+%     \textbf{Axiom extension} \\
+%     \begin{array}{lrcll}
+%     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{app-wrong} & |apply^(k,v) | & \movesto & |wrong| \\
+%     \textit{Propagation} \\
+%     \rulename{seq-wrong-l} & |wrong; v| & \movesto & |wrong| \\
+%     \rulename{seq-wrong-b} & |wrong; wrong| & \movesto & |wrong| \\
+%     \rulename{choice-wrong-l} & |wrong choice v| & \movesto & |wrong| \\
+%     \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
+%     \rulename{if-wrong} & |if wrong then e_1 else e_2| & \movesto & |wrong| \\
+%     \rulename{for-wrong} & |for v_1 choice dots v_n choice wrong in e| & \movesto & |wrong| \\
+%      \end{array}
+%    \end{array}
+%    $$
+% \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+% \end{figurebox}
 
 \lennart{The presentation lacks |:e| in the rules.  Adding it will require some thoughts about types.}
 
@@ -820,5 +844,96 @@ To save space we have used the abbreviation |F| for the expression \newline
     \rulename{top-def} & \movesto & |(2, 3)| \\
   \end{array}$$
 \end{example}
+
+\section{Source Verse}
+
+\begin{figure}
+\begin{tabular}{c}
+\begin{tabular}{rcll}
+  \multicolumn{3}{l}{Expressions:} \\
+  $e$ & ::= & $x$ & use variable \\
+  & $\mid$ & $k$ & constant \\
+  & $\mid$ & \vtt{$d$ := $e$} & definition \\
+  & $\mid$ & \vtt{$x$ : $t$} & definition \\
+  & $\mid$ & \vtt{: $t$} & range \\
+  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
+  & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
+  & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
+  & $\mid$ & |e_1 choice e_2| & alternative \\
+  & $\mid$ & \vtt{$e_1$..$e_2$} & alternative range \\
+  & $\mid$ & \vtt{$e_1$,$\ldots$,$e_n$} & tuple formation, $n >= 2$ \\
+  & $\mid$ & \vtt{()} & empty tuple \simon{right?} \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
+  & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
+  & $\mid$ & \vtt{for($e_1$) in\{ $eb_2$ \}} & array creation \\
+  & $\mid$ & \vtt{for($e_1$)}  & simple array creation \\
+  & $\mid$ & $e_1 \;op\; e_2$ & infix operator \\
+  & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
+  & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
+  & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
+  & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
+  & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
+  & $\mid$ & \vtt{do \{$e$\} } & scope delimiter \\
+\ifmatch
+  & $\mid$ & \vtt{$p$ :- $e$} & match \\
+\fi
+  $t$ & ::= & $e$ & types are expressions \\
+  \\
+  \multicolumn{3}{l}{Definitions:} \\
+  $d$ & ::= & $f \mid b$ \\
+  $f$ & ::= & \vtt{$f$($p$)} & function \\
+   & $\mid$ & \vtt{$f$($p$)\,$\eff$}& function \\
+  & $\mid$ & \vtt{$f$ : $t$} \\
+  & $\mid$ & $x$ & \\
+  $b$ & ::= & $x$ & variable \\
+  & $\mid$ & \vtt{$b$ : $t$} & type \\
+  & $\mid$ & $b_1$\vtt{,} $\cdots$\vtt{,} $b_n$ & tuple \\
+\end{tabular}
+\end{tabular}
+\caption{Source Verse} \label{fig:source-verse}
+\end{figure}
+
+\section{Desugaring Source Verse}
+
+\begin{figure}
+$$
+\begin{array}{rcl}
+  \De{|e_1 choice e_2|} & = & \De{e_1}| choice |\De{e_2} \\
+\end{array}
+$$
+\caption{Desugaring} \label{fig:pat-sugar}
+\end{figure}
+
+\begin{figure}
+\begin{tabular}{l||ll}
+  Source & Expansion & Comment \\
+  \hline
+  \multicolumn{3}{c}{\bf Definitions $d$, $f$, $b$} \\
+  \vtt{$f$($p$) := $e$} & \vtt{$f$ := $p$ => $e$} &  \\
+  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
+  \vtt{$f$ $\eff$ := $e$} & \vtt{$f$ := \vtt{check $\eff$ in $e$}}  \\
+  \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
+  \vtt{($b_0$,$\cdots$,$b_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\[2mm]
+  \hline
+  \multicolumn{3}{c}{\bf Patterns $p$} \\
+  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
+  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
+  \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
+  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := ($e_1$ = $e_2$)} & ??? \\
+   & \multicolumn{2}{l}{Use do?  continue matching in e1?} \\
+  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
+  \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
+  \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
+  \pmatch{(\vtt{let (} e_1 \vtt{) in } p)}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
+  \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
+  \hline
+\end{tabular}\\[2mm]
+\lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
+\lennart{The desugaring of d is probably subtly wrong.}
+\lennart{Mention Tim's principle that a d cab be turned into an e which turns :- into unification}
+\caption{Syntactic sugar for pattern matching} \label{fig:pat-sugar}
+\end{figure}
+
+
 
 \end{document}
