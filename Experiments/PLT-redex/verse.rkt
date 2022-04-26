@@ -12,7 +12,7 @@
      (bar e ...)
      (if e e e)
      (for e e)
-     (def q h e)  ;; See comment for binding forms.
+     (def h e)  ;; See comment for binding forms.
      wrong
      )
   (op ::= cop apply)
@@ -32,11 +32,10 @@
       )
   (h ::=
      (h ...)
-     x
+     (var x)
      (:= x v))
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
-  (q ::= r i)  ;; what kind of def regular or if/for
   #:binding-forms
   ;; The binding forms require non-overlapping patterns
   ;; (according to Robby Findler).
@@ -49,14 +48,8 @@
   (rec x e #:refers-to x)
   (h ...) #:exports (shadow h ...)
   (:= x v) #:exports x
-  x #:exports x
-  (def r h #:refers-to h e #:refers-to h)             ;; h variables just bound in e
-  (def i h #:refers-to h e #:refers-to h) #:exports h ;; h variables accessible
-  ; XXX I don't know how to encode the fact that all (def i h ...) in a 'for'
-  ; should bind the same variables.  Instead, the 'for' loop does not respect bindings properly.
-  ;(bar (def i h e_1 #:refers-to h) e_2 ...) #:exports h
-  (if e_1 e_2 #:refers-to e_1 e_3)
-  (for e_1 e_2 #:refers-to e_1)
+  (var x) #:exports x
+  (def h #:refers-to h e #:refers-to h)             ;; h variables just bound in e
   )
 
 ;LA: I would like to name this +, but then the actual + in
@@ -100,11 +93,11 @@
    ; #:domain ex
    ; #:codomain e
    (--> (xarray (h ...) (e ...) (v ...) ())
-        (def r (h ...) (seq e ... (arr v ...))))
+        (def (h ...) (seq e ... (arr v ...))))
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (v_2 e_2 ...))
         (xarray (h ...) (e_1 ...) (v_1 ... v_2) (e_2 ...)))
    (--> (xarray (h ...) (e_1 ...) (v_1 ...) (e_2 e_3 ...))
-        (xarray (h ... a) (e_1 ... (= a e_2)) (v_1 ... a) (e_3 ...))
+        (xarray (h ... (var a)) (e_1 ... (= a e_2)) (v_1 ... a) (e_3 ...))
         (side-condition (not (redex-match verse v (term e_2))))
         (fresh a))
    ))
@@ -126,16 +119,16 @@
    (subtract (x_1 ...) (x_3 ...))])
 
 ; Bound variables from a leading def.
-(define-metafunction verse
-  bvs-e : e -> (x ...)
-  [(bvs-e (def i h e)) (bvs-h h)]
-  [(bvs-e e) ()]
-  )
+;(define-metafunction verse
+;  bvs-e : e -> (x ...)
+;  [(bvs-e (def h e)) (bvs-h h)]
+;  [(bvs-e e) ()]
+;  )
 
 ; Variables that are bound in a heap.
 (define-metafunction verse
   bvs-h : h -> (x ...)
-  [(bvs-h x) (x)]
+  [(bvs-h (var x)) (x)]
   [(bvs-h (:= x v)) (x)]
   [(bvs-h (h ...))
    (x ... ...)
@@ -145,7 +138,7 @@
 ; Variables that have values (i.e., that are set) in the heap.
 (define-metafunction verse
   vvs : h -> (x ...)
-  [(vvs x) ()]
+  [(vvs (var x)) ()]
   [(vvs (:= x v)) (x)]
   [(vvs (h ...))
    (x ... ...)
@@ -166,12 +159,12 @@
    (where ((x ...) ...) ((fvs-e e) ...))]
   [(fvs-e (if e_1 e_2 e_3)) (x_1 ... x_2 ... x_3 ...)
    (where (x_1 ...) (fvs-e e_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-e e_1)))
+   (where (x_2 ...) (fvs-e e_2))
    (where (x_3 ...) (fvs-e e_3))]
   [(fvs-e (for e_1 e_2)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-e e_1))
-   (where (x_2 ...) (subtract (fvs-e e_2) (bvs-e e_1)))]
-  [(fvs-e (def q h e)) (x_1 ... x_2 ...)
+   (where (x_2 ...) (fvs-e e_2))]
+  [(fvs-e (def h e)) (x_1 ... x_2 ...)
    (where (x_1 ...) (fvs-h h))
    (where (x_2 ...) (subtract (fvs-e e) (bvs-h h)))]
   [(fvs-e wrong) ()]
@@ -179,7 +172,7 @@
 ; Free variables in h
 (define-metafunction verse
   fvs-h : h -> (x ...)
-  [(fvs-h x) ()]
+  [(fvs-h (var x)) ()]
   [(fvs-h (:= x v)) (fvs-v v)]
   [(fvs-h (h ...)) (x ... ...)
    (where ((x ...) ...) ((fvs-h h) ...))]
@@ -196,14 +189,14 @@
   )
 
 (module+ test
-  (test-match verse e (term (def r () 0)))
-  (test-match verse e (term (bar (def r () 0) (def r () 1))))
-  (test-match verse e (term (def r ( x) (= x k))))
+  (test-match verse e (term (def () 0)))
+  (test-match verse e (term (bar (def () 0) (def () 1))))
+  (test-match verse e (term (def (var x) (= x k))))
   (test-match verse h (term (:= a 2)))
-  (test-match verse h (term (x (:= y 1) () (z))))
-  (test-equal (term (bvs-h (x (:= y 1) (z) ()))) (term (x y z)))
-  (test-equal (term (vvs (x (:= y 1) (z) ()))) (term (y)))
-  (test-equal (term (bvs-e (def i x 0))) (term (x)))
+  (test-match verse h (term ((var x) (:= y 1) () (var z))))
+  (test-equal (term (bvs-h ((var x) (:= y 1) (var z) ()))) (term (x y z)))
+  (test-equal (term (vvs ((var x) (:= y 1) (var z) ()))) (term (y)))
+;  (test-equal (term (bvs-e (def i (var x) 0))) (term (x)))
 ;  (test-equal (term (bvs-e (bar
 ;                             (def r (heap x (:= y 1)) 0)
 ;                             (def r z 1))))
@@ -214,13 +207,13 @@
   (test-equal (term (fvs-e (seq (@ f x) (@ g x)))) (term (f x g x)))
   (test-equal (term (fvs-e (array (@ f x) (@ g x)))) (term (f x g x)))
   (test-equal (term (fvs-e (bar x (@ f y)))) (term (x f y)))
-  (test-equal (term (fvs-e (=> x (def r () (@ f x))))) (term (f)))
-  (test-equal (term (fvs-e (def r x (@ f x)))) (term (f)))
-  (test-equal (term (fvs-e (def r (:= x y) (@ x z)))) (term (y z)))
-  (test-equal (term (fvs-h (x (:= y z)))) (term (z)))
-  (test-equal (term (fvs-e (=> x (def r y (array x y z))))) (term (z)))
-  (test-equal (term (fvs-e (if (def i x x) (++ x y) z))) (term (y z)))
-  (test-equal (term (fvs-e (for (def i x (@ x y)) (@ x z)))) (term (y z)))
+  (test-equal (term (fvs-e (=> x (def () (@ f x))))) (term (f)))
+  (test-equal (term (fvs-e (def (var x) (@ f x)))) (term (f)))
+  (test-equal (term (fvs-e (def (:= x y) (@ x z)))) (term (y z)))
+  (test-equal (term (fvs-h ((var x) (:= y z)))) (term (z)))
+  (test-equal (term (fvs-e (=> x (def (var y) (array x y z))))) (term (z)))
+  (test-equal (term (fvs-e (if (def (var x) x) (=> x (++ x y)) z))) (term (y z)))
+  (test-equal (term (fvs-e (for (def (var x) (@ x y)) (=> x (@ x z))))) (term (y z)))
   )
 
 (define-extended-language verse+E verse
@@ -230,7 +223,7 @@
      (= e X)
      (seq e ... X e ...)
      (op X)
-     (def q h X)
+     (def h X)
      )
   (CX ::=
       hole
@@ -238,7 +231,7 @@
       (= ce CX)
       (seq ce ... CX e ...)
       (op CX)
-      (def q h CX)
+      (def h CX)
       )
   (L ::=
        hole
@@ -257,7 +250,7 @@
         (if E e e)
         (for E e)
         (bar e ... E e ...)
-        (def q h E)
+        (def h E)
         )  
   )
 
@@ -265,7 +258,7 @@
 (define-metafunction verse+E
   bvs-X : X -> (x ...)
   [(bvs-X hole) ()]
-  [(bvs-X (def q h X)) (x_1 ... x_2 ...)
+  [(bvs-X (def h X)) (x_1 ... x_2 ...)
    (where (x_1 ...) (bvs-h h))
    (where (x_2 ...) (bvs-X X))]
   [(bvs-X (= X e)) (bvs-X X)]
@@ -286,8 +279,8 @@
    verse+E
    #:domain e
    ;; Substitution
-   (--> (def q (in-hole H (:= x v)) e)
-        (def q (in-hole H (:= x v)) (substitute e x v))
+   (--> (def (in-hole H (:= x v)) e)
+        (def (in-hole H (:= x v)) (substitute e x v))
         (side-condition (member (term x) (term (fvs-e e))))
         "Subst")
    ;; Choice
@@ -347,7 +340,7 @@
         "Unify-seqr")
    ;; Lambda and applications
    (--> (apply (arr (=> x e_1) e_2))
-        (def r t (seq (= t e_2) (substitute e_1 x t)))
+        (def (var t) (seq (= t e_2) (substitute e_1 x t)))
         (fresh t)
         "App-lam")
    (--> (apply (arr (rec x e_1) e_2))
@@ -368,46 +361,34 @@
    (--> (if (bar) e_1 e_2)
         e_2
         "If-false")
-   (--> (if (in-hole L (def i h v)) e_1 e_2)
-        (def r h e_1)
-        "If-true1")
-   (--> (if (in-hole L v) e_1 e_2) ;; missing def
-        e_1
-        "If-true2")
+   (--> (if (in-hole L v) e_1 e_2)
+        (@ e_1 v)
+        "If-true")
    ;; For-loops
    ;; For2 only needed when the 'for' does not have a 'def'
    ;; For3 only needed when the 'for' does not have a 'bar'
    ;; For4 only needed when the 'for' does not have a 'bar' nor 'def'
-   (--> (for (bar (def i h v) ...) e)
-        (def r (t ...) (seq (= t (def r h e)) ... (arr t ...)))
+   (--> (for (bar v ...) e)
+        (def ((var t) ...) (seq (= t (@ e v)) ... (arr t ...)))
         (fresh ((t ...) (v ...)))
         "For1")
-   (--> (for (bar v ...) e) ;; missing def
-        (def r (t ...) (seq (= t e) ... (arr t ...)))
-        (fresh ((t ...) (v ...)))
-        "For2")
-   (--> (for (def i h v) e)
-        (def r (t) (seq (= t (def r h e)) (arr t)))
-        (fresh t)
-        "For3")
    (--> (for v e)
-        (def r (t) (seq (= t e) (arr t)))
+        (def ((var t)) (seq (= t (@ e v)) (arr t)))
         (fresh t)
-        "For4")
+        "For2")
    ;; Def blocks
-   (--> (in-hole X (def q h e))
-        (in-hole X e)
-        (side-condition (not (equal? (term X) (term hole))))
+   (--> (def h e)
+        e
         (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
         "Def-elim")
    ;; Unification
-   (--> (def q (in-hole H x) (in-hole X (= x v)))
-        (def q (in-hole H (:= x v)) (in-hole X v))
+   (--> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H (:= x v)) (in-hole X v))
         (side-condition (disjoint (term (fvs-v v)) (term (vvs (in-hole H (:= x v))))))
         (side-condition (disjoint (term (fvs-v v)) (term (bvs-X X))))
         "Bind")
-   (--> (def q (in-hole H x) (in-hole X (= x v)))
-        (def q (in-hole H (x y)) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
+   (--> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H ((var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
         (where (x_1 x_2 ...) (intersect (fvs-v v) (bvs-X X)))
         ; (side-condition (not (redex-match? verse x v)))
@@ -552,8 +533,8 @@
 (module+ test
   ;; Substitution
   (atest--> e-axioms ;; Subst
-           (term (def r (:= x 5) x))
-           (term (def r (:= x 5) 5)))
+           (term (def (:= x 5) x))
+           (term (def (:= x 5) 5)))
   ;; Choice
   (test--> e-axioms ;; Bar-assoc-1
            (term (bar 1 (bar) 2))
@@ -562,11 +543,11 @@
            (term (bar 1 (bar 2)))
            (term (bar 1 2)))
   (test--> e-axioms ;; Fail
-           (term (def r (x y) (bar)))
+           (term (def ((var x) (var y)) (bar)))
            (term (bar)))
-  (test--> e-axioms ;; Choice
-           (term (def i () (bar 1 2)))
-           (term (bar (def i () 1) (def i () 2))))
+  (atest--> e-axioms ;; Choice
+           (term (def (var x) (bar 1 x)))
+           (term (bar (def (var x) 1) (def (var x) x))))
   ;; Primitive operations
   (test--> e-axioms ;; P-add
            (term (++ 3 4))
@@ -602,7 +583,7 @@
   ;; Lambda and applications
   (test--> e-axioms ;; App-lam
            (term (@ (=> a (++ a 1)) 5))
-           (term (def r t (seq (= t 5) (++ t 1)))))
+           (term (def (var t) (seq (= t 5) (++ t 1)))))
   (atest--> e-axioms ;; App-rec
            (term (@ (rec a (=> n (arr a n))) 5))
            (term (@ (=> n (arr (rec a (=> n (arr a n))) n)) 5)))
@@ -617,47 +598,41 @@
            (term (if (bar) 1 2))
            (term 2))
   (test--> e-axioms ;; If-true1-1
-           (term (if (def i () 3) 1 2))
-           (term (def r () 1)))
+           (term (if 3 (=> x 1) 2))
+           (term (apply (arr (=> x 1) 3))))
   (test--> e-axioms ;; If-true1-2
-           (term (if (bar (def i () 3) (def i () 4)) 1 2))
-           (term (def r () 1)))
-  (test--> e-axioms ;; If-true2
-           (term (if 3 1 2))
-           (term 1))
+           (term (if (bar 3 (def () 4)) (=> x 1) 2))
+           (term (apply (arr (=> x 1) 3))))
   ;; For-loops
   (test--> e-axioms ;; For1-1
-           (term (for (bar) 0))
-           (term (def r () (seq (arr)))))
+           (term (for (bar) (=> x 0)))
+           (term (def () (seq (arr)))))
   (test--> e-axioms ;; For1-2
-           (term (for (bar (def i x 5)) 0))
-           (term (def r (t) (seq (= t (def r x 0)) (arr t)))))
+           (term (for (bar 5) (=> x 0)))
+           (term (def ((var t)) (seq (= t (apply (arr (=> x 0) 5))) (arr t)))))
+  (test--> e-axioms ;; For1-3
+           (term (for (bar 5 6) (=> x 0)))
+           (term (def ((var t) (var t1)) (seq (= t (apply (arr (=> x 0) 5))) (= t1 (apply (arr (=> x 0) 6))) (arr t t1)))))
   (test--> e-axioms ;; For2
-           (term (for (bar 5) 0))
-           (term (def r (t) (seq (= t 0) (arr t)))))
-  (atest--> e-axioms ;; For3
-           (term (for (def i x 5) 0))
-           (term (def r (t) (seq (= t (def r x 0)) (arr t)))))
-  (test--> e-axioms ;; For4
-           (term (for 5 0))
-           (term (def r (t) (seq (= t 0) (arr t)))))
+           (term (for 5 (=> x 0)))
+           (term (def ((var t)) (seq (= t (apply (arr (=> x 0) 5))) (arr t)))))
   ;; Do blocks
   (test--> e-axioms ;; Do-def
-           (term (add (def r (:= x 1) y)))
-           (term (add y)))
+           (term (def (:= x 1) y))
+           (term y))
   ;; Unification
   (atest--> e-axioms ;; Bind-1
-           (term (def r (a) (= a 5)))
-           (term (def r ((:= a 5)) 5)))
+           (term (def (var a) (= a 5)))
+           (term (def (:= a 5) 5)))
   (atest--> e-axioms ;; Bind-2
-           (term (def r (a) (= a b)))
-           (term (def r ((:= a b)) b)))  
+           (term (def (var a) (= a b)))
+           (term (def (:= a b) b)))  
   (test-equal ;; Bind-3  do NOT allow circularity
-           (apply-reduction-relation e-axioms (term (def r (a) (= a a))))
+           (apply-reduction-relation e-axioms (term (def (var a) (= a a))))
            '())
-  (atest--> e-axioms
-           (term (def r a (def r b (= a (arr 1 b)))))
-           (term (def r (a y) (def r b (seq (= b y) (= a (arr 1 y)))))))
+  (atest--> e-axioms ;; Promote
+           (term (def (var a) (def (var b) (= a (arr 1 b)))))
+           (term (def ((var a) (var y)) (def (var b) (seq (= b y) (= a (arr 1 y)))))))
 ;  (test--> e-axioms ;; Swap
 ;           (term (def r (a) (= 5 a)))
 ;           (term (def r (a) (= a 5))))
@@ -715,39 +690,39 @@
 ;
 
 ;; This rule gets rid of an unused def at the top level of a program.
-(define top-def
-  (reduction-relation
-   verse+E
-   #:domain e
-   (--> (def q h e)
-        e
-        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
-        "Top-def")
-   ))
-   
+;(define top-def
+;  (reduction-relation
+;   verse+E
+;   #:domain e
+;   (--> (def q h e)
+;        e
+;        (side-condition (disjoint (term (fvs-e e)) (term (bvs-h h))))
+;        "Top-def")
+;   ))
+;   
 
 (define e-axioms*
   (context-closure (union-reduction-relations e-axioms w-axioms) verse+E E))
 
 (define p-axioms
-  (union-reduction-relations top-def e-axioms*))
+  e-axioms*)
 
 (module+ test
   (test-->> p-axioms
-            (term (def r (:= x 1) x))
+            (term (def (:= x 1) x))
             (term 1))
   (test-->> p-axioms
-            (term (def r x (seq (= 6 x) (++ x 1))))
+            (term (def (var x) (seq (= 6 x) (++ x 1))))
             (term 7))
   (test-->> p-axioms
-            (term (def r (x y) (seq (= y (if (def i () (= x 1)) 111 222)) (seq (= x 1) y))))
+            (term (def ((var x) (var y)) (seq (= y (if (seq (= x 1) (arr)) (=> z 111) 222)) (seq (= x 1) y))))
             (term 111))
   (test-->> p-axioms
-            (term (def r (x y) (seq (= y (if (def i () (= x 1)) 111 222)) (seq (= x 2) y))))
+            (term (def ((var x) (var y)) (seq (= y (if (seq (= x 1) (arr)) (=> z 111) 222)) (seq (= x 2) y))))
             (term 222))
 ; Using test-->> is better, but very slow.
   (test-->>E p-axioms
-            (term (for (def i x (= x (bar 1 2))) (++ x 1)))
+            (term (for (def (var x) (seq (= x (bar 1 2)) x)) (=> x (++ x 1))))
             (term (array 2 3)))
   (test-->> p-axioms
             (term (@ (array 1 2) 1))
@@ -759,41 +734,39 @@
 
 (module+ test
   (test-->> p-axioms ;; Example-1
-            (term (def r (x y) (seq (= x 3) (= y (++ x 1)))))
+            (term (def ((var x) (var y)) (seq (= x 3) (= y (++ x 1)))))
             (term 4))
   (test-->> p-axioms ;; Example-2
-            (term (def r (x y) (seq (= y (++ x 1)) (= x 3) y)))
+            (term (def ((var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
             (term 4))
   (atest-->> p-axioms ;; Example-3
-            (term (def r (x y) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
-            (term (bar
-                   (def r ((:= x 3) (:= y 4)) 3)
-                   (def r ((:= x 77) (:= y 78)) 77))))
+            (term (def ((var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
+            (term (bar 3 77)))
   (test-->>E p-axioms ;; simple recusion
              (term
-              (def r (:= f (rec g (=> n (if (= n 0) 0 (++ n -1)))))
+              (def (:= f (rec g (=> n (if (= n 0) 0 (++ n -1)))))
                 (@ f 1)))
              (term 0))
   (test-->>E p-axioms ;; factorial
              (term
-              (def r fac
+              (def (var fac)
                 (seq
-                 (= fac (rec f (=> n (if (>> n 0) (** n (@ f (++ n -1))) 1))))
+                 (= fac (rec f (=> n (if (seq (>> n 0) (arr)) (=> z (** n (@ f (++ n -1)))) 1))))
                  (@ fac 3))))
              (term 6))
   (test-->>E p-axioms
              (term
-              (def r even-odd ; even odd)
+              (def (var even-odd) ; even odd)
                 (seq
                  (= even-odd
                     (rec f
                       (array
-                       (=> n (if (= n 0) ;; function even
-                                 0       ;; 0 indicates even
+                       (=> n (if (seq (= n 0) (arr)) ;; function even
+                                 (=> z 0)       ;; 0 indicates even
                                  (@ (@ f 1) (++ n -1)) ;; call odd
                                  ))
-                       (=> n (if (= n 0) ;; function odd
-                                 1       ;; 1 indicates odd
+                       (=> n (if (seq (= n 0) (arr)) ;; function odd
+                                 (=> z 1)       ;; 1 indicates odd
                                  (@ (@ f 0) (++ n -1)) ;; call even
                                  ))
                        ))
@@ -810,7 +783,7 @@
              )
   (test-->>E p-axioms
             (term
-             (def r (adder inc)
+             (def ((var adder) (var inc))
                (seq
                 (= adder (=> n (=> k (++ n k))))
                 (= inc (@ adder 1))

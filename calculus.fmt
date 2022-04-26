@@ -30,6 +30,7 @@
 %format semi = "\textbf{seq}"
 %format gt = "\textbf{gt}"
 %format rec = "\textbf{rec}"
+%format range = "\textbf{range}"
 %format wrong = "\textbf{wrong}"
 %format dots = ".."
 %format hnf = "\hnf"
