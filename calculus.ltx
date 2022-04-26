@@ -217,7 +217,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Types} & ty & ::= & |int| \vb |string| \vb |type(v)| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |applyx cop ce| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
-    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\a
+    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
  \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
@@ -245,7 +245,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}[t]{rcl}
     \boundvars{ \hole } & = & \emptyset \\
     \boundvars{ |def h in X| } & = & \boundvars{h} \cup \boundvars{X} \\
-    \boundvars{ |op^(X)| } & = & \boundvars{X} \\
+    \boundvars{ |applyx X e| } & = & \boundvars{X} \\
+    \boundvars{ |applyx e X| } & = & \boundvars{X}
   \end{array}\qquad
   \begin{array}[t]{rcl}
     \boundvars{ |X==e| } & = & \boundvars{X} \\
@@ -295,7 +296,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Sequencing} \\
     \begin{array}{lrcl}
     \rulename{seq} & |v ; e| & \movesto & |e| \\
-    \rulename{op-seq} & |op^(e_1 ; e_2)| & \movesto & |e_1 ; op^(e_2)| \\
+    \rulename{app-seql} & |applyx (e_1 ; e_2) e_3| & \movesto & |e_1 ; applyx e_2 e_3| \\
+    \rulename{app-seqr} & |applyx v (e_1 ; e_2)| & \movesto & |e_1 ; applyx v e_2| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
     \end{array} \\
@@ -306,8 +308,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x in (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
-    \rulename{app-type} & |(type(v))(e)| & \movesto & |applyx v e| \\
-    \rulename{app-arr} & |(v_0,dots,v_k,dots,v_n)(k)| & \movesto &
+    \rulename{app-type} & |applyx (type(v))(e)| & \movesto & |applyx v e| \\
+    \rulename{app-arr} & |applyx (v_0,dots,v_k,dots,v_n)(k)| & \movesto &
     \begin{array}[t]{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\
            |fail| & \text{otherwise}
@@ -430,8 +432,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
 An expression |e| has syntax given in \Cref{fig:verse-syntax}.
 Constants |k| are simply integers in this presentation, and come equipped with
-some primitive operations |op|.  To avoid clutter, we provide only two representative
-operations, |add^(e_1,e_2)| for integer addition, and |gt^(e_1,e_2)| for integer comparison.
+some primitive operations.  To avoid clutter, we provide only two representative
+operations, |add| for integer addition, and |gt| for integer comparison.
 
 \paragraph{Tuples and arrays.}
 All functions (including |add| and |gt|) take a single argument, but that
@@ -439,7 +441,7 @@ argument can be a tuple, say |(e_1,e_2)|. In Verse, tuples and arrays are the sa
 a tuple is just an array whose size is statically known.
 The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| constructs an array.
 We discuss |for| in \Cref{sec:for}.
-\joachim{Note that our syntax requires tuples to be in A-Normal-Form. We should explain that here. Also, if we require tuples construction in ANF, why not other primitive operations ($op$)?}
+\joachim{Note that our syntax requires tuples to be in A-Normal-Form. We should explain that here. Also, if we require tuples construction in ANF, why not function application.}
 
 \paragraph{Unification and sequencing.}
 Unification and sequencing are part of the expressions language.
@@ -538,7 +540,7 @@ The reason to disallow these is that we do not know if they are needed.
     \begin{array}{lrcl}
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
-      && \vb & |op^(E)| \vb |def h in E| \vb |E choice e| \vb |e choice E| \\
+      && \vb & |applyx E e| \vb |applyx e E| \vb |def h in E| \vb |E choice e| \vb |e choice E| \\
       && \vb & |if E then e else e| \vb |for E in e| \\
     \end{array}
   $$
