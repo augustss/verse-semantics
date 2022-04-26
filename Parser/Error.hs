@@ -5,8 +5,8 @@ import GHC.Stack
 unimplemented :: (HasCallStack) => a
 unimplemented = error "unimplemented"
 
-impossible :: (HasCallStack) => a
-impossible = error "impossible"
+impossible :: (HasCallStack, Show a) => a -> b
+impossible a = error $ "impossible: " ++ show a
 
 internalError :: (HasCallStack) => a
 internalError = error "internalError"

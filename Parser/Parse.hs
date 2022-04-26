@@ -36,7 +36,7 @@ pIdent = try $ do
   pure $ Ident l w
 
 keywords :: [String]
-keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "then", "where"]
+keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "then", "typedef", "where"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -82,18 +82,21 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [Variable <$> pIdent, LitInt <$> pDecimal, pEmpty, pParens pExprSeq, pArray]
+pAtom = choice [Variable <$> pIdent, LitInt <$> pDecimal, pEmpty, pParens pExprSeq, pArray, pTypedef]
   where pEmpty = try $ pParens (pure (Array (BExprs [])))
 
 pArray :: P Expr
 pArray = pKeyword "array" *> (Array <$> pBlockM)
 
+pTypedef :: P Expr
+pTypedef = pKeyword "typedef" *> (Typedef <$> pBlockM)
+
 pTerm :: P Expr
 pTerm = do
   fn <- pAtom
   let pArg :: P (Expr -> Expr)
-      pArg = (flip Index <$> pBrackets pExprSeq) <|>
-             (flip Call <$> pParens pExprSeq) <|>
+      pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
+             (flip ApplyS <$> pParens pExprSeq) <|>
              (flip EffAttr <$> try (pAngles pIdent))
       apply a f = f a
   foldl apply fn <$> many pArg

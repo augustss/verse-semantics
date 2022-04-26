@@ -29,11 +29,14 @@ data CState = CState
 command :: Command CState
 command = Command
   { c_commands =
-      [ Cmd "read FILE"      "Parse a file"                   cRead
-      , Cmd "desugar [EXPR]" "Desugar [last] expression"      cDesugar
-      , Cmd "scope [EXPR]"   "Insert defs"                    cScope
-      , Cmd "show [EXPR]"    "Show [last] expression"         cShow
-      , Cmd "print [EXPR]"   "Pretty print [last] expression" cPrint
+      [ Cmd "read FILE"       "Parse a file"                   cRead
+      , Cmd "desugar [EXPR]"  "Desugar [last] expression"      cDesugar
+      , Cmd "light [EXPR]"    "Initial desugaring"             cDesugarLight
+      , Cmd "function [EXPR]" "Function desugaring"            cFunction
+      , Cmd "scope [EXPR]"    "Insert defs"                    cScope
+      , Cmd "show [EXPR]"     "Show [last] expression"         cShow
+      , Cmd "simplify [EXPR]" "Show [last] expression"         cSimplify
+      , Cmd "print [EXPR]"    "Pretty print [last] expression" cPrint
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -77,11 +80,35 @@ cDesugar =
       pp e'
       pure e'
 
+cDesugarLight :: Run CState
+cDesugarLight =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+      let e' = desugarLight e
+      pp e'
+      pure e'
+
 cScope :: Run CState
 cScope =
   withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $ do
       let e' = scope e
+      pp e'
+      pure e'
+
+cFunction :: Run CState
+cFunction =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+      let e' = desugarFunction e
+      pp e'
+      pure e'
+
+cSimplify :: Run CState
+cSimplify =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+      let e' = simplify e
       pp e'
       pure e'
 

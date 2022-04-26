@@ -10,8 +10,9 @@ module Expr(
   Eff,
   Op,
   arrayS,
+  compos, composOp,
   ) where
-
+import Control.Monad.Identity
 import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
@@ -46,8 +47,8 @@ data Expr
   | Variable Ident            -- x
   | Array Block               -- e1,e2,...
   | Seq [Expr]                -- e1;e2;...
-  | Call Expr Expr            -- f(e)
-  | Index Expr Expr           -- f[e]
+  | ApplyS Expr Expr          -- f(e)
+  | ApplyD Expr Expr          -- f[e]
   | EffAttr Expr Eff          -- f<e>
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
@@ -63,8 +64,13 @@ data Expr
   | Case1 Block               -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function Expr [Eff] Block -- function(e)<eff>{e}
-  -- Only after scope extrusion
+  | Typedef Block             -- typedef{e}
+  -- Only after scope extrusion, etc
   | Def [Ident] Block         -- def xs in e
+  | Unify Expr Expr           -- e = e
+  | Type Expr
+  | Range Expr
+  | Lambda Ident Expr
   deriving (Eq, Ord, Show, Data)
 
 type Eff = Ident
@@ -102,11 +108,11 @@ instance Pretty Expr where
             | denominator r == 1 -> text $ show (numerator r)
             | otherwise -> maybeParens (p >= 9) $ text $ show (numerator r) ++ "/" ++ show (denominator r)
           Array e -> text "array" <> ppr 0 e
-          Seq es -> ppSeq l es
+          Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
-          Call  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
+          ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
             where (q, ql, _) = fixity "()"
-          Index f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
+          ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
             where (q, ql, _) = fixity "()"
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"
@@ -139,8 +145,14 @@ instance Pretty Expr where
                                            indent $ ppr 0 bs ]
           Function a es b -> maybeParens (p > 0) $ text "fn" <> parens (pPrintL l a) <> effs <> ppr 0 b
             where effs = mconcat (map (\ e -> text "<" <> pPrintL l e <> text ">") es)
+          Typedef e -> text "typedef" <> braces (ppr 0 e)
+          ----
           Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
                                                   text "in" <+> ppr 0 e ]
+          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
+          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+          Type e -> text "type" <> braces (ppr 0 e)
+          Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
@@ -158,7 +170,8 @@ fixity op = fromMaybe internalError $ lookup op tbl
     inr s p = (s, (p, p+1, p))
     tbl =
       [ --inn ","     1
-        inr "=>"      2
+        inn "where"   1
+      , inr "=>"      2
       , inn ":="      3
       , inr "||"      4
       , inr "&&"      5
@@ -236,3 +249,40 @@ freeVars = block . Block
     block (Block e) = expr e \\ definedVars e
 
 -}
+
+compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
+compos _ e@LitInt{} = pure e
+compos _ e@LitRat{} = pure e
+compos _ e@Variable{} = pure e
+compos f (Array b) = Array <$> composBlock f b
+compos f (Seq es) = Seq <$> traverse f es
+compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2
+compos f (ApplyD e1 e2) = ApplyD <$> f e1 <*> f e2
+compos f (EffAttr e r) = EffAttr <$> f e <*> pure r
+compos f (PrefixOp op e) = PrefixOp op <$> f e
+compos f (PostfixOp e op) = PostfixOp <$> f e <*> pure op
+compos f (InfixOp e1 op e2) = InfixOp <$> f e1 <*> pure op <*> f e2
+compos f (If1 b) = If1 <$> composBlock f b
+compos f (If2 e b) = If2 <$> f e <*> composBlock f b
+compos f (If2E e b) = If2E <$> f e <*> composBlock f b
+compos f (If3 e b1 b2) = If3 <$> f e <*> composBlock f b1 <*> composBlock f b2
+compos f (For1 b) = For1 <$> composBlock f b
+compos f (For2 e b) = For2 <$> f e <*> composBlock f b
+compos f (Let e b) = Let <$> f e <*> composBlock f b
+compos f (Do b) = Do <$> composBlock f b
+compos f (Case1 b) = Case1 <$> composBlock f b
+compos f (Case2 e b) = Case2 <$> f e <*> composBlock f b
+compos f (Function e r b) = Function <$> f e <*> pure r <*> composBlock f b
+compos f (Typedef b) = Typedef <$> composBlock f b
+compos f (Def is b) = Def is <$> composBlock f b
+compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
+compos f (Type e) = Type <$> f e
+compos f (Range e) = Range <$> f e
+compos f (Lambda v e) = Lambda v <$> f e
+
+composBlock :: (Applicative f) => (Expr -> f Expr) -> Block -> f Block
+composBlock f (BExpr e) = BExpr <$> f e
+composBlock f (BExprs es) = BExprs <$> traverse f es
+
+composOp :: (Expr -> Expr) -> Expr -> Expr
+composOp f = runIdentity . compos (pure . f)
