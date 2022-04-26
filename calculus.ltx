@@ -364,9 +364,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{promote} & |def H^[x] in X^[x=v]| 
        & \movesto
     &  \begin{array}[t]{@@{}l}
-        |def H^[x,y] in X^[z==y; x==v]| \\
+        |def H^[x,y] in X^[z==y; x==v^[z subst y]]| \\
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
-        \text{and}\; y \not\in \boundvars{H} \cup \freevars{|X^[x=v]|} \\
+        \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
 
 %    \rulename{B3} & |def H^[x] in X^[(e_1,dots,e_n)==x]| & \movesto & |def H^[x] in X^[x==(e_1,dots,e_n)]| \\
@@ -602,19 +602,18 @@ Nor does $X$ look inside choices.  For example,
 |def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
 
 Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
-First, rule \rulename{swap} swaps |(e=x)| to |(x=e)|, which directly fits rule \rulename{bind}.
+First, rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)|, which directly fits rule \rulename{bind}.
 We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
-the side condition.
+using |hnf| rather than |v| in this rule.
 
 \rulename{promote} is subtle, and deals with a case like
     $$ |def x in dots x dots(def z in dots(x==(3,z))dots)dots| $$
-We can't use \rulename{bind} directly, because it would be ill-scoped to substitute |(3,z)| for |x| outside the |def| that binds |z|.
-Instead we invent a fresh variable |y| that we unify with |z|, but is bound as an sibling of |x|, thus
-    $$ |def x,y in dots x dots(def z in dots(z=y; x==(3,z))dots)dots| $$
-The rule \rulename{bind} can now eliminate |z|:
-    $$ |def x,y in dots x dots(dots(y;x==(3,y))dots)dots| $$
-and finally \rulename{bind} can bind |x| to |(3,y)|
-    $$ |def y in dots (3,y) dots(dots(y;(3,y))dots)dots| $$
+We can't use \rulename{bind} directly, because it would be ill-scoped to add |x:=(3,z)|
+to the outermost |def|. Instead we invent a fresh variable |y| (bound as a sibling to |x|),
+substitute it for |z| in |v|, and unify it with |z|, thus
+    $$ |def x,y in dots x dots(def z in dots(z=y; x==(3,y))dots)dots| $$
+Now  \rulename{bind} can substitute |(3,y)| for |x|:
+    $$ |def y in dots (3,y) dots(def z in dots(z=y;(3,y))dots)dots| $$
 and all is well.
 
 \subsection{Choice and failure}
