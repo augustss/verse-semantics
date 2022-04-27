@@ -35,6 +35,8 @@
 
 % Desugaring
 \newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
+\newcommand{\Fd}[2]{{\mathcal F}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -893,14 +895,10 @@ $$
 \begin{array}{rcll}
   |De k| & = & |k| \\
   |De x| & = & |x| \\
-  |De (e_1, dots e_n)| & = & |De (e_1), dots De (e_n)| \\
+  |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
-  |De (e_1[e_2])| & = & |(De e_1)[De e_2]| \\
-  |De (e_1(e_2))| & = & |De (succeeds[e_1[e_2]])| \\
-  |De (if{e})| & = & |De (if(e) else ())| \\
-  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else ())| \\
-  |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
-  |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
+  |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
+  |De (e_1^(e_2))| & = & |De (succeeds^[e_1^[e_2]])| \\
   |De (!e)| & = & |De (if e then :() else ())| \\
   |De (:e)| & = & |: De e| \\
   |De (sop e)| & = & |De (prefix sop (e))| \\
@@ -908,13 +906,39 @@ $$
   |De (e sop)| & = & |De (postfix sop (e))| \\
   |De (e fop)| & = & |De (postfix fop [e])| \\
   |De (e_1 => e_2)| & = & |De (function e_1 e_2)| \\
-  |De (l := e)| & = & |xxxx| \\
+  |De (l := e)| & = & |Ld l e| \\
   |De (l : e)| & = & |De (l := :e)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
   |De (e_1 srcor e_2)| & = & |De (if(e_1) else e_2)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
-
+  |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
+  |De (e_1 sop e_2)| & = & |De (operator sop (e_1, e_2))| \\
+  |De (e_1 fop e_2)| & = & |De (operator sop [e_1, e_2])| \\
+  |De (if{e})| & = & |De (if(e) else ())| \\
+  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else ())| \\
+  |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
+  |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
+  |De (for{e})| & = & |De (for (x := e) in { x })| & \text{|x| fresh} \\
+  |De (let(e_1) in e_2)| & = & |let(De e_1) in De e_2| \\
+  |De (do{e})| & = & |do{De e_1}| \\
+  |De (case{e_1; dots e_n})| & = & |De (x:any) => case(x){e_1; dots e_n}| \\
+  |De (case(e){e_1; dots e_n}| & = & |De x:=e; if(e_1[x]) else dots if(e_n[x]) else :()| \\
+%% XXX effects are missing
+  |De (function e_1 e_2)| & = &
+      |function(x:any)(e_1 = x; do{De e_2})| & \text{|x| fresh} \\
+  |De (typedef^{e})| & = & |typedef^{De e}| \\
+  %%\end{array}
+  %%\begin{array}{rcll}
+  \\
+  |Ld x e| & = & |x = De e| \\
+  |Ld (l : t) e| & = & |Ld l (t^[e])| \\
+  |Ld (e_1^(e_2)) e_3| & = & |Fd (e_1^(e_2)) e_3| \\
+  |Ld (l ?) e| & = & |Ld l (e ?)| \\
+  |Ld (e_1 ?) e_2| & = & |De (assign(e_1,e_2))| \\
+  |Ld (l_1, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
+  |Fd (e_1^(e_2)) e_3| & = & |Fd e_1 (function e_2 e_3)| \\
+  |Fd x e| & = & |De (x := e)| \\
 \end{array}
 $$
 \caption{Desugaring} \label{fig:pat-sugar}

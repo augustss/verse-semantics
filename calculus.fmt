@@ -1,4 +1,6 @@
 %format De (x) = "\De{" x "}"
+%format Ld (x)(y) = "\Ld{" x "}{" y "}"
+%format Fd (x)(y) = "\Fd{" x "}{" y "}"
 %format applyx a (b) = a "(" b ")"
 
 %format lambda = "\lambda\!"
@@ -46,8 +48,10 @@
 %format int = "\textbf{int}"
 %format string = "\textbf{string}"
 %format function (x)(rhs) = "\textbf{function}(" x ")\{" rhs "\}"
-%format prefix op = "\textbf{prefix}\textquote " op
-%format postfix = "\textbf{postfix}"
+%format prefix op = "\textbf{prefix}\textquote " op "\textquote"
+%format postfix op = "\textbf{postfix}\textquote " op "\textquote"
+%format operator op = "\textbf{operator}\textquote " op "\textquote"
+%format typedef = "\textbf{typedef}"
 %format dots = ".."
 %format hnf = "\hnf"
 %format emp = "\epsilon"
