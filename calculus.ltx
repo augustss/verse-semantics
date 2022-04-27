@@ -843,48 +843,59 @@ To save space we have used the abbreviation |F| for the expression \newline
 \section{Source Verse}
 
 \begin{figure}
-\begin{tabular}{c}
-\begin{tabular}{rcll}
-  \multicolumn{3}{l}{Expressions:} \\
-  $e$ & ::= & $x$ & use variable \\
-  & $\mid$ & $k$ & constant \\
-  & $\mid$ & \vtt{$d$ := $e$} & definition \\
-  & $\mid$ & \vtt{$x$ : $t$} & definition \\
-  & $\mid$ & \vtt{: $t$} & range \\
-  & $\mid$ & \vtt{$e_1$[$e_2$]} & function application, may fail \\
-  & $\mid$ & \vtt{$e_1$($e_2$)} & function application, may not fail \\
-  & $\mid$ & \vtt{$p$ => $e$} & lambda expression \\
-  & $\mid$ & |e_1 choice e_2| & alternative \\
-  & $\mid$ & \vtt{$e_1$..$e_2$} & alternative range \\
-  & $\mid$ & \vtt{$e_1$,$\ldots$,$e_n$} & tuple formation, $n >= 2$ \\
-  & $\mid$ & \vtt{()} & empty tuple \simon{right?} \\
-  & $\mid$ & \vtt{if ($e_1$) then $e_2$ else $e_3$} & conditional \\
-  & $\mid$ & \vtt{if ($e_1$) then $e_2$} & one-arm conditional \\
-  & $\mid$ & \vtt{for($e_1$) in\{ $eb_2$ \}} & array creation \\
-  & $\mid$ & \vtt{for($e_1$)}  & simple array creation \\
-  & $\mid$ & $e_1 \;op\; e_2$ & infix operator \\
-  & $\mid$ & \vtt{typedef\{$e$\}} & type definition \\
-  & $\mid$ & \vtt{case($e$) of \{$e_1$;$\cdots$;$e_n$\}} & case expression \\
-  & $\mid$ & \vtt{let ($e_1$) in $e_2$} & local bindings \\
-  & $\mid$ & \vtt{$e_1$ ; $e_2$} & sequencing \\
-  & $\mid$ & \vtt{$e_1$ where $e_2$} & sequencing \\
-  & $\mid$ & \vtt{do \{$e$\} } & scope delimiter \\
-\ifmatch
-  & $\mid$ & \vtt{$p$ :- $e$} & match \\
-\fi
-  $t$ & ::= & $e$ & types are expressions \\
-  \\
-  \multicolumn{3}{l}{Definitions:} \\
-  $d$ & ::= & $f \mid b$ \\
-  $f$ & ::= & \vtt{$f$($p$)} & function \\
-   & $\mid$ & \vtt{$f$($p$)\,$\eff$}& function \\
-  & $\mid$ & \vtt{$f$ : $t$} \\
-  & $\mid$ & $x$ & \\
-  $b$ & ::= & $x$ & variable \\
-  & $\mid$ & \vtt{$b$ : $t$} & type \\
-  & $\mid$ & $b_1$\vtt{,} $\cdots$\vtt{,} $b_n$ & tuple \\
-\end{tabular}
-\end{tabular}
+$$
+\begin{array}{rcll}
+  |e| & ::= &               & \text{Expressons} \\
+      & & |x|               & \text{variable reference} \\
+      & & |k|               & \text{constant} \\
+      & & |e_1, dots, e_n|  & \text{array} \\
+      & & |e_1 ; e_2|       & \text{sequencing} \\
+      & & |e_1^[e_2]|       & \text{function application} \\
+      & & |l := e|          & \text{definition} \\
+      & & |: e|             & \text{range} \\
+      & & |e_1 => e_2|      & \text{lambda expression} \\
+      & & |e_1 `choice` e_2| & \text{choice} \\
+      & & |if(e) then b_1 else b_2| & \text{conditional expression} \\
+      & & |for(e) in b|     & \text{finite loop} \\
+      & & |let(e) in b|     & \text{local binding} \\
+      & & |do b|            & \text{scope delimiter} \\
+      & & |function e b|    & \text{anonymous function} \\
+      & & |typedef{e}|      & \text{type definition} \\
+  %%%%%
+      & & & \text{Expressions removed by desugaring} \\
+      & & |e_1^(e_2)|       & \text{non-failing function application} \\
+      & & |op e|            & \text{prefix operator} \\
+      & & |e op|            & \text{postfix operator} \\
+      & & |e_1 op e_2|      & \text{infix operator} \\
+      & & |l : e|           & \text{of type} \\
+      & & |e_1 srcand e_2|  & \text{logical and} \\
+      & & |e_1 srcor e_2|   & \text{logical or} \\
+      & & |e_1 where e_2|   & \text{reverse sequencing} \\
+      & & |if(e) then b|    & \text{conditional expression} \\
+      & & |if(e) else b|    & \text{conditional expression} \\
+      & & |if{e}|           & \text{conditional expression} \\
+      & & |for{e}|          & \text{finite loop} \\
+      & & |case(e) of b|    & \text{case expression} \\
+      & & |case{b}|         & \text{case expression} \\
+      \\
+   |b| & ::= & & \text{Blocks} \\
+      & & |e|               & \text{single expression} \\
+      & & { e_1; dots ; e_n } & \text{multiple expressions} \\
+      \\
+   |l| & ::= &              & \text{Definition LHS} \\
+      & & |x|               & \text{variable} \\
+      & & |l : e|           & \text{of type} \\
+      & & |f^(e)|           & \text{function} \\
+      & & |l?|              & \text{optional} \\
+      & & |e^|              & \text{assignment} \\
+      & & |l_1, dots l_n|   & \text{array} \\
+   \\
+   |f| & ::= &              & \text{Function definition LHS} \\
+      & & |f^(e)|           & \text{function argument} \\
+      & & |f<x>|            & \text{function effect} \\
+      & & |x|               & \text{function name} \\
+\end{array}
+$$
 \caption{Source Verse} \label{fig:source-verse}
 \end{figure}
 
@@ -933,11 +944,11 @@ $$
   \\
   |Ld x e| & = & |x = De e| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
-  |Ld (e_1^(e_2)) e_3| & = & |Fd (e_1^(e_2)) e_3| \\
+  |Ld (f^(e)) e_3| & = & |Fd (f^(e)) e_3| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1 ?) e_2| & = & |De (assign(e_1,e_2))| \\
   |Ld (l_1, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
-  |Fd (e_1^(e_2)) e_3| & = & |Fd e_1 (function e_2 e_3)| \\
+  |Fd (f^(e_1)) e_d| & = & |Fd f (function e_1 e_2)| \\
   |Fd x e| & = & |De (x := e)| \\
 \end{array}
 $$
