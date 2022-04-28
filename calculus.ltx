@@ -917,6 +917,8 @@ $$
         &     & + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb \\
         &     & < \vb <= \vb > \vb >= \vb <>
   \\
+  |r| & ::= & \textit{Effects} \\
+      &     & |succeeds| \vb |decides| \vb |iterates|
 \end{array}
 $$
 \caption{Source Verse} \label{fig:source-verse-misc}
@@ -964,12 +966,12 @@ $$
   |De (typedef^{e})| & = & |typedef^{De e}| \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
-  |Ld x e| & = & |x = De e| \\
+  |Ld x e| & = & |x := De e| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
-  |Ld (f^(e)) e_3| & = & |Fd (f^(e)) e_3| \\
+  |Ld (f^(e_1)) e_2| & = & |Fd (f^(e_1)) e_2| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1 ?) e_2| & = & |De (assign^(e_1,e_2))| \\
-  |Ld (l_1, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
+  |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
   |Fd (f^(e_1)effsR) e_2| & = & |Fd f (function e_1 effsR e_2)| \\
   |Fd x e| & = & |De (x := e)| \\
 \end{array}
