@@ -1,8 +1,9 @@
 module Desugar(desugar, desugarLight, desugarFunction, scope, simplify) where
 import Control.Arrow(first, second)
 import Control.Monad.State.Strict
---import Data.List
+import Data.List
 import Data.Maybe
+import Debug.Trace
 
 import Expr
 import Error
@@ -35,7 +36,8 @@ desugarS = expr
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
     expr (PrefixOp (Ident l "!") e) = expr $ If2 e $ BExpr $ eFail l
-    expr (PrefixOp (Ident _ ":") e) = Range <$> expr e
+    expr (PrefixOp (Ident l ":") e) = --Range <$> expr e
+      newIdent "d" >>= \ i -> expr $ ApplyD e (tAny l i)
     expr (PrefixOp (Ident l op) e) = expr $ call "pre" l op e
     expr (PostfixOp e (Ident l op)) = expr $ call "post" l op e
     expr (InfixOp e1 (Ident l op) e2) =
@@ -56,21 +58,23 @@ desugarS = expr
     expr (For2 e1 e2) = For2 <$> expr e1 <*> block e2
     expr (Let e1 e2) = Let <$> expr e1 <*> block e2
     expr (Do e) = Do <$> block e
-    expr (Case1 b) = newIdent "d" >>= \ i -> expr $ InfixOp (tAny i) (Ident noLoc "=>") $ Case2 (Variable i) b
+    expr (Case1 b) =
+      newIdent "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
     expr (Case2 e1 e2) = desugarCase e1 e2
     expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> block e2
-    expr (Typedef b) = newIdent "t" >>= \ i -> Type . Lambda i <$> expr (blockToExpr b)
+    expr (Typedef b) = newIdent "d" >>= \ i -> Type . Lambda i <$> expr (blockToExpr b)
+    expr Any = pure Any
       
     expr e@Def{} = impossible e
     expr e@Unify{} = impossible e
-    expr e@Range{} = impossible e
+--    expr e@Range{} = impossible e
     expr e@Type{} = impossible e
     expr e@Lambda{} = impossible e
 
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
 
-    tAny i = InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))
+    tAny l i = define l i Any
 
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
@@ -144,7 +148,7 @@ desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettySho
 
 -- Insert defs
 scope :: Expr -> Expr
-scope = {-scopeCheck . -} scopeDef
+scope = scopeCheck . scopeDef
 
 scopeDef :: Expr -> Expr
 scopeDef = insDef . scopeExpr
@@ -153,19 +157,25 @@ scopeDefB :: Block -> Block
 scopeDefB (BExpr e) = BExpr $ scopeDef e
 scopeDefB (BExprs es) = BExpr $ scopeDef $ Seq es
 
-{-
-_scopeCheck :: Expr -> Expr
-_scopeCheck e =
-  case freeVars e of
+scopeCheck :: Expr -> Expr
+scopeCheck e =
+  case freeVars e \\ predef of
     [] -> e
-    xs -> error $ "Undefined " ++ prettyShow xs
+    xs -> trace ("Undefined " ++ prettyShow xs)
+          e
+
+predef :: [Ident]
+predef = map (Ident noLoc) ["int", "any", "nat", "float", "string"]
 
 freeVars :: Expr -> [Ident]
 freeVars ae = execState (free ae) []
   where
-    -- XXX incomplete
     free e@(Variable v) = do modify (\ s -> union [v] s); pure e
--}
+    free (Lambda v e) = do e' <- free e; modify (\ s -> s \\ [v]); pure e'
+    free (Def vs e)  = do e' <- freeB e; modify (\ s -> s \\ vs); pure (Def vs e')
+    free e = compos free e
+    freeB (BExpr e) = BExpr <$> free e
+    freeB (BExprs es) = BExprs <$> mapM free es
 
 insDef :: ([Ident], Expr) -> Expr
 insDef (is, e) | anySame is = error $ "Multiple definition " ++ prettyShow is
@@ -216,8 +226,9 @@ scopeExpr (Do _b) = unimplemented
 scopeExpr (Function p r e) = ([], Function p r $ scopeDefB e)
 scopeExpr (Type (Lambda v e)) = ([], Type $ Lambda v $ def xs $ BExpr $ Unify (Variable v) e')
   where (xs, e') = scopeExpr e
-scopeExpr (Range e) = second Range $ scopeExpr e
+--scopeExpr (Range e) = second Range $ scopeExpr e
 scopeExpr (Lambda v e) = ([], Lambda v $ scopeDef e)
+scopeExpr Any = ([], Any)
 scopeExpr e = error $ "scopeExpr " ++ show e
 
 scopeBlock :: Block -> ([Ident], Block)
@@ -260,9 +271,10 @@ desugarFunctionS = expr
     expr e@Def{} = impossible e
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (InfixOp e1 op e2) = InfixOp <$> expr e1 <*> pure op <*> expr e2
-    expr (Range e) = Range <$> expr e
+--    expr (Range e) = Range <$> expr e
     expr (Type e) = Type <$> expr e
     expr (Lambda v e) = Lambda v <$> expr e
+    expr Any = pure Any
     expr e = impossible e
 
     block (BExpr e) = BExpr <$> expr e
@@ -279,5 +291,5 @@ desugarFunctionS = expr
 
 simplify :: Expr -> Expr
 simplify = simp
-  where simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
+  where --simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
         simp e = composOp simp e

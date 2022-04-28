@@ -69,8 +69,9 @@ data Expr
   | Def [Ident] Block         -- def xs in e
   | Unify Expr Expr           -- e = e
   | Type Expr
-  | Range Expr
+--x  | Range Expr
   | Lambda Ident Expr
+  | Any                       -- :any
   deriving (Eq, Ord, Show, Data)
 
 type Eff = Ident
@@ -150,9 +151,10 @@ instance Pretty Expr where
           Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
                                                   text "in" <+> ppr 0 e ]
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
-          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+--          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
           Type e -> text "type" <> braces (ppr 0 e)
           Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
+          Any -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "any")))
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
@@ -201,55 +203,6 @@ arrayS :: [Expr] -> Expr
 arrayS [e] = e
 arrayS es = Array (BExprs es)
 
-{-
--- Find all variables defined in the scope of an expression.
--- Does not include variables from nested scopes.
-definedVars :: Expr -> [Ident]
-definedVars = expr
-  where
-    expr LitInt {} = []
-    expr LitRat {} = []
-    expr (Array es) = concatMap expr es
-    expr (Seq es) = concatMap expr es
-    expr Lambda {} = []
-    expr Variable {} = []
-    expr (Apply _ e1 e2) = expr e1 ++ expr e2
-    expr Or {} = []
-    expr (Range e) = expr e
-    expr (Unify e1 e2) = expr e1 ++ expr e2
-    expr (Define i e) = i : expr e
-    expr If {} = []
-    expr For {} = []
-    expr (Let _ e) = expr e
-    expr (PrimOp _ es) = concatMap expr es
-    expr Case {} = internalError
-    expr Function {} = internalError
-
--- All free variables in an expressions
-freeVars :: Expr -> [Ident]
-freeVars = block . Block
-  where
-    expr LitInt {} = []
-    expr LitRat {} = []
-    expr (Array es) = foldr (union . freeVars) [] es
-    expr (Seq es) = foldr (union . freeVars) [] es
-    expr (Lambda i b) = block b \\ [i]
-    expr (Variable v) = [v]
-    expr (Apply _ e1 e2) = expr e1 `union` expr e2
-    expr (Or b1 b2) = block b1 `union` block b2
-    expr (Range e) = expr e
-    expr (Unify e1 e2) = expr e1 `union` expr e2
-    expr (Define _ e) = expr e
-    expr (If b1 b2 b3) = block b1 `union` block b2 `union` block b3
-    expr (For b1 b2) = block b1 `union` block b2
-    expr (Let (Block b) e) = (expr b `union` expr e) \\ definedVars b
-    expr (PrimOp _ es) = foldr (union . freeVars) [] es
-    expr Case {} = internalError
-    expr Function {} = internalError
-    block (Block e) = expr e \\ definedVars e
-
--}
-
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 compos _ e@LitInt{} = pure e
 compos _ e@LitRat{} = pure e
@@ -277,8 +230,9 @@ compos f (Typedef b) = Typedef <$> composBlock f b
 compos f (Def is b) = Def is <$> composBlock f b
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Type e) = Type <$> f e
-compos f (Range e) = Range <$> f e
+--compos f (Range e) = Range <$> f e
 compos f (Lambda v e) = Lambda v <$> f e
+compos _ Any = pure Any
 
 composBlock :: (Applicative f) => (Expr -> f Expr) -> Block -> f Block
 composBlock f (BExpr e) = BExpr <$> f e

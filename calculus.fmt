@@ -35,6 +35,7 @@
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
+%format let = "\textbf{let}"
 %format apply = "\textbf{apply}"
 % only used in comments, but still prettier this way:
 %format fix = "\textbf{fix}"
@@ -125,6 +126,7 @@
 %format ce_n
 %format ce_m
 
+%format l_0
 %format l_1
 %format l_n
 
