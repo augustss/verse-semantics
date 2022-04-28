@@ -47,11 +47,15 @@
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
 %format string = "\textbf{string}"
-%format function (x)(rhs) = "\textbf{function}(" x ")\{" rhs "\}"
+%format function (x)(r)(rhs) = "\textbf{function}(" x ")" r "\{" rhs "\}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
 %format typedef = "\textbf{typedef}"
+%format case = "\textbf{case}"
+%format of = "\textbf{of}"
+%format assign = "\textbf{assign}"
+%format any = "\textbf{any}"
 %format dots = ".."
 %format hnf = "\hnf"
 %format emp = "\epsilon"
@@ -65,6 +69,10 @@
 %format , = ",\,"
 %format X = "X"
 %format CX = "CX"
+%format eqgt = "=>"
+%format apeff g x = g "\!\!<\!\!" x "\!\!>"
+%  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
+%format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 
 %format x_1
 %format x_2
@@ -116,3 +124,10 @@
 %format ce_3
 %format ce_n
 %format ce_m
+
+%format l_1
+%format l_n
+
+%format op_a
+%format op_b
+%format op_i

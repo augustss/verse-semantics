@@ -845,58 +845,81 @@ To save space we have used the abbreviation |F| for the expression \newline
 \begin{figure}
 $$
 \begin{array}{rcll}
-  |e| & ::= &               & \text{Expressons} \\
-      & & |x|               & \text{variable reference} \\
-      & & |k|               & \text{constant} \\
-      & & |e_1, dots, e_n|  & \text{array} \\
-      & & |e_1 ; e_2|       & \text{sequencing} \\
-      & & |e_1^[e_2]|       & \text{function application} \\
-      & & |l := e|          & \text{definition} \\
-      & & |: e|             & \text{range} \\
-      & & |e_1 => e_2|      & \text{lambda expression} \\
-      & & |e_1 `choice` e_2| & \text{choice} \\
-      & & |if(e) then b_1 else b_2| & \text{conditional expression} \\
-      & & |for(e) in b|     & \text{finite loop} \\
-      & & |let(e) in b|     & \text{local binding} \\
-      & & |do b|            & \text{scope delimiter} \\
-      & & |function e b|    & \text{anonymous function} \\
-      & & |typedef{e}|      & \text{type definition} \\
+  |e| & ::= & \textit{Expressions} \\
+      &     & |x|               & \text{variable reference} \\
+      & \vb & |k|               & \text{constant} \\
+      & \vb & |e_1, dots, e_n|  & \text{array} \\
+      & \vb & |()|              & \text{empty array} \\
+      & \vb & |e_1 ; e_2|       & \text{sequencing} \\
+      & \vb & |e_1^[e_2]|       & \text{function application} \\
+      & \vb & |l := e|          & \text{definition} \\
+      & \vb & |: e|             & \text{range} \\
+      & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
+      & \vb & |e_1 `choice` e_2| & \text{choice} \\
+      & \vb & |e_1 = e_2|       & \text{unification} \\
+      & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
+      & \vb & |for(e) in b|     & \text{finite loop} \\
+      & \vb & |let(e) in b|     & \text{local binding} \\
+      & \vb & |do b|            & \text{scope delimiter} \\
+      & \vb & |function e effsR b|    & \text{anonymous function} \\
+      & \vb & |typedef{e}|      & \text{type definition} \\
   %%%%%
-      & & & \text{Expressions removed by desugaring} \\
-      & & |e_1^(e_2)|       & \text{non-failing function application} \\
-      & & |op e|            & \text{prefix operator} \\
-      & & |e op|            & \text{postfix operator} \\
-      & & |e_1 op e_2|      & \text{infix operator} \\
-      & & |l : e|           & \text{of type} \\
-      & & |e_1 srcand e_2|  & \text{logical and} \\
-      & & |e_1 srcor e_2|   & \text{logical or} \\
-      & & |e_1 where e_2|   & \text{reverse sequencing} \\
-      & & |if(e) then b|    & \text{conditional expression} \\
-      & & |if(e) else b|    & \text{conditional expression} \\
-      & & |if{e}|           & \text{conditional expression} \\
-      & & |for{e}|          & \text{finite loop} \\
-      & & |case(e) of b|    & \text{case expression} \\
-      & & |case{b}|         & \text{case expression} \\
-      \\
-   |b| & ::= & & \text{Blocks} \\
-      & & |e|               & \text{single expression} \\
-      & & { e_1; dots ; e_n } & \text{multiple expressions} \\
-      \\
-   |l| & ::= &              & \text{Definition LHS} \\
-      & & |x|               & \text{variable} \\
-      & & |l : e|           & \text{of type} \\
-      & & |f^(e)|           & \text{function} \\
-      & & |l?|              & \text{optional} \\
-      & & |e^|              & \text{assignment} \\
-      & & |l_1, dots l_n|   & \text{array} \\
-   \\
-   |f| & ::= &              & \text{Function definition LHS} \\
-      & & |f^(e)|           & \text{function argument} \\
-      & & |f<x>|            & \text{function effect} \\
-      & & |x|               & \text{function name} \\
+      &     & \textit{Expressions removed by desugaring} \\
+      & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
+      & \vb & |op_b e|          & \text{prefix operator} \\
+      & \vb & |e op_a|          & \text{postfix operator} \\
+      & \vb & |e_1 op_i e_2|    & \text{infix operator} \\
+      & \vb & |l : e|           & \text{of type} \\
+      & \vb & |e_1 srcand e_2|  & \text{logical and} \\
+      & \vb & |e_1 srcor e_2|   & \text{logical or} \\
+      & \vb & |e_1 where e_2|   & \text{reverse sequencing} \\
+      & \vb & |if(e) then b|    & \text{conditional expression} \\
+      & \vb & |if(e) else b|    & \text{conditional expression} \\
+      & \vb & |if{e}|           & \text{conditional expression} \\
+      & \vb & |for{e}|          & \text{finite loop} \\
+      & \vb & |case(e) of b|    & \text{case expression} \\
+      & \vb & |case{b}|         & \text{case expression} \\
 \end{array}
 $$
-\caption{Source Verse} \label{fig:source-verse}
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  |x| &     & \textit{Variable} \\
+  |k| &     & \textit{Integer constant} \\
+      \\
+  |b| & ::= & \textit{Blocks} \\
+      &     & |e|               & \text{single expression} \\
+      & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
+      \\
+  |l| & ::= & \textit{Definition LHS} \\
+      &     & |x|               & \text{variable} \\
+      & \vb & |l : e|           & \text{of type} \\
+      & \vb & |f^(e)|           & \text{function} \\
+      & \vb & |l?|              & \text{optional} \\
+      & \vb & |e|\,\,\hat{}         & \text{assignment} \\
+      & \vb & |l_1, dots l_n|   & \text{array} \\
+   \\
+  |f| & ::= & \textit{Function definition LHS} \\
+      &     & |f^(e)|           & \text{function argument} \\
+      & \vb & |apeff f r|       & \text{function effect} \\
+      & \vb & |x|               & \text{function name} \\
+  \\
+ |op_b| & ::= & \textit{Prefix operators} \\
+        &     & ! \vb - \vb + \\
+  \\
+ |op_a| & ::= & \textit{Postfix operators} \\
+        &     & ? \vb \hat{} \\
+  \\
+ |op_i| & ::= & \textit{Infix operators} \\
+        &     & + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb \\
+        &     & < \vb <= \vb > \vb >= \vb <>
+  \\
+\end{array}
+$$
+\caption{Source Verse} \label{fig:source-verse-misc}
 \end{figure}
 
 \section{Desugaring Source Verse}
@@ -912,11 +935,11 @@ $$
   |De (e_1^(e_2))| & = & |De (succeeds^[e_1^[e_2]])| \\
   |De (!e)| & = & |De (if e then :() else ())| \\
   |De (:e)| & = & |: De e| \\
-  |De (sop e)| & = & |De (prefix sop (e))| \\
-  |De (fop e)| & = & |De (prefix fop [e])| \\
-  |De (e sop)| & = & |De (postfix sop (e))| \\
-  |De (e fop)| & = & |De (postfix fop [e])| \\
-  |De (e_1 => e_2)| & = & |De (function e_1 e_2)| \\
+  |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
+  |De (op_b e)| & = & |De (prefix op_b (e))| \\
+  |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
+  |De (e op_a)| & = & |De (postfix op_a (e))| \\
+  |De (e_1 eqgt e_2)| & = & |De (function e_1 () e_2)| \\
   |De (l := e)| & = & |Ld l e| \\
   |De (l : e)| & = & |De (l := :e)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
@@ -924,8 +947,8 @@ $$
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
   |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
-  |De (e_1 sop e_2)| & = & |De (operator sop (e_1, e_2))| \\
-  |De (e_1 fop e_2)| & = & |De (operator sop [e_1, e_2])| \\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i [e_1, e_2])| & \text{if |op_i| can fail}\\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i (e_1, e_2))| \\
   |De (if{e})| & = & |De (if(e) else ())| \\
   |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else ())| \\
   |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
@@ -936,55 +959,23 @@ $$
   |De (case{e_1; dots e_n})| & = & |De (x:any) => case(x){e_1; dots e_n}| \\
   |De (case(e){e_1; dots e_n}| & = & |De x:=e; if(e_1[x]) else dots if(e_n[x]) else :()| \\
 %% XXX effects are missing
-  |De (function e_1 e_2)| & = &
-      |function(x:any)(e_1 = x; do{De e_2})| & \text{|x| fresh} \\
+  |De (function e_1 effsR e_2)| & = &
+      |function(x:any)effsR(e_1 = x; do{De e_2})| & \text{|x| fresh} \\
   |De (typedef^{e})| & = & |typedef^{De e}| \\
-  %%\end{array}
-  %%\begin{array}{rcll}
+  |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
   |Ld x e| & = & |x = De e| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
   |Ld (f^(e)) e_3| & = & |Fd (f^(e)) e_3| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
-  |Ld (e_1 ?) e_2| & = & |De (assign(e_1,e_2))| \\
+  |Ld (e_1 ?) e_2| & = & |De (assign^(e_1,e_2))| \\
   |Ld (l_1, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
-  |Fd (f^(e_1)) e_d| & = & |Fd f (function e_1 e_2)| \\
+  |Fd (f^(e_1)effsR) e_2| & = & |Fd f (function e_1 effsR e_2)| \\
   |Fd x e| & = & |De (x := e)| \\
 \end{array}
 $$
 \caption{Desugaring} \label{fig:pat-sugar}
 \end{figure}
-
-\begin{figure}
-\begin{tabular}{l||ll}
-  Source & Expansion & Comment \\
-  \hline
-  \multicolumn{3}{c}{\bf Definitions $d$, $f$, $b$} \\
-  \vtt{$f$($p$) := $e$} & \vtt{$f$ := $p$ => $e$} &  \\
-  \vtt{$d$ : $t$ := $e$} & \vtt{$d$ := $t$[$e$]} &  \\
-  \vtt{$f$ $\eff$ := $e$} & \vtt{$f$ := \vtt{check $\eff$ in $e$}}  \\
-  \vtt{$x$ := $e$} & \vtt{$x$ = $e$} & \\
-  \vtt{($b_0$,$\cdots$,$b_n$):= $e$} & \vtt{x := $e$;} \vtt{$d_0$ := x[0];} $\cdots$\vtt{;} \vtt{$d_n$ := x[n]} & \vtt{x} fresh \\[2mm]
-  \hline
-  \multicolumn{3}{c}{\bf Patterns $p$} \\
-  \vtt{$p$ => $e$} & \vtt{\clam{x}{(\pmatch{p}{\vtt{x}}; $e$)}} & \vtt{x} fresh \\
-  \pmatch{(p_0,\cdots,p_n)}{e} & \vtt{x := $e$;} \pmatch{p_0}{\vtt{x[0];}} $\cdots$\vtt{;} \pmatch{p_n}{\vtt{x[n]}} & \vtt{x} fresh \\
-  \pmatch{(d \vtt{~:~} t)}{e} & \vtt{$d$ : $t$ := $e$} & \\
-  \pmatch{(d \vtt{~:=~} e_1)}{e_2} & \vtt{$d$ := ($e_1$ = $e_2$)} & ??? \\
-   & \multicolumn{2}{l}{Use do?  continue matching in e1?} \\
-  \pmatch{\vtt{:} t}{e} & \vtt{$t$[$e$]} & \\
-  \pmatch{(e_1 \vtt{;~} p)}{e_2} & \vtt{$e_1$; (\pmatch{p}{e_2})} & \\
-  \pmatch{(p \vtt{~where~} e_1)}{e_2} & \vtt{(\pmatch{p}{e_2}) where $e_1$} & \\
-  \pmatch{(\vtt{let (} e_1 \vtt{) in } p)}{e_2} & \vtt{let ($e_1$) in (\pmatch{p}{e_2})} & \\
-  \pmatch{e_1}{e_2} & \vtt{do ($e_1$ = $e_2$)} \\
-  \hline
-\end{tabular}\\[2mm]
-\lennart{Should there be a scope limiting \vtt{do} in pattern desugaring or not?}
-\lennart{The desugaring of d is probably subtly wrong.}
-\lennart{Mention Tim's principle that a d cab be turned into an e which turns :- into unification}
-\caption{Syntactic sugar for pattern matching} \label{fig:pat-sugar}
-\end{figure}
-
 
 
 \end{document}
