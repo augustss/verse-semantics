@@ -508,7 +508,7 @@ Here are some example heaps, with an indication of whether they are well formed:
 \end{center}
 
 \subsection{|wrong|}
-Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in an |apply|.
+Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in a function application.
 There are no general reduction rules to propagate |wrong|, instead the reduction gets stuck.
 \joachim{I'm a bit confused, there are a few incomplete rules to propagate wrong in \ref{fig:wrong-axioms}. In particular, I'd be curious about |fail; wrong|. But also about |if v choice wrong|. }
 \lennart{We need to think more about |wrong|.  You can make case for |fail; wrong| being |fail|.
@@ -517,6 +517,13 @@ There are no general reduction rules to propagate |wrong|, instead the reduction
 
 \joachim{Also, due to \rulename{fail}, we have |wrong; fail| $\movesto$ |fail|, that does not look right. Probably |e;X| should not be an execution context.}
 \lennart{No, |e;X| must be an execution context.  Consider |def x in x+1; x = 2|, we must do the |x = 2| before we can do |x+1|.}
+
+An alternative to using |wrong| would be to say that bad expressions just get stuck.
+Unfortunately this leads to non-confluence as we can get stuck in different way depending on the order of reduction.
+A simple example of this is |def x in x=(()=>1); x=(()=>2); x()|.
+This can be reduced by \rulename{bind} in two different ways, and after a few more reduction we get stuck with
+either |(()=>1)=(()=>2); 1| or  |(()=>2)=(()=>2); 2|.
+So even if we consider terms modulo commutativity of equality we have different terms.
 
 \subsection{Confluence}
 We have the following conjecture: the Verse reduction rules are confluent in the following sense.
