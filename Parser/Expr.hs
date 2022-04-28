@@ -67,10 +67,10 @@ data Expr
   | Typedef Block             -- typedef{e}
   -- Only after scope extrusion, etc
   | Def [Ident] Block         -- def xs in e
-  | Unify Expr Expr           -- e = e
-  | Type Expr
+  | Unify Expr Expr           -- e1 = e2
+  | Type Expr                 -- 
 --x  | Range Expr
-  | Lambda Ident Expr
+  | Lambda Ident Expr         -- lam x in e
   | Any                       -- :any
   deriving (Eq, Ord, Show, Data)
 

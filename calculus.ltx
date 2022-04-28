@@ -901,6 +901,7 @@ $$
       & \vb & |l?|              & \text{optional} \\
       & \vb & |e|\,\,\hat{}         & \text{assignment} \\
       & \vb & |l_1, dots l_n|   & \text{array} \\
+      & \vb & |l_1 minusgt l_2| & \text{domain-range} \\
    \\
   |f| & ::= & \textit{Function definition LHS} \\
       &     & |f^(e)|           & \text{function argument} \\
@@ -943,7 +944,7 @@ $$
   |De (e op_a)| & = & |De (postfix op_a (e))| \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () e_2)| \\
   |De (l := e)| & = & |Ld l e| \\
-  |De (l : e)| & = & |De (l := :e)| \\
+  |De (l : e)| & = & |Ld l (:e)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
   |De (e_1 srcor e_2)| & = & |De (if(e_1) else e_2)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
@@ -972,6 +973,7 @@ $$
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1 ?) e_2| & = & |De (assign^(e_1,e_2))| \\
   |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
+  |Ld (x_1 minusgt x_2) (:e)| & = & |Ld x_1 x; Ld x_2 (e^[x:any])| & \text{|x| fresh} \\
   |Fd (f^(e_1)effsR) e_2| & = & |Fd f (function e_1 effsR e_2)| \\
   |Fd x e| & = & |De (x := e)| \\
 \end{array}

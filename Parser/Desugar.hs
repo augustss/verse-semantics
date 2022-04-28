@@ -74,8 +74,6 @@ desugarS = expr
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
 
-    tAny l i = define l i Any
-
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='"] = ApplyD
@@ -119,6 +117,9 @@ eSucceeds = Variable (Ident noLoc "succeeds")
 define :: Loc -> Ident -> Expr -> Expr
 define l i e = InfixOp (Variable i) (Ident l ":=") e
 
+tAny :: Loc -> Ident -> Expr
+tAny l i = define l i Any
+
 desugarColon :: Loc -> Expr -> Expr -> D Expr
 desugarColon l x t = desugarDef l x (PrefixOp (Ident l ":") t)
 
@@ -134,6 +135,11 @@ desugarDef l (Array (BExprs xs)) e = do
   es <- zipWithM (\ x i -> desugarDef l x (ApplyD v (LitInt i))) xs [0..]
   chk <- desugarS $ PrefixOp (Ident l "!") $ ApplyD v (LitInt (toInteger (length xs)))  -- Check that list ends correctly
   pure $ Seq $ maybeToList me ++ [chk] ++ es
+desugarDef l (InfixOp x (Ident _ "->") y) (PrefixOp (Ident _ ":") t) = do
+  i <- newIdent "d"
+  ex <- desugarDef l x (Variable i)
+  ey <- desugarDef l y (ApplyD t (tAny l i))
+  pure $ Seq [ex, ey]
 -- What else is allowed?  LitInt and LitRat would be easy.
 desugarDef l x _ = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x
 
@@ -292,4 +298,6 @@ desugarFunctionS = expr
 simplify :: Expr -> Expr
 simplify = simp
   where --simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
-        simp e = composOp simp e
+    simp (Unify e Any) = simp e
+    simp (ApplyD (Variable (Ident _ "any")) e) = simp e
+    simp e = composOp simp e
