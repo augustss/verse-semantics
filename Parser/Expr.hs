@@ -9,8 +9,8 @@ module Expr(
   Block(..),
   Eff,
   Op,
-  arrayS,
   compos, composOp,
+  seqE,
   ) where
 import Control.Monad.Identity
 import Data.Data (Data)
@@ -204,10 +204,6 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inl "()"     13
       ]
 
-arrayS :: [Expr] -> Expr
-arrayS [e] = e
-arrayS es = Array (BExprs es)
-
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 compos _ e@LitInt{} = pure e
 compos _ e@LitRat{} = pure e
@@ -247,3 +243,11 @@ composBlock f (BExprs es) = BExprs <$> traverse f es
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)
+
+seqE :: [Expr] -> Expr
+seqE = mk . concatMap flat
+  where flat (Seq es) = es
+        flat e = [e]
+        mk [e] = e
+        mk es = Seq es
+

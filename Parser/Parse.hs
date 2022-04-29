@@ -198,28 +198,9 @@ pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
 pFile :: P Expr
 pFile = skip *> pExprSeq <* eof
 
------
-{-
-data Test
-  = TestParse {testName :: String, testExpr :: Expr}
-  | TestEval {testName :: String, testExpr :: Expr, testResult :: [String]}
-  | TestEvalMany {testName :: String, testExpr :: Expr, testResult :: [String]}
-  | TestEvalError {testName :: String, testExpr :: Expr, testError :: String}
-  deriving (Show)
-
-pTest :: P Test
-pTest =
-  skip
-    *> choice
-      [ TestParse <$> (pKeyword "testp" *> pParens pWord) <*> pBraces pExpr,
-        TestEval <$> (pKeyword "tests" *> pParens pWord) <*> pBraces pExpr <*> pBraces (sepBy1 pString (pOp ",")),
-        TestEvalMany <$> (pKeyword "testm" *> pParens pWord) <*> pBraces pExpr <*> pBraces (sepBy1 pString (pOp ",")),
-        TestEvalError <$> (pKeyword "teste" *> pParens pWord) <*> pBraces pExpr <*> pBraces pString
-      ]
-
-pTests :: P [Test]
-pTests = many pTest <* eof
--}
+arrayS :: [Expr] -> Expr
+arrayS [e] = e
+arrayS es = Array (BExprs es)
 
 ------
 

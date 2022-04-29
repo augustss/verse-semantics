@@ -1,4 +1,4 @@
-module Desugar(desugar, desugarLight, desugarFunction, scope, simplify, makeUniq) where
+module Desugar(desugar, desugarLight, desugarFunction, scope, simplify, makeUniq, predefs, blockToExpr) where
 import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 --import Data.List
@@ -260,13 +260,6 @@ lambdas is e =
   BExpr $ Lambda v $ Def is $ BExpr $ seqE [Unify (Array (BExprs (map Variable is))) (Variable v), blockToExpr e]
   where v = Ident noLoc "$v"  -- XXX
 
-seqE :: [Expr] -> Expr
-seqE = mk . concatMap flat
-  where flat (Seq es) = es
-        flat e = [e]
-        mk [e] = e
-        mk es = Seq es
-
 desugarFunction :: Expr -> Expr
 desugarFunction = flip evalState 1 . desugarFunctionS
 
@@ -307,8 +300,8 @@ desugarFunctionS = expr
 
 ------------
 
-predef :: [Ident]
-predef = map (Ident noLoc)
+predefs :: [Ident]
+predefs = map (Ident noLoc)
   [ "int", "any", "nat", "float", "string", "false"
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
@@ -326,7 +319,7 @@ makeUniq :: Expr -> Expr
 makeUniq e = evalState (uniqE globals e) 1
   where
     globals :: Env
-    globals = M.fromList $ zip predef predef
+    globals = M.fromList $ zip predefs predefs
 
 type Env = M.Map Ident Ident
 

@@ -7,6 +7,7 @@ import Desugar
 import Expr
 import Parse
 import Command
+import Core
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
