@@ -309,13 +309,14 @@ desugarFunctionS = expr
 
 predef :: [Ident]
 predef = map (Ident noLoc)
-  [ "int", "any", "nat", "float", "string"
+  [ "int", "any", "nat", "float", "string", "false"
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
   , "in'..'", "in'->'"
   , "pre'-'"
   , "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
+  , "$assign"
   ]
 
 -- Make all variable names unique by appending a number.
@@ -373,7 +374,7 @@ uniqE' env = expr
     expr (Choice e1 e2) = Choice <$> uniqE env e1 <*> uniqE env e2
     expr (Lambda v e) = do
       env' <- envIdents [v]
-      Lambda v <$> uniqE (M.union env' env) e
+      Lambda (env' M.! v) <$> uniqE (M.union env' env) e
     expr Any = pure Any
     expr Fail = pure Fail
     expr e = impossible e

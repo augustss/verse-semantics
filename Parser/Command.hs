@@ -23,6 +23,7 @@ data Command s = Command
   , c_bye      :: String
   , c_prompt   :: String
   , c_state    :: s
+  , c_history  :: Maybe FilePath
   }
 
 runCommand :: forall s . Command s -> IO ()
@@ -34,7 +35,8 @@ runCommand Command{..} = do
                c_commands
     rpl = REPL { repl_init = pure (c_prompt, c_state)
                , repl_eval = eval
-               , repl_exit = const $ putStrLn c_bye }
+               , repl_exit = const $ putStrLn c_bye
+               , repl_hist = c_history }
     help :: Run s
     help _ s = do
       putStrLn c_help
@@ -74,5 +76,6 @@ _testCommand = Command
   , c_bye = "Bye then!"
   , c_prompt = "> "
   , c_state = 1
+  , c_history = Nothing
   }
 

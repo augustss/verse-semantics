@@ -30,7 +30,8 @@ command :: Command CState
 command = Command
   { c_commands =
       [ Cmd "read FILE"       "Parse a file"                   cRead
-      , Cmd "desugar [EXPR]"  "Desugar [last] expression"      cDesugar
+      , Cmd "desugar [EXPR]"  "Desugar [last] expression = :li + :fu + :un + :sc"
+                                                               cDesugar
       , Cmd "light [EXPR]"    "Initial desugaring"             cDesugarLight
       , Cmd "function [EXPR]" "Function desugaring"            cFunction
       , Cmd "scope [EXPR]"    "Insert defs"                    cScope
@@ -41,10 +42,11 @@ command = Command
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
-  , c_greet = "Verse parse&desugar testing.\nUse :help for help, and :q to quit."
+  , c_greet = "Verse parse&desugar testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = Nothing }
+  , c_history = Just ".versei"
   }
 
 updateLastExpr :: CState -> Expr -> IO CState

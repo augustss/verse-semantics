@@ -9,7 +9,8 @@ import System.Console.Haskeline
 data REPL s = REPL {
     repl_init :: IO (String, s),                        -- prompt and initial state
     repl_eval :: s -> String -> IO (Bool, s),           -- quit flag and new state
-    repl_exit :: s -> IO ()
+    repl_exit :: s -> IO (),
+    repl_hist :: Maybe FilePath
     }
 
 repl :: REPL s -> IO ()
@@ -25,4 +26,5 @@ repl p = do
                          liftIO $ repl_exit p s'
                       else
                          loop s'
-    runInputT defaultSettings (loop state)
+        settings = defaultSettings { historyFile = repl_hist p }
+    runInputT settings (loop state)
