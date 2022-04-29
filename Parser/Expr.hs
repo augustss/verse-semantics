@@ -69,9 +69,11 @@ data Expr
   | Def [Ident] Block         -- def xs in e
   | Unify Expr Expr           -- e1 = e2
   | Type Expr                 -- 
---x  | Range Expr
+  | Define Ident Expr         -- i := e
+  | Choice Expr Expr          -- e | e
   | Lambda Ident Expr         -- lam x in e
   | Any                       -- :any
+  | Fail                      -- :false
   deriving (Eq, Ord, Show, Data)
 
 type Eff = Ident
@@ -153,8 +155,11 @@ instance Pretty Expr where
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
 --          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
           Type e -> text "type" <> braces (ppr 0 e)
+          Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
+          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
           Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
           Any -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "any")))
+          Fail -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "false")))
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
@@ -230,9 +235,11 @@ compos f (Typedef b) = Typedef <$> composBlock f b
 compos f (Def is b) = Def is <$> composBlock f b
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Type e) = Type <$> f e
---compos f (Range e) = Range <$> f e
+compos f (Define i e) = Define i <$> f e
+compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Lambda v e) = Lambda v <$> f e
 compos _ Any = pure Any
+compos _ Fail = pure Fail
 
 composBlock :: (Applicative f) => (Expr -> f Expr) -> Block -> f Block
 composBlock f (BExpr e) = BExpr <$> f e

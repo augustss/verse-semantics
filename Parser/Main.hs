@@ -36,6 +36,7 @@ command = Command
       , Cmd "scope [EXPR]"    "Insert defs"                    cScope
       , Cmd "show [EXPR]"     "Show [last] expression"         cShow
       , Cmd "simplify [EXPR]" "Show [last] expression"         cSimplify
+      , Cmd "uniq [EXPR]"     "Make identifiers unique"        cUniq
       , Cmd "print [EXPR]"    "Pretty print [last] expression" cPrint
       ]
   , c_exec = cParseLine
@@ -72,45 +73,31 @@ withLastExpr cmd line s = do
     Nothing -> do putStrLn "No last expression"; pure s'
     Just e -> cmd e s'
 
-cDesugar :: Run CState
-cDesugar =
+cTransform :: (Expr -> Expr) -> Run CState
+cTransform tr =
   withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $ do
-      let e' = desugar e
+      let e' = tr e
       pp e'
       pure e'
+
+cDesugar :: Run CState
+cDesugar = cTransform desugar
 
 cDesugarLight :: Run CState
-cDesugarLight =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-      let e' = desugarLight e
-      pp e'
-      pure e'
+cDesugarLight = cTransform desugarLight
 
 cScope :: Run CState
-cScope =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-      let e' = scope e
-      pp e'
-      pure e'
+cScope = cTransform scope
 
 cFunction :: Run CState
-cFunction =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-      let e' = desugarFunction e
-      pp e'
-      pure e'
+cFunction = cTransform desugarFunction
 
 cSimplify :: Run CState
-cSimplify =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-      let e' = simplify e
-      pp e'
-      pure e'
+cSimplify = cTransform simplify
+
+cUniq :: Run CState
+cUniq = cTransform makeUniq
 
 cShow :: Run CState
 cShow =
