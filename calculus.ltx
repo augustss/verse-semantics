@@ -381,7 +381,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\ \\[-2mm]
     \begin{array}{lrcl}
     \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
-    \rulename{uvar} & |x == x| & \movesto & |x| \\
     \rulename{utype} & |x == applyx range ty| & \movesto & |applyx ty x; x| \\
     \rulename{ucon} & |k_1 == k_2| & \movesto
     & \begin{array}[t]{@@{}ll}
@@ -592,7 +591,7 @@ Can it be made safe by a better treatment of |e choice E|?
 
 \subsection{Unification}
 
-Rules \rulename{uvar}-\rulename{ucon}-\rulename{utup} do conventional unification, decomposing
+Rules \rulename{ucon} and \rulename{utup} do conventional unification, decomposing
 tuples where necessary.  Notice that |e_1 == e_2| reduces to its unified value.  For example,
 |(3==3) + 7| reduces to |10|.
 
@@ -633,6 +632,8 @@ substitute it for |z| in |v| to prevent this rule from applying again, and unify
 Now  \rulename{bind} can substitute |(3,y)| for |x|:
     $$ |def y in dots (3,y) dots(def z in dots(z=y;(3,y))dots)dots| $$
 and all is well.
+
+One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x in x = (y => y); (x == x)|. If we use \rulename{bind} first, we will unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
 
 \subsection{Choice and failure}
 
