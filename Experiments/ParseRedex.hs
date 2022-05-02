@@ -5,6 +5,7 @@ import System.IO
 import Text.ParserCombinators.ReadP
 import Text.PrettyPrint.HughesPJClass hiding (char)
 import Text.Printf
+import System.Environment
 
 readUTF8File :: FilePath -> IO String
 readUTF8File fn = do
@@ -19,9 +20,13 @@ main = do
   file <- readUTF8File "example.rkt"
   print file
 -}
-  file <- readFile "example.rkt"
+  [fn] <- getArgs
+{-
+  file <- readFile fn
   let v = runReadP (pSExp <* eof) file
   print v
+-}
+  latexFile fn
 
 dropGuillemets :: String -> String
 dropGuillemets = filter (`notElem` "\xab\xbb")
@@ -70,13 +75,13 @@ type Sym = String
 
 data Exp
   = EVar Sym | EInt Integer | EArray [Val] | ELam Sym Exp | ERec Sym Exp
-  | EUnify Exp Exp | ESeq [Exp] | EOp Sym Exp | EAlt [Exp]
-  | EIf Exp Exp Exp | EFor Exp Exp | EDef Heap Exp | EWrong
+  | EUnify Exp Exp | ESeq [Exp] | EAp Exp Exp | EAlt [Exp]
+  | EIf Exp Exp | EFor Exp | EDef Heap Exp | EWrong
   deriving (Show)
 
 type Val = Exp
 
-data Heap = HVar Sym | HVal Sym Val | HMany [Heap]
+data Heap = HVar Sym | HMany [Heap]
   deriving (Show)
 
 conv :: SExp -> [(String, Exp)]
@@ -97,16 +102,15 @@ sExpToExp (SList [SSym "=>", SSym x, e]) = ELam x $ sExpToExp e
 sExpToExp (SList [SSym "rec", SSym x, e]) = ERec x $ sExpToExp e
 sExpToExp (SList [SSym "=", e1, e2]) = EUnify (sExpToExp e1) (sExpToExp e2)
 sExpToExp (SList (SSym "seq" : es)) = ESeq (map sExpToExp es)
-sExpToExp (SList [SSym op, e]) | op `elem` ops = EOp op $ sExpToExp e
 sExpToExp (SList (SSym "bar" : es)) = EAlt (map sExpToExp es)
-sExpToExp (SList [SSym "if", e1, e2, e3]) = EIf (sExpToExp e1) (sExpToExp e2) (sExpToExp e3)
-sExpToExp (SList [SSym "for", e1, e2]) = EFor (sExpToExp e1) (sExpToExp e2)
-sExpToExp (SList [SSym "def", SSym _, h, e]) = EDef (sExpToHeap h) (sExpToExp e)
+sExpToExp (SList [SSym "orElse", e1, e2]) = EIf (sExpToExp e1) (sExpToExp e2)
+sExpToExp (SList [SSym "collect", e1]) = EFor (sExpToExp e1)
+sExpToExp (SList [SSym "def", h, e]) = EDef (sExpToHeap h) (sExpToExp e)
+sExpToExp (SList [e1, e2]) = EAp (sExpToExp e1) (sExpToExp e2)
 sExpToExp s = error $ "sExpToExp: " ++ show s
 
 sExpToHeap :: SExp -> Heap
-sExpToHeap (SSym s) = HVar s
-sExpToHeap (SList [SSym ":=", SSym x, e]) = HVal x $ sExpToExp e
+sExpToHeap (SList [SSym "var", SSym s]) = HVar s
 sExpToHeap (SList hs) = HMany $ map sExpToHeap hs
 
 instance Pretty Exp where
@@ -120,25 +124,27 @@ instance Pretty Exp where
     where eq | l == prettyNormal = "="
              | otherwise = "=="
   pPrintPrec l p (ESeq es) = maybeParens (p > 0) $ fsep (punctuate (text ";") (map (pPrintPrec l 0) es))
-  pPrintPrec l p (EOp op es@EArray{}) = text op' <> pPrintPrec l 0 es
-    where op' | l == prettyNormal = op
-              | otherwise = op ++ "^"
-  pPrintPrec l p (EOp op e) = text op' <> text "(" <> pPrintPrec l 0 e <> text ")"
-    where op' | l == prettyNormal = op
-              | otherwise = op ++ "^"
+  pPrintPrec l p (EAp f es@EArray{}) = op' <> pPrintPrec l 0 es
+    where op' | l == prettyNormal = pPrintPrec l 10 f
+              | otherwise = pPrintPrec l 10 f <> text "^"
+  pPrintPrec l p (EAp f e) = op' <> text "(" <> pPrintPrec l 0 e <> text ")"
+    where op' | l == prettyNormal = pPrintPrec l 10 f
+              | otherwise = pPrintPrec l 10 f <> text "^"
   pPrintPrec l p (EAlt []) = text "fail"
   pPrintPrec l p (EAlt [e]) = pPrintPrec l p e
   pPrintPrec l p (EAlt es) = maybeParens (p > 2) $ fsep (punctuate (text bar) (map (pPrintPrec l 2) es))
     where bar | l == prettyNormal = "|"
               | otherwise = " choice "
-  pPrintPrec l p (EIf e1 e2 e3) = maybeParens (p > 0) $ text "if" <+> pPrintPrec l 0 e1 <+> text "then" <+> pPrintPrec l 0 e2 <+> text "else" <+> pPrintPrec l 0 e3
-  pPrintPrec l p (EFor e1 e2) = maybeParens (p > 0) $ text "for" <+> pPrintPrec l 0 e1 <+> text "in" <+> pPrintPrec l 0 e2
-  pPrintPrec l p (EDef h e) = maybeParens (p > 0) $ text "def" <+> pPrintPrec l 0 h <+> text "in" <+> pPrintPrec l 0 e
+  pPrintPrec l p (EIf e1 e2) = maybeParens (p > 0) $ text "orElse" <+> pPrintPrec l 10 e1 <+> pPrintPrec l 10 e2
+  pPrintPrec l p (EFor e1) = maybeParens (p > 0) $ text "collect" <+> pPrintPrec l 10 e1
+  pPrintPrec l p (EDef h e) = maybeParens (p > 0) $ text "def" <+> pPrintPrec l 0 (flat h) <+> text "in" <+> pPrintPrec l 0 e
+    where flat = HMany . f
+          f h@HVar{} = [h]
+          f (HMany hs) = concatMap f hs
   pPrintPrec l _ EWrong = text "wrong"
 
 instance Pretty Heap where
   pPrintPrec _ _ (HVar x) = text x
-  pPrintPrec l _ (HVal x e) = text x <> text ":=" <> pPrintPrec l 0 e
   pPrintPrec l _ (HMany hs) = fsep $ punctuate (text ",") (map (pPrintPrec l 0) hs)
 
 ltx :: (Pretty a) => a -> String
@@ -160,10 +166,11 @@ latexReds ((_, e) : rs) =
   \  \\begin{array}{rcl}\n" ++
 
   "    \\multicolumn{3}{l}{|" ++ ltx e ++ "|} \\\\\n" ++
-  concatMap red rs ++
+  concatMap red (filter relevant rs) ++
   "  \\end{array}$$\n\
   \\\end{example}\n"
   where
+    relevant (n, _) = n /= "Heap"
     red (n, x) =
       "    \\rulename{" ++ n' ++ "} & \\movesto & |" ++ ltx (normSyms x) ++ "| \\\\\n"
       where n' = map toLower n
@@ -183,13 +190,12 @@ normSyms (ELam s e) = ELam (truncSym s) (normSyms e)
 normSyms (ERec s e) = ERec (truncSym s) (normSyms e)
 normSyms (EUnify e1 e2) = EUnify (normSyms e1) (normSyms e2)
 normSyms (ESeq es) = ESeq (map normSyms es)
-normSyms (EOp s e) = EOp s (normSyms e)
+normSyms (EAp f e) = EAp (normSyms f) (normSyms e)
 normSyms (EAlt es) = EAlt (map normSyms es)
-normSyms (EIf e1 e2 e3) = EIf (normSyms e1) (normSyms e2) (normSyms e3)
-normSyms (EFor e1 e2) = EFor (normSyms e1) (normSyms e2)
+normSyms (EIf e1 e2) = EIf (normSyms e1) (normSyms e2)
+normSyms (EFor e1) = EFor (normSyms e1)
 normSyms (EDef h e) = EDef (heap h) (normSyms e)
   where heap (HVar s) = HVar $ truncSym s
-        heap (HVal s e) = HVal (truncSym s) (normSyms e)
         heap (HMany hs) = HMany (map heap hs)
 normSyms EWrong = EWrong
 
