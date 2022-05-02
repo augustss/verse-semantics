@@ -718,27 +718,26 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| 
 
 \subsection{Examples}
 
-\begin{example}
-  $$\begin{array}{rcl}
-    \multicolumn{3}{l}{|def (x,y) in x==3; y==add^(x,1)|} \\
-    \rulename{bind}  & \movesto & |def (x:=3,y) in 3; y==add^(x,1)| \\
-    \rulename{seq}   & \movesto & |def (x:=3,y) in y==add^(x,1)| \\
-    \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1)| \\
-    \rulename{p-add} & \movesto & |def (x:=3,y) in y==4| \\
-    \rulename{bind}  & \movesto & |def (x:=3,y:=4) in 4| \\
-    \end{array}$$
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def x, y in x == 3; y == add^(x, 1)|} \\
+    \rulename{bind} & \movesto & |def y in 3; y == add^(3, 1)| \\
+    \rulename{p-add} & \movesto & |def y in 3; y == 4| \\
+    \rulename{seq} & \movesto & |def y in y == 4| \\
+    \rulename{bind} & \movesto & |def in 4| \\
+    \rulename{def-elim} & \movesto & |4| \\
+  \end{array}$$
 \end{example}
 
-\begin{example}
-  $$\begin{array}{rcl}
-    \multicolumn{3}{l}{|def (x,y) in y==add^(x,1); x==3; y|} \\
-    \rulename{bind}  & \movesto & |def (x:=3,y) in y==add^(x,1); 3; y| \\
-    \rulename{subst} & \movesto & |def (x:=3,y) in y==add^(3,1); 3; y| \\
-    \rulename{p-add} & \movesto & |def (x:=3,y) in y==4; 3; y| \\
-    \rulename{bind} & \movesto & |def (x:=3,y:=4) in 4; 3; y| \\
-    \rulename{p-seq}(twice) & \movesto & |def (x:=3,y:=4) in y| \\
-    \rulename{subst} & \movesto & |def (x:=3,y:=4) in 4|
-    \end{array}$$
+\begin{example} $$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{|def x, y in y == add^(x, 1); x == 3; y|} \\
+    \rulename{bind} & \movesto & |def y in y == add^(3, 1); 3; y| \\
+    \rulename{p-add} & \movesto & |def y in y == 4; 3; y| \\
+    \rulename{bind} & \movesto & |def in 4; 3; 4| \\
+    \rulename{seq} & \movesto & |def in 4| \\
+    \rulename{def-elim} & \movesto & |4| \\
+  \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
   |(y==add^(x,1))|.  But the evaluation context |X| allows us to apply rule \rulename{bind}
   in the \emph{second} argument of sequencing, which gives a value to |x| in the heap.
