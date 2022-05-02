@@ -64,7 +64,7 @@ desugarS = expr
       newIdent "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
     expr (Case2 e1 e2) = desugarCase e1 e2
     expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> block e2
-    expr (Typedef b) = newIdent "d" >>= \ i -> Type . Lambda i <$> expr (blockToExpr b)
+    expr (Typedef e) = Typedef <$> block e
     expr Any = pure Any
     expr Fail = pure Fail
     expr (Define i e) = Define i <$> expr e
@@ -74,6 +74,8 @@ desugarS = expr
     expr e@Choice{} = impossible e
     expr e@Type{} = impossible e
     expr e@Lambda{} = impossible e
+    expr e@IfC{} = impossible e
+    expr e@ForC{} = impossible e
 
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
@@ -168,40 +170,14 @@ desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettySho
 
 -- Insert defs
 scope :: Expr -> Expr
-scope = scopeDef
+scope = uncurry Def . second exprToBlock . flip evalState 1 . scopeExpr
 
-scopeDef :: Expr -> Expr
-scopeDef = insDef . scopeExpr
-
-scopeDefB :: Block -> Block
-scopeDefB (BExpr e) = BExpr $ scopeDef e
-scopeDefB (BExprs es) = BExpr $ scopeDef $ Seq es
-
-{-
-scopeCheck :: Expr -> Expr
-scopeCheck e =
-  case freeVars e \\ predef of
-    [] -> e
-    xs -> trace ("Undefined " ++ prettyShow xs)
-          e
-
-freeVars :: Expr -> [Ident]
-freeVars ae = execState (free ae) []
+scopeDef :: Expr -> D Expr
+scopeDef ee = def <$> scopeExpr ee
   where
-    free e@(Variable v) = do modify (\ s -> union [v] s); pure e
-    free (Lambda v e) = do e' <- free e; modify (\ s -> s \\ [v]); pure e'
-    free (Def vs e)  = do e' <- freeB e; modify (\ s -> s \\ vs); pure (Def vs e')
-    free e = compos free e
-    freeB (BExpr e) = BExpr <$> free e
-    freeB (BExprs es) = BExprs <$> mapM free es
--}
-
-insDef :: ([Ident], Expr) -> Expr
-insDef (is, e) = def is (BExpr e)
-
-def :: [Ident] -> Block -> Expr
-def [] e = blockToExpr e
-def is e = Def is e
+    def :: ([Ident], Expr) -> Expr
+    def ([], e) = e
+    def (is, e) = Def is $ exprToBlock e
 
 blockToExpr :: Block -> Expr
 blockToExpr (BExpr e) = e
@@ -211,54 +187,60 @@ exprToBlock :: Expr -> Block
 exprToBlock (Seq es) = BExprs es
 exprToBlock e = BExpr e
 
-scopeExpr :: Expr -> ([Ident], Expr)
-scopeExpr e@LitInt{} = ([], e)
-scopeExpr e@LitRat{} = ([], e)
-scopeExpr e@Variable{} = ([], e)
-scopeExpr (Array b) = second Array $ scopeBlock b
-scopeExpr (Seq es) = second Seq $ scopeExprs es
-scopeExpr (ApplyS e1 e2) = (is1 ++ is2, ApplyS e1' e2') where (is1, e1') = scopeExpr e1; (is2, e2') = scopeExpr e2
-scopeExpr (ApplyD e1 e2) = (is1 ++ is2, ApplyD e1' e2') where (is1, e1') = scopeExpr e1; (is2, e2') = scopeExpr e2
-scopeExpr (Unify e1 e2) = (is1 ++ is2, Unify e1' e2') where (is1, e1') = scopeExpr e1; (is2, e2') = scopeExpr e2
---scopeExpr (EffAttr e r) = (is, EffAttr e' r) where (is, e') = scopeExpr e
-scopeExpr (If3 e1 e2 e3) = ([], If3 e1'' e2'' e3')
-  where (xs, e1') = scopeExpr e1
-        e2' = scopeDefB e2
-        e3' = scopeDefB e3
-        e1'' = def xs $ BExprs [e1', exs]
-        e2'' = lambdas xs e2'
-        exs = Array (BExprs (map Variable xs))
-scopeExpr (For2 e1 e2) = ([], For2 e1'' e2'')
-  where (xs, e1') = scopeExpr e1
-        e2' = scopeDefB e2
-        e1'' = def xs $ BExprs [e1', exs]
-        e2'' = lambdas xs e2'
-        exs = Array (BExprs (map Variable xs))
---scopeExpr (Let e b) = scopeExpr $ seqE [e, blockToExpr b]
---scopeExpr (Do b) = scopeExpr $ blockToExpr b
---scopeExpr (Function p r e) = ([], Function p r $ scopeDefB e)
-scopeExpr (Type (Lambda v e)) = ([], Type $ Lambda v $ def xs $ BExpr $ Unify (Variable v) e')
-  where (xs, e') = scopeExpr e
-scopeExpr (Define x e) = (x:xs, e'')
-  where (xs, e') = scopeExpr e
-        e'' = Unify (Variable x) e'
-scopeExpr (Choice e1 e2) = ([], Unify (scopeDef e1) (scopeDef e2))
-scopeExpr (Lambda v e) = ([], Lambda v $ scopeDef e)
-scopeExpr Any = ([], Any)
-scopeExpr Fail = ([], Fail)
+scopeExpr :: Expr -> D ([Ident], Expr)
+scopeExpr e@LitInt{} = pure ([], e)
+scopeExpr e@LitRat{} = pure ([], e)
+scopeExpr e@Variable{} = pure ([], e)
+scopeExpr (Array b) = second Array <$> scopeBlock b
+scopeExpr (Seq es) = second Seq <$> scopeExprs es
+scopeExpr (ApplyS e1 e2) = do
+  (is1, e1') <- scopeExpr e1
+  (is2, e2') <- scopeExpr e2
+  pure (is1 ++ is2, ApplyS e1' e2')
+scopeExpr (ApplyD e1 e2) = do
+  (is1, e1') <- scopeExpr e1
+  (is2, e2') <- scopeExpr e2
+  pure (is1 ++ is2, ApplyD e1' e2')
+scopeExpr (Unify e1 e2) = do
+  (is1, e1') <- scopeExpr e1
+  (is2, e2') <- scopeExpr e2
+  pure (is1 ++ is2, Unify e1' e2')
+scopeExpr (If3 e1 e2 e3) = do
+  e1' <- scopeDef $ Seq [e1, thunk $ blockToExpr e2]
+  e3' <- scopeDef $ thunk $ blockToExpr e3
+  pure ([], IfC e1' e3')
+scopeExpr (For2 e1 e2) = do
+  e1' <- scopeDef $ Seq [e1, thunk $ blockToExpr e2]
+  pure ([], ForC e1')
+scopeExpr (Typedef e) = do
+  v <- newIdent "s"
+  (_, e') <- scopeExpr $ Lambda v $ blockToExpr e
+  pure ([], Type e')
+scopeExpr (Define x e) = do
+  (xs, e') <- scopeExpr e
+  let e'' = Unify (Variable x) e'
+  pure (x:xs, e'')
+scopeExpr (Choice e1 e2) = do
+  e1' <- scopeDef e1
+  e2' <- scopeDef e2
+  pure ([], Choice e1' e2')
+scopeExpr (Lambda v e) = do
+  e' <- scopeDef e
+  pure ([], Lambda v e')
+scopeExpr Any = pure ([], Any)
+scopeExpr Fail = pure ([], Fail)
 scopeExpr e = impossible e
 
-scopeBlock :: Block -> ([Ident], Block)
-scopeBlock (BExpr e) = second BExpr $ scopeExpr e
-scopeBlock (BExprs es) = second BExprs $ scopeExprs es
+scopeBlock :: Block -> D ([Ident], Block)
+scopeBlock (BExpr e) = second BExpr <$> scopeExpr e
+scopeBlock (BExprs es) = second BExprs <$> scopeExprs es
 
-scopeExprs :: [Expr] -> ([Ident], [Expr])
-scopeExprs es = first concat $ unzip $ map scopeExpr es
+scopeExprs :: [Expr] -> D ([Ident], [Expr])
+scopeExprs es = first concat <$> unzip <$> mapM scopeExpr es
 
-lambdas :: [Ident] -> Block -> Block
-lambdas is e =
-  BExpr $ Lambda v $ Def is $ BExpr $ seqE [Unify (Array (BExprs (map Variable is))) (Variable v), blockToExpr e]
-  where v = Ident noLoc "$v"  -- XXX
+thunk :: Expr -> Expr
+thunk = Lambda dummyIdent
+  where dummyIdent = Ident noLoc "_"
 
 desugarFunction :: Expr -> Expr
 desugarFunction = flip evalState 1 . desugarFunctionS
@@ -362,7 +344,7 @@ uniqE' env = expr
     expr (Let e1 e2)    = xLet <$> blockX e1 e2
     expr (Do e)         = xDo <$> uniqB env e
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr (Type e) = Type <$> expr e
+    expr (Typedef e) = Typedef <$> block e
     expr (Define i e) = Define (fromMaybe undefined $ M.lookup i env) <$> expr e
     expr (Choice e1 e2) = Choice <$> uniqE env e1 <*> uniqE env e2
     expr (Lambda v e) = do

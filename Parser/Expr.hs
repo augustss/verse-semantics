@@ -72,6 +72,8 @@ data Expr
   | Define Ident Expr         -- i := e
   | Choice Expr Expr          -- e | e
   | Lambda Ident Expr         -- lam x in e
+  | ForC Expr                 -- forC (e1; (() => e2))
+  | IfC Expr Expr             -- ifC (e1; (() => e2)) (() => e3)
   | Any                       -- :any
   | Fail                      -- :false
   deriving (Eq, Ord, Show, Data)
@@ -158,6 +160,11 @@ instance Pretty Expr where
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
           Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
+          IfC e1 e2 -> maybeParens (p > 0) $ sep [text "ifC"
+                                                 , indent $ ppr 11 e1
+                                                 , indent $ ppr 11 e2]
+          ForC e1 -> maybeParens (p > 0) $ sep [text "forC"
+                                               , indent $ ppr 11 e1]
           Any -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "any")))
           Fail -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "false")))
 
@@ -234,6 +241,8 @@ compos f (Type e) = Type <$> f e
 compos f (Define i e) = Define i <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Lambda v e) = Lambda v <$> f e
+compos f (IfC e1 e2) = IfC <$> f e1 <*> f e2
+compos f (ForC e1) = ForC <$> f e1
 compos _ Any = pure Any
 compos _ Fail = pure Fail
 

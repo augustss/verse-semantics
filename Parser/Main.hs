@@ -37,7 +37,8 @@ command = Command
       , Cmd "function [EXPR]" "Function desugaring"            cFunction
       , Cmd "scope [EXPR]"    "Insert defs"                    cScope
       , Cmd "show [EXPR]"     "Show [last] expression"         cShow
-      , Cmd "simplify [EXPR]" "Show [last] expression"         cSimplify
+      , Cmd "simplify [EXPR]" "Simplify [last] expression"     cSimplify
+      , Cmd "core [EXPR]"     "Generate core"                  cCore
       , Cmd "uniq [EXPR]"     "Make identifiers unique"        cUniq
       , Cmd "print [EXPR]"    "Pretty print [last] expression" cPrint
       ]
@@ -101,6 +102,14 @@ cSimplify = cTransform simplify
 
 cUniq :: Run CState
 cUniq = cTransform makeUniq
+
+cCore :: Run CState
+cCore =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+      let e' = exprToCore e
+      pp e'
+      pure e
 
 cShow :: Run CState
 cShow =
