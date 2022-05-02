@@ -170,14 +170,14 @@ desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettySho
 
 -- Insert defs
 scope :: Expr -> Expr
-scope = uncurry Def . second exprToBlock . flip evalState 1 . scopeExpr
+scope = uncurry Def . flip evalState 1 . scopeExpr
 
 scopeDef :: Expr -> D Expr
 scopeDef ee = def <$> scopeExpr ee
   where
     def :: ([Ident], Expr) -> Expr
     def ([], e) = e
-    def (is, e) = Def is $ exprToBlock e
+    def (is, e) = Def is e
 
 blockToExpr :: Block -> Expr
 blockToExpr (BExpr e) = e

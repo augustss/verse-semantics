@@ -5,7 +5,7 @@ import Control.Monad.State.Strict
 
 import Print
 import Expr
-import Desugar(predefs, blockToExpr)
+import Desugar(predefs)
 import Error
 
 data Core
@@ -86,7 +86,7 @@ core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
 core (Unify e1 e2) = CUnify <$> core e1 <*> core e2
 core e@Type{} = val e
 core (Def is e) = do
-  e' <- core (blockToExpr e)
+  e' <- core e
   ts <- getTmps
   pure $ CDef (is ++ ts) e'
 core e@Choice{} = CBar <$> mapM core (flat e)
@@ -136,7 +136,7 @@ coreToExpr (CBar []) = Fail
 coreToExpr (CBar es) = foldr1 Choice $ map coreToExpr es
 coreToExpr (CIf e1 e2) = IfC (coreToExpr e1) (coreToExpr e2)
 coreToExpr (CFor e1) = ForC (coreToExpr e1)
-coreToExpr (CDef is e) = Def is (BExpr $ coreToExpr e)
+coreToExpr (CDef is e) = Def is (coreToExpr e)
 
 valueToExpr :: Value -> Expr
 valueToExpr (Var i) = Variable i

@@ -66,7 +66,7 @@ data Expr
   | Function Expr [Eff] Block -- function(e)<eff>{e}
   | Typedef Block             -- typedef{e}
   -- Only after scope extrusion, etc
-  | Def [Ident] Block         -- def xs in e
+  | Def [Ident] Expr         -- def xs in e
   | Unify Expr Expr           -- e1 = e2
   | Type Expr                 -- 
   | Define Ident Expr         -- i := e
@@ -235,7 +235,7 @@ compos f (Case1 b) = Case1 <$> composBlock f b
 compos f (Case2 e b) = Case2 <$> f e <*> composBlock f b
 compos f (Function e r b) = Function <$> f e <*> pure r <*> composBlock f b
 compos f (Typedef b) = Typedef <$> composBlock f b
-compos f (Def is b) = Def is <$> composBlock f b
+compos f (Def is e) = Def is <$> f e
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Type e) = Type <$> f e
 compos f (Define i e) = Define i <$> f e
