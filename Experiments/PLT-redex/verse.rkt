@@ -29,7 +29,7 @@
   (ty ::= int (type v))
   (ce ::=
       v
-      (apply cop ce)
+      (cop ce)
       (= ce ce)
       (seq ce ...)
       )
@@ -692,9 +692,9 @@
   (test-->> p-axioms ;; Example-2
             (term (def ((var x) (var y)) (seq (= y (++ x 1)) (= x 3) y)))
             (term 4))
-;  (atest-->> p-axioms ;; Example-3
-;            (term (def ((var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
-;            (term (bar 3 77)))
+  (test-->>E p-axioms ;; Example-3
+            (term (def ((var x) (var y)) (seq (= y (++ x 1)) (bar (= x 3) (= x 77)))))
+            (term (bar 3 77)))
   (test-->>E p-axioms ;; simple recusion
              (term
               (def (var f)
