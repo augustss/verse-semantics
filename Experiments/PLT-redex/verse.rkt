@@ -261,10 +261,18 @@
   (reduction-relation
    verse+E
    #:domain e
-   ;; Heaps
+   ;; Def blocks
+   (--> (def () e)
+        e
+        "Def-elim")
    (--> (def (h_1 ... () h_2 ...) e)
         (def (h_1 ... h_2 ...) e)
         "Heap")
+   ;; Unification, moved from below to get nicer traces
+   (--> (def (in-hole H (var x)) (in-hole X (= x v)))
+        (def (in-hole H ()) (substitute (in-hole X v) x v))
+        (side-condition (disjoint (term (fvs-v v)) (term (union (x) (bvs-X X)))))
+        "Bind")
    ;; Choice
    (--> (bar e_1 ... (bar e_2 ...) e_3 ...)
         (bar e_1 ... e_2 ... e_3 ...)
@@ -277,6 +285,24 @@
         (bar (in-hole CX e) ...)
         (side-condition (not (equal? (term CX) (term hole))))
         "Choose")
+   ;; Sequencing
+   ;; TODO: This rule could be more generous and remove all vs the sequence.
+   ;; It shouldn'e make any difference, but would give smaller terms.
+   (--> (seq v ... e)
+        e
+        "Seq")
+   (--> ((seq e_1 e_2) e_3)
+        (seq e_1 (e_2 e_3))
+        "App-seql")
+   (--> (v_1 (seq e_2 e_3))
+        (seq e_2 (v_1 e_3))
+        "App-seqr")
+   (--> (= (seq e_1 e_2) e_3)
+        (seq e_1 (= e_2 e_3))
+        "Unify-seql")
+   (--> (= v_1 (seq e_2 e_3))
+        (seq e_2 (= v_1 e_3))
+        "Unify-seqr")
    ;; Primitive operations
    (--> (add (arr k_1 k_2))
         (plus k_1 k_2)
@@ -302,24 +328,6 @@
         (bar)
         (side-condition (not (redex-match? verse k (term v))))
         "P-int2")
-   ;; Sequencing
-   ;; TODO: This rule could be more generous and remove all vs the sequence.
-   ;; It shouldn'e make any difference, but would give smaller terms.
-   (--> (seq v ... e)
-        e
-        "Seq")
-   (--> ((seq e_1 e_2) e_3)
-        (seq e_1 (e_2 e_3))
-        "App-seql")
-   (--> (v_1 (seq e_2 e_3))
-        (seq e_2 (v_1 e_3))
-        "App-seqr")
-   (--> (= (seq e_1 e_2) e_3)
-        (seq e_1 (= e_2 e_3))
-        "Unify-seql")
-   (--> (= v_1 (seq e_2 e_3))
-        (seq e_2 (= v_1 e_3))
-        "Unify-seqr")
    ;; Lambda and applications
    (--> ((=> x e_1) e_2)
         (def (var t) (seq (= t e_2) (substitute e_1 x t)))
@@ -362,15 +370,8 @@
         (def ((var t)) (seq (= t (v (arr))) (arr t)))
         (fresh t)
         "Collect2")
-   ;; Def blocks
-   (--> (def () e)
-        e
-        "Def-elim")
    ;; Unification
-   (--> (def (in-hole H (var x)) (in-hole X (= x v)))
-        (def (in-hole H ()) (substitute (in-hole X v) x v))
-        (side-condition (disjoint (term (fvs-v v)) (term (union (x) (bvs-X X)))))
-        "Bind")
+   ; Bind rule moved earlier to get nicer traces
    (--> (def (in-hole H (var x)) (in-hole X (= x v)))
         (def (in-hole H ((var x) (var y))) (in-hole X (seq (= x_1 y) (= x (substitute v x_1 y)))))
         ;; z \in (fvs-v v) and z \in (bvs-X X)
