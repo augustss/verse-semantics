@@ -31,15 +31,10 @@ command :: Command CState
 command = Command
   { c_commands =
       [ Cmd "read FILE"       "Parse a file"                   cRead
-      , Cmd "desugar [EXPR]"  "Desugar [last] expression = :li + :fu + :un + :sc"
-                                                               cDesugar
-      , Cmd "light [EXPR]"    "Initial desugaring"             cDesugarLight
-      , Cmd "function [EXPR]" "Function desugaring"            cFunction
-      , Cmd "scope [EXPR]"    "Insert defs"                    cScope
+      , Cmd "desugar [EXPR]"  "Desugar [last] expression ="    cDesugar
       , Cmd "show [EXPR]"     "Show [last] expression"         cShow
       , Cmd "simplify [EXPR]" "Simplify [last] expression"     cSimplify
       , Cmd "core [EXPR]"     "Generate core"                  cCore
-      , Cmd "uniq [EXPR]"     "Make identifiers unique"        cUniq
       , Cmd "print [EXPR]"    "Pretty print [last] expression" cPrint
       ]
   , c_exec = cParseLine
@@ -88,20 +83,8 @@ cTransform tr =
 cDesugar :: Run CState
 cDesugar = cTransform desugar
 
-cDesugarLight :: Run CState
-cDesugarLight = cTransform desugarLight
-
-cScope :: Run CState
-cScope = cTransform scope
-
-cFunction :: Run CState
-cFunction = cTransform desugarFunction
-
 cSimplify :: Run CState
 cSimplify = cTransform simplify
-
-cUniq :: Run CState
-cUniq = cTransform makeUniq
 
 cCore :: Run CState
 cCore =

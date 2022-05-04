@@ -1,11 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{- x# LANGUAGE PatternSynonyms # -}
+{-# LANGUAGE PatternSynonyms #-}
 {- x# LANGUAGE ViewPatterns # -}
 
 module Expr(
   Loc, noLoc,
   Ident(..),
   Expr(..),
+  pattern AnyT,
+  pattern Fail,
+  pattern Unit,
   Block(..),
   Eff,
   Op,
@@ -65,18 +68,27 @@ data Expr
   | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function Expr [Eff] Block -- function(e)<eff>{e}
   | Typedef Block             -- typedef{e}
-  -- Only after scope extrusion, etc
-  | Def [Ident] Expr         -- def xs in e
-  | Unify Expr Expr           -- e1 = e2
-  | Type Expr                 -- 
+  -- Initial desugaring turns some operators into more easily recognizable forms
   | Define Ident Expr         -- i := e
   | Choice Expr Expr          -- e | e
+  | Unify Expr Expr           -- e1 = e2
+  | Range Expr                -- :e
+  | Any                       -- any
+{-
+  | Def [Ident] Expr          -- def xs in e
+  | Type Expr                 -- 
   | Lambda Ident Expr         -- lam x in e
   | ForC Expr                 -- forC (e1; (() => e2))
   | IfC Expr Expr             -- ifC (e1; (() => e2)) (() => e3)
-  | Any                       -- :any
-  | Fail                      -- :false
+-}
   deriving (Eq, Ord, Show, Data)
+
+pattern AnyT :: Expr
+pattern AnyT = Range Any
+pattern Fail :: Expr
+pattern Fail = Range Unit
+pattern Unit :: Expr
+pattern Unit = Array (BExprs [])
 
 type Eff = Ident
 
@@ -152,21 +164,23 @@ instance Pretty Expr where
             where effs = mconcat (map (\ e -> text "<" <> pPrintL l e <> text ">") es)
           Typedef e -> text "typedef" <> braces (ppr 0 e)
           ----
-          Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
-                                                  text "in" <+> ppr 0 e ]
-          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
---          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-          Type e -> text "type" <> braces (ppr 0 e)
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
+          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
+          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+          Any -> pPrintPrec l p (Variable (Ident noLoc "any"))
+{-
+          Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
+                                                  text "in" <+> ppr 0 e ]
+--          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+          Type e -> text "type" <> braces (ppr 0 e)
           Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
           IfC e1 e2 -> maybeParens (p > 0) $ sep [text "ifC"
                                                  , indent $ ppr 11 e1
                                                  , indent $ ppr 11 e2]
           ForC e1 -> maybeParens (p > 0) $ sep [text "forC"
                                                , indent $ ppr 11 e1]
-          Any -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "any")))
-          Fail -> pPrintPrec l p (PrefixOp (Ident noLoc ":") (Variable (Ident noLoc "false")))
+-}
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
@@ -235,16 +249,18 @@ compos f (Case1 b) = Case1 <$> composBlock f b
 compos f (Case2 e b) = Case2 <$> f e <*> composBlock f b
 compos f (Function e r b) = Function <$> f e <*> pure r <*> composBlock f b
 compos f (Typedef b) = Typedef <$> composBlock f b
-compos f (Def is e) = Def is <$> f e
-compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
-compos f (Type e) = Type <$> f e
 compos f (Define i e) = Define i <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
+compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
+compos f (Range e) = Range <$> f e
+compos _ Any = pure Any
+{-
+compos f (Def is e) = Def is <$> f e
+compos f (Type e) = Type <$> f e
 compos f (Lambda v e) = Lambda v <$> f e
 compos f (IfC e1 e2) = IfC <$> f e1 <*> f e2
 compos f (ForC e1) = ForC <$> f e1
-compos _ Any = pure Any
-compos _ Fail = pure Fail
+-}
 
 composBlock :: (Applicative f) => (Expr -> f Expr) -> Block -> f Block
 composBlock f (BExpr e) = BExpr <$> f e

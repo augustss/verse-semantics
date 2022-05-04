@@ -34,6 +34,8 @@
 % ---------------------------------------
 
 % Desugaring
+\newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
+\newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
 \newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
 \newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
 \newcommand{\Fd}[2]{{\mathcal F}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
@@ -930,7 +932,7 @@ $$
       & \vb & |if{e}|           & \text{conditional expression} \\
       & \vb & |for{e}|          & \text{finite loop} \\
       & \vb & |case(e) of b|    & \text{case expression} \\
-      & \vb & |case{b}|         & \text{case expression} \\
+      & \vb & |case{e_1; dots e_n}| & \text{case expression} \\
 \end{array}
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
@@ -974,6 +976,8 @@ $$
       &     & |succeeds| \vb |decides| \vb |iterates|
 \end{array}
 $$
+\\
+Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
 \caption{Source Verse} \label{fig:source-verse-misc}
 \end{figure}
 
@@ -988,13 +992,13 @@ $$
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
   |De (e_1^(e_2))| & = & |De (succeeds^[e_1^[e_2]])| \\
-  |De (!e)| & = & |De (if e then :() else ())| \\
+  |De (!e)| & = & |De (if e then :false else false)| \\
   |De (:e)| & = & |: De e| \\
   |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
   |De (op_b e)| & = & |De (prefix op_b (e))| \\
   |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
   |De (e op_a)| & = & |De (postfix op_a (e))| \\
-  |De (e_1 eqgt e_2)| & = & |De (function e_1 () e_2)| \\
+  |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (l := e)| & = & |Ld l e| \\
   |De (l : e)| & = & |Ld l (:e)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
@@ -1004,18 +1008,18 @@ $$
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   |De (e_1 op_i e_2)| & = & |De (operator op_i [e_1, e_2])| & \text{if |op_i| can fail}\\
   |De (e_1 op_i e_2)| & = & |De (operator op_i (e_1, e_2))| \\
-  |De (if{e})| & = & |De (if(e) else ())| \\
-  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else ())| \\
+  |De (if{e})| & = & |De (if(e) else false)| \\
+  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else false)| \\
   |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
   |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
   |De (for{e})| & = & |De (for (x := e) in { x })| & \text{|x| fresh} \\
-  |De (let(e_1) in e_2)| & = & |let(De e_1) in De e_2| \\
-  |De (do{e})| & = & |do{De e_1}| \\
-  |De (case{e_1; dots e_n})| & = & |De (x:any) => case(x){e_1; dots e_n}| \\
-  |De (case(e){e_1; dots e_n}| & = & |De x:=e; if(e_1[x]) else dots if(e_n[x]) else :()| \\
+  |De (let(e) in b)| & = & |De (e); De b| & \textit{see note} \\
+  |De (do b)| & = & |De b| & \textit{see note}  \\
+  |De (case{e_1; dots e_n})| & = & |De ((x:any) => case(x){e_1; dots e_n})| & \text{|x| fresh} \\
+  |De (case(e){e_1; dots e_n}| & = & |De (x:=e; if(e_1[x]) else dots if(e_n[x]) else :false)| \\
 %% XXX effects are missing
-  |De (function e_1 effsR e_2)| & = &
-      |function(x:any)effsR(e_1 = x; do{De e_2})| & \text{|x| fresh} \\
+  |De (function e effsR b)| & = &
+      |function(x:any)effsR(e = x; do{De b})| & \text{|x| fresh} \\
   |De (typedef^{e})| & = & |typedef^{De e}| \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
@@ -1025,13 +1029,46 @@ $$
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1 ?) e_2| & = & |De (assign^(e_1,e_2))| \\
   |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
-  |Ld (x_1 minusgt x_2) (:e)| & = & |Ld x_1 x; Ld x_2 (e^[x:any])| & \text{|x| fresh} \\
-  |Fd (f^(e_1)effsR) e_2| & = & |Fd f (function e_1 effsR e_2)| \\
-  |Fd x e| & = & |De (x := e)| \\
+  |Ld (l_1 minusgt l_2) (:e)| & = & |Ld l_1 x; Ld l_2 (e^[x:any])| & \text{|x| fresh} \\
+  |Fd (f^(e)effsR) e_2| & = & |Fd f (function e_1 effsR {e_2})| \\
+  |Fd x e| & = & |x := De e| \\
 \end{array}
 $$
-\caption{Desugaring} \label{fig:pat-sugar}
+{\em Note}: The desugaring assumes a scope correct Verse program.
+This means that there can be not variable name clashes in |let| and |do|.
+A more robust desugaring could $\alpha$-convert such clashes.
+\caption{Desugaring} \label{fig:desugar}
 \end{figure}
 
+\begin{figure}
+$$
+\begin{array}{rcll}
+|An| & = |dots| & \text{ANF conversion of values} \\
+\end{array}
+$$
+\lennart{Inserting |def| is missing}
+\caption{ANF conversion} \label{fig:anf}
+\end{figure}
+
+\begin{figure}
+$$
+  \begin{array}{rcll}
+    |Cr k| & = & |k| \\
+    |Cr x| & = & |x| \\
+    |Cr (e_1 dots e_n)| & = & |Cr e_1 dots Cr e_n| \\
+    |Cr (: e_1)| & = & |range^(Cr e_1)| \\
+    |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
+    |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (e_1 := e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
+    |Cr (e_1 choose e_2])| & = & |Cr e_1 choose Cr e_2| \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |orElse (Cr e_1 ; x => Cr e_2) (Cr e_3)| & \text{|x| fresh} \\
+    |Cr (for e_1 in e_2)| & = & |collect (Cr e_1 ; x => Cr e_2)| & \text{|x| fresh} \\
+    |Cr (function(x:any)()e)| & = & |x => Cr e| \\
+    |Cr (typedef{e})| & = & |x => Cr e [x]| & \text{|x| fresh} \\
+  \end{array}
+$$
+\caption{Core conversion} \label{fig:core-conversion}
+\end{figure}
 
 \end{document}

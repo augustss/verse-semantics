@@ -1,4 +1,6 @@
 %format De (x) = "\De{" x "}"
+%format An (x) = "\An{" x "}"
+%format Cr (x) = "\Cr{" x "}"
 %format Ld (x)(y) = "\Ld{" x "}{" y "}"
 %format Fd (x)(y) = "\Fd{" x "}{" y "}"
 %format applyx a (b) = a "(" b ")"
@@ -38,8 +40,11 @@
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
 %format let = "\textbf{let}"
+%format orElse = "\textbf{orElse}"
+%format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"
 % only used in comments, but still prettier this way:
+%format false = "\textbf{false}"
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
@@ -51,7 +56,7 @@
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
 %format string = "\textbf{string}"
-%format function (x)(r)(rhs) = "\textbf{function}(" x ")" r "\{" rhs "\}"
+%format function (x)(r)(rhs) = "\textbf{function}(" x ")" r rhs
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -109,6 +114,9 @@
 %format h_3
 %format h_n
 
+%format b_1
+%format b_2
+
 %format v_0
 %format v_1
 %format v1'
@@ -132,6 +140,7 @@
 
 %format l_0
 %format l_1
+%format l_2
 %format l_n
 
 %format op_a

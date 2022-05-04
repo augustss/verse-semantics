@@ -1,14 +1,20 @@
-module Desugar(desugar, desugarLight, desugarFunction, scope, simplify, makeUniq, predefs, blockToExpr) where
+module Desugar(desugar, simplify, predefs, blockToExprs) where
 import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 --import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Debug.Trace
+import GHC.Stack
 
 import Expr
 import Error
 import Print hiding (first)
+
+scope = undefined
+makeUniq = undefined
+simplify = undefined
+desugarFunction = undefined
 
 anySame :: (Eq a) => [a] -> Bool
 anySame [] = False
@@ -17,16 +23,15 @@ anySame (x:xs) = x `elem` xs || anySame xs
 --------
 
 desugar :: Expr -> Expr
-desugar = scope . makeUniq . desugarFunction . desugarLight
-
-desugarLight :: Expr -> Expr
-desugarLight = flip evalState 1 . desugarS
+desugar = eval . (desugarDo <=< desugarS)
+  where eval = flip evalState 1
 
 type D = State Int
 
 desugarS :: Expr -> D Expr
 desugarS = expr
   where
+    expr :: HasCallStack => Expr -> D Expr
     expr e@LitInt{} = pure e
     expr e@LitRat{} = pure e
     expr e@Variable{} = pure e
@@ -36,9 +41,8 @@ desugarS = expr
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
-    expr (PrefixOp (Ident l "!") e) = expr $ If2 e $ BExpr $ eFail l
-    expr (PrefixOp (Ident l ":") e) = --Range <$> expr e
-      newIdent "d" >>= \ i -> expr $ ApplyD e (tAny l i)
+    expr (PrefixOp (Ident l "!") e) = If3 <$> expr e <*> pure (BExpr Fail) <*> pure (BExpr Unit)
+    expr (PrefixOp (Ident _ ":") e) = Range <$> expr e
     expr (PrefixOp (Ident l op) e) = expr $ call "pre" l op e
     expr (PostfixOp e (Ident l op)) = expr $ call "post" l op e
     expr (InfixOp e1 (Ident l op) e2) =
@@ -53,7 +57,7 @@ desugarS = expr
         "where" -> newIdent "w" >>= \ i -> expr $ Seq [define l i e1, e2, Variable i]
         _    -> expr $ call "in" l op $ Array $ BExprs [e1, e2]
     expr (If1 e) = inVar (blockToExpr e) >>= \ (t, e') -> expr $ If2 e' (BExpr t)
-    expr (If2 e1 e2) = expr $ If3 e1 e2 (BExpr $ Array $ BExprs [])
+    expr (If2 e1 e2) = expr $ If3 e1 e2 (BExpr Unit)
     expr (If2E e1 e2) = inVar e1 >>= \ (t, e') -> expr $ If3 e' (BExpr t) e2
     expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> block e2 <*> block e3
     expr (For1 e) = inVar (blockToExpr e) >>= \ (t, e') -> expr $ For2 e' (BExpr t)
@@ -65,18 +69,25 @@ desugarS = expr
     expr (Case2 e1 e2) = desugarCase e1 e2
     expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> block e2
     expr (Typedef e) = Typedef <$> block e
-    expr Any = pure Any
-    expr Fail = pure Fail
-    expr (Define i e) = Define i <$> expr e
-      
-    expr e@Def{} = impossible e
-    expr e@Unify{} = impossible e
+
+    expr e@Define{} = impossible e
     expr e@Choice{} = impossible e
+    expr e@Unify{} = impossible e
+    expr e@Range{} = impossible e
+    expr e@Any{} = impossible e
+
+{-
+    expr e@Def{} = impossible e
     expr e@Type{} = impossible e
     expr e@Lambda{} = impossible e
     expr e@IfC{} = impossible e
     expr e@ForC{} = impossible e
+    expr Any = pure Any
+    expr Fail = pure Fail
+    expr (Define i e) = Define i <$> expr e
+-}
 
+    block :: HasCallStack => Block -> D Block
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
 
@@ -107,17 +118,13 @@ inVar :: Expr -> D (Expr, Expr)
 inVar e = (\ (e', me) -> (e', fromMaybe e' me)) <$> inVarM e
 
 desugarCase :: Expr -> Block -> D Expr
-desugarCase e@Variable{} (BExprs es) = desugarS $ foldr mkOr (eFail noLoc) es
+desugarCase e@Variable{} (BExprs es) = desugarS $ foldr mkOr Fail es
   where mkOr a r = If2E (ApplyD a e) (BExpr r)
 desugarCase Variable{} _ = internalError
 desugarCase e b = do
   (t, e') <- inVar e
   ec <- desugarCase t b
   pure $ Seq [e', ec]
-
--- Failure, i.e., :false, i.e., :()
-eFail :: Loc -> Expr
-eFail _l = Fail
 
 eAssign :: Loc -> Expr
 eAssign l = Variable (Ident l "$assign")
@@ -129,7 +136,7 @@ define :: Loc -> Ident -> Expr -> Expr
 define _l i e = Define i e
 
 tAny :: Loc -> Ident -> Expr
-tAny l i = define l i Any
+tAny l i = define l i AnyT
 
 desugarColon :: Loc -> Expr -> Expr -> D Expr
 desugarColon l x t = desugarDef l x (PrefixOp (Ident l ":") t)
@@ -166,6 +173,79 @@ desugarFunDef l (Variable f) [] e = define l f <$> desugarS e
 desugarFunDef _ Variable{} _ _ = internalError
 desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
+blockToExpr :: Block -> Expr
+blockToExpr = seqE . blockToExprs
+
+blockToExprs :: Block -> [Expr]
+blockToExprs (BExpr e) = [e]
+blockToExprs (BExprs es) = es
+
+predefs :: [Ident]
+predefs = map (Ident noLoc)
+  [ "int", "any", "nat", "float", "string", "false"
+  , "in'+'", "in'-'", "in'*'", "in'/'"
+  , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
+  , "in'..'", "in'->'"
+  , "pre'-'"
+  , "post'^'", "post'?'"
+  , "succeeds", "decides", "iterates", "io"
+  , "$assign"
+  ]
+
+--------------------
+
+-- Remove let/do and possible name clashes.
+-- XXX name clash removal not implemented
+desugarDo :: Expr -> D Expr
+desugarDo = compos f
+  where f (Do b) = f $ blockToExpr b
+        f (Let e b) = f $ seqE (e : blockToExprs b)
+        f e = compos f e
+
+--------------------
+
+{-
+
+desugarFunction :: Expr -> Expr
+desugarFunction = flip evalState 1 . desugarFunctionS
+
+desugarFunctionS :: Expr -> D Expr
+desugarFunctionS = expr
+  where
+    expr e@LitInt{} = pure e
+    expr e@LitRat{} = pure e
+    expr e@Variable{} = pure e
+    expr (Array b) = Array <$> block b
+    expr (Seq es) = seqE <$> mapM expr es
+    expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
+    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+    expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> block e2 <*> block e3
+    expr (For2 e1 e2) = For2 <$> expr e1 <*> block e2
+    expr (Let e1 e2) = Let <$> expr e1 <*> block e2
+    expr (Do e) = Do <$> block e
+    expr (Case2 e1 e2) = Case2 <$> expr e1 <*> block e2
+    expr (Function e1 fs e2) = function e1 fs e2
+{-
+    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
+    expr (Type e) = Type <$> expr e
+    expr (Define i e) = Define i <$> expr e
+    expr (Choice e1 e2) = Unify <$> expr e1 <*> expr e2
+    expr (Lambda v e) = Lambda v <$> expr e
+    expr Any = pure Any
+    expr Fail = pure Fail
+-}
+    expr e = impossible e
+
+    block (BExpr e) = BExpr <$> expr e
+    block (BExprs es) = BExprs <$> mapM expr es
+
+    function e1 fs e2 = do
+      i <- newIdent "z"
+      e1' <- expr e1
+      e2' <- expr $ blockToExpr e2
+      let e2'' = foldr ApplyS e2' $ map Variable fs
+      pure $ Lambda i $ seqE [Unify e1' (Variable i), e2'']
+
 --------------------
 
 -- Insert defs
@@ -178,10 +258,6 @@ scopeDef ee = def <$> scopeExpr ee
     def :: ([Ident], Expr) -> Expr
     def ([], e) = e
     def (is, e) = Def is e
-
-blockToExpr :: Block -> Expr
-blockToExpr (BExpr e) = e
-blockToExpr (BExprs es) = seqE es
 
 exprToBlock :: Expr -> Block
 exprToBlock (Seq es) = BExprs es
@@ -242,57 +318,7 @@ thunk :: Expr -> Expr
 thunk = Lambda dummyIdent
   where dummyIdent = Ident noLoc "_"
 
-desugarFunction :: Expr -> Expr
-desugarFunction = flip evalState 1 . desugarFunctionS
-
-desugarFunctionS :: Expr -> D Expr
-desugarFunctionS = expr
-  where
-    expr e@LitInt{} = pure e
-    expr e@LitRat{} = pure e
-    expr e@Variable{} = pure e
-    expr (Array b) = Array <$> block b
-    expr (Seq es) = seqE <$> mapM expr es
-    expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
-    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-    expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> block e2 <*> block e3
-    expr (For2 e1 e2) = For2 <$> expr e1 <*> block e2
-    expr (Let e1 e2) = Let <$> expr e1 <*> block e2
-    expr (Do e) = Do <$> block e
-    expr (Case2 e1 e2) = Case2 <$> expr e1 <*> block e2
-    expr (Function e1 fs e2) = function e1 fs e2
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr (Type e) = Type <$> expr e
-    expr (Define i e) = Define i <$> expr e
-    expr (Choice e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr (Lambda v e) = Lambda v <$> expr e
-    expr Any = pure Any
-    expr Fail = pure Fail
-    expr e = impossible e
-
-    block (BExpr e) = BExpr <$> expr e
-    block (BExprs es) = BExprs <$> mapM expr es
-
-    function e1 fs e2 = do
-      i <- newIdent "z"
-      e1' <- expr e1
-      e2' <- expr $ blockToExpr e2
-      let e2'' = foldr ApplyS e2' $ map Variable fs
-      pure $ Lambda i $ seqE [Unify e1' (Variable i), e2'']
-
 ------------
-
-predefs :: [Ident]
-predefs = map (Ident noLoc)
-  [ "int", "any", "nat", "float", "string", "false"
-  , "in'+'", "in'-'", "in'*'", "in'/'"
-  , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
-  , "in'..'", "in'->'"
-  , "pre'-'"
-  , "post'^'", "post'?'"
-  , "succeeds", "decides", "iterates", "io"
-  , "$assign"
-  ]
 
 -- Make all variable names unique by appending a number.
 -- Check for undefined identifiers.
@@ -397,3 +423,4 @@ simplify = simp
     simp (Unify e Any) = simp e
     simp (ApplyD (Variable (Ident _ "any")) e) = simp e
     simp e = composOp simp e
+-}

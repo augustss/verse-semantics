@@ -5,7 +5,7 @@ import Control.Monad.State.Strict
 
 import Print
 import Expr
-import Desugar(predefs)
+import Desugar(predefs, blockToExprs)
 import Error
 
 data Core
@@ -71,10 +71,6 @@ getTmps = do
 exprToCore :: Expr -> Core
 exprToCore = flip evalState ([], 1) . core
 
-blockToExprs :: Block -> [Expr]
-blockToExprs (BExpr e) = [e]
-blockToExprs (BExprs es) = es
-
 core :: Expr -> C Core
 core e@LitInt{} = val e
 core e@LitRat{} = val e
@@ -84,17 +80,19 @@ core (Seq es) = CSeq <$> mapM core es
 core (ApplyS e1 e2) = core $ ApplyD (Variable (Ident noLoc "succeeds")) (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
 core (Unify e1 e2) = CUnify <$> core e1 <*> core e2
+{-
 core e@Type{} = val e
 core (Def is e) = do
   e' <- core e
   ts <- getTmps
   pure $ CDef (is ++ ts) e'
-core e@Choice{} = CBar <$> mapM core (flat e)
-  where flat (Choice e1 e2) = flat e1 ++ flat e2
-        flat ee = [ee]
 core e@Lambda{} = val e
 core (IfC e1 e2) = CIf <$> core e1 <*> core e2
 core (ForC e) = CFor <$> core e
+-}
+core e@Choice{} = CBar <$> mapM core (flat e)
+  where flat (Choice e1 e2) = flat e1 ++ flat e2
+        flat ee = [ee]
 core e@Any = val e
 core Fail = pure $ CBar []
 core e = impossible e
@@ -112,10 +110,12 @@ value (Variable i@(Ident _ s)) | i `elem` predefs = pure ([], HNF $ VPrim s)
 value (Array b) = do
   (css, vs) <- unzip <$> mapM value (blockToExprs b)
   pure (concat css, HNF $ VArray vs)
+{-
 value (Lambda i e) = do
   e' <- core e
   pure ([], HNF $ VLam i e')
 value (Type e) = second (HNF . VType) <$> value e
+-}
 value Any = pure ([], HNF $ VPrim "any")
 value e = do
   e' <- core e
@@ -134,9 +134,11 @@ coreToExpr (CSeq es) = Seq (map coreToExpr es)
 coreToExpr (CApply e1 e2) = ApplyD (coreToExpr e1) (coreToExpr e2)
 coreToExpr (CBar []) = Fail
 coreToExpr (CBar es) = foldr1 Choice $ map coreToExpr es
+{-
 coreToExpr (CIf e1 e2) = IfC (coreToExpr e1) (coreToExpr e2)
 coreToExpr (CFor e1) = ForC (coreToExpr e1)
 coreToExpr (CDef is e) = Def is (coreToExpr e)
+-}
 
 valueToExpr :: Value -> Expr
 valueToExpr (Var i) = Variable i
@@ -147,6 +149,6 @@ hnfToExpr (VInt i) = LitInt i
 hnfToExpr (VRat i) = LitRat i
 hnfToExpr (VPrim s) = Variable $ Ident noLoc s
 hnfToExpr (VArray es) = Array $ BExprs $ map valueToExpr es
-hnfToExpr (VLam i e) = Lambda i $ coreToExpr e
+--hnfToExpr (VLam i e) = Lambda i $ coreToExpr e
 hnfToExpr VRec{} = undefined
-hnfToExpr (VType e) = Type $ valueToExpr e
+--hnfToExpr (VType e) = Type $ valueToExpr e
