@@ -232,7 +232,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     && \vb & |applyx X e| \vb |applyx e X| \vb |def h in X | \\
  \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
     &&\vb & |applyx CX e| \vb |applyx ce CX| \vb |def h in CX| \\
-    \text{Left choice context} & L & ::= & \hole \vb |L choice e| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
     \\
