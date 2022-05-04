@@ -391,8 +391,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array}\\
     \rulename{ux1} & |k == (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |(v_1,dots,v_n) == k | & \movesto & |fail| \\
-    \rulename{ux3} & |(x => e) == hnf| & \movesto & |fail|  \qquad \text{(or stuck?)}\\
-    \rulename{ux4} & |hnf == (x => e)| & \movesto & |fail|  \qquad \text{(or stuck?)}
      \end{array}
    \end{array}
    $$
@@ -413,7 +411,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
     \rulename{def-wrong} & |def h in v| & \movesto & |wrong| & \text{if $|h| \neq |emp|$} \\
-    \rulename{unify-wrong} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
+    \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
+    \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
+    \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
     \textit{Propagation} \\
     \rulename{eq-wrong-l} & |wrong = v| & \movesto & |wrong| \\
     \rulename{eq-wrong-r} & |v = wrong| & \movesto & |wrong| \\
