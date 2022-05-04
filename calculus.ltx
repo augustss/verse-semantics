@@ -1094,13 +1094,13 @@ $$
     |Cr (: e)| & = & |range^(Cr e)| \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
-    |Cr (x := e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (x := e)| & = & |x = Cr e| \\
     |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
     |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
     |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one^(one^(Bi (e_1; (x => Bi e_2))) `choice` (x => Bi e_3))) ()| & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |all^(Bi(e_1 ; x => Cr e_2))| & \text{|x| fresh} \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
-    |Cr (typedef{e})| & = & |x => Bi e [x]| & \text{|x| fresh} \\
+    |Cr (typedef{e})| & = & |x => (Bi (e)^[x])| & \text{|x| fresh} \\
     \\
     |Bi| & \multicolumn{3}{l}{ \text{inserts |def| for all local bindings.} } \\
     |Bi e| & = & |def (Vr e) in Cr e| \\
