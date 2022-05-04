@@ -329,7 +329,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Conditionals} \\
     \begin{array}{rcll}
     \rulename{orElse-r} & |orElse fail e_2| & \movesto & e_2 \\
-    \rulename{orElse-l} & |orElse L^[v] e_2| & \movesto & |v| \\[2mm]
+    \rulename{orElse-l} & |orElse L^[v] e_2| & \movesto & |applyx v ()| \\[2mm]
     \end{array} \\
 
     \textit{Collect} \\
