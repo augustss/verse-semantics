@@ -988,6 +988,7 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 \begin{figure}
 $$
 \begin{array}{rcll}
+  |De| & \multicolumn{3}{l}{ \text{converts Source Verse to a subset of Source Verse.} } \\
   |De k| & = & |k| \\
   |De x| & = & |x| \\
   |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
@@ -1035,6 +1036,7 @@ A more robust desugaring could $\alpha$-convert such clashes.
 \begin{figure}
 $$
 \begin{array}{rcll}
+  |Ld| & \multicolumn{3}{l}{\text{converts a definition |l := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := De e| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
   |Ld (f^(e_1)) e_2| & = & |Fd (f^(e_1)) e_2| \\
@@ -1043,9 +1045,11 @@ $$
   |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
   |Ld (l_1 minusgt l_2) (:e)| & = & |Ld l_1 x; Ld l_2 (e^[x:any])| & \text{|x| fresh} \\
   \\
+  |Fd| & \multicolumn{3}{l}{\text{Converts function definitions to |function|.}} \\
   |Fd (f^(e)effsR) e_2| & = & |Fd f (function e_1 effsR {e_2})| \\
   |Fd x e| & = & |x := De e| \\
   \\
+  |Mt| & \multicolumn{3}{l}{\text{Does a matching (variant of unification) that treats functions specially.}} \\
   |Mt k e| & = & |x = k| \\
   |Mt x e| & = & |x := De e| \\
   |Mt (e_0, dots, e_n) e| & = & |De (x := e); Mt e_0 (x^[0]); dots; Mt e_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
@@ -1083,7 +1087,7 @@ $$
   
 $$
   \begin{array}{rcll}
-    |Cr|   &   & \text{ converts the limited SourceVerse to Core.} \\
+    |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
     |Cr k| & = & |k| \\
     |Cr x| & = & |x| \\
     |Cr (e_1, dots, e_n)| & = & |Cr e_1, dots, Cr e_n| \\
@@ -1098,10 +1102,10 @@ $$
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
     |Cr (typedef{e})| & = & |x => Bi e [x]| & \text{|x| fresh} \\
     \\
-    |Bi| && \text{inserts |def| for all local bindings.} \\
+    |Bi| & \multicolumn{3}{l}{ \text{inserts |def| for all local bindings.} } \\
     |Bi e| & = & |def (Vr e) in Cr e| \\
     \\
-    |Vr| && \text{finds all local bindings.} \\
+    |Vr| & \multicolumn{3}{l}{ \text{finds all local bindings.} } \\
     |Vr k| & = & |emp| \\
     |Vr x| & = & |emp| \\
     |Vr (e_1, dots, e_n)| & = & |Vr e_1, dots, Vr e_n| \\
