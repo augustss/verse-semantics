@@ -219,7 +219,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
     \text{Primops} & op  & ::= & cop \vb |range| \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
-    \text{Types} & ty & ::= & |int| \vb |string| \vb |type(v)| \\
+    \text{Types} & ty & ::= & |int| \vb |string| \vb |type v| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |applyx cop ce| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
@@ -312,7 +312,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x in (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
-    \rulename{app-type} & |applyx (type(v))(e)| & \movesto & |applyx v e| \\
+    \rulename{app-type} & |applyx (type v)(e)| & \movesto & |applyx v e| \\
     \rulename{app-arr} & |applyx (v_0,dots,v_k,dots,v_n)(k)| & \movesto &
     \begin{array}[t]{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\
@@ -326,15 +326,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\
     \\[-2mm]
 
-    \textit{Conditionals} \\
+    \textit{One and all} \\
     \begin{array}{lrcl}
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\[2mm]
-    \end{array} \\
-
-    \textit{Collect} \\
-    \begin{array}{lrcl}
     \rulename{all-0} & |all fail| & \movesto & |()| \\
     \rulename{all-n} &
       |all (v_1 choice dots choice v_n)|
