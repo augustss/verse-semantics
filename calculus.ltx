@@ -1061,8 +1061,8 @@ $$
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (e_1 := e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
-    |Cr (e_1 choose e_2])| & = & |Cr e_1 choose Cr e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = & |orElse (Cr e_1 ; x => Cr e_2) (Cr e_3)| & \text{|x| fresh} \\
+    |Cr (e_1 `choice` e_2)| & = & |Cr e_1 `choice` Cr e_2| \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |orElse (Cr e_1 ; x => Cr e_2) Cr e_3| & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |collect (Cr e_1 ; x => Cr e_2)| & \text{|x| fresh} \\
     |Cr (function(x:any)()e)| & = & |x => Cr e| \\
     |Cr (typedef{e})| & = & |x => Cr e [x]| & \text{|x| fresh} \\
