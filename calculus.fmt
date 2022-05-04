@@ -1,8 +1,12 @@
 %format De (x) = "\De{" x "}"
 %format An (x) = "\An{" x "}"
 %format Cr (x) = "\Cr{" x "}"
+%format Ty (x) = "\Ty{" x "}"
+%format Bi (x) = "\Bi{" x "}"
+%format Vr (x) = "\Vr{" x "}"
 %format Ld (x)(y) = "\Ld{" x "}{" y "}"
 %format Fd (x)(y) = "\Fd{" x "}{" y "}"
+%format Mt (x)(y) = "\Mt{" x "}{" y "}"
 %format applyx a (b) = a "(" b ")"
 
 %format lambda = "\lambda\!"
@@ -45,6 +49,7 @@
 %format orElse = "\textbf{orElse}"
 %format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"
+%format arrow = "\textbf{arrow}"
 % only used in comments, but still prettier this way:
 %format false = "\textbf{false}"
 %format fix = "\textbf{fix}"
@@ -100,10 +105,12 @@
 %format k_1
 %format k_2
 
+%format e_0
 %format e_1
 %format e1'
 %format e_2
 %format e_3
+%format e_4
 %format e_n
 %format e_m
 %format e_n'

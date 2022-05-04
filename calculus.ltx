@@ -37,8 +37,12 @@
 \newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
 \newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
 \newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ty}[1]{{\mathcal T}\llbracket #1 \rrbracket}
+\newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
+\newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
 \newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
 \newcommand{\Fd}[2]{{\mathcal F}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
+\newcommand{\Mt}[2]{{\mathcal M}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -896,7 +900,7 @@ To save space we have used the abbreviation |F| for the expression \newline
 \begin{figure}
 $$
 \begin{array}{rcll}
-  |e| & ::= & \textit{Expressions} \\
+  |e,t| & ::= & \textit{Expressions} \\
       &     & |x|               & \text{variable reference} \\
       & \vb & |k|               & \text{constant} \\
       & \vb & |e_1, dots, e_n|  & \text{array} \\
@@ -904,18 +908,16 @@ $$
       & \vb & |e_1 ; e_2|       & \text{sequencing} \\
       & \vb & |e_1^[e_2]|       & \text{function application} \\
       & \vb & |x := e|          & \text{definition} \\
-      & \vb & |: e|             & \text{range} \\
-      & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
+      & \vb & |: t|             & \text{range} \\
       & \vb & |e_1 `choice` e_2| & \text{choice} \\
       & \vb & |e_1 = e_2|       & \text{unification} \\
       & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
       & \vb & |for(e) in b|     & \text{finite loop} \\
-      & \vb & |let(e) in b|     & \text{local binding} \\
-      & \vb & |do b|            & \text{scope delimiter} \\
       & \vb & |function e effsR b|    & \text{anonymous function} \\
       & \vb & |typedef{e}|      & \text{type definition} \\
   %%%%%
       &     & \textit{Expressions removed by desugaring} \\
+      & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
       & \vb & |l := e|          & \text{definition} \\
       & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
       & \vb & |op_b e|          & \text{prefix operator} \\
@@ -929,6 +931,8 @@ $$
       & \vb & |if(e) else b|    & \text{conditional expression} \\
       & \vb & |if{e}|           & \text{conditional expression} \\
       & \vb & |for{e}|          & \text{finite loop} \\
+      & \vb & |let(e) in b|     & \text{local binding} \\
+      & \vb & |do b|            & \text{scope delimiter} \\
       & \vb & |case(e) of b|    & \text{case expression} \\
       & \vb & |case{e_1; dots e_n}| & \text{case expression} \\
 \end{array}
@@ -948,7 +952,7 @@ $$
       \\
   |l| & ::= & \textit{Definition LHS} \\
       &     & |x|               & \text{variable} \\
-      & \vb & |l : e|           & \text{of type} \\
+      & \vb & |l : t|           & \text{of type} \\
       & \vb & |f^(e)|           & \text{function} \\
       & \vb & |l?|              & \text{optional} \\
       & \vb & |e|\,\,\hat{}         & \text{assignment} \\
@@ -991,14 +995,14 @@ $$
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
   |De (e_1^(e_2))| & = & |De (succeeds^[e_1^[e_2]])| \\
   |De (!e)| & = & |De (if e then :false else false)| \\
-  |De (:e)| & = & |: De e| \\
+  |De (:t)| & = & |: De t| \\
   |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
   |De (op_b e)| & = & |De (prefix op_b (e))| \\
   |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
   |De (e op_a)| & = & |De (postfix op_a (e))| \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (l := e)| & = & |Ld l e| \\
-  |De (l : e)| & = & |Ld l (:e)| \\
+  |De (l : t)| & = & |Ld l (:t)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
   |De (e_1 srcor e_2)| & = & |De (if(e_1) else e_2)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
@@ -1015,28 +1019,55 @@ $$
   |De (do b)| & = & |De b| & \textit{see note}  \\
   |De (case{e_1; dots e_n})| & = & |De ((x:any) => case(x){e_1; dots e_n})| & \text{|x| fresh} \\
   |De (case(e){e_1; dots e_n}| & = & |De (x:=e; if(e_1[x]) else dots if(e_n[x]) else :false)| \\
-%% XXX effects are missing
-  |De (function e effsR b)| & = &
-      |function(x:any)effsR(e = x; do{De b})| & \text{|x| fresh} \\
+  |De (function e effsR b)| & = & |De (function(e)(dots)((r[b])))| & \\
+  |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
   |De (typedef^{e})| & = & |typedef^{De e}| \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
-  |Ld x e| & = & |x := De e| \\
-  |Ld (l : t) e| & = & |Ld l (t^[e])| \\
-  |Ld (f^(e_1)) e_2| & = & |Fd (f^(e_1)) e_2| \\
-  |Ld (l ?) e| & = & |Ld l (e ?)| \\
-  |Ld (e_1 ?) e_2| & = & |De (assign^(e_1,e_2))| \\
-  |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
-  |Ld (l_1 minusgt l_2) (:e)| & = & |Ld l_1 x; Ld l_2 (e^[x:any])| & \text{|x| fresh} \\
-  |Fd (f^(e)effsR) e_2| & = & |Fd f (function e_1 effsR {e_2})| \\
-  |Fd x e| & = & |x := De e| \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
 This means that there can be not variable name clashes in |let| and |do|.
 A more robust desugaring could $\alpha$-convert such clashes.
-\caption{Desugaring} \label{fig:desugar}
+\caption{Desugaring of expressions} \label{fig:desugar-expr}
 \end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  |Ld x e| & = & |x := De e| \\
+  |Ld (l : t) e| & = & |Ld l (t^[e])| \\
+  |Ld (f^(e_1)) e_2| & = & |Fd (f^(e_1)) e_2| \\
+  |Ld (l ?) e| & = & |Ld l (e ?)| \\
+  |Ld (e_1 ^) e_2| & = & |De (assign^(e_1,e_2))| \\
+  |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); !x^[n+1] | & \text{|x| fresh} \\
+  |Ld (l_1 minusgt l_2) (:e)| & = & |Ld l_1 x; Ld l_2 (e^[x:any])| & \text{|x| fresh} \\
+  \\
+  |Fd (f^(e)effsR) e_2| & = & |Fd f (function e_1 effsR {e_2})| \\
+  |Fd x e| & = & |x := De e| \\
+  \\
+  |Mt k e| & = & |x = k| \\
+  |Mt x e| & = & |x := De e| \\
+  |Mt (e_0, dots, e_n) e| & = & |De (x := e); Mt e_0 (x^[0]); dots; Mt e_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
+  |Mt (e_1 : t) e_2| & = & |De (e_1:t := e_2)| \\
+  |Mt (e_1 := e_2) e_3| & = & |De (e_1 := (e_2 = e_3))| \\
+  |Mt (: t) e| & = & |De (:t := e)| \\
+  |Mt (e_1; e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
+  |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (e_2; e_3)| \\
+  |Mt (let (e_1) in e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
+  |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| \\
+  |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| \\
+  |Mt e_1 e_2| & = & |De (do{e_1} = e_2)| & \text{otherwise} \\
+%% Maybe?  |Mt (l ?) e| & = & |Mt l (e ?)| & \text{otherwise} \\
+%%  \\
+%%  |Ty (:t)| & = & |De t| \\
+%%  |Ty e| & = & |De (typedef{e})| \\
+\end{array}
+$$
+\lennart{|Mt| can probably be simplified by using |De| on the first argument before calling it.}
+\caption{Desugaring of matching} \label{fig:desugar-expr}
+\end{figure}
+
 
 \begin{figure}
 $$
@@ -1044,26 +1075,46 @@ $$
 |An| & = |dots| & \text{ANF conversion of values} \\
 \end{array}
 $$
-\lennart{Inserting |def| is missing}
+\lennart{Maybe do this as part of |De|?}
 \caption{ANF conversion} \label{fig:anf}
 \end{figure}
 
 \begin{figure}
+  
 $$
   \begin{array}{rcll}
+    |Cr|   &   & \text{ converts the limited SourceVerse to Core.} \\
     |Cr k| & = & |k| \\
     |Cr x| & = & |x| \\
-    |Cr (e_1 dots e_n)| & = & |Cr e_1 dots Cr e_n| \\
-    |Cr (: e_1)| & = & |range^(Cr e_1)| \\
+    |Cr (e_1, dots, e_n)| & = & |Cr e_1, dots, Cr e_n| \\
+    |Cr (: e)| & = & |range^(Cr e)| \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
-    |Cr (e_1 := e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (x := e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
-    |Cr (e_1 `choice` e_2)| & = & |Cr e_1 `choice` Cr e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one ( one (e_1; (x => e_2)) `choice` (x => e_3))) ()| & \text{|x| fresh} \\
-    |Cr (for e_1 in e_2)| & = & |all (Cr e_1 ; x => Cr e_2)| & \text{|x| fresh} \\
-    |Cr (function(x:any)()e)| & = & |x => Cr e| \\
-    |Cr (typedef{e})| & = & |x => Cr e [x]| & \text{|x| fresh} \\
+    |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one^(one^(Bi (e_1; (x => Bi e_2))) `choice` (x => Bi e_3))) ()| & \text{|x| fresh} \\
+    |Cr (for e_1 in e_2)| & = & |all^(Bi(e_1 ; x => Cr e_2))| & \text{|x| fresh} \\
+    |Cr (function(x:any)()e)| & = & |x => Bi e| \\
+    |Cr (typedef{e})| & = & |x => Bi e [x]| & \text{|x| fresh} \\
+    \\
+    |Bi| && \text{inserts |def| for all local bindings.} \\
+    |Bi e| & = & |def (Vr e) in Cr e| \\
+    \\
+    |Vr| && \text{finds all local bindings.} \\
+    |Vr k| & = & |emp| \\
+    |Vr x| & = & |emp| \\
+    |Vr (e_1, dots, e_n)| & = & |Vr e_1, dots, Vr e_n| \\
+    |Vr (: e)| & = & |Vr e| \\
+    |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (x := e)| & = & |x , Vr e| \\
+    |Vr (e_1[e_2])| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1 `choice` e_2)| & = & |emp| \\
+    |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
+    |Vr (for e_1 in e_2)| & = & |emp| \\
+    |Vr (function(x:any)()e)| & = & |emp| \\
+    |Vr (typedef{e})| & = & |emp| \\
   \end{array}
 $$
 \caption{Core conversion} \label{fig:core-conversion}
