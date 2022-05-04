@@ -214,7 +214,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |orElse e_1 e_2| \vb |collect e| \vb |def h in e| \\
+    &&\vb & |one e| \vb |all e| \vb |def h in e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
     \text{Primops} & op  & ::= & cop \vb |range| \\
@@ -308,7 +308,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\[-2mm]
 
     \textit{Lambda and application} \\
-    \begin{array}{rcll}
+    \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x in (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
@@ -327,16 +327,17 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \\[-2mm]
 
     \textit{Conditionals} \\
-    \begin{array}{rcll}
-    \rulename{orElse-r} & |orElse fail e_2| & \movesto & e_2 \\
-    \rulename{orElse-l} & |orElse L^[v] e_2| & \movesto & |applyx v ()| \\[2mm]
+    \begin{array}{lrcl}
+    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\[2mm]
     \end{array} \\
 
     \textit{Collect} \\
-    \begin{array}{rcll}
-    \rulename{collect-0} & |collect fail| & \movesto & |()| \\
-    \rulename{collect-n} &
-      |collect (v_1 choice dots choice v_n)|
+    \begin{array}{lrcl}
+    \rulename{all-0} & |all fail| & \movesto & |()| \\
+    \rulename{all-n} &
+      |all (v_1 choice dots choice v_n)|
     & \movesto &
     \begin{array}[t]{@@{}l}
       |def x_1,dots x_n in| \\
@@ -427,8 +428,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{app-fun-wrong-b} & |wrong^(wrong) | & \movesto & |wrong| \\
     \rulename{choice-wrong-l} & |wrong choice v| & \movesto & |wrong| \\
     \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
-    \rulename{orElse-wrong} & |orElse wrong e_2| & \movesto & |wrong| \\
-    \rulename{collect-wrong} & |collect (v_1 choice dots v_n choice wrong)| & \movesto & |wrong| \\
+    \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
+    \rulename{all-wrong} & |all (v_1 choice dots v_n choice wrong)| & \movesto & |wrong| \\
      \end{array}
    \end{array}
    $$
@@ -551,8 +552,8 @@ In figure \ref{fig:verse-eval} we introduce an evaluation context |E| to force a
 We would like to have a similar |E| for Verse, but it seems difficult to find one that always identifies a
 unique redex for the next reduction.
 Instead we settle for an evaluation context that is ambiguous and allows many different redexes, figure \ref{fig:verse-eval}.
-It allows evaluation almost everywhere, with exception of under a $\lambda$, right-hand-side of an |orElse|, and body of a |collect|.
-The reason to disallow these is that we do not know if they are needed.
+It allows evaluation almost everywhere, with exception of under a $\lambda$.
+The reason to disallow this is that we do not know if they are needed.
 \joachim{The same applies to the second expression in $e_1; e_2$, doesn't it? Oh, and |e_1 choice e_2|, because in an |if| context the second may not be needed.}
 \lennart{Yes, there are several ways where some paths terminate, and others don't.  I don't know what to do about it.}
 
@@ -562,7 +563,7 @@ The reason to disallow these is that we do not know if they are needed.
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
       && \vb & |applyx E e| \vb |applyx e E| \vb |def h in E| \vb |E choice e| \vb |e choice E| \\
-      && \vb & |orElse E e| \vb |collect E| \\
+      && \vb & |one E| \vb |all E| \\
     \end{array}
   $$
 \caption{The Verse calculus: evaluation} \label{fig:verse-eval}
@@ -613,9 +614,9 @@ The side conditions ensure
       This side conditions ensures that we never get cycles in the heap.
 \end{itemize}
 
-Crucially, note that $X$ does not look inside |orElse|, |collect|, or choice (|choice|).
+Crucially, note that $X$ does not look inside |one|, |all|, or choice (|choice|).
 For example
-$$ |def x in (orElse (x==3; e_1 e_2))| $$
+$$ |def x in (one (x==3); x)| $$
 does
 not unify |x| via \rulename{bind}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
 Nor does $X$ look inside choices.  For example,
@@ -678,7 +679,7 @@ If the body of the recursive definition is a function then reduction will eventu
 \subsection{Conditionals}
 
 In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
-it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values). The essence of this check is captures in the |orElse e_1 e_2| construct, which evaluates to the first value returned by |e_1| or, if that fails, |e_2|. The conventional |if e_1 then e_2 else e_3| construct can be built on top of |orElse|.
+it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values). The essence of this check is captured in the |one e| construct, which evaluates to the \emph{first} value returned by |e|. The conventional |if e_1 then e_2 else e_3| construct can be built on top of |one|.
 
 For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
 the |if| returns |e_1|, otherwise it returns |e_2|.
@@ -687,10 +688,10 @@ Comparision operators succeed or fail, rather than returning a Boolean
 (as in most languages). For example |(x>3)| suceeds if |x| is greater
 than 3, returning |x|; and fails if not.
 
-It is very important that in a conditional |(orElse (x=3;1) 2| we
+It is very important that in |(one (x=3;1) 2| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
 |x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
-does not look inside the condition of an |orElse| (look at the syntax of context |X| used in that rule).
+does not look inside an |one| (look at the syntax of context |X| used in that rule).
 
 \subsection{The Equality Principle}
 
@@ -811,6 +812,7 @@ Note that the name $x$ has been $\alpha$-converted to a fresh variable $t$ to av
   \end{array}$$
   \joachim{Should we rewrite this to use CoreVerse? Or move the examples after the desugaring, start them with a source verse term, and apply desugaring as the first step? The latter seems more helpful}
   \lennart{When we have all the desugaring rules we should redo some of these examples to show the entire flow.}
+  \joachim{Also TODO: Still uses |orElse|.}
 \end{example}
 
 
@@ -866,15 +868,15 @@ To save space we have used the abbreviation |F| for the expression \newline
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|collect (def x in x == (1 choice  2); _ => add^(x, 1))|} \\
-    \rulename{choose} & \movesto & |collect (def x in (x == 1; _ => add^(x, 1)) choice  (x == 2; _ => add^(x, 1)))| \\
-    \rulename{choose} & \movesto & |collect ((def x in x == 1; _ => add^(x, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{bind} & \movesto & |collect ((def in 1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{def-elim} & \movesto & |collect ((1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{bind} & \movesto & |collect ((1; _ => add^(1, 1)) choice  (def in 2; _ => add^(2, 1)))| \\
-    \rulename{def-elim} & \movesto & |collect ((1; _ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
-    \rulename{seq} & \movesto & |collect ((_ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
-    \rulename{seq} & \movesto & |collect ((_ => add^(1, 1)) choice  (_ => add^(2, 1)))| \\
+    \multicolumn{3}{l}{|all (def x in x == (1 choice  2); _ => add^(x, 1))|} \\
+    \rulename{choose} & \movesto & |all (def x in (x == 1; _ => add^(x, 1)) choice  (x == 2; _ => add^(x, 1)))| \\
+    \rulename{choose} & \movesto & |all ((def x in x == 1; _ => add^(x, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
+    \rulename{bind} & \movesto & |all ((def in 1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
+    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
+    \rulename{bind} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def in 2; _ => add^(2, 1)))| \\
+    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
+    \rulename{seq} & \movesto & |all ((_ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
+    \rulename{seq} & \movesto & |all ((_ => add^(1, 1)) choice  (_ => add^(2, 1)))| \\
     \rulename{collect1} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (_ => add^(2, 1))^(); (t, t1)| \\
     \rulename{app-lam} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (def t2 in t2 == (); add^(2, 1)); (t, t1)| \\
     \rulename{bind} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (def in (); add^(2, 1)); (t, t1)| \\
@@ -1062,8 +1064,8 @@ $$
     |Cr (e_1 := e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
     |Cr (e_1 `choice` e_2)| & = & |Cr e_1 `choice` Cr e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = & |orElse (Cr e_1 ; x => Cr e_2) Cr e_3| & \text{|x| fresh} \\
-    |Cr (for e_1 in e_2)| & = & |collect (Cr e_1 ; x => Cr e_2)| & \text{|x| fresh} \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one ( one (e_1; (x => e_2)) `choice` (x => e_3))) ()| & \text{|x| fresh} \\
+    |Cr (for e_1 in e_2)| & = & |all (Cr e_1 ; x => Cr e_2)| & \text{|x| fresh} \\
     |Cr (function(x:any)()e)| & = & |x => Cr e| \\
     |Cr (typedef{e})| & = & |x => Cr e [x]| & \text{|x| fresh} \\
   \end{array}
