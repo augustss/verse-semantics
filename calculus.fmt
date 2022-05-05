@@ -43,6 +43,9 @@
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
 
+%format array (x) = "\textbf{arr}\{" x "\}"
+%format typeKW (x) = "\textbf{type}"
+%format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
 %format one (x) = "\textbf{one}\,\{" x "\}"
 %format allKW = "\textbf{all}"
