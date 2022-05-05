@@ -351,7 +351,6 @@
         "Range-arr")
 
    ;; Conditionals
-   ;; If-true2 only needed when the 'if' does not have a 'def'
    (--> (orElse (bar) e_2)
         (e_2 (arr))
         "OrElse-false")
@@ -359,9 +358,6 @@
         (v (arr))
         "OrElse-true")
    ;; For-loops
-   ;; For2 only needed when the 'for' does not have a 'def'
-   ;; For3 only needed when the 'for' does not have a 'bar'
-   ;; For4 only needed when the 'for' does not have a 'bar' nor 'def'
    (--> (collect (bar v ...))
         (def ((var t) ...) (seq (= t (v (arr))) ... (arr t ...)))
         (fresh ((t ...) (v ...)))
