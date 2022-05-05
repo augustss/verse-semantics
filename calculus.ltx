@@ -218,7 +218,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |one e| \vb |all e| \vb |def h e| \\
+    &&\vb & |one e| \vb |all e| \vb |def h e| \vb |succeeds e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
     \text{Primops} & op  & ::= & cop \vb |range| \\
@@ -329,7 +329,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\
     \\[-2mm]
 
-    \textit{One and all} \\
+    \textit{One, all and succeeds} \\
     \begin{array}{lrcl}
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
@@ -343,6 +343,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
        (x_1 == applyx v_1 (); dots x_n == applyx v_n (); (x_1,dots,x_n))| \\
       \text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
     \end{array} \\
+    \rulename{succeeds-value} & |succeeds v| & \movesto & |v| \\
     \end{array} \\
     \\[-2mm]
     \textit{Def-blocks} \\
@@ -429,6 +430,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
     \rulename{all-wrong} & |all (v_1 choice dots v_n choice wrong)| & \movesto & |wrong| \\
+    \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+    \rulename{succeeds-choice} & |succeeds (v choice e)| & \movesto & |wrong| \\
+    \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
      \end{array}
    \end{array}
    $$
@@ -562,7 +566,7 @@ The reason to disallow this is that we do not know if they are needed.
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
       && \vb & |applyx E e| \vb |applyx e E| \vb |def h E| \vb |E choice e| \vb |e choice E| \\
-      && \vb & |one E| \vb |all E| \\
+      && \vb & |one E| \vb |all E| \vb |succeeds E| \\
     \end{array}
   $$
 \caption{The Verse calculus: evaluation} \label{fig:verse-eval}
@@ -974,7 +978,7 @@ $$
         &     & < \vb <= \vb > \vb >= \vb <>
   \\
   |r| & ::= & \textit{Effects} \\
-      &     & |succeeds| \vb |decides| \vb |iterates|
+      &     & |succeedsKW| \vb |decides| \vb |iterates|
 \end{array}
 $$
 \\
@@ -993,7 +997,7 @@ $$
   |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
-  |De (e_1^(e_2))| & = & |De (succeeds^[e_1^[e_2]])| \\
+  |De (e_1^(e_2))| & = & |De (succeeds (e_1^[e_2]))| \\
   |De (!e)| & = & |De (if e then :false else false)| \\
   |De (:t)| & = & |: De t| \\
   |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
