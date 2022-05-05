@@ -219,10 +219,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |def h e| \vb |one e| \vb |all e| \vb |succeeds e| \\
+     && \vb & |def h e| \\
+     && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |range e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
-    \text{Primops} & op  & ::= & cop \vb |range| \\
+    \text{Primops} & op  & ::= & cop \\
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Types} & ty & ::= & |int| \vb |string| \vb |type v| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |applyx cop ce| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
@@ -326,7 +327,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \textit{Range} \\
     \begin{array}{lrcl}
-    \rulename{range-arr} & |range^(v_1, dots, v_n)| & \movesto & |v_1 choice dots choice v_n| \\
+    \rulename{range-arr} & |range (v_1, dots, v_n)| & \movesto & |v_1 choice dots choice v_n| \\
     \end{array} \\
     \\[-2mm]
 
@@ -383,7 +384,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\ \\[-2mm]
     \begin{array}{lrcl}
     \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
-    \rulename{utype} & |x == applyx range ty| & \movesto & |applyx ty x; x| \\
+    \rulename{utype} & |x == range ty| & \movesto & |applyx ty x; x| \\
     \rulename{ucon} & |k_1 == k_2| & \movesto
     & \begin{array}[t]{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
@@ -1085,7 +1086,7 @@ $$
     |An k| & = & |k| \\
     |An x| & = & |x| \\
     |An (e_1, dots, e_n)| & = & |x_1 := An e_1; dots; x_n := An e_n; (x_1, dots, x_n)| & \text{|x_1 dots x_n| fresh} \\
-    |An (: e)| & = & |applyx range (An e)| \\
+    |An (: e)| & = & |: An e| \\
     |An (e_1 ; e_2)| & = & |An e_1 ; An e_2| \\
     |An (e_1 = e_2)| & = & |An e_1 = An e_2| \\
     |An (x := e)| & = & |x = An e| \\
@@ -1102,20 +1103,20 @@ $$
 \end{figure}
 
 \begin{figure}
-  
+
 $$
   \begin{array}{rcll}
     |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
     |Cr k| & = & |k| \\
     |Cr x| & = & |x| \\
     |Cr (x_1, dots, x_n)| & = & |x_1, dots, x_n| \\
-    |Cr (: e)| & = & |range^(Cr e)| \\
+    |Cr (: e)| & = & |range (Cr e)| \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (x := e)| & = & |x = Cr e| \\
-    |Cr (e_1[e_2])| & = & |Cr e_1 [Cr e_2]| \\
+    |Cr (e_1[e_2])| & = & |applyx (Cr e_1) (Cr e_2)| \\
     |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one(one(Bi (e_1; (x => Bi e_2))) `choice` (x => Bi e_3))) ()| & \text{|x| fresh} \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one(one(Bi (e_1; (x => Bi e_2))) `choice` (x => Bi e_3))) (())| & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; x => Cr e_2))| & \text{|x| fresh} \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
     |Cr (typedef{e})| & = & |x => Bi (e)^[x]| & \text{|x| fresh} \\

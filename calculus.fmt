@@ -51,6 +51,8 @@
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format succeedsKW = "\textbf{succeeds}"
 %format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
+%format rangeKW = "\textbf{range}"
+%format range (e) = "\textbf{range}\,\{" e "\}"
 
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
@@ -69,7 +71,6 @@
 %format semi = "\textbf{seq}"
 %format gt = "\textbf{gt}"
 %format rec = "\textbf{rec}"
-%format range = "\textbf{range}"
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
 %format string = "\textbf{string}"
