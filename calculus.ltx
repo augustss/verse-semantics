@@ -1085,14 +1085,14 @@ $$
     |An k| & = & |k| \\
     |An x| & = & |x| \\
     |An (e_1, dots, e_n)| & = & |x_1 := An e_1; dots; x_n := An e_n; (x_1, dots, x_n)| & \text{|x_1 dots x_n| fresh} \\
-    |An (: e)| & = & |range^(An e)| \\
+    |An (: e)| & = & |applyx range (An e)| \\
     |An (e_1 ; e_2)| & = & |An e_1 ; An e_2| \\
     |An (e_1 = e_2)| & = & |An e_1 = An e_2| \\
     |An (x := e)| & = & |x = An e| \\
     |An (e_1[e_2])| & = & |An e_1 [An e_2]| \\
     |An (e_1 `choice` e_2)| & = & |An e_1 `choice` An e_2| \\
-    |An (if e_1 then e_2 else e_3)| & = & |if An e_1 then An e_2 else An e_3)| \\
-    |An (for e_1 in e_2)| & = & |for (An e_1) in An e_2)| \\
+    |An (if e_1 then e_2 else e_3)| & = & |if An e_1 then An e_2 else An e_3| \\
+    |An (for e_1 in e_2)| & = & |for (An e_1) in (An e_2)| \\
     |An (function(e_1)effsR(e_2))| & = & |function(An e_1)effsR(An e_2)| \\
     |An (typedef{e})| & = & |typedef{An e}| \\
 \end{array}
