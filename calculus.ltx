@@ -821,7 +821,9 @@ Note that the name $x$ has been $\alpha$-converted to a fresh variable $t$ to av
 \end{example}
 
 
-\begin{example} $$
+\begin{example}
+  \lennart{This example needs to be updated to use |oneKW|.}
+  $$
   \begin{array}{rcl}
     \multicolumn{3}{l}{|def fcn (fcn == (rec f F); fcn^(2))|} \\
     \rulename{bind} & \movesto & |def emp (rec f F; (rec f F)^(2))| \\
@@ -1026,7 +1028,7 @@ $$
   |De (do b)| & = & |De b| & \textit{see note}  \\
   |De (case{e_1; dots e_n})| & = & |De ((x:any) => case(x){e_1; dots e_n})| & \text{|x| fresh} \\
   |De (case(e){e_1; dots e_n}| & = & |De (x:=e; if(e_1[x]) else dots if(e_n[x]) else :false)| \\
-  |De (function e effsR b)| & = & |De (function(e)(dots)((r[b])))| & \\
+  |De (function e effsR b)| & = & |De (function(e)(dots)((r^[b])))| & \\
   |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
   |De (typedef^{e})| & = & |typedef^{De e}| \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
@@ -1047,7 +1049,7 @@ $$
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
   |Ld (f^(e_1)) e_2| & = & |Fd (f^(e_1)) e_2| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
-  |Ld (e_1 ^) e_2| & = & |De (assign^(e_1,e_2))| \\
+  |Ld (e_1 hat ) e_2| & = & |De (assign^(e_1,e_2))| \\
   |Ld (l_0, dots, l_n) e| & = & |De (x := e); Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
   |Ld (l_1 minusgt l_2) (:e)| & = & |Ld l_1 x; Ld l_2 (e^[x:any])| & \text{|x| fresh} \\
   \\
@@ -1090,12 +1092,12 @@ $$
     |An (e_1 ; e_2)| & = & |An e_1 ; An e_2| \\
     |An (e_1 = e_2)| & = & |An e_1 = An e_2| \\
     |An (x := e)| & = & |x = An e| \\
-    |An (e_1[e_2])| & = & |An e_1 [An e_2]| \\
+    |An (e_1^[e_2])| & = & |An e_1 [An e_2]| \\
     |An (e_1 `choice` e_2)| & = & |An e_1 `choice` An e_2| \\
     |An (if e_1 then e_2 else e_3)| & = & |if An e_1 then An e_2 else An e_3| \\
     |An (for e_1 in e_2)| & = & |for (An e_1) in (An e_2)| \\
     |An (function(e_1)effsR(e_2))| & = & |function(An e_1)effsR(An e_2)| \\
-    |An (typedef{e})| & = & |typedef{An e}| \\
+    |An (typedef^{e})| & = & |typedef^{An e}| \\
 \end{array}
 $$
 \lennart{Maybe do this as part of |De|?}
@@ -1116,10 +1118,10 @@ $$
     |Cr (x := e)| & = & |x = Cr e| \\
     |Cr (e_1[e_2])| & = & |applyx (Cr e_1) (Cr e_2)| \\
     |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one(one(Bi (e_1; (x => Bi e_2))) `choice` (x => Bi e_3))) (())| & \text{|x| fresh} \\
-    |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; x => Cr e_2))| & \text{|x| fresh} \\
+    |Cr (if e_1 then e_2 else e_3)| & = & |applyx (one(one(Bi (e_1; x => e_2)) `choice` (x => Bi e_3))) ()| & \text{|x| fresh} \\
+    |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; x => e_2))| & \text{|x| fresh} \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
-    |Cr (typedef{e})| & = & |x => Bi (e)^[x]| & \text{|x| fresh} \\
+    |Cr (typedef^{e})| & = & |x => Bi (e)^[x]| & \text{|x| fresh} \\
     \\
     |Bi| & \multicolumn{3}{l}{ \text{inserts |defKW| for all local bindings.} } \\
     |Bi e| & = & |def (Vr e) (Cr e)| \\
@@ -1139,7 +1141,8 @@ $$
     |Vr (function(x:any)()e)| & = & |emp| \\
     |Vr (typedef{e})| & = & |emp| \\
   \end{array}
-$$
+  $$
+  \lennart{The rules for if/for should not use =>}
 \caption{Core conversion} \label{fig:core-conversion}
 \end{figure}
 
