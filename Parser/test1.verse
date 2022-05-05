@@ -53,7 +53,7 @@ do{x};
 case{x;y};
 case(x)of{y;z};
 function(x){y};
-fn(x)<succeeds>{y};
+fn(xx:int)<succeeds>{y};
 fn(x)<succeeds><io>{y};
 f(a:int):=a;
 (xs, z) := f[];

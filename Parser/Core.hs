@@ -5,7 +5,7 @@ import Control.Monad.State.Strict
 
 import Print
 import Expr
-import Desugar(predefs, blockToExprs)
+import Desugar(predefs)
 import Error
 
 data Core
@@ -107,8 +107,8 @@ value (LitInt i) = pure ([], HNF $ VInt i)
 value (LitRat i) = pure ([], HNF $ VRat i)
 value (Variable i@(Ident _ s)) | i `elem` predefs = pure ([], HNF $ VPrim s)
                                | otherwise = pure ([], Var i)
-value (Array b) = do
-  (css, vs) <- unzip <$> mapM value (blockToExprs b)
+value (Array es) = do
+  (css, vs) <- unzip <$> mapM value es
   pure (concat css, HNF $ VArray vs)
 {-
 value (Lambda i e) = do
@@ -148,7 +148,7 @@ hnfToExpr :: HNF -> Expr
 hnfToExpr (VInt i) = LitInt i
 hnfToExpr (VRat i) = LitRat i
 hnfToExpr (VPrim s) = Variable $ Ident noLoc s
-hnfToExpr (VArray es) = Array $ BExprs $ map valueToExpr es
+hnfToExpr (VArray es) = Array $ map valueToExpr es
 --hnfToExpr (VLam i e) = Lambda i $ coreToExpr e
 hnfToExpr VRec{} = undefined
 --hnfToExpr (VType e) = Type $ valueToExpr e

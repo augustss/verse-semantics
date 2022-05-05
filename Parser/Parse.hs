@@ -83,10 +83,10 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
 pAtom = choice [Variable <$> pIdent, LitInt <$> pDecimal, pEmpty, pParens pExprSeq, pArray, pTypedef]
-  where pEmpty = try $ pParens (pure (Array (BExprs [])))
+  where pEmpty = try $ pParens (pure (Array []))
 
 pArray :: P Expr
-pArray = pKeyword "array" *> (Array <$> pBlockM)
+pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 pTypedef :: P Expr
 pTypedef = pKeyword "typedef" *> (Typedef <$> pBlockM)
@@ -107,11 +107,14 @@ pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> pParens pEx
     pEff :: P Eff
     pEff = pAngles pIdent
 
+pBlockEs :: P [Expr]
+pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))
+
 pBlock :: P Block
-pBlock = pBlockM <|> (BExpr <$> pExprT)
+pBlock = pBlockM <|> pExprT
 
 pBlockM :: P Block
-pBlockM = BExprs <$> pBraces (sepEndBy pExprT (pOp ";"))
+pBlockM = Block <$> pBlockEs
 
 pExprSeq :: P Expr
 pExprSeq = seqS <$> sepEndBy pExprT (pOp ";")
@@ -120,7 +123,7 @@ pExprSeq1 :: P Expr
 pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
 
 seqS :: [Expr] -> Expr
-seqS [] = Array (BExprs [])
+seqS [] = Array []
 seqS [e] = e
 seqS es = Seq es
 
@@ -200,7 +203,7 @@ pFile = skip *> pExprSeq <* eof
 
 arrayS :: [Expr] -> Expr
 arrayS [e] = e
-arrayS es = Array (BExprs es)
+arrayS es = Array es
 
 ------
 
