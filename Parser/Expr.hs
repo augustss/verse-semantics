@@ -113,6 +113,7 @@ instance Pretty Expr where
       ppNice expr =
         case expr of
           Array es | length es /= 1 -> parens $ ppEs es
+          Define i (Range t) -> ppNice $ InfixOp (Variable i) (Ident noLoc ":") t
           _ -> ppNormal expr
       ppNormal expr =
         case expr of

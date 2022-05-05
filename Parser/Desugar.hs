@@ -1,4 +1,4 @@
-module Desugar(desugar, simplify, predefs) where
+module Desugar(desugar, simplify, predefs, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 --import Data.List

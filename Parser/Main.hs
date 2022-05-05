@@ -30,12 +30,12 @@ data CState = CState
 command :: Command CState
 command = Command
   { c_commands =
-      [ Cmd "read FILE"       "Parse a file"                   cRead
-      , Cmd "desugar [EXPR]"  "Desugar [last] expression ="    cDesugar
-      , Cmd "show [EXPR]"     "Show [last] expression"         cShow
-      , Cmd "simplify [EXPR]" "Simplify [last] expression"     cSimplify
-      , Cmd "core [EXPR]"     "Generate core"                  cCore
-      , Cmd "print [EXPR]"    "Pretty print [last] expression" cPrint
+      [ Cmd "read FILE"       "Parse a file"                          cRead
+      , Cmd "desugar [EXPR]"  "Desugar [last] expression"             cDesugar
+      , Cmd "show [EXPR]"     "Show [last] expression"                cShow
+      , Cmd "simplify [EXPR]" "Simplify [last] expression"            cSimplify
+      , Cmd "core [EXPR]"     "Generate core for [last] expression"   cCore
+      , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
