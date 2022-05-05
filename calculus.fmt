@@ -6,6 +6,7 @@
 %format Ty (x) = "\Ty{" x "}"
 %format Bi (x) = "\Bi{" x "}"
 %format Vr (x) = "\Vr{" x "}"
+%format Vl (x) = "\Vl{" x "}"
 %format Ld (x)(y) = "\Ld{" x "}{" y "}"
 %format Fd (x)(y) = "\Fd{" x "}{" y "}"
 %format Mt (x)(y) = "\Mt{" x "}{" y "}"
