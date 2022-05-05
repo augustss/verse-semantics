@@ -219,7 +219,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |one e| \vb |all e| \vb |def h e| \vb |succeeds e| \\
+    &&\vb & |def h e| \vb |one e| \vb |all e| \vb |succeeds e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
     \text{Primops} & op  & ::= & cop \vb |range| \\
@@ -288,8 +288,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \textit{Primitive operations} \\
     \begin{array}{lrcl}
-    \rulename{p-add} & |add^(k_1 ,k_2)| & \movesto & k_1+k_2 \\
-    \rulename{p-gt} & |gt^(k_1,k_2)| & \movesto &
+    \rulename{p-add} & |applyx add ((k_1 ,k_2))| & \movesto & k_1+k_2 \\
+    \rulename{p-gt} & |applyx gt ((k_1,k_2))| & \movesto &
     \begin{array}[t]{@@{}ll}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}

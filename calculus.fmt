@@ -10,7 +10,7 @@
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format (Fd (x)(y)) = "\Fd{" ^ x "}{" ^ y "}"
 %format (Mt (x)(y)) = "\Mt{" ^ x "}{" ^ y "}"
-%format applyx a (b) = a "(" b ")"
+%format applyx a (b) = a "@" b
 
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
