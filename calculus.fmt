@@ -1,3 +1,5 @@
+%format ^ = " "
+
 %format De (x) = "\De{" x "}"
 %format An (x) = "\An{" x "}"
 %format Cr (x) = "\Cr{" x "}"
@@ -30,7 +32,9 @@
 
 %format hchoice = "\|"
 %format he = "he"
-%format def = "\textbf{def}"
+%format defKW = "\textbf{def}"
+%format def (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\,\{" y "\}"
+%format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format succeeds = "\textbf{succeeds}"
 %format decides = "\textbf{decides}"
 %format iterates = "\textbf{iterates}"
@@ -40,8 +44,12 @@
 %format if = "\textbf{if}"
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
-%format one = "\textbf{one}"
-%format all = "\textbf{all}"
+
+%format oneKW = "\textbf{one}"
+%format one (x) = "\textbf{one}\{" x "\}"
+%format allKW = "\textbf{all}"
+%format all (x) = "\textbf{all}\{" x "\}"
+
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
@@ -80,7 +88,6 @@
 %format subst = "\!:=\!"
 %format == = "="
 % format := = "\mapsto"
-%format ^ = " "
 %format ; = ";\;"
 %format , = ",\,"
 %format X = "X"

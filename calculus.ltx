@@ -218,7 +218,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-    &&\vb & |one e| \vb |all e| \vb |def h in e| \\
+    &&\vb & |one e| \vb |all e| \vb |def h e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |v_1, dots, v_n| \vb |x => e| \vb |rec f e| \vb ty \\
     \text{Primops} & op  & ::= & cop \vb |range| \\
@@ -229,9 +229,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
  \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    && \vb & |applyx X e| \vb |applyx e X| \vb |def h in X | \\
+    && \vb & |applyx X e| \vb |applyx e X| \vb |def h X | \\
  \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
-    &&\vb & |applyx CX e| \vb |applyx ce CX| \vb |def h in CX| \\
+    &&\vb & |applyx CX e| \vb |applyx ce CX| \vb |def h CX| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
     \end{array} \\
     \\
@@ -251,7 +251,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \textbf{Bound variables $\boundvars{X}$ of a context} \\
   \begin{array}[t]{rcl}
     \boundvars{ \hole } & = & \emptyset \\
-    \boundvars{ |def h in X| } & = & \boundvars{h} \cup \boundvars{X} \\
+    \boundvars{ |def h X| } & = & \boundvars{h} \cup \boundvars{X} \\
     \boundvars{ |applyx X e| } & = & \boundvars{X} \\
     \boundvars{ |applyx e X| } & = & \boundvars{X}
   \end{array}\qquad
@@ -312,7 +312,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \textit{Lambda and application} \\
     \begin{array}{lrcl}
-      \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x in (x==e_2; e_1)|
+      \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
     \rulename{app-type} & |applyx (type v)(e)| & \movesto & |applyx v e| \\
@@ -339,15 +339,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |all (v_1 choice dots choice v_n)|
     & \movesto &
     \begin{array}[t]{@@{}l}
-      |def x_1,dots x_n in| \\
-      |x_1 == applyx v_1 (); dots x_n == applyx v_n (); (x_1,dots,x_n)| \\
+      |defTwoLines (x_1,dots x_n)
+       (x_1 == applyx v_1 (); dots x_n == applyx v_n (); (x_1,dots,x_n))| \\
       \text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
     \end{array} \\
     \end{array} \\
     \\[-2mm]
     \textit{Def-blocks} \\
     \begin{array}{rcll}
-    \rulename{def-elim} & |def emp in e| & \movesto & |e| \\
+    \rulename{def-elim} & |def emp e| & \movesto & |e| \\
     \end{array}
    \end{array}
    $$
@@ -358,15 +358,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcl}
-    \rulename{bind} & |def H^[x] in X^[x==v]| & \movesto
+    \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
     & \begin{array}[t]{@@{}l}
-        |def H^[emp] in (X^[v])[x subst v]| \\
+        |def (H^[emp]) ((X^[v])[x subst v])| \\
         \text{if $\freevars{v} \disjoint (x,\boundvars{X})$ }
         \end{array} \\
-    \rulename{promote} & |def H^[x] in X^[x=v]| 
+    \rulename{promote} & |def (H^[x]) (X^[x=v])|
        & \movesto
     &  \begin{array}[t]{@@{}l}
-        |def H^[x,y] in X^[z==y; x==v^[z subst y]]| \\
+        |def (H^[x,y]) (X^[z==y; x==v^[z subst y]])| \\
         \text{if $z \in \freevars{v}$ and $z \in \boundvars{X}$} \\
         \text{and}\; y \not\in \freevars{|H^[x]|,|X^[v]|} \\
       \end{array}\\
@@ -413,7 +413,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
-    \rulename{def-wrong} & |def h in v| & \movesto & |wrong| & \text{if $|h| \neq |emp|$} \\
+    \rulename{def-wrong} & |def h v| & \movesto & |wrong| & \text{if $|h| \neq |emp|$} \\
     \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
@@ -478,7 +478,7 @@ or a recursive definition |rec f e|.
 
 \joachim{This whole section is out-of-date with defs no longer containing bindings.}
 
-A \hexp{} has the form |(def h in e)|, where |h| is a \emph{heap}, whose syntax is given in
+A \hexp{} has the form |(def h e)|, where |h| is a \emph{heap}, whose syntax is given in
 \Cref{fig:verse-syntax}.  A heap is just a collection of \emph{bindings}, which take one of two forms:
 \begin{itemize}
 \item A binding |x| simply introduces the variable |x|, without giving it a value.
@@ -517,12 +517,12 @@ There are no general reduction rules to propagate |wrong|, instead the reduction
 \lennart{We can remove the axioms that propagate |wrong| at all.  I just put those two in, because they don't interfere with |fail|.}
 
 \joachim{Also, due to \rulename{fail}, we have |wrong; fail| $\movesto$ |fail|, that does not look right. Probably |e;X| should not be an execution context.}
-\lennart{No, |e;X| must be an execution context.  Consider |def x in x+1; x = 2|, we must do the |x = 2| before we can do |x+1|.}
+\lennart{No, |e;X| must be an execution context.  Consider |def x (x+1; x = 2)|, we must do the |x = 2| before we can do |x+1|.}
 
 An alternative to using |wrong| would be to say that bad expressions just get stuck.
 Unfortunately this leads to non-confluence as we can get stuck in different way depending on the order of reduction.
 A simple example of this is \\
-|def x in x=(()=>1); x=(()=>2); x()| \\
+|def x (x=(()=>1); x=(()=>2); x())| \\
 This can be reduced by \rulename{bind} in two different ways, and after a few more reduction we get stuck with
 either \\
 |(()=>1)=(()=>2); 1| \\
@@ -561,7 +561,7 @@ The reason to disallow this is that we do not know if they are needed.
     \begin{array}{lrcl}
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
-      && \vb & |applyx E e| \vb |applyx e E| \vb |def h in E| \vb |E choice e| \vb |e choice E| \\
+      && \vb & |applyx E e| \vb |applyx e E| \vb |def h E| \vb |E choice e| \vb |e choice E| \\
       && \vb & |one E| \vb |all E| \\
     \end{array}
   $$
@@ -613,13 +613,13 @@ The side conditions ensure
       This side conditions ensures that we never get cycles in the heap.
 \end{itemize}
 
-Crucially, note that $X$ does not look inside |one|, |all|, or choice (|choice|).
+Crucially, note that $X$ does not look inside |oneKW|, |allKW|, or choice (|choice|).
 For example
-$$ |def x in (one (x==3); x)| $$
+$$ |def x (one (x==3); x)| $$
 does
 not unify |x| via \rulename{bind}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
 Nor does $X$ look inside choices.  For example,
-|def x in (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
+|def x (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
 
 Rules \rulename{swap} and \rulename{promote} are there to allow \rulename{bind} to fire more often.
 First, rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)|, which directly fits rule \rulename{bind}.
@@ -627,23 +627,23 @@ We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forev
 using |hnf| rather than |v| in this rule.
 
 \rulename{promote} is subtle, and deals with a case like
-    $$ |def x in dots x dots(def z in dots(x==(3,z))dots)dots| $$
+    $$ |def x  (dots x dots(def z (dots(x==(3,z))dots))dots)| $$
 We can't use \rulename{bind} directly, because it would be ill-scoped to add |x:=(3,z)|
 to the outermost |def|. Instead we invent a fresh variable |y| (bound as a sibling to |x|),
 substitute it for |z| in |v| to prevent this rule from applying again, and unify it with |z|, thus
-    $$ |def x,y in dots x dots(def z in dots(z=y; x==(3,y))dots)dots| $$
+    $$ |def (x,y) (dots x dots(def z (dots(z=y; x==(3,y))dots))dots)| $$
 Now  \rulename{bind} can substitute |(3,y)| for |x|:
-    $$ |def y in dots (3,y) dots(def z in dots(z=y;(3,y))dots)dots| $$
+    $$ |def y (dots (3,y) dots(def z (dots(z=y;(3,y))dots))dots)| $$
 and all is well.
 
-One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x in x = (y => y); (x == x)|. If we use \rulename{bind} first, we will unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
+One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x (x = (y => y); (x == x))|. If we use \rulename{bind} first, we will unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
 
 \subsection{Choice and failure}
 
-Rule \rulename{choose} is the crucial one: it duplicates the entire |def| context.  But note the
+Rule \rulename{choose} is the crucial one: it duplicates the entire |defKW| context.  But note the
 \emph{choice-free} context |CX|!  For example, the expression
 $$
-|def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); (x,y)|
+|def (x,y) ((x == (3 choice 4)) ; (y == (9 choice 2)); (x,y))|
 $$
 should yield the values |(3,9)|, |(3,2)|, |(4,9)|, |(4,2)|, in that order.
 To get the order right, we must apply \rulename{choose} to the first choice |(3 choice 4)| first, and only
@@ -655,13 +655,13 @@ then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{
 Rule \rulename{fail} collapes an expression with a nexted |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
 $$
-|def (x,y) in (x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y)|
+|def (x,y) ((x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y))|
 $$
 can fail immediately; we don't need to perform the choices for |x| and |y| first, because they will all fail.
-The use of |X| also means that a |def h in (2, fail plus 3, 7)| will collapse to |fail| by \rulename{fail};
+The use of |X| also means that a |def h (2, fail plus 3, 7)| will collapse to |fail| by \rulename{fail};
 we do not need rules like $|fail plus e| \movesto |fail|$.
 
-But note that $X$ does not look inside choices.  For example, |def h in (fail choice e)| does not collapse
+But note that $X$ does not look inside choices.  For example, |def h (fail choice e)| does not collapse
 to |fail| by \rulename{fail}.
 
 \subsection{Functions and application}
@@ -678,7 +678,7 @@ If the body of the recursive definition is a function then reduction will eventu
 \subsection{Conditionals}
 
 In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
-it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values). The essence of this check is captured in the |one e| construct, which evaluates to the \emph{first} value returned by |e|. The conventional |if e_1 then e_2 else e_3| construct can be built on top of |one|.
+it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values). The essence of this check is captured in the |one e| construct, which evaluates to the \emph{first} value returned by |e|. The conventional |if e_1 then e_2 else e_3| construct can be built on top of |oneKW|.
 
 For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
 the |if| returns |e_1|, otherwise it returns |e_2|.
@@ -690,7 +690,7 @@ than 3, returning |x|; and fails if not.
 It is very important that in |(one (x=3;1) 2| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
 |x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
-does not look inside an |one| (look at the syntax of context |X| used in that rule).
+does not look inside an |oneKW| (look at the syntax of context |X| used in that rule).
 
 \subsection{The Equality Principle}
 
@@ -701,7 +701,7 @@ Verse cleaves to the following principle.
 For any choice-free, side-effect-free expression |e|, and values |v_1| and |v_2|,
 if |(e = v_1)| is inhabited, and |(e = v_2)| is inhabited, then |v_1|=|v_2|.
 \end{quote}
-For example suppose |misBehaves = t => def{x} in x|, so that (if we are not careful) the call |misBehaves()| returns
+For example suppose |misBehaves = t => def x x|, so that (if we are not careful) the call |misBehaves()| returns
 a fresh, unbound logical variable.  Now |(misBehaves() = 3)| and |(misBehaves() = 4)| will both succeed (be inhabited),
 but 3 is not equal to 4.  So this wouldn't satisfy the EP.
 
@@ -709,12 +709,12 @@ Another way of putting this is that |=| behaves as an equivalence relation in Ve
 
 \subsection{Source Verse}
 
-In the Verse source language we do not write explicit |def|s. Instead, they are added
+In the Verse source language we do not write explicit |defKW|s. Instead, they are added
 by a simple preprocessing step, that introduces a variable |x| in the innermost
-|def| that encloses all its uses.
+|defKW| that encloses all its uses.
 \simon{It's hard to say more until we say more about Source Verse.}
 
-In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| if
+In the arms of a choice |(e_1 choice e_2)| we add a |def h e_1| around |e_1| if
 |e_1| introduces any new variables; and similarly |e_2|.
 \simon{This was a nice little simplification.}
 
@@ -722,22 +722,22 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| 
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|def x, y in x == 3; y == add^(x, 1)|} \\
-    \rulename{bind} & \movesto & |def y in 3; y == add^(3, 1)| \\
-    \rulename{p-add} & \movesto & |def y in 3; y == 4| \\
-    \rulename{seq} & \movesto & |def y in y == 4| \\
-    \rulename{bind} & \movesto & |def in 4| \\
+    \multicolumn{3}{l}{|def (x, y) (x == 3; y == add^(x, 1))|} \\
+    \rulename{bind} & \movesto & |def y (3; y == add^(3, 1))| \\
+    \rulename{p-add} & \movesto & |def y (3; y == 4)| \\
+    \rulename{seq} & \movesto & |def y (y == 4)| \\
+    \rulename{bind} & \movesto & |def emp 4| \\
     \rulename{def-elim} & \movesto & |4| \\
   \end{array}$$
 \end{example}
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|def x, y in y == add^(x, 1); x == 3; y|} \\
-    \rulename{bind} & \movesto & |def y in y == add^(3, 1); 3; y| \\
-    \rulename{p-add} & \movesto & |def y in y == 4; 3; y| \\
-    \rulename{bind} & \movesto & |def in 4; 3; 4| \\
-    \rulename{seq} & \movesto & |def in 4| \\
+    \multicolumn{3}{l}{|def (x, y) (y == add^(x, 1); x == 3; y)|} \\
+    \rulename{bind} & \movesto & |def y (y == add^(3, 1); 3; y)| \\
+    \rulename{p-add} & \movesto & |def y (y == 4; 3; y)| \\
+    \rulename{bind} & \movesto & |def emp (4; 3; 4)| \\
+    \rulename{seq} & \movesto & |def emp 4| \\
     \rulename{def-elim} & \movesto & |4| \\
   \end{array}$$
   The evaluation of |add^(x,1)| is stuck, and hence so is the unification
@@ -748,18 +748,18 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| 
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|def x, y in y == add^(x, 1); x == 3 choice  x == 77|} \\
-    \rulename{choose} & \movesto & |def x, y in (y == add^(x, 1); x == 3) choice  (y == add^(x, 1); x == 77)| \\
-    \rulename{choose} & \movesto & |(def x, y in y == add^(x, 1); x == 3) choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{bind} & \movesto & |(def y in y == add^(3, 1); 3) choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{p-add} & \movesto & |(def y in y == 4; 3) choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{bind} & \movesto & |(def in 4; 3) choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{seq} & \movesto & |(def in 3) choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{def-elim} & \movesto & |3 choice  (def x, y in y == add^(x, 1); x == 77)| \\
-    \rulename{bind} & \movesto & |3 choice  (def y in y == add^(77, 1); 77)| \\
-    \rulename{p-add} & \movesto & |3 choice  (def y in y == 78; 77)| \\
-    \rulename{bind} & \movesto & |3 choice  (def in 78; 77)| \\
-    \rulename{seq} & \movesto & |3 choice  (def in 77)| \\
+    \multicolumn{3}{l}{|def (x, y) (y == add^(x, 1); x == 3 choice  x == 77)|} \\
+    \rulename{choose} & \movesto & |def (x, y) ((y == add^(x, 1); x == 3) choice  (y == add^(x, 1); x == 77))| \\
+    \rulename{choose} & \movesto & |(def (x, y) (y == add^(x, 1); x == 3)) choice (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{bind} & \movesto & |(def y (y == add^(3, 1); 3)) choice  (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{p-add} & \movesto & |(def y (y == 4; 3)) choice  (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{bind} & \movesto & |(def emp (4; 3)) choice  (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{seq} & \movesto & |(def emp 3) choice  (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{def-elim} & \movesto & |3 choice  (def (x, y) (y == add^(x, 1); x == 77))| \\
+    \rulename{bind} & \movesto & |3 choice  (def y (y == add^(77, 1); 77))| \\
+    \rulename{p-add} & \movesto & |3 choice  (def y (y == 78; 77))| \\
+    \rulename{bind} & \movesto & |3 choice  (def emp (78; 77))| \\
+    \rulename{seq} & \movesto & |3 choice  (def emp 77)| \\
     \rulename{def-elim} & \movesto & |3 choice  77| \\
   \end{array}$$
 
@@ -784,10 +784,10 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h in e_1| around |e_1| 
 \begin{example} $$
   \begin{array}{rcl}
     \multicolumn{3}{l}{|(x => add^(x, 1))^(2)|} \\
-    \rulename{app-lam} & \movesto & |def t in t == 2; add^(t, 1)| \\
-    \rulename{bind} & \movesto & |def in 2; add^(2, 1)| \\
-    \rulename{p-add} & \movesto & |def in 2; 3| \\
-    \rulename{seq} & \movesto & |def in 3| \\
+    \rulename{app-lam} & \movesto & |def t (t == 2; add^(t, 1))| \\
+    \rulename{bind} & \movesto & |def emp (2; add^(2, 1))| \\
+    \rulename{p-add} & \movesto & |def emp (2; 3)| \\
+    \rulename{seq} & \movesto & |def emp 3| \\
     \rulename{def-elim} & \movesto & |3| \\
   \end{array}$$
 A simple $\beta$-reduction.
@@ -796,16 +796,16 @@ Note that the name $x$ has been $\alpha$-converted to a fresh variable $t$ to av
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|def x in x == 3; orElse (gt^(x, 2); _ => add^(x, 1)) (_ => 0)|} \\
-    \rulename{bind} & \movesto & |def in 3; orElse (gt^(3, 2); _ => add^(3, 1)) (_ => 0)| \\
+    \multicolumn{3}{l}{|def x (x == 3; orElse (gt^(x, 2); _ => add^(x, 1)) (_ => 0))|} \\
+    \rulename{bind} & \movesto & |def emp (3; orElse (gt^(3, 2); _ => add^(3, 1)) (_ => 0))| \\
     \rulename{def-elim} & \movesto & |3; orElse (gt^(3, 2); _ => add^(3, 1)) (_ => 0)| \\
     \rulename{seq} & \movesto & |orElse (gt^(3, 2); _ => add^(3, 1)) (_ => 0)| \\
     \rulename{p-gt} & \movesto & |orElse (3; _ => add^(3, 1)) (_ => 0)| \\
     \rulename{seq} & \movesto & |orElse (_ => add^(3, 1)) (_ => 0)| \\
     \rulename{orelse-true} & \movesto & |(_ => add^(3, 1))^()| \\
-    \rulename{app-lam} & \movesto & |def t in t == (); add^(3, 1)| \\
-    \rulename{p-add} & \movesto & |def t in t == (); 4| \\
-    \rulename{bind} & \movesto & |def in (); 4| \\
+    \rulename{app-lam} & \movesto & |def t (t == (); add^(3, 1))| \\
+    \rulename{p-add} & \movesto & |def t (t == (); 4)| \\
+    \rulename{bind} & \movesto & |def emp ((); 4)| \\
     \rulename{def-elim} & \movesto & |(); 4| \\
     \rulename{seq} & \movesto & |4| \\
   \end{array}$$
@@ -817,46 +817,46 @@ Note that the name $x$ has been $\alpha$-converted to a fresh variable $t$ to av
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|def fcn in fcn == (rec f F); fcn^(2)|} \\
-    \rulename{bind} & \movesto & |def in rec f F; (rec f F)^(2)| \\
+    \multicolumn{3}{l}{|def fcn (fcn == (rec f F); fcn^(2))|} \\
+    \rulename{bind} & \movesto & |def emp (rec f F; (rec f F)^(2))| \\
     \rulename{def-elim} & \movesto & |rec f F; (rec f F)^(2)| \\
     \rulename{seq} & \movesto & |(rec f F)^(2)| \\
     \rulename{app-rec} & \movesto & |(n => (orElse (n == 0; _ => 0) (_ => (rec f F)^(sub^(n, 1)))))^(2)| \\
-    \rulename{app-lam} & \movesto & |def t in t == 2; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1)))| \\
-    \rulename{bind} & \movesto & |def in 2; orElse (2 == 0; _ => 0) (_ => (rec f F)^(sub^(2, 1)))| \\
+    \rulename{app-lam} & \movesto & |def t (t == 2; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1))))| \\
+    \rulename{bind} & \movesto & |def emp (2; orElse (2 == 0; _ => 0) (_ => (rec f F)^(sub^(2, 1))))| \\
     \rulename{def-elim} & \movesto & |2; orElse (2 == 0; _ => 0) (_ => (rec f F)^(sub^(2, 1)))| \\
     \rulename{seq} & \movesto & |orElse (2 == 0; _ => 0) (_ => (rec f F)^(sub^(2, 1)))| \\
     \rulename{ux} & \movesto & |orElse (fail; _ => 0) (_ => (rec f F)^(sub^(2, 1)))| \\
     \rulename{fail} & \movesto & |orElse fail (_ => (rec f F)^(sub^(2, 1)))| \\
     \rulename{orelse-false} & \movesto & |(_ => (rec f F)^(sub^(2, 1)))^()| \\
-    \rulename{app-lam} & \movesto & |def t in t == (); (rec f F)^(sub^(2, 1))| \\
-    \rulename{bind} & \movesto & |def in (); (rec f F)^(sub^(2, 1))| \\
+    \rulename{app-lam} & \movesto & |def t (t == (); (rec f F)^(sub^(2, 1)))| \\
+    \rulename{bind} & \movesto & |def emp ((); (rec f F)^(sub^(2, 1)))| \\
     \rulename{def-elim} & \movesto & |(); (rec f F)^(sub^(2, 1))| \\
     \rulename{seq} & \movesto & |(rec f F)^(sub^(2, 1))| \\
     \rulename{p-sub} & \movesto & |(rec f F)^(1)| \\
     \rulename{app-rec} & \movesto & |(n => (orElse (n == 0; _ => 0) (_ => (rec f F)^(sub^(n, 1)))))^(1)| \\
-    \rulename{app-lam} & \movesto & |def t in t == 1; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1)))| \\
-    \rulename{bind} & \movesto & |def in 1; orElse (1 == 0; _ => 0) (_ => (rec f F)^(sub^(1, 1)))| \\
+    \rulename{app-lam} & \movesto & |def t (t == 1; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1))))| \\
+    \rulename{bind} & \movesto & |def emp (1; orElse (1 == 0; _ => 0) (_ => (rec f F)^(sub^(1, 1))))| \\
     \rulename{def-elim} & \movesto & |1; orElse (1 == 0; _ => 0) (_ => (rec f F)^(sub^(1, 1)))| \\
     \rulename{seq} & \movesto & |orElse (1 == 0; _ => 0) (_ => (rec f F)^(sub^(1, 1)))| \\
     \rulename{ux} & \movesto & |orElse (fail; _ => 0) (_ => (rec f F)^(sub^(1, 1)))| \\
     \rulename{fail} & \movesto & |orElse fail (_ => (rec f F)^(sub^(1, 1)))| \\
     \rulename{orelse-false} & \movesto & |(_ => (rec f F)^(sub^(1, 1)))^()| \\
-    \rulename{app-lam} & \movesto & |def t in t == (); (rec f F)^(sub^(1, 1))| \\
-    \rulename{bind} & \movesto & |def in (); (rec f F)^(sub^(1, 1))| \\
+    \rulename{app-lam} & \movesto & |def t (t == (); (rec f F)^(sub^(1, 1)))| \\
+    \rulename{bind} & \movesto & |def ((); (rec f F)^(sub^(1, 1)))| \\
     \rulename{def-elim} & \movesto & |(); (rec f F)^(sub^(1, 1))| \\
     \rulename{seq} & \movesto & |(rec f F)^(sub^(1, 1))| \\
     \rulename{p-sub} & \movesto & |(rec f F)^(0)| \\
     \rulename{app-rec} & \movesto & |(n => (orElse (n == 0; _ => 0) (_ => (rec f F)^(sub^(n, 1)))))^(0)| \\
-    \rulename{app-lam} & \movesto & |def t in t == 0; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1)))| \\
-    \rulename{bind} & \movesto & |def in 0; orElse (0 == 0; _ => 0) (_ => (rec f F)^(sub^(0, 1)))| \\
+    \rulename{app-lam} & \movesto & |def t (t == 0; orElse (t == 0; _ => 0) (_ => (rec f F)^(sub^(t, 1))))| \\
+    \rulename{bind} & \movesto & |def emp (0; orElse (0 == 0; _ => 0) (_ => (rec f F)^(sub^(0, 1))))| \\
     \rulename{def-elim} & \movesto & |0; orElse (0 == 0; _ => 0) (_ => (rec f F)^(sub^(0, 1)))| \\
     \rulename{seq} & \movesto & |orElse (0 == 0; _ => 0) (_ => (rec f F)^(sub^(0, 1)))| \\
     \rulename{ucon} & \movesto & |orElse (0; _ => 0) (_ => (rec f F)^(sub^(0, 1)))| \\
     \rulename{seq} & \movesto & |orElse (_ => 0) (_ => (rec f F)^(sub^(0, 1)))| \\
     \rulename{orelse-true} & \movesto & |(_ => 0)^()| \\
-    \rulename{app-lam} & \movesto & |def t in t == (); 0| \\
-    \rulename{bind} & \movesto & |def in (); 0| \\
+    \rulename{app-lam} & \movesto & |def t (t == (); 0)| \\
+    \rulename{bind} & \movesto & |def emp ((); 0)| \\
     \rulename{def-elim} & \movesto & |(); 0| \\
     \rulename{seq} & \movesto & |0| \\
   \end{array}$$
@@ -867,28 +867,28 @@ To save space we have used the abbreviation |F| for the expression \newline
 
 \begin{example} $$
   \begin{array}{rcl}
-    \multicolumn{3}{l}{|all (def x in x == (1 choice  2); _ => add^(x, 1))|} \\
-    \rulename{choose} & \movesto & |all (def x in (x == 1; _ => add^(x, 1)) choice  (x == 2; _ => add^(x, 1)))| \\
-    \rulename{choose} & \movesto & |all ((def x in x == 1; _ => add^(x, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{bind} & \movesto & |all ((def in 1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def x in x == 2; _ => add^(x, 1)))| \\
-    \rulename{bind} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def in 2; _ => add^(2, 1)))| \\
-    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
+    \multicolumn{3}{l}{|all (def x (x == (1 choice  2); _ => add^(x, 1)))|} \\
+    \rulename{choose} & \movesto & |all (def x ((x == 1; _ => add^(x, 1)) choice  (x == 2; _ => add^(x, 1))))| \\
+    \rulename{choose} & \movesto & |all ((def x (x == 1; _ => add^(x, 1))) choice (def x (x == 2; _ => add^(x, 1))))| \\
+    \rulename{bind} & \movesto & |all ((def emp in (1; _ => add^(1, 1))) choice (def x (x == 2; _ => add^(x, 1))))| \\
+    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def x (x == 2; _ => add^(x, 1))))| \\
+    \rulename{bind} & \movesto & |all ((1; _ => add^(1, 1)) choice  (def emp (2; _ => add^(2, 1))))| \\
+    \rulename{def-elim} & \movesto & |all ((1; _ => add^(1, 1)) choice (2; _ => add^(2, 1)))| \\
     \rulename{seq} & \movesto & |all ((_ => add^(1, 1)) choice  (2; _ => add^(2, 1)))| \\
     \rulename{seq} & \movesto & |all ((_ => add^(1, 1)) choice  (_ => add^(2, 1)))| \\
-    \rulename{collect1} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (_ => add^(2, 1))^(); (t, t1)| \\
-    \rulename{app-lam} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (def t2 in t2 == (); add^(2, 1)); (t, t1)| \\
-    \rulename{bind} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == (def in (); add^(2, 1)); (t, t1)| \\
-    \rulename{def-elim} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == ((); add^(2, 1)); (t, t1)| \\
-    \rulename{seq} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == add^(2, 1); (t, t1)| \\
-    \rulename{p-add} & \movesto & |def t, t1 in t == (_ => add^(1, 1))^(); t1 == 3; (t, t1)| \\
-    \rulename{bind} & \movesto & |def t in t == (_ => add^(1, 1))^(); 3; (t, 3)| \\
-    \rulename{app-lam} & \movesto & |def t in t == (def t2 in t2 == (); add^(1, 1)); 3; (t, 3)| \\
-    \rulename{bind} & \movesto & |def t in t == (def in (); add^(1, 1)); 3; (t, 3)| \\
-    \rulename{def-elim} & \movesto & |def t in t == ((); add^(1, 1)); 3; (t, 3)| \\
-    \rulename{seq} & \movesto & |def t in t == add^(1, 1); 3; (t, 3)| \\
-    \rulename{p-add} & \movesto & |def t in t == 2; 3; (t, 3)| \\
-    \rulename{bind} & \movesto & |def in 2; 3; (2, 3)| \\
+    \rulename{collect1} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == (_ => add^(2, 1))^(); (t, t1))| \\
+    \rulename{app-lam} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == (def t2 (t2 == (); add^(2, 1))); (t, t1))| \\
+    \rulename{bind} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == (def emp ((); add^(2, 1))); (t, t1))| \\
+    \rulename{def-elim} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == ((); add^(2, 1)); (t, t1))| \\
+    \rulename{seq} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == add^(2, 1); (t, t1))| \\
+    \rulename{p-add} & \movesto & |def (t, t1) (t == (_ => add^(1, 1))^(); t1 == 3; (t, t1))| \\
+    \rulename{bind} & \movesto & |def t (t == (_ => add^(1, 1))^(); 3; (t, 3))| \\
+    \rulename{app-lam} & \movesto & |def t (t == (def t2 (t2 == (); add^(1, 1))); 3; (t, 3))| \\
+    \rulename{bind} & \movesto & |def t (t == (def emp ((); add^(1, 1))); 3; (t, 3))| \\
+    \rulename{def-elim} & \movesto & |def t (t == ((); add^(1, 1)); 3; (t, 3))| \\
+    \rulename{seq} & \movesto & |def t (t == add^(1, 1); 3; (t, 3))| \\
+    \rulename{p-add} & \movesto & |def t (t == 2; 3; (t, 3))| \\
+    \rulename{bind} & \movesto & |def emp (2; 3; (2, 3))| \\
     \rulename{def-elim} & \movesto & |2; 3; (2, 3)| \\
     \rulename{seq} & \movesto & |(2, 3)| \\
   \end{array}$$
@@ -1101,8 +1101,8 @@ $$
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
     |Cr (typedef{e})| & = & |x => (Bi (e)^[x])| & \text{|x| fresh} \\
     \\
-    |Bi| & \multicolumn{3}{l}{ \text{inserts |def| for all local bindings.} } \\
-    |Bi e| & = & |def (Vr e) in Cr e| \\
+    |Bi| & \multicolumn{3}{l}{ \text{inserts |defKW| for all local bindings.} } \\
+    |Bi e| & = & |def (Vr e) (Cr e)| \\
     \\
     |Vr| & \multicolumn{3}{l}{ \text{finds all local bindings.} } \\
     |Vr k| & = & |emp| \\
