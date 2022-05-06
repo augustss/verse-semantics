@@ -31,7 +31,7 @@
 %format `choice` = "\mathop{[ \! ]}"
 %format srcand = "\&\&"
 %format srcor = "||"
-%format hat = "\hat{}"
+%format hat = "\hat{\hspace{0.8em}}"
 
 %format hchoice = "\|"
 %format he = "he"
