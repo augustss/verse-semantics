@@ -75,6 +75,7 @@ pOp "-" = pOp' "-" ">"
 pOp "|" = pOp' "|" "|"
 pOp "&" = pOp' "&" "&"
 pOp "." = pOp' "." "."
+pOp "~" = pOp' "~" ">"
 pOp s = symbol s
 
 -- Parse the string s, but not if it's followed by one of the characters in ex
@@ -170,7 +171,7 @@ operatorTable =
     [postOp "^", postOp "?"],
     [op InfixL "*", op InfixL "/"],
     [op InfixL "+", op InfixL "-"],
-    [op InfixR "|", op InfixR "->", op InfixN ".."],
+    [op InfixR "|", op InfixR "~>", op InfixN ".."],
     [op InfixL ":"] ++ map (op InfixR) ["=", ">=", "<=", "<", ">", "<>"],
     [op InfixR "&&"],
     [op InfixR "||"],

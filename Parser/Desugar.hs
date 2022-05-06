@@ -12,8 +12,6 @@ import Expr
 import Error
 import Print hiding (first)
 
-simplify = undefined
-
 anySame :: (Eq a) => [a] -> Bool
 anySame [] = False
 anySame (x:xs) = x `elem` xs || anySame xs
@@ -136,7 +134,7 @@ desugarDef l (Array xs) e = do
   es <- zipWithM (\ x i -> desugarDef l x (ApplyD v (LitInt i))) xs [0..]
   chk <- desugarS $ PrefixOp (Ident l "!") $ ApplyD v (LitInt (toInteger (length xs)))  -- Check that list ends correctly
   pure $ Seq $ maybeToList me ++ [chk] ++ es
-desugarDef l (InfixOp x (Ident _ "->") y) (PrefixOp (Ident _ ":") t) = do
+desugarDef l (InfixOp x (Ident _ "~>") y) (PrefixOp (Ident _ ":") t) = do
   (i, ex) <-
     case x of
       Variable i -> pure (i, [])
@@ -146,8 +144,10 @@ desugarDef l (InfixOp x (Ident _ "->") y) (PrefixOp (Ident _ ":") t) = do
         pure (i, [ex])
   ey <- desugarDef l y (ApplyD t (tAny l i))
   pure $ seqE $ ey : ex
+desugarDef l lhs@(InfixOp _ (Ident _ "~>") _) e =
+  desugarDef l lhs (PrefixOp (Ident noLoc ":") (Typedef e))
 -- What else is allowed?  LitInt and LitRat would be easy.
-desugarDef l x _ = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x
+desugarDef l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
 desugarFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
 desugarFunDef l (EffAttr f a) as e = desugarFunDef l f (a:as) e
@@ -199,6 +199,7 @@ desugarFunctionS = expr
     expr (Define i e) = Define i <$> expr e
     expr (Choice e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (Range e1) = Range <$> expr e1
+    expr (Typedef e1) = Typedef <$> expr e1
     expr Any = pure Any
     expr e = impossible e
 
@@ -358,14 +359,6 @@ uniqE' env = expr
     block (BExpr e) = BExpr <$> expr e
     block (BExprs es) = BExprs <$> mapM expr es
 
-------------
-
-simplify :: Expr -> Expr
-simplify = simp
-  where --simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
-    simp (Unify e Any) = simp e
-    simp (ApplyD (Variable (Ident _ "any")) e) = simp e
-    simp e = composOp simp e
 -}
 
 -- Make all Array take value arguments
@@ -407,7 +400,7 @@ getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
 getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (Typedef e) = []
+getVisible (Typedef _) = []
 getVisible (Define i e) = i : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
@@ -459,12 +452,13 @@ scopeErrs s = expr
       where (errs, s') = defs e1
     expr (Do e) = errs ++ scopeErrs s' e
       where (errs, s') = defs e
-    expr (Function e1 fs e2) = errs ++ scopeErrs s' e1  ++ scopeErrs s' (Do e2)
+    expr (Function e1 _ e2) = errs ++ scopeErrs s' e1  ++ scopeErrs s' (Do e2)
       where (errs, s') = defs e1
     expr (Unify e1 e2) = expr e1 ++ expr e2
-    expr (Define i e) = expr e
+    expr (Define _ e) = expr e
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
     expr (Range e1) = expr e1
+    expr (Typedef e1) = expr (Do e1)
     expr Any = []
     expr e = impossible e
     
@@ -475,3 +469,25 @@ scopeErrs s = expr
           errS = [ ErrShadow i | i <- is, i `S.member` s ]
           s' = foldr S.insert s is
       in  (errM ++ errS, s')
+
+------------
+
+simplify :: Expr -> Expr
+simplify = simp
+  where --simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
+    simp (Unify e AnyT) = simp e
+    simp (ApplyD (Variable (Ident _ "any")) e) = simp e
+    simp (ApplyD (Typedef e1) e2) = simp $ Unify e1 e2
+    simp (Range (Typedef e)) = simp e   -- Always?
+    simp e = composOp simp e
+
+{-
+
+e1:e2  <-->  e1 := :e2
+e1:=e2 <-->  e1:typedef{e2}
+
+:typedef{e} <--> e
+
+e1 := e2  -->  e1 := :typedef{e2}  -->  e1:typedef{e2}
+
+-}

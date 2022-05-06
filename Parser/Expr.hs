@@ -106,14 +106,14 @@ instance Pretty Expr where
       ppA e = ppr 0 e
       ppB (Block es) = braces $ ppSeq l es
       ppB e = braces (ppr 0 e)
-      ppEs xs = fsep . punctuate comma . map (ppr 1) $ xs
+      ppEs = commaSep l 1
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
       ppOp = ppr 0
       ppNice expr =
         case expr of
           Array es | length es /= 1 -> parens $ ppEs es
-          Define i (Range t) -> ppNice $ InfixOp (Variable i) (Ident noLoc ":") t
+--          Define i (Range t) -> ppNice $ InfixOp (Variable i) (Ident noLoc ":") t
           _ -> ppNormal expr
       ppNormal expr =
         case expr of
@@ -209,6 +209,7 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inl "|"       7
       , inl ".."      7
       , inr "->"      7
+      , inr "~>"      7
       , inl "+"       8
       , inl "-"       8
       , inl "*"       9
