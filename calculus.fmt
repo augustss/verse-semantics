@@ -163,10 +163,13 @@
 %format ce_n
 %format ce_m
 
-%format l_0
-%format l_1
-%format l_2
-%format l_n
+%format l   = "lhs"
+%format l_0 = "lhs_0"
+%format l_1 = "lhs_1"
+%format l_2 = "lhs_2"
+%format l_n = "lhs_n"
+
+%format f = "\mathit{fun}"
 
 %format op_a
 %format op_b
