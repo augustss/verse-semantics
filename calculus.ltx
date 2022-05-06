@@ -1016,7 +1016,7 @@ $$
   |De (l := e)| & = & |Ld l (De e)| \\
   |De (l : t)| & = & |Ld l (De (:t))| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
-  |De (e_1 srcor e_2)| & = & |De (if(e_1) else e_2)| \\
+  |De (e_1 srcor e_2)| & = & |De (if(e_1) else if (e_2) else :false)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
   |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
