@@ -1049,6 +1049,7 @@ $$
 \begin{array}{rcll}
   |Ld| & \multicolumn{3}{l}{\text{converts a definition |l := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := e| \\
+  |Ld (: t) e| & = & |t^[e]| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
   |Ld (fun^(e_1)) e| & = & |Fd (fun^(e_1)) e| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
@@ -1064,7 +1065,6 @@ $$
   |Mt k e| & = & |k = e| \\
   |Mt x e| & = & |x := e| \\
   |Mt (e_0, dots, e_n) e| & = & |x := De e; Mt e_0 (x^[0]); dots; Mt e_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
-  |Mt (e_1 := e_2) e_3| & = & |De (e_1 := (e_2 = e_3))|  & \textit{Is this right?} \\
   |Mt (: t) e| & = & |De (:t := e)| \\
   |Mt (e_1; e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
   |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (e_2; e_3)| \\
@@ -1072,6 +1072,7 @@ $$
   |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| \\
   |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| \\
   |Mt (e_1 : t) e_2| & = & |De (e_1:t := e_2)| & \textit{Is this right?}\\
+  |Mt (e_1 := e_2) e_3| & = & |Mt e_1 (e_2 = e_3)|  & \textit{Is this right?} \\
   |Mt e_1 e_2| & = & |De (do{e_1}) = e_2| & \text{otherwise} \\
 %% Maybe?  |Mt (l ?) e| & = & |Mt l (e ?)| & \text{otherwise} \\
 %%  \\
