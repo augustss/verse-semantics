@@ -169,7 +169,7 @@
 %format l_2 = "lhs_2"
 %format l_n = "lhs_n"
 
-%format f = "\mathit{fun}"
+%format fun = "\mathit{fun}"
 
 %format op_a
 %format op_b
