@@ -1058,7 +1058,7 @@ $$
   |Ld (l_1 minusgt l_2) e| & = & |Ld l_1 x; Ld l_2 ((typedef^{e}^[x := :any]))| & \text{|x| fresh} \\
   \\
   |Fd| & \multicolumn{3}{l}{\text{converts function definitions to |functionKW|.}} \\
-  |Fd (fun^(e)effsR) e_2| & = & |Fd fun (De (function e_1 effsR {e_2}))| \\
+  |Fd (fun^(e_1)effsR) e| & = & |Fd fun (De (function e_1 effsR {e}))| \\
   |Fd x e| & = & |x := e| \\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
