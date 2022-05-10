@@ -634,7 +634,7 @@ Comparision operators succeed or fail, rather than returning a Boolean
 (as in most languages). For example |(x>3)| suceeds if |x| is greater
 than 3, returning |x|; and fails if not.
 
-It is very important that in |(one (x=3;1) 2| we
+It is very important that in |one ((x=3;1) choice 2)| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
 |x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
 does not look inside an |oneKW| (look at the syntax of context |X| used in that rule).
