@@ -650,7 +650,7 @@ To clearly identify wrong terms, we introduce the special construct |wrong| to t
 
 The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out wrong reduction; according to the motto “verified programs don’t go wrong”.
 
-But not every |wrong| is wrong: because we allow reduction everywhere, even in dead code, we must allow for |wrong| to appear temporarily, as in this reduction:
+But not every |wrong| is wrong: because we allow reduction everywhere, even in eventually unused code, we must allow for |wrong| to appear temporarily, as in this reduction:
 \[
 |one (1 choice (applyx 2 3))| \movesto |one (1 choice wrong)| \movesto |1|
 \]
