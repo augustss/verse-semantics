@@ -462,9 +462,7 @@ operations, |add| for integer addition, and |gt| for integer comparison.
 All functions (including |add| and |gt|) take a single argument, but that
 argument can be a tuple, say |(e_1,e_2)|. In Verse, tuples and arrays are the same data structure;
 a tuple is just an array whose size is statically known.
-The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |for| constructs an array.
-We discuss |for| in \Cref{sec:for}.
-\joachim{Note that our syntax requires tuples to be in A-Normal-Form. We should explain that here. Also, if we require tuples construction in ANF, why not function application.}
+The expression |(e_1, dots, e_n)| builds an $n$-ary tuple, while |all| constructs an array.
 
 \paragraph{Unification and sequencing.}
 Unification and sequencing are part of the expressions language.
@@ -488,6 +486,8 @@ of |e_2|.  The choice operator is associative.
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
 or a recursive definition |rec f e|.
+
+In this core calculus, the elements of the tuples must be values. This is not a fundamental restriction; instead of |(e_1, e_2)| one can write |defs (x, y) (x = e_1; y = e_2; (x,y))| and when translating the source language to the core language, this transformation will be applied.
 
 \subsection{|wrong| and the verifier}
 Some expressions don't make sense, such as using a number as a function in function application, or comparing two lambda values. These expressions are wrong in a different way than failing expressions and stuck expressions:
