@@ -440,17 +440,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcll}
-    \rulename{eq-wrong-l} & |wrong = v| & \movesto & |wrong| \\
-    \rulename{eq-wrong-r} & |v = wrong| & \movesto & |wrong| \\
-    \rulename{eq-wrong-b} & |wrong = wrong| & \movesto & |wrong| \\
-    \rulename{seq-wrong-l} & |wrong; v| & \movesto & |wrong| \\
-    \rulename{seq-wrong-b} & |wrong; wrong| & \movesto & |wrong| \\
-    \rulename{app-fun-wrong-l} & |applyx wrong v| & \movesto & |wrong| \\
-    \rulename{app-fun-wrong-b} & |applyx wrong wrong| & \movesto & |wrong| \\
-    \rulename{choice-wrong-l} & |wrong choice v| & \movesto & |wrong| \\
-    \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
+    \rulename{wrong} & |X^[wrong]| & \movesto & |wrong| \\
     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
-    \rulename{all-wrong} & |all (v_1 choice dots v_n choice wrong)| & \movesto & |wrong| \\
+    \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
     \end{array}
   \end{array}
@@ -547,8 +539,9 @@ But not every |wrong| is wrong: because we allow reduction everywhere, even in d
 |one (1 choice (applyx 2 3))| \movesto |one (1 choice wrong)| \movesto |1|
 \]
 
-Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{ref:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. With this guarantee in place, we can omit these rules during execution (or, as we will see later, in the confluence proof).
-\joachim{TODO: Replace \rulename{fail} with something more careful.}
+Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{ref:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. Therefore, the propagation rules are irrelevant for the execution of verified program.
+
+Note that the rule \rulename{wrong} can compete with \rulename{fail}. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction.
 
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
@@ -1168,6 +1161,10 @@ This allows us to discover rules that we need to add to our reduction relation t
 In the following we assume the
 \[ \rulename{seq-assoc} \quad |(e1; e2); e3| \movesto |e1; (e2; e3)| \]
 to simplify reasoning about sequences without worrying about how they nest.
+
+\subsection{TODO: Restrict \rulename{choice}}
+
+Currently, rule \rulename{choice} can make programs get stuck by moving a |x=v| equality into a choice, where \rulename{bind} cannot see it any more. \rulename{choice} needs to be restricted to apply to a “maximal |X| context” only.
 
 \subsection{Swap-seq-val}
 
