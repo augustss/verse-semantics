@@ -324,9 +324,9 @@
    (--> (int k)
         k
         "P-int1")
-   (--> (int v)
+   (--> (int hnf)
         (bar)
-        (side-condition (not (redex-match? verse k (term v))))
+        (side-condition (not (redex-match? verse k (term hnf))))
         "P-int2")
    ;; Lambda and applications
    (--> ((=> x e_1) e_2)
@@ -541,9 +541,9 @@
   (test--> e-axioms ;; P-int1
            (term (int 5))
            (term 5))
-  (test--> e-axioms ;; P-int2
-           (term (int (arr 5)))
-           (term (bar)))
+  (test-->> e-axioms ;; P-int on var is stuck (regression test)
+           (term (int x))
+           (term (int x)))
   ;; Floating
   (test-->> e-axioms ;; Seq
            (term (seq 5 10))

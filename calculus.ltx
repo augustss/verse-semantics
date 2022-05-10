@@ -299,9 +299,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array} \\[2mm]
-    \rulename{p-int} & |applyx int v| & \movesto &
+    \rulename{p-int} & |applyx int hnf| & \movesto &
     \begin{array}[t]{@@{}ll}
-      |v| & \text{if $v$ is an integer} \\
+      |hnf| & \text{if $hnf$ is an integer} \\
       |fail| & \text{otherwise}
       \end{array} \\[2mm]
     \end{array} \\
