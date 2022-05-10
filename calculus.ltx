@@ -489,40 +489,6 @@ A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
 or a recursive definition |rec f e|.
 
-\subsection{\Hexp{}s and heaps}
-
-\joachim{This whole section is out-of-date with defs no longer containing bindings.}
-
-A \hexp{} has the form |(def h e)|, where |h| is a \emph{heap}, whose syntax is given in
-\Cref{fig:verse-syntax}.  A heap is just a collection of \emph{bindings}, which take one of two forms:
-\begin{itemize}
-\item A binding |x| simply introduces the variable |x|, without giving it a value.
-\item A binding |x:=v| binds the variable |x| to the value |v|.
-\end{itemize}
-These heaps play the role of |let| expressions in the call by need lambda calculus (\Cref{sec:call-by-need}).
-
-A particular heap has at most one binding for a variable |x|.
-When a heap is born, all its bindings are variable introductions |x|; as execution progresses some of
-these variables get a value |x:=v|.  Once a variable gets value, that value never changes: it is immutable.
-
-A binding in a heap may refer to another binding (e.g |x:=y| or |x:=(y,2)|); but the bindings are never recursive.
-Here are some example heaps, with an indication of whether they are well formed:
-\begin{center}
-\begin{tabular}{rl}
-  Heap, $h$ & OK or not? \\
-  \hline
-  |(x:=1, y)| & OK \\
-  |(x:=1, y:=2)| & OK \\
-  |(x:=y, y:=2)| & OK \\
-  |(x:=(1,x))|   & Not OK: recursive \\
-  |(x:=(y1,y2), y1, y2:=4)| & OK \\
-  |(x:=add^(1,2))| & Syntactically invalid; only values are allowed \\
-  |(f:= n => f(n)| & Not OK: recursive \\
-  |(f:= rec g (n => g(n)))| & OK \\
-  \hline
-\end{tabular}
-\end{center}
-
 \subsection{|wrong| and the verifier}
 Some expressions don't make sense, such as using a number as a function in function application, or comparing two lambda values. These expressions are wrong in a different way than failing expressions and stuck expressions:
 \begin{itemize}
