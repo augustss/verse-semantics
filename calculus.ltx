@@ -13,6 +13,7 @@
 \usepackage{ amssymb }
 \usepackage{cleveref}   % \Cref etc
 \usepackage{ stmaryrd }
+\usepackage{conteq}
 
 
 \renewcommand{\arraystretch}{1.1}
@@ -51,6 +52,8 @@
 
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
 
 % Hole in context
 \newcommand{\hole}{\square}
@@ -425,7 +428,18 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
-    \textit{Propagation} \\
+    \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+    \rulename{succeeds-choice} & |succeeds (v choice e)| & \movesto & |wrong| \\
+    \end{array}
+  \end{array}
+  $$
+\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+\end{figurebox}
+
+\begin{figurebox}
+  $$
+  \begin{array}{l}
+    \begin{array}{lrcll}
     \rulename{eq-wrong-l} & |wrong = v| & \movesto & |wrong| \\
     \rulename{eq-wrong-r} & |v = wrong| & \movesto & |wrong| \\
     \rulename{eq-wrong-b} & |wrong = wrong| & \movesto & |wrong| \\
@@ -437,13 +451,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{choice-wrong-b} & |wrong choice wrong| & \movesto & |wrong| \\
     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
     \rulename{all-wrong} & |all (v_1 choice dots v_n choice wrong)| & \movesto & |wrong| \\
-    \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
-    \rulename{succeeds-choice} & |succeeds (v choice e)| & \movesto & |wrong| \\
     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
-     \end{array}
-   \end{array}
-   $$
-\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+    \end{array}
+  \end{array}
+  $$
+\caption{The Verse calculus: propagation of |wrong|} \label{fig:wrong-propagation}
 \end{figurebox}
 
 
@@ -519,39 +531,24 @@ Here are some example heaps, with an indication of whether they are well formed:
 \end{tabular}
 \end{center}
 
-\subsection{|wrong|}
-Expressions that make no sense reduce to |wrong|, e.g., using a number as a function in a function application.
-There are no general reduction rules to propagate |wrong|, instead the reduction gets stuck.
-\joachim{I'm a bit confused, there are a few incomplete rules to propagate wrong in \ref{fig:wrong-axioms}. In particular, I'd be curious about |fail; wrong|. But also about |if v choice wrong|. }
-\lennart{We need to think more about |wrong|.  You can make case for |fail; wrong| being |fail|.
-  Consider |int[x]; x+1|, if the type test fails we don't care about |x+1|.}
-\lennart{We can remove the axioms that propagate |wrong| at all.  I just put those two in, because they don't interfere with |fail|.}
+\subsection{|wrong| and the verifier}
+Some expressions don't make sense, such as using a number as a function in function application, or comparing two lambda values. These expressions are wrong in a different way than failing expressions and stuck expressions:
+\begin{itemize}
+\item The expression |(1=2)|, for example in an |if| conditional, is benign and its reduction to |fail| is part of the normal course of program execution.
+\item The expression |def x (applyx (one (x = 1; (y => (x = 1)))) ())| is stuck, as no rule can make progress, but there is nothing obivously wrong with this program.
+\end{itemize}
 
-\joachim{Also, due to \rulename{fail}, we have |wrong; fail| $\movesto$ |fail|, that does not look right. Probably |e;X| should not be an execution context.}
-\lennart{No, |e;X| must be an execution context.  Consider |def x (x+1; x = 2)|, we must do the |x = 2| before we can do |x+1|.}
+To clearly identify wrong terms, we introduce the special construct |wrong| to the syntax, and rewrite bad expressions to |wrong| using the rules in Figure \ref{ref:wrong-axioms}.
 
-An alternative to using |wrong| would be to say that bad expressions just get stuck.
-Unfortunately this leads to non-confluence as we can get stuck in different way depending on the order of reduction.
-A simple example of this is \\
-|def x (x=(()=>1); x=(()=>2); x())| \\
-This can be reduced by \rulename{bind} in two different ways, and after a few more reduction we get stuck with
-either \\
-|(()=>1)=(()=>2); 1| \\
-or\\
-|(()=>2)=(()=>1); 2| \\
-So even if we consider terms modulo commutativity of equality we have different terms.
+The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out wrong reduction; according to the motto “verified programs don’t go wrong”.
 
-\subsection{Confluence}
-We have the following conjecture: the Verse reduction rules are confluent in the following sense.
-\begin{quote}
-  Using the reduction rules repeatedly will
-  \begin{itemize}
-  \item terminate with a term in |hnf|.  This is a successful evaluation.
-  \item terminate without a term in |hnf|, i.e., get stuck.
-  \item not terminate.
-  \end{itemize}
-  All successful evaluations will produce the same |hnf| (up to $\alpha,\beta$-equivalence?).
-\end{quote}
+But not every |wrong| is wrong: because we allow reduction everywhere, even in dead code, we must allow for |wrong| to appear temporarily, as in this reduction:
+\[
+|one (1 choice (applyx 2 3))| \movesto |one (1 choice wrong)| \movesto |1|
+\]
+
+Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{ref:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. With this guarantee in place, we can omit these rules during execution (or, as we will see later, in the confluence proof).
+\joachim{TODO: Replace \rulename{fail} with something more careful.}
 
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
@@ -1152,5 +1149,108 @@ $$
   \lennart{The rules for if/for should not use =>}
 \caption{Core conversion} \label{fig:core-conversion}
 \end{figure}
+
+\clearpage
+\section{Confluence}
+
+We aspire our reduction rules to be confluent: For every expression $e$, if $e \movesto^\ast e_1$ and $e \movesto^\ast e_2$, then there exists $e_3$ such that $e_1 \movesto^\ast e_3$ and $e_2 \movesto^\ast e_3$. Note that $e$ can be an open term.
+
+Confluence allows us to apply the rules anywhere, in arbitrary order, without running into a dead end.
+
+\subsection{Confluence and convertibility}
+
+A confluent relation has the Church-Rosser-Property: If $e_1 \convertible e_2$, then there exists $e_3$ such that $e_1 \movesto^\ast e_3$ and $e_2 \movesto^\ast e_3$. Put different: We can follow the reduction relation forwards and backwards, and must still be able to join the terms.
+
+This allows us to discover rules that we need to add to our reduction relation to make it confluent. These rules are not reqiured for evaluation.
+
+\subsection{Associativity of sequencing}
+
+In the following we assume the
+\[ \rulename{seq-assoc} \quad |(e1; e2); e3| \movesto |e1; (e2; e3)| \]
+to simplify reasoning about sequences without worrying about how they nest.
+
+\subsection{Swap-seq-val}
+
+A slightly technical rule, but we want to use it later: because of
+\begin{conteq}
+           |(v_1 = v_2; v_1)| \\
+\movesfrom |def z (z = v_2; z = v_1)|
+\movesto   |v_2; v_2 = v_1|
+\movesto   |v_2 = v_1|
+\end{conteq}
+we want the rule
+\[ \rulename{swap-seq-val} \quad |(v_1 = v_2);v_1| \movesto |(v_2 = v_1)| \]
+
+\subsection{Local substitution}
+
+Consider the following chain of reductions, where |C| denotes an arbitrary context:
+\begin{conteq}
+             |x = v; C^[x]|    \\
+\movesfrom   |x; x = v; C^[x]| \\
+\movesfrom   |def y (y = x; y = v; C^[y])| \\
+\movesto     |v = x; v; C[v]| \\
+\movesfrom   |(v = x; v); C[v]| \\
+\movesto     |x = v; C[v]| \\
+\end{conteq}
+
+This demonstrates the need for a rule that allows us to take information about a variable $x$, possibly bound farther out, and replace an occurence of $x$ in the scope of that equation with $v$.
+
+A possible formulation of this could be
+
+\[ \rulename{local-subst} \quad |C^[x]| \movesto |C^[v]| \text{ if } |C^[x]| = |X^[x = v]|, |X^[hole]| \ne |C^[hole = v]| \]
+
+Note that the chain of reduction above also works if instead of $x$ we any value, yielding:
+\[
+v_1 = v_2; |C^[v_1]| \convertible |v_1 = v_2; C^[v_2]|
+\]
+We do not need to add that as a separate rule, by the following case anaysis:
+\begin{itemize}
+\item If |v_1| is a variable, \rulename{local-subst} applies.
+\item If |v_1| is not a variable, but |v_2| is, \rulename{swap} allows us to use \rulename{local-subst}.
+\item If |v_1| and |v_2| are both constants and the same, substitution would not have any effect. 
+\item If |v_1| and |v_2| are both arrays of the same length, rule \rulename{uarr} decomposes it into equalities between the components. Substitution of the whole array can now be performed by substitution using the component equalities.
+\item If |v_1| and |v_2| are different constants, tuples of different lengths are else inconsistent, it evaluates to |fail| or |wrong|, and that swallows the whole contex that could be affected by first substituting. \joachim{TODO: This only works if |fail| and |wrong| are the same.}
+\end{itemize}
+
+\subsection{Handling |wrong| terms}
+
+Dealing with |wrong| is a challenge when trying to define a confluent semantics.
+In particular: should |wrong;fail| reduce to |wrong| or to |fail|?
+
+On the one hand, we have
+\begin{conteq}
+           |wrong| \\
+\movesfrom |wrong; 1| \\
+\movesfrom |wrong; (1 = 1)| \\
+\movesfrom |(_ => 1) = (_ => 2); applyx (_ => 1) () = 1| \\
+\movesfrom |def x (x = (_ => 1); x = (_ => 2); applyx x() = 1| \\
+\movesto   |(_ => 2) = (_ => 1); applyx (_ => 2) () = 1| \\
+\movesto   |wrong; (2 = 1)| \\
+\movesto   |wrong;fail|
+\end{conteq}
+which calls for $|wrong;fail| \movesto |wrong|$. On the other hand we have
+\begin{conteq}
+           |fail| \\
+\movesfrom |fail; fail| \\
+\movesfrom |fail; if fail then wrong else fail| \\
+\movesfrom |(1 = 2); if 1 = 2 then wrong else fail| \\
+\movesfrom |def x (x = 1; x = 2; if x = 2 then wrong else fail)| \\
+\movesto   |(2 = 1); if 2 = 2 then wrong else fail)| \\
+\movesto   |fail; wrong|
+\end{conteq}
+calling for $|wrong;fail| \movesto |fail|$.
+
+In both cases, we have inconsistent information in the present equation, and using that inconsistent informaion we can get different results. To achieve confluence, we have to fail uniformly in the presence of inconsistent information, and thus we add the rule
+\[ \rulename{wrong-is-fail} \quad |wrong| \movesto |fail| \]
+to treat them the same.
+
+Of course, the |wrong| propagation rules in Figure~\ref{fig:wrong-propagation} must not be used, this would clearly be not confluent. That is ok, though, as these rules are relevant for specifying the verifier. If the verifier is sound, then verified programs can be reduced without these rules.
+
+\subsection{Confluence proof}
+
+With all these rules above added, and maybe some more to take care of minor syntactic differences (order of variable bindings), are the reduction rules confluent? \joachim{I don’t know yet, and I am unsure how to prove it.}
+
+A proof sketch would argue that using \rulename{local-subst} and decomposition of equalities, we can exhaustively propagate all available information about free variables. In the presence of recursion, (e.g. |x = (x,x)|) this may not necessary terminate, but we can hope that any two approximations of the infinite term tree can be joined again.
+
 
 \end{document}
