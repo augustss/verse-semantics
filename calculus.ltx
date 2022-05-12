@@ -1080,6 +1080,10 @@ In the following we assume the
 \[ \rulename{seq-assoc} \quad |(e1; e2); e3| \movesto |e1; (e2; e3)| \]
 to simplify reasoning about sequences without worrying about how they nest.
 
+\subsection{Order of variables in |defKW|}
+
+The rules \rulename{def-float} and \rulename{def-merge} can easily lead to superficial non-confluence where terms differ in the order variables occr in a |defKW|. We hand-wave that problem away by equating terms up to alpha-equivalence where the list of variables in |defKW| is considered a \emph{set} of bound variables.
+
 \subsection{TODO: Restrict \rulename{choice}}
 
 Currently, rule \rulename{choice} can make programs get stuck by moving a |x=v| equality into a choice, where \rulename{bind} cannot see it any more. \rulename{choice} needs to be restricted to apply to a “maximal |X| context” only.
