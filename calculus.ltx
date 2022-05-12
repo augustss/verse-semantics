@@ -555,7 +555,7 @@ then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{
 
 %\joachim{I did not initially manage to understand why |apply v; hole| is not a choice context, i.e. why we need |cop| and |op|. I also tried to combine the two in Redex, in case a failing test would enlighten me, but none did. Can someone add an example? Ah, maybe the crucial property of a choice-free expression is that it is guaranteed to \emph{evaluate} to at most a single value (It still allows to evaluate to |fail|). Ok, makes sense now. I'll leave this note here and add an example later.}
 
-Rule \rulename{fail} collapes an expression with a nexted |fail| into a single |fail|.  It uses the |X| evaluation
+Rule \rulename{fail} collapes an expression with a nested |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
 $$
 |def (x,y) ((x == (3 choice 4)) ; (y == (9 choice 2)); fail; (x,y))|
@@ -592,7 +592,7 @@ than 3, returning |x|; and fails if not.
 
 It is very important that in |one ((x=3;1) choice 2)| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
-|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{b-val}
+|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{bind}
 does not look inside an |oneKW| (look at the syntax of context |X| used in that rule).
 
 \subsection{|wrong| and the verifier}
@@ -602,7 +602,7 @@ Some expressions don't make sense, such as using a number as a function in funct
 \item The expression |def x (applyx (one (x = 1; (y => (x = 1)))) ())| is stuck, as no rule can make progress, but there is nothing obivously wrong with this program.
 \end{itemize}
 
-To clearly identify wrong terms, we introduce the special construct |wrong| to the syntax, and rewrite bad expressions to |wrong| using the rules in Figure \ref{ref:wrong-axioms}.
+To clearly identify wrong terms, we introduce the special construct |wrong| to the syntax, and rewrite bad expressions to |wrong| using the rules in Figure \ref{fig:wrong-axioms}.
 
 The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out wrong reduction; according to the motto “verified programs don’t go wrong”.
 
@@ -611,7 +611,7 @@ But not every |wrong| is wrong: because we allow reduction everywhere, even in e
 |one (1 choice (applyx 2 3))| \movesto |one (1 choice wrong)| \movesto |1|
 \]
 
-Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{ref:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. Therefore, the propagation rules are irrelevant for the execution of verified program.
+Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{fig:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. Therefore, the propagation rules are irrelevant for the execution of verified program.
 
 Note that the rule \rulename{wrong} can compete with \rulename{fail}. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction.
 
