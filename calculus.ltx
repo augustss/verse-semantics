@@ -458,7 +458,7 @@ A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
 or a recursive definition |rec f e|.
 
-In this core calculus, the elements of the tuples must be values. This is not a fundamental restriction; instead of |(e_1, e_2)| one can write |defs (x, y) (x = e_1; y = e_2; (x,y))| and when translating the source language to the core language, this transformation will be applied.
+In this core calculus, the elements of the tuples must be values. This is not a fundamental restriction; instead of |(e_1, e_2)| one can write |def (x, y) (x = e_1; y = e_2; (x,y))| and when translating the source language to the core language, this transformation will be applied.
 
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
