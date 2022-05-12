@@ -70,7 +70,7 @@
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
-\newcommand{\simon}[1]{{\color{red} [{SPJ}: #1]}}
+\newcommand{\simon}[1]{\text{\color{red} [{SPJ}: #1]}}
 \newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
 
 \newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
@@ -926,7 +926,7 @@ $$
   |De (e op_a)| & = & |De (postfix op_a (e))| \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (l := e)| & = & |Ld l (De e)| \\
-  |De (l : t)| & = & |Ld l (De (:t))| \\
+  |De (l : t)| & = & |De (l := :t)| \\
   |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
   |De (e_1 srcor e_2)| & = & |De (if(e_1) else if (e_2) else :false)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
@@ -945,6 +945,8 @@ $$
   |De (case(e){e_1; dots e_n}| & = & |De (x:=e; if(e_1[x]) else dots if(e_n[x]) else :false)| \\
   |De (function e effsR b)| & = & |De (function(e)(dots)((r^[b])))| & \\
   |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
+  && \simon{What about |x:any => (x=e; b)|?  So much simpler!} \\
+  && \simon{Tim sync 11 May.} \\
   |De (typedef^{e})| & = & |typedef^{De e}| \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
@@ -961,15 +963,20 @@ $$
 \begin{array}{rcll}
   |Ld| & \multicolumn{3}{l}{\text{converts a definition |l := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := e| \\
-  |Ld (: t) e| & = & |t^[e]| \\
+  |Ld (: t) e| & = & |t^[e]| \simon{:t isn't in the syntax for lhs}\\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
   |Ld (fun^(e_1)) e| & = & |Fd (fun^(e_1)) e| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1^hat) e| & = & |assign^(De e_1,e)| \\
-  |Ld (l_0, dots, l_n) e| & = & |x := e; Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
+%  |Ld (l_0, dots, l_n) e| & = & |x := e; Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
+  |Ld (l_0, dots, l_n) e| & = &
+  |(x_0:any,dots,x_n:any)=e; Ld l_0 x_0; dots; Ld l_n x_n| & \text{|x_i| fresh} \\
+  &&\simon{We discussed this desugaring with Tim} \\
   |Ld (l_1 minusgt l_2) e| & = & |Ld l_1 x; Ld l_2 ((typedef^{e}^[x := :any]))| & \text{|x| fresh} \\
+  && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
   \\
   |Fd| & \multicolumn{3}{l}{\text{converts function definitions to |functionKW|.}} \\
+  && \simon{I'm inclined to collapse |fun| into |lhs|} \\
   |Fd (fun^(e_1)effsR) e| & = & |Fd fun (De (function e_1 effsR {e}))| \\
   |Fd x e| & = & |x := e| \\
   \\

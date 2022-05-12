@@ -103,14 +103,16 @@
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "=>"
-%format minusgt = "-\!\!>"
+%format minusgt = "\!\leadsto\!"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 
+%format x_0
 %format x_1
 %format x_2
 %format x_3
+%format x_i
 %format x_n
 
 %format hnf_1
@@ -164,11 +166,11 @@
 %format ce_n
 %format ce_m
 
-%format l   = "lhs"
-%format l_0 = "lhs_0"
-%format l_1 = "lhs_1"
-%format l_2 = "lhs_2"
-%format l_n = "lhs_n"
+%format l   = "\mathit{lhs}"
+%format l_0 = "\mathit{lhs}_0"
+%format l_1 = "\mathit{lhs}_1"
+%format l_2 = "\mathit{lhs}_2"
+%format l_n = "\mathit{lhs}_n"
 
 %format fun = "\mathit{fun}"
 
