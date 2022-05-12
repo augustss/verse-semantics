@@ -1,5 +1,7 @@
 %format ^ = " "
 
+%format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
+
 %format (De (x)) = "\De{" ^ x "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"
@@ -94,7 +96,6 @@
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"
-%format subst = "\!:=\!"
 %format == = "="
 % format := = "\mapsto"
 %format ; = ";\;"

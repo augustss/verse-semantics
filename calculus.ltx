@@ -62,6 +62,7 @@
 \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
+\newcommand{\subst}[3]{#1[#3/#2]}
 
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}
@@ -99,7 +100,7 @@
     \end{array} \\
     \\
     \textbf{Axioms}  \\
-    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |e_1^[x subst e_2]| \\
+    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |subst e_1 x e_2]| \\
     \rulename{delta}\qquad k_1 \oplus k_2 \movesto k_1 + k_2 \\
    \end{array}
    $$
@@ -112,7 +113,7 @@ Key points:
 \item \emph{Expressions.} We give the syntax of \emph{expressions} in BNF.
 \item \emph{Axioms.} There is just one axiom, \rulename{beta}.
 You can apply an axiom anywhere in an expression, in either direction but typically left-to-right.
-\item \emph{Substitution.} The notation $|e_2[x subst e_1]|$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
+\item \emph{Substitution.} The notation $|subst e_2 x e_1|$, used on the RHS of rule \rulename{beta},  means the capture-avoiding subsitution that replaces
   each occurrence of $x$ in $e_1$ with $e_2$.
 \item \emph{Evaluation contexts}.  An evaluation context $E$ is an expression with a single ``hole'' in it,
   denoted $\hole$. The notation $E[e]$ means the evaluation context $E$ with its hole filled with $e$.
@@ -161,7 +162,7 @@ has been reduced to a constant $k$.
     \textbf{Axioms}  \\
     \begin{array}{lrcl}
     \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
-    \rulename{let-v} & |let x = v in e| & \movesto & |e^[x subst v]| \\
+    \rulename{let-v} & |let x = v in e| & \movesto & |subst e x v]| \\
     \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)|\quad
         \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
@@ -303,7 +304,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x (x==e_2; e_1)|
           \quad \text{if $x \not\in \freevars{e_2}$} \\
-    \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (e_1^[f subst rec f e_1]) e_2| \\
+    \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (subst e_1 f (rec f e_1)) e_2| \\
     \rulename{app-type} & |applyx (typex v) e| & \movesto & |applyx v e| \\
     \rulename{app-arr} & |applyx (array (v_0,dots,v_k,dots,v_n)) k| & \movesto &
     \begin{array}[t]{@@{}ll}
@@ -348,7 +349,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) in e| \\
     \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
     & \begin{array}[t]{@@{}l}
-        |def (H^[emp]) ((X^[v])[x subst v])| \
+        |def (H^[emp]) (subst (X^[v]) x v)| \
         \text{if $|x| \notin \freevars{v}$ }
         \end{array} \\
     \rulename{def-elim} & |def emp e| & \movesto & |e| \\
