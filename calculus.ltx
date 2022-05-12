@@ -908,55 +908,80 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 
 \section{Desugaring Source Verse}
 
-\begin{figure}
+\begin{figurebox}
 $$
 \begin{array}{rcll}
-  |De| & \multicolumn{3}{l}{ \text{converts Source Verse to a subset of Source Verse.} } \\
+  |De| & \multicolumn{3}{l}{ \text{converts Source Verse to a subset of Source Verse.} } \\[1mm]
+
+  \multicolumn{1}{l}{\textbf{Basic forms}} \\
   |De k| & = & |k| \\
   |De x| & = & |x| \\
   |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
   |De (e_1^(e_2))| & = & |De (succeeds (e_1^[e_2]))| \\
-  |De (!e)| & = & |De (if e then :false else false)| \\
-  |De (:t)| & = & |: De t| \\
-  |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
-  |De (op_b e)| & = & |De (prefix op_b (e))| \\
-  |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
-  |De (e op_a)| & = & |De (postfix op_a (e))| \\
-  |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
+  |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
+  |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
+  \\
+  \multicolumn{1}{l}{\textbf{Bindings}} \\
   |De (l := e)| & = & |Ld l (De e)| \\
   |De (l : t)| & = & |De (l := :t)| \\
-  |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
-  |De (e_1 srcor e_2)| & = & |De (if(e_1) else if (e_2) else :false)| \\
-  |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
-  |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
-  |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
-  |De (e_1 op_i e_2)| & = & |De (operator op_i [e_1, e_2])| & \text{if |op_i| can fail}\\
-  |De (e_1 op_i e_2)| & = & |De (operator op_i (e_1, e_2))| \\
+  \\
+  \multicolumn{1}{l}{\textbf{Functions}} \\
+  |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
+  |De (function e effsR b)| & = & |De (function(e)(dots)((r^[b])))| & \\
+  |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
+  \multicolumn{4}{l}{\simon{What about |x:any => (x=e; b)|?  So much simpler!}} \\
+  \multicolumn{4}{l}{\simon{Tim sync 11 May.}} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Types}} \\
+  |De (:t)| & = & |: De t| \\
+  |De (typedef^{e})| & = & |typedef^{De e}| \\
+  \\
+  \multicolumn{1}{l}{\textbf{Conditionals}} \\
   |De (if{e})| & = & |De (if(e) else false)| \\
   |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else false)| \\
   |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
   |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
+  \\
+  \multicolumn{1}{l}{\textbf{For}} \\
   |De (for{e})| & = & |De (for (x := e) in { x })| & \text{|x| fresh} \\
+  \\
+\end{array}
+$$
+\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \multicolumn{1}{l}{\textbf{Operators}} \\
+  |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
+  |De (op_b e)| & = & |De (prefix op_b (e))| \\
+  |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
+  |De (e op_a)| & = & |De (postfix op_a (e))| \\
+  |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
+  |De (e_1 srcor e_2)| & = & |De (if(e_1) else if (e_2) else :false)| \\
+  |De (!e)| & = & |De (if e then :false else false)| \\
+  |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i [e_1, e_2])| & \text{if |op_i| can fail}\\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i (e_1, e_2))| \\
+  \\
+  \multicolumn{1}{l}{\textbf{Let, do, case}} \\
   |De (let(e) in b)| & = & |De (e); De b| & \textit{see note} \\
   |De (do b)| & = & |De b| & \textit{see note}  \\
   |De (case{e_1; dots e_n})| & = & |De ((x:any) => case(x){e_1; dots e_n})| & \text{|x| fresh} \\
   |De (case(e){e_1; dots e_n}| & = & |De (x:=e; if(e_1[x]) else dots if(e_n[x]) else :false)| \\
-  |De (function e effsR b)| & = & |De (function(e)(dots)((r^[b])))| & \\
-  |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
-  && \simon{What about |x:any => (x=e; b)|?  So much simpler!} \\
-  && \simon{Tim sync 11 May.} \\
-  |De (typedef^{e})| & = & |typedef^{De e}| \\
-  |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
   \\
+  \multicolumn{1}{l}{\textbf{Misc}} \\
+  |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
 This means that there can be not variable name clashes in |let| and |do|.
 A more robust desugaring could $\alpha$-convert such clashes.
-\caption{Desugaring of expressions} \label{fig:desugar-expr}
-\end{figure}
+\caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
+\end{figurebox}
 
 \begin{figure}
 $$
