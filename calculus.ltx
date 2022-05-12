@@ -100,7 +100,7 @@
     \end{array} \\
     \\
     \textbf{Axioms}  \\
-    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |subst e_1 x e_2]| \\
+    \rulename{beta}\qquad (\lambda x.e_1)\; e_2 \movesto |subst e_1 x e_2| \\
     \rulename{delta}\qquad k_1 \oplus k_2 \movesto k_1 + k_2 \\
    \end{array}
    $$
@@ -162,7 +162,7 @@ has been reduced to a constant $k$.
     \textbf{Axioms}  \\
     \begin{array}{lrcl}
     \rulename{beta} & (\lambda x.e_1)\; e_2 & \movesto & |let x = e_2 in e_1| \\
-    \rulename{let-v} & |let x = v in e| & \movesto & |subst e x v]| \\
+    \rulename{let-v} & |let x = v in e| & \movesto & |subst e x v| \\
     \rulename{let-c} & |(let x = e_x in e_1) e_2| & \movesto & |let x = e_x in (e_1 e_2)|\quad
         \text{if $x \not\in \freevars{e_2}$} \\
     \rulename{let-a} & |let x = (let y = e_y in e_x) in e| & \movesto
@@ -269,7 +269,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{fail-l} & |fail choice e| & \movesto & e \\
     \rulename{fail-r} & |e choice fail| & \movesto & e \\
     \rulename{fail} & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \not= \hole \\
-    \rulename{fail-def} & |def h in fail| & \movesto & |fail|  \\
+    \rulename{fail-def} & |def h fail| & \movesto & |fail|  \\
     \rulename{choose} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| & \text{if}~|CX| \not= \hole \\
     \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| 
     \end{array} \\
@@ -279,15 +279,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \rulename{p-add} & |applyx add (k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{p-gt} & |applyx gt (k_1,k_2)| & \movesto &
-    \begin{array}[t]{@@{}ll}
+    \left\{\begin{array}{@@{}ll}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
-      \end{array} \\[2mm]
+      \end{array}\right. \\[2mm]
     \rulename{p-int} & |applyx int hnf| & \movesto &
-    \begin{array}[t]{@@{}ll}
-      |hnf| & \text{if $hnf$ is an integer} \\
+    \left\{\begin{array}{@@{}ll}
+      |hnf| & \text{if |hnf| is an integer} \\
       |fail| & \text{otherwise}
-      \end{array} \\[2mm]
+      \end{array}\right. \\[2mm]
     \end{array} \\
 
     \textit{Sequencing} \\
@@ -307,10 +307,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (subst e_1 f (rec f e_1)) e_2| \\
     \rulename{app-type} & |applyx (typex v) e| & \movesto & |applyx v e| \\
     \rulename{app-arr} & |applyx (array (v_0,dots,v_k,dots,v_n)) k| & \movesto &
-    \begin{array}[t]{@@{}ll}
+    \left\{\begin{array}{@@{}ll}
            |v_k| & \text{if $0 \leq k \leq n$} \\
            |fail| & \text{otherwise}
-           \end{array}\\[4mm]
+           \end{array}\right.\\[4mm]
     \end{array} \\
 
     \textit{Range} \\
@@ -323,7 +323,10 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
-    \rulename{one-fail} & |one fail| & \movesto & |fail| \\[2mm]
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \end{array} \\  \\[-1mm]
+    \begin{array}{lrcl}
     \rulename{all-0} & |all fail| & \movesto & |()| \\
     \rulename{all-n} &
       |all (v_1 choice dots choice v_n)|
@@ -331,9 +334,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}[t]{@@{}l}
       |defTwoLines (x_1,dots x_n)
        (x_1 == applyx v_1 (); dots x_n == applyx v_n (); array (x_1,dots,x_n))| \\
-      \text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}
     \end{array} \\
-    \rulename{succeeds-value} & |succeeds v| & \movesto & |v| \\
+    && \multicolumn{2}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
     \end{array} \\
    \end{array}
    $$
@@ -345,14 +347,12 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}{l}
     \textit{Def-blocks} \\
     \begin{array}{lrcl}
-    \rulename{def-float} & |X^[def h e]| & \movesto & |def h in (X^[e])| \\
-    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) in e| \\
-    \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
-    & \begin{array}[t]{@@{}l}
-        |def (H^[emp]) (subst (X^[v]) x v)| \
-        \text{if $|x| \notin \freevars{v}$ }
-        \end{array} \\
     \rulename{def-elim} & |def emp e| & \movesto & |e| \\
+    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \\
+    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \\
+    \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
+    & |def (H^[emp]) (subst (X^[v]) x v))| \\
+    && \multicolumn{2}{l}{\text{if $|x| \notin \freevars{v}$}} \\
     \end{array} \\
     \\[-2mm]
 
@@ -361,16 +361,19 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
     \rulename{utype} & |x == range ty| & \movesto & |applyx ty x; x| \\
     \rulename{ucon} & |k_1 == k_2| & \movesto
-    & \begin{array}[t]{@@{}ll}
+    & \left\{\begin{array}{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
-      \end{array} \\
-    \rulename{uarr} & |array (v_1,dots,v_m) == array (v1',dots,v_n')| & \movesto
-    & \begin{array}[t]{@@{}ll}
-        |v_1==v1';dots;v_m=v_m'|\\
+      \end{array}\right. \\
+    \rulename{uarr} & \begin{array}{@@{}l}
+      |array (v_1,dots,v_m)| \\
+      | == array (v1',dots,v_n')|
+      \end{array} & \movesto
+    & \left\{\begin{array}{@@{}ll}
+        |v_1==v1';dots;v_m=v_m';|\\
         |array (v_1,dots,v_m)| & \text{if $m=n$} \\
         |fail| & \text{otherwise}
-      \end{array}\\
+      \end{array}\right.\\
     \rulename{ux1} & |k == (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |(v_1,dots,v_n) == k | & \movesto & |fail| \\
      \end{array}
