@@ -8,6 +8,7 @@ import Expr
 import Parse
 import Command
 import Core
+import Eval
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -39,6 +40,10 @@ asDesugared :: SomeExpr -> Expr
 asDesugared (Parsed e) = desugar e
 asDesugared e = asExpr e
 
+asCore :: SomeExpr -> Core
+asCore (Cored e) = e
+asCore e = exprToCore $ asDesugared e
+
 instance Show SomeExpr where
   show NoExpr = "No current expression"
   show (Parsed e) = show e
@@ -59,6 +64,7 @@ command = Command
       , Cmd "show [EXPR]"     "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]" "Simplify [last] expression"            cSimplify
       , Cmd "core [EXPR]"     "Generate core for [last] expression"   cCore
+      , Cmd "eval [EXPR]"     "Evaluate [last] expression"            cEval
       , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
       ]
   , c_exec = cParseLine
@@ -110,6 +116,9 @@ cSimplify = cTransform (Desugared . simplify . asExpr)
 
 cCore :: Run CState
 cCore = cTransform (Cored . exprToCore . asDesugared)
+
+cEval :: Run CState
+cEval = cTransform (Cored . eval . asCore)
 
 cShow :: Run CState
 cShow =
