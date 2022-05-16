@@ -1,11 +1,18 @@
 {-# LANGUAGE PatternSynonyms #-}
-module Core(Core(..), Value(..), HNF(..), exprToCore, coreToRedex) where
+module Core(
+  Core(..),
+  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
+  Value(..),
+  HNF(..),
+  compos, composOp,
+  exprToCore,
+  coreToRedex) where
 import Prelude hiding ((<>))
---import Control.Arrow(second)
+import Control.Monad.Identity
 import Control.Monad.State.Strict
 
 import Print
-import Expr
+import Expr hiding (compos, composOp)
 import Desugar(predefs, getVisible)
 import Error
 import SExp
@@ -87,7 +94,7 @@ core e@LitRat{} = val e
 core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
-core (ApplyS e1 e2) = CMacro (Ident noLoc "succeeds") <$> core (ApplyD e1 e2)
+core (ApplyS e1 e2) = CSucceeds <$> core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
 core (Unify e AnyT) = core e  -- XXX add a core simplification pass
 core (Unify e1 e2) = CUnify <$> core e1 <*> core e2
@@ -151,6 +158,7 @@ instance Pretty Core where
   pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
+  pPrintPrec _ _ CFail = text "fail"
   pPrintPrec l p (CBar cs) = maybeParens (p > 7) $ fsep (punctuate (text " |") (map (pPrintPrec l 7) cs))
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
