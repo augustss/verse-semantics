@@ -26,6 +26,7 @@ data Core
   | CBar [Core]
   | CMacro Ident Core
   | CDef Heap Core
+  | CWrong
   deriving (Show)
 
 type Heap = [Ident]
@@ -163,6 +164,7 @@ instance Pretty Core where
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
     maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is, text "in" <+> pPrintPrec l 0 e]
+  pPrintPrec _ _ CWrong = text "wrong"
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -192,6 +194,7 @@ compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
 compos f (CBar es) = CBar <$> traverse f es
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
+compos _ CWrong = pure CWrong
 
 appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
 appV _ v@Var{} = pure v
