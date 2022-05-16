@@ -1,5 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
-module Core(exprToCore, coreToRedex) where
+module Core(Core(..), Value(..), HNF(..), exprToCore, coreToRedex) where
 import Prelude hiding ((<>))
 --import Control.Arrow(second)
 import Control.Monad.State.Strict
