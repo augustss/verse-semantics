@@ -27,20 +27,20 @@ data Value = Var Ident | HNF HNF
   deriving (Show)
 
 data HNF
-  = VInt Integer
-  | VRat Rational
-  | VPrim String
-  | VArray [Value]
-  | VLam Ident Core
-  | VRec Ident Core
-  | VType Value      -- really a lambda
+  = HInt Integer
+  | HRat Rational
+  | HPrim String
+  | HArray [Value]
+  | HLam Ident Core
+  | HRec Ident Core
+  | HType Value      -- really a lambda
   deriving (Show)
 
 {-
 pattern CInt :: Integer -> Core
-pattern CInt x = CValue (HNF (VInt x))
+pattern CInt x = CValue (HNF (HInt x))
 pattern CRat :: Rational -> Core
-pattern CRat x = CValue (HNF (VRat x))
+pattern CRat x = CValue (HNF (HRat x))
 pattern CVar :: Ident -> Core
 pattern CVar x = CValue (Var x)
 -}
@@ -50,9 +50,14 @@ pattern COne c <- CMacro (Ident _ "one") c
 pattern CAll :: Core -> Core
 pattern CAll c <- CMacro (Ident _ "one") c
   where CAll e = CMacro (Ident noLoc "one") e
+pattern CSucceeds :: Core -> Core
+pattern CSucceeds c <- CMacro (Ident _ "one") c
+  where CSucceeds e = CMacro (Ident noLoc "one") e
+pattern CFail :: Core
+pattern CFail = CBar []
 
 cEmpty :: Core
-cEmpty = CValue $ HNF $ VArray []
+cEmpty = CValue $ HNF $ HArray []
 
 type C = State Int
 
@@ -117,17 +122,17 @@ val :: Expr -> C Core
 val e = CValue <$> value e
 
 value :: Expr -> C Value
-value (LitInt i) = pure (HNF $ VInt i)
-value (LitRat i) = pure (HNF $ VRat i)
-value (Variable i@(Ident _ s)) | i `elem` predefs = pure (HNF $ VPrim s)
+value (LitInt i) = pure (HNF $ HInt i)
+value (LitRat i) = pure (HNF $ HRat i)
+value (Variable i@(Ident _ s)) | i `elem` predefs = pure (HNF $ HPrim s)
                                | otherwise = pure (Var i)
-value (Array es) = HNF . VArray <$> mapM value es
+value (Array es) = HNF . HArray <$> mapM value es
 value (Typedef e) = do
   i <- newTmp
-  HNF . VType . HNF . VLam i <$> coreD (Unify (Variable i) e)
-value (Function (Define x AnyT) fs b) = HNF . VLam x . attr <$> coreD b
+  HNF . HType . HNF . HLam i <$> coreD (Unify (Variable i) e)
+value (Function (Define x AnyT) fs b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
-value Any = pure (HNF $ VPrim "any")
+value Any = pure (HNF $ HPrim "any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
   
 eVar :: String -> Expr
@@ -156,15 +161,42 @@ instance Pretty Value where
   pPrintPrec l p (HNF v) = pPrintPrec l p v
 
 instance Pretty HNF where
-  pPrintPrec l p (VInt i) = pPrintPrec l p i
-  pPrintPrec _ _ (VRat _) = undefined -- pPrintPrec l p r
-  pPrintPrec _ _ (VPrim s) = text s
-  pPrintPrec l _ (VArray vs) = parens $ commaSep l 0 vs
-  pPrintPrec l p (VLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
-  pPrintPrec l p (VRec i c) = maybeParens (p > 2) $ text "rec" <+> pPrintPrec l 0 i <+> pPrintPrec l 0 c
-  pPrintPrec l _ (VType v) = text "type" <> braces (pPrintPrec l 0 v)
+  pPrintPrec l p (HInt i) = pPrintPrec l p i
+  pPrintPrec _ _ (HRat _) = undefined -- pPrintPrec l p r
+  pPrintPrec _ _ (HPrim s) = text s
+  pPrintPrec l _ (HArray vs) = parens $ commaSep l 0 vs
+  pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
+  pPrintPrec l p (HRec i c) = maybeParens (p > 2) $ text "rec" <+> pPrintPrec l 0 i <+> pPrintPrec l 0 c
+  pPrintPrec l _ (HType v) = text "type" <> braces (pPrintPrec l 0 v)
 
 ------
 
 coreToRedex :: Core -> SExp
 coreToRedex = undefined
+
+------
+
+compos :: (Applicative f) => (Core -> f Core) -> Core -> f Core
+compos f (CValue v) = CValue <$> appV f v
+compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
+compos f (CSeq es) = CSeq <$> traverse f es
+compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
+compos f (CBar es) = CBar <$> traverse f es
+compos f (CMacro i e) = CMacro i <$> f e
+compos f (CDef h e) = CDef h <$> f e
+
+appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
+appV _ v@Var{} = pure v
+appV f (HNF v) = HNF <$> appH f v
+
+appH :: (Applicative f) => (Core -> f Core) -> HNF -> f HNF
+appH _ v@HInt{} = pure v
+appH _ v@HRat{} = pure v
+appH _ v@HPrim{} = pure v
+appH f (HArray vs) = HArray <$> traverse (appV f) vs
+appH f (HLam i e) = HLam i <$> f e
+appH f (HRec i e) = HRec i <$> f e
+appH f (HType v) = HType <$> appV f v
+
+composOp :: (Core -> Core) -> Core -> Core
+composOp f = runIdentity . compos (pure . f)
