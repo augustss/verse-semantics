@@ -933,6 +933,8 @@ $$
   |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
   \multicolumn{4}{l}{\simon{What about |x:any => (x=e; b)|?  So much simpler!}} \\
   \multicolumn{4}{l}{\simon{Tim sync 11 May.}} \\
+  \multicolumn{4}{l}{\lennart{I don't know how to make that work.  Consider |function(f(:int):int)()b|.}} \\
+  \multicolumn{4}{l}{\lennart{That would turn into |x:any => x=(f(:int):int)); b| and I don't know how to make sense of that. }} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
   |De (:t)| & = & |: De t| \\
