@@ -55,11 +55,11 @@ pattern COne :: Core -> Core
 pattern COne c <- CMacro (Ident _ "one") c
   where COne e = CMacro (Ident noLoc "one") e
 pattern CAll :: Core -> Core
-pattern CAll c <- CMacro (Ident _ "one") c
-  where CAll e = CMacro (Ident noLoc "one") e
+pattern CAll c <- CMacro (Ident _ "all") c
+  where CAll e = CMacro (Ident noLoc "all") e
 pattern CSucceeds :: Core -> Core
-pattern CSucceeds c <- CMacro (Ident _ "one") c
-  where CSucceeds e = CMacro (Ident noLoc "one") e
+pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
+  where CSucceeds e = CMacro (Ident noLoc "succeeds") e
 pattern CFail :: Core
 pattern CFail = CBar []
 
