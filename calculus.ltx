@@ -67,11 +67,14 @@
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}
 
+\newcommand{\coloredtext}[3]{\strut\ifmmode\text{\color{#1} [{#2}: #3]}\else{\color{#1} [{#2}: #3]}\fi}
+% \text in text mode implies a mbox and prevents wrapping, so only use \text in math mode
+% The strut is needed somehow, else \iffmode does not work in an \begin{array} cell?
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
+\newcommand{\simon}{\coloredtext{red}{SPJ}}
 \definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
-\newcommand{\lennart}[1]{\text{\color{dkcyan} [{LA}: #1]}}
-\newcommand{\simon}[1]{\text{\color{red} [{SPJ}: #1]}}
-\newcommand{\joachim}[1]{\text{\color{dkblue} [{JB}: #1]}}
+\newcommand{\joachim}{\coloredtext{dkblue}{JB}}
 
 \newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
 \newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
