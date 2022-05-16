@@ -69,9 +69,9 @@
 
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
-\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\lennart}[1]{\text{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\simon}[1]{\text{\color{red} [{SPJ}: #1]}}
-\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\joachim}[1]{\text{\color{dkblue} [{JB}: #1]}}
 
 \newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
 \newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
@@ -501,7 +501,7 @@ Can it be made safe by a better treatment of |e choice E|?
    \item Rule \rulename{bind} fires only if the variable is equated to a
      \emph{value}, and values can freely be duplicated without duplicating
      work, so \rulename{bind} does not duplicate work.
-   \item The $x \notin \freevars(v)$ is an occures check, which prevents cyclic data structures.
+   \item The $x \notin \freevars{v}$ is an occures check, which prevents cyclic data structures.
    \end{itemize}
 \item Rule \rulename{def-elim} removes up |defKW| bindings, but only when they are empty. Every variable introduced must be, at some point, eliminated using \rulename{bind}.
 \end{itemize}
