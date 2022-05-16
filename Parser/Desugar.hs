@@ -158,7 +158,8 @@ desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettySho
 
 predefs :: [Ident]
 predefs = map (Ident noLoc)
-  [ "int", "any", "nat", "float", "string", "false"
+  [ "any", "nat", "false"  -- These are not primitives
+  , "int", "float", "string"
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
   , "in'..'", "in'->'"
