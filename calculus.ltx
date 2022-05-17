@@ -493,6 +493,7 @@ The reason to disallow this is that we do not know if they are needed.
 \lennart{This |E| is not satisfactory since some paths terminate and others do not, e.g. |if 1 choice loop() then ...|.
 Can it be made safe by a better treatment of |e choice E|?
 }
+\joachim{What about |v choice E|? Only look past a choice if the first branch is done?}
 
 \subsection{Notes on the rewrite rules}
 
