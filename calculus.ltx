@@ -403,7 +403,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
-    \rulename{succeeds-choice} & |succeeds (v choice e)| & \movesto & |wrong| \\
+    \rulename{succeeds-choice} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
     \end{array}
   \end{array}
   $$
