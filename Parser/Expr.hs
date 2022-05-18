@@ -6,7 +6,6 @@ module Expr(
   Loc, noLoc,
   Ident(..),
   Expr(..),
-  pattern AnyT,
   pattern Fail,
   pattern Unit,
   Block,
@@ -74,7 +73,7 @@ data Expr
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
-  | Any                       -- any
+  | AnyT                      -- :any
 {-
   | Def [Ident] Expr          -- def xs in e
   | Type Expr                 -- 
@@ -84,8 +83,6 @@ data Expr
 -}
   deriving (Eq, Ord, Show, Data)
 
-pattern AnyT :: Expr
-pattern AnyT = Range Any
 pattern Fail :: Expr
 pattern Fail = Range Unit
 pattern Unit :: Expr
@@ -168,7 +165,7 @@ instance Pretty Expr where
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
           Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-          Any -> pPrintPrec l p (Variable (Ident noLoc "any"))
+          AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
 {-
           Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
                                                   text "in" <+> ppr 0 e ]
@@ -251,7 +248,7 @@ compos f (Define i e) = Define i <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
-compos _ Any = pure Any
+compos _ AnyT = pure AnyT
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)

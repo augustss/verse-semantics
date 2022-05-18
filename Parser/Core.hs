@@ -1,15 +1,20 @@
 {-# LANGUAGE PatternSynonyms #-}
 module Core(
   Core(..),
-  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
+  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail, pattern CRange,
+  pattern CVar, pattern CPrim,
   Value(..),
   HNF(..),
   compos, composOp,
   exprToCore,
-  coreToRedex) where
+  coreToRedex,
+  fvs,
+  subst,
+  ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
 import Control.Monad.State.Strict
+import Data.List
 
 import Print
 import Expr hiding (compos, composOp)
@@ -26,13 +31,13 @@ data Core
   | CBar [Core]
   | CMacro Ident Core
   | CDef Heap Core
-  | CWrong
-  deriving (Show)
+  | CWrong String
+  deriving (Show, Eq)
 
 type Heap = [Ident]
 
 data Value = Var Ident | HNF HNF
-  deriving (Show)
+  deriving (Show, Eq)
 
 data HNF
   = HInt Integer
@@ -42,16 +47,18 @@ data HNF
   | HLam Ident Core
   | HRec Ident Core
   | HType Value      -- really a lambda
-  deriving (Show)
+  deriving (Show, Eq)
 
 {-
 pattern CInt :: Integer -> Core
 pattern CInt x = CValue (HNF (HInt x))
 pattern CRat :: Rational -> Core
 pattern CRat x = CValue (HNF (HRat x))
+-}
+pattern CPrim :: String -> Core
+pattern CPrim s = CValue (HNF (HPrim s))
 pattern CVar :: Ident -> Core
 pattern CVar x = CValue (Var x)
--}
 pattern COne :: Core -> Core
 pattern COne c <- CMacro (Ident _ "one") c
   where COne e = CMacro (Ident noLoc "one") e
@@ -61,8 +68,13 @@ pattern CAll c <- CMacro (Ident _ "all") c
 pattern CSucceeds :: Core -> Core
 pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
+pattern CRange :: Core -> Core
+pattern CRange c <- CMacro (Ident _ "range") c
+  where CRange e = CMacro (Ident noLoc "range") e
 pattern CFail :: Core
 pattern CFail = CBar []
+pattern CRec :: Ident -> Core -> Core
+pattern CRec i e = CValue (HNF (HRec i e))
 
 cEmpty :: Core
 cEmpty = CValue $ HNF $ HArray []
@@ -97,15 +109,22 @@ core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = CSucceeds <$> core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
-core (Unify e AnyT) = core e  -- XXX add a core simplification pass
-core (Unify e1 e2) = CUnify <$> core e1 <*> core e2
+core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
-core (Define i e) = core $ Unify (Variable i) e
-core (Range e) = core $ ApplyD (eVar "range") e
-core e@Any = val e
+core (Define i e) = do --core $ Unify (Variable i) e
+  e' <- core e
+  rf <- newTmp
+  let e'' =
+        if i `elem` fvs e' then
+          CRec rf $ subst (i, Var rf) e'
+        else
+          e'
+  pure $ cUnify (CVar i) e''
+core (Range _e) = undefined -- CRange <$> core e
+core e@AnyT = val e
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
   e2' <- thunk e2
@@ -120,6 +139,10 @@ core (If3 e1 e2 e3) = do
   pure $ CApply fn cEmpty
 core e@Function{} = val e
 core e = impossible e
+
+cUnify :: Core -> Core -> Core
+cUnify e (CPrim ":any") = e
+cUnify e1 e2 = CUnify e1 e2
 
 coreD :: Expr -> C Core
 coreD e | null is = core e
@@ -140,11 +163,11 @@ value (Typedef e) = do
   HNF . HType . HNF . HLam i <$> coreD (Unify (Variable i) e)
 value (Function (Define x AnyT) fs b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
-value Any = pure (HNF $ HPrim "any")
+value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
   
-eVar :: String -> Expr
-eVar = Variable . Ident noLoc
+--eVar :: String -> Expr
+--eVar = Variable . Ident noLoc
 
 thunk :: Expr -> C Expr
 thunk e = do
@@ -156,7 +179,7 @@ thunk e = do
 
 instance Pretty Core where
   pPrintPrec l p (CValue v) = pPrintPrec l p v
-  pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
+  pPrintPrec l p (CUnify c1 c2) = maybeParens (True || p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
   pPrintPrec _ _ CFail = text "fail"
@@ -164,7 +187,7 @@ instance Pretty Core where
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
     maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is, text "in" <+> pPrintPrec l 0 e]
-  pPrintPrec _ _ CWrong = text "wrong"
+  pPrintPrec _ _ (CWrong s) = text $ "wrong" ++ show s
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -194,7 +217,7 @@ compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
 compos f (CBar es) = CBar <$> traverse f es
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
-compos _ CWrong = pure CWrong
+compos _ e@CWrong{} = pure e
 
 appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
 appV _ v@Var{} = pure v
@@ -211,3 +234,58 @@ appH f (HType v) = HType <$> appV f v
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
+
+fvs :: Core -> [Ident]
+fvs (CValue v) = fvsV v
+fvs (CUnify e1 e2) = fvs e1 `union` fvs e2
+fvs (CSeq es) = foldr union [] $ map fvs es
+fvs (CApply e1 e2) = fvs e1 `union` fvs e2
+fvs (CBar es) = foldr union [] $ map fvs es
+fvs (CMacro _ e) = fvs e
+fvs (CDef is e) = fvs e \\ is
+fvs CWrong{} = []
+
+fvsV :: Value -> [Ident]
+fvsV (Var i) = [i]
+fvsV (HNF h) = fvsH h
+
+fvsH :: HNF -> [Ident]
+fvsH (HArray vs) = foldr union [] $ map fvsV vs
+fvsH (HLam i e) = fvs e \\ [i]
+fvsH (HRec i e) = fvs e \\ [i]
+fvsH (HType v) = fvsV v
+fvsH _ = []
+
+------
+
+-- Replace x by b in e
+-- Do an occurs check and alpha-conversion when necessary
+subst :: (Ident, Value) -> Core -> Core
+subst (x, b) ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
+                | otherwise = sub ae
+  where
+    bs = fvs (CValue b)
+    sub (CValue v) = CValue $ subV v
+    sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
+    sub (CSeq es) = CSeq $ map sub es
+    sub (CApply e1 e2) = CApply (sub e1) (sub e2)
+    sub (CBar es) = CBar $ map sub es
+    sub (CMacro i e) = CMacro i $ sub e
+    sub a@(CDef h e) | x `elem` h = a
+                     | null (intersect bs h) = CDef h $ sub e
+                     | otherwise = unimplemented 
+    sub e@CWrong{} = e
+
+    subV v@(Var i) | i == x = b
+                   | otherwise = v
+    subV (HNF v) = HNF $ subH v
+
+    subH (HArray vs) = HArray $ map subV vs
+    subH a@(HLam i e) | x == i = a
+                      | i `notElem` bs = HLam i $ sub e
+                      | otherwise = unimplemented
+    subH a@(HRec i e) | x == i = a
+                      | i `notElem` bs = HRec i $ sub e
+                      | otherwise = unimplemented
+    subH (HType v) = HType $ subV v
+    subH v = v

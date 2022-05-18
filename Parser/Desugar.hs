@@ -19,7 +19,7 @@ anySame (x:xs) = x `elem` xs || anySame xs
 --------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< desugarFunctionS <=< desugarDoS <=< scopeCheck <=< desugarS)
+desugar = eval . (anfS <=< hackRange <=< desugarFunctionS <=< desugarDoS <=< scopeCheck <=< desugarS)
   where eval = flip evalState 1
 
 type D = State Int
@@ -33,7 +33,7 @@ desugarS = expr
     expr e@Variable{} = pure e
     expr (Array es) = Array <$> mapM expr es
     expr (Seq es) = seqE <$> mapM expr es
-    expr (ApplyS e1 e2) | ()/=() = expr $ ApplyD eSucceeds $ ApplyD e1 e2
+    --expr (ApplyS e1 e2) | ()/=() = expr $ ApplyD eSucceeds $ ApplyD e1 e2
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
@@ -70,7 +70,7 @@ desugarS = expr
     expr (Range e) = Range <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr Any = pure Any
+    expr AnyT = pure AnyT
 
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
@@ -110,8 +110,8 @@ desugarCase e b = do
 eAssign :: Loc -> Expr
 eAssign l = Variable (Ident l "$assign")
 
-eSucceeds :: Expr
-eSucceeds = Variable (Ident noLoc "succeeds")
+--eSucceeds :: Expr
+--eSucceeds = Variable (Ident noLoc "succeeds")
 
 define :: Loc -> Ident -> Expr -> Expr
 define _l i e = Define i e
@@ -123,31 +123,34 @@ desugarColon :: Loc -> Expr -> Expr -> D Expr
 desugarColon l x t = desugarDef l x (PrefixOp (Ident l ":") t)
 
 desugarDef :: Loc -> Expr -> Expr -> D Expr
-desugarDef l (Variable i) e = define l i <$> desugarS e
 desugarDef _ (InfixOp x (Ident l ":") t) e = desugarDef l x $ ApplyS t e  -- XXX Is this correct
 desugarDef l f@ApplyS{} e = desugarFunDef l f [] e
 desugarDef l f@EffAttr{} e = desugarFunDef l f [] e
-desugarDef l (PostfixOp x q@(Ident _ "?")) e = desugarDef l x (PostfixOp e q)
-desugarDef l (PostfixOp x (Ident _ "^")) e = desugarS $ ApplyS (eAssign l) $ Array [x, e]
-desugarDef l (Array xs) e = do
-  (v, me) <- inVarM e
-  es <- zipWithM (\ x i -> desugarDef l x (ApplyD v (LitInt i))) xs [0..]
-  chk <- desugarS $ PrefixOp (Ident l "!") $ ApplyD v (LitInt (toInteger (length xs)))  -- Check that list ends correctly
-  pure $ Seq $ maybeToList me ++ [chk] ++ es
-desugarDef l (InfixOp x (Ident _ "~>") y) (PrefixOp (Ident _ ":") t) = do
+desugarDef l x e = desugarBind l x e
+
+desugarBind :: Loc -> Expr -> Expr -> D Expr
+desugarBind l (Variable i) e = define l i <$> desugarS e
+desugarBind l (PostfixOp x q@(Ident _ "?")) e = desugarBind l x (PostfixOp e q)
+desugarBind l (PostfixOp x (Ident _ "^")) e = desugarS $ ApplyS (eAssign l) $ Array [x, e]
+desugarBind l (Array ls) e = do
+  xs <- mapM (const $ newIdent "d") ls
+  let eun = Unify (Array (map (tAny l) xs)) e
+  els <- zipWithM (\ lhs x -> desugarBind l lhs (Variable x)) ls xs
+  pure $ Seq $ eun : els
+desugarBind l (InfixOp x (Ident _ "~>") y) (PrefixOp (Ident _ ":") t) = do
   (i, ex) <-
     case x of
       Variable i -> pure (i, [])
       _ -> do
         i <- newIdent "d"
-        ex <- desugarDef l x (Variable i)
+        ex <- desugarBind l x (Variable i)
         pure (i, [ex])
-  ey <- desugarDef l y (ApplyD t (tAny l i))
+  ey <- desugarBind l y (ApplyD t (tAny l i))
   pure $ seqE $ ey : ex
-desugarDef l lhs@(InfixOp _ (Ident _ "~>") _) e =
-  desugarDef l lhs (PrefixOp (Ident noLoc ":") (Typedef e))
+desugarBind l lhs@(InfixOp _ (Ident _ "~>") _) e =
+  desugarBind l lhs (PrefixOp (Ident noLoc ":") (Typedef e))
 -- What else is allowed?  LitInt and LitRat would be easy.
-desugarDef l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
+desugarBind l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
 desugarFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
 desugarFunDef l (EffAttr f a) as e = desugarFunDef l f (a:as) e
@@ -201,7 +204,7 @@ desugarFunctionS = expr
     expr (Choice e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (Range e1) = Range <$> expr e1
     expr (Typedef e1) = Typedef <$> expr e1
-    expr Any = pure Any
+    expr AnyT = pure AnyT
     expr e = impossible e
 
     function e1@(Define _ AnyT) fs e2 = Function e1 fs <$> expr e2
@@ -379,7 +382,7 @@ anfS = anf
       pure (concat ess, Array vs)
     value e@Function{} = pure ([], e)
     value e@Typedef{} = pure ([], e)
-    value e@Any{} = pure ([], e)
+    value e@AnyT{} = pure ([], e)
     value e = do
       i <- newIdent "a"
       e' <- anf e
@@ -405,7 +408,7 @@ getVisible (Typedef _) = []
 getVisible (Define i e) = i : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
-getVisible Any = []
+getVisible AnyT = []
 getVisible Function{} = []
 getVisible e = impossible e
 
@@ -460,7 +463,7 @@ scopeErrs s = expr
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
     expr (Range e1) = expr e1
     expr (Typedef e1) = expr (Do e1)
-    expr Any = []
+    expr AnyT = []
     expr e = impossible e
     
     defs :: Expr -> ([ScopeErr], S.Set Ident)
@@ -492,3 +495,13 @@ e1:=e2 <-->  e1:typedef{e2}
 e1 := e2  -->  e1 := :typedef{e2}  -->  e1:typedef{e2}
 
 -}
+
+hackRange :: Expr -> D Expr
+hackRange = f
+  where
+    f (Range e) = do
+      r <- newIdent "r"
+      e' <- f e
+      pure $ ApplyD e' (tAny noLoc r)
+    f e = compos f e
+    
