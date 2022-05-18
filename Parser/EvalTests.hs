@@ -11,6 +11,12 @@ import Print
 
 -- Test assertions
 
+-- | Tests that two SourceVerse expressions, when desugared and converted to
+-- core, evaluate to the same thing
+--
+-- TODO: Use something more suitable than ==
+--  * α-equivalence on values
+--  * equating wrong with wrong
 assertEquiv :: HasCallStack => String -> String -> IO ()
 assertEquiv src1 src2 = do
     let p1 = parseDie pFile "<test input 1>" src1
@@ -26,7 +32,7 @@ assertEquiv src1 src2 = do
                 [] -> "unknown location"
                 (_,sloc):_ -> prettySrcLoc sloc
 
-    if (v1 == v2)
+    if v1 == v2
     then do
         putStrLn $ pos ++ " success!"
     else do
@@ -40,15 +46,14 @@ assertEquiv src1 src2 = do
         putStrLn "evaluates to"
         pp v2
 
--- Helpers to create specific Core
-
-
 main :: IO ()
 main = do
     -- Check that BIND removes _one_ unification only
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 2)" "(y:any => 1) = (y:any => 2)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
-    -- Parallel subst
+    -- If BIND is implemented in parallel, it may forget to substitute in the substitutions
     assertEquiv "x:any; y:any; x=y; y=1" "1"
+    assertEquiv "x:any; y:any; x=1; y=x" "1"
+    assertEquiv "x:any; y:any; x=x; y=x" "x:int; x=(x,x)" -- check for occurs check
 
 
