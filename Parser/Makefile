@@ -1,4 +1,4 @@
-PKGS = -package megaparsec -package epicgames -package parser-combinators -package haskeline
+PKGS = -package megaparsec -package parser-combinators -package haskeline
 .PHONY: clean
 
 parser: *.hs
