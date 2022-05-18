@@ -304,18 +304,15 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\
     \\[-2mm]
 
-    \textit{Lambda and application} \\
+    \textit{Application} \\
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e_1) e_2| & \movesto & |def x (x==e_2; e_1)|
-          \quad \text{if $x \not\in \freevars{e_2}$} \\
+          \quad \text{if $x \not\in \freevars{e_1, e_2}$} \\
     \rulename{app-rec} & |applyx (rec f e_1) e_2| & \movesto & |applyx (subst e_1 f (rec f e_1)) e_2| \\
     \rulename{app-type} & |applyx (typex v) e| & \movesto & |applyx v e| \\
-    \rulename{app-arr} & |applyx (array (v_0,dots,v_k,dots,v_n)) k| & \movesto &
-    \left\{\begin{array}{@@{}ll}
-           |v_k| & \text{if $0 \leq k \leq n$} \\
-           |fail| & \text{otherwise}
-           \end{array}\right.\\[4mm]
+    \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots (v = n; v_n)| \\
     \end{array} \\
+    \\[-2mm]
 
     \textit{Range} \\
     \begin{array}{lrcl}
@@ -585,14 +582,14 @@ to |fail| by \rulename{fail}.
 
 \subsection{Functions and application}
 
-Rule \rulename{app-lam} is a rather simple and beautiful $\beta$-reduction rule.
-Notice that |apply| is one of the primitive functions in $cop$.
-
-A tuples/array behaves like a (finite) function, and can be applied to a numeric value
-in \rulename{app-arr} to index it.
+Rule \rulename{app-lam} is our $\beta$-reduction rule. It can be applied even if the argument |e_2| is not (yet) a value, and introduces a fresh name for the eventual value of the argument. If |e_2| happens to be a value |v|, then this yields the same as the simple and beautiful $\beta$-reduction rule |applyx (x => e) v| $\movesto$ |subst e x v|.
 
 A recursive definition gets unrolled one step when it is used in the function position of |apply| by rule \rulename{app-rec}.
 If the body of the recursive definition is a function then reduction will eventually proceed.
+
+A tuples/array behaves like a (finite) function, and can be applied to a numeric value
+in \rulename{app-arr} to index it: |applyx (array (v_0,dots v_n)) k| evaluates to |v_k| if |k| is a number within the bounds of the array, or to |fail| otherwise. But since \rulename{app-arr} is defined via choice, the expression |y = applyx a x| actually enumerates the positions and values of all entries of the array |a|. For example, |all (def x (42 = applyx a x; x))| finds the indicies of all entries in |a| that are 42.
+
 
 \subsection{Conditionals}
 
