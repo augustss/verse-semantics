@@ -62,9 +62,12 @@ main = do
     -- Check that BIND removes _one_ unification only
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 2)" "(y:any => 1) = (y:any => 2)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
+
     -- If BIND is implemented in parallel, it may forget to substitute in the substitutions
     assertEquiv "x:any; y:any; x=y; y=1" "1"
     assertEquiv "x:any; y:any; x=1; y=x" "1"
     assertEquiv "x:any; y:any; x=x; y=x" "x:int; x=(x,x)" -- check for occurs check
 
+    -- Array access via choices
+    assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
 
