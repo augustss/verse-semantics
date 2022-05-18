@@ -48,5 +48,7 @@ main = do
     -- Check that BIND removes _one_ unification only
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 2)" "(y:any => 1) = (y:any => 2)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
+    -- Parallel subst
+    assertEquiv "x:any; y:any; x=y; y=1" "1"
 
 
