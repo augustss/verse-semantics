@@ -236,6 +236,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Choice-free primops} & cop  & ::= & |gt| \vb |add| \\
     \text{Types} & ty & ::= & |int| \vb |string| \vb |typex v| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |applyx cop ce| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
+     && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
  \\
