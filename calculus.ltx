@@ -582,7 +582,7 @@ to |fail| by \rulename{fail}.
 
 \subsection{Functions and application}
 
-Rule \rulename{app-lam} is our $\beta$-reduction rule. It can be applied even if the argument |e_2| is not (yet) a value, and introduces a fresh name for the eventual value of the argument. If |e_2| happens to be a value |v|, then this yields the same as the simple and beautiful $\beta$-reduction rule |applyx (x => e) v| $\movesto$ |subst e x v|.
+Rule \rulename{app-lam} is our $\beta$-reduction rule. It can be applied even if the argument |e_2| is not (yet) a value, and unifies the parameter with the results from that expression. If |e_2| happens to already be a value |v|, then this yields the same as the simple and beautiful $\beta$-reduction rule |applyx (x => e) v| $\movesto$ |subst e x v|.
 
 A recursive definition gets unrolled one step when it is used in the function position of |apply| by rule \rulename{app-rec}.
 If the body of the recursive definition is a function then reduction will eventually proceed.
