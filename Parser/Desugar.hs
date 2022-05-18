@@ -1,4 +1,4 @@
-module Desugar(desugar, simplify, predefs, getVisible) where
+module Desugar(desugar, simplify, primOps, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 --import Data.List
@@ -159,10 +159,15 @@ desugarFunDef l (Variable f) [] e = define l f <$> desugarS e
 desugarFunDef _ Variable{} _ _ = internalError
 desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
-predefs :: [Ident]
-predefs = map (Ident noLoc)
-  [ "any", "nat", "false"  -- These are not primitives
-  , "int", "float", "string"
+-- Definitions that should go in a Prelude
+prelude :: [Ident]
+prelude = map (Ident noLoc)
+  [ "int", "float", "string", "any", "nat", "false"]
+
+-- Primitives
+primOps :: [Ident]
+primOps = map (Ident noLoc)
+  [ "int#", "float#", "string#"
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
   , "in'..'", "in'->'"
@@ -297,7 +302,7 @@ makeUniq :: Expr -> Expr
 makeUniq e = evalState (uniqE globals e) 1
   where
     globals :: Env
-    globals = M.fromList $ zip predefs predefs
+    globals = M.fromList $ zip primOps primOps
 
 type Env = M.Map Ident Ident
 
@@ -422,7 +427,7 @@ data ScopeErr
 
 scopeCheck :: Expr -> D Expr
 scopeCheck e = do
-  let errs = scopeErrs (S.fromList predefs) (Do e)
+  let errs = scopeErrs (S.fromList $ prelude ++ primOps) (Do e)
   case [ is | ErrMultiple is <- errs ] of
     [] -> pure ()
     is : _ -> error $ "scopeCheck: Multiply defined " ++ show is

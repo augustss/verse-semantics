@@ -18,7 +18,7 @@ import Data.List
 
 import Print
 import Expr hiding (compos, composOp)
-import Desugar(predefs, getVisible)
+import Desugar(primOps, getVisible)
 import Error
 import SExp
 --import Debug.Trace
@@ -155,7 +155,7 @@ val e = CValue <$> value e
 value :: Expr -> C Value
 value (LitInt i) = pure (HNF $ HInt i)
 value (LitRat i) = pure (HNF $ HRat i)
-value (Variable i@(Ident _ s)) | i `elem` predefs = pure (HNF $ HPrim s)
+value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
                                | otherwise = pure (Var i)
 value (Array es) = HNF . HArray <$> mapM value es
 value (Typedef e) = do
