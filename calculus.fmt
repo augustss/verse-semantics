@@ -61,7 +61,7 @@
 %format iteratesKW = "\textbf{iterates}"
 %format iterates (e) = "\textbf{iterates}\,\{" e "\}"
 %format rangeKW = "\textbf{range}"
-%format range (e) = "\textbf{range}\,\{" e "\}"
+%format range = "\textbf{range}"
 
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
