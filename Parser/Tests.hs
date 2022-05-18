@@ -1,6 +1,17 @@
-module EvalTest where
+{-
 
-import Control.Monad
+A few tests. Can be run with
+
+   make tests && ./tests
+
+or with auto-reload using
+
+   ghcid Tests.hs -W -T main --clear
+
+-}
+
+module Main where
+
 import GHC.Stack
 
 import Core
