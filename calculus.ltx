@@ -403,7 +403,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
-    \rulename{def-wrong} & |def h v| & \movesto & |wrong| & \text{if $|h| \neq |emp|$} \\
     \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
@@ -413,7 +412,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array}
   \end{array}
   $$
-  \joachim{\rulename{def-wrong} is not confluent if we have |defKW|-floating} \\
 \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
 \end{figurebox}
 
@@ -588,7 +586,7 @@ A recursive definition gets unrolled one step when it is used in the function po
 If the body of the recursive definition is a function then reduction will eventually proceed.
 
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
-in \rulename{app-arr} to index it: |applyx (array (v_0,dots v_n)) k| evaluates to |v_k| if |k| is a number within the bounds of the array, or to |fail| otherwise. But since \rulename{app-arr} is defined via choice, the expression |y = applyx a x| actually enumerates the positions and values of all entries of the array |a|. For example, |all (def x (42 = applyx a x; x))| finds the indicies of all entries in |a| that are 42.
+in \rulename{app-arr} to index it: |applyx (array (v_0,dots v_n)) k| evaluates to |v_k| if |k| is a number within the bounds of the array, or to |fail| otherwise. But since \rulename{app-arr} is defined via choice, the expression |y = applyx a x| actually enumerates the positions and values of all entries of the array |a|. For example, |all (def x (42 = applyx a x; x))| finds the indicies of all entries in |a| that are 42. Note that an application of the empty array |applyx (array ()) v| always fails, even if |v| is not a number.
 
 
 \subsection{Conditionals}
