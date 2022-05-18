@@ -228,7 +228,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx e_1 e_2|
      \vb |e_1 choice e_2| \vb |fail| \\
      && \vb & |def h e| \\
-     && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |range e| \\
+     && \vb & |one e| \vb |all e| \\
+     && \vb & |succeeds e| \vb |decides e| \vb |range e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \\
     && \vb & |x => e| \vb |rec f e| \vb ty \\
@@ -322,12 +323,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \end{array} \\
     \\[-2mm]
 
-    \textit{One, all and succeeds} \\
+    \textit{One and all} \\
     \begin{array}{lrcl}
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
-    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
     \end{array} \\  \\[-1mm]
     \begin{array}{lrcl}
     \rulename{all-0} & |all fail| & \movesto & |()| \\
@@ -339,6 +339,14 @@ The |let| construct cleverly models the heap, maintaining sharing.
        (x_1 == applyx v_1 (); dots x_n == applyx v_n (); array (x_1,dots,x_n))| \\
     \end{array} \\
     && \multicolumn{2}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
+    \end{array} \\
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lrcl}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
     \end{array} \\
    \end{array}
    $$
@@ -404,6 +412,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
     \rulename{succeeds-choice} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+    \rulename{decides-choice} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
     \end{array}
   \end{array}
   $$
@@ -452,17 +461,21 @@ Recursion is encoded as a special fixpoint operator |rec f e|, with the meaning 
 \joachim{Out of curiosity: Why this? Could we use |fix v| instead, with |applyx (fix v) e| $\movesto$ |applyx (applyx v (fix v)) e|? Or could we even make |fix| a primitive operation, with |fix(v)| $\movesto$ |applyx v (fix v)|? (I guess the latter isn't good because we want |fix f| to be a value)}
 \lennart{No deep reason.  I thought this looked nicer.}
 
-\paragraph{Choice.}
-In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
-zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
-of |e_2|.  The choice operator is associative.
-
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
 or a recursive definition |rec f e|.
 
 In this core calculus, the elements of the tuples must be values. This is not a fundamental restriction; instead of |(e_1, e_2)| one can write |def (x, y) (x = e_1; y = e_2; (x,y))| and when translating the source language to the core language, this transformation will be applied.
+
+\paragraph{Choice.}
+In Verse, an expression may yield a sequence of zero, one, or many results.  The expression |fail| yields
+zero results; the expression |(e_1 choice e_2)| yields all the results of |e_1| and then all the results
+of |e_2|.  The choice operator is associative.
+
+The choices returned from an expression may be collected into an array using the |allKW| construct. The |oneKW| construct returns the first value produced by an expression, and is used to implement conditionals.
+
+The effect annotations |succeedsKW| and |decidesKW| restrict how many results an expression may return. An expression wrapped by |succeedsKW| must return exactly one value; an expression wrapped by |decidesKW| must return zero or one value, but not a choice of values. 
 
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
@@ -557,8 +570,6 @@ should yield the values |(3,9)|, |(3,2)|, |(4,9)|, |(4,2)|, in that order.
 To get the order right, we must apply \rulename{choose} to the first choice |(3 choice 4)| first, and only
 then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{choose} to ensure that only the
 \emph{leftmost} choice can be chosen.
-
-%\joachim{I did not initially manage to understand why |apply v; hole| is not a choice context, i.e. why we need |cop| and |op|. I also tried to combine the two in Redex, in case a failing test would enlighten me, but none did. Can someone add an example? Ah, maybe the crucial property of a choice-free expression is that it is guaranteed to \emph{evaluate} to at most a single value (It still allows to evaluate to |fail|). Ok, makes sense now. I'll leave this note here and add an example later.}
 
 Rule \rulename{fail} collapes an expression with a nested |fail| into a single |fail|.  It uses the |X| evaluation
 context, which looks more deeply into an expression than does |CX|.  For example
@@ -904,7 +915,7 @@ $$
         & \vb & < \vb <= \vb > \vb >= \vb <>
   \\
   |r| & ::= & \textit{Effects} \\
-      &     & |succeedsKW| \vb |decides| \vb |iterates|
+      &     & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
 \end{array}
 $$
 \\

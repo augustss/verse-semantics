@@ -37,8 +37,6 @@
 
 %format hchoice = "\|"
 %format he = "he"
-%format decides = "\textbf{decides}"
-%format iterates = "\textbf{iterates}"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
 %format do = "\textbf{do}"
@@ -58,6 +56,10 @@
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format succeedsKW = "\textbf{succeeds}"
 %format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
+%format decidesKW = "\textbf{decides}"
+%format decides (e) = "\textbf{decides}\,\{" e "\}"
+%format iteratesKW = "\textbf{iterates}"
+%format iterates (e) = "\textbf{iterates}\,\{" e "\}"
 %format rangeKW = "\textbf{range}"
 %format range (e) = "\textbf{range}\,\{" e "\}"
 
