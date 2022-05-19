@@ -188,11 +188,11 @@ evalWrong = evalTrace "evalWrong" f
     f e | ws@(_:_) <- getWrongs e = cWrongs ws
     f e = composOp f e
 
-    -- Follows the X context
     getWrongs (CWrong s) = [s]
     getWrongs (CUnify e1 e2) = getWrongs e1 ++ getWrongs e2
     getWrongs (CSeq es) = concatMap getWrongs es
     getWrongs (CApply e1 e2) = getWrongs e1 ++ getWrongs e2
+    getWrongs (CDef _ e) = getWrongs e
     getWrongs _ = []
 
 -- Handle CFail propagation
