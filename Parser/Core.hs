@@ -1,7 +1,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 module Core(
   Core(..),
-  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail, pattern CRange,
+  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
   pattern CVar, pattern CPrim,
   Value(..),
   HNF(..),
@@ -68,9 +68,6 @@ pattern CAll c <- CMacro (Ident _ "all") c
 pattern CSucceeds :: Core -> Core
 pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
-pattern CRange :: Core -> Core
-pattern CRange c <- CMacro (Ident _ "range") c
-  where CRange e = CMacro (Ident noLoc "range") e
 pattern CFail :: Core
 pattern CFail = CBar []
 pattern CRec :: Ident -> Core -> Core
@@ -114,7 +111,7 @@ core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
-core (Define i e) = do --core $ Unify (Variable i) e
+core (Define i e) = do
   e' <- core e
   rf <- newTmp
   let e'' =
@@ -123,13 +120,12 @@ core (Define i e) = do --core $ Unify (Variable i) e
         else
           e'
   pure $ cUnify (CVar i) e''
-core (Range _e) = undefined -- CRange <$> core e
 core e@AnyT = val e
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
   e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
-  CAll <$> core (seqE [e1, e2'])
+  CAll <$> coreD (seqE [e1, e2'])
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
@@ -187,7 +183,7 @@ instance Pretty Core where
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
     maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is, text "in" <+> pPrintPrec l 0 e]
-  pPrintPrec _ _ (CWrong s) = text $ "wrong" ++ show s
+  pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
