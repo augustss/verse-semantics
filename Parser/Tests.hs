@@ -96,3 +96,8 @@ main = do
                 \for(x := 0|1|2|3) {(even(n), odd(n))}"
                 "((1,0), (0,1), (1,0), (0,1))"
 
+    -- Non-retractions as types
+    assertEquiv "succ(n:int) := n + 1;\
+                \f(m:succ) := m;\
+                \f(5)"
+                "6"
