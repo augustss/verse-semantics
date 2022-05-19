@@ -43,7 +43,7 @@ assertEquiv' expectOK src1 src2 = do
     let v1 = eval False c1
     let v2 = eval False c2
 
-    let pos = case getCallStack callStack of
+    let pos = case getCallStack (popCallStack callStack) of
                 [] -> "unknown location"
                 (_,sloc):_ -> prettySrcLoc sloc
 
