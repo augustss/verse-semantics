@@ -87,8 +87,8 @@ main = do
     -- If BIND is implemented in parallel, it may forget to substitute in the substitutions
     assertEquiv "x:any; y:any; x=y; y=1" "1"
     assertEquiv "x:any; y:any; x=1; y=x" "1"
-    assertEquiv "x:any; y:any; x=y; y=(x,x)" "x:int; x=(x,x)" -- check for occurs check
-    assertEquiv "x:any; y:any; y=(x,x); x=y" "x:int; x=(x,x)" -- check for occurs check
+    assertEquiv "x:any; y:any; x=y; y=(x,x)" "x:any; x=(x,x)" -- check for occurs check
+    assertEquiv "x:any; y:any; y=(x,x); x=y" "x:any; x=(x,x)" -- check for occurs check
 
     -- Array access via choices
     assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
@@ -97,8 +97,8 @@ main = do
 
     -- Recursion
     assertEquiv "f(n:int) := if (n = 0) {1} else {n * f(n-1)}; f(5)" "120"
-    assertEquiv "even(n:int) := if (n = 0) {1} else {1-odd(n-1)};\
-                \odd(n:int)  := if (n = 0) {1} else {1-even(n-1)};\
+    assertEquiv "even(n:int) := if (n = 0) {1} else {odd(n-1)};\
+                \odd(n:int)  := if (n = 0) {0} else {even(n-1)};\
                 \for(x := 0|1|2|3) {(even(x), odd(x))}"
                 "((1,0), (0,1), (1,0), (0,1))"
 
