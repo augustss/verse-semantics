@@ -238,24 +238,29 @@ evalUnify = evalTrace "evalUnify" f
 evalBind :: Core -> Core
 evalBind = evalTrace "evalBind" f
   where
-    f (CDef h e) | b@(x,_) : _ <- coll h e =
-      let e' = dropB b e
-      in  cDef (h \\ [x]) $ subst b e'
+    f (CDef h e) | Just (x, e')  <- bind h e = cDef (h \\ [x]) e'
     f e = composOp f e
 
-    coll h (CUnify (CVar x) (CValue v)) | elem x h = [(x, v)]
-    coll h (CUnify e1 e2) = coll h e1 ++ coll h e2
-    coll h (CApply e1 e2) = coll h e1 ++ coll h e2
-    coll h (CSeq es) = concatMap (coll h) es
-    coll h (CSucceeds e) = coll h e
-    coll _ _ = []
-
-    dropB b (CUnify (CVar x) e@(CValue v)) | (x, v) == b = e
-    dropB b (CUnify e1 e2) = CUnify (dropB b e1) (dropB b e2)
-    dropB b (CApply e1 e2) = CApply (dropB b e1) (dropB b e2)
-    dropB b (CSeq es) = CSeq $ map (dropB b) es
-    dropB b (CSucceeds e) = CSucceeds $ dropB b e
-    dropB _ e = e
+    bind h e =
+      case runState (findB h e) Nothing of
+        (_, Nothing) -> Nothing
+        (e', Just b@(x,_)) -> Just (x, subst b e')
+    -- Find the leftmost BIND.
+    -- Return a function representing the CX context.
+    findB h e = do
+      me <- get
+      if isJust me then
+        pure e  -- Already found, just keep going
+       else
+        case e of
+          CUnify (CVar x) ev@(CValue v) | elem x h -> do
+            put $ Just (x, v)
+            pure ev
+          CUnify e1 e2 -> CUnify <$> findB h e1 <*> findB h e2
+          CSeq es -> CSeq <$> mapM (findB h) es
+          CApply e1 e2 -> CApply <$> findB h e1 <*> findB h e2
+          CSucceeds b -> CSucceeds <$> findB h b
+          _ -> pure e
 
 
 -- Handle simple 'def'
