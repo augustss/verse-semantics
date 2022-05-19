@@ -101,3 +101,11 @@ main = do
                 \f(m:succ) := m;\
                 \f(5)"
                 "6"
+
+    -- Evaluation in if
+    assertEquiv "if(y:int; y=1) 42 else 23" "42"
+    assertEquiv "if(y:int; y=1) y else 23" "1"
+    -- Confluence: Lack of local substitution
+    assertEquiv "x : int; if (y:int; y = x; y = 1; x = 2) {42} else {23}"
+                "x : int; if (y:int; y = 1; y = x; x = 2) {42} else {23}"
+
