@@ -37,8 +37,8 @@ assertEquiv src1 src2 = do
     let d2 = desugar p2
     let c1 = exprToCore d1
     let c2 = exprToCore d2
-    let v1 = eval c1
-    let v2 = eval c2
+    let v1 = eval False c1
+    let v2 = eval False c2
 
     let pos = case getCallStack callStack of
                 [] -> "unknown location"
