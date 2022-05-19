@@ -230,10 +230,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
      && \vb & |def h e| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \\
-    && \vb & |x => e| \vb |range| \vb ty \\
-    \text{Primops} & op  & ::= & |gt| \vb |add| \\
-    \text{Types} & ty & ::= & |int| \vb |string| \vb |typex v| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \vb |x => e| \vb |range| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
@@ -283,9 +281,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array}\right. \\[2mm]
-    \rulename{p-int} & |applyx int hnf| & \movesto &
+    \rulename{p-isInt} & |applyx isInt hnf| & \movesto &
     \left\{\begin{array}{@@{}ll}
-      |hnf| & \text{if |hnf| is an integer} \\
+      |()| & \text{if |hnf| is an integer} \\
       |fail| & \text{otherwise}
       \end{array}\right. \\[2mm]
     \end{array} \\
@@ -302,7 +300,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e) v| & \movesto & |subst e x v|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-type} & |applyx (typex v_1) v_2| & \movesto & |applyx v_1 v_2| \\
     \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots (v = n; v_n)| \\
     \rulename{app-range} & |applyx range v| & \movesto & |def x (applyx v x)|
           \quad \text{if $x \not\in \freevars{v}$} \\
@@ -436,8 +433,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
 An expression |e| has syntax given in \Cref{fig:verse-syntax}.
 Constants |k| are simply integers in this presentation, and come equipped with
-some primitive operations.  To avoid clutter, we provide only two representative
-operations, |add| for integer addition, and |gt| for integer comparison.
+some primitive operations. To avoid clutter, we provide only representative
+operations: |add| for integer addition, and |gt| for integer comparison and |isInt| for the primitive type check
 
 \paragraph{Tuples and arrays.}
 All functions (including |add| and |gt|) take a single argument, but that
@@ -1064,7 +1061,7 @@ $$
     & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
-    |Cr (typedef^{e})| & = & |typex (x => Bi (e^[x]))| & \text{|x| fresh} \\
+    |Cr (typedef^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
     \\
     |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
     |Th e| & = & |function(x:any)()e| & \text{|x| fresh} \\
@@ -1090,6 +1087,18 @@ $$
   $$
 \caption{Core conversion} \label{fig:core-conversion}
 \end{figure}
+
+\begin{figure}
+\begin{code}
+any    = (x => x)
+int    = (x => applyx isInt x; x)
+nat    = (x => applyx isInt x; x > (-1); x)
+false  = array()
+\end{code}
+
+\caption{Core prelude} \label{fig:core-prelude}
+\end{figure}
+
 
 \clearpage
 \section{Confluence}

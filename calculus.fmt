@@ -82,6 +82,8 @@
 %format rec = "\textbf{rec}"
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
+%format nat = "\textbf{nat}"
+%format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format function (x)(r)(rhs) = "\textbf{function}(" x ")" r rhs
 %format functionKW = "\textbf{function}"
