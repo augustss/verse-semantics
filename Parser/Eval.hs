@@ -277,6 +277,7 @@ evalBind = evalTrace "evalBind" f
         (e', Just (x, lam@(VLam y b))) -> -- recursive function, UREC rule
           let v = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue lam), b]
           in  Just $ cDef (h \\ [x]) (subst x v e')
+        (_, Just (x, _)) -> Just $ CWrong $ "occurs check " ++ prettyShow x
         _ -> Nothing
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
