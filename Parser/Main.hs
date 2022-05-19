@@ -26,6 +26,7 @@ main = runCommand command
 
 data CState = CState
   { lastExpr :: SomeExpr
+  , tracing  :: Bool
   }
 
 data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core
@@ -66,18 +67,23 @@ command = Command
       , Cmd "core [EXPR]"     "Generate core for [last] expression"   cCore
       , Cmd "eval [EXPR]"     "Evaluate [last] expression"            cEval
       , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
+      , Cmd "trace"           "Turn on evaluation tracing"            (cTrace True)
+      , Cmd "notrace"         "Turn off evaluation tracing"           (cTrace False)
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
   , c_greet = "Verse parse&desugar testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
-  , c_state = CState { lastExpr = NoExpr }
+  , c_state = CState { lastExpr = NoExpr, tracing = False }
   , c_history = Just ".versei"
   }
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
 updateLastExpr s e = pure s{ lastExpr = e }
+
+cTrace :: Bool -> Run CState
+cTrace trc _ s = pure s{ tracing = trc }
 
 cRead :: Run CState
 cRead fn s =
@@ -118,7 +124,8 @@ cCore :: Run CState
 cCore = cTransform (Cored . exprToCore . asDesugared)
 
 cEval :: Run CState
-cEval = cTransform (Cored . eval . asCore)
+cEval c s =
+  cTransform (Cored . eval (tracing s) . asCore) c s
 
 cShow :: Run CState
 cShow =

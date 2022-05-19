@@ -81,25 +81,24 @@ newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
 
-doTrace :: Bool
-doTrace = True
+type EvalCore = Bool -> Core -> Core
 
-evalTrace :: String -> (Core -> Core) -> Core -> Core
-evalTrace s f e | not doTrace = e'
-                | e == e'     = e'
-                | otherwise   = trace (s ++ ":\n" ++ prettyShow e') e'
+evalTrace :: String -> (Core -> Core) -> EvalCore
+evalTrace s f trc e | not trc = e'
+                    | e == e'     = e'
+                    | otherwise   = trace (s ++ ":\n" ++ prettyShow e') e'
   where e' = f e
 
 -------------
 
 -- Reduce until we reach HNF
-eval :: Core -> Core
-eval ea = loop 50 $ replacePrelude $ evalTrace "eval" (const ea) (CWrong"")
+eval :: EvalCore
+eval trc ea = loop 50 $ replacePrelude trc $ evalTrace "eval" (const ea) trc (CWrong"")
   where
     loop :: Int -> Core -> Core
     loop 0 e = e
     loop n e | isIrred e = e
-             | otherwise = loop (n-1) $ evalSteps e
+             | otherwise = loop (n-1) $ evalSteps trc e
 
 -- Irreducible term
 isIrred :: Core -> Bool
@@ -114,17 +113,17 @@ isX CSeq{} = True
 isX _ = False
 
 -- Take some reduction steps.
-evalSteps :: Core -> Core
-evalSteps =
-  evalDefFloat . evalAll . evalChoice .
-  evalWrong . evalFail . evalUnify . evalBind . evalDef .
-  evalOne . evalApp . evalSeq . evalBar . evalSucceeds . evalPrimOps
+evalSteps :: EvalCore
+evalSteps t =
+  evalDefFloat t . evalAll t . evalChoice t .
+  evalWrong t . evalFail t . evalUnify t . evalBind t . evalDef t .
+  evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t
 
 -- Handle CBar
 --  CHOOSE
 -- First locate an anchor point and then try to find CX hole with a CBar.
 -- XXX What are the anchor points?
-evalChoice :: Core -> Core
+evalChoice :: EvalCore
 evalChoice = evalTrace "evalChoice" f
   where
     f (COne e) = COne $ choice e
@@ -166,7 +165,7 @@ evalChoice = evalTrace "evalChoice" f
 
 -- Handle CDef floating
 --  DEF-FLOAT
-evalDefFloat :: Core -> Core
+evalDefFloat :: EvalCore
 evalDefFloat = evalTrace "evalDefFloat" f
   where
     f e | isX e = float e
@@ -183,7 +182,7 @@ evalDefFloat = evalTrace "evalDefFloat" f
 
 -- Handle CWrong propagation
 --  WRONG
-evalWrong :: Core -> Core
+evalWrong :: EvalCore
 evalWrong = evalTrace "evalWrong" f
   where
     f e | ws@(_:_) <- getWrongs e = cWrongs ws
@@ -198,7 +197,7 @@ evalWrong = evalTrace "evalWrong" f
 
 -- Handle CFail propagation
 --  FAIL
-evalFail :: Core -> Core
+evalFail :: EvalCore
 evalFail = evalTrace "evalFail" f
   where
     f e | hasFail e = CFail
@@ -213,7 +212,7 @@ evalFail = evalTrace "evalFail" f
 
 -- Handle unification
 --  SWAP, UTYPE, UCON, UARR, UX*
-evalUnify :: Core -> Core
+evalUnify :: EvalCore
 evalUnify = evalTrace "evalUnify" f
   where
     f (CUnify e x@CVar{}) | not (isVar e) = f $ CUnify x e
@@ -235,7 +234,7 @@ evalUnify = evalTrace "evalUnify" f
 
 
 -- Handle BIND rule
-evalBind :: Core -> Core
+evalBind :: EvalCore
 evalBind = evalTrace "evalBind" f
   where
     f (CDef h e) | Just (x, e')  <- bind h e = cDef (h \\ [x]) e'
@@ -265,7 +264,7 @@ evalBind = evalTrace "evalBind" f
 
 -- Handle simple 'def'
 --  FAIL-DEF, DEF-ELIM, DEF-WRONG, DEF-MERGE
-evalDef :: Core -> Core
+evalDef :: EvalCore
 evalDef = evalTrace "evalDef" f
   where
     f (CDef _ CFail) = CFail
@@ -278,7 +277,7 @@ evalDef = evalTrace "evalDef" f
 
 -- Handle 'all'
 --  ALL-0, ALL-N, ALL-WRONG
-evalAll :: Core -> Core
+evalAll :: EvalCore
 evalAll = evalTrace "evalAll" f
   where
     f (CAll (CValue v)) = mkArr [v]
@@ -295,7 +294,7 @@ evalAll = evalTrace "evalAll" f
 
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
-evalOne :: Core -> Core
+evalOne :: EvalCore
 evalOne = evalTrace "evalOne" f
   where
     f (COne e@CValue{}) = f e
@@ -307,7 +306,7 @@ evalOne = evalTrace "evalOne" f
 -- Handle non-primop applications
 --  APP-LAM, APP-TYPE, APP-REC, APP-ARR
 --  APP-CONST-WRONG
-evalApp :: Core -> Core
+evalApp :: EvalCore
 evalApp = evalTrace "evalApp" f
   where
     f (CApply (CLam i e1) e2) = f $ CDef [i'] $ CSeq [CUnify (CVar i') e2, e1']
@@ -323,7 +322,7 @@ evalApp = evalTrace "evalApp" f
 
 -- Handle CSeq in odd places
 --  SEQ, APP-SEQL, APP-SEQR, UNIFY-SEQL, UNIFY-SEQR
-evalSeq :: Core -> Core
+evalSeq :: EvalCore
 evalSeq = evalTrace "evalSeq" f
   where
     f (CSeq es) = cSeq $ filter (not . isValue) (init es') ++ [last es']
@@ -338,7 +337,7 @@ evalSeq = evalTrace "evalSeq" f
 
 -- Handle CBar associativity and fail elimination
 -- FAIL-L, FAIL-R, ASSOC-CHOICE
-evalBar :: Core -> Core
+evalBar :: EvalCore
 evalBar = evalTrace "evalBar" f
   where
     f (CBar es) = CBar $ concatMap (flat . f) es
@@ -348,7 +347,7 @@ evalBar = evalTrace "evalBar" f
 
 -- succeeds{v}  -->  v
 -- SUCCEEDS-VALUE, SUCCEEDS-FAIL, SUCCEEDS-CHOICE, SUCCEEDS-WRONG
-evalSucceeds :: Core -> Core
+evalSucceeds :: EvalCore
 evalSucceeds = evalTrace "evalSucceeds" f
   where
     f (CSucceeds e@CValue{}) = f e
@@ -359,7 +358,7 @@ evalSucceeds = evalTrace "evalSucceeds" f
 
 -- Reduce applications of primops
 -- P-* rules
-evalPrimOps :: Core -> Core
+evalPrimOps :: EvalCore
 evalPrimOps = evalTrace "evalPrimOps" f
   where
     --- any, nat, false need not be primitives
@@ -400,7 +399,7 @@ getInverse _ = Nothing
 -------------------
 
 -- Until we get a proper prelude, just hack it.
-replacePrelude :: Core -> Core
+replacePrelude :: EvalCore
 replacePrelude = evalTrace "replacePrelude" f
   where
     f (CVar (Ident _ i)) | Just e <- lookup i prelude = e
