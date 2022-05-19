@@ -125,6 +125,7 @@ evalSteps =
 -- Handle CBar
 --  CHOOSE
 -- First locate an anchor point and then try to find CX hole with a CBar.
+-- XXX What are the anchor points?
 evalChoice :: Core -> Core
 evalChoice = evalTrace "evalChoice" f
   where
@@ -133,6 +134,7 @@ evalChoice = evalTrace "evalChoice" f
     f (CSucceeds e) = CSucceeds $ choice e
     f e = composOp f e
 
+    choice (CBar es) = CBar $ map choice es  -- look for nested choices
     choice e =
       case runState (findC e) Nothing of
         (_, Nothing) -> f e  -- no choice found, look deeper down
