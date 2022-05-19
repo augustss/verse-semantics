@@ -6,7 +6,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Eval(eval) where
 import Control.Monad.State.Strict
-import Control.Monad.Writer
 import Data.List
 import Data.Maybe
 import Debug.Trace
@@ -172,13 +171,35 @@ evalDefFloat = evalTrace "evalDefFloat" f
     f e = composOp f e
 
     float e =
-      case runWriter (g e) of
-        (e', hs) -> cDef (concat hs) e'
+      case runState (findD e) Nothing of
+        (_, Nothing) -> e
+        (e', Just d) ->
+          case alphaConvert (fvs (e' (CArray []))) d of
+            CDef h b -> CDef h (e' b)
+            x -> impossible x
 
-    -- Follows the X context
-    g e | isX e = compos g e
-    g (CDef h e) = do tell [h]; pure e  -- XXX maybe use f in e
-    g e = pure e   -- XXX maybe use f in e
+    findD e = do
+      me <- get
+      if isJust me then
+        pure $ const e  -- Already found, just keep going
+       else
+        case e of
+          CUnify e1 e2 -> do
+            e1' <- findD e1
+            e2' <- findD e2
+            pure $ \ x -> CUnify (e1' x) (e2' x)
+          CSeq es -> do
+            es' <- mapM findD es
+            pure $ \ x -> CSeq (map ($ x) es')
+          CApply e1 e2 -> do
+            e1' <- findD e1
+            e2' <- findD e2
+            pure $ \ x -> CApply (e1' x) (e2' x)
+          CDef _ _ -> do
+            put $ Just e
+            pure id
+          _ -> pure $ const e
+
 
 -- Handle CWrong propagation
 --  WRONG
@@ -310,8 +331,10 @@ evalApp :: EvalCore
 evalApp = evalTrace "evalApp" f
   where
     f (CApply (CLam i e1) e2) = f $ CDef [i'] $ CSeq [CUnify (CVar i') e2, e1']
-      where (i', e1') | i `elem` fvs e2 = unimplemented
+      where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
                       | otherwise = (i, e1)
+            vs = fvs e2
+            x = head $ newVars "i" vs
     f (CApply (CValue v@(VRec i e1)) e2) = CApply e1' e2
       where e1' = subst i v e1
     f (CApply (CArray vs) e@(CValue _)) = CBar $ zipWith g [0..] vs
