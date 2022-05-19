@@ -3,6 +3,7 @@
 --  X lacks succeeds
 
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Eval(eval) where
 import Control.Monad.State.Strict
 import Control.Monad.Writer
