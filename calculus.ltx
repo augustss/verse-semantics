@@ -231,7 +231,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \\
-    && \vb & |x => e| \vb |rec f e| \vb |range| \vb ty \\
+    && \vb & |x => e| \vb |range| \vb ty \\
     \text{Primops} & op  & ::= & |gt| \vb |add| \\
     \text{Types} & ty & ::= & |int| \vb |string| \vb |typex v| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
@@ -302,8 +302,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e) v| & \movesto & |subst e x v|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-rec} & |applyx (rec f e) v| & \movesto & |applyx (subst e f (rec f e)) v| \\
-    &&&\joachim{not quite ANF, but will remove later anyways} \\
     \rulename{app-type} & |applyx (typex v_1) v_2| & \movesto & |applyx v_1 v_2| \\
     \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots (v = n; v_n)| \\
     \rulename{app-range} & |applyx range v| & \movesto & |def x (applyx v x)|
@@ -374,6 +372,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array}\right.\\
     \rulename{ux1} & |k == array (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |array (v_1,dots,v_n) == k | & \movesto & |fail| \\
+    \rulename{urec} & |x = (y => e)| & \movesto & |x = (y => def x (x = (y => e); e))|\\
+    &&& \text{if $|x| \in \freevars{e}$} \\
      \end{array}\\
 
     \\[-2mm]
@@ -454,11 +454,6 @@ Both of these operators are associative.
 
 \joachim{Would it be ok to say that |applyx e_1 e_2|, if |e_1| or |e_2| are not already values, is a short-hand for the latter, to simplify examples and the desugaring rules? Or is that too sloppy?}
 
-\paragraph{Recursion}
-Recursion is encoded as a special fixpoint operator |rec f e|, with the meaning that |rec f e == fix (f => e)|.
-\joachim{Out of curiosity: Why this? Could we use |fix v| instead, with |applyx (fix v) e| $\movesto$ |applyx (applyx v (fix v)) e|? Or could we even make |fix| a primitive operation, with |fix(v)| $\movesto$ |applyx v (fix v)|? (I guess the latter isn't good because we want |fix f| to be a value)}
-\lennart{No deep reason.  I thought this looked nicer.}
-
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
 The latter is just an integer constant |k|, an array |(v_1, dots,v_n)|, lambda |(x => e)|,
@@ -533,9 +528,8 @@ on the LHS is part of the syntax of Verse. In contrast
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
-Rules \rulename{bind}, \rulename{def-float}, and \rulename{swap} come into play when variables are involved.
+Rules \rulename{bind} comes into play when variables are involved.
 First, \rulename{bind} says that when within the scope of |x|, we find an equation that unifies it with a value |v|, we can substitute that value for |x| and eliminate |x| completely.
-The side condition $\freevars{v} \disjoint \{x\}$ ensuress that |v| does not mention |x| itself -- the ``occurs check''. This way we never have cyclic values.
 
 Crucially, note that $X$ does not look inside |oneKW|, |allKW|, or choice (|choice|).
 For example
@@ -549,11 +543,21 @@ Rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)| to allow rule \rulename{bind} 
 We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
 using |hnf| rather than |v| in this rule.
 
+\paragraph{Recursion}
+
+The side condition $\freevars{v} \disjoint \{x\}$ ensuress that |v| does not mention |x| itself -- the ``occurs check''. This way we never have cyclic values like |x = (x,x)|.
+
+Verse does support recursive functions and closures, such as |loop = (y => loop @ y)|. This equation cannot be used by \rulename{bind} directly, but \rulename{urec} will push the binding inside and rewrite to |loop = (def loop in loop = (y => loop @ y); loop @ y)|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{bind} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping.
+
+\paragraph{Scope expansion}
+
 Rule \rulename{def-float} expands the scope of variables within the current execution context $X$, and \rulename{def-merge} combines all variables with the same scope in a single |defKW|. This allows \rulename{bind} to fire on any of these variable. For example in
     $$ |def x  (dots x dots(def z (dots(x==(3,z))dots))dots)| $$
 it would be dangerous if \rulename{bind} could substitute |(3,z)| for |x| right away, because |z| is not in scope everywhere where |x| is. But after floating and merging we get
     $$ |def (x,z)  (dots x dots(dots(x==(3,z))dots)dots)| $$
 and now we can safely invoke \rulename{bind} on |x|.
+
+\paragraph{Reflexivity}
 
 One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x (x = (y => y); (x == x))|. If we use \rulename{bind} first, we will unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
 
