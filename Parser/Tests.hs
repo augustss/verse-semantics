@@ -89,3 +89,10 @@ main = do
     -- Non-ANF array access
     assertEquiv "for (x:int, x=(2,0,2)[x+1]) {x}" "(0)"
 
+    -- Recursion
+    assertEquiv "f(n:int) := if (n = 0) {1} else {n * f(n-1)}; f(5)" "120"
+    assertEquiv "even(n:int) := if (n = 0) {1} else {1-odd(n-1)};\
+                \odd(n:int)  := if (n = 0) {1} else {1-even(n-1)};\
+                \for(x := 0|1|2|3) {(even(n), odd(n))}"
+                "((1,0), (0,1), (1,0), (0,1))"
+
