@@ -14,6 +14,7 @@ module Main where
 
 import GHC.Stack
 import Control.Exception
+import Control.Monad
 
 import Core
 import Desugar
@@ -64,6 +65,11 @@ assertEquiv' expectOK src1 src2 = do
                 putStrLn "evaluates to"
                 pp v2
                 putStrLn ""
+                when (prettyShow v1 == prettyShow v2) $ do
+                    putStrLn "The unpretty printed values are"
+                    print v1
+                    putStrLn "resp."
+                    print v2
             else do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
       ) (\e -> do

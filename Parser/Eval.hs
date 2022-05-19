@@ -125,8 +125,13 @@ evalSteps t =
 -- First locate an anchor point and then try to find CX hole with a CBar.
 -- XXX What are the anchor points?
 evalChoice :: EvalCore
-evalChoice = evalTrace "evalChoice" f
+evalChoice = evalTrace "evalChoice" t
   where
+    -- Top-level anchor point
+    t (CBar [e]) = e
+    t e = choice e
+
+    -- Find more anchor points
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
