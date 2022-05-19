@@ -93,7 +93,7 @@ main = do
     assertEquiv "f(n:int) := if (n = 0) {1} else {n * f(n-1)}; f(5)" "120"
     assertEquiv "even(n:int) := if (n = 0) {1} else {1-odd(n-1)};\
                 \odd(n:int)  := if (n = 0) {1} else {1-even(n-1)};\
-                \for(x := 0|1|2|3) {(even(n), odd(n))}"
+                \for(x := 0|1|2|3) {(even(x), odd(x))}"
                 "((1,0), (0,1), (1,0), (0,1))"
 
     -- Non-retractions as types
