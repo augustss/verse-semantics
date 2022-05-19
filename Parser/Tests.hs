@@ -86,4 +86,6 @@ main = do
 
     -- Array access via choices
     assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
+    -- Non-ANF array access
+    assertEquiv "for (x:int, x=(2,0,2)[x+1]) {x}" "(0)"
 
