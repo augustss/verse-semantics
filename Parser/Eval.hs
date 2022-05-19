@@ -273,7 +273,7 @@ evalBind = evalTrace "evalBind" f
         pure e  -- Already found, just keep going
        else
         case e of
-          CUnify (CVar x) ev@(CValue v) | elem x h -> do
+          CUnify ex@(CVar x) ev@(CValue v) | elem x h, ex /= ev -> do
             put $ Just (x, v)
             pure ev
           CUnify e1 e2 -> CUnify <$> findB h e1 <*> findB h e2
