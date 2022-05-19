@@ -272,13 +272,25 @@ evalBind = evalTrace "evalBind" f
 
     bind h e =
       case runState (findB h e) Nothing of
-        (e', Just (x, v)) | x `notElem` bs -> Just $ cDef (h \\ [x]) (subst x v e')
-          where bs = fvs (CValue v)
-        (e', Just (x, lam@(VLam y b))) -> -- recursive function, UREC rule
-          let v = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue lam), b]
-          in  Just $ cDef (h \\ [x]) (subst x v e')
-        (_, Just (x, _)) -> Just $ CWrong $ "occurs check " ++ prettyShow x
+        (e', Just (x, v))
+            | Just v' <- occursCheck x v -> Just $ cDef (h \\ [x]) (subst x v' e')
+            | otherwise                  -> Just $ CWrong $ "occurs check " ++ prettyShow x
         _ -> Nothing
+
+    -- Combines occurs check and UREC
+    occursCheck :: Ident -> Value -> Maybe Value
+    occursCheck x v0 = go v0
+      where
+        go :: Value -> Maybe Value
+        go v@(Var y)
+            | x == y    = Nothing -- occurs check
+            | otherwise = Just v
+        go v@(VInt {})       = Just v
+        go v@(VLam y b)
+            | x `elem` fvs b = Just $ VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b]
+            | otherwise      = Just v
+        go (VArray vs)       = VArray <$> mapM go vs
+
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
     findB h e = do
