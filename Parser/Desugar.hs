@@ -470,7 +470,7 @@ scopeErrs s = expr
     expr (Typedef e1) = expr (Do e1)
     expr AnyT = []
     expr e = impossible e
-    
+
     defs :: Expr -> ([ScopeErr], S.Set Ident)
     defs e =
       let is = getVisible e
@@ -483,11 +483,11 @@ scopeErrs s = expr
 
 simplify :: Expr -> Expr
 simplify = simp
-  where --simp (Unify v@(Variable _) (Range e)) = Seq [ApplyD (simp e) v, v]
+  where
     simp (Unify e AnyT) = simp e
     simp (ApplyD (Variable (Ident _ "any")) e) = simp e
     simp (ApplyD (Typedef e1) e2) = simp $ Unify e1 e2
-    simp (Range (Typedef e)) = simp e   -- Always?
+    --simp (Range (Typedef e)) = simp e   -- Always?
     simp e = composOp simp e
 
 {-
