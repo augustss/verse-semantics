@@ -25,10 +25,7 @@ import Print
 
 -- | Tests that two SourceVerse expressions, when desugared and converted to
 -- core, evaluate to the same thing
---
--- TODO: Use something more suitable than ==
---  * α-equivalence on values
---  * equating wrong with wrong
+
 assertEquiv :: HasCallStack => String -> String -> IO ()
 assertEquiv src1 src2 = do
     let p1 = parseDie pFile "<test input 1>" src1
@@ -46,7 +43,7 @@ assertEquiv src1 src2 = do
 
     catch
       (do
-        if v1 == v2
+        if v1 `equivValue` v2
         then do
             putStrLn $ pos ++ " success!"
         else do
@@ -71,6 +68,14 @@ assertEquiv src1 src2 = do
             putStrLn ""
       )
 
+-- | Equivalence on values (or stuck expressions)
+--
+--  * Ignores message on `wrong`
+--  * TODO: α-equivalence on lambdas
+equivValue :: Core -> Core -> Bool
+equivValue (CWrong _) (CWrong _) = True
+equivValue v1 v2 = v1 == v2
+
 main :: IO ()
 main = do
     -- Check that BIND removes _one_ unification only
@@ -82,7 +87,8 @@ main = do
     -- If BIND is implemented in parallel, it may forget to substitute in the substitutions
     assertEquiv "x:any; y:any; x=y; y=1" "1"
     assertEquiv "x:any; y:any; x=1; y=x" "1"
-    assertEquiv "x:any; y:any; x=x; y=x" "x:int; x=(x,x)" -- check for occurs check
+    assertEquiv "x:any; y:any; x=y; y=(x,x)" "x:int; x=(x,x)" -- check for occurs check
+    assertEquiv "x:any; y:any; y=(x,x); x=y" "x:int; x=(x,x)" -- check for occurs check
 
     -- Array access via choices
     assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
