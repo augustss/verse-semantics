@@ -10,11 +10,13 @@ module Core(
   coreToRedex,
   fvs,
   subst,
+  alphaConvert,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Data.List
+import Data.Maybe
 
 import Print
 import Expr hiding (compos, composOp)
@@ -269,7 +271,7 @@ subst x b ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
     sub (CMacro i e) = CMacro i $ sub e
     sub a@(CDef h e) | x `elem` h = a
                      | null (intersect bs h) = CDef h $ sub e
-                     | otherwise = unimplemented 
+                     | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
 
     subV v@(Var i) | i == x = b
@@ -279,9 +281,46 @@ subst x b ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
     subH (HArray vs) = HArray $ map subV vs
     subH a@(HLam i e) | x == i = a
                       | i `notElem` bs = HLam i $ sub e
-                      | otherwise = unimplemented
+                      | otherwise = subH $ alphaConvertH bs a
     subH a@(HRec i e) | x == i = a
                       | i `notElem` bs = HRec i $ sub e
-                      | otherwise = unimplemented
+                      | otherwise = subH $ alphaConvertH bs a
     subH (HType v) = HType $ subV v
     subH v = v
+
+-- Alpha convert a term, avoiding vs as the names for bound
+-- variables.
+alphaConvert :: [Ident] -> Core -> Core
+alphaConvert vs = alpha []
+  where
+    alpha m (CValue v) = CValue (alphaV m v)
+    alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
+    alpha m (CSeq es) = CSeq (map (alpha m) es)
+    alpha m (CApply e1 e2) = CApply (alpha m e1) (alpha m e2)
+    alpha m (CBar es) = CBar (map (alpha m) es)
+    alpha m (CMacro i e) = CMacro i (alpha m e)
+    alpha m (CDef h e) = CDef h' (alpha m' e)
+      where h' = map fresh h
+            m' = foldr add m $ zip h h'
+    alpha _ e@CWrong{} = e
+
+    alphaV m (Var i) = Var $ fromMaybe i $ lookup i m
+    alphaV m (HNF h) = HNF (alphaH m h)
+
+    alphaH m (HArray es) = HArray (map (alphaV m) es)
+    alphaH m (HLam i e) = HLam i' $ alpha (add (i, i') m) e where i' = fresh i
+    alphaH m (HRec i e) = HRec i' $ alpha (add (i, i') m) e where i' = fresh i
+    alphaH m (HType v) = HType (alphaV m v)
+    alphaH _ h = h
+
+    add ii@(i, i') m | i == i' = m
+                     | otherwise = ii : m
+
+    fresh i@(Ident l s) | i `notElem` vs = i
+                        | otherwise = fresh $ Ident l (s ++ "'")
+
+alphaConvertH :: [Ident] -> HNF -> HNF
+alphaConvertH vs h =
+  case alphaConvert vs (CValue (HNF h)) of
+    CValue (HNF h') -> h'
+    _ -> impossible ()
