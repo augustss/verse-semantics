@@ -13,6 +13,7 @@ or with auto-reload using
 module Main where
 
 import GHC.Stack
+import Control.Exception
 
 import Core
 import Desugar
@@ -43,23 +44,37 @@ assertEquiv src1 src2 = do
                 [] -> "unknown location"
                 (_,sloc):_ -> prettySrcLoc sloc
 
-    if v1 == v2
-    then do
-        putStrLn $ pos ++ " success!"
-    else do
-        putStrLn $ pos ++ " failure:"
-        putStrLn "The expression"
-        pp p1
-        putStrLn "evaluates to"
-        pp v1
-        putStrLn "but"
-        pp p2
-        putStrLn "evaluates to"
-        pp v2
+    catch
+      (do
+        if v1 == v2
+        then do
+            putStrLn $ pos ++ " success!"
+        else do
+            putStrLn $ pos ++ " failure:"
+            putStrLn "The expression"
+            pp p1
+            putStrLn "evaluates to"
+            pp v1
+            putStrLn "but"
+            pp p2
+            putStrLn "evaluates to"
+            pp v2
+            putStrLn ""
+      ) (\e -> do
+            putStrLn $ pos ++ " failure:"
+            putStrLn "The expression"
+            pp p1
+            putStrLn "or the expression"
+            pp p2
+            putStrLn "caused an exception:"
+            print (e :: SomeException)
+            putStrLn ""
+      )
 
 main :: IO ()
 main = do
     -- Check that BIND removes _one_ unification only
+    assertEquiv "x:any; y:any; x = y; x = y; x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 2)" "(y:any => 1) = (y:any => 2)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
 
