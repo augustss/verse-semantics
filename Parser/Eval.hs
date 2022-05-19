@@ -85,13 +85,10 @@ doTrace :: Bool
 doTrace = True
 
 evalTrace :: String -> (Core -> Core) -> Core -> Core
-evalTrace s f e | not doTrace = e
-                | otherwise =
-  let e' = f e
-  in  if e == e' then
-        e -- trace s e
-      else
-        trace (s ++ ":\n" ++ prettyShow e') e'
+evalTrace s f e | not doTrace = e'
+                | e == e'     = e'
+                | otherwise   = trace (s ++ ":\n" ++ prettyShow e') e'
+  where e' = f e
 
 -------------
 
