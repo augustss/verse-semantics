@@ -74,13 +74,6 @@ data Expr
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
   | AnyT                      -- :any
-{-
-  | Def [Ident] Expr          -- def xs in e
-  | Type Expr                 -- 
-  | Lambda Ident Expr         -- lam x in e
-  | ForC Expr                 -- forC (e1; (() => e2))
-  | IfC Expr Expr             -- ifC (e1; (() => e2)) (() => e3)
--}
   deriving (Eq, Ord, Show, Data)
 
 pattern Fail :: Expr
@@ -166,18 +159,6 @@ instance Pretty Expr where
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
           Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
-{-
-          Def xs e -> maybeParens (p > 0) $ sep [ text "def" <> parens (ppEs xs),
-                                                  text "in" <+> ppr 0 e ]
---          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-          Type e -> text "type" <> braces (ppr 0 e)
-          Lambda v e -> text "lam" <> parens (ppr 0 v) <> braces (ppr 0 e)
-          IfC e1 e2 -> maybeParens (p > 0) $ sep [text "ifC"
-                                                 , indent $ ppr 11 e1
-                                                 , indent $ ppr 11 e2]
-          ForC e1 -> maybeParens (p > 0) $ sep [text "forC"
-                                               , indent $ ppr 11 e1]
--}
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
