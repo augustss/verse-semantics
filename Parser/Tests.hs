@@ -48,21 +48,24 @@ assertEquiv' expectOK src1 src2 = do
                 (_,sloc):_ -> prettySrcLoc sloc
 
     catch
-      (do
-        if (v1 `equivValue` v2) == expectOK
+      ( if (v1 `equivValue` v2) == expectOK
         then do
             putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
         else do
-            putStrLn $ pos ++ " failure:"
-            putStrLn "The expression"
-            pp p1
-            putStrLn "evaluates to"
-            pp v1
-            putStrLn "but"
-            pp p2
-            putStrLn "evaluates to"
-            pp v2
-            putStrLn ""
+            if expectOK
+            then do
+                putStrLn $ pos ++ " failure:"
+                putStrLn "The expression"
+                pp p1
+                putStrLn "evaluates to"
+                pp v1
+                putStrLn "but"
+                pp p2
+                putStrLn "evaluates to"
+                pp v2
+                putStrLn ""
+            else do
+                putStrLn $ pos ++ " unexpected success, please update test case!"
       ) (\e -> do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
