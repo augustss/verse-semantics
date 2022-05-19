@@ -47,7 +47,6 @@ data HNF
   | HPrim String
   | HArray [Value]
   | HLam Ident Core
-  | HRec Ident Core
   | HType Value      -- really a lambda
   deriving (Show, Eq)
 
@@ -72,8 +71,6 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
 pattern CFail :: Core
 pattern CFail = CBar []
-pattern CRec :: Ident -> Core -> Core
-pattern CRec i e = CValue (HNF (HRec i e))
 
 cEmpty :: Core
 cEmpty = CValue $ HNF $ HArray []
@@ -113,15 +110,7 @@ core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
-core (Define i e) = do
-  e' <- core e
-  rf <- newTmp
-  let e'' =
-        if i `elem` fvs e' then
-          CRec rf $ subst i (Var rf) e'
-        else
-          e'
-  pure $ cUnify (CVar i) e''
+core (Define i e) = cUnify (CVar i) <$> core e
 core e@AnyT = val e
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
@@ -197,7 +186,6 @@ instance Pretty HNF where
   pPrintPrec _ _ (HPrim s) = text s
   pPrintPrec l _ (HArray vs) = parens $ commaSep l 0 vs
   pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
-  pPrintPrec l p (HRec i c) = maybeParens (p > 2) $ text "rec" <+> pPrintPrec l 0 i <+> pPrintPrec l 0 c
   pPrintPrec l _ (HType v) = text "type" <> braces (pPrintPrec l 0 v)
 
 ------
@@ -227,7 +215,6 @@ appH _ v@HRat{} = pure v
 appH _ v@HPrim{} = pure v
 appH f (HArray vs) = HArray <$> traverse (appV f) vs
 appH f (HLam i e) = HLam i <$> f e
-appH f (HRec i e) = HRec i <$> f e
 appH f (HType v) = HType <$> appV f v
 
 composOp :: (Core -> Core) -> Core -> Core
@@ -250,7 +237,6 @@ fvsV (HNF h) = fvsH h
 fvsH :: HNF -> [Ident]
 fvsH (HArray vs) = foldr union [] $ map fvsV vs
 fvsH (HLam i e) = fvs e \\ [i]
-fvsH (HRec i e) = fvs e \\ [i]
 fvsH (HType v) = fvsV v
 fvsH _ = []
 
@@ -259,7 +245,7 @@ fvsH _ = []
 -- Replace x by b in e
 -- Do an occurs check and alpha-conversion when necessary
 subst :: Ident -> Value -> Core -> Core
-subst x b ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
+subst x b ae | x `elem` bs = impossible "subst occur check"
              | otherwise = sub ae
   where
     bs = fvs (CValue b)
@@ -281,9 +267,6 @@ subst x b ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
     subH (HArray vs) = HArray $ map subV vs
     subH a@(HLam i e) | x == i = a
                       | i `notElem` bs = HLam i $ sub e
-                      | otherwise = subH $ alphaConvertH bs a
-    subH a@(HRec i e) | x == i = a
-                      | i `notElem` bs = HRec i $ sub e
                       | otherwise = subH $ alphaConvertH bs a
     subH (HType v) = HType $ subV v
     subH v = v
@@ -309,7 +292,6 @@ alphaConvert vs = alpha []
 
     alphaH m (HArray es) = HArray (map (alphaV m) es)
     alphaH m (HLam i e) = HLam i' $ alpha (add (i, i') m) e where i' = fresh i
-    alphaH m (HRec i e) = HRec i' $ alpha (add (i, i') m) e where i' = fresh i
     alphaH m (HType v) = HType (alphaV m v)
     alphaH _ h = h
 

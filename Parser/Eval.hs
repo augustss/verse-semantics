@@ -2,6 +2,11 @@
 -- reduction rule bugs
 --  X lacks succeeds
 
+-- TODO:
+--  Broken tests
+--    succ(n : int) := n + 1; f(m : succ) := m; f(5)
+--      FIX: deugaring bug
+
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Eval(eval) where
@@ -32,9 +37,6 @@ pattern VLam i e = HNF (HLam i e)
 
 pattern CLam :: Ident -> Core -> Core
 pattern CLam i e = CValue (VLam i e)
-
-pattern VRec :: Ident -> Core -> Value
-pattern VRec i e = HNF (HRec i e)
 
 pattern CType :: Value -> Core
 pattern CType e = CValue (HNF (HType e))
@@ -232,10 +234,15 @@ evalFail = evalTrace "evalFail" f
     hasFail _ = False
 
 -- Handle unification
---  SWAP, UTYPE, UCON, UARR, UX*
+--  SWAP, UTYPE, UCON, UARR, UREC, UX*
 evalUnify :: EvalCore
 evalUnify = evalTrace "evalUnify" f
   where
+{-
+    f ue@(CUnify ex@(CVar x) (CLam y e)) | x `elem` fvs e =
+      trace ("UREC " ++ prettyShow (x, y, fvs e, e)) $
+      CUnify ex $ CLam y $ CDef [x] $ CSeq [ue, e]
+-}
     f (CUnify e x@CVar{}) | not (isVar e) = f $ CUnify x e
     f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
     f e = composOp f e
@@ -254,17 +261,23 @@ evalUnify = evalTrace "evalUnify" f
     unifyV _ _ = CWrong "unifyV"
 
 
--- Handle BIND rule
+--CWrong ("occurs check: " ++ prettyShow (x, bs))
+
+-- Handle BIND rules
 evalBind :: EvalCore
 evalBind = evalTrace "evalBind" f
   where
-    f (CDef h e) | Just (x, e')  <- bind h e = cDef (h \\ [x]) e'
+    f (CDef h e) | Just d <- bind h e = d
     f e = composOp f e
 
     bind h e =
       case runState (findB h e) Nothing of
-        (_, Nothing) -> Nothing
-        (e', Just (x, v)) -> Just (x, subst x v e')
+        (e', Just (x, v)) | x `notElem` bs -> Just $ cDef (h \\ [x]) (subst x v e')
+          where bs = fvs (CValue v)
+        (e', Just (x, lam@(VLam y b))) -> -- recursive function, UREC rule
+          let v = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue lam), b]
+          in  Just $ cDef (h \\ [x]) (subst x v e')
+        _ -> Nothing
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
     findB h e = do
@@ -335,8 +348,6 @@ evalApp = evalTrace "evalApp" f
                       | otherwise = (i, e1)
             vs = fvs e2
             x = head $ newVars "i" vs
-    f (CApply (CValue v@(VRec i e1)) e2) = CApply e1' e2
-      where e1' = subst i v e1
     f (CApply (CArray vs) e@(CValue _)) = CBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify e (CInt i), CValue v]
     f (CApply (CType v1) e2) = f $ CApply (CValue v1) e2
