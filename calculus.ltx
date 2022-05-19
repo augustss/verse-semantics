@@ -418,7 +418,11 @@ The |let| construct cleverly models the heap, maintaining sharing.
   $$
   \begin{array}{l}
     \begin{array}{lrcll}
-    \rulename{wrong} & |X^[wrong]| & \movesto & |wrong| \\
+    \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
+    \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
+    \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
+    \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
+    \rulename{wrong-def} & |def h wrong| & \movesto & |wrong|  \\
     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
@@ -616,7 +620,7 @@ But not every |wrong| is wrong: because we allow reduction everywhere, even in e
 
 Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{fig:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. Therefore, the propagation rules are irrelevant for the execution of verified program.
 
-Note that the rule \rulename{wrong} can compete with fail propagation rules. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction.
+Note that the rule propagation rules for |wrong| can compete with fail propagation rules. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction.
 
 \subsection{The Equality Principle}
 
