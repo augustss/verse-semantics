@@ -342,8 +342,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \textit{Def-blocks} \\
     \begin{array}{lrcl}
     \rulename{def-elim} & |def emp e| & \movesto & |e| \\
-    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \quad \text{if}~|X| \ne \hole \\\\
-    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \\
+    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \quad \text{if}~|X| \ne \hole,\,  h \disjoint \freevars{X} \\
+    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \quad h_1 \disjoint h_2 \\
     \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
     & |def (H^[emp]) (subst (X^[v]) x v)| \\
     && \multicolumn{2}{l}{\text{if $|x| \notin \freevars{v}$}} \\
