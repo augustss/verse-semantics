@@ -110,6 +110,8 @@ main = do
                 \odd(n:int)  := if (n = 0) {0} else {even(n-1)};\
                 \for(x := 0|1|2|3) {(even(x), odd(x))}"
                 "((1,0), (0,1), (1,0), (0,1))"
+    assertEquiv "pair := (1, function(n:int) {pair[0]}); pair[0]" "1"
+    assertEquiv "pair := (1, function(n:int) {if (n = 0) {1} else {n * pair[1](n-1)}}); pair[1](5)" "120"
 
     -- Non-retractions as types
     assertEquiv "succ(n:int) := n + 1;\
