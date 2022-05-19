@@ -74,9 +74,10 @@ assertEquiv src1 src2 = do
 main :: IO ()
 main = do
     -- Check that BIND removes _one_ unification only
-    assertEquiv "x:any; y:any; x = y; x = y; x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 2)" "(y:any => 1) = (y:any => 2)"
     assertEquiv "x:any; x = (y:any => 1); x = (y:any => 1)" "(y:any => 1) = (y:any => 1)"
+    assertEquiv "x:any; y:any; x = y; x = y; x = 1" "1"
+    assertEquiv "x:any; y:any; x = y; x = y; x = (z:any => 1)" "(z:any => 1) = (z:any => 1)"
 
     -- If BIND is implemented in parallel, it may forget to substitute in the substitutions
     assertEquiv "x:any; y:any; x=y; y=1" "1"
