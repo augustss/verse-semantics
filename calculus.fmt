@@ -108,6 +108,7 @@
 %format CX = "CX"
 %format eqgt = "=>"
 %format minusgt = "\!\leadsto\!"
+%format (eff x) = "\!\!<\!\!" x "\!\!>"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots

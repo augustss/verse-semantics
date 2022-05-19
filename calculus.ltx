@@ -844,13 +844,15 @@ $$
       & \vb & |e_1 = e_2|       & \text{unification} \\
       & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
       & \vb & |for(e) in b|     & \text{finite loop} \\
-      & \vb & |function e effsR b|    & \text{anonymous function} \\
+      & \vb & |functionKW a dots b|    & \text{anonymous function} \\
       & \vb & |typedef^{e}|      & \text{type definition} \\
   %%%%%
   \\
       &     & \textit{Expressions removed by desugaring} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
-      & \vb & |lhs := e|          & \text{definition} \\
+      & \vb & |l := e|           & \text{pattern definition} \\
+      & \vb & |x a dots := e|     & \text{function definition} \\
+      & \vb & |x a dots : t := e| & \text{function definition with return type} \\
       & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
       & \vb & |op_b e|          & \text{prefix operator} \\
       & \vb & |e op_a|          & \text{postfix operator} \\
@@ -880,20 +882,19 @@ $$
       &     & |e|               & \text{single expression} \\
       & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
       \\
-  |l| & ::= & \textit{Definition LHS} \\
+  |a| & ::= & \textit{Function parameter} \\
+      &     & |()|               & \text{empty parameter list} \\
+      & \vb & |(e)|              & \text{function parameter} \\
+      & \vb & |a ^ eff r|        & \text{function effect annotation} \\
+      \\
+  |l| & ::= & \textit{Patterns} \\
       &     & |x|               & \text{variable} \\
-      & \vb & |l : t|           & \text{of type} \\
+      & \vb & |l : t|       & \text{of type} \\
       & \vb & |: t|             & \text{of type} \\
-      & \vb & |fun^(e)|         & \text{function} \\
-      & \vb & |l?|              & \text{optional} \\
+      & \vb & |l?|          & \text{optional} \\
       & \vb & |e|\,\,\hat{}     & \text{assignment} \\
       & \vb & |l_1, dots l_n|   & \text{array} \\
       & \vb & |l_1 minusgt l_2| & \text{domain-range} \\
-   \\
-  |fun| & ::= & \textit{Function definition LHS} \\
-      &     & |fun^(e)|         & \text{function argument} \\
-      & \vb & |apeff fun r|     & \text{function effect} \\
-      & \vb & |x|               & \text{function name} \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
         &     & ! \vb - \vb + \\
@@ -932,17 +933,17 @@ $$
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   \\
   \multicolumn{1}{l}{\textbf{Bindings}} \\
-  |De (l := e)| & = & |Ld l (De e)| \\
   |De (l : t)| & = & |De (l := :t)| \\
+  |De (l := e)| & = & |Ld l (De e)| \\
+  |De (x a dots := e)| & = & |x := De(function a dots e)| \\
+  |De (x a dots : t := e)| & = & |x := De(functionKW a dots (t^[e]))| \\
   \\
   \multicolumn{1}{l}{\textbf{Functions}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
-  |De (function e effsR b)| & = & |De (function(e)(dots)((r^[b])))| & \\
+  |De (functionKW a1 a2 dots b)| & = & |De (functionKW a1 (functionKW a2 dots b))| & \\
+  |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
+  |De (functionKW a (eff r) b)| & = & |De (functionKW a (r^[b]))| & \\
   |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
-  \multicolumn{4}{l}{\simon{What about |x:any => (x=e; b)|?  So much simpler!}} \\
-  \multicolumn{4}{l}{\simon{Tim sync 11 May.}} \\
-  \multicolumn{4}{l}{\lennart{I don't know how to make that work.  Consider |function(f(:int):int)()b|.}} \\
-  \multicolumn{4}{l}{\lennart{That would turn into |x:any => x=(f(:int):int)); b| and I don't know how to make sense of that. }} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
   |De (:t)| & = & |: De t| \\
@@ -1001,21 +1002,12 @@ $$
   |Ld x e| & = & |x := e| \\
   |Ld (: t) e| & = & |t^[e]| \\
   |Ld (l : t) e| & = & |Ld l (t^[e])| \\
-  |Ld (fun^(e_1)) e| & = & |Fd (fun^(e_1)) e| \\
   |Ld (l ?) e| & = & |Ld l (e ?)| \\
   |Ld (e_1^hat) e| & = & |assign^(De e_1,e)| \\
-%  |Ld (l_0, dots, l_n) e| & = & |x := e; Ld l_0 (x^[0]); dots; Ld l_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
   |Ld (l_0, dots, l_n) e| & = &
   |(x_0:any,dots,x_n:any)=e; Ld l_0 x_0; dots; Ld l_n x_n| & \text{|x_i| fresh} \\
-  &&\simon{We discussed this desugaring with Tim} \\
   |Ld (l_1 minusgt l_2) e| & = & |y:=e; Ld l_1 x; Ld l_2 ((typedef^{y}^[x := :any]))| & \text{|x|,|y| fresh} \\
   && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
-  \\
-  |Fd| & \multicolumn{3}{l}{\text{converts function definitions to |functionKW|.}} \\
-  && \simon{I'm inclined to collapse |fun| into |lhs|} \\
-  && \lennart{Sounds good, but how?} \\
-  |Fd (fun^(e_1)effsR) e| & = & |Fd fun (De (function e_1 effsR {e}))| \\
-  |Fd x e| & = & |x := e| \\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
   |Mt k e| & = & |k = e| \\
