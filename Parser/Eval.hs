@@ -243,7 +243,7 @@ evalBind = evalTrace "evalBind" f
     bind h e =
       case runState (findB h e) Nothing of
         (_, Nothing) -> Nothing
-        (e', Just b@(x,_)) -> Just (x, subst b e')
+        (e', Just (x, v)) -> Just (x, subst x v e')
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
     findB h e = do
@@ -313,7 +313,7 @@ evalApp = evalTrace "evalApp" f
       where (i', e1') | i `elem` fvs e2 = unimplemented
                       | otherwise = (i, e1)
     f (CApply (CValue v@(VRec i e1)) e2) = CApply e1' e2
-      where e1' = subst (i, v) e1
+      where e1' = subst i v e1
     f (CApply (CArray vs) e@(CValue _)) = CBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify e (CInt i), CValue v]
     f (CApply (CType v1) e2) = f $ CApply (CValue v1) e2

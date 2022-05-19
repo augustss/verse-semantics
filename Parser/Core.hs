@@ -116,7 +116,7 @@ core (Define i e) = do
   rf <- newTmp
   let e'' =
         if i `elem` fvs e' then
-          CRec rf $ subst (i, Var rf) e'
+          CRec rf $ subst i (Var rf) e'
         else
           e'
   pure $ cUnify (CVar i) e''
@@ -256,9 +256,9 @@ fvsH _ = []
 
 -- Replace x by b in e
 -- Do an occurs check and alpha-conversion when necessary
-subst :: (Ident, Value) -> Core -> Core
-subst (x, b) ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
-                | otherwise = sub ae
+subst :: Ident -> Value -> Core -> Core
+subst x b ae | x `elem` bs = CWrong ("occurs check: " ++ prettyShow (x, bs))
+             | otherwise = sub ae
   where
     bs = fvs (CValue b)
     sub (CValue v) = CValue $ subV v
