@@ -212,7 +212,11 @@ desugarFunctionS = expr
     expr AnyT = pure AnyT
     expr e = impossible e
 
-    function e1@(Define _ AnyT) fs e2 = Function e1 fs <$> expr e2
+    function (Define i a) fs e2 | isAnyT a = Function (Define i AnyT) fs <$> expr e2
+      -- XXX remove "any" when we have a simplifier.
+      where isAnyT AnyT = True
+            isAnyT (Range (Variable (Ident _ "any"))) = True
+            isAnyT _ = False
     function e1 fs e2 = do
       i <- newIdent "z"
       e1' <- expr e1
