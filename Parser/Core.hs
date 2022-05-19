@@ -131,7 +131,7 @@ core (For2 e1 e2) = do
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
-  l <- core (seqE [e1, e2'])
+  l <- coreD (seqE [e1, e2'])
   r <- core e3'
   let fn = COne $ CBar [l, r]
   pure $ CApply fn cEmpty
