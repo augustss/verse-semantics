@@ -106,6 +106,6 @@ main = do
     assertEquiv "if(y:int; y=1) 42 else 23" "42"
     assertEquiv "if(y:int; y=1) y else 23" "1"
     -- Confluence: Lack of local substitution
-    assertEquiv "x : int; if (y:int; y = x; y = 1; x = 2) {42} else {23}"
-                "x : int; if (y:int; y = 1; y = x; x = 2) {42} else {23}"
+    assertEquiv "x : int; if (y:int; y = x; y = 1; y > 1) {42} else {23}"
+                "x : int; if (y:int; y = 1; y = x; y > 1) {42} else {23}"
 
