@@ -4,6 +4,7 @@
 
 {-# LANGUAGE PatternSynonyms #-}
 module Eval(eval) where
+import Control.Monad.State.Strict
 import Control.Monad.Writer
 import Data.List
 import Data.Maybe
@@ -61,13 +62,6 @@ isVar :: Core -> Bool
 isVar CVar{} = True
 isVar _ = False
 
-{-
-isTy :: Core -> Bool
-isTy (CValue (HNF (HPrim t))) = t `elem` ["int", "nat", "any", "false"]
-isTy (CValue (HNF (HType _))) = True
-isTy _ = False
--}
-
 cWrongs :: [String] -> Core
 cWrongs [] = internalError
 cWrongs ws = CWrong $ intercalate ";" ws
@@ -76,9 +70,13 @@ getWrong :: Core -> Maybe String
 getWrong (CWrong s) = Just s
 getWrong _ = Nothing
 
-getValue :: Core -> Maybe Core
-getValue e@CValue{} = Just e
+getValue :: Core -> Maybe Value
+getValue (CValue v) = Just v
 getValue _ = Nothing
+
+-- Infinite list of variables not in vs
+newVars :: String -> [Ident] -> [Ident]
+newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
 
@@ -102,13 +100,14 @@ eval ea = loop 50 $ replacePrelude $ evalTrace "eval" (const ea) (CWrong"")
   where
     loop :: Int -> Core -> Core
     loop 0 e = e
-    loop n e | isHNF e = e
+    loop n e | isIrred e = e
              | otherwise = loop (n-1) $ evalSteps e
 
-isHNF :: Core -> Bool
-isHNF (CValue (HNF _)) = True
-isHNF CWrong{} = True  -- Not really a HNF, but cannot reduce
-isHNF _ = False
+-- Irreducible term
+isIrred :: Core -> Bool
+isIrred (CValue (HNF _)) = True
+isIrred CWrong{} = True  -- Not really a HNF, but cannot reduce
+isIrred _ = False
 
 isX :: Core -> Bool
 isX CUnify{} = True
@@ -116,16 +115,54 @@ isX CApply{} = True
 isX CSeq{} = True
 isX _ = False
 
--- Unhandled rules:
---  CHOOSE
---  
-
 -- Take some reduction steps.
 evalSteps :: Core -> Core
 evalSteps =
-  evalDefFloat . evalAll .
+  evalDefFloat . evalAll . evalChoice .
   evalWrong . evalFail . evalUnify . evalBind . evalDef .
   evalOne . evalApp . evalSeq . evalBar . evalSucceeds . evalPrimOps
+
+-- Handle CBar
+--  CHOOSE
+-- First locate an anchor point and then try to find CX hole with a CBar.
+evalChoice :: Core -> Core
+evalChoice = evalTrace "evalChoice" f
+  where
+    f (COne e) = COne $ choice e
+    f (CAll e) = CAll $ choice e
+    f (CSucceeds e) = CSucceeds $ choice e
+    f e = composOp f e
+
+    choice e =
+      case runState (findC e) Nothing of
+        (_, Nothing) -> f e  -- no choice found, look deeper down
+        (e', Just es) -> CBar $ map e' es
+    -- Find the leftmost choice.
+    -- Return a function representing the CX context.
+    findC e = do
+      me <- get
+      if isJust me then
+        pure $ const e  -- Already found, just keep going
+       else
+        case e of
+          CUnify e1 e2 -> do
+            e1' <- findC e1
+            e2' <- findC e2
+            pure $ \ x -> CUnify (e1' x) (e2' x)
+          CSeq es -> do
+            es' <- mapM findC es
+            pure $ \ x -> CSeq (map ($ x) es')
+          CApply e1 e2 -> do
+            e1' <- findC e1
+            e2' <- findC e2
+            pure $ \ x -> CApply (e1' x) (e2' x)
+          CDef h b -> do
+            b' <- findC b
+            pure $ \ x -> CDef h (b' x)
+          CBar es -> do
+            put $ Just es
+            pure id
+          _ -> pure $ const e
 
 -- Handle CDef floating
 --  DEF-FLOAT
@@ -239,14 +276,17 @@ evalDef = evalTrace "evalDef" f
 evalAll :: Core -> Core
 evalAll = evalTrace "evalAll" f
   where
-    f (CAll e@CValue{}) = mkArr [e]
+    f (CAll (CValue v)) = mkArr [v]
     f (CAll e@CWrong{}) = e
     f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
                        | Just vs  <- traverse getValue es = mkArr vs
     f e = composOp f e
 
-    mkArr :: [Core] -> Core
-    mkArr es = undefined
+    mkArr :: [Value] -> Core
+    mkArr vs =
+      let xs = take (length vs) $ newVars "x" $ fvs (CArray vs)
+          unit = CArray []
+      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply (CValue v) unit) xs vs ++ [CArray $ map Var xs]
 
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
