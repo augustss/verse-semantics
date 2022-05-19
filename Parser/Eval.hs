@@ -290,6 +290,7 @@ evalBind = evalTrace "evalBind" f
             | x `elem` fvs b = Just $ VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b]
             | otherwise      = Just v
         go (VArray vs)       = VArray <$> mapM go vs
+        go _ = internalError
 
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
