@@ -27,7 +27,13 @@ import Print
 -- core, evaluate to the same thing
 
 assertEquiv :: HasCallStack => String -> String -> IO ()
-assertEquiv src1 src2 = do
+assertEquiv = assertEquiv' True
+
+assertFail :: HasCallStack => String -> String -> IO ()
+assertFail = assertEquiv' False
+
+assertEquiv' :: HasCallStack => Bool -> String -> String -> IO ()
+assertEquiv' expectOK src1 src2 = do
     let p1 = parseDie pFile "<test input 1>" src1
     let p2 = parseDie pFile "<test input 2>" src2
     let d1 = desugar p1
@@ -43,9 +49,9 @@ assertEquiv src1 src2 = do
 
     catch
       (do
-        if v1 `equivValue` v2
+        if (v1 `equivValue` v2) == expectOK
         then do
-            putStrLn $ pos ++ " success!"
+            putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
         else do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
@@ -112,6 +118,6 @@ main = do
     assertEquiv "if(y:int; y=1) 42 else 23" "42"
     assertEquiv "if(y:int; y=1) y else 23" "1"
     -- Confluence: Lack of local substitution
-    assertEquiv "x : int; if (y:int; y = x; y = 1; y > 1) {42} else {23}"
+    assertFail  "x : int; if (y:int; y = x; y = 1; y > 1) {42} else {23}"
                 "x : int; if (y:int; y = 1; y = x; y > 1) {42} else {23}"
 
