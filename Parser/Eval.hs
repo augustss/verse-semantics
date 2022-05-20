@@ -255,7 +255,7 @@ evalUnify = evalTrace "evalUnify" f
     unifyV _ VInt{} = CFail
 
     unifyV v@(VArray vs1) (VArray vs2) | length vs1 == length vs2 =
-                                           cSeq $ zipWith unifyV vs1 vs2 ++ [CValue v]
+      cSeq $ zipWith (\ v1 v2 -> CUnify (CValue v1) (CValue v2)) vs1 vs2 ++ [CValue v]
                                        | otherwise = CFail
     unifyV VArray{} _ = CFail
     unifyV _ VArray{} = CFail
