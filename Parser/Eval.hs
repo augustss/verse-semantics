@@ -45,6 +45,10 @@ pattern VInt i = HNF (HInt i)
 pattern CInt :: Integer -> Core
 pattern CInt i = CValue (VInt i)
 
+pattern CDecides :: Core -> Core
+pattern CDecides c <- CMacro (Ident _ "decides") c
+  where CDecides e = CMacro (Ident noLoc "decides") e
+
 cSeq :: [Core] -> Core
 cSeq [] = internalError
 cSeq [e] = e
@@ -133,6 +137,7 @@ evalChoice = evalTrace "evalChoice" t
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
+    f (CDecides e) = CDecides $ choice e
     f e = composOp f e
 
     choice (CBar es) = CBar $ map choice es  -- look for nested choices
@@ -211,10 +216,11 @@ evalWrong = evalTrace "evalWrong" f
     getWrongs (CSeq es) = concatMap getWrongs es
     getWrongs (CDef _ e) = getWrongs e
     getWrongs (CSucceeds e) = getWrongs e
+    getWrongs (CDecides e) = getWrongs e
     getWrongs _ = []
 
 -- Handle CFail propagation
---  FAIL
+--  FAIL-*
 evalFail :: EvalCore
 evalFail = evalTrace "evalFail" f
   where
@@ -225,6 +231,7 @@ evalFail = evalTrace "evalFail" f
     hasFail CFail = True
     hasFail (CUnify e1 e2) = hasFail e1 || hasFail e2
     hasFail (CSeq es) = any hasFail es
+    hasFail (CDef _ e) = hasFail e
     hasFail _ = False
 
 -- Handle unification
@@ -389,6 +396,7 @@ evalBar = evalTrace "evalBar" f
 
 -- succeeds{v}  -->  v
 -- SUCCEEDS-VALUE, SUCCEEDS-FAIL, SUCCEEDS-CHOICE, SUCCEEDS-WRONG
+-- DECIDES-*
 evalSucceeds :: EvalCore
 evalSucceeds = evalTrace "evalSucceeds" f
   where
@@ -396,6 +404,10 @@ evalSucceeds = evalTrace "evalSucceeds" f
     f (CSucceeds CFail) = CWrong "succeeds-fail"
     f (CSucceeds (CBar (CValue{} : _))) = CWrong "succeeds-many"
     f (CSucceeds e@CWrong{}) = e
+    f (CDecides e@CValue{}) = f e
+    f (CDecides CFail) = CFail
+    f (CDecides (CBar (CValue{} : _))) = CWrong "decides-many"
+    f (CDecides e@CWrong{}) = e
     f e = composOp f e
 
 -- Reduce applications of primops
