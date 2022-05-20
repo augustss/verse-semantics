@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -- XXX
 -- reduction rule bugs
 --  X lacks succeeds
@@ -291,8 +292,10 @@ evalBind = evalTrace "evalBind" f
             | x == y    = Nothing -- occurs check
             | otherwise = Just v
         go v@(VInt {})       = Just v
-        go v@(VLam y b)
-            | x `elem` fvs b = Just $ VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b]
+        go v@(VLam _ b)
+            | x `elem` fvs b =
+              let VLam y' b' = alphaConvertV [x] v  -- Make sure y doesn't clash with x
+              in  Just $ VLam y' $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b']
             | otherwise      = Just v
         go (VArray vs)       = VArray <$> mapM go vs
         go _ = internalError

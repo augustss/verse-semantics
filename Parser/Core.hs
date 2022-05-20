@@ -10,7 +10,7 @@ module Core(
   coreToRedex,
   fvs,
   subst,
-  alphaConvert,
+  alphaConvert, alphaConvertV, alphaConvertH,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
@@ -305,4 +305,10 @@ alphaConvertH :: [Ident] -> HNF -> HNF
 alphaConvertH vs h =
   case alphaConvert vs (CValue (HNF h)) of
     CValue (HNF h') -> h'
+    _ -> impossible ()
+
+alphaConvertV :: [Ident] -> Value -> Value
+alphaConvertV vs v =
+  case alphaConvert vs (CValue v) of
+    CValue v' -> v'
     _ -> impossible ()
