@@ -108,7 +108,7 @@ main = do
     -- Array access via choices
     assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
     -- Non-ANF array access
-    assertEquiv "for (x:int, x=(2,0,2)[x+1]) {x}" "(0)"
+    assertEquiv "for (x:int, x=(2,0,2)[x+1]) {x}" "array{0}"
 
     -- Recursion
     assertEquiv "f(n:int) := if (n = 0) {1} else {n * f(n-1)}; f(5)" "120"
