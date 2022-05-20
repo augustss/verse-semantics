@@ -374,11 +374,13 @@ uniqE' env = expr
 
 -}
 
--- Make all Array take value arguments
+-- Make all Array take value arguments, as well as ApplyS/ApplyD
 anfS :: Expr -> D Expr
 anfS = anf
   where
     anf e@Array{} = val e
+    anf (ApplyS e1 e2) = app ApplyS e1 e2
+    anf (ApplyD e1 e2) = app ApplyD e1 e2
     anf e = compos anf e
     val e = do
       (es, v) <- value e
@@ -396,6 +398,10 @@ anfS = anf
       i <- newIdent "a"
       e' <- anf e
       pure ([Define i e'], Variable i)
+    app con e1 e2 = do
+      (es1, e1') <- value e1
+      (es2, e2') <- value e2
+      pure $ seqE $ es1 ++ es2 ++ [con e1' e2']
 
 ------------
 

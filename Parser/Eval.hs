@@ -28,19 +28,16 @@ pattern CArray :: [Value] -> Core
 pattern CArray vs = CValue (VArray vs)
 
 pattern CUnOp :: String -> Value -> Core
-pattern CUnOp op v <- CApply (CPrim op) (CValue v@HNF{})
+pattern CUnOp op v <- CApply (VPrim op) v@HNF{}
 
 pattern CBinOp :: String -> Value -> Value -> Core
-pattern CBinOp op v1 v2 <- CApply (CPrim op) (CArray [v1@HNF{}, v2@HNF{}])
+pattern CBinOp op v1 v2 <- CApply (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
 
 pattern VLam :: Ident -> Core -> Value
 pattern VLam i e = HNF (HLam i e)
 
-pattern CLam :: Ident -> Core -> Core
-pattern CLam i e = CValue (VLam i e)
-
-pattern CType :: Value -> Core
-pattern CType e = CValue (HNF (HType e))
+pattern VType :: Value -> Value
+pattern VType e = HNF (HType e)
 
 pattern VInt :: Integer -> Value
 pattern VInt i = HNF (HInt i)
@@ -158,10 +155,6 @@ evalChoice = evalTrace "evalChoice" t
           CSeq es -> do
             es' <- mapM findC es
             pure $ \ x -> CSeq (map ($ x) es')
-          CApply e1 e2 -> do
-            e1' <- findC e1
-            e2' <- findC e2
-            pure $ \ x -> CApply (e1' x) (e2' x)
           CDef h b -> do
             b' <- findC b
             pure $ \ x -> CDef h (b' x)
@@ -199,10 +192,6 @@ evalDefFloat = evalTrace "evalDefFloat" f
           CSeq es -> do
             es' <- mapM findD es
             pure $ \ x -> CSeq (map ($ x) es')
-          CApply e1 e2 -> do
-            e1' <- findD e1
-            e2' <- findD e2
-            pure $ \ x -> CApply (e1' x) (e2' x)
           CDef _ _ -> do
             put $ Just e
             pure id
@@ -220,7 +209,6 @@ evalWrong = evalTrace "evalWrong" f
     getWrongs (CWrong s) = [s]
     getWrongs (CUnify e1 e2) = getWrongs e1 ++ getWrongs e2
     getWrongs (CSeq es) = concatMap getWrongs es
-    getWrongs (CApply e1 e2) = getWrongs e1 ++ getWrongs e2
     getWrongs (CDef _ e) = getWrongs e
     getWrongs _ = []
 
@@ -236,7 +224,6 @@ evalFail = evalTrace "evalFail" f
     hasFail CFail = True
     hasFail (CUnify e1 e2) = hasFail e1 || hasFail e2
     hasFail (CSeq es) = any hasFail es
-    hasFail (CApply e1 e2) = hasFail e1 || hasFail e2
     hasFail _ = False
 
 -- Handle unification
@@ -313,7 +300,6 @@ evalBind = evalTrace "evalBind" f
             pure ev
           CUnify e1 e2 -> CUnify <$> findB h e1 <*> findB h e2
           CSeq es -> CSeq <$> mapM (findB h) es
-          CApply e1 e2 -> CApply <$> findB h e1 <*> findB h e2
           CSucceeds b -> CSucceeds <$> findB h b
           _ -> pure e
 
@@ -344,9 +330,9 @@ evalAll = evalTrace "evalAll" f
 
     mkArr :: [Value] -> Core
     mkArr vs =
-      let xs = take (length vs) $ newVars "x" $ fvs (CArray vs)
-          unit = CArray []
-      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply (CValue v) unit) xs vs ++ [CArray $ map Var xs]
+      let xs = take (length vs) $ newVars "x" $ fvsV (VArray vs)
+          unit = VArray []
+      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply v unit) xs vs ++ [CArray $ map Var xs]
 
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
@@ -365,15 +351,16 @@ evalOne = evalTrace "evalOne" f
 evalApp :: EvalCore
 evalApp = evalTrace "evalApp" f
   where
-    f (CApply (CLam i e1) e2) = f $ CDef [i'] $ CSeq [CUnify (CVar i') e2, e1']
+    f (CApply (VLam i e1) v2) = f $ subst i' v2 e1'
       where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
                       | otherwise = (i, e1)
-            vs = fvs e2
+            vs = fvsV v2
             x = head $ newVars "i" vs
-    f (CApply (CArray vs) e@(CValue _)) = CBar $ zipWith g [0..] vs
-      where g i v = CSeq [CUnify e (CInt i), CValue v]
-    f (CApply (CType v1) e2) = f $ CApply (CValue v1) e2
-    f (CApply CInt{} _) = CWrong "APP-CONST-WRONG"
+    f (CApply (VArray vs) vi) = CBar $ zipWith g [0..] vs
+      where g i v = CSeq [CUnify ei (CInt i), CValue v]
+            ei = CValue vi
+    f (CApply (VType v1) e2) = f $ CApply v1 e2
+    f (CApply VInt{} _) = CWrong "APP-CONST-WRONG"
     f e = composOp f e
 
 -- Handle CSeq in odd places
@@ -383,9 +370,7 @@ evalSeq = evalTrace "evalSeq" f
   where
     f (CSeq es) = cSeq $ filter (not . isValue) (init es') ++ [last es']
       where es' = concatMap (flat . f) es
-    f (CApply (CSeq es) e2) = CSeq $ init es ++ [CApply (last es) e2]
     f (CUnify (CSeq es) e2) = CSeq $ init es ++ [CUnify (last es) e2]
-    f (CApply e1@CValue{} (CSeq es)) = CSeq $ init es ++ [CApply e1 (last es)]
     f (CUnify e1@CValue{} (CSeq es)) = CSeq $ init es ++ [CUnify e1 (last es)]
     f e = composOp f e
     flat (CSeq es) = es
@@ -445,35 +430,30 @@ evalPrimOps = evalTrace "evalPrimOps" f
                                | otherwise = CFail
     cmp _ _ _ = CFail   -- CWrong?
 
-{-
-getInverse :: Core -> Maybe Core
-getInverse e@(CPrim s) | s `elem` ["int", "nat", "any", "false"] = Just e
-getInverse e@(CType _) = Just e
-getInverse _ = Nothing
--}
-
 -------------------
 
 -- Until we get a proper prelude, just hack it.
+-- XXX This doesn't really work, it only replaces in applications.
+-- Could just put the prelude as a prefix to the program.
 replacePrelude :: EvalCore
 replacePrelude = evalTrace "replacePrelude" f
   where
-    f (CVar (Ident _ i)) | Just e <- lookup i prelude = e
+    f (CApply (Var (Ident _ i)) v) | Just p <- lookup i prelude = CApply p v
     f e = composOp f e
 
 -- Functions that should be in a prelude.
-prelude :: [(String, Core)]
+prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                         -- x => x
   ,("nat", typ [app "int#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "int#" vx])                            -- x => int#[x]; x
-  ,("false", CArray [])                                    -- ()
+  ,("false", VArray [])                                    -- ()
   ,("float", undefined)
   ,("string", undefined)
   ]
-  where typ s = CType $ VLam ix $ cSeq $ s ++ [x]
+  where typ s = VType $ VLam ix $ cSeq $ s ++ [x]
         ix = Ident noLoc "q"
         x = CVar ix
         vx = Var ix
-        app f v = CApply (CPrim f) (CValue v)
-        app2 f v1 v2 = CApply (CPrim f) (CArray [v1, v2])
+        app f v = CApply (VPrim f) v
+        app2 f v1 v2 = CApply (VPrim f) (VArray [v1, v2])

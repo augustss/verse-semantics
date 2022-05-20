@@ -2,13 +2,13 @@
 module Core(
   Core(..),
   pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
-  pattern CVar, pattern CPrim,
+  pattern CVar, pattern VPrim,
   Value(..),
   HNF(..),
   compos, composOp,
   exprToCore,
   coreToRedex,
-  fvs,
+  fvs, fvsV,
   subst,
   alphaConvert, alphaConvertV, alphaConvertH,
   ) where
@@ -29,7 +29,7 @@ data Core
   = CValue Value
   | CUnify Core Core
   | CSeq [Core]
-  | CApply Core Core
+  | CApply Value Value
   | CBar [Core]
   | CMacro Ident Core
   | CDef Heap Core
@@ -56,8 +56,8 @@ pattern CInt x = CValue (HNF (HInt x))
 pattern CRat :: Rational -> Core
 pattern CRat x = CValue (HNF (HRat x))
 -}
-pattern CPrim :: String -> Core
-pattern CPrim s = CValue (HNF (HPrim s))
+pattern VPrim :: String -> Value
+pattern VPrim s = HNF (HPrim s)
 pattern CVar :: Ident -> Core
 pattern CVar x = CValue (Var x)
 pattern COne :: Core -> Core
@@ -72,8 +72,8 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
 pattern CFail :: Core
 pattern CFail = CBar []
 
-cEmpty :: Core
-cEmpty = CValue $ HNF $ HArray []
+vEmpty :: Value
+vEmpty = HNF $ HArray []
 
 type C = State Int
 
@@ -104,7 +104,7 @@ core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = CSucceeds <$> core (ApplyD e1 e2)
-core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
+core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
@@ -123,12 +123,14 @@ core (If3 e1 e2 e3) = do
   l <- coreD (seqE [e1, e2'])
   r <- core e3'
   let fn = COne $ CBar [l, r]
-  pure $ CApply fn cEmpty
+  i <- newTmp
+  pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core e = impossible e
 
+-- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core
-cUnify e (CPrim ":any") = e
+cUnify e (CValue (VPrim ":any")) = e
 cUnify e1 e2 = CUnify e1 e2
 
 coreD :: Expr -> C Core
@@ -200,7 +202,7 @@ compos :: (Applicative f) => (Core -> f Core) -> Core -> f Core
 compos f (CValue v) = CValue <$> appV f v
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
 compos f (CSeq es) = CSeq <$> traverse f es
-compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
+compos f (CApply e1 e2) = CApply <$> appV f e1 <*> appV f e2
 compos f (CBar es) = CBar <$> traverse f es
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
@@ -225,7 +227,7 @@ fvs :: Core -> [Ident]
 fvs (CValue v) = fvsV v
 fvs (CUnify e1 e2) = fvs e1 `union` fvs e2
 fvs (CSeq es) = foldr union [] $ map fvs es
-fvs (CApply e1 e2) = fvs e1 `union` fvs e2
+fvs (CApply e1 e2) = fvsV e1 `union` fvsV e2
 fvs (CBar es) = foldr union [] $ map fvs es
 fvs (CMacro _ e) = fvs e
 fvs (CDef is e) = fvs e \\ is
@@ -249,11 +251,11 @@ subst :: Ident -> Value -> Core -> Core
 subst x b ae | x `elem` bs = impossible "subst occur check"
              | otherwise = sub ae
   where
-    bs = fvs (CValue b)
+    bs = fvsV b
     sub (CValue v) = CValue $ subV v
     sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
     sub (CSeq es) = CSeq $ map sub es
-    sub (CApply e1 e2) = CApply (sub e1) (sub e2)
+    sub (CApply e1 e2) = CApply (subV e1) (subV e2)
     sub (CBar es) = CBar $ map sub es
     sub (CMacro i e) = CMacro i $ sub e
     sub a@(CDef h e) | x `elem` h = a
@@ -280,7 +282,7 @@ alphaConvert vs = alpha []
     alpha m (CValue v) = CValue (alphaV m v)
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
     alpha m (CSeq es) = CSeq (map (alpha m) es)
-    alpha m (CApply e1 e2) = CApply (alpha m e1) (alpha m e2)
+    alpha m (CApply e1 e2) = CApply (alphaV m e1) (alphaV m e2)
     alpha m (CBar es) = CBar (map (alpha m) es)
     alpha m (CMacro i e) = CMacro i (alpha m e)
     alpha m (CDef h e) = CDef h' (alpha m' e)
