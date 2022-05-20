@@ -3,11 +3,6 @@
 -- reduction rule bugs
 --  X lacks succeeds
 
--- TODO:
---  Broken tests
---    succ(n : int) := n + 1; f(m : succ) := m; f(5)
---      FIX: deugaring bug
-
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Eval(eval) where
@@ -36,6 +31,9 @@ pattern CBinOp op v1 v2 <- CApply (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
 
 pattern VLam :: Ident -> Core -> Value
 pattern VLam i e = HNF (HLam i e)
+
+pattern CLam :: Ident -> Core -> Core
+pattern CLam i e = CValue (VLam i e)
 
 pattern VInt :: Integer -> Value
 pattern VInt i = HNF (HInt i)
@@ -81,6 +79,10 @@ newVars :: String -> [Ident] -> [Ident]
 newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
+
+-- Do not reduce under lambda.
+notLam :: Bool
+notLam = True
 
 type EvalCore = Bool -> Core -> Core
 
@@ -132,6 +134,7 @@ evalChoice = evalTrace "evalChoice" t
     t e = choice e
 
     -- Find more anchor points
+    f e@CLam{} | notLam = e
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
@@ -171,6 +174,7 @@ evalChoice = evalTrace "evalChoice" t
 evalDefFloat :: EvalCore
 evalDefFloat = evalTrace "evalDefFloat" f
   where
+    f e@CLam{} | notLam = e
     f e | isX e = float e
     f e = composOp f e
 
@@ -237,6 +241,7 @@ evalFail = evalTrace "evalFail" f
 evalUnify :: EvalCore
 evalUnify = evalTrace "evalUnify" f
   where
+    f e@CLam{} | notLam = e
 {-
     f ue@(CUnify ex@(CVar x) (CLam y e)) | x `elem` fvs e =
       trace ("UREC " ++ prettyShow (x, y, fvs e, e)) $
@@ -266,6 +271,7 @@ evalUnify = evalTrace "evalUnify" f
 evalBind :: EvalCore
 evalBind = evalTrace "evalBind" f
   where
+    f e@CLam{} | notLam = e
     f (CDef h e) | Just d <- bind h e = d
     f e = composOp f e
 
@@ -315,6 +321,7 @@ evalBind = evalTrace "evalBind" f
 evalDef :: EvalCore
 evalDef = evalTrace "evalDef" f
   where
+    f e@CLam{} | notLam = e
     f (CDef _ CFail) = CFail
     f (CDef [] e) = f e
     f (CDef (_:_) CValue{}) = CWrong "def-wrong"
@@ -328,6 +335,7 @@ evalDef = evalTrace "evalDef" f
 evalAll :: EvalCore
 evalAll = evalTrace "evalAll" f
   where
+    f e@CLam{} | notLam = e
     f (CAll (CValue v)) = mkArr [v]
     f (CAll e@CWrong{}) = e
     f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
@@ -345,6 +353,7 @@ evalAll = evalTrace "evalAll" f
 evalOne :: EvalCore
 evalOne = evalTrace "evalOne" f
   where
+    f e@CLam{} | notLam = e
     f (COne e@CValue{}) = f e
     f (COne CFail) = CFail
     f (COne (CBar (e@CValue{} : _))) = f e
@@ -357,6 +366,7 @@ evalOne = evalTrace "evalOne" f
 evalApp :: EvalCore
 evalApp = evalTrace "evalApp" f
   where
+    f e@CLam{} | notLam = e
     f (CApply (VLam i e1) v2) = f $ subst i' v2 e1'
       where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
                       | otherwise = (i, e1)
@@ -373,6 +383,7 @@ evalApp = evalTrace "evalApp" f
 evalSeq :: EvalCore
 evalSeq = evalTrace "evalSeq" f
   where
+    f e@CLam{} | notLam = e
     f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
     f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
@@ -386,6 +397,7 @@ evalSeq = evalTrace "evalSeq" f
 evalBar :: EvalCore
 evalBar = evalTrace "evalBar" f
   where
+    f e@CLam{} | notLam = e
     f (CBar es) = CBar $ concatMap (flat . f) es
     f e = composOp f e
     flat (CBar es) = es
@@ -397,6 +409,7 @@ evalBar = evalTrace "evalBar" f
 evalSucceeds :: EvalCore
 evalSucceeds = evalTrace "evalSucceeds" f
   where
+    f e@CLam{} | notLam = e
     f (CSucceeds e@CValue{}) = f e
     f (CSucceeds CFail) = CWrong "succeeds-fail"
     f (CSucceeds (CBar [e@CValue{}])) = f e
@@ -414,6 +427,7 @@ evalSucceeds = evalTrace "evalSucceeds" f
 evalPrimOps :: EvalCore
 evalPrimOps = evalTrace "evalPrimOps" f
   where
+    f e@CLam{} | notLam = e
     --- any, nat, false need not be primitives
     f (CUnOp  "any" v) = CValue v
     f (CUnOp  "nat" v) | VInt i <- v, i >= 0 = CValue v
