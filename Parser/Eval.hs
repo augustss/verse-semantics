@@ -210,6 +210,7 @@ evalWrong = evalTrace "evalWrong" f
     getWrongs (CUnify e1 e2) = getWrongs e1 ++ getWrongs e2
     getWrongs (CSeq es) = concatMap getWrongs es
     getWrongs (CDef _ e) = getWrongs e
+    getWrongs (CSucceeds e) = getWrongs e
     getWrongs _ = []
 
 -- Handle CFail propagation
