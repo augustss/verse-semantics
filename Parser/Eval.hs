@@ -45,10 +45,6 @@ pattern CDecides :: Core -> Core
 pattern CDecides c <- CMacro (Ident _ "decides") c
   where CDecides e = CMacro (Ident noLoc "decides") e
 
-cDef :: [Ident] -> Core -> Core
-cDef [] e = e
-cDef is e = CDef is e
-
 isVar :: Core -> Bool
 isVar CVar{} = True
 isVar _ = False

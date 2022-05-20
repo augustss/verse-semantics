@@ -10,7 +10,7 @@ module Core(
   exprToCore,
   simpCore,
   coreToRedex,
-  cSeq,
+  cSeq, cDef,
   isValue,
   fvs, fvsV,
   subst,
@@ -80,6 +80,10 @@ cSeq :: [Core] -> Core
 cSeq [] = internalError
 cSeq [e] = e
 cSeq es = CSeq es
+
+cDef :: [Ident] -> Core -> Core
+cDef [] e = e
+cDef is e = CDef is e
 
 isValue :: Core -> Bool
 isValue CValue{} = True
@@ -181,14 +185,14 @@ thunk e = do
 
 instance Pretty Core where
   pPrintPrec l p (CValue v) = pPrintPrec l p v
-  pPrintPrec l p (CUnify c1 c2) = maybeParens (True || p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
+  pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
   pPrintPrec _ _ CFail = text "fail"
   pPrintPrec l p (CBar cs) = maybeParens (p > 7) $ fsep (punctuate (text " |") (map (pPrintPrec l 7) cs))
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
-    maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is, text "in" <+> pPrintPrec l 0 e]
+    maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is <+> text "in", pPrintPrec l 0 e]
   pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
 
 instance Pretty Value where
@@ -328,7 +332,7 @@ alphaConvertV vs v =
 
 -- Do some Core simplifications to enhance readability.
 simpCore :: Core -> Core
-simpCore = simpSeq . simpAny
+simpCore = simpSeq . simpAlias . simpAny
 
 -- Get rid of values in Seq, similar to evalSeq
 simpSeq :: Core -> Core
@@ -340,8 +344,45 @@ simpSeq = f
     flat (CSeq es) = es
     flat e = [e]
 
+-- This is a version of APP-LAM for inlined 'any'.
+-- I.e., any[e] = e
 simpAny :: Core -> Core
 simpAny = f
   where
     f (CApply (Var (Ident _ "any")) v) = f $ CValue v
     f e = composOp f e
+
+-- When there are definitions of the form x=y,
+-- then get rid of one of the variables.
+-- Favor getting rid of temporaries.
+-- This is a version of the BIND rule.
+simpAlias :: Core -> Core
+simpAlias = f
+  where
+    f (CDef h e) | Just d <- bind h e = f d
+    f e = composOp f e
+
+    bind h e =
+      case runState (findB h e) Nothing of
+        (e', Just (x, y)) ->
+          let (x', y') = if isTempIdent x then (y, x) else (x, y)
+          in  Just $ cDef (h \\ [y']) $ subst y' (Var x') e'
+        _ -> Nothing
+
+    findB h e = do
+      me <- get
+      if isJust me then
+        pure e  -- Already found, just keep going
+       else
+        case e of
+          CUnify (CVar x) (CVar y) | elem x h, elem y h, x /= y -> do
+            put $ Just (x, y)
+            pure (CVar x)
+          CUnify e1 e2 -> CUnify <$> findB h e1 <*> findB h e2
+          CSeq es -> CSeq <$> mapM (findB h) es
+          CSucceeds b -> CSucceeds <$> findB h b
+          _ -> pure e
+
+isTempIdent :: Ident -> Bool
+isTempIdent (Ident _ ('$':_)) = True
+isTempIdent _ = False
