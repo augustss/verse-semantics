@@ -120,6 +120,7 @@ main = do
     assertEquiv "pair := (1, function(n:int) {if (n = 0) {1} else {n * pair[1](n-1)}}); pair[1](5)" "120"
 
     -- Non-retractions as types
+    assertEquiv "succ(n:int) := n + 1; a:succ := 2" "3"
     assertEquiv "succ(n:int) := n + 1;\
                 \f(m:succ) := m;\
                 \f(5)"
