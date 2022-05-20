@@ -403,11 +403,13 @@ evalSucceeds = evalTrace "evalSucceeds" f
   where
     f (CSucceeds e@CValue{}) = f e
     f (CSucceeds CFail) = CWrong "succeeds-fail"
-    f (CSucceeds (CBar (CValue{} : _))) = CWrong "succeeds-many"
+    f (CSucceeds (CBar [e@CValue{}])) = f e
+    f (CSucceeds (CBar (CValue{} : _ : _))) = CWrong "succeeds-many"
     f (CSucceeds e@CWrong{}) = e
     f (CDecides e@CValue{}) = f e
     f (CDecides CFail) = CFail
-    f (CDecides (CBar (CValue{} : _))) = CWrong "decides-many"
+    f (CDecides (CBar [e@CValue{}])) = f e
+    f (CDecides (CBar (CValue{} : _ : _))) = CWrong "decides-many"
     f (CDecides e@CWrong{}) = e
     f e = composOp f e
 
