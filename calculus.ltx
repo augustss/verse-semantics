@@ -240,7 +240,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
  \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
  \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
     &&\vb & |def h CX| \\
-    \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H
+    \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H\\
+    \text{Value context} & V & ::= & \hole \vb |array (dots,V,dots)|\\
     \end{array} \\
     \\
     \textbf{Shorthand} \\
@@ -369,8 +370,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array}\right.\\
     \rulename{ux1} & |k == array (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |array (v_1,dots,v_n) == k | & \movesto & |fail| \\
-    \rulename{urec} & |x = (y => e)| & \movesto & |x = (y => def x (x = (y => e); e))|\\
-    &&& \text{if $|x| \in \freevars{e}$} \joachim{TODO: also nested lambdas}\\
+    \rulename{urec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
+    &&& \text{if $|x| \in \freevars{e}$}\\
 
      \end{array}\\
 
@@ -549,7 +550,7 @@ using |hnf| rather than |v| in this rule.
 
 The side condition $\freevars{v} \disjoint \{x\}$ ensuress that |v| does not mention |x| itself -- the ``occurs check''. This way we never have cyclic values like |x = (x,x)|.
 
-Verse does support recursive functions and closures, such as |loop = (y => loop @ y)|. This equation cannot be used by \rulename{bind} directly, but \rulename{urec} will push the binding inside and rewrite to |loop = (def loop in loop = (y => loop @ y); loop @ y)|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{bind} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping.
+Verse does support recursive functions and closures, such as |loop = (y => applyx loop y)|. This equation cannot be used by \rulename{bind} directly, due the occurs check. Therefore \rulename{urec} will push the binding inside the lambda and rewrite to |loop = (def loop in loop = (y => applyx loop y); apply loop y)|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{bind} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping. It also works if the recursive lambda is nested more deeply, as in |loops = ((y => applyx(applyx loops 1)y), (y => applyx(applyx loops 0)y))|.
 
 \paragraph{Scope expansion}
 
