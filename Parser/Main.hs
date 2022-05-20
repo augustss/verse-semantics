@@ -64,6 +64,7 @@ command = Command
       , Cmd "desugar [EXPR]"  "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"     "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]" "Simplify [last] expression"            cSimplify
+      , Cmd "csimplify [EXPR]" "Simplify [last] core expression"      cCoreSimplify
       , Cmd "core [EXPR]"     "Generate core for [last] expression"   cCore
       , Cmd "eval [EXPR]"     "Evaluate [last] expression"            cEval
       , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
@@ -119,6 +120,9 @@ cDesugar = cTransform (Desugared . desugar . asExpr)
 
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
+
+cCoreSimplify :: Run CState
+cCoreSimplify = cTransform (Cored . simpCore . asCore)
 
 cCore :: Run CState
 cCore = cTransform (Cored . exprToCore . asDesugared)

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Core(
   Core(..),
@@ -7,7 +8,10 @@ module Core(
   HNF(..),
   compos, composOp,
   exprToCore,
+  simpCore,
   coreToRedex,
+  cSeq,
+  isValue,
   fvs, fvsV,
   subst,
   alphaConvert, alphaConvertV, alphaConvertH,
@@ -23,6 +27,7 @@ import Expr hiding (compos, composOp)
 import Desugar(primOps, getVisible)
 import Error
 import SExp
+import Misc
 --import Debug.Trace
 
 data Core
@@ -70,6 +75,15 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
 pattern CFail :: Core
 pattern CFail = CBar []
+
+cSeq :: [Core] -> Core
+cSeq [] = internalError
+cSeq [e] = e
+cSeq es = CSeq es
+
+isValue :: Core -> Bool
+isValue CValue{} = True
+isValue _ = False
 
 vEmpty :: Value
 vEmpty = HNF $ HArray []
@@ -309,3 +323,25 @@ alphaConvertV vs v =
   case alphaConvert vs (CValue v) of
     CValue v' -> v'
     _ -> impossible ()
+
+-------
+
+-- Do some Core simplifications to enhance readability.
+simpCore :: Core -> Core
+simpCore = simpSeq . simpAny
+
+-- Get rid of values in Seq, similar to evalSeq
+simpSeq :: Core -> Core
+simpSeq = f
+  where
+    f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
+      where Snoc es' e' = concatMap (flat . f) es
+    f e = composOp f e
+    flat (CSeq es) = es
+    flat e = [e]
+
+simpAny :: Core -> Core
+simpAny = f
+  where
+    f (CApply (Var (Ident _ "any")) v) = f $ CValue v
+    f e = composOp f e
