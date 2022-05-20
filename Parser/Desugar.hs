@@ -185,6 +185,7 @@ desugarDoS = f
 
 --------------------
 
+-- XXX This needs to run while we still have Where and Do
 desugarFunctionS :: Expr -> D Expr
 desugarFunctionS = expr
   where
@@ -215,9 +216,42 @@ desugarFunctionS = expr
             isAnyT _ = False
     function e1 fs e2 = do
       i <- newIdent "z"
-      e1' <- expr e1
+      m <- desugarMatch e1 (Variable i)
       e2' <- expr e2
-      pure $ Function (Define i AnyT) fs $ seqE [Unify e1' (Variable i), e2']
+      pure $ Function (Define i AnyT) fs $ seqE [m, e2']
+
+-- Do the almost-unification involved in matching function arguments.
+-- The big difference is the :e and function(p){e}
+desugarMatch :: Expr -> Expr -> D Expr
+desugarMatch pat expr =
+  case pat of
+    LitInt{} -> equal
+    LitRat{} -> equal
+    Variable{} -> equal
+    Array es -> do
+      xs <- mapM (const $ newIdent "a") es
+      ms <- zipWithM desugarMatch es $ map Variable xs
+      let m = Unify (Array (map (tAny noLoc) xs)) expr
+      pure $ seqE $ m : ms
+    Seq (Snoc es e) -> Seq <$> (Snoc <$> mapM desugarFunctionS es <*> desugarMatch e expr)
+    ApplyD{} -> equal
+    ApplyS{} -> equal
+    If3 _e1 _e2 _e3 -> equal
+      -- Would this make sense?:
+      -- If3 <$> desugarFunctionS e1 <*> desugarMatch e2 expr <*> desugarMatch e3 expr
+    For2{} -> equal
+    Function _e1 _fs _e2 -> unimplemented
+    Unify{} -> equal
+    Define i e -> define noLoc i <$> desugarMatch e expr
+    Choice{} -> equal
+    Range e -> ApplyD <$> desugarFunctionS e <*> pure expr
+    Typedef{} -> equal
+    AnyT -> equal
+    _ -> impossible pat
+  where
+    -- XXX pat really needs its own scope
+    equal = unify pat expr
+    unify e1 e2 = Unify <$> desugarFunctionS e1 <*> pure e2
 
 -- Make all Array take value arguments, as well as ApplyS/ApplyD
 anfS :: Expr -> D Expr
