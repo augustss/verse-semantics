@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Desugar(desugar, simplify, primOps, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
@@ -391,9 +392,13 @@ anfS = anf
     value (Array es) = do
       (ess, vs) <- unzip <$> mapM value es
       pure (concat ess, Array vs)
-    value e@Function{} = pure ([], e)
-    value e@Typedef{} = pure ([], e)
+    value e@Function{} = ([],) <$> anf e
+    value e@Typedef{} = ([],) <$> anf e
     value e@AnyT{} = pure ([], e)
+    value (Define i e) = do
+      -- Special version of next case; no need for a new variable
+      e' <- anf e
+      pure ([Define i e'], Variable i)
     value e = do
       i <- newIdent "a"
       e' <- anf e
@@ -519,4 +524,3 @@ hackRange = f
       e' <- f e
       pure $ ApplyD e' (tAny noLoc r)
     f e = compos f e
-    
