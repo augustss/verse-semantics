@@ -37,9 +37,6 @@ pattern CBinOp op v1 v2 <- CApply (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
 pattern VLam :: Ident -> Core -> Value
 pattern VLam i e = HNF (HLam i e)
 
-pattern VType :: Value -> Value
-pattern VType e = HNF (HType e)
-
 pattern VInt :: Integer -> Value
 pattern VInt i = HNF (HInt i)
 
@@ -368,7 +365,6 @@ evalApp = evalTrace "evalApp" f
     f (CApply (VArray vs) vi) = CBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify ei (CInt i), CValue v]
             ei = CValue vi
-    f (CApply (VType v1) e2) = f $ CApply v1 e2
     f (CApply VInt{} _) = CWrong "APP-CONST-WRONG"
     f e = composOp f e
 
@@ -467,7 +463,7 @@ prelude =
   ,("float", undefined)
   ,("string", undefined)
   ]
-  where typ s = VType $ VLam ix $ cSeq $ s ++ [x]
+  where typ s = VLam ix $ cSeq $ s ++ [x]
         ix = Ident noLoc "q"
         x = CVar ix
         vx = Var ix

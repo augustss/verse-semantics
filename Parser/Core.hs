@@ -47,7 +47,6 @@ data HNF
   | HPrim String
   | HArray [Value]
   | HLam Ident Core
-  | HType Value      -- really a lambda
   deriving (Show, Eq)
 
 {-
@@ -149,7 +148,7 @@ value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
 value (Array es) = HNF . HArray <$> mapM value es
 value (Typedef e) = do
   i <- newTmp
-  HNF . HType . HNF . HLam i <$> coreD (Unify (Variable i) e)
+  HNF . HLam i <$> coreD (Unify (Variable i) e)
 value (Function (Define x AnyT) fs b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
@@ -189,7 +188,6 @@ instance Pretty HNF where
   pPrintPrec l _ (HArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
   pPrintPrec l _ (HArray vs) = parens $ commaSep l 0 vs
   pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
-  pPrintPrec l _ (HType v) = text "type" <> braces (pPrintPrec l 0 v)
 
 ------
 
@@ -218,7 +216,6 @@ appH _ v@HRat{} = pure v
 appH _ v@HPrim{} = pure v
 appH f (HArray vs) = HArray <$> traverse (appV f) vs
 appH f (HLam i e) = HLam i <$> f e
-appH f (HType v) = HType <$> appV f v
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
@@ -240,7 +237,6 @@ fvsV (HNF h) = fvsH h
 fvsH :: HNF -> [Ident]
 fvsH (HArray vs) = foldr union [] $ map fvsV vs
 fvsH (HLam i e) = fvs e \\ [i]
-fvsH (HType v) = fvsV v
 fvsH _ = []
 
 ------
@@ -271,7 +267,6 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     subH a@(HLam i e) | x == i = a
                       | i `notElem` bs = HLam i $ sub e
                       | otherwise = subH $ alphaConvertH bs a
-    subH (HType v) = HType $ subV v
     subH v = v
 
 -- Alpha convert a term, avoiding vs as the names for bound
@@ -295,7 +290,6 @@ alphaConvert vs = alpha []
 
     alphaH m (HArray es) = HArray (map (alphaV m) es)
     alphaH m (HLam i e) = HLam i' $ alpha (add (i, i') m) e where i' = fresh i
-    alphaH m (HType v) = HType (alphaV m v)
     alphaH _ h = h
 
     add ii@(i, i') m | i == i' = m
