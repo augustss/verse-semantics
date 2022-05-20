@@ -107,6 +107,7 @@ main = do
 
     -- Array access via choices
     assertEquiv "for ((3,4,5)[x:int]) {x}" "(0,1,2)"
+    assertEquiv "for (i~>x:(3,4,5)) {(i,x)}" "((0,3),(1,4),(2,5))"
     -- Non-ANF array access
     assertEquiv "for (x:int, x=(2,0,2)[x+1]) {x}" "array{0}"
 
@@ -119,6 +120,9 @@ main = do
     assertEquiv "pair := (1, function(n:int) {pair[0]}); pair[0]" "1"
     assertEquiv "pair := (1, function(n:int) {if (n = 0) {1} else {n * pair[1](n-1)}}); pair[1](5)" "120"
 
+    -- Function argument matching
+    assertEquiv "f(x:int, y:int):=2*x+y; f(2,3)" "7"
+
     -- Non-retractions as types
     assertEquiv "succ(n:int) := n + 1; a:succ := 2" "3"
     assertEquiv "succ(n:int) := n + 1;\
@@ -129,6 +133,7 @@ main = do
     -- Evaluation in if
     assertEquiv "if(y:int; y=1) 42 else 23" "42"
     assertEquiv "if(y:int; y=1) y else 23" "1"
+
     -- Confluence: Lack of local substitution
     assertFail  "x : int; if (y:int; y = x; y = 1; y > 1) {42} else {23}"
                 "x : int; if (y:int; y = 1; y = x; y > 1) {42} else {23}"
