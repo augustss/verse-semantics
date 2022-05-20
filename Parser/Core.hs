@@ -184,6 +184,7 @@ instance Pretty HNF where
   pPrintPrec l p (HInt i) = pPrintPrec l p i
   pPrintPrec _ _ (HRat _) = undefined -- pPrintPrec l p r
   pPrintPrec _ _ (HPrim s) = text s
+  pPrintPrec l _ (HArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
   pPrintPrec l _ (HArray vs) = parens $ commaSep l 0 vs
   pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
   pPrintPrec l _ (HType v) = text "type" <> braces (pPrintPrec l 0 v)
