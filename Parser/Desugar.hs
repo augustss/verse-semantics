@@ -12,12 +12,7 @@ import GHC.Stack
 import Expr
 import Error
 import Print hiding (first)
-
-anySame :: (Eq a) => [a] -> Bool
-anySame [] = False
-anySame (x:xs) = x `elem` xs || anySame xs
-
---------
+import Misc
 
 desugar :: Expr -> Expr
 desugar = eval . (anfS <=< hackRange <=< desugarFunctionS <=< desugarDoS <=< scopeCheck <=< desugarS)

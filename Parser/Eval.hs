@@ -20,6 +20,7 @@ import Expr(Ident(..), noLoc)
 import Core
 import Error
 import Print hiding (float)
+import Misc
 
 pattern VArray :: [Value] -> Value
 pattern VArray vs = HNF (HArray vs)
@@ -376,10 +377,10 @@ evalApp = evalTrace "evalApp" f
 evalSeq :: EvalCore
 evalSeq = evalTrace "evalSeq" f
   where
-    f (CSeq es) = cSeq $ filter (not . isValue) (init es') ++ [last es']
-      where es' = concatMap (flat . f) es
-    f (CUnify (CSeq es) e2) = CSeq $ init es ++ [CUnify (last es) e2]
-    f (CUnify e1@CValue{} (CSeq es)) = CSeq $ init es ++ [CUnify e1 (last es)]
+    f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
+      where Snoc es' e' = concatMap (flat . f) es
+    f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
+    f (CUnify e1@CValue{} (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify e1 e]
     f e = composOp f e
     flat (CSeq es) = es
     flat e = [e]
