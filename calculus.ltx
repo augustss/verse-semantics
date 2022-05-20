@@ -1012,17 +1012,15 @@ $$
   && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
-  |Mt k e| & = & |k = e| \\
-  |Mt x e| & = & |x := e| \\
-  |Mt (e_0, dots, e_n) e| & = & |x := De e; Mt e_0 (x^[0]); dots; Mt e_n (x^[n]); De (!x^[n+1]) | & \text{|x| fresh} \\
-  |Mt (: t) e| & = & |De (:t := e)| \\
+  |Mt (e_0, dots, e_n) e| & = & |(x_0:any, dots, x_n:any) = De e; Mt e_0 (x_0); dots; Mt e_n (x_n) | & \text{|x_i| fresh} \\
+  |Mt (: t) e| & = & |De(t)^[e]| \\
   |Mt (e_1; e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
   |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (e_2; e_3)| \\
-  |Mt (let (e_1) in e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
-  |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| \\
-  |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| \\
-  |Mt (e_1 : t) e_2| & = & |De (e_1:t := e_2)| & \textit{Is this right?}\\
-  |Mt (e_1 := e_2) e_3| & = & |Mt e_1 (e_2 = e_3)|  & \textit{Is this right?} \\
+  |Mt (let (e_1) in e_2) e_3| & = & |let (De e_1) in Mt e_2 e_3| \\
+  |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| & \text{wrong} \\
+  |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| & \text{wrong} \\
+  |Mt (l : t) e| & = & |Mt (l := :t) e| & \textit{Is this right?}\\
+  |Mt (l := e_1) e_2| & = & |Ld l (Mt e_1 e_2)|  & \textit{Is this right?} \\
   |Mt e_1 e_2| & = & |De (do{e_1}) = e_2| & \text{otherwise} \\
 %% Maybe?  |Mt (l ?) e| & = & |Mt l (e ?)| & \text{otherwise} \\
 %%  \\
