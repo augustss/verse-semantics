@@ -1153,6 +1153,14 @@ A possible formulation of this could be
 
 \[ \rulename{local-subst} \quad |C^[x]| \movesto |C^[v]| \text{ if } |C^[x]| = |X^[x = v]|, |C^[hole]| \ne |X^[hole = v]| \]
 
+which we can unpack as follows:
+\begin{itemize}
+\item The rule replaces a \emph{single} occurrence of |x| to |v|, anywhere within the current expression |C[x]|. This uses a (not yet spelled out) context |C| that reaches everywhere within an expression, even under lambdas etc.
+\item Of course this is only ok if we may assume that |x| is equal to |v| within the current expression. This is the case if the equation |x=v| is part of the current expression, but not hidden under a lambda or similar; this is what the |X| context says. The first side conditions says that “the current expression |C[x]| has |x=v| within the reach of the execution context |X|.
+\item The occurence of |x| that we replace must \emph{not} be the one in the equation |x = v|; we certainly do not want to rewrite |x = 1| to |1 = 1|. The second side conditions ensures that.
+\item There is no side condition $x \notin \freevars{v}$. The chain of reductions above that justify this rule work even when $x \in \freevars{v}$. This means that an equation |x = (x,x)| can be used for local rewriting over and over, but that seems to be ok.
+\end{itemize}
+
 Note that the chain of reduction above also works if instead of $x$ we any value, yielding:
 \[
 v_1 = v_2; |C^[v_1]| \convertible |v_1 = v_2; C^[v_2]|
