@@ -407,6 +407,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
+    \rulename{occurs-check} & |def (H^[x]) (X^[x=V^[x]])| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
     \rulename{succeeds-choice} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
     \rulename{decides-choice} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
