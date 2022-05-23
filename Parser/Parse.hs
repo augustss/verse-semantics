@@ -114,10 +114,10 @@ pTerm = do
   foldl apply fn <$> many pArg
 
 pFunction :: P Expr
-pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> pParens pExprSeq) <*> many pEff <*> pBlock
+pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlock
   where
-    pEff :: P Eff
-    pEff = pAngles pIdent
+    pArg :: P (Expr, [Eff])
+    pArg = (,) <$> pParens pExprSeq <*> many (pAngles pIdent)
 
 pBlockEs :: P [Expr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))

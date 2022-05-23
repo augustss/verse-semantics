@@ -167,7 +167,7 @@ value (Array es) = HNF . HArray <$> mapM value es
 value (Typedef e) = do
   i <- newTmp
   HNF . HLam i <$> coreD (Unify (Variable i) e)
-value (Function (Define x AnyT) fs b) = HNF . HLam x . attr <$> coreD b
+value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
@@ -179,7 +179,7 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ Function (Define i AnyT) [] e
+  pure $ Function [(Define i AnyT, [])] e
 
 ------
 

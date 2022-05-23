@@ -64,7 +64,7 @@ data Expr
   | Do Block                  -- do e
   | Case1 Block               -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
-  | Function Expr [Eff] Block -- function(e)<eff>{e}
+  | Function [(Expr, [Eff])] Block -- function(e)<eff>...{e}
   | Typedef Block             -- typedef{e}
   | Block [Expr]              -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
@@ -150,8 +150,9 @@ instance Pretty Expr where
           Case2 e bs ->
             maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
                                            indent $ ppr 0 bs ]
-          Function a es b -> maybeParens (p > 0) $ text "fn" <> parens (pPrintL l a) <> effs <> ppB b
-            where effs = mconcat (map (\ e -> text "<" <> pPrintL l e <> text ">") es)
+          Function ars b -> maybeParens (p > 0) $ text "fn" <> hcat (map ppArs ars) <> ppB b
+            where ppArs (e, rs) = parens (pPrintL l e) <> effs
+                     where effs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
           Block es -> braces $ ppSeq l es
           Typedef e -> text "typedef" <> braces (ppr 0 e)
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -224,7 +225,8 @@ compos f (Let e b) = Let <$> f e <*> f b
 compos f (Do b) = Do <$> f b
 compos f (Case1 b) = Case1 <$> f b
 compos f (Case2 e b) = Case2 <$> f e <*> f b
-compos f (Function e r b) = Function <$> f e <*> pure r <*> f b
+compos f (Function ers b) = Function <$> traverse g ers <*> f b
+  where g (e, r) = (,) <$> f e <*> pure r
 compos f (Block es) = Block <$> traverse f es
 compos f (Option me) = Option <$> traverse f me
 compos f (Typedef b) = Typedef <$> f b

@@ -39,9 +39,9 @@ desugarS = expr
     expr (PostfixOp e (Ident l op)) = expr $ call "post" l op e
     expr (InfixOp e1 (Ident l op) e2) =
       case op of
-        "=>" -> expr $ Function e1 [] e2
         ":=" -> desugarDef l e1 e2
         ":"  -> desugarColon l e1 e2
+        "=>" -> expr $ Function [(e1, [])] e2
         "&&" -> expr $ seqE [e1, e2]
         "||" -> expr $ If2E e1 e2
         "="  -> Unify <$> expr e1 <*> expr e2
@@ -59,7 +59,8 @@ desugarS = expr
     expr (Case1 b) =
       newIdent "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
     expr (Case2 e1 e2) = desugarCase e1 e2
-    expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> expr e2
+    expr (Function efs e2) = Function <$> mapM f efs <*> expr e2
+      where f (e, fs) = (, fs) <$> expr e
     expr (Block es) = expr $ seqE es
     expr (Option Nothing) = pure Unit
     expr (Option (Just e)) = expr $ If1 (ApplyD eTruth e)
@@ -155,7 +156,7 @@ desugarBind l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ",
 
 desugarFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
 desugarFunDef l (EffAttr f a) as e = desugarFunDef l f (a:as) e
-desugarFunDef l (ApplyS f a) as e = desugarFunDef l f [] $ Function a (reverse as) e
+desugarFunDef l (ApplyS f a) as e = desugarFunDef l f [] $ Function [(a, reverse as)] e
 desugarFunDef l (Variable f) [] e = define l f <$> desugarS e
 desugarFunDef _ Variable{} _ _ = internalError
 desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
@@ -205,7 +206,7 @@ desugarFunctionS = expr
     expr (For2 e1 e2) = For2 <$> expr e1 <*> expr e2
 --    expr (Let e1 e2) = Let <$> expr e1 <*> expr e2
 --    expr (Do e) = Do <$> expr e
-    expr (Function e1 fs e2) = function e1 fs e2
+    expr (Function ars e2) = function ars e2  -- XXX
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (Define i e) = Define i <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
@@ -214,16 +215,17 @@ desugarFunctionS = expr
     expr AnyT = pure AnyT
     expr e = impossible e
 
-    function (Define i a) fs e2 | isAnyT a = Function (Define i AnyT) fs <$> expr e2
+    function [(Define i a, fs)] e2 | isAnyT a = Function [(Define i AnyT, fs)] <$> expr e2
       -- XXX remove "any" when we have a simplifier.
       where isAnyT AnyT = True
             isAnyT (Range (Variable (Ident _ "any"))) = True
             isAnyT _ = False
-    function e1 fs e2 = do
+    function [(e1, fs)] e2 = do
       i <- newIdent "z"
       m <- desugarMatch e1 (Variable i)
       e2' <- expr e2
-      pure $ Function (Define i AnyT) fs $ seqE [m, e2']
+      pure $ Function [(Define i AnyT, fs)] $ seqE [m, e2']
+    function _ _ = unimplemented
 
 -- Do the almost-unification involved in matching function arguments.
 -- The big difference is the :e and function(p){e}
@@ -245,7 +247,7 @@ desugarMatch pat expr =
       -- Would this make sense?:
       -- If3 <$> desugarFunctionS e1 <*> desugarMatch e2 expr <*> desugarMatch e3 expr
     For2{} -> equal
-    Function _e1 _fs _e2 -> unimplemented
+    --Function _e1 _fs _e2 -> unimplemented
     Unify{} -> equal
     Define i e -> define noLoc i <$> desugarMatch e expr
     Choice{} -> equal
@@ -359,8 +361,9 @@ scopeErrs s = expr
       where (errs, s') = defs e1
     expr (Do e) = errs ++ scopeErrs s' e
       where (errs, s') = defs e
-    expr (Function e1 _ e2) = errs ++ scopeErrs s' e1  ++ scopeErrs s' (Do e2)
-      where (errs, s') = defs e1
+    expr (Function [] e2) = scopeErrs s (Do e2)
+    expr (Function ((a,_):ars) e2) = errs ++ scopeErrs s' (Function ars e2)
+      where (errs, s') = defs a
     expr (Unify e1 e2) = expr e1 ++ expr e2
     expr (Define _ e) = expr e
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
