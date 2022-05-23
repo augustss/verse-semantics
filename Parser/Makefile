@@ -5,7 +5,7 @@ parser: *.hs
 	ghc -Wall --make $(PKGS) Main.hs -o parser
 
 tests: *.hs
-	ghc -Wall --make $(PKGS) Tests.hs -o tests
+	ghc -Wall --make $(PKGS) Testing.hs -main-is Testing -o tests
 
 clean:
 	rm -f *.o *.hi parser parser.exe tests tests.exe

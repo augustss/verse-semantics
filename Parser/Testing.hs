@@ -114,3 +114,6 @@ runTests = mapM_ runTest
 
 runTestFile :: FilePath -> IO ()
 runTestFile = runTests <=< readTests
+
+main :: IO ()
+main = runTestFile "tests.versetest"
