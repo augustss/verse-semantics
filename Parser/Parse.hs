@@ -188,7 +188,7 @@ operatorTable :: [[Operator P Expr]]
 operatorTable =
   [ [preOp ":", preOp "!"],
     [postOp "^", postOp "?"],
-    [op InfixL "*", op InfixL "/"],
+    [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
     [op InfixR "|", op InfixR "~>", op InfixN ".."],
     [op InfixL ":"] ++ map (op InfixR) ["=", ">=", "<=", "<", ">", "<>"],
@@ -196,6 +196,7 @@ operatorTable =
     [op InfixR "||"],
     [op InfixL ":="],
     [op InfixL "where"],  -- XXX precedence
+    [preOp ".."],
     [op InfixR "=>"]
   ]
   where
