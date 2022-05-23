@@ -1,4 +1,9 @@
-module Parse(parseDie, pFile) where
+module Parse(
+  parseDie, pFile,
+  -- Exports for further parsing
+  pKeyword, skip, eof, many, pParens, pBraces,
+  pIdent, pExprSeq,
+  P) where
 
 import Control.Monad
 import Control.Monad.Combinators.Expr

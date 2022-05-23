@@ -1,0 +1,8 @@
+# Test types
+#  SEq  evaluate the two expressions and expect them to be equal
+#  FEq  evaluate the two expressions,
+#       they should be equal but currently the test fails
+#
+# Trivial tests
+testeq(SEq){1+2}     {3}
+testeq(SEq){x:=1; x} {1}
