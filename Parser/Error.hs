@@ -2,8 +2,8 @@ module Error(module Error) where
 
 import GHC.Stack
 
-unimplemented :: (HasCallStack) => a
-unimplemented = error "unimplemented"
+unimplemented :: (HasCallStack) => String -> a
+unimplemented s = error $ "unimplemented: " ++ s
 
 impossible :: (HasCallStack, Show a) => a -> b
 impossible a = error $ "impossible: " ++ show a

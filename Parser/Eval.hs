@@ -434,6 +434,12 @@ evalPrimOps = evalTrace "evalPrimOps" f
     f (CBinOp "in'<='"  v1 v2) = cmp (<=) v1 v2
     f (CBinOp "in'>'"   v1 v2) = cmp (>)  v1 v2
     f (CBinOp "in'>='"  v1 v2) = cmp (>=) v1 v2
+    f (CApply (VPrim "concat#") (VArray as)) | Just vss <- traverse getA as =
+                                                 CValue $ VArray $ concat vss
+                                             | otherwise = CWrong "concat#"
+        where getA (VArray vs) = Just vs
+              getA _ = Nothing
+    f (CApply (VPrim op) _) = unimplemented $ show op
     f e = composOp f e
 
     arith op (VInt i1) (VInt i2) = CInt $ op i1 i2

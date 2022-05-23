@@ -107,7 +107,7 @@ desugarCase e b = do
   pure $ Seq [e', ec]
 
 eAssign :: Loc -> Expr
-eAssign l = Variable (Ident l "$assign")
+eAssign l = Variable (Ident l "assign#")
 
 eTruth :: Expr
 eTruth = Variable (Ident noLoc "truth")
@@ -176,7 +176,8 @@ primOps = map (Ident noLoc)
   , "pre'-'"
   , "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
-  , "$assign"
+  , "assign#"
+  , "concat#"
   ]
 
 --------------------
@@ -225,7 +226,7 @@ desugarFunctionS = expr
       m <- desugarMatch e1 (Variable i)
       e2' <- expr e2
       pure $ Function [(Define i AnyT, fs)] $ seqE [m, e2']
-    function _ _ = unimplemented
+    function ars _ = unimplemented $ show ars
 
 -- Do the almost-unification involved in matching function arguments.
 -- The big difference is the :e and function(p){e}
