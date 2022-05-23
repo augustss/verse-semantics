@@ -33,10 +33,21 @@ pIdent = try $ do
   l <- getSourcePos
   w <- pWord
   guard $ w `notElem` keywords
-  pure $ Ident l w
+  if w `elem` ["operator", "prefix", "postfix"] then do
+    _ <- char '\''
+    op <- takeWhile1P Nothing (`elem` opChars)
+    _ <- char '\''
+    let w' = pre ++ "'" ++ op ++ "'"
+        pre = if w == "operator" then "in" else if w == "prefix" then "pre" else "post"
+    pure $ Ident l w'
+   else do
+    pure $ Ident l w
+
+opChars :: [Char]
+opChars = "!@#$%^&*-+=:<>?/"
 
 keywords :: [String]
-keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "then", "typedef", "where"]
+keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "typedef", "where"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
