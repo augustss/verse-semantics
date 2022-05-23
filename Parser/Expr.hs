@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {- x# LANGUAGE ViewPatterns # -}
@@ -20,13 +21,16 @@ import Data.Maybe
 import Data.Ratio
 import Print
 import Prelude hiding ((<>))
-import Text.Megaparsec (SourcePos, initialPos)
+import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
 import Error
 
 type Loc = SourcePos
 noLoc :: Loc
 noLoc = initialPos ""
+
+instance Pretty Loc where
+  pPrintPrec _ _ = text . sourcePosPretty
 
 data Ident = Ident Loc String
   deriving ({-Eq, Ord, Show,-} Data)
