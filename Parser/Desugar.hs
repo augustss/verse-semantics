@@ -61,6 +61,8 @@ desugarS = expr
     expr (Case2 e1 e2) = desugarCase e1 e2
     expr (Function e1 fs e2) = Function <$> expr e1 <*> pure fs <*> expr e2
     expr (Block es) = expr $ seqE es
+    expr (Option Nothing) = pure Unit
+    expr (Option (Just e)) = expr $ If1 (ApplyD eTruth e)
     expr (Typedef e) = Typedef <$> expr e
     expr (Define i e) = Define i <$> expr e
     expr (Range e) = Range <$> expr e
@@ -105,6 +107,9 @@ desugarCase e b = do
 
 eAssign :: Loc -> Expr
 eAssign l = Variable (Ident l "$assign")
+
+eTruth :: Expr
+eTruth = Variable (Ident noLoc "truth")
 
 --eSucceeds :: Expr
 --eSucceeds = Variable (Ident noLoc "succeeds")

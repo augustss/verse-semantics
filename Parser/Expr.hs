@@ -67,6 +67,7 @@ data Expr
   | Function Expr [Eff] Block -- function(e)<eff>{e}
   | Typedef Block             -- typedef{e}
   | Block [Expr]              -- { e1; e2; ... }
+  | Option (Maybe Expr)       -- option{e}
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -153,6 +154,7 @@ instance Pretty Expr where
             where effs = mconcat (map (\ e -> text "<" <> pPrintL l e <> text ">") es)
           Block es -> braces $ ppSeq l es
           Typedef e -> text "typedef" <> braces (ppr 0 e)
+          Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
@@ -224,6 +226,7 @@ compos f (Case1 b) = Case1 <$> f b
 compos f (Case2 e b) = Case2 <$> f e <*> f b
 compos f (Function e r b) = Function <$> f e <*> pure r <*> f b
 compos f (Block es) = Block <$> traverse f es
+compos f (Option me) = Option <$> traverse f me
 compos f (Typedef b) = Typedef <$> f b
 compos f (Define i e) = Define i <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2

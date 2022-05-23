@@ -169,8 +169,11 @@ pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq1) <*> (pKeywor
 pDo :: P Expr
 pDo = pKeyword "do" *> (Do <$> pBlockM)
 
+pOption :: P Expr
+pOption = pKeyword "option" *> (Option <$> optional pExprSeq1)
+
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pFunction, pTerm ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pOption, pFunction, pTerm ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
