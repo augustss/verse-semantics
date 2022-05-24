@@ -1019,13 +1019,13 @@ $$
 \begin{array}{rcll}
   |Ld| & \multicolumn{3}{l}{\text{converts a definition |l := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := e| \\
-  |Ld (: t) e| & = & |t^[e]| \\
-  |Ld (l : t) e| & = & |Ld l (t^[e])| \\
-  |Ld (l ?) e| & = & |Ld l (e ?)| \\
-  |Ld (e_1^hat) e| & = & |assign^(De e_1,e)| \\
+  |Ld (: t) e| & = & |De(t)^[x:=e]; x| & \text{|x| fresh} \\
+  |Ld (l : t) e| & = & |Ld l (De(t)^[x:=e]); x| & \text{|x| fresh} \\
+  |Ld (l ?) e| & = & |????| \\
+  |Ld (e_1^hat) e| & = & |assign^(De e_1,x:=e); x| & \text{|x| fresh} \\
   |Ld (l_0, dots, l_n) e| & = &
-  |(x_0:any,dots,x_n:any)=e; Ld l_0 x_0; dots; Ld l_n x_n| & \text{|x_i| fresh} \\
-  |Ld (l_1 minusgt l_2) e| & = & |y:=e; Ld l_1 x; Ld l_2 ((typedef^{y}^[x := :any]))| & \text{|x|,|y| fresh} \\
+  |Ld l_0 x_0; dots; Ld l_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
+  |Ld (l_1 minusgt l_2) e| & = & |y:=e; Ld l_1 x; Ld l_2 ((typedef^{y}^[x := :any])); y| & \text{|x|,|y| fresh} \\
   && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
