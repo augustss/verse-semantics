@@ -50,7 +50,7 @@ dsD = expr
     expr (Array es) = arrSplice $ exprElems es
     -- D[e1;...;en] = D[e1]; ...; D[en]
     expr (Seq es) = seqE <$> mapM expr es
-    -- XXX FIX D: D[e1(e2)] unlike D, we leave it until Core generation
+    -- D[e1(e2)] = D[e1](D[e2])
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
     -- D[e1[e2]] = D[e1][D[e2]]
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
@@ -160,7 +160,6 @@ dsD = expr
       where isAnyT AnyT = True
             isAnyT (Range (Variable (Ident _ "any"))) = True
             isAnyT _ = False
-    -- FIX D: move do
     -- D[fn(e){b}] = fn(x:any){M[e]x; D[do b]}
     function e b = do
       x <- newIdent "z"
@@ -216,6 +215,13 @@ inVarM e = do
 inVar :: Expr -> D (Expr, Expr)
 inVar e = (\ (e', me) -> (e', fromMaybe e' me)) <$> inVarM e
 
+inVarC :: Expr -> (Expr -> D Expr) -> D Expr
+inVarC e@Variable{} k = k e
+inVarC e k = do
+  i <- newIdent "d"
+  ke <- k (Variable i)
+  pure $ seqE [define noLoc i e, ke]
+
 dsCase :: Expr -> Block -> D Expr
 -- D[case x of e1; ... en] = e1[x] || ... || en[x]
 dsCase e@Variable{} (Block es) = dsD $ foldr mkOr Fail es
@@ -223,9 +229,8 @@ dsCase e@Variable{} (Block es) = dsD $ foldr mkOr Fail es
 dsCase Variable{} _ = internalError
 -- D[case e of b] = x=D[e]; D[case x of b]
 dsCase e b = do
-  (t, e') <- inVar e
-  ec <- dsCase t b
-  pure $ Seq [e', ec]
+  e' <- dsD e
+  inVarC e' $ \ x -> dsCase x b
 
 eAssign :: Loc -> Expr
 eAssign l = Variable (Ident l "assign#")
@@ -250,15 +255,16 @@ dsLHS l f@ApplyS{} e = dsFunDef l f [] e
 --dsLHS l f@EffAttr{} e = desugarFunDef l f [] e
 dsLHS l x e = dsL l x e
 
--- FIX L: reorder so value is always LHS?  RHS?
 -- Desugar a definition lhs := e
 dsL :: Loc -> Expr -> SExpr -> D SExpr
 dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
 -- L[x] e = x := e
 dsL l (Variable x) e = pure $ define l x e
 -- L[:t] e = t[e]
--- FIX L: use D[t]
-dsL _ (PrefixOp (Ident _ ":") t) e = ApplyD <$> dsD t <*> pure e
+dsL l (PrefixOp (Ident _ ":") t) e = do
+  t' <- dsD t
+  x <- newIdent "x"
+  pure $ Seq [ApplyD t' (define l x e), Variable x]
 -- FIX L: use option
 -- L[e?] = ????
 dsL _l (PostfixOp _lhs (Ident _ "?")) _e = undefined
@@ -342,17 +348,19 @@ dsLArr l lhss e =
 -- Desugar a match for function definitions
 dsM :: Expr -> SExpr -> D SExpr
 dsM e1 e2 | doTrace && trace ("dsM " ++ prettyShow (e1, e2)) False = undefined
--- M[pat0,...,patn] e = (x0:any,...,xn:any) = e; M[pat0]x0; ...; M[patn]xn
+-- See below
 dsM (Array ps) e = dsMArr ps e
-dsM (PrefixOp (Ident _ ":") t) e = ApplyD <$> dsD t <*> pure e
+dsM (PrefixOp (Ident l ":") t) e = do
+  x <- newIdent "d"
+  t' <- dsD t
+  pure $ Seq [ApplyD t' (define l x e), Variable x]
 dsM (Seq (Snoc ps p)) e = do
   ps' <- mapM dsD ps
   p' <- dsM p e
   pure $ seqE (Snoc ps' p')
 dsM (InfixOp e1 (Ident _ "where") e2) e = do
-  e1' <- dsD e1
-  e2' <- dsM e2 e
-  pure $ seqE [e1', e2']
+  e2' <- dsD e2
+  dsM e1 (seqE [e2' e])
 dsM (Let e1 e2) e = do
   e1' <- dsD e1
   e2' <- dsM e2 e
@@ -366,13 +374,13 @@ dsM e1 e = do
 
 dsMArr :: [Expr] -> SExpr -> D SExpr
 dsMArr pats e =
-  -- FIX M: second arg is SExpr, don't use D
   case exprElems pats of
+    -- M[pat0,...,patn] e = M[pat0]x0; ...; M[patn]xn; (x0:any,...,xn:any) = e
     [EElems ps] -> do
       xs <- mapM (const $ newIdent "d") ps
       let eun = Unify (Array (map (tAny noLoc) xs)) e
       els <- zipWithM (\ pat x -> dsM pat (Variable x)) ps xs
-      pure $ Seq $ eun : els
+      pure $ Seq $ els ++ [eun]
     _ -> unimplemented "dsMArr"
 
 dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
