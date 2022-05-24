@@ -5,6 +5,7 @@ import Control.Monad.State.Strict
 --import Data.List
 --import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Either
 import Data.Maybe
 import Debug.Trace
 import GHC.Stack
@@ -14,68 +15,186 @@ import Error
 import Print hiding (first)
 import Misc
 
+isLiteral :: Expr -> Bool
+isLiteral LitInt{} = True
+isLiteral LitRat{} = True
+isLiteral _ = False
+
+doTrace :: Bool
+doTrace = False
+
+-------
+
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< hackRange <=< desugarFunctionS <=< desugarDoS <=< scopeCheck <=< desugarS)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD)
   where eval = flip evalState 1
 
 type D = State Int
 
-desugarS :: Expr -> D Expr
-desugarS = expr
+type SExpr = Expr   -- Simple Expr: only has some of the constructors
+
+-- This follows the D transformation in calculus.ltx
+dsD :: Expr -> D SExpr
+dsD = expr
   where
     expr :: HasCallStack => Expr -> D Expr
-    expr e@LitInt{} = pure e
-    expr e@LitRat{} = pure e
+    expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
+
+    -- Basic forms
+    -- D[k] = k
+    expr e | isLiteral e = pure e
+    -- D[x] = x
     expr e@Variable{} = pure e
-    expr (Array es) = Array <$> mapM expr es
+    -- D[e1,...,en] = ???
+    -- FIX D: update for splices
+    expr (Array es) = arrSplice $ exprElems es
+    -- D[e1;...;en] = D[e1]; ...; D[en]
     expr (Seq es) = seqE <$> mapM expr es
-    --expr (ApplyS e1 e2) | ()/=() = expr $ ApplyD eSucceeds $ ApplyD e1 e2
+    -- XXX FIX D: D[e1(e2)] unlike D, we leave it until Core generation
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
+    -- D[e1[e2]] = D[e1][D[e2]]
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+    -- Attributes are only allow for function definitions
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
+    -- D[e1 = e2] = D[e1] = D[e2], also change constructor
+    expr (InfixOp e1 (Ident _ "=") e2) = Unify <$> expr e1 <*> expr e2
+    -- D[e1 | e2] = D[e1] | D[e2], also change constructor
+    expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
+
+    -- Bindings
+    -- D [lhs : t] = D [lhs := :t]
+    expr (InfixOp lhs (Ident l ":") t) = expr (InfixOp lhs (Ident l ":=") (PrefixOp (Ident l ":") t))
+    -- D [lhs := e] = L[lhs] D[e]
+    expr (InfixOp lhs (Ident l ":=") e) = dsLHS l lhs =<< expr e
+    -- Function bindings recognized by dsLHS
+
+    -- Functions
+    -- D[e1 => e2] = D[fn(e1){e2}]
+    expr (InfixOp e1 (Ident _ "=>") e2) = expr $ Function [(e1, [])] e2
+    -- See below
+    expr (Function [(e, [])] b) = function e b
+    expr (Function [(e, r:rs)] b) = expr $ Function [(e, rs)] $ applyEffect r b
+    -- D[fn a1 a2 ... {b}] = D[fn a1 (fn a2 ... {e})]
+    expr (Function (a:as) b) = expr $ Function [a] $ Function as b
+
+    -- Types
+    -- D[:t] = : D[t], also change constructor
+    expr (PrefixOp (Ident _ ":") t) = Range <$> expr t
+    -- D[typedef{e}] = typedef{D[e]}
+    expr (Typedef e) = Typedef <$> expr e
+
+    -- Conditionals
+    -- D[if{e}] = D[if(e) else false]
+    expr (If1 e) = expr $ If2E e Unit
+    -- D[if(e1)then e2] = D[if(e1)then e2 else false]
+    expr (If2 e1 e2) = expr $ If3 e1 e2 Unit
+    -- D[if(e1)else e2] = D[if(x:e1)then x else e2]
+    expr (If2E e1 e2) = inVar e1 >>= \ (t, e') -> expr $ If3 e' t e2
+    -- D[if(e1)then e2 else e3] = if(D[e1])then D[e2] else D[e3]
+    expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> expr e2 <*> expr e3
+
+    -- For
+    -- D[for{e}] = D[for(x:=e)in x]
+    expr (For1 e) = inVar e >>= \ (t, e') -> expr $ For2 e' t
+    -- D[for(e1)in e2] = for(D[e1]) in D[e2]
+    expr (For2 e1 e2) = For2 <$> expr e1 <*> expr e2
+
+    -- Operators
+    -- D[!e] = D[if(e)then :false else false]
     expr (PrefixOp (Ident _ "!") e) = If3 <$> expr e <*> pure Fail <*> pure Unit
-    expr (PrefixOp (Ident _ ":") e) = Range <$> expr e
+    -- D[op e] = op D[e]
     expr (PrefixOp (Ident l op) e) = expr $ call "pre" l op e
+    -- D[e op] = D[e] op
     expr (PostfixOp e (Ident l op)) = expr $ call "post" l op e
     expr (InfixOp e1 (Ident l op) e2) =
       case op of
-        ":=" -> desugarDef l e1 e2
-        ":"  -> desugarColon l e1 e2
-        "=>" -> expr $ Function [(e1, [])] e2
+        -- D[e1 && e2] = D[e1]; D[e2]
         "&&" -> expr $ seqE [e1, e2]
+        -- D[e1 || e2] = D[if(e1)else e2]
         "||" -> expr $ If2E e1 e2
-        "="  -> Unify <$> expr e1 <*> expr e2
-        "|"  -> Choice <$> expr e1 <*> expr e2
-        "where" -> newIdent "w" >>= \ i -> expr $ Seq [define l i e1, e2, Variable i]
+        -- D[e1 where e2] = D[x:= e1; e2; x]
+        "where" -> newIdent "w" >>= \ x -> expr $ Seq [define l x e1, e2, Variable x]
+        -- D[e1 op e2] = D[e1] op D[e2]
         _    -> expr $ call "in" l op $ Array [e1, e2]
-    expr (If1 e) = inVar e >>= \ (t, e') -> expr $ If2 e' t
-    expr (If2 e1 e2) = expr $ If3 e1 e2 Unit
-    expr (If2E e1 e2) = inVar e1 >>= \ (t, e') -> expr $ If3 e' t e2
-    expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> expr e2 <*> expr e3
-    expr (For1 e) = inVar e >>= \ (t, e') -> expr $ For2 e' t
-    expr (For2 e1 e2) = For2 <$> expr e1 <*> expr e2
+
+    -- Let, do, case
+    -- 'let' kept until after scope check
     expr (Let e1 e2) = Let <$> expr e1 <*> expr e2
-    expr (Do e) = Do <$> expr e
+    -- 'do' kept until after scope check
+    expr (Do e) = Do <$> expr e  -- XXX scope check?
+    -- D[case {b}] = D[(x:any) => case(x)of b]
     expr (Case1 b) =
       newIdent "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
-    expr (Case2 e1 e2) = desugarCase e1 e2
-    expr (Function efs e2) = Function <$> mapM f efs <*> expr e2
-      where f (e, fs) = (, fs) <$> expr e
+    -- D[case(e)of b] = ...
+    expr (Case2 e1 e2) = dsCase e1 e2
+
+    -- Misc
     expr (Block es) = expr $ seqE es
+
+    -- FIX D: add
+    -- D[option{}] = false
     expr (Option Nothing) = pure Unit
-    expr (Option (Just e)) = expr $ If1 (ApplyD eTruth e)
-    expr (Typedef e) = Typedef <$> expr e
+    -- D[option{e}] = D[if(x:=e)then truth(e)
+    expr (Option (Just e)) = inVar e >>= \ (t, e') -> expr $ If2 e' (ApplyD eTruth t)
+
+    -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
     expr (Range e) = Range <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr AnyT = pure AnyT
 
+    expr e = impossible e
+
+    -- Pick the appropriate form of apply for operators
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='"] = ApplyD
                 | otherwise = ApplyS
             s' = p ++ "'" ++ s ++ "'"
+
+    -- Handle function(e){b}
+    -- For nicer desugaring, handle ":any" argument specially
+    function (Define i a) b | isAnyT a = Function [(Define i AnyT, [])] <$> expr b
+      -- XXX remove "any" when we have a simplifier.
+      where isAnyT AnyT = True
+            isAnyT (Range (Variable (Ident _ "any"))) = True
+            isAnyT _ = False
+    -- FIX D: move do
+    -- D[fn(e){b}] = fn(x:any){M[e]x; D[do b]}
+    function e b = do
+      x <- newIdent "z"
+      m <- dsM e (Variable x)
+      b' <- expr (Do b)
+      pure $ Function [(Define x AnyT, [])] $ seqE [m, b']
+
+    -- Splice together ArrayElems
+    arrSplice :: [ArrayElem] -> D SExpr
+    arrSplice [EElems es] = Array <$> mapM expr es  -- no splices
+    arrSplice as = applyPrim "concat#" <$> Array <$> mapM (expr . f) as
+      where f (EElems es) = Array es
+            f (ESplice e) = e
+
+data ArrayElem = EElems [Expr] | ESplice Expr
+  deriving (Show)
+
+-- Handle an array element, it can be ..e or e
+exprElems :: [Expr] -> [ArrayElem]
+exprElems = grp . map cls
+  where cls (PrefixOp (Ident _ "..") e) = Left e
+        cls e = Right e
+        grp [] = []
+        grp (Left e : as) = ESplice e : grp as
+        grp as =
+          let (rs, bs) = span isRight as
+          in  EElems [ e | Right e <- rs ] : grp bs
+
+applyPrim :: String -> SExpr -> SExpr
+applyPrim s e = ApplyS (Variable (Ident noLoc s)) e
+
+-- XXX do something special?
+applyEffect :: Ident -> Expr -> Expr
+applyEffect i e = ApplyD (Variable i) e
 
 newInt :: D Int
 newInt = do
@@ -97,13 +216,15 @@ inVarM e = do
 inVar :: Expr -> D (Expr, Expr)
 inVar e = (\ (e', me) -> (e', fromMaybe e' me)) <$> inVarM e
 
-desugarCase :: Expr -> Block -> D Expr
-desugarCase e@Variable{} (Block es) = desugarS $ foldr mkOr Fail es
+dsCase :: Expr -> Block -> D Expr
+-- D[case x of e1; ... en] = e1[x] || ... || en[x]
+dsCase e@Variable{} (Block es) = dsD $ foldr mkOr Fail es
   where mkOr a r = If2E (ApplyD a e) r
-desugarCase Variable{} _ = internalError
-desugarCase e b = do
+dsCase Variable{} _ = internalError
+-- D[case e of b] = x=D[e]; D[case x of b]
+dsCase e b = do
   (t, e') <- inVar e
-  ec <- desugarCase t b
+  ec <- dsCase t b
   pure $ Seq [e', ec]
 
 eAssign :: Loc -> Expr
@@ -121,45 +242,145 @@ define _l i e = Define i e
 tAny :: Loc -> Ident -> Expr
 tAny l i = define l i AnyT
 
-desugarColon :: Loc -> Expr -> Expr -> D Expr
-desugarColon l x t = desugarDef l x (PrefixOp (Ident l ":") t)
+-- Desugar a definition e1 := e2
+-- L
+dsLHS :: Loc -> Expr -> SExpr -> D SExpr
+dsLHS _ (InfixOp x (Ident l ":") t) e = dsLHS l x $ ApplyS t e  -- XXX Is this correct
+dsLHS l f@ApplyS{} e = dsFunDef l f [] e
+--dsLHS l f@EffAttr{} e = desugarFunDef l f [] e
+dsLHS l x e = dsL l x e
 
-desugarDef :: Loc -> Expr -> Expr -> D Expr
-desugarDef _ (InfixOp x (Ident l ":") t) e = desugarDef l x $ ApplyS t e  -- XXX Is this correct
-desugarDef l f@ApplyS{} e = desugarFunDef l f [] e
-desugarDef l f@EffAttr{} e = desugarFunDef l f [] e
-desugarDef l x e = desugarBind l x e
-
-desugarBind :: Loc -> Expr -> Expr -> D Expr
-desugarBind l (Variable i) e = define l i <$> desugarS e
-desugarBind l (PostfixOp x q@(Ident _ "?")) e = desugarBind l x (PostfixOp e q)
-desugarBind l (PostfixOp x (Ident _ "^")) e = desugarS $ ApplyS (eAssign l) $ Array [x, e]
-desugarBind l (Array ls) e = do
-  xs <- mapM (const $ newIdent "d") ls
-  let eun = Unify (Array (map (tAny l) xs)) e
-  els <- zipWithM (\ lhs x -> desugarBind l lhs (Variable x)) ls xs
-  pure $ Seq $ eun : els
-desugarBind l (InfixOp x (Ident _ "~>") y) (PrefixOp (Ident _ ":") t) = do
-  (i, ex) <-
-    case x of
-      Variable i -> pure (i, [])
-      _ -> do
-        i <- newIdent "d"
-        ex <- desugarBind l x (Variable i)
-        pure (i, [ex])
-  ey <- desugarBind l y (ApplyD t (tAny l i))
-  pure $ seqE $ ey : ex
-desugarBind l lhs@(InfixOp _ (Ident _ "~>") _) e =
-  desugarBind l lhs (PrefixOp (Ident noLoc ":") (Typedef e))
+-- FIX L: reorder so value is always LHS?  RHS?
+-- Desugar a definition lhs := e
+dsL :: Loc -> Expr -> SExpr -> D SExpr
+dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
+-- L[x] e = x := e
+dsL l (Variable x) e = pure $ define l x e
+-- L[:t] e = t[e]
+-- FIX L: use D[t]
+dsL _ (PrefixOp (Ident _ ":") t) e = ApplyD <$> dsD t <*> pure e
+-- FIX L: use option
+-- L[e?] = ????
+dsL _l (PostfixOp _lhs (Ident _ "?")) _e = undefined
+-- L[e1^] e = assign(D[e1], e)
+dsL l (PostfixOp e1 (Ident _ "^")) e = do
+  e1' <- dsD e1
+  pure $ ApplyS (eAssign l) $ Array [e1', e]
+-- FIX L: update for splices
+-- L[lhs1, ... lhsn] = ...
+dsL l (Array lhss) e = dsLArr l lhss e
+-- L[x ~> lhs2] (:t) = L[lhs2] (D[t] [x:any])
+dsL l (InfixOp (Variable x) (Ident _ "~>") lhs2) (Range t) =
+  dsL l lhs2 (ApplyD t (tAny l x))
+-- L[lhs1 ~> lhs2] (:t) = L[lhs1] x; L[x ~> lhs2] (Range t), x fresh
+dsL l (InfixOp         lhs1 (Ident _ "~>") lhs2) (Range t) = do
+  x <- newIdent "d"
+  ex <- dsL l lhs1 (Variable x)
+  ey <- dsL l (InfixOp (Variable x) (Ident l "~>") lhs2) (Range t)
+  pure $ Seq [ex, ey]
+-- L[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
+dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsL l lhs (Range (Typedef e))
 -- What else is allowed?  LitInt and LitRat would be easy.
-desugarBind l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
+dsL l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
-desugarFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
-desugarFunDef l (EffAttr f a) as e = desugarFunDef l f (a:as) e
-desugarFunDef l (ApplyS f a) as e = desugarFunDef l f [] $ Function [(a, reverse as)] e
-desugarFunDef l (Variable f) [] e = define l f <$> desugarS e
-desugarFunDef _ Variable{} _ _ = internalError
-desugarFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
+-- Handle ..l, l
+dsLArr :: Loc -> [Expr] -> SExpr -> D SExpr
+dsLArr l lhss e =
+  case exprElems lhss of
+    -- L[lhs0,...,lhsn] e = (x0:any,...,xn:any) = e; L[lhs0]x0; ...; L[lhsn]xn
+    [EElems ls] -> do
+      xs <- mapM (const $ newIdent "d") ls
+      let eun = Unify (Array (map (tAny l) xs)) e
+      els <- zipWithM (\ lhs x -> dsL l lhs (Variable x)) ls xs
+      pure $ Seq $ els ++ [eun]
+
+    [ESplice lhs] ->
+      dsL l lhs e
+    
+    [EElems ls1, ESplice lhs] -> do
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      let
+        len1 = toInteger $ length ls1
+        a1  = applyPrim "takeL#" $ Array [LitInt len1, v]
+        e'  = applyPrim "dropL#" $ Array [LitInt len1, v]
+      v' <- newIdent "d"
+      let
+        bv' = define l v' e'
+      m1 <- dsL l (Array ls1) a1
+      mm <- dsL l lhs e'
+      pure $ Seq $ bv ++ [m1, bv', mm, v]
+
+    [ESplice lhs, EElems ls2] -> do
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      let
+        len2 = toInteger $ length ls2
+        a2  = applyPrim "takeR#" $ Array [LitInt len2, v]
+        e'' = applyPrim "dropR#" $ Array [LitInt len2, v]
+      mm <- dsL l lhs e''
+      m2 <- dsL l (Array ls2) a2
+      pure $ Seq $ bv ++ [mm, m2, v]
+
+    [EElems ls1, ESplice lhs, EElems ls2] -> do
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      let
+        len1 = toInteger $ length ls1
+        len2 = toInteger $ length ls2
+        a1  = applyPrim "takeL#" $ Array [LitInt len1, v]
+        e'  = applyPrim "dropL#" $ Array [LitInt len1, v]
+      v' <- newIdent "d"
+      let
+        bv' = define l v' e'
+        a2  = applyPrim "takeR#" $ Array [LitInt len2, Variable v']
+        e'' = applyPrim "dropR#" $ Array [LitInt len2, Variable v']
+      m1 <- dsL l (Array ls1) a1
+      mm <- dsL l lhs e''
+      m2 <- dsL l (Array ls2) a2
+      pure $ Seq $ bv ++ [m1, bv', mm, m2, v]
+
+    _ -> syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow (Array lhss) ++ ", should only have one ..e"
+
+-- Desugar a match for function definitions
+dsM :: Expr -> SExpr -> D SExpr
+dsM e1 e2 | doTrace && trace ("dsM " ++ prettyShow (e1, e2)) False = undefined
+-- M[pat0,...,patn] e = (x0:any,...,xn:any) = e; M[pat0]x0; ...; M[patn]xn
+dsM (Array ps) e = dsMArr ps e
+dsM (PrefixOp (Ident _ ":") t) e = ApplyD <$> dsD t <*> pure e
+dsM (Seq (Snoc ps p)) e = do
+  ps' <- mapM dsD ps
+  p' <- dsM p e
+  pure $ seqE (Snoc ps' p')
+dsM (InfixOp e1 (Ident _ "where") e2) e = do
+  e1' <- dsD e1
+  e2' <- dsM e2 e
+  pure $ seqE [e1', e2']
+dsM (Let e1 e2) e = do
+  e1' <- dsD e1
+  e2' <- dsM e2 e
+  pure $ Let e1' e2'
+dsM (ApplyS _ _) _ = unimplemented "dsM"
+dsM (InfixOp lhs (Ident l ":") t) e = dsM (InfixOp lhs (Ident l ":=") (PrefixOp (Ident l ":") t)) e
+dsM (InfixOp lhs (Ident l ":=") e1) e = dsL l lhs =<< dsM e1 e
+dsM e1 e = do
+  e1' <- dsD (Do e1)
+  pure $ Unify e1' e
+
+dsMArr :: [Expr] -> SExpr -> D SExpr
+dsMArr pats e =
+  -- FIX M: second arg is SExpr, don't use D
+  case exprElems pats of
+    [EElems ps] -> do
+      xs <- mapM (const $ newIdent "d") ps
+      let eun = Unify (Array (map (tAny noLoc) xs)) e
+      els <- zipWithM (\ pat x -> dsM pat (Variable x)) ps xs
+      pure $ Seq $ eun : els
+    _ -> unimplemented "dsMArr"
+
+dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
+dsFunDef l (EffAttr f a) as e = dsFunDef l f (a:as) e
+dsFunDef l (ApplyS f a) as e = dsFunDef l f [] $ Function [(a, reverse as)] e
+dsFunDef l (Variable f) [] e = define l f <$> dsD e
+dsFunDef _ Variable{} _ _ = internalError
+dsFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
@@ -177,90 +398,29 @@ primOps = map (Ident noLoc)
   , "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
   , "assign#"
-  , "concat#"
+  , "concat#", "takeL#", "dropL#", "takeR#", "dropR#"
   ]
 
 --------------------
 
 -- Remove let/do and possible name clashes.
 -- XXX name clash removal not implemented
-desugarDoS :: Expr -> D Expr
-desugarDoS = f
-  where f (Do b) = f b
-        f (Let e b) = f $ seqE [e, b]
-        f e = compos f e
+-- XXX Also get rid of lingering Range.
+--     They should probably not exist in the first place.
+dsDo :: Expr -> D Expr
+dsDo = f
+  where
+    -- D[do b] = D[b]
+    f (Do b) = f b
+    -- D[let(e)in b] = D[e]; D[b]
+    f (Let e b) = f $ seqE [e, b]
+    f (Range e) = do
+      r <- newIdent "r"
+      e' <- f e
+      pure $ ApplyD e' (tAny noLoc r)
+    f e = compos f e
 
 --------------------
-
--- XXX This needs to run while we still have Where and Do
-desugarFunctionS :: Expr -> D Expr
-desugarFunctionS = expr
-  where
-    expr e@LitInt{} = pure e
-    expr e@LitRat{} = pure e
-    expr e@Variable{} = pure e
-    expr (Array es) = Array <$> mapM expr es
-    expr (Seq es) = seqE <$> mapM expr es
-    expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
-    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-    expr (If3 e1 e2 e3) = If3 <$> expr e1 <*> expr e2 <*> expr e3
-    expr (For2 e1 e2) = For2 <$> expr e1 <*> expr e2
---    expr (Let e1 e2) = Let <$> expr e1 <*> expr e2
---    expr (Do e) = Do <$> expr e
-    expr (Function ars e2) = function ars e2  -- XXX
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr (Define i e) = Define i <$> expr e
-    expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
-    expr (Range e1) = Range <$> expr e1
-    expr (Typedef e1) = Typedef <$> expr e1
-    expr AnyT = pure AnyT
-    expr e = impossible e
-
-    function [(Define i a, fs)] e2 | isAnyT a = Function [(Define i AnyT, fs)] <$> expr e2
-      -- XXX remove "any" when we have a simplifier.
-      where isAnyT AnyT = True
-            isAnyT (Range (Variable (Ident _ "any"))) = True
-            isAnyT _ = False
-    function [(e1, fs)] e2 = do
-      i <- newIdent "z"
-      m <- desugarMatch e1 (Variable i)
-      e2' <- expr e2
-      pure $ Function [(Define i AnyT, fs)] $ seqE [m, e2']
-    function ars _ = unimplemented $ show ars
-
--- Do the almost-unification involved in matching function arguments.
--- The big difference is the :e and function(p){e}
-desugarMatch :: Expr -> Expr -> D Expr
-desugarMatch pat expr =
-  case pat of
-    LitInt{} -> equal
-    LitRat{} -> equal
-    Variable{} -> equal
-    Array es -> do
-      xs <- mapM (const $ newIdent "a") es
-      ms <- zipWithM desugarMatch es $ map Variable xs
-      let m = Unify (Array (map (tAny noLoc) xs)) expr
-      pure $ seqE $ m : ms
-    Seq (Snoc es e) -> Seq <$> (Snoc <$> mapM desugarFunctionS es <*> desugarMatch e expr)
-    ApplyD{} -> equal
-    ApplyS{} -> equal
-    If3 _e1 _e2 _e3 -> equal
-      -- Would this make sense?:
-      -- If3 <$> desugarFunctionS e1 <*> desugarMatch e2 expr <*> desugarMatch e3 expr
-    For2{} -> equal
-    --Function _e1 _fs _e2 -> unimplemented
-    Unify{} -> equal
-    Define i e -> define noLoc i <$> desugarMatch e expr
-    Choice{} -> equal
-    Range e -> ApplyD <$> desugarFunctionS e <*> pure expr
-    Typedef{} -> equal
-    AnyT -> equal
-    _ -> impossible pat
-  where
-    -- XXX pat really needs its own scope
-    equal = unify pat expr
-    unify e1 e2 = Unify <$> desugarFunctionS e1 <*> pure e2
-
 -- Make all Array take value arguments, as well as ApplyS/ApplyD
 anfS :: Expr -> D Expr
 anfS = anf
@@ -402,12 +562,3 @@ e1:=e2 <-->  e1:typedef{e2}
 e1 := e2  -->  e1 := :typedef{e2}  -->  e1:typedef{e2}
 
 -}
-
-hackRange :: Expr -> D Expr
-hackRange = f
-  where
-    f (Range e) = do
-      r <- newIdent "r"
-      e' <- f e
-      pure $ ApplyD e' (tAny noLoc r)
-    f e = compos f e
