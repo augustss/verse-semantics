@@ -1,13 +1,21 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Misc(
-  anySame,
+  anySame, revTake, revDrop,
   pattern Snoc,
   ) where
 
 anySame :: (Eq a) => [a] -> Bool
 anySame [] = False
 anySame (x:xs) = x `elem` xs || anySame xs
+
+--------
+
+revTake :: Int -> [a] -> [a]
+revTake n = reverse . take n . reverse
+
+revDrop :: Int -> [a] -> [a]
+revDrop n = reverse . drop n . reverse
 
 --------
 
