@@ -415,11 +415,6 @@ evalPrimOps :: EvalCore
 evalPrimOps = evalTrace "evalPrimOps" f
   where
     f e@CLam{} | notLam = e
-    --- any, nat, false need not be primitives
-    f (CUnOp  "any" v) = CValue v
-    f (CUnOp  "nat" v) | VInt i <- v, i >= 0 = CValue v
-                       | otherwise   = CFail
-    f (CUnOp  "false" _) = CFail
     -- real primitives
     f (CUnOp  "int#" v) | VInt _ <- v = CValue v
                         | otherwise   = CFail
