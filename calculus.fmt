@@ -131,6 +131,7 @@
 
 %format a_0
 %format a_1
+%format a_2
 %format a_n
 
 %format e_0

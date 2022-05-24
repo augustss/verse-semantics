@@ -954,12 +954,12 @@ $$
   \multicolumn{1}{l}{\textbf{Bindings}} \\
   |De (l : t)| & = & |De (l := :t)| \\
   |De (l := e)| & = & |Ld l (De e)| \\
-  |De (x a dots := e)| & = & |x := De(function a dots e)| \\
-  |De (x a dots : t := e)| & = & |x := De(functionKW a dots (t^[e]))| \\
+  |De (f a_1 dots a_n := e)| & = & |f := De(functionKW a_1 dots a_n e)| \\
+  |De (f a_1 dots a_n : t := e)| & = & |f := De(functionKW a_1 dots a_n (t^[e]))| \\
   \\
   \multicolumn{1}{l}{\textbf{Functions}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
-  |De (functionKW a1 a2 dots b)| & = & |De (functionKW a1 (functionKW a2 dots b))| & \\
+  |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
   |De (functionKW a (eff r) b)| & = & |De (functionKW a (r^[b]))| & \\
   |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
