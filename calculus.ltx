@@ -62,7 +62,7 @@
 \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
-\newcommand{\subst}[3]{#1[#3/#2]}
+\newcommand{\subst}[3]{#1\{#3/#2\}}
 
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}
@@ -342,17 +342,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
 \begin{figurebox}
   $$
   \begin{array}{l}
-    \textit{Def-blocks} \\
-    \begin{array}{lrcl}
-    \rulename{def-elim} & |def emp e| & \movesto & |e| \\
-    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \quad \text{if}~|X| \ne \hole,\,  h \disjoint \freevars{X} \\
-    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \quad \text{if}~ h_1 \disjoint h_2 \\
-    \rulename{bind} & |def (H^[x]) (X^[x==v])| & \movesto
-    & |def (H^[emp]) (subst (X^[v]) x v)| \\
-    && \multicolumn{2}{l}{\text{if $|x| \notin \freevars{v}$}} \\
-    \end{array} \\
-    \\[-2mm]
-
     \textit{Unification} \\
     \begin{array}{lrcl}
     \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
@@ -372,12 +361,27 @@ The |let| construct cleverly models the heap, maintaining sharing.
       \end{array}\right.\\
     \rulename{ux1} & |k == array (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |array (v_1,dots,v_n) == k | & \movesto & |fail| \\
-    \rulename{urec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
-    &&& \text{if $|x| \in \freevars{e}$}\\
-
      \end{array}\\
 
     \\[-2mm]
+
+    \textit{Def-blocks} \\
+    \begin{array}{lrcl}
+    \rulename{subst} & |X^[x==v]| & \movesto
+    & |(subst X x v)^[x==v]| \\
+    &&& \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{subst-rec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
+    &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
+
+    \rulename{def-unused} & |def (H^[x]) (X^[x==v])| & \movesto
+    & |def (H^[emp]) (X^[v])| \\
+    &&& \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \quad \text{if}~|X| \ne \hole,\,  h \disjoint \freevars{X} \\
+    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \quad \text{if}~ h_1 \disjoint h_2 \\
+    \rulename{def-elim} & |def emp e| & \movesto & |e| \\
+    \end{array} \\
+    \\[-2mm]
+
 
     \textit{Fail propagation} \\
     \begin{array}{lrcl}
@@ -409,7 +413,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
     \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
     \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
-    \rulename{occurs-check} & |def (H^[x]) (X^[x=V^[x]])| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
+    \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
     \rulename{succeeds-choice} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
     \rulename{decides-choice} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
@@ -507,22 +511,6 @@ Can it be made safe by a better treatment of |e choice E|?
 }
 \joachim{What about |v choice E|? Only look past a choice if the first branch is done?}
 
-\subsection{Notes on the rewrite rules}
-
-\begin{itemize}
-\item \emph{Substitution, rule \rulename{bind}.}
-  \begin{itemize}
-    %\item \rulename{bind} does not discard the heap binding, because it may be needed,
-    %  in \rulename{if-true} and \rulename{for}.
-   \item We could use a rule that substitutes in just one place (a la Ariola).
-   \item Rule \rulename{bind} fires only if the variable is equated to a
-     \emph{value}, and values can freely be duplicated without duplicating
-     work, so \rulename{bind} does not duplicate work.
-   \item The $x \notin \freevars{v}$ is an occures check, which prevents cyclic data structures.
-   \end{itemize}
-\item Rule \rulename{def-elim} removes up |defKW| bindings, but only when they are empty. Every variable introduced must be, at some point, eliminated using \rulename{bind}.
-\end{itemize}
-
 \subsection{Unification}
 
 Rules \rulename{ucon} and \rulename{utup} do conventional unification, decomposing
@@ -534,38 +522,48 @@ on the LHS is part of the syntax of Verse. In contrast
 the ``$k_1 = k_2$'' in the side-condition is ``real'' equality: it means that |k_1| and |k_2| are the
 same constant.
 
-Rules \rulename{bind} comes into play when variables are involved.
-First, \rulename{bind} says that when within the scope of |x|, we find an equation that unifies it with a value |v|, we can substitute that value for |x| and eliminate |x| completely.
+\paragraph{Substitution}
 
-Crucially, note that $X$ does not look inside |oneKW|, |allKW|, or choice (|choice|).
-For example
-$$ |def x (one (x==3); x)| $$
-does
-not unify |x| via \rulename{bind}; only variables bound by the \emph{innermost enclosing \hexp{}} can be unified.
-Nor does $X$ look inside choices.  For example,
-|def x (x==2 choice x==3)| does not unify |x| via \rulename{bind}.
+Once we have an equality that indicates that a variable must be equal to a given value here, we can use rule \rulename{subst} to propagate that information in the surrounding context. Note that the substitution applies to the \emph{context} |X|, with a hole where the equation |x = v| was, and we put the equation |x = v| back into the hole afterwards.
 
-Rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)| to allow rule \rulename{bind} to fire.
-We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence
-using |hnf| rather than |v| in this rule.
+The first side-condition $x \in \freevars{X}$ merely prevents this rule from firing vacuously. The second side-condition $x\notin \freevars{v}$, also called the “occurs check”, prevents recursive values from propagating.
+
+We can use this rule even far away from where the variable |x| is defined. For example, an equation |x=1| in the condition of an |if| does not define |x|, but we may still use that equation within the condition of the |if|:
+\[
+\begin{array}{ll}
+& |def x ((if x = 1; x > 2 then e1 else e2); dots)| \\
+\movesto & |def x ((if x = 1; 1 > 2 then e1 else e2); dots)| \\
+\movesto^\ast & |def x ((if fail then e1 else e2); dots)| \\
+\movesto & |def x (e2; dots)|
+\end{array}
+\]
+
+The context |X| crucially prevents us from using the equation for |x| where it does not hold; we cannot rewrite |(x = 1) choice (x + 2)| to |(x = 1) choice (1 + 2)|.
+
+
+Once all occurrences of a variable |x| have been substituted this way, we can remove its bindings with rule \rulename{def-unused}. This rule only removes variables that have a definition. It is illegal in Verse to introduce a variable and never assign it a value, as in |def x 1|.
+
+
+Rule \rulename{swap} swaps |(e=x)| to |(x=e)| to allow rule \rulename{subst} to fire.
+We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence the side condition.
 
 \paragraph{Recursion}
 
-The side condition $\freevars{v} \disjoint \{x\}$ ensuress that |v| does not mention |x| itself -- the ``occurs check''. This way we never have cyclic values like |x = (x,x)|.
+The side condition $x \notin \freevars{v}$ in rule \rulename{subst} ensures that |v| does not mention |x| itself -- the ``occurs check''. This way we cannot use cyclic values like |x = (x,x)|.
 
-Verse does support recursive functions and closures, such as |loop = (y => applyx loop y)|. This equation cannot be used by \rulename{bind} directly, due the occurs check. Therefore \rulename{urec} will push the binding inside the lambda and rewrite to |loop = (def loop in loop = (y => applyx loop y); apply loop y)|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{bind} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping. It also works if the recursive lambda is nested more deeply, as in |loops = ((y => applyx(applyx loops 1)y), (y => applyx(applyx loops 0)y))|.
+Verse supports recursive functions and closures, such as |loop = (y => applyx loop y)|. This equation cannot be used by \rulename{subst} directly, due the occurs check. Therefore \rulename{subst-rec} will push the binding inside the lambda and rewrite to |loop = (def loop in loop = (y => applyx loop y); apply loop y)|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{subst} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping. It also works if the recursive lambda is nested more deeply, as in |loops = ((y => applyx(applyx loops 1)y), (y => applyx(applyx loops 0)y))|.
 
 \paragraph{Scope expansion}
 
-Rule \rulename{def-float} expands the scope of variables within the current execution context $X$, and \rulename{def-merge} combines all variables with the same scope in a single |defKW|. This allows \rulename{bind} to fire on any of these variable. For example in
+Rule \rulename{def-float} expands the scope of variables within the current execution context $X$, and \rulename{def-merge} combines all variables with the same scope in a single |defKW|, to allow |subst| to fire more easily.For example in
     $$ |def x  (dots x dots(def z (dots(x==(3,z))dots))dots)| $$
-it would be dangerous if \rulename{bind} could substitute |(3,z)| for |x| right away, because |z| is not in scope everywhere where |x| is. But after floating and merging we get
+it would be dangerous if \rulename{subst} could substitute |(3,z)| for |x| right away, because |z| is not in scope everywhere where |x| is. But after floating and merging we get
     $$ |def (x,z)  (dots x dots(dots(x==(3,z))dots)dots)| $$
-and now we can safely invoke \rulename{bind} on |x|.
+and now we can safely invoke \rulename{subst} on |x == (3,z)|.
 
 \paragraph{Reflexivity}
 
-One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x (x = (y => y); (x == x))|. If we use \rulename{bind} first, we will unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
+One might expect to see the innocent looking rule \rulename{uvar} allowing $|x == x| \movesto |x|$, but such a rule would lead to non-confluence. Consider |def x (x = (y => y); (x == x))|. If we use \rulename{subst} first, we will then unify two lambda values, which reduces to |wrong| per \rulename{unify-wrong}, but if we use \rulename{uvar} first, the term would reduce to |(y => y)|.
 
 \subsection{Choice and failure}
 
@@ -590,13 +588,13 @@ We cannot expand the choice, because |applyx x ()| is not choice-free, but we ca
 
 \item The |SX| context anchors the rule at a \emph{choice-limiting construct}, such as choice itself.
 
-This is important to avoid getting stuck. Without this provision, rule |\rulename{choose}| would allow the following transition:
+This is important to avoid getting stuck. Without this provision, rule \rulename{choose} would allow the following transition:
 $$
 \begin{array}{rl}
 &|def x (applyx x (); x = (_ => 1); (1 choice 2))| \\ \movesto  &  |def x (applyx x (); ((x = (_ => 1); 1)choice(x = (_ => 1); 2)))|
 \end{array}
 $$
-This is bad, because now the equation that we can use to define |x| using \rulename{bind} is no longer visible to \rulename{bind}, as the |X| context does not reach into choices, and we are suddently stuck.
+This is bad, because now the equation that we can use to define |x| using \rulename{subst} is no longer visible to \rulename{subst}, as the |X| context does not reach into choices, and we are suddently stuck.
 
 
 Note that in examples, we often treat the whole expression as if it was in an |SX| context.
@@ -619,16 +617,16 @@ in \rulename{app-arr} to index it: |applyx (array (v_0,dots v_n)) k| evaluates t
 In Verse, an |if|-expression does not evaluate its condition to a Boolean true or false.  Instead
 it tests whether its condition succeeds (i.e. returns one or more values) or fails (returning no values). The essence of this check is captured in the |one e| construct, which evaluates to the \emph{first} value returned by |e|. The conventional |if e_1 then e_2 else e_3| construct can be built on top of |oneKW|.
 
-For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeds (returning one value, namely |3|)
+For example |if (x=3) then e_1 else e_2| tries to unify |x| and |3|; if that succeeds (returning one value, namely |3|)
 the |if| returns |e_1|, otherwise it returns |e_2|.
 
 Comparision operators succeed or fail, rather than returning a Boolean
-(as in most languages). For example |(x>3)| suceeds if |x| is greater
+(as in most languages). For example |(x>3)| succeeds if |x| is greater
 than 3, returning |x|; and fails if not.
 
 It is very important that in |one ((x=3;1) choice 2)| we
 treat |x| as ``rigid'': the conditional is intended to \emph{test}
-|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{bind}
+|x|'s value, rather \emph{giving} |x| its value!  That is why rule \rulename{subst}
 does not look inside an |oneKW| (look at the syntax of context |X| used in that rule).
 
 \subsection{|wrong| and the verifier}
@@ -638,9 +636,16 @@ Some expressions don't make sense, such as using a number as a function in funct
 \item The expression |def x (applyx (one (x = 1; (y => (x = 1)))) ())| (with implicit ANFing) is stuck, as no rule can make progress, but there is nothing obivously wrong with this program.
 \end{itemize}
 
-To clearly identify wrong terms, we introduce the special construct |wrong| to the syntax, and rewrite bad expressions to |wrong| using the rules in Figure \ref{fig:wrong-axioms}.
+To clearly identify wrong terms, we introduce the special construct |wrong| to the syntax, and rewrite bad expressions to |wrong| using the rules in Figure \ref{fig:wrong-axioms}. Programs go wrong if they
+\begin{itemize}
+\item Add or compare values that are not numbers
+\item Use numbers as functions
+\item Unify lambdas
+\item Fail the occurs check, as in |x = (1,x)|
+\item Fail effect annotations (|succeedsKW|, |decidesKW|)
+\end{itemize}
 
-The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out wrong reduction; according to the motto “verified programs don’t go wrong”.
+The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out the existence of a wrong reduction; according to the motto “verified programs don’t go wrong”.
 
 But not every |wrong| is wrong: because we allow reduction everywhere, even in eventually unused code, we must allow for |wrong| to appear temporarily, as in this reduction:
 \[
@@ -649,7 +654,7 @@ But not every |wrong| is wrong: because we allow reduction everywhere, even in e
 
 Only those occurrences of |wrong| that are “needed” matter. To identify those, we can extend our reduction semantics with the |wrong| propagation rules in Figure~\ref{fig:wrong-propagation}. With these in place, the verifier will guarantee that the overall program does not evaluate to |wrong|, even though subexpressions may be |wrong|. Therefore, the propagation rules are irrelevant for the execution of verified program.
 
-Note that the rule propagation rules for |wrong| can compete with fail propagation rules. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction.
+Note that the rule propagation rules for |wrong| can compete with fail propagation rules. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction sequence.
 
 \subsection{The Equality Principle}
 
@@ -1160,6 +1165,8 @@ we want the rule
 
 \subsection{Local substitution}
 
+The (local) substitution rule \rulename{subst} was strongly motivated by our desire to have a confluent system. Previously, we had a single rule that combined \rulename{subst} and \rulename{def-unused}, and thus only fired when the definig equality was within reach of the |defKW|. But that was not confluent:
+
 Consider the following chain of reductions, where |C| denotes an arbitrary context:
 \begin{conteq}
              |x = v; C^[x]|    \\
@@ -1170,31 +1177,32 @@ Consider the following chain of reductions, where |C| denotes an arbitrary conte
 \movesto     |x = v; C[v]| \\
 \end{conteq}
 
-This demonstrates the need for a rule that allows us to take information about a variable $x$, possibly bound farther out, and replace an occurence of $x$ in the scope of that equation with $v$.
+% A possible formulation of this could be
+% 
+% \[ \rulename{subst} \quad |C^[x]| \movesto |C^[v]| \text{ if } |C^[x]| = |X^[x = v]|, |C^[hole]| \ne |X^[hole = v]| \]
+% 
+% which we can unpack as follows:
+% \begin{itemize}
+% \item The rule replaces a \emph{single} occurrence of |x| to |v|, anywhere within the current expression |C[x]|. This uses a (not yet spelled out) context |C| that reaches everywhere within an expression, even under lambdas etc.
+% \item Of course this is only ok if we may assume that |x| is equal to |v| within the current expression. This is the case if the equation |x=v| is part of the current expression, but not hidden under a lambda or similar; this is what the |X| context says. The first side conditions says that “the current expression |C[x]| has |x=v| within the reach of the execution context |X|.
+% \item The occurence of |x| that we replace must \emph{not} be the one in the equation |x = v|; we certainly do not want to rewrite |x = 1| to |1 = 1|. The second side conditions ensures that.
+% \item There is no side condition $x \notin \freevars{v}$. The chain of reductions above that justify this rule work even when $x \in \freevars{v}$. This means that an equation |x = (x,x)| can be used for local rewriting over and over, but that seems to be ok.
+% \end{itemize}
 
-A possible formulation of this could be
+There is no requirement $x \notin v$ in that derivation. We still restrict \rulename{subst} that way, and use \rulename{occurs-check} to handle programs that have equations like |x = (1,x)|.
+\joachim{I wonder if we still get non-confluence if we have |x| under a lambda, but lets defer that until we know how to handle confluence of lambdas in the first place.}
 
-\[ \rulename{local-subst} \quad |C^[x]| \movesto |C^[v]| \text{ if } |C^[x]| = |X^[x = v]|, |C^[hole]| \ne |X^[hole = v]| \]
-
-which we can unpack as follows:
-\begin{itemize}
-\item The rule replaces a \emph{single} occurrence of |x| to |v|, anywhere within the current expression |C[x]|. This uses a (not yet spelled out) context |C| that reaches everywhere within an expression, even under lambdas etc.
-\item Of course this is only ok if we may assume that |x| is equal to |v| within the current expression. This is the case if the equation |x=v| is part of the current expression, but not hidden under a lambda or similar; this is what the |X| context says. The first side conditions says that “the current expression |C[x]| has |x=v| within the reach of the execution context |X|.
-\item The occurence of |x| that we replace must \emph{not} be the one in the equation |x = v|; we certainly do not want to rewrite |x = 1| to |1 = 1|. The second side conditions ensures that.
-\item There is no side condition $x \notin \freevars{v}$. The chain of reductions above that justify this rule work even when $x \in \freevars{v}$. This means that an equation |x = (x,x)| can be used for local rewriting over and over, but that seems to be ok.
-\end{itemize}
-
-Note that the chain of reduction above also works if instead of $x$ we any value, yielding:
+Note that the chain of reduction above actually also works if instead of $x$ we have any value. This yields
 \[
 v_1 = v_2; |C^[v_1]| \convertible |v_1 = v_2; C^[v_2]|
 \]
 We do not need to add that as a separate rule, by the following case anaysis:
 \begin{itemize}
-\item If |v_1| is a variable, \rulename{local-subst} applies.
-\item If |v_1| is not a variable, but |v_2| is, \rulename{swap} allows us to use \rulename{local-subst}.
-\item If |v_1| and |v_2| are both constants and the same, substitution would not have any effect. 
+\item If |v_1| is a variable, \rulename{subst} applies.
+\item If |v_1| is not a variable, but |v_2| is, \rulename{swap} allows us to use \rulename{subst}.
+\item If |v_1| and |v_2| are both constants and the same, substitution would not have any effect.
 \item If |v_1| and |v_2| are both arrays of the same length, rule \rulename{uarr} decomposes it into equalities between the components. Substitution of the whole array can now be performed by substitution using the component equalities.
-\item If |v_1| and |v_2| are different constants, tuples of different lengths are else inconsistent, it evaluates to |fail| or |wrong|, and that swallows the whole contex that could be affected by first substituting. \joachim{TODO: This only works if |fail| and |wrong| are the same.}
+\item If |v_1| and |v_2| are different constants, tuples of different lengths or else inconsistent, it evaluates to |fail| or |wrong|, and that swallows the whole contex that could be affected by first substituting.
 \end{itemize}
 
 \subsection{Handling |wrong| terms}
@@ -1235,7 +1243,7 @@ Of course, the |wrong| propagation rules in Figure~\ref{fig:wrong-propagation} m
 
 With all these rules above added, and maybe some more to take care of minor syntactic differences (order of variable bindings), are the reduction rules confluent? \joachim{I don’t know yet, and I am unsure how to prove it.}
 
-A proof sketch would argue that using \rulename{local-subst} and decomposition of equalities, we can exhaustively propagate all available information about free variables. In the presence of recursion, (e.g. |x = (x,x)|) this may not necessary terminate, but we can hope that any two approximations of the infinite term tree can be joined again.
+A proof sketch would argue that using \rulename{subst} and decomposition of equalities, we can exhaustively propagate all available information about free variables, and after this propagation, convertible terms are equal.
 
 
 \end{document}
