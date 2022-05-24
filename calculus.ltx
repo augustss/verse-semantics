@@ -236,10 +236,12 @@ The |let| construct cleverly models the heap, maintaining sharing.
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
 %    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
- \\
- \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
- \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
-    &&\vb & |def h CX| \\
+    \\
+    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
+     &&\vb & |def h CX| \\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole | \\
+     &&\vb & |one hole| \vb |all hole| \vb |succeeds hole| \vb |decides hole| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H\\
     \text{Value context} & V & ::= & \hole \vb |array (dots,V,dots)|\\
     \end{array} \\
@@ -269,7 +271,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcll}
     \rulename{fail-l} & |fail choice e| & \movesto & e \\
     \rulename{fail-r} & |e choice fail| & \movesto & e \\
-    \rulename{choose} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| & \text{if}~|CX| \ne \hole \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
     \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| 
     \end{array} \\
     \\
@@ -567,8 +569,13 @@ One might expect to see the innocent looking rule \rulename{uvar} allowing $|x =
 
 \subsection{Choice and failure}
 
-Rule \rulename{choose} is the crucial one: it duplicates the entire |defKW| context.  But note the
-\emph{choice-free} context |CX|!  For example, the expression
+Rule \rulename{choose} is the crucial one: it duplicates an entire expression with a nested choice, moving that expression into the choice, where we then can make more progress:
+$$|def x (x == (1 choice 2))| \movesto |def x (x == 1) `choice` def x (x == 2)|$$
+
+Two aspects of this rule deserve explanation:
+\begin{enumerate}
+\item Note the use of the \emph{choice-free} context |CX|!  For example, the
+expression
 $$
 |def (x,y) ((x == (3 choice 4)) ; (y == (9 choice 2)); (x,y))|
 $$
@@ -576,6 +583,25 @@ should yield the values |(3,9)|, |(3,2)|, |(4,9)|, |(4,2)|, in that order.
 To get the order right, we must apply \rulename{choose} to the first choice |(3 choice 4)| first, and only
 then to the second |(9 choice 2)|.  This is achieved by using |CX| in \rulename{choose} to ensure that only the
 \emph{leftmost} choice can be chosen.
+
+Because we need to expand choices in the right order, we are stuck with a program like the following:
+$$ |def (x,y) (y = applyx x (); x = ((_ => (1 choice 2)) choice (_ => (3 choice 4 choice 5)));y)| $$
+We cannot expand the choice, because |applyx x ()| is not choice-free, but we cannot make progress there either, because we need to know the value of |x|.
+
+\item The |SX| context anchors the rule at a \emph{choice-limiting construct}, such as choice itself.
+
+This is important to avoid getting stuck. Without this provision, rule |\rulename{choose}| would allow the following transition:
+$$
+\begin{array}{rl}
+&|def x (applyx x (); x = (_ => 1); (1 choice 2))| \\ \movesto  &  |def x (applyx x (); ((x = (_ => 1); 1)choice(x = (_ => 1); 2)))|
+\end{array}
+$$
+This is bad, because now the equation that we can use to define |x| using \rulename{bind} is no longer visible to \rulename{bind}, as the |X| context does not reach into choices, and we are suddently stuck.
+
+
+Note that in examples, we often treat the whole expression as if it was in an |SX| context.
+\end{enumerate}
+
 
 The rules listed under \emph{Fail propagation} collapse expressions with a nested |fail| into a single |fail|.
 
@@ -1119,10 +1145,6 @@ to simplify reasoning about sequences without worrying about how they nest.
 \subsection{Order of variables in |defKW|}
 
 The rules \rulename{def-float} and \rulename{def-merge} can easily lead to superficial non-confluence where terms differ in the order variables occr in a |defKW|. We hand-wave that problem away by equating terms up to alpha-equivalence where the list of variables in |defKW| is considered a \emph{set} of bound variables.
-
-\subsection{TODO: Restrict \rulename{choice}}
-
-Currently, rule \rulename{choice} can make programs get stuck by moving a |x=v| equality into a choice, where \rulename{bind} cannot see it any more. \rulename{choice} needs to be restricted to apply to a “maximal |X| context” only.
 
 \subsection{Swap-seq-val}
 
