@@ -424,17 +424,31 @@ evalPrimOps = evalTrace "evalPrimOps" f
     f (CBinOp "in'-'"  v1 v2) = arith (-) v1 v2
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
     f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
-                                            | otherwise = CInt $ i1 - i2
+                                            | otherwise = CInt $ i1 `div` i2
     f (CBinOp "in'<'"   v1 v2) = cmp (<)  v1 v2
     f (CBinOp "in'<='"  v1 v2) = cmp (<=) v1 v2
     f (CBinOp "in'>'"   v1 v2) = cmp (>)  v1 v2
     f (CBinOp "in'>='"  v1 v2) = cmp (>=) v1 v2
-    f (CApply (VPrim "concat#") (VArray as)) | Just vss <- traverse getA as =
-                                                 CValue $ VArray $ concat vss
-                                             | otherwise = CWrong "concat#"
+    f (CBinOp "in'<>'"  v1 v2) = cmp (/=) v1 v2
+
+    f (CUnOp  "concat#" (VArray as)) | all isHNF as =
+      case () of
+        _ | Just vss <- traverse getA as -> CValue $ VArray $ concat vss
+        _ ->  CWrong $ "concat#"
         where getA (VArray vs) = Just vs
               getA _ = Nothing
-    f (CApply (VPrim op) _) = unimplemented $ show op
+    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL#", "dropL#", "takeR#", "dropR#"]
+                                         , let n = fromInteger ni
+                                         , n >= 0 && n <= length vs =
+      case op of
+        "takeL#" -> CArray $ take n vs
+        "dropL#" -> CArray $ drop n vs
+        "takeR#" -> CArray $ revTake n vs
+        "dropR#" -> CArray $ revDrop n vs
+        _ -> impossible "take/drop"
+
+    -- Fully evaluated, and still no match
+    f (CApply (VPrim op) a) | isNF a = unimplemented $ show (op, a)
     f e = composOp f e
 
     arith op (VInt i1) (VInt i2) = CInt $ op i1 i2
@@ -443,6 +457,15 @@ evalPrimOps = evalTrace "evalPrimOps" f
     cmp op (VInt i1) (VInt i2) | op i1 i2 = CInt i1
                                | otherwise = CFail
     cmp _ _ _ = CFail   -- CWrong?
+
+isNF :: Value -> Bool
+isNF (Var _) = False
+isNF (HNF (HArray vs)) = all isNF vs
+isNF (HNF _) = True
+
+isHNF :: Value -> Bool
+isHNF HNF{} = True
+isHNF _ = False
 
 -------------------
 
