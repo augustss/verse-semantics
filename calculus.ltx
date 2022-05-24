@@ -551,7 +551,7 @@ We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forev
 
 The side condition $x \notin \freevars{v}$ in rule \rulename{subst} ensures that |v| does not mention |x| itself -- the ``occurs check''. This way we cannot use cyclic values like |x = (x,x)|.
 
-Verse supports recursive functions and closures, such as |loop = (y => applyx loop y)|. This equation cannot be used by \rulename{subst} directly, due the occurs check. Therefore \rulename{subst-rec} will push the binding inside the lambda and rewrite to |loop = (def loop (loop = (y => applyx loop y); apply loop y))|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{subst} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping. It also works if the recursive lambda is nested more deeply, as in |loops = ((y => applyx(applyx loops 1)y), (y => applyx(applyx loops 0)y))|.
+Verse supports recursive functions and closures, such as |loop = (y => applyx loop y)|. This equation cannot be used by \rulename{subst} directly, due the occurs check. Therefore \rulename{subst-rec} will push the binding inside the lambda and rewrite to |loop = (y => def loop (loop = (y => applyx loop y); apply loop y))|. Now |loop| is no longer a free variable of the value on the right hand side and \rulename{subst} can fire. This rule appears to be looping, but applying rules under a lambda is generally at risk of looping. It also works if the recursive lambda is nested more deeply, as in |loops = ((y => applyx(applyx loops 1)y), (y => applyx(applyx loops 0)y))|.
 
 \paragraph{Scope expansion}
 
@@ -591,7 +591,7 @@ We cannot expand the choice, because |applyx x ()| is not choice-free, but we ca
 This is important to avoid getting stuck. Without this provision, rule \rulename{choose} would allow the following transition:
 $$
 \begin{array}{rl}
-&|def x (applyx x (); x = (_ => 1); (1 choice 2))| \\ \movesto  &  |def x (applyx x (); ((x = (_ => 1); 1)choice(x = (_ => 1); 2)))|
+&|def x (applyx x (); x = (_ => (1 choice 2)); (3 choice 4))| \\ \movesto  &  |def x (applyx x (); ((x = (_ => (1 choice 2)); 3)choice(x = (_ => (1 choice 2)); 4)))|
 \end{array}
 $$
 This is bad, because now the equation that we can use to define |x| using \rulename{subst} is no longer visible to \rulename{subst}, as the |X| context does not reach into choices, and we are suddently stuck.
