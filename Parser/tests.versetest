@@ -35,6 +35,15 @@ testeq(SEq) {3=2}                                 {:false}
 # Array expression splicing
 testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
 testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+
+# Simple function definition
+testeq(SEq) {succ(x:any):=x+1; succ[5]}           {6}
+
+# Different LHSs
+testeq(SEq) {x:=5; x}                             {5}
+testeq(SEq) {:int:=5}                             {5}
+testeq(SEq) {:int:=(1,2)}                         {:false}
+testeq(SEq) {(x:int):=5}                          {5}
 # Array LHS splicing
 testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}

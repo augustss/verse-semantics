@@ -353,14 +353,14 @@ dsM (Array ps) e = dsMArr ps e
 dsM (PrefixOp (Ident l ":") t) e = do
   x <- newIdent "d"
   t' <- dsD t
-  pure $ Seq [ApplyD t' (define l x e), Variable x]
+  pure $ Seq [ApplyD t' (define l x e){-, Variable x-}]
 dsM (Seq (Snoc ps p)) e = do
   ps' <- mapM dsD ps
   p' <- dsM p e
   pure $ seqE (Snoc ps' p')
 dsM (InfixOp e1 (Ident _ "where") e2) e = do
   e2' <- dsD e2
-  dsM e1 (seqE [e2' e])
+  dsM e1 (seqE [e2', e])
 dsM (Let e1 e2) e = do
   e1' <- dsD e1
   e2' <- dsM e2 e
