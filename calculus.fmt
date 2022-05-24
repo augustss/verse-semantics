@@ -176,7 +176,6 @@
 %format ce_n
 %format ce_m
 
-%format p
 %format p_0
 %format p_1
 %format p_2
