@@ -962,7 +962,7 @@ $$
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
   |De (functionKW a (eff r) b)| & = & |De (functionKW a (r^[b]))| & \\
-  |De (function e () b)| & = & |function(x:any)()((Mt e x; do{De b}))| & \text{|x| fresh} \\
+  |De (function e () b)| & = & |function(x:any)()((Mt e x; De (do b))| & \text{|x| fresh} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
   |De (:t)| & = & |: De t| \\
@@ -1029,10 +1029,10 @@ $$
   && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
-  |Mt (e_0, dots, e_n) e| & = & |(x_0:any, dots, x_n:any) = De e; Mt e_0 (x_0); dots; Mt e_n (x_n) | & \text{|x_i| fresh} \\
-  |Mt (: t) e| & = & |De(t)^[e]| \\
+  |Mt (e_0, dots, e_n) e| & = & |Mt e_0 (x_0); dots; Mt e_n (x_n); (x_0:any, dots, x_n:any) = e| & \text{|x_i| fresh} \\
+  |Mt (: t) e| & = & |De(t)^[x:=e]; x| & \text{|x| fresh} \\
   |Mt (e_1; e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
-  |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (e_2; e_3)| \\
+  |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (De e_2; e_3)| \\
   |Mt (let (e_1) in e_2) e_3| & = & |let (De e_1) in Mt e_2 e_3| \\
   |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| & \text{wrong} \\
   |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| & \text{wrong} \\
