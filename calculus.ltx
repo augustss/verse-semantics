@@ -1175,7 +1175,6 @@ Consider the following chain of reductions, where |C| denotes an arbitrary conte
 % \end{itemize}
 
 There is no requirement $x \notin v$ in that derivation. We still restrict \rulename{subst} that way, and use \rulename{occurs-check} to handle programs that have equations like |x = (1,x)|.
-\joachim{I wonder if we still get non-confluence if we have |x| under a lambda, but lets defer that until we know how to handle confluence of lambdas in the first place.}
 
 Note that the chain of reduction above actually also works if instead of $x$ we have any value. This yields
 \[
