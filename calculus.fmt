@@ -176,11 +176,11 @@
 %format ce_n
 %format ce_m
 
-%format l   = "\mathit{lhs}"
-%format l_0 = "\mathit{lhs}_0"
-%format l_1 = "\mathit{lhs}_1"
-%format l_2 = "\mathit{lhs}_2"
-%format l_n = "\mathit{lhs}_n"
+%format p
+%format p_0
+%format p_1
+%format p_2
+%format p_n
 
 %format fun = "\mathit{fun}"
 

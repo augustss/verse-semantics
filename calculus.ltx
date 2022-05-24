@@ -869,14 +869,12 @@ $$
   \\
       &     & \textit{Expressions removed by desugaring} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
-      & \vb & |l := e|           & \text{pattern definition} \\
-      & \vb & |f a_1 dots a_n := e|     & \text{function definition ($n > 0$)} \\
-      & \vb & |f a_1 dots a_n : t := e| & \text{function definition with return type ($n > 0$)} \\
-      & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
-      & \vb & |op_b e|          & \text{prefix operator} \\
+      & \vb & |lhs := e|      & \text{general definition} \\
+      & \vb & |e_1^(e_2)|     & \text{non-failing function application} \\
+      & \vb & |op_b e|         & \text{prefix operator} \\
       & \vb & |e op_a|          & \text{postfix operator} \\
       & \vb & |e_1 op_i e_2|    & \text{infix operator} \\
-      & \vb & |l : e|           & \text{of type} \\
+      & \vb & |p : e|           & \text{of type} \\
       & \vb & |e_1 where e_2|   & \text{reverse sequencing} \\
       & \vb & |if(e) then b|    & \text{conditional expression} \\
       & \vb & |if(e) else b|    & \text{conditional expression} \\
@@ -901,19 +899,24 @@ $$
       &     & |e|               & \text{single expression} \\
       & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
       \\
+  |lhs| & ::= & \textit{Definition left-hand-sides} \\
+      &     & |p|                  & \text{pattern definition} \\
+      & \vb & |f a_1 dots a_n|     & \text{function definition ($n > 0$)} \\
+      & \vb & |f a_1 dots a_n : t| & \text{function definition with return type ($n > 0$)} \\
+      \\
   |a| & ::= & \textit{Function parameter} \\
       &     & |()|               & \text{empty parameter list} \\
       & \vb & |(e)|              & \text{function parameter} \\
       & \vb & |a ^ eff r|        & \text{function effect annotation} \\
       \\
-  |l| & ::= & \textit{Patterns} \\
+  |p| & ::= & \textit{Patterns} \\
       &     & |x|               & \text{variable} \\
-      & \vb & |l : t|       & \text{of type} \\
+      & \vb & |p : t|       & \text{of type} \\
       & \vb & |: t|             & \text{of type} \\
-      & \vb & |l?|          & \text{optional} \\
+      & \vb & |p?|          & \text{optional} \\
       & \vb & |e|\,\,\hat{}     & \text{assignment} \\
-      & \vb & |l_1, dots l_n|   & \text{array} \\
-      & \vb & |l_1 minusgt l_2| & \text{domain-range} \\
+      & \vb & |p_1, dots p_n|   & \text{array} \\
+      & \vb & |p_1 minusgt p_2| & \text{domain-range} \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
         &     & ! \vb - \vb + \\
@@ -952,8 +955,8 @@ $$
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   \\
   \multicolumn{1}{l}{\textbf{Bindings}} \\
-  |De (l : t)| & = & |De (l := :t)| \\
-  |De (l := e)| & = & |Ld l (De e)| \\
+  |De (p : t)| & = & |De (p := :t)| \\
+  |De (p := e)| & = & |Ld p (De e)| \\
   |De (f a_1 dots a_n := e)| & = & |f := De(functionKW a_1 dots a_n e)| \\
   |De (f a_1 dots a_n : t := e)| & = & |f := De(functionKW a_1 dots a_n (t^[e]))| \\
   \\
@@ -1017,16 +1020,16 @@ A more robust desugaring could $\alpha$-convert such clashes.
 \begin{figure}
 $$
 \begin{array}{rcll}
-  |Ld| & \multicolumn{3}{l}{\text{converts a definition |l := e| to simple definitions with just |x := e|.}} \\
+  |Ld| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := e| \\
   |Ld (: t) e| & = & |De(t)^[x:=e]; x| & \text{|x| fresh} \\
-  |Ld (l : t) e| & = & |Ld l (De(t)^[x:=e]); x| & \text{|x| fresh} \\
-  |Ld (l ?) e| & = & |????| \\
+  |Ld (p : t) e| & = & |Ld p (De(t)^[x:=e]); x| & \text{|x| fresh} \\
+  |Ld (p ?) e| & = & |????| \\
   |Ld (e_1^hat) e| & = & |assign^(De e_1,x:=e); x| & \text{|x| fresh} \\
-  |Ld (l_0, dots, l_n) e| & = &
-  |Ld l_0 x_0; dots; Ld l_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
-  |Ld (l_1 minusgt l_2) e| & = & |y:=e; Ld l_1 x; Ld l_2 ((typedef^{y}^[x := :any])); y| & \text{|x|,|y| fresh} \\
-  && \simon{|l_1 minusgt l_2| is firmly in the ``needs more thought'' camp}\\
+  |Ld (p_0, dots, p_n) e| & = &
+  |Ld p_0 x_0; dots; Ld p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
+  |Ld (p_1 minusgt p_2) e| & = & |y:=e; Ld p_1 x; Ld p_2 ((typedef^{y}^[x := :any])); y| & \text{|x|,|y| fresh} \\
+  && \simon{|p_1 minusgt p_2| is firmly in the ``needs more thought'' camp}\\
   \\
   |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
   |Mt (e_0, dots, e_n) e| & = & |Mt e_0 (x_0); dots; Mt e_n (x_n); (x_0:any, dots, x_n:any) = e| & \text{|x_i| fresh} \\
@@ -1036,8 +1039,8 @@ $$
   |Mt (let (e_1) in e_2) e_3| & = & |let (De e_1) in Mt e_2 e_3| \\
   |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| & \text{wrong} \\
   |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| & \text{wrong} \\
-  |Mt (l : t) e| & = & |Mt (l := :t) e| & \textit{Is this right?}\\
-  |Mt (l := e_1) e_2| & = & |Ld l (Mt e_1 e_2)|  & \textit{Is this right?} \\
+  |Mt (p : t) e| & = & |Mt (p := :t) e| & \textit{Is this right?}\\
+  |Mt (p := e_1) e_2| & = & |Ld p (Mt e_1 e_2)|  & \textit{Is this right?} \\
   |Mt e_1 e_2| & = & |De (do{e_1}) = e_2| & \text{otherwise} \\
 %% Maybe?  |Mt (l ?) e| & = & |Mt l (e ?)| & \text{otherwise} \\
 %%  \\
