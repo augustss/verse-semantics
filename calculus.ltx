@@ -656,21 +656,6 @@ Only those occurrences of |wrong| that are “needed” matter. To identify thos
 
 Note that the rule propagation rules for |wrong| can compete with fail propagation rules. This is ok: The specification of the verifier forbids the existene of \emph{any} bad reduction sequence.
 
-\subsection{The Equality Principle}
-
-Verse cleaves to the following principle.
-
-\begin{quote}
-\textbf{The Equality Principle (EP)}.
-For any choice-free, side-effect-free expression |e|, and values |v_1| and |v_2|,
-if |(e = v_1)| is inhabited, and |(e = v_2)| is inhabited, then |v_1|=|v_2|.
-\end{quote}
-For example suppose |misBehaves = t => def x x|, so that (if we are not careful) the call |misBehaves()| returns
-a fresh, unbound logical variable.  Now |(misBehaves() = 3)| and |(misBehaves() = 4)| will both succeed (be inhabited),
-but 3 is not equal to 4.  So this wouldn't satisfy the EP.
-
-Another way of putting this is that |=| behaves as an equivalence relation in Verse.
-
 \subsection{Source Verse}
 
 In the Verse source language we do not write explicit |defKW|s. Instead, they are added
