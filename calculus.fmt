@@ -129,6 +129,10 @@
 %format k_1
 %format k_2
 
+%format a_0
+%format a_1
+%format a_n
+
 %format e_0
 %format e_1
 %format e1'

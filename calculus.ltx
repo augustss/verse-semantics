@@ -870,8 +870,8 @@ $$
       &     & \textit{Expressions removed by desugaring} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
       & \vb & |l := e|           & \text{pattern definition} \\
-      & \vb & |x a dots := e|     & \text{function definition} \\
-      & \vb & |x a dots : t := e| & \text{function definition with return type} \\
+      & \vb & |f a_1 dots a_n := e|     & \text{function definition ($n > 0$)} \\
+      & \vb & |f a_1 dots a_n : t := e| & \text{function definition with return type ($n > 0$)} \\
       & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
       & \vb & |op_b e|          & \text{prefix operator} \\
       & \vb & |e op_a|          & \text{postfix operator} \\
@@ -894,7 +894,7 @@ $$
 \begin{figure}
 $$
 \begin{array}{rcll}
-  |x| &     & \textit{Variable} \\
+  |x,f| &     & \textit{Variable} \\
   |k| &     & \textit{Integer constant} \\
       \\
   |b| & ::= & \textit{Blocks} \\
