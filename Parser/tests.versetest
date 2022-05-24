@@ -4,54 +4,87 @@
 #       they should be equal but currently the test fails
 
 # Trivial tests
-testeq(SEq){1+2}     {3}
-testeq(SEq){x:=1; x} {1}
+testeq(SEq) {2}                                   {2}
+testeq(SEq) {x:=1; x}                             {1}
+# Arithmetic
+testeq(SEq) {3+4}                                 {7}
+testeq(SEq) {3-4}                                 {0-1}
+testeq(SEq) {3*4}                                 {12}
+testeq(SEq) {32/4}                                {8}
+testeq(SEq) {1/0}                                 {:false}
+# Comparison
+testeq(SEq) {3<4}                                 {3}
+testeq(SEq) {3<3}                                 {:false}
+testeq(SEq) {3<2}                                 {:false}
+testeq(SEq) {3<=4}                                {3}
+testeq(SEq) {3<=3}                                {3}
+testeq(SEq) {3<=2}                                {:false}
+testeq(SEq) {3>4}                                 {:false}
+testeq(SEq) {3>3}                                 {:false}
+testeq(SEq) {3>2}                                 {3}
+testeq(SEq) {3>=4}                                {:false}
+testeq(SEq) {3>=3}                                {3}
+testeq(SEq) {3>=2}                                {3}
+testeq(SEq) {3<>4}                                {3}
+testeq(SEq) {3<>3}                                {:false}
+testeq(SEq) {3<>2}                                {3}
+testeq(SEq) {3=4}                                 {:false}
+testeq(SEq) {3=3}                                 {3}
+testeq(SEq) {3=2}                                 {:false}
 
+# Array expression splicing
+testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+# Array LHS splicing
+testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq(SEq) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq(SEq) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only
-testeq(SEq){x:any; x = (y:any => 1); x = (y:any => 2)} {(y:any => 1) = (y:any => 2)}
-testeq(SEq){x:any; x = (y:any => 1); x = (y:any => 1)} {(y:any => 1) = (y:any => 1)}
-testeq(SEq){x:any; y:any; x = y; x = y; x = 1} {1}
-testeq(SEq){x:any; y:any; x = y; x = y; x = (z:any => 1)} {(z:any => 1) = (z:any => 1)}
+testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
+testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
+testeq(SEq) {x:any; y:any; x = y; x = y; x = 1}  {1}
+testeq(SEq) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # If BIND is implemented in parallel, it may forget to substitute in the substitutions
-testeq(SEq){x:any; y:any; x=y; y=1} {1}
-testeq(SEq){x:any; y:any; x=1; y=x} {1}
-testeq(SEq){x:any; y:any; x=y; y=(x,x)} {x:any; x=(x,x)} # check for occurs check
-testeq(SEq){x:any; y:any; y=(x,x); x=y} {x:any; x=(x,x)} # check for occurs check
+testeq(SEq) {x:any; y:any; x=y; y=1}  {1}
+testeq(SEq) {x:any; y:any; x=1; y=x}  {1}
+testeq(SEq) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+testeq(SEq) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
 
 # Array access via choices
-testeq(SEq){for ((3,4,5)[x:int]) {x}} {(0,1,2)}
-testeq(SEq){for (i~>x:(3,4,5)) {(i,x)}} {((0,3),(1,4),(2,5))}
+testeq(SEq) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
+testeq(SEq) {for (i~>x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 # Non-ANF array access
-testeq(SEq){for (x:int, x=(2,0,2)[x+1]) {x}} {array{0}}
+testeq(SEq) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
 # Recursion
-testeq(SEq){f(n:int) := if (n = 0) {1} else {n * f(n-1)}; f(5)} {120}
-testeq(SEq){even(n:int) := if (n = 0) {1} else {odd(n-1)};
-            odd(n:int)  := if (n = 0) {0} else {even(n-1)};
-            for(x := 0|1|2|3) {(even(x), odd(x))}
-           }
-           {((1,0), (0,1), (1,0), (0,1))}
-testeq(SEq){pair := (1, function(n:int) {pair[0]}); pair[0]} {1}
-testeq(SEq){pair := (1, function(n:int) {if (n = 0) {1} else {n * pair[1](n-1)}}); pair[1](5)} {120}
+testeq(SEq) {f(n:int) := if (n = 0)  {1} else  {n * f(n-1)}; f(5)}  {120}
+testeq(SEq) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
+            odd(n:int)  := if (n = 0)  {0} else  {even(n-1)};
+            for(x := 0|1|2|3)  {(even(x), odd(x))}
+            }
+            {((1,0), (0,1), (1,0), (0,1))}
+testeq(SEq) {pair := (1, function(n:int)  {pair[0]}); pair[0]}  {1}
+testeq(SEq) {pair := (1, function(n:int)  {if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}  {120}
 
 # Function argument matching
-testeq(SEq){f(x:int, y:int):=2*x+y; f(2,3)} {7}
+testeq(SEq) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 
 # Non-retractions as types
-testeq(SEq){succ(n:int) := n + 1; a:succ := 2} {3}
-testeq(SEq){succ(n:int) := n + 1;
+testeq(SEq) {succ(n:int) := n + 1; a:succ := 2}  {3}
+testeq(SEq) {succ(n:int) := n + 1;
             f(m:succ) := m;
             f(5)
-           }
-           {6}
+            }
+            {6}
 
 # Evaluation in if
-testeq(SEq){if(y:int; y=1) 42 else 23} {42}
-testeq(SEq){if(y:int; y=1) y else 23} {1}
+testeq(SEq) {if(y:int; y=1) 42 else 23}  {42}
+testeq(SEq) {if(y:int; y=1) y else 23}  {1}
 
 # Confluence: Lack of local substitution
-testeq(FEq){x : int; if (y:int; y = x; y = 1; y > 1) {42} else {23}}
-           {x : int; if (y:int; y = 1; y = x; y > 1) {42} else {23}}
+testeq(FEq) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
+            {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
