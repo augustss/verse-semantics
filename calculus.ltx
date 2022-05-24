@@ -947,7 +947,7 @@ $$
   |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
-  |De (e_1^(e_2))| & = & |De (succeeds (e_1^[e_2]))| \\
+  |De (e_1^(e_2))| & = & |(De e_1)(De e_2)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   \\
@@ -1065,7 +1065,8 @@ $$
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (x := e)| & = & |x = Cr e| \\
-    |Cr (e_1[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
+    |Cr (e_1^[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
+    |Cr (e_1^(e_2))| & = & |succeeds (Cr (e_1^[e_2]))| \\
     |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
     |Cr (if e_1 then e_2 else e_3)| & = &
     \begin{array}[t]{@@{}l}
@@ -1090,7 +1091,8 @@ $$
     |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (x := e)| & = & |x , Vr e| \\
-    |Vr (e_1[e_2])| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1^[e_2])| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1^(e_2))| & = & |Vr e_1 , Vr e_2| \\
     |Vr (e_1 `choice` e_2)| & = & |emp| \\
     |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
     |Vr (for e_1 in e_2)| & = & |emp| \\
