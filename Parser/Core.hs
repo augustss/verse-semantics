@@ -465,4 +465,3 @@ alphaConvertV vs v =
   case alphaConvert vs (CValue v) of
     CValue v' -> v'
     _ -> impossible ()
-
