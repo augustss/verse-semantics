@@ -425,7 +425,7 @@ dsDo = f
     f (Range e) = do
       r <- newIdent "r"
       e' <- f e
-      pure $ ApplyD e' (tAny noLoc r)
+      pure $ Seq [ApplyD e' (tAny noLoc r), Variable r]
     f e = compos f e
 
 --------------------
