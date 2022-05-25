@@ -5,6 +5,7 @@ module Core(
   Core(..),
   pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
   pattern CVar, pattern VPrim,
+  pattern VLam, pattern CLam,
   Value(..),
   HNF(..),
   compos, composOp,
@@ -76,6 +77,11 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
 pattern CFail :: Core
 pattern CFail = CBar []
+pattern VLam :: Ident -> Core -> Value
+pattern VLam i e = HNF (HLam i e)
+pattern CLam :: Ident -> Core -> Core
+pattern CLam i e = CValue (VLam i e)
+
 
 cSeq :: [Core] -> Core
 cSeq [] = internalError
@@ -167,7 +173,7 @@ value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
 value (Array es) = HNF . HArray <$> mapM value es
 value (Typedef e) = do
   i <- newTmp
-  HNF . HLam i <$> coreD (Unify (Variable i) e)
+  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
 value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
@@ -333,14 +339,17 @@ alphaConvertV vs v =
 
 -- Do some Core simplifications to enhance readability.
 simpCore :: Core -> Core
-simpCore = simpSeq . simpAlias . simpAny
+simpCore =
+  simpSeq . simpAlias .
+  simpSeq . simpAlias . simpAny
 
 -- Get rid of values in Seq, similar to evalSeq
 simpSeq :: Core -> Core
 simpSeq = f
   where
-    f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
+    f (CSeq es) | any isValue es' = f $ cSeq $ Snoc (filter (not . isValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
+    f (CUnify v (CSeq (Snoc es e))) | isValue v = f $ cSeq $ es ++ [CUnify v e]
     f e = composOp f e
     flat (CSeq es) = es
     flat e = [e]
@@ -361,6 +370,7 @@ simpAlias :: Core -> Core
 simpAlias = f
   where
     f (CDef h e) | Just d <- bind h e = f d
+    f (CLam x (CDef h e)) | Just d <- lam x h e = f d
     f e = composOp f e
 
     bind h e =
@@ -368,6 +378,14 @@ simpAlias = f
         (e', Just (x, y)) ->
           let (x', y') = if isTempIdent x then (y, x) else (x, y)
           in  Just $ cDef (h \\ [y']) $ subst y' (Var x') e'
+        _ -> Nothing
+
+    lam v h e =
+      case runState (findB (v:h) e) Nothing of
+        (e', Just (x, y)) ->
+          let (x', y') = if isTempIdent x && x /= v then (y, x) else (x, y)
+              v' = if v == y' then x' else v
+          in  Just $ CLam v' $ cDef (h \\ [y']) $ subst y' (Var x') e'
         _ -> Nothing
 
     findB h e = do

@@ -29,12 +29,6 @@ pattern CUnOp op v <- CApply (VPrim op) v@HNF{}
 pattern CBinOp :: String -> Value -> Value -> Core
 pattern CBinOp op v1 v2 <- CApply (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
 
-pattern VLam :: Ident -> Core -> Value
-pattern VLam i e = HNF (HLam i e)
-
-pattern CLam :: Ident -> Core -> Core
-pattern CLam i e = CValue (VLam i e)
-
 pattern VInt :: Integer -> Value
 pattern VInt i = HNF (HInt i)
 
