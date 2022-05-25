@@ -26,16 +26,19 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval)
   where eval = flip evalState 1
+
+data Context = Eval | Abs
+  deriving (Show, Eq)
 
 type D = State Int
 
 type SExpr = Expr   -- Simple Expr: only has some of the constructors
 
 -- This follows the D transformation in calculus.ltx
-dsD :: Expr -> D SExpr
-dsD = expr
+dsD :: Context -> Expr -> D SExpr
+dsD ctx = expr
   where
     expr :: HasCallStack => Expr -> D Expr
     expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
@@ -163,9 +166,9 @@ dsD = expr
     -- D[fn(e){b}] = fn(x:any){M[e]x; D[do b]}
     function e b = do
       x <- newIdent "z"
-      m <- dsM e (Variable x)
+      e' <- dsD Abs e
       b' <- expr (Do b)
-      pure $ Function [(Define x AnyT, [])] $ seqE [m, b']
+      pure $ Function [(Define x AnyT, [])] $ seqE [Unify e' (Variable x), b']
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -224,12 +227,12 @@ inVarC e k = do
 
 dsCase :: Expr -> Block -> D Expr
 -- D[case x of e1; ... en] = e1[x] || ... || en[x]
-dsCase e@Variable{} (Block es) = dsD $ foldr mkOr Fail es
+dsCase e@Variable{} (Block es) = dsD Eval $ foldr mkOr Fail es
   where mkOr a r = If2E (ApplyD a e) r
 dsCase Variable{} _ = internalError
 -- D[case e of b] = x=D[e]; D[case x of b]
 dsCase e b = do
-  e' <- dsD e
+  e' <- dsD Eval e
   inVarC e' $ \ x -> dsCase x b
 
 eAssign :: Loc -> Expr
@@ -262,7 +265,7 @@ dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
 dsL l (Variable x) e = pure $ define l x e
 -- L[:t] e = t[e]
 dsL l (PrefixOp (Ident _ ":") t) e = do
-  t' <- dsD t
+  t' <- dsD Eval t
   x <- newIdent "x"
   pure $ Seq [ApplyD t' (define l x e), Variable x]
 -- FIX L: use option
@@ -270,7 +273,7 @@ dsL l (PrefixOp (Ident _ ":") t) e = do
 dsL _l (PostfixOp _lhs (Ident _ "?")) _e = undefined
 -- L[e1^] e = assign(D[e1], e)
 dsL l (PostfixOp e1 (Ident _ "^")) e = do
-  e1' <- dsD e1
+  e1' <- dsD Eval e1
   pure $ ApplyS (eAssign l) $ Array [e1', e]
 -- FIX L: update for splices
 -- L[lhs1, ... lhsn] = ...
@@ -345,48 +348,10 @@ dsLArr l lhss e =
 
     _ -> syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow (Array lhss) ++ ", should only have one ..e"
 
--- Desugar a match for function definitions
-dsM :: Expr -> SExpr -> D SExpr
-dsM e1 e2 | doTrace && trace ("dsM " ++ prettyShow (e1, e2)) False = undefined
--- See below
-dsM (Array ps) e = dsMArr ps e
-dsM (PrefixOp (Ident l ":") t) e = do
-  x <- newIdent "d"
-  t' <- dsD t
-  pure $ Seq [ApplyD t' (define l x e){-, Variable x-}]
-dsM (Seq (Snoc ps p)) e = do
-  ps' <- mapM dsD ps
-  p' <- dsM p e
-  pure $ seqE (Snoc ps' p')
-dsM (InfixOp e1 (Ident _ "where") e2) e = do
-  e2' <- dsD e2
-  dsM e1 (seqE [e2', e])
-dsM (Let e1 e2) e = do
-  e1' <- dsD e1
-  e2' <- dsM e2 e
-  pure $ Let e1' e2'
-dsM (ApplyS _ _) _ = unimplemented "dsM"
-dsM (InfixOp lhs (Ident l ":") t) e = dsM (InfixOp lhs (Ident l ":=") (PrefixOp (Ident l ":") t)) e
-dsM (InfixOp lhs (Ident l ":=") e1) e = dsL l lhs =<< dsM e1 e
-dsM e1 e = do
-  e1' <- dsD (Do e1)
-  pure $ Unify e1' e
-
-dsMArr :: [Expr] -> SExpr -> D SExpr
-dsMArr pats e =
-  case exprElems pats of
-    -- M[pat0,...,patn] e = M[pat0]x0; ...; M[patn]xn; (x0:any,...,xn:any) = e
-    [EElems ps] -> do
-      xs <- mapM (const $ newIdent "d") ps
-      let eun = Unify (Array (map (tAny noLoc) xs)) e
-      els <- zipWithM (\ pat x -> dsM pat (Variable x)) ps xs
-      pure $ Seq $ els ++ [eun]
-    _ -> unimplemented "dsMArr"
-
 dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
 dsFunDef l (EffAttr f a) as e = dsFunDef l f (a:as) e
 dsFunDef l (ApplyS f a) as e = dsFunDef l f [] $ Function [(a, reverse as)] e
-dsFunDef l (Variable f) [] e = define l f <$> dsD e
+dsFunDef l (Variable f) [] e = define l f <$> dsD Eval e
 dsFunDef _ Variable{} _ _ = internalError
 dsFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
