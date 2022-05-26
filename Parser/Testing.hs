@@ -1,4 +1,4 @@
-module Testing where
+module Testing(main) where
 import Control.Exception
 import Control.Monad
 import GHC.Stack

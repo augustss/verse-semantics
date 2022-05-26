@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+module Main(main, test) where
 import Control.Exception
 import Control.Monad
 
@@ -9,6 +10,7 @@ import Parse
 import Command
 import Core
 import Eval
+import qualified Testing
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -20,6 +22,9 @@ tryIt iob aiob ioa = do
     Right a -> aiob a
 
 -------------------
+
+test :: IO ()
+test = Testing.main
 
 main :: IO ()
 main = runCommand command
