@@ -410,8 +410,8 @@ evalPrimOps = evalTrace "evalPrimOps" f
   where
     f e@CLam{} | notLam = e
     -- real primitives
-    f (CUnOp  "int#" v) | VInt _ <- v = CValue v
-                        | otherwise   = CFail
+    f (CUnOp  "isInt#" v) | VInt _ <- v = CArray []
+                          | otherwise   = CFail
     -- float#, string#
     f (CUnOp  "pre'-'" (VInt i)) = CInt $ -i
     f (CBinOp "in'+'"  v1 v2) = arith (+) v1 v2
@@ -476,8 +476,8 @@ replacePrelude = evalTrace "replacePrelude" f
 prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                         -- x => x
-  ,("nat", typ [app "int#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
-  ,("int", typ [app "int#" vx])                            -- x => int#[x]; x
+  ,("nat", typ [app "isInt#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
+  ,("int", typ [app "isInt#" vx])                            -- x => int#[x]; x
   ,("false", VArray [])                                    -- ()
   ,("float", undefined)
   ,("string", undefined)
