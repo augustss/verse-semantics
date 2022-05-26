@@ -52,7 +52,7 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/"
 
 keywords :: [String]
-keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "typedef", "where"]
+keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -107,7 +107,7 @@ pArray :: P Expr
 pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 pTypedef :: P Expr
-pTypedef = pKeyword "typedef" *> (Typedef <$> pBlockM)
+pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
 
 pTerm :: P Expr
 pTerm = do
