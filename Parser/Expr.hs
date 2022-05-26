@@ -10,6 +10,7 @@ module Expr(
   Expr(..),
   pattern Fail,
   pattern Unit,
+  pattern Range,
   Block,
   Eff,
   Op,
@@ -79,10 +80,12 @@ data Expr
   | Define Ident Expr         -- i := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
-  | Range Expr                -- :e
+--  | Range Expr                -- :e
   | AnyT                      -- :any
   deriving (Eq, Ord, Show, Data)
 
+pattern Range :: Expr -> Expr
+pattern Range e = ApplyD e AnyT
 pattern Fail :: Expr
 pattern Fail = Range Unit
 pattern Unit :: Expr

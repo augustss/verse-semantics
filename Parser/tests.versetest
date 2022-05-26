@@ -38,6 +38,10 @@ testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 
 # Simple function definition
 testeq(SEq) {succ(x:any):=x+1; succ[5]}           {6}
+#   ... with return type
+testeq(SEq) {succ(x:any):int:=x+1; succ[5]}       {6}
+# HO "unification"
+testeq(SEq) {succ(x:int):=x+1; succ = f(x:int):int; f[2]} {3}
 
 # Different LHSs
 testeq(SEq) {x:=5; x}                             {5}

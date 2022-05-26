@@ -77,10 +77,11 @@ evalTrace s f trc e | not trc = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop 50 $ replacePrelude trc $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop 100 $ replacePrelude trc $ evalTrace "eval" (const ea) trc (CWrong"")
   where
     loop :: Int -> Core -> Core
-    loop 0 e = e
+    loop 0 e = --trace "Reduction did not reach a normal form, use :eval to reduce more."
+               e
     loop n e | isIrred e = e
              | otherwise = loop (n-1) $ evalSteps trc e
 
@@ -223,11 +224,6 @@ evalUnify :: EvalCore
 evalUnify = evalTrace "evalUnify" f
   where
     f e@CLam{} | notLam = e
-{-
-    f ue@(CUnify ex@(CVar x) (CLam y e)) | x `elem` fvs e =
-      trace ("UREC " ++ prettyShow (x, y, fvs e, e)) $
-      CUnify ex $ CLam y $ CDef [x] $ CSeq [ue, e]
--}
     f (CUnify e x@CVar{}) | not (isVar e) = f $ CUnify x e
     f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
     f e = composOp f e
@@ -245,8 +241,6 @@ evalUnify = evalTrace "evalUnify" f
 
     unifyV _ _ = CWrong "unifyV"
 
-
---CWrong ("occurs check: " ++ prettyShow (x, bs))
 
 -- Handle BIND rules
 evalBind :: EvalCore
@@ -278,7 +272,7 @@ evalBind = evalTrace "evalBind" f
               in  Just $ VLam y' $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b']
             | otherwise      = Just v
         go (VArray vs)       = VArray <$> mapM go vs
-        go _ = internalError
+        go v = internalErrorMsg (show v)
 
     -- Find the leftmost BIND.
     -- Return a function representing the CX context.
@@ -470,15 +464,17 @@ replacePrelude :: EvalCore
 replacePrelude = evalTrace "replacePrelude" f
   where
     f (CApply (Var (Ident _ i)) v) | Just p <- lookup i prelude = CApply p v
+    f (CVar (Ident _ i)) | Just p <- lookup i prelude = CValue p
     f e = composOp f e
 
 -- Functions that should be in a prelude.
 prelude :: [(String, Value)]
 prelude =
-  [("any", typ [])                                         -- x => x
+  [("any", typ [])                                           -- x => x
   ,("nat", typ [app "isInt#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt#" vx])                            -- x => int#[x]; x
-  ,("false", VArray [])                                    -- ()
+  ,("arrow", arrowV)
+  ,("false", VArray [])                                      -- ()
   ,("float", undefined)
   ,("string", undefined)
   ]
@@ -488,3 +484,19 @@ prelude =
         vx = Var ix
         app f v = CApply (VPrim f) v
         app2 f v1 v2 = CApply (VPrim f) (VArray [v1, v2])
+
+        arrowV =
+          VLam st $
+            CDef [s, t] $
+            CSeq [
+              CUnify (CArray [Var s, Var t]) (CVar st),
+              CLam g $ CLam y $
+                CDef [sy, gsy] $
+                CSeq [
+                  CUnify (CVar sy) (CApply (Var s) (Var y)),
+                  CUnify (CVar gsy) (CApply (Var g) (Var sy)),
+                  CApply (Var t) (Var gsy)
+                  ]
+              ]
+          where [st, s, t, g, y, sy, gsy] =
+                  map (Ident noLoc) ["st","s","t","g","y","sy","gsy"]

@@ -12,7 +12,7 @@ import GHC.Stack
 
 import Expr
 import Error
-import Print hiding (first)
+import Print hiding (first, colon)
 import Misc
 
 isLiteral :: Expr -> Bool
@@ -43,7 +43,7 @@ dropParens = f
 
 -- This follows the D transformation in calculus.ltx
 dsD :: Context -> Expr -> D SExpr
-dsD ctx = expr
+dsD _ctx = expr
   where
     expr :: HasCallStack => Expr -> D Expr
     expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
@@ -70,8 +70,8 @@ dsD ctx = expr
     expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
 
     -- Bindings
-    -- D [lhs : t] = D [lhs := :t]
-    expr (InfixOp lhs (Ident l ":") t) = expr (InfixOp lhs (Ident l ":=") (PrefixOp (Ident l ":") t))
+    -- D [lhs : t] = Lt[lhs] D[t]
+    expr (InfixOp lhs (Ident l ":") t) = dsLHSColon l lhs =<< expr t
     -- D [lhs := e] = L[lhs] D[e]
     expr (InfixOp lhs (Ident l ":=") e) = dsLHS l lhs =<< expr e
     -- Function bindings recognized by dsLHS
@@ -147,7 +147,6 @@ dsD ctx = expr
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
-    expr (Range e) = Range <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr AnyT = pure AnyT
@@ -199,6 +198,9 @@ exprElems = grp . map cls
 applyPrim :: String -> SExpr -> SExpr
 applyPrim s e = ApplyS (Variable (Ident noLoc s)) e
 
+applyPrimD :: String -> SExpr -> SExpr
+applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
+
 -- XXX do something special?
 applyEffect :: Ident -> Expr -> Expr
 applyEffect i e = ApplyD (Variable i) e
@@ -246,9 +248,6 @@ eAssign l = Variable (Ident l "assign#")
 eTruth :: Expr
 eTruth = Variable (Ident noLoc "truth")
 
---eSucceeds :: Expr
---eSucceeds = Variable (Ident noLoc "succeeds")
-
 define :: Loc -> Ident -> Expr -> Expr
 define _l i e = Define i e
 
@@ -258,21 +257,41 @@ tAny l i = define l i AnyT
 -- Desugar a definition e1 := e2
 -- L
 dsLHS :: Loc -> Expr -> SExpr -> D SExpr
-dsLHS _ (InfixOp x (Ident l ":") t) e = dsLHS l x $ ApplyS t e  -- XXX Is this correct
-dsLHS l f@ApplyS{} e = dsFunDef l f [] e
---dsLHS l f@EffAttr{} e = desugarFunDef l f [] e
+dsLHS l f e | isFunDef f = dsFunDef l f [] e
 dsLHS l x e = dsL l x e
+
+-- Desugar a definition e1 : e2
+dsLHSColon :: Loc -> Expr -> SExpr -> D SExpr
+dsLHSColon l e t | isFunDef e = dsFunDefType l e [] =<< dsD Eval t
+-- L[lhs1 ~> lhs2] (:t) = L[lhs1] Lt[lhs2] t 
+dsLHSColon l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
+  e <- dsLHSColon l lhs2 t
+  dsLHS l lhs1 e
+dsLHSColon l e t = do
+  x <- newIdent "d"
+  t' <- dsD Eval t
+  e' <- dsL l e (ApplyD t' (tAny l x))
+  pure $ Seq [e', Variable x]
+
+isFunDef :: Expr -> Bool
+isFunDef ApplyS{} = True
+isFunDef EffAttr{} = True
+isFunDef (InfixOp f (Ident _ ":") _) = isFunDef f
+isFunDef _ = False
 
 -- Desugar a definition lhs := e
 dsL :: Loc -> Expr -> SExpr -> D SExpr
 dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
 -- L[x] e = x := e
 dsL l (Variable x) e = pure $ define l x e
--- L[:t] e = t[e]
-dsL l (PrefixOp (Ident _ ":") t) e = do
-  t' <- dsD Eval t
+-- L[:t] e = D[t][e]
+dsL l (PrefixOp colon@(Ident _ ":") t) e = do
   x <- newIdent "x"
-  pure $ Seq [ApplyD t' (define l x e), Variable x]
+  dsL l (InfixOp (Variable x) colon t) e
+-- L[l:t] e = l := D[t][e]
+dsL l (InfixOp x (Ident _ ":") t) e = do
+  t' <- dsD Eval t
+  dsL l x (ApplyD t' e)
 -- FIX L: use option
 -- L[e?] = ????
 dsL _l (PostfixOp _lhs (Ident _ "?")) _e = undefined
@@ -283,17 +302,8 @@ dsL l (PostfixOp e1 (Ident _ "^")) e = do
 -- FIX L: update for splices
 -- L[lhs1, ... lhsn] = ...
 dsL l (Array lhss) e = dsLArr l lhss e
--- L[x ~> lhs2] (:t) = L[lhs2] (D[t] [x:any])
-dsL l (InfixOp (Variable x) (Ident _ "~>") lhs2) (Range t) =
-  dsL l lhs2 (ApplyD t (tAny l x))
--- L[lhs1 ~> lhs2] (:t) = L[lhs1] x; L[x ~> lhs2] (Range t), x fresh
-dsL l (InfixOp         lhs1 (Ident _ "~>") lhs2) (Range t) = do
-  x <- newIdent "d"
-  ex <- dsL l lhs1 (Variable x)
-  ey <- dsL l (InfixOp (Variable x) (Ident l "~>") lhs2) (Range t)
-  pure $ Seq [ex, ey]
 -- L[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
-dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsL l lhs (Range (Typedef e))
+dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsLHSColon l lhs (Typedef e)
 -- What else is allowed?  LitInt and LitRat would be easy.
 dsL l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
@@ -353,17 +363,34 @@ dsLArr l lhss e =
 
     _ -> syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow (Array lhss) ++ ", should only have one ..e"
 
-dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D Expr
+dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D SExpr
+dsFunDef l (InfixOp f (Ident _ ":") t) as e = dsFunDef l f as (ApplyS t e)
 dsFunDef l (EffAttr f a) as e = dsFunDef l f (a:as) e
 dsFunDef l (ApplyS f a) as e = dsFunDef l f [] $ Function [(a, reverse as)] e
 dsFunDef l (Variable f) [] e = define l f <$> dsD Eval e
 dsFunDef _ Variable{} _ _ = internalError
 dsFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
+dsFunDefType :: Loc -> Expr -> [Eff] -> SExpr -> D SExpr
+dsFunDefType l (EffAttr f a) as t = dsFunDefType l f (a:as) t
+-- XXX This does not support dependent types yet
+dsFunDefType l (ApplyS f a) [] t = do
+  a' <- tyOf a
+  dsFunDefType l f [] $ applyPrimD "arrow" $ Array [a', t]
+dsFunDefType _l (ApplyS _f _a) _as _e = unimplemented "function type with effects"
+dsFunDefType l (Variable f)  [] t = pure $ define l f $ Range t
+dsFunDefType _ Variable{} _ _ = internalError
+dsFunDefType l f _ _ = syntaxError l $ "bad function type definition: " ++ prettyShow f
+
+tyOf :: Expr -> D SExpr
+tyOf (InfixOp _ (Ident _ ":") t) = dsD Eval t
+tyOf (PrefixOp (Ident _ ":") t) = dsD Eval t
+tyOf e = Typedef <$> dsD Abs e
+
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
 prelude = map (Ident noLoc)
-  [ "int", "float", "string", "any", "nat", "false"]
+  [ "int", "float", "string", "any", "nat", "false", "arrow"]
 
 -- Primitives
 primOps :: [Ident]
