@@ -73,6 +73,7 @@ data Expr
   | Typedef Block             -- typedef{e}
   | Block [Expr]              -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
+  | Parens Expr               -- (e)
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -159,8 +160,9 @@ instance Pretty Expr where
             where ppArs (e, rs) = parens (pPrintL l e) <> effs
                      where effs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
           Block es -> braces $ ppSeq l es
-          Typedef e -> text "typedef" <> braces (ppr 0 e)
+          Typedef e -> text "type" <> braces (ppr 0 e)
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
+          Parens e -> parens (ppr 0 e)
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
@@ -184,10 +186,10 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inn "where"   1
       , inr "=>"      2
       , inn ":="      3
+      , inl "="       6     
       , inr "||"      4
       , inr "&&"      5
       , inr ":"       6     
-      , inr "="       6     
       , inr "<>"      6     
       , inr "<="      6     
       , inr ">="      6     
@@ -236,6 +238,7 @@ compos f (Function ers b) = Function <$> traverse g ers <*> f b
 compos f (Block es) = Block <$> traverse f es
 compos f (Option me) = Option <$> traverse f me
 compos f (Typedef b) = Typedef <$> f b
+compos f (Parens e) = Parens <$> f e
 compos f (Define i e) = Define i <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2

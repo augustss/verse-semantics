@@ -99,7 +99,8 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [Variable <$> pIdent, LitInt <$> pDecimal, pEmpty, pParens pExprSeq, pArray, pTypedef]
+pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
+               , Parens <$> pParens pExprSeq, pArray, pTypedef ]
   where pEmpty = try $ pParens (pure (Array []))
 
 pArray :: P Expr
@@ -191,10 +192,10 @@ operatorTable =
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
     [op InfixR "|", op InfixR "~>", op InfixN ".."],
-    [op InfixL ":"] ++ map (op InfixR) ["=", ">=", "<=", "<", ">", "<>"],
+    [op InfixR ":"] ++ map (op InfixR) [">=", "<=", "<", ">", "<>"],
     [op InfixR "&&"],
     [op InfixR "||"],
-    [op InfixL ":="],
+    [op InfixN ":=", op InfixL "="],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
     [op InfixR "=>"]
@@ -210,11 +211,15 @@ operatorTable =
 
     op :: (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
     op fx s = fx (app <$> oper)
-      where app l x y = InfixOp x (Ident l s) y
+      where app l x y = hackDef l x s y
             oper | isAlpha (head s) = getSourcePos <* pKeyword s
                  | otherwise = pOpL s
 
     pOpL s = getSourcePos <* pOp s
+
+    -- x:t=e  is the same as x:t:=e
+    hackDef l x@(InfixOp _ (Ident _ ":") _) "=" y = InfixOp x (Ident l ":=") y
+    hackDef l x s y = InfixOp x (Ident l s) y
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")

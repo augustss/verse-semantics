@@ -26,7 +26,7 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval <=< dropParens)
   where eval = flip evalState 1
 
 data Context = Eval | Abs
@@ -35,6 +35,11 @@ data Context = Eval | Abs
 type D = State Int
 
 type SExpr = Expr   -- Simple Expr: only has some of the constructors
+
+dropParens :: Expr -> D Expr
+dropParens = f
+  where f (Parens e) = f e
+        f e = compos f e
 
 -- This follows the D transformation in calculus.ltx
 dsD :: Context -> Expr -> D SExpr
