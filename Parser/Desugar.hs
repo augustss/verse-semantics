@@ -390,14 +390,17 @@ tyOf e = Typedef <$> dsD Abs e
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
 prelude = map (Ident noLoc)
-  [ "int", "float", "string", "any", "nat", "false", "arrow"]
+  [ "int", "float", "string", "any", "nat", "false", "arrow"
+  , "in'<'", "in'<='", "in'>'", "in'>='"
+  ]
 
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
   [ "int#", "float#", "string#"
   , "in'+'", "in'-'", "in'*'", "in'/'"
-  , "in'<'", "in'<='", "in'>'", "in'>='", "in'<>'"
+  {-, "in'<'", "in'<='", "in'>'", "in'>='"-}
+  , "in'<>'"
   , "in'..'", "in'->'"
   , "pre'-'"
   , "post'^'", "post'?'"

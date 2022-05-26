@@ -413,10 +413,10 @@ evalPrimOps = evalTrace "evalPrimOps" f
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
     f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
                                             | otherwise = CInt $ i1 `div` i2
-    f (CBinOp "in'<'"   v1 v2) = cmp (<)  v1 v2
-    f (CBinOp "in'<='"  v1 v2) = cmp (<=) v1 v2
-    f (CBinOp "in'>'"   v1 v2) = cmp (>)  v1 v2
-    f (CBinOp "in'>='"  v1 v2) = cmp (>=) v1 v2
+    f (CBinOp "intLT#"  v1 v2) = cmp (<)  v1 v2
+    f (CBinOp "intLE#"  v1 v2) = cmp (<=) v1 v2
+    f (CBinOp "intGT#"  v1 v2) = cmp (>)  v1 v2
+    f (CBinOp "intGE#"  v1 v2) = cmp (>=) v1 v2
     f (CBinOp "in'<>'"  v1 v2) = cmp (/=) v1 v2
 
     f (CUnOp  "concat#" (VArray as)) | all isHNF as =
@@ -475,13 +475,15 @@ prelude =
   ,("int", typ [app "isInt#" vx])                            -- x => int#[x]; x
   ,("arrow", arrowV)
   ,("false", VArray [])                                      -- ()
+  ,("in'>'",  cmpV "intGT#")
+  ,("in'>='", cmpV "intGE#")
+  ,("in'<'",  cmpV "intLT#")
+  ,("in'<='", cmpV "intLE#")
   ,("float", undefined)
   ,("string", undefined)
   ]
-  where typ s = VLam ix $ cSeq $ s ++ [x]
-        ix = Ident noLoc "q"
-        x = CVar ix
-        vx = Var ix
+  where typ is = VLam x $ cSeq $ is ++ [CVar x]
+        vx = Var x
         app f v = CApply (VPrim f) v
         app2 f v1 v2 = CApply (VPrim f) (VArray [v1, v2])
 
@@ -498,5 +500,14 @@ prelude =
                   CApply (Var t) (Var gsy)
                   ]
               ]
-          where [st, s, t, g, y, sy, gsy] =
-                  map (Ident noLoc) ["st","s","t","g","y","sy","gsy"]
+        [st, s, t, g, y, sy, gsy, x, xy] =
+           map (Ident noLoc) ["st","s","t","g","y","sy","gsy","x", "xy"]
+
+        cmpV op =
+          VLam xy $
+            CDef [x, y] $
+            CSeq [
+              CUnify (CArray [Var x, Var y]) (CVar xy),
+              app op (Var xy),
+              CVar x
+              ]
