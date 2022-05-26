@@ -78,7 +78,7 @@ command = Command
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
-  , c_greet = "Verse parse&desugar testing.\nUse :help for help, and :quit to quit."
+  , c_greet = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, tracing = False }
@@ -157,6 +157,6 @@ helpMsg = "\
 \  > :show\n\
 \  > :desugar\n\
 \  > :show\n\
+\  > :eval\n\
 \Commands (can be abbreviated):\
 \"
-
