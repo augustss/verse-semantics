@@ -39,6 +39,9 @@ pattern CDecides :: Core -> Core
 pattern CDecides c <- CMacro (Ident _ "decides") c
   where CDecides e = CMacro (Ident noLoc "decides") e
 
+pattern CUnit :: Core
+pattern CUnit = CArray []
+
 isVar :: Core -> Bool
 isVar CVar{} = True
 isVar _ = False
@@ -404,20 +407,26 @@ evalPrimOps = evalTrace "evalPrimOps" f
   where
     f e@CLam{} | notLam = e
     -- real primitives
-    f (CUnOp  "isInt#" v) | VInt _ <- v = CArray []
+    f (CUnOp  "isInt#" v) | VInt{} <- v = CUnit
                           | otherwise   = CFail
     -- float#, string#
+    f (CUnOp  "isArr#" v) | VArray{} <- v = CUnit
+                          | otherwise   = CFail
+    f (CUnOp  "isFcn#" v) | VLam{} <- v = CUnit
+                          | otherwise   = CFail
+
+    --
     f (CUnOp  "pre'-'" (VInt i)) = CInt $ -i
     f (CBinOp "in'+'"  v1 v2) = arith (+) v1 v2
     f (CBinOp "in'-'"  v1 v2) = arith (-) v1 v2
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
     f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
                                             | otherwise = CInt $ i1 `div` i2
-    f (CBinOp "intLT#"  v1 v2) = cmp (<)  v1 v2
-    f (CBinOp "intLE#"  v1 v2) = cmp (<=) v1 v2
-    f (CBinOp "intGT#"  v1 v2) = cmp (>)  v1 v2
-    f (CBinOp "intGE#"  v1 v2) = cmp (>=) v1 v2
-    f (CBinOp "in'<>'"  v1 v2) = cmp (/=) v1 v2
+    f (CBinOp "intLT#"  v1 v2) = cmpU (<)  v1 v2
+    f (CBinOp "intLE#"  v1 v2) = cmpU (<=) v1 v2
+    f (CBinOp "intGT#"  v1 v2) = cmpU (>)  v1 v2
+    f (CBinOp "intGE#"  v1 v2) = cmpU (>=) v1 v2
+    f (CBinOp "in'<>'"  v1 v2) = cmp  (/=) v1 v2
 
     f (CUnOp  "concat#" (VArray as)) | all isHNF as =
       case () of
@@ -442,9 +451,12 @@ evalPrimOps = evalTrace "evalPrimOps" f
     arith op (VInt i1) (VInt i2) = CInt $ op i1 i2
     arith _ _ _ = CFail  -- CWrong?
     
-    cmp op (VInt i1) (VInt i2) | op i1 i2 = CInt i1
+    cmp op (VInt i1) (VInt i2) | op i1 i2  = CInt i1
                                | otherwise = CFail
     cmp _ _ _ = CFail   -- CWrong?
+    cmpU op (VInt i1) (VInt i2) | op i1 i2  = CUnit
+                                | otherwise = CFail
+    cmpU _ _ _ = CFail   -- CWrong?
 
 isNF :: Value -> Bool
 isNF (Var _) = False
@@ -473,7 +485,7 @@ prelude =
   [("any", typ [])                                           -- x => x
   ,("nat", typ [app "isInt#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt#" vx])                            -- x => int#[x]; x
-  ,("arrow", arrowV)
+  ,("in'->'", arrowV)
   ,("false", VArray [])                                      -- ()
   ,("in'>'",  cmpV "intGT#")
   ,("in'>='", cmpV "intGE#")
@@ -495,6 +507,7 @@ prelude =
               CLam g $ CLam y $
                 CDef [sy, gsy] $
                 CSeq [
+                  app "isFcn#" (Var y),
                   CUnify (CVar sy) (CApply (Var s) (Var y)),
                   CUnify (CVar gsy) (CApply (Var g) (Var sy)),
                   CApply (Var t) (Var gsy)

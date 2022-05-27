@@ -376,7 +376,7 @@ dsFunDefType l (EffAttr f a) as t = dsFunDefType l f (a:as) t
 -- XXX This does not support dependent types yet
 dsFunDefType l (ApplyS f a) [] t = do
   a' <- tyOf a
-  dsFunDefType l f [] $ applyPrimD "arrow" $ Array [a', t]
+  dsFunDefType l f [] $ applyPrimD "in'->'" $ Array [a', t]
 dsFunDefType _l (ApplyS _f _a) _as _e = unimplemented "function type with effects"
 dsFunDefType l (Variable f)  [] t = pure $ define l f $ Range t
 dsFunDefType _ Variable{} _ _ = internalError
@@ -390,18 +390,17 @@ tyOf e = Typedef <$> dsD Abs e
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
 prelude = map (Ident noLoc)
-  [ "int", "float", "string", "any", "nat", "false", "arrow"
+  [ "int", "float", "string", "any", "nat", "false"
+  , "in'..'", "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
   ]
 
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
-  [ "int#", "float#", "string#"
+  [ "isInt#", "isFloat#", "isString#", "isArr#", "isFcn#"
   , "in'+'", "in'-'", "in'*'", "in'/'"
-  {-, "in'<'", "in'<='", "in'>'", "in'>='"-}
   , "in'<>'"
-  , "in'..'", "in'->'"
   , "pre'-'"
   , "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
