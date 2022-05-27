@@ -80,7 +80,7 @@ evalTrace s f trc e | not trc = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop 100 $ replacePrelude trc $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop 250 $ evalTrace "eval" (const ea) trc (CWrong"")
   where
     loop :: Int -> Core -> Core
     loop 0 e = --trace "Reduction did not reach a normal form, use :eval to reduce more."
@@ -105,7 +105,8 @@ evalSteps :: EvalCore
 evalSteps t =
   evalDefFloat t . evalAll t . evalChoice t .
   evalWrong t . evalFail t . evalUnify t . evalBind t . evalDef t .
-  evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t
+  evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
+  replacePrelude t
 
 -- Handle CBar
 --  CHOOSE
@@ -493,6 +494,8 @@ prelude =
   ,("in'<='", cmpV "intLE#")
   ,("float", undefined)
   ,("string", undefined)
+  ,("pre'[]'", unimplemented "pre []")
+  ,("pre'^'", unimplemented "pre ^")
   ]
   where typ is = VLam x $ cSeq $ is ++ [CVar x]
         vx = Var x
@@ -507,7 +510,7 @@ prelude =
               CLam g $ CLam y $
                 CDef [sy, gsy] $
                 CSeq [
-                  app "isFcn#" (Var y),
+                  app "isFcn#" (Var g),
                   CUnify (CVar sy) (CApply (Var s) (Var y)),
                   CUnify (CVar gsy) (CApply (Var g) (Var sy)),
                   CApply (Var t) (Var gsy)
