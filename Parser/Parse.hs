@@ -111,7 +111,7 @@ pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
 
 pTerm :: P Expr
 pTerm = do
-  fn <- pAtom
+  fn <- pTermPost
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
              (flip ApplyS <$> pParens pExprSeq) <|>
@@ -184,11 +184,24 @@ pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pOption, pFunction, pTerm ]
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
+pTermPost :: P Expr
+pTermPost = makeExprParser pAtom operatorTablePost
+
+operatorTablePost :: [[Operator P Expr]]
+operatorTablePost =
+  [ [postOp "^", postOp "?"]
+  ]
+  where
+    postOp :: String -> Operator P Expr
+    postOp s = Postfix (app <$> pOpL s)
+      where app l x = PostfixOp x (Ident l s)
+
+    pOpL s = getSourcePos <* pOp s
+
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
   [ [preOp ":", preOp "!"],
-    [postOp "^", postOp "?"],
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
     [op InfixR "|", op InfixR "~>", op InfixN ".."],
@@ -204,10 +217,6 @@ operatorTable =
     preOp :: String -> Operator P Expr
     preOp s = Prefix (app <$> pOpL s)
       where app l x = PrefixOp (Ident l s) x
-
-    postOp :: String -> Operator P Expr
-    postOp s = Postfix (app <$> pOpL s)
-      where app l x = PostfixOp x (Ident l s)
 
     op :: (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
     op fx s = fx (app <$> oper)
