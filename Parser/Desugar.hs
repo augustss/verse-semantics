@@ -156,6 +156,7 @@ dsD _ctx = expr
     -- Pick the appropriate form of apply for operators
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
+                             "pre'^'", "pre'[]'",  -- no need for succeeds
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='"] = ApplyD
                 | otherwise = ApplyS
             s' = p ++ "'" ++ s ++ "'"
@@ -262,16 +263,45 @@ dsLHS l x e = dsL l x e
 
 -- Desugar a definition e1 : e2
 dsLHSColon :: Loc -> Expr -> SExpr -> D SExpr
-dsLHSColon l e t | isFunDef e = dsFunDefType l e [] =<< dsD Eval t
--- L[lhs1 ~> lhs2] (:t) = L[lhs1] Lt[lhs2] t 
+-- L[f(a)<r>...] (:t) = L[f] (:(type{a} -> t))
+dsLHSColon l e t | Just (f, a, rs) <- getFun e =
+  -- XXX This does not support dependent types yet
+  if null rs then
+    dsLHSColon l f $ applyPrimD "in'->'" $ Array [typedef a, t]
+  else
+    unimplemented "function type with effects"
+-- L[f^] (:t) = L[f] (: ^t)
+dsLHSColon l (PostfixOp f op@(Ident _ "^")) t =
+  dsLHSColon l f (PrefixOp op t)
+-- L[f?] (:t) = L[f] (: ?t)
+dsLHSColon l (PostfixOp f op@(Ident _ "?")) t =
+  dsLHSColon l f (PrefixOp op t)
+-- L[f[]] (:t) = L[f] (: []t)
+dsLHSColon l (ApplyD f (Array [])) t =
+  dsLHSColon l f (PrefixOp (Ident l "[]") t)
+-- L[lhs1 ~> lhs2] (:t) = L[lhs1] (L[lhs2] (:t))
 dsLHSColon l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
   e <- dsLHSColon l lhs2 t
   dsLHS l lhs1 e
-dsLHSColon l e t = do
+-- L[f] (:t) = f := D[t][x:= :any]; x
+dsLHSColon l (Variable v) t = do
   x <- newIdent "d"
   t' <- dsD Eval t
-  e' <- dsL l e (ApplyD t' (tAny l x))
-  pure $ Seq [e', Variable x]
+  pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
+dsLHSColon l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
+
+-- Return function, argument, and attributes
+getFun :: Expr -> Maybe (Expr, Expr, [Ident])
+getFun = gf []
+  where
+    gf rs (EffAttr e r) = gf (r:rs) e
+    gf rs (ApplyS f a) = Just (f, a, reverse rs)
+    gf _ _ = Nothing
+
+-- Optimize type{:t} to t
+typedef :: Expr -> Expr
+typedef (PrefixOp (Ident _ ":") t) = t
+typedef e = Typedef e
 
 isFunDef :: Expr -> Bool
 isFunDef ApplyS{} = True
@@ -370,22 +400,6 @@ dsFunDef l (ApplyS f a) as e = dsFunDef l f [] $ Function [(a, reverse as)] e
 dsFunDef l (Variable f) [] e = define l f <$> dsD Eval e
 dsFunDef _ Variable{} _ _ = internalError
 dsFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
-
-dsFunDefType :: Loc -> Expr -> [Eff] -> SExpr -> D SExpr
-dsFunDefType l (EffAttr f a) as t = dsFunDefType l f (a:as) t
--- XXX This does not support dependent types yet
-dsFunDefType l (ApplyS f a) [] t = do
-  a' <- tyOf a
-  dsFunDefType l f [] $ applyPrimD "in'->'" $ Array [a', t]
-dsFunDefType _l (ApplyS _f _a) _as _e = unimplemented "function type with effects"
-dsFunDefType l (Variable f)  [] t = pure $ define l f $ Range t
-dsFunDefType _ Variable{} _ _ = internalError
-dsFunDefType l f _ _ = syntaxError l $ "bad function type definition: " ++ prettyShow f
-
-tyOf :: Expr -> D SExpr
-tyOf (InfixOp _ (Ident _ ":") t) = dsD Eval t
-tyOf (PrefixOp (Ident _ ":") t) = dsD Eval t
-tyOf e = Typedef <$> dsD Abs e
 
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
