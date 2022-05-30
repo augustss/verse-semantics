@@ -229,7 +229,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
      && \vb & |def h e| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \vb |x => e| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |x => e| \\
     \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
@@ -242,13 +242,13 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole | \\
      &&\vb & |one hole| \vb |all hole| \vb |succeeds hole| \vb |decides hole| \\
     \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H\\
-    \text{Value context} & V & ::= & \hole \vb |array (dots,V,dots)|\\
+    \text{Value context} & V & ::= & \hole \vb |arr (dots,V,dots)|\\
     \end{array} \\
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      |()| & \text{means} & |array ()|\\
-      |v_1, dots, v_n| & \text{means} & |array (v_1,dots, v_n)| \quad n \geq 2 \\
+      |()| & \text{means} & |arr ()|\\
+      |v_1, dots, v_n| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 \oplus v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
       v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
      \end{array} \\
@@ -302,7 +302,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e) v| & \movesto & |subst e x v|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
+    \rulename{app-arr} & |applyx (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
 
@@ -319,7 +319,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     & \movesto &
     \begin{array}[t]{@@{}l}
       |defTwoLines (x_1,dots x_n)
-       (x_1 == applyx v_1 (); dots x_n == applyx v_n (); array (x_1,dots,x_n))| \\
+       (x_1 == applyx v_1 (); dots x_n == applyx v_n (); arr (x_1,dots,x_n))| \\
     \end{array} \\
     &&& \multicolumn{1}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
     \end{array} \\
@@ -348,16 +348,16 @@ The |let| construct cleverly models the heap, maintaining sharing.
         |fail| & \text{otherwise}
       \end{array}\right. \\
     \rulename{uarr} & \begin{array}{@@{}l}
-      |array (v_1,dots,v_m)| \\
-      | == array (v1',dots,v_n')|
+      |arr (v_1,dots,v_m)| \\
+      | == arr (v1',dots,v_n')|
       \end{array} & \movesto
     & \left\{\begin{array}{@@{}ll}
         |v_1==v1';dots;v_m=v_m';|\\
-        |array (v_1,dots,v_m)| & \text{if $m=n$} \\
+        |arr (v_1,dots,v_m)| & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{array}\right.\\
-    \rulename{ux1} & |k == array (v_1,dots,v_n) | & \movesto & |fail| \\
-    \rulename{ux2} & |array (v_1,dots,v_n) == k | & \movesto & |fail| \\
+    \rulename{ux1} & |k == arr (v_1,dots,v_n) | & \movesto & |fail| \\
+    \rulename{ux2} & |arr (v_1,dots,v_n) == k | & \movesto & |fail| \\
      \end{array}\\
 
     \\[-2mm]
@@ -850,8 +850,7 @@ $$
   |e,t| & ::= & \textit{Expressions} \\
       &     & |x|               & \text{variable reference} \\
       & \vb & |k|               & \text{constant} \\
-      & \vb & |e_1, dots, e_n|  & \text{array} \\
-      & \vb & |()|              & \text{empty array} \\
+      & \vb & |array (e_1, dots, e_n)| & \text{array}, n \geq 0 \\
       & \vb & |e_1 ; e_2|       & \text{sequencing} \\
       & \vb & |e_1^[e_2]|       & \text{function application} \\
       & \vb & |x := e|          & \text{definition} \\
@@ -865,6 +864,8 @@ $$
   %%%%%
   \\
       &     & \textit{Expressions removed by desugaring} \\
+      & \vb & |e_1, dots, e_n|  & \text{array}, n \geq 2 \\
+      & \vb & |()|              & \text{empty array} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
       & \vb & |p := e|          & \text{general definition} \\
       & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
@@ -872,7 +873,6 @@ $$
       & \vb & |e op_a|          & \text{postfix operator} \\
       & \vb & |e_1 op_i e_2|    & \text{infix operator} \\
       & \vb & |l : t|           & \text{of type} \\
-      & \vb & |f a_1 dots a_n : t|           & \text{of function type} \\
       & \vb & |e_1 where e_2|   & \text{reverse sequencing} \\
       & \vb & |if(e) then b|    & \text{conditional expression} \\
       & \vb & |if(e) else b|    & \text{conditional expression} \\
@@ -936,7 +936,8 @@ $$
   \multicolumn{1}{l}{\textbf{Basic forms}} \\
   |De k| & = & |k| \\
   |De x| & = & |x| \\
-  |De (e_1, dots, e_n)| & = & |De e_1 , dots, De e_n| \\
+  |De (e_1, dots, e_n)| & = & |array (De e_1 , dots, De e_n)| \\
+  |De ()| & = & |array ()| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
   |De (e_1^(e_2))| & = & |(De e_1)(De e_2)| \\
@@ -1015,7 +1016,7 @@ $$
   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Pd (p_0, dots, p_n) e| & = &
-    |Pd p_0 x_0; dots; Pd p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
+    |Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e| & \text{|x_i| fresh} \\
   |Pd (p_1 squiggt p_2) e| & = & |Ld (p_1 squiggt p_2) ((type^{e}))| \\
   \\
 \end{array}
@@ -1045,9 +1046,9 @@ $$
     |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
     |Cr k| & = & |k| \\
     |Cr x| & = & |x| \\
-    |Cr (e_1, dots, e_n)| & = &
+    |Cr (array (e_1, dots, e_n))| & = &
     \begin{array}[t]{@@{}l}
-    |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; (v_1, dots, v_n)| \\
+    |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; arr (v_1, dots, v_n)| \\
     \end{array}
 	& \text{|x_i| fresh} \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
@@ -1075,7 +1076,7 @@ $$
     |Vr| & \multicolumn{3}{l}{ \text{finds all locally defined variables.} } \\
     |Vr k| & = & |emp| \\
     |Vr x| & = & |emp| \\
-    |Vr (e_1, dots, e_n)| & = & |Vr e_1, dots, Vr e_n| \\
+    |Vr (array (e_1, dots, e_n))| & = & |Vr e_1, dots, Vr e_n| \\
     |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (x := e)| & = & |x , Vr e| \\
