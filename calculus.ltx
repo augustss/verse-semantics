@@ -1025,11 +1025,11 @@ $$
 
 $$
 \begin{array}{rcll}
-  |Ld| & \multicolumn{3}{l}{\text{converts a definition |l : t| to simple definitions.}} \\
+  |Ld| & \multicolumn{3}{l}{\text{converts a type ascription |l : t|.}} \\
   |Ld f t| & = & |f := t^[x:any]; x| & \text{|x| fresh} \\
-  |Ld (l^(e)) t| & = & |Ld l ((type^{De e} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
-  |Ld (l^()) t| & = & |Ld l ((type^{()} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
-  |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{effsR}^{t}))| \\
+  |Ld (l^(e)) t| & = & |Ld l ((type^{De e} minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
+  |Ld (l^()) t| & = & |Ld l ((type^{()} minusgt t))| \\
+  |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{r dots}^{t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l^?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
