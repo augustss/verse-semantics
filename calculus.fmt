@@ -10,9 +10,9 @@
 %format (Vr (x)) = "\Vr{" ^ x "}"
 %format (Vl (x)) = "\Vl{" ^ x "}"
 %format (Th (x)) = "\Th{" ^ x "}"
-%format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
+%format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Fd (x)(y)) = "\Fd{" ^ x "}{" ^ y "}"
-%format (Td (x)(y)) = "\Td{" ^ x "}{" ^ y "}"
+%format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format applyx a b = a "@" b
 
 %format lambda = "\lambda\!"
@@ -113,7 +113,7 @@
 %format squiggt = "\!\leadsto\!"
 %format minusgt = "-\!\!>"
 %format (eff x) = "\!\!<\!\!" x "\!\!>"
-%format apeff g x = g "\!\!<\!\!" x "\!\!>"
+%format apeff g x = g "\!\!<\!\!" x "\!\!>\!\!"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
@@ -194,3 +194,6 @@
 
 %format l_1
 %format l_2
+
+%format r_1
+%format r_n

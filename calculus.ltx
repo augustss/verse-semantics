@@ -43,8 +43,8 @@
 \newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
 \newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
 \newcommand{\Fd}[2]{{\mathcal F}\llbracket #1 \rrbracket \, #2}
-\newcommand{\Td}[2]{{\mathcal T}\llbracket #1 \rrbracket \, #2}
-\newcommand{\Ld}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -899,11 +899,15 @@ $$
       &     & |e|               & \text{single expression} \\
       & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
       \\
+  |a| & ::= & \textit{Function argument} \\
+      &     & |apeff (e) r_1 dots (eff r_n)| & n \geq 0 \\
+      &     & |apeff () r_1 dots (eff r_n)| & n \geq 0 \\
+  \\
   |p| & ::= & \textit{Left hand side definition, i.e., of |:=| } \\
-      &     & \text{The subset of |e| handled by |Ld|.} \\
+      &     & \text{The subset of |e| handled by |Pd|.} \\
   \\
   |l| & ::= & \textit{Left hand side type ascription, i.e., of |:| } \\
-      &     & \text{The subset of |e| handled by |Td|.} \\
+      &     & \text{The subset of |e| handled by |Ld|.} \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
         &     & ! \vb - \vb + \\
@@ -913,7 +917,7 @@ $$
   \\
  |op_i| & ::= & \textit{Infix operators} \\
         &     & + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb ..\\
-        & \vb & < \vb <= \vb > \vb >= \vb <>
+        & \vb & < \vb <= \vb > \vb >= \vb <> \\
   \\
   |r| & ::= & \textit{Effects} \\
       &     & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
@@ -942,8 +946,8 @@ $$
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   \\
   \multicolumn{1}{l}{\textbf{Bindings}} \\
-  |De (l : e)| & = & |Td l (De e)| \\
-  |De (p := e)| & = & |Ld p (De e)| \\
+  |De (l : t)| & = & |Ld l (De t)| \\
+  |De (p := e)| & = & |Pd p (De e)| \\
   \\
   \multicolumn{1}{l}{\textbf{Functions}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
@@ -1005,30 +1009,31 @@ A more robust desugaring could $\alpha$-convert such clashes.
 \begin{figurebox}
 $$
 \begin{array}{rcll}
-  |Ld| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
-  |Ld x e| & = & |x := e| \\
-  |Ld (f^(e_1)effsR) e| & = & |Ld f ((De (function e_1 effsR e)))| \\
-  |Ld (: t) e| & = & |Ld (x:t) e| & \text{|x| fresh} \\
-  |Ld (p : t) e| & = & |Ld p ((De t^[x:=e])); x| & \text{|x| fresh} \\
-  |Ld (p ?) e| & = & |Ld p (De ((option^{e}))| \\
-  |Ld (e_1^hat) e| & = & |assign^(De e_1,e)| \\
-  |Ld (p_0, dots, p_n) e| & = &
-    |Ld p_0 x_0; dots; Ld p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
-  |Ld (p_1 squiggt p_2) e| & = & |Td (p_1 squiggt p_2) ((type^{e}))| \\
+  |Pd| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
+  |Pd x e| & = & |x := e| \\
+  |Pd (f^(e_1)effsR) e| & = & |Pd f ((De (function e_1 effsR e)))| \\
+  |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
+  |Pd (p : t) e| & = & |Pd p ((De t^[x:=e])); x| & \text{|x| fresh} \\
+  |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
+  |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
+  |Pd (p_0, dots, p_n) e| & = &
+    |Pd p_0 x_0; dots; Pd p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
+  |Pd (p_1 squiggt p_2) e| & = & |Ld (p_1 squiggt p_2) ((type^{e}))| \\
   \\
 \end{array}
 $$
 
 $$
 \begin{array}{rcll}
-  |Td| & \multicolumn{3}{l}{\text{converts a definition |l : t| to simple definitions.}} \\
-  |Td f t| & = & |f := t^[x:any]; x| & \text{|x| fresh} \\
-  |Td (l^(a)) t| & = & |Td l ((type^{De a} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
-  |Td (l^(a)effsR) t| & = & |Td l ((arrow^(D a)^{effsR}^{t}))| \\
-  |Td (l^hat) t| & = & |Td l ((new^(t)))| \\
-  |Td (l^?) t| & = & |Td l ((? t))| \\
-  |Td (l^arrayty) t| & = & |Td l ((arrayty^t))| \\
-  |Td (l_1 squiggt l_2) t| & = & |Ld l_1 ((Td l_2 t))| \\
+  |Ld| & \multicolumn{3}{l}{\text{converts a definition |l : t| to simple definitions.}} \\
+  |Ld f t| & = & |f := t^[x:any]; x| & \text{|x| fresh} \\
+  |Ld (l^(e)) t| & = & |Ld l ((type^{De e} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
+  |Ld (l^()) t| & = & |Ld l ((type^{()} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
+  |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{effsR}^{t}))| \\
+  |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
+  |Ld (l^?) t| & = & |Ld l ((? t))| \\
+  |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
+  |Ld (l_1 squiggt l_2) t| & = & |Pd l_1 ((Ld l_2 t))| \\
   \\
 \end{array}
 $$
