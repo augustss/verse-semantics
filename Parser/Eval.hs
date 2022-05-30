@@ -494,8 +494,8 @@ prelude =
   ,("in'<='", cmpV "intLE#")
   ,("float", undefined)
   ,("string", undefined)
-  ,("pre'[]'", unimplemented "pre []")
-  ,("pre'^'", unimplemented "pre ^")
+--  ,("pre'[]'", unimplemented "pre []")
+--  ,("pre'^'", unimplemented "pre ^")
   ]
   where typ is = VLam x $ cSeq $ is ++ [CVar x]
         vx = Var x

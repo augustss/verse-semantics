@@ -210,6 +210,7 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inn "post?"  10
       , inn "pre:"   11
       , inn "pre!"   11
+      , inn "pre[]"  11
       , inn "macro"  12
       , inl "()"     13
       ]

@@ -1013,7 +1013,7 @@ $$
   |Pd x e| & = & |x := e| \\
   |Pd (f^(e_1)effsR) e| & = & |Pd f ((De (function e_1 effsR e)))| \\
   |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
-  |Pd (p : t) e| & = & |Pd p ((De t^[x:=e])); x| & \text{|x| fresh} \\
+  |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Pd (p_0, dots, p_n) e| & = &
@@ -1031,7 +1031,7 @@ $$
   |Ld (l^()) t| & = & |Ld l ((type^{()} minusgt t))| \\
   |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{r dots}^{t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
-  |Ld (l^?) t| & = & |Ld l ((? t))| \\
+  |Ld (l?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
   |Ld (l_1 squiggt l_2) t| & = & |Pd l_1 ((Ld l_2 t))| \\
   \\

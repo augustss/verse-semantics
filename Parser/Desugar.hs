@@ -71,12 +71,12 @@ dsD ctx = expr
 
     -- Bindings
     -- D [lhs : t] = T[lhs] D[t]
-    expr (InfixOp lhs (Ident l ":") t) = dsT l lhs =<< expr t
+    expr (InfixOp lhs (Ident l ":") t) = dsL l lhs =<< expr t
     expr (InfixOp lhs (Ident l ":=") e)
     -- D [lhs := e] = D[lhs := type{e}]     in an abstraction context
       | ctx == Abs = expr $ InfixOp lhs (Ident l ":") (Typedef e)
     -- D [lhs := e] = L[lhs] e
-      | otherwise = dsL l lhs e
+      | otherwise = dsP l lhs e
 
     -- Functions
     -- D[e1 => e2] = D[fn(e1){e2}]
@@ -123,7 +123,7 @@ dsD ctx = expr
         -- D[e1 || e2] = D[if(e1)else e2]
         "||" -> expr $ If2E e1 e2
         -- D[e1 where e2] = D[x:= e1; e2; x]
-        "where" -> newIdent "w" >>= \ x -> expr $ Seq [define l x e1, e2, Variable x]
+        "where" -> newIdent l "w" >>= \ x -> expr $ Seq [define l x e1, e2, Variable x]
         -- D[e1 op e2] = D[e1] op D[e2]
         _    -> expr $ call "in" l op $ Array [e1, e2]
 
@@ -134,7 +134,7 @@ dsD ctx = expr
     expr (Do e) = Do <$> expr e  -- XXX scope check?
     -- D[case {b}] = D[(x:any) => case(x)of b]
     expr (Case1 b) =
-      newIdent "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
+      newIdent noLoc "d" >>= \ i -> expr $ InfixOp (tAny noLoc i) (Ident noLoc "=>") $ Case2 (Variable i) b
     -- D[case(e)of b] = ...
     expr (Case2 e1 e2) = dsCase e1 e2
 
@@ -173,7 +173,7 @@ dsD ctx = expr
             isAnyT _ = False
     -- D[fn(e){b}] = fn(x:any){M[e]x; D[do b]}
     function e b = do
-      x <- newIdent "z"
+      x <- newIdent noLoc "z"
       e' <- dsD Abs e
       b' <- expr (Do b)
       pure $ Function [(Define x AnyT, [])] $ seqE [Unify e' (Variable x), b']
@@ -215,15 +215,15 @@ newInt = do
   put $! n+1
   pure n
 
-newIdent :: String -> D Ident
-newIdent s = do
+newIdent :: Loc -> String -> D Ident
+newIdent l s = do
   n <- newInt
-  pure $ Ident noLoc $ "$" ++ s ++ show n
+  pure $ Ident l $ "$" ++ s ++ show n
 
 inVarM :: Expr -> D (Expr, Maybe Expr)
 inVarM e@Variable{} = pure (e, Nothing)
 inVarM e = do
-  i <- newIdent "d"
+  i <- newIdent noLoc "d"
   pure (Variable i, Just $ define noLoc i e)
 
 inVar :: Expr -> D (Expr, Expr)
@@ -232,7 +232,7 @@ inVar e = (\ (e', me) -> (e', fromMaybe e' me)) <$> inVarM e
 inVarC :: Expr -> (Expr -> D Expr) -> D Expr
 inVarC e@Variable{} k = k e
 inVarC e k = do
-  i <- newIdent "d"
+  i <- newIdent noLoc "d"
   ke <- k (Variable i)
   pure $ seqE [define noLoc i e, ke]
 
@@ -259,37 +259,37 @@ tAny :: Loc -> Ident -> SExpr
 tAny l i = define l i AnyT
 
 -- Desugar a definition e1 : e2
-dsT :: Loc -> Expr -> SExpr -> D SExpr
+dsL :: Loc -> Expr -> SExpr -> D SExpr
 -- T[f] t = f := t[x:any]; x
-dsT l (Variable v) t = do
-  x <- newIdent "d"
+dsL l (Variable v) t = do
+  x <- newIdent l "d"
   t' <- dsD Eval t
   pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
 -- T[l(a)<r>...] t = T[l] (:(type{a} -> t))
-dsT l e t | Just (f, a, rs) <- getFun e = do
+dsL l e t | Just (f, a, rs) <- getFun e = do
   vs <- getVisible <$> dsD Abs a
   let us = getFreeD t ++ rs
   if null rs && null (intersect vs us) then do
     -- No dependent types, no effects
     a' <- typedef a
-    dsT l f $ applyPrimD "in'->'" $ Array [a', t]
+    dsL l f $ applyPrimD "in'->'" $ Array [a', t]
    else
     -- XXX This does not support dependent types yet
     unimplemented "complex function type"
 -- T[l^] t = T[l] new[t]
-dsT l (PostfixOp f (Ident _ "^")) t =
-  dsT l f (applyPrimD "new" t)
+dsL l (PostfixOp f (Ident _ "^")) t =
+  dsL l f (applyPrimD "new" t)
 -- T[l?] t = T[l] (?t)
-dsT l (PostfixOp f op@(Ident _ "?")) t =
-  dsT l f (PrefixOp op t)
+dsL l (PostfixOp f op@(Ident _ "?")) t =
+  dsL l f (PrefixOp op t)
 -- T[l[]] t = T[l] ([]t)
-dsT l (ApplyD f (Array [])) t =
-  dsT l f (PrefixOp (Ident l "[]") t)
+dsL l (ApplyD f (Array [])) t =
+  dsL l f (PrefixOp (Ident l "[]") t)
 -- T[lhs1 ~> lhs2] t = L[lhs1] (T[lhs2] t)
-dsT l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
-  e <- dsT l lhs2 t
-  dsL l lhs1 e
-dsT l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
+dsL l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
+  e <- dsL l lhs2 t
+  dsP l lhs1 e
+dsL l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
 
 -- Return function, argument, and attributes
 getFun :: Expr -> Maybe (Expr, Expr, [Ident])
@@ -306,86 +306,90 @@ typedef (InfixOp _ (Ident _ ":") t) = dsD Eval t
 typedef e = Typedef <$> dsD Eval e
 
 -- Desugar a definition lhs := e
-dsL :: Loc -> Expr -> Expr -> D SExpr
-dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
--- L[f(a)<r>...] e = L[f] (function(a)<r>...{e2})
-dsL l e1 e2 | Just (f, a, rs) <- getFun e1 = dsL l f $ Function [(a, rs)] e2
--- L[x] e = x := D[e]
-dsL l (Variable x) e = define l x <$> dsD Eval e
--- L[:t] e = L[x:t] e, x fresh
-dsL l (PrefixOp colon@(Ident _ ":") t) e = do
-  x <- newIdent "x"
-  dsL l (InfixOp (Variable x) colon t) e
--- L[l:t] e = L[l] t[e]
-dsL l (InfixOp x (Ident _ ":") t) e = do
-  dsL l x (ApplyD t e)
--- FIX L: use option
--- L[l?] e = L[l] option{e}
-dsL l (PostfixOp lhs (Ident _ "?")) e =
-  dsL l lhs (Option $ Just e)
--- L[e1^] e = D[assign(e1, e)]
-dsL l (PostfixOp e1 (Ident _ "^")) e = do
+dsP :: Loc -> Expr -> Expr -> D SExpr
+dsP _ e1 e2 | doTrace && trace ("dsP " ++ prettyShow (e1, e2)) False = undefined
+-- P[f(a)<r>...] e = P[f] (function(a)<r>...{e2})
+dsP l e1 e2 | Just (f, a, rs) <- getFun e1 = dsP l f $ Function [(a, rs)] e2
+-- P[x] e = x := D[e]
+dsP l (Variable x) e = define l x <$> dsD Eval e
+-- P[:t] e = P[x:t] e, x fresh
+dsP l (PrefixOp colon@(Ident _ ":") t) e = do
+  x <- newIdent l "x"
+  dsP l (InfixOp (Variable x) colon t) e
+-- P[l:t] e = P[l] t[e]
+dsP l (InfixOp p (Ident _ ":") t) e = do
+  dsP l p (ApplyD t e)
+{-
+  x <- newIdent l "x"
+  p' <- dsP l p =<< dsD Eval (ApplyD t (define l x e))
+  pure $ seqE [p', Variable x]
+-}
+-- P[l?] e = P[l] option{e}
+dsP l (PostfixOp lhs (Ident _ "?")) e =
+  dsP l lhs (Option $ Just e)
+-- P[e1^] e = D[assign(e1, e)]
+dsP l (PostfixOp e1 (Ident _ "^")) e = do
   dsD Eval $ ApplyD (eAssign l) $ Array [e1, e]
 -- FIX L: update for splices
--- L[lhs1, ... lhsn] = ...
-dsL l (Array lhss) e = dsLArr l lhss e
--- L[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
-dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsT l lhs =<< typedef e
+-- P[lhs1, ... lhsn] = ...
+dsP l (Array lhss) e = dsPArr l lhss e
+-- P[lhs ~> lhs2] e = P[lhs ~> lhs2] (: typedef{e})
+dsP l lhs@(InfixOp _ (Ident _ "~>") _) e = dsL l lhs =<< typedef e
 -- What else is allowed?  LitInt and LitRat would be easy.
-dsL l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
+dsP l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
 -- Handle ..l, l
-dsLArr :: Loc -> [Expr] -> SExpr -> D SExpr
-dsLArr l lhss e =
+dsPArr :: Loc -> [Expr] -> SExpr -> D SExpr
+dsPArr l lhss e =
   case exprElems lhss of
-    -- L[lhs0,...,lhsn] e = L[lhs0]x0; ...; L[lhsn]xn; (x0:any,...,xn:any) = e
+    -- P[lhs0,...,lhsn] e = P[lhs0]x0; ...; P[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
-      xs <- mapM (const $ newIdent "d") ls
+      xs <- mapM (const $ newIdent l "d") ls
       let eun = Unify (Array (map (tAny l) xs)) e
-      els <- zipWithM (\ lhs x -> dsL l lhs (Variable x)) ls xs
+      els <- zipWithM (\ lhs x -> dsP l lhs (Variable x)) ls xs
       pure $ Seq $ els ++ [eun]
 
     [ESplice lhs] ->
-      dsL l lhs e
+      dsP l lhs e
     
     [EElems ls1, ESplice lhs] -> do
-      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
         len1 = toInteger $ length ls1
         a1  = applyPrim "takeL#" $ Array [LitInt len1, v]
         e'  = applyPrim "dropL#" $ Array [LitInt len1, v]
-      v' <- newIdent "d"
+      v' <- newIdent l "d"
       let
         bv' = define l v' e'
-      m1 <- dsL l (Array ls1) a1
-      mm <- dsL l lhs e'
+      m1 <- dsP l (Array ls1) a1
+      mm <- dsP l lhs e'
       pure $ Seq $ bv ++ [m1, bv', mm, v]
 
     [ESplice lhs, EElems ls2] -> do
-      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
         len2 = toInteger $ length ls2
         a2  = applyPrim "takeR#" $ Array [LitInt len2, v]
         e'' = applyPrim "dropR#" $ Array [LitInt len2, v]
-      mm <- dsL l lhs e''
-      m2 <- dsL l (Array ls2) a2
+      mm <- dsP l lhs e''
+      m2 <- dsP l (Array ls2) a2
       pure $ Seq $ bv ++ [mm, m2, v]
 
     [EElems ls1, ESplice lhs, EElems ls2] -> do
-      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent "d"; pure (Variable v, [define l v e])
+      (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
         len1 = toInteger $ length ls1
         len2 = toInteger $ length ls2
         a1  = applyPrim "takeL#" $ Array [LitInt len1, v]
         e'  = applyPrim "dropL#" $ Array [LitInt len1, v]
-      v' <- newIdent "d"
+      v' <- newIdent l "d"
       let
         bv' = define l v' e'
         a2  = applyPrim "takeR#" $ Array [LitInt len2, Variable v']
         e'' = applyPrim "dropR#" $ Array [LitInt len2, Variable v']
-      m1 <- dsL l (Array ls1) a1
-      mm <- dsL l lhs e''
-      m2 <- dsL l (Array ls2) a2
+      m1 <- dsP l (Array ls1) a1
+      mm <- dsP l lhs e''
+      m2 <- dsP l (Array ls2) a2
       pure $ Seq $ bv ++ [m1, bv', mm, m2, v]
 
     _ -> syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow (Array lhss) ++ ", should only have one ..e"
@@ -396,6 +400,7 @@ prelude = map (Ident noLoc)
   [ "int", "float", "string", "any", "nat", "false"
   , "in'..'", "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
+  , "assign", "new"
   ]
 
 -- Primitives
@@ -405,9 +410,8 @@ primOps = map (Ident noLoc)
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<>'"
   , "pre'-'"
-  , "post'^'", "post'?'"
+  , "pre'?'", "pre'[]'", "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
-  , "assign#"
   , "concat#", "takeL#", "dropL#", "takeR#", "dropR#"
   ]
 
@@ -426,7 +430,7 @@ dsDo = f
     f (Let e b) = f $ seqE [e, b]
     -- D[:t] = t[x:any]; x
     f (Range e) = do
-      r <- newIdent "r"
+      r <- newIdent noLoc "r"
       e' <- f e
       pure $ Seq [ApplyD e' (tAny noLoc r), Variable r]
     f e = compos f e
@@ -457,7 +461,7 @@ anfS = anf
       e' <- anf e
       pure ([Define i e'], Variable i)
     value e = do
-      i <- newIdent "a"
+      i <- newIdent noLoc "a"
       e' <- anf e
       pure ([Define i e'], Variable i)
     app con e1 e2 = do
@@ -530,7 +534,7 @@ scopeCheck e = do
   case [ i | ErrUndefined i <- errs ] of
     [] -> pure ()
     -- Make it a trace instead of an error for now
-    is -> traceM $ "scopeCheck: warning undefined " ++ show is
+    is@(Ident l _ : _) -> traceM $ "scopeCheck: warning undefined " ++ show (l, is)
   case [ i | ErrShadow i <- errs ] of
     [] -> pure e
     -- Make it a trace instead of an error for now
