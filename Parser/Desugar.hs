@@ -260,7 +260,12 @@ tAny l i = define l i AnyT
 
 -- Desugar a definition e1 : e2
 dsT :: Loc -> Expr -> SExpr -> D SExpr
--- T[f(a)<r>...] t = T[f] (:(type{a} -> t))
+-- T[f] t = f := t[x:any]; x
+dsT l (Variable v) t = do
+  x <- newIdent "d"
+  t' <- dsD Eval t
+  pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
+-- T[l(a)<r>...] t = T[l] (:(type{a} -> t))
 dsT l e t | Just (f, a, rs) <- getFun e = do
   vs <- getVisible <$> dsD Abs a
   let us = getFreeD t ++ rs
@@ -271,24 +276,19 @@ dsT l e t | Just (f, a, rs) <- getFun e = do
    else
     -- XXX This does not support dependent types yet
     unimplemented "complex function type"
--- T[f^] t = T[f] new[t]
+-- T[l^] t = T[l] new[t]
 dsT l (PostfixOp f (Ident _ "^")) t =
   dsT l f (applyPrimD "new" t)
--- T[f?] t = T[f] (?t)
+-- T[l?] t = T[l] (?t)
 dsT l (PostfixOp f op@(Ident _ "?")) t =
   dsT l f (PrefixOp op t)
--- T[f[]] t = T[f] ([]t)
+-- T[l[]] t = T[l] ([]t)
 dsT l (ApplyD f (Array [])) t =
   dsT l f (PrefixOp (Ident l "[]") t)
 -- T[lhs1 ~> lhs2] t = L[lhs1] (T[lhs2] t)
 dsT l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
   e <- dsT l lhs2 t
   dsL l lhs1 e
--- T[f] t = f := D[t][x:= :any]; x
-dsT l (Variable v) t = do
-  x <- newIdent "d"
-  t' <- dsD Eval t
-  pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
 dsT l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
 
 -- Return function, argument, and attributes
