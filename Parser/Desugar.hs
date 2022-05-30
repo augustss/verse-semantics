@@ -2,7 +2,7 @@
 module Desugar(desugar, simplify, primOps, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
---import Data.List
+import Data.List
 --import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Either
@@ -43,7 +43,7 @@ dropParens = f
 
 -- This follows the D transformation in calculus.ltx
 dsD :: Context -> Expr -> D SExpr
-dsD _ctx = expr
+dsD ctx = expr
   where
     expr :: HasCallStack => Expr -> D Expr
     expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
@@ -70,11 +70,13 @@ dsD _ctx = expr
     expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
 
     -- Bindings
-    -- D [lhs : t] = Lt[lhs] D[t]
-    expr (InfixOp lhs (Ident l ":") t) = dsLHSColon l lhs =<< expr t
-    -- D [lhs := e] = L[lhs] D[e]
-    expr (InfixOp lhs (Ident l ":=") e) = dsLHS l lhs =<< expr e
-    -- Function bindings recognized by dsLHS
+    -- D [lhs : t] = T[lhs] D[t]
+    expr (InfixOp lhs (Ident l ":") t) = dsT l lhs =<< expr t
+    expr (InfixOp lhs (Ident l ":=") e)
+    -- D [lhs := e] = D[lhs := type{e}]     in an abstraction context
+      | ctx == Abs = expr $ InfixOp lhs (Ident l ":") (Typedef e)
+    -- D [lhs := e] = L[lhs] e
+      | otherwise = dsL l lhs e
 
     -- Functions
     -- D[e1 => e2] = D[fn(e1){e2}]
@@ -143,7 +145,8 @@ dsD _ctx = expr
     -- D[option{}] = false
     expr (Option Nothing) = pure Unit
     -- D[option{e}] = D[if(x:=e)then truth(e)
-    expr (Option (Just e)) = inVar e >>= \ (t, e') -> expr $ If2 e' (ApplyD eTruth t)
+    expr (Option (Just e)) = inVar e >>= \ (t, e') -> expr $ If2 e' --(ApplyD eTruth t)
+                                                                    (Array [t])
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
@@ -246,49 +249,47 @@ dsCase e b = do
 eAssign :: Loc -> Expr
 eAssign l = Variable (Ident l "assign#")
 
-eTruth :: Expr
-eTruth = Variable (Ident noLoc "truth")
+--eTruth :: Expr
+--eTruth = Variable (Ident noLoc "truth")
 
-define :: Loc -> Ident -> Expr -> Expr
+define :: Loc -> Ident -> SExpr -> SExpr
 define _l i e = Define i e
 
-tAny :: Loc -> Ident -> Expr
+tAny :: Loc -> Ident -> SExpr
 tAny l i = define l i AnyT
 
--- Desugar a definition e1 := e2
--- L
-dsLHS :: Loc -> Expr -> SExpr -> D SExpr
-dsLHS l f e | isFunDef f = dsFunDef l f [] e
-dsLHS l x e = dsL l x e
-
 -- Desugar a definition e1 : e2
-dsLHSColon :: Loc -> Expr -> SExpr -> D SExpr
--- L[f(a)<r>...] (:t) = L[f] (:(type{a} -> t))
-dsLHSColon l e t | Just (f, a, rs) <- getFun e =
-  -- XXX This does not support dependent types yet
-  if null rs then
-    dsLHSColon l f $ applyPrimD "in'->'" $ Array [typedef a, t]
-  else
-    unimplemented "function type with effects"
--- L[f^] (:t) = L[f] (: ^t)
-dsLHSColon l (PostfixOp f op@(Ident _ "^")) t =
-  dsLHSColon l f (PrefixOp op t)
--- L[f?] (:t) = L[f] (: ?t)
-dsLHSColon l (PostfixOp f op@(Ident _ "?")) t =
-  dsLHSColon l f (PrefixOp op t)
--- L[f[]] (:t) = L[f] (: []t)
-dsLHSColon l (ApplyD f (Array [])) t =
-  dsLHSColon l f (PrefixOp (Ident l "[]") t)
--- L[lhs1 ~> lhs2] (:t) = L[lhs1] (L[lhs2] (:t))
-dsLHSColon l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
-  e <- dsLHSColon l lhs2 t
-  dsLHS l lhs1 e
--- L[f] (:t) = f := D[t][x:= :any]; x
-dsLHSColon l (Variable v) t = do
+dsT :: Loc -> Expr -> SExpr -> D SExpr
+-- T[f(a)<r>...] t = T[f] (:(type{a} -> t))
+dsT l e t | Just (f, a, rs) <- getFun e = do
+  vs <- getVisible <$> dsD Abs a
+  let us = getFreeD t ++ rs
+  if null rs && null (intersect vs us) then do
+    -- No dependent types, no effects
+    a' <- typedef a
+    dsT l f $ applyPrimD "in'->'" $ Array [a', t]
+   else
+    -- XXX This does not support dependent types yet
+    unimplemented "complex function type"
+-- T[f^] t = T[f] new[t]
+dsT l (PostfixOp f (Ident _ "^")) t =
+  dsT l f (applyPrimD "new" t)
+-- T[f?] t = T[f] (?t)
+dsT l (PostfixOp f op@(Ident _ "?")) t =
+  dsT l f (PrefixOp op t)
+-- T[f[]] t = T[f] ([]t)
+dsT l (ApplyD f (Array [])) t =
+  dsT l f (PrefixOp (Ident l "[]") t)
+-- T[lhs1 ~> lhs2] t = L[lhs1] (T[lhs2] t)
+dsT l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
+  e <- dsT l lhs2 t
+  dsL l lhs1 e
+-- T[f] t = f := D[t][x:= :any]; x
+dsT l (Variable v) t = do
   x <- newIdent "d"
   t' <- dsD Eval t
   pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
-dsLHSColon l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
+dsT l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
 
 -- Return function, argument, and attributes
 getFun :: Expr -> Maybe (Expr, Expr, [Ident])
@@ -299,41 +300,37 @@ getFun = gf []
     gf _ _ = Nothing
 
 -- Optimize type{:t} to t
-typedef :: Expr -> Expr
-typedef (PrefixOp (Ident _ ":") t) = t
-typedef e = Typedef e
-
-isFunDef :: Expr -> Bool
-isFunDef ApplyS{} = True
-isFunDef EffAttr{} = True
-isFunDef (InfixOp f (Ident _ ":") _) = isFunDef f
-isFunDef _ = False
+typedef :: Expr -> D Expr
+typedef (PrefixOp  (Ident _ ":") t) = dsD Eval t
+typedef (InfixOp _ (Ident _ ":") t) = dsD Eval t
+typedef e = Typedef <$> dsD Eval e
 
 -- Desugar a definition lhs := e
-dsL :: Loc -> Expr -> SExpr -> D SExpr
+dsL :: Loc -> Expr -> Expr -> D SExpr
 dsL _ e1 e2 | doTrace && trace ("dsL " ++ prettyShow (e1, e2)) False = undefined
--- L[x] e = x := e
-dsL l (Variable x) e = pure $ define l x e
--- L[:t] e = D[t][e]
+-- L[f(a)<r>...] e = L[f] (function(a)<r>...{e2})
+dsL l e1 e2 | Just (f, a, rs) <- getFun e1 = dsL l f $ Function [(a, rs)] e2
+-- L[x] e = x := D[e]
+dsL l (Variable x) e = define l x <$> dsD Eval e
+-- L[:t] e = L[x:t] e, x fresh
 dsL l (PrefixOp colon@(Ident _ ":") t) e = do
   x <- newIdent "x"
   dsL l (InfixOp (Variable x) colon t) e
--- L[l:t] e = l := D[t][e]
+-- L[l:t] e = L[l] t[e]
 dsL l (InfixOp x (Ident _ ":") t) e = do
-  t' <- dsD Eval t
-  dsL l x (ApplyD t' e)
+  dsL l x (ApplyD t e)
 -- FIX L: use option
--- L[e?] = ????
-dsL _l (PostfixOp _lhs (Ident _ "?")) _e = undefined
--- L[e1^] e = assign(D[e1], e)
+-- L[l?] e = L[l] option{e}
+dsL l (PostfixOp lhs (Ident _ "?")) e =
+  dsL l lhs (Option $ Just e)
+-- L[e1^] e = D[assign(e1, e)]
 dsL l (PostfixOp e1 (Ident _ "^")) e = do
-  e1' <- dsD Eval e1
-  pure $ ApplyS (eAssign l) $ Array [e1', e]
+  dsD Eval $ ApplyD (eAssign l) $ Array [e1, e]
 -- FIX L: update for splices
 -- L[lhs1, ... lhsn] = ...
 dsL l (Array lhss) e = dsLArr l lhss e
 -- L[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
-dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsLHSColon l lhs (Typedef e)
+dsL l lhs@(InfixOp _ (Ident _ "~>") _) e = dsT l lhs =<< typedef e
 -- What else is allowed?  LitInt and LitRat would be easy.
 dsL l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
@@ -341,7 +338,7 @@ dsL l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" +
 dsLArr :: Loc -> [Expr] -> SExpr -> D SExpr
 dsLArr l lhss e =
   case exprElems lhss of
-    -- L[lhs0,...,lhsn] e = (x0:any,...,xn:any) = e; L[lhs0]x0; ...; L[lhsn]xn
+    -- L[lhs0,...,lhsn] e = L[lhs0]x0; ...; L[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
       xs <- mapM (const $ newIdent "d") ls
       let eun = Unify (Array (map (tAny l) xs)) e
@@ -392,14 +389,6 @@ dsLArr l lhss e =
       pure $ Seq $ bv ++ [m1, bv', mm, m2, v]
 
     _ -> syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow (Array lhss) ++ ", should only have one ..e"
-
-dsFunDef :: Loc -> Expr -> [Eff] -> Expr -> D SExpr
-dsFunDef l (InfixOp f (Ident _ ":") t) as e = dsFunDef l f as (ApplyS t e)
-dsFunDef l (EffAttr f a) as e = dsFunDef l f (a:as) e
-dsFunDef l (ApplyS f a) as e = dsFunDef l f [] $ Function [(a, reverse as)] e
-dsFunDef l (Variable f) [] e = define l f <$> dsD Eval e
-dsFunDef _ Variable{} _ _ = internalError
-dsFunDef l f _ _ = syntaxError l $ "bad function definition: " ++ prettyShow f
 
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
@@ -498,6 +487,30 @@ getVisible (Range e) = getVisible e
 getVisible AnyT = []
 getVisible Function{} = []
 getVisible e = impossible e
+
+getFree :: Expr -> [Ident]
+getFree LitInt{} = []
+getFree LitRat{} = []
+getFree (Variable i) = [i]
+getFree (Array es) = foldr union [] $ map getFree es
+getFree (Seq es) = foldr union [] $ map getFree es
+getFree (ApplyS e1 e2) = getFree e1 `union` getFree e2
+getFree (ApplyD e1 e2) = getFree e1 `union` getFree e2
+getFree (If3 e1 e2 e3) = getFreeD e1 `union` (getFreeD e2 \\ getVisible e1) `union` getFreeD e3
+getFree (For2 e1 e2) = getFreeD e1 `union` (getFreeD e2 \\ getVisible e1)
+getFree (Let e1 e2) = getFreeD e1 `union` (getFree e2 \\ getVisible e1)
+getFree (Do e) = getFreeD e
+getFree (Unify e1 e2) = getFree e1 `union` getFree e2
+getFree (Typedef e) = getFreeD e
+getFree (Define i e) = i : getFree e
+getFree (Choice e1 e2) = getFreeD e1 `union` getFreeD e2
+getFree (Range e) = getFree e
+getFree AnyT = []
+getFree (Function [(e,_)] b) = getFreeD b \\ getVisible e
+getFree e = impossible e
+
+getFreeD :: Expr -> [Ident]
+getFreeD e = getFree e \\ getVisible e
 
 --------------
 
