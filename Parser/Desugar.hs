@@ -247,7 +247,7 @@ dsCase e b = do
   inVarC e' $ \ x -> dsCase x b
 
 eAssign :: Loc -> Expr
-eAssign l = Variable (Ident l "assign#")
+eAssign l = Variable (Ident l "assign")
 
 --eTruth :: Expr
 --eTruth = Variable (Ident noLoc "truth")
@@ -424,6 +424,7 @@ dsDo = f
     f (Do b) = f b
     -- D[let(e)in b] = D[e]; D[b]
     f (Let e b) = f $ seqE [e, b]
+    -- D[:t] = t[x:any]; x
     f (Range e) = do
       r <- newIdent "r"
       e' <- f e
@@ -467,7 +468,7 @@ anfS = anf
 ------------
 
 -- Get all visible identifiers from i := e
-getVisible :: Expr -> [Ident]
+getVisible :: HasCallStack => Expr -> [Ident]
 getVisible LitInt{} = []
 getVisible LitRat{} = []
 getVisible Variable{} = []
