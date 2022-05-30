@@ -38,14 +38,13 @@
 \newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
 \newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
 \newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
-%% \newcommand{\Ty}[1]{{\mathcal T}\llbracket #1 \rrbracket}
 \newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
 \newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
 \newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
-\newcommand{\Th}[1]{{\mathcal T}\llbracket #1 \rrbracket}
-\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
 \newcommand{\Fd}[2]{{\mathcal F}\llbracket #1 \rrbracket \, #2}
-\newcommand{\Mt}[2]{{\mathcal M}\llbracket #1 \rrbracket\llbracket #2 \rrbracket}
+\newcommand{\Td}[2]{{\mathcal T}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Ld}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -869,12 +868,12 @@ $$
   \\
       &     & \textit{Expressions removed by desugaring} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
-      & \vb & |lhs := e|      & \text{general definition} \\
-      & \vb & |e_1^(e_2)|     & \text{non-failing function application} \\
-      & \vb & |op_b e|         & \text{prefix operator} \\
+      & \vb & |p := e|          & \text{general definition} \\
+      & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
+      & \vb & |op_b e|          & \text{prefix operator} \\
       & \vb & |e op_a|          & \text{postfix operator} \\
       & \vb & |e_1 op_i e_2|    & \text{infix operator} \\
-      & \vb & |p : t|           & \text{of type} \\
+      & \vb & |l : t|           & \text{of type} \\
       & \vb & |f a_1 dots a_n : t|           & \text{of function type} \\
       & \vb & |e_1 where e_2|   & \text{reverse sequencing} \\
       & \vb & |if(e) then b|    & \text{conditional expression} \\
@@ -900,24 +899,11 @@ $$
       &     & |e|               & \text{single expression} \\
       & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
       \\
-  |lhs| & ::= & \textit{Definition left-hand-sides} \\
-      &     & |p|                  & \text{pattern definition} \\
-      & \vb & |f a_1 dots a_n|     & \text{function definition ($n > 0$)} \\
-      & \vb & |f a_1 dots a_n : t| & \text{function definition with return type ($n > 0$)} \\
-      \\
-  |a| & ::= & \textit{Function parameter} \\
-      &     & |()|               & \text{empty parameter list} \\
-      & \vb & |(e)|              & \text{function parameter} \\
-      & \vb & |a ^ eff r|        & \text{function effect annotation} \\
-      \\
-  |p| & ::= & \textit{Patterns} \\
-      &     & |x|               & \text{variable} \\
-      & \vb & |p : t|       & \text{of type} \\
-      & \vb & |: t|             & \text{of type} \\
-      & \vb & |p?|          & \text{optional} \\
-      & \vb & |e|\,\,\hat{}     & \text{assignment} \\
-      & \vb & |p_1, dots p_n|   & \text{array} \\
-      & \vb & |p_1 minusgt p_2| & \text{domain-range} \\
+  |p| & ::= & \textit{Left hand side definition, i.e., of |:=| } \\
+      &     & \text{The subset of |e| handled by |Ld|.} \\
+  \\
+  |l| & ::= & \textit{Left hand side type ascription, i.e., of |:| } \\
+      &     & \text{The subset of |e| handled by |Td|.} \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
         &     & ! \vb - \vb + \\
@@ -956,21 +942,19 @@ $$
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
   \\
   \multicolumn{1}{l}{\textbf{Bindings}} \\
-  |De (p : t)| & = & |De (p := :t)| \\
+  |De (l : e)| & = & |Td l (De e)| \\
   |De (p := e)| & = & |Ld p (De e)| \\
-  |De (f a_1 dots a_n := e)| & = & |f := De(functionKW a_1 dots a_n e)| \\
-  |De (f a_1 dots a_n : t := e)| & = & |f := De(functionKW a_1 dots a_n (t^[e]))| \\
   \\
   \multicolumn{1}{l}{\textbf{Functions}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
   |De (functionKW a (eff r) b)| & = & |De (functionKW a (r^[b]))| & \\
-  |De (function e () b)| & = & |function(x:any)()((Mt e x; De (do b))| & \text{|x| fresh} \\
+  |De (function e () b)| & = & |function(x:any)()((De e = x; De (do b))| & \text{|x| fresh} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
-  |De (:t)| & = & |: De t| \\
-  |De (typedef^{e})| & = & |typedef^{De e}| \\
+  |De (:t)| & = & |De t^[x:any]; x| & \text{|x| fresh}  \\
+  |De (type^{e})| & = & |type^{De e}| \\
   \\
   \multicolumn{1}{l}{\textbf{Conditionals}} \\
   |De (if{e})| & = & |De (if(e) else false)| \\
@@ -1018,42 +1002,40 @@ A more robust desugaring could $\alpha$-convert such clashes.
 \caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
 \end{figurebox}
 
-\begin{figure}
+\begin{figurebox}
 $$
 \begin{array}{rcll}
   |Ld| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
   |Ld x e| & = & |x := e| \\
-  |Ld (: t) e| & = & |De(t)^[x:=e]; x| & \text{|x| fresh} \\
-  |Ld (p : t) e| & = & |Ld p (De(t)^[x:=e]); x| & \text{|x| fresh} \\
-  |Ld (p ?) e| & = & |????| \\
-  |Ld (e_1^hat) e| & = & |assign^(De e_1,x:=e); x| & \text{|x| fresh} \\
+  |Ld (f^(e_1)effsR) e| & = & |Ld f ((De (function e_1 effsR e)))| \\
+  |Ld (: t) e| & = & |Ld (x:t) e| & \text{|x| fresh} \\
+  |Ld (p : t) e| & = & |Ld p ((De t^[x:=e])); x| & \text{|x| fresh} \\
+  |Ld (p ?) e| & = & |Ld p (De ((option^{e}))| \\
+  |Ld (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Ld (p_0, dots, p_n) e| & = &
-  |Ld p_0 x_0; dots; Ld p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
-  |Ld (p_1 minusgt p_2) e| & = & |y:=e; Ld p_1 x; Ld p_2 ((typedef^{y}^[x := :any])); y| & \text{|x|,|y| fresh} \\
-  && \simon{|p_1 minusgt p_2| is firmly in the ``needs more thought'' camp}\\
+    |Ld p_0 x_0; dots; Ld p_n x_n; (x_0:any,dots,x_n:any)=e| & \text{|x_i| fresh} \\
+  |Ld (p_1 squiggt p_2) e| & = & |Td (p_1 squiggt p_2) ((type^{e}))| \\
   \\
-  |Mt| & \multicolumn{3}{l}{\text{does a matching (variant of unification) that treats functions specially.}} \\
-  |Mt (e_0, dots, e_n) e| & = & |Mt e_0 (x_0); dots; Mt e_n (x_n); (x_0:any, dots, x_n:any) = e| & \text{|x_i| fresh} \\
-  |Mt (: t) e| & = & |De(t)^[x:=e]; x| & \text{|x| fresh} \\
-  |Mt (e_1; e_2) e_3| & = & |De e_1; Mt e_2 e_3| \\
-  |Mt (e_1 where e_2) e_3| & = & |Mt e_1 (De e_2; e_3)| \\
-  |Mt (let (e_1) in e_2) e_3| & = & |let (De e_1) in Mt e_2 e_3| \\
-  |Mt (e_1^(e_2)effsR:t) e_3| & = & |Mt (e_1^(e_2)effsR:= :t) e_3| & \text{wrong} \\
-  |Mt (e_1^(e_2)effsR:=e_3) e_4| & = & |Mt (e_1 : typedef{function(e_2)effsR{e_3}}) e_4| & \text{wrong} \\
-  |Mt (p : t) e| & = & |Mt (p := :t) e| & \textit{Is this right?}\\
-  |Mt (p := e_1) e_2| & = & |Ld p (Mt e_1 e_2)|  & \textit{Is this right?} \\
-  |Mt e_1 e_2| & = & |De (do{e_1}) = e_2| & \text{otherwise} \\
-%% Maybe?  |Mt (l ?) e| & = & |Mt l (e ?)| & \text{otherwise} \\
-%%  \\
-%%  |Ty (:t)| & = & |De t| \\
-%%  |Ty e| & = & |De (typedef{e})| \\
 \end{array}
 $$
-\lennart{|Mt| can probably be simplified by using |De| on the first argument before calling it.}
-\caption{Desugaring of matching} \label{fig:desugar-expr}
-\end{figure}
 
-\begin{figure}
+$$
+\begin{array}{rcll}
+  |Td| & \multicolumn{3}{l}{\text{converts a definition |l : t| to simple definitions.}} \\
+  |Td f t| & = & |f := t^[x:any]; x| & \text{|x| fresh} \\
+  |Td (l^(a)) t| & = & |Td l ((type^{De a} minusgt t))| & \boundvars{a} \disjoint \freevars{t} \\
+  |Td (l^(a)effsR) t| & = & |Td l ((arrow^(D a)^{effsR}^{t}))| \\
+  |Td (l^hat) t| & = & |Td l ((new^(t)))| \\
+  |Td (l^?) t| & = & |Td l ((? t))| \\
+  |Td (l^arrayty) t| & = & |Td l ((arrayty^t))| \\
+  |Td (l_1 squiggt l_2) t| & = & |Ld l_1 ((Td l_2 t))| \\
+  \\
+\end{array}
+$$
+\caption{Desugaring of matching} \label{fig:desugar-expr}
+\end{figurebox}
+
+\begin{figurebox}
 
 $$
   \begin{array}{rcll}
@@ -1062,10 +1044,9 @@ $$
     |Cr x| & = & |x| \\
     |Cr (e_1, dots, e_n)| & = &
     \begin{array}[t]{@@{}l}
-    |defTwoLines (x1,dots,x_n) (x_1=e_1; dots; x_n=e_n; (v_1, dots, v_n)| \\
+    |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; (v_1, dots, v_n)| \\
     \end{array}
-	& \text{|x_1,dots,x_n| fresh} \\
-    |Cr (: e)| & = & |range (Cr e)| \\
+	& \text{|x_i| fresh} \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
     |Cr (x := e)| & = & |x = Cr e| \\
@@ -1079,7 +1060,7 @@ $$
     & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
-    |Cr (typedef^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
+    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
     \\
     |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
     |Th e| & = & |function(x:any)()e| & \text{|x| fresh} \\
@@ -1091,7 +1072,6 @@ $$
     |Vr k| & = & |emp| \\
     |Vr x| & = & |emp| \\
     |Vr (e_1, dots, e_n)| & = & |Vr e_1, dots, Vr e_n| \\
-    |Vr (: e)| & = & |Vr e| \\
     |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
     |Vr (x := e)| & = & |x , Vr e| \\
@@ -1101,11 +1081,11 @@ $$
     |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
     |Vr (for e_1 in e_2)| & = & |emp| \\
     |Vr (function(x:any)()e)| & = & |emp| \\
-    |Vr (typedef{e})| & = & |emp| \\
+    |Vr (type^{e})| & = & |emp| \\
   \end{array}
   $$
 \caption{Core conversion} \label{fig:core-conversion}
-\end{figure}
+\end{figurebox}
 
 \begin{figure}
 \begin{code}

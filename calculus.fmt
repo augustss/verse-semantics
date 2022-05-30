@@ -12,7 +12,7 @@
 %format (Th (x)) = "\Th{" ^ x "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format (Fd (x)(y)) = "\Fd{" ^ x "}{" ^ y "}"
-%format (Mt (x)(y)) = "\Mt{" ^ x "}{" ^ y "}"
+%format (Td (x)(y)) = "\Td{" ^ x "}{" ^ y "}"
 %format applyx a b = a "@" b
 
 %format lambda = "\lambda\!"
@@ -91,9 +91,12 @@
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
 %format typedef = "\textbf{typedef}"
+%format type = "\textbf{type}"
+%format option = "\textbf{option}"
 %format case = "\textbf{case}"
 %format of = "\textbf{of}"
 %format assign = "\textbf{assign}"
+%format new = "\textbf{new}"
 %format any = "\textbf{any}"
 %format dots = "\cdots"
 %format hnf = "\hnf"
@@ -107,11 +110,13 @@
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "=>"
-%format minusgt = "\!\leadsto\!"
+%format squiggt = "\!\leadsto\!"
+%format minusgt = "-\!\!>"
 %format (eff x) = "\!\!<\!\!" x "\!\!>"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
+%format arrayty = "[]"
 
 %format x_0
 %format x_1
@@ -186,3 +191,6 @@
 %format op_a
 %format op_b
 %format op_i
+
+%format l_1
+%format l_2
