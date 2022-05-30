@@ -229,7 +229,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
      && \vb & |def h e| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \vb |x => e| \vb |range| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |array (v_1, dots, v_n)| \vb |x => e| \\
     \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
@@ -302,9 +302,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \begin{array}{lrcl}
       \rulename{app-lam} & |applyx (x => e) v| & \movesto & |subst e x v|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots (v = n; v_n)| \\
-    \rulename{app-range} & |applyx range v| & \movesto & |def x (applyx v x)|
-          \quad \text{if $x \not\in \freevars{v}$} \\
+    \rulename{app-arr} & |applyx (array (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
 
@@ -323,7 +321,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |defTwoLines (x_1,dots x_n)
        (x_1 == applyx v_1 (); dots x_n == applyx v_n (); array (x_1,dots,x_n))| \\
     \end{array} \\
-    && \multicolumn{2}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
+    &&& \multicolumn{1}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
     \end{array} \\
     \\[-2mm]
 
