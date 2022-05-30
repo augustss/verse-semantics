@@ -134,8 +134,9 @@ core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
+core (Define i AnyT) = pure $ CVar i
 core (Define i e) = cUnify (CVar i) <$> core e
-core e@AnyT = val e
+core AnyT = undefined
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
   e2' <- thunk e2

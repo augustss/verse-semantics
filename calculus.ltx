@@ -1054,6 +1054,7 @@ $$
 	& \text{|x_i| fresh} \\
     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (x := :any)| & = & |x| \\
     |Cr (x := e)| & = & |x = Cr e| \\
     |Cr (e_1^[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
     |Cr (e_1^(e_2))| & = & |succeeds (Cr (e_1^[e_2]))| \\
