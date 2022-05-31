@@ -96,7 +96,6 @@ isIrred _ = False
 
 isX :: Core -> Bool
 isX CUnify{} = True
-isX CApply{} = True
 isX CSeq{} = True
 isX _ = False
 
