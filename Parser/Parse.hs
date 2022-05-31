@@ -100,9 +100,12 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
 pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
-               , Parens <$> pParens pExprSeq, pArray, pTypedef ]
+               , Parens <$> pParens pExprSeq, pArray, pTypedef
+               , pOption, pFunction ]
   where pEmpty = try $ pParens (pure (Array []))
 
+-- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
+-- A trailing ';' can be used, but not a trailing ','.
 pArray :: P Expr
 pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
@@ -120,7 +123,7 @@ pTerm = do
   foldl apply fn <$> many pArg
 
 pFunction :: P Expr
-pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlock
+pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
   where
     pArg :: P (Expr, [Eff])
     pArg = (,) <$> pParens pExprSeq <*> many (pAngles pIdent)
@@ -179,7 +182,7 @@ pOption :: P Expr
 pOption = pKeyword "option" *> (Option <$> optional pExprSeq1)
 
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pOption, pFunction, pTerm ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pTerm ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
