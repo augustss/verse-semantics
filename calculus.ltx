@@ -854,12 +854,12 @@ $$
       & \vb & |e_1 ; e_2|       & \text{sequencing} \\
       & \vb & |e_1^[e_2]|       & \text{function application} \\
       & \vb & |x := e|          & \text{definition} \\
+      & \vb & |x : any|         & \text{introduce variable} \\
       & \vb & |e_1 `choice` e_2| & \text{choice} \\
       & \vb & |e_1 = e_2|       & \text{unification} \\
       & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
       & \vb & |for(e) in b|     & \text{finite loop} \\
       & \vb & |functionKW(x:any){e}|    & \text{anonymous function} \\
-      & \vb & |type^{e}|         & \text{type definition} \\
       & \vb & |arrow(e){r_1,dots,r_n}{t}| & \text{dependent function type} \\
   %%%%%
   \\
@@ -884,6 +884,7 @@ $$
       & \vb & |do b|            & \text{scope delimiter} \\
       & \vb & |case(e) of {e_1; dots e_n}|    & \text{case expression} \\
       & \vb & |case{e_1; dots e_n}| & \text{case expression} \\
+      & \vb & |type^{e}|         & \text{type definition} \\
       & \vb & |option^{}|        & \text{create an option} \\
       & \vb & |option^{e}|       & \text{create an option} \\
 \end{array}
@@ -973,7 +974,7 @@ $$
   |De (function e () b)| & = & |function(x:any)()((De e = x; De (do b))| & \text{|x| fresh} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
-  |De (:t)| & = & |De (x:t; x)| & \text{|x| fresh} \quad \textbf{CORRECT?} \\
+  |De (:t)| & = & |De t^[x:any]| & \text{|x| fresh} \\
   %%  |De (type^{e})| & = & |type^{De e}| \\
   |De (type^{e})| & = & |De (x:any => (x = e; x))| & \text{|x| fresh} \\  
   \\
@@ -1037,7 +1038,7 @@ $$
   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Pd (p_0, dots, p_n) e| & = &
     |Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e| & \text{|x_i| fresh} \\
-  |Pd (p squiggt l) e| & = & |Ld (p squiggt l) ((type^{e}))| \\
+  |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
   \\
 \end{array}
 $$

@@ -85,6 +85,11 @@ testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
 testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 testeq(SEq) {succ(x:int):=x+1; succ = f(x:int):int; f[2]} {3}
 
+#
+testeq(SEq) {:(1,2,3)}                            {1|2|3}
+testeq(SEq) {x:(1,2,3); x}                        {1|2|3}
+testeq(SEq) {x:= :(1,2,3); x}                     {1|2|3}
+testeq(SEq) {x:(1,2,3)}                           {0|1|2}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only
