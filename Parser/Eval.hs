@@ -103,7 +103,7 @@ isX _ = False
 evalSteps :: EvalCore
 evalSteps t =
   evalDefFloat t . evalAll t . evalChoice t .
-  evalWrong t . evalFail t . evalUnify t . evalBind t . evalDef t .
+  evalWrong t . evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
   replacePrelude t
 
@@ -244,7 +244,7 @@ evalUnify = evalTrace "evalUnify" f
 
     unifyV _ _ = CWrong "unifyV"
 
-
+{-
 -- Handle BIND rules
 evalBind :: EvalCore
 evalBind = evalTrace "evalBind" f
@@ -292,7 +292,118 @@ evalBind = evalTrace "evalBind" f
           CSeq es -> CSeq <$> mapM (findB h) es
           CSucceeds b -> CSucceeds <$> findB h b
           _ -> pure e
+-}
 
+-- Handle
+--  DEF-UNUSED
+evalUnused :: EvalCore
+evalUnused = evalTrace "evalUnused" f
+  where
+    f e@CLam{} | notLam = e
+    f (CDef h e) | Just d <- bind h e = d
+    f e = composOp f e
+
+    bind h e =
+      case runState (findB (cfvs e) h e) [] of
+        (_, []) -> Nothing
+        (e', xs)-> Just $ cDef (h \\ xs) e'
+
+    -- Find bindings that are unused.
+    findB vs h e = do
+      case e of
+        CUnify (CVar x) ev@(CValue _)
+          | elem x h                 -- in this heap
+          , x `notElem` delete x vs  -- this is the only mention
+          -> do
+            modify $ (x:)            -- remember variable
+            pure ev                  -- replace with value
+        CUnify e1 e2 -> CUnify <$> findB vs h e1 <*> findB vs h e2
+        CSeq es -> CSeq <$> mapM (findB vs h) es
+        --CSucceeds b -> CSucceeds <$> findB vs h b
+        _ -> pure e
+
+
+-- Handle
+--  SUBST
+--  SUBST-REC
+evalSubst :: EvalCore
+evalSubst = evalTrace "evalSubst" f
+  where
+    f e@CLam{} | notLam = e
+    f e@CSeq{} | Just d <- bind e = d
+    f (CUnify (CVar x) (CValue v)) | Just c <- substRec x v = c
+    f e@CUnify{} | Just d <- bind e = d
+    f e = composOp f e
+
+    bind e =
+      case runState (findB (cfvs e) e) Nothing of
+        (cx, Just (x, v)) ->
+          -- We need to substitute v for x in cx, and then plug the hole
+          -- with x=v.
+          Just $ substDummy (CUnify (CVar x) (CValue v)) $ subst x v cx
+--        (_, Just (x, v)) | x `elem` fvsV v, Var x /= v ->
+--          Just $ CWrong $ "occurs check " ++ prettyShow x
+        _ -> Nothing
+
+    dummy = Ident noLoc "***"  -- Identifier not used anywhere else
+
+    -- XXX This may find the same binding over and over when there are others that could
+    --     succeed.  Must include the fvs cx test!
+    -- Find the leftmost binding.
+    -- Return with the binding replaced by dummy.
+    findB vs e = do
+      me <- get
+      if isJust me then
+        pure e  -- Already found, just keep going
+       else
+        case e of
+          CUnify (CVar x) (CValue v)
+            | x `notElem` fvsV v     -- occurs check
+            , x `elem` delete x vs   -- there is another free occurrence
+            -> do
+              put $ Just (x, v)
+              pure $ CVar dummy
+          CUnify e1 e2 -> CUnify <$> findB vs e1 <*> findB vs e2
+          CSeq es -> CSeq <$> mapM (findB vs) es
+          --CSucceeds b -> CSucceeds <$> findB h b
+          _ -> pure e
+
+    -- Replace dummy by an expression.
+    substDummy e = sub
+      where
+        sub (CVar i) | i == dummy = e
+        sub (CSeq es) = CSeq (map sub es)
+        sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
+        sub c = c
+
+    -- Recognize and execute the SUBST-REC rule
+    substRec :: Ident -> Value -> Maybe Core
+    substRec x vv | x `notElem` fvsV vv = Nothing
+                  | otherwise =
+      case runState (findLam vv) Nothing of
+        (v', Just (y, e)) ->
+          let lam = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
+          in  Just $ CUnify (CVar x) $ CValue $ substDummyV lam v'
+        _ -> Just $ CWrong $ "occurs check " ++ prettyShow x
+      where
+        findLam :: Value -> State (Maybe (Ident, Core)) Value
+        findLam v = do
+          mv <- get
+          if isJust mv then
+            pure v
+           else
+            case v of
+              VLam y e | x `elem` fvs e, x /= y -> do
+                put $ Just (y, e)
+                pure $ Var dummy
+              VArray vs -> VArray <$> mapM findLam vs
+              _ -> pure v
+
+    substDummyV vv = sub
+      where
+        sub (Var i) | i == dummy = vv
+        sub (VArray vs) = VArray $ map sub vs
+        sub v = v
 
 -- Handle simple 'def'
 --  FAIL-DEF, DEF-ELIM, DEF-WRONG, DEF-MERGE

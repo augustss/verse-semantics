@@ -130,6 +130,6 @@ testeq(SEq) {succ(n:int) := n + 1;
 testeq(SEq) {if(y:int; y=1) 42 else 23}  {42}
 testeq(SEq) {if(y:int; y=1) y else 23}  {1}
 
-# Confluence: Lack of local substitution
-testeq(FEq) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
+# Confluence: Needs local substitution
+testeq(SEq) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
             {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}

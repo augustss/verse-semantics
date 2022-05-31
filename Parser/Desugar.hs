@@ -70,12 +70,12 @@ dsD ctx = expr
     expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
 
     -- Bindings
-    -- D [lhs : t] = T[lhs] D[t]
+    -- D [lhs : t] = L[lhs] D[t]
     expr (InfixOp lhs (Ident l ":") t) = dsL l lhs =<< expr t
     expr (InfixOp lhs (Ident l ":=") e)
     -- D [lhs := e] = D[lhs := type{e}]     in an abstraction context
       | ctx == Abs = expr $ InfixOp lhs (Ident l ":") (Typedef e)
-    -- D [lhs := e] = L[lhs] e
+    -- D [lhs := e] = P[lhs] e
       | otherwise = dsP l lhs e
 
     -- Functions
@@ -260,12 +260,15 @@ tAny l i = define l i AnyT
 
 -- Desugar a definition e1 : e2
 dsL :: Loc -> Expr -> SExpr -> D SExpr
--- T[f] t = f := t[x:any]; x
+-- L[x] any =
+dsL l (Variable v) (Variable (Ident _ "any")) =
+  pure $ tAny l v
+-- L[f] t = f := t[x:any]; x
 dsL l (Variable v) t = do
   x <- newIdent l "d"
   t' <- dsD Eval t
   pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
--- T[l(a)<r>...] t = T[l] (:(type{a} -> t))
+-- L[l(a)<r>...] t = L[l] (:(type{a} -> t))
 dsL l e t | Just (f, a, rs) <- getFun e = do
   vs <- getVisible <$> dsD Abs a
   let us = getFreeD t ++ rs
@@ -276,16 +279,16 @@ dsL l e t | Just (f, a, rs) <- getFun e = do
    else
     -- XXX This does not support dependent types yet
     unimplemented "complex function type"
--- T[l^] t = T[l] new[t]
+-- L[l^] t = L[l] new[t]
 dsL l (PostfixOp f (Ident _ "^")) t =
   dsL l f (applyPrimD "new" t)
--- T[l?] t = T[l] (?t)
+-- L[l?] t = L[l] (?t)
 dsL l (PostfixOp f op@(Ident _ "?")) t =
   dsL l f (PrefixOp op t)
--- T[l[]] t = T[l] ([]t)
+-- L[l[]] t = L[l] ([]t)
 dsL l (ApplyD f (Array [])) t =
   dsL l f (PrefixOp (Ident l "[]") t)
--- T[lhs1 ~> lhs2] t = L[lhs1] (T[lhs2] t)
+-- L[lhs1 ~> lhs2] t = P[lhs1] (L[lhs2] t)
 dsL l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
   e <- dsL l lhs2 t
   dsP l lhs1 e

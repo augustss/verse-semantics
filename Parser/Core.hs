@@ -14,7 +14,7 @@ module Core(
   coreToRedex,
   cSeq, cDef,
   isValue,
-  fvs, fvsV,
+  fvs, fvsV, cfvs, cfvsV,
   subst,
   alphaConvert, alphaConvertV, alphaConvertH,
   ) where
@@ -246,24 +246,32 @@ appH f (HLam i e) = HLam i <$> f e
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
 
+-- Unique free variables
 fvs :: Core -> [Ident]
-fvs (CValue v) = fvsV v
-fvs (CUnify e1 e2) = fvs e1 `union` fvs e2
-fvs (CSeq es) = foldr union [] $ map fvs es
-fvs (CApply e1 e2) = fvsV e1 `union` fvsV e2
-fvs (CBar es) = foldr union [] $ map fvs es
-fvs (CMacro _ e) = fvs e
-fvs (CDef is e) = fvs e \\ is
-fvs CWrong{} = []
+fvs = nub . cfvs
 
 fvsV :: Value -> [Ident]
-fvsV (Var i) = [i]
-fvsV (HNF h) = fvsH h
+fvsV = nub . cfvsV
 
-fvsH :: HNF -> [Ident]
-fvsH (HArray vs) = foldr union [] $ map fvsV vs
-fvsH (HLam i e) = fvs e \\ [i]
-fvsH _ = []
+-- Occurrences of free variables
+cfvs :: Core -> [Ident]
+cfvs (CValue v) = cfvsV v
+cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
+cfvs (CSeq es) = concatMap cfvs es
+cfvs (CApply e1 e2) = cfvsV e1 ++ cfvsV e2
+cfvs (CBar es) = concatMap cfvs es
+cfvs (CMacro _ e) = cfvs e
+cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
+cfvs CWrong{} = []
+
+cfvsV :: Value -> [Ident]
+cfvsV (Var i) = [i]
+cfvsV (HNF h) = cfvsH h
+
+cfvsH :: HNF -> [Ident]
+cfvsH (HArray vs) = concatMap cfvsV vs
+cfvsH (HLam i e) = filter (/= i) $ cfvs e
+cfvsH _ = []
 
 ------
 
