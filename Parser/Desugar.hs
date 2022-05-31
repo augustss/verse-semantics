@@ -89,7 +89,9 @@ dsD ctx = expr
 
     -- Types
     -- D[:t] = : D[t], also change constructor
-    expr (PrefixOp (Ident _ ":") t) = Range <$> expr t
+    expr (PrefixOp op@(Ident l ":") t) = do --Range <$> expr t
+      x <- newIdent l "x"
+      expr $ Seq [InfixOp (Variable x) op t, Variable x]
     -- D[typedef{e}] = typedef{D[e]}
     expr (Typedef e) = Typedef <$> expr e
 
