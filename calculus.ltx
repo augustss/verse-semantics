@@ -37,13 +37,25 @@
 % Desugaring
 \newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
 \newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
-\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
 \newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
 \newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
 \newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
 \newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
+
+% Control if desugaring has named transformations or not
+\newif\ifdesugarops
+%\desugaropstrue
+\desugaropsfalse
+
+\ifdesugarops
+\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
 \newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
 \newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
+\else
+\newcommand{\De}[1]{#1}
+\newcommand{\Ld}[2]{#1 : #2}
+\newcommand{\Pd}[2]{#1 := #2}
+\fi
 
 % Names of rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -951,20 +963,24 @@ $$
   |De| & \multicolumn{3}{l}{ \text{converts Source Verse to a subset of Source Verse.} } \\[1mm]
 
   \multicolumn{1}{l}{\textbf{Basic forms}} \\
+\ifdesugarops
   |De k| & = & |k| \\
   |De x| & = & |x| \\
-  |De (e_1, dots, e_n)| & = & |array (De e_1 , dots, De e_n)| \\
-  |De ()| & = & |array ()| \\
   |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
   |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
   |De (e_1^(e_2))| & = & |(De e_1)(De e_2)| \\
   |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
   |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
+\fi
+  |De (e_1, dots, e_n)| & = & |array (De e_1 , dots, De e_n)| \\
+  |De (())| & = & |array ()| \\
   \\
+\ifdesugarops
   \multicolumn{1}{l}{\textbf{Bindings}} \\
   |De (l : t)| & = & |Ld l (De t)| \\
   |De (p := e)| & = & |Pd p (De e)| \\
   \\
+\fi
   \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert to all functions to |functionKW(x:any){e}|}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
@@ -1029,8 +1045,10 @@ A more robust desugaring could $\alpha$-convert such clashes.
 $$
 \begin{array}{rcll}
   |Pd| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
+\ifdesugarops
   |Pd x e| & = & |x := e| \\
-  |Pd (f a) e| & = & |Pd f ((De (function a {e})))| \\
+\fi
+  |Pd (f a) e| & = & |Pd f ((De (function a () {e})))| \\
   |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
   |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
@@ -1047,7 +1065,7 @@ $$
   |Ld| & \multicolumn{3}{l}{\text{converts a type ascription |l : t|.}} \\
   |Ld x t| & = & |x := t^[y:any]; y| & \text{|y| fresh} \\
   |Ld (l^(e)) t| & = & |Ld l ((De (type^{e}) minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
-  |Ld (l^()) t| & = & |Ld l (De (type^{()}) minusgt t)| \\
+  |Ld (l^()) t| & = & |Ld l ((De (type^{()}) minusgt t))| \\
   |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{r dots}^{t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l?) t| & = & |Ld l ((? t))| \\
