@@ -5,13 +5,11 @@
 %format (De (x)) = "\De{" ^ x "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"
-%format (Ty (x)) = "\Ty{" ^ x "}"
 %format (Bi (x)) = "\Bi{" ^ x "}"
 %format (Vr (x)) = "\Vr{" ^ x "}"
 %format (Vl (x)) = "\Vl{" ^ x "}"
 %format (Th (x)) = "\Th{" ^ x "}"
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
-%format (Fd (x)(y)) = "\Fd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format applyx a b = a "@" b
 
