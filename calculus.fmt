@@ -74,6 +74,7 @@
 %format arrow = "\textbf{arrow}"
 % only used in comments, but still prettier this way:
 %format false = "\textbf{false}"
+%format truth = "\textbf{truth}"
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"

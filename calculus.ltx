@@ -854,24 +854,26 @@ $$
       & \vb & |e_1 ; e_2|       & \text{sequencing} \\
       & \vb & |e_1^[e_2]|       & \text{function application} \\
       & \vb & |x := e|          & \text{definition} \\
-      & \vb & |: t|             & \text{range} \\
       & \vb & |e_1 `choice` e_2| & \text{choice} \\
       & \vb & |e_1 = e_2|       & \text{unification} \\
       & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
       & \vb & |for(e) in b|     & \text{finite loop} \\
-      & \vb & |functionKW a_1 dots a_n b|    & \text{anonymous function} \\
-      & \vb & |typedef^{e}|      & \text{type definition} \\
+      & \vb & |functionKW(x:any){e}|    & \text{anonymous function} \\
+      & \vb & |type^{e}|         & \text{type definition} \\
+      & \vb & |arrow(e){r_1,dots,r_n}{t}| & \text{dependent function type} \\
   %%%%%
   \\
       &     & \textit{Expressions removed by desugaring} \\
       & \vb & |e_1, dots, e_n|  & \text{array}, n \geq 2 \\
       & \vb & |()|              & \text{empty array} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
+      & \vb & |functionKW a_1 dots a_n {e}|    & \text{anonymous function} \\
       & \vb & |p := e|          & \text{general definition} \\
       & \vb & |e_1^(e_2)|       & \text{non-failing function application} \\
       & \vb & |op_b e|          & \text{prefix operator} \\
       & \vb & |e op_a|          & \text{postfix operator} \\
       & \vb & |e_1 op_i e_2|    & \text{infix operator} \\
+      & \vb & |: t|             & \text{range} \\
       & \vb & |l : t|           & \text{of type} \\
       & \vb & |e_1 where e_2|   & \text{reverse sequencing} \\
       & \vb & |if(e) then b|    & \text{conditional expression} \\
@@ -882,6 +884,8 @@ $$
       & \vb & |do b|            & \text{scope delimiter} \\
       & \vb & |case(e) of {e_1; dots e_n}|    & \text{case expression} \\
       & \vb & |case{e_1; dots e_n}| & \text{case expression} \\
+      & \vb & |option^{}|        & \text{create an option} \\
+      & \vb & |option^{e}|       & \text{create an option} \\
 \end{array}
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
@@ -890,7 +894,7 @@ $$
 \begin{figure}
 $$
 \begin{array}{rcll}
-  |x,f| &     & \textit{Variable} \\
+  |x,y,f| &     & \textit{Variable} \\
   |k| &     & \textit{Integer constant} \\
       \\
   |b| & ::= & \textit{Blocks} \\
@@ -901,21 +905,34 @@ $$
       &     & |apeff (e) r_1 dots (eff r_n)| & n \geq 0 \\
       & \vb & |apeff () r_1 dots (eff r_n)| & n \geq 0 \\
   \\
-  |p| & ::= & \textit{Left hand side definition, i.e., of |:=| } \\
-      &     & \text{The subset of |e| handled by |Pd|.} \\
+  |p| & ::= & \textit{Left hand side definition, i.e., of |:=|. Subset of |e|. } \\
+      &     & x \\
+      & \vb & |p a| \\
+      & \vb & |: t| \\
+      & \vb & |p : t| \\
+      & \vb & |p^?| \\
+      & \vb & |p^hat| \\
+      & \vb & |p_1, dots, p_n| \\
+      & \vb & |p squiggt l| \\
   \\
-  |l| & ::= & \textit{Left hand side type ascription, i.e., of |:| } \\
-      &     & \text{The subset of |e| handled by |Ld|.} \\
+  |l| & ::= & \textit{Left hand side of type ascription, i.e., of |:|. Subset of |e|. } \\
+      &     & x \\
+      & \vb & |l a| \\
+      & \vb & |l^?| \\
+      & \vb & |l^hat| \\
+      & \vb & |l^arrayty| \\
+      & \vb & |p squiggt l| \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
-        &     & ! \vb - \vb + \\
+        &     & ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \\
   \\
  |op_a| & ::= & \textit{Postfix operators} \\
-        &     & ? \vb \hat{} \vb .. \\
+        &     & ? \vb |hat| \vb .. \\
   \\
  |op_i| & ::= & \textit{Infix operators} \\
         &     & + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb ..\\
         & \vb & < \vb <= \vb > \vb >= \vb <> \\
+        & \vb & |minusgt| \\
   \\
   |r| & ::= & \textit{Effects} \\
       &     & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
@@ -948,7 +965,7 @@ $$
   |De (l : t)| & = & |Ld l (De t)| \\
   |De (p := e)| & = & |Pd p (De e)| \\
   \\
-  \multicolumn{1}{l}{\textbf{Functions}} \\
+  \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert to all functions to |functionKW(x:any){e}|}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
@@ -956,8 +973,9 @@ $$
   |De (function e () b)| & = & |function(x:any)()((De e = x; De (do b))| & \text{|x| fresh} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
-  |De (:t)| & = & |De t^[x:any]; x| & \text{|x| fresh}  \\
-  |De (type^{e})| & = & |type^{De e}| \\
+  |De (:t)| & = & |De (x:t; x)| & \text{|x| fresh} \quad \textbf{CORRECT?} \\
+  %%  |De (type^{e})| & = & |type^{De e}| \\
+  |De (type^{e})| & = & |De (x:any => (x = e; x))| & \text{|x| fresh} \\  
   \\
   \multicolumn{1}{l}{\textbf{Conditionals}} \\
   |De (if{e})| & = & |De (if(e) else false)| \\
@@ -997,6 +1015,8 @@ $$
   \\
   \multicolumn{1}{l}{\textbf{Misc}} \\
   |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
+  |De (option^{})| & = & |false| \\
+  |De (option^{e}| & = & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
@@ -1010,14 +1030,14 @@ $$
 \begin{array}{rcll}
   |Pd| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
   |Pd x e| & = & |x := e| \\
-  |Pd (f^(e_1)effsR) e| & = & |Pd f ((De (function e_1 effsR e)))| \\
+  |Pd (f a) e| & = & |Pd f ((De (function a {e})))| \\
   |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
   |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Pd (p_0, dots, p_n) e| & = &
     |Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e| & \text{|x_i| fresh} \\
-  |Pd (p_1 squiggt p_2) e| & = & |Ld (p_1 squiggt p_2) ((type^{e}))| \\
+  |Pd (p squiggt l) e| & = & |Ld (p squiggt l) ((type^{e}))| \\
   \\
 \end{array}
 $$
@@ -1025,14 +1045,14 @@ $$
 $$
 \begin{array}{rcll}
   |Ld| & \multicolumn{3}{l}{\text{converts a type ascription |l : t|.}} \\
-  |Ld f t| & = & |f := t^[x:any]; x| & \text{|x| fresh} \\
-  |Ld (l^(e)) t| & = & |Ld l ((type^{De e} minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
-  |Ld (l^()) t| & = & |Ld l ((type^{()} minusgt t))| \\
+  |Ld x t| & = & |x := t^[y:any]; y| & \text{|y| fresh} \\
+  |Ld (l^(e)) t| & = & |Ld l ((De (type^{e}) minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
+  |Ld (l^()) t| & = & |Ld l (De (type^{()}) minusgt t)| \\
   |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^(D e)^{r dots}^{t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
-  |Ld (l_1 squiggt l_2) t| & = & |Pd l_1 ((Ld l_2 t))| \\
+  |Ld (p squiggt l) t| & = & |Pd p ((Ld l t))| \\
   \\
 \end{array}
 $$
@@ -1065,7 +1085,7 @@ $$
     & \text{|x| fresh} \\
     |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
     |Cr (function(x:any)()e)| & = & |x => Bi e| \\
-    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
+%%    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
     \\
     |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
     |Th e| & = & |function(x:any)()e| & \text{|x| fresh} \\
