@@ -237,22 +237,19 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \text{Programs} & p  & ::=  & e \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |applyx v_1 v_2|
      \vb |e_1 choice e_2| \vb |fail| \\
-     && \vb & |def h e| \\
+     && \vb & |def x e| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |x => e| \\
     \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
      && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
-    \text{Heaps} & h & ::= & |emp| \vb |h_1 , h_2| \vb |x| \\
-%    \text{Heap values} & hv & ::= & \epsilon \vb hv_1 , hv_2 \vb x:=v \\
     \\
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
     \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
-     &&\vb & |def h CX| \\
+     &&\vb & |def x CX| \\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole | \\
      &&\vb & |one hole| \vb |all hole| \vb |succeeds hole| \vb |decides hole| \\
-    \text{Heap context} & H & ::= & \hole \vb H,h \vb h,H\\
     \text{Value context} & V & ::= & \hole \vb |arr (dots,V,dots)|\\
     \end{array} \\
     \\
@@ -381,12 +378,9 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{subst-rec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
     &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
 
-    \rulename{def-unused} & |def (H^[x]) (X^[x==v])| & \movesto
-    & |def (H^[emp]) (X^[v])| \\
-    &&& \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
-    \rulename{def-float} & |X^[def h e]| & \movesto & |def h (X^[e])| \quad \text{if}~|X| \ne \hole,\,  h \disjoint \freevars{X} \\
-    \rulename{def-merge} & |def h_1 (def h_2 e)| & \movesto & |def (h_1, h_2) e| \quad \text{if}~ h_1 \disjoint h_2 \\
-    \rulename{def-elim} & |def emp e| & \movesto & |e| \\
+    \rulename{def-unused} & |def x (X^[x==v])| & \movesto & |X^[v]|
+    \quad \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])| \quad \text{if}~|X| \ne \hole,\,  x \notin \freevars{X} \\
     \end{array} \\
     \\[-2mm]
 
@@ -397,7 +391,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{fail-seqr} & |e; fail| & \movesto & |fail|  \\
     \rulename{fail-unifyl} & |fail = e| & \movesto & |fail|  \\
     \rulename{fail-unifyr} & |e = fail| & \movesto & |fail|  \\
-    \rulename{fail-def} & |def h fail| & \movesto & |fail|  \\
+    \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
      \end{array}
 
    \end{array}
@@ -439,7 +433,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
     \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
     \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
-    \rulename{wrong-def} & |def h wrong| & \movesto & |wrong|  \\
+    \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
@@ -455,7 +449,8 @@ The |let| construct cleverly models the heap, maintaining sharing.
 An expression |e| has syntax given in \Cref{fig:verse-syntax}.
 Constants |k| are simply integers in this presentation, and come equipped with
 some primitive operations. To avoid clutter, we provide only representative
-operations: |add| for integer addition, and |gt| for integer comparison and |isInt| for the primitive type check
+operations: |add| for integer addition, and |gt| for integer comparison and |isInt| for the primitive type check.
+
 
 \paragraph{Tuples and arrays.}
 All functions (including |add| and |gt|) take a single argument, but that
@@ -463,14 +458,15 @@ argument can be a tuple, say |(e_1,e_2)|. In Verse, tuples and arrays are the sa
 a tuple is just an array whose size is statically known.
 The expression |(v_1, dots, v_n)| builds an $n$-ary tuple, while |all| constructs an array.
 
+\paragraph{Unification variables.}
+Variables are brought into scope using |def x e|. This does not define the variable yet; this happens via unification. In the following we write |def (x,z) e| as a short-hand for |def x (def y e)|.
+
 \paragraph{Unification and sequencing.}
 Unification and sequencing are part of the expressions language.
 They are written |(e_1 == e_2)| and |(e_1; e_2)| respectively.
 Both of these operators are associative.
 
 \paragraph{Lambda and application.}  Lambda abstractions are written |(x => e)|. Function application is written as |applyx v_1 v_2|. To simplify the rules, the function and argument must be a value (variable or head-normal form). Applications involving arbitrary expressions |applyx e_1 e_2| need to be written as |def (x,y) (x = e_1; y = e_2; applyx x y)|.
-
-\joachim{Would it be ok to say that |applyx e_1 e_2|, if |e_1| or |e_2| are not already values, is a short-hand for the latter, to simplify examples and the desugaring rules? Or is that too sloppy?}
 
 \paragraph{Values.}
 A value |v| can be a variable |x|, or it can be a head-normal form |hnf|.
@@ -507,7 +503,7 @@ The reason to disallow this is that we do not know if they are needed.
     \begin{array}{lrcl}
       \text{Evaluation context} &
          E & ::= & \hole \vb |E == e| \vb |e == E| \vb |E ; e| \vb |e; E| \\
-      && \vb & |applyx E e| \vb |applyx e E| \vb |def h E| \vb |E choice e| \vb |e choice E| \\
+      && \vb & |applyx E e| \vb |applyx e E| \vb |def x E| \vb |E choice e| \vb |e choice E| \\
       && \vb & |one E| \vb |all E| \vb |succeeds E| \\
     \end{array}
   $$
@@ -563,9 +559,9 @@ Verse supports recursive functions and closures, such as |loop = (y => applyx lo
 
 \paragraph{Scope expansion}
 
-Rule \rulename{def-float} expands the scope of variables within the current execution context $X$, and \rulename{def-merge} combines all variables with the same scope in a single |defKW|, to allow |subst| to fire more easily.For example in
+Rule \rulename{def-float} expands the scope of variables within the current execution context $X$, to allow |subst| to fire more easily.For example in
     $$ |def x  (dots x dots(def z (dots(x==(3,z))dots))dots)| $$
-it would be dangerous if \rulename{subst} could substitute |(3,z)| for |x| right away, because |z| is not in scope everywhere where |x| is. But after floating and merging we get
+it would be dangerous if \rulename{subst} could substitute |(3,z)| for |x| right away, because |z| is not in scope everywhere where |x| is. But after floating we get
     $$ |def (x,z)  (dots x dots(dots(x==(3,z))dots)dots)| $$
 and now we can safely invoke \rulename{subst} on |x == (3,z)|.
 
@@ -671,7 +667,7 @@ by a simple preprocessing step, that introduces a variable |x| in the innermost
 |defKW| that encloses all its uses.
 \simon{It's hard to say more until we say more about Source Verse.}
 
-In the arms of a choice |(e_1 choice e_2)| we add a |def h e_1| around |e_1| if
+In the arms of a choice |(e_1 choice e_2)| we add a |def x e_1| around |e_1| if
 |e_1| introduces any new variables; and similarly |e_2|.
 \simon{This was a nice little simplification.}
 
@@ -734,7 +730,7 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def h e_1| around |e_1| if
 %    \end{array}$$
   As before, the unification |y==add^(x,1)| is stuck until we get a value for |x|.
   But this time we get two different values for |x| in the two branches of the choice.
-  The crucial rule \rulename{choose} duplicates the heap and the expression that surround
+  The crucial rule \rulename{choose} duplicates the expression that surrounds
   the choice, allowing execution to proceed entirely independently in the two copies.
 \end{example}
 
@@ -1147,7 +1143,7 @@ to simplify reasoning about sequences without worrying about how they nest.
 
 \subsection{Order of variables in |defKW|}
 
-The rules \rulename{def-float} and \rulename{def-merge} can easily lead to superficial non-confluence where terms differ in the order variables occr in a |defKW|. We hand-wave that problem away by equating terms up to alpha-equivalence where the list of variables in |defKW| is considered a \emph{set} of bound variables.
+The rules \rulename{def-float} can easily lead to superficial non-confluence where terms differ in the order of the nested |defKW|. We hand-wave that problem away by equating terms up to alpha-equivalence where the list of variables in |defKW| is considered a \emph{set} of bound variables.
 
 \subsection{Swap-seq-val}
 
