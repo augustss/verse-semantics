@@ -855,7 +855,7 @@ To save space we have used the abbreviation |F| for the expression \newline
 
 \section{Source Verse}
 
-\begin{figure}
+\begin{figurebox}
 $$
 \begin{array}{rcll}
   |e,t| & ::= & \textit{Expressions} \\
@@ -874,7 +874,7 @@ $$
       & \vb & |arrow(e){t}{r_1,dots,r_n}| & \text{dependent function type} \\
   %%%%%
   \\
-      &     & \textit{Expressions removed by desugaring} \\
+      & \multicolumn{2}{l}{\textit{Expressions removed by desugaring}} \\
       & \vb & |e_1, dots, e_n|  & \text{array}, n \geq 2 \\
       & \vb & |()|              & \text{empty array} \\
       & \vb & |e_1 eqgt e_2|    & \text{lambda expression} \\
@@ -901,9 +901,9 @@ $$
 \end{array}
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
-\end{figure}
+\end{figurebox}
 
-\begin{figure}
+\begin{figurebox}
 $$
 \begin{array}{rcll}
   |x,y,f| &     & \textit{Variable} \\
@@ -917,23 +917,12 @@ $$
       &     & |apeff (e) r_1 dots (eff r_n)| & n \geq 0 \\
       & \vb & |apeff () r_1 dots (eff r_n)| & n \geq 0 \\
   \\
-  |p| & ::= & \textit{Left hand side definition, i.e., of |:=|. Subset of |e|. } \\
-      &     & x \\
-      & \vb & |p a| \\
-      & \vb & |: t| \\
-      & \vb & |p : t| \\
-      & \vb & |p^?| \\
-      & \vb & |p^hat| \\
-      & \vb & |p_1, dots, p_n| \\
-      & \vb & |p squiggt l| \\
+  |p| & ::= & \textit{Patterns: left hand side of a definition |p := e|. Subset of |e|. } \\
+      &     & x \vb |p a| \vb |: t| \vb |p : t|  \vb |p^?| \\
+      & \vb & |p^hat| \vb  |p_1, dots, p_n| \vb  |p squiggt l| \\
   \\
-  |l| & ::= & \textit{Left hand side of type ascription, i.e., of |:|. Subset of |e|. } \\
-      &     & x \\
-      & \vb & |l a| \\
-      & \vb & |l^?| \\
-      & \vb & |l^hat| \\
-      & \vb & |l^arrayty| \\
-      & \vb & |p squiggt l| \\
+  |l| & ::= & \textit{Left hand side of a type ascription |l:t|. Subset of |e|. } \\
+      &     & x \vb |l a| \vb |l^?| \vb |l^hat| \vb  |l^arrayty|  \vb  |p squiggt l| \\
   \\
  |op_b| & ::= & \textit{Prefix operators} \\
         &     & ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \\
@@ -943,8 +932,7 @@ $$
   \\
  |op_i| & ::= & \textit{Infix operators} \\
         &     & + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb ..\\
-        & \vb & < \vb <= \vb > \vb >= \vb <> \\
-        & \vb & |minusgt| \\
+        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
   \\
   |r| & ::= & \textit{Effects} \\
       &     & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
@@ -953,14 +941,14 @@ $$
 \\
 Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
 \caption{Source Verse} \label{fig:source-verse-misc}
-\end{figure}
+\end{figurebox}
 
 \section{Desugaring Source Verse}
 
 \begin{figurebox}
 $$
 \begin{array}{rcll}
-  |De| & \multicolumn{3}{l}{ \text{converts Source Verse to a subset of Source Verse.} } \\[1mm]
+  \multicolumn{4}{c}{ \text{Desugar Source Verse into a subset of Source Verse.} } \\[1mm]
 
   \multicolumn{1}{l}{\textbf{Basic forms}} \\
 \ifdesugarops
@@ -1043,8 +1031,8 @@ A more robust desugaring could $\alpha$-convert such clashes.
 
 \begin{figurebox}
 $$
-\begin{array}{rcll}
-  |Pd| & \multicolumn{3}{l}{\text{converts a definition |p := e| to simple definitions with just |x := e|.}} \\
+\begin{array}{rclll}
+\multicolumn{5}{l}{\textbf{Desugar a definition |p := e| into simple definitions with just |x := e|}} \\
 \ifdesugarops
   |Pd x e| & = & |x := e| \\
 \fi
@@ -1054,15 +1042,10 @@ $$
   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
   |Pd (p_0, dots, p_n) e| & = &
-    |Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e| & \text{|x_i| fresh} \\
+    \multicolumn{2}{l}{|Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e|} & \text{|x_i| fresh} \\
   |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
   \\
-\end{array}
-$$
-
-$$
-\begin{array}{rcll}
-  |Ld| & \multicolumn{3}{l}{\text{converts a type ascription |l : t|.}} \\
+\multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
   |Ld x t| & = & |x := t^[y:any]; y| & \text{|y| fresh} \\
   |Ld (l^(e)) t| & = & |Ld l ((De (type^{e}) minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
   |Ld (l^()) t| & = & |Ld l ((De (type^{()}) minusgt t))| \\
@@ -1071,11 +1054,22 @@ $$
   |Ld (l?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
   |Ld (p squiggt l) t| & = & |Pd p ((Ld l t))| \\
-  \\
 \end{array}
 $$
-\caption{Desugaring of matching} \label{fig:desugar-expr}
+\caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
 \end{figurebox}
+
+\begin{figurebox}
+\begin{code}
+any    = (x => x)
+int    = (x => applyx isInt x; x)
+nat    = (x => applyx isInt x; x > (-1); x)
+false  = array()
+\end{code}
+
+\caption{Core prelude} \label{fig:core-prelude}
+\end{figurebox}
+
 
 \begin{figurebox}
 
@@ -1129,17 +1123,6 @@ $$
   $$
 \caption{Core conversion} \label{fig:core-conversion}
 \end{figurebox}
-
-\begin{figure}
-\begin{code}
-any    = (x => x)
-int    = (x => applyx isInt x; x)
-nat    = (x => applyx isInt x; x > (-1); x)
-false  = array()
-\end{code}
-
-\caption{Core prelude} \label{fig:core-prelude}
-\end{figure}
 
 
 \clearpage
