@@ -259,6 +259,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       |v_1, dots, v_n| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 \oplus v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
       v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
+      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots {def x_n e}))| \\
      \end{array} \\
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
