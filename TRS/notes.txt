@@ -1,0 +1,7 @@
+Notes taken while implementing the rules for Core in Haskell
+
+- Why is @ not choice-free?
+
+- ;, |, = are all stated to be associative. But there exists a associative rewrite rule only for |. Why does this exist at all?
+
+
