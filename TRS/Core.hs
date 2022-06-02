@@ -1,9 +1,11 @@
+{-# LANGUAGE PatternSynonyms #-}
 module Core where
 
 import Show
 import TRS
 import Bind
 import Data.List( intercalate, union )
+import Data.Maybe
 
 --------------------------------------------------------------------------------
 
@@ -23,7 +25,7 @@ data Expr
 
 instance Show Expr where
   show (Val v)          = show v
-  show (a :=: b)        = show' a ++ " = " ++ show b
+  show (a :=: b)        = show' a ++ " = " ++ show' b
   show (a :>: b)        = show' a ++ "; " ++ show' b
   show (a :|: b)        = show' a ++ " | " ++ show' b
   show (a :@: b)        = show' a ++ "@" ++ show' b
@@ -73,6 +75,21 @@ instance Show Op where
   show IsInt = "isInt"
 
 --------------------------------------------------------------------------------
+-- patterns
+
+-- Expr
+pattern VAR v  = Val (Var v)
+pattern INT n  = Val (VINT n)
+pattern ADD    = Val (HNF (Op Add))
+pattern GRT    = Val (HNF (Op Gt))
+pattern IsINT  = Val (HNF (Op IsInt))
+pattern ARR vs = Val (VARR vs)
+
+-- Value
+pattern VINT n  = HNF (Int n)
+pattern VARR vs = HNF (Arr vs)
+
+--------------------------------------------------------------------------------
 
 instance Rec Expr where
   rec r (a :=: b)        = [ a' :=: b | a' <- r a ] ++ [ a :=: b' | b' <- r b ]
@@ -105,6 +122,8 @@ instance Free HNF where
   free (Arr vs) = free vs
   free _        = []
 
+{-
+-- not using the "bind" trick for now
 instance Binding Expr where
   binders (a :=: b) = binders a ++ binders b
   binders (a :>: b) = binders a ++ binders b
@@ -114,6 +133,31 @@ instance Binding Expr where
   binders (One a)   = binders a
   binders (All a)   = binders a
   binders _         = []
+-}
+
+--------------------------------------------------------------------------------
+
+class Term a where
+  subst :: Subst Value -> a -> a
+
+instance Term Value where
+  subst sub (Var x) = fromMaybe (Var x) (lookup x sub)
+  subst sub (HNF a) = HNF (subst sub a)
+
+instance Term HNF where
+  subst sub (Arr vs) = Arr (map (subst sub) vs)
+  subst sub a        = a
+
+instance Term Expr where
+  subst sub (Val v)   = Val (subst sub v)
+  subst sub (a :=: b) = subst sub a :=: subst sub b
+  subst sub (a :>: b) = subst sub a :>: subst sub b
+  subst sub (a :|: b) = subst sub a :|: subst sub b
+  subst sub (a :@: b) = subst sub a :@: subst sub b
+  subst sub Fail      = Fail
+  subst sub (Def bnd) = Def (substBind Var subst sub bnd)
+  subst sub (One a)   = One (subst sub a)
+  subst sub (All a)   = All (subst sub a)
 
 --------------------------------------------------------------------------------
 

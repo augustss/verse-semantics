@@ -20,8 +20,12 @@ ident x = Name x
 prim :: Int -> Ident
 prim n = Prim n
 
+identsNotIn :: [Ident] -> [Ident]
+identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
+ where m = maximum (0 : [ n | Prim n <- zs ])
+
 identNotIn :: [Ident] -> Ident
-identNotIn zs = Prim (maximum (0 : [ n | Prim n <- zs ]) + 1)
+identNotIn = head . identsNotIn
 
 --------------------------------------------------------------------------------
 
@@ -49,7 +53,8 @@ instance Free t => Free (Bind t) where
 
 type Subst a = [(Ident,a)]
 
-substBind :: Free t => (Ident->t) -> (Subst t -> t -> t) -> (Subst t -> Bind t -> Bind t)
+substBind :: (Free s, Free t)
+          => (Ident->s) -> (Subst s -> t -> t) -> (Subst s -> Bind t -> Bind t)
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
