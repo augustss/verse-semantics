@@ -120,15 +120,15 @@ rulesChoice lhs =
 --------------------------------------------------------------------------------
 
 rulesPrimOps lhs =
-  do ADD :@: ARR [VINT k1, VINT k2] <- [lhs]
+  do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
  ++
-  do GRT :@: ARR [VINT k1, VINT k2] <- [lhs]
+  do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 > k2
        then pure (INT k1)
        else pure Fail
  ++
-  do IsINT :@: (Val (HNF hnf)) <- [lhs]
+  do IsINT :@: (HNF hnf) <- [lhs]
      case hnf of
        Int _ -> pure (ARR [])
        _     -> pure Fail
@@ -148,7 +148,7 @@ rulesSequencing lhs =
 --------------------------------------------------------------------------------
 
 rulesApplication lhs =
-  do ARR vs :@: Val v <- [lhs]
+  do VARR vs :@: v <- [lhs]
      pure (foldr (:|:) Fail [ (Val v :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
@@ -167,7 +167,7 @@ rulesAll lhs =
   do All es <- [lhs]
      vs     <- choiceVals es
      let xs = identsNotIn (free vs)
-     pure (foldr (\(x,v) -> (Def . Bind x . ((VAR x :=: Val v :@: ARR []) :>:)))
+     pure (foldr (\(x,v) -> (Def . Bind x . ((VAR x :=: (v :@: VARR [])) :>:)))
                  (ARR [ Var x | (x,_) <- xs `zip` vs ])
                  (zip xs vs))
  where

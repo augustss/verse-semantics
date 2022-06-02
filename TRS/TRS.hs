@@ -10,9 +10,6 @@ type Rule a = a -> [a]
 (+++) :: Rule a -> Rule a -> Rule a
 r1 +++ r2 = \x -> r1 x ++ r2 x
 
-rules :: [Rule a] -> Rule a
-rules rs = (`concatMap` rs) . flip ($)
-
 --------------------------------------------------------------------------------
 
 class Rec t where

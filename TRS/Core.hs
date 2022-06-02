@@ -16,7 +16,7 @@ data Expr
   | Expr :=: Expr
   | Expr :>: Expr
   | Expr :|: Expr
-  | Expr :@: Expr
+  | Value :@: Value
   | Fail
   | Def (Bind Expr)
   | One Expr
@@ -28,7 +28,7 @@ instance Show Expr where
   show (a :=: b)        = show' a ++ " = " ++ show' b
   show (a :>: b)        = show' a ++ "; " ++ show' b
   show (a :|: b)        = show' a ++ " | " ++ show' b
-  show (a :@: b)        = show' a ++ "@" ++ show' b
+  show (a :@: b)        = show a ++ "@" ++ show b
   show Fail             = "fail"
   show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
   show (One a)          = "one {" ++ show a ++ "}"
@@ -80,14 +80,14 @@ instance Show Op where
 -- Expr
 pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
-pattern ADD    = Val (HNF (Op Add))
-pattern GRT    = Val (HNF (Op Gt))
-pattern IsINT  = Val (HNF (Op IsInt))
 pattern ARR vs = Val (VARR vs)
 
 -- Value
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
+pattern ADD     = HNF (Op Add)
+pattern GRT     = HNF (Op Gt)
+pattern IsINT   = HNF (Op IsInt)
 
 --------------------------------------------------------------------------------
 
@@ -95,7 +95,6 @@ instance Rec Expr where
   rec r (a :=: b)        = [ a' :=: b | a' <- r a ] ++ [ a :=: b' | b' <- r b ]
   rec r (a :|: b)        = [ a' :|: b | a' <- r a ] ++ [ a :|: b' | b' <- r b ]
   rec r (a :>: b)        = [ a' :>: b | a' <- r a ] ++ [ a :>: b' | b' <- r b ]
-  rec r (a :@: b)        = [ a' :@: b | a' <- r a ] ++ [ a :@: b' | b' <- r b ]
   rec r (Def (Bind x a)) = [ Def (Bind x a') | a' <- r a ]
   rec r (One a)          = [ One a' | a' <- r a]
   rec r (All a)          = [ All a' | a' <- r a]

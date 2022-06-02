@@ -11,7 +11,7 @@ x = ident "x"
 y = ident "y"
 z = ident "z"
 
-ex1 = ARR [] :=: ((GRT :@: ARR [VINT 2, Var x]) :=: INT 3)
+ex1 = ARR [] :=: ((GRT :@: VARR [VINT 2, Var x]) :=: INT 3)
 ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 --------------------------------------------------------------------------------
