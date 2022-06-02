@@ -40,22 +40,17 @@ normalForms :: (Ord a, Rec a) => Rule a -> a -> [a]
 normalForms rule t = normalFormsFuel (-1) rule t
 
 normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [a]
-normalFormsFuel n rule t = go n S.empty (S.singleton t)
+normalFormsFuel n rule t = go n S.empty [t]
  where
-  go 0 _ _ =
-    []
-    
-  go n seen queue =
-    case S.minView queue of
-      Nothing               -> []
-      Just (t,queue')
-        | t `S.member` seen -> go n seen queue'
-        | otherwise         ->
-          case step rule t of
-            [] -> t : go n seen' queue'
-            ts -> go (n-1) seen' (foldr S.insert queue' ts)
-         where
-          seen' = S.insert t seen
+  go 0 _    _           = []
+  go n seen []          = []
+  go n seen (t:ts)
+    | t `S.member` seen = go n seen ts
+    | null ts'          = t : go n seen' ts
+    | otherwise         = go (n-1) seen' (ts' ++ ts)
+   where
+    seen' = S.insert t seen
+    ts'   = step rule t
 
 --
 
