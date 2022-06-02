@@ -349,7 +349,6 @@ The |let| construct cleverly models the heap, maintaining sharing.
   \begin{array}{l}
     \textit{Unification} \\
     \begin{array}{lrcl}
-    \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
     \rulename{ucon} & |k_1 == k_2| & \movesto
     & \left\{\begin{array}{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
@@ -370,11 +369,12 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \\[-2mm]
 
-    \textit{Def-blocks} \\
+    \textit{Unification variables} \\
     \begin{array}{lrcl}
     \rulename{subst} & |X^[x==v]| & \movesto
     & |(subst X x v)^[x==v]| \\
     &&& \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
     \rulename{subst-rec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
     &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
 
