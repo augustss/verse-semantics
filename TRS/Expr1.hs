@@ -9,7 +9,7 @@ import Test.QuickCheck
 
 data Expr
   = Num Integer
-  | Var Name
+  | Var Ident
   | Expr :+: Expr
   | Let Expr (Bind Expr)
  deriving ( Show, Eq, Ord )
@@ -32,13 +32,13 @@ instance Binding Expr where
   binders (Let a bnd) = [ bnd ]
   binders _           = []
 
-subst :: [(Name, Expr)] -> Expr -> Expr
+subst :: Subst Expr -> Expr -> Expr
 subst sub (a :+: b)                        = subst sub a :+: subst sub b
 subst sub (Let a bnd)                      = Let (subst sub a) (substBind Var subst sub bnd)
 subst sub (Var y) | Just t <- lookup y sub = t
 subst sub a                                = a
 
-arbExpr :: Int -> [Name] -> Gen Expr
+arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
   frequency $
   [ (1, Var <$> elements xs) | not (null xs) ] ++
@@ -49,8 +49,8 @@ arbExpr n xs =
  where
   n2 = n `div` 2
 
-arbBind :: Int -> [Name] -> Gen (Bind Expr)
-arbBind n xs = Bind x <$> arbExpr n (x:xs) where x = varNotIn xs
+arbBind :: Int -> [Ident] -> Gen (Bind Expr)
+arbBind n xs = Bind x <$> arbExpr n (x:xs) where x = identNotIn xs
 
 instance Arbitrary Expr where
   arbitrary = sized (`arbExpr` [])
@@ -68,7 +68,7 @@ newtype OpenExpr = Open Expr deriving ( Eq, Ord, Show )
 instance Arbitrary OpenExpr where
   arbitrary =
     do n <- choose (0,5::Int)
-       Open <$> sized (`arbExpr` [ "x" ++ show i | i <- [1..n] ])
+       Open <$> sized (`arbExpr` [ ident ("x" ++ show i) | i <- [1..n] ])
   
   shrink (Open t@(Let _ (Bind _ b))) = map Open (b : shrink t)
   shrink (Open t) = [ Open t' | t' <- shrink t ]
