@@ -5,12 +5,30 @@ import Data.List( union, (\\) )
 
 --------------------------------------------------------------------------------
 
-type Name = String
+--------------------------------------------------------------------------------
+
+data Ident
+  = Name String
+  | Prim Int
+ deriving ( Eq, Ord )
+
+instance Show Ident where
+  show (Name x) = x
+  show (Prim n) = "$" ++ show n
+
+ident :: String -> Ident
+ident x = Name x
+
+prim :: Int -> Ident
+prim n = Prim n
+
+identNotIn :: [Ident] -> Ident
+identNotIn zs = Prim (maximum (0 : [ n | Prim n <- zs ]) + 1)
 
 --------------------------------------------------------------------------------
 
 class Free a where
-  free :: a -> [Name]
+  free :: a -> [Ident]
 
 instance Free () where
   free _ = []
@@ -23,13 +41,17 @@ instance Free a => Free [a] where
 
 --------------------------------------------------------------------------------
 
-data Bind t = Bind Name t
+data Bind t = Bind Ident t
  deriving ( Eq, Ord, Show )
 
 instance Free t => Free (Bind t) where
   free (Bind x t) = free t \\ [x]
 
-substBind :: Free t => (Name->t) -> ([(Name,t)] -> t -> t) -> ([(Name,t)] -> Bind t -> Bind t)
+--------------------------------------------------------------------------------
+
+type Subst a = [(Ident,a)]
+
+substBind :: Free t => (Ident->t) -> (Subst t -> t -> t) -> (Subst t -> Bind t -> Bind t)
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
@@ -38,25 +60,22 @@ substBind var subst sub a@(Bind x t)
   sub' = [ (y,t) | (y,t) <- sub, y /= x ]
   vs   = free (map snd sub') 
   zs   = map fst sub' ++ vs ++ free t
-  x'   = varNotIn zs
-
-varNotIn :: [Name] -> Name
-varNotIn zs = "$" ++ show (maximum (0 : [ read n | '$':n@(_:_) <- zs, all isDigit n ]) + 1)
+  x'   = identNotIn zs
 
 --------------------------------------------------------------------------------
 
 class Binding t where
   binders :: t -> [Bind t]
 
-bind :: Binding t => (Name -> t) -> Bind t
+bind :: Binding t => (Ident -> t) -> Bind t
 bind = bindWith []
 
-bindWith :: Binding t => [Name] -> (Name -> t) -> Bind t
+bindWith :: Binding t => [Ident] -> (Ident -> t) -> Bind t
 bindWith vs f = Bind x t
  where
   t  = f x
   ys = vs ++ [ y | Bind y _ <- binders t ]
-  x  = varNotIn ys
+  x  = identNotIn ys
 
 --------------------------------------------------------------------------------
 
