@@ -6,30 +6,6 @@ import Core
 import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
--- (=), (;), (|) are associative
-
--- normalizes associative operators on top-level
-norm :: Expr -> Expr
-norm ((a :=: b) :=: c) = norm (a :=: (b :=: c))
-norm ((a :>: b) :>: c) = norm (a :>: (b :>: c))
-norm ((a :|: b) :|: c) = norm (a :|: (b :|: c))
-norm (a :=: b)         = a :=: norm b
-norm (a :>: b)         = a :>: norm b
-norm (a :|: b)         = a :|: norm b
-norm a                 = a
-
--- mangles associative operators on top-level
-assocs :: Expr -> [Expr]
-assocs e@(a :=: (b :=: c)) = e : assocs ((a :=: b) :=: c)
-assocs e@(a :>: (b :>: c)) = e : assocs ((a :>: b) :>: c)
-assocs e@(a :|: (b :|: c)) = e : assocs ((a :|: b) :|: c)
-assocs e                   = [e]
-
--- matcher to use for associative operators on top-level
-assoc :: Expr -> [Expr]
-assoc = assocs . norm
-
---------------------------------------------------------------------------------
 -- sub-categories of expressions
 
 isChoiceFree :: Expr -> Bool
@@ -56,19 +32,19 @@ execX, execX1 :: Expr -> [(Context, Expr)]
 execX lhs = execX1 lhs ++ [(id,lhs)]
 
 execX1 lhs =
-  do x :=: e <- assoc lhs
+  do x :=: e <- [lhs]
      (ctx, hole) <- execX x
      pure ((:=: e) . ctx, hole)
  ++
-  do e :=: x <- assoc lhs
+  do e :=: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :=:) . ctx, hole)
  ++
-  do x :>: e <- assoc lhs
+  do x :>: e <- [lhs]
      (ctx, hole) <- execX x
      pure ((:>: e) . ctx, hole)
  ++
-  do e :>: x <- assoc lhs
+  do e :>: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
 
@@ -78,20 +54,20 @@ choiceX, choiceX1 :: Expr -> [(Context, Expr)]
 choiceX lhs = choiceX1 lhs ++ [(id,lhs)]
 
 choiceX1 lhs =
-  do cx :=: e <- assoc lhs
+  do cx :=: e <- [lhs]
      (ctx, hole) <- choiceX cx
      pure ((:=: e) . ctx, hole)
  ++
-  do ce :=: cx <- assoc lhs
+  do ce :=: cx <- [lhs]
      guard (isChoiceFree ce)
      (ctx, hole) <- choiceX cx
      pure ((ce :=:) . ctx, hole)
  ++
-  do cx :>: e <- assoc lhs
+  do cx :>: e <- [lhs]
      (ctx, hole) <- choiceX cx
      pure ((:>: e) . ctx, hole)
  ++
-  do ce :>: cx <- assoc lhs
+  do ce :>: cx <- [lhs]
      guard (isChoiceFree ce)
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)
@@ -104,10 +80,10 @@ choiceX1 lhs =
 
 scopeX :: Expr -> [(Context, Expr)]
 scopeX lhs =
-  do hole :|: e <- assoc lhs
+  do hole :|: e <- [lhs]
      pure ((:|: e), hole)
  ++
-  do e :|: hole <- assoc lhs
+  do e :|: hole <- [lhs]
      pure ((e :|:), hole)
  ++
   do One hole <- [lhs]
@@ -118,16 +94,27 @@ scopeX lhs =
 
 --------------------------------------------------------------------------------
 
+rules = rulesChoice
+    +++ rulesPrimOps
+    +++ rulesSequencing
+    +++ rulesApplication
+    +++ rulesOne
+    +++ rulesAll
+    +++ rulesUnification
+    +++ rulesDef
+    +++ rulesFail
+
+--------------------------------------------------------------------------------
+
 rulesChoice lhs =
-  do Fail :|: e <- assoc lhs
+  do Fail :|: e <- [lhs]
      pure e
  ++
-  do e :|: Fail <- assoc lhs
+  do e :|: Fail <- [lhs]
      pure e
  ++
-  do (sx, e)     <- scopeX lhs
-     (cx, e1_e2) <- choiceX1 e
-     e1 :|: e2   <- assoc e1_e2
+  do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
 
 --------------------------------------------------------------------------------
@@ -149,15 +136,13 @@ rulesPrimOps lhs =
 --------------------------------------------------------------------------------
 
 rulesSequencing lhs =
-  do Val v :>: e <- assoc lhs
+  do Val v :>: e <- [lhs]
      pure e
  ++
-  do e1_e2 :=: e3 <- assoc lhs
-     e1 :>: e2    <- assoc e1_e2
+  do (e1 :>: e2) :=: e3 <- [lhs]
      pure (e1 :>: (e2 :=: e3))
  ++
-  do Val v :=: e1_e2 <- assoc lhs
-     e1 :>: e2       <- assoc e1_e2
+  do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (Val v :=: e2))
 
 --------------------------------------------------------------------------------
@@ -172,8 +157,7 @@ rulesOne lhs =
   do One (Val v) <- [lhs]
      pure (Val v)
  ++
-  do One v_e <- [lhs]
-     Val v :|: e <- assoc v_e
+  do One (Val v :|: e) <- [lhs]
      pure (Val v)
  ++
   do One Fail <- [lhs]
@@ -196,30 +180,30 @@ rulesAll lhs =
 --------------------------------------------------------------------------------
 
 rulesUnification lhs =
-  do e :=: VAR x <- assoc lhs
+  do e :=: VAR x <- [lhs]
      guard (not (isVar e))
      pure (VAR x :=: e)
  ++
-  do INT k1 :=: INT k2 <- assoc lhs
+  do INT k1 :=: INT k2 <- [lhs]
      if k1 == k2
        then pure (INT k1)
        else pure Fail
  ++
-  do ARR vs :=: ARR vs' <- assoc lhs
+  do ARR vs :=: ARR vs' <- [lhs]
      if length vs == length vs'
        then pure (foldr (:>:) (ARR vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
-  do INT k :=: ARR vs <- assoc lhs
+  do INT k :=: ARR vs <- [lhs]
      pure Fail
  ++
-  do ARR vs :=: INT k <- assoc lhs
+  do ARR vs :=: INT k <- [lhs]
      pure Fail
 
 --------------------------------------------------------------------------------
 
 rulesDef lhs =
-  do (ctx, VAR x :=: Val v) <- execX lhs -- execX already applies assoc, so I don't
+  do (ctx, VAR x :=: Val v) <- execX lhs
      let freeX = free (ctx blob)
          freeV = free v
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
@@ -248,16 +232,16 @@ rulesDef lhs =
 --------------------------------------------------------------------------------
 
 rulesFail lhs =
-  do Fail :>: e <- assoc lhs
+  do Fail :>: e <- [lhs]
      pure Fail
  ++
-  do e :>: Fail <- assoc lhs
+  do e :>: Fail <- [lhs]
      pure Fail
  ++
-  do Fail :=: e <- assoc lhs
+  do Fail :=: e <- [lhs]
      pure Fail
  ++
-  do e :=: Fail <- assoc lhs
+  do e :=: Fail <- [lhs]
      pure Fail
  ++
   do Def (Bind x Fail) <- [lhs]

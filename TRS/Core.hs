@@ -93,13 +93,47 @@ pattern VARR vs = HNF (Arr vs)
 
 instance Rec Expr where
   rec r (a :=: b)        = [ a' :=: b | a' <- r a ] ++ [ a :=: b' | b' <- r b ]
-  rec r (a :>: b)        = [ a' :>: b | a' <- r a ] ++ [ a :>: b' | b' <- r b ]
   rec r (a :|: b)        = [ a' :|: b | a' <- r a ] ++ [ a :|: b' | b' <- r b ]
+  rec r (a :>: b)        = [ a' :>: b | a' <- r a ] ++ [ a :>: b' | b' <- r b ]
   rec r (a :@: b)        = [ a' :@: b | a' <- r a ] ++ [ a :@: b' | b' <- r b ]
   rec r (Def (Bind x a)) = [ Def (Bind x a') | a' <- r a ]
   rec r (One a)          = [ One a' | a' <- r a]
   rec r (All a)          = [ All a' | a' <- r a]
   rec r _                = []
+
+{-
+recAssoc :: (Expr -> [Expr]) -> Expr -> [Expr]
+recAssoc r e =
+     [ a' :=: b  | a :=: b <- es, a' <- r a ]
+  ++ [ a  :=: b' | a :=: b <- es, b' <- r b ]
+  ++ [ a' :>: b  | a :>: b <- es, a' <- r a ]
+  ++ [ a  :>: b' | a :>: b <- es, b' <- r b ]
+  ++ [ a' :|: b  | a :|: b <- es, a' <- r a ]
+  ++ [ a  :|: b' | a :|: b <- es, b' <- r b ]
+ where
+  es = assoc e
+
+-- normalizes associative operators on top-level
+norm :: Expr -> Expr
+norm ((a :=: b) :=: c) = norm (a :=: (b :=: c))
+norm ((a :>: b) :>: c) = norm (a :>: (b :>: c))
+norm ((a :|: b) :|: c) = norm (a :|: (b :|: c))
+norm (a :=: b)         = a :=: norm b
+norm (a :>: b)         = a :>: norm b
+norm (a :|: b)         = a :|: norm b
+norm a                 = a
+
+-- mangles associative operators on top-level
+assocs :: Expr -> [Expr]
+assocs e@(a :=: (b :=: c)) = e : assocs ((a :=: b) :=: c)
+assocs e@(a :>: (b :>: c)) = e : assocs ((a :>: b) :>: c)
+assocs e@(a :|: (b :|: c)) = e : assocs ((a :|: b) :|: c)
+assocs e                   = [e]
+
+-- matcher to use for associative operators on top-level
+assoc :: Expr -> [Expr]
+assoc = assocs . norm
+-}
 
 --------------------------------------------------------------------------------
 
