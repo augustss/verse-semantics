@@ -18,6 +18,14 @@ Or something of that shape (i.e. a trivial equality).
 
 Why isn't there?
 
+-----
+
+fail = wrong --> fail
+
+fail = wrong --> wrong
+
+:-(
+
 ===== UNDER DISCUSSION =====
 
 ;, |, = are all stated to be associative. But there exists a associative rewrite rule only for |. Why does this exist at all?
