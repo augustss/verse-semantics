@@ -80,19 +80,18 @@ evalTrace s f trc e | not trc = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop 250 $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop 1000 $ evalTrace "eval" (const ea) trc (CWrong"")
   where
+    -- Loop until convergence or timeout
     loop :: Int -> Core -> Core
-    loop 0 e = --trace "Reduction did not reach a normal form, use :eval to reduce more."
+    loop 0 e = trace "Reduction did not reach a normal form, use :eval to reduce more."
                e
-    loop n e | isIrred e = e
-             | otherwise = loop (n-1) $ evalSteps trc e
-
--- Irreducible term
-isIrred :: Core -> Bool
-isIrred (CValue (HNF _)) = True
-isIrred CWrong{} = True  -- Not really a HNF, but cannot reduce
-isIrred _ = False
+    loop n e =
+      let e' = evalSteps trc e
+      in  if e == e' then
+            e'
+          else
+            loop (n-1) e'
 
 isX :: Core -> Bool
 isX CUnify{} = True
