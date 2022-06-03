@@ -12,7 +12,7 @@ import Core
 import CoreSimp
 import Eval
 import qualified Testing
-import Koen
+import TRSAdapter
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
