@@ -26,7 +26,7 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< dsMatch <=< scopeCheck <=< dsD Eval <=< dropParens)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval <=< dropParens)
   where eval = flip evalState 1
 
 data Context = Eval | Abs
@@ -99,7 +99,11 @@ dsD _ctx = expr
     -- D[:t] = : D[t], also change constructor
     expr (PrefixOp (Ident _ ":") t) = Range <$> expr t
     -- D[typedef{e}] = typedef{D[e]}
-    expr (Typedef e) = Typedef <$> expr e
+    expr (Typedef e) = do
+      y <- newIdent noLoc "y"
+      e' <- expr e
+      e'' <- dsM e' (Variable y)
+      pure $ primFcn y e''
 
     -- Conditionals
     -- D[if{e}] = D[if(e) else false]
@@ -201,9 +205,11 @@ dsD _ctx = expr
       pure $ Function [(Define y AnyT, [])] $ seqE [e'', Do b']
     -}
     function e b = do
+      y <- newIdent noLoc "y"
       e' <- expr e
+      e'' <- dsM e' (Variable y)
       b' <- expr b
-      pure $ Function [(e', [])] b'
+      pure $ primFcn y $ seqE [e'', Do b']
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -218,6 +224,7 @@ unify AnyT e = e
 unify e AnyT = e
 unify e1 e2 = Unify e1 e2
 
+{-
 dsMatch :: SExpr -> D SExpr
 dsMatch = f
   where
@@ -225,13 +232,21 @@ dsMatch = f
       y <- newIdent noLoc "y"
       e' <- dsM e (Variable y)
       b' <- f b
-      pure $ Function [(tAny noLoc y, [])] $ seqE [e', Do b']
+      pure $ primFcn y $ seqE [e', Do b']
     f e@Function{} = impossible e
     f (Define2 i x e) = do
       e' <- dsM e (Variable i)
       e'' <- f e'
       pure $ Seq [tAny noLoc i, Define x e'']
+    f (Typedef e) = do
+      y <- newIdent noLoc "y"
+      e' <- dsM e (Variable y)
+      pure $ primFcn y e'
     f e = compos f e
+-}
+
+primFcn :: Ident -> SExpr -> SExpr
+primFcn y e = Function [(tAny noLoc y, [])] e
 
 dsM :: SExpr -> SExpr -> D SExpr
 dsM expr y =
@@ -564,6 +579,11 @@ dsDo = f
       r <- newIdent noLoc "r"
       e' <- f e
       pure $ ApplyD e' (tAny noLoc r)
+
+    f (Define2 i x e) = do
+      e' <- dsM e (Variable i)
+      e'' <- f e'
+      pure $ Seq [tAny noLoc i, Define x e'']
 
     f e = compos f e
 
