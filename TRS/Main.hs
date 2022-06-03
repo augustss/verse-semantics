@@ -4,6 +4,7 @@ import Core
 import Rules
 import TRS
 import Bind
+import Test.QuickCheck
 
 --------------------------------------------------------------------------------
 
@@ -16,7 +17,13 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 --------------------------------------------------------------------------------
 
-main = sequence_ [ print t | t <- normalForms rules ex2 ]
+main = quickCheck prop_NormalForms
+
+prop_NormalForms p =
+  case normalFormsFuel 999 rules p of
+    []          -> whenFail (print "DOES NOT TERMINATE") False
+    q1 : q2 : _ -> whenFail (print q1 >> print q2) False
+    _           -> property True
 
 --------------------------------------------------------------------------------
 
