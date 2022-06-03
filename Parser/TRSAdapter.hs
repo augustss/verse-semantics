@@ -26,6 +26,7 @@ coreToTrs (CAll e) = T.All $ coreToTrs e
 coreToTrs (CDef [] e) = coreToTrs e
 coreToTrs (CDef (i:is) e) = T.Def $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e)
 coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
+coreToTrs CWrong{} = T.Wrong
 coreToTrs e = impossible e
 
 coreToTrsV :: Value -> T.Value
@@ -59,6 +60,7 @@ trsToCore ee@T.Def{} = flat [] ee
         flat vs e = CDef (map trsToCoreI vs) (trsToCore e)
 trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
+trsToCore T.Wrong = CWrong "unknown"
 
 trsToCoreV :: T.Value -> Value
 trsToCoreV (T.Var i) = Var (trsToCoreI i)
