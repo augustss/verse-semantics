@@ -5,7 +5,11 @@
 
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Eval(eval, Flags(..)) where
+module Eval(
+  eval,
+  evalSeq,
+  Flags(..)
+  ) where
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe

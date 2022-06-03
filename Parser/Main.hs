@@ -9,6 +9,7 @@ import Expr
 import Parse
 import Command
 import Core
+import CoreSimp
 import Eval
 import qualified Testing
 
