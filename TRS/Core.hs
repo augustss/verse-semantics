@@ -4,6 +4,7 @@ module Core where
 import Show
 import TRS
 import Bind
+import Test.QuickCheck
 import Data.List( intercalate, union )
 import Data.Maybe
 
@@ -194,8 +195,96 @@ instance Term Expr where
 
 --------------------------------------------------------------------------------
 
--- TODO: Arbitrary instances
+instance Arbitrary Op where
+  arbitrary = elements [ Add, Gt, IsInt ]
 
+---
+
+instance Arbitrary HNF where
+  arbitrary = arbIdents >>= (sized . flip arbHNF)
+
+  shrink (Int n)  = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Arr vs) = [ Arr vs' | vs' <- shrink vs ]
+  shrink _        = []
+
+arbIdents :: Gen [Ident]
+arbIdents =
+  do k <- choose (1,7)
+     return (take k (map ident names))
+ where
+  names = ["x","y","z","v","w"] ++ ["x" ++ show i | i <- [1..]]
+
+arbHNF :: Int -> [Ident] -> Gen HNF
+arbHNF n xs =
+  frequency
+  [ (1, Int `fmap` arbitrary)
+  , (1, Op  `fmap` arbitrary)
+  , (n, Arr `fmap` listOf (arbValue n2 xs))
+  ]
+ where
+  n2 = n `div` 2
+
+---
+
+instance Arbitrary Value where
+  arbitrary = arbIdents >>= (sized . flip arbValue)
+
+  shrink (Var _) = [ HNF (Int 0), HNF (Arr []) ]
+  shrink (HNF a) = [ HNF a' | a' <- shrink a ]
+
+arbValue :: Int -> [Ident] -> Gen Value
+arbValue n xs =
+  frequency $
+  [ (1, Var `fmap` elements xs) | not (null xs) ] ++
+  [ (n', HNF `fmap` arbHNF n1 xs)
+  ]
+ where
+  n' = if null xs then 1 else n
+  n1 = if n > 0 then n-1 else 0
+
+---
+
+instance Arbitrary Expr where
+  arbitrary = sized (`arbExpr` []) -- closed by default 
+
+  shrink (Val v)   = [ Val v' | v' <- shrink v ]
+  shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
+  shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
+  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :@: b) = [Val a,Val b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
+  shrink Fail      = []
+  shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
+  shrink (All a)   = [a] ++ [All a'| a'<-shrink a]
+  shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
+ 
+arbExpr :: Int -> [Ident] -> Gen Expr
+arbExpr n xs =
+  frequency
+  [ (1, Val `fmap` arbValue n xs)
+  , (1, return Fail) -- maybe not have this?
+  , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (:@:) <$> arbValue n2 xs <*> arbValue n2 xs)
+  , (n, Def <$> arbBind n1 xs)
+  , (n, One <$> arbExpr n1 xs)
+  , (n, All <$> arbExpr n1 xs)
+  ]
+ where
+  n1 = n-1
+  n2 = n `div` 2
+
+arbBind :: Int -> [Ident] -> Gen (Bind Expr)
+arbBind n xs =
+  frequency $
+  [ (1, do x <- elements xs
+           Bind x <$> arbExpr n xs)
+  | not (null xs)
+  ] ++
+  [ (4, do let x = identNotIn xs
+           Bind x <$> arbExpr n (x:xs))
+  ]
+  
 --------------------------------------------------------------------------------
 
 
