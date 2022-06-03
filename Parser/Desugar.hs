@@ -2,7 +2,7 @@
 module Desugar(desugar, simplify, primOps, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
-import Data.List
+--import Data.List
 --import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Either
@@ -26,7 +26,7 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval <=< dropParens)
+desugar = eval . (anfS <=< dsDo <=< dsMatch <=< scopeCheck <=< dsD Eval <=< dropParens)
   where eval = flip evalState 1
 
 data Context = Eval | Abs
@@ -43,7 +43,7 @@ dropParens = f
 
 -- This follows the D transformation in calculus.ltx
 dsD :: Context -> Expr -> D SExpr
-dsD ctx = expr
+dsD _ctx = expr
   where
     expr :: HasCallStack => Expr -> D Expr
     expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
@@ -55,6 +55,7 @@ dsD ctx = expr
     expr e@Variable{} = pure e
     -- D[e1,...,en] = ???
     -- FIX D: update for splices
+    -- YYY needs work
     expr (Array es) = arrSplice $ exprElems es
     -- D[e1;...;en] = D[e1]; ...; D[en]
     expr (Seq es) = seqE <$> mapM expr es
@@ -65,18 +66,25 @@ dsD ctx = expr
     -- Attributes are only allow for function definitions
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
     -- D[e1 = e2] = D[e1] = D[e2], also change constructor
-    expr (InfixOp e1 (Ident _ "=") e2) = Unify <$> expr e1 <*> expr e2
+    expr (InfixOp e1 (Ident _ "=") e2) = unify <$> expr e1 <*> expr e2
     -- D[e1 | e2] = D[e1] | D[e2], also change constructor
     expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
+    -- D[e1 where e2] = D[e1] where D[e2], also change constructor
+    expr (InfixOp e1 (Ident _ "where") e2) = Where <$> expr e1 <*> expr e2
 
     -- Bindings
     -- D [lhs : t] = L[lhs] D[t]
+{-
     expr (InfixOp lhs (Ident l ":") t) = dsL l lhs =<< expr t
     expr (InfixOp lhs (Ident l ":=") e)
     -- D [lhs := e] = D[lhs := type{e}]     in an abstraction context
       | ctx == Abs = expr $ InfixOp lhs (Ident l ":") (Typedef e)
     -- D [lhs := e] = P[lhs] e
       | otherwise = dsP l lhs e
+-}
+    expr (InfixOp lhs (Ident l ":") t) = dsP l lhs' (Range t')
+      where (lhs', t') = dsColon l lhs t
+    expr (InfixOp lhs (Ident l ":=") e) = dsP l lhs e
 
     -- Functions
     -- D[e1 => e2] = D[fn(e1){e2}]
@@ -89,9 +97,7 @@ dsD ctx = expr
 
     -- Types
     -- D[:t] = : D[t], also change constructor
-    expr (PrefixOp (Ident l ":") t) = do --Range <$> expr t
-      x <- newIdent l "x"
-      expr $ ApplyD t (tAny l x)
+    expr (PrefixOp (Ident _ ":") t) = Range <$> expr t
     -- D[typedef{e}] = typedef{D[e]}
     expr (Typedef e) = Typedef <$> expr e
 
@@ -124,8 +130,10 @@ dsD ctx = expr
         "&&" -> expr $ seqE [e1, e2]
         -- D[e1 || e2] = D[if(e1)else e2]
         "||" -> expr $ If2E e1 e2
+{-
         -- D[e1 where e2] = D[x:= e1; e2; x]
         "where" -> newIdent l "w" >>= \ x -> expr $ Seq [define l x e1, e2, Variable x]
+-}
         -- D[e1 op e2] = D[e1] op D[e2]
         _    -> expr $ call "in" l op $ Array [e1, e2]
 
@@ -152,8 +160,11 @@ dsD ctx = expr
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
+    expr (Define2 i j e) = Define2 i j <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
+    expr (Unify e1 e2) = unify <$> expr e1 <*> expr e2
+    expr (Where e1 e2) = Where <$> expr e1 <*> expr e2
+    expr (Range e) = Range <$> expr e
     expr AnyT = pure AnyT
 
     expr e = impossible e
@@ -167,6 +178,7 @@ dsD ctx = expr
             s' = p ++ "'" ++ s ++ "'"
 
     -- Handle function(e){b}
+    {-
     -- For nicer desugaring, handle ":any" argument specially
     function (Define i a) b | isAnyT a = Function [(Define i AnyT, [])] <$> expr b
       -- XXX remove "any" when we have a simplifier.
@@ -179,6 +191,19 @@ dsD ctx = expr
       e' <- dsD Abs e
       b' <- expr (Do b)
       pure $ Function [(Define x AnyT, [])] $ seqE [Unify e' (Variable x), b']
+    -}
+    {-
+    function e b = do
+      e' <- expr e
+      b' <- expr b
+      y <- newIdent noLoc "y"
+      e'' <- dsM e' (Variable y)
+      pure $ Function [(Define y AnyT, [])] $ seqE [e'', Do b']
+    -}
+    function e b = do
+      e' <- expr e
+      b' <- expr b
+      pure $ Function [(e', [])] b'
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -187,6 +212,70 @@ dsD ctx = expr
     arrSplice as = applyPrim "concat#" <$> Array <$> mapM (expr . f) as
       where f (EElems es) = Array es
             f (ESplice e) = e
+
+unify :: Expr -> Expr -> Expr
+unify AnyT e = e
+unify e AnyT = e
+unify e1 e2 = Unify e1 e2
+
+dsMatch :: SExpr -> D SExpr
+dsMatch = f
+  where
+    f (Function [(e, [])] b) = do
+      y <- newIdent noLoc "y"
+      e' <- dsM e (Variable y)
+      b' <- f b
+      pure $ Function [(tAny noLoc y, [])] $ seqE [e', Do b']
+    f e@Function{} = impossible e
+    f (Define2 i x e) = do
+      e' <- dsM e (Variable i)
+      e'' <- f e'
+      pure $ Seq [tAny noLoc i, Define x e'']
+    f e = compos f e
+
+dsM :: SExpr -> SExpr -> D SExpr
+dsM expr y =
+  case expr of
+    e | isLiteral e -> dflt
+    Variable{} -> dflt
+    Array es -> do
+      xs <- mapM (const $ newIdent noLoc "y") es
+      es' <- zipWithM dsM es (map Variable xs)
+      pure $ seqE [unify y (Array $ map (tAny noLoc) xs), Array es']
+    Seq (Snoc es e) -> do
+      e' <- dsM e y
+      pure $ Seq (Snoc es e')
+    ApplyS{} -> dflt
+    ApplyD{} -> dflt
+    If3{} -> dflt
+    For2{} -> dflt
+    Let e b -> Let e <$> dsM b y
+    Do e -> Do <$> dsM e y
+    Where e1 e2 -> Where <$> dsM e1 y <*> pure e2
+    Unify e1 e2 -> do
+      e1' <- dsM e1 y
+      e2' <- dsM e2 y
+      pure $ unify e1' e2'
+    Typedef{} -> dflt
+    Define i e -> Define i <$> dsM e y
+    Define2 j i e -> do
+      e' <- dsM e y
+      pure $ Seq [Define j y, Define i e']
+    Choice{} -> dflt
+    Range e -> pure $ ApplyD e y
+    AnyT -> dflt
+    Function [(fexpr, [])] gexpr -> do
+      let h = y
+      vy <- newIdent noLoc "y"
+      x <- newIdent noLoc "x"
+      z <- newIdent noLoc "z"
+      ex <- define noLoc x <$> dsM fexpr (Variable vy)
+      let ez = define noLoc z $ ApplyD h (Variable x)
+      res <- dsM gexpr (Variable z)
+      pure $ Function [(tAny noLoc vy, [])] $ seqE [ex, ez, Do res]
+    _ -> impossible expr
+  where
+    dflt = pure $ unify y expr
 
 data ArrayElem = EElems [Expr] | ESplice Expr
   deriving (Show)
@@ -261,6 +350,7 @@ define _l i e = Define i e
 tAny :: Loc -> Ident -> SExpr
 tAny l i = define l i AnyT
 
+{-
 -- Desugar a definition e1 : e2
 dsL :: Loc -> Expr -> SExpr -> D SExpr
 -- L[x] any =
@@ -282,20 +372,25 @@ dsL l e t | Just (f, a, rs) <- getFun e = do
    else
     -- XXX This does not support dependent types yet
     unimplemented "complex function type"
--- L[l^] t = L[l] new[t]
-dsL l (PostfixOp f (Ident _ "^")) t =
-  dsL l f (applyPrimD "new" t)
--- L[l?] t = L[l] (?t)
-dsL l (PostfixOp f op@(Ident _ "?")) t =
-  dsL l f (PrefixOp op t)
--- L[l[]] t = L[l] ([]t)
-dsL l (ApplyD f (Array [])) t =
-  dsL l f (PrefixOp (Ident l "[]") t)
 -- L[lhs1 ~> lhs2] t = P[lhs1] (L[lhs2] t)
 dsL l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
   e <- dsL l lhs2 t
   dsP l lhs1 e
 dsL l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
+-}
+
+-- Desugar a definition e1 : e2
+dsColon :: Loc -> Expr -> SExpr -> (SExpr, SExpr)
+-- L[l^] t = L[l] new[t]
+dsColon l (PostfixOp f (Ident _ "^")) t =
+  dsColon l f (applyPrimD "new" t)
+-- L[l?] t = L[l] (?t)
+dsColon l (PostfixOp f op@(Ident _ "?")) t =
+  dsColon l f (PrefixOp op t)
+-- L[l[]] t = L[l] ([]t)
+dsColon l (ApplyD f (Array [])) t =
+  dsColon l f (PrefixOp (Ident l "[]") t)
+dsColon _ e t = (e, t)
 
 -- Return function, argument, and attributes
 getFun :: Expr -> Maybe (Expr, Expr, [Ident])
@@ -305,11 +400,13 @@ getFun = gf []
     gf rs (ApplyS f a) = Just (f, a, reverse rs)
     gf _ _ = Nothing
 
+{-
 -- Optimize type{:t} to t
 typedef :: Expr -> D Expr
 typedef (PrefixOp  (Ident _ ":") t) = dsD Eval t
 typedef (InfixOp _ (Ident _ ":") t) = dsD Eval t
 typedef e = Typedef <$> dsD Eval e
+-}
 
 -- Desugar a definition lhs := e
 dsP :: Loc -> Expr -> Expr -> D SExpr
@@ -322,9 +419,13 @@ dsP l (Variable x) e = define l x <$> dsD Eval e
 dsP l (PrefixOp colon@(Ident _ ":") t) e = do
   x <- newIdent l "x"
   dsP l (InfixOp (Variable x) colon t) e
+-- P[x:t] e = P[x] t[e]
+dsP l (InfixOp p@Variable{} (Ident _ ":") t) e = do
+  dsP l p (ApplyD t e)
 -- P[l:t] e = P[l] t[e]
 dsP l (InfixOp p (Ident _ ":") t) e = do
-  dsP l p (ApplyD t e)
+  let (p', t') = dsColon l p t
+  dsP l p' (ApplyD t' e)
 {-
   x <- newIdent l "x"
   p' <- dsP l p =<< dsD Eval (ApplyD t (define l x e))
@@ -339,8 +440,26 @@ dsP l (PostfixOp e1 (Ident _ "^")) e = do
 -- FIX L: update for splices
 -- P[lhs1, ... lhsn] = ...
 dsP l (Array lhss) e = dsPArr l lhss e
--- P[lhs ~> lhs2] e = P[lhs ~> lhs2] (: typedef{e})
+{-
+-- P[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
 dsP l lhs@(InfixOp _ (Ident _ "~>") _) e = dsL l lhs =<< typedef e
+-}
+{-
+dsP _ (InfixOp (Variable i) (Ident _ "~>") (Variable x)) e =
+  Define2 i x <$> dsD Eval e
+-}
+dsP l (InfixOp i (Ident _ "~>") x) e = do
+  (i', di) <-
+    case i of
+      Variable i' -> pure (i', [])
+      _ -> do i' <- newIdent l "i"; di <- dsP l i (Variable i'); pure (i', [di])
+  (x', dx) <-
+    case x of
+      Variable x' -> pure (x', [])
+      _ -> do x' <- newIdent l "x"; dx <- dsP l x (Variable x'); pure (x', [dx])
+  e' <- dsD Eval e
+  pure $ seqE $ di ++ dx ++ [Define2 i' x' e']
+
 -- What else is allowed?  LitInt and LitRat would be easy.
 dsP l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
 
@@ -434,11 +553,18 @@ dsDo = f
     f (Do b) = f b
     -- D[let(e)in b] = D[e]; D[b]
     f (Let e b) = f $ seqE [e, b]
-    -- D[:t] = t[x:any]; x
+
+    -- D[e1 where e2] = D[x:= e1; e2; x]
+    f (Where e1 e2) = do
+      x <- newIdent noLoc "w"
+      pure $ Seq [define noLoc x e1, e2, Variable x]
+
+    -- D[:t] = t[x:any]
     f (Range e) = do
       r <- newIdent noLoc "r"
       e' <- f e
-      pure $ Seq [ApplyD e' (tAny noLoc r), Variable r]
+      pure $ ApplyD e' (tAny noLoc r)
+
     f e = compos f e
 
 --------------------
@@ -491,14 +617,17 @@ getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
 getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (Typedef _) = []
 getVisible (Define i e) = i : getVisible e
+getVisible (Define2 i j e) = i : j : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible AnyT = []
 getVisible Function{} = []
 getVisible e = impossible e
 
+{-
 getFree :: Expr -> [Ident]
 getFree LitInt{} = []
 getFree LitRat{} = []
@@ -522,6 +651,7 @@ getFree e = impossible e
 
 getFreeD :: Expr -> [Ident]
 getFreeD e = getFree e \\ getVisible e
+-}
 
 --------------
 
@@ -571,7 +701,9 @@ scopeErrs s = expr
     expr (Function ((a,_):ars) e2) = errs ++ scopeErrs s' (Function ars e2)
       where (errs, s') = defs a
     expr (Unify e1 e2) = expr e1 ++ expr e2
+    expr (Where e1 e2) = expr e1 ++ expr e2
     expr (Define _ e) = expr e
+    expr (Define2 _ _ e) = expr e
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
     expr (Range e1) = expr e1
     expr (Typedef e1) = expr (Do e1)
@@ -591,7 +723,7 @@ scopeErrs s = expr
 simplify :: Expr -> Expr
 simplify = simp
   where
-    simp (Unify e AnyT) = simp e
+    --simp (Unify e AnyT) = simp e
     simp (ApplyD (Variable (Ident _ "any")) e) = simp e
     simp (ApplyD (Typedef e1) e2) = simp $ Unify e1 e2
     --simp (Range (Typedef e)) = simp e   -- Always?

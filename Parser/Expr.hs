@@ -10,7 +10,7 @@ module Expr(
   Expr(..),
   pattern Fail,
   pattern Unit,
-  pattern Range,
+--  pattern Range,
   Block,
   Eff,
   Op,
@@ -78,14 +78,16 @@ data Expr
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
+  | Define2 Ident Ident Expr  -- i~x := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
---  | Range Expr                -- :e
+  | Range Expr                -- :e
+  | Where Expr Expr           -- e1 where e2
   | AnyT                      -- :any
   deriving (Eq, Ord, Show, Data)
 
-pattern Range :: Expr -> Expr
-pattern Range e = ApplyD e AnyT
+--pattern Range :: Expr -> Expr
+--pattern Range e = ApplyD e AnyT
 pattern Fail :: Expr
 pattern Fail = Range Unit
 pattern Unit :: Expr
@@ -168,9 +170,11 @@ instance Pretty Expr where
           Parens e -> parens (ppr 0 e)
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
+          Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
           Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+          Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
@@ -208,6 +212,8 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inl "/"       9
       , inn "post^"  10
       , inn "post?"  10
+      , inn "pre^"   11
+      , inn "pre?"   11
       , inn "pre:"   11
       , inn "pre!"   11
       , inn "pre[]"  11
@@ -244,8 +250,10 @@ compos f (Option me) = Option <$> traverse f me
 compos f (Typedef b) = Typedef <$> f b
 compos f (Parens e) = Parens <$> f e
 compos f (Define i e) = Define i <$> f e
+compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
+compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
 compos _ AnyT = pure AnyT
 
