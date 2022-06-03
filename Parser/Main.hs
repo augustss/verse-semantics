@@ -51,6 +51,8 @@ asDesugared e = asExpr e
 
 asCore :: SomeExpr -> Core
 asCore (Cored e) = e
+asCore (Cores [e]) = e
+asCore Cores{} = error "Multiple Core values"
 asCore e = exprToCore $ asDesugared e
 
 instance Show SomeExpr where
