@@ -116,6 +116,9 @@ rulesChoice lhs =
   do (sx, e)         <- scopeX lhs
      (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
+ ++
+  do (e1 :|: e2) :|: e3 <- [lhs]
+     pure (e1 :|: (e2 :|: e3))
 
 --------------------------------------------------------------------------------
 
