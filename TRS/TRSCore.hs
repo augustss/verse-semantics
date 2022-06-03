@@ -1,5 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
-module Core where
+module TRSCore where
 
 import Show
 import TRS
