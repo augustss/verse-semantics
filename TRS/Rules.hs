@@ -103,6 +103,7 @@ rules = rulesChoice
     +++ rulesUnification
     +++ rulesDef
     +++ rulesFail
+    +++ rulesWrong
 
 --------------------------------------------------------------------------------
 
@@ -251,4 +252,24 @@ rulesFail lhs =
      pure Fail
 
 --------------------------------------------------------------------------------
+
+rulesWrong lhs =
+  do Def (Bind x (Val v)) <- [lhs]
+     guard (x `notElem` free v)
+     pure Wrong
+ ++
+  do Wrong :=: e <- [lhs]
+     pure Wrong
+ ++
+  do e :=: Wrong <- [lhs]
+     pure Wrong
+ ++
+  do Wrong :>: e <- [lhs]
+     pure Wrong
+ ++
+  do e :>: Wrong <- [lhs]
+     pure Wrong
+
+--------------------------------------------------------------------------------
+
 
