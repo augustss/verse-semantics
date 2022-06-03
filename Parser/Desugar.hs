@@ -182,6 +182,7 @@ dsD ctx = expr
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
+    arrSplice [] = pure $ Array []
     arrSplice [EElems es] = Array <$> mapM expr es  -- no splices
     arrSplice as = applyPrim "concat#" <$> Array <$> mapM (expr . f) as
       where f (EElems es) = Array es
