@@ -555,6 +555,8 @@ evalPrimOps = evalTrace "evalPrimOps" f
         "dropR#" -> CArray $ revDrop n vs
         _ -> impossible "take/drop"
 
+    f e@(CUnOp "new#" _) = e  -- XXX Just leave it alone for now
+
     -- Fully evaluated, and still no match
     f (CApply (VPrim op) a) | isNF a = unimplemented $ show (op, a)
     f e = composOp f e
@@ -602,6 +604,7 @@ prelude =
   ,("in'>='", cmpV "intGE#")
   ,("in'<'",  cmpV "intLT#")
   ,("in'<='", cmpV "intLE#")
+  ,("new", newV)
   ,("float", undefined)
   ,("string", undefined)
 --  ,("pre'[]'", unimplemented "pre []")
@@ -635,5 +638,14 @@ prelude =
             CSeq [
               CUnify (CArray [Var x, Var y]) (CVar xy),
               app op (Var xy),
+              CVar x
+              ]
+
+        newV =
+          VLam t $ CLam x $
+            CDef [y] $
+            CSeq [
+              CUnify (CVar y) (CApply (Var t) (Var x)),
+              app "new#" (Var y),
               CVar x
               ]
