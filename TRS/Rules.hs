@@ -2,7 +2,7 @@ module Rules where
 
 import TRS
 import Bind
-import Core
+import TRSCore
 import Control.Monad( guard )
 
 --------------------------------------------------------------------------------

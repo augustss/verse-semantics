@@ -9,8 +9,10 @@ import Expr
 import Parse
 import Command
 import Core
+import CoreSimp
 import Eval
 import qualified Testing
+import Koen
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -34,13 +36,14 @@ data CState = CState
   , tracing  :: Bool
   }
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core
+data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
 
 asExpr :: SomeExpr -> Expr
 asExpr NoExpr = error "No current expression"
 asExpr (Parsed e) = e
 asExpr (Desugared e) = e
 asExpr (Cored _) = error "Current expression is Core"
+asExpr (Cores _) = error "Current expression is [Core]"
 
 asDesugared :: SomeExpr -> Expr
 asDesugared (Parsed e) = desugar e
@@ -55,12 +58,17 @@ instance Show SomeExpr where
   show (Parsed e) = show e
   show (Desugared e) = show e
   show (Cored e) = show e
+  show (Cores e) = show e
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr = text "No current expression"
   pPrintPrec l p (Parsed e) = pPrintPrec l p e
   pPrintPrec l p (Desugared e) = pPrintPrec l p e
   pPrintPrec l p (Cored e) = pPrintPrec l p e
+  pPrintPrec _ _ (Cores []) = text "No reduction results !?!"
+  pPrintPrec l p (Cores [e]) = pPrintPrec l p e
+  pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
+                                     map (pPrintPrec l 0) es
 
 command :: Command CState
 command = Command
@@ -75,6 +83,7 @@ command = Command
       , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
       , Cmd "trace"           "Turn on evaluation tracing"            (cTrace True)
       , Cmd "notrace"         "Turn off evaluation tracing"           (cTrace False)
+      , Cmd "rewrite"         "Rewrite with accurate rules"           cRewrite
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -134,7 +143,12 @@ cCore = cTransform (Cored . exprToCore . asDesugared)
 
 cEval :: Run CState
 cEval c s =
-  cTransform (Cored . eval (tracing s) . asCore) c s
+  cTransform (Cored . eval flg . asCore) c s
+  where flg = Flags { underLambda = False, traceEval = tracing s }
+
+cRewrite :: Run CState
+cRewrite =
+  cTransform (Cores . rewrite 1000 . asCore)
 
 cShow :: Run CState
 cShow =

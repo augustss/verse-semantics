@@ -46,12 +46,13 @@ assertFail = assertEquiv' False
 
 assertEquiv' :: HasCallStack => Bool -> Ident -> Expr -> Expr -> IO ()
 assertEquiv' expectOK name p1 p2 = do
+    let flg = Flags { underLambda = False, traceEval = False }
     let d1 = desugar p1
     let d2 = desugar p2
     let c1 = exprToCore d1
     let c2 = exprToCore d2
-    let v1 = eval False c1
-    let v2 = eval False c2
+    let v1 = eval flg c1
+    let v2 = eval flg c2
 
     let pos =
           case name of

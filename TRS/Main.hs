@@ -1,6 +1,6 @@
 module Main where
 
-import Core
+import TRSCore
 import Rules
 import TRS
 import Bind

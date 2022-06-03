@@ -60,6 +60,7 @@ testeq(SEq) {x? := 1/0; x}                        {array{}}
 testeq(SEq) {99^ := 5}                            {assign[99,5]}
 testeq(SEq) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
 testeq(SEq) {i~>x := 2; (i, x)}                   {2,2}
+testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
 # Array LHS splicing
 testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
@@ -68,28 +69,27 @@ testeq(SEq) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq(SEq) {(x:int) = 5}                         {5}
-testeq(SEq) {succ(x:any):=x+1; (y:succ)=1}        {1}
-testeq(SEq) {succ(x:any):=x+1; (y:succ)=1; y}     {2}
 testeq(SEq) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq(SEq) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq(SEq) {ap0(f(x:int):=2) := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
-#testeq(SEq) {(p^ : int) = 2}                      {p:=new[int][2]; 2}
+# DESUGAR HOW?
+testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
 testeq(SEq) {x? : int}                             { x : ?int }
 testeq(SEq) {x[] : int}                           { x : []int }
 testeq(SEq) {i~>x:(3,4,5); (i, x)}                {(0,3)|(1,4)|(2,5)}
+# DESUGAR HOW?
 #testeq(SEq) {p^[](:int):int}                      {0}
 
 # Array expression splicing
 testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
 testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
-testeq(SEq) {succ(x:int):=x+1; succ = f(x:int):int; f[2]} {3}
 
 #
 testeq(SEq) {:(1,2,3)}                            {1|2|3}
 testeq(SEq) {x:(1,2,3); x}                        {1|2|3}
 testeq(SEq) {x:= :(1,2,3); x}                     {1|2|3}
-testeq(SEq) {x:(1,2,3)}                           {0|1|2}
+testeq(SEq) {x:(1,2,3)}                           {1|2|3}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only
