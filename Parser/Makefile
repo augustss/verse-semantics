@@ -1,9 +1,9 @@
-PKGS = -package megaparsec -package parser-combinators -package haskeline
+PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -i../TRS
 .PHONY: clean all testing
 
 all:	verse tests
 
-parser: *.hs
+verse: *.hs
 	ghc -Wall --make $(PKGS) Main.hs -o verse
 
 tests: *.hs

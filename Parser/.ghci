@@ -1,4 +1,6 @@
+:set -i../TRS
 :set -Wall
 :set -package megaparsec
 :set -package parser-combinators
 :set -package haskeline
+:set -package QuickCheck
