@@ -134,7 +134,8 @@ cCore = cTransform (Cored . exprToCore . asDesugared)
 
 cEval :: Run CState
 cEval c s =
-  cTransform (Cored . eval (tracing s) . asCore) c s
+  cTransform (Cored . eval flg . asCore) c s
+  where flg = Flags { underLambda = False, traceEval = tracing s }
 
 cShow :: Run CState
 cShow =

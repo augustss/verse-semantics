@@ -5,7 +5,7 @@
 
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Eval(eval) where
+module Eval(eval, Flags(..)) where
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe
@@ -64,14 +64,16 @@ newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
 
--- Do not reduce under lambda.
-notLam :: Bool
-notLam = True
+data Flags = Flags
+  { traceEval   :: !Bool
+  , underLambda :: !Bool
+  }
+  deriving (Show)
 
-type EvalCore = Bool -> Core -> Core
+type EvalCore = Flags -> Core -> Core
 
 evalTrace :: String -> (Core -> Core) -> EvalCore
-evalTrace s f trc e | not trc = e'
+evalTrace s f flg e | not (traceEval flg) = e'
                     | e == e'     = e'
                     | otherwise   = trace (s ++ ":\n" ++ prettyShow e') e'
   where e' = f e
@@ -111,14 +113,14 @@ evalSteps t =
 -- First locate an anchor point and then try to find CX hole with a CBar.
 -- XXX What are the anchor points?
 evalChoice :: EvalCore
-evalChoice = evalTrace "evalChoice" t
+evalChoice flg = evalTrace "evalChoice" t flg
   where
     -- Top-level anchor point
     t (CBar [e]) = e
     t e = choice e
 
     -- Find more anchor points
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
@@ -156,9 +158,9 @@ evalChoice = evalTrace "evalChoice" t
 -- Handle CDef floating
 --  DEF-FLOAT
 evalDefFloat :: EvalCore
-evalDefFloat = evalTrace "evalDefFloat" f
+evalDefFloat flg = evalTrace "evalDefFloat" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f e | isX e = float e
     f e = composOp f e
 
@@ -223,9 +225,9 @@ evalFail = evalTrace "evalFail" f
 -- Handle unification
 --  SWAP, UTYPE, UCON, UARR, UREC, UX*
 evalUnify :: EvalCore
-evalUnify = evalTrace "evalUnify" f
+evalUnify flg = evalTrace "evalUnify" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CUnify e x@CVar{}) | not (isVar e) = f $ CUnify x e
     f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
     f e = composOp f e
@@ -248,7 +250,7 @@ evalUnify = evalTrace "evalUnify" f
 evalBind :: EvalCore
 evalBind = evalTrace "evalBind" f
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CDef h e) | Just d <- bind h e = d
     f e = composOp f e
 
@@ -296,9 +298,9 @@ evalBind = evalTrace "evalBind" f
 -- Handle
 --  DEF-UNUSED
 evalUnused :: EvalCore
-evalUnused = evalTrace "evalUnused" f
+evalUnused flg = evalTrace "evalUnused" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CDef h e) | Just d <- bind h e = d
     f e = composOp f e
 
@@ -326,9 +328,9 @@ evalUnused = evalTrace "evalUnused" f
 --  SUBST
 --  SUBST-REC
 evalSubst :: EvalCore
-evalSubst = evalTrace "evalSubst" f
+evalSubst flg = evalTrace "evalSubst" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f e@CSeq{} | Just d <- bind e = d
     f (CUnify (CVar x) (CValue v)) | Just c <- substRec x v = c
     f e@CUnify{} | Just d <- bind e = d
@@ -407,9 +409,9 @@ evalSubst = evalTrace "evalSubst" f
 -- Handle simple 'def'
 --  FAIL-DEF, DEF-ELIM, DEF-WRONG, DEF-MERGE
 evalDef :: EvalCore
-evalDef = evalTrace "evalDef" f
+evalDef flg = evalTrace "evalDef" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CDef _ CFail) = CFail
     f (CDef [] e) = f e
     f (CDef (_:_) CValue{}) = CWrong "def-wrong"
@@ -421,9 +423,9 @@ evalDef = evalTrace "evalDef" f
 -- Handle 'all'
 --  ALL-0, ALL-N, ALL-WRONG
 evalAll :: EvalCore
-evalAll = evalTrace "evalAll" f
+evalAll flg = evalTrace "evalAll" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CAll (CValue v)) = mkArr [v]
     f (CAll e@CWrong{}) = e
     f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
@@ -439,9 +441,9 @@ evalAll = evalTrace "evalAll" f
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
 evalOne :: EvalCore
-evalOne = evalTrace "evalOne" f
+evalOne flg = evalTrace "evalOne" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (COne e@CValue{}) = f e
     f (COne CFail) = CFail
     f (COne (CBar (e@CValue{} : _))) = f e
@@ -452,9 +454,9 @@ evalOne = evalTrace "evalOne" f
 --  APP-LAM, APP-TYPE, APP-REC, APP-ARR
 --  APP-CONST-WRONG
 evalApp :: EvalCore
-evalApp = evalTrace "evalApp" f
+evalApp flg = evalTrace "evalApp" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CApply (VLam i e1) v2) = f $ subst i' v2 e1'
       where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
                       | otherwise = (i, e1)
@@ -469,9 +471,9 @@ evalApp = evalTrace "evalApp" f
 -- Handle CSeq in odd places
 --  SEQ, APP-SEQL, APP-SEQR, UNIFY-SEQL, UNIFY-SEQR
 evalSeq :: EvalCore
-evalSeq = evalTrace "evalSeq" f
+evalSeq flg = evalTrace "evalSeq" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
     f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
@@ -483,9 +485,9 @@ evalSeq = evalTrace "evalSeq" f
 -- Handle CBar associativity and fail elimination
 -- FAIL-L, FAIL-R, ASSOC-CHOICE
 evalBar :: EvalCore
-evalBar = evalTrace "evalBar" f
+evalBar flg = evalTrace "evalBar" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CBar es) = CBar $ concatMap (flat . f) es
     f e = composOp f e
     flat (CBar es) = es
@@ -495,9 +497,9 @@ evalBar = evalTrace "evalBar" f
 -- SUCCEEDS-VALUE, SUCCEEDS-FAIL, SUCCEEDS-CHOICE, SUCCEEDS-WRONG
 -- DECIDES-*
 evalSucceeds :: EvalCore
-evalSucceeds = evalTrace "evalSucceeds" f
+evalSucceeds flg = evalTrace "evalSucceeds" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     f (CSucceeds e@CValue{}) = f e
     f (CSucceeds CFail) = CWrong "succeeds-fail"
     f (CSucceeds (CBar [e@CValue{}])) = f e
@@ -513,9 +515,9 @@ evalSucceeds = evalTrace "evalSucceeds" f
 -- Reduce applications of primops
 -- P-* rules
 evalPrimOps :: EvalCore
-evalPrimOps = evalTrace "evalPrimOps" f
+evalPrimOps flg = evalTrace "evalPrimOps" f flg
   where
-    f e@CLam{} | notLam = e
+    f e@CLam{} | not (underLambda flg) = e
     -- real primitives
     f (CUnOp  "isInt#" v) | VInt{} <- v = CUnit
                           | otherwise   = CFail
