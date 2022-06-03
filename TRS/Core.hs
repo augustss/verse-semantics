@@ -5,7 +5,7 @@ import Show
 import TRS
 import Bind
 import Test.QuickCheck
-import Data.List( intercalate, union )
+import Data.List( intercalate, union, elemIndex )
 import Data.Maybe
 
 --------------------------------------------------------------------------------
@@ -18,11 +18,11 @@ data Expr
   | Expr :>: Expr
   | Expr :|: Expr
   | Value :@: Value
-  | Fail
   | Def (Bind Expr)
   | One Expr
   | All Expr
- deriving ( Eq, Ord )
+  | Fail
+  | Wrong
 
 instance Show Expr where
   show (Val v)          = show v
@@ -34,6 +34,7 @@ instance Show Expr where
   show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
   show (One a)          = "one {" ++ show a ++ "}"
   show (All a)          = "all {" ++ show a ++ "}"
+  show Wrong            = "wrong"
 
 instance Parens Expr where
   parens (_ :=: _) = True
@@ -41,6 +42,74 @@ instance Parens Expr where
   parens (_ :|: _) = True
   parens (_ :@: _) = True
   parens _         = False
+
+instance Eq Expr where
+  a == b = a `compare` b == EQ
+  
+instance Ord Expr where
+  a `compare` b = comp [] [] a b
+   where
+    -- so much code... this can probably simplified a lot
+    comp xs ys Wrong Wrong = EQ
+    comp xs ys Wrong _     = LT
+    comp xs ys _     Wrong = GT
+    
+    comp xs ys Fail Fail = EQ
+    comp xs ys Fail _    = LT
+    comp xs ys _    Fail = GT
+    
+    comp xs ys (Val v) (Val w) = compV xs ys v w
+    comp xs ys (Val v) _       = LT
+    comp xs ys _       (Val w) = GT
+
+    comp xs ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
+    comp xs ys (a:=:b) _       = LT
+    comp xs ys _       (c:=:d) = GT
+    
+    comp xs ys (a:>:b) (c:>:d) = comp xs ys a c & comp xs ys b d
+    comp xs ys (a:>:b) _       = LT
+    comp xs ys _       (c:>:d) = GT
+    
+    comp xs ys (a:|:b) (c:|:d) = comp xs ys a c & comp xs ys b d
+    comp xs ys (a:|:b) _       = LT
+    comp xs ys _       (c:|:d) = GT
+    
+    comp xs ys (a:@:b) (c:@:d) = compV xs ys a c & compV xs ys b d
+    comp xs ys (a:@:b) _       = LT
+    comp xs ys _       (c:@:d) = GT
+    
+    comp xs ys (One a) (One b) = comp xs ys a b
+    comp xs ys (One a) _       = LT
+    comp xs ys _       (One b) = GT
+    
+    comp xs ys (All a) (All b) = comp xs ys a b
+    comp xs ys (All a) _       = LT
+    comp xs ys _       (All b) = GT
+    
+    comp xs ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
+
+    compV xs ys (Var x) (Var y) =
+      case (elemIndex x xs, elemIndex y ys) of
+        (Just i, Just j)   -> i `compare` j
+        (Nothing, Nothing) -> x `compare` y
+        (Just _, Nothing)  -> LT
+        (Nothing, Just _)  -> GT
+    compV xs ys (Var _) _       = LT
+    compV xs ys _       (Var _) = GT
+
+    compV xs ys (HNF a) (HNF b) = compH xs ys a b
+    
+    compH xs ys (Arr vs) (Arr ws)
+      | n == m    = head (dropWhile (==EQ) (zipWith (compV xs ys) vs ws) ++ [EQ])
+      | otherwise = n `compare` m
+     where
+      n  = length vs
+      m  = length ws
+    
+    compH xs ys a b = a `compare` b
+
+    EQ & c = c
+    c  & _ = c
 
 --------------------------------------------------------------------------------
 
@@ -192,6 +261,7 @@ instance Term Expr where
   subst sub (Def bnd) = Def (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
+  subst sub Wrong     = Wrong
 
 --------------------------------------------------------------------------------
 
