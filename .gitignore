@@ -26,6 +26,7 @@ cabal.project.local~
 *.log
 *.out
 *.pdf
+*.ptb
 *~
 tmp
 \#*

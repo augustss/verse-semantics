@@ -14,7 +14,8 @@ stdenv.mkDerivation rec {
     haskellPackages.lhs2tex
     # for the Haskell stuff
     (ghc.withPackages(p: with p;
-      [megaparsec parser-combinators mtl uniplate optparse-applicative smallcheck haskeline]))
+      [megaparsec parser-combinators mtl uniplate optparse-applicative smallcheck haskeline
+       QuickCheck]))
     ghcid
   ];
 }

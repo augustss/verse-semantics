@@ -184,9 +184,8 @@ rulesAll lhs =
 --------------------------------------------------------------------------------
 
 rulesUnification lhs =
-  do e :=: VAR x <- [lhs]
-     guard (not (isVar e))
-     pure (VAR x :=: e)
+  do Val (HNF hnf) :=: VAR x <- [lhs]
+     pure (VAR x :=: Val (HNF hnf))
  ++
   do INT k1 :=: INT k2 <- [lhs]
      if k1 == k2

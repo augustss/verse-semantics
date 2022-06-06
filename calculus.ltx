@@ -375,7 +375,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
     \rulename{subst} & |X^[x==v]| & \movesto
     & |(subst X x v)^[x==v]| \\
     &&& \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
-    \rulename{swap} & |e==x| & \movesto & |x==e| \qquad \text{if |e| is not a variable}\\
+    \rulename{swap} & |hnf==x| & \movesto & |x==hnf| \\
     \rulename{subst-rec} & |x = V^[y => e]| & \movesto & |x = V[y => def x (x = V^[y => e]; e)]|\\
     &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
 
@@ -551,8 +551,8 @@ The context |X| crucially prevents us from using the equation for |x| where it d
 Once all occurrences of a variable |x| have been substituted this way, we can remove its bindings with rule \rulename{def-unused}. This rule only removes variables that have a definition. It is illegal in Verse to introduce a variable and never assign it a value, as in |def x 1|.
 
 
-Rule \rulename{swap} swaps |(e=x)| to |(x=e)| to allow rule \rulename{subst} to fire.
-We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence the side condition.
+Rule \rulename{swap} swaps |(hnf=x)| to |(x=hnf)| to allow rule \rulename{subst} to fire.
+We just need to be careful that we cannot swap |(x=y)| to |(y=x)| and back forever; hence this rule matches on |hnf| instead of |v|.
 
 \paragraph{Recursion}
 

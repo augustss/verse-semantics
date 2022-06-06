@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 module CoreSimp(simpCore) where
 import Control.Monad.State.Strict
 import Data.List

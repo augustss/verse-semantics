@@ -232,7 +232,7 @@ evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
     f e@CLam{} | not (underLambda flg) = e
-    f (CUnify e x@CVar{}) | not (isVar e) = f $ CUnify x e
+    f (CUnify e@(CValue HNF{}) x@CVar{}) = f $ CUnify x e
     f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
     f e = composOp f e
 

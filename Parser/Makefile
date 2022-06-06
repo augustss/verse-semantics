@@ -3,10 +3,10 @@ PKGS = -package megaparsec -package parser-combinators -package haskeline -packa
 
 all:	verse tests
 
-verse: *.hs
+verse: *.hs ../TRS/*.hs
 	ghc -Wall --make $(PKGS) Main.hs -o verse
 
-tests: *.hs
+tests: *.hs ../TRS/*.hs
 	ghc -Wall --make $(PKGS) Testing.hs -main-is Testing -o tests
 
 testing: tests
