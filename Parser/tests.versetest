@@ -74,7 +74,7 @@ testeq(SEq) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq(SEq) {ap0(f(x:int):=2) := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
-testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
+#testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
 testeq(SEq) {x? : int}                             { x : ?int }
 testeq(SEq) {x[] : int}                           { x : []int }
 testeq(SEq) {i~>x:(3,4,5); (i, x)}                {(0,3)|(1,4)|(2,5)}

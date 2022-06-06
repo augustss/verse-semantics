@@ -396,6 +396,12 @@ dsL l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
 
 -- Desugar a definition e1 : e2
 dsColon :: Loc -> Expr -> SExpr -> (SExpr, SExpr)
+-- L[x] t = P (x := :t)
+dsColon _ x@Variable{} t =
+  (x, t)
+-- L[l(a) t = L[l] (type{function(a){:t}})
+dsColon l f@(ApplyS _ _) t | Just (lhs, arg, effs) <- getFun f = do
+  dsColon l lhs (Typedef (Function [(arg, effs)] (Range t)))
 -- L[l^] t = L[l] new[t]
 dsColon l (PostfixOp f (Ident _ "^")) t =
   dsColon l f (applyPrimD "new" t)
@@ -405,7 +411,10 @@ dsColon l (PostfixOp f op@(Ident _ "?")) t =
 -- L[l[]] t = L[l] ([]t)
 dsColon l (ApplyD f (Array [])) t =
   dsColon l f (PrefixOp (Ident l "[]") t)
-dsColon _ e t = (e, t)
+-- L[p~>q] t = P[p~>q] (:t)
+dsColon _ p@(InfixOp _ (Ident _ "~>") _) t =
+  (p, t)
+dsColon l f _ = syntaxError l $ "bad LHS of :, " ++ prettyShow f
 
 -- Return function, argument, and attributes
 getFun :: Expr -> Maybe (Expr, Expr, [Ident])
@@ -439,8 +448,12 @@ dsP l (InfixOp p@Variable{} (Ident _ ":") t) e = do
   dsP l p (ApplyD t e)
 -- P[l:t] e = P[l] t[e]
 dsP l (InfixOp p (Ident _ ":") t) e = do
+  dsP l p (ApplyD t e)
+{-
+dsP l (InfixOp p (Ident _ ":") t) e = do
   let (p', t') = dsColon l p t
   dsP l p' (ApplyD t' e)
+-}
 {-
   x <- newIdent l "x"
   p' <- dsP l p =<< dsD Eval (ApplyD t (define l x e))

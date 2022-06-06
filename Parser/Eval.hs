@@ -561,6 +561,7 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
         _ -> impossible "take/drop"
 
     f e@(CUnOp "new#" _) = e  -- XXX Just leave it alone for now
+    f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
 
     -- Fully evaluated, and still no match
     f (CApply (VPrim op) a) | isNF a = unimplemented $ show (op, a)
@@ -651,6 +652,5 @@ prelude =
             CDef [y] $
             CSeq [
               CUnify (CVar y) (CApply (Var t) (Var x)),
-              app "new#" (Var y),
-              CVar x
+              app "new#" (Var y)
               ]
