@@ -566,6 +566,7 @@ primOps = map (Ident noLoc)
   , "pre'?'", "pre'[]'", "post'^'", "post'?'"
   , "succeeds", "decides", "iterates", "io"
   , "concat#", "takeL#", "dropL#", "takeR#", "dropR#"
+  , "length"
   ]
 
 --------------------

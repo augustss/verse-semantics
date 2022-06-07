@@ -560,6 +560,9 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
         "dropR#" -> CArray $ revDrop n vs
         _ -> impossible "take/drop"
 
+    f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
+                          | otherwise = CFail
+
     f e@(CUnOp "new#" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
 
