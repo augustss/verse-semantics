@@ -134,10 +134,6 @@ dsD _ctx = expr
         "&&" -> expr $ seqE [e1, e2]
         -- D[e1 || e2] = D[if(e1)else e2]
         "||" -> expr $ If2E e1 e2
-{-
-        -- D[e1 where e2] = D[x:= e1; e2; x]
-        "where" -> newIdent l "w" >>= \ x -> expr $ Seq [define l x e1, e2, Variable x]
--}
         -- D[e1 op e2] = D[e1] op D[e2]
         _    -> expr $ call "in" l op $ Array [e1, e2]
 
@@ -177,33 +173,11 @@ dsD _ctx = expr
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "pre'^'", "pre'[]'",  -- no need for succeeds
-                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='"] = ApplyD
+                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='","length"] = ApplyD
                 | otherwise = ApplyS
             s' = p ++ "'" ++ s ++ "'"
 
     -- Handle function(e){b}
-    {-
-    -- For nicer desugaring, handle ":any" argument specially
-    function (Define i a) b | isAnyT a = Function [(Define i AnyT, [])] <$> expr b
-      -- XXX remove "any" when we have a simplifier.
-      where isAnyT AnyT = True
-            isAnyT (Range (Variable (Ident _ "any"))) = True
-            isAnyT _ = False
-    -- D[fn(e){b}] = fn(x:any){M[e]x; D[do b]}
-    function e b = do
-      x <- newIdent noLoc "z"
-      e' <- dsD Abs e
-      b' <- expr (Do b)
-      pure $ Function [(Define x AnyT, [])] $ seqE [Unify e' (Variable x), b']
-    -}
-    {-
-    function e b = do
-      e' <- expr e
-      b' <- expr b
-      y <- newIdent noLoc "y"
-      e'' <- dsM e' (Variable y)
-      pure $ Function [(Define y AnyT, [])] $ seqE [e'', Do b']
-    -}
     function e b = do
       y <- newIdent noLoc "y"
       e' <- expr e
@@ -223,27 +197,6 @@ unify :: Expr -> Expr -> Expr
 unify AnyT e = e
 unify e AnyT = e
 unify e1 e2 = Unify e1 e2
-
-{-
-dsMatch :: SExpr -> D SExpr
-dsMatch = f
-  where
-    f (Function [(e, [])] b) = do
-      y <- newIdent noLoc "y"
-      e' <- dsM e (Variable y)
-      b' <- f b
-      pure $ primFcn y $ seqE [e', Do b']
-    f e@Function{} = impossible e
-    f (Define2 i x e) = do
-      e' <- dsM e (Variable i)
-      e'' <- f e'
-      pure $ Seq [tAny noLoc i, Define x e'']
-    f (Typedef e) = do
-      y <- newIdent noLoc "y"
-      e' <- dsM e (Variable y)
-      pure $ primFcn y e'
-    f e = compos f e
--}
 
 primFcn :: Ident -> SExpr -> SExpr
 primFcn y e = Function [(tAny noLoc y, [])] e
@@ -365,35 +318,6 @@ define _l i e = Define i e
 tAny :: Loc -> Ident -> SExpr
 tAny l i = define l i AnyT
 
-{-
--- Desugar a definition e1 : e2
-dsL :: Loc -> Expr -> SExpr -> D SExpr
--- L[x] any =
-dsL l (Variable v) (Variable (Ident _ "any")) =
-  pure $ tAny l v
--- L[f] t = f := t[x:any]; x
-dsL l (Variable v) t = do
-  x <- newIdent l "d"
-  t' <- dsD Eval t
-  pure $ Seq [define l v (ApplyD t' (tAny l x)), Variable x]
--- L[l(a)<r>...] t = L[l] (:(type{a} -> t))
-dsL l e t | Just (f, a, rs) <- getFun e = do
-  vs <- getVisible <$> dsD Abs a
-  let us = getFreeD t ++ rs
-  if null rs && null (intersect vs us) then do
-    -- No dependent types, no effects
-    a' <- typedef a
-    dsL l f $ applyPrimD "in'->'" $ Array [a', t]
-   else
-    -- XXX This does not support dependent types yet
-    unimplemented "complex function type"
--- L[lhs1 ~> lhs2] t = P[lhs1] (L[lhs2] t)
-dsL l (InfixOp lhs1 (Ident _ "~>") lhs2) t = do
-  e <- dsL l lhs2 t
-  dsP l lhs1 e
-dsL l f _ = syntaxError l $ "bad definition: " ++ prettyShow f
--}
-
 -- Desugar a definition e1 : e2
 dsColon :: Loc -> Expr -> SExpr -> (SExpr, SExpr)
 -- L[x] t = P (x := :t)
@@ -423,14 +347,6 @@ getFun = gf []
     gf rs (EffAttr e r) = gf (r:rs) e
     gf rs (ApplyS f a) = Just (f, a, reverse rs)
     gf _ _ = Nothing
-
-{-
--- Optimize type{:t} to t
-typedef :: Expr -> D Expr
-typedef (PrefixOp  (Ident _ ":") t) = dsD Eval t
-typedef (InfixOp _ (Ident _ ":") t) = dsD Eval t
-typedef e = Typedef <$> dsD Eval e
--}
 
 -- Desugar a definition lhs := e
 dsP :: Loc -> Expr -> Expr -> D SExpr
@@ -468,14 +384,6 @@ dsP l (PostfixOp e1 (Ident _ "^")) e = do
 -- FIX L: update for splices
 -- P[lhs1, ... lhsn] = ...
 dsP l (Array lhss) e = dsPArr l lhss e
-{-
--- P[lhs ~> lhs2] e = L[lhs ~> lhs2] (: typedef{e})
-dsP l lhs@(InfixOp _ (Ident _ "~>") _) e = dsL l lhs =<< typedef e
--}
-{-
-dsP _ (InfixOp (Variable i) (Ident _ "~>") (Variable x)) e =
-  Define2 i x <$> dsD Eval e
--}
 dsP l (InfixOp i (Ident _ "~>") x) e = do
   (i', di) <-
     case i of
