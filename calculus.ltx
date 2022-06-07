@@ -873,7 +873,6 @@ $$
       & \vb & |if(e) then b_1 else b_2| & \text{conditional expression} \\
       & \vb & |for(e) in b|     & \text{finite loop} \\
       & \vb & |functionKW(x:any){e}|    & \text{anonymous function} \\
-      & \vb & |arrow(e){t}{r_1,dots,r_n}| & \text{dependent function type} \\
   %%%%%
   \\
       & \multicolumn{2}{l}{\textit{Expressions removed by desugaring}} \\
@@ -1052,7 +1051,7 @@ $$
   |Ld x t| & = & |x := t^[y:any]; y| & \text{|y| fresh} \\
   |Ld (l^(e)) t| & = & |Ld l ((De (type^{e}) minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
   |Ld (l^()) t| & = & |Ld l ((De (type^{()}) minusgt t))| \\
-  |Ld (l^(e)effsR) t| & = & |Ld l ((arrow^((De e))^{t}^{r dots}))| \\
+  |Ld (l^(e)effsR) t| & = & |Ld l ((type{function e effsR {:t}}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
