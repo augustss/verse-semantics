@@ -26,11 +26,8 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD Eval <=< dropParens)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD <=< dropParens)
   where eval = flip evalState 1
-
-data Context = Eval | Abs
-  deriving (Show, Eq)
 
 type D = State Int
 
@@ -42,8 +39,8 @@ dropParens = f
         f e = compos f e
 
 -- This follows the D transformation in calculus.ltx
-dsD :: Context -> Expr -> D SExpr
-dsD _ctx = expr
+dsD :: Expr -> D SExpr
+dsD = expr
   where
     expr :: HasCallStack => Expr -> D Expr
     expr e | doTrace && trace ("dsD " ++ prettyShow e) False = undefined
@@ -225,7 +222,7 @@ dsM expr y =
     If3 e1 e2 e3 -> If3 e1 <$> dsM e2 y <*> dsM e3 y
     For2 e1 e2 -> do
       let l = noLoc
-      e1' <- dsD Eval e1
+      e1' <- dsD e1
       a <- newIdent l "a"
       x <- newIdent l "x"
       e2' <- dsM e2 (Variable x)
@@ -317,12 +314,12 @@ inVarC e k = do
 
 dsCase :: Expr -> Block -> D Expr
 -- D[case x of e1; ... en] = e1[x] || ... || en[x]
-dsCase e@Variable{} (Block es) = dsD Eval $ foldr mkOr Fail es
+dsCase e@Variable{} (Block es) = dsD $ foldr mkOr Fail es
   where mkOr a r = If2E (ApplyD a e) r
 dsCase Variable{} _ = internalError
 -- D[case e of b] = x=D[e]; D[case x of b]
 dsCase e b = do
-  e' <- dsD Eval e
+  e' <- dsD e
   inVarC e' $ \ x -> dsCase x b
 
 eAssign :: Loc -> Expr
@@ -373,7 +370,7 @@ dsP _ e1 e2 | doTrace && trace ("dsP " ++ prettyShow (e1, e2)) False = undefined
 -- P[f(a)<r>...] e = P[f] (function(a)<r>...{e2})
 dsP l e1 e2 | Just (f, a, rs) <- getFun e1 = dsP l f $ Function [(a, rs)] e2
 -- P[x] e = x := D[e]
-dsP l (Variable x) e = define l x <$> dsD Eval e
+dsP l (Variable x) e = define l x <$> dsD e
 -- P[:t] e = P[x:t] e, x fresh
 dsP l (PrefixOp colon@(Ident _ ":") t) e = do
   x <- newIdent l "x"
@@ -391,7 +388,7 @@ dsP l (InfixOp p (Ident _ ":") t) e = do
 -}
 {-
   x <- newIdent l "x"
-  p' <- dsP l p =<< dsD Eval (ApplyD t (define l x e))
+  p' <- dsP l p =<< dsD (ApplyD t (define l x e))
   pure $ seqE [p', Variable x]
 -}
 -- P[l?] e = P[l] option{e}
@@ -399,7 +396,7 @@ dsP l (PostfixOp lhs (Ident _ "?")) e =
   dsP l lhs (Option $ Just e)
 -- P[e1^] e = D[assign(e1, e)]
 dsP l (PostfixOp e1 (Ident _ "^")) e = do
-  dsD Eval $ ApplyD (eAssign l) $ Array [e1, e]
+  dsD $ ApplyD (eAssign l) $ Array [e1, e]
 -- FIX L: update for splices
 -- P[lhs1, ... lhsn] = ...
 dsP l (Array lhss) e = dsPArr l lhss e
@@ -412,7 +409,7 @@ dsP l (InfixOp i (Ident _ "~>") x) e = do
     case x of
       Variable x' -> pure (x', [])
       _ -> do x' <- newIdent l "x"; dx <- dsP l x (Variable x'); pure (x', [dx])
-  e' <- dsD Eval e
+  e' <- dsD e
   pure $ seqE $ di ++ dx ++ [Define2 i' x' e']
 
 -- What else is allowed?  LitInt and LitRat would be easy.
