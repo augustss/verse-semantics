@@ -309,7 +309,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
 
     \textit{Application} \\
     \begin{array}{lrcl}
-      \rulename{app-lam} & |applyx (x => e) v| & \movesto & |subst e x v|
+      \rulename{app-lam} & |applyx (x => e) v| & \movesto & |def x (x=v; e)|
           \quad \text{if $x \not\in \freevars{v}$} \\
     \rulename{app-arr} & |applyx (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
