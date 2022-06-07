@@ -46,10 +46,6 @@ pattern CDecides c <- CMacro (Ident _ "decides") c
 pattern CUnit :: Core
 pattern CUnit = CArray []
 
-isVar :: Core -> Bool
-isVar CVar{} = True
-isVar _ = False
-
 cWrongs :: [String] -> Core
 cWrongs [] = internalError
 cWrongs ws = CWrong $ intercalate ";" ws
