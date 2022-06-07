@@ -181,7 +181,7 @@ ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
 
 fixity :: String -> (Rational, Rational, Rational)
-fixity op = fromMaybe internalError $ lookup op tbl
+fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
   where
     --                L    R
     inn s p = (s, (p, p+1, p+1))
@@ -212,6 +212,7 @@ fixity op = fromMaybe internalError $ lookup op tbl
       , inl "/"       9
       , inn "post^"  10
       , inn "post?"  10
+      , inn "."      10
       , inn "pre^"   11
       , inn "pre?"   11
       , inn "pre:"   11

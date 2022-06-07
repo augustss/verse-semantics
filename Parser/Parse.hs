@@ -188,6 +188,18 @@ pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
 pTermPost :: P Expr
+pTermPost = do
+  let pPost = do
+        l <- getSourcePos
+        let op s = pOp s *> pure (\ x -> PostfixOp x (Ident l s))
+            dot = (\ i x -> InfixOp x (Ident l ".") (Variable i)) <$> (pOp "." *> pIdent)
+        choice [op "^", op "?", dot]
+  a <- pAtom
+  ops <- many pPost
+  pure $ foldl (flip ($)) a ops
+
+{-
+pTermPost :: P Expr
 pTermPost = makeExprParser pAtom operatorTablePost
 
 operatorTablePost :: [[Operator P Expr]]
@@ -200,6 +212,7 @@ operatorTablePost =
       where app l x = PostfixOp x (Ident l s)
 
     pOpL s = getSourcePos <* pOp s
+-}
 
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
