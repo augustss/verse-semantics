@@ -215,8 +215,20 @@ dsM expr y =
       pure $ Seq (Snoc es e')
     ApplyS{} -> dflt
     ApplyD{} -> dflt
-    If3{} -> dflt
-    For2{} -> dflt
+    If3 e1 e2 e3 -> If3 e1 <$> dsM e2 y <*> dsM e3 y
+    For2 e1 e2 -> do
+      let l = noLoc
+      e1' <- dsD Eval e1
+      a <- newIdent l "a"
+      x <- newIdent l "x"
+      e2' <- dsM e2 (Variable x)
+      let body = Function [(tAny l x, [])] e2'
+          adef = define l a $ For2 e1' body
+          test = Unify (applyPrimD "length" (Variable a)) (applyPrimD "length" y)
+      i <- newIdent l "i"
+      f <- newIdent l "f"
+      let res = For2 (define l f $ ApplyD (Variable a) (tAny l i)) $ ApplyD (Variable f) (ApplyD y (Variable i))
+      pure $ Seq [adef, test, res]
     Let e b -> Let e <$> dsM b y
     Do e -> Do <$> dsM e y
     Where e1 e2 -> Where <$> dsM e1 y <*> pure e2
@@ -229,7 +241,7 @@ dsM expr y =
     Define2 j i e -> do
       e' <- dsM e y
       pure $ Seq [Define j y, Define i e']
-    Choice{} -> dflt
+    Choice e1 e2 -> Choice <$> dsM e1 y <*> dsM e2 y
     Range e -> pure $ ApplyD e y
     AnyT -> dflt
     Function [(fexpr, [])] gexpr -> do
