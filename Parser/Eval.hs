@@ -227,7 +227,7 @@ evalFail = evalTrace "evalFail" f
     hasFail _ = False
 
 -- Handle unification
---  SWAP, UTYPE, UCON, UARR, UREC, UX*
+--  SWAP, UCON, UARR, UREC, UX*
 evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
@@ -237,7 +237,7 @@ evalUnify flg = evalTrace "evalUnify" f flg
     f e = composOp f e
 
     unifyV v@(VInt i1) (VInt i2) | i1 == i2 = CValue v
-                               | otherwise = CFail
+                                 | otherwise = CFail
     unifyV VInt{} _ = CFail
     unifyV _ VInt{} = CFail
 
@@ -248,56 +248,6 @@ evalUnify flg = evalTrace "evalUnify" f flg
     unifyV _ VArray{} = CFail
 
     unifyV _ _ = CWrong "unifyV"
-
-{-
--- Handle BIND rules
-evalBind :: EvalCore
-evalBind = evalTrace "evalBind" f
-  where
-    f e@CLam{} | not (underLambda flg) = e
-    f (CDef h e) | Just d <- bind h e = d
-    f e = composOp f e
-
-    bind h e =
-      case runState (findB h e) Nothing of
-        (e', Just (x, v))
-            | Just v' <- occursCheck x v -> Just $ cDef (h \\ [x]) (subst x v' e')
-            | otherwise                  -> Just $ CWrong $ "occurs check " ++ prettyShow x
-        _ -> Nothing
-
-    -- Combines occurs check and UREC
-    occursCheck :: Ident -> Value -> Maybe Value
-    occursCheck x v0 = go v0
-      where
-        go :: Value -> Maybe Value
-        go v@(Var y)
-            | x == y    = Nothing -- occurs check
-            | otherwise = Just v
-        go v@(VInt {})       = Just v
-        go v@(VLam _ b)
-            | x `elem` fvs b =
-              let VLam y' b' = alphaConvertV [x] v  -- Make sure y doesn't clash with x
-              in  Just $ VLam y' $ CDef [x] $ CSeq [CUnify (CVar x) (CValue v0), b']
-            | otherwise      = Just v
-        go (VArray vs)       = VArray <$> mapM go vs
-        go v = internalErrorMsg (show v)
-
-    -- Find the leftmost BIND.
-    -- Return a function representing the CX context.
-    findB h e = do
-      me <- get
-      if isJust me then
-        pure e  -- Already found, just keep going
-       else
-        case e of
-          CUnify ex@(CVar x) ev@(CValue v) | elem x h, ex /= ev -> do
-            put $ Just (x, v)
-            pure ev
-          CUnify e1 e2 -> CUnify <$> findB h e1 <*> findB h e2
-          CSeq es -> CSeq <$> mapM (findB h) es
-          CSucceeds b -> CSucceeds <$> findB h b
-          _ -> pure e
--}
 
 -- Handle
 --  DEF-UNUSED
