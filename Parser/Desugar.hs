@@ -249,17 +249,27 @@ dsM expr y =
     Range e -> pure $ ApplyD e y
     AnyT -> dflt
     Function [(fexpr, [])] gexpr -> do
-      let h = y
-      vy <- newIdent noLoc "y"
-      x <- newIdent noLoc "x"
-      z <- newIdent noLoc "z"
-      ex <- define noLoc x <$> dsM fexpr (Variable vy)
-      let ez = define noLoc z $ ApplyD h (Variable x)
-      res <- dsM gexpr (Variable z)
-      pure $ Function [(tAny noLoc vy, [])] $ seqE [ex, ez, Do res]
+      known <- do
+        let h = y
+        vy <- newIdent noLoc "y"
+        x <- newIdent noLoc "x"
+        z <- newIdent noLoc "z"
+        ex <- define noLoc x <$> dsM fexpr (Variable vy)
+        let ez = define noLoc z $ ApplyD h (Variable x)
+        res <- dsM gexpr (Variable z)
+        pure $ Function [(tAny noLoc vy, [])] $ seqE [ex, ez, Do res]
+      unknown <-
+        Unify y <$> dsD expr
+      if useKnown then
+        pure $ If3 (applyPrimD "known#" y) known unknown
+       else
+        pure known
     _ -> impossible expr
   where
     dflt = pure $ unify y expr
+
+useKnown :: Bool
+useKnown = True
 
 data ArrayElem = EElems [Expr] | ESplice Expr
   deriving (Show)
@@ -491,6 +501,7 @@ primOps = map (Ident noLoc)
   , "succeeds", "decides", "iterates", "io"
   , "concat#", "takeL#", "dropL#", "takeR#", "dropR#"
   , "length"
+  , "known#"  -- This is a horrible hack
   ]
 
 --------------------

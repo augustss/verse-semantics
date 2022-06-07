@@ -91,7 +91,11 @@ eval trc ea = loop 1000 $ evalTrace "eval" (const ea) trc (CWrong"")
     loop n e =
       let e' = evalSteps trc e
       in  if e == e' then
-            e'
+            let e'' = evalKnown trc e'
+            in  if e'' == e' then
+                  e''
+                else
+                  loop (n-1) e''
           else
             loop (n-1) e'
 
@@ -559,6 +563,7 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
 
+    f e@(CUnOp "known#" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "new#" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
 
@@ -584,6 +589,14 @@ isNF (HNF _) = True
 isHNF :: Value -> Bool
 isHNF HNF{} = True
 isHNF _ = False
+
+-- A gruesome hack to test if something is an uninstantiated logical variable.
+evalKnown :: EvalCore
+evalKnown flg = evalTrace "evalKnown" f flg
+  where
+    f (CApply (VPrim "known#") v) | isHNF v   = CUnit
+                                  | otherwise = CFail
+    f e = composOp f e
 
 -------------------
 
