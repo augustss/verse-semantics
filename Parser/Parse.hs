@@ -82,7 +82,7 @@ pDecimal = L.decimal <* skip
 --pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
 
 pOp :: String -> P String
-pOp ":" = pOp' ":" "="
+pOp ":" = pOp' ":" "=-"
 pOp "=" = pOp' "=" ">"
 pOp "<" = pOp' "<" ">="
 pOp ">" = pOp' ">" "="
@@ -227,7 +227,8 @@ operatorTable =
     [op InfixN ":=", op InfixL "="],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
-    [op InfixR "=>"]
+    [op InfixR "=>"],
+    [op InfixN ":-"]
   ]
   where
     preOp :: String -> Operator P Expr

@@ -189,7 +189,8 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
     inr s p = (s, (p, p+1, p))
     tbl =
       [ --inn ","     1
-        inn "pre.."   0
+        inn ":-"      (-1)
+      , inn "pre.."   0
       , inn "where"   1
       , inr "=>"      2
       , inn ":="      3

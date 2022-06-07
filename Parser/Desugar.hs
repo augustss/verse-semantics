@@ -71,6 +71,13 @@ dsD _ctx = expr
     expr (InfixOp e1 (Ident _ "|") e2) = Choice <$> expr e1 <*> expr e2
     -- D[e1 where e2] = D[e1] where D[e2], also change constructor
     expr (InfixOp e1 (Ident _ "where") e2) = Where <$> expr e1 <*> expr e2
+    -- D[e1 :- e2] = M[e2] D[e1]
+    expr (InfixOp e1 (Ident l ":-") e2) = do
+      e1' <- expr e1
+      e2' <- expr e2
+      y <- newIdent l "y"
+      e2'' <- dsM e2' (Variable y)
+      pure $ Seq [define l y e1', e2'']
 
     -- Bindings
     -- D [lhs : t] = L[lhs] D[t]
