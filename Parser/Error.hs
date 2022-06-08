@@ -1,6 +1,6 @@
 module Error(module Error) where
-
 import GHC.Stack
+import Print
 
 unimplemented :: (HasCallStack) => String -> a
 unimplemented s = error $ "unimplemented: " ++ s
@@ -14,8 +14,8 @@ internalError = error "internalError"
 internalErrorMsg :: (HasCallStack) => String -> a
 internalErrorMsg s = error $ "internalError: " ++ s
 
-syntaxError :: (HasCallStack, Show loc) => loc -> String -> a
-syntaxError l s = error $ show l ++ " syntax error: " ++ s
+syntaxError :: (HasCallStack, Pretty loc) => loc -> String -> a
+syntaxError l s = error $ prettyShow l ++ " syntax error: " ++ s
 
 assert :: (HasCallStack) => Bool -> String -> a -> a
 assert True _ a = a
