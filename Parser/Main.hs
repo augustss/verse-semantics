@@ -32,8 +32,9 @@ main :: IO ()
 main = runCommand command
 
 data CState = CState
-  { lastExpr :: SomeExpr
-  , tracing  :: Bool
+  { lastExpr    :: !SomeExpr
+  , tracing     :: !Bool
+  , definitions :: ![Expr]
   }
 
 data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
@@ -75,24 +76,27 @@ instance Pretty SomeExpr where
 command :: Command CState
 command = Command
   { c_commands =
-      [ Cmd "read FILE"       "Parse a file"                          cRead
-      , Cmd "desugar [EXPR]"  "Desugar [last] expression"             cDesugar
-      , Cmd "show [EXPR]"     "Show [last] expression"                cShow
-      , Cmd "simplify [EXPR]" "Simplify [last] expression"            cSimplify
-      , Cmd "csimplify [EXPR]" "Simplify [last] core expression"      cCoreSimplify
-      , Cmd "core [EXPR]"     "Generate core for [last] expression"   cCore
-      , Cmd "eval [EXPR]"     "Evaluate [last] expression"            cEval
-      , Cmd "print [EXPR]"    "Pretty print [last] expression"        cPrint
-      , Cmd "trace"           "Turn on evaluation tracing"            (cTrace True)
-      , Cmd "notrace"         "Turn off evaluation tracing"           (cTrace False)
-      , Cmd "rewrite"         "Rewrite with accurate rules"           cRewrite
+      [ Cmd "read FILE"            "Parse a file"                          cRead
+      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+      , Cmd "show [EXPR]"          "Show [last] expression"                cShow
+      , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
+      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"      cCoreSimplify
+      , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
+      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
+      , Cmd "trace"                "Turn on evaluation tracing"            (cTrace True)
+      , Cmd "notrace"              "Turn off evaluation tracing"           (cTrace False)
+      , Cmd "rewrite"              "Rewrite with accurate rules"           cRewrite
+      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
+      , Cmd "clear"                "Clear global defs"                     cClear
+      , Cmd "deval [EXPR]"         "Evaluate [last] expression with defs"  cDefEval
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
   , c_greet = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
-  , c_state = CState { lastExpr = NoExpr, tracing = False }
+  , c_state = CState { lastExpr = NoExpr, tracing = False, definitions = [] }
   , c_history = Just ".versei"
   }
 
@@ -148,9 +152,24 @@ cEval c s =
   cTransform (Cored . eval flg . asCore) c s
   where flg = Flags { underLambda = False, traceEval = tracing s }
 
+cDefEval :: Run CState
+cDefEval c s = do
+  let addDefs e = Seq $ definitions s ++ [e]
+  s' <- cTransform (Parsed . addDefs . asExpr) c s
+  cEval "" s'
+
 cRewrite :: Run CState
 cRewrite =
   cTransform (Cores . rewrite 1000 . asCore)
+
+cDefine :: Run CState
+cDefine =
+  withLastExpr $ \ e s -> do
+    let !e' = asExpr e
+    pure  s{ definitions = definitions s ++ [e'] }
+
+cClear :: Run CState
+cClear _ s = pure s{ definitions = [] }
 
 cShow :: Run CState
 cShow =
