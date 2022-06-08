@@ -14,6 +14,7 @@
 \usepackage{cleveref}   % \Cref etc
 \usepackage{ stmaryrd }
 \usepackage{conteq}
+\usepackage{textgreek}
 
 
 \renewcommand{\arraystretch}{1.1}
@@ -490,13 +491,13 @@ The effect annotations |succeedsKW| and |decidesKW| restrict how many results an
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
 can be used anywhere in a program.
-This is similar to how the axioms for the $\lambda$-calculus in figure \ref{fig:call-by-name} can be applied anywhere.
+This is similar to how the axioms for the \textlambda-calculus in figure \ref{fig:call-by-name} can be applied anywhere.
 In figure \ref{fig:verse-eval} we introduce an evaluation context |E| to force a particular evaluation order.
 
 We would like to have a similar |E| for Verse, but it seems difficult to find one that always identifies a
 unique redex for the next reduction.
 Instead we settle for an evaluation context that is ambiguous and allows many different redexes, figure \ref{fig:verse-eval}.
-It allows evaluation almost everywhere, with exception of under a $\lambda$.
+It allows evaluation almost everywhere, with exception of under a lambda.
 The reason to disallow this is that we do not know if they are needed.
 \joachim{The same applies to the second expression in $e_1; e_2$, doesn't it? Oh, and |e_1 choice e_2|, because in an |if| context the second may not be needed.}
 \lennart{Yes, there are several ways where some paths terminate, and others don't.  I don't know what to do about it.}
@@ -613,7 +614,9 @@ The rules listed under \emph{Fail propagation} collapse expressions with a neste
 
 \subsection{Functions and application}
 
-Rule \rulename{app-lam} is our jolly simple $\beta$-reduction rule. Since our grammar requires function applications to always have a \emph{value} as the argument, the duplication performed by substitution does not risk duplicating work or effects. But note that that we \emph{can} apply this rule even when the argument is a yet unknown variable.
+Rule \rulename{app-lam} is our \textbeta-reduction rule. It does not subsitute $v$ for $x$ in $e$, but together rules \rulename{subst}, \rulename{def-unused} and \rulename{seq}, we get $|(x => e)@v| \movesto^\ast |subst e x v|$, and \textbeta-reduction works as expected.
+
+Since our grammar requires function applications to always have a \emph{value} as the argument, the duplication performed by substitution does not risk duplicating work or effects. But note that that we \emph{can} apply this rule even when the argument is a yet unknown variable.
 
 A tuples/array behaves like a (finite) function, and can be applied to a numeric value
 in \rulename{app-arr} to index it: |applyx (array (v_0,dots v_n)) k| evaluates to |v_k| if |k| is a number within the bounds of the array, or to |fail| otherwise. But since \rulename{app-arr} is defined via choice, the expression |y = applyx a x| actually enumerates the positions and values of all entries of the array |a|. For example, |all (def x (42 = applyx a x; x))| finds the indicies of all entries in |a| that are 42. Note that an application of the empty array |applyx (array ()) v| always fails, even if |v| is not a number.
@@ -746,8 +749,8 @@ In the arms of a choice |(e_1 choice e_2)| we add a |def x e_1| around |e_1| if
     \rulename{seq} & \movesto & |def emp 3| \\
     \rulename{def-elim} & \movesto & |3| \\
   \end{array}$$
-A simple $\beta$-reduction.
-Note that the name $x$ has been $\alpha$-converted to a fresh variable $t$ to avoid accidental capture.
+A simple \textbeta-reduction.
+Note that the name $x$ has been \textalpha-converted to a fresh variable $t$ to avoid accidental capture.
 \end{example}
 
 \begin{example} $$
@@ -1025,7 +1028,7 @@ $$
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
 This means that there can be no variable name clashes in |let| and |do|.
-A more robust desugaring could $\alpha$-convert such clashes.
+A more robust desugaring could \textalpha-convert such clashes.
 \caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
 \end{figurebox}
 
