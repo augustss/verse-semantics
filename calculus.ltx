@@ -971,7 +971,7 @@ $$
   |De (p := e)| & = & |Pd p (De e)| \\
   \\
 \fi
-  \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert to all functions to |functionKW(x:any){e}|}} \\
+  \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert all functions to |functionKW(x:any){e}|}} \\
   |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
@@ -1049,9 +1049,7 @@ $$
   \\
 \multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
   |Ld x t| & = & |x := t^[y:any]; y| & \text{|y| fresh} \\
-  |Ld (l^(e)) t| & = & |Ld l ((De (type^{e}) minusgt t))| & \boundvars{e} \disjoint \freevars{t} \\
-  |Ld (l^()) t| & = & |Ld l ((De (type^{()}) minusgt t))| \\
-  |Ld (l^(e)effsR) t| & = & |Ld l ((type{function e effsR {:t}}))| \\
+  |Ld (l a) t| & = & |Ld l (arrow (function a () {t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l?) t| & = & |Ld l ((? t))| \\
   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
@@ -1067,6 +1065,7 @@ any    = (x => x)
 int    = (x => applyx isInt x; x)
 nat    = (x => applyx isInt x; x > (-1); x)
 false  = array()
+arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
 \caption{Core prelude} \label{fig:core-prelude}
