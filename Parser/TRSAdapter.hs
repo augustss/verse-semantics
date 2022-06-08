@@ -76,4 +76,4 @@ trsToCoreI (T.Name s) = Ident noLoc s
 trsToCoreI _ = undefined
 
 allOps :: [(T.Op, String)]
-allOps = [(T.Gt, "in'>'"), (T.Add, "in'+'"), (T.IsInt, "isInt#")]
+allOps = [(T.Gt, "in'>'"), (T.Add, "in'+'"), (T.IsInt, "isInt$")]

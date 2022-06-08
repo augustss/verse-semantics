@@ -473,12 +473,12 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
   where
     f e@CLam{} | not (underLambda flg) = e
     -- real primitives
-    f (CUnOp  "isInt#" v) | VInt{} <- v = CUnit
+    f (CUnOp  "isInt$" v) | VInt{} <- v = CUnit
                           | otherwise   = CFail
     -- float#, string#
-    f (CUnOp  "isArr#" v) | VArray{} <- v = CUnit
+    f (CUnOp  "isArr$" v) | VArray{} <- v = CUnit
                           | otherwise   = CFail
-    f (CUnOp  "isFcn#" v) | VLam{} <- v = CUnit
+    f (CUnOp  "isFcn$" v) | VLam{} <- v = CUnit
                           | otherwise   = CFail
 
     --
@@ -488,33 +488,33 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
     f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
                                             | otherwise = CInt $ i1 `div` i2
-    f (CBinOp "intLT#"  v1 v2) = cmpU (<)  v1 v2
-    f (CBinOp "intLE#"  v1 v2) = cmpU (<=) v1 v2
-    f (CBinOp "intGT#"  v1 v2) = cmpU (>)  v1 v2
-    f (CBinOp "intGE#"  v1 v2) = cmpU (>=) v1 v2
+    f (CBinOp "intLT$"  v1 v2) = cmpU (<)  v1 v2
+    f (CBinOp "intLE$"  v1 v2) = cmpU (<=) v1 v2
+    f (CBinOp "intGT$"  v1 v2) = cmpU (>)  v1 v2
+    f (CBinOp "intGE$"  v1 v2) = cmpU (>=) v1 v2
     f (CBinOp "in'<>'"  v1 v2) = cmp  (/=) v1 v2
 
-    f (CUnOp  "concat#" (VArray as)) | all isHNF as =
+    f (CUnOp  "concat$" (VArray as)) | all isHNF as =
       case () of
         _ | Just vss <- traverse getA as -> CValue $ VArray $ concat vss
-        _ ->  CWrong $ "concat#"
+        _ ->  CWrong $ "concat$"
         where getA (VArray vs) = Just vs
               getA _ = Nothing
-    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL#", "dropL#", "takeR#", "dropR#"]
+    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL$", "dropL$", "takeR$", "dropR$"]
                                          , let n = fromInteger ni
                                          , n >= 0 && n <= length vs =
       case op of
-        "takeL#" -> CArray $ take n vs
-        "dropL#" -> CArray $ drop n vs
-        "takeR#" -> CArray $ revTake n vs
-        "dropR#" -> CArray $ revDrop n vs
+        "takeL$" -> CArray $ take n vs
+        "dropL$" -> CArray $ drop n vs
+        "takeR$" -> CArray $ revTake n vs
+        "dropR$" -> CArray $ revDrop n vs
         _ -> impossible "take/drop"
 
     f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
 
-    f e@(CUnOp "known#" _) = e  -- XXX Just leave it alone for now
-    f e@(CUnOp "new#" _) = e  -- XXX Just leave it alone for now
+    f e@(CUnOp "known$" _) = e  -- XXX Just leave it alone for now
+    f e@(CUnOp "new$" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
 
     -- Fully evaluated, and still no match
@@ -544,7 +544,7 @@ isHNF _ = False
 evalKnown :: EvalCore
 evalKnown flg = evalTrace "evalKnown" f flg
   where
-    f (CApply (VPrim "known#") v) | isHNF v   = CUnit
+    f (CApply (VPrim "known$") v) | isHNF v   = CUnit
                                   | otherwise = CFail
     f e = composOp f e
 
@@ -564,14 +564,14 @@ replacePrelude = evalTrace "replacePrelude" f
 prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                           -- x => x
-  ,("nat", typ [app "isInt#" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
-  ,("int", typ [app "isInt#" vx])                            -- x => int#[x]; x
+  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
+  ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
   ,("in'->'", arrowV)
   ,("false", VArray [])                                      -- ()
-  ,("in'>'",  cmpV "intGT#")
-  ,("in'>='", cmpV "intGE#")
-  ,("in'<'",  cmpV "intLT#")
-  ,("in'<='", cmpV "intLE#")
+  ,("in'>'",  cmpV "intGT$")
+  ,("in'>='", cmpV "intGE$")
+  ,("in'<'",  cmpV "intLT$")
+  ,("in'<='", cmpV "intLE$")
   ,("new", newV)
   ,("float", undefined)
   ,("string", undefined)
@@ -591,7 +591,7 @@ prelude =
               CLam g $ CLam y $
                 CDef [sy, gsy] $
                 CSeq [
-                  app "isFcn#" (Var g),
+                  app "isFcn$" (Var g),
                   CUnify (CVar sy) (CApply (Var s) (Var y)),
                   CUnify (CVar gsy) (CApply (Var g) (Var sy)),
                   CApply (Var t) (Var gsy)
@@ -614,5 +614,5 @@ prelude =
             CDef [y] $
             CSeq [
               CUnify (CVar y) (CApply (Var t) (Var x)),
-              app "new#" (Var y)
+              app "new$" (Var y)
               ]

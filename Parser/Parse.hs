@@ -8,6 +8,7 @@ module Parse(
 import Control.Monad
 import Control.Monad.Combinators.Expr
 import Data.Char
+import Data.Maybe
 import Data.Void
 --import Epic.Print hiding (char)
 import Text.Megaparsec
@@ -36,20 +37,23 @@ pWord = lexeme ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "ide
 pIdent :: P Ident
 pIdent = try $ do
   l <- getSourcePos
-  w <- pWord
+  w0 <- pWord
+  suf <- optional (char '$')
+  let w = w0 ++ maybeToList suf
   guard $ w `notElem` keywords
-  if w `elem` ["operator", "prefix", "postfix"] then do
+  if w `elem` ["operator", "prefix", "postfix", "infix"] then do
     _ <- char '\''
     op <- takeWhile1P Nothing (`elem` opChars)
     _ <- char '\''
     let w' = pre ++ "'" ++ op ++ "'"
-        pre = if w == "operator" then "in" else if w == "prefix" then "pre" else "post"
+        pre = if w == "postfix" then "post" else if w == "prefix" then "pre" else "in"
+    skip
     pure $ Ident l w'
    else do
     pure $ Ident l w
 
 opChars :: [Char]
-opChars = "!@#$%^&*-+=:<>?/"
+opChars = "!@#$%^&*-+=:<>?/[]"
 
 keywords :: [String]
 keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]
@@ -101,7 +105,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 pAtom :: P Expr
 pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
                , Parens <$> pParens pExprSeq, pArray, pTypedef
-               , pOption, pFunction ]
+               , pOption, pFunction, pBlockM ]
   where pEmpty = try $ pParens (pure (Array []))
 
 -- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
