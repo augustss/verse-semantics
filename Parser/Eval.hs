@@ -10,6 +10,7 @@ module Eval(
   evalSeq,
   Flags(..)
   ) where
+import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe
@@ -124,12 +125,11 @@ evalChoice flg = evalTrace "evalChoice" t flg
     t e = choice e
 
     -- Find more anchor points
-    f e@CLam{} | not (underLambda flg) = e
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
     f (CDecides e) = CDecides $ choice e
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     choice (CBar es) = CBar $ map choice es  -- look for nested choices
     choice e =
@@ -164,9 +164,8 @@ evalChoice flg = evalTrace "evalChoice" t flg
 evalDefFloat :: EvalCore
 evalDefFloat flg = evalTrace "evalDefFloat" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f e | isX e = float e
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     float e =
       case runState (findD e) Nothing of
@@ -231,10 +230,9 @@ evalFail = evalTrace "evalFail" f
 evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CUnify e@(CValue HNF{}) x@CVar{}) = f $ CUnify x e
     f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     unifyV v@(VInt i1) (VInt i2) | i1 == i2 = CValue v
                                  | otherwise = CFail
@@ -254,9 +252,8 @@ evalUnify flg = evalTrace "evalUnify" f flg
 evalUnused :: EvalCore
 evalUnused flg = evalTrace "evalUnused" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CDef h e) | Just d <- bind h e = d
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     bind h e =
       case runState (findB (cfvs e) h e) [] of
@@ -284,11 +281,10 @@ evalUnused flg = evalTrace "evalUnused" f flg
 evalSubst :: EvalCore
 evalSubst flg = evalTrace "evalSubst" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f e@CSeq{} | Just d <- bind e = d
     f (CUnify (CVar x) (CValue v)) | Just c <- substRec x v = c
     f e@CUnify{} | Just d <- bind e = d
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     bind e =
       case runState (findB (cfvs e) e) Nothing of
@@ -365,26 +361,24 @@ evalSubst flg = evalTrace "evalSubst" f flg
 evalDef :: EvalCore
 evalDef flg = evalTrace "evalDef" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CDef _ CFail) = CFail
     f (CDef [] e) = f e
     f (CDef (_:_) CValue{}) = CWrong "def-wrong"
     f (CDef h1 (CDef h2 e)) =
       assert (null (intersect h1 h2)) ("DEF-MERGE: " ++ show (h1,h2)) $
       f $ CDef (h1 ++ h2) e
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
 -- Handle 'all'
 --  ALL-0, ALL-N, ALL-WRONG
 evalAll :: EvalCore
 evalAll flg = evalTrace "evalAll" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CAll (CValue v)) = mkArr [v]
     f (CAll e@CWrong{}) = e
     f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
                        | Just vs  <- traverse getValue es = mkArr vs
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     mkArr :: [Value] -> Core
     mkArr vs =
@@ -397,12 +391,11 @@ evalAll flg = evalTrace "evalAll" f flg
 evalOne :: EvalCore
 evalOne flg = evalTrace "evalOne" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (COne e@CValue{}) = f e
     f (COne CFail) = CFail
     f (COne (CBar (e@CValue{} : _))) = f e
     f (COne e@CWrong{}) = e
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
 -- Handle non-primop applications
 --  APP-LAM, APP-TYPE, APP-REC, APP-ARR
@@ -410,7 +403,6 @@ evalOne flg = evalTrace "evalOne" f flg
 evalApp :: EvalCore
 evalApp flg = evalTrace "evalApp" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CApply (VLam i e1) v2) = f $ subst i' v2 e1'
       where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
                       | otherwise = (i, e1)
@@ -420,19 +412,18 @@ evalApp flg = evalTrace "evalApp" f flg
       where g i v = CSeq [CUnify ei (CInt i), CValue v]
             ei = CValue vi
     f (CApply VInt{} _) = CWrong "APP-CONST-WRONG"
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
 -- Handle CSeq in odd places
 --  SEQ, APP-SEQL, APP-SEQR, UNIFY-SEQL, UNIFY-SEQR
 evalSeq :: EvalCore
 evalSeq flg = evalTrace "evalSeq" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
     f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
     f (CUnify e1@CValue{} (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify e1 e]
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
     flat (CSeq es) = es
     flat e = [e]
 
@@ -441,9 +432,8 @@ evalSeq flg = evalTrace "evalSeq" f flg
 evalBar :: EvalCore
 evalBar flg = evalTrace "evalBar" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CBar es) = CBar $ concatMap (flat . f) es
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
     flat (CBar es) = es
     flat e = [e]
 
@@ -453,7 +443,6 @@ evalBar flg = evalTrace "evalBar" f flg
 evalSucceeds :: EvalCore
 evalSucceeds flg = evalTrace "evalSucceeds" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     f (CSucceeds e@CValue{}) = f e
     f (CSucceeds CFail) = CWrong "succeeds-fail"
     f (CSucceeds (CBar [e@CValue{}])) = f e
@@ -464,14 +453,13 @@ evalSucceeds flg = evalTrace "evalSucceeds" f flg
     f (CDecides (CBar [e@CValue{}])) = f e
     f (CDecides (CBar (CValue{} : _ : _))) = CWrong "decides-many"
     f (CDecides e@CWrong{}) = e
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
 -- Reduce applications of primops
 -- P-* rules
 evalPrimOps :: EvalCore
 evalPrimOps flg = evalTrace "evalPrimOps" f flg
   where
-    f e@CLam{} | not (underLambda flg) = e
     -- real primitives
     f (CUnOp  "isInt$" v) | VInt{} <- v = CUnit
                           | otherwise   = CFail
@@ -519,7 +507,7 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
 
     -- Fully evaluated, and still no match
     f (CApply (VPrim op) a) | isNF a = unimplemented $ show (op, a)
-    f e = composOp f e
+    f e = composOpLam (underLambda flg) f e
 
     arith op (VInt i1) (VInt i2) = CInt $ op i1 i2
     arith _ _ _ = CFail  -- CWrong?
@@ -616,3 +604,13 @@ prelude =
               CUnify (CVar y) (CApply (Var t) (Var x)),
               app "new$" (Var y)
               ]
+
+-- A special purpose composOp that can avoid going under lambda.
+composOpLam :: Bool -> (Core -> Core) -> Core -> Core
+composOpLam underLam f = runIdentity . composC fc fv fh
+  where
+    fc = pure . f
+    fv = composV fc fv fh
+    fh h@HLam{} | not underLam = pure h
+    fh h = composH fc fv fh h
+    
