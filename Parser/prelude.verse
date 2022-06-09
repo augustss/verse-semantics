@@ -23,3 +23,4 @@ operator'<' (x:int, y:int) := { intLT$[x, y]; x };
 operator'<='(x:int, y:int) := { intLE$[x, y]; x };
 truth(x:any) := array{x};
 
+operator'..'(i:int, n:int) := if (i > n) then :false else i | (i+1)..n
