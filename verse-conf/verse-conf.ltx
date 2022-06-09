@@ -1,0 +1,569 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[acmsmall,review,anonymous,dvipsnames]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+%include ../calculus.fmt
+
+
+\RequirePackage[utf8]{inputenc}
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{CONF} % CONF = POPL or ICFP or OOPSLA
+\acmArticle{1}
+\acmYear{2018}
+\acmMonth{1}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+
+%% -------------- Copyright information ------------------
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \Cref
+
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; \mid \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % Head normal form
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\fi
+% ---------------- End of comments -----------------
+
+
+
+
+
+\begin{document}
+
+%% Title information
+\title{The Verse Calculus}
+
+                                        %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+% \titlenote{with title note}             %% \titlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+% \subtitle{Subtitle}                     %% \subtitle is optional
+% \subtitlenote{with subtitle note}       %% \subtitlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Lennart Augustsson}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \department{Epic Games}              %% \department is recommended
+  \institution{Institution1}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+p  \country{Country1}                    %% \country is recommended
+}
+
+\author{Simon Peyton Jones}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Country1}                    %% \country is recommended
+}
+\email{simonpj@@epicgames.com}          %% \email is recommended
+
+\author{Joachim Breitner}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Country1}                    %% \country is recommended
+}
+\email{joachim.breitner@@epicgames.com}          %% \email is recommended
+
+
+
+
+%% ---------------- Abstract ---------------------
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+  The abstract
+\end{abstract}
+
+
+%% ---------------- Classification ---------------------
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011008</concept_id>
+<concept_desc>Software and its engineering~General programming languages</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003456.10003457.10003521.10003525</concept_id>
+<concept_desc>Social and professional topics~History of programming languages</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~General programming languages}
+\ccsdesc[300]{Social and professional topics~History of programming languages}
+%% End of generated code
+
+
+%% Keywords
+%% comma separated list
+% \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
+
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+
+\section{Introduction}
+
+Functional logic programming has a long history and a rich literature.
+But it is somewhat tricky for programmers to reason about functional logic programs: they must think about
+logical variables, narrowing, backtracking, and the like.   This contrasts with functional programming,
+where one can say ``just apply rewrite rules, such as beta reduction, let-inlining, and case-of-known-constructor''.
+Moreover, these rewrite rules apply even in the presence of free variables; that is, under lambdas.
+
+We therefore seek a completely-precise expression of functional logic programming, as
+at term rewriting system, to give us both a formal semantics (via a small-step reductions),
+and a powerful set of equvalences that programmers can use to reason about their programs,
+and compilers can use to optimise them.
+
+Our main contribution is a new core calculus for functional logic programming that
+has the following properties:
+\begin{itemize}
+\item It has a small-step term rewriting semantics for a functional logic langauge
+  that supports both narrowing and residuation.
+  Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step, about how their program executes.
+\item It natively supports higher-order programming, just like the lambda calculus.  In contrast,
+  the functional-logic literature typically addresses higher order features via defunctionalisation \cite[3.3]{hanus-survey}.
+\item It supports so-called non-deterministic programming; that is, an expression can return one result, many results, or no result (failure).
+  As a result, it natively supports both narrowing and residuation.
+\end{itemize}
+There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
+We discuss related work in \Cref{sec:related}.
+
+
+\section{The Verse calculus}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lrcl}
+    \text{Integer constants} & k \\
+    \text{Data constructors} & K \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \text{Programs} & p  & ::=  & e \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |applyx v_1 v_2| \\
+    && \vb & |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
+    && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+% SPJ Omitting for now
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
+    \text{Values} & v & ::= & x  \vb \hnf \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |con K (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
+     && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
+    \\
+    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
+     &&\vb & |def x CX| \\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole | \\
+     &&\vb & |one hole| \vb |all hole| \vb |succeeds hole| \vb |decides hole| \\
+    \text{Value context} & V & ::= & \hole \vb |arr (dots,V,dots)|\\
+    \end{array} \\
+    \\
+    \textbf{Shorthand} \\
+    \begin{array}{rcl}
+      |()| & \text{means} & |arr ()|\\
+      |v_1, dots, v_n| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 \oplus v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
+      v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
+      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots {def x_n e}))| \\
+     \end{array} \\
+  \\
+  \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:verse-syntax}
+\end{figure}
+
+
+We begin by presenting the Verse calculus informally.  We will give its
+rewrite rules precisely in \Cref{sec:rewrite-rules}
+
+\subsection{Syntax}
+
+The syntax of the Verse calculus is given in \Cref{fig:verse-syntax}.
+There is a core sub-language that is just the lambda-calculus with
+some built-in operations and data constructors:
+\begin{itemize}
+\item \emph{Head normal forms}.
+A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a saturated
+constructor application |con K (v1,dots,vn)|, or a lambda term |lam x e|.
+For the built-in constants and operators we use only integer constants, and two representative
+\item \emph{Values.}
+In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
+so a \emph{value} |v| is either a head normal form, or a variable |x|.
+\item \emph{Expressions} |e| includes values |v|, an applications |applyx v1 v2|.  Remembering that
+a value can be a lambda, that gives us the full lambda calculus.
+\end{itemize}
+But expressions also include two other key collections of constructs.
+First, \emph{logical variables and unification}:
+you can bring a fresh logical variable into scope with |defKW|; unify two expressions with |e1 = e2|; and
+sequence two expressions with |e1 ; e2|.
+As an example, what might be written |let x e1 e2| in a conventional functional language can be written
+|def x (x=e1; e2)| in the Verse calculus.
+
+Second, 
+
+\simon{Why are applications |applyx v1 v2| not |applyx e1 e2|?}
+
+\subsection{Semantics by example}
+
+\simon{Numerous examples}
+
+
+\section{Rewrite rules}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Choice} \\
+    \begin{array}{lrcll}
+    \rulename{fail-l} & |fail choice e| & \movesto & e \\
+    \rulename{fail-r} & |e choice fail| & \movesto & e \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
+    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| 
+    \end{array} \\
+    \\
+
+    \textit{Primitive operations} \\
+    \begin{array}{lrcl}
+    \rulename{p-add} & |applyx add (k_1 ,k_2)| & \movesto & k_1+k_2 \\
+    \rulename{p-gt} & |applyx gt (k_1,k_2)| & \movesto &
+    \left\{\begin{array}{@@{}ll}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{array}\right. \\[2mm]
+    \rulename{p-isInt} & |applyx isInt hnf| & \movesto &
+    \left\{\begin{array}{@@{}ll}
+      |()| & \text{if |hnf| is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array}\right. \\[2mm]
+    \end{array} \\
+
+    \textit{Sequencing} \\
+    \begin{array}{lrcl}
+    \rulename{seq} & |v ; e| & \movesto & |e| \\
+    \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+    \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+    \end{array} \\
+    \\[-2mm]
+
+    \textit{Application} \\
+    \begin{array}{lrcl}
+      \rulename{app-lam} & |applyx (lam x e) v| & \movesto & |def x (x=v; e)|
+          \quad \text{if $x \not\in \freevars{v}$} \\
+    \rulename{app-arr} & |applyx (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
+    \end{array} \\
+    \\[-2mm]
+
+    \textit{One and all} \\
+    \begin{array}{lrcl}
+    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \end{array} \\  \\[-1mm]
+    \begin{array}{lrcl}
+    \rulename{all-0} & |all fail| & \movesto & |()| \\
+    \rulename{all-n} &
+      |all (v_1 choice dots choice v_n)|
+    & \movesto &
+    \begin{array}[t]{@@{}l}
+      |defTwoLines (x_1,dots x_n)
+       (x_1 == applyx v_1 (); dots x_n == applyx v_n (); arr (x_1,dots,x_n))| \\
+    \end{array} \\
+    &&& \multicolumn{1}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v_1, \ldots, v_n}$}}
+    \end{array} \\
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lrcl}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+   \end{array}
+   $$
+  \caption{The Verse calculus: general axioms} \label{fig:general-axioms}
+\end{figure}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Unification} \\
+    \begin{array}{lrcl}
+    \rulename{ucon} & |k_1 == k_2| & \movesto
+    & \left\{\begin{array}{@@{}ll}
+        |k_1| & \text{if $k_1=k_2$} \\
+        |fail| & \text{otherwise}
+      \end{array}\right. \\
+    \rulename{uarr} & \begin{array}{@@{}l}
+      |con K (v_1,dots,v_m)| \\
+      | == con K (v1',dots,v_n')|
+      \end{array} & \movesto
+    & \left\{\begin{array}{@@{}ll}
+        |v_1==v1';dots;v_m=v_m';|\\
+        |con K (v_1,dots,v_m)| & \text{if $m=n$} \\
+        |fail| & \text{otherwise}
+      \end{array}\right.\\
+    \rulename{ux1} & |k == con K (v_1,dots,v_n) | & \movesto & |fail| \\
+    \rulename{ux2} & |con K (v_1,dots,v_n) == k | & \movesto & |fail| \\
+     \end{array}\\
+
+    \\[-2mm]
+
+    \textit{Unification variables} \\
+    \begin{array}{lrcll}
+    \rulename{swap} & |hnf==x| & \movesto & |x==hnf| \\
+    \rulename{subst} & |X^[x==v]| & \movesto
+    & |(subst X x v)^[x==v]|
+    & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & |x = V[lam y (def x (x = V^[y => e]; e))]|
+    & \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
+
+    \rulename{def-elim} & |def x (X^[x==v])| & \movesto & |X^[v]|
+    & \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
+    & \text{if}~|X| \ne \hole,\,  x \notin \freevars{X} \\
+    \end{array} \\
+    \\[-2mm]
+
+
+    \textit{Fail propagation} \\
+    \begin{array}{lrcl}
+    \rulename{fail-seql} & |fail; e| & \movesto & |fail|  \\
+    \rulename{fail-seqr} & |e; fail| & \movesto & |fail|  \\
+    \rulename{fail-unifyl} & |fail = e| & \movesto & |fail|  \\
+    \rulename{fail-unifyr} & |e = fail| & \movesto & |fail|  \\
+    \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
+     \end{array}
+
+   \end{array}
+   $$
+\caption{The Verse calculus: unification axioms} \label{fig:unification-axioms}
+\end{figure}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+    \end{array} \\
+    \\
+    \textbf{Axiom extension} \\
+    \begin{array}{lrcll}
+    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+    \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
+    \rulename{unify-wrong-1} & |(x_1 => e_1) = (x_2 => e_2)| & \movesto & |wrong| \\
+    \rulename{unify-wrong-2} & |(x => e) == hnf| & \movesto & |wrong|\\
+    \rulename{unify-wrong-3} & |hnf == (x => e)| & \movesto & |wrong|\\
+    \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
+    \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+    \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
+    \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+    \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
+    \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+    \end{array}
+  \end{array}
+  $$
+\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+\end{figure}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{lrcll}
+    \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
+    \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
+    \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
+    \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
+    \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
+    \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
+    \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
+    \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
+    \end{array}
+  \end{array}
+  $$
+\caption{The Verse calculus: propagation of |wrong|} \label{fig:wrong-propagation}
+\end{figure}
+
+We formalise our caluculus by equipping it with a set of rewrite
+rules.  You should think of these in exactly the way that you think of
+rewrite rules for the lambda calculus: you can apply any rewrite rule,
+anywhere, at any time.  In particular, rewrite rules can be applied
+to open terms, and under lambdas.  The rewrite rules are equivalences:
+each rule is semantics-preserving if applied left-to-right or
+right-to-left.  However, we intend that the left-to-right direction ``makes progress''.
+\simon{Forward ref to where we make this more precise.}
+
+\simon{Talk about evaluation strategy.}
+
+\simon{Commentary on the rules}
+
+\section{Metatheory and confluence}
+
+\simon{Joachim!}
+
+\section{Related work}
+
+\section{Conclusions and further work}
+
+
+% -------------------- Acknowledgements ----------------
+\begin{acks}                            %% acks environment is optional
+                                        %% contents suppressed with 'anonymous'
+\end{acks}
+
+% -------------------- Bibliography ----------------
+\bibliography{verse}
+
+
+\end{document}

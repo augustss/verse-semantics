@@ -1,3 +1,6 @@
+\let\Bbbk\relax
+%include polycode.fmt
+
 %format ^ = " "
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
@@ -13,6 +16,7 @@
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format applyx a b = a "@" b
 
+%format lam x (e) = "\lambda x. e"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format at = "\, @\!\!"
@@ -44,6 +48,9 @@
 
 %format array (x) = "\textbf{array}\{" x "\}"
 %format arr (x) = "\textbf{arr}\{" x "\}"
+%format con k (x) = k"\{" x "\}"
+%% the idea is that we can define con k (x) = "\textbf{arr}\{" x "\}"
+%% to eliminate constructors K from the presentation
 %format typeKW (x) = "\textbf{type}"
 %format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
@@ -197,3 +204,6 @@
 
 %format r_1
 %format r_n
+
+%format K_1
+%format K_2
