@@ -981,7 +981,7 @@ $$
   \multicolumn{1}{l}{\textbf{Types}} \\
   |De (:t)| & = & |De t^[x:any]| & \text{|x| fresh} \\
   %%  |De (type^{e})| & = & |type^{De e}| \\
-  |De (type^{e})| & = & |De (x:any => (x = e; x))| & \text{|x| fresh} \\  
+  |De (type^{e})| & = & |De (x:any => x = e)| & \text{|x| fresh} \\  
   \\
   \multicolumn{1}{l}{\textbf{Conditionals}} \\
   |De (if{e})| & = & |De (if(e) else false)| \\
