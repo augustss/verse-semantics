@@ -7,6 +7,8 @@ import Data.Maybe
 import Expr(Ident(..))
 import Core
 import Eval
+--import Print
+--import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.
 simpCore :: Core -> Core
@@ -36,6 +38,8 @@ simpAlias = f . g
   where
     f (CDef h e) | Just d <- bind h e = f d
     f (CLam x (CDef h e)) | Just d <- lam x h e = f d
+    f (CApply v1 v2) = CApply (compv v1) (compv v2)
+      where compv v = v' where CValue v' = f (CValue v)
     f e = composOp f e
 
     g (CUnify (CVar x) e@(CUnify (CVar y) _)) =
@@ -54,7 +58,7 @@ simpAlias = f . g
         (e', Just (x, y)) ->
           let (x', y') = if isTempIdent x && x /= v then (y, x) else (x, y)
               v' = if v == y' then x' else v
-          in  Just $ CLam v' $ cDef (h \\ [y']) $ subst y' (Var x') e'
+          in  Just $ CLam v' $ cDef (h \\ [v']) $ subst y' (Var x') e'
         _ -> Nothing
 
     findB h e = do

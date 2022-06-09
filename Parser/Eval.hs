@@ -227,7 +227,7 @@ evalFail = evalTrace "evalFail" f
     hasFail _ = False
 
 -- Handle unification
---  SWAP, UCON, UARR, UREC, UX*
+--  SWAP, UCON, UARR, UX*
 evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
