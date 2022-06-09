@@ -15,6 +15,8 @@ module Core(
   fvs, fvsV, cfvs, cfvsV,
   subst,
   alphaConvert, alphaConvertV, alphaConvertH,
+  composC, composV, composH,
+  composOpC, composOpV, composOpH,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
@@ -242,6 +244,36 @@ appH f (HLam i e) = HLam i <$> f e
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
+
+composC :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Core -> f Core
+composC _  fv _  (CValue v) = CValue <$> fv v
+composC fc _  _  (CUnify e1 e2) = CUnify <$> fc e1 <*> fc e2
+composC fc _  _  (CSeq es) = CSeq <$> traverse fc es
+composC _  fv _  (CApply e1 e2) = CApply <$> fv e1 <*> fv e2
+composC fc _  _  (CBar es) = CBar <$> traverse fc es
+composC fc _  _  (CMacro i e) = CMacro i <$> fc e
+composC fc _  _  (CDef h e) = CDef h <$> fc e
+composC _  _  _   e@CWrong{} = pure e
+
+composV :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Value -> f Value
+composV _  _  _  v@Var{} = pure v
+composV _  _  fh (HNF v) = HNF <$> fh v
+
+composH :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> HNF -> f HNF
+composH _  _  _  v@HInt{} = pure v
+composH _  _  _  v@HRat{} = pure v
+composH _  _  _  v@HPrim{} = pure v
+composH _  fv _  (HArray vs) = HArray <$> traverse fv vs
+composH fc _  _  (HLam i e) = HLam i <$> fc e
+
+composOpC :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> Core -> Core
+composOpC fc fv fh = runIdentity . composC (pure . fc) (pure . fv) (pure . fh)
+
+composOpV :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> Value -> Value
+composOpV fc fv fh = runIdentity . composV (pure . fc) (pure . fv) (pure . fh)
+
+composOpH :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> HNF -> HNF
+composOpH fc fv fh = runIdentity . composH (pure . fc) (pure . fv) (pure . fh)
 
 -- Unique free variables
 fvs :: Core -> [Ident]
