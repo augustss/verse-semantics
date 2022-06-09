@@ -34,14 +34,15 @@ simpAny = f
 -- Favor getting rid of temporaries.
 -- This is a version of the BIND rule.
 simpAlias :: Core -> Core
-simpAlias = f . g
+simpAlias = fc . g
   where
-    f (CDef h e) | Just d <- bind h e = f d
-    f (CLam x (CDef h e)) | Just d <- lam x h e = f d
-    f (CApply v1 v2) = CApply (compv v1) (compv v2)
-      where compv v = v' where CValue v' = f (CValue v)
-    f e = composOp f e
+    fc (CDef h e) | Just d <- bind h e = fc d
+    fc e = composOpC fc fv fh e
+    fh (HLam x (CDef h e)) | Just d <- lam x h e = fh d
+    fh e = composOpH fc fv fh e
+    fv = composOpV fc fv fh
 
+    -- x = (y = e)  -->  x = y; y = e
     g (CUnify (CVar x) e@(CUnify (CVar y) _)) =
       CSeq [CUnify (CVar x) (CVar y), e]
     g e = composOp g e
@@ -58,7 +59,7 @@ simpAlias = f . g
         (e', Just (x, y)) ->
           let (x', y') = if isTempIdent x && x /= v then (y, x) else (x, y)
               v' = if v == y' then x' else v
-          in  Just $ CLam v' $ cDef (h \\ [v']) $ subst y' (Var x') e'
+          in  Just $ HLam v' $ cDef (h \\ [v']) $ subst y' (Var x') e'
         _ -> Nothing
 
     findB h e = do
