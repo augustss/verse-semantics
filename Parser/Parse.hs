@@ -53,7 +53,7 @@ pIdent = try $ do
     pure $ Ident l w
 
 opChars :: [Char]
-opChars = "!@#$%^&*-+=:<>?/[]"
+opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]

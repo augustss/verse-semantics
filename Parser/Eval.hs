@@ -79,12 +79,15 @@ evalTrace s f flg e | not (traceEval flg) = e'
 eval :: EvalCore
 eval trc ea = loop 1000 $ evalTrace "eval" (const ea) trc (CWrong"")
   where
+    -- HACK: Recognizer when we have loaded the prelude.verse file
+    hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False
+
     -- Loop until convergence or timeout
     loop :: Int -> Core -> Core
     loop 0 e = trace "Reduction did not reach a normal form, use :eval to reduce more."
                e
     loop n e =
-      let e' = evalSteps trc e
+      let e' = evalSteps hasPRELUDE trc e
       in  if e == e' then
             let e'' = evalKnown trc e'
             in  if e'' == e' then
@@ -100,12 +103,12 @@ isX CSeq{} = True
 isX _ = False
 
 -- Take some reduction steps.
-evalSteps :: EvalCore
-evalSteps t =
+evalSteps :: Bool -> EvalCore
+evalSteps hasPRELUDE t =
   evalDefFloat t . evalAll t . evalChoice t . evalSplit t .
   evalWrong t . evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
-  replacePrelude t
+  (if hasPRELUDE then id else replacePrelude t)
 
 -- Handle CBar
 --  CHOOSE
@@ -575,8 +578,6 @@ prelude =
   ,("in'<'",  cmpV "intLT$")
   ,("in'<='", cmpV "intLE$")
   ,("new", newV)
-  ,("float", undefined)
-  ,("string", undefined)
 --  ,("pre'[]'", unimplemented "pre []")
 --  ,("pre'^'", unimplemented "pre ^")
   ]

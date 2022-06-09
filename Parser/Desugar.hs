@@ -489,20 +489,23 @@ prelude = map (Ident noLoc)
   , "in'..'", "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
   , "assign", "new"
+  , "pre'?'", "pre'[]'", "post'^'"
   ]
 
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
-  [ "isInt$", "isFloat$", "isString$", "isArr$", "isFcn$"
+  [ "isInt$", "isFlt$", "isStr$", "isPtr$", "isArr$", "isFcn$"
   , "in'+'", "in'-'", "in'*'", "in'/'"
   , "in'<>'"
   , "pre'-'"
-  , "pre'?'", "pre'[]'", "post'^'", "post'?'"
+  , "post'?'"
   , "succeeds", "decides", "iterates", "io"
   , "concat$", "takeL$", "dropL$", "takeR$", "dropR$"
   , "length"
   , "known$"  -- This is a horrible hack
+  , "deref$", "new$", "assign$"
+  , "intGT$", "intGE$", "intLT$", "intLE$"
   ]
 
 --------------------
@@ -633,7 +636,9 @@ data ScopeErr
 
 scopeCheck :: Expr -> D Expr
 scopeCheck e = do
-  let errs = scopeErrs (S.fromList $ prelude ++ primOps) (Do e)
+  let errs = scopeErrs (S.fromList $ prel ++ primOps) (Do e)
+      -- HACK: Recognize when we have loaded prelude.verse
+      prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else prelude
   case [ is | ErrMultiple is <- errs ] of
     [] -> pure ()
     is : _ -> error $ "scopeCheck: Multiply defined " ++ prettyShow (head is) ++

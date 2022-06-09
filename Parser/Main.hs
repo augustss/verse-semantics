@@ -86,10 +86,10 @@ command = Command
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "trace"                "Turn on evaluation tracing"            (cTrace True)
       , Cmd "notrace"              "Turn off evaluation tracing"           (cTrace False)
-      , Cmd "rewrite"              "Rewrite with accurate rules"           cRewrite
+      , Cmd "rewrite"              "Rewrite [last] expression with accurate rules"           cRewrite
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
       , Cmd "clear"                "Clear global defs"                     cClear
-      , Cmd "deval [EXPR]"         "Evaluate [last] expression with defs"  cDefEval
+      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
       , Cmd "display"              "Show current global defs"              cDisplay
       ]
   , c_exec = cParseLine
@@ -156,8 +156,8 @@ cEval c s =
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ definitions s ++ [e]
-  s' <- cTransform (Parsed . addDefs . asExpr) c s
-  cEval "" s'
+      flg = Flags { underLambda = False, traceEval = tracing s }
+  cTransform (Cored . eval flg . simpCore . asCore . Parsed . addDefs . asExpr) c s
 
 cRewrite :: Run CState
 cRewrite =
