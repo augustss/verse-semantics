@@ -2,6 +2,7 @@
 module Main(main, test) where
 import Control.Exception
 import Control.Monad
+import Data.Maybe
 
 import Print
 import Desugar
@@ -35,6 +36,7 @@ data CState = CState
   { lastExpr    :: !SomeExpr
   , tracing     :: !Bool
   , definitions :: ![Expr]
+  , prelude     :: !(Maybe Expr)
   }
 
 data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
@@ -91,13 +93,14 @@ command = Command
       , Cmd "clear"                "Clear global defs"                     cClear
       , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
       , Cmd "display"              "Show current global defs"              cDisplay
+      , Cmd "prelude"              "Load prelude.verse"                    cPrelude
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
   , c_greet = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
-  , c_state = CState { lastExpr = NoExpr, tracing = False, definitions = [] }
+  , c_state = CState { lastExpr = NoExpr, tracing = False, definitions = [], prelude = Nothing }
   , c_history = Just ".versei"
   }
 
@@ -111,6 +114,15 @@ cRead :: Run CState
 cRead fn s =
   tryIt (pure s) (updateLastExpr s . Parsed) $ do
     file <- readFile fn
+    let prog = parseDie pFile fn file
+    when (prog == prog) $
+      putStrLn "OK"
+    pure prog
+
+cPrelude :: Run CState
+cPrelude fn s =
+  tryIt (pure s) (\ e -> pure s{ prelude = Just e }) $ do
+    file <- readFile $ if null fn then "prelude.verse" else fn
     let prog = parseDie pFile fn file
     when (prog == prog) $
       putStrLn "OK"
@@ -155,7 +167,7 @@ cEval c s =
 
 cDefEval :: Run CState
 cDefEval c s = do
-  let addDefs e = Seq $ definitions s ++ [e]
+  let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
       flg = Flags { underLambda = False, traceEval = tracing s }
   cTransform (Cored . eval flg . simpCore . asCore . Parsed . addDefs . asExpr) c s
 
@@ -174,6 +186,10 @@ cClear _ s = pure s{ definitions = [] }
 
 cDisplay :: Run CState
 cDisplay _ s = do
+  case prelude s of
+    Nothing -> pure ()
+    Just e -> do putStrLn "prelude:"; pp e
+  putStrLn "definitions:"
   mapM_ pp $ definitions s
   pure s
 
