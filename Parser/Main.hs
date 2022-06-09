@@ -90,6 +90,7 @@ command = Command
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
       , Cmd "clear"                "Clear global defs"                     cClear
       , Cmd "deval [EXPR]"         "Evaluate [last] expression with defs"  cDefEval
+      , Cmd "display"              "Show current global defs"              cDisplay
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -170,6 +171,11 @@ cDefine =
 
 cClear :: Run CState
 cClear _ s = pure s{ definitions = [] }
+
+cDisplay :: Run CState
+cDisplay _ s = do
+  mapM_ pp $ definitions s
+  pure s
 
 cShow :: Run CState
 cShow =
