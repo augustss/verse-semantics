@@ -92,6 +92,9 @@
 % ---------------- Useful macros ----------------
 \renewcommand{\arraystretch}{1.1}
 
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
 \newcommand{\vb}{\; \mid \;}    % Vertical bar
@@ -323,35 +326,94 @@ We discuss related work in \Cref{sec:related}.
 \end{figure}
 
 
-We begin by presenting the Verse calculus informally.  We will give its
+We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \Cref{sec:rewrite-rules}
 
-\subsection{Syntax}
-
-The syntax of the Verse calculus is given in \Cref{fig:verse-syntax}.
+The syntax of \versecalc{} is given in \Cref{fig:verse-syntax}.
 There is a core sub-language that is just the lambda-calculus with
 some built-in operations and data constructors:
 \begin{itemize}
 \item \emph{Head normal forms}.
 A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a saturated
-constructor application |con K (v1,dots,vn)|, or a lambda term |lam x e|.
+constructor application |con K (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
+functions |gt| and |add|.
+\item \emph{Arrays and tuples}.
+A variadic data constructor |arrKW| builds finite tuples, also called arrays, |arr (v_1, dots, v_n)|.
+For notational convenience we allow ourselves to abbreviate such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
-\item \emph{Expressions} |e| includes values |v|, an applications |applyx v1 v2|.  Remembering that
+\item \emph{Expressions} |e| includes values |v|, an applications |applyx v_1 v_2|.  Remembering that
 a value can be a lambda, that gives us the full lambda calculus.
 \end{itemize}
-But expressions also include two other key collections of constructs.
-First, \emph{logical variables and unification}:
-you can bring a fresh logical variable into scope with |defKW|; unify two expressions with |e1 = e2|; and
-sequence two expressions with |e1 ; e2|.
-As an example, what might be written |let x e1 e2| in a conventional functional language can be written
-|def x (x=e1; e2)| in the Verse calculus.
+But expressions also include two other key collections of constructs:
+logical variables and unification (\Cref{sec:unify}), and choice (\Cref{sec:choice}).
 
-Second, 
+\subsection{Logical variables and unification} \label{sec:unify}
+
+The Verse calculus includes first class logical variables and unification:
+you can bring a fresh logical variable into scope with |defKW|; equate two expressions with |e_1 = e_2|; and
+sequence two expressions with |e_1 ; e_2| (see \Cref{fig:verse-syntax}).
+As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
+|def x (x=e_1; e_2)| in the Verse calculus.
+
+A program executes by solving its equations.  For example
+$$
+|def (x,y,z) (x=(y,3); x=(2,z); y)|
+$$
+is solved by unifying |x| with |(y,3)| and with |(2,z)|; that in turn unifies |(y,3)| with |(2,z)|, which
+unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
+
+Unification deals with pattern matching in functions. For example:
+$$
+|def fst ((fst = lam pr (def (a,b) (pr = (a,b); a))); applyx fst (2,5))|
+$$
+This term binds |fst| to a lambda, and applies that function to |(2,5)|.
+The lambda unifies its argument with |(a,b)|, where |a,b| are fresh logical
+variables in the body of the lambda; and returns the first of the two, namely |a|.
+Although a \versecalc program  is just a single expression, it is tiresome to
+wrap it in a binding for every support function such as |fst|, so we allow
+ourselves a set of top-level bindings for such functions.
+
+The input to |fst| may include logical variables. For example:
+$$
+|def (x,y,z) (x=(y,z); fst@x = 2; y)|
+$$
+Here |fst@x| evaluates to |y|, which we then unify with |2|; the logical
+variable |z| never gets a value, but that does not matter.
+Another way to say this is that, as usual in logic programming, we may
+constraint the \emph{output} of a function (here |fst@x = 2|, and thereby
+affect its \emph{input} (here |(y,z)|.
 
 \simon{Why are applications |applyx v1 v2| not |applyx e1 e2|?}
+
+\subsection{Choice} \label{sec:choice}
+
+The second key collection of constructs in \versecalc{} concerns expressions
+that yield multiple values.
+In conventional functional programming, an expression evaluates to a single value.
+In contrast, a \versecalc{} expression (unless it gets stuck) evaluates a choice of zero, one, or many values.
+The expression |fail| yields no values; a head normal form |hnf| yields one value;
+and the choice |e_1 choice e_2| yields all the values
+yielded by |e_1| and all the values yielded by |e_2|.
+
+Choice allows us to do pattern matching.  Here is the obligatory append function:
+$$
+|append(xs,ys) =| \begin{array}[t]{l}
+  |(xs = con Nil (); ys) choice| \\
+  |(def (y,ys) (xs = con Cons (y,ys); con Cons (x, applyx append (ys, zs))))|
+\end{array}
+$$
+If |xs| is |Nil|, the left hand choice succeeds, returning |y|; and the right hand choice
+fails (by attempting to unify |Nil| with |Cons|.  If |xs| is built with a data
+constructor other than |Nil| or |Cons|, both choices fail, and |append| returns no
+results.  We use ``fail'' and ``returns no results'' synonymously.
+
+If |xs| is of form |con Cons (y,ys)|,
+the right hand choice succeeds, and we return a |Cons| with a recursive call.
+But not quite!  What if the recursive call fails (i.e. returns no results)?
+
 
 \subsection{Semantics by example}
 

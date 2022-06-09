@@ -16,7 +16,7 @@
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format applyx a b = a "@" b
 
-%format lam x (e) = "\lambda x. e"
+%format lam x (e) = "\lambda" x".\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format at = "\, @\!\!"
@@ -47,8 +47,10 @@
 %format orElse = "\textbf{orElse}"
 
 %format array (x) = "\textbf{array}\{" x "\}"
-%format arr (x) = "\textbf{arr}\{" x "\}"
+%format arrKW = "\textbf{arr}"
+%format arr (x) = arrKW "\{" x "\}"
 %format con k (x) = k"\{" x "\}"
+%format tuple = "\textbf{tup}"
 %% the idea is that we can define con k (x) = "\textbf{arr}\{" x "\}"
 %% to eliminate constructors K from the presentation
 %format typeKW (x) = "\textbf{type}"
@@ -59,6 +61,7 @@
 %format all (x) = "\textbf{all}\,\{" x "\}"
 %format defKW = "\textbf{def}"
 %format def (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\,\{" y "\}"
+%format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format succeedsKW = "\textbf{succeeds}"
 %format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
@@ -72,7 +75,6 @@
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
-%format let = "\textbf{let}"
 %format orElse = "\textbf{orElse}"
 %format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"
@@ -113,7 +115,8 @@
 %format == = "="
 % format := = "\mapsto"
 %format ; = ";\;"
-%format , = ",\,"
+%format csp = ",\,"  %% Comma with space
+%format , = ","
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "=>"
