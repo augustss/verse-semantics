@@ -2,7 +2,7 @@
 module Desugar(desugar, simplify, primOps, getVisible) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
---import Data.List
+import Data.List
 --import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Either
@@ -177,7 +177,8 @@ dsD = expr
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "pre'^'", "pre'[]'",  -- no need for succeeds
-                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='","length"] = ApplyD
+                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
+                             "length","in'..'"] = ApplyD
                 | otherwise = ApplyS
             s' = p ++ "'" ++ s ++ "'"
 
@@ -635,11 +636,13 @@ scopeCheck e = do
   let errs = scopeErrs (S.fromList $ prelude ++ primOps) (Do e)
   case [ is | ErrMultiple is <- errs ] of
     [] -> pure ()
-    is : _ -> error $ "scopeCheck: Multiply defined " ++ show is
+    is : _ -> error $ "scopeCheck: Multiply defined " ++ prettyShow (head is) ++
+                      prettyShow [ l | Ident l _ <- is ]
   case [ i | ErrUndefined i <- errs ] of
     [] -> pure ()
     -- Make it a trace instead of an error for now
-    is@(Ident l _ : _) -> traceM $ "scopeCheck: warning undefined " ++ show (l, is)
+    is -> mapM_ undef is
+      where undef i@(Ident l _) = traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
   case [ i | ErrShadow i <- errs ] of
     [] -> pure e
     -- Make it a trace instead of an error for now
@@ -682,7 +685,7 @@ scopeErrs s = expr
     defs :: Expr -> ([ScopeErr], S.Set Ident)
     defs e =
       let is = getVisible e
-          errM = if anySame is then [ErrMultiple is] else []
+          errM = map ErrMultiple $ filter ((> 1) . length) $ group $ sort is
           errS = [ ErrShadow i | i <- is, i `S.member` s ]
           s' = foldr S.insert s is
       in  (errM ++ errS, s')
