@@ -56,10 +56,10 @@ simpAlias = fc . g
 
     lam v h e =
       case runState (findB (v:h) e) Nothing of
-        (e', Just (x, y)) ->
-          let (x', y') = if isTempIdent x && x /= v then (y, x) else (x, y)
-              v' = if v == y' then x' else v
-          in  Just $ HLam v' $ cDef (h \\ [v']) $ subst y' (Var x') e'
+        (e', Just (x, y)) | v == x || v == y ->
+          -- Eliminate y' in favor of x'
+          let (x', y') = if isTempIdent x then (y, x) else (x, y)
+          in  Just $ HLam x' $ cDef (h \\ [x, y]) $ subst y' (Var x') e'
         _ -> Nothing
 
     findB h e = do
