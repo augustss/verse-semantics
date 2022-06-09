@@ -22,12 +22,6 @@ import Error
 import Print hiding (float)
 import Misc
 
-pattern VArray :: [Value] -> Value
-pattern VArray vs = HNF (HArray vs)
-
-pattern CArray :: [Value] -> Core
-pattern CArray vs = CValue (VArray vs)
-
 pattern CUnOp :: String -> Value -> Core
 pattern CUnOp op v <- CApply (VPrim op) v@HNF{}
 
@@ -108,7 +102,7 @@ isX _ = False
 -- Take some reduction steps.
 evalSteps :: EvalCore
 evalSteps t =
-  evalDefFloat t . evalAll t . evalChoice t .
+  evalDefFloat t . evalAll t . evalChoice t . evalSplit t .
   evalWrong t . evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
   replacePrelude t
@@ -129,6 +123,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
     f (CDecides e) = CDecides $ choice e
+    f (CSplit n g e) = CSplit n g $ choice e
     f e = composOpLam (underLambda flg) f e
 
     choice (CBar es) = CBar $ map choice es  -- look for nested choices
@@ -291,17 +286,17 @@ evalSubst flg = evalTrace "evalSubst" f flg
         (cx, Just (x, v)) ->
           -- We need to substitute v for x in cx, and then plug the hole
           -- with x=v.
-          Just $ substDummy (CUnify (CVar x) (CValue v)) $ subst x v cx
+          Just $ substHole (CUnify (CVar x) (CValue v)) $ subst x v cx
 --        (_, Just (x, v)) | x `elem` fvsV v, Var x /= v ->
 --          Just $ CWrong $ "occurs check " ++ prettyShow x
         _ -> Nothing
 
-    dummy = Ident noLoc "***"  -- Identifier not used anywhere else
+    hole = Ident noLoc "***"  -- Identifier not used anywhere else
 
     -- XXX This may find the same binding over and over when there are others that could
     --     succeed.  Must include the fvs cx test!
     -- Find the leftmost binding.
-    -- Return with the binding replaced by dummy.
+    -- Return with the binding replaced by hole.
     findB vs e = do
       me <- get
       if isJust me then
@@ -313,16 +308,16 @@ evalSubst flg = evalTrace "evalSubst" f flg
             , x `elem` delete x vs   -- there is another free occurrence
             -> do
               put $ Just (x, v)
-              pure $ CVar dummy
+              pure $ CVar hole
           CUnify e1 e2 -> CUnify <$> findB vs e1 <*> findB vs e2
           CSeq es -> CSeq <$> mapM (findB vs) es
           --CSucceeds b -> CSucceeds <$> findB h b
           _ -> pure e
 
-    -- Replace dummy by an expression.
-    substDummy e = sub
+    -- Replace hole by an expression.
+    substHole e = sub
       where
-        sub (CVar i) | i == dummy = e
+        sub (CVar i) | i == hole = e
         sub (CSeq es) = CSeq (map sub es)
         sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
         sub c = c
@@ -334,7 +329,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
       case runState (findLam vv) Nothing of
         (v', Just (y, e)) ->
           let lam = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
-          in  Just $ CUnify (CVar x) $ CValue $ substDummyV lam v'
+          in  Just $ CUnify (CVar x) $ CValue $ substHoleV lam v'
         _ -> Just $ CWrong $ "occurs check " ++ prettyShow x
       where
         findLam :: Value -> State (Maybe (Ident, Core)) Value
@@ -346,13 +341,13 @@ evalSubst flg = evalTrace "evalSubst" f flg
             case v of
               VLam y e | x `elem` fvs e, x /= y -> do
                 put $ Just (y, e)
-                pure $ Var dummy
+                pure $ Var hole
               VArray vs -> VArray <$> mapM findLam vs
               _ -> pure v
 
-    substDummyV vv = sub
+    substHoleV vv = sub
       where
-        sub (Var i) | i == dummy = vv
+        sub (Var i) | i == hole = vv
         sub (VArray vs) = VArray $ map sub vs
         sub v = v
 
@@ -368,6 +363,20 @@ evalDef flg = evalTrace "evalDef" f flg
       assert (null (intersect h1 h2)) ("DEF-MERGE: " ++ show (h1,h2)) $
       f $ CDef (h1 ++ h2) e
     f e = composOpLam (underLambda flg) f e
+
+-- Handle 'one'
+--  SPLIT-*
+evalSplit :: EvalCore
+evalSplit flg = evalTrace "evalSplit" f flg
+  where
+    f (CSplit n _ CFail) = CApply n (VArray [])
+    f (CSplit _ g (CValue v)) = CApply g $ VArray [v, VLam dummy CFail]
+    f (CSplit _ g (CBar (CValue v : es))) = CApply g $ VArray [v, VLam dummy $ CBar es]
+    f (CSplit _ _ e@CWrong{}) = e
+    f e = composOpLam (underLambda flg) f e
+
+dummy :: Ident
+dummy = Ident noLoc "_"
 
 -- Handle 'all'
 --  ALL-0, ALL-N, ALL-WRONG
@@ -500,6 +509,11 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
 
     f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
+
+    -- XXX Stricter than necessary?
+    f (CApply (VPrim "cons$") v) | VArray [v1, VArray vs] <- v = CArray $ v1 : vs
+                                 | VArray [_, va] <- v, isHNF va = CFail
+--x                                 | isHNF v = CFail
 
     f e@(CUnOp "known$" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "new$" _) = e  -- XXX Just leave it alone for now

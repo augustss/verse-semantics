@@ -3,7 +3,7 @@
 module Core(
   Core(..),
   pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
-  pattern CVar, pattern VPrim,
+  pattern CVar, pattern VPrim, pattern VArray, pattern CArray,
   pattern VLam, pattern CLam,
   Value(..),
   HNF(..),
@@ -31,6 +31,10 @@ import Error
 import SExp
 --import Debug.Trace
 
+-- Use CSplit instead of COne/CAll
+useSplit :: Bool
+useSplit = True
+
 data Core
   = CValue Value
   | CUnify Core Core
@@ -40,6 +44,7 @@ data Core
   | CMacro Ident Core
   | CDef Heap Core
   | CWrong String
+  | CSplit Value Value Core
   deriving (Show, Eq)
 
 type Heap = [Ident]
@@ -61,6 +66,10 @@ pattern CInt x = CValue (HNF (HInt x))
 pattern CRat :: Rational -> Core
 pattern CRat x = CValue (HNF (HRat x))
 -}
+pattern VArray :: [Value] -> Value
+pattern VArray vs = HNF (HArray vs)
+pattern CArray :: [Value] -> Core
+pattern CArray vs = CValue (VArray vs)
 pattern VPrim :: String -> Value
 pattern VPrim s = HNF (HPrim s)
 pattern CVar :: Ident -> Core
@@ -140,17 +149,51 @@ core Fail = pure $ CBar []
 core (For2 e1 e2) = do
   e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
-  CAll <$> coreD (seqE [e1, e2'])
+  ee <- coreD (seqE [e1, e2'])
+  if useSplit then cAll ee else pure $ CAll ee
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
   l <- coreD (seqE [e1, e2'])
   r <- core e3'
-  let fn = COne $ CBar [l, r]
+  fn <- (if useSplit then cOne else pure . COne) $ CBar [l, r]
   i <- newTmp
   pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core e = impossible e
+
+cOne :: Core -> C Core
+cOne e = do
+  u1 <- newTmp
+  u2 <- newTmp
+  v <- newTmp
+  a <- newTmp
+  pure $ CSplit (VLam u1 CFail) (VLam a $ CDef [v, u2] $ CSeq [CUnify (CVar a) $ CArray [Var v, Var u2], CVar v]) e
+
+cAll :: Core -> C Core
+cAll e = do
+  f <- newTmp
+  g <- newTmp
+  u <- newTmp
+  a <- newTmp
+  v <- newTmp
+  r <- newTmp
+  x <- newTmp
+  y <- newTmp
+  pure $ CDef [f, g] $
+           CSeq [
+             CUnify (CVar f) (CLam u $ CArray []),
+             CUnify (CVar g) (CLam a $
+                               CDef [v, r, x, y] $
+                                 CSeq [
+                                   CUnify (CVar a) (CArray [Var v, Var r]),
+                                   CUnify (CVar x) (CSplit (Var f) (Var g) (CApply (Var r) (VArray []))),
+                                   CUnify (CVar y) (CApply (Var v) (VArray [])),
+                                   CApply (VPrim "cons$") (VArray [Var y, Var x])
+                                   ]),
+             CSplit (Var f) (Var g) e
+             ]
+                                
 
 -- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core
@@ -201,6 +244,8 @@ instance Pretty Core where
   pPrintPrec l p (CDef is e) =
     maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is <+> text "in", pPrintPrec l 0 e]
   pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
+  pPrintPrec l _ (CSplit f g e) =
+    text "split" <> parens (pPrintPrec l 0 f <> text "," <+> pPrintPrec l 0 g <> text "," <+> pPrintPrec l 0 e)
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -230,6 +275,7 @@ compos f (CBar es) = CBar <$> traverse f es
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
+compos f (CSplit n g e) = CSplit <$> appV f n <*> appV f g <*> f e
 
 appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
 appV _ v@Var{} = pure v
@@ -254,6 +300,7 @@ composC fc _  _  (CBar es) = CBar <$> traverse fc es
 composC fc _  _  (CMacro i e) = CMacro i <$> fc e
 composC fc _  _  (CDef h e) = CDef h <$> fc e
 composC _  _  _   e@CWrong{} = pure e
+composC fc fv _  (CSplit f g e) = CSplit <$> fv f <*> fv g <*> fc e
 
 composV :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Value -> f Value
 composV _  _  _  v@Var{} = pure v
@@ -291,6 +338,7 @@ cfvs (CApply e1 e2) = cfvsV e1 ++ cfvsV e2
 cfvs (CBar es) = concatMap cfvs es
 cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
+cfvs (CSplit f g e) = cfvsV f ++ cfvsV g ++ cfvs e
 cfvs CWrong{} = []
 
 cfvsV :: Value -> [Ident]
@@ -321,6 +369,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | null (intersect bs h) = CDef h $ sub e
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
+    sub (CSplit f g e) = CSplit (subV f) (subV g) (sub e)
 
     subV v@(Var i) | i == x = b
                    | otherwise = v
@@ -347,6 +396,7 @@ alphaConvert vs = alpha []
       where h' = map fresh h
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
+    alpha m (CSplit f g e) = CSplit (alphaV m f) (alphaV m g) (alpha m e)
 
     alphaV m (Var i) = Var $ fromMaybe i $ lookup i m
     alphaV m (HNF h) = HNF (alphaH m h)
