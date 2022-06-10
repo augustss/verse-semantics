@@ -339,12 +339,12 @@ constructor application |con K (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
 \item \emph{Arrays and tuples}.
-A variadic data constructor |arrKW| builds finite tuples, also called arrays, |arr (v_1, dots, v_n)|.
+A built-in variadic data constructor |arrKW| builds finite tuples, also called arrays, |arr (v_1, dots, v_n)|.
 For notational convenience we allow ourselves to abbreviate such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
-\item \emph{Expressions} |e| includes values |v|, an applications |applyx v_1 v_2|.  Remembering that
+\item \emph{Expressions} |e| includes values |v|, and applications |applyx v_1 v_2|.  Remembering that
 a value can be a lambda, that gives us the full lambda calculus.
 \end{itemize}
 But expressions also include two other key collections of constructs:
