@@ -14,7 +14,10 @@
 %format (Th (x)) = "\Th{" ^ x "}"
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
-%format applyx a b = a "@" b
+
+%% Applications
+%% %format applyx a b = a "@" b
+%format applyx a (b) = a"("b")"
 
 %format lam x (e) = "\lambda" x".\," e
 %format lambda = "\lambda\!"

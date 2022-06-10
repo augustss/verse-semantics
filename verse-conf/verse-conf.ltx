@@ -270,7 +270,7 @@ has the following properties:
   that supports both narrowing and residuation.
   Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step, about how their program executes.
 \item It natively supports higher-order programming, just like the lambda calculus.  In contrast,
-  the functional-logic literature typically addresses higher order features via defunctionalisation \cite[3.3]{hanus-survey}.
+  the functional-logic literature typically addresses higher order features via defunctionalisation \cite[3.3]{hanus:survey}.
 \item It supports so-called non-deterministic programming; that is, an expression can return one result, many results, or no result (failure).
   As a result, it natively supports both narrowing and residuation.
 \end{itemize}
@@ -372,31 +372,60 @@ $$
 This term binds |fst| to a lambda, and applies that function to |(2,5)|.
 The lambda unifies its argument with |(a,b)|, where |a,b| are fresh logical
 variables in the body of the lambda; and returns the first of the two, namely |a|.
-Although a \versecalc program  is just a single expression, it is tiresome to
+Although a \versecalc{} program  is just a single expression, it is tiresome to
 wrap it in a binding for every support function such as |fst|, so we allow
 ourselves a set of top-level bindings for such functions.
 
 The input to |fst| may include logical variables. For example:
 $$
-|def (x,y,z) (x=(y,z); fst@x = 2; y)|
+|def (x,y,z) (x=(y,z); applyx fst x = 2; y)|
 $$
-Here |fst@x| evaluates to |y|, which we then unify with |2|; the logical
+Here |applyx fst x| evaluates to |y|, which we then unify with |2|; the logical
 variable |z| never gets a value, but that does not matter.
 Another way to say this is that, as usual in logic programming, we may
-constraint the \emph{output} of a function (here |fst@x = 2|, and thereby
+constraint the \emph{output} of a function (here |applyx fst x = 2|, and thereby
 affect its \emph{input} (here |(y,z)|.
+
+Although ``|;|'' is called ``sequencing'', that sequencing is immaterial for equations.
+For example\footnote{We are informally writing |3+y| rather than
+  |applyx add (3,y)|, and similarly with other operators.},
+consider |def x (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
+we will see why in \Cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
+No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
+and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
+and unify |x| with that.  The idea of leaving stuck expressions aside, and executing other parts of the
+program is called \emph{residuation} \cite{hanus:survey}, and is at the heart of our mantra ``just solve the equations''.
 
 \simon{Why are applications |applyx v1 v2| not |applyx e1 e2|?}
 
-\subsection{Choice} \label{sec:choice}
+\subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
-The second key collection of constructs in \versecalc{} concerns expressions
-that yield multiple values.
 In conventional functional programming, an expression evaluates to a single value.
-In contrast, a \versecalc{} expression (unless it gets stuck) evaluates a choice of zero, one, or many values.
+In contrast, a \versecalc{} expression (unless it gets stuck) evaluates to a choice of zero, one, or many values.
 The expression |fail| yields no values; a head normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
+Duplicates are not eliminated and, as we shall see in \Cref{sec:for}, order is maintained; in short
+an expression yields a sequences of values, not a bag, and certainly not a set.
+
+What if the choice was not at the top-level of an expression?  For example, what does |(3, (7 choice 5))| mean?
+In \versecalc{} it does \emph{not} mean a pair with some kind of multi-value in its second component.
+Indeed, as you can see from \Cref{fig:verse-syntax}, this expression is syntactically ill-formed.
+We must instead give a name to that choice, and then we can put it in the pair, thus: |def x in x = (7 choice 5); (3,x)|.
+This is syntactically legal, but what does it mean?  In \versecalc{} a variable is never bound to a multi-value.
+Instead, |x| is successively bound to |7|, and then to |5|, like this:
+$$
+|def x (x = (7 choice 5); (3,x))| \quad = \quad |(def x (x=7; (3,x))) choice (def x (x=5; (3,x))))|
+$$
+We duplicate the context surrounding the choice, and ``float the choice outwards''.
+
+We saw in the last section that sequencing is
+
+To take a celebrated example, suppose
+|square = lam x (x*x)|.  What does |applyx square (3 choice 4)| mean? If we make the choice \emph{before}
+the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
+it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
+All functional-logic languages, including 
 
 Choice allows us to do pattern matching.  Here is the obligatory append function:
 $$
@@ -414,10 +443,9 @@ If |xs| is of form |con Cons (y,ys)|,
 the right hand choice succeeds, and we return a |Cons| with a recursive call.
 But not quite!  What if the recursive call fails (i.e. returns no results)?
 
+\subsection{Conditionals and |one|}
 
-\subsection{Semantics by example}
-
-\simon{Numerous examples}
+\subsection{Arrays and |all|}
 
 
 \section{Rewrite rules}
@@ -614,7 +642,7 @@ right-to-left.  However, we intend that the left-to-right direction ``makes prog
 
 \simon{Joachim!}
 
-\section{Related work}
+\section{Related work} \label{sec:related}
 
 \section{Conclusions and further work}
 
@@ -625,7 +653,7 @@ right-to-left.  However, we intend that the left-to-right direction ``makes prog
 \end{acks}
 
 % -------------------- Bibliography ----------------
-\bibliography{verse}
+\bibliography{../verse}
 
 
 \end{document}
