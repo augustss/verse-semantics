@@ -367,16 +367,19 @@ evalDef flg = evalTrace "evalDef" f flg
       f $ CDef (h1 ++ h2) e
     f e = composOpLam (underLambda flg) f e
 
--- Handle 'one'
+-- Handle 'split'
 --  SPLIT-*
 evalSplit :: EvalCore
 evalSplit flg = evalTrace "evalSplit" f flg
   where
     f (CSplit n _ CFail) = CApply n (VArray [])
-    f (CSplit _ g (CValue v)) = CApply g $ VArray [v, VLam dummy CFail]
-    f (CSplit _ g (CBar (CValue v : es))) = CApply g $ VArray [v, VLam dummy $ CBar es]
+    f e@(CSplit _ g (CValue v)) = val e g v (VLam dummy CFail)
+    f e@(CSplit _ g (CBar (CValue v : es))) = val e g v (VLam dummy $ CBar es)
     f (CSplit _ _ e@CWrong{}) = e
     f e = composOpLam (underLambda flg) f e
+    val e g v r =
+      let y : _ = newVars "a" (fvs e)
+      in  CDef [y] $ CSeq [CUnify (CVar y) (CApply g v), CApply (Var y) r]
 
 dummy :: Ident
 dummy = Ident noLoc "_"

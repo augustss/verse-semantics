@@ -167,15 +167,13 @@ cOne e = do
   u1 <- newTmp
   u2 <- newTmp
   v <- newTmp
-  a <- newTmp
-  pure $ CSplit (VLam u1 CFail) (VLam a $ CDef [v, u2] $ CSeq [CUnify (CVar a) $ CArray [Var v, Var u2], CVar v]) e
+  pure $ CSplit (VLam u1 CFail) (VLam v $ CLam u2 $ CVar v) e
 
 cAll :: Core -> C Core
 cAll e = do
   f <- newTmp
   g <- newTmp
   u <- newTmp
-  a <- newTmp
   v <- newTmp
   r <- newTmp
   x <- newTmp
@@ -183,10 +181,9 @@ cAll e = do
   pure $ CDef [f, g] $
            CSeq [
              CUnify (CVar f) (CLam u $ CArray []),
-             CUnify (CVar g) (CLam a $
-                               CDef [v, r, x, y] $
+             CUnify (CVar g) (CLam v $ CLam r $
+                               CDef [x, y] $
                                  CSeq [
-                                   CUnify (CVar a) (CArray [Var v, Var r]),
                                    CUnify (CVar x) (CSplit (Var f) (Var g) (CApply (Var r) (VArray []))),
                                    CUnify (CVar y) (CApply (Var v) (VArray [])),
                                    CApply (VPrim "cons$") (VArray [Var y, Var x])
