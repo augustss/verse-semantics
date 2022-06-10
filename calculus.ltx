@@ -1134,6 +1134,7 @@ $$
     \rulename{split-fail} & |split fail f g| & \movesto & |applyx f ()| \\
     \rulename{split-value} & |split v f g| & \movesto & |def x (x = applyx g v; applyx x (y => fail)| & \text{|x,y| fresh} \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |def x (x = applyx g v; applyx x (y => e)| & \text{|x,y| fresh} \\
+    \rulename{split-wrong} & |split wrong f g| & \movesto & |wrong| \\
 \end{array} \\
 \\
 \begin{array}{rclll}
@@ -1149,6 +1150,7 @@ $$
 \end{array}
 \end{array}
 $$
+\lennart{Does |f| need to be a thunk?  Does second argument to |g| need to be a thunk?}
 \caption{Alternative: Use |splitKW| instead of |oneKW| and |allKW|.} \label{fig:split}
 \end{figurebox}
 
