@@ -278,7 +278,7 @@ There is a rich seam of related work; an excellent starting point is Hanus's sur
 We discuss related work in \Cref{sec:related}.
 
 
-\section{The Verse calculus}
+\section{The Verse calculus, informally} \label{sec:informal}
 
 \begin{figure}
   $$
@@ -387,7 +387,7 @@ constraint the \emph{output} of a function (here |applyx fst x = 2|, and thereby
 affect its \emph{input} (here |(y,z)|.
 
 Although ``|;|'' is called ``sequencing'', that sequencing is immaterial for equations.
-For example\footnote{We are informally writing |3+y| rather than
+For example\footnote{We informally write |3+y| rather than
   |applyx add (3,y)|, and similarly with other operators.},
 consider |def x (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
 we will see why in \Cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
@@ -408,10 +408,15 @@ yielded by |e_1| and all the values yielded by |e_2|.
 Duplicates are not eliminated and, as we shall see in \Cref{sec:for}, order is maintained; in short
 an expression yields a sequences of values, not a bag, and certainly not a set.
 
+The equations we saw in \Cref{sec:unify} can fail, if the arguments
+are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3|,
+while |3=4| fails, returning no results.  In general, we use ``fail''
+and ``returns no results'' synonymously.
+
 What if the choice was not at the top-level of an expression?  For example, what does |(3, (7 choice 5))| mean?
 In \versecalc{} it does \emph{not} mean a pair with some kind of multi-value in its second component.
 Indeed, as you can see from \Cref{fig:verse-syntax}, this expression is syntactically ill-formed.
-We must instead give a name to that choice, and then we can put it in the pair, thus: |def x in x = (7 choice 5); (3,x)|.
+We must instead give a name to that choice, and then we can put it in the pair, thus: |def x (x = (7 choice 5); (3,x))|.
 This is syntactically legal, but what does it mean?  In \versecalc{} a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
@@ -419,36 +424,103 @@ $$
 $$
 We duplicate the context surrounding the choice, and ``float the choice outwards''.
 
-We saw in the last section that sequencing is
+We saw in the last section that equations are insensitive to sequencing, but choice is not. Consider
+|def (x,y) (x = (3 choice 4); y = (20 choice 30); (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
+|((3,20) choice (3,30) choice (4,20) choice (4,30))|.
 
-To take a celebrated example, suppose
-|square = lam x (x*x)|.  What does |applyx square (3 choice 4)| mean? If we make the choice \emph{before}
-the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
-it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
-All functional-logic languages, including 
+% To take a celebrated example, suppose
+% |square = lam x (x*x)|.  What does |applyx square (3 choice 4)| mean? If we make the choice \emph{before}
+% the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
+% it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
+% All functional-logic languages, including 
 
-Choice allows us to do pattern matching.  Here is the obligatory append function:
+Choice allows us to do pattern matching.  Here is the obligatory append function
+\footnote{
+Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) (p = (x,y); body)|
+  }:
 $$
-|append(xs,ys) =| \begin{array}[t]{l}
+|append =lamhdr (xs,ys)| \begin{array}[t]{l}
   |(xs = con Nil (); ys) choice| \\
-  |(def (y,ys) (xs = con Cons (y,ys); con Cons (x, applyx append (ys, zs))))|
+  |(def (x,xs') (xs = con Cons (x,xs'); con Cons (x, applyx append (xs', ys))))|
 \end{array}
 $$
 If |xs| is |Nil|, the left hand choice succeeds, returning |y|; and the right hand choice
-fails (by attempting to unify |Nil| with |Cons|.  If |xs| is built with a data
-constructor other than |Nil| or |Cons|, both choices fail, and |append| returns no
-results.  We use ``fail'' and ``returns no results'' synonymously.
-
+fails (by attempting to unify |Nil| with |Cons|.
 If |xs| is of form |con Cons (y,ys)|,
-the right hand choice succeeds, and we return a |Cons| with a recursive call.
-But not quite!  What if the recursive call fails (i.e. returns no results)?
+the right hand choice succeeds, and we make a recursive call to |append|.
+Finally if |xs| is built with a data
+constructor other than |Nil| or |Cons|, both choices fail, and |append| returns no
+results.
+
+This approach to pattern matching is akin to \emph{narrowing} \cite{hanus:survey}.
+Suppose |single = con Cons (1, con Nil ())|, a singleton list whose only element is 1.
+Consider this call:
+$$
+|def xs (applyx append( xs, single) = single; xs)|
+$$
+The call to |append| expands into a choice
+$$
+  |(xs = con Nil (); single)| \quad |choice| \quad
+  |(def (x,xs') (xs = con Cons (x,xs'); con Cons (x, applyx append (xs', single))))|
+$$
+which amounts to exploring the possiblity that |xs| is headed by |Nil| or |Cons| -- the
+essence of narrowing.  It should not take long to reassure yourself that the program
+evaluates to |con Nil ()|, effectively running |append| backwards in the classic logic-programming manner.
+
+The details of choice are clearly a bit tricky.  This section has offered intutition
+but no precision, but fear not: \Cref{sec:rewrite-rules} will make all this precise.
 
 \subsection{Conditionals and |one|}
+
+Every source language will provide a conditional, like |if (x=0) then
+e_1 else e_2|.  But what is the equality operator in |(x=0)|?  One
+possiblity, adopted by Curry, is this: there is one ``='' for
+equations (as in \Cref{sec:unify}), and another, say ``=='', for
+testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
+different, more minimalist position. In \versecalc{} there is just one equality, written ``='' just as in
+\Cref{sec:unify}. The expression |if (x=0) then e_1 else e_2| tries to unify |x| with |0|.  If that succeeds (returns one or more values),
+the |if| returns |e_1|; otherwise it returns |e_2|.  There are no data constructors |True| and |False|; instead
+failure plays the role of falsity.
+
+But something is terribly wrong here.  Consider |def (x,y) (y = (if (x=0) 3 4); x=7)|.  Presumably this is meant
+to set |x| to |7|, test if it is equal to |0| (it is not), and unify |y| with 4.
+But what is to stop us instead unifying |x| with |0| (via |(x=0)|, unifying |y| with |3|, and then
+failing when we try to unify |x| with |7|?  Not only is that not what we intended, but it also looks very
+non-deterministic: the result is affected by the order in which we did unifications!
+This non-determinism is deeply tied up with the fact that |if| can inspect the success or failure
+of its argument, reifying choice.
+
+To address this, we give |if| a special property: unifications inside |e_1| (the condition of the |if|)
+can only unify variables |defKW|'d inside |e_1|; varaibles bound outside |e_1| are ``rigid''.  So in our example, the |x| in |(x=0)| is
+rigid and cannot be unified.  Instead the |if| is stuck, and we move on to unify |x=7|.  That unblocks
+the |if| and all is well.
+
+In fact, \versecalc{} distils the three-argument |if| into something simpler, the unary construct |one(e)|.
+Its specification is this:
+if |e| fails, |one(e)| fails; otherwise |one(e)| returns the first of the values yielded by |e|.
+Now, |if e_1 then e_2 else e_3| can (nearly) be re-expressed like this:
+$$
+|one( (one(e_1); e_2) choice e_3 )|
+$$
+If |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
+get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't right:
+what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
+which wraps the then and else branches in a thunk:
+$$
+|applyx (one( one(e_1; (lam x e_2)) choice (lam x e_3))) ()|
+$$
+The argument of the outer |oneKW| evaluates to either |((lam x e_2) choice (lam x e_3))| or |(lam x e_3)|
+depending on whether |e_1| succeeds or fails, respectively, and the outer |oneKW| then picks the first of
+these and applies it to |()|.  As a bonus, if we do no evaluation under a lambda, then |e_2| and |e_3| will
+remain un-evaluated until the choice is made, just as we expect.
+
+Now |if| is just syntactic sugar, and the special property of |if| becomes a special property of |oneKW|.
+
 
 \subsection{Arrays and |all|}
 
 
-\section{Rewrite rules}
+\section{Rewrite rules} \label{sec:rewrite-rules}
 
 \begin{figure}
   $$
@@ -550,17 +622,15 @@ But not quite!  What if the recursive call fails (i.e. returns no results)?
 
     \textit{Unification variables} \\
     \begin{array}{lrcll}
-    \rulename{swap} & |hnf==x| & \movesto & |x==hnf| \\
-    \rulename{subst} & |X^[x==v]| & \movesto
-    & |(subst X x v)^[x==v]|
-    & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
-    \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & |x = V[lam y (def x (x = V^[y => e]; e))]|
-    & \text{if $|x| \in \freevars{e}$, $x \ne y$}\\
-
     \rulename{def-elim} & |def x (X^[x==v])| & \movesto & |X^[v]|
     & \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
     \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
     & \text{if}~|X| \ne \hole,\,  x \notin \freevars{X} \\
+    \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+    \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
+        & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[y => e]; e))]|} \\
+        &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}
     \end{array} \\
     \\[-2mm]
 
@@ -625,7 +695,15 @@ But not quite!  What if the recursive call fails (i.e. returns no results)?
 \caption{The Verse calculus: propagation of |wrong|} \label{fig:wrong-propagation}
 \end{figure}
 
-We formalise our caluculus by equipping it with a set of rewrite
+In the informal explanation of \Cref{sec:informal} we repeatedly spoke of
+expressions ``evaluating to'' soemthing else, where the ``something else'' was often not even
+a value.  We were really just rewriting our program (for example by beta-reduction),
+one step at a time.  The history of functional programming tells us that an excellent
+way of giving a semantics to a program is by describing the rewrites that can apply to it.
+Then ``execution'' is just ``keep rewriting''.  We might hope that a compiler does something
+much more efficient, but it should give the same answers.
+
+With that in mind, we formalise \versecalc{} by equipping it with a set of rewrite
 rules.  You should think of these in exactly the way that you think of
 rewrite rules for the lambda calculus: you can apply any rewrite rule,
 anywhere, at any time.  In particular, rewrite rules can be applied
@@ -633,6 +711,8 @@ to open terms, and under lambdas.  The rewrite rules are equivalences:
 each rule is semantics-preserving if applied left-to-right or
 right-to-left.  However, we intend that the left-to-right direction ``makes progress''.
 \simon{Forward ref to where we make this more precise.}
+
+
 
 \simon{Talk about evaluation strategy.}
 

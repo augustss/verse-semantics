@@ -20,6 +20,7 @@
 %format applyx a (b) = a"("b")"
 
 %format lam x (e) = "\lambda" x".\," e
+%format lamhdr x = "\lambda" x".\,"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format at = "\, @\!\!"
@@ -59,9 +60,9 @@
 %format typeKW (x) = "\textbf{type}"
 %format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
-%format one (x) = "\textbf{one}\,\{" x "\}"
+%format one (x) = "\textbf{one}\{" x "\}"
 %format allKW = "\textbf{all}"
-%format all (x) = "\textbf{all}\,\{" x "\}"
+%format all (x) = "\textbf{all}\{" x "\}"
 %format splitKW = "\textbf{split}"
 %format split (x) (y) (z) = "\textbf{split}\,\{" x "," y "," z "\}"
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
