@@ -1142,10 +1142,10 @@ $$
     |one e| & = & |split e (x => fail) (x => y => x)| & \text{|x,y| fresh} \\
     |all e| & = &
     \begin{array}[t]{@@{}l}
-      |defKW f,g in| \\
-      |f := x => ();| \\
-      |g := x => y => cons (applyx x ()) (split (applyx y ()) f g);| \\
-      |split e f g|
+      |defKW f,g in {| \\
+      \quad |f := x => ();| \\
+      \quad |g := x => y => cons (applyx x ()) (split (applyx y ()) f g);| \\
+      \quad |split e f g }|
     \end{array}  & \text{|x,y| fresh} \\
 \end{array}
 \end{array}
