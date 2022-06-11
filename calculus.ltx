@@ -261,6 +261,7 @@ The |let| construct cleverly models the heap, maintaining sharing.
       v_1 \oplus v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
       v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
       |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots {def x_n e}))| \\
+      |_ => e| & \text{means} & |x => e|, \text{|x| fresh} \\
      \end{array} \\
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
@@ -1138,7 +1139,7 @@ $$
 \end{array} \\
 \\
 \begin{array}{rclll}
-    \multicolumn{5}{l}{ \text{Definition of |oneKW| and |allKW| in terms of |splitKW|. } } \\
+    \multicolumn{5}{l}{ \text{Definition of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW| in terms of |splitKW|. } } \\
     |one e| & = & |split e (x => fail) (x => y => x)| & \text{|x,y| fresh} \\
     |all e| & = &
     \begin{array}[t]{@@{}l}
@@ -1147,11 +1148,15 @@ $$
       \quad |g := x => y => cons (applyx x ()) (split (applyx y ()) f g);| \\
       \quad |split e f g }|
     \end{array}  & \text{|x,y| fresh} \\
+    |succeeds e| & = & |splitKW e {_ => wrong,| \\
+    \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
+    |decides e| & = & |splitKW e {_ => fail,| \\
+    \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
 \end{array}
 \end{array}
 $$
 \lennart{Does |f| need to be a thunk?  Does second argument to |g| need to be a thunk? Yes, or it may |fail| in the wrong place.}
-\caption{Alternative: Use |splitKW| instead of |oneKW| and |allKW|.} \label{fig:split}
+\caption{Alternative: Use |splitKW| instead of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW|.} \label{fig:split}
 \end{figurebox}
 
 \clearpage
