@@ -1148,9 +1148,9 @@ $$
       \quad |g := x => y => cons (applyx x ()) (split (applyx y ()) f g);| \\
       \quad |split e f g }|
     \end{array}  & \text{|x,y| fresh} \\
-    |succeeds e| & = & |splitKW e {_ => wrong,| \\
+    |succeeds e| & = & |splitKW^{e, _ => wrong,| \\
     \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
-    |decides e| & = & |splitKW e {_ => fail,| \\
+    |decides e| & = & |splitKW^{e, _ => fail,| \\
     \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
 \end{array}
 \end{array}
