@@ -75,7 +75,7 @@ testeq(SEq) {ap0(f(x:int):=2) := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
 #testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
-testeq(SEq) {x? : int}                             { x : ?int }
+testeq(SEq) {x? : int}                            { x : ?int }
 testeq(SEq) {x[] : int}                           { x : []int }
 testeq(SEq) {i~>x:(3,4,5); (i, x)}                {(0,3)|(1,4)|(2,5)}
 # DESUGAR HOW?
@@ -108,6 +108,9 @@ testeq(SEq) {
 
 testeq(SEq) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
 testeq(SEq) {f() := 1|2; for(f[]; x:=3|4){x}}     {(3,4,3,4)}
+
+testeq(SEq) {0[0]}                                {wrong$}
+testeq(SEq) {operator'/'(1,0)}                    {wrong$}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only

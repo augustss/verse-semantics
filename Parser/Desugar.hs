@@ -506,6 +506,7 @@ primOps = map (Ident noLoc)
   , "known$"  -- This is a horrible hack
   , "deref$", "new$", "assign$"
   , "intGT$", "intGE$", "intLT$", "intLE$"
+  , "wrong$"
   ]
 
 --------------------

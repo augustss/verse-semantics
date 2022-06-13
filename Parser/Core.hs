@@ -132,6 +132,7 @@ exprToCore = flip evalState 1 . coreD
 core :: Expr -> C Core
 core e@LitInt{} = val e
 core e@LitRat{} = val e
+core (Variable (Ident _ "wrong$")) = pure $ CWrong "called"
 core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
