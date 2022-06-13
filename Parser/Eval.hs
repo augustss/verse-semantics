@@ -113,12 +113,12 @@ evalSteps hasPRELUDE t =
 -- Handle CBar
 --  CHOOSE
 -- First locate an anchor point and then try to find CX hole with a CBar.
--- XXX What are the anchor points?
+-- XXX This probably doesn't implement the SX/CX reduction correctly.
+-- We need to try every SX context, not just the first one.
 evalChoice :: EvalCore
 evalChoice flg = evalTrace "evalChoice" t flg
   where
     -- Top-level anchor point
-    t (CBar [e]) = e
     t e = choice e
 
     -- Find more anchor points
@@ -129,13 +129,29 @@ evalChoice flg = evalTrace "evalChoice" t flg
     f (CSplit n g e) = CSplit n g $ choice e
     f e = composOpLam (underLambda flg) f e
 
-    choice (CBar es) = CBar $ map choice es  -- look for nested choices
+    -- Is choice free expression?
+    isCE CValue{} = True
+    isCE (CUnify e1 e2) = isCE e1 && isCE e2
+    isCE (CSeq es) = all isCE es
+    isCE COne{} = True
+    isCE CAll{} = True
+    isCE CSucceeds{} = True
+    isCE CDecides{} = True
+    --isCE CSplit = ??? depends on n and g
+    isCE (CApply (VPrim p) _) = isCEPrim p
+    isCE _ = False
+
+    isCEPrim _ = True
+
+    choice (CBar es) = CBar $ map choice es
+--    choice e | trace ("\nchoice ***\n" ++ prettyShow e++"\n---") False = undefined
     choice e =
       case runState (findC e) Nothing of
         (_, Nothing) -> f e  -- no choice found, look deeper down
         (e', Just es) -> CBar $ map e' es
     -- Find the leftmost choice.
     -- Return a function representing the CX context.
+    findC :: Core -> State (Maybe [Core]) (Core -> Core)
     findC e = do
       me <- get
       if isJust me then
@@ -144,11 +160,16 @@ evalChoice flg = evalTrace "evalChoice" t flg
         case e of
           CUnify e1 e2 -> do
             e1' <- findC e1
-            e2' <- findC e2
+            e2' <- if isCE e1 then findC e2 else pure $ const e2
             pure $ \ x -> CUnify (e1' x) (e2' x)
           CSeq es -> do
-            es' <- mapM findC es
-            pure $ \ x -> CSeq (map ($ x) es')
+            let loop [] = pure []
+                loop (x:xs) = do
+                  x' <- findC x
+                  xs' <- if isCE x then loop xs else pure $ map const xs
+                  pure $ x' : xs'
+            es' <- loop es
+            pure $ \ x -> CSeq $ map ($ x) es'
           CDef h b -> do
             b' <- findC b
             pure $ \ x -> CDef h (b' x)
@@ -447,6 +468,7 @@ evalSeq flg = evalTrace "evalSeq" f flg
 evalBar :: EvalCore
 evalBar flg = evalTrace "evalBar" f flg
   where
+    f (CBar [e]) = e
     f (CBar es) = CBar $ concatMap (flat . f) es
     f e = composOpLam (underLambda flg) f e
     flat (CBar es) = es

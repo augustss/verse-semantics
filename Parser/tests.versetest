@@ -106,6 +106,9 @@ testeq(SEq) {
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
   fac[3] }                                                                     {6}
 
+testeq(SEq) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
+testeq(SEq) {f() := 1|2; for(f[]; x:=3|4){x}}     {(3,4,3,4)}
+
 # Joachim's tests
 # Check that BIND removes _one_ unification only
 testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
