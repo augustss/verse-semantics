@@ -135,7 +135,7 @@ core e@LitRat{} = val e
 core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
-core (ApplyS e1 e2) = CSucceeds <$> core (ApplyD e1 e2)
+core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
@@ -150,19 +150,20 @@ core (For2 e1 e2) = do
   e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
   ee <- coreD (seqE [e1, e2'])
-  if useSplit then cAll ee else pure $ CAll ee
+  cAll ee
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
   l <- coreD (seqE [e1, e2'])
   r <- core e3'
-  fn <- (if useSplit then cOne else pure . COne) $ CBar [l, r]
+  fn <- cOne $ CBar [l, r]
   i <- newTmp
   pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core e = impossible e
 
 cOne :: Core -> C Core
+cOne e | not useSplit = pure $ COne e
 cOne e = do
   u1 <- newTmp
   u2 <- newTmp
@@ -170,6 +171,7 @@ cOne e = do
   pure $ CSplit (VLam u1 CFail) (VLam v $ CLam u2 $ CVar v) e
 
 cAll :: Core -> C Core
+cAll e | not useSplit = pure $ CAll e
 cAll e = do
   f <- newTmp
   g <- newTmp
@@ -191,6 +193,20 @@ cAll e = do
              CSplit (Var f) (Var g) e
              ]
                                 
+cSucceeds :: Core -> C Core
+cSucceeds e | not useSplit = pure $ CSucceeds e
+cSucceeds e = do
+  u1 <- newTmp
+  u2 <- newTmp
+  u3 <- newTmp
+  u4 <- newTmp
+  x <- newTmp
+  y <- newTmp
+  pure $ CSplit (VLam u1 (CWrong "succeeds-fail"))
+                (VLam x $ CLam y $ CSplit (VLam u2 (CVar x))
+                                          (VLam u3 $ CLam u4 $ CWrong "succeed-many")
+                                          (CApply (Var y) (VArray [])))
+                e
 
 -- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core

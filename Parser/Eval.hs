@@ -137,9 +137,15 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CAll{} = True
     isCE CSucceeds{} = True
     isCE CDecides{} = True
-    --isCE CSplit = ??? depends on n and g
+    isCE (CSplit (VLam _ n) (VLam _ g) _) = isCE' n && isCE' g
     isCE (CApply (VPrim p) _) = isCEPrim p
     isCE _ = False
+
+    -- Check if the arms of CSplit are choice free
+    isCE' (CLam _ e) = isCE' e
+    isCE' CWrong{} = True
+    isCE' CFail = True
+    isCE' e = isCE e
 
     isCEPrim _ = True
 
