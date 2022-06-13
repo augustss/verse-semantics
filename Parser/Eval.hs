@@ -126,7 +126,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
     f (CDecides e) = CDecides $ choice e
-    f (CSplit n g e) = CSplit n g $ choice e
+    f (CSplit e n g) = CSplit (choice e) n g
     f e = composOpLam (underLambda flg) f e
 
     -- Is choice free expression?
@@ -137,7 +137,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CAll{} = True
     isCE CSucceeds{} = True
     isCE CDecides{} = True
-    isCE (CSplit (VLam _ n) (VLam _ g) _) = isCE' n && isCE' g
+    isCE (CSplit _ (VLam _ n) (VLam _ g)) = isCE' n && isCE' g
     isCE (CApply (VPrim p) _) = isCEPrim p
     isCE _ = False
 
@@ -399,10 +399,10 @@ evalDef flg = evalTrace "evalDef" f flg
 evalSplit :: EvalCore
 evalSplit flg = evalTrace "evalSplit" f flg
   where
-    f (CSplit n _ CFail) = CApply n (VArray [])
-    f e@(CSplit _ g (CValue v)) = val e g v (VLam dummy CFail)
-    f e@(CSplit _ g (CBar (CValue v : es))) = val e g v (VLam dummy $ CBar es)
-    f (CSplit _ _ e@CWrong{}) = e
+    f (CSplit CFail n _) = CApply n (VArray [])
+    f e@(CSplit (CValue v) _ g) = val e g v (VLam dummy CFail)
+    f e@(CSplit (CBar (CValue v : es)) _ g) = val e g v (VLam dummy $ CBar es)
+    f (CSplit e@CWrong{} _ _) = e
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
