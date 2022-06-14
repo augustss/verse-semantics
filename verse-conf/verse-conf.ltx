@@ -298,15 +298,26 @@ We discuss related work in \Cref{sec:related}.
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |con K (v_1, dots, v_n)| \vb |lam x e| \\
-    \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \\
-     && \vb & |one e| \vb |all e| \vb |succeeds e| \vb |decides e| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add|
+\iffullverse
+    \vb |isInt|
+\fi
+    \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| 
+    \vb |one e| \vb |all e| \\
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
     \\
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
     \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
      &&\vb & |def x CX| \\
-    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole | \\
-     &&\vb & |one hole| \vb |all hole| \vb |succeeds hole| \vb |decides hole| \\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+\iffullverse
+    && \vb & |succeeds hole| \vb |decides hole| \\
+\fi
+    \\
     \text{Value context} & V & ::= & \hole \vb |arr (dots,V,dots)|\\
     \end{array} \\
     \\
@@ -327,7 +338,7 @@ We discuss related work in \Cref{sec:related}.
 
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
-rewrite rules precisely in \Cref{sec:rewrite-rules}
+rewrite rules precisely in \Cref{sec:rewrite-rules}.
 
 \versecalc{} is modelled on the lambda calculus, and indeed the lambda calculus is
 a sub-language of \versecalc{}.  Just like the lambda calculus, \versecalc{} is untyped;
