@@ -829,6 +829,20 @@ constants.  For example $|applyx add (3,4)| \movesto |7|$.  The only unusual poi
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
 and returns |k_1| otherwise.
 
+Sequencing, is very simple (rule \rulename{seq}):
+|(e_1;e_2)|, simply reduces |e_1| to a value, and then discards it, returning
+|e_2|.  The reason for evaluating |e_1| is for its unification effects.
+Our insistence on clear sequencing also makes it possible to extend \versecalc{}
+with more general effects, but that is beyond the scope of this paper.
+
+Notice that \versecalc{} is \emph{lenient}, not lazy, nor strict.  Consider a function
+call |f(e)|.  In \versecalc{} the argument of an application is syntactically a value (\Cref{fig:syntax})
+so we must actually write |(x=e; f(x))|. This expression will not return a value until
+|e| reduces to a value: everything is eventually evaluated.  But even so |f(x)| can proceed
+to beta-reduce (\Cref{sec:beta})... \simon{working here}
+
+\subsection{Function application} \label{sec:beta)
+
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
 only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
 and a unifcation constraint |(x=v)| to bind |x| to the argument.
@@ -921,10 +935,6 @@ To make further progress, we need a rule for choice, \Cref{sec:choice-rules}.
   see \Cref{sec:recursion}.
 \end{itemize}
 
-Rules \rulename{swap} and \rulename{def-float} are adminstrative; the former
-swaps the arguments to unification to make \rulename{subst} apply, while
-the latter moves a |defKW| ``out of the way''.  For example |x = (def y e)| $\movesto$ |def y (x=e)|.
-
 
 \subsection{Unification: recursion and the occurs check} \label{sec:occurs} \label{sec:recursion}
 
@@ -942,6 +952,19 @@ $$
 |factorial = lam n (if (n=0) then 1 else n * applyx factorial (n-1))|
 $$
 \simon{Discussion on Slack.}
+
+\subsection{Unification: administrative rules}
+
+A number of rules are administative: they shuffle expressions about in order to make
+the main unification rules apply.
+Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
+the expression |(y = (def x (x,2)); dots)| does not bind |y| to a value, but if we float the |defKW| out
+we get |def x (y=(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
+Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
+again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
+same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{sec:mixing}).
+
+Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
