@@ -547,18 +547,17 @@ Its specification is this:
 if |e| fails, |one(e)| fails; otherwise |one(e)| returns the first of the values yielded by |e|.
 Now, |if e_1 then e_2 else e_3| can (nearly) be re-expressed like this:
 $$
-|one( (one(e_1); e_2) choice e_3 )|
+|one( (e_1; e_2) choice e_3 )|
 $$
 If |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't right:
 what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
 which wraps the then and else branches in a thunk:
 $$
-|applyx (one( one(e_1; (lam x e_2)) choice (lam x e_3))) ()|
+|applyx (one( (e_1; (lam x e_2)) choice (lam x e_3))) ()|
 $$
-The argument of the outer |oneKW| evaluates to either |((lam x e_2) choice (lam x e_3))| or |(lam x e_3)|
-depending on whether |e_1| succeeds or fails, respectively, and the outer |oneKW| then picks the first of
-these and applies it to |()|.  As a bonus, if we do no evaluation under a lambda, then |e_2| and |e_3| will
+The argument of |oneKW| evaluates to either |((lam x e_2) choice dots)| or |(lam x e_3)|
+depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |()|.  As a bonus, if we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain un-evaluated until the choice is made, just as we expect.
 
 Now |if| is just syntactic sugar, and the special property of |if| becomes a special property of |oneKW|.
