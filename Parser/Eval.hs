@@ -137,15 +137,11 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CAll{} = True
     isCE CSucceeds{} = True
     isCE CDecides{} = True
-    isCE (CSplit _ (VLam _ n) (VLam _ g)) = isCE' n && isCE' g
+    isCE (CSplit _ (VLam _ n) (VLam _ (CLam _ g))) = isCE n && isCE g
     isCE (CApply (VPrim p) _) = isCEPrim p
+    isCE CFail = True
+    isCE CWrong{} = True
     isCE _ = False
-
-    -- Check if the arms of CSplit are choice free
-    isCE' (CLam _ e) = isCE' e
-    isCE' CWrong{} = True
-    isCE' CFail = True
-    isCE' e = isCE e
 
     isCEPrim _ = True
 
@@ -403,6 +399,7 @@ evalSplit flg = evalTrace "evalSplit" f flg
     f e@(CSplit (CValue v) _ g) = val e g v (VLam dummy CFail)
     f e@(CSplit (CBar (CValue v : es)) _ g) = val e g v (VLam dummy $ CBar es)
     f (CSplit e@CWrong{} _ _) = e
+    f (CSplit (CBar (e@CWrong{} : _)) _ _) = e
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
