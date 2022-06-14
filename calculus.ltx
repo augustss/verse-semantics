@@ -1136,6 +1136,7 @@ $$
     \rulename{split-value} & |split v f g| & \movesto & |def x (x = applyx g v; applyx x (_ => fail)| & \text{|x| fresh} \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |def x (x = applyx g v; applyx x (_ => e)| & \text{|x| fresh} \\
     \rulename{split-wrong} & |split wrong f g| & \movesto & |wrong| \\
+    \rulename{split-wrong} & |split (wrong `choice` e) f g| & \movesto & |wrong| \\
 \end{array} \\
 \\
 \begin{array}{rclll}
