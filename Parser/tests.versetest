@@ -122,8 +122,11 @@ testeq(SEq) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
 testeq(SEq) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
 testeq(SEq) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
 
-testeq(SEq) {0[0]}                                {wrong$}
-testeq(SEq) {operator'/'(1,0)}                    {wrong$}
+testeq(SEq) {0[0]}                                {wrong}
+testeq(SEq) {operator'/'(1,0)}                    {wrong}
+
+testeq(SEq) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
+testeq(SEq) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only

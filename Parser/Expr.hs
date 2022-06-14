@@ -56,6 +56,7 @@ data Expr
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
+  | ApplyEff [Eff] Expr       -- eff(rs){e}
   | EffAttr Expr Eff          -- f<e>
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
@@ -132,6 +133,7 @@ instance Pretty Expr where
             where (q, ql, _) = fixity "()"
           ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
             where (q, ql, _) = fixity "()"
+          ApplyEff rs e -> text "eff" <> parens (commaSep l 0 rs) <> braces (ppr 0 e)
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
@@ -231,6 +233,7 @@ compos f (Array es) = Array <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
 compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2
 compos f (ApplyD e1 e2) = ApplyD <$> f e1 <*> f e2
+compos f (ApplyEff rs e) = ApplyEff rs <$> f e
 compos f (EffAttr e r) = EffAttr <$> f e <*> pure r
 compos f (PrefixOp op e) = PrefixOp op <$> f e
 compos f (PostfixOp e op) = PostfixOp <$> f e <*> pure op

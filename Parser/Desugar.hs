@@ -60,6 +60,8 @@ dsD = expr
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
     -- D[e1[e2]] = D[e1][D[e2]]
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+    -- D[eff(rs){e}] = eff(rs){D[e]}
+    expr (ApplyEff rs e) = ApplyEff rs <$> expr e
     -- Attributes are only allow for function definitions
     expr e@(EffAttr _ (Ident l _)) = syntaxError l $ "attribute not allowed: " ++ prettyShow e
     -- D[e1 = e2] = D[e1] = D[e2], also change constructor
@@ -95,7 +97,7 @@ dsD = expr
     expr (InfixOp e1 (Ident _ "=>") e2) = expr $ Function [(e1, [])] e2
     -- See below
     expr (Function [(e, [])] b) = function e b
-    expr (Function [(e, r:rs)] b) = expr $ Function [(e, rs)] $ applyEffect r b
+    expr (Function [(e, rs)] b) = expr $ Function [(e, [])] $ ApplyEff rs b
     -- D[fn a1 a2 ... {b}] = D[fn a1 (fn a2 ... {e})]
     expr (Function (a:as) b) = expr $ Function [a] $ Function as b
 
@@ -220,6 +222,7 @@ dsM expr y =
       pure $ Seq (Snoc es e')
     ApplyS{} -> dflt
     ApplyD{} -> dflt
+    ApplyEff{} -> dflt
     If3 e1 e2 e3 -> If3 e1 <$> dsM e2 y <*> dsM e3 y
     For2 e1 e2 -> do
       let l = noLoc
@@ -291,10 +294,6 @@ applyPrim s e = ApplyS (Variable (Ident noLoc s)) e
 
 applyPrimD :: String -> SExpr -> SExpr
 applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
-
--- XXX do something special?
-applyEffect :: Ident -> Expr -> Expr
-applyEffect i e = ApplyD (Variable i) e
 
 newInt :: D Int
 newInt = do
@@ -506,7 +505,7 @@ primOps = map (Ident noLoc)
   , "known$"  -- This is a horrible hack
   , "deref$", "new$", "assign$"
   , "intGT$", "intGE$", "intLT$", "intLE$"
-  , "wrong$"
+  , "wrong"
   ]
 
 --------------------
@@ -586,6 +585,7 @@ getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
 getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (ApplyEff _ e) = getVisible e
 getVisible If3{} = []
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
@@ -667,6 +667,7 @@ scopeErrs s = expr
     expr (Seq es) = concatMap expr es
     expr (ApplyS e1 e2) = expr e1 ++ expr e2
     expr (ApplyD e1 e2) = expr e1 ++ expr e2
+    expr (ApplyEff _ e) = expr e
     expr (If3 e1 e2 e3) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2) ++ expr (Do e3)
       where (errs, s') = defs e1
     expr (For2 e1 e2) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2)

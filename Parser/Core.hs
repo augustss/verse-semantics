@@ -83,6 +83,9 @@ pattern CAll c <- CMacro (Ident _ "all") c
 pattern CSucceeds :: Core -> Core
 pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
   where CSucceeds e = CMacro (Ident noLoc "succeeds") e
+pattern CDecides :: Core -> Core
+pattern CDecides c <- CMacro (Ident _ "decides") c
+  where CDecides e = CMacro (Ident noLoc "decides") e
 pattern CFail :: Core
 pattern CFail = CBar []
 pattern VLam :: Ident -> Core -> Value
@@ -132,12 +135,13 @@ exprToCore = flip evalState 1 . coreD
 core :: Expr -> C Core
 core e@LitInt{} = val e
 core e@LitRat{} = val e
-core (Variable (Ident _ "wrong$")) = pure $ CWrong "called"
+core (Variable (Ident l "wrong")) = pure $ CWrong $ "called: " ++ prettyShow l
 core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
+core (ApplyEff rs e) = coreEffs rs =<< core e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
@@ -162,6 +166,12 @@ core (If3 e1 e2 e3) = do
   pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core e = impossible e
+
+coreEffs :: [Ident] -> Core -> C Core
+coreEffs [] e = pure e
+coreEffs [Ident _ "decides"] e = cDecides e
+coreEffs [Ident _ "succeeds"] e = cSucceeds e
+coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
 
 cOne :: Core -> C Core
 cOne e | not useSplit = pure $ COne e
@@ -205,6 +215,22 @@ cSucceeds e = do
   y <- newTmp
   pure $ CSplit e
                 (VLam u1 (CWrong "succeeds-fail"))
+                (VLam x $ CLam y $ CSplit (CApply (Var y) (VArray []))
+                                          (VLam u2 (CVar x))
+                                          (VLam u3 $ CLam u4 $ CWrong "succeed-many")
+                )
+
+cDecides :: Core -> C Core
+cDecides e | not useSplit = pure $ CDecides e
+cDecides e = do
+  u1 <- newTmp
+  u2 <- newTmp
+  u3 <- newTmp
+  u4 <- newTmp
+  x <- newTmp
+  y <- newTmp
+  pure $ CSplit e
+                (VLam u1 CFail)
                 (VLam x $ CLam y $ CSplit (CApply (Var y) (VArray []))
                                           (VLam u2 (CVar x))
                                           (VLam u3 $ CLam u4 $ CWrong "succeed-many")
