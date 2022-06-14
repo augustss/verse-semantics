@@ -290,7 +290,7 @@ We discuss related work in \Cref{sec:related}.
     \text{Integer constants} & k \\
     \text{Data constructors} & K \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & e \\
+    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |applyx v_1 v_2| \\
     && \vb & |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
     && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
@@ -363,7 +363,8 @@ For notational convenience we allow ourselves to abbreviate such tuples to just 
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |applyx v_1 v_2|.  Remembering that
-a value can be a lambda, that gives us the full lambda calculus.
+  a value can be a lambda, that gives us the full lambda calculus.
+  \item \emph{A program}, |p|, is a closed expression from which we extract one result using |one| (see \Cref{sec:one}).
 \end{itemize}
 But expressions also include two other key collections of constructs:
 logical variables and unification (\Cref{sec:unify}), and choice (\Cref{sec:choice}).
@@ -522,7 +523,7 @@ which amounts to exploring the possiblity that |xs| is headed by |Nil| or |Cons|
 essence of narrowing.  It should not take long to reassure yourself that the program
 evaluates to |con Nil ()|, effectively running |append| backwards in the classic logic-programming manner.
 
-\subsection{Conditionals and |oneKW|} \label{sec:rigid}
+\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one}
 
 Every source language will provide a conditional, like |if (x=0) then
 e_1 else e_2|.  But what is the equality operator in |(x=0)|?  One
@@ -688,7 +689,8 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
 
    \end{array}
    $$
-  \caption{The Verse calculus: rewrite rules (1)} \label{fig:general-axioms}
+  \caption{The Verse calculus: rewrite rules (1)}
+    \label{fig:general-axioms} \label{fig:rules1}
 \end{figure}
 
 \begin{figure}
@@ -740,7 +742,8 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
 
    \end{array}
    $$
-\caption{The Verse calculus: rewrite rules (2)} \label{fig:unification-axioms}
+  \caption{The Verse calculus: rewrite rules (2)}
+    \label{fig:rules2}  \label{fig:choice}
 \end{figure}
 
 % ---------------------- Commenting out the wrong rules ------------------
@@ -818,7 +821,7 @@ has the following properties:
   and by compilers, to transform (and hopefully optimise) the program.
 \end{itemize}
 
-The rewrite rules are given in Figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}.
+The rewrite rules are given in Figures \ref{fig:rules1d-axioms} and \ref{fig:choice}.
 \simon{add wrong axioms}, and are described next.
 
 \subsection{Basic rewrites}
@@ -913,8 +916,9 @@ ill-formed expression |(e,2)|.
     and the unification equation.
 \item
 Note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
-That restriction is the key to the flexible/rigid distinction we dicussed
-in \Cref{sec:rigid}. For example, consider the expression
+That restriction is the key to localising unification (see \Cref{sec:mixing}), and
+the flexible/rigid distinction of
+\Cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); (x+1,y))|.
 We must not propagate the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
@@ -967,6 +971,56 @@ same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{se
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
 \subsection{Rules for choice} \label{sec:choice-rules}
+
+The rules for choice are given in \Cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
+say that |fail| is the unit for choice |choice|.  Rules \rulename{one-value}, \rulename{one-choice}
+and \rulename{one-fail} describe the semantics for |one|, just as in \Cref{sec:one}.
+The \rulename{assoc-choice} is an administrative rule, to allow \rulename{one-choice} to fire.
+
+The most interesting rule is \rulename{choose} which, just as described in \Cref{sec:choice},
+``floats the choice outwards'', duplicating the surrounding context.
+But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
+defined in \Cref{fig:syntax}. A \emph{choice context} |CX| is like an
+execution context |X|, \emph{but with no possible
+  choices to the left of the hole}:
+$$
+CX ::= \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX|
+\vb |def x CX|
+$$
+Here, |ce| is guaranteed-choice-free expression (syntax in \Cref{fig:syntax}).
+This syntactic condition is necessarily conservative; for example, a call |f(x)|
+is considered not guaranteed-choice-free, because it depends on what function |f| does.
+We must guarantee not to have choices to the left so that we preserve order --
+see \Cref{sec:mixing}.
+
+The context |SX| (\Cref{fig:syntax}) is a \emph{scope context}; it
+ensures that |CX| is as large as possible.  This is a subtle point:
+without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
+  a use of |one|, see \Cref{sec:one}, but using |if| makes the example easier to understand.}:
+$$
+\begin{array}{ll}
+\multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
+\movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
+\movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
+\movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
+\movesto \{\rulename{def-elim}\} & |1; (77 choice 99)|\\
+\movesto \{\rulename{seq}\} & |77 choice 99|\\
+\end{array}
+$$
+But suppose instead we floated the choice out, \emph{part-way}, like this:
+$$
+\begin{array}{ll}
+\multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
+\movesto \{\text{Bogus \rulename{choose}}\} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
+\end{array}
+$$
+Now the |(x=1)| is inside the choice branches, so we cannot use \rulename{subst} to rewrite the
+condition of the |if|.  Nor can we use \rulename{choose} again to float the choice further out,
+because the |if| is not guaranteed choice-free (for example, the branches might contains choices).
+So, alas, we are stuck!
+
+Our not-entirely-satisfying solution is to force \rulename{choose} to float the choice all the way
+to the innermost enclosing scope construct; hence the |SX| in the rule.
 
 
 \section{Metatheory and confluence}
@@ -1044,8 +1098,8 @@ the CRWL framework.  Their key insight (inspired by Ariola \emph{et al}
 \cite{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
-However both CRWL and Fraguas \emph{et al} suffer from a major problem: their
-treatment of logical variables.   A key rewrite rule is this;
+However both CRWL and Fraguas \emph{et al} suffer from a major problem:
+they require something we call \emph{magical rewriting}. A key rewrite rule is this;
 $$
 \begin{array}{l}
 f( \theta(e_1),\ldots, \theta(e_n) ) \movesto \theta( rhs ) \\
@@ -1061,10 +1115,10 @@ $$
 The substitution for the free variables of the left hand side can
 readily be chosen by matching the left hand side against the call.
 But the substitution for the extra variables must be chosen ``magically''
-(\cite[Section 7]{fraguas:rewriting}) or clairvoyantly, so as to make the future execution
+\cite[Section 7]{fraguas:rewriting} or clairvoyantly, so as to make the future execution
 work out. This is admirably high level, because it hides everything
 about unification, but it is not much help to a programmer trying to
-understand a program.
+understand a program, nor is it directly executable.
 
 To explain actual execution, the state of the art is described by
 Hanus \emph{et al}\cite{hanus:semantics}.  They give both a big-step operational
@@ -1082,6 +1136,27 @@ account of logical variables and choice, directly as small-step
 rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
+
+\subsection{Intermediate language}
+
+Hanus's \emph{Flat Language} \cite[Fig 1]{hanus:semantics} plays the same role as \versecalc{}:
+it is a small core language
+into which a larger surface language can be desugared.
+There are some common features: variables, literals, constructor applications,
+and sequencing (written \verb!hnf! in the Flat Langauge).
+However, it seems that \versecalc{} has a greater economy of concepts.
+In particular, the Flat Language
+has two forms of equality \verb!(==)! and \verb!(=:=)!, and two forms
+of case-expression, \verb!case! and \verb!fcase!.  In each pair, the former suspends
+if it encounters a logical variable; the latter unifies or narrows
+respectively. In contrast, \versecalc{}
+has a single equality |(=)|, and the orthogonal |one| construct, to deal with all four concepts.
+
+The Flat Language has let-expressions \verb!(let x=e in b)!, where \versecalc{} uses
+|defKW| and (again) unification.
+The Flat Language also uses the same construct for a different purpose, to
+bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
+In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
