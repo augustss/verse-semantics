@@ -557,7 +557,8 @@ $$
 |applyx (one( (e_1; (lam x e_2)) choice (lam x e_3))) ()|
 $$
 The argument of |oneKW| evaluates to either |((lam x e_2) choice dots)| or |(lam x e_3)|
-depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |()|.  As a bonus, if we do no evaluation under a lambda, then |e_2| and |e_3| will
+depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |()|.
+As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain un-evaluated until the choice is made, just as we expect.
 
 Now |if| is just syntactic sugar, and the special property of |if| becomes a special property of |oneKW|.
@@ -776,7 +777,7 @@ programming language?  Here are some possiblities:
 \begin{itemize}
 \item \emph{High level.} A denotational semantics is the classical approach, but it is quite mathematical
   (and hence not a good way to explain to programmer what their program means),
-  and it does not distinguish between call-by-need and call-by-name (hence ``high level'').
+  and it cannot distinguish between call-by-need and call-by-name (hence ``high level'').
 \item \emph{Low level.} A big-step operational semantics typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation \cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
 \item \emph{Lower level}. Despite its ``operational semantics'' title, this big step approach
   does not convey accurate operational intutition, because it goes all the way to a value
@@ -837,12 +838,18 @@ $\alpha$-conversion to rename |x| to $x' \not\in \freevars{v}$.
 
 Next we study unification, again in \Cref{fig:general-axioms}.
 Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
-are absolutely standard rules for unification. The only special thing
+are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
 constructor applications\footnote{An alternative choice would
 for unification to yield |()| on success; but it does not make much difference
-either way.}.
+either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
+you attempt to unify an integer with a tuple.
+
+Slightly less obviously,
+\rulename{ux3} and \rulename{ux4} make unification fail if you attempt to unify a
+lambda with any other value -- including itself.
+Thus |(lam x x)=(lam x x)| fails. We discuss this more in \Cref{sec:unify-lambda}.
 
 Matters get more interesting when variables are involved.
 The key rule is \rulename{subst}:
@@ -902,7 +909,7 @@ to translate a higher order program into a first-order
 form\footnote{
   He does not mention this, but for a language with arbitrary nested lambdas
   one would need to do lambda-lifting as well, but that is a small point.}
-using defunctionalisation \cite[Section 3.3]{hanus-survey}, and a buit-in
+using defunctionalisation \cite[Section 3.3]{hanus:survey}, and a buit-in
 function |apply| function.
 But this encoding is hardly a natural rendition of the lambda calculus, and it
 obstructs the goal of using rewrite rules to explain to programmers how
@@ -1000,6 +1007,29 @@ account of logical variables and choice, directly as small-step
 rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
+
+\section{Variations and choices}
+
+In a calculs like \versecalc{} there is room for many design variations.
+We discuss some of them here.
+
+\subsection{Unifying lambdas}
+
+In \versecalc{} we say that any attempt to unify two lambdas fails -- even if the
+lambdas are semantically identical.  The problem, obviously, is that it is hard
+to tell if they \emph{are} semantically identical.
+
+We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
+Here is an expression that could rewrite in two different ways:
+$$
+\begin{array}{lll}
+ \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x ())|} \\
+&    \movesto \{\textit{use \rulename{SUSBST} on second equality}\} & |(lam p 1) = (lam q 2); 1| \\
+OR & \movesto \{\textit{use \rulename{SUSBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
+\end{array}
+$$
+These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
+lead to |fail|, and confluence is restored.
 
 \section{Conclusions and further work}
 
