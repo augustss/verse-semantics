@@ -79,6 +79,7 @@
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 
+%format in = "\textbf{in}"
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
