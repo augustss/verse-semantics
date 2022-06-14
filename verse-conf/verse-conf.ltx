@@ -644,6 +644,9 @@ So, e.g., |for(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choic
       \end{array}\right.\\
     \rulename{ux1} & |k == con K (v_1,dots,v_n) | & \movesto & |fail| \\
     \rulename{ux2} & |con K (v_1,dots,v_n) == k | & \movesto & |fail| \\
+    \rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
+    \rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
+    \rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| \quad \text{if }|V| \ne |hole|
      \end{array}\\
 
     \\[-2mm]
@@ -660,8 +663,6 @@ So, e.g., |for(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choic
     \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[lam y e]; e))]|} \\
         &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}
     \end{array} \\
-    \\[-2mm]
-
     \textit{Sequencing} \\
     \begin{array}{lrcl}
     \rulename{seq} & |v ; e| & \movesto & |e| \\
@@ -730,53 +731,45 @@ So, e.g., |for(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choic
 \caption{The Verse calculus: rewrite rules (2)} \label{fig:unification-axioms}
 \end{figure}
 
-\begin{figure}
-  $$
-  \begin{array}{l}
-    \textbf{Syntax extension} \\
-    \begin{array}{lrcl}
-      \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
-    \end{array} \\
-    \\
-    \textbf{Axiom extension} \\
-    \begin{array}{lrcll}
-    \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-    \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-    \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
-    \rulename{unify-wrong-1} & |(lam x_1 e_1) = (lam x_2 e_2)| & \movesto & |wrong| \\
-    \rulename{unify-wrong-2} & |(lam x e) == hnf| & \movesto & |wrong|\\
-    \rulename{unify-wrong-3} & |hnf == (lam x e)| & \movesto & |wrong|\\
-    \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
-\iffullverse
-    \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
-    \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
-    \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
-    \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
-    \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
-\fi
-    \end{array}
-  \end{array}
-  $$
-\caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
-\end{figure}
+% ---------------------- Commenting out the wrong rules ------------------
+% \begin{figure}
+%   $$
+%   \begin{array}{l}
+%     \textbf{Syntax extension} \\
+%     \begin{array}{lrcl}
+%       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+%     \end{array} \\
+%     \\
+%     \textbf{Axiom extension} \\
+%     \begin{array}{lrcll}
+%     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
+%     \rulename{unify-wrong-1} & |(lam x_1 e_1) = (lam x_2 e_2)| & \movesto & |wrong| \\
+%     \rulename{unify-wrong-2} & |(lam x e) == hnf| & \movesto & |wrong|\\
+%     \rulename{unify-wrong-3} & |hnf == (lam x e)| & \movesto & |wrong|\\
+%     \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
+% \iffullverse
+%     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+% \fi
+%     \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
+%     \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
+%     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
+%     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
+%     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
+%     \end{array}
+%   \end{array}
+%   $$
+% \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+% \end{figure}
 
-\begin{figure}
-  $$
-  \begin{array}{l}
-    \begin{array}{lrcll}
-    \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
-    \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
-    \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
-    \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
-    \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
-    \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
-    \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
-    \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
-    \end{array}
-  \end{array}
-  $$
-\caption{The Verse calculus: propagation of |wrong|} \label{fig:wrong-propagation}
-\end{figure}
 
 How can we give a precise semantics to a non-strict functional
 programming language?  Here are some possiblities:
