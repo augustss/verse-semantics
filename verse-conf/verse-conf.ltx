@@ -841,7 +841,7 @@ so we must actually write |(x=e; f(x))|. This expression will not return a value
 |e| reduces to a value: everything is eventually evaluated.  But even so |f(x)| can proceed
 to beta-reduce (\Cref{sec:beta})... \simon{working here}
 
-\subsection{Function application} \label{sec:beta)
+\subsection{Function application} \label{sec:beta}
 
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
 only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
