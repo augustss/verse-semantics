@@ -318,7 +318,7 @@ We discuss related work in \Cref{sec:related}.
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
     \\
-    \text{Value context} & V & ::= & \hole \vb |arr (dots,V,dots)|\\
+    \text{Value context} & V & ::= & \hole \vb |con K (v_1, dots ,V, dots, v_n)|\\
     \end{array} \\
     \\
     \textbf{Shorthand} \\
@@ -831,7 +831,7 @@ ensures that the |defKW x|
 does not capture any variables free in |v|.  If |x| appears free in |v|, just use
 $\alpha$-conversion to rename |x| to $x' \not\in \freevars{v}$.
 
-\subsection{Unification}
+\subsection{Unification: the easy bits}
 
 Next we study unification, again in \Cref{fig:general-axioms}.
 Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
@@ -842,11 +842,11 @@ constructor applications\footnote{An alternative choice would
 for unification to yield |()| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
 you attempt to unify an integer with a tuple.
-
 Slightly less obviously,
 \rulename{ux3} and \rulename{ux4} make unification fail if you attempt to unify a
-lambda with any other value -- including itself.
-Thus |(lam x x)=(lam x x)| fails. We discuss this more in \Cref{sec:unify-lambda}.
+lambda with any other value.  We discuss this design choice further in \Cref{sec:unifying-lambda}.
+
+\subsection{Unification: the \rulename{subst} rule}
 
 Matters get more interesting when variables are involved.
 The key rule is \rulename{subst}:
@@ -855,22 +855,42 @@ $$
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
 It says that if we have a unification constraint |(x=v)| in a term,
-we can replace nearby occurrences of |x| by |v|.  Here |X| is an \emph{execution context},
-defined in \Cref{fig:syntax}.  A ``context'' is just a term with a hole |hole| in it.
-The notation |X^[e]| is the term obtained by filling the hole in |X| with |e|. The
-notation |subst X x v| is the context obtained by replacing all free occurences of |x| in |X| by |v|.
+we can replace nearby occurrences of |x| by |v|.  In this rule, |X| is an \emph{execution context},
+defined in \Cref{fig:syntax}.
+In general, a ``context'' is just a syntactic construct (in this case an expression)
+with a single hole, written |hole|, in it.
+The notation |X^[e]| is the expression obtained by filling the hole in |X| with |e|.
+For example |(y = (hole, 4))| is a possible execution context; filling its hole with 99
+gives the expression |y = (99,4)|.
+The notation |subst X x v| is the context obtained by replacing all free occurences of |x| in |X| by |v|.
 
-Notice that we replace all \emph{other} occurrences of |x| by |v|, leaving
-the original |(x=v)| undisturbed. If that turns out to be the \emph{only} occurence
-of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop the |defKW|,
-and the unification equation.
-
-Notice also that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
+So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the execution
+context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
+There are several things to notice:
+\begin{itemize}
+\item Crucially, \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
+restriction is what implements so-called \emph{call-time choice} \cite{hanus:survey}.
+We do not need a heap, or thunks, or updates; the equalities of the program elegantly
+suffice to express the necessary sharing.
+The fact that we substitute only values for variables also ensures that substitution is syntactically
+valid; if we tried to substitute an expression |e| for a variable in |(x,2)| we would the
+ill-formed expression |(e,2)|.
+\item \rulename{subst}
+  replaces the occurrences of |x| in |X|, \emph{but leaves the original |(x=v)| undisturbed}.
+  For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using the
+  |X = (y=x+1; hole)|.  We must not drop the |(x=v)| because there may be other occurrences of |x|
+  ``further out'', such as |(z=x+3)| in this example.
+\item If the equality |(x=v)| turns out to be the \emph{only} occurence
+      of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
+    and the unification equation.
+\item
+Note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
 That restriction is the key to the flexible/rigid distinction we dicussed
 in \Cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); (x+1,y))|.
-We cannot (and indeed should not!) propagate the binding |(x=3)| to the expression |(x+1)|,
-because the latter is outside the choice.  But rule \rulename{subst}
+We must not propagate the binding |(x=3)| to the expression |(x+1)|,
+because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
+But rule \rulename{subst}
 \emph{can} propagate it locally
 within the first arm of the choice, thus\footnote{
 You may wonder if this local propagation is useful, a point we return
@@ -881,15 +901,36 @@ $$
 |y = ((x=3; 3*2) choice (x=4)); (x+1,y)|
 $$
 To make further progress, we need a rule for choice, \Cref{sec:choice-rules}.
+\item The $(x \in \freevars{X}))$ in \rulename{subst} is there only to prevent \rulename{subst} from
+  begin able to fire infinitiely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
+  also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
+  see \Cref{sec:recursion}.
+\end{itemize}
 
 Rules \rulename{swap} and \rulename{def-float} are adminstrative; the former
 swaps the arguments to unification to make \rulename{subst} apply, while
 the latter moves a |defKW| ``out of the way''.  For example |x = (def y e)| $\movesto$ |def y (x=e)|.
 
-The key point is that \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
-restriction is what implements so-called \emph{call-time choice}.
-We do not need a heap, or thunks, or updates; the equalities of the program elegantly
-suffice to express the necessary sharing.
+
+\subsection{Unification: recursion and the occurs check} \label{sec:occurs} \label{sec:recursion}
+
+The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=(x,3))| fail, because the only successful
+unification would yield an infinitely-nested pair.
+$$
+    \rulename{ux-occurs} \quad |x=V^[x]| \quad \movesto \quad |fail| \quad \text{if }|V| \ne |hole|
+$$
+In this rule, |V| is an \emph{value context}, defined in \Cref{fig:syntax}.
+So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
+that is, if |x| occurs under a ``shell'' of constructors.
+
+What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
+$$
+|factorial = lam n (if (n=0) then 1 else n * applyx factorial (n-1))|
+$$
+\simon{Discussion on Slack.}
+
+\subsection{Rules for choice} \label{sec:choice-rules}
+
 
 \section{Metatheory and confluence}
 
@@ -1010,7 +1051,7 @@ residuation.
 In a calculs like \versecalc{} there is room for many design variations.
 We discuss some of them here.
 
-\subsection{Unifying lambdas}
+\subsection{Unifying lambdas} \label{sec:unifying-lambda}
 
 In \versecalc{} we say that any attempt to unify two lambdas fails -- even if the
 lambdas are semantically identical.  The problem, obviously, is that it is hard
