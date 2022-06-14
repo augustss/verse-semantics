@@ -720,10 +720,7 @@ So, e.g., |for(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choic
 
     \textit{Fail propagation} \\
     \begin{array}{lrcl}
-    \rulename{fail-seql} & |fail; e| & \movesto & |fail|  \\
-    \rulename{fail-seqr} & |e; fail| & \movesto & |fail|  \\
-    \rulename{fail-unifyl} & |fail = e| & \movesto & |fail|  \\
-    \rulename{fail-unifyr} & |e = fail| & \movesto & |fail|  \\
+    \rulename{fail}     & |X[fail]| & \movesto & |fail|  \\
     \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
      \end{array}
 
