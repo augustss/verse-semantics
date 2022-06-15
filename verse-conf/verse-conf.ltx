@@ -1116,9 +1116,9 @@ Alternatively, starting with |y = (lam z x)|, we obtain
 \]
 Can we join |(1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |(1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z ((1, v_y))|$, we get
 \[
-\begin{array}{l@@{\,}l@@{\,}l@@{\,}l}
-|(1,v_y)| & \movesto^\ast |(1,lam z ((1, v_y)))| & \movesto^\ast |(1, lam z ((1, (lam z ((1, v_y))))))| & \movesto^\ast \cdots \\
-|v_x|     & \movesto^\ast |(1,lam z v_x)| & \movesto^\ast |(1, lam z ((1, (lam z v_x))))| & \movesto^\ast  \cdots 
+\begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
+& |(1,v_y)| & \movesto^\ast & |(1,lam z ((1, v_y)))| & \movesto^\ast & |(1, lam z ((1, (lam z ((1, v_y))))))| & \movesto^\ast & \cdots \\
+|v_x|     & \movesto^\ast & |(1,lam z v_x)| & \movesto^\ast & |(1, lam z ((1, (lam z v_x))))| & \movesto^\ast && \cdots
 \end{array}
 \]
 and we \emph{cannot} join them; they keep “missing each other”.
