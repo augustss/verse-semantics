@@ -739,8 +739,8 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
 
 
     \textit{Fail propagation} \\
-    \begin{array}{lrcl}
-    \rulename{fail}     & |X^[fail]| & \movesto & |fail|  \\
+    \begin{array}{lrcll}
+    \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \ne \hole  \\
     \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
      \end{array}
 
