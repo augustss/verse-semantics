@@ -1123,7 +1123,7 @@ Can we join |(1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |(1,lam z v_x)|$ and
 \]
 and we \emph{cannot} join them; they keep “missing each other”.
 
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression”. This phenomenum has been studied before and led to a various generalizations of confluence to allow this behavior.
+But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |(1, lam z ((1, (lam z dots))))| . This phenomenum has been studied before and led to a various generalizations of confluence to allow this behavior.
 
 In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
 
