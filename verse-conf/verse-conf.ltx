@@ -1058,10 +1058,10 @@ Therefore, we aim for confluence up to an equivalence relation $\sim$, which is 
 \item \textalpha-equivalence
 \item $|def (x,y) e| \sim |def (y,x) e|$
 \item $|X[v_1=v_2]| \sim |v_1=v_2;X^[v_2]|$
-\item $|e_1;(e_2;e_3)| \sim |(e_1;e_2);e_3|$
+\item $|(e_1;e_2);e_3| \sim |e_1;(e_2;e_3)|$
 \end{itemize}
 
-Equivalently, we can consider confluence (up to \textalpha-equivalence) for the reduction system extended with by $|def (x,y) e| \movesto |def (y,x) e|$ and $|X^[v_1=v_2;e]| \movesto |v_1=v_2;X^[e]|$ and $|e_1;(e_2;e_3)| \movesto |(e_1;e_2);e_3|$ .
+Equivalently, we can consider confluence (up to \textalpha-equivalence) for the reduction system extended with by $|def (x,y) e| \movesto |def (y,x) e|$ and $|X^[v_1=v_2;e]| \movesto |v_1=v_2;X^[e]|$ and $|(e_1;e_2);e_3| \movesto |e_1;(e_2;e_3)|$.
 
 \joachim{We could omit the associativity rule for |;| if we had the “equalities only on the left of |;|” property}
 
