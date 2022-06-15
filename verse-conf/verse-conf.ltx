@@ -666,6 +666,8 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
     \rulename{ux2} & |arr (v_1,dots,v_n) == k | & \movesto & |fail| \\
     \rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
     \rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
+    \rulename{ux5} & |op == hnf| & \movesto & |fail|\\
+    \rulename{ux6} & |hnf == op| & \movesto & |fail|\\
     \rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| \quad \text{if }|V| \ne |hole|
      \end{array}\\
 
@@ -875,8 +877,8 @@ for unification to yield |()| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
 you attempt to unify an integer with a tuple.
 Slightly less obviously,
-\rulename{ux3} and \rulename{ux4} make unification fail if you attempt to unify a
-lambda with any other value.  We discuss this design choice further in \Cref{sec:unifying-lambda}.
+\rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
+lambda or a built-in operation with any other value.  We discuss this design choice further in \Cref{sec:unifying-lambda}.
 
 \subsection{Unification: the \rulename{subst} rule}
 
@@ -1271,7 +1273,7 @@ We discuss some of them here.
 
 \subsection{Unifying lambdas} \label{sec:unifying-lambda}
 
-In \versecalc{} we say that any attempt to unify two lambdas fails -- even if the
+In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails -- even if the
 lambdas are semantically identical.  The problem, obviously, is that it is hard
 to tell if they \emph{are} semantically identical.
 
