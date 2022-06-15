@@ -632,13 +632,13 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
       |fail| & \text{otherwise}
       \end{array}\right. \\
     \rulename{p-map} &
-      |map (f, (v_1 choice dots choice v_n))|
+      |map (v, (v_1 choice dots choice v_n))|
     & \movesto &
     \begin{array}[t]{@@{}l}
       |defTwoLines (x_1,dots x_n)
-       (x_1 == applyx f v_1; dots x_n == applyx f v_n; arr (x_1,dots,x_n))| \\
+       (x_1 == applyx v v_1; dots x_n == applyx v v_n; arr (x_1,dots,x_n))| \\
     \end{array} \\
-    &&& \multicolumn{1}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{f, v_1, \ldots, v_n}$}} \\[2mm]
+    &&& \multicolumn{1}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v, v_1, \ldots, v_n}$}} \\[2mm]
 \iffullverse
     \rulename{p-isInt} & |applyx isInt hnf| & \movesto &
     \left\{\begin{array}{@@{}ll}
