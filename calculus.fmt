@@ -1,6 +1,3 @@
-\let\Bbbk\relax
-%include polycode.fmt
-
 %format ^ = " "
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
