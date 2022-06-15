@@ -1038,7 +1038,7 @@ Confluence will give us the assurance that we will not get different results whe
 
 The main source for possible non-confluence is rule \rulename{subst}: If we have multiple equations for a variable $x$ available, we can use any of them to rewrite. A typical example would be
 \[ |def x (x=v_1; x=v_2; e)| \]
-which we can rewrite by \rulename{subst} (and administrative \rulename{seq} and \rulename{def-elim}) to either
+which we can rewrite by \rulename{subst} (and administrative \rulename{def-elim} and \rulename{seq}) to either
 \[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
 Can we still join these two expressions? The unification rules allow us to decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variable on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
 
@@ -1066,27 +1066,23 @@ Equivalently, we can consider confluence (up to \textalpha-equivalence) for the 
 
 With with that out of the way, there still remains a source of non-confluence, due to recursion. In
 \[ |def (x,y) (x=(1,y); y=(lam z x); x)| \]
-we can apply \rulename{subst} to $x$ first and obtain
+we can apply \rulename{subst} to $x$ first and obtain the following reduction (omiting spelling out the application of rules \rulename{def-elim} and \rulename{seq}):
 \[
 \begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def (x,y) (x=(1,y); y=(lam z ((1,y))); (1,y))| \\
-\movesto \{\rulename{def-elim}\}  & |def y (y=(lam z ((1,y))); (1,y))| \\
-\movesto \{\rulename{subst-rec}\} & |def y (y=v_y; (1,y))| \text{ where } |v_y| = |(lam z (def y (y = (lam z (1,y)); (1,y))))| \\
-\movesto \{\rulename{subst}\}     & |def y (y=v_y; (1,v_y))|  \\
-\movesto \{\rulename{def-elim}\}  & |(1,v_y)|  \\
+\movesto \{\rulename{subst}\}     & |def y (y=(lam z ((1,y))); (1,y))| \\
+\movesto \{\rulename{subst-rec}\} & |def y (y=v_y; (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (1,y)); (1,y))))| \\
+\movesto \{\rulename{subst}\}     & |(1,v_y)|  \\
 \end{array}
 \]
-or, alternatively, start with |y = (lam z x)| and obtain
+Alternatively, starting with |y = (lam z x)|, we obtain
 \[
 \begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def (x,y) (x=(1,lam z x); y=(lam z x); x)| \\
-\movesto \{\rulename{def-elim}\}  & |def x (x=(1,lam z x); x)| \\
-\movesto \{\rulename{subst-rec}\} & |def x (x=v_x; x)| \text{ where } |v_x| = |(1,lam z (def x (x = (1,(lam z x)); x)))| \\
-\movesto \{\rulename{subst}\}     & |def x (y=v_x; v_x)|  \\
-\movesto \{\rulename{def-elim}\}  & |v_x|  \\
+\movesto \{\rulename{subst}\}     & |def x (x=(1,lam z x); x)| \\
+\movesto \{\rulename{subst-rec}\} & |def x (x=v_x; x)| \quad \text{ where } |v_x| = |(1,lam z (def x (x = (1,(lam z x)); x)))| \\
+\movesto \{\rulename{subst}\}     & |v_x|  \\
 \end{array}
 \]
-Can we join |(1,v_y)| and |v_x|? We find that $|v_x| \movesto^\ast |(1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (1, v_y)|$, so
+Can we join |(1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |(1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z ((1, v_y))|$, we get
 \[
 \begin{array}{l@@{\,}l@@{\,}l@@{\,}l}
 |(1,v_y)| & \movesto^\ast |(1,lam z ((1, v_y)))| & \movesto^\ast |(1, lam z ((1, (lam z ((1, v_y))))))| & \movesto^\ast \cdots \\
@@ -1097,7 +1093,7 @@ and we \emph{cannot} join them; they keep “missing each other”.
 
 But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression”. This phenomenum has been studied before and led to a various generalizations of confluence to allow this behavior.
 
-In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely, and can be paraphrased as: Given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
+In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
 
 Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
 \begin{conjecture}{Skew-confluence}
