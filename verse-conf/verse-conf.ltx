@@ -686,6 +686,8 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+    \rulename{unify-unifyl} & |((v_1 == v_2) == e)| & \movesto & |(v_1 == v_2); (v_2 == e)| \\
+    \rulename{unify-unifyr} & |(e == (v_1 == v_2))| & \movesto & |(v_1 == v_2); (e == v_2)| \\
     \end{array} \\
     \\[-2mm]
 
@@ -966,7 +968,7 @@ the main unification rules apply.
 Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
 the expression |(y = (def x (x,2)); dots)| does not bind |y| to a value, but if we float the |defKW| out
 we get |def x (y=(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
-Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
+Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification, and rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move unifications out of unifications,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{sec:mixing}).
 
@@ -1055,11 +1057,13 @@ Therefore, we aim for confluence up to an equivalence relation $\sim$, which is 
 \begin{itemize}
 \item \textalpha-equivalence
 \item $|def (x,y) e| \sim |def (y,x) e|$
-\item $|X[v_1=v_2;e]| \sim |v_1=v_2;X^[e]|$
+\item $|X[v_1=v_2]| \sim |v_1=v_2;X^[v_2]|$
+\item $|e_1;(e_2;e_3)| \sim |(e_1;e_2);e_3|$
 \end{itemize}
-\joachim{This assumes we add the equality-liberating rules discussed before to the rules proper.}
 
-Equivalently, we can consider confluence (up to \textalpha-equivalence) for the reduction system extended with by $|def (x,y) e| \movesto |def (y,x) e|$ and $|X^[v_1=v_2;e]| \movesto |v_1=v_2;X^[e]|$.
+Equivalently, we can consider confluence (up to \textalpha-equivalence) for the reduction system extended with by $|def (x,y) e| \movesto |def (y,x) e|$ and $|X^[v_1=v_2;e]| \movesto |v_1=v_2;X^[e]|$ and $|e_1;(e_2;e_3)| \movesto |(e_1;e_2);e_3|$ .
+
+\joachim{We could omit the associativity rule for |;| if we had the “equalities only on the left of |;|” property}
 
 \subsection{Skew-confluence}
 
