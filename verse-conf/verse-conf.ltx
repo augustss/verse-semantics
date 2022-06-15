@@ -1163,13 +1163,13 @@ functional logic languages, the brand leader is Constructor based
 ReWrite logic (CRWL).
 It is a ``big-step'' rewrite semantics,
 one that rewrites a term to value in one big step.
-Fraguas \emph{et al}\cite{fraguas:rewriting} make a powerful case for
+\Citet{fraguas:rewriting} make a powerful case for
 instead giving the semantics of a functional logic language using ``small-step'' rewrite
 rules, more like those of the lambda calculus, that successively rewrite the term, one step at
 a time, until it reaches a normal form.
 they offer set of small-step rewrite rules, that is provably equivalent to
-the CRWL framework.  Their key insight (inspired by Ariola \emph{et al}
-\cite{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
+the CRWL framework.  Their key insight (inspired by 
+\citet{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
 However both CRWL and Fraguas \emph{et al} suffer from a major problem:
@@ -1195,8 +1195,8 @@ about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
 
 To explain actual execution, the state of the art is described by
-Hanus \emph{et al}\cite{hanus:semantics}.  They give both a big-step operational
-semantics (in the syle of Launchbury \cite{launchbury:natural}), and
+\citet{hanus:semantics}.  They give both a big-step operational
+semantics (in the syle of \citet{launchbury:natural}), and
 a small-step operational semantics.  These two approaches both thread a
 \emph{heap}, which holds
 the unification variables and their unification state; and the small-step
