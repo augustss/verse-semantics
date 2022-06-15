@@ -845,12 +845,6 @@ Sequencing, is very simple (rule \rulename{seq}):
 Our insistence on clear sequencing also makes it possible to extend \versecalc{}
 with more general effects, but that is beyond the scope of this paper.
 
-Notice that \versecalc{} is \emph{lenient}, not lazy, nor strict.  Consider a function
-call |f(e)|.  In \versecalc{} the argument of an application is syntactically a value (\Cref{fig:syntax})
-so we must actually write |(x=e; f(x))|. This expression will not return a value until
-|e| reduces to a value: everything is eventually evaluated.  But even so |f(x)| can proceed
-to beta-reduce (\Cref{sec:beta})... \simon{working here}
-
 \subsection{Function application} \label{sec:beta}
 
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
@@ -956,7 +950,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \Cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of tuples.
+that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |box|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -978,6 +972,19 @@ same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{se
 Similarly, rules \rulename{unify-unifyl}, \rulename{unify-unifyr} and \rulename{seqr-unify} move unifications between values into the encosing list of sequences and to the left of |;|, where they can be further moved out of the way.
 
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
+
+\subsection{Local substitution}
+
+Consider this trick term:
+$$
+|def x (x = (if (x=0; x>1) then 33 else 55))|
+$$
+What should this do? At first sight you might think it was stuck; how can we simplify the |if|
+when its condition mentions |x| which is not yet defined.  But in fact rule \rulename{subst} allows
+us to substitute \emph{locally} in the |X|-neighbourhood of the equality |(x=1)| thus:
+$$
+|def x (x = (if (x=1; x>1) then 33 else 55))| \movesto |def x (x = (if (x=1; 1>1) then 33 else 55))|
+$$
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
@@ -1031,6 +1038,24 @@ So, alas, we are stuck!
 Our not-entirely-satisfying solution is to force \rulename{choose} to float the choice all the way
 to the innermost enclosing scope construct; hence the |SX| in the rule.
 
+\subsection{\versecalc{} is lenient}
+
+\versecalc{} is a \emph{lenient}, not lazy (call-by-need), nor strict (call-by-value).  Under lenient
+evaluation, everything is eventually evaluated, but functions can run
+before their arguments have a value.
+Consider a function
+call |applyx f e|.  In \versecalc{} applications are in administrative normal form (ANF),
+so we must actually write |(x=e; applyx f x)|. This expression will not return a value until
+|e| reduces to a value: that is, everything is eventually evaluated.  But even so |applyx f x| can proceed
+to beta-reduce (\Cref{sec:beta}), assuming we know the definition of |f|.
+This is not just a way to get \emph{parallelism}, which was the motivation for introducing
+lenience in the dataflow language Id \cite{lenience}; in a functional logic language
+it is critical for \emph{semantics}.  Suppose |y = lam (p,q) (p=7;q)| and consider
+$$
+|def (f,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); applyx f y|
+$$
+Here |y| does not get a value until |x| is known; but |x| does not get its
+value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
 \section{Confluence}
 
