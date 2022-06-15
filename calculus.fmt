@@ -87,6 +87,7 @@
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
+%format map = "\textbf{map}"
 %format sub = "\textbf{sub}"
 %format semi = "\textbf{seq}"
 %format gt = "\textbf{gt}"
