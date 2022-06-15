@@ -1,6 +1,6 @@
 LATEX=pdflatex -halt-on-error
 verse-conf.pdf: verse-conf.ltx ../calculus.fmt ../verse.bib
-	lhs2TeX -P ..: verse-conf.ltx > verse-conf.tex
+	lhs2TeX verse-conf.ltx > verse-conf.tex
 	$(LATEX) verse-conf
 	bibtex verse-conf
 	$(LATEX) verse-conf
