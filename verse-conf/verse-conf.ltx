@@ -291,7 +291,6 @@ We discuss related work in \Cref{sec:related}.
     \textbf{Syntax} \\
     \begin{array}{lrcl}
     \text{Integer constants} & k \\
-    \text{Data constructors} & K \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e,r,s  & ::=  & |v| \vb |applyx v_1 v_2| \\
@@ -302,7 +301,7 @@ We discuss related work in \Cref{sec:related}.
     && \vb & |succeeds e| \vb |decides e| \\
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |con K (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
     \text{Primops} & op  & ::= & |gt| \vb |add|
 \iffullverse
     \vb |isInt|
@@ -325,7 +324,7 @@ We discuss related work in \Cref{sec:related}.
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
     \\
-    \text{Value context} & V & ::= & \hole \vb |con K (v_1, dots ,V, dots, v_n)|\\
+    \text{Value context} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
     \end{array} \\
     \\
     \textbf{Shorthand} \\
@@ -352,15 +351,12 @@ a sub-language of \versecalc{}.  Just like the lambda calculus, \versecalc{} is 
 adding a type system is an excellent goal, but is the subject of another paper.
 The syntax of \versecalc{} is given in \Cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
-some built-in operations and data constructors:
+some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Head normal forms}.
-A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a saturated
-constructor application |con K (v_1,dots,v_n)|, or a lambda term |lam x e|.
+A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple, also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
-\item \emph{Arrays and tuples}.
-A built-in variadic data constructor |arrKW| builds finite tuples, also called arrays, |arr (v_1, dots, v_n)|.
 For notational convenience we allow ourselves to abbreviate such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
@@ -493,38 +489,37 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 
 \subsection{Pattern matching}
 
-Choice allows us to do pattern matching.  Here is the obligatory append function
+Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |()| to represent the empty list and pairs to represent |Cons|:
 \footnote{
 Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) (p = (x,y); body)|
   }:
 $$
 |append =lamhdr (xs,ys)| \begin{array}[t]{l}
-  |(xs = con Nil (); ys) choice| \\
-  |(def (x,xs') (xs = con Cons (x,xs'); con Cons (x, applyx append (xs', ys))))|
+  |(xs = (); ys) choice| \\
+  |(def (x,xs') (xs = (x,xs'); (x, applyx append (xs', ys))))|
 \end{array}
 $$
-If |xs| is |Nil|, the left hand choice succeeds, returning |y|; and the right hand choice
-fails (by attempting to unify |Nil| with |Cons|.
-If |xs| is of form |con Cons (y,ys)|,
+If |xs| is |()|, the left hand choice succeeds, returning |y|; and the right hand choice
+fails (by attempting to unify |()| with |(x,xs')|).
+If |xs| is of form |(y,ys)|,
 the right hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with a data
-constructor other than |Nil| or |Cons|, both choices fail, and |append| returns no
+Finally if |xs| is built with head normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results.
 
 This approach to pattern matching is akin to \emph{narrowing} \cite{hanus:survey}.
-Suppose |single = con Cons (1, con Nil ())|, a singleton list whose only element is 1.
+Suppose |single = (1, ())|, a singleton list whose only element is 1.
 Consider this call:
 $$
 |def xs (applyx append( xs, single) = single; xs)|
 $$
 The call to |append| expands into a choice
 $$
-  |(xs = con Nil (); single)| \quad |choice| \quad
-  |(def (x,xs') (xs = con Cons (x,xs'); con Cons (x, applyx append (xs', single))))|
+  |(xs = (); single)| \quad |choice| \quad
+  |(def (x,xs') (xs = (x,xs'); (x, applyx append (xs', single))))|
 $$
-which amounts to exploring the possiblity that |xs| is headed by |Nil| or |Cons| -- the
+which amounts to exploring the possiblity that |xs| is headed by |()| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
-evaluates to |con Nil ()|, effectively running |append| backwards in the classic logic-programming manner.
+evaluates to |()|, effectively running |append| backwards in the classic logic-programming manner.
 
 \subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one}
 
@@ -653,16 +648,16 @@ And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the ar
         |fail| & \text{otherwise}
       \end{array}\right. \\
     \rulename{ucon} & \begin{array}{@@{}l}
-      |con K (v_1,dots,v_m)| \\
-      | == con K (v1',dots,v_n')|
+      |arr (v_1,dots,v_m)| \\
+      | == arr (v1',dots,v_n')|
       \end{array} & \movesto
     & \left\{\begin{array}{@@{}ll}
-    \multicolumn{2}{l}{|(v_1==v1';dots;v_m=v_m'; con K (v_1,dots,v_m))|} \\
+    \multicolumn{2}{l}{|(v_1==v1';dots;v_m=v_m'; arr (v_1,dots,v_m))|} \\
     & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{array}\right.\\
-    \rulename{ux1} & |k == con K (v_1,dots,v_n) | & \movesto & |fail| \\
-    \rulename{ux2} & |con K (v_1,dots,v_n) == k | & \movesto & |fail| \\
+    \rulename{ux1} & |k == arr (v_1,dots,v_n) | & \movesto & |fail| \\
+    \rulename{ux2} & |arr (v_1,dots,v_n) == k | & \movesto & |fail| \\
     \rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
     \rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
     \rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| \quad \text{if }|V| \ne |hole|
@@ -872,7 +867,7 @@ Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
 are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
-constructor applications\footnote{An alternative choice would
+tuples\footnote{An alternative choice would
 for unification to yield |()| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
 you attempt to unify an integer with a tuple.
@@ -952,7 +947,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \Cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of constructors.
+that is, if |x| occurs under a ``shell'' of tuples.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$

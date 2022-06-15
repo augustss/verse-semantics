@@ -53,10 +53,7 @@
 %format array (x) = "\textbf{array}\{" x "\}"
 %format arrKW = "\textbf{arr}"
 %format arr (x) = arrKW "\{" x "\}"
-%format con k (x) = k"\{" x "\}"
 %format tuple = "\textbf{tup}"
-%% the idea is that we can define con k (x) = "\textbf{arr}\{" x "\}"
-%% to eliminate constructors K from the presentation
 %format typeKW (x) = "\textbf{type}"
 %format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
