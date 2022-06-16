@@ -1354,7 +1354,7 @@ may be worse than the disease.
 
 \subsection{Generalizing |oneKW| and |allKW|}
 
-In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as disucsed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  cdots \vb |split e v_1 v_2|$ and rules
+In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcl}
     \rulename{split-fail} & |split fail f g| & \movesto & |applyx f ()| \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (v, lam _ e)| \\
@@ -1367,19 +1367,30 @@ Indeed, this is more general, as we can implement |oneKW| and |allKW| with |spli
     |one e| & \equiv |f^(_) := fail; | & |g^(x,y):= x;| & |split e f g| \\
     |all e| & \equiv |f^(_) := ();|    & |g^(x,y):= applyx cons (x, split (applyx y ()) f g);| & |split e f g|
 \end{array}\]
-For this paper we stuck to the arguably simpler |oneKW| and |allKW|, to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |split| instead.
-
+For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
+to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |splitKW| instead.
 
 
 
 \section{Conclusions and further work}
 
 \subsection{Types}
+The full Verse language has types and static checking of those.
+In the dynamic semantics the types can be represented by partial
+identity function---identity of the values of the type and |fail| otherwise.
+We have a reduction rules for this, but they are left out for space and exposition reasons.
 
 \subsection{Assignment}
-The full Verse language has updateable references in the style of SML.
+The full Verse language has updateable references in a store, in the style of SML.
+We also have (tentative) reduction rules for this as well.
+They are non-trivial, because store updates have to be transactions, e.g.,
+when the condition of an |if| fails any store effects in the condition are rolled back.
 
 \subsection{Effects}
+In this paper we have seen one kind of effect, namely being multi-valued.
+Adding assignable references add another set of effects, as does I/O.
+To have this real Verse has an effect system in addition to the type system.
+We have reduction rules for effect checking as well, but for the real language this is done at compile time.
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
