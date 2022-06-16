@@ -605,16 +605,16 @@ We will illustrate this with a few examples.
 \begin{figure}
   $$
   \begin{array}{l}
-    \begin{array}{rcl}
+    \begin{array}{rcll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
-      |f^(x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
-      |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| \\
-      |(e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2;(x,y))| \\
+      |f^(x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| & \text{|p| fresh} \\
+      |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| & \text{|x,y| fresh} \\
+      |(e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2;(x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyx add (e_1,e_2)| \\
       |e_1>e_2| & \equiv & |applyx gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
-%      |for e_1 in e_2| & \equiv & |applyx map ((lam z (applyx z ())), all (e_1; thunk e_2))| \\
+      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); applyx t ()| & \text{|t| fresh} \\
+      |for e_1 in e_2| & \equiv & |applyx map ((lam z (applyx z ())), all (e_1; thunk e_2))| \\
     \end{array} \\
   \end{array}
   $$
@@ -622,12 +622,15 @@ We will illustrate this with a few examples.
 \label{fig:sugar}
 \end{figure}
 
-The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values, not arbitrary expressions, in in array literals and function-applications. To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
+The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
+not arbitrary expressions, in in array literals and function-applications.
+To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 \begin{itemize}
 \item With |:=| we simulatenous introduce and assign a variable.
 \item When defining functions, we allow simple patterns on the left of |:=|
 \item When writing expressions that are not values in function application and pairs, we omit assigning them to a variable first.
 \item We allow the use of |if| as explained above.
+\item We allow the use of |for| as explained below.
 \end{itemize}
 
 \begin{figure}
@@ -638,9 +641,9 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
       |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-      |map^(f, xs)| & :=  |if (x := head xs) then () else applyx cons (applyx f x, applyx map (f,applyx tail xs))| \\
+      |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else ()| \\
       |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |some^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
+      |find^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |every^(p, xs)| & :=  |applyx map (p,xs)| \\
     \end{array}
   \end{array}
@@ -659,29 +662,41 @@ and |oneKW| is like |head| for choices.
 
 To obtain the first element of an array, we turn the array into a sequence of choices and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
 
-To get the tail of an array, again we apply the array to a fresh variable, and restrict that variable with |i > 0|. This way, the expresison fails a tthe first value and only the other values are collected by |allKW|. This definition of |tail| returns the empty array if |xs| is empty or not even an array.
+To get the tail of an array, again we apply the array to a fresh variable, and restrict that variable with |i > 0|.
+This way, the expression fails a the first value and only the other values are collected by |allKW|.
+This definition of |tail| returns the empty array if |xs| is empty or not even an array.
 
-We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we get from choosing |x|, or all the elements of |xs|, and similarly we can define |append|.
+We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we get from choosing |x|,
+or all the elements of |xs|, and similarly we can define |append|.
 
-For the function |map|, which applies a function to each element of an array and collects the results, two possible implementation come to mind, and they differ when the function passed to |map|  fails or produces more than a single value. The definition |mapFlat(f,xs) := all (def i (applyx f (applyx xs i)))| would flatten the choices from iterating through |xs| with the choices taken by |f|, so |mapFlat((lam x ((x, x+1))), (10,20))| $\equiv$ |(10,11,20,21)|.
+For the function |map|, which applies a function to each element of an array and collects the results,
+two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
+The definition |mapFlat(f,xs) := all (def i (applyx f (applyx xs i)))| would flatten the choices from iterating through |xs| with
+the choices taken by |f|, so |mapFlat((lam x ((x, x+1))), (10,20))| $\equiv$ |(10,11,20,21)|.
 
-But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values, to affect the whole expression and obtain the cartesian product of these choices. The expression
-|map((lam x ((x, x+1))), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
-We get that behaviour if we simly define |map| much like in any other functional programming language: If taking the head of the array fails, it must be an empty array, and we return an empty array. Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
+But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values,
+to affect the whole expression and obtain the cartesian product of these choices.
+The expression |map((lam x ((x `choice` x+1))), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
+We get that behaviour if we simly define |map| much like in any other functional programming language:
+If taking the head of the array fails, it must be an empty array, and we return an empty array.
+Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
 
-How can we filter an array with a predicate |p|? We turn the array into the sequence of choices, and let those fail where |p| fails before collecting the other values into an array.
+How can we filter an array with a predicate |p|?
+We turn the array into the sequence of choices, and let those fail where |p| fails before collecting the other values into an array.
 
-If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the array, and returns the first matching element, or fails if |p| does not hold for any element.
+If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the array,
+and returns the first matching element, or fails if |p| does not hold for any element.
 
-And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|! If |p| fails for any value, the whole call to |map(p,xs)| fails.
+And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|!
+If |p| fails for any value, the whole call to |map(p,xs)| fails.
 
 
 \subsection{Comprehensions with |for|} \label{sec:for}
 
-Source languages can use this to build more featureful constructs like |for|, mimicking the list comprehension in languages like Haskell or Python:
+Source languages can use this to build more featureful constructs like |for|,
+mimicking the list comprehension in languages like Haskell or Python:
 The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in |e_1|.
 The |e_1| is called the {\em domain} of the loop.
-
 
 The scoping is peculiar that variables bound in |e_1| also scope over |e_2|.
 So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |(3,4,6)|.
@@ -698,7 +713,8 @@ Just like |if| is defined in terms of the primitive |oneKW| we can define |for|
 in terms of the primitive |all e|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the array to |()| afterwards, using the |map| function defined above. The full desugaring for |for^(e_1) in e_2| is thus
+apply each element of the array to |()| afterwards, using the |map| function defined above.
+The full desugaring for |for^(e_1) in e_2| is thus
 \[
 |applyx map ((lam z (applyx z ())), all (e_1; lam x e_2))|.
 \]
