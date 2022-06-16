@@ -645,6 +645,8 @@ To make the examples less verbose we will use a small dose of syntactic sugar, s
 
 \startexample
 We can define the typical list functions
+\simon{Don't these defns belong in the Figure?  They are referred to \emph{from} the Figure!  Also don't they need a bit of explanation??
+Explaining these idioms is part of what Section 3 is for!}
 $$
 \begin{array}{lll}
   |head^(xs)| & := & |one (def i (applyx xs i))| \\
@@ -724,11 +726,12 @@ constants.  For example $|applyx add (3,4)| \movesto |7|$.  The only unusual poi
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
 and returns |k_1| otherwise.
 
-Rule \rulename{p-map} implements a map operation over arrays: It applies the function |f| to each value
-in turn, and collects the results into a array. If the function applications produce a choice of values, this will, as it should, produce a choice of arrays:
-\[
-|applyx map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
-\]
+% Rule \rulename{p-map} implements a map operation over arrays: It applies the function |f| to each value
+% in turn, and collects the results into a array. If the function applications produce a choice
+% of values, this will, as it should, produce a choice of arrays:
+% \[
+% |applyx map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
+% \]
 
 Sequencing, is very simple (rule \rulename{seq}):
 |(e_1;e_2)|, simply reduces |e_1| to a value, and then discards it, returning
