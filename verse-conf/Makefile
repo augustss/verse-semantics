@@ -8,4 +8,5 @@ verse-conf.pdf: verse-conf.ltx rewrites.ltx ../calculus.fmt ../verse.bib
 	$(LATEX) verse-conf
 
 clean:
-	rm -f verse-conf.aux verse-conf.log verse-conf.out verse-conf.pdf
+	rm -f verse-conf.tex rewrites.tex
+	rm -f verse-conf.aux verse-conf.log verse-conf.out verse-conf.pdf verse-conf.bbl verse-conf.blg

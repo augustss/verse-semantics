@@ -1,5 +1,6 @@
 calculus.tex
 verse-conf/verse-conf.tex
+verse-conf/rewrites.tex
 
 dist
 dist-*
@@ -27,6 +28,8 @@ cabal.project.local~
 *.log
 *.out
 *.pdf
+*.bbl
+*.blg
 *.ptb
 *~
 tmp
