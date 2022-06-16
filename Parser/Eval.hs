@@ -455,6 +455,7 @@ evalApp flg = evalTrace "evalApp" f flg
 
 -- Handle CSeq in odd places
 --  SEQ, APP-SEQL, APP-SEQR, UNIFY-SEQL, UNIFY-SEQR
+--  UNIFY-UNIFYL, UNIFY-UNIFYR
 evalSeq :: EvalCore
 evalSeq flg = evalTrace "evalSeq" f flg
   where
@@ -462,6 +463,10 @@ evalSeq flg = evalTrace "evalSeq" f flg
       where Snoc es' e' = concatMap (flat . f) es
     f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
     f (CUnify e1@CValue{} (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify e1 e]
+    f (CUnify e1@(CUnify CValue{} v2@CValue{}) e2) =
+      CSeq [e1, CUnify v2 e2]
+    f (CUnify e1 e2@(CUnify CValue{} v2@CValue{})) =
+      CSeq [e2, CUnify e1 v2]
     f e = composOpLam (underLambda flg) f e
     flat (CSeq es) = es
     flat e = [e]
