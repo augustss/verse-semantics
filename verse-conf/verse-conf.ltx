@@ -588,6 +588,9 @@ Arrays can be constructed by collecting all the results from a multi-valued expr
 if |e| fails the |all e| is the empty array,
 otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduces to
 the array |(v_1, dots, v_n)|.
+\label{sec:all}
+
+Do we even need |oneKW| as a primitive construct, given that we have |allKW|? Can we not use |applyx (all e) 0| instead of |one e|? Indeed they behave the same if |e| fully reduces to finitely many choices of values. But |allKW| really requires the evaluation of all choices before proceeding, while |oneKW| does not even have to evaluate past the first choice. So |one (1 `choice` applyx loop ())|, where |loop| is a non-terminating function, reduces to 1, while |applyx (all (1 choice` applyx loop ())) 0| would also loop.
 
 
 
@@ -1332,6 +1335,26 @@ $$
 $$
 We believe this can be made to work, but it adds unwelcome clutter to program terms, and the cure
 may be worse than the disease.
+
+\subsection{Generalizing |oneKW| and |allKW|}
+
+In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as disucsed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  cdots \vb |split e v_1 v_2|$ and rules
+\[\begin{array}{lrcl}
+    \rulename{split-fail} & |split fail f g| & \movesto & |applyx f ()| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (v, lam _ e)| \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyx g (v, lam _ fail)| \\
+\end{array}\]
+The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |f| together with the remaining computation, safely tucked away behind a lambda.
+
+Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
+\[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
+    |one e| & = |f^(_) := fail; | & |g^(x,y):= x;| & |split e f g| \\
+    |all e| & = |f^(_) := ();|    & |g^(x,y):= applyx cons (x, split (applyx y ()) f g);| & |split e f g|
+\end{array}\]
+For this paper we stuck to the arguably simpler |oneKW| and |allKW|, to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |split| instead.
+
+
+
 
 \section{Conclusions and further work}
 
