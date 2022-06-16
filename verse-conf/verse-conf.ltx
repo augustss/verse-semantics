@@ -902,7 +902,8 @@ $$
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
 Now the tricky term is stuck; but maybe that does not matter. After
-all, even with local substitution, the tricky term would be stuck if we replaced |(x=0)| with |(x=2)|.
+all, even with local substitution, the tricky term would be stuck if we
+replaced |(x=0)| with |(x=33)|, as the reader may care to verify.
 \emph{But the real reason we need local substitution is not expressiveness, but confluence.}
 Suppose we use \rulename{global-subst} instead of \rulename{subst} and consider
 $$
@@ -1244,20 +1245,41 @@ for |x|.
 An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
 the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 
-
 \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
 
 Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
 
 But the quite similar expression |(applyx f () =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
-\[\begin{array}{lrcl}
- & |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)| \\
- & |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
- & |v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)| \\
- & |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
+\[\begin{array}{rcl@@{\hspace{10mm}}rcl}
+|(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
+& |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
+|v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)|
+& |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
  \end{array}\]
 
 \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
+
+\subsection{Ordering and choices}
+
+As we discussed in \Cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
+First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
+the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
+$$
+\rulename{simpler-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[e_1] choice X^[e_2]|
+$$
+The trouble with that is that it may change the order of the results (\Cref{sec:mixing}).
+Another possiblity would be to accept the the results may come out in the ``wrong'' order, but have
+some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
+$$
+\rulename{labelled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
+$$
+Here the two branches are labelled with |L| and |R|.  We can add new rules to reorder such
+labelled expressions, something like
+$$
+\rulename{sort-l} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
+$$
+We believe this can be made to work, but it adds unwelcome clutter to program terms, and the cure
+may be worse than the disease.
 
 \section{Conclusions and further work}
 
