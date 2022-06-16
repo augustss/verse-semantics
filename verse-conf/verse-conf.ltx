@@ -635,7 +635,7 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
       |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-      |map^(f, xs)| & :=  |if xs = () then () else applyx cons (applyx f (applyx head x), applyx map (f,applyx tail xs))| \\
+      |map^(f, xs)| & :=  |if (x := head xs) then () else applyx cons (applyx f x, applyx map (f,applyx tail xs))| \\
       |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |some^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |every^(p, xs)| & :=  |applyx map (p,xs)| \\
@@ -664,7 +664,7 @@ For the function |map|, which applies a function to each element of an array and
 
 But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values, to affect the whole expression and obtain the cartesian product of these choices. The expression
 |map((lam x ((x, x+1))), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
-We get that behaviour if we simly define |map| much like in any other functional programming language: If the array is empty, return it, else apply |f| to the |head|, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
+We get that behaviour if we simly define |map| much like in any other functional programming language: If taking the head of the array fails, it must be an empty array, and we return an empty array. Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
 
 How can we filter an array with a predicate |p|? We turn the array into the sequence of choices, and let those fail where |p| fails before collecting the other values into an array.
 
