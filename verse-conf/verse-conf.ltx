@@ -623,6 +623,24 @@ The \versecalc{} is a fairly small language, but it is quite expressive as is.
 We will illustrate this with a few examples.
 To make the examples less verbose we will use a small dose of syntactic sugar, see \ref{fig:sugar}.
 
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{rcl}
+      |x := e; dots| & = & |def x (x = e; dots)| \\
+      |f^(x) := e; dots| & = & |f := lam x e; dots| \\
+      |f^(x,y) := e; dots| & = & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
+      |e_1+e_2| & = & |applyx add (e_1,e_2)| \\
+      |e_1>e_2| & = & |applyx gt (e_1,e_2)| \\
+      |if e_1 then e_2 else e_3| & = & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
+      |for e_1 in e_2| & = & |y := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), y)| \\
+    \end{array} \\
+  \end{array}
+  $$
+\caption{Syntactic sugar} \label{fig:sugar}
+\end{figure}
+
+
 \startexample
 We can define the typical list functions
 $$
@@ -631,7 +649,7 @@ $$
   |tail^(xs)| & := & |all (def i (i > 0; applyx xs i))| \\
   |cons^(x,xs)| & := & |all (x `choice` def i (applyx xs i))| \\
   |map^(f, xs)| & := & |all (def i (x := applyx xs i; applyx f x))| \\
-  |append^(xs, ys)| & := & |all ((def i (applyx xs i)) `choice` (def i (applyx ys i)))| \\
+  |append^(xs, ys)| & := & |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
 \end{array}
 $$
 \lennart{Mention that this |map| flattens alternatives rather than producing the cartesian product.}
@@ -651,23 +669,6 @@ This means that we cannot avoid handling this case.
 $$
 |if x:=a^(5) then print^(x) else print^("out of bounds")|
 $$
-
-\begin{figure}
-  $$
-  \begin{array}{l}
-    \begin{array}{rcl}
-      |x := e; dots| & = & |def x (x = e; dots)| \\
-      |f^(x) := e; dots| & = & |f := lam x e; dots| \\
-      |f^(x,y) := e; dots| & = & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
-      |e_1+e_2| & = & |applyx add (e_1,e_2)| \\
-      |e_1>e_2| & = & |applyx gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & = & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
-      |for e_1 in e_2| & = & |y := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), y)| \\
-    \end{array} \\
-  \end{array}
-  $$
-\caption{Syntactic sugar} \label{fig:sugar}
-\end{figure}
 
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
