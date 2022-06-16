@@ -682,7 +682,7 @@ $$
   |some^(p, xs)| & := & |applyx (applyx filter (p, xs)) 0| \\
 \end{array}
 $$
-If any |p| fails, the whole |for|-loop fails, if all |p| succeed the result is an array.
+For |every|, if any |p| fails, the whole |for|-loop fails, if all |p| succeed the result is an array.
 This may be an uninteresting array, but that does not matter when used in a condition of an |if|.
 
 
@@ -702,6 +702,7 @@ $$
 |if x:=a^(5) then print^(x) else print^("out of bounds")|
 $$
 
+\lennart{Add some logic programming examples.}
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
