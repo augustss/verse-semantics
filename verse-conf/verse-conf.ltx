@@ -290,9 +290,6 @@ has the following properties:
 There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
 We discuss related work in \Cref{sec:related}.
 
-\section{Short introduction to Verse} \label{sec:verse}
-\lennart{Introduce and motivate Verse with a few examples.}
-
 \section{The Verse calculus, informally} \label{sec:informal}
 
 \begin{figure}
@@ -619,7 +616,6 @@ For instance, |a := (10,20,30); applyx a (1 `choice` 0 `choice` 1)| will reduce 
 It even allows the index to be a logical variable; |def i (applyx a i)| (|a| as as before) reduces to |10 `choice` 20 `choice` 30|.
 This is useful since it allows iterating over array elements using |for|.
 E.g., |for^(def (i, x) (x = applyx a i)) in x+1| will produce an array with 1 added to the elements of |a|.
-And |for^(def (i, x) (x = applyx a i); i > 0) in x| will take the tail of the array |a|.
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
@@ -893,6 +889,59 @@ $$
 $$
 Here |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
+
+\newcommand\startexample{\vspace{1em}\noindent}
+
+\section{Some Verse examples} \label{sec:verse}
+The \versecalc{} is a fairly small language, but it is quite expressive as is.
+We will illustrate this with a few examples.
+To make the examples less verbose we will use a small dose of syntactic sugar, see \ref{fig:sugar}.
+
+\startexample
+To take the tail of an array we want all the elements, except index 0.
+Since array indexing can use a logical variable as index, it can be expressed as
+$$
+|tail^(a) := for^(def i (x: = applyx a i); i > 0) in x|
+$$
+
+\startexample
+Making a choice between a sequence of numbers can be expressed like this
+$$
+|fromTo^(lo,hi) := if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
+$$
+so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |(1,2,3,4,5)|.
+
+\startexample
+Indexing out-of-bounds of an array results in |fail|.
+This means that we cannot avoid handling this case.
+$$
+|if x:=a^(5) then print^(x) else print^("out of bounds")|
+$$
+
+\startexample
+Assuming that the function |len| returns the length of an array, we can append arrays like this
+$$
+|append^(a,b) := for(i:=applyx fromTo (0, applyx len a+ applyx len b - 1)) in applyx a i `choice` applyx b (i - applyx len a)|
+$$
+This relies on indexing out of bounds resulting in |fail|.
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{rcl}
+      |x := e; dots| & = & |def x (x = e; dots)| \\
+      |f^(x) := e; dots| & = & |f := lam x e; dots| \\
+      |f^(x,y) := e; dots| & = & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
+      |e_1+e_2| & = & |applyx add (e_1,e_2)| \\
+      |e_1>e_2| & = & |applyx gt (e_1,e_2)| \\
+      |if e_1 then e_2 else e_3| & = & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
+      |for e_1 in e_2| & = & |y := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), y)| \\
+    \end{array} \\
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:sugar}
+\end{figure}
+
 
 \section{Confluence}
 
