@@ -351,10 +351,11 @@ We discuss related work in \cref{sec:related}.
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
-
 \versecalc{} is modelled on the lambda calculus, and indeed the lambda calculus is
-a sub-language of \versecalc{}.  Just like the lambda calculus, \versecalc{} is untyped;
+a sub-language of \versecalc{}.  \emph{Every lambda calculus term is a \versecalc{} term},
+and has the same semantics. Just like the lambda calculus, \versecalc{} is untyped;
 adding a type system is an excellent goal, but is the subject of another paper.
+
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
 some built-in operations and tuples as data constructors:
@@ -527,7 +528,7 @@ which amounts to exploring the possiblity that |xs| is headed by |()| or a pair 
 essence of narrowing.  It should not take long to reassure yourself that the program
 evaluates to |()|, effectively running |append| backwards in the classic logic-programming manner.
 
-\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one}
+\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one} \label{sec:if}
 
 Every source language will provide a conditional, like |if (x=0) then
 e_1 else e_2|.  But what is the equality operator in |(x=0)|?  One
@@ -574,15 +575,16 @@ Now |if| is just syntactic sugar, and the special property of |if| becomes a spe
 
 
 \subsection{Arrays}
-The main data structure in our (reduced) Verse is the array.
-An array is a finite sequence of values.
-It can be used like a function, and indexing is simply function application
-with the argument being numbers from 0 and up.  Indexing out of range is |fail|.
-So, e.g., |def a (a = (10,20,30); applyx a 1)| reduces to |20|.
+The main data structure in \versecalc{} is the array.
+An array is a finite sequence of values, |(v_1,dots,v_n)|.
+It can be used like a function: indexing is simply function application
+with the argument being integers from 0 and up.  Indexing out of range is |fail|.
+For example, |def a (a = (10,20,30); applyx a 1)| reduces to |20|.
 
 The reduction rule for indexing in arrays allows a multi-valued index expression.
 For instance, |a := (10,20,30); applyx a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
-It even allows the index to be a logical variable; |def i (applyx a i)| (|a| as as before) reduces to |10 `choice` 20 `choice` 30|.
+It even allows the index to be a logical variable;
+|def i (applyx a i)| also reduces to |10 `choice` 20 `choice` 30|.
 
 Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| fails the |all e| is the empty array,
@@ -590,7 +592,14 @@ otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduce
 the array |(v_1, dots, v_n)|.
 \label{sec:all}
 
-Do we even need |oneKW| as a primitive construct, given that we have |allKW|? Can we not use |applyx (all e) 0| instead of |one e|? Indeed they behave the same if |e| fully reduces to finitely many choices of values. But |allKW| really requires the evaluation of all choices before proceeding, while |oneKW| does not even have to evaluate past the first choice. So |one (1 `choice` applyx loop ())|, where |loop| is a non-terminating function, reduces to 1, while |applyx (all (1 choice` applyx loop ())) 0| would also loop.
+Do we even need |oneKW| as a primitive construct, given that we have
+|allKW|? Can we not use |applyx (all e) 0| instead of |one e|? Indeed
+they behave the same if |e| fully reduces to finitely many choices of
+values. But |allKW| really requires the evaluation of \emph{all}
+choices before proceeding, while |oneKW| only needs to evaluate the
+first choice. So, supposing that |loop| is a non-terminating function,
+|one (1 `choice` applyx loop ())| reduces to 1, while
+|applyx (all (1 `choice` applyx loop ())) 0| loops.
 
 
 
@@ -626,11 +635,12 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
 not arbitrary expressions, in in array literals and function-applications.
 To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 \begin{itemize}
-\item With |:=| we simulatenous introduce and assign a variable.
+\item With |:=| we simultaenous introduce and assign a variable.
 \item When defining functions, we allow simple patterns on the left of |:=|
-\item When writing expressions that are not values in function application and pairs, we omit assigning them to a variable first.
-\item We allow the use of |if| as explained above.
-\item We allow the use of |for| as explained below.
+\item In function applications we allow ourselves to write |applyx e_1 e_2|,
+  rather that insisting on both function and argument being a value.
+\item We allow the use of |if|, as explained in \cref{sec:if}.
+\item We allow the use of |for|, as we will explain in \cref{sec:for}.
 \end{itemize}
 
 \begin{figure}
@@ -641,6 +651,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
       |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
+      |flatMap^(f,xs)| & := |all (def i (applyx f (applyx xs i)))| \\
       |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else ()| \\
       |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |find^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
@@ -658,38 +669,47 @@ by using the duality between arrays and choices, as seen in \cref{fig:list-funct
 An array can be turned into choices by indexing, |applyx a i|, with a logical variable |i|.
 Conversely, choices can be turned into an array using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices
-and |oneKW| is like |head| for choices.
-
+and |oneKW| is like |head| for choices.  With that in mind, here is how to understand
+the definitions in \cref{fig:list-functions}:
+\begin{itemize}
+\item |head|.
 To obtain the first element of an array, we turn the array into a sequence of choices and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
 
+\item |tail|.
 To get the tail of an array, again we apply the array to a fresh variable, and restrict that variable with |i > 0|.
 This way, the expression fails at the first value and only the other values are collected by |allKW|.
 This definition of |tail| returns the empty array if |xs| is empty or not even an array.
 
-We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we get from choosing |x|,
+\item |cons| and |append|.
+We can implement |applyx cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|,
 or all the elements of |xs|, and similarly we can define |append|.
 
+\item |flatMap|.
 For the function |map|, which applies a function to each element of an array and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
-The definition |mapFlat(f,xs) := all (def i (applyx f (applyx xs i)))| would flatten the choices from iterating through |xs| with
-the choices taken by |f|, so |mapFlat((lam x ((x, x+1))), (10,20))| $\equiv$ |(10,11,20,21)|.
+|flatMap| flattens the choices from iterating through |xs| with
+the choices taken by |f|, so |applyx flatMap ((lam x ((x, x+1))), (10,20))| $\equiv$ |(10,11,20,21)|.
 
-But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values,
+\item |map|.
+But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 to affect the whole expression and obtain the cartesian product of these choices.
 The expression |map((lam x ((x `choice` x+1))), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
-We get that behaviour if we simly define |map| much like in any other functional programming language:
-If taking the head of the array fails, it must be an empty array, and we return an empty array.
+We get that behaviour if we simply define |map| much like in any other functional programming language:
+if taking the head of the array fails, it must be an empty array, and we return an empty array.
 Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
 
+\item |filter|.
 How can we filter an array with a predicate |p|?
 We turn the array into the sequence of choices, and let those fail where |p| fails before collecting the other values into an array.
 
+\item |find|.
 If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the array,
 and returns the first matching element, or fails if |p| does not hold for any element.
 
+\item |every|.
 And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|!
 If |p| fails for any value, the whole call to |map(p,xs)| fails.
-
+\end{itemize}
 
 \subsection{Comprehensions with |for|} \label{sec:for}
 
@@ -761,13 +781,13 @@ programming language?  Here are some possiblities:
   does not convey accurate operational intutition, because it goes all the way to a value
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
   they typically describe how a (heap, expression, stack) configuration evolves, one small
-  step at a time \cite{pj:stg-machine}.
+  step at a time (e.g. \cite{pj:stg-machine}).
   The difficulty is that the description is now so low-level that it is again hard to explain to programmers.
 \item \emph{Medium level.}  A rewrite semantics steers between these two extremes.
-  For example, Ariola \emph{et al}'s ``A call by need lambda calculus''\cite{ariola:call-by-need} shows how
+  For example, Ariola \emph{et al}'s ``A call by need lambda calculus'' \cite{ariola:call-by-need} shows how
   to give the semantics of a call-by-need language as a set of rewrite rules. The great
-  advantage of this approach is that it is readily explicable to programmmers; indeed
-  the execution of Haskell or ML programs is typically explained by successive rewrites
+  advantage of this approach is that it is readily explicable to programmmers.
+  Indeed teachers almost always explain the execution of Haskell or ML programs as a succession of rewrites
   of the program (e.g. inline this call, simplify this |case| expression, etc).
 \end{itemize}
 Up to this point there has been no satisfying rewrite semantics for functional logic langauges
@@ -929,7 +949,10 @@ What if |x| occurs inside a lambda?  That is very useful, and we do not want to 
 $$
 |factorial = lam n (if (n=0) then 1 else n * applyx factorial (n-1))|
 $$
-\simon{Discussion on Slack.}
+Our solution, \rulename{subst-rec}, is standard: if the occurrence of |x| is inside a lambda |lam y e|,
+we create a new local binding for |x| under the lambda.  Now the original equality is
+non-recursive, and \rulename{subst} can apply.
+
 
 \subsection{Unification: administrative rules}
 
