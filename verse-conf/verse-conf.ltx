@@ -1348,8 +1348,8 @@ The intuition behind |splitKW| is that it distinguishes a failing computation fr
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & = |f^(_) := fail; | & |g^(x,y):= x;| & |split e f g| \\
-    |all e| & = |f^(_) := ();|    & |g^(x,y):= applyx cons (x, split (applyx y ()) f g);| & |split e f g|
+    |one e| & \equiv |f^(_) := fail; | & |g^(x,y):= x;| & |split e f g| \\
+    |all e| & \equiv |f^(_) := ();|    & |g^(x,y):= applyx cons (x, split (applyx y ()) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|, to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |split| instead.
 
