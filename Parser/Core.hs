@@ -197,8 +197,8 @@ cAll e = do
              CUnify (CVar g) (CLam v $ CLam r $
                                CDef [x, y] $
                                  CSeq [
-                                   CUnify (CVar x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
                                    CUnify (CVar y) (CApply (Var v) (VArray [])),
+                                   CUnify (CVar x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
                                    CApply (VPrim "cons$") (VArray [Var y, Var x])
                                    ]),
              CSplit e (Var f) (Var g)
