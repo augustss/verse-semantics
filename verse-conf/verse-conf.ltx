@@ -309,7 +309,7 @@ We discuss related work in \Cref{sec:related}.
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
-    \text{Primops} & op  & ::= & |gt| \vb |add| \vb |map|
+    \text{Primops} & op  & ::= & |gt| \vb |add|
 \iffullverse
     \vb |isInt|
 \fi
@@ -362,7 +362,7 @@ some built-in operations and tuples as data constructors:
 \item \emph{Head normal forms}.
 A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple, also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
-functions |gt| and |add|, as well as |map| as a useful array operations.
+functions |gt| and |add|.
 For notational convenience we allow ourselves to abbreviate such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
@@ -601,11 +601,10 @@ It's specification is: if |e| fails the |all e| is the empty array,
 otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| is
 the array |(v_1, dots, v_n)|.
 
-And just like with |if| we have to be careful when |e_2| itself fails or produces multiple results; simply writing |all (e1;e2)| would give the wrong semantics. So again we put |e_2| under a lambda, and apply each element of the array to |()| afterwards, using the |map| operation. The full desugaring for |for^(e_1) in e_2| is thus
+And just like with |if| we have to be careful when |e_2| itself fails or produces multiple results; simply writing |all (e1;e2)| would give the wrong semantics. So again we put |e_2| under a lambda, and apply each element of the array to |()| afterwards, using the |map| function. The full desugaring for |for^(e_1) in e_2| is thus
 \[
 |def y (y = all (e_1; lam x e_2); applyx map ((lam z (applyx z ())), y)|.
 \]
-We chose to make |map| a built-in operation, but it is not really special: Had we introduced the usual head, tail and cons operations instead we could define |map| with them.
 
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
@@ -625,16 +624,24 @@ We will illustrate this with a few examples.
 To make the examples less verbose we will use a small dose of syntactic sugar, see \ref{fig:sugar}.
 
 \startexample
-To take the tail of an array we want all the elements, except index 0.
-Since array indexing can use a logical variable as index, it can be expressed as
+We can define the typical list functions
 $$
-|tail^(a) := for^(def i (x: = applyx a i); i > 0) in x|
+\begin{array}{lll}
+  |head^(xs)| & := & |one (def i (applyx xs i))| \\
+  |tail^(xs)| & := & |all (def i (i > 0; applyx xs i))| \\
+  |cons^(x,xs)| & := & |all (x `choice` def i (applyx xs i))| \\
+  |map^(f, xs)| & := & |all (def i (x := applyx xs i; applyx f x))| \\
+  |append^(xs, ys)| & := & |all ((def i (applyx xs i)) `choice` (def i (applyx ys i)))| \\
+\end{array}
 $$
+\lennart{Mention that this |map| flattens alternatives rather than producing the cartesian product.}
 
 \startexample
 Making a choice between a sequence of numbers can be expressed like this
 $$
-|fromTo^(lo,hi) := if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
+\begin{array}{lll}
+  |fromTo^(lo,hi)| & := & |if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
+\end{array}
 $$
 so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |(1,2,3,4,5)|.
 
@@ -644,13 +651,6 @@ This means that we cannot avoid handling this case.
 $$
 |if x:=a^(5) then print^(x) else print^("out of bounds")|
 $$
-
-\startexample
-Assuming that the function |len| returns the length of an array, we can append arrays like this
-$$
-|append^(a,b) := for(i:=applyx fromTo (0, applyx len a+ applyx len b - 1)) in applyx a i `choice` applyx b (i - applyx len a)|
-$$
-This relies on indexing out of bounds resulting in |fail|.
 
 \begin{figure}
   $$
