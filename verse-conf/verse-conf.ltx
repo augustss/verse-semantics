@@ -636,8 +636,8 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
       |map^(f, xs)| & :=  |if xs = () then () else applyx cons (applyx f (applyx head x), applyx map (f,applyx tail xs))| \\
-      |filter^(p, xs)| & :=  |all (def (i,x) (x := applyx xs i; one (applyx p x); x)))| \\
-      |some^(p, xs)| & :=  |one (def (i,x) (x := applyx xs i; one (applyx p x); x)))| \\
+      |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
+      |some^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |every^(p, xs)| & :=  |applyx map (p,xs)| \\
     \end{array}
   \end{array}
