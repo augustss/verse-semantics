@@ -101,14 +101,15 @@
 
     \textit{One and all} \\
     \begin{array}{lrcl}
-    \rulename{one-value} & |one v| & \movesto & |v| \\
-    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-value} & |one v| & \movesto & |v| \\
     \end{array} \\  \\[-1mm]
     \begin{array}{lrcl}
-    \rulename{all-0} & |all fail| & \movesto & |()| \\
-    \rulename{all-n} &
-      |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1 choice dots choice v_n)|
+    \rulename{all-fail} & |all fail| & \movesto & |()| \\
+    \rulename{all-choice} &
+      |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1 choice dots choice v_n)| \\
+    \rulename{all-value} & |all v| & \movesto & |arr v| \\
     \end{array} \\
     \\[-2mm]
 
