@@ -66,7 +66,7 @@
 \usepackage{mathtools}
 % \usepackage{amsmath}
 \usepackage{verbatim}
-\usepackage[capitalize]{cleveref}   % \Cref
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
 \usepackage{textgreek} % \textalpha etc.
 
 % This makes a tt font that is slightly smaller.
@@ -288,7 +288,7 @@ has the following properties:
   As a result, it natively supports both narrowing and residuation.
 \end{itemize}
 There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
-We discuss related work in \Cref{sec:related}.
+We discuss related work in \cref{sec:related}.
 
 \section{The Verse calculus, informally} \label{sec:informal}
 
@@ -350,12 +350,12 @@ We discuss related work in \Cref{sec:related}.
 
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
-rewrite rules precisely in \Cref{sec:rewrite-rules}.
+rewrite rules precisely in \cref{sec:rewrite-rules}.
 
 \versecalc{} is modelled on the lambda calculus, and indeed the lambda calculus is
 a sub-language of \versecalc{}.  Just like the lambda calculus, \versecalc{} is untyped;
 adding a type system is an excellent goal, but is the subject of another paper.
-The syntax of \versecalc{} is given in \Cref{fig:syntax}.
+The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
@@ -369,20 +369,20 @@ In a functional logic language an expression may evaluate to an as-yet-unknown l
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |applyx v_1 v_2|.  Remembering that
   a value can be a lambda, that gives us the full lambda calculus.
-  \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \Cref{sec:one}).
+  \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 \end{itemize}
 Expressions also include two other key collections of constructs:
-logical variables and unification (\Cref{sec:unify}), and choice (\Cref{sec:choice}).
+logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
 The details of choice and unification, and especially their
 interaction, are rather tricky, so this section will do a lot of
-arm-waving.  But fear not: \Cref{sec:rewrite-rules} will make all this
+arm-waving.  But fear not: \cref{sec:rewrite-rules} will make all this
 precise.
 
 \subsection{Logical variables and unification} \label{sec:unify}
 
 The Verse calculus includes first class logical variables and unification:
 you can bring a fresh logical variable into scope with |defKW|; equate two expressions with |e_1 = e_2|; and
-sequence two expressions with |e_1 ; e_2| (see \Cref{fig:syntax}).
+sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
 |def x (x=e_1; e_2)| in the Verse calculus.
 
@@ -421,7 +421,7 @@ is immaterial for equations.
 For example\footnote{We informally write |3+y| rather than
   |applyx add (3,y)|, and similarly with other operators.},
 consider |def x (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
-we will see why in \Cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
+we will see why in \cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
 and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
 and unify |x| with that.  The idea of leaving stuck expressions aside, and executing other parts of the
@@ -436,17 +436,17 @@ In contrast, a \versecalc{} expression (unless it gets stuck) evaluates to a cho
 The expression |fail| yields no values; a head normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
-Duplicates are not eliminated and, as we shall see in \Cref{sec:for}, order is maintained; in short
+Duplicates are not eliminated and, as we shall see in \cref{sec:for}, order is maintained; in short
 an expression yields a sequences of values, not a bag, and certainly not a set.
 
-The equations we saw in \Cref{sec:unify} can fail, if the arguments
+The equations we saw in \cref{sec:unify} can fail, if the arguments
 are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3|,
 while |3=4| fails, returning no results.  In general, we use ``fail''
 and ``returns no results'' synonymously.
 
 What if the choice was not at the top-level of an expression?  For example, what does |(3, (7 choice 5))| mean?
 In \versecalc{} it does \emph{not} mean a pair with some kind of multi-value in its second component.
-Indeed, as you can see from \Cref{fig:syntax}, this expression is syntactically ill-formed.
+Indeed, as you can see from \cref{fig:syntax}, this expression is syntactically ill-formed.
 We must instead give a name to that choice, and then we can put it in the pair, thus: |def x (x = (7 choice 5); (3,x))|.
 This is syntactically legal, but what does it mean?  In \versecalc{} a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
@@ -457,7 +457,7 @@ We duplicate the context surrounding the choice, and ``float the choice outwards
 
 \subsection{Mixing choice and unification} \label{sec:mixing}
 
-We saw in \Cref{sec:unify} that \emph{equations} are insensitive to sequencing ---
+We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing ---
 but \emph{choice} is not.
 Consider
 |def (x,y) (x = (3 choice 4); y = (20 choice 30); (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
@@ -469,7 +469,7 @@ $$
 |def x ((x=3; x+1) choice (x=4; x*2))|
 $$
 Intuitively, either unify |x| with |3| and return |x+1|, or unify |x| with |4| and return |x*2|.
-But so far we have said only ``a program executes by solving its equations'' (\Cref{sec:unify}).
+But so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
 Well, we can see two equations here, |(x=3)| and |(x=4)|, which are mutually contradictory,
 so clearly we need to refine our notion of ``solving''.
 The answer is pretty clear: in a branch of a choice, solve the equations in that branch
@@ -532,10 +532,10 @@ evaluates to |()|, effectively running |append| backwards in the classic logic-p
 Every source language will provide a conditional, like |if (x=0) then
 e_1 else e_2|.  But what is the equality operator in |(x=0)|?  One
 possiblity, adopted by Curry, is this: there is one ``='' for
-equations (as in \Cref{sec:unify}), and another, say ``=='', for
+equations (as in \cref{sec:unify}), and another, say ``=='', for
 testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
 different, more minimalist position. In \versecalc{} \emph{there is just one equality operator}, written ``='' just as in
-\Cref{sec:unify}. The expression |if (x=0) then e_1 else e_2| tries to unify |x| with |0|.  If that succeeds (returns one or more values)
+\cref{sec:unify}. The expression |if (x=0) then e_1 else e_2| tries to unify |x| with |0|.  If that succeeds (returns one or more values)
 the |if| returns |e_1|; otherwise it returns |e_2|.  There are no data constructors |True| and |False|; instead
 failure plays the role of falsity.
 
@@ -549,7 +549,7 @@ To address this, we give |if| a special property: unifications inside |e_1| (the
 can only unify variables |defKW|'d inside |e_1|; varaibles bound outside |e_1| are ``rigid''.  So in our example, the |x| in |(x=0)| is
 rigid and cannot be unified.  Instead the |if| is stuck, and we move on to unify |x=7|.  That unblocks
 the |if| and all is well.  This special property is precisely the same as the one we sketched for
-choice (\Cref{sec:mixing}), where we wanted local equation-solving.
+choice (\cref{sec:mixing}), where we wanted local equation-solving.
 
 In fact, \versecalc{} distils the three-argument |if| into something simpler, the unary construct |one(e)|.
 Its specification is this:
@@ -573,21 +573,102 @@ remain un-evaluated until the choice is made, just as we expect.
 Now |if| is just syntactic sugar, and the special property of |if| becomes a special property of |oneKW|.
 
 
-\subsection{Arrays and |allKW|} \label{sec:for}
+\subsection{Arrays}
 The main data structure in our (reduced) Verse is the array.
 An array is a finite sequence of values.
-It behaves like a function; indexing is by function application
+It can be used like a function, and indexing is simply function application
 with the argument being numbers from 0 and up.  Indexing out of range is |fail|.
 So, e.g., |def a (a = (10,20,30); applyx a 1)| reduces to |20|.
 
-To go from a multi-valued expression to an array of values there is a |for| construct.
-An expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in |e_1|.
+The reduction rule for indexing in arrays allows a multi-valued index expression.
+For instance, |a := (10,20,30); applyx a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
+It even allows the index to be a logical variable; |def i (applyx a i)| (|a| as as before) reduces to |10 `choice` 20 `choice` 30|.
+
+Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
+if |e| fails the |all e| is the empty array,
+otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduces to
+the array |(v_1, dots, v_n)|.
+
+
+
+\newcommand\startexample{\vspace{1em}\noindent}
+
+\section{Some Verse examples} \label{sec:verse}
+\versecalc{} is a fairly small language, but it is quite expressive.
+We will illustrate this with a few examples.
+
+\subsection{Syntactic sugar}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{rcl}
+      |x := e; dots| & \equiv & |def x (x = e; dots)| \\
+      |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
+      |f^(x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
+      |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| \\
+      |(e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2;(x,y))| \\
+      |e_1+e_2| & \equiv & |applyx add (e_1,e_2)| \\
+      |e_1>e_2| & \equiv & |applyx gt (e_1,e_2)| \\
+      |if e_1 then e_2 else e_3| & \equiv & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
+%      |for e_1 in e_2| & \equiv & |applyx map ((lam z (applyx z ())), all (e_1; thunk e_2))| \\
+    \end{array} \\
+  \end{array}
+  $$
+\label{fig:sugar}
+\caption{Syntactic sugar} 
+\end{figure}
+
+The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values, not arbitrary expressions, in in array literals and function-applications. To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
+\begin{itemize}
+\item With |:=| we simulatenous introduce and assign a variable.
+\item When defining functions, we allow simple patterns on the left of |:=|
+\item When writing expressions that are not values in function application and pairs, we omit assigning them to a variable first.
+\item We allow the use of |for| and |if| as explained above.
+\end{itemize}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{l@@{\;}l}
+      |head^(xs)| & :=  |one (def i (applyx xs i))| \\
+      |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
+      |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
+      |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
+      |map^(f, xs)| & :=  |(xs = (); ()) `choice` (applyx cons (applyx f (applyx head x), applyx map (f,applyx tail xs)))| \\
+    \end{array}
+  \end{array}
+  $$
+\caption{Common list functions} \label{fig:list-functions}
+\end{figure}
+
+\subsection{List functions}
+
+We can define the typical list functions one would expect from functional programming using the primitive |oneKW| and |allKW|, as seen in \cref{fig:list-functions}.
+
+To obtain the first element of an array, we turn the array into a sequence of choices by indexing with a fresh variable, and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
+
+To get the tail of an array, again we apply the array to a fresh variable, and also restrict that variable with |i > 0|. This way, at |i=0| this fails and the first value is omitted when |allKW| collects the other elements into a new array. This definition of |tail| returns the empty array if |xs| is empty or not even an array.
+
+We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we get from choosing |x|, or all the elements of |xs|. Similarly we can define |append|.
+
+For the function |map|, which applies a function to each element of an array and collects the results, two possible implementation come to mind, and they differ when the function passed to |map|  fails or produces more than a single value. The definition |mapFlat(f,xs) := all (def i (applyx f (applyx xs i)))| would flatten the choices from iterating through |xs| with the choices taken by |f|, so |mapFlat((lam x (x, x+1)), (10,20))| $\equiv$ |(10,11,20,21)|.
+
+But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values, to affect the whole expression. The expression
+|map((lam x (x, x+1)), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
+We get that behaviour if we define |map| using the list operations, much like in other functional programming language: We use a choice to check whether the array is empty, and if not, apply |f| to the |head|, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
+
+\subsection{Comprehensions with |for|} \label{sec:for}
+
+Source languages can use this to build more featureful constructs like |for|, mimicking the list comprehension in languages like Haskell or Python:
+The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in |e_1|.
 The |e_1| is called the {\em domain} of the loop.
+
+
 The scoping is peculiar that variables bound in |e_1| also scope over |e_2|.
 So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |(3,4,6)|.
 This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) in (x+1)|.
 
-The |for| construct is akin to list comprehension in languages like Haskell or Python.
 Like list comprehension it supports filtering, but in Verse this falls out naturally by just using
 a possibly failing expression in the domain.
 So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |(4,6)|.
@@ -595,70 +676,25 @@ So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |(
 Nested iteration in a |for| works as expected, and requires nothing special.
 So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) in x+y| reduces to |(11, 12, 13, 21, 22, 23)|
 
-Just like |if| is defined in terms of the simpler primitive |oneKW| the |for| loop is
-defined in terms of the simpler unary |all e|, which simply collects all choices into an array.
-It's specification is: if |e| fails the |all e| is the empty array,
-otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| is
-the array |(v_1, dots, v_n)|.
-
-Just like with |if|, with |for| we have to be careful when |e_2| itself fails or produces multiple results;
-simply writing |all (e1;e2)| would give the wrong semantics. So again we put |e_2| under a lambda, and
-apply each element of the array to |()| afterwards, using the |map| operation. The full desugaring for |for^(e_1) in e_2| is thus
+Just like |if| is defined in terms of the primitive |oneKW| we can define |for|
+in terms of the primitive |all e|.
+Again, we have to be careful when |e_2| itself fails or produces multiple results;
+simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
+apply each element of the array to |()| afterwards, using the |map| function defined above. The full desugaring for |for^(e_1) in e_2| is thus
 \[
-|def y (y = all (e_1; lam x e_2); applyx map ((lam z (applyx z ())), y)|.
+|applyx map ((lam z (applyx z ())), all (e_1; lam x e_2))|.
 \]
 
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
 So, e.g., |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choice` (1, 3) `choice` (3, 2) `choice` (1, 2)|.
+At this point it is crucial to use |map|, not |mapFlat|.
 
-The reduction rule for indexing in arrays allows a multi-valued index expression.
-For instance, |a := (10,20,30); applyx a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
-It even allows the index to be a logical variable; |def i (applyx a i)| (|a| as as before) reduces to |10 `choice` 20 `choice` 30|.
-This is useful since it allows iterating over array elements using |for|.
-E.g., |for^(def (i, x) (x = applyx a i)) in x+1| will produce an array with 1 added to the elements of |a|.
-
-\newcommand\startexample{\vspace{1em}\noindent}
-
-\section{Some Verse examples} \label{sec:verse}
-\versecalc{} is a fairly small language, but it is quite expressive.
-We will illustrate this with a few examples.
-To make the examples less verbose we will use a small dose of syntactic sugar, summarised in \Cref{fig:sugar}.
-
-\begin{figure}
-  $$
-  \begin{array}{l}
-    \begin{array}{rcl}
-      |x := e; dots| & = & |def x (x = e; dots)| \\
-      |f^(x) := e; dots| & = & |f := lam x e; dots| \\
-      |f^(x,y) := e; dots| & = & |f^(p) := def (x,y) (p=(x,y); e); dots| \\
-      |e_1+e_2| & = & |applyx add (e_1,e_2)| \\
-      |e_1>e_2| & = & |applyx gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & = & |applyx (one( (e_1; (thunk e_2)) choice (thunk e_3))) ()| \\
-      |for e_1 in e_2| & = & |y := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), y)| \\
-    \end{array} \\
-  \end{array}
-  $$
-\caption{Syntactic sugar} \label{fig:sugar}
-\end{figure}
+Given that array indexing expands into choices, we can iterate over array indices and elements using |for|.
+E.g., |for^(def (i, x) (x = applyx a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
 
 
-\startexample
-We can define the typical list functions
-\simon{Don't these defns belong in the Figure?  They are referred to \emph{from} the Figure!  Also don't they need a bit of explanation??
-Explaining these idioms is part of what Section 3 is for!}
-$$
-\begin{array}{lll}
-  |head^(xs)| & := & |one (def i (applyx xs i))| \\
-  |tail^(xs)| & := & |all (def i (i > 0; applyx xs i))| \\
-  |cons^(x,xs)| & := & |all (x `choice` def i (applyx xs i))| \\
-  |map^(f, xs)| & := & |all (def i (x := applyx xs i; applyx f x))| \\
-  |append^(xs, ys)| & := & |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-\end{array}
-$$
-\lennart{Mention that this |map| flattens alternatives rather than producing the cartesian product.}
-
-\startexample
+\subsection{Enumerations}
 Making a choice between a sequence of numbers can be expressed like this
 $$
 \begin{array}{lll}
@@ -667,7 +703,7 @@ $$
 $$
 so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |(1,2,3,4,5)|.
 
-\startexample
+\subsection{Handling out-of-bounds errors}
 Indexing out-of-bounds of an array results in |fail|.
 This means that we cannot avoid handling this case.
 $$
@@ -700,7 +736,7 @@ programming language?  Here are some possiblities:
   of the program (e.g. inline this call, simplify this |case| expression, etc).
 \end{itemize}
 Up to this point there has been no satisfying rewrite semantics for functional logic langauges
-(see \Cref{sec:related} for previous work).
+(see \cref{sec:related} for previous work).
 Our main contribution is to fill this gap with a rewrite semantics for \versecalc{}, that
 has the following properties:
 \begin{itemize}
@@ -712,7 +748,7 @@ has the following properties:
   applied where; that is the task of a separate \emph{evaluation stragegy}.
 \item The rules can be applied by programmers, to reason about what their program does;
   and by compilers, to transform (and hopefully optimise) the program.
-\item There is no ``magical rewriting'' (\Cref{sec:magical}): all the variables on the
+\item There is no ``magical rewriting'' (\cref{sec:magical}): all the variables on the
   right hand side of a rule are bound on the left.
 \end{itemize}
 The rewrite rules are given in Figures \ref{fig:rules1} and \ref{fig:rules2},
@@ -720,7 +756,7 @@ and are described next.
 
 \subsection{Basic rewrites}
 
-Looking at \Cref{fig:general-axioms}, rules \rulename{p-add} and \rulename{p-gt}
+Looking at \cref{fig:general-axioms}, rules \rulename{p-add} and \rulename{p-gt}
 should be familiar: they simply rewrite applications of |add| and |gt| to integer
 constants.  For example $|applyx add (3,4)| \movesto |7|$.  The only unusual point is
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
@@ -767,7 +803,7 @@ a suspending semantics would be equally easy to express.
 
 \subsection{Unification: the easy bits}
 
-Next we study unification, again in \Cref{fig:general-axioms}.
+Next we study unification, again in \cref{fig:general-axioms}.
 Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
 are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
@@ -778,7 +814,7 @@ either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
 you attempt to unify an integer with a tuple.
 Slightly less obviously,
 \rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
-lambda or a built-in operation with any other value.  We discuss this design choice further in \Cref{sec:unifying-lambda}.
+lambda or a built-in operation with any other value.  We discuss this design choice further in \cref{sec:unifying-lambda}.
 
 \subsection{Unification: the \rulename{subst} rule}
 
@@ -790,7 +826,7 @@ $$
 $$
 It says that if we have an equality |(x=v)| in a term,
 we can replace ``nearby'' occurrences of |x| by |v|.  In this rule, |X| is an \emph{execution context},
-defined in \Cref{fig:syntax}.
+defined in \cref{fig:syntax}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
 with a single hole, written |hole|, in it.
 The notation |X^[e]| is the expression obtained by filling the hole in |X| with |e|.
@@ -819,9 +855,9 @@ ill-formed expression |(e,2)|.
     and the unification equation.
 \item
 Note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
-That restriction is the key to localising unification (\Cref{sec:mixing}), and
+That restriction is the key to localising unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
-\Cref{sec:rigid}. For example, consider the expression
+\cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); (x+1,y))|.
 We must not propagate the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
@@ -829,17 +865,17 @@ But rule \rulename{subst}
 \emph{can} propagate it locally
 within the first arm of the choice, thus\footnote{
 You may wonder if this local propagation is useful, a point we return
-to in \Cref{sec:local-prop}.}:
+to in \cref{sec:local-prop}.}:
 $$
 |y = ((x=3; x*2) choice (x=4)); (x+1,y)|
 \movesto
 |y = ((x=3; 3*2) choice (x=4)); (x+1,y)|
 $$
-To make further progress, we need a rule for choice, \Cref{sec:choice-rules}.
+To make further progress, we need a rule for choice, \cref{sec:choice-rules}.
 \item The $(x \in \freevars{X}))$ in \rulename{subst} prevents \rulename{subst} from
   begin able to fire infinitely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
   also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
-  see \Cref{sec:recursion}.
+  see \cref{sec:recursion}.
 \end{itemize}
 
 
@@ -850,7 +886,7 @@ unification would yield an infinitely-nested pair.
 $$
     \rulename{ux-occurs} \quad |x=V^[x]| \quad \movesto \quad |fail| \quad \text{if }|V| \ne |hole|
 $$
-In this rule, |V| is an \emph{value context}, defined in \Cref{fig:syntax}.
+In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
 that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |box|$ is to avoid failure for |x=x|.
 
@@ -869,7 +905,7 @@ the expression |(y = (def x (x,2)); dots)| does not bind |y| to a value, but if 
 we get |def x (y=(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
 Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
-same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{sec:mixing}).
+same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
 
 Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
 Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
@@ -920,31 +956,31 @@ alias for the unified variable.  This is a tricky point!
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
-The rules for choice are given in \Cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
+The rules for choice are given in \cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
 say that |fail| is the unit for choice |choice|.  Rules \rulename{one-value}, \rulename{one-choice}
-and \rulename{one-fail} describe the semantics for |oneKW|, just as in \Cref{sec:one}.
+and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
 The \rulename{assoc-choice} is an administrative rule, to allow \rulename{one-choice} to fire.
 
-The most interesting rule is \rulename{choose} which, just as described in \Cref{sec:choice},
+The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
 ``floats the choice outwards'', duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
-defined in \Cref{fig:syntax}. A \emph{choice context} |CX| is like an
+defined in \cref{fig:syntax}. A \emph{choice context} |CX| is like an
 execution context |X|, \emph{but with no possible
   choices to the left of the hole}:
 $$
 CX ::= \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX|
 \vb |def x CX|
 $$
-Here, |ce| is guaranteed-choice-free expression (syntax in \Cref{fig:syntax}).
+Here, |ce| is guaranteed-choice-free expression (syntax in \cref{fig:syntax}).
 This syntactic condition is necessarily conservative; for example, a call |f(x)|
 is considered not guaranteed-choice-free, because it depends on what function |f| does.
 We must guarantee not to have choices to the left so that we preserve order --
-see \Cref{sec:mixing}.
+see \cref{sec:mixing}.
 
-The context |SX| (\Cref{fig:syntax}) is a \emph{scope context}; it
+The context |SX| (\cref{fig:syntax}) is a \emph{scope context}; it
 ensures that |CX| is as large as possible.  This is a subtle point:
 without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
-  a use of |oneKW|, see \Cref{sec:one}, but using |if| makes the example easier to understand.}:
+  a use of |oneKW|, see \cref{sec:one}, but using |if| makes the example easier to understand.}:
 $$
 \begin{array}{ll}
 \multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
@@ -979,7 +1015,7 @@ Consider a function
 call |applyx f e|.  In \versecalc{} applications are in administrative normal form (ANF),
 so we must actually write |(x=e; applyx f x)|. This expression will not return a value until
 |e| reduces to a value: that is, everything is eventually evaluated.  But even so |applyx f x| can proceed
-to beta-reduce (\Cref{sec:beta}), assuming we know the definition of |f|.
+to beta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 This is not just a way to get \emph{parallelism}, which was the motivation for introducing
 lenience in the dataflow language Id \cite{lenience}; in a functional logic language
 it is critical for \emph{semantics}.  Suppose |y = lam (p,q) (p=7;q)| and consider
@@ -1106,7 +1142,7 @@ construction.
 
 In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can make progress, by floating out the
-choice (rule \rulename{choose} in \Cref{fig:general-axioms}), thus
+choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-determinstic selection.  Rule \rulename{choose} is not a new idea -- indeed
@@ -1229,13 +1265,13 @@ lead to |fail|, and confluence is restored.
 \subsection{Choice and failure} \label{sec:choice-and-failure}
 
 In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
-and certainly not a set (\Cref{sec:choice}).  That suggests that a good evaluation strategy might be to
+and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
 only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
 $$
 |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
 $$
 The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-|if| is no choice-free.  With the rules in \Cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+|if| is no choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
 $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
 and make progress.  But to do this we must look at the right branch of the choice, before we know whether
 the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
@@ -1261,13 +1297,13 @@ But the quite similar expression |(applyx f () =y)=1;y>2| is stuck, because \rul
 
 \subsection{Ordering and choices}
 
-As we discussed in \Cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
+As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
 First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
 the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
 $$
 \rulename{simpler-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[e_1] choice X^[e_2]|
 $$
-The trouble with that is that it may change the order of the results (\Cref{sec:mixing}).
+The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
 Another possiblity would be to accept the the results may come out in the ``wrong'' order, but have
 some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
 $$
