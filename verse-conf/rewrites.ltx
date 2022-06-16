@@ -15,6 +15,14 @@
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array}\right. \\
+    \rulename{p-map} &
+      |applyx map (v, (v_1 choice dots choice v_n))|
+    & \movesto &
+    \begin{array}[t]{@@{}l}
+      |defTwoLines (x_1,dots x_n)
+       (x_1 == applyx v v_1; dots x_n == applyx v v_n; arr (x_1,dots,x_n))| \\
+    \end{array} \\
+    && \multicolumn{2}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v, v_1, \ldots, v_n}$}} \\[2mm]
 \iffullverse
     \rulename{p-isInt} & |applyx isInt hnf| & \movesto &
     \left\{\begin{array}{@@{}ll}
@@ -76,8 +84,8 @@
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-    \rulename{unify-unifyl} & |((v_1 == v_2) == e)| & \movesto & |(v_1 == v_2); (v_2 == e)| \\
-    \rulename{unify-unifyr} & |(e == (v_1 == v_2))| & \movesto & |(v_1 == v_2); (e == v_2)| \\
+    \rulename{unify-unifyl} & |(v_1 == v_2) == e| & \movesto & |(v_1 == v_2); (v_2 == e)| \\
+    \rulename{unify-unifyr} & |e == (v_1 == v_2)| & \movesto & |(v_1 == v_2); (e == v_2)| \\
     \end{array} \\
     \\[-2mm]
 

@@ -601,7 +601,9 @@ It's specification is: if |e| fails the |all e| is the empty array,
 otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| is
 the array |(v_1, dots, v_n)|.
 
-And just like with |if| we have to be careful when |e_2| itself fails or produces multiple results; simply writing |all (e1;e2)| would give the wrong semantics. So again we put |e_2| under a lambda, and apply each element of the array to |()| afterwards, using the |map| function. The full desugaring for |for^(e_1) in e_2| is thus
+Just like with |if|, with |for| we have to be careful when |e_2| itself fails or produces multiple results;
+simply writing |all (e1;e2)| would give the wrong semantics. So again we put |e_2| under a lambda, and
+apply each element of the array to |()| afterwards, using the |map| operation. The full desugaring for |for^(e_1) in e_2| is thus
 \[
 |def y (y = all (e_1; lam x e_2); applyx map ((lam z (applyx z ())), y)|.
 \]
@@ -619,9 +621,9 @@ E.g., |for^(def (i, x) (x = applyx a i)) in x+1| will produce an array with 1 ad
 \newcommand\startexample{\vspace{1em}\noindent}
 
 \section{Some Verse examples} \label{sec:verse}
-The \versecalc{} is a fairly small language, but it is quite expressive as is.
+\versecalc{} is a fairly small language, but it is quite expressive.
 We will illustrate this with a few examples.
-To make the examples less verbose we will use a small dose of syntactic sugar, see \ref{fig:sugar}.
+To make the examples less verbose we will use a small dose of syntactic sugar, summarised in \Cref{fig:sugar}.
 
 \begin{figure}
   $$
@@ -695,7 +697,7 @@ programming language?  Here are some possiblities:
   the execution of Haskell or ML programs is typically explained by successive rewrites
   of the program (e.g. inline this call, simplify this |case| expression, etc).
 \end{itemize}
-Up to this point there has been no rewrite semantics for functional logic langauges
+Up to this point there has been no satisfying rewrite semantics for functional logic langauges
 (see \Cref{sec:related} for previous work).
 Our main contribution is to fill this gap with a rewrite semantics for \versecalc{}, that
 has the following properties:
@@ -708,10 +710,11 @@ has the following properties:
   applied where; that is the task of a separate \emph{evaluation stragegy}.
 \item The rules can be applied by programmers, to reason about what their program does;
   and by compilers, to transform (and hopefully optimise) the program.
+\item There is no ``magical rewriting'' (\Cref{sec:magical}): all the variables on the
+  right hand side of a rule are bound on the left.
 \end{itemize}
-
-The rewrite rules are given in Figures \ref{fig:rules1d-axioms} and \ref{fig:choice}.
-\simon{add wrong axioms}, and are described next.
+The rewrite rules are given in Figures \ref{fig:rules1} and \ref{fig:rules2},
+and are described next.
 
 \subsection{Basic rewrites}
 
@@ -721,7 +724,8 @@ constants.  For example $|applyx add (3,4)| \movesto |7|$.  The only unusual poi
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
 and returns |k_1| otherwise.
 
-Rule \rulename{p-map} implements a map operation over arrays: It applies the function |f| to each value in turn, and collects the results into a array. If the function applications produce a choice of values, this will, as it should, produce a choice of arrays:
+Rule \rulename{p-map} implements a map operation over arrays: It applies the function |f| to each value
+in turn, and collects the results into a array. If the function applications produce a choice of values, this will, as it should, produce a choice of arrays:
 \[
 |applyx map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 \]
@@ -736,10 +740,10 @@ with more general effects, but that is beyond the scope of this paper.
 
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
 only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
-and a unifcation constraint |(x=v)| to bind |x| to the argument.
-The rule may look as if it does call-by-value, because the argument is a value |v|,
+and an equality |(x=v)| to bind |x| to the argument.
+The rule may appear to use call-by-value, because the argument is a value |v|,
 but remember that values include variables, and that variable may be bound to an
-as-yet-unevaluated value.  For example:
+as-yet-unevaluated expression.  For example:
 $$
 |def y (y = 3+4; applyx (lam x (x+1)) y)|
 \; \movesto \;
@@ -749,6 +753,14 @@ Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
 ensures that the |defKW x|
 does not capture any variables free in |v|.  If |x| appears free in |v|, just use
 \textalpha-conversion to rename |x| to $x' \not\in \freevars{v}$.
+
+In \versecalc{}, arrays behave like (finite) functions, in which application is
+indexing.  Rule \rulename{app-arr} describes how array application works.
+Notice that \rulename{app-arr} does not require the argument to be an integer $k$; instead
+the rule works by narrowing.  So the expression |def x ((2,3,2,7,9)(x) = 2; x)|
+does not suspend awaiting a value for |x|; instead it explores all the
+alternatives, returning |(0 choice 2)|.  This is a free design decision:
+a suspending semantics would be equally easy to express.
 
 \subsection{Unification: the easy bits}
 
@@ -773,21 +785,21 @@ $$
 \rulename{subst} \quad |X^[x==v]|  \movesto  |(subst X x v)^[x==v]|
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
-It says that if we have a unification constraint |(x=v)| in a term,
-we can replace nearby occurrences of |x| by |v|.  In this rule, |X| is an \emph{execution context},
+It says that if we have an equality |(x=v)| in a term,
+we can replace ``nearby'' occurrences of |x| by |v|.  In this rule, |X| is an \emph{execution context},
 defined in \Cref{fig:syntax}.
-In general, a ``context'' is just a syntactic construct (in this case an expression)
+In general, a ``context'' is a syntactic construct (in this case an expression)
 with a single hole, written |hole|, in it.
 The notation |X^[e]| is the expression obtained by filling the hole in |X| with |e|.
-For example |(y = (hole, 4))| is a possible execution context; filling its hole with 99
-gives the expression |y = (99,4)|.
+For example |(y = (hole, 4))| is a possible execution context, |X|; filling its hole with 99
+gives the expression |(y = (99,4))|.
 The notation |subst X x v| is the context obtained by replacing all free occurences of |x| in |X| by |v|.
 
-So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the execution
-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
+So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the
+|X|-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
 There are several things to notice:
 \begin{itemize}
-\item Crucially, \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
+\item \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
 restriction is what implements so-called \emph{call-time choice} \cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
@@ -796,15 +808,15 @@ valid; if we tried to substitute an expression |e| for a variable in |(x,2)| we 
 ill-formed expression |(e,2)|.
 \item \rulename{subst}
   replaces the occurrences of |x| in |X|, \emph{but leaves the original |(x=v)| undisturbed}.
-  For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using the
+  For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using
   |X = (y=x+1; hole)|.  We must not drop the |(x=v)| because there may be other occurrences of |x|
   ``further out'', such as |(z=x+3)| in this example.
-\item If the equality |(x=v)| turns out to be the \emph{only} occurence
+\item If the equality |(x=v)| turns out to be the sole remaining occurence
       of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
     and the unification equation.
 \item
 Note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
-That restriction is the key to localising unification (see \Cref{sec:mixing}), and
+That restriction is the key to localising unification (\Cref{sec:mixing}), and
 the flexible/rigid distinction of
 \Cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); (x+1,y))|.
@@ -821,8 +833,8 @@ $$
 |y = ((x=3; 3*2) choice (x=4)); (x+1,y)|
 $$
 To make further progress, we need a rule for choice, \Cref{sec:choice-rules}.
-\item The $(x \in \freevars{X}))$ in \rulename{subst} is there only to prevent \rulename{subst} from
-  begin able to fire infinitiely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
+\item The $(x \in \freevars{X}))$ in \rulename{subst} prevents \rulename{subst} from
+  begin able to fire infinitely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
   also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
   see \Cref{sec:recursion}.
 \end{itemize}
@@ -856,13 +868,17 @@ Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing 
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \Cref{sec:mixing}).
 
-Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification. Again, this helps making progress in |(x=y)=1;y>0| by exposing |y=1| for further use by \rulename{subst}. Furthermore, in order to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|, as discussed in \cref{sec:conf-move-eqn}. These rules could be more general, see \cref{sec:variations-liberate-unify}.
+Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
+Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
+rewrites it to |((x=y);(y=1);y>0|, thus exposing |y=1| for further use by \rulename{subst}. Furthermore, in order
+to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
+as discussed in \cref{sec:conf-move-eqn}. These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
 \subsection{Local substitution}
 
-Consider this trick term:
+Consider this tricky term:
 $$
 |def x (x = (if (x=0; x>1) then 33 else 55))|
 $$
@@ -870,8 +886,33 @@ What should this do? At first sight you might think it was stuck; how can we sim
 when its condition mentions |x| which is not yet defined.  But in fact rule \rulename{subst} allows
 us to substitute \emph{locally} in the |X|-neighbourhood of the equality |(x=1)| thus:
 $$
-|def x (x = (if (x=1; x>1) then 33 else 55))| \movesto |def x (x = (if (x=1; 1>1) then 33 else 55))|
+|def x (x = if (x=0; x>1) then 33 else 55)| \begin{array}[t]{l}
+  \movesto |def x (x = if (x=0; 0>1) then 33 else 55)| \\
+  \movesto |def x (x = if fail then 33 else 55)|\\
+  \movesto |def x (x = 55)| \quad \movesto |55|
+  \end{array}
 $$
+But this is example is arguably a weird corner case.  Perhaps we ccan simplify the system, by only allowing
+substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
+$$
+\rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
+        \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+$$
+Now the tricky term is stuck; but maybe that does not matter. After
+all, even with local substitution, the tricky term would be stuck if we replaced |(x=0)| with |(x=2)|.
+\emph{But the real reason we need local substitution is not expressiveness, but confluence.}
+Suppose we use \rulename{global-subst} instead of \rulename{subst} and consider
+$$
+|def x (x = if (def y (y=x; y=0; y>1)) then 33 else 55)|
+$$
+In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
+By using \rulename{global-subst} on |(y=x)|, we could recover the original tricky term, which is
+stuck.
+
+\emph{But by using \rulename{global-subst} on |(y=0)|, instead, we could simplify the |if|.}
+Two different rewrites starting from the same term lead to non-joinable terms.
+In effect, local substitution via \rulename{subst} has the same effect as introducing a local
+alias for the unified variable.  This is a tricky point!
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
@@ -1068,7 +1109,7 @@ non-determinstic selection.  Rule \rulename{choose} is not a new idea -- indeed
 it is common in calculi for calculi with choice (e.g. \cite{what}) --
 but it does not appear to have been used to describe functional logic languages before.
 
-\subsection{Treatment of logical variables}
+\subsection{Treatment of logical variables} \label{sec:magical}
 
 Our variables, introduced by |defKW|, are usually called \emph{logical variables},
 or \emph{extra variables} in the literature.  The latter term arises because they
@@ -1160,7 +1201,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-In a calculs like \versecalc{} there is room for many design variations.
+In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
 
 \subsection{Unifying lambdas} \label{sec:unifying-lambda}
@@ -1180,6 +1221,26 @@ OR & \movesto \{\textit{use \rulename{SUSBST} on second equality}\} & |(lam q 2)
 $$
 These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
 lead to |fail|, and confluence is restored.
+
+\subsection{Choice and failure} \label{sec:choice-and-failure}
+
+In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
+and certainly not a set (\Cref{sec:choice}).  That suggests that a good evaluation strategy might be to
+only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
+$$
+|(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
+$$
+The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+|if| is no choice-free.  With the rules in \Cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+$|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+and make progress.  But to do this we must look at the right branch of the choice, before we know whether
+the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
+|(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
+for |x|.
+
+An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
+the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
+
 
 \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
 
