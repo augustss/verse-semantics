@@ -663,7 +663,7 @@ and |oneKW| is like |head| for choices.
 To obtain the first element of an array, we turn the array into a sequence of choices and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
 
 To get the tail of an array, again we apply the array to a fresh variable, and restrict that variable with |i > 0|.
-This way, the expression fails a the first value and only the other values are collected by |allKW|.
+This way, the expression fails at the first value and only the other values are collected by |allKW|.
 This definition of |tail| returns the empty array if |xs| is empty or not even an array.
 
 We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we get from choosing |x|,
@@ -698,7 +698,7 @@ mimicking the list comprehension in languages like Haskell or Python:
 The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in |e_1|.
 The |e_1| is called the {\em domain} of the loop.
 
-The scoping is peculiar that variables bound in |e_1| also scope over |e_2|.
+The scoping is peculiar in that variables bound in |e_1| also scope over |e_2|.
 So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |(3,4,6)|.
 This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) in (x+1)|.
 
@@ -878,7 +878,7 @@ restriction is what implements so-called \emph{call-time choice} \cite{hanus:sur
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
 The fact that we substitute only values for variables also ensures that substitution is syntactically
-valid; if we tried to substitute an expression |e| for a variable in |(x,2)| we would the
+valid; if we tried to substitute an expression |e| for a variable in |(x,2)| we would get the
 ill-formed expression |(e,2)|.
 \item \rulename{subst}
   replaces the occurrences of |x| in |X|, \emph{but leaves the original |(x=v)| undisturbed}.
@@ -1007,7 +1007,7 @@ CX ::= \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX|
 \vb |def x CX|
 $$
 Here, |ce| is guaranteed-choice-free expression (syntax in \cref{fig:syntax}).
-This syntactic condition is necessarily conservative; for example, a call |f(x)|
+This syntactic condition is necessarily conservative; for example, a call |applyx f x|
 is considered not guaranteed-choice-free, because it depends on what function |f| does.
 We must guarantee not to have choices to the left so that we preserve order --
 see \cref{sec:mixing}.
