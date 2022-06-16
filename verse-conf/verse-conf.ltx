@@ -895,7 +895,7 @@ $$
   \movesto |def x (x = 55)| \quad \movesto |55|
   \end{array}
 $$
-But this is example is arguably a weird corner case.  Perhaps we ccan simplify the system, by only allowing
+But this is example is arguably a weird corner case.  Perhaps we can simplify the system, by only allowing
 substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
 $$
 \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
