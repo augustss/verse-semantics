@@ -635,7 +635,10 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
       |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-      |map^(f, xs)| & :=  |(xs = (); ()) `choice` (applyx cons (applyx f (applyx head x), applyx map (f,applyx tail xs)))| \\
+      |map^(f, xs)| & :=  |if xs = () then () else applyx cons (applyx f (applyx head x), applyx map (f,applyx tail xs))| \\
+      |filter^(p, xs)| & :=  |all (def (i,x) (x := applyx xs i; one (applyx p x); x)))| \\
+      |some^(p, xs)| & :=  |one (def (i,x) (x := applyx xs i; one (applyx p x); x)))| \\
+      |every^(p, xs)| & :=  |applyx map (p,xs)| \\
     \end{array}
   \end{array}
   $$
@@ -644,7 +647,12 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
 
 \subsection{List functions}
 
-We can define the typical list functions one would expect from functional programming using the primitive |oneKW| and |allKW|, as seen in \cref{fig:list-functions}.
+We can define the typical list functions one would expect from functional programming
+by using the duality between arrays and choices, as seen in \cref{fig:list-functions}.
+An array can be turned into choices by indexing, |applyx a i|, with a logical variable |i|.
+Conversely, choices can be turned into and array using |allKW|.
+The choice operator, |choice|, serves as both |cons| and |append| for choices
+and |oneKW| is like |head| for choices.
 
 To obtain the first element of an array, we turn the array into a sequence of choices by indexing with a fresh variable, and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
 
@@ -654,9 +662,16 @@ We can implement |applyx cons (x,xs)| by collecing with |allKW| the choices we g
 
 For the function |map|, which applies a function to each element of an array and collects the results, two possible implementation come to mind, and they differ when the function passed to |map|  fails or produces more than a single value. The definition |mapFlat(f,xs) := all (def i (applyx f (applyx xs i)))| would flatten the choices from iterating through |xs| with the choices taken by |f|, so |mapFlat((lam x (x, x+1)), (10,20))| $\equiv$ |(10,11,20,21)|.
 
-But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values, to affect the whole expression. The expression
+But often this is not what we want; and we want the effects of |f|, such as failure or returning multiple values, to affect the whole expression and obtain the cartesian product of these choices. The expression
 |map((lam x (x, x+1)), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
-We get that behaviour if we define |map| using the list operations, much like in other functional programming language: We use a choice to check whether the array is empty, and if not, apply |f| to the |head|, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
+We get that behaviour if we define |map| using the list operations, much like in other functional programming language: If the array is empty, return it, else apply |f| to the |head|, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
+
+How can we filter an array with a predicate |p|? We turn the array into the sequence of choices, and let those fail where |p| fails, and collect it back into an array.
+
+If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the array, and returns the first element.
+
+And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|! If |p| fails for any value, the whole call to |map(p,xs)| fails.
+
 
 \subsection{Comprehensions with |for|} \label{sec:for}
 
