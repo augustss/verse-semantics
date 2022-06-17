@@ -997,10 +997,11 @@ What should this do? At first sight you might think it was stuck; how can we sim
 when its condition mentions |x| which is not yet defined.  But in fact rule \rulename{subst} allows
 us to substitute \emph{locally} in the |X|-neighbourhood of the equality |(x=1)| thus:
 $$
-|def x (x = if (x=0; x>1) then 33 else 55)| \begin{array}[t]{l}
-  \movesto |def x (x = if (x=0; 0>1) then 33 else 55)| \\
-  \movesto |def x (x = if fail then 33 else 55)|\\
-  \movesto |def x (x = 55)| \quad \movesto |55|
+\begin{array}[t]{r@@{\;}l}
+           & |def x (x = if (x=0; x>1) then 33 else 55)| \\
+  \movesto & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
+  \movesto & |def x (x = if fail then 33 else 55)|\\
+  \movesto & |def x (x = 55)| \quad \movesto |55|
   \end{array}
 $$
 But this is example is arguably a weird corner case.  Perhaps we can simplify the system, by only allowing
