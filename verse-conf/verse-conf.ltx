@@ -623,7 +623,7 @@ We will illustrate this with a few examples.
       |e_1+e_2| & \equiv & |applyx add (e_1,e_2)| \\
       |e_1>e_2| & \equiv & |applyx gt (e_1,e_2)| \\
       |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); applyx t ()| & \text{|t| fresh} \\
-      |for e_1 in e_2| & \equiv & |applyx map ((lam z (applyx z ())), all (e_1; thunk e_2))| \\
+      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), v)| & \text{|v| fresh} \\
     \end{array} \\
   \end{array}
   $$
@@ -737,8 +737,9 @@ simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| und
 apply each element of the array to |()| afterwards, using the |map| function defined above.
 The full desugaring for |for^(e_1) in e_2| is thus
 \[
-|applyx map ((lam z (applyx z ())), all (e_1; lam x e_2))|.
+|v := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), v)|
 \]
+for a fresh variable |v|.
 
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
