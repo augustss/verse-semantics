@@ -131,7 +131,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
 
     -- Is choice free expression?
     isCE CValue{} = True
-    isCE (CUnify e1 e2) = isCE e1 && isCE e2
+    isCE (CUnify _ e) = isCE e
     isCE (CSeq es) = all isCE es
     isCE COne{} = True
     isCE CAll{} = True
@@ -161,9 +161,8 @@ evalChoice flg = evalTrace "evalChoice" t flg
        else
         case e of
           CUnify e1 e2 -> do
-            e1' <- findC e1
-            e2' <- if isCE e1 then findC e2 else pure $ const e2
-            pure $ \ x -> CUnify (e1' x) (e2' x)
+            e2' <- findC e2
+            pure $ \ x -> CUnify e1 (e2' x)
           CSeq es -> do
             let loop [] = pure []
                 loop (x:xs) = do
@@ -203,9 +202,8 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
        else
         case e of
           CUnify e1 e2 -> do
-            e1' <- findD e1
             e2' <- findD e2
-            pure $ \ x -> CUnify (e1' x) (e2' x)
+            pure $ \ x -> CUnify e1 (e2' x)
           CSeq es -> do
             es' <- mapM findD es
             pure $ \ x -> CSeq (map ($ x) es')
@@ -224,7 +222,7 @@ evalWrong = evalTrace "evalWrong" f
     f e = composOp f e
 
     getWrongs (CWrong s) = [s]
-    getWrongs (CUnify e1 e2) = getWrongs e1 ++ getWrongs e2
+    getWrongs (CUnify _ e) = getWrongs e
     getWrongs (CSeq es) = concatMap getWrongs es
     getWrongs (CDef _ e) = getWrongs e
     getWrongs (CSucceeds e) = getWrongs e
@@ -241,7 +239,7 @@ evalFail = evalTrace "evalFail" f
 
     -- Follows the X context
     hasFail CFail = True
-    hasFail (CUnify e1 e2) = hasFail e1 || hasFail e2
+    hasFail (CUnify _ e) = hasFail e
     hasFail (CSeq es) = any hasFail es
     hasFail (CDef _ e) = hasFail e
     hasFail _ = False
@@ -251,8 +249,8 @@ evalFail = evalTrace "evalFail" f
 evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
-    f (CUnify e@(CValue HNF{}) x@CVar{}) = f $ CUnify x e
-    f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
+    f (CUnify v@HNF{} (CValue x@Var{})) = f $ CUnify x (CValue v)
+    f (CUnify v1@HNF{} (CValue v2@HNF{})) = unifyV v1 v2
     f e = composOpLam (underLambda flg) f e
 
     unifyV v@(VInt i1) (VInt i2) | i1 == i2 = CValue v
@@ -261,7 +259,7 @@ evalUnify flg = evalTrace "evalUnify" f flg
     unifyV _ VInt{} = CFail
 
     unifyV v@(VArray vs1) (VArray vs2) | length vs1 == length vs2 =
-      cSeq $ zipWith (\ v1 v2 -> CUnify (CValue v1) (CValue v2)) vs1 vs2 ++ [CValue v]
+      cSeq $ zipWith (\ v1 v2 -> CUnify v1 (CValue v2)) vs1 vs2 ++ [CValue v]
                                        | otherwise = CFail
     unifyV VArray{} _ = CFail
     unifyV _ VArray{} = CFail
@@ -284,13 +282,13 @@ evalUnused flg = evalTrace "evalUnused" f flg
     -- Find bindings that are unused.
     findB vs h e = do
       case e of
-        CUnify (CVar x) ev@(CValue _)
+        CUnify (Var x) ev@(CValue _)
           | elem x h                 -- in this heap
           , x `notElem` delete x vs  -- this is the only mention
           -> do
             modify $ (x:)            -- remember variable
             pure ev                  -- replace with value
-        CUnify e1 e2 -> CUnify <$> findB vs h e1 <*> findB vs h e2
+        CUnify e1 e2 -> CUnify e1 <$> findB vs h e2
         CSeq es -> CSeq <$> mapM (findB vs h) es
         --CSucceeds b -> CSucceeds <$> findB vs h b
         _ -> pure e
@@ -303,7 +301,7 @@ evalSubst :: EvalCore
 evalSubst flg = evalTrace "evalSubst" f flg
   where
     f e@CSeq{} | Just d <- bind e = d
-    f (CUnify (CVar x) (CValue v)) | Just c <- substRec x v = c
+    f (CUnify (Var x) (CValue v)) | Just c <- substRec x v = c
     f e@CUnify{} | Just d <- bind e = d
     f e = composOpLam (underLambda flg) f e
 
@@ -312,7 +310,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
         (cx, Just (x, v)) ->
           -- We need to substitute v for x in cx, and then plug the hole
           -- with x=v.
-          Just $ substHole (CUnify (CVar x) (CValue v)) $ subst x v cx
+          Just $ substHole (CUnify (Var x) (CValue v)) $ subst x v cx
 --        (_, Just (x, v)) | x `elem` fvsV v, Var x /= v ->
 --          Just $ CWrong $ "occurs check " ++ prettyShow x
         _ -> Nothing
@@ -329,13 +327,13 @@ evalSubst flg = evalTrace "evalSubst" f flg
         pure e  -- Already found, just keep going
        else
         case e of
-          CUnify (CVar x) (CValue v)
+          CUnify (Var x) (CValue v)
             | x `notElem` fvsV v     -- occurs check
             , x `elem` delete x vs   -- there is another free occurrence
             -> do
               put $ Just (x, v)
               pure $ CVar hole
-          CUnify e1 e2 -> CUnify <$> findB vs e1 <*> findB vs e2
+          CUnify e1 e2 -> CUnify e1 <$> findB vs e2
           CSeq es -> CSeq <$> mapM (findB vs) es
           --CSucceeds b -> CSucceeds <$> findB h b
           _ -> pure e
@@ -345,7 +343,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
       where
         sub (CVar i) | i == hole = e
         sub (CSeq es) = CSeq (map sub es)
-        sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
+        sub (CUnify e1 e2) = CUnify e1 (sub e2)
         sub c = c
 
     -- Recognize and execute the SUBST-REC rule
@@ -354,8 +352,8 @@ evalSubst flg = evalTrace "evalSubst" f flg
                   | otherwise =
       case runState (findLam vv) Nothing of
         (v', Just (y, e)) ->
-          let lam = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
-          in  Just $ CUnify (CVar x) $ CValue $ substHoleV lam v'
+          let lam = VLam y $ CDef [x] $ CSeq [CUnify (Var x) (CValue vv), e]
+          in  Just $ CUnify (Var x) $ CValue $ substHoleV lam v'
         _ -> Just $ CWrong $ "occurs check " ++ prettyShow x
       where
         findLam :: Value -> State (Maybe (Ident, Core)) Value
@@ -403,7 +401,7 @@ evalSplit flg = evalTrace "evalSplit" f flg
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
-      in  CDef [y] $ CSeq [CUnify (CVar y) (CApply g v), CApply (Var y) r]
+      in  CDef [y] $ CSeq [CUnify (Var y) (CApply g v), CApply (Var y) r]
 
 dummy :: Ident
 dummy = Ident noLoc "_"
@@ -423,7 +421,7 @@ evalAll flg = evalTrace "evalAll" f flg
     mkArr vs =
       let xs = take (length vs) $ newVars "x" $ fvsV (VArray vs)
           unit = VArray []
-      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply v unit) xs vs ++ [CArray $ map Var xs]
+      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (Var x) $ CApply v unit) xs vs ++ [CArray $ map Var xs]
 
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
@@ -448,8 +446,7 @@ evalApp flg = evalTrace "evalApp" f flg
             vs = fvsV v2
             x = head $ newVars "i" vs
     f (CApply (VArray vs) vi) = CBar $ zipWith g [0..] vs
-      where g i v = CSeq [CUnify ei (CInt i), CValue v]
-            ei = CValue vi
+      where g i v = CSeq [CUnify vi (CInt i), CValue v]
     f (CApply VInt{} _) = CWrong "APP-CONST-WRONG"
     f e = composOpLam (underLambda flg) f e
 
@@ -461,12 +458,8 @@ evalSeq flg = evalTrace "evalSeq" f flg
   where
     f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
-    f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
-    f (CUnify e1@CValue{} (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify e1 e]
-    f (CUnify e1@(CUnify CValue{} v2@CValue{}) e2) =
-      CSeq [e1, CUnify v2 e2]
-    f (CUnify e1 e2@(CUnify CValue{} v2@CValue{})) =
-      CSeq [e2, CUnify e1 v2]
+    f (CUnify v (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify v e]
+    f (CUnify v1 e@(CUnify v2 _)) = CSeq [CUnify v1 (CValue v2), e]
     f e = composOpLam (underLambda flg) f e
     flat (CSeq es) = es
     flat e = [e]
@@ -623,13 +616,13 @@ prelude =
           VLam st $
             CDef [s, t] $
             CSeq [
-              CUnify (CArray [Var s, Var t]) (CVar st),
+              CUnify (VArray [Var s, Var t]) (CVar st),
               CLam g $ CLam y $
                 CDef [sy, gsy] $
                 CSeq [
                   app "isFcn$" (Var g),
-                  CUnify (CVar sy) (CApply (Var s) (Var y)),
-                  CUnify (CVar gsy) (CApply (Var g) (Var sy)),
+                  CUnify (Var sy) (CApply (Var s) (Var y)),
+                  CUnify (Var gsy) (CApply (Var g) (Var sy)),
                   CApply (Var t) (Var gsy)
                   ]
               ]
@@ -640,7 +633,7 @@ prelude =
           VLam xy $
             CDef [x, y] $
             CSeq [
-              CUnify (CArray [Var x, Var y]) (CVar xy),
+              CUnify (VArray [Var x, Var y]) (CVar xy),
               app op (Var xy),
               CVar x
               ]
@@ -649,7 +642,7 @@ prelude =
           VLam t $ CLam x $
             CDef [y] $
             CSeq [
-              CUnify (CVar y) (CApply (Var t) (Var x)),
+              CUnify (Var y) (CApply (Var t) (Var x)),
               app "new$" (Var y)
               ]
 
