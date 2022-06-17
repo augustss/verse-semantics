@@ -349,6 +349,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
     -- Recognize and execute the SUBST-REC rule
     substRec :: Ident -> Value -> Maybe Core
     substRec x vv | x `notElem` fvsV vv = Nothing
+                  | Var x == vv = Nothing
                   | otherwise =
       case runState (findLam vv) Nothing of
         (v', Just (y, e)) ->
