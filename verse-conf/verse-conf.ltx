@@ -766,7 +766,19 @@ $$
 |if x:=a^(5) then print^(x) else print^("out of bounds")|
 $$
 
-\lennart{Add some logic programming examples.}
+\subsection{Subset and powerset}
+\lennart{Is this example too elementary?}
+The subsets (subarrays) of of an array can be expressed with this multi-valued function.
+First compute the subsets of all but the first element, and then return these with and without the first element added.
+$$
+|subset^(a) := if x:=applyx head a then s:= applyx subset (applyx tail a); applyx cons (x, s) `choice` s else ()|
+$$
+And computing the powerset is then simply a matter of collecting all the subsets into an array.
+$$
+|powerset^(a) := for x := applyx subset a in x|
+$$
+
+\lennart{Add more logic programming examples.}
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
