@@ -443,8 +443,8 @@ dsPArr l lhss e =
       (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
         len1 = toInteger $ length ls1
-        a1  = applyPrim "takeL$" $ Array [LitInt len1, v]
-        e'  = applyPrim "dropL$" $ Array [LitInt len1, v]
+        a1  = applyPrimD "takeL$" $ Array [LitInt len1, v]
+        e'  = applyPrimD "dropL$" $ Array [LitInt len1, v]
       v' <- newIdent l "d"
       let
         bv' = define l v' e'
@@ -456,8 +456,8 @@ dsPArr l lhss e =
       (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
         len2 = toInteger $ length ls2
-        a2  = applyPrim "takeR$" $ Array [LitInt len2, v]
-        e'' = applyPrim "dropR$" $ Array [LitInt len2, v]
+        a2  = applyPrimD "takeR$" $ Array [LitInt len2, v]
+        e'' = applyPrimD "dropR$" $ Array [LitInt len2, v]
       mm <- dsP l lhs e''
       m2 <- dsP l (Array ls2) a2
       pure $ Seq $ bv ++ [mm, m2, v]
@@ -467,13 +467,13 @@ dsPArr l lhss e =
       let
         len1 = toInteger $ length ls1
         len2 = toInteger $ length ls2
-        a1  = applyPrim "takeL$" $ Array [LitInt len1, v]
-        e'  = applyPrim "dropL$" $ Array [LitInt len1, v]
+        a1  = applyPrimD "takeL$" $ Array [LitInt len1, v]
+        e'  = applyPrimD "dropL$" $ Array [LitInt len1, v]
       v' <- newIdent l "d"
       let
         bv' = define l v' e'
-        a2  = applyPrim "takeR$" $ Array [LitInt len2, Variable v']
-        e'' = applyPrim "dropR$" $ Array [LitInt len2, Variable v']
+        a2  = applyPrimD "takeR$" $ Array [LitInt len2, Variable v']
+        e'' = applyPrimD "dropR$" $ Array [LitInt len2, Variable v']
       m1 <- dsP l (Array ls1) a1
       mm <- dsP l lhs e''
       m2 <- dsP l (Array ls2) a2
@@ -500,7 +500,7 @@ primOps = map (Ident noLoc)
   , "pre'-'"
   , "post'?'"
   , "succeeds", "decides", "iterates", "io"
-  , "concat$", "takeL$", "dropL$", "takeR$", "dropR$"
+  , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
   , "length"
   , "known$"  -- This is a horrible hack
   , "deref$", "new$", "assign$"

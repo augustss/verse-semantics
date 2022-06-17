@@ -527,15 +527,17 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
         _ ->  CWrong $ "concat$"
         where getA (VArray vs) = Just vs
               getA _ = Nothing
-    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL$", "dropL$", "takeR$", "dropR$"]
-                                         , let n = fromInteger ni
-                                         , n >= 0 && n <= length vs =
-      case op of
-        "takeL$" -> CArray $ take n vs
-        "dropL$" -> CArray $ drop n vs
-        "takeR$" -> CArray $ revTake n vs
-        "dropR$" -> CArray $ revDrop n vs
-        _ -> impossible "take/drop"
+    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL$", "dropL$", "takeR$", "dropR$"] =
+      let n = fromInteger ni in
+      if n >= 0 && n <= length vs then
+        case op of
+          "takeL$" -> CArray $ take n vs
+          "dropL$" -> CArray $ drop n vs
+          "takeR$" -> CArray $ revTake n vs
+          "dropR$" -> CArray $ revDrop n vs
+          _ -> impossible "take/drop"
+       else
+        CFail
 
     f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
