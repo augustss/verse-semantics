@@ -717,7 +717,7 @@ If |p| fails for any value, the whole call to |map(p,xs)| fails.
 Source languages can use this to build more featureful constructs like |for|,
 mimicking the list comprehension in languages like Haskell or Python:
 The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in |e_1|.
-The |e_1| is called the {\em domain} of the loop.
+The |e_1| is called the \emph{domain} of the loop.
 
 The scoping is peculiar in that variables bound in |e_1| also scope over |e_2|.
 So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |(3,4,6)|.
@@ -1367,6 +1367,13 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 % 
 % \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
 
+\subsection{Not restricting application and arrays}
+
+We have opted to restrict array formation and function application to only allow \emph{values} and not \emph{expressions}.
+This is not a necessary restriction, but allowing expressions would require many more rules.
+The extra rules would describe how to distribute, e.g., application over sequencing.
+There is no loss of expressive power using values, just slightly more verbose terms.
+
 \subsection{Restricting unification}
 
 The system becomes slightly simpler if we restrict the syntax of equalities so that the left-hand-side is always a value.
@@ -1375,8 +1382,7 @@ $$
 |e_1 = e_2| \quad \text{desugars to} \quad |def x (x = e_1; x = e_2)|
 $$
 The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
-The difference is modest, but it would make our language
-a little smaller.
+The difference is modest, but it would make our language a little smaller.
 
 \subsection{Ordering and choices}
 
