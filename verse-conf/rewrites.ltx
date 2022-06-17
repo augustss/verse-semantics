@@ -84,8 +84,8 @@
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-    \rulename{unify-unifyl} & |(v_1 == v_2) == e| & \movesto & |(v_1 == v_2); (v_2 == e)| \\
-    \rulename{unify-unifyr} & |e == (v_1 == v_2)| & \movesto & |(v_1 == v_2); (e == v_2)| \\
+    \rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| \\
+    \rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| \\
     \end{array} \\
     \\[-2mm]
 

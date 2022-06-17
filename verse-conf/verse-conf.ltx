@@ -1353,19 +1353,30 @@ for |x|.
 An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
 the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 
-\subsection{Liberating more equations} \label{sec:variations-liberate-unify}
+% \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
+% 
+% Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
+% 
+% But the quite similar expression |(applyx f () =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
+% \[\begin{array}{rcl@@{\hspace{10mm}}rcl}
+% |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
+% & |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
+% |v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)|
+% & |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
+%  \end{array}\]
+% 
+% \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
 
-Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
+\subsection{Restricting unification}
 
-But the quite similar expression |(applyx f () =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
-\[\begin{array}{rcl@@{\hspace{10mm}}rcl}
-|(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
-& |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
-|v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)|
-& |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
- \end{array}\]
-
-\joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
+The system becomes slightly simpler if we restrict the syntax of equalities so that the left-hand-side is always a value.
+Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form:
+$$
+|e_1 = e_2| \quad \text{desugars to} \quad |def x (x = e_1; x = e_2)|
+$$
+The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
+The difference is modest, but it would make our language
+a little smaller.
 
 \subsection{Ordering and choices}
 
