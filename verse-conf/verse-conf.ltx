@@ -1156,13 +1156,14 @@ Can we join |(1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |(1,lam z v_x)|$ and
 \]
 and we \emph{cannot} join them; they keep “missing each other”.
 
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |(1, lam z ((1, (lam z dots))))| . This phenomenum has been studied before and led to a various generalizations of confluence to allow this behavior.
+But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |(1, lam z ((1, (lam z dots))))|. This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
 
 In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
 
 Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
 \begin{conjecture}{Skew-confluence}
-The reduction system $\mapsto$ is skew-confluent.
+  The reduction system $\mapsto$ is skew-confluent.
+  \lennart{This uses $\mapsto$ rather than $\movesto$.  Is that intentional?}
 \end{conjecture}
 
 
@@ -1383,7 +1384,7 @@ In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consum
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (v, lam _ e)| \\
     \rulename{split-value} & |split v f g| & \movesto & |applyx g (v, lam _ fail)| \\
 \end{array}\]
-The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |f| together with the remaining computation, safely tucked away behind a lambda.
+The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
