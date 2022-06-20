@@ -17,6 +17,8 @@ stdenv.mkDerivation rec {
       [megaparsec parser-combinators mtl uniplate optparse-applicative smallcheck haskeline
        QuickCheck]))
     ghcid
+    # Isabelle
+    isabelle
   ];
 }
 
