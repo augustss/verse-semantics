@@ -961,7 +961,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |box|$ is to avoid failure for |x=x|.
+that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -987,7 +987,9 @@ Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification bet
 Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
 rewrites it to |((x=y);(y=1);y>0|, thus exposing |y=1| for further use by \rulename{subst}. Furthermore, in order
 to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
-as discussed in \cref{sec:conf-move-eqn}. These rules could be more general, see \cref{sec:variations-liberate-unify}.
+as discussed in \cref{sec:conf-move-eqn}.
+%% The \label has been commented out.
+% These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
@@ -1104,11 +1106,11 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 
 
 \subsection{Examples}
-\lennart{I think we should have a few examples of reduction sequences.}
+\lennart{I think we should have a few more examples of reduction sequences.}
 
 \section{Confluence}
 
-The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it better be the case that no matter how the rules are applied, one always obtains the same meaning for the program!
+The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same meaning for the program!
 
 If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, then we can find $e_4$ so that $e_2 \movesto^\ast e_4$ and $e_3 \movesto^\ast e_4$.
 
@@ -1191,7 +1193,7 @@ Until we have concluded the formal proof of skew-confluence, including the preci
 \section{Related work} \label{sec:related}
 
 \subsection{Flat vs higher order}.  When giving the semantics
-of functional logic languages, a first-oder presentation is almost universal.
+of functional logic languages, a first-order presentation is almost universal.
 User-defined functions can be defined at top level only;
 and function symbols (the names of such functions) are syntactically
 distinguished from ordinary variables. As Hanus describes, it is possible
@@ -1380,7 +1382,7 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 We have opted to restrict array formation and function application to only allow \emph{values} and not \emph{expressions}.
 This is not a necessary restriction, but allowing expressions would require many more rules.
 The extra rules would describe how to distribute, e.g., application over sequencing.
-There is no loss of expressive power using values, just slightly more verbose terms.
+There is no loss of expressive power using just values, just slightly more verbose terms.
 
 \subsection{Restricting unification}
 
@@ -1435,6 +1437,7 @@ to avoid confusing the presentation with these higher-order encoding, but we don
 
 
 \section{Conclusions and further work}
+\lennart{This needs a little fleshing out.}
 
 \subsection{Types}
 The full Verse language has types and static checking of those.
@@ -1451,7 +1454,7 @@ when the condition of an |if| fails any store effects in the condition are rolle
 \subsection{Effects}
 In this paper we have seen one kind of effect, namely being multi-valued.
 Adding assignable references add another set of effects, as does I/O.
-To have this real Verse has an effect system in addition to the type system.
+To accomodate this, real Verse has an effect system in addition to the type system.
 We have reduction rules for effect checking as well, but for the real language this is done at compile time.
 
 % -------------------- Acknowledgements ----------------
