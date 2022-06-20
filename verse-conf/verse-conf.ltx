@@ -367,7 +367,9 @@ some built-in operations and tuples as data constructors:
 A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple, also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
-For notational convenience we allow ourselves to abbreviate such tuples to just |(v_1, dots, v_n)|.
+For notational convenience we allow ourselves to abbreviate\footnote{
+We do not use |(v_1, dots, v_n)| as the canonical notation because it is ambiguous for 1-tuples.
+} such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
