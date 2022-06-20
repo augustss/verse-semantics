@@ -550,12 +550,12 @@ failing when we try to unify |x| with |7|?  Not only is that not what we intende
 non-deterministic: the result is affected by the order in which we did unifications!
 
 To address this, we give |if| a special property: unifications inside |e_1| (the condition of the |if|)
-can only unify variables |defKW|'d inside |e_1|; varaibles bound outside |e_1| are ``rigid''.  So in our example, the |x| in |(x=0)| is
+can only unify variables |defKW|'d inside |e_1|; variables bound outside |e_1| are ``rigid''.  So in our example, the |x| in |(x=0)| is
 rigid and cannot be unified.  Instead the |if| is stuck, and we move on to unify |x=7|.  That unblocks
 the |if| and all is well.  This special property is precisely the same as the one we sketched for
 choice (\cref{sec:mixing}), where we wanted local equation-solving.
 
-In fact, \versecalc{} distils the three-argument |if| into something simpler, the unary construct |one(e)|.
+In fact, \versecalc{} distills the three-argument |if| into something simpler, the unary construct |one(e)|.
 Its specification is this:
 if |e| fails, |one(e)| fails; otherwise |one(e)| returns the first of the values yielded by |e|.
 Now, |if e_1 then e_2 else e_3| can (nearly) be re-expressed like this:
@@ -577,7 +577,7 @@ remain un-evaluated until the choice is made, just as we expect.
 Now |if| is just syntactic sugar, and the special property of |if| becomes a special property of |oneKW|.
 
 
-\subsection{Arrays}
+\subsection{Arrays and |allKW|} \label{sec:array}
 The main data structure in \versecalc{} is the array.
 An array is a finite sequence of values, |(v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
@@ -593,6 +593,7 @@ Arrays can be constructed by collecting all the results from a multi-valued expr
 if |e| fails the |all e| is the empty array,
 otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduces to
 the array |(v_1, dots, v_n)|.
+\lennart{Somewhere we should mention that |choice| is associative (in some sense) and can be reassociated.}
 \label{sec:all}
 
 Do we even need |oneKW| as a primitive construct, given that we have
