@@ -80,12 +80,12 @@
         &&& \text{if $|x| \in \freevars{e}$, $x \ne y$}
     \end{array} \\
     \textit{Sequencing} \\
-    \begin{array}{lrcl}
+    \begin{array}{lrcl@@{\hspace{5mm}}l}
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-    \rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| \\
-    \rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| \\
+    \rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & x \; \text{fresh}\\
+    \rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & x \; \text{fresh}\\
     \end{array} \\
     \\[-2mm]
 

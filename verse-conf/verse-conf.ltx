@@ -278,11 +278,10 @@ at term rewriting system, to give us both a formal semantics (via a small-step r
 and a powerful set of equvalences that programmers can use to reason about their programs,
 and compilers can use to optimise them.
 
-Our main contribution is a new core calculus, \versecalc{}, for functional logic programming that
+Our main contribution is a new core calculus, the Verse calculus or \versecalc{} for short,
+for functional logic programming that
 has the following properties:
 \begin{itemize}
-\item It has a \emph{small-step term rewriting semantics} for a functional logic language.
-  Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step, about how their program executes.
 \item It natively supports \emph{higher-order programming}, just like the lambda calculus.  In contrast,
   the functional-logic literature typically addresses higher order features via defunctionalisation \cite[3.3]{hanus:survey}.
 \item It supports \emph{logical variables}. In the expression |def x e|, the variable |x| is brought into scope,
@@ -290,9 +289,17 @@ has the following properties:
   an existential variable always stands for a single value; logical variables are not mutable.
 \item It supports so-called \emph{non-deterministic programming}; that is, an expression can return one result, many results, or no result (failure).
   As a result, it natively supports both narrowing and residuation.
+\item \versecalc{} has a \emph{small-step term rewriting semantics} (\Cref{sec:rewrite-rules}).
+  Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step,
+  about how their program executes.  This set of rewrite rules is our main contribution.
+\item \simon{Something about confluence.}
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
+It should be possible to compile a variety of functional logic languages, including Curry, into \versecalc{}.
+We are also working on a new programming language for the metaverse, built directly on \versecalc{}; indeed,
+our motivation for developing \versecalc{} is practical rather than theoretical.
+
 There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
 We discuss related work in \cref{sec:related}.
 
@@ -799,26 +806,28 @@ $$
 \input{rewrites}
 
 How can we give a precise semantics to a non-strict functional
-programming language?  Here are some possiblities:
+programming language?  Here are some possibilities:
 \begin{itemize}
-\item \emph{High level.} A denotational semantics is the classical approach, but it is quite mathematical
+\item \emph{A denotational semantics} is the classical approach, but it is quite mathematical
   (and hence not a good way to explain to programmer what their program means),
-  and it cannot distinguish between call-by-need and call-by-name (hence ``high level'').
-\item \emph{Low level.} A big-step operational semantics typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation \cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
-\item \emph{Lower level}. Despite its ``operational semantics'' title, this big step approach
+  and it cannot distinguish between call-by-need and call-by-name.
+  It is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
+  becuase of the logical variables.
+\item \emph{A big-step operational semantics} typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation \cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
+\item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, th big-step approach
   does not convey accurate operational intutition, because it goes all the way to a value
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
   they typically describe how a (heap, expression, stack) configuration evolves, one small
   step at a time (e.g. \cite{pj:stg-machine}).
   The difficulty is that the description is now so low-level that it is again hard to explain to programmers.
-\item \emph{Medium level.}  A rewrite semantics steers between these two extremes.
+\item \emph{A rewrite semantics} steers between these two extremes.
   For example, Ariola \emph{et al}'s ``A call by need lambda calculus'' \cite{ariola:call-by-need} shows how
   to give the semantics of a call-by-need language as a set of rewrite rules. The great
   advantage of this approach is that it is readily explicable to programmmers.
   Indeed teachers almost always explain the execution of Haskell or ML programs as a succession of rewrites
   of the program (e.g. inline this call, simplify this |case| expression, etc).
 \end{itemize}
-Up to this point there has been no satisfying rewrite semantics for functional logic langauges
+Up to this point there has been no satisfying rewrite semantics for functional logic languages
 (see \cref{sec:related} for previous work).
 Our main contribution is to fill this gap with a rewrite semantics for \versecalc{}, that
 has the following properties:
@@ -901,7 +910,8 @@ lambda or a built-in operation with any other value.  We discuss this design cho
 
 \subsection{Unification: the \rulename{subst} rule}
 
-Matters get more interesting when variables are involved.
+The key innovation in \versecalc{} is the way bindings (that is, just ordinary equalities)
+of logical variables are propagated.
 The key rule is \rulename{subst}:
 $$
 \rulename{subst} \quad |X^[x==v]|  \movesto  |(subst X x v)^[x==v]|
@@ -913,8 +923,8 @@ defined in \cref{fig:syntax}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
 with a single hole, written |hole|, in it.
 The notation |X^[e]| is the expression obtained by filling the hole in |X| with |e|.
-For example |(y = (hole, 4))| is a possible execution context, |X|; filling its hole with 99
-gives the expression |(y = (99,4))|.
+For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
+gives the expression |(y = tup (99,4))|.
 The notation |subst X x v| is the context obtained by replacing all free occurences of |x| in |X| by |v|.
 
 So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the
