@@ -9,8 +9,8 @@
   \begin{array}{l}
     \textit{Primitive operations} \\
     \begin{array}{lrcl}
-    \rulename{p-add} & |applyx add (k_1 ,k_2)| & \movesto & k_1+k_2 \\
-    \rulename{p-gt} & |applyx gt (k_1,k_2)| & \movesto &
+    \rulename{p-add} & |applyx add (tup (k_1 ,k_2))| & \movesto & k_1+k_2 \\
+    \rulename{p-gt} & |applyx gt (tup (k_1,k_2))| & \movesto &
     \left\{\begin{array}{@@{}ll}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}

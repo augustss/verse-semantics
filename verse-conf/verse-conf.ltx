@@ -338,11 +338,11 @@ We discuss related work in \cref{sec:related}.
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      |emptytup| & \text{means} & |arr ()|\\
-      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
-      v_1 + v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
-      v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
-      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots def x_n e))| \\
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyx add (tup ( v_1, v_2 )) | \\
+      v_1 > v_2 & \text{means} & |applyx gt (tup ( v_1, v_2 )) | \\
+      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
      \end{array} \\
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
@@ -502,10 +502,10 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 
 \subsection{Pattern matching}
 
-Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |emptytup| to represent the empty list and pairs to represent |Cons|:
+Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |emptytup| to represent the empty list and pairs to represent |cons|:
 \footnote{
-Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (tup (x,y)) (p = (x,y); body)|
-  }:
+Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) (p = tup (x,y); body)|
+  }
 $$
 |append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
   |(xs = emptytup; ys) choice| \\
@@ -600,7 +600,7 @@ the array |tup (v_1, dots, v_n)|.
 \label{sec:all}
 
 Do we even need |oneKW| as a primitive construct, given that we have
-|allKW|? Can we not use |applyx (all e) 0| instead of |one e|? Indeed
+|allKW|? Can we not use |applyx (all e) (0)| instead of |one e|? Indeed
 they behave the same if |e| fully reduces to finitely many choices of
 values. But |allKW| really requires the evaluation of \emph{all}
 choices before proceeding, while |oneKW| only needs to evaluate the
@@ -624,7 +624,7 @@ We will illustrate this with a few examples.
     \begin{array}{rcll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
-      |f^tup (x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| & \text{|p| fresh} \\
+      |f^tup (x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=tup (x,y); e); dots| & \text{|p| fresh} \\
       |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| & \text{|x,y| fresh} \\
       |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyx add (tup (e_1,e_2))| \\
@@ -642,7 +642,7 @@ The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-li
 not arbitrary expressions, in in array literals and function-applications.
 To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 \begin{itemize}
-\item With |:=| we simultaenous introduce and assign a variable.
+\item With |:=| we simultaneously introduce and assign a variable.
 \item When defining functions, we allow simple patterns on the left of |:=|
 \item In function applications we allow ourselves to write |applyx e_1 e_2|,
   rather that insisting on both function and argument being a value, and
@@ -663,7 +663,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
       |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else emptytup| \\
       |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |find^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |every^(p, xs)| & :=  |applyx map (p,xs)| \\
+      |every^(p, xs)| & :=  |applyx map (tup(p,xs))| \\
     \end{array}
   \end{array}
   $$
@@ -696,12 +696,12 @@ or all the elements of |xs|, and similarly we can define |append|.
 For the function |map|, which applies a function to each element of an array and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
 |flatMap| flattens the choices from iterating through |xs| with
-the choices taken by |f|, so |applyx flatMap ((lam x ((x, x+1))), (10,20))| $\equiv$ |(10,11,20,21)|.
+the choices taken by |f|, so |applyx flatMap (tup (lam x ((x, x+1)), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
 
 \item |map|.
 But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 to affect the whole expression and obtain the cartesian product of these choices.
-The expression |map((lam x ((x `choice` x+1))), (10,20))| should reduce to |(10,20)`choice`(10,21) `choice` (11,20) `choice` (11,21)|.
+The expression |applyx map (tup (lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
 We get that behaviour if we simply define |map| much like in any other functional programming language:
 if taking the head of the array fails, it must be an empty array, and we return an empty array.
 Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
@@ -735,7 +735,7 @@ a possibly failing expression in the domain.
 So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |tup (4,6)|.
 
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) in x+y| reduces to |(11, 12, 13, 21, 22, 23)|
+So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) in x+y| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just like |if| is defined in terms of the primitive |oneKW| we can define |for|
 in terms of the primitive |all e|.
@@ -771,7 +771,7 @@ so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |tup (1,2,3,4,5
 Indexing out-of-bounds of an array results in |fail|.
 This means that we cannot avoid handling this case.
 $$
-|if x:=a^(5) then print^(x) else print^("out of bounds")|
+|if x:=applyx a 5 then applyx print x else applyx print "out of bounds"|
 $$
 
 \subsection{Subset and powerset}
