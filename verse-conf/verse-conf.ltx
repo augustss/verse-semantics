@@ -346,6 +346,7 @@ We discuss related work in \cref{sec:related}.
       |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
      \end{array} \\
   \\
+  \text{The notation $\freevars{e}$ means the free variable of $e$.} \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
@@ -697,7 +698,7 @@ or all the elements of |xs|, and similarly we can define |append|.
 For the function |map|, which applies a function to each element of an array and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
 |flatMap| flattens the choices from iterating through |xs| with
-the choices taken by |f|, so |applyN flatMap ( (lam x ((x, x+1)), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
+the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
 
 \item |map|.
 But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
@@ -1198,6 +1199,7 @@ Until we have concluded the formal proof of skew-confluence, including the preci
 \section{Related work} \label{sec:related}
 
 \subsection{Flat vs higher order}
+
 When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
 User-defined functions can be defined at top level only;
