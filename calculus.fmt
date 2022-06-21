@@ -20,8 +20,10 @@
 %format apply0 a = a "\langle\rangle"
 
 %% Function application with 1 argument
-%% %format apply1 a b = a "(" b ")"
-%format apply1 a b = a "\," b
+%format apply1 a b = a "(" b ")"
+
+%% Function application with 1 argument, without parenthesis
+%format apply1N a b = a "\," b
 
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"

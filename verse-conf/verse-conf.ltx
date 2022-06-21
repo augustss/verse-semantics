@@ -316,7 +316,7 @@ We discuss related work in \cref{sec:related}.
     \text{Integer constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1 v_1 v_2|
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
     && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
 % SPJ Omitting for now
@@ -384,8 +384,8 @@ functions |gt| and |add|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
-\item \emph{Expressions} |e| includes values |v|, and applications |apply1 v_1 v_2|.\footnote{
-For brevity we will write |applyN f (v_1,dots,v_n)| instead of |apply1 f (tup (v_1,dots,v_n))|.
+\item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
+For clarity we with usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an array.
 }
 
   Remembering that a value can be a lambda, that gives us the full lambda calculus.
