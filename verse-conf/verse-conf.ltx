@@ -1497,12 +1497,13 @@ We have reduction rules for effect checking as well, but for the real language t
   \begin{array}{l}
     \textbf{Syntax extension} \\
     \begin{array}{lrcl}
-      \text{References}    & r \\
-      \text{Expressions}   & e   & ::= & \cdots \vb |store s e| \\
-      \text{Primops}       & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
-      \text{Head values}   & hnf & ::= & \cdots \vb r \\
-      \text{Store}         & s   & ::= & |cell r v| \vb |s,s| \vb |emp| \\
-      \text{Store context} & S   & ::= & \hole \vb |S,s| \vb |s,S| \\
+      \text{References}         & r \\
+      \text{Expressions}        & e   & ::= & \cdots \vb |store s e| \\
+      \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
+      \text{Head values}        & hnf & ::= & \cdots \vb r \\
+      \text{Execution contexts} & X   & ::= & \cdots \vb |store s X| \\
+      \text{Store}              & s   & ::= & |cell r v| \vb |s,s| \vb |emp| \\
+      \text{Store context}      & S   & ::= & \hole \vb |S,s| \vb |s,S| \\
     \end{array} \\
 \\
 
