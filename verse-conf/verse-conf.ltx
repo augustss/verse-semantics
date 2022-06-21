@@ -303,7 +303,7 @@ We discuss related work in \cref{sec:related}.
     \text{Integer constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |applyx v_1 v_2| \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1 v_1 v_2| \\
     && \vb & |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
     && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
 % SPJ Omitting for now
@@ -326,8 +326,7 @@ We discuss related work in \cref{sec:related}.
     && \vb & |succeeds e| \vb |decides e| \\
 \fi
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \\
-     &&\vb & |def x CX| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
     \vb |one hole| \vb |all hole| \\
 \iffullverse
@@ -340,8 +339,8 @@ We discuss related work in \cref{sec:related}.
     \begin{array}{rcl}
 %%      |emptytup| & \text{means} & |arr ()|\\
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
-      v_1 + v_2 & \text{means} & |applyx add (tup ( v_1, v_2 )) | \\
-      v_1 > v_2 & \text{means} & |applyx gt (tup ( v_1, v_2 )) | \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
       |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
      \end{array} \\
   \\
@@ -368,14 +367,14 @@ some built-in operations and tuples as data constructors:
   also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
-For notational convenience we allow ourselves to abbreviate\footnote{
-We do not use |(v_1, dots, v_n)| as the canonical notation because it is ambiguous for 1-tuples.
-} such tuples to just |(v_1, dots, v_n)|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head normal form, or a variable |x|.
-\item \emph{Expressions} |e| includes values |v|, and applications |applyx v_1 v_2|.  Remembering that
-  a value can be a lambda, that gives us the full lambda calculus.
+\item \emph{Expressions} |e| includes values |v|, and applications |apply1 v_1 v_2|.\footnote{
+For brevity we will write |applyN f (v_1,dots,v_n)| instead of |apply1 f (tup (v_1,dots,v_n))|.
+}
+
+  Remembering that a value can be a lambda, that gives us the full lambda calculus.
   \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 \end{itemize}
 Expressions also include two other key collections of constructs:
@@ -403,7 +402,7 @@ unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
 
 Unification deals with pattern matching in functions. For example:
 $$
-|def fst ((fst = lam pr (def (tup (a,b)) (pr = tup (a,b); a))); applyx fst (tup (2,5)))|
+|def fst ((fst = lam pr (def (tup (a,b)) (pr = tup (a,b); a))); applyN fst (2,5))|
 $$
 This term binds |fst| to a lambda, and applies that function to |tup (2,5)|.
 The lambda unifies its argument with |(a,b)|, where |a,b| are fresh logical
@@ -415,18 +414,18 @@ we allow ourselves a set of top-level bindings for such functions.
 
 The input to |fst| may include logical variables. For example:
 $$
-|def (x,y,z) (x=(y,z); applyx fst x = 2; y)|
+|def (x,y,z) (x=(y,z); apply1 fst x = 2; y)|
 $$
-Here |applyx fst x| evaluates to |y|, which we then unify with |2|; the logical
+Here |apply1 fst x| evaluates to |y|, which we then unify with |2|; the logical
 variable |z| never gets a value, but that does not matter.
 Another way to say this is that, as usual in logic programming, we may
-constraint the \emph{output} of a function (here |applyx fst x = 2|), and thereby
+constraint the \emph{output} of a function (here |apply1 fst x = 2|), and thereby
 affect its \emph{input} (here |(y,z)|).
 
 Although ``|;|'' is called ``sequencing'', the order of that sequence
 is immaterial for equations.
 For example\footnote{We informally write |3+y| rather than
-  |applyx add (3,y)|, and similarly with other operators.},
+  |applyN add (3,y)|, and similarly with other operators.},
 consider |def x (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
 we will see why in \cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
@@ -434,7 +433,7 @@ and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we ca
 and unify |x| with that.  The idea of leaving stuck expressions aside, and executing other parts of the
 program is called \emph{residuation} \cite{hanus:survey}, and is at the heart of our mantra ``just solve the equations''.
 
-\simon{Why are applications |applyx v1 v2| not |applyx e1 e2|?}
+\simon{Why are applications |apply1 v1 v2| not |apply1 e1 e2|?}
 
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
@@ -495,7 +494,7 @@ $$
 and now it is apparent that the sole occurrence of |x| in each |defKW| is the equation
 |(x=3)|, or |(x=4)| respectively; so we can drop the |defKW| and the equation, yielding |(4 choice 8)|.
 % To take a celebrated example, suppose
-% |square = lam x (x*x)|.  What does |applyx square (3 choice 4)| mean? If we make the choice \emph{before}
+% |square = lam x (x*x)|.  What does |apply1 square (3 choice 4)| mean? If we make the choice \emph{before}
 % the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
 % it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
 % All functional-logic languages, including 
@@ -509,7 +508,7 @@ Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) 
 $$
 |append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
   |(xs = emptytup; ys) choice| \\
-  |(def (x,xs') (xs = tup (x,xs'); (x, applyx append (tup (xs', ys)))))|
+  |(def (x,xs') (xs = tup (x,xs'); (x, applyN append (xs', ys))))|
 \end{array}
 $$
 If |xs| is |emptytup|, the left hand choice succeeds, returning |y|; and the right hand choice
@@ -523,12 +522,12 @@ This approach to pattern matching is akin to \emph{narrowing} \cite{hanus:survey
 Suppose |single = tup (1, emptytup)|, a singleton list whose only element is 1.
 Consider this call:
 $$
-|def xs (applyx append (tup ( xs, single)) = single; xs)|
+|def xs (applyN append ( xs, single) = single; xs)|
 $$
 The call to |append| expands into a choice
 $$
   |(xs = emptytup; single)| \quad |choice| \quad
-  |(def (x,xs') (xs = tup (x,xs'); (x, applyx append (tup (xs', single)))))|
+  |(def (x,xs') (xs = tup (x,xs'); (x, applyN append (xs', single))))|
 $$
 which amounts to exploring the possiblity that |xs| is headed by |emptytup| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
@@ -570,7 +569,7 @@ get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't
 what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
 which wraps the then and else branches in a thunk:
 $$
-|applyx (one( (e_1; (lam x e_2)) choice (lam x e_3))) emptytup|
+|apply0 (one( (e_1; (lam x e_2)) choice (lam x e_3)))|
 $$
 The argument of |oneKW| evaluates to either |((lam x e_2) choice dots)| or |(lam x e_3)|
 depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
@@ -585,12 +584,12 @@ The main data structure in \versecalc{} is the array.
 An array is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
-For example, |def a (a = (10,20,30); applyx a 1)| reduces to |20|.
+For example, |def a (a = (10,20,30); apply1 a 1)| reduces to |20|.
 
 The reduction rule for indexing in arrays allows a multi-valued index expression.
-For instance, |a := (10,20,30); applyx a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
+For instance, |a := (10,20,30); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
 It even allows the index to be a logical variable;
-|def i (applyx a i)| also reduces to |10 `choice` 20 `choice` 30|.
+|def i (apply1 a i)| also reduces to |10 `choice` 20 `choice` 30|.
 
 Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| fails the |all e| is the empty array,
@@ -600,13 +599,13 @@ the array |tup (v_1, dots, v_n)|.
 \label{sec:all}
 
 Do we even need |oneKW| as a primitive construct, given that we have
-|allKW|? Can we not use |applyx (all e) (0)| instead of |one e|? Indeed
+|allKW|? Can we not use |apply1 (all e) 0| instead of |one e|? Indeed
 they behave the same if |e| fully reduces to finitely many choices of
 values. But |allKW| really requires the evaluation of \emph{all}
 choices before proceeding, while |oneKW| only needs to evaluate the
 first choice. So, supposing that |loop| is a non-terminating function,
-|one (1 `choice` applyx loop emptytup)| reduces to 1, while
-|applyx (all (1 `choice` applyx loop emptytup)) 0| loops.
+|one (1 `choice` apply0 loop)| reduces to 1, while
+|apply1 (all (1 `choice` apply0 loop)) 0| loops.
 
 
 
@@ -625,12 +624,12 @@ We will illustrate this with a few examples.
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
       |f^tup (x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=tup (x,y); e); dots| & \text{|p| fresh} \\
-      |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| & \text{|x,y| fresh} \\
+      |apply1 e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
       |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
-      |e_1+e_2| & \equiv & |applyx add (tup (e_1,e_2))| \\
-      |e_1>e_2| & \equiv & |applyx gt (tup (e_1,e_2))| \\
-      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); applyx t emptytup| & \text{|t| fresh} \\
-      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyx map ((lam z (applyx z emptytup)), v)| & \text{|v| fresh} \\
+      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
+      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
+      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 t| & \text{|t| fresh} \\
+      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); apply1 map ((lam z (apply0 z)), v)| & \text{|v| fresh} \\
     \end{array} \\
   \end{array}
   $$
@@ -644,7 +643,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 \begin{itemize}
 \item With |:=| we simultaneously introduce and assign a variable.
 \item When defining functions, we allow simple patterns on the left of |:=|
-\item In function applications we allow ourselves to write |applyx e_1 e_2|,
+\item In function applications we allow ourselves to write |apply1 e_1 e_2|,
   rather that insisting on both function and argument being a value, and
   likewise for pairs |tup (e_1,e_2)|.
 \item We allow the use of |if|, as explained in \cref{sec:if}.
@@ -655,15 +654,15 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
   $$
   \begin{array}{l}
     \begin{array}{l@@{\;}l}
-      |head^(xs)| & :=  |one (def i (applyx xs i))| \\
-      |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
-      |cons^tup(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
-      |append^tup(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-      |flatMap^tup(f,xs)| & := |all (def i (applyx f (applyx xs i)))| \\
-      |map^tup(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else emptytup| \\
-      |filter^tup(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |find^tup(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |every^tup(p, xs)| & :=  |applyx map (tup(p,xs))| \\
+      |head^(xs)| & :=  |one (def i (apply1 xs i))| \\
+      |tail^(xs)| & :=  |all (def i (i > 0; apply1 xs i))| \\
+      |cons^tup(x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
+      |append^tup(xs, ys)| & :=  |all (def i (apply1 xs i) `choice` def i (apply1 ys i))| \\
+      |flatMap^tup(f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
+      |map^tup(f, xs)| & :=  |if x := apply1 head xs then apply1 cons (apply1 f x, apply1 map (f,apply1 tail xs)) else emptytup| \\
+      |filter^tup(p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |find^tup(p, xs)| & :=  |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |every^tup(p, xs)| & :=  |applyN map (p,xs)| \\
     \end{array}
   \end{array}
   $$
@@ -674,7 +673,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 
 We can define the typical list functions one would expect from functional programming
 by using the duality between arrays and choices, as seen in \cref{fig:list-functions}.
-An array can be turned into choices by indexing, |applyx a i|, with a logical variable |i|.
+An array can be turned into choices by indexing, |apply1 a i|, with a logical variable |i|.
 Conversely, choices can be turned into an array using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices
 and |oneKW| is like |head| for choices.  With that in mind, here is how to understand
@@ -689,19 +688,19 @@ This way, the expression fails at the first value and only the other values are 
 This definition of |tail| returns the empty array if |xs| is empty or not even an array.
 
 \item |cons| and |append|.
-We can implement |applyx cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|,
+We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|,
 or all the elements of |xs|, and similarly we can define |append|.
 
 \item |flatMap|.
 For the function |map|, which applies a function to each element of an array and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
 |flatMap| flattens the choices from iterating through |xs| with
-the choices taken by |f|, so |applyx flatMap (tup (lam x ((x, x+1)), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
+the choices taken by |f|, so |applyN flatMap ( (lam x ((x, x+1)), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
 
 \item |map|.
 But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 to affect the whole expression and obtain the cartesian product of these choices.
-The expression |applyx map (tup (lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
+The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
 We get that behaviour if we simply define |map| much like in any other functional programming language:
 if taking the head of the array fails, it must be an empty array, and we return an empty array.
 Else we apply |f| to the head, recurse on the |tail| and assemble the result with |cons|.\label{sec:map}
@@ -744,7 +743,7 @@ simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| und
 apply each element of the array to |emptytup| afterwards, using the |map| function defined above.
 The full desugaring for |for^(e_1) in e_2| is thus
 \[
-|v := all (e_1; thunk e_2); applyx map ((lam z (applyx z emptytup)), v)|
+|v := all (e_1; thunk e_2); applyN map ((lam z (apply0 z)), v)|
 \]
 for a fresh variable |v|.
 
@@ -755,23 +754,23 @@ So, e.g., |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that array indexing expands into choices, we can iterate over array indices and elements using |for|.
-E.g., |for^(def (i, x) (x = applyx a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
+E.g., |for^(def (i, x) (x = apply1 a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
 
 
 \subsection{Enumerations}
 Making a choice between a sequence of numbers can be expressed like this
 $$
 \begin{array}{lll}
-  |fromTo^tup (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
+  |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyN fromTo (lo+1,hi)|
 \end{array}
 $$
-so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |tup (1,2,3,4,5)|.
+so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the array |tup (1,2,3,4,5)|.
 
 \subsection{Handling out-of-bounds errors}
 Indexing out-of-bounds of an array results in |fail|.
 This means that we cannot avoid handling this case.
 $$
-|if x:=applyx a 5 then applyx print x else applyx print "out of bounds"|
+|if x:=apply1 a 5 then apply1 print x else apply1 print "out of bounds"|
 $$
 
 \subsection{Subset and powerset}
@@ -779,11 +778,11 @@ $$
 The subsets (subarrays) of of an array can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
-|subset^(a) := if x:=applyx head a then s:= applyx subset (applyx tail a); applyx cons (tup (x, s)) `choice` s else emptytup|
+|subset^(a) := if x:=apply1 head a then s:= apply1 subset (apply1 tail a); applyN cons (x, s) `choice` s else emptytup|
 $$
 And computing the powerset is then simply a matter of collecting all the subsets into an array.
 $$
-|powerset^(a) := for x := applyx subset a in x|
+|powerset^(a) := for x := apply1 subset a in x|
 $$
 
 \lennart{Add more logic programming examples.}
@@ -835,7 +834,7 @@ and are described next.
 
 Looking at \cref{fig:general-axioms}, rules \rulename{p-add} and \rulename{p-gt}
 should be familiar: they simply rewrite applications of |add| and |gt| to integer
-constants.  For example $|applyx add (3,4)| \movesto |7|$.  The only unusual point is
+constants.  For example $|applyN add (3,4)| \movesto |7|$.  The only unusual point is
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
 and returns |k_1| otherwise.
 
@@ -843,7 +842,7 @@ and returns |k_1| otherwise.
 % in turn, and collects the results into a array. If the function applications produce a choice
 % of values, this will, as it should, produce a choice of arrays:
 % \[
-% |applyx map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
+% |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
 
 Sequencing, is very simple (rule \rulename{seq}):
@@ -861,7 +860,7 @@ The rule may appear to use call-by-value, because the argument is a value |v|,
 but remember that values include variables, and that variable may be bound to an
 as-yet-unevaluated expression.  For example:
 $$
-|def y (y = 3+4; applyx (lam x (x+1)) y)|
+|def y (y = 3+4; apply1 (lam x (x+1)) y)|
 \; \movesto \;
 |def y (y = 3+4; def x (x=y; x+1))|
 $$
@@ -969,7 +968,7 @@ that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |hole|
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
-|factorial = lam n (if (n=0) then 1 else n * applyx factorial (n-1))|
+|factorial = lam n (if (n=0) then 1 else n * apply1 factorial (n-1))|
 $$
 Our solution, \rulename{subst-rec}, is standard: if the occurrence of |x| is inside a lambda |(lam y e)|,
 we create a new local binding for |x| under the lambda.  Now the original equality is
@@ -1055,7 +1054,7 @@ CX ::= \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX|
 \vb |def x CX|
 $$
 Here, |ce| is guaranteed-choice-free expression (syntax in \cref{fig:syntax}).
-This syntactic condition is necessarily conservative; for example, a call |applyx f x|
+This syntactic condition is necessarily conservative; for example, a call |apply1 f x|
 is considered not guaranteed-choice-free, because it depends on what function |f| does.
 We must guarantee not to have choices to the left so that we preserve order --
 see \cref{sec:mixing}.
@@ -1095,15 +1094,15 @@ to the innermost enclosing scope construct; hence the |SX| in the rule.
 evaluation, everything is eventually evaluated, but functions can run
 before their arguments have a value.
 Consider a function
-call |applyx f e|.  In \versecalc{} applications are in administrative normal form (ANF),
-so we must actually write |(x=e; applyx f x)|. This expression will not return a value until
-|e| reduces to a value: that is, everything is eventually evaluated.  But even so |applyx f x| can proceed
+call |apply1 f e|.  In \versecalc{} applications are in administrative normal form (ANF),
+so we must actually write |(x=e; apply1 f x)|. This expression will not return a value until
+|e| reduces to a value: that is, everything is eventually evaluated.  But even so |apply1 f x| can proceed
 to beta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 This is not just a way to get \emph{parallelism}, which was the motivation for introducing
 lenience in the dataflow language Id \cite{lenience}; in a functional logic language
 it is critical for \emph{semantics}.  Suppose |y = lam (p,q) (p=7;q)| and consider
 $$
-|def (f,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); applyx f y|
+|def (f,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
 $$
 Here |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
@@ -1371,7 +1370,7 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 % 
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
 % 
-% But the quite similar expression |(applyx f emptytup =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
+% But the quite similar expression |(apply0 f =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
 % \[\begin{array}{rcl@@{\hspace{10mm}}rcl}
 % |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
 % & |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
@@ -1424,16 +1423,16 @@ may be worse than the disease.
 
 In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcl}
-    \rulename{split-fail} & |split fail f g| & \movesto & |applyx f emptytup| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (tup (v, lam _ e))| \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyx g (tup (v, lam _ fail))| \\
+    \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, lam _ e)| \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, lam _ fail)| \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
     |one e| & \equiv |f^(_) := fail; | & |g^tup (x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |f^(_) := emptytup;|    & |g^tup (x,y):= applyx cons (tup (x, split (applyx y emptytup) f g));| & |split e f g|
+    |all e| & \equiv |f^(_) := emptytup;|    & |g^tup (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
 to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |splitKW| instead.
