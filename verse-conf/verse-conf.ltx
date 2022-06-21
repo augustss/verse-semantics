@@ -1422,20 +1422,20 @@ may be worse than the disease.
 \subsection{Generalizing |oneKW| and |allKW|}
 
 In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
-\[\begin{array}{lrcl}
+\[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, lam _ e)| \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, lam _ fail)| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)| & \text{|x| fresh}  \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)| \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & \equiv |f^(_) := fail; | & |g^tup (x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |f^(_) := emptytup;|    & |g^tup (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
+    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
+    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
-to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |splitKW| instead.
+to avoid confusing the presentation with these higher-order encoding, but we do not expect any complications using |splitKW| instead.
 
 
 
