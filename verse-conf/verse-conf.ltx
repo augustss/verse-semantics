@@ -949,8 +949,8 @@ $$
 |y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
 $$
 To make further progress, we need a rule for choice, \cref{sec:choice-rules}.
-\item The $(x \in \freevars{X}))$ in \rulename{subst} prevents \rulename{subst} from
-  begin able to fire infinitely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
+\item The $(x \in \freevars{X})$ in \rulename{subst} prevents the rule from
+  firing infinitely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
   also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
   see \cref{sec:recursion}.
 \end{itemize}
@@ -971,14 +971,14 @@ What if |x| occurs inside a lambda?  That is very useful, and we do not want to 
 $$
 |factorial = lam n (if (n=0) then 1 else n * applyx factorial (n-1))|
 $$
-Our solution, \rulename{subst-rec}, is standard: if the occurrence of |x| is inside a lambda |lam y e|,
+Our solution, \rulename{subst-rec}, is standard: if the occurrence of |x| is inside a lambda |(lam y e)|,
 we create a new local binding for |x| under the lambda.  Now the original equality is
 non-recursive, and \rulename{subst} can apply.
 
 
 \subsection{Unification: administrative rules}
 
-A number of rules are administative: they shuffle expressions about in order to make
+A number of rules are administrative: they shuffle expressions about in order to make
 the main unification rules apply.
 Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
 the expression |(y = (def x (x,2)); dots)| does not bind |y| to a value, but if we float the |defKW| out
