@@ -1580,7 +1580,7 @@ We have reduction rules for effect checking as well, but for the real language t
 
 To add updateable references we extend the system with syntax and rules from figure \ref{fig:store-axioms}.
 The |store s e| indicates that |e| should be reduced using the store |s|.
-A store is simply a mapping from references to values.
+A store is simply a mapping from references to values (one mapping being |cell r v|).
 A reference is some opaque type that supports equality (unification) and creation of a new reference.
 
 There are three new operations, |alloc|, |read|, and |write|.
