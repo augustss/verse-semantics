@@ -338,11 +338,11 @@ We discuss related work in \cref{sec:related}.
     \\
     \textbf{Shorthand} \\
     \begin{array}{rcl}
-      |()| & \text{means} & |arr ()|\\
-      |v_1, dots, v_n| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      |emptytup| & \text{means} & |arr ()|\\
+      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyx add ( v_1, v_2 )| \\
       v_1 > v_2 & \text{means} & |applyx gt ( v_1, v_2 )| \\
-      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots {def x_n e}))| \\
+      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots def x_n e))| \\
      \end{array} \\
   \\
   \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
@@ -364,7 +364,8 @@ It has a very conventional sub-language that is just the lambda-calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Head normal forms}.
-A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple, also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
+  A head normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
+  also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
 For notational convenience we allow ourselves to abbreviate\footnote{
@@ -402,9 +403,9 @@ unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
 
 Unification deals with pattern matching in functions. For example:
 $$
-|def fst ((fst = lam pr (def (a,b) (pr = (a,b); a))); applyx fst (2,5))|
+|def fst ((fst = lam pr (def (tup (a,b)) (pr = tup (a,b); a))); applyx fst (tup (2,5)))|
 $$
-This term binds |fst| to a lambda, and applies that function to |(2,5)|.
+This term binds |fst| to a lambda, and applies that function to |tup (2,5)|.
 The lambda unifies its argument with |(a,b)|, where |a,b| are fresh logical
 variables in the body of the lambda; and returns the first of the two, namely |a|.
 Although a \versecalc{} program  is just a single expression, it is tiresome to
@@ -501,37 +502,37 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 
 \subsection{Pattern matching}
 
-Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |()| to represent the empty list and pairs to represent |Cons|:
+Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |emptytup| to represent the empty list and pairs to represent |Cons|:
 \footnote{
-Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) (p = (x,y); body)|
+Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (tup (x,y)) (p = (x,y); body)|
   }:
 $$
-|append =lamhdr (xs,ys)| \begin{array}[t]{l}
-  |(xs = (); ys) choice| \\
-  |(def (x,xs') (xs = (x,xs'); (x, applyx append (xs', ys))))|
+|append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
+  |(xs = emptytup; ys) choice| \\
+  |(def (x,xs') (xs = tup (x,xs'); (x, applyx append (tup (xs', ys)))))|
 \end{array}
 $$
-If |xs| is |()|, the left hand choice succeeds, returning |y|; and the right hand choice
-fails (by attempting to unify |()| with |(x,xs')|).
-If |xs| is of form |(y,ys)|,
+If |xs| is |emptytup|, the left hand choice succeeds, returning |y|; and the right hand choice
+fails (by attempting to unify |emptytup| with |(x,xs')|).
+If |xs| is of form |tup (y,ys)|,
 the right hand choice succeeds, and we make a recursive call to |append|.
 Finally if |xs| is built with head normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results.
 
 This approach to pattern matching is akin to \emph{narrowing} \cite{hanus:survey}.
-Suppose |single = (1, ())|, a singleton list whose only element is 1.
+Suppose |single = tup (1, emptytup)|, a singleton list whose only element is 1.
 Consider this call:
 $$
-|def xs (applyx append( xs, single) = single; xs)|
+|def xs (applyx append (tup ( xs, single)) = single; xs)|
 $$
 The call to |append| expands into a choice
 $$
-  |(xs = (); single)| \quad |choice| \quad
-  |(def (x,xs') (xs = (x,xs'); (x, applyx append (xs', single))))|
+  |(xs = emptytup; single)| \quad |choice| \quad
+  |(def (x,xs') (xs = tup (x,xs'); (x, applyx append (tup (xs', single)))))|
 $$
-which amounts to exploring the possiblity that |xs| is headed by |()| or a pair -- the
+which amounts to exploring the possiblity that |xs| is headed by |emptytup| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
-evaluates to |()|, effectively running |append| backwards in the classic logic-programming manner.
+evaluates to |emptytup|, effectively running |append| backwards in the classic logic-programming manner.
 
 \subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one} \label{sec:if}
 
@@ -569,10 +570,10 @@ get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't
 what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
 which wraps the then and else branches in a thunk:
 $$
-|applyx (one( (e_1; (lam x e_2)) choice (lam x e_3))) ()|
+|applyx (one( (e_1; (lam x e_2)) choice (lam x e_3))) emptytup|
 $$
 The argument of |oneKW| evaluates to either |((lam x e_2) choice dots)| or |(lam x e_3)|
-depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |()|.
+depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain un-evaluated until the choice is made, just as we expect.
 
@@ -581,7 +582,7 @@ Now |if| is just syntactic sugar, and the special property of |if| becomes a spe
 
 \subsection{Arrays and |allKW|} \label{sec:array}
 The main data structure in \versecalc{} is the array.
-An array is a finite sequence of values, |(v_1,dots,v_n)|.
+An array is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
 For example, |def a (a = (10,20,30); applyx a 1)| reduces to |20|.
@@ -594,7 +595,7 @@ It even allows the index to be a logical variable;
 Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| fails the |all e| is the empty array,
 otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduces to
-the array |(v_1, dots, v_n)|.
+the array |tup (v_1, dots, v_n)|.
 \lennart{Somewhere we should mention that |choice| is associative (in some sense) and can be reassociated.}
 \label{sec:all}
 
@@ -604,8 +605,8 @@ they behave the same if |e| fully reduces to finitely many choices of
 values. But |allKW| really requires the evaluation of \emph{all}
 choices before proceeding, while |oneKW| only needs to evaluate the
 first choice. So, supposing that |loop| is a non-terminating function,
-|one (1 `choice` applyx loop ())| reduces to 1, while
-|applyx (all (1 `choice` applyx loop ())) 0| loops.
+|one (1 `choice` applyx loop emptytup)| reduces to 1, while
+|applyx (all (1 `choice` applyx loop emptytup)) 0| loops.
 
 
 
@@ -623,13 +624,13 @@ We will illustrate this with a few examples.
     \begin{array}{rcll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
-      |f^(x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| & \text{|p| fresh} \\
+      |f^tup (x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=(x,y); e); dots| & \text{|p| fresh} \\
       |applyx e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;applyx x y)| & \text{|x,y| fresh} \\
-      |(e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2;(x,y))| & \text{|x,y| fresh} \\
-      |e_1+e_2| & \equiv & |applyx add (e_1,e_2)| \\
-      |e_1>e_2| & \equiv & |applyx gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); applyx t ()| & \text{|t| fresh} \\
-      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), v)| & \text{|v| fresh} \\
+      |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
+      |e_1+e_2| & \equiv & |applyx add (tup (e_1,e_2))| \\
+      |e_1>e_2| & \equiv & |applyx gt (tup (e_1,e_2))| \\
+      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); applyx t emptytup| & \text{|t| fresh} \\
+      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyx map ((lam z (applyx z emptytup)), v)| & \text{|v| fresh} \\
     \end{array} \\
   \end{array}
   $$
@@ -645,7 +646,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 \item When defining functions, we allow simple patterns on the left of |:=|
 \item In function applications we allow ourselves to write |applyx e_1 e_2|,
   rather that insisting on both function and argument being a value, and
-  likewise for pairs |(e_1,e_2)|.
+  likewise for pairs |tup (e_1,e_2)|.
 \item We allow the use of |if|, as explained in \cref{sec:if}.
 \item We allow the use of |for|, as we will explain in \cref{sec:for}.
 \end{itemize}
@@ -659,7 +660,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
       |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
       |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
       |flatMap^(f,xs)| & := |all (def i (applyx f (applyx xs i)))| \\
-      |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else ()| \\
+      |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else emptytup| \\
       |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |find^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
       |every^(p, xs)| & :=  |applyx map (p,xs)| \\
@@ -726,12 +727,12 @@ The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in
 The |e_1| is called the \emph{domain} of the loop.
 
 The scoping is peculiar in that variables bound in |e_1| also scope over |e_2|.
-So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |(3,4,6)|.
+So, e.g., |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |tup (3,4,6)|.
 This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) in (x+1)|.
 
 Like list comprehension it supports filtering, but in Verse this falls out naturally by just using
 a possibly failing expression in the domain.
-So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |(4,6)|.
+So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |tup (4,6)|.
 
 Nested iteration in a |for| works as expected, and requires nothing special.
 So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) in x+y| reduces to |(11, 12, 13, 21, 22, 23)|
@@ -740,16 +741,17 @@ Just like |if| is defined in terms of the primitive |oneKW| we can define |for|
 in terms of the primitive |all e|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the array to |()| afterwards, using the |map| function defined above.
+apply each element of the array to |emptytup| afterwards, using the |map| function defined above.
 The full desugaring for |for^(e_1) in e_2| is thus
 \[
-|v := all (e_1; thunk e_2); applyx map ((lam z (applyx z ())), v)|
+|v := all (e_1; thunk e_2); applyx map ((lam z (applyx z emptytup)), v)|
 \]
 for a fresh variable |v|.
 
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
-So, e.g., |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to |(3, 3) `choice` (1, 3) `choice` (3, 2) `choice` (1, 2)|.
+So, e.g., |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to
+|tup (3, 3) `choice` tup (1, 3) `choice` tup (3, 2) `choice` tup (1, 2)|.
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that array indexing expands into choices, we can iterate over array indices and elements using |for|.
@@ -760,10 +762,10 @@ E.g., |for^(def (i, x) (x = applyx a i)) in x+i| will produce an array with the 
 Making a choice between a sequence of numbers can be expressed like this
 $$
 \begin{array}{lll}
-  |fromTo^(lo,hi)| & := & |if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
+  |fromTo^tup (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyx fromTo (lo+1,hi)|
 \end{array}
 $$
-so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |(1,2,3,4,5)|.
+so |for^(x:= applyx fromTo (1,5)) in x| will reduce to the array |tup (1,2,3,4,5)|.
 
 \subsection{Handling out-of-bounds errors}
 Indexing out-of-bounds of an array results in |fail|.
@@ -777,7 +779,7 @@ $$
 The subsets (subarrays) of of an array can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
-|subset^(a) := if x:=applyx head a then s:= applyx subset (applyx tail a); applyx cons (x, s) `choice` s else ()|
+|subset^(a) := if x:=applyx head a then s:= applyx subset (applyx tail a); applyx cons (tup (x, s)) `choice` s else emptytup|
 $$
 And computing the powerset is then simply a matter of collecting all the subsets into an array.
 $$
@@ -884,7 +886,7 @@ are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
 tuples\footnote{An alternative choice would
-for unification to yield |()| on success; but it does not make much difference
+for unification to yield |emptytup| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unfication fail if
 you attempt to unify an integer with a tuple.
 Slightly less obviously,
@@ -942,9 +944,9 @@ within the first arm of the choice, thus\footnote{
 You may wonder if this local propagation is useful, a point we return
 to in \cref{sec:local-prop}.}:
 $$
-|y = ((x=3; x*2) choice (x=4)); (x+1,y)|
+|y = ((x=3; x*2) choice (x=4)); tup (x+1,y)|
 \movesto
-|y = ((x=3; 3*2) choice (x=4)); (x+1,y)|
+|y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
 $$
 To make further progress, we need a rule for choice, \cref{sec:choice-rules}.
 \item The $(x \in \freevars{X}))$ in \rulename{subst} prevents \rulename{subst} from
@@ -1156,33 +1158,33 @@ Finally, to make equality on values commutative, we add \rulename{var-swap}; els
 \subsection{Skew-confluence}
 
 With with that out of the way, there still remains a source of non-confluence, due to recursion. In
-\[ |def (x,y) (x=(1,y); y=(lam z x); x)| \]
+\[ |def (x,y) (x=tup (1,y); y=(lam z x); x)| \]
 we can apply \rulename{subst} to $x$ first and obtain the following reduction (omiting spelling out the application of rules \rulename{def-elim} and \rulename{seq}):
 \[
 \begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def y (y=(lam z ((1,y))); (1,y))| \\
-\movesto \{\rulename{subst-rec}\} & |def y (y=v_y; (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (1,y)); (1,y))))| \\
-\movesto \{\rulename{subst}\}     & |(1,v_y)|  \\
+\movesto \{\rulename{subst}\}     & |def y (y=(lam z (tup (1,y))); tup (1,y))| \\
+\movesto \{\rulename{subst-rec}\} & |def y (y=v_y; tup (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))| \\
+\movesto \{\rulename{subst}\}     & |tup (1,v_y)|  \\
 \end{array}
 \]
 Alternatively, starting with |y = (lam z x)|, we obtain
 \[
 \begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def x (x=(1,lam z x); x)| \\
-\movesto \{\rulename{subst-rec}\} & |def x (x=v_x; x)| \quad \text{ where } |v_x| = |(1,lam z (def x (x = (1,(lam z x)); x)))| \\
+\movesto \{\rulename{subst}\}     & |def x (x=tup (1,lam z x); x)| \\
+\movesto \{\rulename{subst-rec}\} & |def x (x=v_x; x)| \quad \text{ where } |v_x| = |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))| \\
 \movesto \{\rulename{subst}\}     & |v_x|  \\
 \end{array}
 \]
-Can we join |(1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |(1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z ((1, v_y))|$, we get
+Can we join |tup (1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, we get
 \[
 \begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
-& |(1,v_y)| & \movesto^\ast & |(1,lam z ((1, v_y)))| & \movesto^\ast & |(1, lam z ((1, (lam z ((1, v_y))))))| & \movesto^\ast & \cdots \\
-|v_x|     & \movesto^\ast & |(1,lam z v_x)| & \movesto^\ast & |(1, lam z ((1, (lam z v_x))))| & \movesto^\ast && \cdots
+& |tup (1,v_y)| & \movesto^\ast & |tup (1,lam z (tup (1, v_y)))| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z (tup (1, v_y))))))| & \movesto^\ast & \cdots \\
+|v_x|     & \movesto^\ast & |tup (1,lam z v_x)| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z v_x))))| & \movesto^\ast && \cdots
 \end{array}
 \]
 and we \emph{cannot} join them; they keep “missing each other”.
 
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |(1, lam z ((1, (lam z dots))))|. This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
+But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
 
 In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
 
@@ -1338,7 +1340,7 @@ We cannot say that the attempt to unify gets stuck, because that leads to non-co
 Here is an expression that could rewrite in two different ways:
 $$
 \begin{array}{lll}
- \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x ())|} \\
+ \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
 &    \movesto \{\textit{use \rulename{SUSBST} on second equality}\} & |(lam p 1) = (lam q 2); 1| \\
 OR & \movesto \{\textit{use \rulename{SUSBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
 \end{array}
@@ -1369,7 +1371,7 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 % 
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
 % 
-% But the quite similar expression |(applyx f () =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
+% But the quite similar expression |(applyx f emptytup =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
 % \[\begin{array}{rcl@@{\hspace{10mm}}rcl}
 % |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
 % & |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
@@ -1422,16 +1424,16 @@ may be worse than the disease.
 
 In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcl}
-    \rulename{split-fail} & |split fail f g| & \movesto & |applyx f ()| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (v, lam _ e)| \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyx g (v, lam _ fail)| \\
+    \rulename{split-fail} & |split fail f g| & \movesto & |applyx f emptytup| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyx g (tup (v, lam _ e))| \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyx g (tup (v, lam _ fail))| \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & \equiv |f^(_) := fail; | & |g^(x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |f^(_) := ();|    & |g^(x,y):= applyx cons (x, split (applyx y ()) f g);| & |split e f g|
+    |one e| & \equiv |f^(_) := fail; | & |g^tup (x,y):= x;| & |split e f g| \\
+    |all e| & \equiv |f^(_) := emptytup;|    & |g^tup (x,y):= applyx cons (tup (x, split (applyx y emptytup) f g));| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
 to avoid confusing the presentation with these higher-order encoding, but we don't expect any complications using |splitKW| instead.
