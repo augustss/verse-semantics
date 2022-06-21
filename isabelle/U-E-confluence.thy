@@ -186,8 +186,7 @@ locale U_E_confluence =
   fixes U :: \<open>'a rel\<close> 
   fixes E :: \<open>'a rel\<close>
   fixes equiv :: \<open>nat \<Rightarrow> 'a rel\<close>
-  assumes equiv_0: "equiv 0 = UNIV"
-  and equiv_refl[simp]: "(x,x) \<in> equiv n"
+  assumes equiv_refl[simp]: "(x,x) \<in> equiv n"
   and equiv_trans: "trans (equiv n)"
   and equiv_symm: "sym (equiv n)"
   and E_equiv: "diag (equiv (Suc n)) E (equiv n) E"
