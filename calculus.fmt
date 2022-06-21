@@ -82,6 +82,10 @@
 %format def (x) (y) = "\exists" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
+%format storeKW = "\textbf{store}"
+%format store (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\,\{" y "\}"
+%format storeTwoLines (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\\\{" y "\}"
+%format cell (k) (v) = k "\!\rightarrow\!" v
 %format succeedsKW = "\textbf{succeeds}"
 %format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
 %format decidesKW = "\textbf{decides}"
@@ -127,6 +131,9 @@
 %format of = "\textbf{of}"
 %format assign = "\textbf{assign}"
 %format new = "\textbf{new}"
+%format alloc = "\textbf{alloc}"
+%format read = "\textbf{read}"
+%format write = "\textbf{write}"
 %format any = "\textbf{any}"
 %format dots = "\cdots"
 %format hnf = "\hnf"
@@ -228,7 +235,11 @@
 %format l_1
 %format l_2
 
+%format s_1
+%format s_2
+
 %format r_1
+%format r_2
 %format r_n
 
 %format K_1
