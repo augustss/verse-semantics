@@ -47,8 +47,10 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 
-%format choice = "[ \! ]"
-%format `choice` = "\mathop{[ \! ]}"
+%% %format choice = "[ \! ]"
+%% %format `choice` = "\mathop{[ \! ]}"
+%format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
+%format `choice` = "\rule[-0.3mm]{0.5mm}{2.5mm}"
 %format srcand = "\&\&"
 %format srcor = "||"
 %format hat = "\hat{\hspace{0.8em}}"

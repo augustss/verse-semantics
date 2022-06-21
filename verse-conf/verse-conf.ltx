@@ -296,7 +296,8 @@ has the following properties:
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
-It should be possible to compile a variety of functional logic languages, including Curry, into \versecalc{}.
+It should be possible to compile a variety of functional logic languages,
+including Curry \cite{hanus:curry-report}, into \versecalc{}.
 We are also working on a new programming language for the metaverse, built directly on \versecalc{}; indeed,
 our motivation for developing \versecalc{} is practical rather than theoretical.
 
@@ -480,8 +481,8 @@ We duplicate the context surrounding the choice, and ``float the choice outwards
 We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing ---
 but \emph{choice} is not.
 Consider
-|def (x,y) (x = (3 choice 4); y = (20 choice 30); (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
-|((3,20) choice (3,30) choice (4,20) choice (4,30))|.
+|def (x,y) (x = (3 choice 4); y = (20 choice 30); tup (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
+|((tup (3,20)) choice (tup (3,30)) choice (tup (4,20)) choice (tup (4,30)))|.
 
 So much for choice under unification.  What if we have
 unification under choice?  For exapmle:
@@ -812,9 +813,9 @@ programming language?  Here are some possibilities:
   (and hence not a good way to explain to programmer what their program means),
   and it cannot distinguish between call-by-need and call-by-name.
   It is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
-  becuase of the logical variables.
+  because of the logical variables.
 \item \emph{A big-step operational semantics} typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation \cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
-\item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, th big-step approach
+a\item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, the big-step approach
   does not convey accurate operational intutition, because it goes all the way to a value
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
   they typically describe how a (heap, expression, stack) configuration evolves, one small
@@ -1212,24 +1213,8 @@ Until we have concluded the formal proof of skew-confluence, including the preci
 
 \section{Related work} \label{sec:related}
 
-\subsection{Flat vs higher order}
-
-When giving the semantics
-of functional logic languages, a first-order presentation is almost universal.
-User-defined functions can be defined at top level only;
-and function symbols (the names of such functions) are syntactically
-distinguished from ordinary variables. As Hanus describes, it is possible
-to translate a higher order program into a first-order
-form\footnote{
-  He does not mention this, but for a language with arbitrary nested lambdas
-  one would need to do lambda-lifting as well, but that is a small point.}
-using defunctionalisation \cite[Section 3.3]{hanus:survey}, and a buit-in
-function |apply| function.
-But this encoding is hardly a natural rendition of the lambda calculus, and it
-obstructs the goal of using rewrite rules to explain to programmers how
-their program might execute.
-
-A strength of our presentation is that it deals natively with the full lambda calculus.
+Now that we know what \versecalc{} is, we can identify its distinctive features,
+compared to other approaches.
 
 \subsection{Choice and non-determinism}
 
@@ -1253,7 +1238,42 @@ non-determinstic selection.  Rule \rulename{choose} is not a new idea -- indeed
 it is common in calculi for calculi with choice (e.g. \cite{what}) --
 but it does not appear to have been used to describe functional logic languages before.
 
-\subsection{Treatment of logical variables} \label{sec:magical}
+\subsection{One and all}
+
+Logical variables, choice, and equalities are present in many functional logic
+languages.  However |oneKW| and |allKW| are distinctive features of \versecalc{}.
+
+First, notice that |allKW| \emph{reifies} choice (a control operator) into an array (a data structure);
+for example, |all (1 choice 7 choice 2)| returns the array |tup (1,7,2)|),
+In the other direction, indexing turns an array into choice (e.g. |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
+Other languages can reify choices into a (non-deterministic)
+list, via an operator called \verb!bagof!, or a mechanism called
+\emph{encapsulated search} in Curry.  But this is regarded as a somewhat sophisticated feature,
+whereas it is part of the fabric of \versecalc{}.
+
+Second, even under the reification of |allKW|,
+\versecalc{} is \emph{deterministic}.  Choice is not
+non-determinstic choice, it is takes pains to maintain order, so that
+when reifying choice into an array, the order of elements in that
+array is completely determined.  Anything else would leak
+non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
+and \cref{sec:rules-for-choice}, we have to take pains to maintain the
+left-to-right order of choices.
+
+Maintaining that order has other payoffs. For example, it is relatively easy to add
+effects other than choice, including mutable varialbes and input/output, to \versecalc{}.
+To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
+for mutable variables.
+
+Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
+depending on whether or not it succeeds.  \simon{Can one do this in Curry?}
+
+Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' vs ``rigid'' logical variables.
+As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW| cannot be unifies inside it;
+they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
+scope of the \rulename{subst} rule, and specifically excludes |oneKW| and |allKW|.
+
+\subsection{The semantics of logical variables} \label{sec:magical}
 
 Our variables, introduced by |defKW|, are usually called \emph{logical variables},
 or \emph{extra variables} in the literature.  The latter term arises because they
@@ -1322,13 +1342,32 @@ rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
 
+\subsection{Flat vs higher order}
+
+When giving the semantics
+of functional logic languages, a first-order presentation is almost universal.
+User-defined functions can be defined at top level only;
+and function symbols (the names of such functions) are syntactically
+distinguished from ordinary variables. As Hanus describes, it is possible
+to translate a higher order program into a first-order
+form\footnote{
+  He does not mention this, but for a language with arbitrary nested lambdas
+  one would need to do lambda-lifting as well, but that is a small point.}
+using defunctionalisation \cite[Section 3.3]{hanus:survey}, and a buit-in
+function |apply| function.
+But this encoding is hardly a natural rendition of the lambda calculus, and it
+obstructs the goal of using rewrite rules to explain to programmers how
+their program might execute.
+
+A strength of our presentation is that it deals natively with the full lambda calculus.
+
 \subsection{Intermediate language}
 
 Hanus's \emph{Flat Language} \cite[Fig 1]{hanus:semantics} plays the same role as \versecalc{}:
 it is a small core language
 into which a larger surface language can be desugared.
 There are some common features: variables, literals, constructor applications,
-and sequencing (written \verb!hnf! in the Flat Langauge).
+and sequencing (written \verb!hnf! in the Flat Language).
 However, it seems that \versecalc{} has a greater economy of concepts.
 In particular, the Flat Language
 has two forms of equality \verb!(==)! and \verb!(=:=)!, and two forms
