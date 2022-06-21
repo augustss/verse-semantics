@@ -278,17 +278,21 @@ at term rewriting system, to give us both a formal semantics (via a small-step r
 and a powerful set of equvalences that programmers can use to reason about their programs,
 and compilers can use to optimise them.
 
-Our main contribution is a new core calculus for functional logic programming that
+Our main contribution is a new core calculus, \versecalc{}, for functional logic programming that
 has the following properties:
 \begin{itemize}
-\item It has a small-step term rewriting semantics for a functional logic langauge
-  that supports both narrowing and residuation.
+\item It has a \emph{small-step term rewriting semantics} for a functional logic language.
   Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step, about how their program executes.
-\item It natively supports higher-order programming, just like the lambda calculus.  In contrast,
+\item It natively supports \emph{higher-order programming}, just like the lambda calculus.  In contrast,
   the functional-logic literature typically addresses higher order features via defunctionalisation \cite[3.3]{hanus:survey}.
-\item It supports so-called non-deterministic programming; that is, an expression can return one result, many results, or no result (failure).
-  As a result, it natively supports both narrowing and residuation. \lennart{Both the first and third bullet mentions supporting narrowing and residuation.}
+\item It supports \emph{logical variables}. In the expression |def x e|, the variable |x| is brought into scope,
+  but gains its value through \emph{equalities} |(e_1 = e_2)| in |e|.  Like any declarative language, however,
+  an existential variable always stands for a single value; logical variables are not mutable.
+\item It supports so-called \emph{non-deterministic programming}; that is, an expression can return one result, many results, or no result (failure).
+  As a result, it natively supports both narrowing and residuation.
 \end{itemize}
+As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
+Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
 There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
 We discuss related work in \cref{sec:related}.
 
@@ -305,8 +309,8 @@ We discuss related work in \cref{sec:related}.
     \text{Integer constants} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1 v_1 v_2| \\
-    && \vb & |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
+    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1 v_1 v_2|
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
     && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
 % SPJ Omitting for now
 \iffullverse
@@ -590,13 +594,13 @@ with the argument being integers from 0 and up.  Indexing out of range is |fail|
 For example, |def a (a = (10,20,30); apply1 a 1)| reduces to |20|.
 
 The reduction rule for indexing in arrays allows a multi-valued index expression.
-For instance, |a := (10,20,30); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |20 `choice` 10 `choice` 20|.
+For instance, |a := (10,20,30); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |(20 `choice` 10 `choice` 20)|.
 It even allows the index to be a logical variable;
-|def i (apply1 a i)| also reduces to |10 `choice` 20 `choice` 30|.
+|def i (apply1 a i)| also reduces to |(10 `choice` 20 `choice` 30)|.
 
 Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| fails the |all e| is the empty array,
-otherwise if |e| reduces to |v_1 `choice` dots `choice` v_n| then |all e| reduces to
+otherwise if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
 the array |tup (v_1, dots, v_n)|.
 \lennart{Somewhere we should mention that |choice| is associative (in some sense) and can be reassociated.}
 \label{sec:all}
@@ -631,8 +635,8 @@ We will illustrate this with a few examples.
       |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
       |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 t| & \text{|t| fresh} \\
-      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); apply1 map ((lam z (apply0 z)), v)| & \text{|v| fresh} \\
+      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 t| & \text{|t,x| fresh} \\
+      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); apply1 map (tup (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
     \end{array} \\
   \end{array}
   $$

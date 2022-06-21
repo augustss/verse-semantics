@@ -12,15 +12,21 @@
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 
-%% Applications
+%% ----------- Applications --------------
 %% %format applyx a b = a "@" b
 %% %format applyx a b = a "\," b
+
 %% Function application with no arguments
 %format apply0 a = a "\langle\rangle"
+
 %% Function application with 1 argument
-%format apply1 a b = a "(" b ")"
+%% %format apply1 a b = a "(" b ")"
+%format apply1 a b = a "\," b
+
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"
+
+%% ----------- End of Applications --------------
 
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
