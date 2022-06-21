@@ -657,13 +657,13 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
     \begin{array}{l@@{\;}l}
       |head^(xs)| & :=  |one (def i (applyx xs i))| \\
       |tail^(xs)| & :=  |all (def i (i > 0; applyx xs i))| \\
-      |cons^(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
-      |append^(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
-      |flatMap^(f,xs)| & := |all (def i (applyx f (applyx xs i)))| \\
-      |map^(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else emptytup| \\
-      |filter^(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |find^(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
-      |every^(p, xs)| & :=  |applyx map (tup(p,xs))| \\
+      |cons^tup(x,xs)| & :=  |all (x `choice` def i (applyx xs i))| \\
+      |append^tup(xs, ys)| & :=  |all (def i (applyx xs i) `choice` def i (applyx ys i))| \\
+      |flatMap^tup(f,xs)| & := |all (def i (applyx f (applyx xs i)))| \\
+      |map^tup(f, xs)| & :=  |if x := applyx head xs then applyx cons (applyx f x, applyx map (f,applyx tail xs)) else emptytup| \\
+      |filter^tup(p, xs)| & :=  |all (def i (x := applyx xs i; one (applyx p x); x)))| \\
+      |find^tup(p, xs)| & :=  |one (def i (x := applyx xs i; one (applyx p x); x)))| \\
+      |every^tup(p, xs)| & :=  |applyx map (tup(p,xs))| \\
     \end{array}
   \end{array}
   $$
