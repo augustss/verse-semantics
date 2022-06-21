@@ -395,14 +395,14 @@ As an example, what might be written |dlet x e_1 e_2| in a conventional function
 A program executes by solving its equations, to get values for some of the logical variables.
 For example
 $$
-|def (x,y,z) (x=(y,3); x=(2,z); y)|
+|def (x,y,z) (x=tup(y,3); x=tup(2,z); y)|
 $$
-is solved by unifying |x| with |(y,3)| and with |(2,z)|; that in turn unifies |(y,3)| with |(2,z)|, which
+is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
 unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
 
 Unification deals with pattern matching in functions. For example:
 $$
-|def fst ((fst = lam pr (def (tup (a,b)) (pr = tup (a,b); a))); applyN fst (2,5))|
+|def fst ((fst = lam pr (def (a,b) (pr = tup (a,b); a))); applyN fst (2,5))|
 $$
 This term binds |fst| to a lambda, and applies that function to |tup (2,5)|.
 The lambda unifies its argument with |(a,b)|, where |a,b| are fresh logical
@@ -414,13 +414,13 @@ we allow ourselves a set of top-level bindings for such functions.
 
 The input to |fst| may include logical variables. For example:
 $$
-|def (x,y,z) (x=(y,z); apply1 fst x = 2; y)|
+|def (x,y,z) (x=tup(y,z); apply1 fst x = 2; y)|
 $$
 Here |apply1 fst x| evaluates to |y|, which we then unify with |2|; the logical
 variable |z| never gets a value, but that does not matter.
 Another way to say this is that, as usual in logic programming, we may
 constraint the \emph{output} of a function (here |apply1 fst x = 2|), and thereby
-affect its \emph{input} (here |(y,z)|).
+affect its \emph{input} (here |tup(y,z)|).
 
 Although ``|;|'' is called ``sequencing'', the order of that sequence
 is immaterial for equations.
@@ -503,16 +503,16 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 
 Choice allows us to do pattern matching.  Here is the obligatory append function, where we use the empty tuple |emptytup| to represent the empty list and pairs to represent |cons|:
 \footnote{
-Here we allow ourselves to write |lam (x,y) body| rather than |lam p (def (x,y) (p = tup (x,y); body)|
+Here we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x,y) (p = tup (x,y); body)|
   }
 $$
 |append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
   |(xs = emptytup; ys) choice| \\
-  |(def (x,xs') (xs = tup (x,xs'); (x, applyN append (xs', ys))))|
+  |(def (a,as) (xs = tup (a,as); (a, applyN append (as, ys))))|
 \end{array}
 $$
 If |xs| is |emptytup|, the left hand choice succeeds, returning |y|; and the right hand choice
-fails (by attempting to unify |emptytup| with |(x,xs')|).
+fails (by attempting to unify |emptytup| with |tup(a,as)|).
 If |xs| is of form |tup (y,ys)|,
 the right hand choice succeeds, and we make a recursive call to |append|.
 Finally if |xs| is built with head normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
@@ -527,7 +527,7 @@ $$
 The call to |append| expands into a choice
 $$
   |(xs = emptytup; single)| \quad |choice| \quad
-  |(def (x,xs') (xs = tup (x,xs'); (x, applyN append (xs', single))))|
+  |(def (a,as) (xs = tup (a,as); tup(a, applyN append (as, single))))|
 $$
 which amounts to exploring the possiblity that |xs| is headed by |emptytup| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
@@ -569,9 +569,9 @@ get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't
 what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
 which wraps the then and else branches in a thunk:
 $$
-|apply0 (one( (e_1; (lam x e_2)) choice (lam x e_3)))|
+|apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
-The argument of |oneKW| evaluates to either |((lam x e_2) choice dots)| or |(lam x e_3)|
+The argument of |oneKW| evaluates to either |((thunk (e_2)) choice dots)| or |(thunk (e_3))|
 depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain un-evaluated until the choice is made, just as we expect.
@@ -622,8 +622,8 @@ We will illustrate this with a few examples.
   \begin{array}{l}
     \begin{array}{rcll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
-      |f^(x) := e; dots| & \equiv & |f := lam x e; dots| \\
-      |f^tup (x,y) := e; dots| & \equiv & |f^(p) := def (x,y) (p=tup (x,y); e); dots| & \text{|p| fresh} \\
+      |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
+      |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x,y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
       |apply1 e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
       |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
@@ -654,15 +654,15 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
   $$
   \begin{array}{l}
     \begin{array}{l@@{\;}l}
-      |head^(xs)| & :=  |one (def i (apply1 xs i))| \\
-      |tail^(xs)| & :=  |all (def i (i > 0; apply1 xs i))| \\
-      |cons^tup(x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
-      |append^tup(xs, ys)| & :=  |all (def i (apply1 xs i) `choice` def i (apply1 ys i))| \\
-      |flatMap^tup(f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
-      |map^tup(f, xs)| & :=  |if x := apply1 head xs then apply1 cons (apply1 f x, apply1 map (f,apply1 tail xs)) else emptytup| \\
-      |filter^tup(p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |find^tup(p, xs)| & :=  |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |every^tup(p, xs)| & :=  |applyN map (p,xs)| \\
+      |apply1 head xs| & :=  |one (def i (apply1 xs i))| \\
+      |apply1 tail xs| & :=  |all (def i (i > 0; apply1 xs i))| \\
+      |applyN cons (x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
+      |applyN append (xs, ys)| & :=  |all (def i (apply1 xs i) `choice` def i (apply1 ys i))| \\
+      |applyN flatMap (f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
+      |applyN map (f, xs)| & :=  |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
+      |applyN filter (p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |applyN find (p, xs)| & :=  |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |applyN every (p, xs)| & :=  |applyN map (p,xs)| \\
     \end{array}
   \end{array}
   $$
@@ -980,8 +980,8 @@ non-recursive, and \rulename{subst} can apply.
 A number of rules are administrative: they shuffle expressions about in order to make
 the main unification rules apply.
 Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
-the expression |(y = (def x (x,2)); dots)| does not bind |y| to a value, but if we float the |defKW| out
-we get |def x (y=(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
+the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
+we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
 Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
@@ -1100,7 +1100,7 @@ so we must actually write |(x=e; apply1 f x)|. This expression will not return a
 to beta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 This is not just a way to get \emph{parallelism}, which was the motivation for introducing
 lenience in the dataflow language Id \cite{lenience}; in a functional logic language
-it is critical for \emph{semantics}.  Suppose |y = lam (p,q) (p=7;q)| and consider
+it is critical for \emph{semantics}.  Suppose |y = lamhdr (tup(p,q)) (p=7;q)| and consider
 $$
 |def (f,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
 $$

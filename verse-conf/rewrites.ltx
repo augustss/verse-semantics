@@ -9,22 +9,22 @@
   \begin{array}{l}
     \textit{Primitive operations} \\
     \begin{array}{lrcl}
-    \rulename{p-add} & |applyx add (tup (k_1 ,k_2))| & \movesto & k_1+k_2 \\
-    \rulename{p-gt} & |applyx gt (tup (k_1,k_2))| & \movesto &
+    \rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & k_1+k_2 \\
+    \rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
     \left\{\begin{array}{@@{}ll}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
       \end{array}\right. \\
 %    \rulename{p-map} &
-%      |applyx map (v, (v_1 choice dots choice v_n))|
+%      |applyN map (v, (v_1 choice dots choice v_n))|
 %    & \movesto &
 %    \begin{array}[t]{@@{}l}
 %      |defTwoLines (x_1,dots x_n)
-%       (x_1 == applyx v v_1; dots x_n == applyx v v_n; arr (x_1,dots,x_n))| \\
+%       (x_1 == apply1 v v_1; dots x_n == apply1 v v_n; arr (x_1,dots,x_n))| \\
 %    \end{array} \\
 %    && \multicolumn{2}{l}{\text{if $\{x_1, \ldots, x_n\} \disjoint \freevars{v, v_1, \ldots, v_n}$}} \\[2mm]
 \iffullverse
-    \rulename{p-isInt} & |applyx isInt hnf| & \movesto &
+    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
     \left\{\begin{array}{@@{}ll}
       |()| & \text{if |hnf| is an integer} \\
       |fail| & \text{otherwise}
@@ -34,9 +34,9 @@
 
     \textit{Application} \\
     \begin{array}{lrcl}
-      \rulename{app-beta} & |applyx (lam x e) v| & \movesto & |def x (x=v; e)|
+      \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-arr} & |applyx (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
+    \rulename{app-arr} & |apply1 (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
 
