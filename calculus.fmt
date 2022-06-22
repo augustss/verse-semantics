@@ -47,10 +47,18 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 
-%% %format choice = "[ \! ]"
-%% %format `choice` = "\mathop{[ \! ]}"
-%format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
-%format `choice` = "\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}"
+%% Old version: | for BNF, [] for choice
+%%format vbar = "\mathop{\mid}"
+%%%format choice = "[ \! ]"
+%%%format `choice` = "\mathop{[ \! ]}"
+%%format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
+%%format `choice` = "\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}"
+
+%% New version: tall | for BNF, fat | for choice
+%format vbar = "\mathop{\bigm|}"
+%format choice = "\boldsymbol{|}"
+%format `choice` = "\mathop{\boldsymbol{|}}"
+
 %format srcand = "\&\&"
 %format srcor = "||"
 %format hat = "\hat{\hspace{0.8em}}"
