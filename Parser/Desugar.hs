@@ -660,6 +660,11 @@ scopeCheck e = do
            -- XXX Here we should patch up the shadowing problem
            pure e
 
+knownEffects :: [Ident]
+knownEffects = map (Ident noLoc) [
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
+  ]
+
 scopeErrs :: S.Set Ident -> Expr -> [ScopeErr]
 scopeErrs s = expr
   where
@@ -671,7 +676,9 @@ scopeErrs s = expr
     expr (Seq es) = concatMap expr es
     expr (ApplyS e1 e2) = expr e1 ++ expr e2
     expr (ApplyD e1 e2) = expr e1 ++ expr e2
-    expr (ApplyEff _ e) = expr e
+    expr (ApplyEff is e) =
+      [ErrUndefined i | i <- is \\ knownEffects ] ++
+      expr e
     expr (If3 e1 e2 e3) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2) ++ expr (Do e3)
       where (errs, s') = defs e1
     expr (For2 e1 e2) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2)
