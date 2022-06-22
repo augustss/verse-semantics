@@ -1648,7 +1648,7 @@ and also when the |e| is a result.
 To support limited store operations (e.g., |read|, but not |write|) we can equip the store with a set of currently allowed operations.
 We also need some extra expressions that modify this set as the store ``moves'' around.
 
-\lennart{These rules might leak uninstantiated logical variables into the store.  Is this bad?}
+\lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
 
 
 \end{document}
