@@ -97,7 +97,7 @@
 %format storeKW = "\textbf{store}"
 %format store (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\,\{" y "\}"
 %format storeTwoLines (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\\\{" y "\}"
-%format cell (k) (v) = k "\!\rightarrow\!" v
+%format cell (k) (v) = k "\mapsto\!" v
 %format succeedsKW = "\textbf{succeeds}"
 %format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
 %format decidesKW = "\textbf{decides}"
