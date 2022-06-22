@@ -499,7 +499,7 @@ primOps = map (Ident noLoc)
   , "in'<>'"
   , "pre'-'"
   , "post'?'"
-  , "succeeds", "decides", "iterates", "io"
+--  , "succeeds", "decides", "iterates", "io"
   , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
   , "length"
   , "known$"  -- This is a horrible hack

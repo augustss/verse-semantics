@@ -133,7 +133,7 @@ instance Pretty Expr where
             where (q, ql, _) = fixity "()"
           ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
             where (q, ql, _) = fixity "()"
-          ApplyEff rs e -> text "eff" <> parens (commaSep l 0 rs) <> braces (ppr 0 e)
+          ApplyEff rs e -> text "effects" <> parens (commaSep l 0 rs) <> ppB e
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
@@ -167,7 +167,7 @@ instance Pretty Expr where
             where ppArs (e, rs) = parens (pPrintL l e) <> effs
                      where effs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
           Block es -> braces $ ppSeq l es
-          Typedef e -> text "type" <> braces (ppr 0 e)
+          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e -> parens (ppr 0 e)
           ----

@@ -56,7 +56,7 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
-keywords = ["array", "do", "else", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]
+keywords = ["array", "do", "else", "effects", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -105,7 +105,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 pAtom :: P Expr
 pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
                , Parens <$> pParens pExprSeq, pArray, pTypedef
-               , pOption, pFunction, pBlockM ]
+               , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
 -- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
@@ -115,6 +115,9 @@ pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 pTypedef :: P Expr
 pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
+
+pEffects :: P Expr
+pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pIdent) <*> pBlockM)
 
 pTerm :: P Expr
 pTerm = do
