@@ -1,6 +1,6 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Bind where
 
-import Data.Char( isDigit )
 import Data.List( union, (\\) )
 
 --------------------------------------------------------------------------------

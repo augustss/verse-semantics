@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-type-defaults -Wno-unused-matches -Wno-missing-signatures -Wno-missing-pattern-synonym-signatures -Wno-name-shadowing #-}
 {-# LANGUAGE PatternSynonyms #-}
 module TRSCore where
 

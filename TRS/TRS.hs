@@ -1,7 +1,8 @@
+{-# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-matches #-}
 module TRS where
 
 import qualified Data.Set as S
-import Data.Set( Set )
+--import Data.Set( Set )
 
 --------------------------------------------------------------------------------
 

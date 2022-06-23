@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans #-}
 module Rules where
 
 import TRS
@@ -26,8 +27,10 @@ isVar _       = False
 
 type Context = Expr -> Expr
 
--- scope contexts
+instance Show Context where
+  show ctx = show (ctx (VAR (Name "HOLE")))
 
+-- Execution contexts
 execX, execX1 :: Expr -> [(Context, Expr)]
 execX lhs = execX1 lhs ++ [(id,lhs)]
 
