@@ -127,6 +127,9 @@ testeq(SEq) {operator'/'(1,0)}                    {wrong}
 testeq(SEq) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
 testeq(SEq) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
+testeq(SEq) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
+testeq(SEq) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
+
 # Joachim's tests
 # Check that BIND removes _one_ unification only
 testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
