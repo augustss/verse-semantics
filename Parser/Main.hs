@@ -26,6 +26,10 @@ tryIt iob aiob ioa = do
 
 -------------------
 
+-- Use CSplit instead of COne/CAll
+useSplit :: Bool
+useSplit = True
+
 test :: IO ()
 test = Testing.main
 
@@ -53,10 +57,15 @@ asDesugared (Parsed e) = desugar e
 asDesugared e = asExpr e
 
 asCore :: SomeExpr -> Core
-asCore (Cored e) = e
-asCore (Cores [e]) = e
-asCore Cores{} = error "Multiple Core values"
-asCore e = exprToCore $ asDesugared e
+asCore = asCore' useSplit
+
+type UseSplit = Bool
+
+asCore' :: UseSplit -> SomeExpr -> Core
+asCore' _ (Cored e) = e
+asCore' _ (Cores [e]) = e
+asCore' _ Cores{} = error "Multiple Core values"
+asCore' b e = exprToCore b $ asDesugared e
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
@@ -82,7 +91,7 @@ command = Command
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
-      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"      cCoreSimplify
+      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
@@ -158,7 +167,7 @@ cCoreSimplify :: Run CState
 cCoreSimplify = cTransform (Cored . simpCore . asCore)
 
 cCore :: Run CState
-cCore = cTransform (Cored . exprToCore . asDesugared)
+cCore = cTransform (Cored . exprToCore useSplit . asDesugared)
 
 cEval :: Run CState
 cEval c s =
@@ -173,7 +182,7 @@ cDefEval c s = do
 
 cRewrite :: Run CState
 cRewrite =
-  cTransform (Cores . rewrite 1000 . asCore)
+  cTransform (Cores . rewrite 1000 . asCore' False)
 
 cDefine :: Run CState
 cDefine =

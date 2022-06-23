@@ -21,6 +21,7 @@ module Core(
 import Prelude hiding ((<>))
 import Control.Monad.Identity
 import Control.Monad.State.Strict
+import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 
@@ -30,10 +31,6 @@ import Desugar(primOps, getVisible)
 import Error
 import SExp
 --import Debug.Trace
-
--- Use CSplit instead of COne/CAll
-useSplit :: Bool
-useSplit = True
 
 data Core
   = CValue Value
@@ -110,7 +107,7 @@ isValue _ = False
 vEmpty :: Value
 vEmpty = HNF $ HArray []
 
-type C = State Int
+type C = ReaderT Bool (State Int)
 
 seqC :: [Core] -> Core
 seqC acs =
@@ -129,8 +126,8 @@ newTmp = do
   put $! n+1
   pure i
 
-exprToCore :: Expr -> Core
-exprToCore = flip evalState 1 . coreD
+exprToCore :: Bool -> Expr -> Core
+exprToCore useSplit = flip evalState 1 . flip runReaderT useSplit . coreD
 
 core :: Expr -> C Core
 core e@LitInt{} = val e
@@ -174,16 +171,20 @@ coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
 
 cOne :: Core -> C Core
-cOne e | not useSplit = pure $ COne e
 cOne e = do
+ useSplit <- ask
+ if not useSplit then pure $ COne e
+ else do
   u1 <- newTmp
   u2 <- newTmp
   v <- newTmp
   pure $ CSplit e (VLam u1 CFail) (VLam v $ CLam u2 $ CVar v)
 
 cAll :: Core -> C Core
-cAll e | not useSplit = pure $ CAll e
 cAll e = do
+ useSplit <- ask
+ if not useSplit then pure $ CAll e
+ else do
   f <- newTmp
   g <- newTmp
   u <- newTmp
@@ -205,8 +206,10 @@ cAll e = do
              ]
                                 
 cSucceeds :: Core -> C Core
-cSucceeds e | not useSplit = pure $ CSucceeds e
 cSucceeds e = do
+ useSplit <- ask
+ if not useSplit then pure $ CSucceeds e
+ else do
   u1 <- newTmp
   u2 <- newTmp
   u3 <- newTmp
@@ -221,8 +224,10 @@ cSucceeds e = do
                 )
 
 cDecides :: Core -> C Core
-cDecides e | not useSplit = pure $ CDecides e
 cDecides e = do
+ useSplit <- ask
+ if not useSplit then pure $ CDecides e
+ else do
   u1 <- newTmp
   u2 <- newTmp
   u3 <- newTmp
