@@ -327,7 +327,8 @@ instance Arbitrary Expr where
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
   shrink (All a)   = [a] ++ [All a'| a'<-shrink a]
   shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
- 
+  shrink Wrong     = []
+
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
   frequency
