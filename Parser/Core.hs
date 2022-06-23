@@ -152,7 +152,9 @@ core (For2 e1 e2) = do
   e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
   ee <- coreD (seqE [e1, e2'])
-  cAll ee
+  ea <- cAll ee
+  xa <- newTmp
+  pure $ CDef [xa] $ CSeq [cUnify (Var xa) ea, CApply (VPrim "mapAp") (Var xa)]
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
@@ -191,16 +193,14 @@ cAll e = do
   v <- newTmp
   r <- newTmp
   x <- newTmp
-  y <- newTmp
   pure $ CDef [f, g] $
            CSeq [
              CUnify (Var f) (CLam u $ CArray []),
              CUnify (Var g) (CLam v $ CLam r $
-                               CDef [x, y] $
+                               CDef [x] $
                                  CSeq [
-                                   CUnify (Var y) (CApply (Var v) (VArray [])),
                                    CUnify (Var x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
-                                   CApply (VPrim "cons$") (VArray [Var y, Var x])
+                                   CApply (VPrim "cons$") (VArray [Var v, Var x])
                                    ]),
              CSplit e (Var f) (Var g)
              ]

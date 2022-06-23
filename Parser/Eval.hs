@@ -412,17 +412,11 @@ dummy = Ident noLoc "_"
 evalAll :: EvalCore
 evalAll flg = evalTrace "evalAll" f flg
   where
-    f (CAll (CValue v)) = mkArr [v]
+    f (CAll (CValue v)) = CArray [v]
     f (CAll e@CWrong{}) = e
     f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
-                       | Just vs  <- traverse getValue es = mkArr vs
+                       | Just vs  <- traverse getValue es = CArray vs
     f e = composOpLam (underLambda flg) f e
-
-    mkArr :: [Value] -> Core
-    mkArr vs =
-      let xs = take (length vs) $ newVars "x" $ fvsV (VArray vs)
-          unit = VArray []
-      in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (Var x) $ CApply v unit) xs vs ++ [CArray $ map Var xs]
 
 -- Handle 'one'
 --  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
@@ -542,6 +536,9 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
 
+    -- Use in 'all' desugaring.  mapAp = map ($())
+    f (CUnOp  "mapAp" (VArray vs)) = mkArr vs
+
     -- XXX Stricter than necessary?
     f (CApply (VPrim "cons$") v) | VArray [v1, VArray vs] <- v = CArray $ v1 : vs
                                  | VArray [_, va] <- v, isHNF va = CFail
@@ -573,6 +570,12 @@ isNF (HNF _) = True
 isHNF :: Value -> Bool
 isHNF HNF{} = True
 isHNF _ = False
+
+mkArr :: [Value] -> Core
+mkArr vs =
+  let xs = take (length vs) $ newVars "x" $ fvsV (VArray vs)
+      unit = VArray []
+  in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (Var x) $ CApply v unit) xs vs ++ [CArray $ map Var xs]
 
 -- A gruesome hack to test if something is an uninstantiated logical variable.
 evalKnown :: EvalCore
