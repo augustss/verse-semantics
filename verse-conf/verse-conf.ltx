@@ -889,7 +889,7 @@ does not capture any variables free in |v|.  If |x| appears free in |v|, just us
 In \versecalc{}, arrays behave like (finite) functions, in which application is
 indexing.  Rule \rulename{app-arr} describes how array application works.
 Notice that \rulename{app-arr} does not require the argument to be an integer $k$; instead
-the rule works by narrowing.  So the expression |def x ((2,3,2,7,9)(x) = 2; x)|
+the rule works by narrowing.  So the expression |def x (apply1 (tup(2,3,2,7,9)) x = 2; x)|
 does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
@@ -975,7 +975,7 @@ To make further progress, we need a rule for choice, \cref{sec:choice-rules}.
 
 \subsection{Unification: recursion and the occurs check} \label{sec:occurs} \label{sec:recursion}
 
-The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=(x,3))| fail, because the only successful
+The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=tup(x,3))| fail, because the only successful
 unification would yield an infinitely-nested pair.
 $$
     \rulename{ux-occurs} \quad |x=V^[x]| \quad \movesto \quad |fail| \quad \text{if }|V| \ne |hole|
@@ -1631,7 +1631,7 @@ Note that these reductions only happen when the store is exactly at the operatio
 
 Most of the store axioms just move the store around from left-to-right, ``visiting'' every subexpression,
 and moving on when the subexpression has reduced to a value.
-This way every subexpression (in a non-looping program) will get a ``visit'' and the all reference operations
+This way every subexpression (in a non-looping program) will get a ``visit'' and all reference operations
 can reduce.
 
 The interesting rules are those that cover |splitKW|.
