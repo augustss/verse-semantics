@@ -264,7 +264,99 @@
 \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
   a work in progress.  So please don't share it; if there is anyone you think would be
   interested/helpful, do suggest them to us.}
+
 \section{Introduction}
+
+Functional logic programming languages add expressiveness to functional programming
+by introducing logical variables, equality constraints that constrain those variables,
+and choice to allow multiple alternatives to be explored.  Here is a tiny example:
+$$
+|def (x,y,z) (x=tup(y,3); x=tup(2,z); y)|
+$$
+This expression introduces three logical (or existential) variables |x,y,z|,
+constains them with two equalities |(x=tup(y,3)0| and |(x=tup(2,z))|, and finally returns |y|.
+The only solution to the two equalies is |y=2|, |z=3|, and |x=tup(2,3)|; so the result of the
+whole expression is |y|.
+
+Functional logic programming has a long history and a rich literature.
+But it is somewhat tricky for programmers to \emph{reason} about
+functional logic programs: they must think about logical variables,
+narrowing, backtracking, Horn clauses, resolution, and the like.  This
+contrasts with functional programming, where one can say ``just apply
+rewrite rules, such as beta reduction, let-inlining, and
+case-of-known-constructor''.  Moreover, these rewrite rules apply even
+in the presence of free variables; that is, under lambdas.
+
+We therefore seek a completely-precise expression of functional logic programming, as
+a term rewriting system, to give us both a formal semantics (via a small-step reductions),
+and a powerful set of equvalences that programmers can use to reason about their programs,
+and compilers can use to optimise them.
+
+We make the following contributions in this paper.
+First, we describe a new core calculus, the Verse calculus or \versecalc{} for short,
+for functional logic programming (\cref{sec:informal} and \ref{sec:verse}).
+Like any functional logic language,
+\versecalc{} supports logical variable, equalities, and choice, but it is distinctive in several ways:
+\begin{itemize}
+\item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
+  Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
+  In contrast, the functional-logic literature is rooted in a first-order world, and
+  typically addresses higher order features via an encoding called defunctionalisation \cite[3.3]{hanus:survey}.
+\item Although \versecalc{} supports choice, it is \emph{deterministic}, unlike most
+  functional logic languages which are non-deterministic (\cref{sec:deterministic}).
+  In \versecalc{} choices are laid out in \emph{space}, in the syntax of the term, rather than
+  being explored by non-deterministic selection.
+\item All functional logic languages have some notion of ``flexible'' vs ``rigid'' variables,
+  or ``suspending'' vs ``narrowing'' operations.  \versecalc{} offers a distinctively new
+  way to address these distinctions, namely the operators |oneKW| (\cref{sec:one})
+  and |allKW| (\cref{sec:all}).  This leads to a elegant economy of concepts: for example,
+  there is just one equality (other languages have a suspending equality and a narrowing equality),
+  and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
+\end{itemize}
+As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
+Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
+It should be possible to compile a variety of functional logic languages,
+including Curry \cite{hanus:curry-report}, into \versecalc{}.
+We are also working on Verse, a new programming language for the metaverse, built directly on \versecalc{}; indeed,
+our motivation for developing \versecalc{} is practical rather than theoretical.
+
+Our second contribution is to equip \versecalc{} with a
+\emph{small-step term rewriting semantics} (\cref{sec:rewrite-rules}).
+We said that the lambda calculus is a subset of \versecalc{} so it is natural to give its
+semantics using rewrite rules, just like the lambda calculus.  That seems problmeatical, because
+logical variables and unification involve sharing and non-local communication that seems hard
+to express in a rewrite system.
+
+Exactly the same is true of call-by-need, however.  For a long time, the only semantics of
+call by need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
+was an operational semantics that sequentially threaded a global heap through execuction \cite{launchbury:natural}.
+But then Ariola \emph{et al}, in an inspirational paper, showed how to reify the heap into the term itself,
+and thereby build a rewrite system that is completely faithful to lazy evaluation \cite{ariola:call-by-need}.
+Inspired by their idea, we present a new rewrite system for functional logic program, that reifies
+logical varaibles and unification into the term itself.
+Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step,
+about how their program executes.  For example, the expression above can be rewriten
+thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cref{sec:rewrite-rules}; they
+  are given here just for reference.}:
+$$
+\begin{array}{ll}
+  & |def (x,y,z) (x=tup(y,3); x=tup(2,z); y)| \\
+  \rulename{subst} & \movesto |def (x,y,z) (x=tup(y,3); tup(y,3)=tup(2,z); y)| \\
+  \rulename{ucon},\rulename{seq} & \movesto |def (x,y,z) (x=tup(y,3); y=2; 3=z; y)| \\
+  \rulename{subst},\rulename{def-elim},\rulename{swap} & \movesto |def (x,z) (x=tup(2,3); z=3; 2)| \\
+  \rulename{def-elim} & \movesto |2| \\
+\end{array}
+$$
+
+
+\simon{Something about confluence.}
+
+There is a rich seam of related work; an excellent starting point is Hanus's survey \cite{hanus:survey}.
+We discuss related work in \cref{sec:related}.
+
+
+\section{Old introduction}
+\simon{Left in for comparison}
 
 Functional logic programming has a long history and a rich literature.
 But it is somewhat tricky for programmers to reason about functional logic programs: they must think about
@@ -410,16 +502,21 @@ As an example, what might be written |dlet x e_1 e_2| in a conventional function
   in an expression |def x e| the |defKW| scopes as far to the right as possible,
 }.
 
-A program executes by solving its equations, to get values for some of the logical variables.
+\emph{A program executes by solving its equations}, to get values for some of the logical variables.
 For example
 $$
 |def (x,y,z) (x=tup(y,3); x=tup(2,z); y)|
 $$
 is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
 unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
+Note carefully that, like any declarative language,
+\emph{a logical variable always stands for a single value}; logical
+variables are not mutable.
+We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
+mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
 
 High level functional languages usually provide some kind of
-pattern-matching; in such a langauge, we might write define |fst| by
+pattern-matching; in such a language, we might define |fst| by
 |applyN fst (a,b) = a|. Such pattern-matching is typically desugared to
 more primitive |case| expressions.  But in \versecalc{} we don't need |case| expressions:
 unification does the job.  For example we can define |fst| like this:
@@ -435,7 +532,7 @@ each example |e| being wrapped with a binding for |fst|, thus |def fst (fst = ..
 and similarly for all other library functions.
 
 This way of desugaring pattern matching means that the input
-to |fst| may include logical variables. For example:
+to |fst| may not be fully determined when the function is called. For example:
 $$
 |def (x,y,z) (x=tup(y,z); apply1 fst x = 2; y)|
 $$
@@ -1246,7 +1343,7 @@ Until we have concluded the formal proof of skew-confluence, including the preci
 Now that we know what \versecalc{} is, we can identify its distinctive features,
 compared to other approaches.
 
-\subsection{Choice and non-determinism}
+\subsection{Choice and non-determinism} \label{sec:deterministic}
 
 A significant difference between our presentation and earlier works is our
 treatment of choice. Consider an expression like |(3 + (20 choice 30))|.
@@ -1265,7 +1362,7 @@ choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-determinstic selection.  Rule \rulename{choose} is not a new idea -- indeed
-it is common in calculi for calculi with choice (e.g. \cite{what}) --
+oit is common in calculi for calculi with choice (e.g. \cite{what}) --
 but it does not appear to have been used to describe functional logic languages before.
 
 \subsection{One and all}
