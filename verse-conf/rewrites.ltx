@@ -36,7 +36,7 @@
     \begin{array}{lrcl}
       \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
           \quad \text{if $x \not\in \freevars{v}$} \\
-    \rulename{app-arr} & |apply1 (arr (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
+    \rulename{app-arr} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
 
