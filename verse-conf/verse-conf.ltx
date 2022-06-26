@@ -463,6 +463,7 @@ We discuss related work in \cref{sec:related}.
 \caption{The Verse calculus: syntax} \label{fig:syntax}
 \end{figure}
 
+\lennart{Mention that in the examples |;|, |choice| (, and |=|) syntactically are right associative.}
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
@@ -478,6 +479,7 @@ some built-in operations and tuples as data constructors:
 \item \emph{Head-normal forms}.
   A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
   also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
+  \lennart{Niklas was quite adamant that we should call them either arrays or tuples and stick to that.}
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
 \item \emph{Values.}
@@ -530,10 +532,10 @@ $$
 |first = lam pr (def (a,b) (pr = tup (a,b); a))|
 $$
 The lambda unifies its argument (presumably a pair)
-with |(a,b)|, where |a,b| are fresh logical
+with |tup(a,b)|, where |a,b| are fresh logical
 variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, in this presentation we allow ourselves to write a term like
-|applyN first (2,5))|, where we define |first| separately. Formally, you can imagine
+|applyN first (2,5)|, where we define |first| separately. Formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first = ...); e|;
 and similarly for all other library functions.
 
@@ -560,11 +562,12 @@ and unify |x| with that.  The idea of leaving stuck expressions aside, and execu
 program is called \emph{residuation}~\cite{hanus:survey}, and is at the heart of our mantra ``just solve the equations''.
 
 \simon{Why are applications |apply1 v1 v2| not |apply1 e1 e2|?}
+\lennart{To have fewer distributive rules.}
 
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
 In conventional functional programming, an expression evaluates to a single value.
-In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values).
+In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values \lennart{Can it get stuck?}).
 The expression |fail| yields no values; a head-normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
@@ -642,12 +645,12 @@ and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def
 $$
 |append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
   |(xs = emptytup; ys) choice| \\
-  |(def (x1,xrest) (xs = tup (x1,xrest); tup (x1, applyN append (xrest, ys))))|
+  |(def (x,xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys))))|
 \end{array}
 $$
 If |xs| is |emptytup|, the left-hand choice succeeds, returning |y|; and the right-hand choice
-fails (by attempting to unify |emptytup| with |tup(x1,xrest)|).
-If |xs| is of the form |tup (x1,xrest)|,
+fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
+If |xs| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
 Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results.
@@ -661,7 +664,7 @@ $$
 The call to |append| expands into a choice
 $$
   |(zs = emptytup; single)| \quad |choice| \quad
-  |(def (x1,xrest) (zs = tup (x1,xrest); tup(x1, applyN append (xrest, single))))|
+  |(def (x,xrest) (zs = tup (x,xrest); tup(x, applyN append (xrest, single))))|
 $$
 which amounts to exploring the possibility that |zs| is headed by |emptytup| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
@@ -759,8 +762,6 @@ first choice. So, supposing that |loop| is a non-terminating function,
 |apply1 (all (1 `choice` apply0 loop)) 0| loops.
 
 
-\newcommand\startexample{\vspace{1em}\noindent}
-
 \section{Some Verse examples} \label{sec:verse}
 \versecalc{} is a fairly small language, but it is quite expressive.
 We will illustrate this with a few examples.
@@ -778,8 +779,8 @@ We will illustrate this with a few examples.
       |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
       |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |t := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 t| & \text{|t,x| fresh} \\
-      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); apply1 map (tup (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
+      |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh} \\
+      |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
     \end{array} \\
   \end{array}
   $$
@@ -895,7 +896,7 @@ simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| und
 apply each element of the array to |emptytup| afterwards, using the |map| function defined above.
 The full desugaring for |for^(e_1) in e_2| is thus
 \[
-|v := all (e_1; thunk e_2); applyN map ((lam z (apply0 z)), v)|
+|v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
 \]
 for a fresh variable |v|.
 
@@ -1074,8 +1075,8 @@ restriction is what implements so-called \emph{call-time choice}~\cite{hanus:sur
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
 The fact that we substitute only values for variables also ensures that substitution is syntactically
-valid; if we tried to substitute an expression |e| for a variable in |(x,2)| we would get the
-ill-formed expression |(e,2)|.
+valid; if we tried to substitute an expression |e| for a variable in |tup(x,2)| we would get the
+ill-formed expression |tup(e,2)|.
 \item \rulename{subst}
   replaces the occurrences of |x| in |X|, \emph{but leaves the original |(x=v)| undisturbed}.
   For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using
@@ -1520,6 +1521,8 @@ bring a logical variable into scope, using the strange binding \verb!x=x!, thus 
 In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
+
+\lennart{Mention binary vs n-ary for choice and arrays?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
