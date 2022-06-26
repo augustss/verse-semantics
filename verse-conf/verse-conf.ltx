@@ -294,7 +294,7 @@ case-of-known-constructor''.  Moreover, these rewrite rules apply even
 in the presence of free variables; that is, under lambdas.
 
 We therefore seek a completely-precise expression of functional logic programming, as
-a term rewriting system, to give us both a formal semantics (via a small-step reductions),
+a term-rewriting system, to give us both a formal semantics (via small-step reductions),
 and a powerful set of equivalences that programmers can use to reason about their programs,
 and compilers can use to optimise them.
 
@@ -307,13 +307,13 @@ Like any functional logic language,
 \item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, the functional-logic literature is rooted in a first-order world, and
-  typically addresses higher order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
+  typically addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
 \item Although \versecalc{} supports choice, it is \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
   In \versecalc{} choices are laid out in \emph{space}, in the syntax of the term, rather than
   being explored by non-deterministic selection.
-\item All functional logic languages have some notion of ``flexible'' vs ``rigid'' variables,
-  or ``suspending'' vs ``narrowing'' operations.  \versecalc{} offers a distinctively new
+\item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
+  or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
   way to address these distinctions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This leads to a elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
@@ -327,14 +327,14 @@ We are also working on Verse, a new programming language for the metaverse, buil
 our motivation for developing \versecalc{} is practical rather than theoretical.
 
 Our second contribution is to equip \versecalc{} with a
-\emph{small-step term rewriting semantics} (\cref{sec:rewrite-rules}).
-We said that the lambda calculus is a subset of \versecalc{} so it is natural to give its
+\emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
+We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
 semantics using rewrite rules, just like the lambda calculus.  That seems problematical, because
 logical variables and unification involve sharing and non-local communication that seems hard
 to express in a rewrite system.
 
 Exactly the same is true of call-by-need, however.  For a long time, the only semantics of
-call by need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
+call-by-need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
 was an operational semantics that sequentially threaded a global heap through execution~\cite{launchbury:natural}.
 But then Ariola {\etal}, in an inspirational paper, showed how to reify the heap into the term itself,
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
@@ -1275,7 +1275,7 @@ If the rewrite rules were terminating, then we would expect strong normalization
 
 Confluence will give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
 
-\subsection{subst vs. subst}
+\subsection{subst \emph{vs.} subst}
 
 The main source for possible non-confluence is rule \rulename{subst}: If we have multiple equations for a variable $x$ available, we can use any of them to rewrite. A typical example would be
 \[ |def x (x=v_1; x=v_2; e)| \]
@@ -1407,7 +1407,7 @@ for mutable variables.
 Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
 depending on whether or not it succeeds.  \simon{Can one do this in Curry?}
 
-Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' vs ``rigid'' logical variables.
+Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' \emph{vs.} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
 they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
 scope of the \rulename{subst} rule, and specifically excludes |oneKW| and |allKW|.
@@ -1523,7 +1523,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-\lennart{Mention binary vs n-ary for choice and arrays?}
+\lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
@@ -1555,7 +1555,7 @@ $$
 |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
 $$
 The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-|if| is no choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+|if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
 $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
 and make progress.  But to do this we must look at the right branch of the choice, before we know whether
 the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
@@ -1605,7 +1605,7 @@ $$
 \rulename{simpler-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[e_1] choice X^[e_2]|
 $$
 The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
-Another possibility would be to accept the results may come out in the ``wrong'' order, but have
+Another possibility would be to accept that results may come out in the ``wrong'' order, but have
 some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
 $$
 \rulename{labelled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
@@ -1634,7 +1634,7 @@ Indeed, this is more general, as we can implement |oneKW| and |allKW| with |spli
     |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
-to avoid confusing the presentation with these higher-order encoding, but we do not expect any complications using |splitKW| instead.
+to avoid confusing the presentation with these higher-order encodings, but we do not expect any complications using |splitKW| instead.
 
 
 
@@ -1642,10 +1642,10 @@ to avoid confusing the presentation with these higher-order encoding, but we do 
 \lennart{This needs a little fleshing out.}
 
 \subsection{Types}
-The full Verse language has types and static checking of those.
-In the dynamic semantics the types can be represented by partial
-identity function---identity of the values of the type and |fail| otherwise.
-We have a reduction rules for this, but they are left out for space and exposition reasons.
+The full Verse language has statically-checked types.
+In the dynamic semantics, the types can be represented by partial
+identity functions---identity of the values of the type and |fail| otherwise.
+We have reduction rules for this, but they are left out for space and exposition reasons.
 
 \subsection{Assignment}
 The full Verse language has updateable references in a store, in the style of SML.
@@ -1656,7 +1656,7 @@ See \cref{sec:store} for the relevant rules.
 
 \subsection{Effects}
 In this paper we have seen one kind of effect, namely being multi-valued.
-Adding assignable references add another set of effects, as does I/O.
+Adding assignable references adds another set of effects, as does I/O.
 To accommodate this, real Verse has an effect system in addition to the type system.
 We have reduction rules for effect checking as well, but for the real language this is done at compile time.
 
@@ -1801,9 +1801,9 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xrest zs unary
 % LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
 % LocalWords:  featureful multivalued mapFlat powerset denotational
-% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl
+% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
 % LocalWords:  unifyr neighbourhood ariola deterministically bagof
 % LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
-% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp
+% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
 % LocalWords:  updateable alloc storeTwoLines canCopy storeKW
 % LocalWords:  subexpression
