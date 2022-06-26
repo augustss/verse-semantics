@@ -1373,13 +1373,14 @@ choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea -- indeed
-it is common in calculi for calculi with choice ({\eg},~\cite{what}) --
+it is common in calculi with choice ({\eg},~\cite{what}) --
 but it does not appear to have been used to describe functional logic languages before.
 
 \subsection{One and all}
 
 Logical variables, choice, and equalities are present in many functional logic
 languages.  However |oneKW| and |allKW| are distinctive features of \versecalc{}.
+\lennart{What about Fresh?}
 
 First, notice that |allKW| \emph{reifies} choice (a control operator) into an array (a data structure);
 for example, |all (1 choice 7 choice 2)| returns the array |tup (1,7,2)|),
@@ -1407,7 +1408,7 @@ Thirdly, |oneKW| allows us to reify failure; to try something and take different
 depending on whether or not it succeeds.  \simon{Can one do this in Curry?}
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' vs ``rigid'' logical variables.
-As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW| cannot be unifies inside it;
+As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
 they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
 scope of the \rulename{subst} rule, and specifically excludes |oneKW| and |allKW|.
 
