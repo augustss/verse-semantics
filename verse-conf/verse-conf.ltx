@@ -310,10 +310,12 @@ Like any functional logic language,
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, the functional-logic literature is rooted in a first-order world, and
   typically addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
-\item Although \versecalc{} supports choice, it is \emph{deterministic}, unlike most
+\item \versecalc{} uses \emph{contructive choice}, meaning that the choice operator behaves
+  a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
+  This makes \versecalc{} \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
-  In \versecalc{} choices are \emph{constructively} laid out in the \emph{syntax} 
-  of the term, rather than being explored by non-deterministic selection.
+  In \versecalc{} choices are laid out in \emph{space},
+  in the syntax of the term, rather than being explored by non-deterministic selection.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
   or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
@@ -343,8 +345,10 @@ But then Ariola {\etal}, in a seminal paper, showed how to reify the heap into t
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic program, that reifies
 logical variables and unification into the term itself.
-Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step,
-about how their program executes.  For example, the expression above can be rewritten
+Just like rewriting for the lambda calculus, this semantics
+gives programmers a set of equivalences with which
+they can reason equationally about their programs.
+For example, the expression above can be rewritten
 thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
 $$
@@ -371,6 +375,7 @@ into a single array holding the list of successful results, lets \versecalc{}
 economically account for tricky features of logic programming like narrowing,
 backtracking and resolution, via equational rewrites, giving programmers
 a set of equivalences with which they can reason about their programs.}
+\simon{this feels a bit out of place.  I have beefed up the bullet on constructive choice a bit.  Will it do instead?}
 
 \simon{Something about confluence.}
 
@@ -1029,7 +1034,7 @@ It says that if we have an equality |(x=v)| in a term,
 we can replace ``nearby'' occurrences of |x| by |v|.
 
 But what does ``nearby'' mean? In this rule, |X| is an \emph{execution context},
-whose syntax is given in \cref{fig:syntax}.
+whose syntax is given in \cref{fig:contexts}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
 containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
 The notation |X^[e]| is the expression obtained by filling the hole
@@ -1042,6 +1047,7 @@ So \rulename{subst} says that we can replace all occurrences of |x| by |v| in th
 |X|-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
 There are several things to notice:
 \begin{itemize}
+\item Rule \rulename{swap} puts the variable on the left of the unification, to avoid duplicating \rulename{subst}.
 \item \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
 restriction is what implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
@@ -1057,25 +1063,27 @@ ill-formed expression |tup(e,2)|.
 \item If the equality |(x=v)| turns out to be the sole remaining occurrence
       of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
     and the unification equation.
-\item
-Note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice}.
+\item \rulename{subst} does not specify how big the execution context |X| is:
+  it can be anything from a local expression immediately surrounding the |(x=v)| to an
+  arbitrarily large expression.
+But note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice} (\cref{fig:contexts}).
 That restriction is the key to localising unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
-|(y = ((x=3; x*2) choice (x=4)); (x+1,y))|.
+|(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
 We must not propagate the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
 But rule \rulename{subst}
 \emph{can} propagate it locally
 within the first arm of the choice, thus\footnote{
 You may wonder if this local propagation is useful, a point we return
-to in \cref{sec:local-prop}.}:
+to in \cref{sec:local-subst}.}:
 $$
 |y = ((x=3; x*2) choice (x=4)); tup (x+1,y)|
 \movesto
 |y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
 $$
-To make further progress, we need a rule for choice, \cref{sec:choice-rules}.
+To make further progress, we need a rule for choice, see \cref{sec:choice-rules}.
 \item The $(x \in \freevars{X})$ in \rulename{subst} prevents the rule from
   firing infinitely often, doing nothing each time.  The other guard $(x \not\in \freevars{v})$
   also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
@@ -1124,51 +1132,57 @@ as discussed in \cref{sec:conf-move-eqn}.
 
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
-\subsection{Local substitution} \label{sec:local-prop}
+\subsection{Local substitution} \label{sec:local-subst}
 
-Consider this tricky term:
+Consider this (extremely) tricky term:
 $$
 |def x (x = (if (x=0; x>1) then 33 else 55))|
 $$
-What should this do? At first sight you might think it was stuck; how can we simplify the |if|
-when its condition mentions |x| which is not yet defined.  But in fact rule \rulename{subst} allows
-us to substitute \emph{locally} in the |X|-neighbourhood of the equality |(x=0)| thus:
+What should this do? At first you might think it was stuck; how can we simplify the |if|
+when its condition mentions |x| which is not yet defined?  But in fact rule \rulename{subst} allows
+us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
 $$
+|def x (x = if (x=0; x>1) then 33 else 55)| \\
 \begin{array}[t]{r@@{\;}l}
-           & |def x (x = if (x=0; x>1) then 33 else 55)| \\
   \movesto & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
   \movesto & |def x (x = if fail then 33 else 55)|\\
   \movesto & |def x (x = 55)| \quad \movesto |55|
   \end{array}
 $$
-But this is example is arguably a weird corner case.  Perhaps we can simplify the system, by only allowing
+Minor variants of the same example get stuck instead of reducing. For example, replace
+the |(x=0)| with |(x=100)| and rewriting gets stuck, as the reader may verify; and rightly so,
+because the equations have no solution.  Replace |(x=0)| with |(x=33)| and rewriting again
+gets stuck, although in this case there are \emph{two} valid solutions to the equations, namely $x=33$ and $x=55$.
+
+It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
 substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
 $$
 \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
-Now the tricky term is stuck; but maybe that does not matter. After
-all, even with local substitution, the tricky term would be stuck if we
-replaced |(x=0)| with |(x=33)|, as the reader may care to verify.
-\emph{But the real reason we need local substitution is not expressiveness, but confluence.}
-Suppose we use \rulename{global-subst} instead of \rulename{subst} and consider
+Now all three variants get stuck.  But alas, we lose confluence.  Consider this term
 $$
 |def x (x = if (def y (y=x; y=0; y>1)) then 33 else 55)|
 $$
 In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
-By using \rulename{global-subst} on |(y=x)|, we could recover the original tricky term, which is
-stuck.
-
-\emph{But by using \rulename{global-subst} on |(y=0)|, instead, we could simplify the |if|.}
-Two different rewrites starting from the same term lead to non-joinable terms.
-In effect, local substitution via \rulename{subst} has the same effect as introducing a local
-alias for the unified variable.  This is a tricky point!
+Suppose we use \rulename{global-subst} instead of \rulename{subst}.  Then we can rewrite this term in two
+different ways:
+\begin{itemize}
+\item Use \rulename{global-subst} on |(y=x)|; doing so recovers the original tricky term, which is
+stuck, because \rulename{global-subst} cannot rewrite it.
+\item use \rulename{global-subst} on |(y=0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
+\end{itemize}
+We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
+This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
+the simpler \rulename{global-subst}: to establish confluence.
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
 say that |fail| is the unit for choice |choice|.  Rules \rulename{one-value}, \rulename{one-choice}
 and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
+Similarly \rulename{all-fail}, \rulename{all-choice} and \rulename{all-value} describe
+the semantics of |allKW| (\cref{sec:all}).
 The \rulename{assoc-choice} is an administrative rule, to allow \rulename{one-choice} to fire.
 
 The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
@@ -1212,9 +1226,15 @@ Now the |(x=1)| is inside the choice branches, so we cannot use \rulename{subst}
 condition of the |if|.  Nor can we use \rulename{choose} again to float the choice further out,
 because the |if| is not guaranteed choice-free (for example, the branches might contains choices).
 So, alas, we are stuck!
-
 Our not-entirely-satisfying solution is to force \rulename{choose} to float the choice all the way
 to the innermost enclosing scope construct; hence the |SX| in the rule.
+
+Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
+\emph{eliminate} choices, and even then only to reify it into the term.
+So choice behaves a bit like a data constuctor, or normal form, of the language.
+For this reason we call
+this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
+picking one branch or the other, which immediately gives up confluence.
 
 \subsection{\versecalc{} is lenient}
 
