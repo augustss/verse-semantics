@@ -1231,7 +1231,33 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 
 
 \subsection{Examples}
-\lennart{I think we should have a few more examples of reduction sequences.}
+$$
+\begin{array}{lll}
+                   &          & |swap(x,y) := (y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+\rulename{desugar} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
+\rulename{subst} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+\rulename{def-elim} & \movesto & |(               (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+\rulename{seq}        & \movesto & |def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
+\rulename{app-beta}   & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\rulename{subst}      & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\rulename{def-elim}   & \movesto & |def (p)     (((p; def (x,y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\rulename{def-float}  & \movesto & |def (p,x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\rulename{def-float}  & \movesto & |def (p,x,y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\rulename{subst}      & \movesto & |def (p,x,y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
+\rulename{seq}        & \movesto & |def (p,x,y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
+\rulename{unify-seql} & \movesto & |def (p,x,y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
+\rulename{ucon}       & \movesto & |def (p,x,y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
+\rulename{subst}      & \movesto & |def (p,x,y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
+\rulename{def-elim}   & \movesto & |def (p,x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
+\rulename{subst}      & \movesto & |def (p,x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
+\rulename{def-elim}   & \movesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
+\rulename{def-elim}   & \movesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
+\rulename{seq}        & \movesto & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
+\rulename{seq}        & \movesto & |            (               (           3; tup(2,3));  tup(3,2))| \\
+\rulename{seq}        & \movesto & |                                           tup(2,3);   tup(3,2)| \\
+\rulename{seq}        & \movesto & |                                                       tup(3,2)| \\
+\end{array}
+$$
 
 \section{Confluence}
 
