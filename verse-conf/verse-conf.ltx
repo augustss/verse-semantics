@@ -1247,35 +1247,48 @@ $$
 Here |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
+\newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 
 \subsection{Examples}
+A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
+Most of the reduction are very adminstrative in nature, but these are the highlights.
+At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
+Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
+so that at \circlednum{5} the actual unification can happen.
+At \circlednum{6} and \circlednum{7} we finally get the values into the result,
+and the rest of the reductions just gets rid of terms no longer needed.
+\begin{figure}
+\begin{scriptsize}
 $$
-\begin{array}{lll}
-                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-\rulename{desugar} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
-\rulename{subst} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\rulename{def-elim} & \movesto & |(               (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\rulename{seq}        & \movesto & |def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
-\rulename{app-beta}   & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\rulename{subst}      & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\rulename{def-elim}   & \movesto & |def (p)     (((p; def (x,y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\rulename{def-float}  & \movesto & |def (p,x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\rulename{def-float}  & \movesto & |def (p,x,y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\rulename{subst}      & \movesto & |def (p,x,y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
-\rulename{seq}        & \movesto & |def (p,x,y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
-\rulename{unify-seql} & \movesto & |def (p,x,y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
-\rulename{ucon}       & \movesto & |def (p,x,y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
-\rulename{subst}      & \movesto & |def (p,x,y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
-\rulename{def-elim}   & \movesto & |def (p,x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
-\rulename{subst}      & \movesto & |def (p,x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
-\rulename{def-elim}   & \movesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
-\rulename{def-elim}   & \movesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
-\rulename{seq}        & \movesto & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
-\rulename{seq}        & \movesto & |            (               (           3; tup(2,3));  tup(3,2))| \\
-\rulename{seq}        & \movesto & |                                           tup(2,3);   tup(3,2)| \\
-\rulename{seq}        & \movesto & |                                                       tup(3,2)| \\
+\begin{array}{llll}
+&                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+&\rulename{desugar} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
+\circlednum{1}&\rulename{subst} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+&\rulename{def-elim} & \movesto & |(               (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+&\rulename{seq}        & \movesto & |def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
+\circlednum{2}&\rulename{app-beta}   & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\circlednum{3}&\rulename{subst}      & \movesto & |def (p) ((def (xy) (xy = p; def (x,y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+&\rulename{def-elim}   & \movesto & |def (p)     (((p; def (x,y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+&\rulename{def-float}  & \movesto & |def (p,x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+&\rulename{def-float}  & \movesto & |def (p,x,y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+&\rulename{subst}      & \movesto & |def (p,x,y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
+&\rulename{seq}        & \movesto & |def (p,x,y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
+\circlednum{4}&\rulename{unify-seql} & \movesto & |def (p,x,y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
+\circlednum{5}&\rulename{ucon}       & \movesto & |def (p,x,y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
+\circlednum{6}&\rulename{subst}      & \movesto & |def (p,x,y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
+&\rulename{def-elim}   & \movesto & |def (p,x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
+\circlednum{7}&\rulename{subst}      & \movesto & |def (p,x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
+&\rulename{def-elim}   & \movesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
+&\rulename{def-elim}   & \movesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
+%&\rulename{seq}        & \movesto & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
+%&\rulename{seq}        & \movesto & |            (               (           3; tup(2,3));  tup(3,2))| \\
+%&\rulename{seq}        & \movesto & |                                           tup(2,3);   tup(3,2)| \\
+&\rulename{seq*4}      & \movesto & |                                                       tup(3,2)| \\
 \end{array}
 $$
+\end{scriptsize}
+\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\end{figure}
 
 \section{Confluence}
 
