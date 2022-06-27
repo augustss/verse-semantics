@@ -314,29 +314,30 @@ Like any functional logic language,
   being explored by non-deterministic selection.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
   or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
-  way to address these distinctions, namely the operators |oneKW| (\cref{sec:one})
+  way to address these notions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This leads to a elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
-It should be possible to compile a variety of functional logic languages,
+We believe that it is possible to compile a variety of functional logic languages,
 including Curry~\cite{hanus:curry-report}, into \versecalc{}.
-We are also working on Verse, a new programming language for the metaverse, built directly on \versecalc{}; indeed,
+We are ourselves working on Verse, a new programming language for
+the metaverse, built directly on \versecalc{}; indeed,
 our motivation for developing \versecalc{} is practical rather than theoretical.
 
 Our second contribution is to equip \versecalc{} with a
 \emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
 We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
-semantics using rewrite rules, just like the lambda calculus.  That seems problematical, because
+semantics using rewrite rules, just like the lambda calculus.  That seems problematical, however, because
 logical variables and unification involve sharing and non-local communication that seems hard
 to express in a rewrite system.
 
-Exactly the same is true of call-by-need, however.  For a long time, the only semantics of
+Exactly the same difficulty arises with call-by-need.  For a long time, the only semantics of
 call-by-need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
-was an operational semantics that sequentially threaded a global heap through execution~\cite{launchbury:natural}.
-But then Ariola {\etal}, in an inspirational paper, showed how to reify the heap into the term itself,
+was an operational semantics that sequentially threads a global heap through execution~\cite{launchbury:natural}.
+But then Ariola {\etal}, in a seminal paper, showed how to reify the heap into the term itself,
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic program, that reifies
 logical variables and unification into the term itself.
@@ -348,62 +349,17 @@ $$
 \begin{array}{lll}
   & & |def (x,y,z) (x=tup(y,3); x=tup(2,z); y)| \\
   \rulename{subst} & \movesto & |def (x,y,z) (x=tup(y,3); tup(y,3)=tup(2,z); y)| \\
-  \rulename{ucon},\rulename{seq} & \movesto & |def (x,y,z) (x=tup(y,3); y=2; 3=z; y)| \\
-  \rulename{subst},\rulename{def-elim},\rulename{swap} & \movesto & |def (x,z) (x=tup(2,3); z=3; 2)| \\
+  \rulename{ucon},\rulename{seq} & \movesto & |def (x,y,z) (x=tup(y,3); y=2; 3=z; tup(y,3); y)| \\
+  \rulename{subst},\rulename{def-elim},\rulename{swap} & \movesto & |def (x,z) (x=tup(2,3); z=3; tup(y,3); 2)| \\
   \rulename{def-elim}, \rulename{seq} & \movesto & |2| \\
 \end{array}
 $$
-\lennart{That reduction sequence uses some associativity of ; that we don't have a rule for.}
 
 \simon{Something about confluence.}
 
 There is a rich seam of related work; an excellent starting point is Hanus's survey~\cite{hanus:survey}.
 We discuss related work in \cref{sec:related}.
 
-
-\section{Old introduction}
-\simon{Left in for comparison}
-
-Functional logic programming has a long history and a rich literature.
-But it is somewhat tricky for programmers to reason about functional logic programs: they must think about
-logical variables, narrowing, backtracking, Horn clauses, resolution,
-and the like.   This contrasts with functional programming,
-where one can say ``just apply rewrite rules, such as beta reduction, let-inlining, and case-of-known-constructor''.
-Moreover, these rewrite rules apply even in the presence of free variables; that is, under lambdas.
-
-We therefore seek a completely-precise expression of functional logic programming, as
-at term rewriting system, to give us both a formal semantics (via a small-step reductions),
-and a powerful set of equivalences that programmers can use to reason about their programs,
-and compilers can use to optimise them.
-
-Our main contribution is a new core calculus, the Verse calculus or \versecalc{} for short,
-for functional logic programming that
-has the following properties:
-\begin{itemize}
-\item It natively supports \emph{higher-order programming}, just like the lambda calculus.  In contrast,
-  the functional-logic literature typically addresses higher order features via defunctionalisation~\cite[3.3]{hanus:survey}.
-\item It supports \emph{logical variables}. In the expression |def x e|, the variable |x| is brought into scope,
-  but gains its value through \emph{equalities} |(e_1 = e_2)| in |e|.  Like any declarative language, however,
-  an existential variable always stands for a single value; logical variables are not mutable.
-\item It supports so-called \emph{non-deterministic programming}; that is, an expression can return one result, many results, or no result (failure).
-  As a result, it natively supports both narrowing and residuation.
-\item \versecalc{} has a \emph{small-step term rewriting semantics} (\Cref{sec:rewrite-rules}).
-  Just like rewriting for the lambda calculus, this semantics allows programmers to reason, step by step,
-  about how their program executes.  This set of rewrite rules is our main contribution.
-\item \simon{Something about confluence.}
-\end{itemize}
-As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
-Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
-It should be possible to compile a variety of functional logic languages,
-including Curry~\cite{hanus:curry-report}, into \versecalc{}.
-We are also working on Verse, a new programming language for the metaverse, built directly on \versecalc{}; indeed,
-our motivation for developing \versecalc{} is practical rather than theoretical.
-
-There is a rich seam of related work; an excellent starting point is Hanus's survey~\cite{hanus:survey}.
-We discuss related work in \cref{sec:related}.
-
-\lennart{I think we should mention that this work is related to an actual programming language.
-  This will also motivate the name of the calculus.}
 
 \section{The Verse calculus, informally} \label{sec:informal}
 
@@ -428,8 +384,11 @@ We discuss related work in \cref{sec:related}.
 \iffullverse
     \vb |isInt|
 \fi
-    \end{array} \\
-    \\
+    \\[1mm]
+    \text{\emph{Concrete syntax}:} &
+          \multicolumn{3}{l}{\text{``|choice|'', ``;'', and ``|=|'' are right-associative.}} \\
+    &     \multicolumn{3}{l}{\text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.}} \\
+    \end{array} \\ \\[-3mm]
     \textbf{Contexts} \\
     \begin{array}{lrcl}
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| 
@@ -446,7 +405,7 @@ We discuss related work in \cref{sec:related}.
 \fi
     \text{Value context} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
     \end{array} \\
-    \\
+    \\[-2mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
 %%      |emptytup| & \text{means} & |arr ()|\\
@@ -505,10 +464,7 @@ The Verse calculus includes first class logical variables and unification:
 you can bring a fresh logical variable into scope with |defKW|; equate two expressions with |e_1 = e_2|; and
 sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
-|def x (x=e_1; e_2)| in \versecalc{}\footnote{
-  Just as with |lam x e|, where the $\lambda$ scopes as far to the right as possible,
-  in an expression |def x e| the |defKW| scopes as far to the right as possible,
-}.
+|def x (x=e_1; e_2)| in \versecalc{}.
 
 \emph{A program executes by solving its equations} to get values for some of the logical variables.
 For example,
@@ -1057,11 +1013,14 @@ $$
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
 It says that if we have an equality |(x=v)| in a term,
-we can replace ``nearby'' occurrences of |x| by |v|.  In this rule, |X| is an \emph{execution context},
-defined in \cref{fig:syntax}.
+we can replace ``nearby'' occurrences of |x| by |v|.
+
+But what does ``nearby'' mean? In this rule, |X| is an \emph{execution context},
+whose syntax is given in \cref{fig:syntax}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
-with a single hole, written |hole|, in it.
-The notation |X^[e]| is the expression obtained by filling the hole in |X| with |e|.
+containing a single hole, written |hole|.
+The notation |X^[e]| is the expression obtained by filling the hole
+in |X| with |e| \cite{felleisen:contexts1,felleisen:contexts2}.
 For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
 gives the expression $|X^[99]| \equiv |(y = tup (99,4))|$.
 The notation |subst X x v| is the context obtained by replacing all free occurrences of |x| in |X| by |v|.
