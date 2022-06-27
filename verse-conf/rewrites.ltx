@@ -6,6 +6,25 @@
 
 \begin{figure}
   $$
+    \begin{array}{lrcl}
+    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Value contexts} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+\iffullverse
+    && \vb & |succeeds hole| \vb |decides hole| \\
+\fi
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| 
+    \vb |one e| \vb |all e|
+  \end{array}
+   $$
+  \caption{The syntax of contexts}
+    \label{fig:contexts}
+\end{figure}
+
+\begin{figure}
+  $$
   \begin{array}{l}
     \textit{Primitive operations} \\
     \begin{array}{lrcl}

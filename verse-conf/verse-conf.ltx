@@ -364,9 +364,7 @@ $$
 
 \simon{Something about confluence.}
 
-There is a rich seam of related work; an excellent starting point is Hanus's survey~\cite{hanus:survey}.
-We discuss related work in \cref{sec:related}.
-
+There is a rich seam of related work, as we discuss in \cref{sec:related}.
 
 \section{The Verse calculus, informally} \label{sec:informal}
 
@@ -396,23 +394,6 @@ We discuss related work in \cref{sec:related}.
           \multicolumn{3}{l}{\text{``|choice|'', ``;'', and ``|=|'' are right-associative.}} \\
     &     \multicolumn{3}{l}{\text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.}} \\
     \end{array} \\ \\[-3mm]
-    \textbf{Contexts} \\
-    \begin{array}{lrcl}
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| 
-    \vb |one e| \vb |all e| \\
-\iffullverse
-    && \vb & |succeeds e| \vb |decides e| \\
-\fi
-    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-    \vb |one hole| \vb |all hole| \\
-\iffullverse
-    && \vb & |succeeds hole| \vb |decides hole| \\
-\fi
-    \text{Value context} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
-    \end{array} \\
-    \\[-2mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
 %%      |emptytup| & \text{means} & |arr ()|\\
@@ -428,8 +409,6 @@ We discuss related work in \cref{sec:related}.
   $$
 \caption{The Verse calculus: syntax} \label{fig:syntax}
 \end{figure}
-
-\lennart{Mention that in the examples |;|, |choice| (, and |=|) syntactically are right associative.}
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
@@ -523,9 +502,6 @@ No matter!  We simply leave it and try some other equation. In this case, we can
 and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
 and unify |x| with that.  The idea of leaving stuck expressions aside, and executing other parts of the
 program is called \emph{residuation}~\cite{hanus:survey}, and is at the heart of our mantra ``just solve the equations''.
-
-\simon{Why are applications |apply1 v1 v2| not |apply1 e1 e2|?}
-\lennart{To have fewer distributive rules.}
 
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
@@ -1043,9 +1019,9 @@ we can replace ``nearby'' occurrences of |x| by |v|.
 But what does ``nearby'' mean? In this rule, |X| is an \emph{execution context},
 whose syntax is given in \cref{fig:syntax}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
-containing a single hole, written |hole|.
+containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
 The notation |X^[e]| is the expression obtained by filling the hole
-in |X| with |e| \cite{felleisen:contexts1,felleisen:contexts2}.
+in |X| with |e|.
 For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
 gives the expression $|X^[99]| \equiv |(y = tup (99,4))|$.
 The notation |subst X x v| is the context obtained by replacing all free occurrences of |x| in |X| by |v|.
@@ -1249,6 +1225,30 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 
+\subsection{Evaluation strategy}
+
+The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
+rwerite rule to apply next, if you want to get to the answer expeditiously. That is
+the role of an \emph{evaluation strategy} that, given a closed term, says which redex
+to rewrite first.  For example, in the pure lambda calculus, \emph{normal order reduction},
+sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
+guarantees to terminate if any strategy does so.
+
+There are theree issues in formulating an evaluation strategy.  (1) does the strategy guarantee
+terminate if there is \emph{any} terminating sequence of reduction?  This is obviously highly desirable.
+(2) does it terminate in the minimal number of steps
+-- so called ``optimal reduction''?  This is typically very hard, even in theory, and
+invariably involves reducing under lambdas, which is in conflict with: (3)
+can it be compiled into efficient code?
+
+Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
+we can make some informal comments.  First, just as in the lambda calculus we never need to
+evaluate under a lambda.
+Second, it never makes sense to evaluate in the right-hand argument of a choice, because
+\versecalc{} strong ordering semantics mean that we must find out what the left hand argument
+is (especially, whether it fails) before it is useful...\simon{working here}
+
+
 \subsection{Examples}
 A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
 Most of the reduction are very adminstrative in nature, but these are the highlights.
@@ -1374,7 +1374,9 @@ Until we have concluded the formal proof of skew-confluence, including the preci
 
 \section{Related work} \label{sec:related}
 
-Now that we know what \versecalc{} is, we can identify its distinctive features,
+Functional logic programming has a rich literature; an excellent
+starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
+know what \versecalc{} is, we can identify its distinctive features,
 compared to other approaches.
 
 \subsection{Choice and non-determinism} \label{sec:deterministic}
@@ -1686,6 +1688,11 @@ We have reduction rules for effect checking as well, but for the real language t
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
+  We thank our colleagues for their helpufl feedback on earlier drafts of this paper,
+  including
+  Ranjit Jhala,
+  and Dale Miller.
+
 \end{acks}
 
 % -------------------- Bibliography ----------------
