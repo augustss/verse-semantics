@@ -312,7 +312,7 @@ Like any functional logic language,
   typically addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
 \item Although \versecalc{} supports choice, it is \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
-  In \versecalc{} choices are \emph{constructively} laid out in \emph{space}, 
+  In \versecalc{} choices are \emph{constructively} laid out in \emph{space},
   in the syntax of the term, rather than being explored by non-deterministic selection.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
   or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
@@ -364,15 +364,17 @@ $$
 \end{array}
 $$
 %
-\ranjit{Crucially we show how \versecalc{}'s notion of \emph{constructive choice}, wherein different 
-choices are explicated in the syntax of the term, and can be reified into a single array 
-holding the list of successful results, allows our rewriting semantics to account for 
-narrowing, backtracking and resolution, giving programmers a set of equivalences with which 
-they can reason equationally about their programs.}
+\ranjit{Crucially we show (\cref{sec:related}) how \versecalc{}'s 
+notion of \emph{constructive choice}, wherein different choices are 
+explicated in the syntax of the term, and can, via |allKKW| be reified 
+into a single array holding the list of successful results, lets \versecalc{} 
+economically account for tricky features of logic programming like narrowing, 
+backtracking and resolution, via equational rewrites, giving programmers 
+a set of equivalences with which they can reason about their programs.}
 
 \simon{Something about confluence.}
 
-There is a rich seam of related work, as we discuss in \cref{sec:related}.
+% There is a rich seam of related work, as we discuss in \cref{sec:related}.
 
 \section{The Verse calculus, informally} \label{sec:informal}
 
@@ -566,7 +568,7 @@ $$
 Are we stuck now?  No, we can float the choice out as
 before\footnote{Indeed we could have done so first, had we wished.}, thus
 $$
-|def x ((x=3; 4) choice (x=4; 8))| \movesto |(def x (x=3; 4)) choice (def x (x=4; 8))| 
+|def x ((x=3; 4) choice (x=4; 8))| \movesto |(def x (x=3; 4)) choice (def x (x=4; 8))|
 $$
 and now it is apparent that the sole occurrence of |x| in each |defKW| is the equation
 |(x=3)|, or |(x=4)| respectively; so we can drop the |defKW| and the equation, yielding |(4 choice 8)|.
@@ -574,7 +576,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 % |square = lam x (x*x)|.  What does |apply1 square (3 choice 4)| mean? If we make the choice \emph{before}
 % the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
 % it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
-% All functional-logic languages, including 
+% All functional-logic languages, including
 
 \subsection{Pattern matching and narrowing}
 
@@ -950,7 +952,7 @@ has the following properties:
 The rewrite rules are given in Figures~\ref{fig:rules1} and \ref{fig:rules2},
 and are described next.
 
-\subsection{Basic rewrites}
+\subsection{Primitive rewrites}
 
 Looking at \cref{fig:general-axioms}, rules \rulename{p-add} and \rulename{p-gt}
 should be familiar: they simply rewrite applications of |add| and |gt| to integer
@@ -965,9 +967,11 @@ and returns |k_1| otherwise.
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
 
-Sequencing, is very simple (rule \rulename{seq}):
-|(e_1;e_2)|, simply reduces |e_1| to a value, and then discards it, returning
-|e_2|.  The reason for evaluating |e_1| is for its unification effects.
+Sequencing, is very simple (rule \rulename{seq}): |(e_1;e_2)|, 
+reduces |e_1| to a value, and then discards it, returning
+|e_2| \ranjit{not what the rule in Fig4 looks like?}.  
+%
+The reason for evaluating |e_1| is for its unification effects.
 Our insistence on clear sequencing also makes it possible to extend \versecalc{}
 with more general effects, but that is beyond the scope of this paper.
 
@@ -1120,7 +1124,7 @@ as discussed in \cref{sec:conf-move-eqn}.
 
 Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
-\subsection{Local substitution}
+\subsection{Local substitution} \label{sec:local-prop}
 
 Consider this tricky term:
 $$
@@ -1425,11 +1429,11 @@ whereas it is part of the fabric of \versecalc{}.
 
 Second, even under the reification of |allKW|,
 \versecalc{} is \emph{deterministic}.  Choice is not
-non-deterministic choice, it takes pains to maintain order, so that
+non-deterministic: \versecalc{} takes pains to maintain order, so that
 when reifying choice into an array, the order of elements in that
 array is completely determined.  Anything else would leak
 non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
-and \cref{sec:rules-for-choice}, we have to take pains to maintain the
+and \cref{sec:choice-rules}, we have to take care to maintain the
 left-to-right order of choices.
 
 Maintaining that order has other payoffs. For example, it is relatively easy to add
@@ -1443,7 +1447,7 @@ depending on whether or not it succeeds.  \simon{Can one do this in Curry?}
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' \emph{vs.} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
 they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
-scope of the \rulename{subst} rule, and specifically excludes |oneKW| and |allKW|.
+scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and |allKW|.
 
 \subsection{The semantics of logical variables} \label{sec:magical}
 
@@ -1461,17 +1465,20 @@ introduction is implicit in the top-level rules, simply by not being bound
 on the left.  Logical variables are
 at the heart of the ``logic'' part of functional logic programming.
 
-To give a high-level semantics for non-strict, non-deterministic
-functional logic languages, the brand leader is Constructor-based
-ReWrite Logic (CRWL).
-It is a ``big-step'' rewrite semantics,
-one that rewrites a term to a value in one big step.
-\Citet{fraguas:rewriting} make a powerful case for
-instead giving the semantics of a functional logic language using ``small-step'' rewrite
-rules, more like those of the lambda calculus, that successively rewrite the term, one step at
+
+Constructor-based ReWrite Logic (CRWL) \cite{FIXME} is the brand leader for 
+high-level semantics for non-strict, non-deterministic functional logic languages.
+%
+CRLW is a ``big-step'' rewrite semantics that rewrites a term to a value in a single 
+step.
+%
+\Citet{fraguas:rewriting} make a powerful case for instead giving the semantics 
+of a functional logic language using ``small-step'' rewrite rules, more like those 
+of the lambda calculus, that successively rewrite the term, one step at
 a time, until it reaches a normal form.
-they offer set of small-step rewrite rules, that is provably equivalent to
-the CRWL framework.  Their key insight (inspired by 
+%
+\Citet{fraguas:rewriting} offer set of small-step rewrite rules, that 
+is provably equivalent to the CRWL framework.  Their key insight (inspired by
 \citet{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
@@ -1501,12 +1508,14 @@ To explain actual execution, the state of the art is described by
 \citet{hanus:semantics}.  They give both a big-step operational
 semantics (in the style of \citet{launchbury:natural}), and
 a small-step operational semantics.  These two approaches both thread a
-\emph{heap}, which holds
-the unification variables and their unification state; and the small-step
-semantics also has a \emph{stack}, to specify the focus of execution.
+\emph{heap}, which holds the unification variables and their unification 
+state; and the small-step semantics also has a \emph{stack}, to specify 
+the focus of execution.
+%
 The trouble is that heaps and stacks are difficult to explain to a programmer,
 and do not make it easy to reason about program equivalence.
-To model residuation requires a new level of complexity, needing concurrency.
+%
+To account for residuation, they have to further complicate their model with concurrency.
 
 In contrast, our rewrite rules give a complete, executable ({\ie}, no ``magic'')
 account of logical variables and choice, directly as small-step
@@ -1527,11 +1536,10 @@ form\footnote{
   one would need to do lambda-lifting as well, but that is a small point.}
 using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
-But this encoding is hardly a natural rendition of the lambda calculus, and it
-obstructs the goal of using rewrite rules to explain to programmers how
-their program might execute.
-
-A strength of our presentation is that it deals natively with the full lambda calculus.
+Sadly, this encoding is hardly a natural rendition of the lambda calculus: 
+it obstructs the goal of using rewrite rules to explain to programmers how
+their program might execute. In contrast, a strength of our \versecalc{} 
+presentation is that it deals natively with the full lambda calculus.
 
 \subsection{Intermediate language}
 
@@ -1599,9 +1607,9 @@ An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and dro
 the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 
 % \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
-% 
+%
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
-% 
+%
 % But the quite similar expression |(apply0 f =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
 % \[\begin{array}{rcl@@{\hspace{10mm}}rcl}
 % |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
@@ -1609,7 +1617,7 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 % |v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)|
 % & |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
 %  \end{array}\]
-% 
+%
 % \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
 
 \subsection{Not restricting application and arrays}
@@ -1766,7 +1774,7 @@ We have reduction rules for effect checking as well, but for the real language t
     \rulename{st-split-copy} &
       \begin{array}[t]{@@{}l}
         | storeTwoLines s (split e f g)|
-      \end{array} & \movesto & 
+      \end{array} & \movesto &
       \begin{array}[t]{@@{}l}
         | storeTwoLines s (split (store s e) f g)| \\
       \end{array} & \text{|canCopy e|} \\
