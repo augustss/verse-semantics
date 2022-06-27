@@ -347,11 +347,18 @@ thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cr
   are given here just for reference.}:
 $$
 \begin{array}{lll}
-  & & |def (x,y,z) (x=tup(y,3); x=tup(2,z); y)| \\
-  \rulename{subst} & \movesto & |def (x,y,z) (x=tup(y,3); tup(y,3)=tup(2,z); y)| \\
-  \rulename{ucon},\rulename{seq} & \movesto & |def (x,y,z) (x=tup(y,3); y=2; 3=z; tup(y,3); y)| \\
-  \rulename{subst},\rulename{def-elim},\rulename{swap} & \movesto & |def (x,z) (x=tup(2,3); z=3; tup(y,3); 2)| \\
-  \rulename{def-elim}, \rulename{seq} & \movesto & |2| \\
+                   &          & |def (x,y,z) (x = tup(y,3); x = tup(2,z); y)| \\
+  \rulename{subst} & \movesto & |def (x,y,z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
+  \rulename{ucon}  & \movesto & |def (x,y,z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
+%  \rulename{subst} & \movesto & |def (x,y,z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
+  \rulename{subst, swap}  & \movesto & |def (x,y,z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
+%  \rulename{def-elim} & \movesto & |def (x,y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
+%  \rulename{def-elim} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
+  \rulename{def-elim,def-elimmdef-elim} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
+%  \rulename{seq} & \movesto & |                             (2;     3;     tup(2,3)); 2| \\
+%  \rulename{seq} & \movesto & |                                    (3;     tup(2,3)); 2| \\
+%  \rulename{seq} & \movesto & |                                            tup(2,3);  2| \\
+  \rulename{seq,seq,seq,seq} & \movesto & |                                                       2| \\
 \end{array}
 $$
 
