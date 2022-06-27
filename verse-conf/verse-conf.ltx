@@ -312,8 +312,8 @@ Like any functional logic language,
   typically addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
 \item Although \versecalc{} supports choice, it is \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
-  In \versecalc{} choices are \emph{constructively} laid out in \emph{space},
-  in the syntax of the term, rather than being explored by non-deterministic selection.
+  In \versecalc{} choices are \emph{constructively} laid out in the \emph{syntax} 
+  of the term, rather than being explored by non-deterministic selection.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
   or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
@@ -364,12 +364,12 @@ $$
 \end{array}
 $$
 %
-\ranjit{Crucially we show (\cref{sec:related}) how \versecalc{}'s 
-notion of \emph{constructive choice}, wherein different choices are 
-explicated in the syntax of the term, and can, via |allKKW| be reified 
-into a single array holding the list of successful results, lets \versecalc{} 
-economically account for tricky features of logic programming like narrowing, 
-backtracking and resolution, via equational rewrites, giving programmers 
+\ranjit{Crucially we show (\cref{sec:related}) how \versecalc{}'s
+notion of \emph{constructive choice}, wherein different choices are
+explicated in the syntax of the term, and can, via |allKKW| be reified
+into a single array holding the list of successful results, lets \versecalc{}
+economically account for tricky features of logic programming like narrowing,
+backtracking and resolution, via equational rewrites, giving programmers
 a set of equivalences with which they can reason about their programs.}
 
 \simon{Something about confluence.}
