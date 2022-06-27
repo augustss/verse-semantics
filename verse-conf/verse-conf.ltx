@@ -1251,7 +1251,7 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 \subsection{Examples}
 $$
 \begin{array}{lll}
-                   &          & |swap(x,y) := (y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
 \rulename{desugar} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
 \rulename{subst} & \movesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
 \rulename{def-elim} & \movesto & |(               (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
