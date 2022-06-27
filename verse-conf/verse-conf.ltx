@@ -1466,18 +1466,18 @@ on the left.  Logical variables are
 at the heart of the ``logic'' part of functional logic programming.
 
 
-Constructor-based ReWrite Logic (CRWL) \cite{FIXME} is the brand leader for 
+Constructor-based ReWrite Logic (CRWL) \cite{FIXME} is the brand leader for
 high-level semantics for non-strict, non-deterministic functional logic languages.
 %
-CRLW is a ``big-step'' rewrite semantics that rewrites a term to a value in a single 
+CRLW is a ``big-step'' rewrite semantics that rewrites a term to a value in a single
 step.
 %
-\Citet{fraguas:rewriting} make a powerful case for instead giving the semantics 
-of a functional logic language using ``small-step'' rewrite rules, more like those 
+\Citet{fraguas:rewriting} make a powerful case for instead giving the semantics
+of a functional logic language using ``small-step'' rewrite rules, more like those
 of the lambda calculus, that successively rewrite the term, one step at
 a time, until it reaches a normal form.
 %
-\Citet{fraguas:rewriting} offer set of small-step rewrite rules, that 
+\Citet{fraguas:rewriting} offer set of small-step rewrite rules, that
 is provably equivalent to the CRWL framework.  Their key insight (inspired by
 \citet{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
@@ -1508,8 +1508,8 @@ To explain actual execution, the state of the art is described by
 \citet{hanus:semantics}.  They give both a big-step operational
 semantics (in the style of \citet{launchbury:natural}), and
 a small-step operational semantics.  These two approaches both thread a
-\emph{heap}, which holds the unification variables and their unification 
-state; and the small-step semantics also has a \emph{stack}, to specify 
+\emph{heap}, which holds the unification variables and their unification
+state; and the small-step semantics also has a \emph{stack}, to specify
 the focus of execution.
 %
 The trouble is that heaps and stacks are difficult to explain to a programmer,
