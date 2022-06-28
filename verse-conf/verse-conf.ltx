@@ -1461,15 +1461,15 @@ Next we focus on those rules that implement the essence of the unification algor
 
 These rules mimick the standard unification algorithm applied to set of equations in an expression $e$:
 \[
-\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e \equiv X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
+\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
 \]
 Standard unification terminates and calculates the most general unifier of such a set of equations, which is unique up to order of equations and variable renaming. We can adapt that proof to show that the essential unification rules terminate, and further that the normal forms can be reduced to each other with the help of the extra rules (to reorder and rename), \rulename{seq} (to clean up values left by \rulename{ExtraMove} and the use of |stepUCnm1| under lambdas, to take care of fixed-points. This shows that the relation |stepUn| consisting of these rules is confluent.
 
 \subsubsection{Assembling |stepUn|}
 
-Furthemore, it commutes with substitution in the sense that |e_1 stepsUCn e_2| implies that |subst e_1 x v| and |subst e_2 x v| can be joined by |stepsUn|.
+Furthemore, it commutes with substitution in the sense that |e_1 stepUCn e_2| implies that |subst e_1 x v| and |subst e_2 x v| can be joined by |stepUn|.
 
-This means that applying |stepsUn| at the different scope commutes, and thus the union of |stepUn| applied at all possible scopes is confluent.
+This means that applying |stepUn| at the different scope commutes, and thus the union of |stepUn| applied at all possible scopes is confluent.
 
 Now we can add the remaining rules, piece by piece: The choice rules, the sequencing rules, floating and removal and failing of |defKW| and applications of \rulename{subst} with a non-maximal $X$. These are confluent on their own, as they do not overlap, or have overlaps that can easily be resolved. So what remains is to show that they commute with each other.
 
