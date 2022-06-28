@@ -1336,7 +1336,7 @@ $$
 
 The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
 
-If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4$ and $e_3 \movesto^\ast e_4$?
+If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_2 \movesfrom^\ast e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$?
 
 Confluence would give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
 
@@ -1348,7 +1348,7 @@ which we can rewrite by \rulename{subst} (and administrative \rulename{def-elim}
 \[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
 Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variables on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
 
-So it seems that confluence is within reach? Unfortunately, not quite:
+Confluence seems to be within? Unfortunately, not quite:
 
 \subsection{Confluence up-to order of quantifiers, position of equations and variable names}
 
@@ -1377,7 +1377,7 @@ Finally, to make equality on values commutative, we add \rulename{var-swap}; els
 
 For our normal rules we took great care to make them not vacuously looping, {\eg} the side condition $x \in \freevars{X}$ in \rulename{subst}, so that they can form the basis of an evaluator. Since the purpose of these extra rules is to introduce a notion of equivalence, we do not have to worry that, say, \rulename{var-swap} can be applied over and over again.
 
-While these rules do not fundamentally change the evaluation of programs or their results, they allow us to iron out irrelevant differences in intermediate terms.
+While these rules do not fundamentally change the evaluation of programs or their results,\joachim{Koen says that this needs to be elaborated. And it may not hold without adjustments to the main rules!} they allow us to iron out irrelevant differences in intermediate terms.
 
 \subsection{Confluence and recursion}%
 \label{sec:confluence-and-recursion}
@@ -1407,16 +1407,16 @@ But notice that as we keep evaluating these fixed-points, they produce the same 
 
 \begin{definition}[Depth cutting]
 To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
-$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|. The relation $cute n$ is the equivalence relation defined by |cute' n e_1 e_2 := cut n e_1 === cut n e_2|.
+$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|. The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2 := cut n e_1 === cut n e_2|.
 \end{definition}
 
-Clearly for every $n \in \mathbb N$ we can now find expressions |e_1| and |e_2| so that |tup (1,v_y)| $\movesto^\ast$ |e_1|, |v_x| $\movesto^\ast$ |e_2| and |cute' n e_1 n e_2|, and this is the notion of confluence we aim for.
+Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
 
-\begin{definition}[Joinability up-to depth]
-We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3|, |e_2 ->* e_4| and |cute' n e_3 e_4|.
+\begin{definition}[Joinability up-to arbitrary depth]
+We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3 `cuten` e_4 <-* e_2|.
 \end{definition}
 
-The main proposition here is that our rewrite system is confluent up to any arbitrary depth:
+The main confluence proposition says that our rewrite system is confluent up to any arbitrary depth:
 
 \begin{proposition}[Confluence]
 \label{thm:confluence}%
@@ -1430,23 +1430,20 @@ In general, confluence up-to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} joining |e_1 -> e_2| and |e_1 -> e_3|), which is still work in progress.
-We have, however, reasons to be optimistic: Working on the proof, whose high-level appoach is described in \cref{sec:confluence-proof-plan}, has uncovered non-confluence in earlier iterations of our rewrite system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress (see \cref{sec:confluence-proof-plan} for a high-level proof plan).
+
+We have, however, reasons to be optimistic: Even the incomplete proof effort already helped us fix various unwanted causes for non-confluence in our system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
 
 \subsection{Equational theory}
 
-The relation |~| can now be used to develop an equational theory for {\versecalc}. Assuming our confluence conjeture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect the following equalities to hold:
+The relation |~| can now be used to develop an equational theory for {\versecalc}. Assuming our confluence conjecture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect that this equivalence is respected by substitution,
+\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|, \]
+allows equational reasoning with local equations,
+\[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)|, \]
+and even allows rewriting with a local equation within that equation's right-hand side,
+\[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))|. \]
 
-\begin{enumerate}
-\item It is respected by substitution:
-\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|. \]
-\item It allows equational reasoning with local equations:
-\[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)| \]
-\item It even allows rewriting with a local equation within that equation's right-hand side:
-\[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))| \]
-\end{enumerate}
-
-The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations that are not true in the theory of |~|, such as the commutativity of sequencing
+The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations, such as the commutativity of sequencing
 \[
 |(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|,
 \]
@@ -1456,7 +1453,7 @@ naming of subexpressions
 \]
 and the removal of repeated choice-free expressions
 \[
-|ce;ce ~= ce|.
+|(ce;ce) ~= ce|.
 \]
 The development of this theory is future work.
 
@@ -1464,18 +1461,19 @@ The development of this theory is future work.
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Consider an equation |x = v| that is not failed by the occurs check, so |x| may occur in |v|, but only under lambda.  Clearly, applying \rulename{subst-rec} exhaustively to that equation terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand side, so that we get
+Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda.  Clearly, applying \rulename{subst-rec} exhaustively to that equation terminates and is confluent: For every lambda |(lam y e)| in |v|, not nested under another lambda, it changes the body of the lambda to |def x (x=v;e)|. Let |(mu x v)| denote the resulting right-hand side. We can now derive
 \[
 |x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
 \]
-as a derived rule.
 
-This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$, if $x \notin \freevars{v}$ then $|(mu x v) === v|$ and the fixpoint can be unrolled via
-\[
-|mu x v ->* subst v x ((mu x v))|.
-\]
+This expression behaves much as one would expect from a fixed-point operator:
+\begin{itemize}
+\item $\freevars{|mu x v|} = \freevars v \setminus \{x\}$
+\item If $x \notin \freevars{v}$ then $|(mu x v) === v|$.
+\item The fixpoint can be unrolled via |mu x v ->* subst v x ((mu x v))|.
+\end{itemize}
 
-We can recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved using the following lemma, which unrolls a fixed point partially:
+Recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved using the following lemma, which unrolls a fixed point partially:
 \[
 |mu x(subst v_1 y v_2) ~ subst v_1 y (mu y (subst v_2 x v_1))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}
 \]

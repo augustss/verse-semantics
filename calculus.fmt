@@ -263,11 +263,13 @@
 %format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"
 %format cutr (n) = "\underset{" n "}\movesto"
 %format cutrr (n) = "\underset{" n "}\movesfrom"
+%format `cuten` = "\equiv_{n}"
 %format cute (n) = "\equiv_{" n "}"
 %format cute' (n) e1 e2 = e1 "\equiv_{" n "}" e2
 %format ~ = "\mathrel{\sim}"
 %format ~= = "\mathrel{\simeq}"
 %format ->*  = "\movesto^{\ast}"
+%format <-*  = "\movesfrom^{\ast}"
 %format <->  = "\mathrel{\convertible}"
 %format ===  = "\mathrel{\equiv}"
 %format :=  = "\mathrel{\coloneqq}"
