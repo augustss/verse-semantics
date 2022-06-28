@@ -1230,7 +1230,7 @@ Our not-entirely-satisfying solution is to force \rulename{choose} to float the 
 to the innermost enclosing scope construct; hence the |SX| in the rule.
 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
-\emph{eliminate} choices, and even then only to reify it into the term.
+\emph{eliminate} choices, and even then only to reify it into the term.\joachim{fail-l and fail-r also eliminate choices}
 So choice behaves a bit like a data constuctor, or normal form, of the language.
 For this reason we call
 this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
