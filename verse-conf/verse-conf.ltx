@@ -305,7 +305,7 @@ We make the following contributions in this paper.
 First, we describe a new core calculus, the Verse calculus or \versecalc{} for short,
 for functional logic programming (\cref{sec:informal} and \ref{sec:verse}).
 Like any functional logic language,
-\versecalc{} supports logical variable, equalities, and choice, but it is distinctive in several ways:
+\versecalc{} supports logical variables, equalities, and choice, but it is distinctive in several ways:
 \begin{itemize}
 \item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
@@ -497,7 +497,7 @@ $$
 |def (x,y,z) (x=tup(y,z); apply1 first x = 2; y)|
 $$
 Here |apply1 first x| evaluates to |y|, which we then unify with |2|; the logical
-variable |z| never gets a value, but that does not matter.
+variable |z| never gets a value, but that does not matter. \lennart{Well, this program gets stuck since |z| never gets a value.}
 Another way to say this is that, as usual in logic programming, we may
 constrain the \emph{output} of a function (here |apply1 first x = 2|), and thereby
 affect its \emph{input} (here |tup(y,z)|).
@@ -816,8 +816,8 @@ If we use |oneKW| instead of |allKW|, we get the function that checks if |p| hol
 and returns the first matching element, or fails if |p| does not hold for any element.
 
 \item |every|.
-And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|!
-If |p| fails for any value, the whole call to |map(p,xs)| fails.
+And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |applyN map (p,xs)|!
+If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
 \end{itemize}
 
 \subsection{Choice comprehensions} \label{sec:for}
