@@ -494,13 +494,12 @@ and similarly for all other library functions.
 This way of desugaring pattern matching means that the input
 to |first| may not be fully determined when the function is called. For example:
 $$
-|def (x,y,z) (x=tup(y,z); apply1 first x = 2; y)|
+|def (x,y) (x=tup(y,5); apply1 first x = 2; y)|
 $$
-Here |apply1 first x| evaluates to |y|, which we then unify with |2|; the logical
-variable |z| never gets a value, but that does not matter. \lennart{Well, this program gets stuck since |z| never gets a value.}
+Here |apply1 first x| evaluates to |y|, which we then unify with |2|.
 Another way to say this is that, as usual in logic programming, we may
 constrain the \emph{output} of a function (here |apply1 first x = 2|), and thereby
-affect its \emph{input} (here |tup(y,z)|).
+affect its \emph{input} (here |tup(y,5)|).
 
 Although ``|;|\!'' is called ``sequencing'', the order of that sequence
 is immaterial for equations.
