@@ -22,6 +22,7 @@
 \newcommand{\Eg}{\emph{E.g.}}
 \newcommand{\etc}{\emph{etc.}}
 \newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
 
 \RequirePackage[utf8]{inputenc}
 
@@ -1324,13 +1325,13 @@ $$
 
 \section{Confluence}
 
-The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same meaning for the program!
+The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
 
 If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, then we can find $e_4$ so that $e_2 \movesto^\ast e_4$ and $e_3 \movesto^\ast e_4$.
 
 Confluence will give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
 
-\subsection{subst \emph{vs.} subst}
+\subsection{subst {\vs} subst, a critical pair}
 
 The main source for possible non-confluence is rule \rulename{subst}: If we have multiple equations for a variable $x$ available, we can use any of them to rewrite. A typical example would be
 \[ |def x (x=v_1; x=v_2; e)| \]
@@ -1340,7 +1341,7 @@ Can we still join these two expressions? The unification rules allow us to decom
 
 So it seems that confluence is within reach? Unfortunately, not quite:
 
-\subsection{Confluence up-to}
+\subsection{Confluence up-to order of quantifiers, position of equations and variable names}
 
 \begin{figure}
 \[\begin{array}{lrcl}
@@ -1359,32 +1360,28 @@ There some sources of non-confluence that we would consider insignificant. For e
 can be reduced to
 | (def (x,y) (x=z;y=z)) |
 or
-| (def (y,x) (x=z;y=z)) |, which are different expressions, but the difference is one we do not care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system. This is obviously looping, but this is not an issue.
+| (def (y,x) (x=z;y=z)) |, which are different expressions, but the difference is not one we care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system. It is ok for this rule to be obviously looping.
 
-Similarly, we do not care about where, within the same $X$-context, an equality is asserted, so we allow ourselves to move any such equation to the front of the $X$-context, using \rulename{unify-move}. We leave $v_2$ in place, just like \rulename{def-elim} does. Adding this rules does not allow more or fundamentally different evaluations; this motivated adding the rules \rulename{unify-unifyl} and \rulename{unify-unifyr}.
+Similarly, we do not care about where, within the same $X$-context, an equality is asserted, so we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. We leave $v_2$ in place, just like \rulename{def-elim} does.
 
 Finally, to make equality on values commutative, we add \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
 
-\subsection{Skew-confluence}
+While these rules do not fundamentally change the evaluation of programs or their results, they allow us to iron out irrelevant differences in intermediate terms.
+
+\subsection{Confluence and recursion}
 
 With that out of the way, there still remains a source of non-confluence, due to recursion. In
 \[ |def (x,y) (x=tup (1,y); y=(lam z x); x)| \]
 we can apply \rulename{subst} to $x$ first and obtain the following reduction (omitting spelling out the application of rules \rulename{def-elim} and \rulename{seq}):
-\[
-\begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def y (y=(lam z (tup (1,y))); tup (1,y))| \\
-\movesto \{\rulename{subst-rec}\} & |def y (y=v_y; tup (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))| \\
-\movesto \{\rulename{subst}\}     & |tup (1,v_y)|  \\
-\end{array}
-\]
-Alternatively, starting with |y = (lam z x)|, we obtain
-\[
-\begin{array}{ll}
-\movesto \{\rulename{subst}\}     & |def x (x=tup (1,lam z x); x)| \\
-\movesto \{\rulename{subst-rec}\} & |def x (x=v_x; x)| \quad \text{ where } |v_x| = |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))| \\
-\movesto \{\rulename{subst}\}     & |v_x|  \\
-\end{array}
-\]
+\begin{align*}
+& \movesto \{\rulename{subst}\}     && |def y (y=(lam z (tup (1,y))); tup (1,y))| \\
+& \movesto \{\rulename{subst-rec}\} && |def y (y=v_y; tup (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))| \\
+& \movesto \{\rulename{subst}\}     && |tup (1,v_y)|  \\
+\intertext{Alternatively, we can apply \rulename{subst} to |y = (lam z x)| first, and obtain}
+& \movesto \{\rulename{subst}\}     && |def x (x=tup (1,lam z x); x)| \\
+& \movesto \{\rulename{subst-rec}\} && |def x (x=v_x; x)| \quad \text{ where } |v_x| = |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))| \\
+& \movesto \{\rulename{subst}\}     && |v_x|
+\end{align*}
 Can we join |tup (1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, we get
 \[
 \begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
@@ -1394,14 +1391,50 @@ Can we join |tup (1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |tup (1,lam z v_
 \]
 and we \emph{cannot} join them; they keep “missing each other”.
 
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
+But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|, or put differently, we can make the two expressions be the same up to an arbitrary depth.
 
-In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
+\begin{definition}[Depth cutting]
+To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
+$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |lam x (cut n e)|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|.
+\end{definition}
 
-Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
-\begin{conjecture}{Skew-confluence}
-  The reduction system $\movesto$ is skew-confluent.
-\end{conjecture}
+Clearly for every $n \in \mathbb N$ we can now find |e_1| and |e_2| so that |tup (1,v_y)| $\movesto^\ast$ |e_1|, |v_x| $\movesto^\ast$ |e_2| and |cut n e_1| $\equiv$ |cut n e_2|, and this is the notion of confluence we aim for.
+
+\begin{definition}[Joinability up-to depth]
+We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 `join` e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3|, |e_2 ->* e_4| and |cut n e_3 === cut n e_4|.
+\end{definition}
+
+The main proposition here is that our rewrite system is confluent up to any arbitrary depth:
+
+\begin{theorem}[Confluence]
+For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 `join` e_3|.
+\end{theorem}
+
+In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case it is:
+
+\begin{theorem}[Church-Rosser]
+|e_1 <-> e2| implies |e_1 `join` e_2|.
+\end{theorem}
+
+\subsection{Confluence proof outline}
+
+A full rigorous proof does not fit this paper, but we can give an outline and point out the interesting ideas.
+
+Because our rewrite system is not terminating, local confluence (|<- ->| $\subseteq$ |~|) on its own does not imply confluence. But we can divide our rules into two sets: The relation |stepU| consists of the rules from sections Unification,  Unification variables, Sequencing and fail propagation, as well as the extra rules from \cref{fig:rules-confluence}. The relation |stepE| consists of the remaining rules, {\i.e.} evaluation of application and resolving |oneKW| and |allKW|. The idea behind this separation is that |stepU| does not look under lambdas, so it commutes nicely with cutting at a certain depth (|cutrr (n);stepU| $\subseteq$ |cutr(n);cutrr(n);stepUr|), while |stepE| looks at most one level of lambdas deep, in \rulename{app-beta}, and takes terms related by |cutr (n+1)| to terms related by |cutr (n)| (|cutrr (n+1);stepE| $\subseteq$ |cutr(n);cutrr(n);stepEr|).
+
+Furthermore, the rules of |stepE| are \emph{orthogonal} (they do not overlap) and left-linear, so  not only is |stepE| on its own confluent, but its parallel application |stepEp| has the diamond property (|stepEpr; stepEp| $\subseteq$ |stepEp;stepEpr|) and also reduces the depth of expressions at most level (|cutrr (n+1);stepEp| $\subseteq$ |cutr(n);cutrr(n);stepEpr|).
+
+\joachim{working here}
+
+
+% This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
+%
+% In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
+%
+% Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
+% \begin{conjecture}{Skew-confluence}
+%   The reduction system $\movesto$ is skew-confluent.
+% \end{conjecture}
 
 
 \section{Related work} \label{sec:related}

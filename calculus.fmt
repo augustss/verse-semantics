@@ -255,4 +255,19 @@
 %format r_n
 
 %format K_1
-%format K_2
+
+%% ----------- Metatheory --------------
+%format cut (n) x = "\operatorname{cut}_{" n "}" x
+%format cutr (n) = "\underset{" n "}\movesto"
+%format cutrr (n) = "\underset{" n "}\movesfrom"
+%format `join` = "\sim"
+%format ->*  = "\movesto^{\ast}"
+%format <->  = "\convertible"
+%format ===  = "\equiv"
+%format stepU  = "\underset{U}\movesto"
+%format stepUr  = "\underset{U}\movesfrom"
+%format stepE  = "\underset{E}\movesto"
+%format stepEp  = "\underset{E}\movesto^{||}"
+%format stepEr  = "\underset{E}\movesfrom"
+%format stepEp  = "\underset{E}\movesto^{||}"
+%format stepEpr  = "\underset{E}\movesfrom^{||}"
