@@ -429,12 +429,11 @@ adding a type system is an excellent goal, but is the subject of another paper.
 
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
-some built-in operations and tuples as data constructors:
+some built-in operations and arrays as data constructors:
 \begin{itemize}
 \item \emph{Head-normal forms}.
-  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
-  also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
-  \lennart{Niklas was quite adamant that we should call them either arrays or tuples and stick to that.}
+  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, an array,
+  |tup (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
 \item \emph{Values.}
@@ -515,7 +514,7 @@ program is called \emph{residuation}~\cite{hanus:survey}, and is at the heart of
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
 In conventional functional programming, an expression evaluates to a single value.
-In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values \lennart{Can it get stuck?}).
+In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values.
 The expression |fail| yields no values; a head-normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
@@ -587,7 +586,7 @@ language into unification. But what about pattern matching with multiple equatio
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly\footnote{
-We use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells;
+We use the empty array |emptytup| to represent the empty list and pairs to represent cons cells;
 and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x,y) (p = tup (x,y); body)|
   }:
 $$
@@ -600,7 +599,7 @@ If |xs| is |emptytup|, the left-hand choice succeeds, returning |y|; and the rig
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
 If |xs| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
+Finally if |xs| is built with head-normal forms other than the empty array and pairs, both choices fail, and |append| returns no
 results.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
@@ -875,7 +874,6 @@ $$
 $$
 
 \subsection{Subset and powerset}
-\lennart{Is this example too elementary?}
 The subsets (subarrays) of an array can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
@@ -903,8 +901,6 @@ $$
 |apply1 fcn a := def (x,y) (a = applyN pat (x,y); x+y)|
 \end{array}
 $$
-
-\lennart{Add more logic programming examples.}
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
@@ -1007,10 +1003,10 @@ Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
 are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
-tuples\footnote{An alternative choice would
+arrays\footnote{An alternative choice would
 for unification to yield |emptytup| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unification fail if
-you attempt to unify an integer with a tuple.
+you attempt to unify an integer with an array.
 Slightly less obviously,
 \rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
 lambda or a built-in operation with any other value.  We discuss this design choice further in \cref{sec:unifying-lambda}.
@@ -1094,7 +1090,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |hole|$ is to avoid failure for |x=x|.
+that is, if |x| occurs under a ``shell'' of arrays.  The guard $|V| \not= |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -1674,7 +1670,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-\lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
+%% \lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
@@ -1803,8 +1799,7 @@ to avoid confusing the presentation with these higher-order encodings, but we do
 
 
 
-\section{Conclusions and further work}
-\lennart{This needs a little fleshing out.}
+\section{Further work}
 
 \subsection{Types}
 
