@@ -917,7 +917,7 @@ programming language?  Here are some possibilities:
 \item \emph{A denotational semantics} is the classical approach, but it is quite mathematical
   (and hence not a good way to explain to programmer what their program means),
   and it cannot distinguish between call-by-need and call-by-name.
-  It is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
+  Moreover, it is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
   because of the logical variables.
 \item \emph{A big-step operational semantics} typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
 \item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, the big-step approach
@@ -1255,19 +1255,19 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 \subsection{Evaluation strategy}
 
 The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
-rwerite rule to apply next if you want to execute the program. That is
+rewrite rule to apply next if you want to execute the program. That is
 the role of an \emph{evaluation strategy} that, given a closed term, says which redex
 to rewrite first.  For example, in the pure lambda calculus, \emph{normal order reduction},
 sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
 guarantees to terminate if any strategy does so.
 
 Any decent evaluation strategy should (a) guarantee terminate if there
-is \emph{any} terminating sequence of reduction; and (b) be amenable
+is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code.
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps
 -- so called ``optimal reduction''  -- but optimal reduction is typically very hard, even in theory, and
-invariably involves reducing under lambdas, so for practical purposes it is out of reach.
+invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
 
 Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
 we can make some informal comments.  First, in service of (b) we envisage compiling
@@ -1278,14 +1278,15 @@ a choice\footnote{Except perhaps in parallel, of course.}, because
 is (especially, whether it fails) before the right-hand one can be used.
 So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
 
-The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; 2+3)|,
-the |(2+3)| may or may not be the leftmost redex, depending on whether |e| is stuck (i.e. contains no
-redexes); and whether or not |e| is stuck is a syntactic property, and
-(worse) may depend not only on |e| itself, but on its context.
+The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; tup(x,3)=tup(2,y))|,
+the equality may or may not be the leftmost redex, depending on whether |e| is stuck (i.e. contains no
+redexes); and whether or not |e| is stuck is a not syntactic property, and
+(worse) may depend not only on |e| itself, but on its context. Even worse, |e| may subsequently
+become un-stuck when we rewrite the equality.
 
 Any calculus in which a redex to the ``right'' may unblock one to the
 ``left'' -- that is, residuation -- must grapple with this problem,
-which we leave for future work.
+so we leave evaluation strategy and compilation for future work.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
