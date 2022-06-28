@@ -1325,7 +1325,7 @@ $$
 \caption{Sample reduction sequence} \label{fig:sample-reductions}
 \end{figure}
 
-\section{Confluence}
+\section{Confluence and metatheory}
 
 The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
 
@@ -1403,30 +1403,100 @@ $|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |lam x (cut n e)|
 Clearly for every $n \in \mathbb N$ we can now find |e_1| and |e_2| so that |tup (1,v_y)| $\movesto^\ast$ |e_1|, |v_x| $\movesto^\ast$ |e_2| and |cut n e_1| $\equiv$ |cut n e_2|, and this is the notion of confluence we aim for.
 
 \begin{definition}[Joinability up-to depth]
-We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 `join` e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3|, |e_2 ->* e_4| and |cut n e_3 === cut n e_4|.
+We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3|, |e_2 ->* e_4| and |cut n e_3 === cut n e_4|.
 \end{definition}
 
 The main proposition here is that our rewrite system is confluent up to any arbitrary depth:
 
 \begin{theorem}[Confluence]
-For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 `join` e_3|.
+\label{thm:confluence}%
+For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 ~ e_3|.
 \end{theorem}
 
 In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case it is:
 
 \begin{theorem}[Church-Rosser]
-|e_1 <-> e2| implies |e_1 `join` e_2|.
+\label{thm:church-rosser}%
+|e_1 <-> e2| implies |e_1 ~ e_2|.
 \end{theorem}
 
 \subsection{Confluence proof outline}
 
 A full rigorous proof does not fit this paper, but we can give an outline and point out the interesting ideas.
+\joachim{Not sure how useful this section is. Shorter? Longer? Different?}
 
-Because our rewrite system is not terminating, local confluence (|<- ->| $\subseteq$ |~|) on its own does not imply confluence. But we can divide our rules into two sets: The relation |stepU| consists of the rules from sections Unification,  Unification variables, Sequencing and fail propagation, as well as the extra rules from \cref{fig:rules-confluence}. The relation |stepE| consists of the remaining rules, {\i.e.} evaluation of application and resolving |oneKW| and |allKW|. The idea behind this separation is that |stepU| does not look under lambdas, so it commutes nicely with cutting at a certain depth (|cutrr (n);stepU| $\subseteq$ |cutr(n);cutrr(n);stepUr|), while |stepE| looks at most one level of lambdas deep, in \rulename{app-beta}, and takes terms related by |cutr (n+1)| to terms related by |cutr (n)| (|cutrr (n+1);stepE| $\subseteq$ |cutr(n);cutrr(n);stepEr|).
+Because our rewrite system is not terminating, local confluence (|<-;->| $\subseteq$ |~|) on its own does not imply confluence. We can, however, use a divide-and-conquer approach and subdivide the reduction relation into smaller, relation that commute with each other, and show confluence for them.
+
+\subsubsection{Splitting off the E-rules}
+
+We first divide our rules into two sets: The relation |stepUC| consists of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. The relation |stepE| consists of the remaining rules, {\i.e.} evaluation of application and resolving |oneKW| and |allKW|. The idea behind this separation is that |stepUC| does not look under lambdas, so it commutes nicely with cutting at a certain depth (|cutrr (n);stepUC| $\subseteq$ |cutr(n);cutrr(n);stepUCr|), while |stepE| looks at most one level of lambdas deep, in \rulename{app-beta}, and takes terms related by |cutr (n+1)| to terms related by |cutr (n)| (|cutrr (n+1);stepE| $\subseteq$ |cutr(n);cutrr(n);stepEr|).
 
 Furthermore, the rules of |stepE| are \emph{orthogonal} (they do not overlap) and left-linear, so  not only is |stepE| on its own confluent, but its parallel application |stepEp| has the diamond property (|stepEpr; stepEp| $\subseteq$ |stepEp;stepEpr|) and also reduces the depth of expressions at most level (|cutrr (n+1);stepEp| $\subseteq$ |cutr(n);cutrr(n);stepEpr|).
 
-\joachim{working here}
+The two relations commute, and crucially, commuting |stepEp| with |stepUC| does not require taking more evaluation steps than before (|stepUCr; stepEp| $\subseteq$ |stepEp; stepUCrs|).
+
+From these properties and $|->| = (|stepUC| \cup |stepEp|)^\ast$ we obtain \Cref{thm:confluence} by a general lemma about abstract rewriting, if we can show that the unification rules are confluent up-to depth cutting: |stepUCrs;stepUCs| $\subseteq$ |stepUCs;cutr n;cutrr n;stepUCrs|.
+
+\subsubsection{One layer at a time}
+
+Because |stepUC| and |cut n| commute, this is equivalent the confluence of the relation |stepUCn := (stepUCn `cup` cut n)|. This brings us to the world of “conventional” confluence.
+
+We can describe |stepUCn| inductively. For $n=0$ all terms reduce to $\Omega$, so confluence is immediate.
+
+For $n>0$, we can understand |stepUCn| as the union of applying the $U$ rules not under a lambda with a rule that applies |stepUCnm1| under lambdas.
+
+This inductive description allows us to also prove confluence and other properties of |stepUCn| by induction on $n$.
+
+\subsubsection{The unification core}
+
+Next we focus on those rules that implement the essence of the unification algorithm: The essential unification rules are the rules from section Unification plus rules \rulename{swap}, \rulename{subst} and \rulename{substrec} and \rulename{fail} with the following restrictions, to focus on the top scope only: The application of \rulename{subst} must be a the root, and the other rules may be applied only within an $X$ context.
+
+These rules mimick the standard unification algorithm applied to set of equations in an expression $e$:
+\[
+\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e \equiv X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
+\]
+Standard unification terminates and calculates the most general unifier of such a set of equations, which is unique up to order of equations and variable renaming. We can adapt that proof to show that the essential unification rules terminate, and further that the normal forms can be reduced to each other with the help of the extra rules (to reorder and rename), \rulename{seq} (to clean up values left by \rulename{ExtraMove} and the use of |stepUCnm1| under lambdas, to take care of fixed-points. This shows that the relation |stepUn| consisting of these rules is confluent.
+
+\subsubsection{Assembling |stepUn|}
+
+Furthemore, it commutes with substitution in the sense that |e_1 stepsUCn e_2| implies that |subst e_1 x v| and |subst e_2 x v| can be joined by |stepsUn|.
+
+This means that applying |stepsUn| at the different scope commutes, and thus the union of |stepUn| applied at all possible scopes is confluent.
+
+Now we can add the remaining rules, piece by piece: The choice rules, the sequencing rules, floating and removal and failing of |defKW| and applications of \rulename{subst} with a non-maximal $X$. These are confluent on their own, as they do not overlap, or have overlaps that can easily be resolved. So what remains is to show that they commute with each other.
+
+Following this path one can conclude that |stepUn| is confluent, and thus \cref{thm:confluence}.
+
+\subsection{Equational theory}
+
+The relation |~| can now be used to describe an equational theory for {\versecalc}. It is an equivalence relation and congruent, and contains, as per \cref{thm:church-rosser}, all reductions. From the confluence proof we can extract some additional useful equalities:
+
+\begin{enumerate}
+\item It is respected by substitution:
+\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|. \]
+\item It allows equational reasoning with local equations:
+\[ |v_1 = v_2;C^[v_1] ~ v_1 = v_2;C^[v_2]| \]
+\item It even allows rewriting with a local equation within that equation's right-hand-side:
+\[ |v=C^[v] ~ v=C^[C^[v]]| \]
+\end{enumerate}
+
+\subsection{Fixed points}
+
+To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
+
+Clearly, applying \rulename{subst-rec} exhaustively to an equation |x = v| terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand-side, so that we get
+\[
+|x = v ->* x = mu x v|.
+\]
+
+This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$ and
+\[
+|mu x v ->* subst v x (mu x v)|.
+\]
+
+It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our set of values. In particular, because |mu x v| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |mu x v| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
+
+
 
 
 % This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
