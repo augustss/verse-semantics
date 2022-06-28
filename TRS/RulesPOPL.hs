@@ -113,7 +113,6 @@ rules = rulesPrimOps
     +++ rulesOne
     +++ rulesAll
     +++ rulesFail
-    +++ rulesKoenExtra
 
 --------------------------------------------------------------------------------
 
@@ -156,10 +155,10 @@ rulesUnification lhs =
   do ARR vs :=: INT k <- [lhs]
      pure Fail
  ++
-  do Value (HNF (Op _)) :=: Value (HNF _) <- [lhs]
+  do Val (HNF (Op _)) :=: Val (HNF _) <- [lhs]
      pure Fail
  ++
-  do Value (HNF _) :=: Value (HNF (Op _)) <- [lhs]
+  do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
      pure Fail
  ++
   do VAR x :=: Val val <- [lhs]
@@ -213,11 +212,11 @@ rulesSequencing lhs =
  ++
   do (e1 :=: e2) :=: e3 <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
+     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3))))
  ++
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
+     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3))))
 
 --------------------------------------------------------------------------------
 
