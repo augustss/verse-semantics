@@ -1365,16 +1365,18 @@ So it seems that confluence is within reach? Unfortunately, not quite:
 
 \label{sec:conf-move-eqn}
 
-There some sources of non-confluence that we would consider insignificant. For example
-| (def x (x=z));(def y (y=z)) |
+There are some sources of non-confluence that we would consider insignificant. For example
+| (def x (x=e_1));(def y (y=e_2)) |
 can be reduced to
-| (def (x,y) (x=z;y=z)) |
+| (def (x,y) (x=e_1;y=e_2)) |
 or
-| (def (y,x) (x=z;y=z)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system. It is ok for this rule to be obviously looping.
+| (def (y,x) (x=e_1;y=e_2)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system.
 
 Similarly, we do not care about where, within the same $X$-context, an equality is asserted, so we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rules leaves $v_2$ in place, just like \rulename{def-elim} does.
 
 Finally, to make equality on values commutative, we add \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
+
+For our normal rules we took great care to make them not vacuously looping, {\eg} the side condition $x \in \freevars{X}$ in \rulename{subst}, so that they can form the basis of an evaluator. Since the purpose of these extra rules is to introduce a notion of equivalence, we do not have to worry that, say, \rulename{var-swap} can be applied over and over again.
 
 While these rules do not fundamentally change the evaluation of programs or their results, they allow us to iron out irrelevant differences in intermediate terms.
 
@@ -1429,7 +1431,8 @@ In general, confluence up-to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-A full rigorous proof is work in progress. We have, however, reasons to be optimistic: Working on the proof, whose high-level appoach is described in \cref{sec:confluence-proof-plan}, has uncovered non-confluence in earlier iterations of our rewrite system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} joining |e_1 -> e_2| and |e_1 -> e_3|), which is still work in progress.
+We have, however, reasons to be optimistic: Working on the proof, whose high-level appoach is described in \cref{sec:confluence-proof-plan}, has uncovered non-confluence in earlier iterations of our rewrite system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
 
 \subsection{Equational theory}
 
