@@ -1440,7 +1440,7 @@ The relation |~| can now be used to describe an equational theory for {\versecal
 \[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|. \]
 \item It allows equational reasoning with local equations:
 \[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)| \]
-\item It even allows rewriting with a local equation within that equation's right-hand-side:
+\item It even allows rewriting with a local equation within that equation's right-hand side:
 \[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))| \]
 \end{enumerate}
 
@@ -1454,6 +1454,7 @@ Consider an equation |x = v| that is not failed by the occurs check, so |x| may 
 \[
 |x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
 \]
+as a derived rule.
 
 This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$, if $x \notin \freevars{v}$ then $|(mu x v) === v|$ and the fixpoint can be unrolled via
 \[
@@ -1466,7 +1467,7 @@ We can recall the example from \cref{sec:confluence-and-recursion}, where |v_y =
 \]
 
 
-It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our set of values. In particular, because |mu x v| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |mu x v| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
+It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |(mu x v)| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
 
 
 
