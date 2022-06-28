@@ -256,6 +256,9 @@
 
 %format K_1
 
+%format C_1
+%format C_2
+
 %% ----------- Metatheory --------------
 %format cut (n) x = "\operatorname{cut}_{" n "}" x
 %format cutr (n) = "\underset{" n "}\movesto"
@@ -294,4 +297,4 @@
 %format stepEr      = "\underset{E}\movesfrom"
 %format stepEp      = "\underset{E||}\movesto"
 %format stepEpr     = "\underset{E||}\movesfrom"
-%format (mu x (e))  = "(\mu" x".\," e ")"
+%format mu x (e)    = "\mu" x".\," e

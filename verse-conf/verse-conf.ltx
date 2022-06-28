@@ -1370,7 +1370,8 @@ Finally, to make equality on values commutative, we add \rulename{var-swap}; els
 
 While these rules do not fundamentally change the evaluation of programs or their results, they allow us to iron out irrelevant differences in intermediate terms.
 
-\subsection{Confluence and recursion}
+\subsection{Confluence and recursion}%
+\label{sec:confluence-and-recursion}
 
 With that out of the way, there still remains a source of non-confluence, due to recursion. In
 \[ |def (x,y) (x=tup (1,y); y=(lam z x); x)| \]
@@ -1484,14 +1485,19 @@ The relation |~| can now be used to describe an equational theory for {\versecal
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Clearly, applying \rulename{subst-rec} exhaustively to an equation |x = v| terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand-side, so that we get
+Clearly, applying \rulename{subst-rec} exhaustively to an equation |x = v| terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand side, so that we get
 \[
-|x = v ->* x = mu x v|.
+|x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
 \]
 
-This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$ and
+This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$, if $x \notin \freevars{v}$ then $|(mu x v) === v|$ and the fixpoint can be unrolled via
 \[
-|mu x v ->* subst v x (mu x v)|.
+|mu x v ->* subst v x ((mu x v))|.
+\]
+
+We can recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved because we can partially unroll a fixed-point:
+\[
+|mu x(C_1^[C_2^[x]]) ~ C_1^[mu y(C_2^[C_1^[y]])]|
 \]
 
 It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our set of values. In particular, because |mu x v| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |mu x v| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
