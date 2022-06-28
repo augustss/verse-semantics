@@ -1433,7 +1433,7 @@ A full rigorous proof is work in progress. We have, however, reasons to be optim
 
 \subsection{Equational theory}
 
-The relation |~| can now be used to describe an equational theory for {\versecalc}. Assuming our confluence conjeture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect the following equalities to hold:
+The relation |~| can now be used to develop an equational theory for {\versecalc}. Assuming our confluence conjeture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect the following equalities to hold:
 
 \begin{enumerate}
 \item It is respected by substitution:
@@ -1444,7 +1444,19 @@ The relation |~| can now be used to describe an equational theory for {\versecal
 \[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))| \]
 \end{enumerate}
 
-The joinability relation |~| is weaker than contextual equivalence. \joachim{TODO}
+The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations that are not true in the theory of |~|, such as the commutativity of sequencing
+\[
+|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|,
+\]
+naming of subexpressions
+\[
+|e ~= (def x (x = e; x))| \quad \text{if } x \notin\freevars{e}
+\]
+and the removal of repeated choice-free expressions
+\[
+|ce;ce ~= ce|.
+\]
+The development of this theory is future work.
 
 \subsection{Fixed points}
 
