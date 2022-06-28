@@ -1494,7 +1494,7 @@ It is satisfying that {\versecalc} supports a form of fixed-point operator, with
 % \end{conjecture}
 
 
-\section{Related work} \label{sec:related}
+\section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
@@ -1561,8 +1561,8 @@ scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and
 
 \subsection{The semantics of logical variables} \label{sec:magical}
 
-Our variables, introduced by |defKW|, are usually called \emph{logical variables},
-or \emph{extra variables} in the literature.  The latter term arises because they
+Our logical variables, introduced by |defKW|, are often called
+\emph{extra variables} in the literature, because they
 are typically introduced as variables that appear on the right-hand side of a function
 definition, but are not bound on the left.  For example, in Curry we can write
 \begin{verbatim}

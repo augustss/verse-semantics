@@ -71,6 +71,8 @@
     \begin{array}{lrcll}
     \rulename{def-elim} & |def x (X^[x==v])| & \movesto & |X^[v]|
     & \text{if $|x| \notin \freevars{X}$, $|x| \notin \freevars{v}$} \\
+    \rulename{def-elim-r} & |def x (X^[y==x])| & \movesto & |X^[y]|
+    & \text{if $|x| \notin \freevars{X}, |x| \not= |y|$} \\
     \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
     & \text{if}~|X| \ne \hole,\,  x \notin \freevars{X} \\
     \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
