@@ -962,13 +962,9 @@ and returns |k_1| otherwise.
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
 
-Sequencing, is very simple (rule \rulename{seq}): |(e_1;e_2)|, 
-reduces |e_1| to a value, and then discards it, returning
-|e_2| \ranjit{not what the rule in Fig4 looks like?}.  
-%
-The reason for evaluating |e_1| is for its unification effects.
-Our insistence on clear sequencing also makes it possible to extend \versecalc{}
-with more general effects, but that is beyond the scope of this paper.
+Sequencing (rule \rulename{seq}) is very simple: |(v;e)| discards |v|, leaving just |e|.
+The rule only fires with a \emph{value} on the left; we must rewrite the expression on
+the left for effects.
 
 \subsection{Function application} \label{sec:beta}
 
@@ -1806,7 +1802,7 @@ to avoid confusing the presentation with these higher-order encodings, but we do
 The full Verse language has statically-checked types.
 In the dynamic semantics, the types can be represented by partial
 identity functions---identity of the values of the type and |fail| otherwise.
-This gives a distinctive new perspective oon type systems, one that we leave
+This gives a distinctive new perspective on type systems, one that we leave
 for future work.
 
 \subsection{Effects}
