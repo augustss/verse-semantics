@@ -1492,7 +1492,7 @@ The relation |~| can now be used to describe an equational theory for {\versecal
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Clearly, applying \rulename{subst-rec} exhaustively to an equation |x = v| terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand side, so that we get
+Consider an equation |x = v| that is not failed by the occurs check, so |x| may occur in |v|, but only under lambda.  Clearly, applying \rulename{subst-rec} exhaustively to that equation terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand side, so that we get
 \[
 |x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
 \]
