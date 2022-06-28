@@ -309,20 +309,20 @@ Like any functional logic language,
 \begin{itemize}
 \item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
-  In contrast, the functional-logic literature is rooted in a first-order world, and
-  typically addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
-\item \versecalc{} uses \emph{contructive choice}, meaning that the choice operator behaves
-  a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
-  This makes \versecalc{} \emph{deterministic}, unlike most
-  functional logic languages which are non-deterministic (\cref{sec:deterministic}).
-  In \versecalc{} choices are laid out in \emph{space},
-  in the syntax of the term, rather than being explored by non-deterministic selection.
+  In contrast, most of the functional-logic literature is rooted in a first-order world, and
+  addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
   or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This leads to a elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
+\item \versecalc{} uses \emph{constructive choice}, meaning that the choice operator behaves
+  a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
+  This makes \versecalc{} \emph{deterministic}, unlike most
+  functional logic languages which are non-deterministic (\cref{sec:deterministic}).
+  In \versecalc{} choices are laid out in \emph{space},
+  in the syntax of the term, rather than being explored by non-deterministic selection.
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
@@ -345,7 +345,10 @@ was an operational semantics that sequentially threads a global heap through exe
 But then Ariola {\etal}, in a seminal paper, showed how to reify the heap into the term itself,
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic program, that reifies
-logical variables and unification into the term itself.
+logical variables and unification into the term itself,
+and exploits our notion of constructive choice to replace non-deterministic
+search with a (deterministic) array of successful results.
+
 Just like rewriting for the lambda calculus, this semantics
 gives programmers a set of equivalences with which
 they can reason equationally about their programs.
@@ -369,15 +372,6 @@ $$
 \end{array}
 $$
 %
-\ranjit{Crucially we show (\cref{sec:related}) how \versecalc{}'s
-notion of \emph{constructive choice}, wherein different choices are
-explicated in the syntax of the term, and can, via |allKKW| be reified
-into a single array holding the list of successful results, lets \versecalc{}
-economically account for tricky features of logic programming like narrowing,
-backtracking and resolution, via equational rewrites, giving programmers
-a set of equivalences with which they can reason about their programs.}
-\simon{this feels a bit out of place.  I have beefed up the bullet on constructive choice a bit.  Will it do instead?}
-
 \simon{Something about confluence.}
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
@@ -1150,10 +1144,11 @@ $$
   \movesto & |def x (x = 55)| \quad \movesto |55|
   \end{array}
 $$
-Minor variants of the same example get stuck instead of reducing. For example, replace
-the |(x=0)| with |(x=100)| and rewriting gets stuck, as the reader may verify; and rightly so,
-because the equations have no solution.  Replace |(x=0)| with |(x=33)| and rewriting again
-gets stuck, although in this case there are \emph{two} valid solutions to the equations, namely $x=33$ and $x=55$.
+Minor variants of the same example get stuck instead of reducing. For example, if you replace
+the |(x=0)| with |(x=100)| then rewriting gets stuck, as the reader may verify; and yet there
+is a solution to the equations, namely $x=55$.
+But if you replace |(x=0)| with |(x=55)| then rewriting again
+gets stuck, and rightly so, since in this case there are \emph{no} valid solutions to the equations.
 
 It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
 substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
@@ -1180,7 +1175,7 @@ the simpler \rulename{global-subst}: to establish confluence.
 \subsection{Rules for choice} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
-say that |fail| is the unit for choice |choice|.  Rules \rulename{one-value}, \rulename{one-choice}
+say that |fail| is the unit for choice.  Rules \rulename{one-value}, \rulename{one-choice}
 and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
 Similarly \rulename{all-fail}, \rulename{all-choice} and \rulename{all-value} describe
 the semantics of |allKW| (\cref{sec:all}).
@@ -1231,7 +1226,8 @@ Our not-entirely-satisfying solution is to force \rulename{choose} to float the 
 to the innermost enclosing scope construct; hence the |SX| in the rule.
 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
-\emph{eliminate} choices, and even then only to reify it into the term.\joachim{fail-l and fail-r also eliminate choices}
+\emph{decompose} choices\footnote{\rulename{fail-l} and \rulename{fail-r} also
+  eliminate choice, but only because there is no choice.}.
 So choice behaves a bit like a data constuctor, or normal form, of the language.
 For this reason we call
 this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
@@ -1259,26 +1255,37 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 \subsection{Evaluation strategy}
 
 The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
-rwerite rule to apply next, if you want to get to the answer expeditiously. That is
+rwerite rule to apply next if you want to execute the program. That is
 the role of an \emph{evaluation strategy} that, given a closed term, says which redex
 to rewrite first.  For example, in the pure lambda calculus, \emph{normal order reduction},
 sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
 guarantees to terminate if any strategy does so.
 
-There are theree issues in formulating an evaluation strategy.  (1) does the strategy guarantee
-terminate if there is \emph{any} terminating sequence of reduction?  This is obviously highly desirable.
-(2) does it terminate in the minimal number of steps
--- so called ``optimal reduction''?  This is typically very hard, even in theory, and
-invariably involves reducing under lambdas, which is in conflict with: (3)
-can it be compiled into efficient code?
+Any decent evaluation strategy should (a) guarantee terminate if there
+is \emph{any} terminating sequence of reduction; and (b) be amenable
+to compilation into efficient code.
+It would be even better if the strategy could (c) guarantee to find the
+result in the minimal number of rewrite steps
+-- so called ``optimal reduction''  -- but optimal reduction is typically very hard, even in theory, and
+invariably involves reducing under lambdas, so for practical purposes it is out of reach.
 
 Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
-we can make some informal comments.  First, just as in the lambda calculus we never need to
-evaluate under a lambda.
-Second, it never makes sense to evaluate in the right-hand argument of a choice, because
-\versecalc{} strong ordering semantics mean that we must find out what the left hand argument
-is (especially, whether it fails) before it is useful...\simon{working here}
+we can make some informal comments.  First, in service of (b) we envisage compiling
+lambdas to code, and thus we never rewrite under a lambda.
+Second, it never makes sense to evaluate in the right-hand argument of
+a choice\footnote{Except perhaps in parallel, of course.}, because
+\versecalc{} strong ordering semantics mean that we must first find out what the left-hand argument
+is (especially, whether it fails) before the right-hand one can be used.
+So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
 
+The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; 2+3)|,
+the |(2+3)| may or may not be the leftmost redex, depending on whether |e| is stuck (i.e. contains no
+redexes); and whether or not |e| is stuck is a syntactic property, and
+(worse) may depend not only on |e| itself, but on its context.
+
+Any calculus in which a redex to the ``right'' may unblock one to the
+``left'' -- that is, residuation -- must grapple with this problem,
+which we leave for future work.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
@@ -1751,22 +1758,36 @@ the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
 %
 % \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
 
-\subsection{Not restricting application and arrays}
+\subsection{Administrative normal form}
 
-We have opted to restrict array formation and function application to only allow \emph{values} and not \emph{expressions}.
-This is not a necessary restriction, but allowing expressions would require many more rules.
-The extra rules would describe how to distribute, {\eg}, application over sequencing.
-There is no loss of expressive power using just values, just slightly more verbose terms.
+We have chosen to restrict array formation and function application to
+\emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
+|e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
+It would be entirely straightforward to allow expresssions rather than values, but doing so
+would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
+Restricting to values involves no loss of expressive power:
+it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
-\subsection{Restricting unification}
-
-The system becomes slightly simpler if we restrict the syntax of equalities so that the left-hand-side is always a value.
+We could take the ANF idea a bit further, by restricting the syntax of equalities so
+that the left-hand-side is always a value.
 Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form:
 $$
 |e_1 = e_2| \quad \text{desugars to} \quad |def x (x = e_1; x = e_2)|
 $$
 The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
-The difference is modest, but it would make our language a little smaller.
+We have chosen not to do this, mainly because it makes |(=)| assymetrical and adds a lot of clutter;
+a debatable decision, but one of no great consequence.
+
+\subsection{Dead existentials}
+
+Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-elim} comes closest,
+but it insists that every existential is given a value. It would be easy to add a rule to discard a existential
+whose bound variable is not used in its body, and so far as we know doing so would not lead to
+new difficulties for (say) confluence.  It is mostly a philosophical issue.  For example, the term
+|(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
+  solution for |x|}.  So if |x| is entirely unconstrained, maybe we should return an infinite number of results?
+For now, we make a conservative choice, and insist that every existential gets a value:
+only \rulename{def-elim} eliminates an existential.
 
 \subsection{Ordering and choices}
 
@@ -1814,22 +1835,21 @@ to avoid confusing the presentation with these higher-order encodings, but we do
 \lennart{This needs a little fleshing out.}
 
 \subsection{Types}
+
 The full Verse language has statically-checked types.
 In the dynamic semantics, the types can be represented by partial
 identity functions---identity of the values of the type and |fail| otherwise.
-We have reduction rules for this, but they are left out for space and exposition reasons.
-
-\subsection{Assignment}
-The full Verse language has updateable references in a store, in the style of SML.
-We also have (tentative) reduction rules for this as well.
-They are non-trivial, because store updates have to be transactions, {\eg},
-when the condition of an |if| fails any store effects in the condition are rolled back.
-See \cref{sec:store} for the relevant rules.
+This gives a distinctive new perspective oon type systems, one that we leave
+for future work.
 
 \subsection{Effects}
-In this paper we have seen one kind of effect, namely being multi-valued.
-Adding assignable references adds another set of effects, as does I/O.
-To accommodate this, real Verse has an effect system in addition to the type system.
+The full Verse language has updateable references in a store, in the style of SML.
+We also have (tentative) reduction rules for this as well.
+They are non-trivial, because store updates must be \emph{transactional}, {\eg},
+when the condition of an |if| fails any store effects in the condition must be rolled back.
+See \cref{sec:store} for the relevant rules.
+
+The full Verse language goes further, and has an effect system in addition to the type system.
 We have reduction rules for effect checking as well, but for the real language this is done at compile time.
 
 % -------------------- Acknowledgements ----------------
