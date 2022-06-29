@@ -1467,37 +1467,24 @@ The development of this theory is future work.
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda.  Clearly, applying \rulename{subst-rec} exhaustively to that equation terminates and is confluent: For every lambda |(lam y e)| in |v|, not nested under another lambda, it changes the body of the lambda to |def x (x=v;e)|. Let |(mu x v)| denote the resulting right-hand side. We can now derive
+Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of every |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
 \[
-|x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
+|x = v| ~ |x = (mu x v)|.
 \]
 
 This expression behaves much as one would expect from a fixed-point operator:
 \begin{itemize}
 \item $\freevars{|mu x v|} = \freevars v \setminus \{x\}$
 \item If $x \notin \freevars{v}$ then $|(mu x v) === v|$.
-\item The fixpoint can be unrolled via |mu x v ->* subst v x ((mu x v))|.
+\item The fixpoint can be unrolled: |mu x v ~ subst v x ((mu x v))|.
 \end{itemize}
 
 Recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved using the following lemma, which unrolls a fixed point partially:
 \[
-|mu x(subst v_1 y v_2) ~ subst v_1 y (mu y (subst v_2 x v_1))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}
+|mu x(subst v_1 y v_2) ~ subst v_1 y (mu y (subst v_2 x v_1))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}.
 \]
 
-
-It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |(mu x v)| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
-
-
-
-
-% This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
-%
-% In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
-%
-% Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
-% \begin{conjecture}{Skew-confluence}
-%   The reduction system $\movesto$ is skew-confluent.
-% \end{conjecture}
+It is satisfying that in {\versecalc} a form of fixed-point operator emerges, without having to add it explicitly to our syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |(mu x v)| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
 
 
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
