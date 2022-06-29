@@ -1969,41 +1969,38 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 
 \section{Confluence proof plan}\label{sec:confluence-proof-plan}
 
-In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making.
-
-The main ideas are
+In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making. The main steps are:
 \begin{itemize}
 \item Split the depths-preserving unification rules from the depth-collapsing evaluation rules.
-\item The unification fragment, together with depth-cutting, is terminating.
+\item The unification fragment is terminating if we cut at a given depth.
 \item The unification fragment, together with the additional rules and depth-cutting, is confluent.
 \item The additional rules and the depths-cutting can be moved to the end of any sequence.
 \end{itemize}
 
 \subsection{Notation}
 
-We briefly recapitulate some standard notation about abstract rewriting. If $\rightarrow$ is a relation on a set $A$, then $\leftarrow$ is its inverse, $\rightarrow^\ast$ its reflexive transitive closure and $\rightarrow^=$ its reflexive closure. If $\rightsquigarrow$ is also a relation on a set $A$, then $\leftarrow;\rightsquigarrow$ is its composition.
+We briefly recapitulate some standard notation about abstract rewriting. If $\rightarrow$ is a relation on a set $A$, then $\leftarrow$ is its inverse, $\rightarrow^\ast$ its reflexive transitive closure and $\rightarrow^=$ its reflexive closure. If $\rightsquigarrow$ is also a relation on $A$, then $\leftarrow;\rightsquigarrow$ is its composition.
 
 Relations $\rightarrow$ and $\rightsquigarrow$ commute if $\leftarrow^\ast;\rightsquigarrow^\ast\subseteq \rightsquigarrow^\ast;\leftarrow^\ast$. A self-commuting relation is confluent. A relation $\rightarrow$ has the diamond property if $\leftarrow;\rightarrow\subseteq \rightarrow;\leftarrow$.
 
 
-
-If $A$ is a set of terms and $\underset{R}\rightarrow$ is defined as the congruence closure of a set of rules $R$, then $\underset{R||}\rightarrow$ is the parallel application of the rules $R$ at disjoint positions.
+If $A$ is a set of terms and $\underset{R}\rightarrow$ is defined as the congruence closure of a set of rules $R$, then $\underset{R||||}\rightarrow$ is the parallel application of the rules $R$ at disjoint positions.
 
 
 \subsection{Separatnig the evaluation rules}
 
-The first problem we need to deal with is that, as discussed in \cref{sec:confluence-and-recursion}, we can only hope for confluence up to a certain depth $n$. But simply fixing that depth is unlikely to work, as rule \rulename{app-beta} collapses one layer of lambdas. The more beta-reductions are still to happen, the deeper we have to unroll fixpoints.
+The first problem we need to deal with is that, as discussed in \cref{sec:confluence-and-recursion}, we can only hope for confluence up to a certain depth $n$. But simply fixing a single depth for the whole proof is unlikely to work, as rule \rulename{app-beta} collapses one layer of lambdas. The more beta-reductions are still to happen, the deeper we have to unroll fixpoints.
 
 We can address this problem with the following general lemma (which we have proven using Isabelle)
 \begin{lemma}\label{lem:u-e}
 Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common set. If
 \begin{enumerate}
 \item |cute n| is an equivalence relation
-\item |cute n; stepA `ss`  stepA; cute n|
-\item |cute (n+1);stepB `ss`  stepB; cute n|
-\item |stepArs;stepAs `ss`  stepAs;cute n;stepArs|
-\item |stepBr;stepB `ss`  stepB;stepBr|
-\item |stepAr;stepB `ss`  stepB;stepArs|
+\item |cute n; stepA `ss` stepA; cute n|
+\item |cute (n+1);stepB `ss` stepB; cute n|
+\item |stepArs;stepAs `ss` stepAs;cute n;stepArs|
+\item |stepBr;stepB `ss` stepB;stepBr|
+\item |stepAr;stepB `ss` stepB;stepArs|
 \end{enumerate}
 then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie}
 |stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
@@ -2024,25 +2021,25 @@ Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-line
 
 The two relations  commute, and crucially, commuting them does not increase the number of (parallel) evaluation steps needed. By \cref{lem:u-e} it remains to show that |stepA| is confluent up to |cute n|.
 
-Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation |stepUn := stepA `cup` cutr n| is confluent. This brings us to the world of “conventional” confluence.
+Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation |stepUn := stepA; cutr n| is confluent. This brings us to the world of “conventional” confluence.
 
 \subsection{Termination and confluence of the unification rules}
 
 With the evaluation rules, in particular \rulename{app-beta}, out of the way, and only a fixed depth $n$ to worry about, do the remaining rules (not including the extra rules from \cref{fig:rules-confluence}) terminate?
 
-This seems to be the case. For the unification ruels this is not immediate, but note that they mimick the standard unification algorithm applied to set of equations in an expression $e$
+This seems to be the case. For the unification rules this is not immediate, but note that they mimick the standard unification algorithm applied to set of equations in an expression $e$
 \[
 \operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
 \]
 and allude to the termination of the standard unification algorithm here.
 
-Unfortunately, the relation is not locally confluent, as we have seen in \cref{sec:confluence-extra}, and we need te extra rules in \cref{fig:rules-confluence} to equate them. Lemma 11 in \Citep{ohlebusch:modulo}, or possibly more powerful decreasing diagrams techniques, gives us elementary diagrams to complete in order to show confluence up-to these extra rules.
+Unfortunately, the relation is not locally confluent, as we have seen in \cref{sec:confluence-extra}, and we need the extra rules in \cref{fig:rules-confluence} to equate them. Lemma 11 in \Citep{ohlebusch:modulo}, gives us elementary diagrams to complete in order to show confluence up-to these extra rules.
 
-It may help to keep the termination argument simpler to prove confluence of the core unification rules separately from confluence of the choice rules, and then show that they commute.
+It may help to keep the termination argument simpler by proving confluence of the core unification rules separately from the choice rules, and then prove that they commute.
 
 \subsection{Moving equivalences to the end}
 
-Finally, to get to the form in \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequece, and commute them past |stepA| and |stepB|. If two single steps do not commute to two single steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
+Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
 
 \end{document}
 
