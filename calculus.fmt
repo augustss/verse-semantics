@@ -195,6 +195,8 @@
 %format e_2
 %format e_3
 %format e_4
+%format e_5
+%format e_6
 %format e_n
 %format e_m
 %format e_n'
@@ -302,4 +304,8 @@
 %format stepEr      = "\underset{E}\movesfrom"
 %format stepEp      = "\underset{E||}\movesto"
 %format stepEpr     = "\underset{E||}\movesfrom"
+%format stepX       = "\movestoX"
+%format stepXs      = "\movestoX^{\ast}"
+%format stepXr      = "\movesfromX"
+%format stepXrs     = "\movesfromX^{\ast}"
 %format mu x (e)    = "\mu" x".\," e

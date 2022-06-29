@@ -121,6 +121,8 @@
 
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
 \newcommand{\movesfrom}{\longleftarrow}
 \newcommand{\convertible}{\longleftrightarrow^{\ast}}
 
@@ -514,7 +516,7 @@ program is called \emph{residuation}~\cite{hanus:survey}, and is at the heart of
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
 In conventional functional programming, an expression evaluates to a single value.
-In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values.
+In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values).
 The expression |fail| yields no values; a head-normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
@@ -1033,7 +1035,6 @@ So \rulename{subst} says that we can replace all occurrences of |x| by |v| in th
 |X|-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
 There are several things to notice:
 \begin{itemize}
-\item Rule \rulename{swap} puts the variable on the left of the unification, to avoid duplicating \rulename{subst}.
 \item \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
 restriction is what implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
@@ -1046,9 +1047,6 @@ ill-formed expression |tup(e,2)|.
   For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using
   |X = (y=x+1; hole)|.  We must not drop the |(x=v)| because there may be other occurrences of |x|
   ``further out'', such as |(z=x+3)| in this example.
-\item If the equality |(x=v)| turns out to be the sole remaining occurrence
-      of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
-    and the unification equation.
 \item \rulename{subst} does not specify how big the execution context |X| is:
   it can be anything from a local expression immediately surrounding the |(x=v)| to an
   arbitrarily large expression.
@@ -1086,7 +1084,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of arrays.  The guard $|V| \not= |hole|$ is to avoid failure for |x=x|.
+that is, if |x| occurs under a ``shell'' of arrays.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -1099,11 +1097,23 @@ non-recursive, and \rulename{subst} can apply.
 
 \subsection{Unification: administrative rules}
 
-A number of rules are administrative: they shuffle expressions about in order to make
+%JB: I have reordered this to match the order of the rules in the figure.
+% Not sure which is the optimal order, but it makes sense to keep them together?
+
+If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
+the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
+and the unification equation, and similarly \rulename{def-elim-r} if the equation is ordered the othe way.
+
+
+A number of rules shuffle expressions about in order to make
 the main unification rules apply.
+The rule \rulename{swap} swaps the arguments to unification to put the variable on the left.
+
 Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
 the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
 we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
+
+
 Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
@@ -1115,8 +1125,6 @@ to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
 as discussed in \cref{sec:conf-move-eqn}.
 %% The \label has been commented out.
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
-
-Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
 \subsection{Local substitution} \label{sec:local-subst}
 
@@ -1342,15 +1350,16 @@ Can we still join these two expressions? It seems that the unification rules dec
 
 Confluence seems to be within? Unfortunately, not quite:
 
-\subsection{Confluence up-to order of quantifiers, position of equations and variable names}
+\subsection{Order of quantifiers, position of equations and variable names}
 
 \begin{figure}
 \[\begin{array}{lrcl}
-    \rulename{def-swap} & |def (x,y) e| & \movesto & |def (y,x) e|\\
-    \rulename{unify-move} & |X^[v_1=v_2]| & \movesto & |v_1=v_2;X^[v_2]| \\
-    \rulename{var-swap} & |x=y| & \movesto & |y=x| \\
+    \rulename{def-swap} & |def (x,y) e| & \movestoX & |def (y,x) e|\\
+    \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
+    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
+    \rulename{seq} & |v;e| & \movestoX & |e| \\
 \end{array}\]
-  \caption{Additional rewrite rules for confluence}
+  \caption{}
     \label{fig:rules-confluence}
 \end{figure}
 
@@ -1361,20 +1370,19 @@ There are some sources of non-confluence that we would consider insignificant. F
 can be reduced to
 | (def (x,y) (x=e_1;y=e_2)) |
 or
-| (def (y,x) (x=e_1;y=e_2)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system.
+| (def (y,x) (x=e_1;y=e_2)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about, and we want to consider these expression equivalent. To that end we introduce separate rewrite system $\movestoX$, with rules in \cref{fig:rules-confluence}:
 
-Similarly, we do not care about where, within the same $X$-context, an equality is asserted, so we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rules leaves $v_2$ in place, just like \rulename{def-elim} does.
+\begin{itemize}
+\item \rulename{def-swap} makes the order of |defKW| irrelevant.
+\item As we do not care about where, within the same $X$-context, an equality is asserted, we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rule leaves $v_2$ in place, just like \rulename{def-elim} does.
+\item In the presence of an equation between two variables, we do not care which of the two variables is mentiond, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
+\item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
+\end{itemize}
 
-Finally, to make equality on values commutative, we add \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
-
-For our normal rules we took great care to make them not vacuously looping, {\eg} the side condition $x \in \freevars{X}$ in \rulename{subst}, so that they can form the basis of an evaluator. Since the purpose of these extra rules is to introduce a notion of equivalence, we do not have to worry that, say, \rulename{var-swap} can be applied over and over again.
-
-While these rules do not fundamentally change the evaluation of programs or their results,\joachim{Koen says that this needs to be elaborated. And it may not hold without adjustments to the main rules!} they allow us to iron out irrelevant differences in intermediate terms.
-
-\subsection{Confluence and recursion}%
+\subsection{Recursion}%
 \label{sec:confluence-and-recursion}
 
-With that out of the way, there still remains a source of non-confluence, due to recursion. In
+There remains still another source of non-confluence, due to recursion. In
 \[ |def (x,y) (x=tup (1,y); y=(lam z x); x)| \]
 we can apply \rulename{subst} to $x$ first and obtain the following reduction (omitting spelling out the application of rules \rulename{def-elim} and \rulename{seq}):
 \begin{align*}
@@ -1404,18 +1412,23 @@ $|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e)
 
 Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
 
-\begin{definition}[Joinability up-to arbitrary depth]
-We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3 `cuten` e_4 <-* e_2|.
-\end{definition}
+\subsection{Confluence}
 
-The main confluence proposition says that our rewrite system is confluent up to any arbitrary depth:
+While |->| is not confluent, it we can say that it is confluent up to |stepE| and |cutr n|:
+
+\begin{definition}
+We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
+\[
+|e_1 ->* e_3 stepXs e_4 `cuten` e_5 stepXrs e_6 <-* e_2|.
+\]
+\end{definition}
 
 \begin{proposition}[Confluence]
 \label{thm:confluence}%
 For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 ~ e_3|.
 \end{proposition}
 
-In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case it is:
+In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case we belive it is, and we get:
 
 \begin{proposition}[Church-Rosser]
 \label{thm:church-rosser}%
