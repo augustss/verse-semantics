@@ -73,9 +73,9 @@
         & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
     \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[lam y e]; e))]|} \\
         &&&& \text{if $|x| \in \freevars{e}$, $x \ne y$} \\
-    \rulename{def-elim} & |def x (DX^[x==v])| & \movesto & |DX^[v]|
+    \rulename{def-eliml} & |def x (DX^[x==v])| & \movesto & |DX^[v]|
         & \text{if $|x| \notin \freevars{DX}$, $|x| \notin \freevars{v}$} \\
-    \rulename{def-elim-r} & |def x (DX^[v==x])| & \movesto & |DX^[y]|
+    \rulename{def-elimr} & |def x (DX^[v==x])| & \movesto & |DX^[v]|
         & \text{if $|x| \notin \freevars{DX}, |x| \notin \freevars{v}$} \\
     \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
     \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
@@ -93,6 +93,11 @@
     \rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & x \; \text{fresh}\\
     \end{array} \\
     \\[-2mm]
+    \textit{Fail propagation} \\
+    \begin{array}{lrcll}
+    \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
+    \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \ne \hole  \\
+     \end{array}
 
    \end{array}
    $$
@@ -133,12 +138,12 @@
     \\
 
     \textit{One and all} \\
-    \begin{array}{lrcl}
+    \begin{array}[t]{lrcl}
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
     \rulename{one-value} & |one v| & \movesto & |v| \\
-    \end{array} \\  \\[-1mm]
-    \begin{array}{lrcl}
+    \end{array} \hspace{5mm}
+    \begin{array}[t]{lrcl}
     \rulename{all-fail} & |all fail| & \movesto & |arr ()| \\
     \rulename{all-choice} &
       |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1, dots, v_n)| \\
@@ -154,14 +159,6 @@
     \rulename{dec-value} & |decides v| & \movesto & |v| \\
     \end{array} \\
 \fi
-
-
-    \textit{Fail propagation} \\
-    \begin{array}{lrcll}
-    \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \ne \hole  \\
-    \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
-     \end{array}
-
    \end{array}
    $$
   \caption{The Verse calculus: rewrite rules (2)}
