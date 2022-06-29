@@ -1351,6 +1351,7 @@ Can we still join these two expressions? It seems that the unification rules dec
 Confluence seems to be within? Unfortunately, not quite:
 
 \subsection{Order of quantifiers, position of equations and variable names}
+\label{sec:confluence-extra}
 
 \begin{figure}
 \[\begin{array}{lrcl}
@@ -1968,52 +1969,80 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 
 \section{Confluence proof plan}\label{sec:confluence-proof-plan}
 
-\joachim{Now that this is moved to the appendix, I will rewrite to change the pace and style.}
+In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making.
 
-A full rigorous proof does not fit this paper, but we can give an outline and point out the interesting ideas.
+The main ideas are
+\begin{itemize}
+\item Split the depths-preserving unification rules from the depth-collapsing evaluation rules.
+\item The unification fragment, together with depth-cutting, is terminating.
+\item The unification fragment, together with the additional rules and depth-cutting, is confluent.
+\item The additional rules and the depths-cutting can be moved to the end of any sequence.
+\end{itemize}
 
-Because our rewrite system is not terminating, local confluence (|<-;->| $\subseteq$ |~|) on its own does not imply confluence. We can, however, use a divide-and-conquer approach and subdivide the reduction relation into smaller, relation that commute with each other, and show confluence for them.
+\subsection{Notation}
 
-\subsection{Splitting off the E-rules}
+We briefly recapitulate some standard notation about abstract rewriting. If $\rightarrow$ is a relation on a set $A$, then $\leftarrow$ is its inverse, $\rightarrow^\ast$ its reflexive transitive closure and $\rightarrow^=$ its reflexive closure. If $\rightsquigarrow$ is also a relation on a set $A$, then $\leftarrow;\rightsquigarrow$ is its composition.
 
-We first divide our rules into two sets: The relation |stepUC| consists of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. The relation |stepE| consists of the remaining rules, {\i.e.} evaluation of application and resolving |oneKW| and |allKW|. The idea behind this separation is that |stepUC| does not look under lambdas, so it commutes nicely with cutting at a certain depth (|cutrr (n);stepUC| $\subseteq$ |cutr(n);cutrr(n);stepUCr|), while |stepE| looks at most one level of lambdas deep, in \rulename{app-beta}, and takes terms related by |cutr (n+1)| to terms related by |cutr (n)| (|cutrr (n+1);stepE| $\subseteq$ |cutr(n);cutrr(n);stepEr|).
+Relations $\rightarrow$ and $\rightsquigarrow$ commute if $\leftarrow^\ast;\rightsquigarrow^\ast\subseteq \rightsquigarrow^\ast;\leftarrow^\ast$. A self-commuting relation is confluent. A relation $\rightarrow$ has the diamond property if $\leftarrow;\rightarrow\subseteq \rightarrow;\leftarrow$.
 
-Furthermore, the rules of |stepE| are \emph{orthogonal} (they do not overlap) and left-linear, so  not only is |stepE| on its own confluent, but its parallel application |stepEp| has the diamond property (|stepEpr; stepEp| $\subseteq$ |stepEp;stepEpr|) and also reduces the depth of expressions at most one level (|cutrr (n+1);stepEp| $\subseteq$ |cutr(n);cutrr(n);stepEpr|).
 
-The two relations commute, and crucially, commuting |stepEp| with |stepUC| does not require taking more evaluation steps than before (|stepUCr; stepEp| $\subseteq$ |stepEp; stepUCrs|).
 
-From these properties and $|->| = (|stepUC| \cup |stepEp|)^\ast$ we obtain \Cref{thm:confluence} by a general lemma about abstract rewriting, if we can show that the unification rules are confluent up-to depth cutting: |stepUCrs;stepUCs| $\subseteq$ |stepUCs;cutr n;cutrr n;stepUCrs|.
+If $A$ is a set of terms and $\underset{R}\rightarrow$ is defined as the congruence closure of a set of rules $R$, then $\underset{R||}\rightarrow$ is the parallel application of the rules $R$ at disjoint positions.
 
-\subsection{One layer at a time}
 
-Because |stepUC| and |cut n| commute, this is equivalent the confluence of the relation |stepUCn := (stepUCn `cup` cutr n)|. This brings us to the world of “conventional” confluence.
+\subsection{Separatnig the evaluation rules}
 
-We can describe |stepUCn| inductively. For $n=0$ all terms reduce to $\Omega$, so confluence is immediate.
+The first problem we need to deal with is that, as discussed in \cref{sec:confluence-and-recursion}, we can only hope for confluence up to a certain depth $n$. But simply fixing that depth is unlikely to work, as rule \rulename{app-beta} collapses one layer of lambdas. The more beta-reductions are still to happen, the deeper we have to unroll fixpoints.
 
-For $n>0$, we can understand |stepUCn| as the union of applying the $U$ rules not under a lambda with a rule that applies |stepUCnm1| under lambdas.
+We can address this problem with the following general lemma (which we have proven using Isabelle)
+\begin{lemma}\label{lem:u-e}
+Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common set. If
+\begin{enumerate}
+\item |cute n| is an equivalence relation
+\item |cute n; stepA `ss`  stepA; cute n|
+\item |cute (n+1);stepB `ss`  stepB; cute n|
+\item |stepArs;stepAs `ss`  stepAs;cute n;stepArs|
+\item |stepBr;stepB `ss`  stepB;stepBr|
+\item |stepAr;stepB `ss`  stepB;stepArs|
+\end{enumerate}
+then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie}
+|stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
+\end{lemma}
 
-This inductive description allows us to also prove confluence and other properties of |stepUCn| by induction on $n$.
+We divide our relation $\movesto$ into two sets:
+\begin{enumerate}
+\item The unification and choice fragment, consisting of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. This becomes the |stepA| of \cref{lem:u-e}.
 
-\subsection{The unification core}
+This fragment respects $\equiv_n$, as it does not look under lambdas.
 
-Next we focus on those rules that implement the essence of the unification algorithm: The essential unification rules are the rules from section Unification plus rules \rulename{swap}, \rulename{subst} and \rulename{substrec} and \rulename{fail} with the following restrictions, to focus on the top scope only: The application of \rulename{subst} must be a the root, and the other rules may be applied only within an $X$ context.
+\item The remaining rules, {\i.e.} resolving applications and |oneKW| and |allKW|, form the evaluation fragment.
 
-These rules mimick the standard unification algorithm applied to set of equations in an expression $e$:
+These rules look under at most one level of lambdas, so take terms related by |cutr (n+1)| to terms related by |cutr (n)|.
+
+Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-linear, so not only is this fragment on its own confluent, but its parallel application has the diamond property and still reduces the depth of expressions at most one level. The \emph{parallel} application becomes the |stepB| of \cref{lem:u-e}.
+\end{enumerate}
+
+The two relations  commute, and crucially, commuting them does not increase the number of (parallel) evaluation steps needed. By \cref{lem:u-e} it remains to show that |stepA| is confluent up to |cute n|.
+
+Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation |stepUn := stepA `cup` cutr n| is confluent. This brings us to the world of “conventional” confluence.
+
+\subsection{Termination and confluence of the unification rules}
+
+With the evaluation rules, in particular \rulename{app-beta}, out of the way, and only a fixed depth $n$ to worry about, do the remaining rules (not including the extra rules from \cref{fig:rules-confluence}) terminate?
+
+This seems to be the case. For the unification ruels this is not immediate, but note that they mimick the standard unification algorithm applied to set of equations in an expression $e$
 \[
 \operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
 \]
-Standard unification terminates and calculates the most general unifier of such a set of equations, which is unique up to order of equations and variable renaming. We can adapt that proof to show that the essential unification rules terminate, and further that the normal forms can be reduced to each other with the help of the extra rules (to reorder and rename), \rulename{seq} (to clean up values left by \rulename{ExtraMove} and the use of |stepUCnm1| under lambdas, to take care of fixed-points. This shows that the relation |stepUn| consisting of these rules is confluent.
+and allude to the termination of the standard unification algorithm here.
 
-\subsection{Assembling |stepUn|}
+Unfortunately, the relation is not locally confluent, as we have seen in \cref{sec:confluence-extra}, and we need te extra rules in \cref{fig:rules-confluence} to equate them. Lemma 11 in \Citep{ohlebusch:modulo}, or possibly more powerful decreasing diagrams techniques, gives us elementary diagrams to complete in order to show confluence up-to these extra rules.
 
-Furthemore, it commutes with substitution in the sense that |e_1 stepUCn e_2| implies that |subst e_1 x v| and |subst e_2 x v| can be joined by |stepUn|.
+It may help to keep the termination argument simpler to prove confluence of the core unification rules separately from confluence of the choice rules, and then show that they commute.
 
-This means that applying |stepUn| at the different scope commutes, and thus the union of |stepUn| applied at all possible scopes is confluent.
+\subsection{Moving equivalences to the end}
 
-Now we can add the remaining rules, piece by piece: The choice rules, the sequencing rules, floating and removal and failing of |defKW| and applications of \rulename{subst} with a non-maximal $X$. These are confluent on their own, as they do not overlap, or have overlaps that can easily be resolved. So what remains is to show that they commute with each other.
-
-Following this path one can conclude that |stepUn| is confluent, and thus \cref{thm:confluence}.
-
+Finally, to get to the form in \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequece, and commute them past |stepA| and |stepB|. If two single steps do not commute to two single steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
 
 \end{document}
 
