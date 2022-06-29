@@ -281,6 +281,7 @@
 %format stepAs      = "\underset{A}\movesto^{\ast}"
 %format stepAr      = "\underset{A}\movesfrom"
 %format stepArs     = "\underset{A}\movesfrom^{\ast}"
+%format stepAe      = "\underset{A}\movesto^{=}"
 %format stepB       = "\underset{B}\movesto"
 %format stepBs      = "\underset{B}\movesto^{\ast}"
 %format stepBr      = "\underset{B}\movesfrom"

@@ -190,7 +190,7 @@ locale U_E_confluence =
   and equiv_trans: "trans (equiv n)"
   and equiv_symm: "sym (equiv n)"
   and E_equiv: "diag (equiv (Suc n)) E (equiv n) E"
-  and U_equiv: "comm (equiv n) U"
+  and U_equiv: "diag (equiv n) U (equiv n) (U\<^sup>=)"
   and U_confl: "diag (U\<^sup>*) (U\<^sup>*) (U\<^sup>*) (U\<^sup>* O equiv n)"
   and E_diamond: "diam E"
   and E_U_commute: "diag E U E (U\<^sup>*)"
@@ -233,14 +233,14 @@ proof-
   next
     case (relp_count2_left x y k z)
     from `(x, y) \<in> U` `(x, c) \<in> equiv (n + k)`
-    obtain a where "(c,a) \<in> U" "(y,a) \<in> equiv (n + k)"
+    obtain a where "(c,a) \<in> U\<^sup>=" "(y,a) \<in> equiv (n + k)"
       using U_equiv unfolding comm_def diag_def by auto
 
     from relp_count2_left.IH[OF `(y,a) \<in> equiv (n + k)`]
     obtain b where "(z, b) \<in> equiv n" and "(a,b) \<in> rel_count2 U E k" by auto
 
-    from `(c,a) \<in> U` `(a,b) \<in> rel_count2 U E k`
-    have "(c,b) \<in> rel_count2 U E k" by rule
+    from `(c,a) \<in> U\<^sup>=` `(a,b) \<in> rel_count2 U E k`
+    have "(c,b) \<in> rel_count2 U E k" by (auto intro: rel_count2_intros)
     with `(z, b) \<in> equiv n`    
     show ?case by auto
   next
