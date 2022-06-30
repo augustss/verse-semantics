@@ -325,7 +325,7 @@ instance Arbitrary Expr where
   shrink (a :@: b) = [Val a,Val b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
-  shrink (All a)   = [a] ++ [All a'| a'<-shrink a]
+  shrink (All a)   = [a, ARR []] ++ [All a'| a'<-shrink a]
   shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
   shrink Wrong     = []
 

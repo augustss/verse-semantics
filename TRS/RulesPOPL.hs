@@ -4,6 +4,7 @@ import TRS
 import Bind
 import TRSCore
 import Control.Monad( guard )
+import Data.List( sort )
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -48,6 +49,14 @@ execX1 lhs =
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
 
+defX :: Expr -> [(Context, Expr)]
+defX lhs =
+  do execX lhs
+ ++
+  do Def (Bind x dx) <- [lhs]
+     (ctx, hole) <- defX dx
+     return (Def . Bind x . ctx, hole)
+
 -- choice contexts
 
 choiceX, choiceX1 :: Expr -> [(Context, Expr)]
@@ -74,7 +83,7 @@ choiceX1 lhs =
  ++
   do Def (Bind x cx) <- [lhs]
      (ctx, hole) <- choiceX cx
-     pure ((Def . Bind x) . ctx, hole) -- hopefully this is sound!
+     pure (Def . Bind x . ctx, hole) -- hopefully this is sound!
 
 -- scope contexts
 
@@ -169,7 +178,16 @@ rulesUnification lhs =
 
 rulesUnificationVariables lhs =
   do Def (Bind x a) <- [lhs]
-     (ctx, VAR x' :=: Val v) <- execX a
+     (ctx, VAR x' :=: Val v) <- defX a
+     guard (x == x')
+     let freeX = free (ctx blob)
+         freeV = free v
+     guard (x `notElem` freeX)
+     guard (x `notElem` freeV)
+     pure (ctx (Val v))
+ ++
+  do Def (Bind x a) <- [lhs]
+     (ctx, Val v :=: VAR x') <- defX a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -246,6 +264,7 @@ rulesOne lhs =
   do One Fail <- [lhs]
      pure Fail
 
+{-
 rulesAll lhs =
   do All es <- [lhs]
      vs     <- choiceVals es
@@ -253,6 +272,18 @@ rulesAll lhs =
      pure (foldr (\(x,v) -> (Def . Bind x . ((VAR x :=: (v :@: VARR [])) :>:)))
                  (ARR [ Var x | (x,_) <- xs `zip` vs ])
                  (zip xs vs))
+ where
+  choiceVals :: Expr -> [[Value]]
+  choiceVals Fail      = [[]]
+  choiceVals (a :|: b) = [ vs1 ++ vs2 | vs1 <- choiceVals a, vs2 <- choiceVals b ]
+  choiceVals (Val v)   = [[v]]
+  choiceVals _         = []
+-}
+
+rulesAll lhs =
+  do All es <- [lhs]
+     vs     <- choiceVals es
+     pure (ARR vs)
  where
   choiceVals :: Expr -> [[Value]]
   choiceVals Fail      = [[]]
@@ -271,4 +302,29 @@ rulesFail lhs =
   
 --------------------------------------------------------------------------------
 
+(=~=) :: Expr -> Expr -> Bool
+a =~= b = norm a == norm b
 
+norm :: Expr -> Expr
+norm (Val (Var x) :=: Val (Var y)) | y > x = Val (Var y) :=: Val (Var x)
+norm (a :>: b) = norm a :>: norm b
+norm (a :=: b) = norm a :=: norm b
+norm (a :|: b) = norm a :|: norm b
+norm a@(Def _) = normDef [] a
+norm (One a)   = One (norm a)
+norm (All a)   = All (norm a)
+norm e         = e
+
+normDef :: [Ident] -> Expr -> Expr
+normDef xs (Def (Bind x a)) = normDef (x:xs) a
+normDef xs a                = defs (sort ys) (norm (subst sub a))
+ where
+  vs  = filter (`elem` xs) (free a)
+  ys  = [ ident ("x" ++ show (index x vs)) | x <- xs ]
+  sub = [ (x, Var y) | (x,y) <- xs `zip` ys ]
+  
+  index x zs = head $ [ i | (z,i) <- zs `zip` [1..], z == x ] ++ [0]
+  
+  defs []     a = a
+  defs (x:xs) a = Def (Bind x (defs xs a))
+  

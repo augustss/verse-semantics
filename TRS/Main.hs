@@ -1,7 +1,7 @@
 module Main where
 
 import TRSCore
-import Rules
+import RulesPOPL
 import TRS
 import Bind
 import Test.QuickCheck
@@ -20,10 +20,11 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 main = quickCheck prop_NormalForms
 
 prop_NormalForms p =
-  case normalFormsFuel 999 rules p of
-    []          -> whenFail (print "DOES NOT TERMINATE") False
-    q1 : q2 : _ -> whenFail (print q1 >> print q2) False
-    _           -> property True
+  let qs = normalFormsFuel 999 rules p in
+    case nub (map norm qs) of
+      []          -> whenFail (print "DOES NOT TERMINATE") False
+      q1 : q2 : _ -> whenFail (print (qs!!0) >> print (qs!!1)) False
+      _           -> property True
 
 --------------------------------------------------------------------------------
 
