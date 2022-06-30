@@ -13,7 +13,7 @@ rewrite n = map trsToCore . normalFormsFuel n rules . coreToTrs
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)
-coreToTrs (CUnify e1 e2) = T.Val (coreToTrsV e1) T.:=: coreToTrs e2
+coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (CSeq []) = undefined
 coreToTrs (CSeq [e]) = coreToTrs e
 coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
@@ -46,8 +46,7 @@ coreToTrsI (Ident _ s) = T.Name s
 
 trsToCore :: T.Expr -> Core
 trsToCore (T.Val v) = CValue $ trsToCoreV v
-trsToCore (T.Val e1 T.:=: e2) = CUnify (trsToCoreV e1) (trsToCore e2)
-trsToCore (_e1 T.:=: _e2) = unimplemented "ANF unify" -- CUnify (trsToCoreV e1) (trsToCore e2)
+trsToCore (e1 T.:=: e2) = CUnify (trsToCore e1) (trsToCore e2)
 trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]

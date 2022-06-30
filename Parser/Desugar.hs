@@ -519,7 +519,7 @@ dsDo :: Expr -> D Expr
 dsDo = f
   where
     -- D[do b] = D[b]
-    f (Do b) = f b
+--    f (Do b) = f b
     -- D[let(e)in b] = D[e]; D[b]
     f (Let e b) = f $ seqE [e, b]
 
@@ -550,9 +550,9 @@ anfS = anf
     anf (ApplyS e1 e2) = app ApplyS e1 e2
     anf (ApplyD e1 e2) = app ApplyD e1 e2
     anf (Unify e1 e2) = do
-      (es, v) <- value e1
+      e1' <- anf e1
       e2' <- anf e2
-      pure $ seqE $ es ++ [Unify v e2']
+      pure $ Unify e1' e2'
     anf e = compos anf e
     val e = do
       (es, v) <- value e
