@@ -121,6 +121,8 @@
 
 % Right arrow for rewrites
 \newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
 \newcommand{\movesfrom}{\longleftarrow}
 \newcommand{\convertible}{\longleftrightarrow^{\ast}}
 
@@ -232,7 +234,15 @@
 %% Note: \begin{abstract}...\end{abstract} environment must come
 %% before \maketitle command
 \begin{abstract}
-  The abstract
+  Functional logic languages have a rich literature, but it is tricky
+  to give them a satisfying semantics.  In this paper we describe the
+  Verse calculus, \versecalc{}, a new core calculus for functional
+  logical programming. Our main contribution is equip \versecalc{} with a
+  small-step rewrite semantics, so that we can reason
+  about a \versecalc{} program in the same way as one does lambda
+  calculus; that is, by applying successive rewrites to it.
+  This semantics elegantly fills the gap between very high level
+  ``magical'' semantics, and very low-level operational semantics.
 \end{abstract}
 
 
@@ -270,9 +280,9 @@
 %% environment and commands, and keywords command.
 \maketitle
 
-\textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
-  a work in progress.  So please don't share it; if there is anyone you think would be
-  interested/helpful, do suggest them to us.}
+% \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
+%   a work in progress.  So please don't share it; if there is anyone you think would be
+%   interested/helpful, do suggest them to us.}
 
 \section{Introduction}
 
@@ -280,7 +290,7 @@ Functional logic programming languages add expressiveness to functional programm
 by introducing logical variables, equality constraints that constrain those variables,
 and choice to allow multiple alternatives to be explored.  Here is a tiny example:
 $$
-|def (x,y,z) (x=tup(y,3); x=tup(2,z); y)|
+|def (x y z) (x=tup(y,3); x=tup(2,z); y)|
 $$
 This expression introduces three logical (or existential) variables |x,y,z|,
 constrains them with two equalities |(x=tup(y,3)| and |(x=tup(2,z))|, and finally returns |y|.
@@ -305,7 +315,7 @@ We make the following contributions in this paper.
 First, we describe a new core calculus, the Verse calculus or \versecalc{} for short,
 for functional logic programming (\cref{sec:informal} and \ref{sec:verse}).
 Like any functional logic language,
-\versecalc{} supports logical variable, equalities, and choice, but it is distinctive in several ways:
+\versecalc{} supports logical variables, equalities, and choice, but it is distinctive in several ways:
 \begin{itemize}
 \item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
@@ -357,14 +367,14 @@ thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cr
   are given here just for reference.}:
 $$
 \begin{array}{lll}
-                   &          & |def (x,y,z) (x = tup(y,3); x = tup(2,z); y)| \\
-  \rulename{subst} & \movesto & |def (x,y,z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-  \rulename{ucon}  & \movesto & |def (x,y,z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
-%  \rulename{subst} & \movesto & |def (x,y,z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-  \rulename{subst, swap}  & \movesto & |def (x,y,z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
-%  \rulename{def-elim} & \movesto & |def (x,y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
-%  \rulename{def-elim} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
-  \rulename{def-elim,def-elim,def-elim} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
+                   &          & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
+  \rulename{subst} & \movesto & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
+  \rulename{ucon}  & \movesto & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
+%  \rulename{subst} & \movesto & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
+  \rulename{subst, swap}  & \movesto & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
+%  \rulename{def-eliml} & \movesto & |def (x y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
+%  \rulename{def-eliml} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
+  \rulename{def-eliml,def-eliml,def-eliml} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                             (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                    (3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                            tup(2,3);  2| \\
@@ -383,12 +393,12 @@ $$
   \begin{array}{l}
     \textbf{Syntax} \\
     \begin{array}{lrcl}
-    \text{Integer constants} & k \\
+    \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e,r,s  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| \\
-    && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
+    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -399,10 +409,12 @@ $$
 \iffullverse
     \vb |isInt|
 \fi
-    \\[1mm]
-    \text{\emph{Concrete syntax}:} &
-          \multicolumn{3}{l}{\text{``|choice|'', ``;'', and ``|=|'' are right-associative.}} \\
-    &     \multicolumn{3}{l}{\text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.}} \\
+    \end{array} \\
+    \\[-3mm]
+    \text{\emph{Concrete syntax}:} \;\;
+    \begin{array}[t]{l}
+          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
@@ -410,11 +422,11 @@ $$
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |def (x_1,x_2,dots,x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+      |def (x_1 x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
      \end{array} \\
-  \\
-  \text{The notation $\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.} \\
-  \text{We say $S_1 \disjoint S_2$ to mean that set $S_1$ is disjoint from $S_2$.}
+  \\[-2mm]
+  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.} \\
+  \text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
 \caption{The Verse calculus: syntax} \label{fig:syntax}
@@ -429,12 +441,11 @@ adding a type system is an excellent goal, but is the subject of another paper.
 
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
-some built-in operations and tuples as data constructors:
+some built-in operations and arrays as data constructors:
 \begin{itemize}
 \item \emph{Head-normal forms}.
-  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
-  also called array, |arr (v_1,dots,v_n)|, or a lambda term |lam x e|.
-  \lennart{Niklas was quite adamant that we should call them either arrays or tuples and stick to that.}
+  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, an array,
+  |tup (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
 \item \emph{Values.}
@@ -465,7 +476,7 @@ As an example, what might be written |dlet x e_1 e_2| in a conventional function
 \emph{A program executes by solving its equations} to get values for some of the logical variables.
 For example,
 $$
-|def (x,y,z) (x=tup(y,3); x=tup(2,z); y)|
+|def (x y z) (x=tup(y,3); x=tup(2,z); y)|
 $$
 is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
 unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
@@ -481,7 +492,7 @@ pattern-matching; in such a language, we might define |first| by
 more primitive |case| expressions.  But in \versecalc{} we don't need |case| expressions:
 unification does the job.  For example we can define |first| like this:
 $$
-|first = lam pr (def (a,b) (pr = tup (a,b); a))|
+|first = lam pr (def (a b) (pr = tup (a,b); a))|
 $$
 The lambda unifies its argument (presumably a pair)
 with |tup(a,b)|, where |a,b| are fresh logical
@@ -494,13 +505,12 @@ and similarly for all other library functions.
 This way of desugaring pattern matching means that the input
 to |first| may not be fully determined when the function is called. For example:
 $$
-|def (x,y,z) (x=tup(y,z); apply1 first x = 2; y)|
+|def (x y) (x=tup(y,5); apply1 first x = 2; y)|
 $$
-Here |apply1 first x| evaluates to |y|, which we then unify with |2|; the logical
-variable |z| never gets a value, but that does not matter.
+Here |apply1 first x| evaluates to |y|, which we then unify with |2|.
 Another way to say this is that, as usual in logic programming, we may
 constrain the \emph{output} of a function (here |apply1 first x = 2|), and thereby
-affect its \emph{input} (here |tup(y,z)|).
+affect its \emph{input} (here |tup(y,5)|).
 
 Although ``|;|\!'' is called ``sequencing'', the order of that sequence
 is immaterial for equations.
@@ -516,7 +526,7 @@ program is called \emph{residuation}~\cite{hanus:survey}, and is at the heart of
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
 In conventional functional programming, an expression evaluates to a single value.
-In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values \lennart{Can it get stuck?}).
+In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values).
 The expression |fail| yields no values; a head-normal form |hnf| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
@@ -545,7 +555,7 @@ We duplicate the context surrounding the choice, and ``float the choice outwards
 We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing ---
 but \emph{choice} is not.
 Consider
-|def (x,y) (x = (3 choice 4); y = (20 choice 30); tup (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
+|def (x y) (x = (3 choice 4); y = (20 choice 30); tup (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
 |((tup (3,20)) choice (tup (3,30)) choice (tup (4,20)) choice (tup (4,30)))|.
 
 So much for choice under unification.  What if we have
@@ -588,20 +598,20 @@ language into unification. But what about pattern matching with multiple equatio
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly\footnote{
-We use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells;
-and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x,y) (p = tup (x,y); body)|
+We use the empty array |emptytup| to represent the empty list and pairs to represent cons cells;
+and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x y) (p = tup (x,y); body)|
   }:
 $$
 |append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
   |(xs = emptytup; ys) choice| \\
-  |(def (x,xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys))))|
+  |(def (x xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys))))|
 \end{array}
 $$
 If |xs| is |emptytup|, the left-hand choice succeeds, returning |y|; and the right-hand choice
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
 If |xs| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
+Finally if |xs| is built with head-normal forms other than the empty array and pairs, both choices fail, and |append| returns no
 results.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
@@ -613,7 +623,7 @@ $$
 The call to |append| expands into a choice
 $$
   |(zs = emptytup; single)| \quad |choice| \quad
-  |(def (x,xrest) (zs = tup (x,xrest); tup(x, applyN append (xrest, single))))|
+  |(def (x xrest) (zs = tup (x,xrest); tup(x, applyN append (xrest, single))))|
 $$
 which amounts to exploring the possibility that |zs| is headed by |emptytup| or a pair -- the
 essence of narrowing.  It should not take long to reassure yourself that the program
@@ -637,7 +647,7 @@ different, more minimalist position. In \versecalc{} \emph{there is just one equ
 the |if| returns |e_2|; otherwise it returns |e_3|.  There are no data constructors |True| and |False|; instead
 failure plays the role of falsity.
 
-But something is terribly wrong here.  Consider |def (x,y) (y = (if (x=0) 3 4); x=7)|.  Presumably this is meant
+But something is terribly wrong here.  Consider |def (x y) (y = (if (x=0) 3 4); x=7)|.  Presumably this is meant
 to set |x| to |7|, test if it is equal to |0| (it is not), and unify |y| with 4.
 But what is to stop us instead unifying |x| with |0| (via |(x=0)|), unifying |y| with |3|, and then
 failing when we try to unify |x| with |7|?  Not only is that not what we intended, but it also looks very
@@ -677,9 +687,9 @@ The main data structure in \versecalc{} is the array.
 An array is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
-For example, |def a (a = (10,27,32); apply1 a 1)| reduces to |27|.
+For example, |a := tup (10,27,32); apply1 a 1| reduces to |27|.
 The reduction rule for indexing in arrays allows a multi-valued index expression.
-For instance, |a := (10,27,32); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |(27 `choice` 10 `choice` 27)|.
+For instance, |a := tup (10,27,32); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |(27 `choice` 10 `choice` 27)|.
 
 Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
@@ -691,7 +701,8 @@ $n$-way choice.
 \label{sec:all}
 
 You might think that array indexing would be stuck until we know the index,
-but \versecalc{} uses narrowing to make progress. The expression |(def i (apply1 a i))|
+but \versecalc{} uses narrowing to make progress.
+The expression |a := tup (10,27,32); def i (apply1 a i)|
 looks stuck because we have no value for |i|, but in fact it rewrites to
 $$
 |def i ((i=0; 10) choice (i=1; 27) choice (i=2; 32)|
@@ -723,9 +734,9 @@ We will illustrate this with a few examples.
     \begin{array}{rcll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
-      |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x,y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
-      |apply1 e_1 e_2| & \equiv & |def (x,y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
-      |tup (e_1, e_2)| & \equiv & |def (x,y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
+      |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
+      |apply1 e_1 e_2| & \equiv & |def (x y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
+      |tup (e_1, e_2)| & \equiv & |def (x y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
       |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
       |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
       |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh} \\
@@ -816,8 +827,8 @@ If we use |oneKW| instead of |allKW|, we get the function that checks if |p| hol
 and returns the first matching element, or fails if |p| does not hold for any element.
 
 \item |every|.
-And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |map(p,xs)|!
-If |p| fails for any value, the whole call to |map(p,xs)| fails.
+And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |applyN map (p,xs)|!
+If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
 \end{itemize}
 
 \subsection{Choice comprehensions} \label{sec:for}
@@ -856,7 +867,7 @@ So, {\eg}, |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that array indexing expands into choices, we can iterate over array indices and elements using |for|.
-{\Eg}, |for^(def (i, x) (x = apply1 a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
+{\Eg}, |for^(def (i  x) (x = apply1 a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
 
 
 \subsection{Enumerations}
@@ -876,7 +887,6 @@ $$
 $$
 
 \subsection{Subset and powerset}
-\lennart{Is this example too elementary?}
 The subsets (subarrays) of an array can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
@@ -894,18 +904,16 @@ This means that we can use ordinary abstraction mechanisms for patterns.
 Here is a function that should be called like |applyN fcn (88,1,99,2)|.
 $$
 \begin{array}{l}
-|apply1 fcn a := def (x,y) (a = tup(x,1,y,2); x+y)|
+|apply1 fcn a := def (x y) (a = tup(x,1,y,2); x+y)|
 \end{array}
 $$
 If we want to give a name to the pattern, it is simple
 $$
 \begin{array}{l}
 |applyN pat (v,w) := tup(v,1,w,2);| \\
-|apply1 fcn a := def (x,y) (a = applyN pat (x,y); x+y)|
+|apply1 fcn a := def (x y) (a = applyN pat (x,y); x+y)|
 \end{array}
 $$
-
-\lennart{Add more logic programming examples.}
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
@@ -919,7 +927,7 @@ programming language?  Here are some possibilities:
   and it cannot distinguish between call-by-need and call-by-name.
   Moreover, it is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
   because of the logical variables.
-\item \emph{A big-step operational semantics} typically involves explaining how a (heap,expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
+\item \emph{A big-step operational semantics} typically involves explaining how a (heap, expression) starting point evaluates to a (heap,value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
 \item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, the big-step approach
   does not convey accurate operational intuition, because it goes all the way to a value
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
@@ -967,13 +975,9 @@ and returns |k_1| otherwise.
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
 
-Sequencing, is very simple (rule \rulename{seq}): |(e_1;e_2)|, 
-reduces |e_1| to a value, and then discards it, returning
-|e_2| \ranjit{not what the rule in Fig4 looks like?}.  
-%
-The reason for evaluating |e_1| is for its unification effects.
-Our insistence on clear sequencing also makes it possible to extend \versecalc{}
-with more general effects, but that is beyond the scope of this paper.
+Sequencing (rule \rulename{seq}) is very simple: |(v;e)| discards |v|, leaving just |e|.
+The rule only fires with a \emph{value} on the left; we must rewrite the expression on
+the left for effects.
 
 \subsection{Function application} \label{sec:beta}
 
@@ -1008,27 +1012,16 @@ Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
 are the standard rules for unification. The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
-tuples\footnote{An alternative choice would
+arrays\footnote{An alternative choice would
 for unification to yield |emptytup| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unification fail if
-you attempt to unify an integer with a tuple.
+you attempt to unify an integer with an array.
 Slightly less obviously,
 \rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
 lambda or a built-in operation with any other value.  We discuss this design choice further in \cref{sec:unifying-lambda}.
 
-\subsection{Unification: the \rulename{subst} rule}
-
-The key innovation in \versecalc{} is the way bindings (that is, just ordinary equalities)
-of logical variables are propagated.
-The key rule is \rulename{subst}:
-$$
-\rulename{subst} \quad |X^[x==v]|  \movesto  |(subst X x v)^[x==v]|
-        \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
-$$
-It says that if we have an equality |(x=v)| in a term,
-we can replace ``nearby'' occurrences of |x| by |v|.
-
-But what does ``nearby'' mean? In this rule, |X| is an \emph{execution context},
+Failure, written |fail|, propagates upwards, as \rulename{fail-def} and \rulename{fail} show. 
+The latter rule makes use of an \emph{execution context}, |X|,
 whose syntax is given in \cref{fig:contexts}.
 In general, a ``context'' is a syntactic construct (in this case an expression)
 containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
@@ -1036,13 +1029,27 @@ The notation |X^[e]| is the expression obtained by filling the hole
 in |X| with |e|.
 For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
 gives the expression $|X^[99]| \equiv |(y = tup (99,4))|$.
-The notation |subst X x v| is the context obtained by replacing all free occurrences of |x| in |X| by |v|.
+So \rulename{fail} says that if |fail| occurs in an |X|-context, thus |X^[fail]|, we can rewrite
+it to |fail|, discarding |X| altogether. For example |(x=y; fail; 3)| rewrites to |fail|.
+
+\subsection{Unification: the \rulename{subst} rule}
+
+The key innovation in \versecalc{} is the way bindings (that is, just ordinary equalities)
+of logical variables are propagated.
+The key rule is \rulename{subst}:
+$$
+\rulename{subst} \quad |X^[x=v]|  \movesto  |(subst X x v)^[x=v]|
+        \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+$$
+The notation |subst X x v| is the context obtained by replacing all
+free occurrences of |x| in |X| by |v|.
+So \rulename{subst} says that if we have an equality |(x=v)| in a term |X^[x=v]|
+we can replace occurrences of |x| in |X| by |v|.
 
 So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the
 |X|-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
 There are several things to notice:
 \begin{itemize}
-\item Rule \rulename{swap} puts the variable on the left of the unification, to avoid duplicating \rulename{subst}.
 \item \rulename{subst} fires only when the right-hand side of the unification is a \emph{value} |v|, so that the substitution does not risk duplicating work, or choices. This
 restriction is what implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
@@ -1055,9 +1062,6 @@ ill-formed expression |tup(e,2)|.
   For example, we can rewrite |((y=x+1; x=3); z=x+3)| to |((y=3+1; x=3); z=x+3)|, using
   |X = (y=x+1; hole)|.  We must not drop the |(x=v)| because there may be other occurrences of |x|
   ``further out'', such as |(z=x+3)| in this example.
-\item If the equality |(x=v)| turns out to be the sole remaining occurrence
-      of |x| in the body of a |defKW|, then rule \rulename{def-elim} can drop both the |defKW|
-    and the unification equation.
 \item \rulename{subst} does not specify how big the execution context |X| is:
   it can be anything from a local expression immediately surrounding the |(x=v)| to an
   arbitrarily large expression.
@@ -1095,7 +1099,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \not= |hole|$ is to avoid failure for |x=x|.
+that is, if |x| occurs under a ``shell'' of arrays.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -1108,11 +1112,23 @@ non-recursive, and \rulename{subst} can apply.
 
 \subsection{Unification: administrative rules}
 
-A number of rules are administrative: they shuffle expressions about in order to make
+%JB: I have reordered this to match the order of the rules in the figure.
+% Not sure which is the optimal order, but it makes sense to keep them together?
+
+If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
+the body of a |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
+and the unification equation, and similarly \rulename{def-elimr} if the equation is ordered the othe way.
+
+
+A number of rules shuffle expressions about in order to make
 the main unification rules apply.
+The rule \rulename{swap} swaps the arguments to unification to put the variable on the left.
+
 Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
 the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
 we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
+
+
 Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
@@ -1124,8 +1140,6 @@ to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
 as discussed in \cref{sec:conf-move-eqn}.
 %% The \label has been commented out.
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
-
-Finally, rule \rulename{swap} swaps the arguments to unification to make \rulename{subst} apply.
 
 \subsection{Local substitution} \label{sec:local-subst}
 
@@ -1151,7 +1165,7 @@ But if you replace |(x=0)| with |(x=55)| then rewriting again
 gets stuck, and rightly so, since in this case there are \emph{no} valid solutions to the equations.
 
 It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
-substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
+substitution over the entire scope of the |defKW|, and combining it with \rulename{def-eliml} thus:
 $$
 \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
@@ -1207,7 +1221,7 @@ $$
 \movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
 \movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
 \movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
-\movesto \{\rulename{def-elim}\} & |1; (77 choice 99)|\\
+\movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
 \movesto \{\rulename{seq}\} & |77 choice 99|\\
 \end{array}
 $$
@@ -1235,7 +1249,8 @@ picking one branch or the other, which immediately gives up confluence.
 
 \subsection{\versecalc{} is lenient}
 
-\versecalc{} is a \emph{lenient}, not lazy (call-by-need), nor strict (call-by-value).  Under lenient
+\versecalc{} is a \emph{lenient}, not lazy (call-by-need), nor strict (call-by-value) \cite{lenience}.
+Under lenient
 evaluation, everything is eventually evaluated, but functions can run
 before their arguments have a value.
 Consider a function
@@ -1243,14 +1258,23 @@ call |apply1 f e|.  In \versecalc{} applications are in administrative normal fo
 so we must actually write |(x=e; apply1 f x)|. This expression will not return a value until
 |e| reduces to a value: that is, everything is eventually evaluated.  But even so |apply1 f x| can proceed
 to beta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
-This is not just a way to get \emph{parallelism}, which was the motivation for introducing
-lenience in the data-flow language Id~\cite{lenience}; in a functional logic language
-it is critical for \emph{semantics}.  Suppose |y = lamhdr (tup(p,q)) (p=7;q)| and consider
+
+Lenience supports \emph{abstraction}.  For example, we can replace an expression |(x=tup(y,3); y>7)| by
 $$
-|def (f,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
+|def f (f = (lam (tup (p,q)) (p=tup(q,3); q>7)); applyN f (x,y)|
 $$
-Here |y| does not get a value until |x| is known; but |x| does not get its
-value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
+Here we abstract over the free variables of the expression, and define a named function |f|.
+Calling the function is just the same as writing the original expression.
+This transformation would not be valid under call-by-value.
+
+% This is not just a way to get \emph{parallelism}, which was the original motivation for introducing
+% lenience in the data-flow language Id~\cite{lenience}; it affects
+% \emph{semantics}. Consider
+% $$
+% |def (f,x,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
+% $$
+% Here |y| does not get a value until |x| is known; but |x| does not get its
+%value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
 \subsection{Evaluation strategy}
 
@@ -1305,24 +1329,24 @@ and the rest of the reductions just gets rid of terms no longer needed.
 $$
 \begin{array}{llll}
 \hspace{-1.5mm}&                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{desugar} & \xmovesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
-\hspace{-1.5mm}\circlednum{1}&\rulename{subst} & \xmovesto & |def (swap) (swap = (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\hspace{-1.5mm}&\rulename{def-elim} & \xmovesto & |(               (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p) (((apply1 (lam xy (def (x,y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
-\hspace{-1.5mm}\circlednum{2}&\rulename{app-beta}   & \xmovesto & |def (p) ((def (xy) (xy = p; def (x,y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}\circlednum{3}&\rulename{subst}      & \xmovesto & |def (p) ((def (xy) (xy = p; def (x,y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-elim}   & \xmovesto & |def (p)     (((p; def (x,y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p,x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p,x,y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{subst}      & \xmovesto & |def (p,x,y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
-\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p,x,y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{4}&\rulename{unify-seql} & \xmovesto & |def (p,x,y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{5}&\rulename{ucon}       & \xmovesto & |def (p,x,y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{6}&\rulename{subst}      & \xmovesto & |def (p,x,y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
-\hspace{-1.5mm}&\rulename{def-elim}   & \xmovesto & |def (p,x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
-\hspace{-1.5mm}\circlednum{7}&\rulename{subst}      & \xmovesto & |def (p,x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
-\hspace{-1.5mm}&\rulename{def-elim}   & \xmovesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
-\hspace{-1.5mm}&\rulename{def-elim}   & \xmovesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
+\hspace{-1.5mm}&\rulename{desugar} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
+\hspace{-1.5mm}\circlednum{1}&\rulename{subst} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+\hspace{-1.5mm}&\rulename{def-eliml} & \xmovesto & |(               (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
+\hspace{-1.5mm}\circlednum{2}&\rulename{app-beta}   & \xmovesto & |def (p) ((def (xy) (xy = p; def (x y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\hspace{-1.5mm}\circlednum{3}&\rulename{subst}      & \xmovesto & |def (p) ((def (xy) (xy = p; def (x y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p)     (((p; def (x y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p x y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\hspace{-1.5mm}&\rulename{subst}      & \xmovesto & |def (p x y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
+\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p x y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
+\hspace{-1.5mm}\circlednum{4}&\rulename{unify-seql} & \xmovesto & |def (p x y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
+\hspace{-1.5mm}\circlednum{5}&\rulename{ucon}       & \xmovesto & |def (p x y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
+\hspace{-1.5mm}\circlednum{6}&\rulename{subst}      & \xmovesto & |def (p x y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
+\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
+\hspace{-1.5mm}\circlednum{7}&\rulename{subst}      & \xmovesto & |def (p x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
+\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
+\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
 %&\rulename{seq}        & \xmovesto & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
 %&\rulename{seq}        & \xmovesto & |            (               (           3; tup(2,3));  tup(3,2))| \\
 %&\rulename{seq}        & \xmovesto & |                                           tup(2,3);   tup(3,2)| \\
@@ -1333,57 +1357,60 @@ $$
 \caption{Sample reduction sequence} \label{fig:sample-reductions}
 \end{figure}
 
-\section{Confluence and metatheory}
+\section{Confluence and equational theory}
 
 The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
 
-If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, then we can find $e_4$ so that $e_2 \movesto^\ast e_4$ and $e_3 \movesto^\ast e_4$.
+If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_2 \movesfrom^\ast e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$?
 
-Confluence will give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
+Confluence would give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
 
 \subsection{subst {\vs} subst, a critical pair}
 
 The main source for possible non-confluence is rule \rulename{subst}: If we have multiple equations for a variable $x$ available, we can use any of them to rewrite. A typical example would be
 \[ |def x (x=v_1; x=v_2; e)| \]
-which we can rewrite by \rulename{subst} (and administrative \rulename{def-elim} and \rulename{seq}) to either
+which we can rewrite by \rulename{subst} (and administrative \rulename{def-eliml} and \rulename{seq}) to either
 \[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
-Can we still join these two expressions? The unification rules allow us to decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variable on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
+Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variables on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
 
-So it seems that confluence is within reach? Unfortunately, not quite:
+Confluence seems to be within? Unfortunately, not quite:
 
-\subsection{Confluence up-to order of quantifiers, position of equations and variable names}
+\subsection{Order of quantifiers, position of equations and variable names}
+\label{sec:confluence-extra}
 
 \begin{figure}
 \[\begin{array}{lrcl}
-    \rulename{def-swap} & |def (x,y) e| & \movesto & |def (y,x) e|\\
-    \rulename{unify-move} & |X^[v_1=v_2]| & \movesto & |v_1=v_2;X^[v_2]| \\
-    \rulename{var-swap} & |x=y| & \movesto & |y=x| \\
+    \rulename{def-swap} & |def (x y) e| & \movestoX & |def (y x) e|\\
+    \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
+    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
+    \rulename{seq} & |v;e| & \movestoX & |e| \\
 \end{array}\]
-  \caption{Additional rewrite rules for confluence}
+  \caption{}
     \label{fig:rules-confluence}
 \end{figure}
 
 \label{sec:conf-move-eqn}
 
-There some sources of non-confluence that we would consider insignificant. For example
-| (def x (x=z));(def y (y=z)) |
+There are some sources of non-confluence that we would consider insignificant. For example
+| (def x (x=e_1));(def y (y=e_2)) |
 can be reduced to
-| (def (x,y) (x=z;y=z)) |
+| (def (x y) (x=e_1;y=e_2)) |
 or
-| (def (y,x) (x=z;y=z)) |, which are different expressions, but the difference is not one we care about. We can capture this idea that our notion of confluence may ignore the order of |defKW|s by adding an additional rule, \rulename{def-swap} in \cref{fig:rules-confluence}, to the rewrite system. It is ok for this rule to be obviously looping.
+| (def (y x) (x=e_1;y=e_2)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about, and we want to consider these expression equivalent. To that end we introduce separate rewrite system $\movestoX$, with rules in \cref{fig:rules-confluence}:
 
-Similarly, we do not care about where, within the same $X$-context, an equality is asserted, so we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. We leave $v_2$ in place, just like \rulename{def-elim} does.
+\begin{itemize}
+\item \rulename{def-swap} makes the order of |defKW| irrelevant.
+\item As we do not care about where, within the same $X$-context, an equality is asserted, we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rule leaves $v_2$ in place, just like \rulename{def-eliml} does.
+\item In the presence of an equation between two variables, we do not care which of the two variables is mentiond, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
+\item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
+\end{itemize}
 
-Finally, to make equality on values commutative, we add \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
-
-While these rules do not fundamentally change the evaluation of programs or their results, they allow us to iron out irrelevant differences in intermediate terms.
-
-\subsection{Confluence and recursion}%
+\subsection{Recursion}%
 \label{sec:confluence-and-recursion}
 
-With that out of the way, there still remains a source of non-confluence, due to recursion. In
-\[ |def (x,y) (x=tup (1,y); y=(lam z x); x)| \]
-we can apply \rulename{subst} to $x$ first and obtain the following reduction (omitting spelling out the application of rules \rulename{def-elim} and \rulename{seq}):
+There remains still another source of non-confluence, due to recursion. In
+\[ |def (x y) (x=tup (1,y); y=(lam z x); x)| \]
+we can apply \rulename{subst} to $x$ first and obtain the following reduction (omitting spelling out the application of rules \rulename{def-eliml} and \rulename{seq}):
 \begin{align*}
 & \movesto \{\rulename{subst}\}     && |def y (y=(lam z (tup (1,y))); tup (1,y))| \\
 & \movesto \{\rulename{subst-rec}\} && |def y (y=v_y; tup (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))| \\
@@ -1393,139 +1420,99 @@ we can apply \rulename{subst} to $x$ first and obtain the following reduction (o
 & \movesto \{\rulename{subst-rec}\} && |def x (x=v_x; x)| \quad \text{ where } |v_x| = |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))| \\
 & \movesto \{\rulename{subst}\}     && |v_x|
 \end{align*}
-Can we join |tup (1,v_y)| and |v_x|? Given $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, we get
+Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, so we get
 \[
 \begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
 & |tup (1,v_y)| & \movesto^\ast & |tup (1,lam z (tup (1, v_y)))| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z (tup (1, v_y))))))| & \movesto^\ast & \cdots \\
 |v_x|     & \movesto^\ast & |tup (1,lam z v_x)| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z v_x))))| & \movesto^\ast && \cdots
 \end{array}
 \]
-and we \emph{cannot} join them; they keep “missing each other”.
+and we find that we \emph{cannot} join them; they keep “missing each other”. The relation $\movesto$ is \emph{not} confluent.
 
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|, or put differently, we can make the two expressions be the same up to an arbitrary depth.
+But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth.
 
 \begin{definition}[Depth cutting]
 To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
-$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |lam x (cut n e)|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|.
+$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|. The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2 := cut n e_1 === cut n e_2|.
 \end{definition}
 
-Clearly for every $n \in \mathbb N$ we can now find |e_1| and |e_2| so that |tup (1,v_y)| $\movesto^\ast$ |e_1|, |v_x| $\movesto^\ast$ |e_2| and |cut n e_1| $\equiv$ |cut n e_2|, and this is the notion of confluence we aim for.
+Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
 
-\begin{definition}[Joinability up-to depth]
-We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3| and |e_4| so that |e_1 ->* e_3|, |e_2 ->* e_4| and |cut n e_3 === cut n e_4|.
+\subsection{Confluence}
+
+While |->| is not confluent, it we can say that it is confluent up to |stepE| and |cutr n|:
+
+\begin{definition}
+We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
+\[
+|e_1 ->* e_3 stepXs e_4 `cuten` e_5 stepXrs e_6 <-* e_2|.
+\]
 \end{definition}
 
-The main proposition here is that our rewrite system is confluent up to any arbitrary depth:
-
-\begin{theorem}[Confluence]
+\begin{proposition}[Confluence]
 \label{thm:confluence}%
 For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 ~ e_3|.
-\end{theorem}
+\end{proposition}
 
-In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case it is:
+In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case we belive it is, and we get:
 
-\begin{theorem}[Church-Rosser]
+\begin{proposition}[Church-Rosser]
 \label{thm:church-rosser}%
-|e_1 <-> e2| implies |e_1 ~ e_2|.
-\end{theorem}
+|e_1 <-> e_2| implies |e_1 ~ e_2|.
+\end{proposition}
 
-\subsection{Confluence proof outline}
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress (see \cref{sec:confluence-proof-plan} for a high-level proof plan).
 
-A full rigorous proof does not fit this paper, but we can give an outline and point out the interesting ideas.
-\joachim{Not sure how useful this section is. Shorter? Longer? Different?}
-
-Because our rewrite system is not terminating, local confluence (|<-;->| $\subseteq$ |~|) on its own does not imply confluence. We can, however, use a divide-and-conquer approach and subdivide the reduction relation into smaller, relation that commute with each other, and show confluence for them.
-
-\subsubsection{Splitting off the E-rules}
-
-We first divide our rules into two sets: The relation |stepUC| consists of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. The relation |stepE| consists of the remaining rules, {\i.e.} evaluation of application and resolving |oneKW| and |allKW|. The idea behind this separation is that |stepUC| does not look under lambdas, so it commutes nicely with cutting at a certain depth (|cutrr (n);stepUC| $\subseteq$ |cutr(n);cutrr(n);stepUCr|), while |stepE| looks at most one level of lambdas deep, in \rulename{app-beta}, and takes terms related by |cutr (n+1)| to terms related by |cutr (n)| (|cutrr (n+1);stepE| $\subseteq$ |cutr(n);cutrr(n);stepEr|).
-
-Furthermore, the rules of |stepE| are \emph{orthogonal} (they do not overlap) and left-linear, so  not only is |stepE| on its own confluent, but its parallel application |stepEp| has the diamond property (|stepEpr; stepEp| $\subseteq$ |stepEp;stepEpr|) and also reduces the depth of expressions at most one level (|cutrr (n+1);stepEp| $\subseteq$ |cutr(n);cutrr(n);stepEpr|).
-
-The two relations commute, and crucially, commuting |stepEp| with |stepUC| does not require taking more evaluation steps than before (|stepUCr; stepEp| $\subseteq$ |stepEp; stepUCrs|).
-
-From these properties and $|->| = (|stepUC| \cup |stepEp|)^\ast$ we obtain \Cref{thm:confluence} by a general lemma about abstract rewriting, if we can show that the unification rules are confluent up-to depth cutting: |stepUCrs;stepUCs| $\subseteq$ |stepUCs;cutr n;cutrr n;stepUCrs|.
-
-\subsubsection{One layer at a time}
-
-Because |stepUC| and |cut n| commute, this is equivalent the confluence of the relation |stepUCn := (stepUCn `cup` cutr n)|. This brings us to the world of “conventional” confluence.
-
-We can describe |stepUCn| inductively. For $n=0$ all terms reduce to $\Omega$, so confluence is immediate.
-
-For $n>0$, we can understand |stepUCn| as the union of applying the $U$ rules not under a lambda with a rule that applies |stepUCnm1| under lambdas.
-
-This inductive description allows us to also prove confluence and other properties of |stepUCn| by induction on $n$.
-
-\subsubsection{The unification core}
-
-Next we focus on those rules that implement the essence of the unification algorithm: The essential unification rules are the rules from section Unification plus rules \rulename{swap}, \rulename{subst} and \rulename{substrec} and \rulename{fail} with the following restrictions, to focus on the top scope only: The application of \rulename{subst} must be a the root, and the other rules may be applied only within an $X$ context.
-
-These rules mimick the standard unification algorithm applied to set of equations in an expression $e$:
-\[
-\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
-\]
-Standard unification terminates and calculates the most general unifier of such a set of equations, which is unique up to order of equations and variable renaming. We can adapt that proof to show that the essential unification rules terminate, and further that the normal forms can be reduced to each other with the help of the extra rules (to reorder and rename), \rulename{seq} (to clean up values left by \rulename{ExtraMove} and the use of |stepUCnm1| under lambdas, to take care of fixed-points. This shows that the relation |stepUn| consisting of these rules is confluent.
-
-\subsubsection{Assembling |stepUn|}
-
-Furthemore, it commutes with substitution in the sense that |e_1 stepUCn e_2| implies that |subst e_1 x v| and |subst e_2 x v| can be joined by |stepUn|.
-
-This means that applying |stepUn| at the different scope commutes, and thus the union of |stepUn| applied at all possible scopes is confluent.
-
-Now we can add the remaining rules, piece by piece: The choice rules, the sequencing rules, floating and removal and failing of |defKW| and applications of \rulename{subst} with a non-maximal $X$. These are confluent on their own, as they do not overlap, or have overlaps that can easily be resolved. So what remains is to show that they commute with each other.
-
-Following this path one can conclude that |stepUn| is confluent, and thus \cref{thm:confluence}.
+We have, however, reasons to be optimistic: Even the incomplete proof effort already helped us fix various unwanted causes for non-confluence in our system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
 
 \subsection{Equational theory}
 
-The relation |~| can now be used to describe an equational theory for {\versecalc}. It is an equivalence relation and congruent, and contains, as per \cref{thm:church-rosser}, all reductions. From the confluence proof we can extract some additional useful equalities:
+The relation |~| can now be used to develop an equational theory for {\versecalc}. Assuming our confluence conjecture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect that this equivalence is respected by substitution,
+\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|, \]
+allows equational reasoning with local equations,
+\[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)|, \]
+and even allows rewriting with a local equation within that equation's right-hand side,
+\[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))|. \]
 
-\begin{enumerate}
-\item It is respected by substitution:
-\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|. \]
-\item It allows equational reasoning with local equations:
-\[ |v_1 = v_2;C^[v_1] ~ v_1 = v_2;C^[v_2]| \]
-\item It even allows rewriting with a local equation within that equation's right-hand-side:
-\[ |v=C^[v] ~ v=C^[C^[v]]| \]
-\end{enumerate}
-
-Here, $C$ is an arbitrary context.\joachim{Should we add it to \cref{fig:contexts}? We  only need it here, and it is tediuos to spell out.}
+The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations, such as the commutativity of sequencing
+\[
+|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|,
+\]
+naming of subexpressions
+\[
+|e ~= (def x (x = e; x))| \quad \text{if } x \notin\freevars{e}
+\]
+and the removal of repeated choice-free expressions
+\[
+|(ce;ce) ~= ce|.
+\]
+The development of this theory is future work.
 
 \subsection{Fixed points}
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Consider an equation |x = v| that is not failed by the occurs check, so |x| may occur in |v|, but only under lambda.  Clearly, applying \rulename{subst-rec} exhaustively to that equation terminates and is confluent: For every lambda |lam y e| in |v|, not nested under another lambda, it wraps the body of the lambda in |def x (x=v;e)|. Let |mu x v| denote the resulting right-hand side, so that we get
+Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of every |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
 \[
-|x = v| \movesto^{\ast}_{\rulename{subst-rec}} |x = (mu x v)|.
+|x = v| ~ |x = (mu x v)|.
 \]
 
-This expression behaves much as one would expect from a fixed-point operator: $\freevars{|mu x v|} = \freevars v \setminus \{x\}$, if $x \notin \freevars{v}$ then $|(mu x v) === v|$ and the fixpoint can be unrolled via
+This expression behaves much as one would expect from a fixed-point operator:
+\begin{itemize}
+\item $\freevars{|mu x v|} = \freevars v \setminus \{x\}$
+\item If $x \notin \freevars{v}$ then $|(mu x v) === v|$.
+\item The fixpoint can be unrolled: |mu x v ~ subst v x ((mu x v))|.
+\end{itemize}
+
+Recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved using the following lemma, which unrolls a fixed point partially:
 \[
-|mu x v ->* subst v x ((mu x v))|.
+|mu x(subst v_1 y v_2) ~ subst v_1 y (mu y (subst v_2 x v_1))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}.
 \]
 
-We can recall the example from \cref{sec:confluence-and-recursion}, where |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))|. The problem of joining |tup(1,v_y) ~ v_x| can be solved because we can partially unroll a fixed-point:
-\[
-|mu x(C_1^[C_2^[x]]) ~ C_1^[mu y(C_2^[C_1^[y]])]|
-\]
-
-It is satisfying that {\versecalc} supports a form of fixed-point operator, without having to add it explicitly to our set of values. In particular, because |mu x v| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |mu x v| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
+It is satisfying that in {\versecalc} a form of fixed-point operator emerges, without having to add it explicitly to our syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need special rules for unrolling |(mu x v)| when we are unifying or applying values. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
 
 
-
-
-% This phenomenon has been studied before and led to a various generalizations of confluence to allow this behavior.
-%
-% In particular the notion of \emph{skew-confluence} as introduced by \citet{ariola:skew-confluence}, applies here nicely: Slightly paraphrased it states that given $e_1 \movesto^\ast e_2$ and $e_1 \movesto^\ast e_3$, it suffices that for every \emph{finite} observation on expressions, both $e_2$ and $e_3$ eventually reduce to expression that are indistinguishable by that finite observation.
-%
-% Until we have concluded the formal proof of skew-confluence, including the precise definition of finite observation, we state our aspiration as a conjecture:
-% \begin{conjecture}{Skew-confluence}
-%   The reduction system $\movesto$ is skew-confluent.
-% \end{conjecture}
-
-
-\section{Related work} \label{sec:related}
+\section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
@@ -1592,8 +1579,8 @@ scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and
 
 \subsection{The semantics of logical variables} \label{sec:magical}
 
-Our variables, introduced by |defKW|, are usually called \emph{logical variables},
-or \emph{extra variables} in the literature.  The latter term arises because they
+Our logical variables, introduced by |defKW|, are often called
+\emph{extra variables} in the literature, because they
 are typically introduced as variables that appear on the right-hand side of a function
 definition, but are not bound on the left.  For example, in Curry we can write
 \begin{verbatim}
@@ -1631,9 +1618,9 @@ f( \theta(e_1),\ldots, \theta(e_n) ) \movesto \theta( rhs ) \\
 \text{if}
 \begin{array}[t]{l}
   (e_1, \ldots, e_n) \movesto rhs
-   \; \text{is a top-level function binding} \\
-\text{and $\theta$ is a substitution mapping variables to closed values} \\
-\text{and $dom(\theta) = \mathit{fvs}(e_1, \ldots, e_n, rhs)$}
+   \; \text{is a top-level function binding, and} \\
+\text{$\theta$ is a substitution mapping variables to closed values, s.t
+$dom(\theta) = \mathit{fvs}(e_1, \ldots, e_n, rhs)$}
 \end{array}
 \end{array}
 $$
@@ -1705,7 +1692,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-\lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
+%% \lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
@@ -1745,7 +1732,7 @@ the left branch will reach a value or fail.  There is nothing wrong with this, b
 for |x|.
 
 An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
-the rules for |oneKW| and |allKW|.  Both alternatives seems reasonable choices.
+the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
 
 % \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
 %
@@ -1773,24 +1760,22 @@ it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
 We could take the ANF idea a bit further, by restricting the syntax of equalities so
 that the left-hand-side is always a value.
-Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form:
-$$
-|e_1 = e_2| \quad \text{desugars to} \quad |def x (x = e_1; x = e_2)|
-$$
+Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form,
+by desugaring |(e_1 = e_2)| to |(def x (x = e_1; x = e_2))|.
 The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
 We have chosen not to do this, mainly because it makes |(=)| assymetrical and adds a lot of clutter;
 a debatable decision, but one of no great consequence.
 
 \subsection{Dead existentials}
 
-Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-elim} comes closest,
+Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-eliml} comes closest,
 but it insists that every existential is given a value. It would be easy to add a rule to discard a existential
 whose bound variable is not used in its body, and so far as we know doing so would not lead to
 new difficulties for (say) confluence.  It is mostly a philosophical issue.  For example, the term
 |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
   solution for |x|}.  So if |x| is entirely unconstrained, maybe we should return an infinite number of results?
 For now, we make a conservative choice, and insist that every existential gets a value:
-only \rulename{def-elim} eliminates an existential.
+only \rulename{def-eliml} eliminates an existential.
 
 \subsection{Ordering and choices}
 
@@ -1834,15 +1819,14 @@ to avoid confusing the presentation with these higher-order encodings, but we do
 
 
 
-\section{Conclusions and further work}
-\lennart{This needs a little fleshing out.}
+\section{Further work}
 
 \subsection{Types}
 
 The full Verse language has statically-checked types.
 In the dynamic semantics, the types can be represented by partial
 identity functions---identity of the values of the type and |fail| otherwise.
-This gives a distinctive new perspective oon type systems, one that we leave
+This gives a distinctive new perspective on type systems, one that we leave
 for future work.
 
 \subsection{Effects}
@@ -1869,6 +1853,8 @@ We have reduction rules for effect checking as well, but for the real language t
 \bibliography{../verse}
 
 \appendix
+
+\cleardoublepage
 
 \section{Updateable references} \label{sec:store}
 
@@ -1991,6 +1977,83 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 
 \lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
 
+\section{Confluence proof plan}\label{sec:confluence-proof-plan}
+
+In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making. The main steps are:
+\begin{itemize}
+\item Split the depth-preserving unification rules from the depth-collapsing evaluation rules (\ref{sec:conf-proof-split}).
+\item The unification fragment is terminating, assuming we cut at a given depth (\ref{sec:conf-proof-term}).
+\item Furthermore, it is confluent if we add the additional rules (\ref{sec:conf-proof-u}).
+\item The additional rules and the depths-cutting can be moved to the end of any sequence (\ref{sec:conf-proof-split}).
+\end{itemize}
+
+\subsection{Notation}
+
+We briefly recapitulate some standard notation about abstract rewriting. If $\rightarrow$ is a relation on a set $A$, then $\leftarrow$ is its inverse, $\rightarrow^\ast$ its reflexive transitive closure and $\rightarrow^=$ its reflexive closure. If $\rightsquigarrow$ is also a relation on $A$, then $\leftarrow;\rightsquigarrow$ is its composition.
+
+Relations $\rightarrow$ and $\rightsquigarrow$ commute if $\leftarrow^\ast;\rightsquigarrow^\ast\subseteq \rightsquigarrow^\ast;\leftarrow^\ast$. A self-commuting relation is confluent. A relation $\rightarrow$ has the diamond property if $\leftarrow;\rightarrow\subseteq \rightarrow;\leftarrow$.
+
+% If $A$ is a set of terms and $\underset{R}\rightarrow$ is defined as the congruence closure of a set of rules $R$, then $\underset{R||||}\rightarrow$ is the parallel application of the rules $R$ at disjoint positions.
+
+\subsection{Separating the evaluation rules}
+\label{sec:conf-proof-split}
+
+The first problem we need to deal with is that, as discussed in \cref{sec:confluence-and-recursion}, we can only hope for confluence up to a certain depth $n$. But simply fixing a single depth for the whole proof is unlikely to work, as rule \rulename{app-beta} collapses one layer of lambdas. The more beta-reductions are still to happen, the deeper we have to unroll fixpoints.
+
+We can address this problem with the following general lemma (which we have proven using Isabelle)
+\begin{lemma}\label{lem:u-e}
+Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common set. If
+\begin{enumerate}
+\item |cute n| is an equivalence relation
+\item |cute n; stepA `ss` stepAe; cute n|
+\item |cute (n+1);stepB `ss` stepB; cute n|
+\item |stepArs;stepAs `ss` stepAs;cute n;stepArs|
+\item |stepBr;stepB `ss` stepB;stepBr|
+\item |stepAr;stepB `ss` stepB;stepArs|
+\end{enumerate}
+then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie}
+|stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
+\end{lemma}
+
+We divide our relation $\movesto$ into two sets:
+\begin{enumerate}
+\item The unification and choice fragment, consisting of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. This becomes the |stepA| of \cref{lem:u-e}.
+
+This fragment respects $\equiv_n$, as it does not look under lambdas.
+
+\item The remaining rules, {\i.e.} resolving applications and |oneKW| and |allKW|, form the evaluation fragment.
+
+These rules look under at most one level of lambdas, so take terms related by |cutr (n+1)| to terms related by |cutr (n)|.
+
+Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-linear, so not only is this fragment on its own confluent, but its parallel application has the diamond property and still reduces the depth of expressions at most one level. The \emph{parallel} application becomes the |stepB| of \cref{lem:u-e}.
+\end{enumerate}
+
+The two relations  commute, and crucially, commuting them does not increase the number of (parallel) evaluation steps needed. By \cref{lem:u-e} it remains to show that |stepA| is confluent up to |cute n|.
+
+Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation |stepUn := stepA; cutr n| is confluent. This brings us to the world of “conventional” confluence.
+
+\subsection{Termination of the unification fragment}
+\label{sec:conf-proof-term}
+
+With the evaluation rules, in particular \rulename{app-beta}, out of the way, and only a fixed depth $n$ to worry about, do the remaining rules (not including the extra rules from \cref{fig:rules-confluence}) terminate?
+
+This seems to be the case. For the unification rules this is not immediate, but note that they mimick the standard unification algorithm applied to set of equations in an expression $e$
+\[
+\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
+\]
+and allude to the termination of the standard unification algorithm here.
+
+\subsection{Confluence of the unification rules}
+\label{sec:conf-proof-u}
+
+Unfortunately, the relation is not locally confluent, as we have seen in \cref{sec:confluence-extra}, and we need the extra rules in \cref{fig:rules-confluence} to equate them. Lemma 11 in \Citep{ohlebusch:modulo}, gives us elementary diagrams to complete in order to show confluence up-to these extra rules.
+
+It may help to keep the termination argument simpler by proving confluence of the core unification rules separately from the choice rules, and then prove that they commute.
+
+\subsection{Moving equivalences to the end}
+\label{sec:conf-proof-moving}
+
+Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
 
 \end{document}
 

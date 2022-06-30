@@ -515,6 +515,8 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f (CBinOp "intGE$"  v1 v2) = cmpU (>=) v1 v2
     f (CBinOp "in'<>'"  v1 v2) = cmp  (/=) v1 v2
 
+    f (CBinOp "in'..'"  v1 v2) = enum v1 v2
+
     f (CUnOp  "concat$" (VArray as)) | all isHNF as =
       case () of
         _ | Just vss <- traverse getA as -> CValue $ VArray $ concat vss
@@ -561,6 +563,10 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     cmpU op (VInt i1) (VInt i2) | op i1 i2  = CUnit
                                 | otherwise = CFail
     cmpU _ _ _ = CFail   -- CWrong?
+
+    enum (VInt lo) (VInt hi) = CBar [CInt i | i <- [lo .. hi ]]
+    enum _ _ = CFail
+
 
 isNF :: Value -> Bool
 isNF (Var _) = False

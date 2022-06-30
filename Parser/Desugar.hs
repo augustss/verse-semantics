@@ -485,7 +485,7 @@ dsPArr l lhss e =
 prelude :: [Ident]
 prelude = map (Ident noLoc)
   [ "int", "float", "string", "any", "nat", "false"
-  , "in'..'", "in'->'"
+  , "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
   , "assign", "new"
   , "pre'?'", "pre'[]'", "post'^'"
@@ -505,6 +505,7 @@ primOps = map (Ident noLoc)
   , "known$"  -- This is a horrible hack
   , "deref$", "new$", "assign$"
   , "intGT$", "intGE$", "intLT$", "intLE$"
+  , "in'..'"
   , "wrong"
   ]
 

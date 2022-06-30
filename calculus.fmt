@@ -154,7 +154,7 @@
 %format hole = "\hole"
 %format == = "="
 % format := = "\mapsto"
-%format ; = ";\;"
+%format ; = ";\,"
 %format csp = ",\,"  %% Comma with space
 %format , = ","
 %format X = "X"
@@ -195,6 +195,8 @@
 %format e_2
 %format e_3
 %format e_4
+%format e_5
+%format e_6
 %format e_n
 %format e_m
 %format e_n'
@@ -260,16 +262,35 @@
 %format C_2
 
 %% ----------- Metatheory --------------
-%format cut (n) x = "\operatorname{cut}_{" n "}" x
+%format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"
 %format cutr (n) = "\underset{" n "}\movesto"
 %format cutrr (n) = "\underset{" n "}\movesfrom"
-%format ~ = "\sim"
+%format `cuten` = "\equiv_{n}"
+%format cute (n) = "\equiv_{" n "}"
+%format cute' (n) e1 e2 = e1 "\equiv_{" n "}" e2
+%format ~ = "\mathrel{\sim}"
+%format ~= = "\mathrel{\simeq}"
 %format ->*  = "\movesto^{\ast}"
-%format <->  = "{\convertible}"
-%format ===  = "{\equiv}"
-%format :=  = "{\coloneqq}"
-%format `cup`  = "\cup"
-%format stepU       = "\underset{U}\movesto"
+%format <-*  = "\movesfrom^{\ast}"
+%format <->  = "\mathrel{\convertible}"
+%format ===  = "\mathrel{\equiv}"
+%format `ss`  = "\mathrel{\subseteq}"
+%format :=  = "\mathrel{\coloneqq}"
+%format `cup`  = "\mathop{\cup}"
+%format stepA       = "\underset{A}\movesto"
+%format stepAs      = "\underset{A}\movesto^{\ast}"
+%format stepAr      = "\underset{A}\movesfrom"
+%format stepArs     = "\underset{A}\movesfrom^{\ast}"
+%format stepAe      = "\underset{A}\movesto^{=}"
+%format stepB       = "\underset{B}\movesto"
+%format stepBs      = "\underset{B}\movesto^{\ast}"
+%format stepBr      = "\underset{B}\movesfrom"
+%format stepBrs     = "\underset{B}\movesfrom^{\ast}"
+%format stepB       = "\underset{B}\movesto"
+%format stepAB      = "\underset{AB}\movesto"
+%format stepABs     = "\underset{AB}\movesto^{\ast}"
+%format stepABr     = "\underset{AB}\movesfrom"
+%format stepABrs    = "\underset{AB}\movesfrom^{\ast}"
 %format stepUs      = "\underset{U}\movesto^{\ast}"
 %format stepUr      = "\underset{U}\movesfrom"
 %format stepUrs     = "\underset{U}\movesfrom^{\ast}"
@@ -297,4 +318,8 @@
 %format stepEr      = "\underset{E}\movesfrom"
 %format stepEp      = "\underset{E||}\movesto"
 %format stepEpr     = "\underset{E||}\movesfrom"
+%format stepX       = "\movestoX"
+%format stepXs      = "\movestoX^{\ast}"
+%format stepXr      = "\movesfromX"
+%format stepXrs     = "\movesfromX^{\ast}"
 %format mu x (e)    = "\mu" x".\," e

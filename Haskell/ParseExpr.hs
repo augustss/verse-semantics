@@ -83,7 +83,7 @@ instance Pretty Expr where
       ppNormal expr =
         case expr of
           DefIn is e -> maybeParens (p > 0) $
-            fsep [text "def" <+> fsep (punctuate comma $ map (pPrintPrec l 0) is),
+            fsep [text "def" <+> fsep (map (pPrintPrec l 0) is),
                   text "in" <+> pPrintPrec l 0 e]
           Var n -> pPrintPrec l 0 n
           Int i
