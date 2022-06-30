@@ -43,8 +43,8 @@ simpAlias = fc . g
     fv = composOpV fc fv fh
 
     -- x = (y = e)  -->  x = y; y = e
-    g (CUnify (Var x) e@(CUnify (Var y) _)) =
-      CSeq [CUnify (Var x) (CVar y), e]
+    g (CUnify (CVar x) e@(CUnify (CVar y) _)) =
+      CSeq [CUnify (CVar x) (CVar y), e]
     g e = composOp g e
 
     bind h e =
@@ -68,7 +68,7 @@ simpAlias = fc . g
         pure e  -- Already found, just keep going
        else
         case e of
-          CUnify (Var x) (CVar y) | elem x h, elem y h, x /= y -> do
+          CUnify (CVar x) (CVar y) | elem x h, elem y h, x /= y -> do
             put $ Just (x, y)
             pure (CVar x)
           CUnify e1 e2 -> CUnify e1 <$> findB h e2

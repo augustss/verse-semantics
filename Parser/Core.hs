@@ -34,7 +34,7 @@ import SExp
 
 data Core
   = CValue Value
-  | CUnify Value Core
+  | CUnify Core Core
   | CSeq [Core]
   | CApply Value Value
   | CBar [Core]
@@ -139,13 +139,13 @@ core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
 core (ApplyEff rs e) = coreEffs rs =<< core e
-core (Unify e1 e2) = cUnify <$> value e1 <*> core e2
+core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
 core (Define i AnyT) = pure $ CVar i
-core (Define i e) = cUnify (Var i) <$> core e
+core (Define i e) = cUnify (CVar i) <$> core e
 core AnyT = undefined
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
@@ -154,7 +154,7 @@ core (For2 e1 e2) = do
   ee <- coreD (seqE [e1, e2'])
   ea <- cAll ee
   xa <- newTmp
-  pure $ CDef [xa] $ CSeq [cUnify (Var xa) ea, CApply (VPrim "mapAp") (Var xa)]
+  pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp") (Var xa)]
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
@@ -162,8 +162,9 @@ core (If3 e1 e2 e3) = do
   r <- core e3'
   fn <- cOne $ CBar [l, r]
   i <- newTmp
-  pure $ CDef [i] $ seqC [cUnify (Var i) fn, CApply (Var i) vEmpty]
+  pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
+core (Do e) = coreD e
 core e = impossible e
 
 coreEffs :: [Ident] -> Core -> C Core
@@ -195,11 +196,11 @@ cAll e = do
   x <- newTmp
   pure $ CDef [f, g] $
            CSeq [
-             CUnify (Var f) (CLam u $ CArray []),
-             CUnify (Var g) (CLam v $ CLam r $
+             CUnify (CVar f) (CLam u $ CArray []),
+             CUnify (CVar g) (CLam v $ CLam r $
                                CDef [x] $
                                  CSeq [
-                                   CUnify (Var x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
+                                   CUnify (CVar x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
                                    CApply (VPrim "cons$") (VArray [Var v, Var x])
                                    ]),
              CSplit e (Var f) (Var g)
@@ -242,8 +243,8 @@ cDecides e = do
                 )
 
 -- A small optimization to get smaller examples.
-cUnify :: Value -> Core -> Core
-cUnify e (CValue (VPrim ":any")) = CValue e
+cUnify :: Core -> Core -> Core
+cUnify e (CValue (VPrim ":any")) = e
 cUnify e1 e2 = CUnify e1 e2
 
 coreD :: Expr -> C Core
@@ -316,7 +317,7 @@ coreToRedex = undefined
 
 compos :: (Applicative f) => (Core -> f Core) -> Core -> f Core
 compos f (CValue v) = CValue <$> appV f v
-compos f (CUnify e1 e2) = CUnify <$> appV f e1 <*> f e2
+compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
 compos f (CSeq es) = CSeq <$> traverse f es
 compos f (CApply e1 e2) = CApply <$> appV f e1 <*> appV f e2
 compos f (CBar es) = CBar <$> traverse f es
@@ -341,7 +342,7 @@ composOp f = runIdentity . compos (pure . f)
 
 composC :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Core -> f Core
 composC _  fv _  (CValue v) = CValue <$> fv v
-composC fc fv _  (CUnify e1 e2) = CUnify <$> fv e1 <*> fc e2
+composC fc _fv _  (CUnify e1 e2) = CUnify <$> fc e1 <*> fc e2
 composC fc _  _  (CSeq es) = CSeq <$> traverse fc es
 composC _  fv _  (CApply e1 e2) = CApply <$> fv e1 <*> fv e2
 composC fc _  _  (CBar es) = CBar <$> traverse fc es
@@ -380,7 +381,7 @@ fvsV = nub . cfvsV
 -- Occurrences of free variables
 cfvs :: Core -> [Ident]
 cfvs (CValue v) = cfvsV v
-cfvs (CUnify e1 e2) = cfvsV e1 ++ cfvs e2
+cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CSeq es) = concatMap cfvs es
 cfvs (CApply e1 e2) = cfvsV e1 ++ cfvsV e2
 cfvs (CBar es) = concatMap cfvs es
@@ -408,7 +409,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
   where
     bs = fvsV b
     sub (CValue v) = CValue $ subV v
-    sub (CUnify e1 e2) = CUnify (subV e1) (sub e2)
+    sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
     sub (CSeq es) = CSeq $ map sub es
     sub (CApply e1 e2) = CApply (subV e1) (subV e2)
     sub (CBar es) = CBar $ map sub es
@@ -435,7 +436,7 @@ alphaConvert :: [Ident] -> Core -> Core
 alphaConvert vs = alpha []
   where
     alpha m (CValue v) = CValue (alphaV m v)
-    alpha m (CUnify e1 e2) = CUnify (alphaV m e1) (alpha m e2)
+    alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
     alpha m (CSeq es) = CSeq (map (alpha m) es)
     alpha m (CApply e1 e2) = CApply (alphaV m e1) (alphaV m e2)
     alpha m (CBar es) = CBar (map (alpha m) es)
