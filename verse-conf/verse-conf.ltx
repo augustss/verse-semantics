@@ -322,11 +322,11 @@ Like any functional logic language,
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
 \item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
-  or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a distinctively new
+  or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
-  and |allKW| (\cref{sec:all}).  This leads to a elegant economy of concepts: for example,
+  and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
-  and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
+  and conditional expressions are driven by failure rather than booleans (\cref{sec:if}). One language (called ``Fresh'', unimplemented and introduced in an unpublished technical report \cite{smolka:fresh}) has constructs similar to |oneKW| and |allKW| but treats equality in a rather different way.
 \item \versecalc{} uses \emph{constructive choice}, meaning that the choice operator behaves
   a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
   This makes \versecalc{} \emph{deterministic}, unlike most
