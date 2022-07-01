@@ -39,6 +39,7 @@ main = runCommand command
 
 data CState = CState
   { lastExpr    :: !SomeExpr
+  , lastFile    :: !(Maybe FilePath)
   , tracing     :: !Bool
   , definitions :: ![Expr]
   , prelude     :: !(Maybe Expr)
@@ -110,7 +111,7 @@ command = Command
   , c_greet = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
-  , c_state = CState { lastExpr = NoExpr, tracing = False, definitions = [], prelude = Nothing }
+  , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, tracing = False, definitions = [], prelude = Nothing }
   , c_history = Just ".versei"
   }
 
@@ -121,8 +122,10 @@ cTrace :: Bool -> Run CState
 cTrace trc _ s = pure s{ tracing = trc }
 
 cRead :: Run CState
-cRead fn s =
-  tryIt (pure s) (updateLastExpr s . Parsed) $ do
+cRead afn s = do
+  let fn = if afn == "" then fromMaybe (error "No previous file name") (lastFile s) else afn
+      s' = s{lastFile = Just fn}
+  tryIt (pure s') (updateLastExpr s' . Parsed) $ do
     file <- readFile fn
     let prog = parseDie pFile fn file
     when (prog == prog) $
