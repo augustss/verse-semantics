@@ -34,8 +34,7 @@
 
     \textit{Application} \\
     \begin{array}{lrcl}
-      \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
-          \quad \text{if $x \not\in \freevars{v}$} \\
+      \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)| \\
     \rulename{app-arr} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
@@ -72,14 +71,14 @@
     \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
         & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
     \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[lam y e]; e))]|} \\
-        &&&& \text{if $|x| \in \freevars{e}$, $x \ne y$} \\
-    \rulename{def-eliml} & |def x (DX^[x==v])| & \movesto & |DX^[v]|
-        & \text{if $|x| \notin \freevars{DX}$, $|x| \notin \freevars{v}$} \\
-    \rulename{def-elimr} & |def x (DX^[v==x])| & \movesto & |DX^[v]|
-        & \text{if $|x| \notin \freevars{DX}, |x| \notin \freevars{v}$} \\
+        &&&& \text{if $|x| \in \freevars{e}$} \\
+    \rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+        & \text{if $|x| \notin \freevars{X}\cup \freevars{v}$} \\
+    \rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+        & \text{if $|x| \notin \freevars{X}\cup \freevars{v}$} \\
     \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
     \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
-        & \text{if}~|X| \ne \hole,\,  x \notin \freevars{X}
+        & \text{if}~|X| \ne \hole
     \end{array} \\
 
     \\[-2mm]
@@ -115,7 +114,6 @@
 \iffullverse
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
-    \text{Definition contexts} & DX & ::= & X \vb |def x DX| \\
     \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
     \vb |one e| \vb |all e|

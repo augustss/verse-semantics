@@ -175,6 +175,13 @@
 %format x_i
 %format x_n
 
+%format y_0
+%format y_1
+%format y_2
+%format y_3
+%format y_i
+%format y_n
+
 %format hnf_1
 %format hnf_2
 
