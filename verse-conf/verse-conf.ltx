@@ -1361,7 +1361,7 @@ $$
 
 The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
 
-If the rewrite rules were terminating, then we would expect strong normalization: all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_2 \movesfrom^\ast e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$?
+If the rewrite rules were terminating, then we would expect that all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_2 \movesfrom^\ast e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$?
 
 Confluence would give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
 
