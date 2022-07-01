@@ -34,7 +34,8 @@
 
     \textit{Application} \\
     \begin{array}{lrcl}
-      \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)| \\
+      \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
+          \quad \text{if $x \not\in \freevars{v}$} \\
     \rulename{app-arr} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
     \end{array} \\
     \\[-2mm]
@@ -78,7 +79,7 @@
         & \text{if $|x| \notin \freevars{X}\cup \freevars{v}$} \\
     \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
     \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
-        & \text{if}~|X| \ne \hole
+        & \text{if}~|X| \ne \hole,\,  x \notin \freevars{X}
     \end{array} \\
 
     \\[-2mm]

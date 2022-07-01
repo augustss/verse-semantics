@@ -957,8 +957,8 @@ has the following properties:
 \item There is no ``magical rewriting'' (\cref{sec:magical}): all the variables on the
   right-hand side of a rule are bound on the left.
 \end{itemize}
-
-The rewrite rules are given in Figures~\ref{fig:rules1} and \ref{fig:rules2}. They assume the bounds variables of the whole program, {\ie} in the expression matched by the rule's left-hand side \emph{and} the surrounding context, to be all distinct. Fresh variables are distinct from all variables bound in the program. After applying a rule bound variables that are no longer distinct are implicitly renamed.
+The rewrite rules are given in Figures~\ref{fig:rules1} and \ref{fig:rules2},
+and are described next.
 
 \subsection{Primitive rewrites}
 
@@ -992,7 +992,10 @@ $$
 \; \movesto \;
 |def y (y = 3+4; def x (x=y; x+1))|
 $$
-Note that our variable convention implies that $x \not\in \freevars{v}$ in \rulename{app-beta} and no unwanted variable capture happens.
+Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
+ensures that the |defKW x|
+does not capture any variables free in |v|.  If |x| appears free in |v|, just use
+\textalpha-conversion to rename |x| to $x' \not\in \freevars{v}$.
 
 In \versecalc{}, arrays behave like (finite) functions, in which application is
 indexing.  Rule \rulename{app-arr} describes how array application works.
