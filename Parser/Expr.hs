@@ -76,6 +76,8 @@ data Expr
   | Block [Expr]              -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
   | Parens Expr               -- (e)
+  | Set Expr Ident Expr       -- set e1 = e2
+  | MVar Ident Expr Expr      -- var i : t = e
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -170,6 +172,8 @@ instance Pretty Expr where
           Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e -> parens (ppr 0 e)
+          Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
+          MVar i t e -> text "var" <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
@@ -195,8 +199,13 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "pre.."   0
       , inn "where"   1
       , inr "=>"      2
-      , inn ":="      3
-      , inl "="       6     
+      , inn ":="      3 -- XXX This is probably the wrong level
+      , inn "+="      3
+      , inn "-="      3
+      , inn "*="      3
+      , inn "/="      3
+      , inl "="       3 -- XXX is this right
+      , inl ">>"      3 -- XXX is this right
       , inr "||"      4
       , inr "&&"      5
       , inr ":"       6     
@@ -254,6 +263,8 @@ compos f (Block es) = Block <$> traverse f es
 compos f (Option me) = Option <$> traverse f me
 compos f (Typedef b) = Typedef <$> f b
 compos f (Parens e) = Parens <$> f e
+compos f (Set e1 op e2) = Set <$> f e1 <*> pure op <*> f e2
+compos f (MVar i e1 e2) = MVar i <$> f e1 <*> f e2
 compos f (Define i e) = Define i <$> f e
 compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2

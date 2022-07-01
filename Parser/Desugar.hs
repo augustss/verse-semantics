@@ -36,6 +36,8 @@ type SExpr = Expr   -- Simple Expr: only has some of the constructors
 dropParens :: Expr -> D Expr
 dropParens = f
   where f (Parens e) = f e
+        f (InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3  "=") e3) =
+          f $ InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3 ":=") e3
         f e = compos f e
 
 -- This follows the D transformation in calculus.ltx
@@ -163,6 +165,15 @@ dsD = expr
     -- D[option{e}] = D[if(x:=e)then truth(e)
     expr (Option (Just e)) = inVar e >>= \ (t, e') -> expr $ If2 e' --(ApplyD eTruth t)
                                                                     (Array [t])
+
+    expr (Set e1 (Ident l "=") e2) = 
+      dsD $ ApplyD (eAssign l) $ Array [e1, e2]
+    expr (Set e1 op e2) =
+      expr $ InfixOp e1 op e2
+    expr (MVar i t e) = do
+      t' <- expr t
+      e' <- expr e
+      pure $ Define i $ ApplyD (applyPrimD "new" t') e'
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
@@ -404,9 +415,11 @@ dsP l (InfixOp p (Ident _ ":") t) e = do
 -- P[l?] e = P[l] option{e}
 dsP l (PostfixOp lhs (Ident _ "?")) e =
   dsP l lhs (Option $ Just e)
+{-
 -- P[e1^] e = D[assign(e1, e)]
 dsP l (PostfixOp e1 (Ident _ "^")) e = do
   dsD $ ApplyD (eAssign l) $ Array [e1, e]
+-}
 -- FIX L: update for splices
 -- P[lhs1, ... lhsn] = ...
 dsP l (Array lhss) e = dsPArr l lhss e

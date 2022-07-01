@@ -56,7 +56,8 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
-keywords = ["array", "do", "else", "effects", "for", "fn", "function", "if", "in", "let", "of", "option", "then", "type", "where"]
+keywords = ["array", "block", "do", "else", "effects", "for", "fn", "function", "if"
+           , "in", "let", "of", "option", "set", "then", "type", "var", "where"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -89,13 +90,16 @@ pOp :: String -> P String
 pOp ":" = pOp' ":" "=-"
 pOp "=" = pOp' "=" ">"
 pOp "<" = pOp' "<" ">="
-pOp ">" = pOp' ">" "="
+pOp ">" = pOp' ">" ">="
 --pOp "^" = pOp' "^" ":"
-pOp "-" = pOp' "-" ">"
+pOp "-" = pOp' "-" "=>"
 pOp "|" = pOp' "|" "|"
 pOp "&" = pOp' "&" "&"
 pOp "." = pOp' "." "."
 pOp "~" = pOp' "~" ">"
+pOp "+" = pOp' "+" "="
+pOp "*" = pOp' "*" "="
+pOp "/" = pOp' "/" "="
 pOp s = symbol s
 
 -- Parse the string s, but not if it's followed by one of the characters in ex
@@ -169,13 +173,13 @@ pIf = pKeyword "if" *> (
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
-  (For2 <$> pParens pExprSeq1 <*> (pKeywordOpt "in" *> pBlock))
+  (For2 <$> pParens pExprSeq1 <*> (pKeywordOpt "do" *> pBlock))
   <|>
   (For1 <$> pBlockM)
   )
 
 pLet :: P Expr
-pLet = pKeyword "let" *> (Let <$> pParens pExprSeq <*> (pKeywordOpt "in" *> pBlock))
+pLet = pKeyword "let" *> (Let <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
 
 pCase :: P Expr
 pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq1) <*> (pKeywordOpt "of" *> pBlockM))
@@ -183,13 +187,29 @@ pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq1) <*> (pKeywor
         mkCase (Just e1) e2 = Case2 e1 e2
 
 pDo :: P Expr
-pDo = pKeyword "do" *> (Do <$> pBlockM)
+pDo = pKeyword "block" *> (Do <$> pBlockM)
 
 pOption :: P Expr
 pOption = pKeyword "option" *> (Option <$> optional pExprSeq1)
 
+pSet :: P Expr
+pSet = pKeyword "set" *> do
+  e <- pExprT
+  case e of
+    InfixOp e1 op@(Ident _ sop) e2
+      | sop `elem` ["=", "+=", "-=", "*=", "/="] ->
+        pure $ Set e1 op e2
+    _ -> fail "set not followed by assignment operator"
+
+pVar :: P Expr
+pVar = pKeyword "var" *> do
+  e <- pExprT
+  case e of
+    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ "=") e3 -> pure $ MVar i1 e2 e3
+    _ -> fail "var not followed by x : t = e"
+
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pTerm ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
@@ -231,7 +251,8 @@ operatorTable =
     [op InfixR ":"] ++ map (op InfixR) [">=", "<=", "<", ">", "<>"],
     [op InfixR "&&"],
     [op InfixR "||"],
-    [op InfixN ":=", op InfixL "="],
+    [op InfixN ":=", op InfixL "=", op InfixL ">>"
+    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/="],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
     [op InfixR "=>"],
@@ -244,15 +265,11 @@ operatorTable =
 
     op :: (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
     op fx s = fx (app <$> oper)
-      where app l x y = hackDef l x s y
+      where app l x y = InfixOp x (Ident l s) y
             oper | isAlpha (head s) = getSourcePos <* pKeyword s
                  | otherwise = pOpL s
 
     pOpL s = getSourcePos <* pOp s
-
-    -- x:t=e  is the same as x:t:=e
-    hackDef l x@(InfixOp _ (Ident _ ":") _) "=" y = InfixOp x (Ident l ":=") y
-    hackDef l x s y = InfixOp x (Ident l s) y
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
