@@ -1188,12 +1188,14 @@ the simpler \rulename{global-subst}: to establish confluence.
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
-The rules for choice are given in \cref{fig:choice}. Rules \rulename{fail-l} and \rulename{fail-r}
-say that |fail| is the unit for choice.  Rules \rulename{one-value}, \rulename{one-choice}
+The rules for choice are given in \cref{fig:choice}.
+
+Rules \rulename{one-value}, \rulename{one-choice}
 and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
 Similarly \rulename{all-fail}, \rulename{all-choice} and \rulename{all-value} describe
 the semantics of |allKW| (\cref{sec:all}).
-The \rulename{assoc-choice} is an administrative rule, to allow \rulename{one-choice} to fire.
+
+The rules for |oneKW| and |allKW| expect multiple choices to be normalized into a right-associative list of non-failing values, and the administrative rules \rulename{assoc-choice}, \rulename{fail-l} and \rulename{fail-r} bring nested choices into that form.
 
 The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
 ``floats the choice outwards'', duplicating the surrounding context.
@@ -1240,8 +1242,7 @@ Our not-entirely-satisfying solution is to force \rulename{choose} to float the 
 to the innermost enclosing scope construct; hence the |SX| in the rule.
 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
-\emph{decompose} choices\footnote{\rulename{fail-l} and \rulename{fail-r} also
-  eliminate choice, but only because there is no choice.}.
+\emph{decompose} choices.
 So choice behaves a bit like a data constuctor, or normal form, of the language.
 For this reason we call
 this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
@@ -1715,38 +1716,27 @@ $$
 These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
 lead to |fail|, and confluence is restored.
 
-\subsection{Choice and failure} \label{sec:choice-and-failure}
+% JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think. 
 
-In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
-and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
-only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
-$$
-|(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
-$$
-The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-|if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
-$|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
-and make progress.  But to do this we must look at the right branch of the choice, before we know whether
-the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
-|(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
-for |x|.
+% \subsection{Choice and failure} \label{sec:choice-and-failure}
+% 
+% In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
+% and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
+% only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
+% $$
+% |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
+% $$
+% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+% |if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+% $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+% and make progress.  But to do this we must look at the right branch of the choice, before we know whether
+% the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
+% |(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
+% for |x|.
+% 
+% An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
+% the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
 
-An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
-the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
-
-% \subsection{Liberating more equations} \label{sec:variations-liberate-unify}
-%
-% Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} help to make more equations available for rewriting with \rulename{subst}. For example, |(x=y)=1;y>2| rewrites to |x=y;y=1;y>2|, which allows \rulename{subst} to rewrite with |y=1|, and the whole expression collapses to |fail|.
-%
-% But the quite similar expression |(apply0 f =y)=1;y>2| is stuck, because \rulename{unify-unifyr} requires the inner unification between \emph{values}. We chose the more restrictive variant because confluence calls for just that, but one could have a more complete set of rules instead, covering all cases where two values ought to be equated:
-% \[\begin{array}{rcl@@{\hspace{10mm}}rcl}
-% |(v_1 = e) = v_2| & \movesto & |(v_1 = e); (v_1 = v_2)|
-% & |(e = v_1) = v_2| & \movesto & |(e = v_1); (v_1 = v_2)| \\
-% |v_1 = (e = v_2)| & \movesto & |(v_1 = v_2); (e = v_2)|
-% & |v_1 = (v_2 = e)| & \movesto & |(v_1 = v_2); (v_2 = e)| \\
-%  \end{array}\]
-%
-% \joachim{Not sure if this section is worth it, or does a good job of explaining why we don’t use the full rules. Also these rules are not confluent.}
 
 \subsection{Administrative normal form}
 

@@ -128,15 +128,6 @@
 \begin{figure}
   $$
   \begin{array}{l}
-    \textit{Choice} \\
-    \begin{array}{lrcll}
-    \rulename{fail-l} & |fail choice e| & \movesto & e \\
-    \rulename{fail-r} & |e choice fail| & \movesto & e \\
-    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
-    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| 
-    \end{array} \\
-    \\
-
     \textit{One and all} \\
     \begin{array}[t]{lrcl}
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
@@ -149,9 +140,20 @@
       |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1, dots, v_n)| \\
     \rulename{all-value} & |all v| & \movesto & |arr v| \\
     \end{array} \\
+
     \\[-2mm]
 
+    \textit{Choice} \\
+    \begin{array}{lrcll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+
 \iffullverse
+    \\[-2mm]
+
     \textit{Effects} \\
     \begin{array}{lrcl}
     \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
