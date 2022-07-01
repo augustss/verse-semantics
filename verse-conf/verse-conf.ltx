@@ -1545,8 +1545,7 @@ but it does not appear to have been used to describe functional logic languages 
 \subsection{One and all}
 
 Logical variables, choice, and equalities are present in many functional logic
-languages.  However |oneKW| and |allKW| are distinctive features of \versecalc{}.
-\lennart{What about Fresh?}
+languages.  However |oneKW| and |allKW| are distinctive features of \versecalc{} (apart from Smolka {\etal}'s Fresh~\cite{smolka:fresh}, which has \emph{confinement} and \emph{collection}, but their treatment of equality and thus logical variables is rather different).
 
 First, notice that |allKW| \emph{reifies} choice (a control operator) into an array (a data structure);
 for example, |all (1 choice 7 choice 2)| returns the array |tup (1,7,2)|),
