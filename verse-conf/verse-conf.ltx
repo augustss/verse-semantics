@@ -1436,25 +1436,13 @@ The main source for possible non-confluence is rule \rulename{subst}: If we have
 \[ |def x (x=v_1; x=v_2; e)| \]
 which we can rewrite by \rulename{subst} (and administrative \rulename{def-eliml} and \rulename{seq}) to either
 \[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
-Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variables on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
+Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variable on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
 
 Confluence seems to be within reach? Unfortunately, not quite, as we discuss next.
 
 \subsection{Order of quantifiers, position of equations and variable names}
 \label{sec:confluence-extra}
 
-\begin{figure}
-\[\begin{array}{lr@@{\;}c@@{\;}l}
-    \rulename{def-swap} & |def (x y) e| & \movestoX & |def (y x) e|\\
-    \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
-    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
-    \rulename{seq} & |v;e| & \movestoX & |e| \\
-\end{array}\]
-  \caption{}
-    \label{fig:rules-confluence}
-\end{figure}
-
-\label{sec:conf-move-eqn}
 
 There are some sources of non-confluence that we would consider insignificant. For example
 | (def x (x=e_1));(def y (y=e_2)) |
@@ -1469,7 +1457,20 @@ or
 \item In the presence of an equation between two variables, we do not care which of the two variables is mentiond, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
 \item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
 \end{itemize}
-\simon{Another sentence needed here.  What role does this new rewrite system play? Fwd ref to 5.4?}
+We can now consider two expressions the same up to these administrative differences if they are convertible via |stepX|.
+
+\begin{figure}
+\[\begin{array}{lr@@{\;}c@@{\;}l}
+    \rulename{def-swap} & |def (x y) e| & \movestoX & |def (y x) e|\\
+    \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
+    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
+    \rulename{seq} & |v;e| & \movestoX & |e| \\
+\end{array}\]
+  \caption{}
+    \label{fig:rules-confluence}
+\end{figure}
+
+\label{sec:conf-move-eqn}
 
 \subsection{Recursion}%
 \label{sec:confluence-and-recursion}
@@ -1494,7 +1495,7 @@ Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam 
 \end{array}
 \]
 and we find that we \emph{cannot} join them; they keep “missing each other”. The relation $\movesto$ is \emph{not} confluent.
-
+%
 But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth.
 
 \begin{definition}[Depth cutting]
@@ -1518,10 +1519,10 @@ We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for e
 
 \begin{proposition}[Confluence]
 \label{thm:confluence}%
-For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 ~ e_3|.
+For all |e_2 <-* e_1 ->* e_3| we have |e_2 ~ e_3|.
 \end{proposition}
 
-In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case we believe it is, and we get:
+In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation. For \versecalc, we believe both hold:
 
 \begin{proposition}[Church-Rosser]
 \label{thm:church-rosser}%
