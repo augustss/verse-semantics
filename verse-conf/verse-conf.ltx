@@ -1580,7 +1580,9 @@ $$
 So our expression rewrites (non-deterministically) to either |(3+20)| or |(3+30)|;
 and that in turn allows the addition to make progress.
 Of course, including non-deterministic choice means the rules are non-confluent by
-construction.
+construction.  Instead, one must generalise to say that a reduction does not change the
+\emph{set} of results; in the context of lambda calculi see
+for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 
 In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can make progress, by floating out the
@@ -1611,11 +1613,11 @@ In the other direction, indexing turns an array into choice ({\eg}, |def i (appl
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
 \emph{set functions} in (an extension of) Curry \cite[Section 4.2.7]{curry:tutorial}
-implemented in the Kiel Curry System interpreter \cite{kics}.
+implemented in the Kiel Curry System interpreter \cite{brassel:encapsulated,kics,hanus:set-functions}.
 But this is regarded as a somewhat sophisticated feature,
 whereas it is part of the foundational fabric of \versecalc{}.
-Curry's set functions need careful explanation about what is ``inside'' and ``outside''
-the set function \cite{hanus:set-functions}, something that is a straightforward
+Curry's set functions need careful explanation about sharing across non-deterministic choices,
+or what is ``inside'' and ``outside'' the set function, something that appears as a straightforward
 consequence of \versecalc{}'s single rule \rulename{choose}.
 
 Second, even under the reification of |allKW|,
@@ -1692,6 +1694,10 @@ But the substitution for the extra variables must be chosen ``magically''
 work out. This is admirably high level, because it hides everything
 about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
+In subsequent journal paper they refine CRWL to avoid magical rewriting using
+``let-narrowing'' \cite[Section 6]{fraguas:let-narrowing}; this system
+looks rather different to ours, especially in its treatment of choice,
+but is rather close in spirit.
 
 To explain actual execution, the state of the art is described by
 \citet{hanus:semantics}.  They give both a big-step operational
@@ -1916,11 +1922,12 @@ We have reduction rules for effect checking as well, but for the real language t
                                         %% contents suppressed with 'anonymous'
   We thank our colleagues for their helpufl feedback on earlier drafts of this paper,
   including
-  Francisco Lopez Fraguas,
+  Francisco L\'opez-Fraguas,
   Michael Hanus,
   Ranjit Jhala,
-  and Dale Miller.
-
+  Dale Miller
+  Juan Rodr\'iguez-Hortal\'a,
+  and Jaime S\'anches-Hern\'andez.
 \end{acks}
 
 % -------------------- Bibliography ----------------
