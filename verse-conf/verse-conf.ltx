@@ -921,8 +921,8 @@ $$
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
-\figureContexts
 \figureRulesI
+\figureContexts
 
 How can we give a precise semantics to a non-strict functional
 programming language?  Here are some possibilities:
@@ -946,6 +946,7 @@ programming language?  Here are some possibilities:
   Indeed teachers almost always explain the execution of Haskell or ML programs as a succession of rewrites
  of the program ({\eg}, inline this call, simplify this |case| expression, \etc).
 \end{itemize}
+
 Up to this point there has been no satisfying rewrite semantics for functional logic languages
 (see \cref{sec:related} for previous work).
 Our main technical contribution is to fill this gap with a rewrite semantics for \versecalc{}, one that
@@ -962,6 +963,7 @@ has the following properties:
 \item There is no ``magical rewriting'' (\cref{sec:magical}): all the variables on the
   right-hand side of a rule are bound on the left.
 \end{itemize}
+
 The rewrite rules are given in Figures~\ref{fig:rules1} and \ref{fig:rules2},
 and are described next.
 
