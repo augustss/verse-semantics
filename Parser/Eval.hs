@@ -41,9 +41,11 @@ cWrongs :: [String] -> Core
 cWrongs [] = internalError
 cWrongs ws = CWrong $ intercalate ";" ws
 
+{-
 getWrong :: Core -> Maybe String
 getWrong (CWrong s) = Just s
 getWrong _ = Nothing
+-}
 
 getValue :: Core -> Maybe Value
 getValue (CValue v) = Just v
@@ -101,8 +103,9 @@ isX _ = False
 -- Take some reduction steps.
 evalSteps :: Bool -> EvalCore
 evalSteps hasPRELUDE t =
+  evalWrong t .
   evalDefFloat t . evalAll t . evalChoice t . evalSplit t .
-  evalWrong t . evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
+  evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
   (if hasPRELUDE then id else replacePrelude t)
 
@@ -217,6 +220,7 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
 evalWrong :: EvalCore
 evalWrong = evalTrace "evalWrong" f
   where
+    f (CDef (_:_) CValue{}) = CWrong "def-wrong"
     f e | ws@(_:_) <- getWrongs e = cWrongs ws
     f e = composOp f e
 
@@ -226,6 +230,12 @@ evalWrong = evalTrace "evalWrong" f
     getWrongs (CDef _ e) = getWrongs e
     getWrongs (CSucceeds e) = getWrongs e
     getWrongs (CDecides e) = getWrongs e
+    getWrongs (CSplit (CWrong s) _ _) = [s]
+    getWrongs (CSplit (CBar (CWrong s : _)) _ _) = [s]
+    getWrongs (COne (CWrong s)) = [s]
+    getWrongs (COne (CBar (CWrong s : _))) = [s]
+    getWrongs (CAll (CWrong s)) = [s]
+    getWrongs (CAll (CBar es)) = concatMap getWrongs es
     getWrongs _ = []
 
 -- Handle CFail propagation
@@ -382,7 +392,6 @@ evalDef flg = evalTrace "evalDef" f flg
   where
     f (CDef _ CFail) = CFail
     f (CDef [] e) = f e
-    f (CDef (_:_) CValue{}) = CWrong "def-wrong"
     f (CDef h1 (CDef h2 e)) =
       assert (null (intersect h1 h2)) ("DEF-MERGE: " ++ show (h1,h2)) $
       f $ CDef (h1 ++ h2) e
@@ -396,8 +405,6 @@ evalSplit flg = evalTrace "evalSplit" f flg
     f (CSplit CFail n _) = CApply n (VArray [])
     f e@(CSplit (CValue v) _ g) = val e g v (VLam dummy CFail)
     f e@(CSplit (CBar (CValue v : es)) _ g) = val e g v (VLam dummy $ CBar es)
-    f (CSplit e@CWrong{} _ _) = e
-    f (CSplit (CBar (e@CWrong{} : _)) _ _) = e
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
@@ -407,25 +414,22 @@ dummy :: Ident
 dummy = Ident noLoc "_"
 
 -- Handle 'all'
---  ALL-0, ALL-N, ALL-WRONG
+--  ALL-0, ALL-N
 evalAll :: EvalCore
 evalAll flg = evalTrace "evalAll" f flg
   where
     f (CAll (CValue v)) = CArray [v]
-    f (CAll e@CWrong{}) = e
-    f (CAll (CBar es)) | ws@(_:_) <- mapMaybe getWrong es = cWrongs ws
-                       | Just vs  <- traverse getValue es = CArray vs
+    f (CAll (CBar es)) | Just vs  <- traverse getValue es = CArray vs
     f e = composOpLam (underLambda flg) f e
 
 -- Handle 'one'
---  ONE-VALUE, ONE-CHOICE, ONE-FAIL, ONE-WRONG
+--  ONE-VALUE, ONE-CHOICE, ONE-FAIL
 evalOne :: EvalCore
 evalOne flg = evalTrace "evalOne" f flg
   where
     f (COne e@CValue{}) = f e
     f (COne CFail) = CFail
     f (COne (CBar (e@CValue{} : _))) = f e
-    f (COne e@CWrong{}) = e
     f e = composOpLam (underLambda flg) f e
 
 -- Handle non-primop applications
@@ -483,12 +487,10 @@ evalSucceeds flg = evalTrace "evalSucceeds" f flg
     f (CSucceeds CFail) = CWrong "succeeds-fail"
     f (CSucceeds (CBar [e@CValue{}])) = f e
     f (CSucceeds (CBar (CValue{} : _ : _))) = CWrong "succeeds-many"
-    f (CSucceeds e@CWrong{}) = e
     f (CDecides e@CValue{}) = f e
     f (CDecides CFail) = CFail
     f (CDecides (CBar [e@CValue{}])) = f e
     f (CDecides (CBar (CValue{} : _ : _))) = CWrong "decides-many"
-    f (CDecides e@CWrong{}) = e
     f e = composOpLam (underLambda flg) f e
 
 -- Reduce applications of primops
