@@ -1904,7 +1904,7 @@ As \Cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, 
 For example this
 program does not yield a value:
 $$
-|def (ones,y,z) (ones = tup (1,ones); tup (y,z) = x; y)|
+|def (ones,y,z) (ones = tup (1,ones); tup (y,z) = ones; y)|
 $$
 Here |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
 |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
