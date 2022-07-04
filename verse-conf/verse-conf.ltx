@@ -1773,7 +1773,7 @@ new difficulties for (say) confluence.  It is mostly a philosophical issue.  For
 |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
   solution for |x|}.  So if |x| is entirely unconstrained, maybe we should return an infinite number of results?
 For now, we make a conservative choice, and insist that every existential gets a value:
-only \rulename{def-eliml} eliminates an existential.
+only \rulename{def-eliml} and \rulename{def-elimr} eliminate an existential.
 
 \subsection{Ordering and choices}
 
