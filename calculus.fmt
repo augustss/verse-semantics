@@ -30,6 +30,7 @@
 
 %% ----------- End of Applications --------------
 
+%format space = "\hspace{1mm}"
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
 %format thunk (e) = "\lambda x.\," e

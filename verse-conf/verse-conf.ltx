@@ -486,7 +486,7 @@ functions |gt| and |add|.
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we with usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an array.
+For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an array.
 }
 
   Remembering that a value can be a lambda, this gives us the full lambda calculus.
@@ -513,7 +513,7 @@ $$
 |def (x y z) (x=tup(y,3); x=tup(2,z); y)|
 $$
 is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
-unifies |y| with |2| and |z| with |3|.  Finally |y| is returned as the result.
+unifies |y| with |2| and |z| with |3|.  Finally |2| is returned as the result.
 Note carefully that, like any declarative language,
 \emph{a logical variable always stands for a single value}; logical
 variables are not mutable.
@@ -638,17 +638,16 @@ We use the empty array |emptytup| to represent the empty list and pairs to repre
 and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x y) (p = tup (x,y); body)|
   }:
 $$
-|append =lamhdr (tup (xs,ys))| \begin{array}[t]{l}
-  |(xs = emptytup; ys) choice| \\
-  |(def (x xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys))))|
-\end{array}
+|append =lam (tup (xs,ys))
+  ((xs = emptytup; ys) space choice space
+   (def (x xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys)))))|
 $$
-If |xs| is |emptytup|, the left-hand choice succeeds, returning |y|; and the right-hand choice
+If |xs| is |emptytup|, the left-hand choice succeeds, returning |ys|; and the right-hand choice
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
 If |xs| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
 Finally if |xs| is built with head-normal forms other than the empty array and pairs, both choices fail, and |append| returns no
-results.
+results at all.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
 Suppose |single = tup (1, emptytup)|, a singleton list whose only element is 1.
@@ -785,7 +784,7 @@ We will illustrate this with a few examples.
 \end{figure}
 
 The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
-not arbitrary expressions, in array literals and function-applications.
+not arbitrary expressions, in array literals and function-applications \cite{felleisen:anf}.
 To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 \begin{itemize}
 \item With |:=| we simultaneously introduce and ``assign'' a variable
@@ -1947,6 +1946,7 @@ We have reduction rules for effect checking as well, but for the real language t
   We thank our colleagues for their helpufl feedback on earlier drafts of this paper,
   including
   Francisco L\'opez-Fraguas,
+  Andy Gordon,
   Michael Hanus,
   Ranjit Jhala,
   Dale Miller
