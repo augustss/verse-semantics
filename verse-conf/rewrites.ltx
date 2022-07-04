@@ -144,7 +144,7 @@
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
     \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
-    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+    \rulename{assoc-choice} & SX^|(e_1 choice e_2) choice e_3| & \movesto & SX^|e_1 choice (e_2 choice e_3)| \\
     \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
     \end{array} \\
 
