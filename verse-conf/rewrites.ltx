@@ -18,10 +18,10 @@
 
 \rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
-    $\left\{\begin{array}{@@{}ll}
+    $\begin{cases}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
-      \end{array}\right.$ \\
+      \end{cases}$ \\
 
 \iffullverse
     \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
@@ -41,20 +41,19 @@
 \rulegroupname{Unification}
 
 \rulename{ulit} & |k_1 == k_2| & \movesto
-    & \largerhs{$\left\{\begin{array}{@@{}ll}
+    & \largerhs{$\begin{cases}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
-      \end{array}\right.$} \\
+      \end{cases}$} \\
 \rulename{ucon} & $\begin{array}{@@{}l@@{}}
       |arr (v_1,dots,v_m)| \\
       \quad |== arr (v1',dots,v_n')|
       \end{array}$ & \movesto
-    & \largerhs{$
-      \left\{\begin{array}{@@{}ll}
-        \multicolumn{2}{@@{}l}{|(v_1==v1';dots;v_m=v_m'; arr (v_1,dots,v_m))|} \\
+    & \largerhs{$\begin{cases}
+        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; arr (v_1,dots,v_m)|} \\
             & \text{if $m=n$} \\
         |fail| & \text{otherwise}
-      \end{array}\right.
+      \end{cases}
     $}\\
 \rulename{ux1} & |k == arr (v_1,dots,v_n) | & \movesto & |fail| \\
 \rulename{ux2} & |arr (v_1,dots,v_n) == k | & \movesto & |fail| \\
@@ -69,7 +68,7 @@
 
 \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
     & if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$ \\
-\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[lam y e]; e))]|} \\
+\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
     &&&& if $|x| \in \freevars{e}$ \\
 \rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
     & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
