@@ -66,7 +66,7 @@
 
 \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
     & if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$ \\
-\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
+\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
     &&&& if $|x| \in \freevars{e}$ \\
 \rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
     & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
