@@ -1238,8 +1238,6 @@ and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec
 Similarly \rulename{all-fail}, \rulename{all-choice} and \rulename{all-value} describe
 the semantics of |allKW| (\cref{sec:all}).
 
-The rules for |oneKW| and |allKW| expect multiple choices to be normalized into a right-associative list of non-failing values, and the administrative rules \rulename{assoc-choice}, \rulename{fail-l} and \rulename{fail-r} bring nested choices into that form.
-
 The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
 ``floats the choice outwards'', duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
@@ -1292,6 +1290,25 @@ So choice behaves a bit like a data constuctor, or normal form, of the language.
 For this reason we call
 this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
 picking one branch or the other, which immediately gives up confluence.
+
+The rules for |oneKW| and |allKW| expect multiple choices to be
+normalized into a right-associative list of non-failing values, and
+the administrative rules \rulename{assoc-choice}, \rulename{fail-l}
+and \rulename{fail-r} bring nested choices into that form. But why do these rules
+need a |SX| context? Are they not universally true?  Consider this expression:
+$$
+|(if (x > 2) then e1 else e2); (x = 1 choice fail)|
+$$
+The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+|if| is not choice-free.  If \rulename{fail-r} lacked a |SX| context we could rewrite
+ $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+and make progress.  But to do this \emph{we must look at the right branch of the choice, before we know whether
+  the left branch will reach a value or fail}, and that requires the implementation to explore
+both branches in parallel, a bit like adding parallel-or to the language.  That is a heavy obligation, and one
+we do not need to incur.
+Adding the |SX| context to \rulename{fail-r} allows an implementation
+to be sequential -- without, of course, prohibiting parallel evaluation.  The |SX| is less significant
+for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
 \subsection{\versecalc{} is lenient} \label{sec:lenient}
 
