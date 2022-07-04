@@ -922,7 +922,6 @@ $$
 
 \figureRulesI
 \figureContexts
-\figureRulesII
 
 How can we give a precise semantics to a non-strict functional
 programming language?  Here are some possibilities:
@@ -1190,6 +1189,8 @@ stuck, because \rulename{global-subst} cannot rewrite it.
 We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
 This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
 the simpler \rulename{global-subst}: to establish confluence.
+
+\figureRulesII
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
