@@ -1,0 +1,4 @@
+session Verse = Nominal2 +
+  theories
+    CoreVerse
+    "U-E-confluence"
