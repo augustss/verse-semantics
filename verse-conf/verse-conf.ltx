@@ -1441,7 +1441,7 @@ Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,
 
 \subsection{Confluence}
 
-While |->| is not confluent, it we can say that it is confluent up to |stepE| and |cutr n|:
+While |->| is not confluent on its own, we can say that it is confluent up to |stepE| and |cutr n|:
 
 \begin{definition}
 We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
@@ -1462,9 +1462,10 @@ In general, confluence up-to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress (see \cref{sec:confluence-proof-plan} for a high-level proof plan).
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress.
+%(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
 
-We have, however, reasons to be optimistic: Even the incomplete proof effort already helped us fix various unwanted causes for non-confluence in our system. Moreover, we have an implementation of the reduction semantics in Haskell and have been using property-based testing and QuickCheck \citep{quickcheck} to vet our assumptions and various lemmas.
+We have, however, reasons to be optimistic: Even our incomplete proof effort already helped us root out various forms of unwanted non-confluence. Moreover, we have an implementation of the reduction semantics in Haskell and we are using property-based testing with QuickCheck \citep{quickcheck} to search for non-confluence.
 
 \subsection{Equational theory}
 
@@ -1493,7 +1494,7 @@ The development of this theory is future work.
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of every |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
+Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of \emph{some} |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
 \[
 |x = v| ~ |x = (mu x v)|.
 \]
@@ -1966,6 +1967,9 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 
 \lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
 
+% JB: Removed, given that even the very first step turned out to not help with out system
+% and then not much of value can be said there 
+\iffalse
 \section{Confluence proof plan}\label{sec:confluence-proof-plan}
 
 In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making. The main steps are:
@@ -2014,7 +2018,9 @@ This fragment respects $\equiv_n$, as it does not look under lambdas.
 
 These rules look under at most one level of lambdas, so take terms related by |cutr (n+1)| to terms related by |cutr (n)|.
 
-Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-linear, so not only is this fragment on its own confluent, but its parallel application has the diamond property and still reduces the depth of expressions at most one level. The \emph{parallel} application becomes the |stepB| of \cref{lem:u-e}.
+Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-linear, so not only is this fragment on its own confluent, but its parallel application has the diamond property and still reduces the depth of expressions at most one level.
+% JB: The second half of the previous sentence is wrong, and the reason I am removing this section
+The \emph{parallel} application becomes the |stepB| of \cref{lem:u-e}.
 \end{enumerate}
 
 The two relations  commute, and crucially, commuting them does not increase the number of (parallel) evaluation steps needed. By \cref{lem:u-e} it remains to show that |stepA| is confluent up to |cute n|.
@@ -2043,6 +2049,8 @@ It may help to keep the termination argument simpler by proving confluence of th
 \label{sec:conf-proof-moving}
 
 Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
+
+\fi % confluence appendix
 
 \end{document}
 
