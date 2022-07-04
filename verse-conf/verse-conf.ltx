@@ -1422,7 +1422,7 @@ which we can rewrite by \rulename{subst} (and administrative \rulename{def-eliml
 \[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
 Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variables on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
 
-Confluence seems to be within? Unfortunately, not quite:
+Confluence seems to be within reach? Unfortunately, not quite, as we discuss next.
 
 \subsection{Order of quantifiers, position of equations and variable names}
 \label{sec:confluence-extra}
@@ -1453,6 +1453,7 @@ or
 \item In the presence of an equation between two variables, we do not care which of the two variables is mentiond, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
 \item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
 \end{itemize}
+\simon{Another sentence needed here.  What role does this new rewrite system play? Fwd ref to 5.4?}
 
 \subsection{Recursion}%
 \label{sec:confluence-and-recursion}
@@ -1482,7 +1483,8 @@ But notice that as we keep evaluating these fixed-points, they produce the same 
 
 \begin{definition}[Depth cutting]
 To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
-$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally else. When we need to write the function as a relation, we use |cutr n|. The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2 := cut n e_1 === cut n e_2|.
+$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally otherwise.
+When we need to write the function as a relation, we use |cutr n|. The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2| iff |cut n e_1 === cut n e_2|.
 \end{definition}
 
 Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
@@ -1490,6 +1492,7 @@ Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,
 \subsection{Confluence}
 
 While |->| is not confluent on its own, we can say that it is confluent up to |stepE| and |cutr n|:
+\simon{What on earth is |stepE|?  Maybe wiggly arrow?}
 
 \begin{definition}
 We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
@@ -1503,7 +1506,7 @@ We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for e
 For all |e_1 ->* e_2|, |e_1 ->* e_3| we have |e_2 ~ e_3|.
 \end{proposition}
 
-In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case we belive it is, and we get:
+In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation, but in our case we believe it is, and we get:
 
 \begin{proposition}[Church-Rosser]
 \label{thm:church-rosser}%
@@ -1512,8 +1515,13 @@ In general, confluence up-to an equivalence relation is not necessarily the same
 
 Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress.
 %(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
+\simon{Do we have local confluence?  Or is it not even a useful stepping stone?}
 
-We have, however, reasons to be optimistic: Even our incomplete proof effort already helped us root out various forms of unwanted non-confluence. Moreover, we have an implementation of the reduction semantics in Haskell and we are using property-based testing with QuickCheck \citep{quickcheck} to search for non-confluence.
+We have, however, reasons to be optimistic: our incomplete proof
+effort has already helped us root out various forms of unwanted
+non-confluence. Moreover, we have an implementation of the complete
+reduction semantics in Haskell and we are using property-based testing
+with QuickCheck \citep{quickcheck} to search for non-confluence.
 
 \subsection{Equational theory}
 
@@ -1567,7 +1575,7 @@ It is satisfying that in {\versecalc} a form of fixed-point operator emerges, wi
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
 know what \versecalc{} is, we can identify its distinctive features,
-compared to other approaches.
+and compare them to other approaches.
 
 \subsection{Choice and non-determinism} \label{sec:deterministic}
 
@@ -1585,13 +1593,13 @@ construction.  Instead, one must generalise to say that a reduction does not cha
 for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 
 In contrast, our rules never pick one side or the other of a choice.
-And yet |(3 + (20 choice 30))| can make progress, by floating out the
+And yet |(3 + (20 choice 30))| can still make progress, by floating out the
 choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
-it is common in calculi with choice, see {\eg},~\cite[Section 6.1]{liguoro:non-det}\cite[Section 3]{lago:probabilistic},
-and (more recently) has been used to describe functional logic languages where it is variously
+it is common in calculi with choice, see {\eg},~\cite[Section 6.1]{liguoro:non-det}\cite[Section 3]{lago:probabilistic}
+and, more recently, has been used to describe functional logic languages where it is variously
 called \emph{bubbling} \cite{antoy:bubbling} or \emph{pull-tabbing} \cite{antoy:pull-tabbing}.
 However, our formulation appears simpler, because we avoid the need for attaching
 an identifier to each choice with its attendant complications.
@@ -1612,11 +1620,11 @@ for example, |all (1 choice 7 choice 2)| returns the array |tup (1,7,2)|),
 In the other direction, indexing turns an array into choice ({\eg}, |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
-\emph{set functions} in (an extension of) Curry \cite[Section 4.2.7]{curry:tutorial}
+\emph{set-functions} in an extension of Curry \cite[Section 4.2.7]{curry:tutorial},
 implemented in the Kiel Curry System interpreter \cite{brassel:encapsulated,kics,hanus:set-functions}.
 But this is regarded as a somewhat sophisticated feature,
 whereas it is part of the foundational fabric of \versecalc{}.
-Curry's set functions need careful explanation about sharing across non-deterministic choices,
+Curry's set-functions need careful explanation about sharing across non-deterministic choices,
 or what is ``inside'' and ``outside'' the set function, something that appears as a straightforward
 consequence of \versecalc{}'s single rule \rulename{choose}.
 
@@ -1628,14 +1636,14 @@ array is completely determined.  Anything else would leak
 non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
 and \cref{sec:choice-rules}, we have to take care to maintain the
 left-to-right order of choices.
-
-Maintaining that order has other payoffs. For example, it is relatively easy to add
+However, maintaining that order has other payoffs. For example, it is relatively easy to add
 effects other than choice, including mutable variables and input/output, to \versecalc{}.
 To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
 for mutable variables.
 
 Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
-depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour.
+depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour,
+and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' \emph{vs.} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
