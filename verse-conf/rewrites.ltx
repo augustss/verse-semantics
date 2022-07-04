@@ -9,8 +9,10 @@
 
 \newcommand{\figureRulesI}{
 \begin{figure}
-\begin{longtable}{@@{\quad} l r @@{\;}>{$}c<{$}@@{\;} l l}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
 % The quad indents the lines
+% The \hspace{-..} removes redundant space between rule name column and LHS column
+% that arises because the longest rule name and the longer LHS are not on the same line
 % The \; reduces the spacing around the arrow
 % The >{$} turns on math mode for the arrow column
 
