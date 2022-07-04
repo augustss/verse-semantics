@@ -4,11 +4,12 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newcommand{\figureRulesI}{
 \begin{figure}
   $$
   \begin{array}{l}
     \textit{Primitive operations} \\
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
     \rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & k_1+k_2 \\
     \rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
     \left\{\begin{array}{@@{}ll}
@@ -33,7 +34,7 @@
     \end{array} \\
 
     \textit{Application} \\
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
       \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
           \quad \text{if $x \not\in \freevars{v}$} \\
     \rulename{app-arr} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & |(v = 0; v_0) choice dots choice (v = n; v_n)| \\
@@ -41,15 +42,15 @@
     \\[-2mm]
 
     \textit{Unification} \\
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
     \rulename{ulit} & |k_1 == k_2| & \movesto
     & \left\{\begin{array}{@@{}ll}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
       \end{array}\right. \\
-    \rulename{ucon} & \begin{array}{@@{}l}
+    \rulename{ucon} & \begin{array}{@@{}l@@{}}
       |arr (v_1,dots,v_m)| \\
-      | == arr (v1',dots,v_n')|
+      \quad |== arr (v1',dots,v_n')|
       \end{array} & \movesto
     & \left\{\begin{array}{@@{}ll}
     \multicolumn{2}{@@{}l}{|(v_1==v1';dots;v_m=v_m'; arr (v_1,dots,v_m))|} \\
@@ -68,7 +69,7 @@
     \\[-2mm]
 
     \textit{Unification variables} \\
-    \begin{array}{lrcll}
+    \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
         & \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
     \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \multicolumn{2}{l}{|x = V[lam y (def x (x = V^[lam y e]; e))]|} \\
@@ -85,7 +86,7 @@
     \\[-2mm]
 
     \textit{Sequencing} \\
-    \begin{array}{lrcl@@{\hspace{5mm}}l}
+    \begin{array}{lr@@{\;}c@@{\;}l@@{\hspace{5mm}}l}
     \rulename{seq} & |v ; e| & \movesto & |e| \\
     \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
     \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
@@ -94,7 +95,7 @@
     \end{array} \\
     \\[-2mm]
     \textit{Fail propagation} \\
-    \begin{array}{lrcll}
+    \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
     \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if}~|X| \ne \hole  \\
      \end{array}
@@ -104,10 +105,12 @@
   \caption{The Verse calculus: rewrite rules (1)}
     \label{fig:general-axioms} \label{fig:rules1}
 \end{figure}
+}
 
+\newcommand{\figureContexts}{
 \begin{figure}
   $$
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
     \text{Value contexts} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
@@ -123,17 +126,19 @@
   \caption{The syntax of contexts}
     \label{fig:contexts}
 \end{figure}
+}
 
+\newcommand{\figureRulesII}{
 \begin{figure}
   $$
   \begin{array}{l}
     \textit{One and all} \\
-    \begin{array}[t]{lrcl}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
     \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \end{array} \hspace{5mm}
-    \begin{array}[t]{lrcl}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
     \rulename{all-fail} & |all fail| & \movesto & |arr ()| \\
     \rulename{all-choice} &
       |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1, dots, v_n)| \\
@@ -143,7 +148,7 @@
     \\[-2mm]
 
     \textit{Choice} \\
-    \begin{array}{lrcll}
+    \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
     \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
     \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
@@ -154,7 +159,7 @@
     \\[-2mm]
 
     \textit{Effects} \\
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
     \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
     \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
     \rulename{dec-value} & |decides v| & \movesto & |v| \\
@@ -165,18 +170,19 @@
   \caption{The Verse calculus: rewrite rules (2)}
     \label{fig:rules2}  \label{fig:choice}
 \end{figure}
+}
 
 % ---------------------- Commenting out the wrong rules ------------------
 % \begin{figure}
 %   $$
 %   \begin{array}{l}
 %     \textbf{Syntax extension} \\
-%     \begin{array}{lrcl}
+%     \begin{array}{lr@@{\;}c@@{\;}l}
 %       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
 %     \end{array} \\
 %     \\
 %     \textbf{Axiom extension} \\
-%     \begin{array}{lrcll}
+%     \begin{array}{lr@@{\;}c@@{\;}ll}
 %     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
 %     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
 %     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\

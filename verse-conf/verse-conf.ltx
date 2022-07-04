@@ -151,6 +151,9 @@
 
 
 
+% Loads the rewrite figures.
+% They still need to be placed using \figureGeneralAxioms etc.
+\input{rewrites}
 
 
 \begin{document}
@@ -917,7 +920,9 @@ $$
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
-\input{rewrites}
+\figureRulesI
+\figureContexts
+\figureRulesII
 
 How can we give a precise semantics to a non-strict functional
 programming language?  Here are some possibilities:
