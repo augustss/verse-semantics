@@ -75,6 +75,7 @@
 \usepackage{verbatim}
 \usepackage[capitalize]{cleveref}   % \cref and \Cref
 \usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
 
 % This makes a tt font that is slightly smaller.
 % \usepackage[scaled=0.8]{beramono}
@@ -1223,21 +1224,20 @@ The context |SX| (\cref{fig:syntax}) is a \emph{scope context}; it
 ensures that |CX| is as large as possible.  This is a subtle point:
 without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
   a use of |oneKW|, see \cref{sec:one}, but using |if| makes the example easier to understand.}:
-$$
-\begin{array}{ll}
-\multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
-\movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
-\movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
-\movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
-\movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
-\movesto \{\rulename{seq}\} & |77 choice 99|\\
-\end{array}
-$$
+% using longtable allows page breaks
+\begin{longtable}{>{\quad}l>{$}l<{$}l}
+\multicolumn{3}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
+& \movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
+& \movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
+& \movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
+& \movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
+& \movesto \{\rulename{seq}\} & |77 choice 99|\\
+\end{longtable}
 But suppose instead we floated the choice out, \emph{part-way}, like this:
 $$
 \begin{array}{ll}
 \multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
-\movesto \{\text{Bogus \rulename{choose}}\} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
+\quad \movesto \{\text{Bogus \rulename{choose}}\} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
 \end{array}
 $$
 Now the |(x=1)| is inside the choice branches, so we cannot use \rulename{subst} to rewrite the
