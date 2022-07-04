@@ -370,7 +370,7 @@ For example, the expression above can be rewritten
 thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
 $$
-\begin{array}{lll}
+\begin{array}{l@@{\;}c@@{\;}l}
                    &          & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
   \rulename{subst} & \movesto & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
   \rulename{ucon}  & \movesto & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
@@ -378,11 +378,11 @@ $$
   \rulename{subst, swap}  & \movesto & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
 %  \rulename{def-eliml} & \movesto & |def (x y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
 %  \rulename{def-eliml} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
-  \rulename{def-eliml,def-eliml,def-eliml} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
+  3\times\rulename{def-eliml} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                             (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                    (3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                            tup(2,3);  2| \\
-  \rulename{seq,seq,seq,seq} & \movesto & |                                                       2| \\
+  4\times\rulename{seq} & \movesto & |                                                       2| \\
 \end{array}
 $$
 %
@@ -396,7 +396,7 @@ $$
   $$
   \begin{array}{l}
     \textbf{Syntax} \\
-    \begin{array}{lrcl}
+    \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
@@ -735,7 +735,7 @@ We will illustrate this with a few examples.
 \begin{figure}
   $$
   \begin{array}{l}
-    \begin{array}{rcll}
+    \begin{array}{r@@{\;}c@@{\;}ll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
       |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
@@ -877,7 +877,7 @@ Given that array indexing expands into choices, we can iterate over array indice
 \subsection{Enumerations}
 Making a choice between a sequence of numbers can be expressed like this
 $$
-\begin{array}{lll}
+\begin{array}{l@@{\;}c@@{\;}l}
   |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyN fromTo (lo+1,hi)|
 \end{array}
 $$
@@ -1100,7 +1100,7 @@ To make further progress, we need a rule for choice, see \cref{sec:choice-rules}
 The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=tup(x,3))| fail, because the only successful
 unification would yield an infinitely-nested pair.
 $$
-    \rulename{ux-occurs} \quad |x=V^[x]| \quad \movesto \quad |fail| \quad \text{if }|V| \ne |hole|
+    \rulename{ux-occurs} \quad |x=V^[x]| \; \movesto \; |fail| \quad \text{if }|V| \ne |hole|
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
@@ -1334,7 +1334,7 @@ and the rest of the reductions just gets rid of terms no longer needed.
 \begin{figure}
 \begin{scriptsize}
 $$
-\begin{array}{llll}
+\begin{array}{llr@@{\;}l}
 \hspace{-1.5mm}&                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
 \hspace{-1.5mm}&\rulename{desugar} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
 \hspace{-1.5mm}\circlednum{1}&\rulename{subst} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
@@ -1386,7 +1386,7 @@ Confluence seems to be within? Unfortunately, not quite:
 \label{sec:confluence-extra}
 
 \begin{figure}
-\[\begin{array}{lrcl}
+\[\begin{array}{lr@@{\;}c@@{\;}l}
     \rulename{def-swap} & |def (x y) e| & \movestoX & |def (y x) e|\\
     \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
     \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
