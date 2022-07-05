@@ -550,8 +550,9 @@ affect its \emph{input} (here |tup(y,5)|).
 
 Although ``|;|\!'' is called ``sequencing'', the order of that sequence
 is immaterial for equations.
-For example\footnote{We informally write |3+y| rather than
-  |applyN add (3,y)|, and similarly with other operators.},
+For example
+% foothand not needed, the figure introduces this shorthand
+%\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
 consider |def x (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
 we will see why in \cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
