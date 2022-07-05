@@ -1787,14 +1787,15 @@ lambdas are semantically identical.  The problem, obviously, is that it is hard
 to tell if they \emph{are} semantically identical.
 
 We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that could rewrite in two different ways:
-$$
-\begin{array}{lll}
- \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
-&    \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam p 1) = (lam q 2); 1| \\
-OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
-\end{array}
-$$
+Here is an expression that rewrites in two different ways, depending on which equality we \rulename{subst} first:
+\[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
+% $$
+% \begin{array}{lll}
+%  \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
+% &    \movesto \{\textit{use \rulename{SUBST} on first equality}\} & |(lam p 1) = (lam q 2); 1| \\
+% OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
+% \end{array}
+% $$
 These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
 lead to |fail|, and confluence is restored.  A perhaps-unexpected consequence is that we cannot add a rule
 $\rulename{urefl}\; |(x=x)| \movesto |x|$, because that would lead to non-confluence if |x| turns out to be a lambda.
