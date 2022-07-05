@@ -349,13 +349,13 @@ functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
 contrasts with functional programming, where one can say ``just apply
 rewrite rules, such as beta reduction, let-inlining, and
-case-of-known-constructor''.  Moreover, these rewrite rules apply even
+case-of-known-constructor.''  Moreover, these rewrite rules apply even
 in the presence of free variables; that is, under lambdas.
 
 We therefore seek a precise expression of functional logic programming as
 a term-rewriting system, to give us both a formal semantics (via small-step reductions),
 and a powerful set of equivalences that programmers can use to reason about their programs,
-and compilers can use to optimise them.
+and compilers can use to optimize them.
 
 We make the following contributions in this paper.
 First, we describe a new core calculus, the Verse calculus or \versecalc{} for short,
@@ -380,7 +380,7 @@ Like any functional logic language,
   In \versecalc{} choices are laid out in \emph{space},
   in the syntax of the term, rather than being explored by non-deterministic selection.
 \end{itemize}
-As always with a calculus, the idea is that \versecalc{} distils the essence of functional logic programming.
+As always with a calculus, the idea is that \versecalc{} distills the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
 We believe that it is possible to compile a variety of functional logic languages,
 including Curry~\cite{hanus:curry-report}, into \versecalc{}.
@@ -485,13 +485,13 @@ $$
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
-\versecalc{} is modelled on the lambda calculus, and indeed the lambda calculus is
+\versecalc{} is modeled on the lambda calculus, and indeed the lambda calculus is
 a sub-language of \versecalc{}.  \emph{Every lambda calculus term is a \versecalc{} term},
 and has the same semantics. Just like the lambda calculus, \versecalc{} is untyped;
 adding a type system is an excellent goal, but is the subject of another paper.
 
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
-It has a very conventional sub-language that is just the lambda-calculus with
+It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Head-normal forms}.
@@ -536,9 +536,9 @@ Note carefully that, like any declarative language,
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
 mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
 
-High level functional languages usually provide some kind of
-pattern-matching; in such a language, we might define |first| by
-|applyN first (a,b) = a|. Such pattern-matching is typically desugared to
+High-level functional languages usually provide some kind of
+pattern matching; in such a language, we might define |first| by
+|applyN first (a,b) = a|. Such pattern matching is typically desugared to
 more primitive |case| expressions.  But in \versecalc{} we don't need |case| expressions:
 unification does the job.  For example we can define |first| like this:
 $$
@@ -574,7 +574,7 @@ and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we ca
 and unify |x| with that.  The idea of leaving stuck expressions aside, and executing other parts of the
 program is called
 \emph{residuation}~\cite{hanus:survey}\footnote{Hanus did not invent the terms ``residuation'' and``narrowing'', but
-his survey is an excellent introduction and bibliography.}, and is at the heart of our mantra ``just solve the equations''.
+his survey is an excellent introduction and bibliography.}, and is at the heart of our mantra ``just solve the equations.''
 
 \subsection{Choice} \label{sec:choice} \label{sec:call-time-choice}
 
@@ -591,7 +591,7 @@ are not equal, yielding no results.  Thus |3=3| succeeds, returns a single resul
 while |3=4| fails, returning no results.  In general, we use ``fail''
 and ``returns no results'' synonymously.
 
-What if the choice was not at the top-level of an expression?  For example,
+What if the choice was not at the top level of an expression?  For example,
 what does |tup (3, (7 choice 5))| mean?
 In \versecalc{} it does \emph{not} mean a pair with some kind of multi-value in its second component.
 Indeed, as you can see from \cref{fig:syntax}, this expression is syntactically ill-formed.
@@ -601,12 +601,11 @@ Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
 |def x (x = (7 choice 5); tup (3,x))| \quad = \quad |(def x (x=7; tup (3,x))) choice (def x (x=5; tup (3,x))))|
 $$
-We duplicate the context surrounding the choice, and ``float the choice outwards''.
+We duplicate the context surrounding the choice, and ``float the choice outwards.''
 
 \subsection{Mixing choice and unification} \label{sec:mixing}
 
-We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing ---
-but \emph{choice} is not.
+We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing---but \emph{choice} is not.
 Consider
 |def (x y) (x = (3 choice 4); y = (20 choice 30); tup (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
 |((tup (3,20)) choice (tup (3,30)) choice (tup (4,20)) choice (tup (4,30)))|.
@@ -619,9 +618,9 @@ $$
 Intuitively, either unify |x| with |3| and return |x+1|, or unify |x| with |4| and return |x*2|.
 But so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
 Well, we can see two equations here, |(x=3)| and |(x=4)|, which are mutually contradictory,
-so clearly we need to refine our notion of ``solving''.
+so clearly we need to refine our notion of ``solving.''
 The answer is pretty clear: in a branch of a choice, solve the equations in that branch
-to get the value for some logical variables; \emph{and propagate those values to occurrences in
+to get the value for some logical variables, \emph{and propagate those values to occurrences in
   that branch (only)}. Occurrences of that variable outside the choice are unaffected.  We call
 this \emph{local propagation}.
 This local-propagation rule would allow us to reason thus:
@@ -629,7 +628,7 @@ $$
 |def x ((x=3; x+1) choice (x=4; x*2))| \movesto  |def x ((x=3; 4) choice (x=4; 8))|
 $$
 Are we stuck now?  No, we can float the choice out as
-before\footnote{Indeed we could have done so first, had we wished.}, thus
+before\footnote{Indeed we could have done so first, had we wished.},
 $$
 |def x ((x=3; 4) choice (x=4; 8))| \movesto |(def x (x=3; 4)) choice (def x (x=4; 8))|
 $$
@@ -677,7 +676,7 @@ $$
   |(zs = emptytup; single)| \quad |choice| \quad
   |(def (x xrest) (zs = tup (x,xrest); tup(x, applyN append (xrest, single))))|
 $$
-which amounts to exploring the possibility that |zs| is headed by |emptytup| or a pair -- the
+which amounts to exploring the possibility that |zs| is headed by |emptytup| or a pair---the
 essence of narrowing.  It should not take long to reassure yourself that the program
 evaluates to |emptytup|, effectively running |append| backwards in the classic logic-programming manner.
 
@@ -706,7 +705,7 @@ failing when we try to unify |x| with |7|?  Not only is that not what we intende
 non-deterministic: the result is affected by the order in which we did unifications!
 
 To address this, we give |if| a special property: in the expression |if e_1 then e_2 else e_3|, unifications inside |e_1| (the condition of the |if|)
-can only unify variables |defKW|'d inside |e_1|; variables bound outside |e_1| are called ``rigid''.  So in our example, the |x| in |(x=0)| is
+can only unify variables |defKW|'d inside |e_1|; variables bound outside |e_1| are called ``rigid.''  So in our example, the |x| in |(x=0)| is
 rigid and cannot be unified.  Instead, the |if| is stuck, and we move on to unify |x=7|.  That unblocks
 the |if| and all is well.  This special property is precisely the local propagation rule that we sketched for
 choice (\cref{sec:mixing}).
@@ -880,7 +879,7 @@ If we use |oneKW| instead of |allKW|, we get the function that checks if |p| hol
 and returns the first matching element, or fails if |p| does not hold for any element.
 
 \item |every|.
-And to test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
+To test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
 If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
 \end{itemize}
 
@@ -986,7 +985,7 @@ programming language?  Here are some possibilities:
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
   they typically describe how a (heap, expression, stack) configuration evolves, one small
   step at a time ({\eg}, \cite{pj:stg-machine}).
-  The difficulty is that the description is now so low-level that it is again hard to explain to programmers.
+  The difficulty is that the description is now so low level that it is again hard to explain to programmers.
 \item \emph{A rewrite semantics} steers between these two extremes.
   For example, Ariola {\etal}'s ``A call by need lambda calculus''~\cite{ariola:call-by-need} shows how
   to give the semantics of a call-by-need language as a set of rewrite rules. The great
@@ -1124,7 +1123,7 @@ ill-formed expression |tup(e,2)|.
   it can be anything from a local expression immediately surrounding the |(x=v)| to an
   arbitrarily large expression.
 But note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice} (\cref{fig:contexts}).
-That restriction is the key to localising unification (\cref{sec:mixing}), and
+That restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
@@ -1156,7 +1155,7 @@ $$
     \rulename{ux-occurs} \quad |x=V^[x]| \; \movesto \; |fail| \quad \text{if }|V| \ne |hole|
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
-So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
+So \rulename{ux-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
 that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
@@ -1174,20 +1173,19 @@ non-recursive, and \rulename{subst} can apply.
 % Not sure which is the optimal order, but it makes sense to keep them together?
 
 If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
-the body of a |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
-and the unification equation, and similarly \rulename{def-elimr} if the equation is ordered the othe way.
+the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
+and the unification equation, and similarly \rulename{def-elimr} if the equation is ordered the other way.
 
 
 A number of rules shuffle expressions about in order to make
 the main unification rules apply.
 The rule \rulename{swap} swaps the arguments to unification to put the variable on the left.
 
-Rule \rulename{def-float} moves a |defKW| ``out of the way''. For example,
+Rule \rulename{def-float} moves an |defKW| ``out of the way.'' For example,
 the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
 we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
 
-
-Similarly rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
+Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
 
@@ -1206,7 +1204,7 @@ $$
 |def x (x = (if (x=0; x>1) then 33 else 55))|
 $$
 What should this do? At first you might think it was stuck; how can we simplify the |if|
-when its condition mentions |x| which is not yet defined?  But in fact rule \rulename{subst} allows
+when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
 $$
 |def x (x = if (x=0; x>1) then 33 else 55)| \\
@@ -1228,7 +1226,7 @@ $$
 \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
 $$
-Now all three variants get stuck.  But alas, we lose confluence.  Consider this term
+Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
 $$
 |def x (x = if (def y (y=x; y=0; y>1)) then 33 else 55)|
 $$
@@ -1267,8 +1265,7 @@ $$
 Here, |ce| is guaranteed-choice-free expression (syntax in \cref{fig:syntax}).
 This syntactic condition is necessarily conservative; for example, a call |apply1 f x|
 is considered not guaranteed-choice-free, because it depends on what function |f| does.
-We must guarantee not to have choices to the left so that we preserve order --
-see \cref{sec:mixing}.
+We must guarantee not to have choices to the left so that we preserve order---see \cref{sec:mixing}.
 
 The context |SX| (\cref{fig:syntax}) is a \emph{scope context}; it
 ensures that |CX| is as large as possible.  This is a subtle point:
@@ -1338,7 +1335,7 @@ and the two results are not joinable.
 % both branches in parallel, a bit like adding parallel-or to the language.  That is a heavy obligation, and one
 % we do not need to incur.
 % Adding the |SX| context to \rulename{fail-r} allows an implementation
-% to be sequential -- without, of course, prohibiting parallel evaluation.  The |SX| is less significant
+% to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
 \subsection{\versecalc{} is lenient} \label{sec:lenient}
@@ -1352,13 +1349,13 @@ Consider a function
 call |apply1 f e|.  In \versecalc{} applications are in administrative normal form (ANF),
 so we must actually write |(x=e; apply1 f x)|. This expression will not return a value until
 |e| reduces to a value: that is, everything is eventually evaluated.  But even so |apply1 f x| can proceed
-to beta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
+to beta reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 
 Lenience supports \emph{abstraction}.  For example, we can replace an expression |(x=tup(y,3); y>7)| by
 $$
 |def f (f = (lam (tup (p,q)) (p=tup(q,3); q>7)); applyN f (x,y)|
 $$
-Here we abstract over the free variables of the expression, and define a named function |f|.
+Here, we abstract over the free variables of the expression, and define a named function |f|.
 Calling the function is just the same as writing the original expression.
 This transformation would not be valid under call-by-value.
 
@@ -1368,7 +1365,7 @@ lenience in the data-flow language Id~\cite{lenience}; it affects
 $$
 |def (f x y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
 $$
-Here |y| does not get a value until |x| is known; but |x| does not get its
+Here, |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 Laziness would be another possible design choice, one that is even more expressive, as we discuss in
 \Cref{sec:laziness}.
@@ -1386,8 +1383,8 @@ Any decent evaluation strategy should (a) guarantee to terminate if there
 is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code.
 It would be even better if the strategy could (c) guarantee to find the
-result in the minimal number of rewrite steps
--- so called ``optimal reduction''  -- but optimal reduction is typically very hard, even in theory, and
+result in the minimal number of rewrite steps---so called ``optimal reduction''---but
+optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
 \simon{Olin will add a citation or two here.}
 
@@ -1406,7 +1403,7 @@ redexes); and whether or not |e| is stuck is a not syntactic property, and
 (worse) may depend not only on |e| itself, but on its context. Even worse, |e| may subsequently
 become un-stuck when we rewrite the equality.
 Any calculus in which a redex to the ``right'' may unblock one to the
-``left'' -- that is, residuation -- must grapple with this problem,
+``left''---that is, residuation---must grapple with this problem,
 so we leave evaluation strategy and compilation for future work.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
@@ -1415,12 +1412,12 @@ so we leave evaluation strategy and compilation for future work.
 \subsection{Examples}
 A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
 This example shows how constraining the output of a function call can constrain the argument.
-While most of the reduction are adminstrative in nature, these are the highlights:
+While most of the reductions are adminstrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
 Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
 so that at \circlednum{5} the actual unification can happen.
 At \circlednum{6} and \circlednum{7} we finally get the values into the result,
-and the rest of the reductions just gets rid of terms no longer needed.
+and the rest of the reductions just get rid of terms no longer needed.
 \begin{figure}
 \begin{scriptsize}
 $$
@@ -1531,7 +1528,7 @@ Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam 
 \]
 and we find that we \emph{cannot} join them; they keep “missing each other”. The relation $\movesto$ is \emph{not} confluent.
 %
-But notice that as we keep evaluating these fixed-points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth.
+But notice that as we keep evaluating these fixed points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth.
 
 \begin{definition}[Depth cutting]
 To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
@@ -1558,7 +1555,7 @@ We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for e
 For all |e_2 <-* e_1 ->* e_3| we have |e_2 ~ e_3|.
 \end{proposition}
 
-In general, confluence up-to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation. For \versecalc, we believe both hold:
+In general, confluence up to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation. For \versecalc, we believe both hold:
 
 \begin{proposition}[Church-Rosser]
 \label{thm:church-rosser}%
@@ -1601,7 +1598,7 @@ This expression behaves much as one would expect from a fixed-point operator:
 \item The fixpoint can be unrolled: |mu x v ~ subst v x ((mu x v))|.
 \end{itemize}
 
-In the example from \cref{sec:confluence-and-recursion}, we find |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))| and we can join |tup(1,v_y) ~ v_x| using the a general lemma about partially unrolling a fixed-point:
+In the example from \cref{sec:confluence-and-recursion}, we find |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))| and we can join |tup(1,v_y) ~ v_x| using the a general lemma about partially unrolling a fixed point:
 \[
 |mu x(subst v_1 y v_2) ~ subst v_1 y ((mu y (subst v_2 x v_1)))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}.
 \]
@@ -1627,7 +1624,7 @@ $$
 So our expression rewrites (non-deterministically) to either |(3+20)| or |(3+30)|;
 and that in turn allows the addition to make progress.
 Of course, including non-deterministic choice means the rules are non-confluent by
-construction.  Instead, one must generalise to say that a reduction does not change the
+construction.  Instead, one must generalize to say that a reduction does not change the
 \emph{set} of results; in the context of lambda calculi see
 for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 
@@ -1686,7 +1683,7 @@ and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' \emph{vs.} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
-they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
+they are ``rigid.''  This notion is nicely captured by the execution context |X|, which limits the
 scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and |allKW|.
 
 \subsection{The semantics of logical variables} \label{sec:magical}
@@ -1741,7 +1738,7 @@ But the substitution for the extra variables must be chosen ``magically''
 work out. This is admirably high level, because it hides everything
 about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
-In subsequent journal paper they refine CRWL to avoid magical rewriting using
+In a subsequent journal paper they refine CRWL to avoid magical rewriting using
 ``let-narrowing'' \cite[Section 6]{fraguas:let-narrowing}; this system
 looks rather different to ours, especially in its treatment of choice,
 but is rather close in spirit.
@@ -1774,7 +1771,7 @@ and function symbols (the names of such functions) are syntactically
 distinguished from ordinary variables. As Hanus describes, it is possible
 to translate a higher order program into a first-order
 form\footnote{
-  He does not mention this, but for a language with arbitrary nested lambdas
+  Hanus does not mention this, but for a language with arbitrarily nested lambdas
   one would need to do lambda-lifting as well, but that is a small point.}
 using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
@@ -1813,7 +1810,7 @@ We discuss some of them here.
 
 \subsection{Unifying lambdas} \label{sec:unifying-lambda}
 
-In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails -- even if the
+In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails---even if the
 lambdas are semantically identical.  The problem, obviously, is that it is hard
 to tell if they \emph{are} semantically identical.
 
@@ -1874,11 +1871,11 @@ a debatable decision, but one of no great consequence.
 \subsection{Dead existentials}
 
 Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-eliml} comes closest,
-but it insists that every existential is given a value. It would be easy to add a rule to discard a existential
-whose bound variable is not used in its body, and so far as we know doing so would not lead to
+but it insists that every existential is given a value. It would be easy to add a rule to discard an existential
+whose bound variable is not used in its body, and so far as we know, doing so would not lead to
 new difficulties for (say) confluence.  It is mostly a philosophical issue.  For example, the term
 |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
-  solution for |x|}.  So if |x| is entirely unconstrained, maybe we should return an infinite number of results?
+  solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
 For now, we make a conservative choice, and insist that every existential gets a value:
 only \rulename{def-eliml} and \rulename{def-elimr} eliminate an existential.
 
@@ -1894,9 +1891,9 @@ The trouble with that is that it may change the order of the results (\cref{sec:
 Another possibility would be to accept that results may come out in the ``wrong'' order, but have
 some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
 $$
-\rulename{labelled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
+\rulename{labeled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
 $$
-Here the two branches are labelled with |L| and |R|.  We can add new rules to reorder such
+Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
 labelled expressions, something like
 $$
 \rulename{sort-l} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
@@ -1906,7 +1903,7 @@ may be worse than the disease.
 
 \subsection{Generalizing |oneKW| and |allKW|}
 
-In \versecalc{} we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have, however, introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
+In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)| & \text{|x| fresh}  \\
@@ -1930,9 +1927,9 @@ program does not yield a value:
 $$
 |def (ones y z) (ones = tup (1,ones); tup (y,z) = ones; y)|
 $$
-Here |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
+Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
 |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
-|ones = tup(1,ones)|, which has an ``occurs check''.
+|ones = tup(1,ones)|, which has an ``occurs check.''
 Remembering the duality between values and choices,
 one might also want |allKW| to return a lazy stream
 of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
@@ -1957,7 +1954,7 @@ meant. Likewise, a high-level semantics simply provides the eventual answer
 produced by the program, without insight into the \emph{computational steps}
 that got us from program start to program completion.
 
-The moral here is that \emph{formal specifications can be obfuscatory -- or
+The moral here is that \emph{formal specifications can be obfuscatory---or
 illuminating.} The latter kind shed light because the are defined \emph{in
 terms of the intended mechanisms of the language}. \versecalc{} does this; it
 respects the conceptual structures of the Verse language.
@@ -1966,21 +1963,21 @@ Note that when we say ``illuminating'' we mean that in multiple ways.
 A semantics can be illuminating for humans who are trying to understand
 what a particular program does, or how an proposed change to the language
 will affect the language. It can drive analyses that help the compiler
-optimise programs. It underlies the use of formal methods and verification
+optimize programs. It underlies the use of formal methods and verification
 to provide machine-derived and -checkable proofs of correctness. All of
-these application depend on the semantics being defined at the appropriate
+these applications depend on the semantics being defined at the appropriate
 level: the level of the computational model that underlies the language.
 This has been our goal in this work.
 
 We have much left to do.  The full Verse language has
-statically-checked types.  In the dynamic semantics, the types can be
+statically checked types.  In the dynamic semantics, the types can be
 represented by partial identity functions---identity of the values of
 the type and |fail| otherwise.  This gives a distinctive new
 perspective on type systems, one that we intend to develop in future
 work.  The full Verse language also has a statically-checked effect system,
 including both mutable references and input/output.  All these effects
 must be \emph{transactional}, {\eg}, when the condition of an |if|
-fails any store effects in the condition must be rolled back.
+fails, any store effects in the condition must be rolled back.
 By way of example, \Cref{sec:store} extends our reduction rules to handle mutable state.
 
 % -------------------- Acknowledgements ----------------
