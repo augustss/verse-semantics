@@ -1453,7 +1453,7 @@ or
 \begin{itemize}
 \item \rulename{def-swap} makes the order of |defKW| irrelevant.
 \item As we do not care about where, within the same $X$-context, an equality is asserted, we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rule leaves $v_2$ in place, just like \rulename{def-eliml} does.
-\item In the presence of an equation between two variables, we do not care which of the two variables is mentiond, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
+\item In the presence of an equation between two variables, we do not care which of the two variables is mentioned, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
 \item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
 \end{itemize}
 We can now consider two expressions the same up to these administrative differences if they are convertible via |stepX|.
