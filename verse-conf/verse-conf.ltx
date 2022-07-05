@@ -319,7 +319,7 @@
 \section{Introduction}
 
 Functional logic programming languages add expressiveness to functional programming
-by introducing logical variables, equality constraints that constrain those variables,
+by introducing logical variables, equality constraints among those variables,
 and choice to allow multiple alternatives to be explored.  Here is a tiny example:
 $$
 |def (x y z) (x=tup(y,3); x=tup(2,z); y)|
@@ -448,7 +448,9 @@ $$
     \text{\emph{Concrete syntax}:} \;\;
     \begin{array}[t]{l}
           \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
-          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.}
+          \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+          \hspace{2mm} \text{{\eg} |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+1))))))|.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
