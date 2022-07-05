@@ -391,7 +391,7 @@ and thereby build a rewrite system that is completely faithful to lazy evaluatio
 Inspired by their idea, we present a new rewrite system for functional logic program, that reifies
 logical variables and unification into the term itself,
 and exploits our notion of constructive choice to replace non-deterministic
-search with a (deterministic) array of successful results.
+search with a (deterministic) tuple of successful results.
 
 Just like rewriting for the lambda calculus, this semantics
 gives programmers a set of equivalences with which
@@ -403,7 +403,7 @@ $$
 \begin{array}{l@@{\;}c@@{\;}l}
                    &          & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
   \rulename{subst} & \movesto & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-  \rulename{ucon}  & \movesto & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
+  \rulename{utup}  & \movesto & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
 %  \rulename{subst} & \movesto & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
   \rulename{subst, swap}  & \movesto & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
 %  \rulename{def-eliml} & \movesto & |def (x y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
@@ -475,10 +475,10 @@ adding a type system is an excellent goal, but is the subject of another paper.
 
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda-calculus with
-some built-in operations and arrays as data constructors:
+some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Head-normal forms}.
-  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, an array,
+  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
   |tup (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
@@ -486,7 +486,7 @@ functions |gt| and |add|.
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an array.
+For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an tuple.
 }
 
   Remembering that a value can be a lambda, this gives us the full lambda calculus.
@@ -634,7 +634,7 @@ language into unification. But what about pattern matching with multiple equatio
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly\footnote{
-We use the empty array |emptytup| to represent the empty list and pairs to represent cons cells;
+We use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells;
 and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x y) (p = tup (x,y); body)|
   }:
 $$
@@ -646,7 +646,7 @@ If |xs| is |emptytup|, the left-hand choice succeeds, returning |ys|; and the ri
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
 If |xs| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with head-normal forms other than the empty array and pairs, both choices fail, and |append| returns no
+Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results at all.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
@@ -717,25 +717,25 @@ We use the same local-propagation rule for |oneKW| that we do for choice (\Cref{
 together with the desugaring for |if| into |oneKW|,
 we get the ``special property'' of |if| described above.
 
-\subsection{Arrays and |allKW|} \label{sec:array}
-The main data structure in \versecalc{} is the array.
-An array is a finite sequence of values, |tup (v_1,dots,v_n)|.
+\subsection{Tuples and |allKW|} \label{sec:tuple}
+The main data structure in \versecalc{} is the tuple.
+A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
 For example, |a := tup (10,27,32); apply1 a 1| reduces to |27|.
-The reduction rule for indexing in arrays allows a multi-valued index expression.
+The reduction rule for indexing in tuples allows a multi-valued index expression.
 For instance, |a := tup (10,27,32); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |(27 `choice` 10 `choice` 27)|.
 
-Arrays can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
+Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
-the array |tup (v_1, dots, v_n)|;
+the tuple |tup (v_1, dots, v_n)|;
 as a consequence, if $e$ fails, the |allKW| simply produces the empty sequence.
 Note that |choice| is associative, which means that we (and the compiler)
 can think of a sequence or tree of binary choices as really being a single
 $n$-way choice.
 \label{sec:all}
 
-You might think that array indexing would be stuck until we know the index,
+You might think that tuple indexing would be stuck until we know the index,
 but \versecalc{} uses narrowing to make progress.
 The expression |a := tup (10,27,32); def i (apply1 a i)|
 looks stuck because we have no value for |i|, but in fact it rewrites to
@@ -744,8 +744,8 @@ $$
 $$
 which (as we will see in \Cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
-So |allKW| allows a choice to be reified into an array; and |(def i (apply1 a i))| allow an
-array to be turned back into a choice.
+So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 a i))| allow a
+tuple to be turned back into a choice.
 
 Do we even need |oneKW| as a primitive construct, given that we have
 |allKW|? Can we not use |apply1 (all e) 0| instead of |one e|? Indeed
@@ -784,7 +784,7 @@ We will illustrate this with a few examples.
 \end{figure}
 
 The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
-not arbitrary expressions, in array literals and function-applications \cite{felleisen:anf}.
+not arbitrary expressions, in tuple literals and function-applications \cite{felleisen:anf}.
 To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 \begin{itemize}
 \item With |:=| we simultaneously introduce and ``assign'' a variable
@@ -820,27 +820,27 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 \subsection{List functions}
 
 We can define the typical list functions one would expect from functional programming
-by using the duality between arrays and choices, as seen in \cref{fig:list-functions}.
-An array can be turned into choices by indexing, |apply1 a i|, with a logical variable |i|.
-Conversely, choices can be turned into an array using |allKW|.
+by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
+A tuple can be turned into choices by indexing, |apply1 a i|, with a logical variable |i|.
+Conversely, choices can be turned into a tuple using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices
 and |oneKW| is like |head| for choices.  With that in mind, here is how to understand
 the definitions in \cref{fig:list-functions}:
 \begin{itemize}
 \item |head|.
-To obtain the first element of an array, we turn the array into a sequence of choices and then pick out the first value using |oneKW|. If the array is empty, |head| fails.
+To obtain the first element of a tuple, we turn the tuple into a sequence of choices and then pick out the first value using |oneKW|. If the tuple is empty, |head| fails.
 
 \item |tail|.
-To get the tail of an array, again we apply the array to a fresh variable, and restrict that variable with |i > 0|.
+To get the tail of a tuple, again we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
 This way, the expression fails at the first value and only the other values are collected by |allKW|.
-This definition of |tail| returns the empty array if |xs| is empty or not even an array.
+This definition of |tail| returns the empty tuple if |xs| is empty or not even a tuple.
 
 \item |cons| and |append|.
 We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|,
 or all the elements of |xs|, and similarly we can define |append|.
 
 \item |flatMap|.
-For the function |map|, which applies a function to each element of an array and collects the results,
+For the function |map|, which applies a function to each element of a tuple and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
 |flatMap| flattens the choices from iterating through |xs| with
 the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
@@ -850,19 +850,19 @@ But often this is not what we want: we may want the effects of |f|, such as fail
 to affect the whole expression and obtain the cartesian product of these choices.
 The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
 We get that behaviour if we simply define |map| much like in any other functional programming language:
-if taking the head of the array fails, it must be an empty array, and we return an empty array.
+if taking the head of the tuple fails, it must be an empty tuple, and we return an empty tuple.
 Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
 
 \item |filter|.
-How can we filter an array with a predicate |p|?
-We turn the array into the sequence of choices, and let those fail where |p| fails before collecting the other values into an array.
+How can we filter a tuple with a predicate |p|?
+We turn the tuple into the sequence of choices, and let those fail where |p| fails before collecting the other values into a tuple.
 
 \item |find|.
-If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the array,
+If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the tuple,
 and returns the first matching element, or fails if |p| does not hold for any element.
 
 \item |every|.
-And to test if a predicate |p| holds for every element of an array |xs|, we can simply use |applyN map (p,xs)|!
+And to test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
 If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
 \end{itemize}
 
@@ -874,12 +874,12 @@ The expression |for^(e_1) in e_2| will evaluate |e_2| for each of the choices in
 The |e_1| is called the \emph{domain} of the loop.
 
 The scoping is peculiar in that variables bound in |e_1| also scope over |e_2|.
-So, {\eg}, |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the array |tup (3,4,6)|.
+So, {\eg}, |for^(def x (x = 2 `choice` 3 `choice` 5)) in (x+1)| will reduce to the tuple |tup (3,4,6)|.
 This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) in (x+1)|.
 
 Like list comprehension, it supports filtering, but in Verse this falls out naturally by just using
 a possibly failing expression in the domain.
-So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the array |tup (4,6)|.
+So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) in (x+1)| reduces to the tuple |tup (4,6)|.
 
 Nested iteration in a |for| works as expected, and requires nothing special.
 So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) in x+y| reduces to |tup (11, 12, 13, 21, 22, 23)|
@@ -888,7 +888,7 @@ Just like |if| is defined in terms of the primitive |oneKW|, we can define |for|
 in terms of the primitive |all e|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the array to |emptytup| afterwards, using the |map| function defined above.
+apply each element of the tuple to |emptytup| afterwards, using the |map| function defined above.
 The full desugaring for |for^(e_1) in e_2| is thus
 \[
 |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
@@ -901,8 +901,8 @@ So, {\eg}, |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to
 |tup (3, 3) `choice` tup (3, 2) `choice` tup (1, 3) `choice` tup (1, 2)|.
 At this point it is crucial to use |map|, not |mapFlat|.
 
-Given that array indexing expands into choices, we can iterate over array indices and elements using |for|.
-{\Eg}, |for^(def (i  x) (x = apply1 a i)) in x+i| will produce an array with the elements of |a|, increased by their index in |a|.
+Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
+{\Eg}, |for^(def (i  x) (x = apply1 a i)) in x+i| will produce a tuple with the elements of |a|, increased by their index in |a|.
 
 
 \subsection{Enumerations}
@@ -912,22 +912,22 @@ $$
   |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyN fromTo (lo+1,hi)|
 \end{array}
 $$
-so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the array |tup (1,2,3,4,5)|.
+so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the tuple |tup (1,2,3,4,5)|.
 
 \subsection{Handling out-of-bounds errors}
-Indexing out-of-bounds of an array results in |fail|.
+Indexing out-of-bounds of a tuple results in |fail|.
 This means that we cannot avoid handling this case.
 $$
 |if x:=apply1 a 5 then apply1 print x else apply1 print "out of bounds"|
 $$
 
 \subsection{Subset and powerset}
-The subsets (subarrays) of an array can be expressed with this multi-valued function.
+The subsets (subtuples) of a tuple can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
 |subset^(a) := if x:=apply1 head a then s:= apply1 subset (apply1 tail a); applyN cons (x, s) `choice` s else emptytup|
 $$
-And computing the powerset is then simply a matter of collecting all the subsets into an array.
+And computing the powerset is then simply a matter of collecting all the subsets into a tuple.
 $$
 |powerset^(a) := for x := apply1 subset a in x|
 $$
@@ -1005,9 +1005,9 @@ constants.  For example $|applyN add (3,4)| \movesto |7|$.  The only unusual poi
 that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
 and returns |k_1| otherwise.
 
-% Rule \rulename{p-map} implements a map operation over arrays: It applies the function |f| to each value
-% in turn, and collects the results into a array. If the function applications produce a choice
-% of values, this will, as it should, produce a choice of arrays:
+% Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
+% in turn, and collects the results into a tuple. If the function applications produce a choice
+% of values, this will, as it should, produce a choice of tuples:
 % \[
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
@@ -1034,8 +1034,8 @@ ensures that the |defKW x|
 does not capture any variables free in |v|.  If |x| appears free in |v|, just use
 \textalpha-conversion to rename |x| to $x' \not\in \freevars{v}$.
 
-In \versecalc{}, arrays behave like (finite) functions, in which application is
-indexing.  Rule \rulename{app-arr} describes how array application works.
+In \versecalc{}, tuples behave like (finite) functions, in which application is
+indexing.  Rule \rulename{app-arr} describes how tuple application works.
 Notice that \rulename{app-arr} does not require the argument to be an integer $k$; instead
 the rule works by narrowing.  So the expression |def x (apply1 (tup(2,3,2,7,9)) x = 2; x)|
 does not suspend awaiting a value for |x|; instead it explores all the
@@ -1045,15 +1045,15 @@ a suspending semantics would be equally easy to express.
 \subsection{Unification: the easy bits}
 
 Next we study unification, again in \cref{fig:general-axioms}.
-Rules \rulename{ulit}, \rulename{ucon}, \rulename{ux1} and \rulename{ux2}
+Rules \rulename{ulit}, \rulename{utup}, \rulename{ux1} and \rulename{ux2}
 are the standard rules for unification, going back at least 40 years \cite{MartelliMontanari82}.
 The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
-arrays\footnote{An alternative choice would
+tuples\footnote{An alternative choice would
 for unification to yield |emptytup| on success; but it does not make much difference
 either way.}.  \rulename{ux1} and \rulename{ux2} make unification fail if
-you attempt to unify an integer with an array.
+you attempt to unify an integer with a tuple.
 Slightly less obviously,
 \rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
 lambda or a built-in operation with any other value.  We discuss this design choice further in \cref{sec:unifying-lambda}.
@@ -1139,7 +1139,7 @@ $$
 $$
 In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{uc-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of arrays.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
+that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
 
 What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
 $$
@@ -1405,7 +1405,7 @@ $$
 \hspace{-1.5mm}&\rulename{subst}      & \xmovesto & |def (p x y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
 \hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p x y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
 \hspace{-1.5mm}\circlednum{4}&\rulename{unify-seql} & \xmovesto & |def (p x y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{5}&\rulename{ucon}       & \xmovesto & |def (p x y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
+\hspace{-1.5mm}\circlednum{5}&\rulename{utup}       & \xmovesto & |def (p x y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
 \hspace{-1.5mm}\circlednum{6}&\rulename{subst}      & \xmovesto & |def (p x y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
 \hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
 \hspace{-1.5mm}\circlednum{7}&\rulename{subst}      & \xmovesto & |def (p x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
@@ -1630,9 +1630,9 @@ It is a very interesting design, but one does not appear to have been implemente
 and its treatment of equality and thus logical variables is rather different to ours.
 
 Several aspects of |allKW| and |oneKW| are worth noting.
-First, |allKW| \emph{reifies} choice (a control operator) into an array (a data structure);
-for example, |all (1 choice 7 choice 2)| returns the array |tup (1,7,2)|),
-In the other direction, indexing turns an array into choice ({\eg}, |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
+First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
+for example, |all (1 choice 7 choice 2)| returns the tuple |tup (1,7,2)|),
+In the other direction, indexing turns a tuple into choice ({\eg}, |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
 \emph{set-functions} in an extension of Curry \cite[Section 4.2.7]{curry:tutorial},
@@ -1646,8 +1646,8 @@ consequence of \versecalc{}'s single rule \rulename{choose}.
 Second, even under the reification of |allKW|,
 \versecalc{} is \emph{deterministic}.  Choice is not
 non-deterministic: \versecalc{} takes pains to maintain order, so that
-when reifying choice into an array, the order of elements in that
-array is completely determined.  Anything else would leak
+when reifying choice into a tuple, the order of elements in that
+tuple is completely determined.  Anything else would leak
 non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
 and \cref{sec:choice-rules}, we have to take care to maintain the
 left-to-right order of choices.
@@ -1782,7 +1782,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-%% \lennart{Mention binary \emph{vs.} n-ary for choice and arrays?}
+%% \lennart{Mention binary \emph{vs.} n-ary for choice and tuples?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
@@ -1830,7 +1830,7 @@ $\rulename{urefl}\; |(x=x)| \movesto |x|$, because that would lead to non-conflu
 
 \subsection{Administrative normal form}
 
-We have chosen to restrict array formation and function application to
+We have chosen to restrict tuple formation and function application to
 \emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
 |e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
 It would be entirely straightforward to allow expresssions rather than values, but doing so
@@ -2171,7 +2171,7 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
 
 % LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
 % LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
-% LocalWords:  distils metaverse Ariola subst ucon elim Hanus lrcl
+% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl
 % LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xrest zs unary
 % LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
