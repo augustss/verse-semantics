@@ -913,7 +913,7 @@ Given that tuple indexing expands into choices, we can iterate over tuple indice
 Making a choice between a sequence of numbers can be expressed like this
 $$
 \begin{array}{l@@{\;}c@@{\;}l}
-  |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else lo `choice` applyN fromTo (lo+1,hi)|
+  |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
 \end{array}
 $$
 so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the tuple |tup (1,2,3,4,5)|.
