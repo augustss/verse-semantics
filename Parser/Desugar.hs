@@ -26,7 +26,7 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< dsD <=< dropParens)
+desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< addDeref <=< dsD <=< dropParens)
   where eval = flip evalState 1
 
 type D = State Int
@@ -166,14 +166,18 @@ dsD = expr
     expr (Option (Just e)) = inVar e >>= \ (t, e') -> expr $ If2 e' --(ApplyD eTruth t)
                                                                     (Array [t])
 
+{-
     expr (Set e1 (Ident l "=") e2) = 
       dsD $ ApplyD (eAssign l) $ Array [e1, e2]
-    expr (Set e1 op e2) =
-      expr $ InfixOp e1 op e2
-    expr (MVar i t e) = do
+-}
+    expr (Set e1 op e2) = Set <$> expr e1 <*> pure op <*> expr e2
+    expr (MVar i t e) = MVar i <$> expr t <*> expr e
+      {-
+      do
       t' <- expr t
       e' <- expr e
       pure $ Define i $ ApplyD (applyPrimD "new" t') e'
+      -}
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
@@ -189,7 +193,8 @@ dsD = expr
     -- Pick the appropriate form of apply for operators
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
-                             "pre'^'", "pre'[]'",  -- no need for succeeds
+                             "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
+                             "in'+='", "in'-='", "in'*='", "in'/='",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
                              "length","in'..'"] = ApplyD
                 | otherwise = ApplyS
@@ -343,8 +348,8 @@ dsCase e b = do
   e' <- dsD e
   inVarC e' $ \ x -> dsCase x b
 
-eAssign :: Loc -> Expr
-eAssign l = Variable (Ident l "assign")
+--eAssign :: Loc -> Expr
+--eAssign l = Variable (Ident l "write$")
 
 --eTruth :: Expr
 --eTruth = Variable (Ident noLoc "truth")
@@ -512,14 +517,15 @@ primOps = map (Ident noLoc)
   , "in'<>'"
   , "pre'-'"
   , "post'?'"
---  , "succeeds", "decides", "iterates", "io"
   , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
   , "length"
   , "known$"  -- This is a horrible hack
-  , "deref$", "new$", "assign$"
+  , "alloc$", "read$", "write$"
   , "intGT$", "intGE$", "intLT$", "intLE$"
   , "in'..'"
   , "wrong"
+  , "in'+='", "in'-='", "in'*='", "in'/='"
+  , "print$"
   ]
 
 --------------------
@@ -603,7 +609,7 @@ getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
 getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (ApplyEff _ e) = getVisible e
+getVisible (ApplyEff _ _e) = [] -- getVisible e
 getVisible If3{} = []
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
@@ -618,6 +624,32 @@ getVisible (Range e) = getVisible e
 getVisible AnyT = []
 getVisible Function{} = []
 getVisible e = impossible e
+
+getVar :: HasCallStack => Expr -> [Ident]
+getVar LitInt{} = []
+getVar LitRat{} = []
+getVar Variable{} = []
+getVar (Array es) = concatMap getVar es
+getVar (Seq es) = concatMap getVar es
+getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
+getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
+getVar (ApplyEff _ _e) = [] -- getVar e
+getVar If3{} = []
+getVar For2{} = []
+getVar (Let _ e) = getVar e
+getVar Do{} = []
+getVar (Unify e1 e2) = getVar e1 ++ getVar e2
+getVar (Where e1 e2) = getVar e1 ++ getVar e2
+getVar (Typedef _) = []
+getVar (Define _ e) = getVar e
+getVar (Define2 _ _ e) = getVar e
+getVar Choice{} = []
+getVar (Set _ _ e) = getVar e
+getVar (MVar i t e) = i : getVar t ++ getVar e
+getVar (Range e) = getVar e
+getVar AnyT = []
+getVar Function{} = []
+getVar e = impossible e
 
 {-
 getFree :: Expr -> [Ident]
@@ -721,6 +753,56 @@ scopeErrs s = expr
           errS = [ ErrShadow i | i <- is, i `S.member` s ]
           s' = foldr S.insert s is
       in  (errM ++ errS, s')
+
+addDeref :: Expr -> D Expr
+addDeref = pure . exprD S.empty
+  where
+    expr _ e@LitInt{} = e
+    expr _ e@LitRat{} = e
+    expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
+                          | otherwise = e
+    expr s (Array es) = Array $ map (expr s) es
+    expr s (Seq es) = Seq $ map (expr s) es
+    expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
+    expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
+    expr s (ApplyEff is e) = ApplyEff is (expr s e)
+    expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
+      where s' = defs s e1
+    expr s (For2 e1 e2) = For2 (expr s' e1) (exprD s' e2)
+      where s' = defs s e1
+    expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
+      where s' = defs s e1
+    expr s (Do e) = Do (exprD s e)
+    expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
+      where s' = defs s a
+    expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
+    expr s (Where e1 e2) = Where (expr s e1) (expr s e2)
+    expr s (Define i e) = Define i (expr s e)
+    expr s (Define2 i j e) = Define2 i j (expr s e)
+    expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
+    expr s (Set e1 op e2) = set s e1 op (expr s e2)
+    expr s (MVar i t e) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
+    expr s (Range e1) = Range (expr s e1)
+    expr s (Typedef e1) = Typedef (exprD s e1)
+    expr _ AnyT = AnyT
+    expr _ e = impossible e
+
+    exprD s e = expr (defs s e) e
+
+    set s e1 (Ident l "=") e2 = set s e1 (Ident l "write$") e2
+    set s e1@(Variable i) op@(Ident l _) e2
+      | i `S.member` s = ApplyD (Variable op) $ Array [e1, e2]
+      | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
+    set s (ApplyD e1@(Variable i) ei) (Ident l sop) e2
+      | i `S.member` s = ApplyD (Variable (Ident l (sop++"[]"))) $ Array [e1, ei, e2]
+      | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
+    set _ e1 _ _ = syntaxError (getLoc e1) $ "set LHS not valid: " ++ prettyShow e1
+
+    defs :: S.Set Ident -> Expr -> S.Set Ident
+    defs s e = S.union s (S.fromList (getVar e))
+
+getLoc :: Expr -> Loc
+getLoc _ = noLoc
 
 ------------
 
