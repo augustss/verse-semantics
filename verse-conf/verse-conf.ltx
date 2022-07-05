@@ -486,7 +486,7 @@ functions |gt| and |add|.
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not an tuple.
+For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 }
 
   Remembering that a value can be a lambda, this gives us the full lambda calculus.
@@ -722,9 +722,9 @@ The main data structure in \versecalc{} is the tuple.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
-For example, |a := tup (10,27,32); apply1 a 1| reduces to |27|.
+For example, |t := tup (10,27,32); apply1 t 1| reduces to |27|.
 The reduction rule for indexing in tuples allows a multi-valued index expression.
-For instance, |a := tup (10,27,32); apply1 a (1 `choice` 0 `choice` 1)| will reduce to |(27 `choice` 10 `choice` 27)|.
+For instance, |t := tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1)| will reduce to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
@@ -737,14 +737,14 @@ $n$-way choice.
 
 You might think that tuple indexing would be stuck until we know the index,
 but \versecalc{} uses narrowing to make progress.
-The expression |a := tup (10,27,32); def i (apply1 a i)|
+The expression |t := tup (10,27,32); def i (apply1 t i)|
 looks stuck because we have no value for |i|, but in fact it rewrites to
 $$
 |def i ((i=0; 10) choice (i=1; 27) choice (i=2; 32)|
 $$
 which (as we will see in \Cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
-So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 a i))| allow a
+So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 t i))| allow a
 tuple to be turned back into a choice.
 
 Do we even need |oneKW| as a primitive construct, given that we have
@@ -821,7 +821,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 
 We can define the typical list functions one would expect from functional programming
 by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
-A tuple can be turned into choices by indexing, |apply1 a i|, with a logical variable |i|.
+A tuple can be turned into choices by indexing, |apply1 t i|, with a logical variable |i|.
 Conversely, choices can be turned into a tuple using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices
 and |oneKW| is like |head| for choices.  With that in mind, here is how to understand
@@ -902,7 +902,7 @@ So, {\eg}, |for^(x:=1 `choice` 2) in {3 `choice` x}| will reduce to
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-{\Eg}, |for^(def (i  x) (x = apply1 a i)) in x+i| will produce a tuple with the elements of |a|, increased by their index in |a|.
+{\Eg}, |for^(def (i  x) (x = apply1 t i)) in x+i| will produce a tuple with the elements of |t|, increased by their index in |t|.
 
 
 \subsection{Enumerations}
@@ -918,18 +918,18 @@ so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the tuple |tup (1,2,3,4,5
 Indexing out-of-bounds of a tuple results in |fail|.
 This means that we cannot avoid handling this case.
 $$
-|if x:=apply1 a 5 then apply1 print x else apply1 print "out of bounds"|
+|if x:=apply1 t 5 then apply1 print x else apply1 print "out of bounds"|
 $$
 
 \subsection{Subset and powerset}
 The subsets (subtuples) of a tuple can be expressed with this multi-valued function.
 First compute the subsets of all but the first element, and then return these with and without the first element added.
 $$
-|subset^(a) := if x:=apply1 head a then s:= apply1 subset (apply1 tail a); applyN cons (x, s) `choice` s else emptytup|
+|subset^(t) := if x:=apply1 head t then s:= apply1 subset (apply1 tail t); applyN cons (x, s) `choice` s else emptytup|
 $$
 And computing the powerset is then simply a matter of collecting all the subsets into a tuple.
 $$
-|powerset^(a) := for x := apply1 subset a in x|
+|powerset^(t) := for x := apply1 subset t in x|
 $$
 
 \subsection{First class patterns}
@@ -938,14 +938,14 @@ This means that we can use ordinary abstraction mechanisms for patterns.
 For example, here is a function that should be called like |applyN fcn (88,1,99,2)|.
 $$
 \begin{array}{l}
-|apply1 fcn a := def (x y) (a = tup(x,1,y,2); x+y)|
+|apply1 fcn t := def (x y) (t = tup(x,1,y,2); x+y)|
 \end{array}
 $$
 If we want to give a name to the pattern, it is simple to do so:
 $$
 \begin{array}{l}
 |applyN pat (v,w) := tup(v,1,w,2);| \\
-|apply1 fcn a := def (x y) (a = applyN pat (x,y); x+y)|
+|apply1 fcn t := def (x y) (t = applyN pat (x,y); x+y)|
 \end{array}
 $$
 
