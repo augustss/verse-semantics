@@ -1335,7 +1335,7 @@ This is not just a way to get \emph{parallelism}, which was the original motivat
 lenience in the data-flow language Id~\cite{lenience}; it affects
 \emph{semantics}. Consider
 $$
-|def (f,x,y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
+|def (f x y) (f = (lam p (x=7;p)); y = (if (x>0) then 7 else 8); apply1 f y|
 $$
 Here |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
@@ -1897,7 +1897,7 @@ As \Cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, 
 For example this
 program does not yield a value:
 $$
-|def (ones,y,z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+|def (ones y z) (ones = tup (1,ones); tup (y,z) = ones; y)|
 $$
 Here |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
 |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
@@ -1907,7 +1907,7 @@ one might also want |allKW| to return a lazy stream
 of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
 this program would converge:
 $$
-|def (y,z) (tup (y,z) = all (def onec (onec = (1 choice onec))); y|
+|def (y z) (tup (y z) = all (def onec (onec = (1 choice onec))); y|
 $$
 Here we suppose that |allKW| returns a lazy stream of values (represented as nested
 pairs), from which we may pick the first and discard the rest.
