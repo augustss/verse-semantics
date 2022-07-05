@@ -1297,29 +1297,35 @@ The rules for |oneKW| and |allKW| expect multiple choices to be
 normalized into a right-associative list of non-failing values, and
 the administrative rules \rulename{assoc-choice}, \rulename{fail-l}
 and \rulename{fail-r} bring nested choices into that form. But why do these rules
-need a |SX| context? Again, they are needed to guarantee confluence.  Consider:
-% $$
-% \begin{array}
-% |f(); (fail choice (3 = (1 choice 3)))| \movesto\{fail-l-no-sx} |f(); 3 = (1 choice 3)| \\
-% |f(); (fail choice (3 = (1 choice 3)))| \movesto |f(); fail  choice  ((3 = 1) choice (3 = 3))| \movesto |f();3|
-% \end{array}
-% $$
-
-
-Consider this expression:
+need a |SX| context? Again, they are needed to guarantee confluence. Suppose we had a rule \rulename{fail-l-no-sx}
+that unconditionally rewrites |(fail choice e)| to |e|. Now consider these
+two reduction sequences, starting from the same expression:
 $$
-|(if (x > 2) then e1 else e2); (x = 1 choice fail)|
+\begin{array}{rll}
+|applyN f (); (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{fail-l-no-sx}\} & |applyN f (); 3 = (1 choice 3)| \\
+|applyN f (); (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{choose}\} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
+ & \movesto\{\rulename{ulit}\}  & |applyN f (); (fail  choice  (fail choice 3))| \\
+ & \movesto\{\rulename{fail-l-no-sx} \times 2\} & |applyN f ();3|
+\end{array}
 $$
-The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-|if| is not choice-free.  If \rulename{fail-r} lacked a |SX| context we could rewrite
- $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
-and make progress.  But to do this \emph{we must look at the right branch of the choice, before we know whether
-  the left branch will reach a value or fail}, and that requires the implementation to explore
-both branches in parallel, a bit like adding parallel-or to the language.  That is a heavy obligation, and one
-we do not need to incur.
-Adding the |SX| context to \rulename{fail-r} allows an implementation
-to be sequential -- without, of course, prohibiting parallel evaluation.  The |SX| is less significant
-for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
+The first sequence gets stuck after one step\footnote{The strange |applyN f ()| prevents
+  us using \rulename{choose} to float the |(1 choice 3)| upwards.}, while the second makes more progress;
+and the two results are not joinable.
+
+% Consider this expression:
+% $$
+% |(if (x > 2) then e1 else e2); (x = 1 choice fail)|
+% $$
+% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+% |if| is not choice-free.  If \rulename{fail-r} lacked a |SX| context we could rewrite
+%  $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+% and make progress.  But to do this \emph{we must look at the right branch of the choice, before we know whether
+%   the left branch will reach a value or fail}, and that requires the implementation to explore
+% both branches in parallel, a bit like adding parallel-or to the language.  That is a heavy obligation, and one
+% we do not need to incur.
+% Adding the |SX| context to \rulename{fail-r} allows an implementation
+% to be sequential -- without, of course, prohibiting parallel evaluation.  The |SX| is less significant
+% for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
 \subsection{\versecalc{} is lenient} \label{sec:lenient}
 
