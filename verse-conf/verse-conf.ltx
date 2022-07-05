@@ -918,23 +918,23 @@ $$
 $$
 so |for^(x:= applyN fromTo (1,5)) in x| will reduce to the tuple |tup (1,2,3,4,5)|.
 
-\subsection{Handling out-of-bounds errors}
-Indexing out-of-bounds of a tuple results in |fail|.
-This means that we cannot avoid handling this case.
-$$
-|if x:=apply1 t 5 then apply1 print x else apply1 print "out of bounds"|
-$$
+%% \subsection{Handling out-of-bounds errors}
+%% Indexing out-of-bounds of a tuple results in |fail|.
+%% This means that we cannot avoid handling this case.
+%% $$
+%% |if x:=apply1 t 5 then apply1 print x else apply1 print "out of bounds"|
+%% $$
 
-\subsection{Subset and powerset}
-The subsets (subtuples) of a tuple can be expressed with this multi-valued function.
-First compute the subsets of all but the first element, and then return these with and without the first element added.
-$$
-|subset^(t) := if x:=apply1 head t then s:= apply1 subset (apply1 tail t); applyN cons (x, s) `choice` s else emptytup|
-$$
-And computing the powerset is then simply a matter of collecting all the subsets into a tuple.
-$$
-|powerset^(t) := for x := apply1 subset t in x|
-$$
+%% \subsection{Subset and powerset}
+%% The subsets (subtuples) of a tuple can be expressed with this multi-valued function.
+%% First compute the subsets of all but the first element, and then return these with and without the first element added.
+%% $$
+%% |subset^(t) := if x:=apply1 head t then s:= apply1 subset (apply1 tail t); applyN cons (x, s) `choice` s else emptytup|
+%% $$
+%% And computing the powerset is then simply a matter of collecting all the subsets into a tuple.
+%% $$
+%% |powerset^(t) := for x := apply1 subset t in x|
+%% $$
 
 \subsection{First class patterns}
 Pattern matching for function definitions is simply done by unification of ordinary expressions.
