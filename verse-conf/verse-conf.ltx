@@ -1505,14 +1505,15 @@ But notice that as we keep evaluating these fixed-points, they produce the same 
 \begin{definition}[Depth cutting]
 To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
 $|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally otherwise.
-When we need to write the function as a relation, we use |cutr n|. The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2| iff |cut n e_1 === cut n e_2|.
+%When we need to write the function as a relation, we use |cutr n|.
+The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2| iff |cut n e_1 === cut n e_2|.
 \end{definition}
 
 Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
 
 \subsection{Confluence}
 
-While |->| is not confluent on its own, we can say that it is confluent up to |stepX| and |cutr n|:
+While |->| is not confluent on its own, we can say that it is confluent up to |stepX| and |cute n|:
 
 \begin{definition}
 We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
