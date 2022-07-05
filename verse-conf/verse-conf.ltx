@@ -1625,7 +1625,7 @@ and its treatment of equality and thus logical variables is rather different to 
 
 Several aspects of |allKW| and |oneKW| are worth noting.
 First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
-for example, |all (1 choice 7 choice 2)| returns the tuple |tup (1,7,2)|),
+for example, |all (1 choice 7 choice 2)| returns the tuple |tup (1,7,2)|,
 In the other direction, indexing turns a tuple into choice ({\eg}, |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
