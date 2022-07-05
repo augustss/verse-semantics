@@ -775,8 +775,9 @@ We will illustrate this with a few examples.
       |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
       |apply1 e_1 e_2| & \equiv & |def (x y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
       |tup (e_1, e_2)| & \equiv & |def (x y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
-      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
-      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
+% already in the first figure
+%      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
+%      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
       |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh} \\
       |for e_1 in e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
     \end{array} \\
@@ -1625,7 +1626,7 @@ and its treatment of equality and thus logical variables is rather different to 
 
 Several aspects of |allKW| and |oneKW| are worth noting.
 First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
-for example, |all (1 choice 7 choice 2)| returns the tuple |tup (1,7,2)|,
+for example, |all (1 choice 7 choice 2)| returns the tuple |tup (1,7,2)|.
 In the other direction, indexing turns a tuple into choice ({\eg}, |def i (apply1 (tup (1,7,2)) i)| yields |(1 choice 7 choice 2)|).
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
