@@ -133,7 +133,7 @@
 \definecolor{olive}{rgb}{0.5, 0.5, 0.0}
 \definecolor{dkblue}{rgb}{0,0.1,0.5}
 
-\iftrue  % iftrue to enable, iffalse to disable
+\iffalse  % iftrue to enable, iffalse to disable
 \newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
@@ -160,7 +160,8 @@
 \begin{document}
 
 %% Title information
-\title{The essence of functional logic programming}
+% \title{The essence of functional logic programming}
+\title{The Verse calculus: a core calculus for functional logic programming}
 
                                         %% [Short Title] is optional;
                                         %% when present, will be used in
@@ -517,8 +518,7 @@ $$
 is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
 unifies |y| with |2| and |z| with |3|.  Finally |2| is returned as the result.
 Note carefully that, like any declarative language,
-\emph{a logical variable always stands for a single value}; logical
-variables are not mutable.
+\emph{logical variables are not mutable}.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
 mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
 
@@ -747,7 +747,7 @@ $$
 $$
 which (as we will see in \Cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
-So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 t i))| allow a
+So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 t i))| allows a
 tuple to be turned back into a choice.
 
 Do we even need |oneKW| as a primitive construct, given that we have
@@ -1916,27 +1916,24 @@ pairs), from which we may pick the first and discard the rest.
 
 A lazy variant of \versecalc{} looks entirely feasible, but we have not worked out the details.
 
-\section{What do we mean by ``essence''?}
-\simon{Words from Olin}
+\section{Looking back, looking forward}
 
-The semantics of VC are designed at a level intended to capture the
-computational model of the language; this is not a given for a formal
-semantics. Defining a language with a low-level semantics is like
-saying that the meaning of a program is given by the x86
-instructions to which it is compiled by some reference compiler. This
-is a true statement, but the translation is not exactly an
-\emph{illuminating} one, to a human who is reduced to staring at a pile of
-assembly code in order to understand exactly what the original program
+The semantics of \versecalc{} are designed at a level intended to capture the
+\emph{computational model} of the language; not all formal semantics do so.
+Defining a language by giving its low-level semantics is \emph{precise} but not necessarily \emph{illuminating}.
+For example, giving a reference compiler that compiles
+the program to x86 instructions is precise, but is not helpful
+to a human who is trying to understand exactly what the original program
 meant. Likewise, a high-level semantics simply provides the eventual answer
-produced by the program, without giving any insight into the computational
-steps that got us from program start to program completion.
+produced by the program, without insight into the \emph{computational steps}
+that got us from program start to program completion.
 
 The moral here is that \emph{formal specifications can be obfuscatory -- or
 illuminating.} The latter kind shed light because the are defined \emph{in
-terms of the intended mechanisms of the language}. VC does this; it
+terms of the intended mechanisms of the language}. \versecalc{} does this; it
 respects the conceptual structures of the Verse language.
 
-Note that when we say "illuminating," we mean that in multiple ways.
+Note that when we say ``illuminating'' we mean that in multiple ways.
 A semantics can be illuminating for humans who are trying to understand
 what a particular program does, or how an proposed change to the language
 will affect the language. It can drive analyses that help the compiler
@@ -1944,28 +1941,18 @@ optimise programs. It underlies the use of formal methods and verification
 to provide machine-derived and -checkable proofs of correctness. All of
 these application depend on the semantics being defined at the appropriate
 level: the level of the computational model that underlies the language.
-
 This has been our goal in this work.
 
-\section{Further work}
-
-\subsection{Types}
-
-The full Verse language has statically-checked types.
-In the dynamic semantics, the types can be represented by partial
-identity functions---identity of the values of the type and |fail| otherwise.
-This gives a distinctive new perspective on type systems, one that we leave
-for future work.
-
-\subsection{Effects}
-The full Verse language has updateable references in a store, in the style of SML.
-We also have (tentative) reduction rules for this as well.
-They are non-trivial, because store updates must be \emph{transactional}, {\eg},
-when the condition of an |if| fails any store effects in the condition must be rolled back.
-See \cref{sec:store} for the relevant rules.
-
-The full Verse language goes further, and has an effect system in addition to the type system.
-We have reduction rules for effect checking as well, but for the real language this is done at compile time.
+We have much left to do.  The full Verse language has
+statically-checked types.  In the dynamic semantics, the types can be
+represented by partial identity functions---identity of the values of
+the type and |fail| otherwise.  This gives a distinctive new
+perspective on type systems, one that we intend to develop in future
+work.  The full Verse language also has a statically-checked effect system,
+including both mutable references and input/output.  All these effects
+must be\emph{transactional}, {\eg}, when the condition of an |if|
+fails any store effects in the condition must be rolled back.
+By way of example, \Cref{sec:store} extends our reduction rules to handle mutable state.
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
