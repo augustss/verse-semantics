@@ -1978,7 +1978,8 @@ work.  The full Verse language also has a statically-checked effect system,
 including both mutable references and input/output.  All these effects
 must be \emph{transactional}, {\eg}, when the condition of an |if|
 fails, any store effects in the condition must be rolled back.
-By way of example, \Cref{sec:store} extends our reduction rules to handle mutable state.
+We have a preliminary reduction rules for updateable references,
+but they are not included here
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
@@ -1998,6 +1999,8 @@ By way of example, \Cref{sec:store} extends our reduction rules to handle mutabl
 
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
+
+\iffalse
 
 \appendix
 
@@ -2123,6 +2126,7 @@ To support limited store operations ({\eg}, |read|, but not |write|) we can equi
 We also need some extra expressions that modify this set as the store ``moves'' around.
 
 \lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
+\fi
 
 % JB: Removed, given that even the very first step turned out to not help with out system
 % and then not much of value can be said there 
