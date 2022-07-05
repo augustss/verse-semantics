@@ -1476,18 +1476,21 @@ We can now consider two expressions the same up to these administrative differen
 \subsection{Recursion}%
 \label{sec:confluence-and-recursion}
 
-There remains still another source of non-confluence, due to recursion. In
-\[ |def (x y) (x=tup (1,y); y=(lam z x); x)| \]
-we can apply \rulename{subst} to $x$ first and obtain the following reduction (omitting spelling out the application of rules \rulename{def-eliml} and \rulename{seq}):
-\begin{align*}
-& \movesto \{\rulename{subst}\}     && |def y (y=(lam z (tup (1,y))); tup (1,y))| \\
-& \movesto \{\rulename{subst-rec}\} && |def y (y=v_y; tup (1,y))| \quad \text{ where } |v_y| = |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))| \\
-& \movesto \{\rulename{subst}\}     && |tup (1,v_y)|  \\
-\intertext{Alternatively, we can apply \rulename{subst} to |y = (lam z x)| first, and obtain}
-& \movesto \{\rulename{subst}\}     && |def x (x=tup (1,lam z x); x)| \\
-& \movesto \{\rulename{subst-rec}\} && |def x (x=v_x; x)| \quad \text{ where } |v_x| = |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))| \\
-& \movesto \{\rulename{subst}\}     && |v_x|
-\end{align*}
+There remains still another source of non-confluence, due to recursion. Depending on whether we apply \rulename{subst} first to |x| or |y| we get these two reductions:
+\[ |tup (1,v_y) <-* def (x y) (x=tup (1,y); y=(lam z x); x) ->* v_x|\]
+where $|v_y| \equiv |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))|$ and $|v_x| \equiv |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))|$.
+%
+%we can apply \rulename{subst} to $x$ first and obtain the following reduction:
+%\[
+%|-> def y (y=(lam z (tup (1,y))); tup (1,y)) -> def y (y=v_y; tup (1,y)) -> tup (1,v_y)|
+%\]
+%where $|v_y| \equiv |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))|$.
+%Alternatively, we can apply \rulename{subst} to |y = (lam z x)| first, and obtain
+%\[
+%| -> def x (x=tup (1,lam z x); x) -> def x (x=v_x; x) -> v_x|
+%\]
+%where $|v_x| \equiv |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))|$.
+%
 Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, so we get
 \[
 \begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
