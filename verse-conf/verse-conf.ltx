@@ -133,7 +133,7 @@
 \definecolor{olive}{rgb}{0.5, 0.5, 0.0}
 \definecolor{dkblue}{rgb}{0,0.1,0.5}
 
-\iffalse  % iftrue to enable, iffalse to disable
+\iftrue  % iftrue to enable, iffalse to disable
 \newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
@@ -451,7 +451,7 @@ $$
           \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
-          \hspace{2mm} \text{{\eg} |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+1))))))|.}
+          \hspace{2mm} \text{{\eg} |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
@@ -1297,7 +1297,16 @@ The rules for |oneKW| and |allKW| expect multiple choices to be
 normalized into a right-associative list of non-failing values, and
 the administrative rules \rulename{assoc-choice}, \rulename{fail-l}
 and \rulename{fail-r} bring nested choices into that form. But why do these rules
-need a |SX| context? Are they not universally true?  Consider this expression:
+need a |SX| context? Again, they are needed to guarantee confluence.  Consider:
+% $$
+% \begin{array}
+% |f(); (fail choice (3 = (1 choice 3)))| \movesto\{fail-l-no-sx} |f(); 3 = (1 choice 3)| \\
+% |f(); (fail choice (3 = (1 choice 3)))| \movesto |f(); fail  choice  ((3 = 1) choice (3 = 3))| \movesto |f();3|
+% \end{array}
+% $$
+
+
+Consider this expression:
 $$
 |(if (x > 2) then e1 else e2); (x = 1 choice fail)|
 $$
@@ -1950,15 +1959,17 @@ the type and |fail| otherwise.  This gives a distinctive new
 perspective on type systems, one that we intend to develop in future
 work.  The full Verse language also has a statically-checked effect system,
 including both mutable references and input/output.  All these effects
-must be\emph{transactional}, {\eg}, when the condition of an |if|
+must be \emph{transactional}, {\eg}, when the condition of an |if|
 fails any store effects in the condition must be rolled back.
 By way of example, \Cref{sec:store} extends our reduction rules to handle mutable state.
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
                                         %% contents suppressed with 'anonymous'
-  We thank our colleagues for their helpufl feedback on earlier drafts of this paper,
+  We thank our colleagues for their helpful and specific
+  feedback on earlier drafts of this paper,
   including
+  Jessica Augustsson,
   Francisco L\'opez-Fraguas,
   Andy Gordon,
   Michael Hanus,
