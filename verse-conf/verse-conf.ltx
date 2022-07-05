@@ -1548,18 +1548,11 @@ and even allows rewriting with a local equation within that equation's right-han
 \[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))|. \]
 
 The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations, such as the commutativity of sequencing
-\[
-|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|,
-\]
+(|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|),
 naming of subexpressions
-\[
-|e ~= (def x (x = e; x))| \quad \text{if } x \notin\freevars{e}
-\]
+(|e ~= (def x (x = e; x))| if $x \notin\freevars{e}$),
 and the removal of repeated choice-free expressions
-\[
-|(ce;ce) ~= ce|.
-\]
-The development of this theory is future work.
+(|(ce;ce) ~= ce|).  The development of this theory is future work.
 
 \subsection{Fixed points}
 
