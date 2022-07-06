@@ -127,6 +127,12 @@
 \newcommand{\movesfrom}{\longleftarrow}
 \newcommand{\convertible}{\longleftrightarrow^{\ast}}
 
+% Arrows with explanation, including the common cases of one, two or a repated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
 % ----------------- Author comments ---------------------
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \definecolor{dkgreen}{rgb}{0,0.3,0}
@@ -416,20 +422,18 @@ thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cr
   are given here just for reference.}:
 $$
 \begin{array}{ll}
-                                   & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
-  \movesto\{\rulename{subst}\}     & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-  \movesto\{\rulename{utup}\}      & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
-% \movesto\{\rulename{subst}\}     & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-  \movesto\{\rulename{subst}, \rulename{swap}\}
-                                   & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
-% \movesto\{\rulename{def-eliml}\} & |def (x y)   (x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
-% \movesto\{\rulename{def-eliml}\} & |def (x)     (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
-  \movesto\{\rulename{def-eliml} \times 3 \}
-                                   & |                 tup(2,3); (2;     3;     tup(2,3)); 2| \\
-% \movesto\{\rulename{seq}\}       & |                           (2;     3;     tup(2,3)); 2| \\
-% \movesto\{\rulename{seq}\}       & |                                  (3;     tup(2,3)); 2| \\
-% \movesto\{\rulename{seq}\}       & |                                          tup(2,3);  2| \\
-  \movesto\{\rulename{seq}\times4\}& |                                                     2|
+                           & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
+  \movestoR{subst}         & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
+  \movestoR{utup}          & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
+% \movestoR{subst}         & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
+  \movestoRR{subst}{swap}  & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
+% \movestoR{def-eliml}     & |def (x y)   (x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
+% \movestoR{def-eliml}     & |def (x)     (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
+  \movestoRn{def-eliml}{3} & |                 tup(2,3); (2;     3;     tup(2,3)); 2| \\
+% \movestoR{seq}           & |                           (2;     3;     tup(2,3)); 2| \\
+% \movestoR{seq}           & |                                  (3;     tup(2,3)); 2| \\
+% \movestoR{seq}           & |                                          tup(2,3);  2| \\
+  \movestoRn{seq}{4}       & |                                                     2|
 \end{array}
 $$
 %
@@ -1278,18 +1282,18 @@ without this restriction we lose confluence.  To see this, consider\footnote{Rem
 \begin{center}
 \begin{tabular}{>{\quad}l>{$}l<{$}l}
 & & |def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|\\
-& \movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
-& \movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
-& \movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
-%& \movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
-& \movesto \{\rulename{def-eliml}, \rulename{seq}\} & |77 choice 99|\\
+& \movestoR{subst} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
+& \movestoC{\text{simplify |if|}} & |def x (55; (x=1); (77 choice 99))|\\
+& \movestoR{seq} & |def x ((x=1); (77 choice 99))|\\
+%& \movestoR{def-eliml} & |1; (77 choice 99)|\\
+& \movestoRR{def-eliml}{seq} & |77 choice 99|\\
 \end{tabular}
 \end{center}
 But suppose instead we floated the choice out, \emph{part-way}, like this:
 $$
 \begin{array}{ll}
 \multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
-\quad \movesto \{\text{Bogus \rulename{choose}}\} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
+\quad \movestoC{\text{Bogus \rulename{choose}}} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
 \end{array}
 $$
 Now the |(x=1)| is inside the choice branches, so we cannot use \rulename{subst} to rewrite the
@@ -1315,10 +1319,10 @@ that unconditionally rewrites |(fail choice e)| to |e|. Now consider these
 two reduction sequences, starting from the same expression:
 $$
 \begin{array}{rll}
-|apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{fail-l-no-sx}\} & |applyN f (); 3 = (1 choice 3)| \\
-|apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{choose}\} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
- & \movesto\{\rulename{ulit}\times 2\}  & |applyN f (); (fail  choice  (fail choice 3))| \\
- & \movesto\{\rulename{fail-l-no-sx} \times 2\} & |applyN f ();3|
+|apply0 f; (fail choice (3 = (1 choice 3)))| & \movestoR{fail-l-no-sx} & |applyN f (); 3 = (1 choice 3)| \\
+|apply0 f; (fail choice (3 = (1 choice 3)))| & \movestoR{choose} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
+ & \movestoRn{ulit}{2}  & |applyN f (); (fail  choice  (fail choice 3))| \\
+ & \movestoRn{fail-l-no-sx}{2} & |applyN f ();3|
 \end{array}
 $$
 The first sequence gets stuck after one step\footnote{The strange |apply0 f| prevents
