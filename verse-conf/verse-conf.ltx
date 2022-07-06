@@ -1313,13 +1313,13 @@ that unconditionally rewrites |(fail choice e)| to |e|. Now consider these
 two reduction sequences, starting from the same expression:
 $$
 \begin{array}{rll}
-|applyN f (); (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{fail-l-no-sx}\} & |applyN f (); 3 = (1 choice 3)| \\
-|applyN f (); (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{choose}\} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
+|apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{fail-l-no-sx}\} & |applyN f (); 3 = (1 choice 3)| \\
+|apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{choose}\} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
  & \movesto\{\rulename{ulit}\}  & |applyN f (); (fail  choice  (fail choice 3))| \\
  & \movesto\{\rulename{fail-l-no-sx} \times 2\} & |applyN f ();3|
 \end{array}
 $$
-The first sequence gets stuck after one step\footnote{The strange |applyN f ()| prevents
+The first sequence gets stuck after one step\footnote{The strange |apply0 f| prevents
   us using \rulename{choose} to float the |(1 choice 3)| upwards.}, while the second makes more progress;
 and the two results are not joinable.
 
