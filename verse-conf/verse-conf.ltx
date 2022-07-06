@@ -1277,12 +1277,12 @@ without this restriction we lose confluence.  To see this, consider\footnote{Rem
 % SLPJ: longtable seems to totally mess up pagination
 \begin{center}
 \begin{tabular}{>{\quad}l>{$}l<{$}l}
-\multicolumn{3}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
+& & |def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|\\
 & \movesto \{\rulename{subst}\} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
 & \movesto \{\text{simplify |if|}\} & |def x (55; (x=1); (77 choice 99))|\\
 & \movesto \{\rulename{seq}\} & |def x ((x=1); (77 choice 99))|\\
-& \movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
-& \movesto \{\rulename{seq}\} & |77 choice 99|\\
+%& \movesto \{\rulename{def-eliml}\} & |1; (77 choice 99)|\\
+& \movesto \{\rulename{def-eliml}, \rulename{seq}\} & |77 choice 99|\\
 \end{tabular}
 \end{center}
 But suppose instead we floated the choice out, \emph{part-way}, like this:
