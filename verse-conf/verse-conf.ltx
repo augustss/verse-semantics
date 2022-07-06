@@ -1284,18 +1284,16 @@ The context |SX| (\cref{fig:syntax}) is a \emph{scope context}; it
 ensures that |CX| is as large as possible.  This is a subtle point:
 without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
   a use of |oneKW|, see \cref{sec:one}, but using |if| makes the example easier to understand.}:
-% using longtable allows page breaks
-% SLPJ: longtable seems to totally mess up pagination
-\begin{center}
-\begin{tabular}{>{\quad}l>{$}l<{$}l}
-& & |def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|\\
-& \movestoR{subst} & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
-& \movestoC{\text{simplify |if|}} & |def x (55; (x=1); (77 choice 99))|\\
-& \movestoR{seq} & |def x ((x=1); (77 choice 99))|\\
-%& \movestoR{def-eliml} & |1; (77 choice 99)|\\
-& \movestoRR{def-eliml}{seq} & |77 choice 99|\\
-\end{tabular}
-\end{center}
+$$
+\begin{array}{l@@{\;}l}
+                                 & |def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|\\
+ \movestoR{subst}                & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
+ \movestoC{\text{simplify |if|}} & |def x (55; (x=1); (77 choice 99))|\\
+ \movestoR{seq}                  & |def x ((x=1); (77 choice 99))|\\
+% \movestoR{def-eliml}           & |1; (77 choice 99)|\\
+ \movestoRR{def-eliml}{seq}      & |77 choice 99|\\
+\end{array}
+$$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
 $$
 \begin{array}{ll}
