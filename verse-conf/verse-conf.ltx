@@ -470,7 +470,7 @@ Rules may be applied anywhere they match, again just like the lambda calculus. T
           \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
-          \hspace{2mm} \text{{\eg} |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
@@ -989,7 +989,7 @@ programming language?  Here are some possibilities:
   does not convey accurate operational intuition, because it goes all the way to a value
   in one step. So-called ``small-step'' operational semantics are therefore widely used;
   they typically describe how a (heap, expression, stack) configuration evolves, one small
-  step at a time ({\eg},~\cite{pj:stg-machine}).
+  step at a time ({\eg}, ~\cite{pj:stg-machine}).
   The difficulty is that the description is now so low level that it is again hard to explain to programmers.
 \item \emph{A rewrite semantics} steers between these two extremes.
   For example, Ariola {\etal}'s ``A call by need lambda calculus''~\cite{ariola:call-by-need} shows how
@@ -1578,7 +1578,7 @@ In general, confluence up to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} |e_2 <- e_1 -> e_3| $\implies$ |e_2 ~ e_3|), and requires a more involved proof, which is still work in progress.
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie}, |e_2 <- e_1 -> e_3| $\implies$ |e_2 ~ e_3|), and requires a more involved proof, which is still work in progress.
 %(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
 %
 We have, however, reasons to be optimistic: our incomplete proof
@@ -1605,7 +1605,7 @@ and the removal of repeated choice-free expressions
 
 \subsection{Fixed points}
 
-To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie}, |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie} |x = v ~ x = (mu x v)|.
+To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie}, |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie}, |x = v ~ x = (mu x v)|.
 %
 This expression behaves much as one would expect from a fixed-point operator:
 \begin{itemize}
@@ -1650,7 +1650,7 @@ choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
-it is common in calculi with choice, see {\eg},~\citetext{\citealp[Section 6.1]{liguoro:non-det}, \citealp[Section 3]{lago:probabilistic}}
+it is common in calculi with choice, see {\eg}, ~\citetext{\citealp[Section 6.1]{liguoro:non-det}, \citealp[Section 3]{lago:probabilistic}}
 and, more recently, has been used to describe functional logic languages where it is variously
 called \emph{bubbling} \cite{antoy:bubbling} or \emph{pull-tabbing} \cite{antoy:pull-tabbing}.
 However, our formulation appears simpler, because we avoid the need for attaching
@@ -2183,7 +2183,7 @@ Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common s
 \item |stepBr;stepB `ss` stepB;stepBr|
 \item |stepAr;stepB `ss` stepB;stepArs|
 \end{enumerate}
-then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie}
+then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie},
 |stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
 \end{lemma}
 
