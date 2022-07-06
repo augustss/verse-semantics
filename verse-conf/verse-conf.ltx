@@ -423,11 +423,11 @@ $$
   \rulename{subst, swap}  & \movesto & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
 %  \rulename{def-eliml} & \movesto & |def (x y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
 %  \rulename{def-eliml} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
-  3\times\rulename{def-eliml} & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
+  \rulename{def-eliml} \times 3 & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                             (2;     3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                    (3;     tup(2,3)); 2| \\
 %  \rulename{seq} & \movesto & |                                            tup(2,3);  2| \\
-  4\times\rulename{seq} & \movesto & |                                                       2| \\
+  \rulename{seq} \times 4 & \movesto & |                                                       2| \\
 \end{array}
 $$
 %
