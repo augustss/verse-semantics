@@ -179,18 +179,18 @@ lemma congruentE[elim, consumes 2]:
   using assms
   by (simp add: congruent.simps)
 
-lemma congruent_OO[intro!]:
+lemma congruent_OO[simp]:
   assumes "congruent R" and "congruent S"
   shows "congruent (R OO S)"
   using assms
   by(auto intro!: congruentI)
 
-lemma congruent_inv[intro!]:
+lemma congruent_inv[simp]:
   assumes "congruent R"
   shows "congruent (R\<inverse>\<inverse>)"
   using assms by(auto intro!: congruentI)
 
-lemma congruent_star[intro!]:
+lemma congruent_star[simp]:
   assumes "congruent R"
   shows "congruent R\<^sup>*\<^sup>*"
 proof
@@ -210,7 +210,7 @@ proof
 qed
 
 inductive underC :: "C \<Rightarrow> red \<Rightarrow> red" for C and R where
-  underCI: "R x y \<Longrightarrow> underC C R (appC C x) (appC C y)"
+  underCI: "C \<noteq> CHole \<Longrightarrow> R x y \<Longrightarrow> underC C R (appC C x) (appC C y)"
 
 
 inductive cc :: "red \<Rightarrow> red" for R where
@@ -221,12 +221,11 @@ lemma congruent_cc[simp]:
   by (auto intro!: congruentI elim!:cc.cases underC.cases
            simp add: appC_appC_compC intro: underC.intros cc.intros)
 
-
 lemma cc_local_confluence:
   assumes "congruent S"
   assumes "symp S"
   assumes "R\<inverse>\<inverse> OO R \<le> S"
-  assumes "\<And> C. C \<noteq> CHole \<Longrightarrow> R\<inverse>\<inverse> OO underC C R \<le> S"
+  assumes "\<And> C. R\<inverse>\<inverse> OO underC C R \<le> S"
   shows "(cc R)\<inverse>\<inverse> OO cc R \<le> S"
 proof-
 {
@@ -245,9 +244,10 @@ proof-
     case (InLeft C3)
     have "a2 = appC C3 a1" using `C1 = _` `appC _ _ = _`
       by (simp add:appC_appC_compC[symmetric])
-    with `R a1 b` have "underC C3 R a2 (appC C3 b)"
+    with `R a1 b`  `C3 \<noteq> CHole`
+    have "underC C3 R a2 (appC C3 b)"
       by (auto simp add:underC.simps)
-    with `R a2 c` assms(4)[OF `C3 \<noteq> CHole`]
+    with `R a2 c` assms(4)
     have "S c (appC C3 b)" by auto
     then show ?thesis using `C1 = _` `congruent S`
       by (auto simp add: appC_appC_compC[symmetric])
@@ -255,9 +255,10 @@ proof-
     case (InRight C3)
     have "a1 = appC C3 a2" using `C2 = _` `appC _ _ = _`
       by (simp add:appC_appC_compC[symmetric])
-    with `R a2 c` have "underC C3 R a1 (appC C3 c)"
+    with `R a2 c`  `C3 \<noteq> CHole`
+    have "underC C3 R a1 (appC C3 c)"
       by (auto simp add:underC.simps)
-    with `R a1 b` assms(4)[OF `C3 \<noteq> CHole`]
+    with `R a1 b` assms(4)
     have "S b (appC C3 c)" by auto
     hence "S (appC C1 b) (appC C2 c)" using `C2 = _` `congruent S`
       by (auto simp add: appC_appC_compC[symmetric])
@@ -270,14 +271,49 @@ qed
 inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq v e) e"
 equivariance rule_Seq
+
 definition "VR = cc (rule_Seq)"
 
-theorem local_confluence:
-  "VR\<inverse>\<inverse> OO VR \<le>  VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
-  unfolding VR_def
-  apply (rule cc_local_confluence)
-     apply auto
-    apply (auto simp add: symp_def)
+definition "J = VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
+
+lemma refl_J[simp]: "J x x"
+  unfolding J_def by auto
+
+lemma congruent_J[simp]: "congruent J"
+  unfolding J_def VR_def by simp
+
+lemma symp_J[simp]: "symp J"
+  unfolding J_def VR_def symp_def by auto
+
+lemma joinI[case_names Peak]:
+  assumes "\<And> a b c. R1 a b \<Longrightarrow> R2 a c \<Longrightarrow> S b c"
+  shows "R1\<inverse>\<inverse> OO R2 \<le> S"
+  using assms by auto
+
+(* Joinable at the root *)
+
+
+lemma Seq_Seq: "rule_Seq\<inverse>\<inverse> OO rule_Seq \<le> J"
+  by(auto intro!: joinI elim!: rule_Seq.cases)
+
+(* Joinable below *)
+
+(* R just to tidy things up. Should be union of all rules. *)
+lemma Seq_C: "rule_Seq\<inverse>\<inverse> OO underC C R \<le> J"
+  apply (rule joinI)
+  apply (auto elim!:rule_Seq.cases underC.cases)
+  apply (cases C;auto)
+  (* now apply Seq on the right of J. In one case needs that appC is a value! *)
   sorry
 
+
+theorem local_confluence:
+  "VR\<inverse>\<inverse> OO VR \<le> J"
+  unfolding VR_def
+  apply (rule cc_local_confluence)
+     apply simp
+    apply simp
+  apply (rule Seq_Seq)
+  apply (rule Seq_C)
+  done
 end
