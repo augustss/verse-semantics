@@ -1213,18 +1213,19 @@ as discussed in \cref{sec:conf-move-eqn}.
 
 Consider this (extremely) tricky term:
 $$
-|def x (x = (if (x=0; x>1) then 33 else 55))|
+|def x (x = if (x=0; x>1) then 33 else 55)|
 $$
 What should this do? At first you might think it was stuck; how can we simplify the |if|
 when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
 $$
-|def x (x = if (x=0; x>1) then 33 else 55)| \\
-\begin{array}[t]{r@@{\;}l}
-  \movesto & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
-  \movesto & |def x (x = if fail then 33 else 55)|\\
-  \movesto & |def x (x = 55)| \quad \movesto |55|
-  \end{array}
+\begin{array}{l@@{\;}l}
+                                & |def x (x = if (x=0; x>1) then 33 else 55)| \\
+\movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
+\movestoR{fail}                 & |def x (x = if fail then 33 else 55)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55)| \\
+\movestoR{def-eliml}            & |55|
+\end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
 the |(x=0)| with |(x=100)| then rewriting gets stuck, as the reader may verify; and yet there
