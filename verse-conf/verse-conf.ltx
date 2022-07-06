@@ -1249,7 +1249,7 @@ different ways:
 \begin{itemize}
 \item Use \rulename{global-subst} on |(y=x)|; doing so recovers the original tricky term, which is
 stuck, because \rulename{global-subst} cannot rewrite it.
-\item use \rulename{global-subst} on |(y=0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
+\item Use \rulename{global-subst} on |(y=0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
 \end{itemize}
 We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
 This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
