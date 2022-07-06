@@ -415,19 +415,21 @@ For example, the expression above can be rewritten
 thus\footnote{The rule names come from \cref{fig:rules1}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
 $$
-\begin{array}{l@@{\;}c@@{\;}l}
-                   &          & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
-  \rulename{subst} & \movesto & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-  \rulename{utup}  & \movesto & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
-%  \rulename{subst} & \movesto & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-  \rulename{subst, swap}  & \movesto & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
-%  \rulename{def-eliml} & \movesto & |def (x y)(x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
-%  \rulename{def-eliml} & \movesto & |def (x)  (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
-  \rulename{def-eliml} \times 3 & \movesto & |              tup(2,3); (2;     3;     tup(2,3)); 2| \\
-%  \rulename{seq} & \movesto & |                             (2;     3;     tup(2,3)); 2| \\
-%  \rulename{seq} & \movesto & |                                    (3;     tup(2,3)); 2| \\
-%  \rulename{seq} & \movesto & |                                            tup(2,3);  2| \\
-  \rulename{seq} \times 4 & \movesto & |                                                       2| \\
+\begin{array}{ll}
+                                   & |def (x y z) (x = tup(y,3); x = tup(2,z); y)| \\
+  \movesto\{\rulename{subst}\}     & |def (x y z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
+  \movesto\{\rulename{utup}\}      & |def (x y z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
+% \movesto\{\rulename{subst}\}     & |def (x y z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
+  \movesto\{\rulename{subst}, \rulename{swap}\}
+                                   & |def (x y z) (x = tup(2,3); (y = 2; z = 3; tup(2,3)); 2)| \\
+% \movesto\{\rulename{def-eliml}\} & |def (x y)   (x = tup(2,3); (y = 2; 3;     tup(2,3)); 2)| \\
+% \movesto\{\rulename{def-eliml}\} & |def (x)     (x = tup(2,3); (2;     3;     tup(2,3)); 2)| \\
+  \movesto\{\rulename{def-eliml} \times 3 \}
+                                   & |                 tup(2,3); (2;     3;     tup(2,3)); 2| \\
+% \movesto\{\rulename{seq}\}       & |                           (2;     3;     tup(2,3)); 2| \\
+% \movesto\{\rulename{seq}\}       & |                                  (3;     tup(2,3)); 2| \\
+% \movesto\{\rulename{seq}\}       & |                                          tup(2,3);  2| \\
+  \movesto\{\rulename{seq}\times4\}& |                                                     2|
 \end{array}
 $$
 %
@@ -1315,7 +1317,7 @@ $$
 \begin{array}{rll}
 |apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{fail-l-no-sx}\} & |applyN f (); 3 = (1 choice 3)| \\
 |apply0 f; (fail choice (3 = (1 choice 3)))| & \movesto\{\rulename{choose}\} & |applyN f (); (fail  choice  ((3 = 1) choice (3 = 3)))| \\
- & \movesto\{\rulename{ulit}\}  & |applyN f (); (fail  choice  (fail choice 3))| \\
+ & \movesto\{\rulename{ulit}\times 2\}  & |applyN f (); (fail  choice  (fail choice 3))| \\
  & \movesto\{\rulename{fail-l-no-sx} \times 2\} & |applyN f ();3|
 \end{array}
 $$
