@@ -353,8 +353,8 @@ Like any functional logic language,
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
-\item All functional logic languages have some notion of ``flexible'' \emph{vs.} ``rigid'' variables,
-  or ``suspending'' \emph{vs.} ``narrowing'' operations.  \versecalc{} offers a new
+\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables,
+  or ``suspending'' {\vs} ``narrowing'' operations.  \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
@@ -1345,7 +1345,7 @@ Laziness would be another possible design choice, one that is even more expressi
 The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
 rewrite rule to apply next if you want to execute the program. That is
 the role of an \emph{evaluation strategy} that, given a closed term, says which redex
-to rewrite first.  For example, in the pure lambda calculus, \emph{normal order reduction},
+to rewrite first.  For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
 guarantees to terminate if any strategy does so.
 
@@ -1354,7 +1354,7 @@ is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code.
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps
--- so called ``optimal reduction''  -- but optimal reduction is typically very hard, even in theory, and
+--- so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal} --- but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
 
 Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
@@ -1362,12 +1362,12 @@ we can make some informal comments.  First, in service of (b) we envisage compil
 lambdas to code, and thus we never rewrite under a lambda.
 Second, it never makes sense to evaluate in the right-hand argument of
 a choice\footnote{Except perhaps in parallel, of course.}, because
-\versecalc{} strong ordering semantics mean that we must first find out what the left-hand argument
+\versecalc{}'s strong-ordering semantics mean that we must first find out what the left-hand argument
 is (especially, whether it fails) before the right-hand one can be used.
 So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
 
 The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; tup(x,3)=tup(2,y))|,
-the equality may or may not be the leftmost redex, depending on whether |e| is stuck (i.e. contains no
+the equality may or may not be the leftmost redex, depending on whether |e| is stuck ({\ie}, contains no
 redexes); and whether or not |e| is stuck is a not syntactic property, and
 (worse) may depend not only on |e| itself, but on its context. Even worse, |e| may subsequently
 become un-stuck when we rewrite the equality.
@@ -1382,12 +1382,12 @@ so we leave evaluation strategy and compilation for future work.
 \subsection{Examples}
 A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
 This example shows how constraining the output of a function call can constrain the argument.
-While most of the reduction are adminstrative in nature, these are the highlights:
+While most of the reductions are adminstrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
 Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
 so that at \circlednum{5} the actual unification can happen.
 At \circlednum{6} and \circlednum{7} we finally get the values into the result,
-and the rest of the reductions just gets rid of terms no longer needed.
+and the rest of the reductions just get rid of terms no longer needed.
 \begin{figure}
 \begin{scriptsize}
 $$
@@ -1528,7 +1528,7 @@ In general, confluence up-to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress.
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie}, proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress.
 %(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
 \simon{Do we have local confluence?  Or is it not even a useful stepping stone?}
 
@@ -1565,7 +1565,7 @@ The development of this theory is future work.
 
 To conclude theis section on metatheory, let use have a closer look at \rulename{subst-rec}.
 
-Consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of \emph{some} |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
+Consider an equation |x = v| that is not failed by the occurs check, {\ie}, |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes the body of \emph{some} |(lam y e)| in |v|, not nested under another lambda, with $x\in\freevars{e}$ to |def x (x=v;e)|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simulatenously. This is not quite the same expression that we get from applying \rulename{subst-rec} exhaustively, as that process will also affect lambdas nested more deeply, but they are joinable:
 \[
 |x = v| ~ |x = (mu x v)|.
 \]
@@ -1660,7 +1660,7 @@ Thirdly, |oneKW| allows us to reify failure; to try something and take different
 depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour,
 and Curry's set-functions allow one to do the same thing.
 
-Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' \emph{vs.} ``rigid'' logical variables.
+Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
 they are ``rigid''.  This notion is nicely captured by the execution context |X|, which limits the
 scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and |allKW|.
@@ -1697,7 +1697,7 @@ CRWL framework.  Their key insight (like us, inspired by
 is to use |let| to make sharing explicit.
 
 However both CRWL and Fraguas {\etal} suffer from a major problem:
-they require something we call \emph{magical rewriting}. A key rewrite rule is this;
+they require something we call \emph{magical rewriting}. A key rewrite rule is this:
 $$
 \begin{array}{l}
 f( \theta(e_1),\ldots, \theta(e_n) ) \movesto \theta( rhs ) \\
@@ -1717,7 +1717,7 @@ But the substitution for the extra variables must be chosen ``magically''
 work out. This is admirably high level, because it hides everything
 about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
-In subsequent journal paper they refine CRWL to avoid magical rewriting using
+In a subsequent journal paper they refine CRWL to avoid magical rewriting using
 ``let-narrowing'' \cite[Section 6]{fraguas:let-narrowing}; this system
 looks rather different to ours, especially in its treatment of choice,
 but is rather close in spirit.
@@ -1726,14 +1726,15 @@ To explain actual execution, the state of the art is described by
 \citet{hanus:semantics}.  They give both a big-step operational
 semantics (in the style of \citet{launchbury:natural}), and
 a small-step operational semantics.  These two approaches both thread a
-\emph{heap}, which holds the unification variables and their unification
-state; and the small-step semantics also has a \emph{stack}, to specify
+\emph{heap} through the execution, which holds the unification variables and their unification
+state; the small-step semantics also has a \emph{stack}, to specify
 the focus of execution.
 %
 The trouble is that heaps and stacks are difficult to explain to a programmer,
 and do not make it easy to reason about program equivalence.
 %
-To account for residuation, they have to further complicate their model with concurrency.
+In addition to this machinery, the model is further complicated with
+concurrency to account for residuation.
 
 In contrast, our rewrite rules give a complete, executable ({\ie}, no ``magic'')
 account of logical variables and choice, directly as small-step
@@ -1741,14 +1742,14 @@ rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
 
-\subsection{Flat vs higher order}
+\subsection{Flat {\vs} higher order}
 
 When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
 User-defined functions can be defined at top level only;
 and function symbols (the names of such functions) are syntactically
 distinguished from ordinary variables. As Hanus describes, it is possible
-to translate a higher order program into a first-order
+to translate a higher-order program into a first-order
 form\footnote{
   He does not mention this, but for a language with arbitrary nested lambdas
   one would need to do lambda-lifting as well, but that is a small point.}
@@ -1782,7 +1783,7 @@ In contrast, |def x e| seems more direct.
 
 \section{Variations and choices}
 
-%% \lennart{Mention binary \emph{vs.} n-ary for choice and tuples?}
+%% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
 
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
@@ -1926,7 +1927,7 @@ A lazy variant of \versecalc{} looks entirely feasible, but we have not worked o
 
 The full Verse language has statically-checked types.
 In the dynamic semantics, the types can be represented by partial
-identity functions---identity of the values of the type and |fail| otherwise.
+identity functions, which are the identity function on the values of the type and |fail| otherwise.
 This gives a distinctive new perspective on type systems, one that we leave
 for future work.
 
@@ -2119,7 +2120,7 @@ Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common s
 \item |stepBr;stepB `ss` stepB;stepBr|
 \item |stepAr;stepB `ss` stepB;stepArs|
 \end{enumerate}
-then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie}
+then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie},
 |stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
 \end{lemma}
 
@@ -2129,7 +2130,7 @@ We divide our relation $\movesto$ into two sets:
 
 This fragment respects $\equiv_n$, as it does not look under lambdas.
 
-\item The remaining rules, {\i.e.} resolving applications and |oneKW| and |allKW|, form the evaluation fragment.
+\item The remaining rules, {\ie}, resolving applications and |oneKW| and |allKW|, form the evaluation fragment.
 
 These rules look under at most one level of lambdas, so take terms related by |cutr (n+1)| to terms related by |cutr (n)|.
 
