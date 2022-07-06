@@ -132,6 +132,12 @@ by pat_completeness auto+
 termination by lexicographic_order
 (* TODO: Not equivariant! equivariance appC *)
 
+lemma appC_inj[simp]: "appC C x = appC C y \<longleftrightarrow> x = y"
+  apply(induction C)
+              apply auto
+  apply (meson fresh_PairD(1) fresh_PairD(2) obtain_fresh)
+  apply (meson fresh_PairD(1) fresh_PairD(2) obtain_fresh)
+  done  
 
 function compC :: "C \<Rightarrow> C \<Rightarrow> C" where
   "compC CHole e' = e'"
@@ -152,7 +158,15 @@ termination by lexicographic_order
 
 lemma appC_appC_compC:
 "appC C1 (appC C2 e) = appC (compC C1 C2) e"
-by (induction C1) auto
+  by (induction C1) auto
+
+lemma comp_nest[case_names Same InLeft InRight]:
+  fixes C1 C2
+  obtains "C1 = C2"
+  | C3 where "C3 \<noteq> CHole" "C1 = compC C2 C3"
+  | C3 where "C3 \<noteq> CHole" "C2 = compC C1 C3"
+  apply (induction C1 arbitrary: C2; case_tac C2)
+  sorry
 
 type_synonym red = "exp \<Rightarrow> exp \<Rightarrow> bool"
 
@@ -165,7 +179,18 @@ lemma congruentE[elim, consumes 2]:
   using assms
   by (simp add: congruent.simps)
 
-lemma congruent_star:
+lemma congruent_OO[intro]:
+  assumes "congruent R" and "congruent S"
+  shows "congruent (R OO S)"
+  using assms
+  by(auto intro!: congruentI)
+
+lemma congruent_inv[intro]:
+  assumes "congruent R"
+  shows "congruent (R\<inverse>\<inverse>)"
+  using assms by(auto intro!: congruentI)
+
+lemma congruent_star[intro]:
   assumes "congruent R"
   shows "congruent R\<^sup>*\<^sup>*"
 proof
@@ -199,11 +224,48 @@ lemma congruent_cc[simp]:
 
 lemma cc_local_confluence:
   assumes "congruent S"
-  assumes "symp R"
-  assumes "R\<inverse>\<inverse> OO R \<le> R'"
-  assumes "\<And> C. R\<inverse>\<inverse> OO underC C R \<le> R'"
-  shows "cc R\<inverse>\<inverse> OO cc R \<le> S"
-  sorry
+  assumes "symp S"
+  assumes "R\<inverse>\<inverse> OO R \<le> S"
+  assumes "\<And> C. C \<noteq> CHole \<Longrightarrow> R\<inverse>\<inverse> OO underC C R \<le> S"
+  shows "(cc R)\<inverse>\<inverse> OO cc R \<le> S"
+proof-
+{
+  fix a1 a2 C1 b C2 c
+  assume "appC C1 a1 = appC C2 a2"
+  assume "R a1 b"
+  assume "R a2 c"
+  have "S (appC C2 c) (appC C1 b)"
+  proof(cases C1 C2 rule: comp_nest)
+    case Same
+    have "a1 = a2" using `C1 = C2` `appC _ _ = _` sorry
+    with `R a1 b` `R a2 c` `R\<inverse>\<inverse> OO R \<le> S`
+    have "S c b" by auto 
+    then show ?thesis using `C1 = C2` `congruent S` by auto
+  next
+    case (InLeft C3)
+    have "a2 = appC C3 a1" using `C1 = _` `appC _ _ = _`
+      by (simp add:appC_appC_compC[symmetric])
+    with `R a1 b` have "underC C3 R a2 (appC C3 b)"
+      by (auto simp add:underC.simps)
+    with `R a2 c` assms(4)[OF `C3 \<noteq> CHole`]
+    have "S c (appC C3 b)" by auto
+    then show ?thesis using `C1 = _` `congruent S`
+      by (auto simp add: appC_appC_compC[symmetric])
+  next
+    case (InRight C3)
+    have "a1 = appC C3 a2" using `C2 = _` `appC _ _ = _`
+      by (simp add:appC_appC_compC[symmetric])
+    with `R a2 c` have "underC C3 R a1 (appC C3 c)"
+      by (auto simp add:underC.simps)
+    with `R a1 b` assms(4)[OF `C3 \<noteq> CHole`]
+    have "S b (appC C3 c)" by auto
+    hence "S (appC C1 b) (appC C2 c)" using `C2 = _` `congruent S`
+      by (auto simp add: appC_appC_compC[symmetric])
+    then show ?thesis using `symp S` by (auto simp add: symp_def)
+  qed
+  
+} thus ?thesis by (auto simp add: cc.simps)
+qed
 
 inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq v e) e"
