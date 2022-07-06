@@ -1109,10 +1109,9 @@ $$
 $$
 The notation |subst X x v| is the context obtained by replacing all
 free occurrences of |x| in |X| by |v|.
-So \rulename{subst} says that if we have an equality |(x=v)| in a term |X^[x=v]|
-we can replace occurrences of |x| in |X| by |v|.
 
-So \rulename{subst} says that we can replace all occurrences of |x| by |v| in the
+So \rulename{subst} says that if we have an equality |(x=v)| in a term |X^[x=v]|
+we can replace occurrences of |x| in the
 |X|-context surrounding an equality |(x=v)|, thereby propagating |x|'s value to those occurrence sites.
 There are several things to notice:
 \begin{itemize}
