@@ -586,7 +586,7 @@ his survey is an excellent introduction and bibliography.}, and is at the heart 
 
 In conventional functional programming, an expression evaluates to a single value.
 In contrast, a \versecalc{} expression evaluates to a choice of zero, one, or many values (or it can get stuck, which is different from producing zero values).
-The expression |fail| yields no values; a head-normal form |hnf| yields one value;
+The expression |fail| yields no values; a head-normal form |hnf| or a logical variable |x| yields one value;
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
 Duplicates are not eliminated and, as we shall see in \cref{sec:for}, order is maintained; in short,
