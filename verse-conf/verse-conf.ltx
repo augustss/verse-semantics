@@ -1763,7 +1763,7 @@ but is rather close in spirit.
 
 To explain actual execution, the state of the art is described by
 \citet{hanus:semantics}.  They give both a big-step operational
-semantics (in the style of \citet{launchbury:natural}), and
+semantics (in the style of \citep{launchbury:natural}), and
 a small-step operational semantics.  These two approaches both thread a
 \emph{heap}, which holds the unification variables and their unification
 state; and the small-step semantics also has a \emph{stack}, to specify
@@ -1912,11 +1912,11 @@ $$
 \rulename{labeled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
 $$
 Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
-labelled expressions, something like
+labelled expressions, something in the spirit of
 $$
-\rulename{sort-l} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
+\rulename{sort} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
 $$
-We believe this can be made to work, but it adds unwelcome clutter to program terms, and the cure
+We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure
 may be worse than the disease.
 
 \subsection{Generalizing |oneKW| and |allKW|}
@@ -1973,7 +1973,7 @@ produced by the program, without insight into the \emph{computational steps}
 that got us from program start to program completion.
 
 The moral here is that \emph{formal specifications can be obfuscatory---or
-illuminating.} The latter kind shed light because the are defined \emph{in
+illuminating.} The latter kind shed light because they are defined \emph{in
 terms of the intended mechanisms of the language}. \versecalc{} does this; it
 respects the conceptual structures of the Verse language.
 
