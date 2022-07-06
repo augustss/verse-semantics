@@ -829,7 +829,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
       |apply1 head xs| & :=  |apply1 xs 0| \\
       |apply1 tail xs| & :=  |all (def i (i > 0; apply1 xs i))| \\
       |applyN cons (x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
-      |applyN append (xs, ys)| & :=  |all (def i (apply1 xs i) `choice` def i (apply1 ys i))| \\
+      |applyN append (xs, ys)| & :=  |all ((def i (apply1 xs i)) `choice` (def i (apply1 ys i)))| \\
       |applyN flatMap (f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
       |applyN map (f, xs)| & :=  |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
       |applyN filter (p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
@@ -907,7 +907,7 @@ a possibly failing expression in the domain.
 So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to the tuple |tup (4,6)|.
 
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do x+y| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just like |if| is defined in terms of the primitive |oneKW|, we can define |for|
 in terms of the primitive |all e|.
@@ -924,10 +924,10 @@ Note how this achieves that peculiar scoping rule: variables defined in |e_1| ar
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
 So, {\eg}, |for^(x:=10 `choice` 20) do {x `choice` x+1}| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
-At this point it is crucial to use |map|, not |mapFlat|.
+At this point it is crucial to use |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def i (x := apply1 t i)) do x+i| produces a tuple with the elements of |t|, increased by their index in |t|.
+For example |for^(def i (x := apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.
 
 
 \subsection{Enumerations}
