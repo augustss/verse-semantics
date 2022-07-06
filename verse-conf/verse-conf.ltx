@@ -846,22 +846,23 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
 
 We can define the typical list functions one would expect from functional programming
 by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
-A tuple can be turned into choices by indexing, |apply1 t i|, with a logical variable |i|.
+A tuple can be turned into choices by indexing with a logical variable |i|.
 Conversely, choices can be turned into a tuple using |allKW|.
-The choice operator, |choice|, serves as both |cons| and |append| for choices
-and |oneKW| is like |head| for choices.  With that in mind, here is how to understand
+The choice operator, |choice|, serves as both |cons| and |append| for choices.
+%and |oneKW| is like |head| for choices.
+With that in mind, here is how to understand
 the definitions in \cref{fig:list-functions}:
 \begin{itemize}
 \item |head|.
 To obtain the first element of a tuple, we can simply use array indexing. This fails if the tuple is empty.
 
 \item |tail|.
-To get the tail of a tuple, again we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
+To get the tail of a tuple, we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
 This way, the expression fails at the first value and only the other values are collected by |allKW|.
-This definition of |tail| returns the empty tuple if |xs| is empty or not even a tuple.
+It returns the empty tuple if |xs| is empty or not even a tuple.
 
 \item |cons| and |append|.
-We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|,
+We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|
 or all the elements of |xs|, and similarly we can define |append|.
 
 \item |flatMap|.
