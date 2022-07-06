@@ -1951,7 +1951,7 @@ one might also want |allKW| to return a lazy stream
 of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
 this program would converge:
 $$
-|def (y z) (tup (y z) = all (def onec (onec = (1 choice onec))); y|
+|def (y z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
 $$
 Here we suppose that |allKW| returns a lazy stream of values (represented as nested
 pairs), from which we may pick the first and discard the rest.
@@ -1960,7 +1960,7 @@ A lazy variant of \versecalc{} looks entirely feasible, but we have not worked o
 
 \section{Looking back, looking forward}
 
-The semantics of \versecalc{} are designed at a level intended to capture the
+The semantics of \versecalc{} is designed at a level intended to capture the
 \emph{computational model} of the language; not all formal semantics do so.
 Defining a language by giving its low-level semantics is \emph{precise} but not necessarily \emph{illuminating}.
 For example, giving a reference compiler that compiles
@@ -1977,7 +1977,7 @@ respects the conceptual structures of the Verse language.
 
 Note that when we say ``illuminating'' we mean that in multiple ways.
 A semantics can be illuminating for humans who are trying to understand
-what a particular program does, or how an proposed change to the language
+what a particular program does, or how a proposed change to the language
 will affect the language. It can drive analyses that help the compiler
 optimize programs. It underlies the use of formal methods and verification
 to provide machine-derived and -checkable proofs of correctness. All of
@@ -1995,7 +1995,7 @@ including both mutable references and input/output.  All these effects
 must be \emph{transactional}, {\eg}, when the condition of an |if|
 fails, any store effects in the condition must be rolled back.
 We have a preliminary reduction rules for updateable references,
-but they are not included here
+but they are not included here.
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
