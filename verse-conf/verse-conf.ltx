@@ -605,7 +605,7 @@ We must instead give a name to that choice, and then we can put it in the pair, 
 This is syntactically legal, but what does it mean?  In \versecalc{} a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
-|def x (x = (7 choice 5); tup (3,x))| \quad = \quad |(def x (x=7; tup (3,x))) choice (def x (x=5; tup (3,x))))|
+|def x (x = (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x=7; tup (3,x))) choice (def x (x=5; tup (3,x))))|
 $$
 We duplicate the context surrounding the choice, and ``float the choice outwards.''
 
