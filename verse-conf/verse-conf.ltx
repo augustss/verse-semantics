@@ -1308,9 +1308,9 @@ to the innermost enclosing scope construct; hence the |SX| in the rule.
 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
 \emph{decompose} choices.
-So choice behaves a bit like a data constuctor, or normal form, of the language.
+So choice behaves a bit like a data constructor, or normal form, of the language.
 For this reason we call
-this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-determinstically
+this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-deterministically
 picking one branch or the other, which immediately gives up confluence.
 
 The rules for |oneKW| and |allKW| expect multiple choices to be
@@ -1419,7 +1419,7 @@ so we leave evaluation strategy and compilation for future work.
 \subsection{Examples}
 A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
 This example shows how constraining the output of a function call can constrain the argument.
-While most of the reductions are adminstrative in nature, these are the highlights:
+While most of the reductions are administrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
 Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
 so that at \circlednum{5} the actual unification can happen.
@@ -1870,7 +1870,7 @@ $\rulename{urefl}\; |(x=x)| \movesto |x|$, because that would lead to non-conflu
 We have chosen to restrict tuple formation and function application to
 \emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
 |e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
-It would be entirely straightforward to allow expresssions rather than values, but doing so
+It would be entirely straightforward to allow expressions rather than values, but doing so
 would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
 Restricting to values involves no loss of expressive power:
 it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
@@ -1880,7 +1880,7 @@ that the left-hand-side is always a value.
 Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form,
 by desugaring |(e_1 = e_2)| to |(def x (x = e_1; x = e_2))|.
 The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
-We have chosen not to do this, mainly because it makes |(=)| assymetrical and adds a lot of clutter;
+We have chosen not to do this, mainly because it makes |(=)| asymmetrical and adds a lot of clutter;
 a debatable decision, but one of no great consequence.
 
 \subsection{Dead existentials}
@@ -2210,7 +2210,7 @@ Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation
 
 With the evaluation rules, in particular \rulename{app-beta}, out of the way, and only a fixed depth $n$ to worry about, do the remaining rules (not including the extra rules from \cref{fig:rules-confluence}) terminate?
 
-This seems to be the case. For the unification rules this is not immediate, but note that they mimick the standard unification algorithm applied to set of equations in an expression $e$
+This seems to be the case. For the unification rules this is not immediate, but note that they mimic the standard unification algorithm applied to set of equations in an expression $e$
 \[
 \operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
 \]
@@ -2226,7 +2226,7 @@ It may help to keep the termination argument simpler by proving confluence of th
 \subsection{Moving equivalences to the end}
 \label{sec:conf-proof-moving}
 
-Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decerasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
+Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decreasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
 
 \fi % confluence appendix
 
@@ -2234,14 +2234,22 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
 
 % LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
 % LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
-% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl
+% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
 % LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xrest zs unary
 % LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
 % LocalWords:  featureful multivalued mapFlat powerset denotational
 % LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
-% LocalWords:  unifyr neighbourhood ariola deterministically bagof
+% LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
 % LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
 % LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
-% LocalWords:  updateable alloc storeTwoLines canCopy storeKW
-% LocalWords:  subexpression
+% LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
+% LocalWords:  subexpression Claessen equationally eliml fcn elimr
+% LocalWords:  rll redex Formalising equational stepX compositionally
+% LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
+% LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
+% LocalWords:  Smolka flavour FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
+% LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
+% LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
+% LocalWords:  Eqns ohlebusch
