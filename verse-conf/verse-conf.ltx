@@ -1573,9 +1573,9 @@ In general, confluence up to an equivalence relation is not necessarily the same
 |e_1 <-> e_2| implies |e_1 ~ e_2|.
 \end{proposition}
 
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} proving |e_2 ~ e_3| if |e_2 <- e_1 -> e_3|), and requires a more involved proof, which is still work in progress.
+Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie} |e_2 <- e_1 -> e_3| $\implies$ |e_2 ~ e_3|), and requires a more involved proof, which is still work in progress.
 %(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
-
+%
 We have, however, reasons to be optimistic: our incomplete proof
 effort has already helped us root out various forms of unwanted
 non-confluence. Moreover, we have an implementation of the complete
