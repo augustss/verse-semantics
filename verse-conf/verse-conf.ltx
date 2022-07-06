@@ -388,8 +388,8 @@ Like any functional logic language,
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distills the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
-We believe that it is possible to compile a variety of functional logic languages,
-including Curry~\cite{hanus:curry-report}, into \versecalc{}.
+We believe that it is possible to use \versecalc{} as the compilation target for a variety of
+functional logic languages such as Curry~\cite{hanus:curry-report} (although see \cref{sec:laziness}).
 We are ourselves working on Verse, a new programming language for
 the metaverse, built directly on \versecalc{}; indeed,
 our motivation for developing \versecalc{} is practical rather than theoretical.
@@ -437,7 +437,7 @@ $$
 \end{array}
 $$
 %
-Rules may be applied anywhere where they match, again just like for the lambda calculus, and the question of confluence arises, which we discuss in \cref{sec:confluence}.
+Rules may be applied anywhere they match, again just like the lambda calculus. The question of confluence arises, as we discuss in \cref{sec:confluence}.
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
 
