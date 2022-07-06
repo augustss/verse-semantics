@@ -37,7 +37,7 @@
 
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
           & if $x \not\in \freevars{v}$ \\
-\rulename{app-arr} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
 
 \\[-2mm]
 \rulegroupname{Unification}
@@ -47,16 +47,16 @@
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
       \end{cases}$} \\
-\rulename{utup} & \llap{|arr (v_1,dots,v_m) == arr (v1',dots,v_n')|}
+\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
     % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
     & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; arr (v_1,dots,v_m)|} \\
+        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
             & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{cases}
     $}\\
-\rulename{ux1} & |k == arr (v_1,dots,v_n) | & \movesto & |fail| \\
-\rulename{ux2} & |arr (v_1,dots,v_n) == k | & \movesto & |fail| \\
+\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
+\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
 \rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
 \rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
 \rulename{ux5} & |op == hnf| & \movesto & |fail|\\
@@ -105,7 +105,7 @@
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    \text{Value contexts} & V & ::= & \hole \vb |arr (v_1, dots ,V, dots, v_n)|\\
+    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
     \vb |one hole| \vb |all hole| \\
 \iffullverse
@@ -132,10 +132,10 @@
     \rulename{one-value} & |one v| & \movesto & |v| \\
     \end{array} \hspace{5mm}
     \begin{array}[t]{lr@@{\;}c@@{\;}l}
-    \rulename{all-fail} & |all fail| & \movesto & |arr ()| \\
+    \rulename{all-fail} & |all fail| & \movesto & |tup ()| \\
     \rulename{all-choice} &
-      |all (v_1 choice dots choice v_n)| & \movesto & |arr (v_1, dots, v_n)| \\
-    \rulename{all-value} & |all v| & \movesto & |arr v| \\
+      |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
+    \rulename{all-value} & |all v| & \movesto & |tup v| \\
     \end{array} \\
 
     \\[-2mm]

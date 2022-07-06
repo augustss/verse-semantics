@@ -1061,8 +1061,8 @@ does not capture any variables free in |v|.  If |x| appears free in |v|, just us
 \textalpha-conversion to rename |x| to $x' \not\in \freevars{v}$.
 
 In \versecalc{}, tuples behave like (finite) functions, in which application is
-indexing.  Rule \rulename{app-arr} describes how tuple application works.
-Notice that \rulename{app-arr} does not require the argument to be an integer $k$; instead
+indexing.  Rule \rulename{app-tup} describes how tuple application works.
+Notice that \rulename{app-tup} does not require the argument to be an integer $k$; instead
 the rule works by narrowing.  So the expression |def x (apply1 (tup(2,3,2,7,9)) x = 2; x)|
 does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
