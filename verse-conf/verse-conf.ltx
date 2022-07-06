@@ -1286,8 +1286,8 @@ without this restriction we lose confluence.  To see this, consider\footnote{Rem
   a use of |oneKW|, see \cref{sec:one}, but using |if| makes the example easier to understand.}:
 $$
 \begin{array}{l@@{\;}l}
-                                 & |def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|\\
- \movestoR{subst}                & |def x (if (1>0)  then 55 else 44; (x=1); (77 choice 99))|\\
+                                 & |def x ((if (x>0) then 55 else 44); (x=1); (77 choice 99))|\\
+ \movestoR{subst}                & |def x ((if (1>0)  then 55 else 44); (x=1); (77 choice 99))|\\
  \movestoC{\text{simplify |if|}} & |def x (55; (x=1); (77 choice 99))|\\
  \movestoR{seq}                  & |def x ((x=1); (77 choice 99))|\\
 % \movestoR{def-eliml}           & |1; (77 choice 99)|\\
@@ -1297,8 +1297,8 @@ $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
 $$
 \begin{array}{ll}
-\multicolumn{2}{l}{|def x (if (x>0) then 55 else 44; (x=1); (77 choice 99))|}\\
-\quad \movestoC{\text{Bogus \rulename{choose}}} & |def x (if (x>0) then 55 else 44; ((x=1); 77) choice ((x=1); 99))|\\
+\multicolumn{2}{l}{|def x ((if (x>0) then 55 else 44); (x=1); (77 choice 99))|}\\
+\quad \movestoC{\text{Bogus \rulename{choose}}} & |def x ((if (x>0) then 55 else 44); ((x=1); 77) choice ((x=1); 99))|\\
 \end{array}
 $$
 Now the |(x=1)| is inside the choice branches, so we cannot use \rulename{subst} to rewrite the
