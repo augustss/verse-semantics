@@ -744,9 +744,9 @@ The main data structure in \versecalc{} is the tuple.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
-For example, |t := tup (10,27,32); apply1 t 1| reduces to |27| and |apply1 t 3| reduces to |fail|.
+For example, |def t (t = tup (10,27,32); apply1 t 1)| reduces to |27| and |apply1 t 3| reduces to |fail|.
 The reduction rule for indexing in tuples admits multi-valued index expressions.
-For instance, |t := tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1)| reduces to |(27 `choice` 10 `choice` 27)|.
+For instance, |def t (t = tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1))| reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
@@ -759,7 +759,7 @@ $n$-way choice.
 
 You might think that tuple indexing would be stuck until we know the index,
 but \versecalc{} uses narrowing to make progress.
-The expression |t := tup (10,27,32); def i (apply1 t i)|
+The expression |def t (t = tup (10,27,32); def i (apply1 t i))|
 looks stuck because we have no value for |i|, but in fact it rewrites to
 $$
 |def i ((i=0; 10) choice (i=1; 27) choice (i=2; 32)|
