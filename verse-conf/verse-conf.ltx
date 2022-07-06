@@ -825,7 +825,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
   $$
   \begin{array}{l}
     \begin{array}{l@@{\;}l}
-      |apply1 head xs| & :=  |one (def i (apply1 xs i))| \\
+      |apply1 head xs| & :=  |apply1 xs 0| \\
       |apply1 tail xs| & :=  |all (def i (i > 0; apply1 xs i))| \\
       |applyN cons (x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
       |applyN append (xs, ys)| & :=  |all (def i (apply1 xs i) `choice` def i (apply1 ys i))| \\
@@ -851,7 +851,7 @@ and |oneKW| is like |head| for choices.  With that in mind, here is how to under
 the definitions in \cref{fig:list-functions}:
 \begin{itemize}
 \item |head|.
-To obtain the first element of a tuple, we turn the tuple into a sequence of choices and then pick out the first value using |oneKW|. If the tuple is empty, |head| fails.
+To obtain the first element of a tuple, we can simply use array indexing. This fails if the tuple is empty.
 
 \item |tail|.
 To get the tail of a tuple, again we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
