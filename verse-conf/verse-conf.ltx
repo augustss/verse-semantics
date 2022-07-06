@@ -928,7 +928,7 @@ So, {\eg}, |for^(x:=10 `choice` 20) do {x `choice` x+1}| will reduce to
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-{\Eg}, |for^(def (i  x) (x = apply1 t i)) do x+i| will produce a tuple with the elements of |t|, increased by their index in |t|.
+For example |for^(def i (x := apply1 t i)) do x+i| produces a tuple with the elements of |t|, increased by their index in |t|.
 
 
 \subsection{Enumerations}
