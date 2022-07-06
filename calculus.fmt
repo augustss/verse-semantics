@@ -53,7 +53,7 @@
 %%%format choice = "[ \! ]"
 %%%format `choice` = "\mathop{[ \! ]}"
 %format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
-%format `choice` = "\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}"
+%format `choice` = "\hspace{1mm}\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}\hspace{1mm}"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"
