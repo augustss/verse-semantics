@@ -923,8 +923,8 @@ for a fresh variable |v|.
 
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
-So, {\eg}, |for^(x:=1 `choice` 2) do {3 `choice` x}| will reduce to
-|tup (3, 3) `choice` tup (3, 2) `choice` tup (1, 3) `choice` tup (1, 2)|.
+So, {\eg}, |for^(x:=10 `choice` 20) do {x `choice` x+1}| will reduce to
+|tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial to use |map|, not |mapFlat|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
