@@ -216,16 +216,41 @@ inductive underC :: "C \<Rightarrow> red \<Rightarrow> red" for C and R where
 inductive cc :: "red \<Rightarrow> red" for R where
   ccI: "R x y \<Longrightarrow> cc R (appC C x) (appC C y)"
 
+inductive cc' :: "red \<Rightarrow> red" for R where
+  cc'I: "C \<noteq> CHole \<Longrightarrow> R x y \<Longrightarrow> cc' R (appC C x) (appC C y)"
+
+
 lemma congruent_cc[simp]:
   "congruent (cc R)"
-  by (auto intro!: congruentI elim!:cc.cases underC.cases
-           simp add: appC_appC_compC intro: underC.intros cc.intros)
+  by (auto intro!: congruentI elim!:cc.cases 
+           simp add: appC_appC_compC intro: cc.intros)
+
+lemma compC_eq_Hole[simp]:
+  "compC C1 C2 = CHole \<longleftrightarrow> C1 = CHole \<and> C2 = CHole"
+  by (cases C1; cases C2) auto
+
+lemma compC_neq_Hole1[simp]:
+  "C1 \<noteq> CHole \<Longrightarrow> compC C1 C2 \<noteq> CHole"
+  by (cases C1; cases C2) auto
+lemma compC_neq_Hole2[simp]:
+  "C2 \<noteq> CHole \<Longrightarrow> compC C1 C2 \<noteq> CHole"
+  by (cases C1; cases C2) auto
+
+
+lemma congruent_cc'[simp]:
+  "congruent (cc' R)"
+(*
+  by (auto intro!: congruentI elim!:cc'.cases 
+           simp add: appC_appC_compC intro:  cc'.intros)
+*)
+  sorry
+
 
 lemma cc_local_confluence:
   assumes "congruent S"
   assumes "symp S"
   assumes "R\<inverse>\<inverse> OO R \<le> S"
-  assumes "\<And> C. R\<inverse>\<inverse> OO underC C R \<le> S"
+  assumes "\<And> C. R\<inverse>\<inverse> OO cc' R \<le> S"
   shows "(cc R)\<inverse>\<inverse> OO cc R \<le> S"
 proof-
 {
@@ -245,8 +270,7 @@ proof-
     have "a2 = appC C3 a1" using `C1 = _` `appC _ _ = _`
       by (simp add:appC_appC_compC[symmetric])
     with `R a1 b`  `C3 \<noteq> CHole`
-    have "underC C3 R a2 (appC C3 b)"
-      by (auto simp add:underC.simps)
+    have "cc' R a2 (appC C3 b)" by (auto simp add:cc'.simps)
     with `R a2 c` assms(4)
     have "S c (appC C3 b)" by auto
     then show ?thesis using `C1 = _` `congruent S`
@@ -256,8 +280,7 @@ proof-
     have "a1 = appC C3 a2" using `C2 = _` `appC _ _ = _`
       by (simp add:appC_appC_compC[symmetric])
     with `R a2 c`  `C3 \<noteq> CHole`
-    have "underC C3 R a1 (appC C3 c)"
-      by (auto simp add:underC.simps)
+    have "cc' R a1 (appC C3 c)" by (auto simp add:cc'.simps)
     with `R a1 b` assms(4)
     have "S b (appC C3 c)" by auto
     hence "S (appC C1 b) (appC C2 c)" using `C2 = _` `congruent S`
@@ -272,7 +295,8 @@ inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq v e) e"
 equivariance rule_Seq
 
-definition "VR = cc (rule_Seq)"
+definition "Rs = rule_Seq"
+definition "VR = cc Rs"
 
 definition "J = VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
 
@@ -290,30 +314,59 @@ lemma joinI[case_names Peak]:
   shows "R1\<inverse>\<inverse> OO R2 \<le> S"
   using assms by auto
 
-(* Joinable at the root *)
+lemma J_VR[trans]:
+  assumes "J a c"
+  assumes "VR b c"
+  shows "J a b"
+  using assms by (auto simp add: J_def VR_def)
 
+(* Joinable at the root *)
 
 lemma Seq_Seq: "rule_Seq\<inverse>\<inverse> OO rule_Seq \<le> J"
   by(auto intro!: joinI elim!: rule_Seq.cases)
 
-(* Joinable below *)
+(* Joinable not at the root *)
+
+lemma cc'_Seq:
+  assumes "cc' R (Seq v e) c"
+  obtains (left) v' where "cc R v v'" and "c = Seq v' e"
+  | (right) e' where "cc R e e'" and "c = Seq v e'"
+  using assms
+  apply (elim cc'.cases)
+  apply (case_tac C)
+  apply(auto intro:underC.intros  simp add: cc.simps)
+  apply blast
+done
 
 (* R just to tidy things up. Should be union of all rules. *)
-lemma Seq_C: "rule_Seq\<inverse>\<inverse> OO underC C R \<le> J"
-  apply (rule joinI)
-  apply (auto elim!:rule_Seq.cases underC.cases)
-  apply (cases C;auto)
-  (* now apply Seq on the right of J. In one case needs that appC is a value! *)
-  sorry
+lemma Seq_C: "rule_Seq\<inverse>\<inverse> OO cc' Rs \<le> J"
+proof (induction rule: joinI)
+  case (Peak a b c)
+  then show ?case
+  proof(induction)
+    case (rule_Seq v e)
+    from `cc' Rs (Seq v e) c`
+    show ?case
+    proof(induct rule: cc'_Seq)
+      case (left v')
+      then show ?thesis apply simp sorry
+    next
+      case (right e')
+      have "J e e" by simp
+      then show ?thesis apply simp sorry
+    qed
+  qed
+qed
 
 
 theorem local_confluence:
   "VR\<inverse>\<inverse> OO VR \<le> J"
-  unfolding VR_def
+  unfolding VR_def Rs_def
   apply (rule cc_local_confluence)
      apply simp
     apply simp
   apply (rule Seq_Seq)
-  apply (rule Seq_C)
+  apply (rule Seq_C[unfolded Rs_def])
   done
+
 end
