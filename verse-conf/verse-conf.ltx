@@ -1426,31 +1426,34 @@ At \circlednum{6} and \circlednum{7} we finally get the values into the result,
 and the rest of the reductions just get rid of terms no longer needed.
 \begin{figure}
 \begin{scriptsize}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
 $$
-\begin{array}{llr@@{\;}l}
-\hspace{-1.5mm}&                   &          & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{desugar} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
-\hspace{-1.5mm}\circlednum{1}&\rulename{subst} & \xmovesto & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\hspace{-1.5mm}&\rulename{def-eliml} & \xmovesto & |(               (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
-\hspace{-1.5mm}\circlednum{2}&\rulename{app-beta}   & \xmovesto & |def (p) ((def (xy) (xy = p; def (x y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}\circlednum{3}&\rulename{subst}      & \xmovesto & |def (p) ((def (xy) (xy = p; def (x y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p)     (((p; def (x y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{def-float}  & \xmovesto & |def (p x y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\hspace{-1.5mm}&\rulename{subst}      & \xmovesto & |def (p x y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
-\hspace{-1.5mm}&\rulename{seq}        & \xmovesto & |def (p x y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{4}&\rulename{unify-seql} & \xmovesto & |def (p x y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{5}&\rulename{utup}       & \xmovesto & |def (p x y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
-\hspace{-1.5mm}\circlednum{6}&\rulename{subst}      & \xmovesto & |def (p x y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
-\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
-\hspace{-1.5mm}\circlednum{7}&\rulename{subst}      & \xmovesto & |def (p x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
-\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
-\hspace{-1.5mm}&\rulename{def-eliml}   & \xmovesto & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
-%&\rulename{seq}        & \xmovesto & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
-%&\rulename{seq}        & \xmovesto & |            (               (           3; tup(2,3));  tup(3,2))| \\
-%&\rulename{seq}        & \xmovesto & |                                           tup(2,3);   tup(3,2)| \\
-\hspace{-1.5mm}&\rulename{seq $\times$ 4}      & \xmovesto & |                                                       tup(3,2)| \\
+\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+               &                           & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+               & \movestoR{desugar}        & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
+\circlednum{1} & \movestoR{subst}          & |def (swap) (swap = (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+               & \movestoR{def-eliml}      & |(               (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
+               & \movestoR{seq}            & |def (p) (((apply1 (lam xy (def (x y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
+\circlednum{2} & \movestoR{app-beta}       & |def (p) ((def (xy) (xy = p; def (x y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+\circlednum{3} & \movestoR{subst}          & |def (p) ((def (xy) (xy = p; def (x y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+               & \movestoR{def-eliml}      & |def (p)     (((p; def (x y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+               & \movestoR{def-float}      & |def (p x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+               & \movestoR{def-float}      & |def (p x y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
+               & \movestoR{subst}          & |def (p x y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
+               & \movestoR{seq}            & |def (p x y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
+\circlednum{4} & \movestoR{unify-seql}     & |def (p x y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
+\circlednum{5} & \movestoR{utup}           & |def (p x y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
+\circlednum{6} & \movestoR{subst}          & |def (p x y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
+               & \movestoR{def-eliml}      & |def (p x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
+\circlednum{7} & \movestoR{subst}          & |def (p x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
+               & \movestoR{def-eliml}      & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
+               & \movestoR{def-eliml}      & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
+%              & \movestoR{seq}            & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
+%              & \movestoR{seq}            & |            (               (           3; tup(2,3));  tup(3,2))| \\
+%              & \movestoR{seq}            & |                                           tup(2,3);   tup(3,2)| \\
+               & \movestoR{seq $\times$ 4} & |                                                       tup(3,2)| \\
 \end{array}
 $$
 \end{scriptsize}
