@@ -1493,24 +1493,27 @@ There are some sources of non-confluence that we would consider insignificant. F
 can be reduced to
 | (def (x y) (x=e_1;y=e_2)) |
 or
-| (def (y x) (x=e_1;y=e_2)) |, which are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about, and we want to consider these expression equivalent. To that end we introduce separate rewrite system $\movestoX$, with rules in \cref{fig:rules-confluence}:
+| (def (y x) (x=e_1;y=e_2)) |. These are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about. So we want to consider these expression equivalent. To that end we introduce separate rewrite system $\movestoX$, with rules in \cref{fig:rules-confluence}:
 
 \begin{itemize}
 \item \rulename{def-swap} makes the order of |defKW| irrelevant.
 \item As we do not care about where, within the same $X$-context, an equality is asserted, we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rule leaves $v_2$ in place, just like \rulename{def-eliml} does.
 \item In the presence of an equation between two variables, we do not care which of the two variables is mentioned, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
-\item For technical reasons, we include rule \rulename{seq} in $\movestoX$.
+\item We include rule \rulename{seq} in $\movestoX$, so that we can clean up after \rulename{unify-move}.
 \end{itemize}
 We can now consider two expressions the same up to these administrative differences if they are convertible via |stepX|.
 
 \begin{figure}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
 \[\begin{array}{lr@@{\;}c@@{\;}l}
     \rulename{def-swap} & |def (x y) e| & \movestoX & |def (y x) e|\\
     \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
     \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
     \rulename{seq} & |v;e| & \movestoX & |e| \\
 \end{array}\]
-  \caption{}
+  \caption{Additional rewrite rules to relate equivalent expressions}
     \label{fig:rules-confluence}
 \end{figure}
 
@@ -1533,7 +1536,7 @@ where $|v_y| \equiv |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))|$ and 
 %| -> def x (x=tup (1,lam z x); x) -> def x (x=v_x; x) -> v_x|
 %\]
 %where $|v_x| \equiv |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))|$.
-%
+
 Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, so we get
 \[
 \begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
@@ -1543,11 +1546,11 @@ Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam 
 \]
 and we find that we \emph{cannot} join them; they keep “missing each other”. The relation $\movesto$ is \emph{not} confluent.
 %
-But notice that as we keep evaluating these fixed points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth.
+But notice that as we keep evaluating these fixed points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth, which is good enough.
 
 \begin{definition}[Depth cutting]
-To make this formal, we define a function on terms and values that replaces all subexpressions at depth $n$ (measured by counting nested lambdas) with a fixed, arbitrary term $\Omega$, defined by
-$|cut 0 e| \coloneqq \Omega$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally otherwise.
+To make this formal, we define a function on terms and values that removes subexpressions at depth $n$ (measured by counting nested lambdas), defined by
+$|cut 0 e| \coloneqq |fail|$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally otherwise.
 %When we need to write the function as a relation, we use |cutr n|.
 The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2| iff |cut n e_1 === cut n e_2|.
 \end{definition}
@@ -1556,7 +1559,7 @@ Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,
 
 \subsection{Confluence}
 
-While |->| is not confluent on its own, we can say that it is confluent up to |stepX| and |cute n|:
+So although |->| is not confluent on its own, we can say that it is confluent up to |stepX| and |cute n|:
 
 \begin{definition}
 We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
@@ -1588,12 +1591,12 @@ with QuickCheck \citep{quickcheck} to search for non-confluence.
 
 \subsection{Equational theory}
 
-The relation |~| can now be used to develop an equational theory for {\versecalc}. Assuming our confluence conjecture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect that this equivalence is respected by substitution,
-\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 v x ~ subst e_2 v x|, \]
+The relation |~| gives rise to an equational theory for {\versecalc}. Assuming our confluence conjecture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect that this equivalence is respected by substitution,
+\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 x v ~ subst e_2 x v|, \]
 allows equational reasoning with local equations,
 \[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)|, \]
 and even allows rewriting with a local equation within that equation's right-hand side,
-\[ |v_1=(subst v_2 x v_1) ~ v=(subst v_2 x (subst v_2 x v_1))|. \]
+\[ |v_1=(subst v_2 x v_1) ~ v_1=(subst v_2 x (subst v_2 x v_1))|. \]
 
 The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations, such as the commutativity of sequencing
 (|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|),
@@ -1604,7 +1607,7 @@ and the removal of repeated choice-free expressions
 
 \subsection{Fixed points}
 
-To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambdas simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie} |x = v ~ x = (mu x v)|.
+To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie} |x = v ~ x = (mu x v)|.
 %
 This expression behaves much as one would expect from a fixed-point operator:
 \begin{itemize}
@@ -1613,12 +1616,12 @@ This expression behaves much as one would expect from a fixed-point operator:
 \item The fixpoint can be unrolled: |mu x v ~ subst v x ((mu x v))|.
 \end{itemize}
 
-In the example from \cref{sec:confluence-and-recursion}, we find |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))| and we can join |tup(1,v_y) ~ v_x| using the a general lemma about partially unrolling a fixed point:
+In the example from \cref{sec:confluence-and-recursion}, we find |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))| and we can join |tup(1,v_y) ~ v_x| using a general lemma about partially unrolling a fixed point:
 \[
 |mu x(subst v_1 y v_2) ~ subst v_1 y ((mu y (subst v_2 x v_1)))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}.
 \]
 
-It is satisfying that in {\versecalc} a form of fixed-point operator emerges, without having to add it explicitly to our syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need rules dedicated to unrolling |(mu x v)| in equations or applications. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
+It is satisfying that in {\versecalc} a form of fixed-point operator emerges, without us having to add it explicitly to the syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need rules dedicated to unrolling |(mu x v)| in equations or applications. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
 
 
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
