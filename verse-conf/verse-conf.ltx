@@ -1426,7 +1426,7 @@ At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\b
 Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
 so that at \circlednum{5} the actual unification can happen.
 At \circlednum{6} and \circlednum{7} we finally get the values into the result,
-and the rest of the reductions just get rid of terms no longer needed.
+and the rest of the reductions just get rid of terms that are no longer needed.
 \begin{figure}
 \begin{scriptsize}
 % no space needed around math environments in a figure
@@ -1605,7 +1605,7 @@ and the removal of repeated choice-free expressions
 
 \subsection{Fixed points}
 
-To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie} |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie} |x = v ~ x = (mu x v)|.
+To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie}, |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie} |x = v ~ x = (mu x v)|.
 %
 This expression behaves much as one would expect from a fixed-point operator:
 \begin{itemize}
