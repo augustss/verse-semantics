@@ -786,8 +786,10 @@ We will illustrate this with a few examples.
 \subsection{Syntactic sugar}
 
 \begin{figure}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
   $$
-  \begin{array}{l}
     \begin{array}{r@@{\;}c@@{\;}ll}
       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
       |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
@@ -797,10 +799,10 @@ We will illustrate this with a few examples.
 % already in the first figure
 %      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
 %      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh} \\
-      |for e_1 do e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
-    \end{array} \\
-  \end{array}
+      |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh}
+% only used in sectino about for, and there the equation is repeated
+%      |for e_1 do e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
+    \end{array}
   $$
 \caption{Syntactic sugar}
 \label{fig:sugar}
@@ -818,7 +820,7 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
   rather that insisting on both function and argument being a value, and
   likewise for pairs |tup (e_1,e_2)|.
 \item We allow the use of |if|, as explained in \cref{sec:if}.
-\item We allow the use of |for|, as we will explain in \cref{sec:for}.
+% \item We allow the use of |for|, as we will explain in \cref{sec:for}.
 \end{itemize}
 
 \begin{figure}
@@ -912,9 +914,9 @@ in terms of the primitive |all e|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
 apply each element of the tuple to |emptytup| afterwards, using the |map| function defined above.
-The full desugaring for |for^(e_1) do e_2| is thus
+The full desugaring is thus
 \[
-|v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
+|for^(e_1) do e_2| \equiv |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
 \]
 for a fresh variable |v|.
 
@@ -935,7 +937,7 @@ $$
   |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
 \end{array}
 $$
-so |for^(x:= applyN fromTo (1,5)) do x| will reduce to the tuple |tup (1,2,3,4,5)|.
+so |all (applyN fromTo (1,5))| will reduce to the tuple |tup (1,2,3,4,5)|.
 
 %% \subsection{Handling out-of-bounds errors}
 %% Indexing out-of-bounds of a tuple results in |fail|.
