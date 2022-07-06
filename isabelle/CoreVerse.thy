@@ -216,6 +216,9 @@ inductive underC :: "C \<Rightarrow> red \<Rightarrow> red" for C and R where
 inductive cc :: "red \<Rightarrow> red" for R where
   ccI: "R x y \<Longrightarrow> cc R (appC C x) (appC C y)"
 
+lemma cc_rootI[intro]: "R x y \<Longrightarrow> cc R x y"
+  by (drule ccI[of _ _ _ CHole]) simp
+
 inductive cc' :: "red \<Rightarrow> red" for R where
   cc'I: "C \<noteq> CHole \<Longrightarrow> R x y \<Longrightarrow> cc' R (appC C x) (appC C y)"
 
@@ -298,6 +301,14 @@ equivariance rule_Seq
 definition "Rs = rule_Seq"
 definition "VR = cc Rs"
 
+lemma transitive_VR[trans]:
+  "VR a b \<Longrightarrow> VR b c \<Longrightarrow> VR\<^sup>*\<^sup>* a c"
+  by auto
+
+lemma congruent_VR[simp]: "congruent VR"
+  unfolding VR_def VR_def by simp
+
+
 definition "J = VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
 
 lemma refl_J[simp]: "J x x"
@@ -314,11 +325,25 @@ lemma joinI[case_names Peak]:
   shows "R1\<inverse>\<inverse> OO R2 \<le> S"
   using assms by auto
 
-lemma J_VR[trans]:
-  assumes "J a c"
+lemma J_VRr[elim]:
   assumes "VR b c"
+  assumes "J a c"
   shows "J a b"
   using assms by (auto simp add: J_def VR_def)
+
+lemma J_VRl[elim]:
+  assumes "VR c a"
+  assumes "J a b"
+  shows "J c b"
+  using assms by (metis J_VRr sympD symp_J)
+
+
+lemma J_VRstar[trans]:
+  assumes "J a c"
+  assumes "VR\<^sup>*\<^sup>* b c"
+  shows "J a b"
+  using assms by (auto simp add: J_def VR_def)
+
 
 (* Joinable at the root *)
 
@@ -352,8 +377,15 @@ proof (induction rule: joinI)
       then show ?thesis apply simp sorry
     next
       case (right e')
-      have "J e e" by simp
-      then show ?thesis apply simp sorry
+      have "VR (Seq v e') e'" unfolding VR_def Rs_def
+        by (intro cc_rootI rule_Seq.intros)
+      with `c = _`
+      have "VR c e'" by simp
+      moreover
+      from `cc Rs e e'`
+      have "VR e e'" unfolding VR_def.
+      ultimately
+      show ?thesis by force
     qed
   qed
 qed
