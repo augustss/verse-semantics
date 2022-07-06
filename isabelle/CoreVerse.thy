@@ -179,18 +179,18 @@ lemma congruentE[elim, consumes 2]:
   using assms
   by (simp add: congruent.simps)
 
-lemma congruent_OO[intro]:
+lemma congruent_OO[intro!]:
   assumes "congruent R" and "congruent S"
   shows "congruent (R OO S)"
   using assms
   by(auto intro!: congruentI)
 
-lemma congruent_inv[intro]:
+lemma congruent_inv[intro!]:
   assumes "congruent R"
   shows "congruent (R\<inverse>\<inverse>)"
   using assms by(auto intro!: congruentI)
 
-lemma congruent_star[intro]:
+lemma congruent_star[intro!]:
   assumes "congruent R"
   shows "congruent R\<^sup>*\<^sup>*"
 proof
@@ -272,7 +272,12 @@ inductive rule_Seq where
 equivariance rule_Seq
 definition "VR = cc (rule_Seq)"
 
-
-
+theorem local_confluence:
+  "VR\<inverse>\<inverse> OO VR \<le>  VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
+  unfolding VR_def
+  apply (rule cc_local_confluence)
+     apply auto
+    apply (auto simp add: symp_def)
+  sorry
 
 end
