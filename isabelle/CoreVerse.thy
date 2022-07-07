@@ -99,7 +99,7 @@ inductive_cases is_val_SeqE[elim!]: "is_val (Seq e1 e2)"
 
 (* Contexts *)
 
-datatype C =
+nominal_datatype C =
   CHole
 | CSeql C exp
 | CSeqr exp C
@@ -114,7 +114,7 @@ datatype C =
 | CTupr exp C
 | CLam var C
 
-function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
+nominal_function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
   "appC CHole e' = e'"
 | "appC (CSeql C e) e' = Seq (appC C e') e"
 | "appC (CSeqr e C) e' = Seq e (appC C e')"
@@ -128,9 +128,17 @@ function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
 | "appC (CTupl C e) e' = Tup (appC C e') e"
 | "appC (CTupr e C) e' = Tup e (appC C e')"
 | "appC (CLam x C) e' = Lam x (appC C e')"
-by pat_completeness auto+
-termination by lexicographic_order
-(* TODO: Not equivariant! equivariance appC *)
+proof goal_cases
+  case (3 P x)
+  then show ?case
+  proof(induction x)
+    case (Pair a b)
+    then show ?thesis 
+      by (rule_tac C.strong_exhaust[of a]) (auto)
+  qed
+qed (auto simp add: eqvt_def appC_graph_aux_def)
+nominal_termination (eqvt) by lexicographic_order
+equivariance appC
 
 lemma appC_inj[simp]: "appC C x = appC C y \<longleftrightarrow> x = y"
   apply(induction C)
@@ -139,7 +147,7 @@ lemma appC_inj[simp]: "appC C x = appC C y \<longleftrightarrow> x = y"
   apply (meson fresh_PairD(1) fresh_PairD(2) obtain_fresh)
   done  
 
-function compC :: "C \<Rightarrow> C \<Rightarrow> C" where
+fun compC :: "C \<Rightarrow> C \<Rightarrow> C" where
   "compC CHole e' = e'"
 | "compC (CSeql C e) e' = CSeql (compC C e') e"
 | "compC (CSeqr e C) e' = CSeqr e (compC C e')"
@@ -153,20 +161,71 @@ function compC :: "C \<Rightarrow> C \<Rightarrow> C" where
 | "compC (CTupl C e) e' = CTupl (compC C e') e"
 | "compC (CTupr e C) e' = CTupr e (compC C e')"
 | "compC (CLam x C) e' = CLam x (compC C e')"
-by pat_completeness auto+
-termination by lexicographic_order
 
 lemma appC_appC_compC:
 "appC C1 (appC C2 e) = appC (compC C1 C2) e"
   by (induction C1) auto
 
-lemma comp_nest[case_names Same InLeft InRight]:
+(*
+function (sequential) commonC :: "C \<Rightarrow> C \<Rightarrow> C" where
+  "commonC (CSeql C1 e) (CSeql C2 e2) = CSeql (commonC C1 C2) e"
+| "commonC (CSeqr e C1) (CSeqr e C2) = CSeqr e (commonC C1 C2)"
+| "commonC (CBarl C1 e) (CBarl C2 e) = CBarl (commonC C1 C2) e"
+| "commonC (CBarr e C1) (CBarr e C2) = CBarr e (commonC C1 C2)"
+| "commonC (CAppl C1 e) (CAppl C2 e) = CAppl (commonC C1 C2) e"
+| "commonC (CAppr e C1) (CAppr e C2) = CAppr e (commonC C1 C2)"
+| "commonC (CDef x C1) (CDef x C2) = CDef x (commonC C1 C2)"
+| "commonC (COne C1) (COne C2) = COne (commonC C1 C2)"
+| "commonC (CAll C1) (CAll C2) = CAll (commonC C1 C2)"
+| "commonC (CTupl C1 e) (CTupl C2 e) = CTupl (commonC C1 C2) e"
+| "commonC (CTupr e C1) (CTupr e C2) = CTupr e (commonC C1 C2)"
+| "commonC (CLam x C1) (CLam x C2) = CLam x (commonC C1 C2)"
+| "commonC _ _ = CHole"
+  by pat_completeness 
+*)
+
+inductive parallelC where
+  "parallelC (CSeql C1 e1) (CSeqr e2 C2)"
+| "parallelC (CSeqr e1 C1) (CSeql C2 e2)"
+| "parallelC (CBarl C1 e1) (CBarr e2 C2)"
+| "parallelC (CBarr e1 C1) (CBarl C2 e2)"
+| "parallelC (CAppl C1 e1) (CAppr e2 C2)"
+| "parallelC (CAppr e1 C1) (CAppl C2 e2)"
+| "parallelC (CTupl C1 e1) (CTupr e2 C2)"
+| "parallelC (CTupr e1 C1) (CTupl C2 e2)"
+
+
+lemma comp_nest[case_names Same Different InLeft InRight]:
   fixes C1 C2
-  obtains "C1 = C2"
-  | C3 where "C3 \<noteq> CHole" "C1 = compC C2 C3"
-  | C3 where "C3 \<noteq> CHole" "C2 = compC C1 C3"
+  assumes "appC C1 a = appC C2 b"
+  obtains 
+  "C1 = C2"
+| C C1' C2' where
+        "C1 = compC C C1'" "C2 = compC C C2'" "parallelC C1' C2'"
+  | C1' where "C1' \<noteq> CHole" "C1 = compC C2 C1'"
+  | C2' where "C2' \<noteq> CHole" "C2 = compC C1 C2'"
+  using assms
+  apply atomize 
   apply (induction C1 arbitrary: C2; case_tac C2)
-  sorry
+                      apply simp_all
+                     apply (smt (verit, ccfv_SIG) compC.simps(2))
+                    apply (metis compC.simps parallelC.intros)
+                   apply (metis compC.simps parallelC.intros)
+                  apply (smt (verit, best) compC.simps)
+                 apply (smt (verit, best) compC.simps)
+                apply (metis compC.simps parallelC.intros)
+               apply (metis compC.simps parallelC.intros)
+              apply (smt (verit, best) compC.simps)
+             apply (smt (verit, best) compC.simps)
+            apply (metis compC.simps parallelC.intros)
+           apply (metis compC.simps parallelC.intros)
+              apply (smt (verit, best) compC.simps)
+  thm fresh_star_def
+
+  
+  done
+  
+
 
 type_synonym red = "exp \<Rightarrow> exp \<Rightarrow> bool"
 
@@ -240,13 +299,12 @@ lemma compC_neq_Hole2[simp]:
   by (cases C1; cases C2) auto
 
 
+(*
 lemma congruent_cc'[simp]:
   "congruent (cc' R)"
-(*
   by (auto intro!: congruentI elim!:cc'.cases 
            simp add: appC_appC_compC intro:  cc'.intros)
 *)
-  sorry
 
 
 lemma cc_local_confluence:
@@ -262,12 +320,16 @@ proof-
   assume "R a1 b"
   assume "R a2 c"
   have "S (appC C2 c) (appC C1 b)"
-  proof(cases C1 C2 rule: comp_nest)
+    using `appC _ _ = _`
+  proof(cases rule: comp_nest)
     case Same
-    have "a1 = a2" using `C1 = C2` `appC _ _ = _` sorry
+    have "a1 = a2" using `C1 = C2` `appC _ _ = _` by simp
     with `R a1 b` `R a2 c` `R\<inverse>\<inverse> OO R \<le> S`
     have "S c b" by auto 
     then show ?thesis using `C1 = C2` `congruent S` by auto
+  next
+    case (Different C C1' C2')
+    then show ?thesis sorry
   next
     case (InLeft C3)
     have "a2 = appC C3 a1" using `C1 = _` `appC _ _ = _`
@@ -374,7 +436,11 @@ proof (induction rule: joinI)
     show ?case
     proof(induct rule: cc'_Seq)
       case (left v')
-      then show ?thesis apply simp sorry
+      have "VR (Seq v' e) e" unfolding VR_def Rs_def
+        by (intro cc_rootI rule_Seq.intros)
+      with `c = _`
+      have "VR c e" by simp
+      thus ?thesis by force
     next
       case (right e')
       have "VR (Seq v e') e'" unfolding VR_def Rs_def
