@@ -1,4 +1,5 @@
 %format ^ = " "
+%format ^^ = "\hspace{0.3mm}"
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
