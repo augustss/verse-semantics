@@ -38,6 +38,14 @@ nominal_datatype "exp" =
 | Tup exp exp
 | Lam x::var e::exp binds x in e
 
+lemma Def_eq[simp]:
+  "Def x e1 = Def x e2 \<longleftrightarrow> e1 = e2"
+  by auto (meson fresh_PairD(2) obtain_fresh)
+
+lemma Lam_eq[simp]:
+  "Lam x e1 = Lam x e2 \<longleftrightarrow> e1 = e2"
+  by auto (meson fresh_PairD(2) obtain_fresh)
+
 subsection \<open>Substitutions\<close>
 
 nominal_function subst
@@ -99,7 +107,7 @@ inductive_cases is_val_SeqE[elim!]: "is_val (Seq e1 e2)"
 
 (* Contexts *)
 
-nominal_datatype C =
+datatype C =
   CHole
 | CSeql C exp
 | CSeqr exp C
@@ -114,7 +122,35 @@ nominal_datatype C =
 | CTupr exp C
 | CLam var C
 
-nominal_function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
+
+
+instantiation C :: pt
+begin
+fun permute_C where
+  "\<pi> \<bullet> CHole = CHole"
+| "\<pi> \<bullet> (CSeql C e) = CSeql (\<pi> \<bullet> C) (\<pi> \<bullet> e)"
+| "\<pi> \<bullet> (CSeqr e C) = CSeqr (\<pi> \<bullet> e) (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CBarl C e) = CBarl (\<pi> \<bullet> C) (\<pi> \<bullet> e)"
+| "\<pi> \<bullet> (CBarr e C) = CBarr (\<pi> \<bullet> e) (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CAppl C e) = CAppl (\<pi> \<bullet> C) (\<pi> \<bullet> e)"
+| "\<pi> \<bullet> (CAppr e C) = CAppr (\<pi> \<bullet> e) (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CDef x C) = CDef (\<pi> \<bullet> x) (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (COne C) = COne (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CAll C) = CAll (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CTupl C e) = CTupl (\<pi> \<bullet> C) (\<pi> \<bullet> e)"
+| "\<pi> \<bullet> (CTupr e C) = CTupr (\<pi> \<bullet> e) (\<pi> \<bullet> C)"
+| "\<pi> \<bullet> (CLam x C) = CLam (\<pi> \<bullet> x) (\<pi> \<bullet> C)"
+instance
+proof standard
+  fix C::C show "0 \<bullet> C = C"
+    by (induction C) auto
+  next
+  fix p q and C::C show "(p + q) \<bullet> C = p \<bullet> q \<bullet> C"
+    by (induction C) auto
+qed  
+end
+
+function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
   "appC CHole e' = e'"
 | "appC (CSeql C e) e' = Seq (appC C e') e"
 | "appC (CSeqr e C) e' = Seq e (appC C e')"
@@ -128,24 +164,15 @@ nominal_function appC :: "C \<Rightarrow> exp \<Rightarrow> exp" where
 | "appC (CTupl C e) e' = Tup (appC C e') e"
 | "appC (CTupr e C) e' = Tup e (appC C e')"
 | "appC (CLam x C) e' = Lam x (appC C e')"
-proof goal_cases
-  case (3 P x)
-  then show ?case
-  proof(induction x)
-    case (Pair a b)
-    then show ?thesis 
-      by (rule_tac C.strong_exhaust[of a]) (auto)
-  qed
-qed (auto simp add: eqvt_def appC_graph_aux_def)
-nominal_termination (eqvt) by lexicographic_order
-equivariance appC
+by pat_completeness auto+
+termination by lexicographic_order
+
+lemma appC_equivariant[eqvt]:
+  "p \<bullet> (appC C e) = appC (p \<bullet> C) (p \<bullet> e)"
+by (induction C) auto
 
 lemma appC_inj[simp]: "appC C x = appC C y \<longleftrightarrow> x = y"
-  apply(induction C)
-              apply auto
-  apply (meson fresh_PairD(1) fresh_PairD(2) obtain_fresh)
-  apply (meson fresh_PairD(1) fresh_PairD(2) obtain_fresh)
-  done  
+  by(induction C) (auto simp del: permute_C.simps exp.eq_iff(4,11))   
 
 fun compC :: "C \<Rightarrow> C \<Rightarrow> C" where
   "compC CHole e' = e'"
@@ -207,7 +234,7 @@ lemma comp_nest[case_names Same Different InLeft InRight]:
   using assms
   apply atomize 
   apply (induction C1 arbitrary: C2; case_tac C2)
-                      apply simp_all
+                      apply (simp_all del: exp.eq_iff(4,11))
                      apply (smt (verit, ccfv_SIG) compC.simps(2))
                     apply (metis compC.simps parallelC.intros)
                    apply (metis compC.simps parallelC.intros)
@@ -219,11 +246,10 @@ lemma comp_nest[case_names Same Different InLeft InRight]:
              apply (smt (verit, best) compC.simps)
             apply (metis compC.simps parallelC.intros)
            apply (metis compC.simps parallelC.intros)
-              apply (smt (verit, best) compC.simps)
-  thm fresh_star_def
-
-  
-  done
+          apply (smt (verit, best) compC.simps)
+(* Here the lemma does not hold: Different Defs can lead to the
+same expression *)
+  sorry
   
 
 
