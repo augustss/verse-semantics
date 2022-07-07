@@ -144,7 +144,6 @@
 %format case = "\textbf{case}"
 %format of = "\textbf{of}"
 %format assign = "\textbf{assign}"
-%format new = "\textbf{new}"
 %format alloc = "\textbf{alloc}"
 %format read = "\textbf{read}"
 %format write = "\textbf{write}"

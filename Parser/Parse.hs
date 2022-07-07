@@ -95,7 +95,7 @@ pOp ">" = pOp' ">" ">="
 pOp "-" = pOp' "-" "=>"
 pOp "|" = pOp' "|" "|"
 pOp "&" = pOp' "&" "&"
-pOp "." = pOp' "." "."
+pOp "." = pOp' "." "=."
 pOp "~" = pOp' "~" ">"
 pOp "+" = pOp' "+" "="
 pOp "*" = pOp' "*" "="
@@ -166,7 +166,7 @@ pIf = pKeyword "if" *> (
   (If1 <$> pBlockM)
   )
   where
-    mkIf _ Nothing Nothing = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
+    mkIf _  Nothing   Nothing   = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
     mkIf e1 (Just e2) Nothing   = If2  e1 e2
     mkIf e1 Nothing   (Just e3) = If2E e1 e3
     mkIf e1 (Just e2) (Just e3) = If3  e1 e2 e3
@@ -252,7 +252,7 @@ operatorTable =
     [op InfixR "&&"],
     [op InfixR "||"],
     [op InfixN ":=", op InfixL "=", op InfixL ">>"
-    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/="],
+    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
     [op InfixR "=>"],

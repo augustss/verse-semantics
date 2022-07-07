@@ -138,7 +138,7 @@ core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
-core (ApplyEff rs e) = coreEffs rs =<< core e
+core (ApplyEff rs e) = coreEffs rs =<< coreD e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
 core e@Choice{} = CBar <$> mapM coreD (flat e)

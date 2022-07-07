@@ -204,6 +204,7 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "-="      3
       , inn "*="      3
       , inn "/="      3
+      , inn ".="      3
       , inl "="       3 -- XXX is this right
       , inl ">>"      3 -- XXX is this right
       , inr "||"      4

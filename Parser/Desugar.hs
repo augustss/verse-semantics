@@ -194,7 +194,7 @@ dsD = expr
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
-                             "in'+='", "in'-='", "in'*='", "in'/='",
+                             "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
                              "length","in'..'"] = ApplyD
                 | otherwise = ApplyS
@@ -505,7 +505,7 @@ prelude = map (Ident noLoc)
   [ "int", "float", "string", "any", "nat", "false"
   , "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
-  , "assign", "new"
+  , "in'.='", "new"
   , "pre'?'", "pre'[]'", "post'^'"
   ]
 
@@ -780,7 +780,8 @@ addDeref = pure . exprD S.empty
     expr s (Define i e) = Define i (expr s e)
     expr s (Define2 i j e) = Define2 i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
-    expr s (Set e1 op e2) = set s e1 op (expr s e2)
+    expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
+      where op = Ident l ("in'" ++ sop ++ "'")
     expr s (MVar i t e) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
     expr s (Range e1) = Range (expr s e1)
     expr s (Typedef e1) = Typedef (exprD s e1)
@@ -789,7 +790,7 @@ addDeref = pure . exprD S.empty
 
     exprD s e = expr (defs s e) e
 
-    set s e1 (Ident l "=") e2 = set s e1 (Ident l "write$") e2
+    set s e1 (Ident l "in'='") e2 = set s e1 (Ident l "write$") e2
     set s e1@(Variable i) op@(Ident l _) e2
       | i `S.member` s = ApplyD (Variable op) $ Array [e1, e2]
       | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
