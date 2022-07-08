@@ -150,13 +150,14 @@
 \newcommand{\malt}{\diamond}
 \newcommand{\mempty}{\munit{}}
 
-\newcommand{\semapp}[3]{\mathcal{#1}\llbracket #2 \rrbracket\, #3}
-\newcommand{\envapp}[2]{\mathcal{R}\llbracket #1 \rrbracket #2}
+\newcommand{\semfun}[1]{\mathcal{#1}}
+\newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
 \newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
 
-\newcommand{\munit}[1]{\mathit{unit}(#1)}
+\newcommand{\munit}{\mathit{unit}}
 \newcommand{\mintersect}{\Cap}
 \newcommand{\munion}{\Cup}
 \newcommand{\msemi}{\fatsemi}
@@ -415,14 +416,40 @@ As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
 
 \section{A denotational semantics}
 
+\newcommand{\sconcat}{\bowtie}
+\newcommand{\shead}{\mathit{head}}
+\newcommand{\stuple}{\mathit{tuple}}
+\newcommand{\scons}{:}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Sequences $\Value^{*}$} \\
+\begin{array}{rrcl}
+\text{Creation} & [w_1,\cdots,w_n] & & (n >= 0) \\
+\text{Comprehension} & \mcompr{e}{\mbind{x}{s}, \cdots} \\
+\text{Cons} &  (\scons) & : & \Value \rightarrow \Value^{*} \rightarrow \Value^{*}\\
+\text{Concatenation} &  \sconcat & : & \Value^{*} \rightarrow \Value^{*} \rightarrow \Value^{*}\\
+\text{Head}  & \shead & : & \Value^{*} \rightarrow \Value^{*} \\
+             & \shead [] & = & [] \\
+             & \shead (w \scons s) & = & [ w ] \\
+\text{To tuple} & \stuple & : & \Value^{*} \rightarrow \tuple{\Value} \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+\end{array}
+\end{array}
+$$
+\caption{Sequences}
+\label{fig:sequences}
+\end{figure}
+
 \begin{figure}
 $$
 \begin{array}{l}
   \begin{array}{rcl}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \Value^{*} \\
-  \semapp{E}{|v|}{\rho} & = & \munit{\semapp{V}{v}{\rho}} \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & (\semapp{V}{|v_1|}{\rho}) \; (\semapp{V}{|v_2|}{\rho}) \\
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\rho \circ (x \mapsto w))} \\
@@ -449,46 +476,105 @@ $$
     \end{array}
 \\
 \\[3mm]
-a\text{\bf Sequences $\Value^{*}$} \\
 \begin{array}{rrcl}
-\text{Creation} & [w_1,\cdots,w_n] & & n >= 0 \\
-\text{Comprehension} & \mcompr{e}{\mbind{x}{s}, \cdots} \\
-\text{Unit} & \munit{w} & = & [ \, w \, ] \\
-\text{Concatenation} &  s_1 \munion s_2 & = & s_1 \cup s_2 \\
-\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{w}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}, w_1=w_2} \\
+\text{Unit} & \munit(w) & = & [ \, w \, ] \\
+\text{Concatenation} &  s_1 \munion s_2 & = & s_1 \sconcat s_2 \\
+\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{w_1}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}, w_1=w_2} \\
 \text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{w_2}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}} \\
-\text{One}  & \mone [w_1, \cdots] & = & w_1 \\
-\text{All}  & \mall [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+\text{One}  & \mone(s) & = & \shead( s )\\
+\text{All}  & \mall(s) & = & \stuple( s )
   \end{array}
 \end{array}
 $$
 \caption{Expression semantics}
-\label{expression-semantics}
+\label{fig:den-sem1}
 \end{figure}
 
+The denotational semantics is given in \cref{fig:den-sem1}. Points worth noting:
+\begin{itemize}
+\item We have one semantic function (here $\semfun{E}$ and $\semfun{V}$) for each syntactic
+  non terminal (here $e$ and $v$ respectively.)
+\item Each function has one equation for each form of the construct.
+\item Both functions take an environment $\rho$ that maps in-scope identifiers to
+  a \emph{single} value; see the definition $\Env = Ident \rightarrow \Value$.
+\item The value function $\semfun{V}$ returns a \emph{single value} $\Value$ while
+  the expression function $\semfun{E}$ returns a \emph{sequence of values} $\Value^{*}$.
+  Sequences are defined in \cref{fig:sequences}.
+\end{itemize}
+
+\subsection{The equations}
+
+The equations themselves, in \cref{fig:den-sem1}
+are beautifully simple and compositional, as a denotational semantics should be.
+The equations for $\semfun{V}$ should be self-explanatory, but those for $\semfun{E}$ are more interesting.
+\begin{itemize}
+\item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
+The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
+\item Choice $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the union of the sequences returned by |e_1| and |e_2| respectively.a
+  Since we return a \emph{sequence}, not a set, this ``union'' (written $\munion$)
+  is just sequence concatention (see
+  the bottom of the Figure.
+\item Unification $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the \emph{intersection} of the
+  sequences returned by |e_1| and |e_2| respectively. Again this ``intersection'' operator $\mintersect$
+  is defined at the bottom of \cref{fig:den-sem1}. We give it an actual definition, using a sequence
+  comprehension, which does a cartesian product. The equality is mathematical equality of functions;
+  which we can't implement for functions, but it will do as a start.
+\item Sequencing $\semapp{E}{|e_1 ; e_2|}{\rho}$. Again we use an auxiliary function $\msemi$ to combine
+  the meanings of |e_1| and |e_2|. The function $\msemi$ (bottom of \cref{fig:den-sem1} again
+  uses a sequence comprehension.  Again it does a cartesian product, but without the equality constraint of $\mintersect$.
+\item Function application $\semapp{E}{|apply1N v_1 v_2|}{\rho}$ is easy, because $\semfun{V}$ returns a single value: just apply
+  the meaning of the function to the meaning of the argument.
+\item One and all are staightforward.
+\end{itemize}
+
+\subsection{Functions}
+
+How are functions handled?
+Values include lambdas, so this semantics says that a lambda evaluates to a singleton
+sequence, whose only element is a function value. But that function value has
+type $\Value \rightarrow \Value ^{*}$; that is, it is a function that takes a single
+value and returns a \emph{sequence} of values.  This is not TimLambda, but it's simple and well-understood.
+
+\subsection{Existentials}
+
+The big excitement is the treatment of |defKW|. We must extend $\rho$, but what should we bind |x| to?  (Compare the
+equation for $\semapp{V}{|lam x e|}{}$, where we have a value $w$ to hand.)
+Our answer is simple: \emph{try all possible values, and union the results}.
+Of course we can't possibly implement it like this, but it makes a great specification.
+For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
+the semantics is a singleton sequence $[3]$.
+
+But there is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
+of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
+the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
+And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
+
+% -------------------------------------
 \section{An order-sensitive denotational semantics}
 
 \newcommand{\LblValue}{LW}
 \newcommand{\Lbl}{L}
-\newcommand{\lblleft}[1]{{\bf L}(#1)}
-\newcommand{\lblright}[1]{{\bf R}(#1)}
-\newcommand{\lblsemi}[2]{{\bf S}(#1,#2)}
+\newcommand{\lblleft}{{\bf L}}
+\newcommand{\lblright}{{\bf R}}
+\newcommand{\lblsemi}[2]{#1 \sconcat #2}
 \newcommand{\lblunit}{\bullet}
 \newcommand{\domplus}{\, + \,}
-\newcommand{\msort}[1]{\mathit{sort}(#1)}
+\newcommand{\msort}{\mathit{sort}}
 
 \begin{figure}
 $$
 \begin{array}{l}
   \begin{array}{rcl}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \LblValue^{*} \\
+  \multicolumn{3}{l}{\text{Same equations as before, for $\semapp{E}{e}{\rho}$ and $\semapp{V}{v}{\rho}$}}
   \end{array}
 \\
 \\
 \begin{array}{rcl}
 \Value & = & \bot \domplus \mathbb{Z} \domplus \tuple{\Value} \domplus (\Value \rightarrow \LblValue^{*}) \domplus \mathrm{WRONG} \\
-\LblValue^{*} & = & \bot \domplus [] \domplus ((\Lbl \times \Value) \times \LblValue^{*}) \\
-\Lbl & = & \lblunit \domplus \lblleft{\Lbl} \domplus \lblright{\Lbl} \domplus \lblsemi{\Lbl}{\Lbl} \\
+\LblValue & = & \Lbl^{*} \times \Value \\
+\Lbl & = & \lblleft \domplus \lblright \\
 \Env & = & Ident \rightarrow \Value
 \end{array} \\
 \text{where}\; \begin{array}[t]{l}
@@ -499,22 +585,62 @@ $$
 \\[3mm]
 \text{\bf Labelled sequences $\LblValue^{*}$} \\
 \begin{array}{rrcl}
-\text{Creation} & [lw_1,\cdots,lw_n] & & n >= 0 \\
-\text{Comprehension} & \mcompr{e}{\mbind{x}{s}, \cdots} \\
-\text{Unit} & \munit{w} & = & [ \, (\lblunit, w) \, ] \\
-\text{Concatenation} &  s_1 \munion s_2 & = & \mcompr{(\lblleft{l},w)}{\mbind{(l,w)}{s_1}} \cup
-                                              \mcompr{(\lblright{l},w)}{\mbind{(l,w)}{s_2}} \\
+\text{Unit} & \munit(w) & = & [ \, ([], w) \, ] \\
+\text{Concatenation} &  s_1 \munion s_2 & = & \mcompr{(\lblleft \scons l,w)}{\mbind{(l,w)}{s_1}} \cup
+                                             \mcompr{(\lblright \scons l, w)}{\mbind{(l,w)}{s_2}} \\
 \text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{(l_1,w_1)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
 \text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{(\lblsemi{l_1}{l_2}, w_2)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}} \\
-\text{One}  & \mone [w_1, \cdots] & = & w_1 \\
-\text{All}  & \mall [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+\text{One}  & \mone(s) & = & \shead (\msort( s)) \\
+\text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
+\\
+\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \Value^{*} \\
+& \msort( s ) & = & \mcompr{w}{\mbind{([],w)}{s}} \\
+  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblleft:l,w)}{s}} \\
+  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblright:l,w)}{s}} \\
   \end{array}
 \end{array}
 $$
-\caption{Expression semantics}
-\label{expression-semantics}
+\caption{Labelled expression semantics}
+\label{fig:den-sem2}
 \end{figure}
 
+\Cref{fig:den-sem2} give a new denotational semantics that \emph{does} account for order.
+The key idea (due to Joachim) is this: return a sequence of \emph{labelled} values;
+and then sort that sequence (in $\mone$ and $\mall$) into canonical order
+before exposing it to the programmer.
+
+We do not change the equations for $\semfun{E}$ and $\semfun{V}$ at all; they remain
+precisely as they are in \Cref{fig:den-sem1}.  But we do change $\semfun{E}$'s type,
+so that it retuns a sequence of \emph{labelled} values $\LblValue^{*}$.
+A labelled value (of type $\LblValue$) is defined in \cref{fig:den-sem2},
+and is just a pair of a \emph{label} of type $\Lbl^{*}$ and a value.
+A label is a sequence of tags, where a tag is just $\lblleft$ or $\lblright$.
+
+Now, the union (or concatention) operation $\munion$, defined in \cref{fig:den-sem2},
+adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
+and a $\lblright$ tag to those coming from the right.
+So the labels specify where in the tree the value comes from.
+
+Sequencing $\msemi$ concatenates the labels.
+Notice that $\mintersect$ takes the labels entirely from the left argument.
+(We need an example to explain this point.)
+
+Finally $\msort$ puts everything in the ``right'' order: first the values with
+an empty label, then the values whose label starts with $\lblleft$ (notice the
+recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
+Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\Value^{*}$.
+
+Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
+|defKW| binds |x| to |3| and then |4|. The meaning of
+this expression will be
+$$
+\semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
+$$
+Now if we take |allKW| of that expression we will get a singleton sequence
+containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
+$$
+\semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
+$$
 
 \end{document}
 
