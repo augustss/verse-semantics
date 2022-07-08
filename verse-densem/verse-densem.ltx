@@ -455,6 +455,8 @@ $$
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\rho \circ (x \mapsto w))} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \mall (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|lam (x:=e_1) e_2|}{\rho} & = &
+    func (cart [ (w, \semapp{E}{e_2}{(\rho \circ (x \mapsto w))}) \vb w \in \semapp{E}{e_1}{\rho} ]) \\
           \\
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
@@ -482,8 +484,14 @@ $$
 \text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{w_1}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}, w_1=w_2} \\
 \text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{w_2}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}} \\
 \text{One}  & \mone(s) & = & \shead( s )\\
-\text{All}  & \mall(s) & = & \stuple( s )
-  \end{array}
+\text{All}  & \mall(s) & = & \stuple( s ) \\
+\multicolumn{3}{l}{\text{Some pseudo Haskell the generates the cartesian product.}} \\
+\multicolumn{3}{l}{     cart [] = \{ \emptyset \} } \\
+\multicolumn{3}{l}{     cart ((x,ys) : xyss) = \{ \{(x,y)\} \cup f \vb y \in ys, f \in cart(xyss) \} } \\
+\multicolumn{3}{l}{\text{\emph{func} takes a set of pairs and makes the cortresponding function.}} \\
+\end{array}
+%cart [] = [[]]
+%cart ((x, ys) : xyss) = [ (x, y) : f | y <- ys , f <- cart xyss ]
 \end{array}
 $$
 \caption{Expression semantics}
