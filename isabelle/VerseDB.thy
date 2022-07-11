@@ -402,6 +402,9 @@ definition "J = VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
 lemma refl_J[simp]: "J x x"
   unfolding J_def by auto
 
+lemma reflp_J[simp]: "reflp J"
+  unfolding reflp_def by simp
+
 lemma congruent_J[simp]: "congruent J"
   unfolding J_def VR_def by simp
 
@@ -516,7 +519,10 @@ theorem local_confluence:
   unfolding VR_def Rs_def
   apply (rule cc_local_confluence)
      apply simp
-    apply simp
+       apply simp
+      apply simp
+  using J_VRl Rs_def VR_def apply auto[1]
+  using OO_def Rs_def VR_def apply auto[1]
   apply (rule Seq_Seq)
   apply (rule Seq_C[unfolded Rs_def])
   done
