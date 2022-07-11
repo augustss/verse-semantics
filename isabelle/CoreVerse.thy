@@ -4,6 +4,11 @@ imports
   Nominal2.Nominal2
   "HOL-Eisbach.Eisbach"
 begin
+(*
+Status: This is an abandonned attempt.
+The problem is that with locally nameless representation, contexts are not unique.
+See VerseDB for an attempt with debruji-indices.
+*)
 
 atom_decl var
 
