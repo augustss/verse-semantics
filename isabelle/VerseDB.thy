@@ -329,8 +329,11 @@ qed
 lemma cc_local_confluence:
   assumes "congruent S"
   assumes "symp S"
-  assumes "R\<inverse>\<inverse> OO R \<le> S"
-  assumes "R\<inverse>\<inverse> OO cc' R \<le> S"
+  assumes "reflp S"
+  assumes R_left: "cc R OO S \<le> S"
+  assumes R_right: "S OO (cc R)\<inverse>\<inverse> \<le> S"
+  assumes at_root: "R\<inverse>\<inverse> OO R \<le> S"
+  assumes below_root: "R\<inverse>\<inverse> OO cc' R \<le> S"
   shows "(cc R)\<inverse>\<inverse> OO cc R \<le> S"
 proof-
 {
@@ -345,7 +348,7 @@ proof-
     hence "a1 = a2" by simp
     with `R a1 b` `R a2 c`
     have "(R\<inverse>\<inverse> OO R) b c" by auto
-    hence "S b c" using assms(3) by auto
+    hence "S b c" using at_root by auto
     then show ?case by simp
   next
     case (Nil_Cons ece ec)
@@ -353,7 +356,7 @@ proof-
     have "cc' R a1 (appEC (ece # ec) c)" by (auto intro: cc'.intros)
     with `R a1 b` Nil Cons
     have "(R\<inverse>\<inverse> OO cc' R) b (appEC (ece # ec) c)" by auto
-    hence "S b (appEC (ece # ec) c)" using assms(4) by auto
+    hence "S b (appEC (ece # ec) c)" using below_root by auto
     thus ?case using Nil Cons by simp
   next
     case (Cons_Nil ece1 ec1)
@@ -361,7 +364,7 @@ proof-
     have "cc' R a2 (appEC (ece1 # ec1) b)" by (auto intro: cc'.intros)
     with `R a2 c` Nil Cons
     have "(R\<inverse>\<inverse> OO cc' R) c (appEC (ece1 # ec1) b)" by auto
-    hence "S c (appEC (ece1 # ec1) b)" using assms(4) by auto
+    hence "S c (appEC (ece1 # ec1) b)" using below_root by auto
     hence "S (appEC (ece1 # ec1) b) c" using `symp S` by (auto simp add: symp_def)
     thus ?case using Nil by simp
   next
@@ -381,8 +384,11 @@ proof-
       from congruent_cc[of R] this Cons_Cons(2) cc_rootI[of R, OF `R a1 b`] cc_rootI[of R, OF `R a2 c`]
       have "((cc R) OO (cc R)\<inverse>\<inverse> ) (appEC (ece1 # ec1) b) (appEC (ece2 # ec2) c)"
         by (rule commute_parallel_context)
-      (* Need more assumptions about S here *)
-      thus ?thesis sorry
+      moreover
+      have "(cc R) OO (cc R)\<inverse>\<inverse> \<le> S"
+        using R_left R_right `reflp S` by (auto simp add: reflp_def)
+      ultimately
+      show ?thesis by auto
     qed
   qed
 
@@ -433,6 +439,13 @@ lemma Seq_Seq: "rule_Seq\<inverse>\<inverse> OO rule_Seq \<le> J"
 
 section \<open>Elementary diagrams not at the root\<close>
 
+lemma Rs_Val[elim!]:
+  assumes "Rs (Val v) c"
+  obtains False
+  using assms unfolding Rs_def
+  by (auto elim: rule_Seq.cases)
+
+
 lemma cc_Val:
   assumes "cc R (Val v) c"
   obtains
@@ -443,10 +456,12 @@ lemma cc_Val:
   apply (case_tac C)
    apply simp
   apply (case_tac a)
-
+           apply (auto simp add: appEC_def cc.simps)
+  apply blast
+  done
 
 lemma cc'_Seq:
-  assumes "cc' Rs (Seq e1 e2) c"
+  assumes "cc' R (Seq e1 e2) c"
   obtains (left) e1' where "cc R e1 e1'" and "c = Seq e1' e2"
   | (right) e2' where "cc R e2 e2'" and "c = Seq e1 e2'"
   using assms
@@ -470,6 +485,9 @@ proof (induction rule: joinI)
       case (left v')
       thus ?case
       proof(induct rule: cc_Val)
+        case atVal
+        thus ?case by auto
+      next
         case (in_Val vc a b)
         have "VR (Seq v' e) e" unfolding VR_def Rs_def `v' = _`
           by (intro cc_rootI rule_Seq.intros)
