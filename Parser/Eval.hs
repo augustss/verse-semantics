@@ -445,7 +445,8 @@ evalApp flg = evalTrace "evalApp" f flg
             x = head $ newVars "i" vs
     f (CApply (VArray vs) vi) = CBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify (CValue vi) (CInt i), CValue v]
-    f (CApply VInt{} _) = CWrong "APP-CONST-WRONG"
+    f e@(CApply VPrim{} _) = composOpLam (underLambda flg) f e
+    f (CApply HNF{} _) = CWrong "APP-CONST-WRONG"
     f e = composOpLam (underLambda flg) f e
 
 -- Handle CSeq in odd places
@@ -623,6 +624,8 @@ prelude =
   ,("new", newV)
 --  ,("pre'[]'", unimplemented "pre []")
 --  ,("pre'^'", unimplemented "pre ^")
+  ,("post'^'", VLam x $ CApply (VPrim "read$") vx)
+  ,("in'.='", VLam x $ CApply (VPrim "write$") vx)
   ]
   where typ is = VLam x $ cSeq $ is ++ [CVar x]
         vx = Var x
@@ -660,7 +663,7 @@ prelude =
             CDef [y] $
             CSeq [
               CUnify (CVar y) (CApply (Var t) (Var x)),
-              app "new$" (Var y)
+              app "alloc$" (Var y)
               ]
 
 -- A special purpose composOp that can avoid going under lambda.

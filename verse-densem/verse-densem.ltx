@@ -1,0 +1,675 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[acmsmall,review,dvipsnames]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\let\Bbbk\relax % polycode defines that again?
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
+
+\RequirePackage[utf8]{inputenc}
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{POPL} % CONF = POPL or ICFP or OOPSLA
+\acmArticle{1}
+\acmYear{2022}
+\acmMonth{1}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+
+%% -------------- Copyright information ------------------
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
+\usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
+
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Arrows with explanation, including the common cases of one, two or a repated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+% ------------------- Local notational macros -----------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+
+%%\newcommand{\clamsymx}{\Rightarrow}
+%%\newcommand{\clamsym}{$\clamsymx$}
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{W}
+\newcommand{\Env}{Env}
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+\newcommand{\mempty}{\munit{}}
+
+\newcommand{\semfun}[1]{\mathcal{#1}}
+\newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
+\newcommand{\cons}{{:}}           % Cons for value sequences, V*
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+
+\newcommand{\munit}{\mathit{unit}}
+\newcommand{\mintersect}{\Cap}
+\newcommand{\munion}{\Cup}
+\newcommand{\msemi}{\fatsemi}
+\newcommand{\mone}{\mathit{one}}
+\newcommand{\mall}{\mathit{all}}
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
+\newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
+\newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\newcommand{\joachim}[1]{}
+\newcommand{\koen}[1]{}
+\newcommand{\olin}[1]{}
+\newcommand{\ranjit}[1]{}
+\fi
+% ---------------- End of comments -----------------
+
+
+
+\begin{document}
+
+%% Title information
+% \title{The essence of functional logic programming}
+\title{A denotational semantics for the Verse Calculus}
+
+                                        %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+% \titlenote{with title note}             %% \titlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+% \subtitle{Subtitle}                     %% \subtitle is optional
+% \subtitlenote{with subtitle note}       %% \subtitlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Lennart Augustsson}
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{lennart.augustsson@@epicgames.com}          %% \email is recommended
+
+\author{Joachim Breitner}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{0000-0003-3753-6821}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{Germany}                    %% \country is recommended
+}
+\email{joachim.breitner@@epicgames.com}          %% \email is recommended
+
+\author{Koen Claessen}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{koen.claessen@@epicgames.com}          %% \email is recommended
+
+\author{Simon Peyton Jones}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{United Kingdom}                    %% \country is recommended
+}
+\email{simonpj@@epicgames.com}          %% \email is recommended
+
+\author{Olin Shivers}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{olin.shivers@@epicgames.com}          %% \email is recommended
+
+\author{Tim Sweeney}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{tim.sweeney@@epicgames.com}          %% \email is recommended
+
+
+
+%% ---------------- Abstract ---------------------
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+  Functional logic languages have a rich literature, but it is tricky
+  to give them a satisfying semantics.  In this paper we describe the
+  Verse calculus, \versecalc{}, a new core calculus for functional
+  logical programming. Our main contribution is to equip \versecalc{} with a
+  small-step rewrite semantics, so that we can reason
+  about a \versecalc{} program in the same way as one does lambda
+  calculus; that is, by applying successive rewrites to it.
+  This semantics elegantly fills the gap between very high level
+  ``magical'' semantics, and very low-level operational semantics.
+\end{abstract}
+
+
+%% ---------------- Classification ---------------------
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011008</concept_id>
+<concept_desc>Software and its engineering~General programming languages</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003456.10003457.10003521.10003525</concept_id>
+<concept_desc>Social and professional topics~History of programming languages</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~General programming languages}
+\ccsdesc[300]{Social and professional topics~History of programming languages}
+%% End of generated code
+
+
+%% Keywords
+%% comma separated list
+% \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
+
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+% \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
+%   a work in progress.  So please don't share it; if there is anyone you think would be
+%   interested/helpful, do suggest them to us.}
+
+\section{Introduction}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
+    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+% SPJ Omitting for now
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
+    \text{Values} & v & ::= & x  \vb \hnf \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add|
+\iffullverse
+    \vb |isInt|
+\fi
+    \end{array} \\
+    \\[-3mm]
+    \text{\emph{Concrete syntax}:} \;\;
+    \begin{array}[t]{l}
+          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+          \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+    \end{array} \\ \\[-3mm]
+    \textbf{Shorthand} \\
+    \begin{array}{rcl}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+     \end{array} \\
+  \\[-2mm]
+  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:syntax}
+\end{figure}
+
+This paper is a first attempt at a denotational semantics for \versecalc{}.
+
+As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
+
+\section{A denotational semantics}
+
+\newcommand{\sconcat}{\bowtie}
+\newcommand{\shead}{\mathit{head}}
+\newcommand{\stuple}{\mathit{tuple}}
+\newcommand{\scons}{:}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Sequences $\Value^{*}$} \\
+\begin{array}{rrcl}
+\text{Creation} & [w_1,\cdots,w_n] & & (n >= 0) \\
+\text{Comprehension} & \mcompr{e}{\mbind{x}{s}, \cdots} \\
+\text{Cons} &  (\scons) & : & \Value \rightarrow \Value^{*} \rightarrow \Value^{*}\\
+\text{Concatenation} &  \sconcat & : & \Value^{*} \rightarrow \Value^{*} \rightarrow \Value^{*}\\
+\text{Head}  & \shead & : & \Value^{*} \rightarrow \Value^{*} \\
+             & \shead [] & = & [] \\
+             & \shead (w \scons s) & = & [ w ] \\
+\text{To tuple} & \stuple & : & \Value^{*} \rightarrow \tuple{\Value} \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+\end{array}
+\end{array}
+$$
+\caption{Sequences}
+\label{fig:sequences}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \begin{array}{rcl}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \Value^{*} \\
+  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
+  \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & (\semapp{V}{|v_1|}{\rho}) \; (\semapp{V}{|v_2|}{\rho}) \\
+  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\rho \circ (x \mapsto w))} \\
+  \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|all e|}{\rho} & = & \mall (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|lam (x:=e_1) e_2|}{\rho} & = &
+    func (cart [ (w, \semapp{E}{e_2}{(\rho \circ (x \mapsto w))}) \vb w \in \semapp{E}{e_1}{\rho} ]) \\
+          \\
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\rho \circ (x \mapsto w)) \\
+  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = &
+     \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}}
+  \end{array}
+\\
+\\
+\begin{array}{rcl}
+\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \mathrm{WRONG} \\
+\Value^{*} & = & \bot + [] + (\Value \times \Value^{*}) \\
+\Env & = & Ident \rightarrow \Value
+\end{array} \\
+\text{where}\; \begin{array}[t]{l}
+    \text{$\tuple{\Value}$ is a tuple of values} \\
+    \text{$\Value^{*}$ is a (semantic) sequence (monad) of values.}
+    \end{array}
+\\
+\\[3mm]
+\begin{array}{rrcl}
+\text{Unit} & \munit(w) & = & [ \, w \, ] \\
+\text{Concatenation} &  s_1 \munion s_2 & = & s_1 \sconcat s_2 \\
+\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{w_1}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}, w_1=w_2} \\
+\text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{w_2}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}} \\
+\text{One}  & \mone(s) & = & \shead( s )\\
+\text{All}  & \mall(s) & = & \stuple( s ) \\
+\multicolumn{3}{l}{\text{Some pseudo Haskell the generates the cartesian product.}} \\
+\multicolumn{3}{l}{     cart [] = \{ \emptyset \} } \\
+\multicolumn{3}{l}{     cart ((x,ys) : xyss) = \{ \{(x,y)\} \cup f \vb y \in ys, f \in cart(xyss) \} } \\
+\multicolumn{3}{l}{\text{\emph{func} takes a set of pairs and makes the cortresponding function.}} \\
+\end{array}
+%cart [] = [[]]
+%cart ((x, ys) : xyss) = [ (x, y) : f | y <- ys , f <- cart xyss ]
+\end{array}
+$$
+\caption{Expression semantics}
+\label{fig:den-sem1}
+\end{figure}
+
+The denotational semantics is given in \cref{fig:den-sem1}. Points worth noting:
+\begin{itemize}
+\item We have one semantic function (here $\semfun{E}$ and $\semfun{V}$) for each syntactic
+  non terminal (here $e$ and $v$ respectively.)
+\item Each function has one equation for each form of the construct.
+\item Both functions take an environment $\rho$ that maps in-scope identifiers to
+  a \emph{single} value; see the definition $\Env = Ident \rightarrow \Value$.
+\item The value function $\semfun{V}$ returns a \emph{single value} $\Value$ while
+  the expression function $\semfun{E}$ returns a \emph{sequence of values} $\Value^{*}$.
+  Sequences are defined in \cref{fig:sequences}.
+\end{itemize}
+
+\subsection{The equations}
+
+The equations themselves, in \cref{fig:den-sem1}
+are beautifully simple and compositional, as a denotational semantics should be.
+The equations for $\semfun{V}$ should be self-explanatory, but those for $\semfun{E}$ are more interesting.
+\begin{itemize}
+\item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
+The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
+\item Choice $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the union of the sequences returned by |e_1| and |e_2| respectively.a
+  Since we return a \emph{sequence}, not a set, this ``union'' (written $\munion$)
+  is just sequence concatention (see
+  the bottom of the Figure.
+\item Unification $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the \emph{intersection} of the
+  sequences returned by |e_1| and |e_2| respectively. Again this ``intersection'' operator $\mintersect$
+  is defined at the bottom of \cref{fig:den-sem1}. We give it an actual definition, using a sequence
+  comprehension, which does a cartesian product. The equality is mathematical equality of functions;
+  which we can't implement for functions, but it will do as a start.
+\item Sequencing $\semapp{E}{|e_1 ; e_2|}{\rho}$. Again we use an auxiliary function $\msemi$ to combine
+  the meanings of |e_1| and |e_2|. The function $\msemi$ (bottom of \cref{fig:den-sem1} again
+  uses a sequence comprehension.  Again it does a cartesian product, but without the equality constraint of $\mintersect$.
+\item Function application $\semapp{E}{|apply1N v_1 v_2|}{\rho}$ is easy, because $\semfun{V}$ returns a single value: just apply
+  the meaning of the function to the meaning of the argument.
+\item One and all are staightforward.
+\end{itemize}
+
+\subsection{Functions}
+
+How are functions handled?
+Values include lambdas, so this semantics says that a lambda evaluates to a singleton
+sequence, whose only element is a function value. But that function value has
+type $\Value \rightarrow \Value ^{*}$; that is, it is a function that takes a single
+value and returns a \emph{sequence} of values.  This is not TimLambda, but it's simple and well-understood.
+
+\subsection{Existentials}
+
+The big excitement is the treatment of |defKW|. We must extend $\rho$, but what should we bind |x| to?  (Compare the
+equation for $\semapp{V}{|lam x e|}{}$, where we have a value $w$ to hand.)
+Our answer is simple: \emph{try all possible values, and union the results}.
+Of course we can't possibly implement it like this, but it makes a great specification.
+For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
+the semantics is a singleton sequence $[3]$.
+
+But there is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
+of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
+the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
+And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
+
+% -------------------------------------
+\section{An order-sensitive denotational semantics}
+
+\newcommand{\LblValue}{LW}
+\newcommand{\Lbl}{L}
+\newcommand{\lblleft}{{\bf L}}
+\newcommand{\lblright}{{\bf R}}
+\newcommand{\lblsemi}[2]{#1 \sconcat #2}
+\newcommand{\lblunit}{\bullet}
+\newcommand{\domplus}{\, + \,}
+\newcommand{\msort}{\mathit{sort}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \begin{array}{rcl}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \LblValue^{*} \\
+  \multicolumn{3}{l}{\text{Same equations as before, for $\semapp{E}{e}{\rho}$ and $\semapp{V}{v}{\rho}$}}
+  \end{array}
+\\
+\\
+\begin{array}{rcl}
+\Value & = & \bot \domplus \mathbb{Z} \domplus \tuple{\Value} \domplus (\Value \rightarrow \LblValue^{*}) \domplus \mathrm{WRONG} \\
+\LblValue & = & \Lbl^{*} \times \Value \\
+\Lbl & = & \lblleft \domplus \lblright \\
+\Env & = & Ident \rightarrow \Value
+\end{array} \\
+\text{where}\; \begin{array}[t]{l}
+    \text{$\tuple{\Value}$ is a tuple of values} \\
+    \text{$\Value^{*}$ is a (semantic) sequence (monad) of values.}
+    \end{array}
+\\
+\\[3mm]
+\text{\bf Labelled sequences $\LblValue^{*}$} \\
+\begin{array}{rrcl}
+\text{Unit} & \munit(w) & = & [ \, ([], w) \, ] \\
+\text{Concatenation} &  s_1 \munion s_2 & = & \mcompr{(\lblleft \scons l,w)}{\mbind{(l,w)}{s_1}} \cup
+                                             \mcompr{(\lblright \scons l, w)}{\mbind{(l,w)}{s_2}} \\
+\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{(l_1,w_1)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
+\text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{(\lblsemi{l_1}{l_2}, w_2)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}} \\
+\text{One}  & \mone(s) & = & \shead (\msort( s)) \\
+\text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
+\\
+\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \Value^{*} \\
+& \msort( s ) & = & \mcompr{w}{\mbind{([],w)}{s}} \\
+  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblleft:l,w)}{s}} \\
+  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblright:l,w)}{s}} \\
+  \end{array}
+\end{array}
+$$
+\caption{Labelled expression semantics}
+\label{fig:den-sem2}
+\end{figure}
+
+\Cref{fig:den-sem2} give a new denotational semantics that \emph{does} account for order.
+The key idea (due to Joachim) is this: return a sequence of \emph{labelled} values;
+and then sort that sequence (in $\mone$ and $\mall$) into canonical order
+before exposing it to the programmer.
+
+We do not change the equations for $\semfun{E}$ and $\semfun{V}$ at all; they remain
+precisely as they are in \Cref{fig:den-sem1}.  But we do change $\semfun{E}$'s type,
+so that it retuns a sequence of \emph{labelled} values $\LblValue^{*}$.
+A labelled value (of type $\LblValue$) is defined in \cref{fig:den-sem2},
+and is just a pair of a \emph{label} of type $\Lbl^{*}$ and a value.
+A label is a sequence of tags, where a tag is just $\lblleft$ or $\lblright$.
+
+Now, the union (or concatention) operation $\munion$, defined in \cref{fig:den-sem2},
+adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
+and a $\lblright$ tag to those coming from the right.
+So the labels specify where in the tree the value comes from.
+
+Sequencing $\msemi$ concatenates the labels.
+Notice that $\mintersect$ takes the labels entirely from the left argument.
+(We need an example to explain this point.)
+
+Finally $\msort$ puts everything in the ``right'' order: first the values with
+an empty label, then the values whose label starts with $\lblleft$ (notice the
+recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
+Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\Value^{*}$.
+
+Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
+|defKW| binds |x| to |3| and then |4|. The meaning of
+this expression will be
+$$
+\semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
+$$
+Now if we take |allKW| of that expression we will get a singleton sequence
+containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
+$$
+\semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
+$$
+
+\end{document}
+
+% LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
+% LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
+% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
+% LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
+% LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xrest zs unary
+% LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
+% LocalWords:  featureful multivalued mapFlat powerset denotational
+% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
+% LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
+% LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
+% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
+% LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
+% LocalWords:  subexpression Claessen equationally eliml fcn elimr
+% LocalWords:  rll redex Formalising equational stepX compositionally
+% LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
+% LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
+% LocalWords:  Smolka flavour FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
+% LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
+% LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
+% LocalWords:  Eqns ohlebusch

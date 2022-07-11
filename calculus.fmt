@@ -1,4 +1,5 @@
 %format ^ = " "
+%format ^^ = "\hspace{0.3mm}"
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
@@ -30,6 +31,7 @@
 
 %% ----------- End of Applications --------------
 
+%format space = "\hspace{1mm}"
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
 %format thunk (e) = "\lambda x.\," e
@@ -52,7 +54,7 @@
 %%%format choice = "[ \! ]"
 %%%format `choice` = "\mathop{[ \! ]}"
 %format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
-%format `choice` = "\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}"
+%format `choice` = "\hspace{1mm}\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}\hspace{1mm}"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"
@@ -142,7 +144,6 @@
 %format case = "\textbf{case}"
 %format of = "\textbf{of}"
 %format assign = "\textbf{assign}"
-%format new = "\textbf{new}"
 %format alloc = "\textbf{alloc}"
 %format read = "\textbf{read}"
 %format write = "\textbf{write}"
