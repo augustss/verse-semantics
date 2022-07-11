@@ -1,9 +1,14 @@
-theory VerseDB imports Main begin
+theory VerseDB
+  imports Main
+begin
+
+unbundle lattice_syntax
 
 datatype "exp" =
   Val val
 | Seq exp exp
 | Bar exp exp
+| Uni exp exp
 | App val val
 | Def exp
 | One exp
@@ -21,6 +26,7 @@ where
   "\<up>\<^sub>e n k (Val v) = Val (\<up>\<^sub>v n k v)"
 | "\<up>\<^sub>e n k (Seq e1 e2) = (Seq (\<up>\<^sub>e n k e1) (\<up>\<^sub>e n k e2))"
 | "\<up>\<^sub>e n k (Bar e1 e2) = (Bar (\<up>\<^sub>e n k e1) (\<up>\<^sub>e n k e2))"
+| "\<up>\<^sub>e n k (Uni e1 e2) = (Uni (\<up>\<^sub>e n k e1) (\<up>\<^sub>e n k e2))"
 | "\<up>\<^sub>e n k (App e1 e2) = (App (\<up>\<^sub>v n k e1) (\<up>\<^sub>v n k e2))"
 | "\<up>\<^sub>e n k (Def e) = Def (\<up>\<^sub>e n (k+1) e)"
 | "\<up>\<^sub>e n k (One e) = (One e)"
@@ -45,6 +51,8 @@ datatype ece =
 | CSeqr exp
 | CBarl exp
 | CBarr exp
+| CUnil exp
+| CUnir exp
 | CAppl vc val
 | CAppr val vc
 | CDef
@@ -79,6 +87,8 @@ fun appECE :: "ece \<Rightarrow> exp \<Rightarrow> exp" where
 | "appECE (CSeqr e1) e2 = Seq e1 e2"
 | "appECE (CBarl e2) e1 = Bar e1 e2"
 | "appECE (CBarr e1) e2 = Bar e1 e2"
+| "appECE (CUnil e2) e1 = Uni e1 e2"
+| "appECE (CUnir e1) e2 = Uni e1 e2"
 | "appECE (CAppl vc v) e = App (appVC vc e) v"
 | "appECE (CAppr v vc) e = App v (appVC vc e)"
 | "appECE CDef e = Def e"
@@ -159,19 +169,6 @@ lemma congruent_cc[simp]:
   by (auto intro!: congruentI elim!:cc.cases 
            simp add: appEC_append[symmetric] intro: cc.intros)
 
-inductive rule_Seq where
-  rule_Seq: "rule_Seq (Seq (Val v) e) e"
-
-definition "Rs = rule_Seq"
-definition "VR = cc Rs"
-
-lemma transitive_VR[trans]:
-  "VR a b \<Longrightarrow> VR b c \<Longrightarrow> VR\<^sup>*\<^sup>* a c"
-  by auto
-
-lemma congruent_VR[simp]: "congruent VR"
-  unfolding VR_def VR_def by simp
-
 section \<open>Parallel context\<close>
 
 definition "parallelEC ec1 ec2 \<longleftrightarrow>
@@ -225,6 +222,12 @@ proof-
     then show ?thesis sorry
   next
     case (CBarr x5)
+    then show ?thesis sorry
+  next
+    case (CUnil x4)
+    then show ?thesis sorry
+  next
+    case (CUnir x5)
     then show ?thesis sorry
   next
     case (CAppl x61 x62)
@@ -395,6 +398,28 @@ proof-
 } thus ?thesis using `symp S` by (auto simp add: cc.simps symp_def)
 qed
 
+section \<open>The actual rules\<close>
+
+inductive rule_Seq where
+  rule_Seq: "rule_Seq (Seq (Val v) e) e"
+
+inductive rule_Unify_Seql where
+  rule_Unify_Seql: "rule_Unify_Seql (Uni (Seq e1 e2) e3) (Seq e1 (Uni e2 e3))"
+
+
+definition "Rs = (rule_Seq \<squnion> rule_Unify_Seql)"
+definition "VR = cc Rs"
+
+lemmas Rs_cases = rule_Seq.cases rule_Unify_Seql.cases
+
+lemma transitive_VR[trans]:
+  "VR a b \<Longrightarrow> VR b c \<Longrightarrow> VR\<^sup>*\<^sup>* a c"
+  by auto
+
+lemma congruent_VR[simp]: "congruent VR"
+  unfolding VR_def VR_def by simp
+
+
 section \<open>Joinability relation\<close>
 
 definition "J = VR\<^sup>*\<^sup>* OO VR\<^sup>*\<^sup>*\<inverse>\<inverse>"
@@ -440,13 +465,30 @@ section \<open>Elementary diagrams at the root\<close>
 lemma Seq_Seq: "rule_Seq\<inverse>\<inverse> OO rule_Seq \<le> J"
   by(auto intro!: joinI elim!: rule_Seq.cases)
 
+lemma Unify_Seql_Unify_Seql: "rule_Unify_Seql\<inverse>\<inverse> OO rule_Unify_Seql \<le> J"
+  by(auto intro!: joinI elim!: rule_Unify_Seql.cases)
+
+lemma Seq_Unify_Seql: "rule_Seq\<inverse>\<inverse> OO rule_Unify_Seql \<le> J"
+  by(auto intro!: joinI elim!: rule_Seq.cases rule_Unify_Seql.cases)
+
+lemma mirror_elementary:
+  assumes "R1\<inverse>\<inverse> OO R2 \<le> J"
+  shows "R2\<inverse>\<inverse> OO R1 \<le> J"
+  sorry
+
+lemmas root_diagrams
+  = Seq_Seq
+    Unify_Seql_Unify_Seql
+    Seq_Unify_Seql
+    Seq_Unify_Seql[THEN mirror_elementary]
+
 section \<open>Elementary diagrams not at the root\<close>
 
 lemma Rs_Val[elim!]:
   assumes "Rs (Val v) c"
   obtains False
   using assms unfolding Rs_def
-  by (auto elim: rule_Seq.cases)
+  by (auto elim: Rs_cases)
 
 
 lemma cc_Val:
@@ -493,7 +535,7 @@ proof (induction rule: joinI)
       next
         case (in_Val vc a b)
         have "VR (Seq v' e) e" unfolding VR_def Rs_def `v' = _`
-          by (intro cc_rootI rule_Seq.intros)
+          by (intro cc_rootI rule_Seq.intros sup2I1 sup2I2)
         with `c = _`
         have "VR c e" by simp
         thus ?thesis by force
@@ -501,7 +543,7 @@ proof (induction rule: joinI)
     next
       case (right e')
       have "VR (Seq (Val v) e') e'" unfolding VR_def Rs_def
-        by (intro cc_rootI rule_Seq.intros)
+        by (intro cc_rootI rule_Seq.intros sup2I1 sup2I2)
       with `c = _`
       have "VR c e'" by simp
       moreover
@@ -513,6 +555,12 @@ proof (induction rule: joinI)
   qed
 qed
 
+lemma Unify_Seql_C: "rule_Unify_Seql\<inverse>\<inverse>  OO cc' Rs \<le> J"
+  sorry
+
+lemmas non_root_diagrams =
+  Seq_C
+  Unify_Seql_C
 
 theorem local_confluence:
   "VR\<inverse>\<inverse> OO VR \<le> J"
@@ -523,8 +571,11 @@ theorem local_confluence:
       apply simp
   using J_VRl Rs_def VR_def apply auto[1]
   using OO_def Rs_def VR_def apply auto[1]
-  apply (rule Seq_Seq)
-  apply (rule Seq_C[unfolded Rs_def])
+  (* now the per-rule lemmas *)
+   apply (simp only: converse_join relcompp_distrib2 relcompp_distrib)
+   apply(intro le_supI root_diagrams)
+  apply (simp only: converse_join relcompp_distrib2)
+  apply (intro le_supI non_root_diagrams[unfolded Rs_def])
   done
 
 
