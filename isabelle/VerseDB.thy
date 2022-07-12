@@ -73,13 +73,14 @@ definition appVC' ::  "vc \<Rightarrow> val \<Rightarrow> val" where
 definition appVC ::  "vc \<Rightarrow> exp \<Rightarrow> val" where
   "appVC vc e = appVC' vc (Lam e)"
 
+lemma appVC_Cons[simp]: "appVC (vce # vc) e = appVCE vce (appVC vc e)"
+  by (simp add: appVC_def appVC'_def)
 
 lemma appVC'_inj[simp]: "appVC' vc v1 = appVC' vc v2 \<longleftrightarrow> v1 = v2"
   by (induction vc) (auto simp add: appVC'_def)
 
 lemma appVC_inj[simp]: "appVC vc v1 = appVC vc v2 \<longleftrightarrow> v1 = v2"
   by (simp add: appVC_def)
-
 
 fun appECE :: "ece \<Rightarrow> exp \<Rightarrow> exp" where
   "appECE (CVal vc) e = Val (appVC vc e)"
@@ -169,6 +170,15 @@ lemma congruent_cc[simp]:
   by (auto intro!: congruentI elim!:cc.cases 
            simp add: appEC_append[symmetric] intro: cc.intros)
 
+section \<open>Reduction equivalence\<close>
+
+definition "red_equiv R S \<longleftrightarrow>
+  congruent S \<and>
+  symp S \<and>
+  reflp S \<and>
+  R OO S \<le> S \<and>
+  S OO R\<inverse>\<inverse> \<le> S"
+
 section \<open>Parallel context\<close>
 
 definition "parallelEC ec1 ec2 \<longleftrightarrow>
@@ -179,75 +189,236 @@ definition "parallelEC ec1 ec2 \<longleftrightarrow>
   appEC ec2 b' = appEC ec1' a \<and>
   appEC ec2' b' = appEC ec1' a'))"
 
+definition "parallelECE ece1 ece2 \<longleftrightarrow>
+  (\<forall> a b a' b'.
+  appECE ece1 a = appECE ece2 b \<longrightarrow>
+  (\<exists> ece1' ece2'.
+  appECE ece1 a' = appECE ece2' b \<and>
+  appECE ece2 b' = appECE ece1' a \<and>
+  appECE ece2' b' = appECE ece1' a'))"
+
+
+definition "parallelVC vc1 vc2 \<longleftrightarrow>
+  (\<forall> a b a' b'.
+  appVC vc1 a = appVC vc2 b \<longrightarrow>
+  (\<exists> vc1' vc2'.
+  appVC vc1 a' = appVC vc2' b \<and>
+  appVC vc2 b' = appVC vc1' a \<and>
+  appVC vc2' b' = appVC vc1' a'))"
+
+
+lemma Val_eq_appECE_simp[simp]:
+  "(Val v = appECE ece a) \<longleftrightarrow>
+    (\<exists> vc. ece = CVal vc \<and> v = appVC vc a)"
+  by (cases ece) auto
+
+lemma Seq_eq_appECE_simp[simp]:
+  "(Seq a b = appECE ece c) \<longleftrightarrow>
+    (ece = CSeql b \<and> c = a) \<or> (ece = CSeqr a \<and> c = b)"
+  by (cases ece) auto
+
+lemma Bar_eq_appECE_simp[simp]:
+  "(Bar a b = appECE ece c) \<longleftrightarrow>
+    (ece = CBarl b \<and> c = a) \<or> (ece = CBarr a \<and> c = b)"
+  by (cases ece) auto
+
+lemma Uni_eq_appECE_simp[simp]:
+  "(Uni a b = appECE ece c) \<longleftrightarrow>
+    (ece = CUnil b \<and> c = a) \<or> (ece = CUnir a \<and> c = b)"
+  by (cases ece) auto
+
+lemma App_eq_appECE_simp[simp]:
+  "(App v1 v2 = appECE ece c) \<longleftrightarrow>
+    (\<exists> vc. ece = CAppl vc v2 \<and> v1 = appVC vc c) \<or> 
+    (\<exists> vc. ece = CAppr v1 vc \<and> v2 = appVC vc c)"
+  by (cases ece) auto
+
+
+lemma Def_eq_appECE_simp[simp]:
+  "(Def e = appECE ece c) \<longleftrightarrow> (ece = CDef \<and> c = e)"
+  by (cases ece) auto
+
+lemma One_eq_appECE_simp[simp]:
+  "(One e = appECE ece c) \<longleftrightarrow> (ece = COne \<and> c = e)"
+  by (cases ece) auto
+
+lemma All_eq_appECE_simp[simp]:
+  "(All e = appECE ece c) \<longleftrightarrow> (ece = CAll \<and> c = e)"
+  by (cases ece) auto
+
+
+lemma parallelVC[intro!]:
+  assumes neq: "vc1 \<noteq> vc2"
+  shows "parallelVC vc1 vc2"
+using assms
+proof(induct vc1 vc2 rule: list_induct2'[case_names Nil_Nil Cons_Nil Nil_Cons Cons_Cons])
+  case Nil_Nil
+  then show ?case by auto
+next
+  case (Cons_Nil vce vc)
+  then show ?case by(cases vce)(auto simp add: parallelVC_def appVC_def appVC'_def)
+next
+  case (Nil_Cons vce vc)
+  then show ?case by(cases vce)(auto simp add: parallelVC_def appVC_def appVC'_def)
+next
+  case (Cons_Cons vce1 vc1 vce2 vc2)
+  show ?case
+  proof(cases "vce1 = vce2")
+    case True with Cons_Cons have "parallelVC vc1 vc2" by auto
+    with True show ?thesis
+      apply (cases vce1)
+      apply (auto simp add: parallelVC_def )
+      (* Ugly! *)
+      apply (elim allE) apply (erule impE) apply (assumption)
+      apply (erule_tac x = a' in allE)
+      apply (erule_tac x = b' in allE)
+      apply (erule exE)+
+      apply (rule_tac x= "CTup x1 x2 # vc1'" in exI)
+      apply (rule_tac x= "CTup x1 x2 # vc2'" in exI)
+      apply auto
+      done
+  next
+    case False
+    then show ?thesis
+    proof (cases vce1; cases vce2)
+      fix vs1 vs1' vs2 vs2'
+      assume "vce1 = CTup vs1 vs1'" "vce2 = CTup vs2 vs2'"
+      show ?thesis
+      proof(cases "length vs1 + length vs1' = length vs2 + length vs2'")
+        case True
+        consider "length vs1 < length vs2" | "length vs1 = length vs2" | "length vs1 > length vs2"
+          by fastforce     
+        thus ?thesis
+        proof(cases)
+          case 1          
+          then show ?thesis
+          using `vce1 = _` `vce2 = _` True
+          apply (auto simp add: parallelVC_def )
+            (* Ugly! *)
+          apply (rule_tac x= "CTup vs1 (list_update vs1' (length vs2 - length vs1 - 1) (appVC vc2 b'))
+                                   # vc1" in exI)
+          apply (rule_tac x= "CTup (list_update vs2 (length vs1) (appVC vc1 a')) vs2' # vc2" in exI)        
+          apply (auto simp add: list_update_append1)
+            apply (metis list_update_append1 list_update_length)
+           apply (metis Suc_diff_Suc less_Suc_eq list_update_append list_update_code(3) list_update_length not_less_eq)          
+          apply (smt (verit, ccfv_SIG) Suc_diff_Suc less_Suc_eq list_update_append list_update_code(3) list_update_length not_less_eq) 
+          done
+        next
+          case 2 thus ?thesis
+            using  `vce1 \<noteq> vce2`  `vce1 = _` `vce2 = _` by (auto simp add: parallelVC_def)
+        next
+          case 3
+          then show ?thesis
+          using `vce1 = _` `vce2 = _` True
+          apply (auto simp add: parallelVC_def )
+            (* Ugly! *)
+          apply (rule_tac x= "CTup (list_update vs1 (length vs2) (appVC vc2 b')) vs1' # vc1" in exI)
+          apply (rule_tac x= "CTup vs2 (list_update vs2' (length vs1 - length vs2 - 1) (appVC vc1 a')) # vc2" in exI)        
+          apply (auto simp add: list_update_append1)
+           apply (metis Suc_diff_Suc less_Suc_eq list_update_append list_update_code(3) list_update_length not_less_eq)          
+            apply (metis list_update_append1 list_update_length)
+          apply (smt (verit, ccfv_SIG) Suc_diff_Suc less_Suc_eq list_update_append list_update_code(3) list_update_length not_less_eq) 
+          done
+      qed        
+      next
+        case False
+        hence [simp]: "vs1 @ v1 # vs1' \<noteq> vs2 @ v2 # vs2'" for v1 v2
+          by (auto dest!: arg_cong[of _ _ length])
+        then show ?thesis
+          using `vce1 = _` `vce2 = _`
+          by (auto simp add: parallelVC_def appVC_def appVC'_def)
+      qed
+    qed
+  qed  
+qed
+
+lemma parallelVC_CVal_ECE[intro!]:
+  assumes "parallelVC vc1 vc2"
+  shows "parallelECE (CVal vc1) (CVal vc2)"
+  using assms
+  by (fastforce simp add: parallelVC_def parallelECE_def)
+
+lemma parallelVC_CAppl_ECE[intro!]:
+  assumes "parallelVC vc1 vc2 \<or> (v1 \<noteq> v2)"
+  shows "parallelECE (CAppl vc1 v1) (CAppl vc2 v2)"
+  using assms
+  apply (auto simp add: parallelVC_def parallelECE_def)
+  by (metis appECE.simps(8))
+
+lemma parallelVC_CAppr_ECE[intro!]:
+  assumes "parallelVC vc1 vc2 \<or> (v1 \<noteq> v2)"
+  shows "parallelECE (CAppr v1 vc1) (CAppr v2 vc2)"
+  using assms
+  apply (auto simp add: parallelVC_def parallelECE_def)
+  by (metis appECE.simps(9))
+
+
 lemma parallelECE:
   assumes neq: "ece1 \<noteq> ece2"
+  shows "parallelECE ece1 ece2"
+using assms
+proof(cases ece1)
+  case CVal
+  thus ?thesis using assms
+  proof(cases ece2)
+    case (CVal x1)
+    then show ?thesis using `ece1 = _` neq by auto
+  qed(auto simp add: parallelECE_def)
+next case CSeql with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CSeqr with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CBarl with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CBarr with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CUnil with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CUnir with neq show ?thesis unfolding parallelECE_def by fastforce
+next case (CAppl vc1 v1)
+  thus ?thesis using assms
+  proof(cases ece2)
+    case (CAppl vc2 v2)
+    then show ?thesis using `ece1 = _` neq by auto
+  next
+    case (CAppr v2 vc2)
+    then show ?thesis using `ece1 = _` neq 
+      apply (auto simp add: parallelECE_def)
+      apply (rule_tac x= "CAppl vc1 (appVC vc2 b')" in exI)
+      apply (rule_tac x= "CAppr (appVC vc1 a') vc2" in exI)
+      apply auto
+      done
+  qed(auto simp add: parallelECE_def)
+next
+next case (CAppr v1 vc1)
+  thus ?thesis using assms
+  proof(cases ece2)
+    case (CAppr v2 vc2)
+    then show ?thesis using `ece1 = _` neq by auto
+  next
+    case (CAppl vc2 v2)
+    then show ?thesis using `ece1 = _` neq 
+      apply (auto simp add: parallelECE_def)
+      apply (rule_tac x= "CAppr (appVC vc2 b') vc1" in exI)
+      apply (rule_tac x= "CAppl vc2 (appVC vc1 a')" in exI)
+      apply auto
+      done
+  qed(auto simp add: parallelECE_def)
+next case CDef with neq show ?thesis unfolding parallelECE_def by fastforce
+next case COne with neq show ?thesis unfolding parallelECE_def by fastforce
+next case CAll with neq show ?thesis unfolding parallelECE_def by fastforce
+qed
+
+lemma parallelEC_singleton:
+  assumes neq: "parallelECE ece1 ece2"
   shows "parallelEC [ece1] [ece2]"
-proof-
-{ fix a b a' b'
-  assume eq: "appECE ece1 a = appECE ece2 b"
-  have "\<exists> ec1' ec2'.
-      appECE ece1 a' = appEC ec2' b \<and>
-      appECE ece2 b' = appEC ec1' a \<and>
-       appEC ec2' b' = appEC ec1' a'"
-  proof(cases ece1)
-    case (CVal vc1)
-    with eq
-    show ?thesis
-    proof (cases ece2)
-      case (CVal vc2)
-      then show ?thesis sorry
-    qed(auto)
-  next
-    case (CSeql e1)
-    with eq neq
-    show ?thesis
-    proof(cases ece2)
-      case (CSeqr e2)
-      with CSeql eq have "e1 = b" and "e2 = a" by simp_all
-      show ?thesis
-      unfolding CSeql CSeqr `e1 = _` `e2 = _`
-      proof(intro exI conjI)
-        show "appECE (CSeql b) a' = appEC [CSeqr a'] b" by (simp add: appEC_def) 
-      next
-        show "appECE (CSeqr a) b' = appEC [CSeql b'] a" by (simp add: appEC_def)
-      next
-        show "appEC [CSeqr a'] b' = appEC [CSeql b'] a'" by (simp add: appEC_def)
-      qed
-    qed auto
-  next
-    case (CSeqr x3)
-    then show ?thesis sorry
-  next
-    case (CBarl x4)
-    then show ?thesis sorry
-  next
-    case (CBarr x5)
-    then show ?thesis sorry
-  next
-    case (CUnil x4)
-    then show ?thesis sorry
-  next
-    case (CUnir x5)
-    then show ?thesis sorry
-  next
-    case (CAppl x61 x62)
-    then show ?thesis sorry
-  next
-    case (CAppr x71 x72)
-    then show ?thesis sorry
-  next
-    case CDef
-    then show ?thesis sorry
-  next
-    case COne
-    then show ?thesis sorry
-  next
-    case CAll
-    then show ?thesis sorry
-  qed
-} thus ?thesis 
-  by (auto simp add: parallelEC_def appEC_def)
-qed  
+  using assms
+  unfolding parallelECE_def parallelEC_def
+  apply (auto simp add: appEC_def)
+  apply (elim allE) apply (erule impE) apply (assumption)
+  apply (erule_tac x = a' in allE)
+  apply (erule_tac x = b' in allE)
+  apply (erule exE)+
+  apply (rule_tac x= "[ece1']" in exI)
+  apply (rule_tac x= "[ece2']" in exI)
+  apply auto
+  done
+
 
 lemma parallelEC_append1:
   assumes "parallelEC ec1 ec2"
@@ -329,16 +500,19 @@ proof-
   show ?thesis by (metis conversepI relcomppI)
 qed
 
-lemma cc_local_confluence:
-  assumes "congruent S"
-  assumes "symp S"
-  assumes "reflp S"
-  assumes R_left: "cc R OO S \<le> S"
-  assumes R_right: "S OO (cc R)\<inverse>\<inverse> \<le> S"
+lemma cc_local_confluence[case_names red_equiv at_root below_root]:
+  assumes "red_equiv (cc R) S"
   assumes at_root: "R\<inverse>\<inverse> OO R \<le> S"
   assumes below_root: "R\<inverse>\<inverse> OO cc' R \<le> S"
   shows "(cc R)\<inverse>\<inverse> OO cc R \<le> S"
 proof-
+  from `red_equiv _ _`
+  have "congruent S"
+       "symp S"
+       "reflp S"
+   and R_left: "cc R OO S \<le> S"
+   and R_right: "S OO (cc R)\<inverse>\<inverse> \<le> S"
+  unfolding red_equiv_def by auto
 {
   fix a1 a2 C1 b C2 c
   assume "appEC C1 a1 = appEC C2 a2"
@@ -381,7 +555,8 @@ proof-
       then show ?thesis using True by (simp add: appEC_def)
     next
       case False
-      hence "parallelEC [ece1] [ece2]" by (rule parallelECE)
+      hence "parallelECE ece1 ece2" by (rule parallelECE)
+      hence "parallelEC [ece1] [ece2]" by (rule parallelEC_singleton)
       from parallelEC_append1[OF this]
       have "parallelEC (ece1 # ec1) (ece2 # ec2)" by simp
       from congruent_cc[of R] this Cons_Cons(2) cc_rootI[of R, OF `R a1 b`] cc_rootI[of R, OF `R a2 c`]
@@ -460,6 +635,10 @@ lemma J_VRstar[trans]:
   shows "J a b"
   using assms by (auto simp add: J_def VR_def)
 
+lemma red_equiv_J: "red_equiv VR J"
+  unfolding red_equiv_def
+  using converse_relcompp by auto
+
 section \<open>Elementary diagrams at the root\<close>
 
 lemma Seq_Seq: "rule_Seq\<inverse>\<inverse> OO rule_Seq \<le> J"
@@ -474,7 +653,7 @@ lemma Seq_Unify_Seql: "rule_Seq\<inverse>\<inverse> OO rule_Unify_Seql \<le> J"
 lemma mirror_elementary:
   assumes "R1\<inverse>\<inverse> OO R2 \<le> J"
   shows "R2\<inverse>\<inverse> OO R1 \<le> J"
-  sorry
+  by (metis assms converse_relcompp conversep_conversep conversep_mono symp_J symp_conv_conversep_eq)
 
 lemmas root_diagrams
   = Seq_Seq
@@ -505,6 +684,21 @@ lemma cc_Val:
   apply blast
   done
 
+lemma cc_Seq:
+  assumes "cc R (Seq e1 e2) c"
+  obtains 
+    (here) "R (Seq e1 e2) c"
+  | (left) e1' where "cc R e1 e1'" and "c = Seq e1' e2"
+  | (right) e2' where "cc R e2 e2'" and "c = Seq e1 e2'"
+  using assms
+  apply (elim cc.cases)
+  apply (case_tac C)
+   apply simp
+  apply (case_tac a)
+           apply (auto simp add: appEC_def cc.simps)
+  apply blast
+  done
+
 lemma cc'_Seq:
   assumes "cc' R (Seq e1 e2) c"
   obtains (left) e1' where "cc R e1 e1'" and "c = Seq e1' e2"
@@ -516,7 +710,22 @@ lemma cc'_Seq:
   apply (case_tac a)
            apply (auto simp add: appEC_def cc.simps)
   apply blast
+  done
+
+
+lemma cc'_Uni:
+  assumes "cc' R (Uni e1 e2) c"
+  obtains (left) e1' where "cc R e1 e1'" and "c = Uni e1' e2"
+  | (right) e2' where "cc R e2 e2'" and "c = Uni e1 e2'"
+  using assms
+  apply (elim cc'.cases)
+  apply (case_tac C)
+   apply simp
+  apply (case_tac a)
+           apply (auto simp add: appEC_def cc.simps)
+  apply blast
 done
+
 
 lemma Seq_C: "rule_Seq\<inverse>\<inverse> OO cc' Rs \<le> J"
 proof (induction rule: joinI)
@@ -556,7 +765,65 @@ proof (induction rule: joinI)
 qed
 
 lemma Unify_Seql_C: "rule_Unify_Seql\<inverse>\<inverse>  OO cc' Rs \<le> J"
-  sorry
+proof (induction rule: joinI)
+  case (Peak a b c)
+  then show ?case
+  proof(induction)
+    case (rule_Unify_Seql e1 e2 e3)
+    from `cc' Rs (Uni (Seq e1 e2) e3) c`
+    show ?case
+    proof(induct rule: cc'_Uni)
+      case (left e12')
+      from `cc Rs (Seq e1 e2) e12'`
+      show ?case
+      unfolding `c = _`
+      proof(induct rule: cc_Seq)
+        case here
+        (* Overlap with rule Seq *)
+        from `Rs (Seq e1 e2) e12'`
+        obtain v where "e1 = Val v" and "e12' = e2"
+          unfolding Rs_def by (auto elim: Rs_cases)
+        have "VR (Seq (Val v) (Uni e2 e3)) (Uni e2 e3)"
+          unfolding VR_def Rs_def by (auto intro: rule_Seq.intros)
+        thus ?case unfolding `e12' = _` `e1 = _`
+          by fastforce
+      next
+        case (left e1')
+        have "VR (Uni (Seq e1' e2) e3) (Seq e1' (Uni e2 e3))"
+          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        moreover
+        from `cc Rs e1 e1'`
+        have "VR e1 e1'" unfolding VR_def.
+        hence "VR (appEC [CSeql (Uni e2 e3)] e1) (appEC [CSeql(Uni e2 e3)] e1')"
+          using  congruent_VR congruentE by blast
+        ultimately
+        show ?case unfolding `e12' = _` by (fastforce simp add: appEC_def)
+      next
+        case (right e2')
+        have "VR (Uni (Seq e1 e2') e3) (Seq e1 (Uni e2' e3))"
+          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        moreover
+        from `cc Rs e2 e2'`
+        have "VR e2 e2'" unfolding VR_def.
+        hence "VR (appEC [CSeqr e1, CUnil e3] e2) (appEC [CSeqr e1, CUnil e3] e2')"
+          using  congruent_VR congruentE by blast
+        ultimately
+        show ?case unfolding `e12' = _` by (fastforce simp add: appEC_def)
+      qed
+    next
+      case (right e3')
+        have "VR (Uni (Seq e1 e2) e3') (Seq e1 (Uni e2 e3'))"
+          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        moreover
+        from `cc Rs e3 e3'`
+        have "VR e3 e3'" unfolding VR_def.
+        hence "VR (appEC [CSeqr e1, CUnir e2] e3) (appEC [CSeqr e1, CUnir e2] e3')"
+          using  congruent_VR congruentE by blast
+        ultimately
+        show ?case unfolding `c = _` by (fastforce simp add: appEC_def)
+    qed
+  qed
+qed
 
 lemmas non_root_diagrams =
   Seq_C
@@ -564,19 +831,21 @@ lemmas non_root_diagrams =
 
 theorem local_confluence:
   "VR\<inverse>\<inverse> OO VR \<le> J"
-  unfolding VR_def Rs_def
-  apply (rule cc_local_confluence)
-     apply simp
-       apply simp
-      apply simp
-  using J_VRl Rs_def VR_def apply auto[1]
-  using OO_def Rs_def VR_def apply auto[1]
-  (* now the per-rule lemmas *)
-   apply (simp only: converse_join relcompp_distrib2 relcompp_distrib)
-   apply(intro le_supI root_diagrams)
+  unfolding VR_def
+proof (induct rule: cc_local_confluence)
+  case red_equiv show ?case
+    using red_equiv_J[unfolded VR_def].
+next
+  case at_root show ?case
+    apply (simp only: Rs_def converse_join relcompp_distrib2 relcompp_distrib)
+    apply(intro le_supI root_diagrams)
+    done
+next
+  case below_root show ?case 
+  apply (subst Rs_def)
   apply (simp only: converse_join relcompp_distrib2)
-  apply (intro le_supI non_root_diagrams[unfolded Rs_def])
+  apply (intro le_supI non_root_diagrams)
   done
-
+qed
 
 end

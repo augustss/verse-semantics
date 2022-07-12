@@ -1,4 +1,11 @@
+(*
 session Verse = Nominal2 +
   theories
     CoreVerse
+    "U-E-confluence"
+*)
+
+session Verse = HOL +
+  theories
+    VerseDB
     "U-E-confluence"
