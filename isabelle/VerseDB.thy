@@ -585,7 +585,18 @@ inductive rule_Unify_Seql where
 definition "Rs = (rule_Seq \<squnion> rule_Unify_Seql)"
 definition "VR = cc Rs"
 
+lemmas releqD1 = iffD1[OF fun_cong[OF fun_cong]]
+lemmas releqD2 = iffD2[OF fun_cong[OF fun_cong]]
+
+lemmas Rs_intros =
+  Rs_def[THEN releqD2, OF sup2I1, OF rule_Seq.intros]
+  Rs_def[THEN releqD2, OF sup2I2, OF rule_Unify_Seql.intros]
+
+lemmas VR_rootI = Rs_intros[THEN VR_def[THEN releqD2, OF cc_rootI]]
+
+(* Can we make this about Rs only? https://stackoverflow.com/q/72950360/946226 *)
 lemmas Rs_cases = rule_Seq.cases rule_Unify_Seql.cases
+
 
 lemma transitive_VR[trans]:
   "VR a b \<Longrightarrow> VR b c \<Longrightarrow> VR\<^sup>*\<^sup>* a c"
@@ -743,16 +754,14 @@ proof (induction rule: joinI)
         thus ?case by auto
       next
         case (in_Val vc a b)
-        have "VR (Seq v' e) e" unfolding VR_def Rs_def `v' = _`
-          by (intro cc_rootI rule_Seq.intros sup2I1 sup2I2)
-        with `c = _`
+        have "VR (Seq (Val (appVC vc b)) e) e" by (intro VR_rootI)
+        with `c = _` `v' = _` 
         have "VR c e" by simp
         thus ?thesis by force
       qed
     next
       case (right e')
-      have "VR (Seq (Val v) e') e'" unfolding VR_def Rs_def
-        by (intro cc_rootI rule_Seq.intros sup2I1 sup2I2)
+      have "VR (Seq (Val v) e') e'" by (intro VR_rootI)
       with `c = _`
       have "VR c e'" by simp
       moreover
@@ -783,14 +792,12 @@ proof (induction rule: joinI)
         from `Rs (Seq e1 e2) e12'`
         obtain v where "e1 = Val v" and "e12' = e2"
           unfolding Rs_def by (auto elim: Rs_cases)
-        have "VR (Seq (Val v) (Uni e2 e3)) (Uni e2 e3)"
-          unfolding VR_def Rs_def by (auto intro: rule_Seq.intros)
+        have "VR (Seq (Val v) (Uni e2 e3)) (Uni e2 e3)" by (intro VR_rootI)
         thus ?case unfolding `e12' = _` `e1 = _`
           by fastforce
       next
         case (left e1')
-        have "VR (Uni (Seq e1' e2) e3) (Seq e1' (Uni e2 e3))"
-          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        have "VR (Uni (Seq e1' e2) e3) (Seq e1' (Uni e2 e3))" by (intro VR_rootI)
         moreover
         from `cc Rs e1 e1'`
         have "VR e1 e1'" unfolding VR_def.
@@ -800,8 +807,7 @@ proof (induction rule: joinI)
         show ?case unfolding `e12' = _` by (fastforce simp add: appEC_def)
       next
         case (right e2')
-        have "VR (Uni (Seq e1 e2') e3) (Seq e1 (Uni e2' e3))"
-          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        have "VR (Uni (Seq e1 e2') e3) (Seq e1 (Uni e2' e3))" by (intro VR_rootI)
         moreover
         from `cc Rs e2 e2'`
         have "VR e2 e2'" unfolding VR_def.
@@ -812,8 +818,7 @@ proof (induction rule: joinI)
       qed
     next
       case (right e3')
-        have "VR (Uni (Seq e1 e2) e3') (Seq e1 (Uni e2 e3'))"
-          unfolding VR_def Rs_def by (auto intro: rule_Unify_Seql.intros)
+        have "VR (Uni (Seq e1 e2) e3') (Seq e1 (Uni e2 e3'))" by (intro VR_rootI)
         moreover
         from `cc Rs e3 e3'`
         have "VR e3 e3'" unfolding VR_def.
@@ -838,14 +843,14 @@ proof (induct rule: cc_local_confluence)
 next
   case at_root show ?case
     apply (simp only: Rs_def converse_join relcompp_distrib2 relcompp_distrib)
-    apply(intro le_supI root_diagrams)
+    apply (intro le_supI root_diagrams)
     done
 next
   case below_root show ?case 
-  apply (subst Rs_def)
-  apply (simp only: converse_join relcompp_distrib2)
-  apply (intro le_supI non_root_diagrams)
-  done
+    apply (subst Rs_def)
+    apply (simp only: converse_join relcompp_distrib2)
+    apply (intro le_supI non_root_diagrams)
+    done
 qed
 
 end
