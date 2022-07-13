@@ -47,12 +47,12 @@ type_synonym vc = "vce list"
 
 datatype ece =
   CVal vc (* Implicit CLam at the end*)
-| CSeql exp
-| CSeqr exp
-| CBarl exp
-| CBarr exp
-| CUnil exp
-| CUnir exp
+| CSeql (* *) exp
+| CSeqr exp (* *) 
+| CBarl (* *) exp
+| CBarr exp (* *) 
+| CUnil (* *) exp
+| CUnir exp (* *) 
 | CAppl vc val
 | CAppr val vc
 | CDef
@@ -575,9 +575,11 @@ qed
 
 section \<open>The actual rules\<close>
 
+(* v;e \<rightarrow> e *)
 inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq (Val v) e) e"
 
+(* (e1;e2) = e3 \<rightarrow> e1 ; (e2=e3) *)
 inductive rule_Unify_Seql where
   rule_Unify_Seql: "rule_Unify_Seql (Uni (Seq e1 e2) e3) (Seq e1 (Uni e2 e3))"
 
@@ -594,6 +596,8 @@ lemmas Rs_intros =
 
 lemmas VR_rootI = Rs_intros[THEN VR_def[THEN releqD2, OF cc_rootI]]
 
+
+
 (* Can we make this about Rs only? https://stackoverflow.com/q/72950360/946226 *)
 lemmas Rs_cases = rule_Seq.cases rule_Unify_Seql.cases
 
@@ -605,6 +609,19 @@ lemma transitive_VR[trans]:
 lemma congruent_VR[simp]: "congruent VR"
   unfolding VR_def VR_def by simp
 
+lemmas congruentI =
+  congruentE[of _ _ _  "[CSeql e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CSeqr e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CBarl e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CBarr e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CUnil e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CUnir e]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CDef]", simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[COne]" for e, simplified appEC_def, simplified]
+  congruentE[of _ _ _  "[CAll]" for e, simplified appEC_def, simplified]
+
+lemmas VR_C_I = congruentI[OF congruent_VR]
+ 
 
 section \<open>Joinability relation\<close>
 
@@ -801,8 +818,7 @@ proof (induction rule: joinI)
         moreover
         from `cc Rs e1 e1'`
         have "VR e1 e1'" unfolding VR_def.
-        hence "VR (appEC [CSeql (Uni e2 e3)] e1) (appEC [CSeql(Uni e2 e3)] e1')"
-          using  congruent_VR congruentE by blast
+        hence "VR (Seq e1 (Uni e2 e3)) (Seq e1' (Uni e2 e3))" by (intro VR_C_I)          
         ultimately
         show ?case unfolding `e12' = _` by (fastforce simp add: appEC_def)
       next
@@ -811,8 +827,7 @@ proof (induction rule: joinI)
         moreover
         from `cc Rs e2 e2'`
         have "VR e2 e2'" unfolding VR_def.
-        hence "VR (appEC [CSeqr e1, CUnil e3] e2) (appEC [CSeqr e1, CUnil e3] e2')"
-          using  congruent_VR congruentE by blast
+        hence "VR (Seq e1 (Uni e2 e3)) (Seq e1 (Uni e2' e3))" by (intro VR_C_I)          
         ultimately
         show ?case unfolding `e12' = _` by (fastforce simp add: appEC_def)
       qed
@@ -822,8 +837,7 @@ proof (induction rule: joinI)
         moreover
         from `cc Rs e3 e3'`
         have "VR e3 e3'" unfolding VR_def.
-        hence "VR (appEC [CSeqr e1, CUnir e2] e3) (appEC [CSeqr e1, CUnir e2] e3')"
-          using  congruent_VR congruentE by blast
+        hence "VR (Seq e1 (Uni e2 e3)) (Seq e1 (Uni e2 e3'))" by (intro VR_C_I)          
         ultimately
         show ?case unfolding `c = _` by (fastforce simp add: appEC_def)
     qed
