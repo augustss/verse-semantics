@@ -111,7 +111,7 @@ eval h1 (p :>: q) =
 eval h1 (v :=: p) =
   do (w, h2, p') <- eval h1 p
      h3 <- unify h2 v w
-     return (look v h3, h3, p')
+     return (look v h3, h3, v :=: p')
 
 eval h1 (p :|: q) =
   case eval h1 p of
