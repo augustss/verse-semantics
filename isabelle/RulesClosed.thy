@@ -1,0 +1,83 @@
+theory RulesClosed
+imports Rules  SubstContext
+begin
+
+section \<open>A relation is closed if it does not invent fresh free names\<close>
+
+inductive rel_closed :: "red \<Rightarrow> bool"  where
+  rel_closedI: "(\<And> e1 e2 n. R e1 e2 \<Longrightarrow> occursE n e2 \<Longrightarrow> occursE n e1) \<Longrightarrow> rel_closed R"
+
+lemma rel_closed_OO[simp]:
+  assumes "rel_closed R" and "rel_closed S"
+  shows "rel_closed (R OO S)"
+  using assms by(auto simp add: rel_closed.simps)
+
+lemma rel_closed_star[simp]:
+  assumes "rel_closed R"
+  shows "rel_closed R\<^sup>*\<^sup>*"
+proof
+  fix x y n
+  assume "R\<^sup>*\<^sup>* x y" and "occursE n y"
+  then show "occursE n x"
+    using `rel_closed R`
+    by (induction rule: converse_rtranclp_induct) (auto simp add: rel_closed.simps)
+qed
+
+lemma rel_closed_sup2:
+  assumes "rel_closed R" and "rel_closed S"
+  shows "rel_closed (R \<squnion> S)"
+  using assms  by(auto simp add: rel_closed.simps)
+
+section \<open>The closure context preserves closedness\<close>
+
+lemma rel_closed_cc:
+  assumes "rel_closed R"
+  shows "rel_closed (cc R)"
+proof
+  fix x y n
+  assume "cc R x y" and "occursE n y"
+  from `cc R x y`
+  show "occursE n x"
+  proof
+    fix x' y' C
+    assume "x = appEC C x'" and "y = appEC C y'" and "R x' y'"
+    show ?thesis using `occursE n y` unfolding `x = _` `y = _`
+      using `R x' y'` `rel_closed R` by (auto simp add: rel_closed.simps)
+  qed
+qed
+
+section \<open>The Verse rules are closed\<close>
+
+lemma rel_closed_rule_PAdd: "rel_closed rule_PAdd"
+  by (auto intro: rel_closed.intros elim!: rule_PAdd.cases)
+
+lemma rel_closed_rule_PGt: "rel_closed rule_PGt"
+  by (auto intro!: rel_closed.intros elim!: rule_PGt.cases)
+
+lemma rel_closed_rule_App_Beta: "rel_closed rule_App_Beta"
+  by (auto intro!: rel_closed.intros elim!: rule_App_Beta.cases simp add: occursV_liftV)
+
+lemma rel_closed_rule_Seq: "rel_closed rule_Seq"
+  by (auto intro!: rel_closed.intros elim!: rule_Seq.cases)
+
+lemma rel_closed_rule_Unify_Seql: "rel_closed rule_Unify_Seql"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seql.cases)
+
+lemma rel_closed_rule_Unify_Seqr: "rel_closed rule_Unify_Seqr"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seqr.cases)
+
+
+theorem ARs_closed: "rel_closed ARs"
+unfolding ARs_def
+by (intro rel_closed_sup2
+   rel_closed_rule_PAdd
+   rel_closed_rule_PGt
+   rel_closed_rule_App_Beta
+   rel_closed_rule_Seq
+   rel_closed_rule_Unify_Seql
+   rel_closed_rule_Unify_Seqr
+)
+
+
+
+end

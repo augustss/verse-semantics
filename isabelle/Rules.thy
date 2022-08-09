@@ -1,8 +1,21 @@
 theory Rules
-  imports Syntax CongruenceClosure
+  imports Syntax CongruenceClosure Subst
 begin
 
 section \<open>The actual rules\<close>
+
+(* add@<k1,k2> \<rightarrow> (k1 + k2) *)
+inductive rule_PAdd where
+  rule_PAdd: "rule_PAdd (App (Op add_op) (Tup [Const k1, Const k2])) (Val (Const (k1 + k2)))"
+
+(* gt@<k1,k2> \<rightarrow> \<dots> *)
+inductive rule_PGt where
+  rule_PGt: "k1 > k2 \<Longrightarrow> rule_PGt (App (Op gt_op) (Tup [Const k1, Const k2])) (Val (Const k1))"
+| rule_PGt_fail: "k1 \<le> k2 \<Longrightarrow> rule_PGt (App (Op gt_op) (Tup [Const k1, Const k2])) Fail"
+
+(* (\<lambda>x. e)@v \<rightarrow> \<exists> x. x=v;e *)
+inductive rule_App_Beta where
+  rule_App_Beta: "rule_App_Beta (App (Lam e) v) (Def (Seq (Uni (Val (Var 0)) (Val (\<up>\<^sub>v 1 0 v))) e))"
 
 (* v;e \<rightarrow> e *)
 inductive rule_Seq where
@@ -16,6 +29,20 @@ inductive rule_Unify_Seql where
 inductive rule_Unify_Seqr where
   rule_Unify_Seqr: "rule_Unify_Seqr (Uni (Val v) (Seq e1 e2)) (Seq e1 (Uni (Val v) e2))"
 
+section \<open>All rules\<close>
+
+definition "ARs =
+  rule_PAdd \<squnion>
+  rule_PGt \<squnion>
+  rule_App_Beta \<squnion>
+  rule_Seq \<squnion>
+  rule_Unify_Seql \<squnion>
+  rule_Unify_Seqr"
+
+section \<open>The rules as used in the local confluence proof\<close>
+
+text \<open>These are not yet all rules, as the confluence proofs does not scale well.
+If we add other theorems we can define other rule sets.\<close>
 
 definition "Rs = (rule_Seq \<squnion> rule_Unify_Seql \<squnion> rule_Unify_Seqr)"
 definition "VR = cc Rs"

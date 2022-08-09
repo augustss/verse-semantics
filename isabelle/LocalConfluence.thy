@@ -255,8 +255,7 @@ proof (induction rule: joinI)
     proof(induct rule: cc'_Uni)
       case (left Val')
       from `cc Rs (Val v) Val'`
-      show ?case
-      unfolding `c = _`
+      show ?case unfolding `c = _`
       proof(induct rule: cc_Val)
         case atVal
         thus ?case by auto
