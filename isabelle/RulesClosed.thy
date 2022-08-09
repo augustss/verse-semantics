@@ -57,6 +57,11 @@ lemma rel_closed_rule_PGt: "rel_closed rule_PGt"
 lemma rel_closed_rule_App_Beta: "rel_closed rule_App_Beta"
   by (auto intro!: rel_closed.intros elim!: rule_App_Beta.cases simp add: occursV_liftV)
 
+lemma rel_closed_rule_App_Tup: "rel_closed rule_App_Tup" 
+  apply (auto intro!: rel_closed.intros elim!: rule_App_Tup.cases simp add: in_set_enumerate_eq)
+  using nth_mem by blast
+
+
 lemma rel_closed_rule_Seq: "rel_closed rule_Seq"
   by (auto intro!: rel_closed.intros elim!: rule_Seq.cases)
 
@@ -73,6 +78,7 @@ by (intro rel_closed_sup2
    rel_closed_rule_PAdd
    rel_closed_rule_PGt
    rel_closed_rule_App_Beta
+   rel_closed_rule_App_Tup
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr

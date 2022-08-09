@@ -17,6 +17,10 @@ inductive rule_PGt where
 inductive rule_App_Beta where
   rule_App_Beta: "rule_App_Beta (App (Lam e) v) (Def (Seq (Uni (Val (Var 0)) (Val (\<up>\<^sub>v 1 0 v))) e))"
 
+(* <vs>@v \<rightarrow> \<dots> *)
+inductive rule_App_Tup where
+  rule_App_Tup: "rule_App_Tup (App (Tup vs) v) (bars (map (\<lambda>(k, v'). Seq (Uni (Val v) (Val (Const i))) (Val v')) (enumerate 0 vs)))"
+
 (* v;e \<rightarrow> e *)
 inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq (Val v) e) e"
@@ -35,6 +39,7 @@ definition "ARs =
   rule_PAdd \<squnion>
   rule_PGt \<squnion>
   rule_App_Beta \<squnion>
+  rule_App_Tup \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

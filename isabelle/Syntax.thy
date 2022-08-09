@@ -24,6 +24,11 @@ and val =
 
 type_synonym red = "exp \<Rightarrow> exp \<Rightarrow> bool"
 
+section \<open>Smart constructors\<close>
 
+fun bars :: "exp list \<Rightarrow> exp" where
+  "bars [] = Fail"
+| "bars [x] = x"
+| "bars (x#xs) = Bar x (bars xs)"
 
 end

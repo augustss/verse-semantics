@@ -39,6 +39,11 @@ where
 | "occursV n (Lam e) \<longleftrightarrow> occursE (n+1) e"
 | "occursV n (Op op) \<longleftrightarrow> False"
 
+
+lemma occursE_bars[simp]:
+  "occursE n (bars es) \<longleftrightarrow> (\<exists> e \<in> set es. occursE n e)"
+by (induction es rule: bars.induct) auto
+
 lemma occursE_liftE: "occursE n (\<up>\<^sub>e k j e) \<longleftrightarrow>
     (if n < j then occursE n e else if n < j + k then False else  occursE (n - k) e)"
   and occursV_liftV: "occursV n (\<up>\<^sub>v k j v) \<longleftrightarrow>
