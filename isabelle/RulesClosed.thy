@@ -58,9 +58,8 @@ lemma rel_closed_rule_App_Beta: "rel_closed rule_App_Beta"
   by (auto intro!: rel_closed.intros elim!: rule_App_Beta.cases simp add: occursV_liftV)
 
 lemma rel_closed_rule_App_Tup: "rel_closed rule_App_Tup" 
-  apply (auto intro!: rel_closed.intros elim!: rule_App_Tup.cases simp add: in_set_enumerate_eq)
-  using nth_mem by blast
-
+  by (auto 4 4 intro!: rel_closed.intros elim!: rule_App_Tup.cases
+      simp add:  nth_enumerate_eq set_conv_nth )
 
 lemma rel_closed_rule_Seq: "rel_closed rule_Seq"
   by (auto intro!: rel_closed.intros elim!: rule_Seq.cases)
@@ -71,6 +70,12 @@ lemma rel_closed_rule_Unify_Seql: "rel_closed rule_Unify_Seql"
 lemma rel_closed_rule_Unify_Seqr: "rel_closed rule_Unify_Seqr"
   by (auto intro!: rel_closed.intros elim!: rule_Unify_Seqr.cases)
 
+lemma rel_closed_rule_ULit: "rel_closed rule_ULit"
+  by (auto intro!: rel_closed.intros elim!: rule_ULit.cases)
+
+lemma rel_closed_rule_UTup: "rel_closed rule_UTup"
+  by (auto 4 4 intro!: rel_closed.intros elim!: rule_UTup.cases in_set_zipE)
+
 
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
@@ -79,6 +84,8 @@ by (intro rel_closed_sup2
    rel_closed_rule_PGt
    rel_closed_rule_App_Beta
    rel_closed_rule_App_Tup
+   rel_closed_rule_ULit
+   rel_closed_rule_UTup
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr

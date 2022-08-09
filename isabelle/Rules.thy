@@ -33,6 +33,19 @@ inductive rule_Unify_Seql where
 inductive rule_Unify_Seqr where
   rule_Unify_Seqr: "rule_Unify_Seqr (Uni (Val v) (Seq e1 e2)) (Seq e1 (Uni (Val v) e2))"
 
+(* k1 = k2 \<rightarrow> \<dots> *)
+inductive rule_ULit  where
+  rule_ULit_eq: "k1 = k2 \<Longrightarrow> rule_ULit (Uni (Val (Const k1)) (Val (Const k2))) (Val (Const k1))"
+| rule_ULit_ne: "k1 \<noteq> k2 \<Longrightarrow> rule_ULit (Uni (Val (Const k1)) (Val (Const k2))) Fail"
+
+(* k1 = k2 \<rightarrow> \<dots> *)
+inductive rule_UTup where
+  rule_UTup: "length vs1 = length vs2 \<Longrightarrow>
+    rule_UTup (Uni (Val (Tup vs1)) (Val (Tup vs2)))
+              (seqs ((map2 (\<lambda> v1 v2. Uni (Val v1) (Val v2)) vs1 vs2) @ [Val (Tup vs1)]))"
+| rule_UTup_ne: "length vs1 \<noteq> length vs2 \<Longrightarrow> rule_UTup (Uni (Val (Tup vs1)) (Val (Tup vs2))) Fail"
+
+
 section \<open>All rules\<close>
 
 definition "ARs =
@@ -40,6 +53,8 @@ definition "ARs =
   rule_PGt \<squnion>
   rule_App_Beta \<squnion>
   rule_App_Tup \<squnion>
+  rule_ULit \<squnion>
+  rule_UTup \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

@@ -31,4 +31,10 @@ fun bars :: "exp list \<Rightarrow> exp" where
 | "bars [x] = x"
 | "bars (x#xs) = Bar x (bars xs)"
 
+fun seqs :: "exp list \<Rightarrow> exp" where
+  "seqs [] = Fail"
+| "seqs [x] = x"
+| "seqs (x#xs) = Seq x (seqs xs)"
+
+
 end
