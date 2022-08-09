@@ -6,6 +6,13 @@ session Verse = Nominal2 +
 *)
 
 session Verse = HOL +
-  theories
-    VerseDB
-    "U-E-confluence"
+theories
+  CCJoin
+  CongruenceClosure
+  Contexts
+  LocalConfluence
+  ParallelContexts
+  Rules
+  Subst
+  Syntax
+  "U-E-confluence"
