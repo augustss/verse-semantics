@@ -76,6 +76,8 @@ lemma rel_closed_rule_ULit: "rel_closed rule_ULit"
 lemma rel_closed_rule_UTup: "rel_closed rule_UTup"
   by (auto 4 4 intro!: rel_closed.intros elim!: rule_UTup.cases in_set_zipE)
 
+lemma rel_closed_rule_UX: "rel_closed rule_UX"
+  by (auto intro!: rel_closed.intros elim!: rule_UX.cases)
 
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
@@ -86,6 +88,7 @@ by (intro rel_closed_sup2
    rel_closed_rule_App_Tup
    rel_closed_rule_ULit
    rel_closed_rule_UTup
+   rel_closed_rule_UX
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr

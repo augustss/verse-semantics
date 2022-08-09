@@ -45,6 +45,21 @@ inductive rule_UTup where
               (seqs ((map2 (\<lambda> v1 v2. Uni (Val v1) (Val v2)) vs1 vs2) @ [Val (Tup vs1)]))"
 | rule_UTup_ne: "length vs1 \<noteq> length vs2 \<Longrightarrow> rule_UTup (Uni (Val (Tup vs1)) (Val (Tup vs2))) Fail"
 
+(* various failing unification rules *)
+inductive rule_UX where
+  rule_UX1: "rule_UX (Uni (Val (Const k)) (Val (Tup vs))) Fail"
+| rule_UX2: "rule_UX (Uni (Val (Tup vs)) (Val (Const k))) Fail"
+| rule_UX3C: "rule_UX (Uni (Val (Lam e)) (Val (Const k))) Fail"
+| rule_UX3T: "rule_UX (Uni (Val (Lam e)) (Val (Tup vs))) Fail"
+| rule_UX3O: "rule_UX (Uni (Val (Lam e)) (Val (Op op))) Fail"
+| rule_UX4C: "rule_UX (Uni (Val (Const k)) (Val (Lam e))) Fail"
+| rule_UX4T: "rule_UX (Uni (Val (Tup vs))  (Val (Lam e))) Fail"
+| rule_UX4O: "rule_UX (Uni (Val (Op op))   (Val (Lam e))) Fail"
+| rule_UX5C: "rule_UX (Uni (Val (Op op)) (Val (Const k))) Fail"
+| rule_UX5T: "rule_UX (Uni (Val (Op op)) (Val (Tup vs))) Fail"
+| rule_UX5O: "rule_UX (Uni (Val (Op op1))  (Val (Op op2))) Fail"
+| rule_UX6C: "rule_UX (Uni (Val (Const k)) (Val (Op op))) Fail"
+| rule_UX6T: "rule_UX (Uni (Val (Tup vs))  (Val (Op op))) Fail"
 
 section \<open>All rules\<close>
 
@@ -55,6 +70,7 @@ definition "ARs =
   rule_App_Tup \<squnion>
   rule_ULit \<squnion>
   rule_UTup \<squnion>
+  rule_UX \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"
