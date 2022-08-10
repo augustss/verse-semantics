@@ -49,17 +49,10 @@ inductive rule_UTup where
 inductive rule_UX where
   rule_UX1: "rule_UX (Uni (Val (Const k)) (Val (Tup vs))) Fail"
 | rule_UX2: "rule_UX (Uni (Val (Tup vs)) (Val (Const k))) Fail"
-| rule_UX3C: "rule_UX (Uni (Val (Lam e)) (Val (Const k))) Fail"
-| rule_UX3T: "rule_UX (Uni (Val (Lam e)) (Val (Tup vs))) Fail"
-| rule_UX3O: "rule_UX (Uni (Val (Lam e)) (Val (Op op))) Fail"
-| rule_UX4C: "rule_UX (Uni (Val (Const k)) (Val (Lam e))) Fail"
-| rule_UX4T: "rule_UX (Uni (Val (Tup vs))  (Val (Lam e))) Fail"
-| rule_UX4O: "rule_UX (Uni (Val (Op op))   (Val (Lam e))) Fail"
-| rule_UX5C: "rule_UX (Uni (Val (Op op)) (Val (Const k))) Fail"
-| rule_UX5T: "rule_UX (Uni (Val (Op op)) (Val (Tup vs))) Fail"
-| rule_UX5O: "rule_UX (Uni (Val (Op op1))  (Val (Op op2))) Fail"
-| rule_UX6C: "rule_UX (Uni (Val (Const k)) (Val (Op op))) Fail"
-| rule_UX6T: "rule_UX (Uni (Val (Tup vs))  (Val (Op op))) Fail"
+| rule_UX3: "isHNF v \<Longrightarrow> rule_UX (Uni (Val (Lam e)) (Val v)) Fail"
+| rule_UX4: "isHNF v \<Longrightarrow>rule_UX (Uni (Val v) (Val (Lam e))) Fail"
+| rule_UX5: "isHNF v \<Longrightarrow> rule_UX (Uni (Val (Op op)) (Val v)) Fail"
+| rule_UX6: "isHNF v \<Longrightarrow> rule_UX (Uni (Val v) (Val (Op op))) Fail"
 
 (* x = V[x] \<rightarrow> fail *)
 inductive rule_UXOccurs where
@@ -100,6 +93,8 @@ inductive rule_DefElimr where
       (Def (appEC (replicate n CDef) (appEC ec (Uni (Val v) (Val (Var n))))))
            (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
 
+inductive rule_Swap where
+  rule_SwapK: "isHNF v \<Longrightarrow> rule_Swap (Uni (Val v) (Val (Var n))) (Uni (Val (Var n)) (Val v))"
 
 section \<open>All rules\<close>
 
@@ -116,6 +111,7 @@ definition "ARs =
   rule_SubstRec \<squnion>
   rule_DefEliml \<squnion>
   rule_DefElimr \<squnion>
+  rule_Swap \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

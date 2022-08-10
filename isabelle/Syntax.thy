@@ -21,6 +21,12 @@ and val =
 | Lam exp
 | Op op
 
+inductive isHNF where
+  "isHNF (Const k)"
+| "isHNF (Tup vs)"
+| "isHNF (Lam e)"
+| "isHNF (Op op)"
+
 
 type_synonym red = "exp \<Rightarrow> exp \<Rightarrow> bool"
 

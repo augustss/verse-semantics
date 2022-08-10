@@ -100,6 +100,9 @@ lemma rel_closed_rule_DefElimr: "rel_closed rule_DefElimr"
   by (auto intro!: rel_closed.intros elim!: rule_DefElimr.cases
         simp add: occursE_liftE)
 
+lemma rel_closed_rule_Swap: "rel_closed rule_Swap"
+  by (auto intro!: rel_closed.intros elim!: rule_Swap.cases)
+
 
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
@@ -116,6 +119,7 @@ by (intro rel_closed_sup2
    rel_closed_rule_SubstRec
    rel_closed_rule_DefEliml
    rel_closed_rule_DefElimr
+   rel_closed_rule_Swap
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr
