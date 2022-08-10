@@ -6,6 +6,7 @@ session Verse = Nominal2 +
 *)
 
 session Verse = HOL +
-  theories
-    VerseDB
-    "U-E-confluence"
+theories
+  RulesClosed
+  LocalConfluence
+  "U-E-confluence"
