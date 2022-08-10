@@ -125,6 +125,22 @@ inductive rule_DefFail where
 inductive rule_Fail where
   rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
 
+(* one{fail} \<rightarrow> fail *)
+inductive rule_OneFail where
+  rule_OneFail: "rule_OneFail (One Fail) Fail"
+
+(* one{v | e} \<rightarrow> v *)
+inductive rule_OneChoice where
+  rule_OneChoice: "rule_OneChoice (One (Bar (Val v) e)) (Val v)"
+
+(* one{v} \<rightarrow> v *)
+inductive rule_OneValue where
+  rule_OneValue: "rule_OneValue (One (Val v)) (Val v)"
+
+(* all rules about all in one, using the bars helper *)
+inductive rule_All where
+  rule_All: "rule_All (All (bars (map Val vs))) (Val (Tup vs))"
+
 
 section \<open>All rules\<close>
 
@@ -149,7 +165,11 @@ definition "ARs =
   rule_Unify_Unifyl \<squnion>
   rule_Unify_Unifyr \<squnion>
   rule_DefFail \<squnion>
-  rule_Fail"
+  rule_OneFail \<squnion>
+  rule_OneChoice \<squnion>
+  rule_OneValue \<squnion>
+  rule_All
+"
 
 section \<open>The rules as used in the local confluence proof\<close>
 

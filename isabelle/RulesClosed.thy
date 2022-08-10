@@ -118,6 +118,18 @@ lemma rel_closed_rule_DefFail: "rel_closed rule_DefFail"
 lemma rel_closed_rule_Fail: "rel_closed rule_Fail"
   by (auto intro!: rel_closed.intros elim!: rule_Fail.cases)
 
+lemma rel_closed_rule_OneFail: "rel_closed rule_OneFail"
+  by (auto intro!: rel_closed.intros elim!: rule_OneFail.cases)
+
+lemma rel_closed_rule_OneChoice: "rel_closed rule_OneChoice"
+  by (auto intro!: rel_closed.intros elim!: rule_OneChoice.cases)
+
+lemma rel_closed_rule_OneValue: "rel_closed rule_OneValue"
+  by (auto intro!: rel_closed.intros elim!: rule_OneValue.cases)
+
+lemma rel_closed_rule_All: "rel_closed rule_All"
+  by (auto intro!: rel_closed.intros elim!: rule_All.cases)
+
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
 by (intro rel_closed_sup2
@@ -142,6 +154,10 @@ by (intro rel_closed_sup2
    rel_closed_rule_Unify_Unifyr
    rel_closed_rule_DefFail
    rel_closed_rule_Fail
+   rel_closed_rule_OneFail
+   rel_closed_rule_OneChoice
+   rel_closed_rule_OneValue
+   rel_closed_rule_All
 )
 
 
