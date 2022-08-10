@@ -112,9 +112,11 @@ lemma rel_closed_rule_Unify_Unifyl: "rel_closed rule_Unify_Unifyl"
 lemma rel_closed_rule_Unify_Unifyr: "rel_closed rule_Unify_Unifyr"
   by (auto intro!: rel_closed.intros elim!: rule_Unify_Unifyr.cases simp add: occursE_liftE)
 
+lemma rel_closed_rule_DefFail: "rel_closed rule_DefFail"
+  by (auto intro!: rel_closed.intros elim!: rule_DefFail.cases)
+
 lemma rel_closed_rule_Fail: "rel_closed rule_Fail"
   by (auto intro!: rel_closed.intros elim!: rule_Fail.cases)
-
 
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
@@ -138,6 +140,7 @@ by (intro rel_closed_sup2
    rel_closed_rule_Unify_Seqr
    rel_closed_rule_Unify_Unifyl
    rel_closed_rule_Unify_Unifyr
+   rel_closed_rule_DefFail
    rel_closed_rule_Fail
 )
 

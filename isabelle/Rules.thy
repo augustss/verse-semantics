@@ -89,10 +89,6 @@ inductive rule_Swap where
 inductive rule_DefFloat where
   rule_DefFloat: "isX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (liftEC 1 0 ec) e))"
 
-(* X[fail] \<rightarrow> fail *)
-inductive rule_Fail where
-  rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
-
 (* v;e \<rightarrow> e *)
 inductive rule_Seq where
   rule_Seq: "rule_Seq (Seq (Val v) e) e"
@@ -121,6 +117,14 @@ inductive rule_Unify_Unifyr where
          (Seq (Uni (Val (Var 0)) (liftE 1 0 e2))
               (Uni (Val (Var 0)) (liftE 1 0 e3)))))"
 
+(* \<exists>x. fail \<rightarrow> fail *)
+inductive rule_DefFail where
+  rule_DefFail: "rule_DefFail (Def Fail) Fail"
+
+(* X[fail] \<rightarrow> fail *)
+inductive rule_Fail where
+  rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
+
 
 section \<open>All rules\<close>
 
@@ -144,6 +148,7 @@ definition "ARs =
   rule_Unify_Seqr \<squnion>
   rule_Unify_Unifyl \<squnion>
   rule_Unify_Unifyr \<squnion>
+  rule_DefFail \<squnion>
   rule_Fail"
 
 section \<open>The rules as used in the local confluence proof\<close>
