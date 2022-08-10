@@ -18,6 +18,37 @@ lemma depthECE_isXE[simp]: "isXE ece \<Longrightarrow> depthECE ece = 0"
 lemma depthEC_isX[simp]: "isX ec \<Longrightarrow> depthEC ec = 0"
   by (induction ec) (auto simp add: isX_def depthEC_def)
 
+fun liftVCE :: "nat \<Rightarrow> vce \<Rightarrow> vce" where
+  "liftVCE n (CTup vs1 vs2) = CTup (map (liftV n 0) vs1) (map (liftV n 0) vs2)"
+
+definition liftVC :: "nat \<Rightarrow> vc \<Rightarrow> vc" where
+  "liftVC n vc = map (liftVCE n) vc"
+
+fun delVCE :: "nat \<Rightarrow> vce \<Rightarrow> vce" where
+  "delVCE n (CTup vs1 vs2) = CTup (map (delV n) vs1) (map (delV n) vs2)"
+
+definition delVC :: "nat \<Rightarrow> vc \<Rightarrow> vc" where
+  "delVC n vc = map (delVCE n) vc"
+
+fun delECE :: "nat \<Rightarrow> ece \<Rightarrow> ece" where
+  "delECE n (CVal vc) = CVal (delVC n vc)"
+| "delECE n CDef = CDef"
+| "delECE n (CAppl vc v2) = CAppl (delVC n vc) (delV n v2)"
+| "delECE n (CAppr v1 vc) = CAppr (delV n v1) (delVC n vc)"
+| "delECE n (CSeql e2) = CSeql (delE n e2)"
+| "delECE n (CSeqr e1) = CSeqr (delE n e1)"
+| "delECE n (CBarl e2) = CBarl (delE n e2)"
+| "delECE n (CBarr e1) = CBarr (delE n e1)"
+| "delECE n (CUnil e2) = CUnil (delE n e2)"
+| "delECE n (CUnir e1) = CUnir (delE n e1)"
+| "delECE n COne = COne"
+| "delECE n CAll = CAll"
+
+fun delEC :: "nat \<Rightarrow> ec \<Rightarrow> ec" where
+  "delEC n [] = []" 
+| "delEC n (ece#ec) = delECE n ece # delEC (depthECE ece + n) ec" 
+
+
 fun substVCE :: "nat \<Rightarrow> val \<Rightarrow> vce \<Rightarrow> vce" where
   "substVCE n v (CTup vs1 vs2) = CTup (map (substV n v) vs1) (map (substV n v) vs2)"
 
@@ -48,8 +79,8 @@ lemma depthECE_substECE[simp]: "depthECE (substECE n v ece) = depthECE ece"
 lemma depthEC_substEC[simp]: "depthEC (substEC n v ec) = depthEC ec"
   by (induction ec arbitrary: n v) (auto simp add: depthEC_def)
 
-
-definition "occursVCE n vce = occursV n (appVCE vce (Const 0))"
+fun occursVCE where
+  "occursVCE n (CTup vs1 vs2) \<longleftrightarrow> (\<exists> v \<in> set vs1. occursV n v) \<or>  (\<exists> v \<in> set vs2. occursV n v)"
 
 definition occursVC where "occursVC n vc \<longleftrightarrow> (\<exists> vce \<in> set vc. occursVCE n vce)"
 
@@ -67,7 +98,7 @@ fun occursEC where
 
 lemma occursV_appVCE[simp]:
   "occursV n (appVCE vce v) \<longleftrightarrow> occursV n v \<or> occursVCE n vce"
-  by (cases vce) (auto simp add: occursVCE_def)
+  by (cases vce) auto
 
 lemma occursE_appVC[simp]:
   "occursV n (appVC vc e) \<longleftrightarrow> occursE (1 + n) e \<or> occursVC n vc"
@@ -85,13 +116,19 @@ lemma occursE_appEC[simp]:
   apply (simp add: ab_semigroup_add_class.add_ac(1) add.commute)
   done
 
+lemma occursVCE_liftVCE[simp]: "occursVCE n (liftVCE k vce) \<longleftrightarrow>
+    (if n < k then False else occursVCE (n - k) vce)"
+  by (cases vce) (auto simp add: occursV_liftV)
+
+lemma occursVC_liftVC[simp]: "occursVC n (liftVC k vc) \<longleftrightarrow>
+    (if n < k then False else occursVC (n - k) vc)"
+ by (auto simp add: occursVC_def liftVC_def)
+
+
 lemma occursVCE_substVCE[simp]:
   "occursVCE i (substVCE n v vce) \<longleftrightarrow> 
   (i \<noteq> n \<and> occursVCE i vce) \<or> (occursVCE n vce \<and> occursV i v)"
-  apply (induction vce)
-  apply (auto simp add: occursVCE_def )
-  apply (meson Un_iff imageI occursV_substV)+
-  done
+by (cases vce) auto
 
 lemma occursVC_substVC[simp]:
   "occursVC i (substVC n v vc) \<longleftrightarrow> 
@@ -102,7 +139,6 @@ lemma occursECE_substECE[simp]:
   "occursECE i (substECE n v ece) \<longleftrightarrow> 
   (i \<noteq> n \<and> occursECE i ece) \<or> (occursECE n ece \<and> occursV i v)"
   by (cases ece) (auto simp add: occursECE_def)
-
 
 lemma occursEC_substEC[simp]:
   "occursEC i (substEC n v ec) \<longleftrightarrow> 

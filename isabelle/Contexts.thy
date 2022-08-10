@@ -128,4 +128,5 @@ inductive isXE :: "ece \<Rightarrow> bool" where
 definition isX :: "ec \<Rightarrow> bool" where
   "isX ec \<longleftrightarrow> (\<forall> ece \<in> set ec. isXE ece)"
 
+
 end

@@ -20,6 +20,26 @@ where
 | "\<up>\<^sub>v n k (Lam e) = Lam (\<up>\<^sub>e n (k+1) e)"
 | "\<up>\<^sub>v n k (Op op) = Op op"
 
+
+fun delE :: "nat \<Rightarrow> exp \<Rightarrow> exp"
+and delV :: "nat \<Rightarrow> val \<Rightarrow> val"
+where
+  "delE n (Val v) = Val (delV n v)"
+| "delE n(Seq e1 e2) = (Seq (delE n e1) (delE n e2))"
+| "delE n (Bar e1 e2) = (Bar (delE n e1) (delE n e2))"
+| "delE n (Uni e1 e2) = (Uni (delE n e1) (delE n e2))"
+| "delE n (App e1 e2) = (App (delV n e1) (delV n e2))"
+| "delE n (Def e) = Def (delE (Suc n) e)"
+| "delE n (One e) = (One (delE n e))"
+| "delE n (All e) = (All (delE n e))"
+| "delE n Fail = Fail"
+| "delV n (Var i) = Var (if i < n then i else i - 1)"
+| "delV n (Const c) = Const c"
+| "delV n (Tup vs) = Tup (map (delV n) vs)"
+| "delV n (Lam e) = Lam (delE (Suc n) e)"
+| "delV n (Op op) = Op op"
+
+
 fun substE :: "nat \<Rightarrow> val \<Rightarrow> exp \<Rightarrow> exp"
 and substV :: "nat \<Rightarrow> val \<Rightarrow> val \<Rightarrow> val"
 where

@@ -71,6 +71,35 @@ inductive rule_Subst where
       (appEC ec               (Uni (Val (Var n)) (Val v)))
       (appEC (substEC n v ec) (Uni (Val (Var n)) (Val v)))"
 
+(* x = V[\<lambda>z. e] \<rightarrow> x = V[\<lambda>z. \<exists>x. x = V[\<lambda>z. e]; e] *)
+(* This is hairy with de-Brujin-indices *)
+inductive rule_SubstRec where
+  rule_SubstRec: "occursE (n + 1) e \<Longrightarrow>
+      e1 = substE (n+2) (Var 1) (\<up>\<^sub>e 2 0 e) \<Longrightarrow>
+      rhs = Val (appVC (liftVC 2 vc) e1) \<Longrightarrow>
+      e2 = substE (n+1) (Var 0) (\<up>\<^sub>e 1 0 e) \<Longrightarrow>
+    rule_SubstRec
+      (Uni (Val (Var n)) (Val (appVC vc e)))
+      (Uni (Val (Var n)) (Val (appVC vc (Def (Seq (Uni (Val (Var 0)) rhs) e2)))))"
+
+inductive rule_DefEliml where
+  rule_DefEliml: "
+      isX ec \<Longrightarrow>
+      \<not> occursEC n ec \<Longrightarrow>
+      \<not> occursV n v \<Longrightarrow>
+    rule_DefEliml
+      (Def (appEC (replicate n CDef) (appEC ec (Uni (Val (Var n)) (Val v)))))
+           (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
+
+inductive rule_DefElimr where
+  rule_DefElimr: "
+      isX ec \<Longrightarrow>
+      \<not> occursEC n ec \<Longrightarrow>
+      \<not> occursV n v \<Longrightarrow>
+    rule_DefElimr
+      (Def (appEC (replicate n CDef) (appEC ec (Uni (Val v) (Val (Var n))))))
+           (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
+
 
 section \<open>All rules\<close>
 
@@ -84,6 +113,9 @@ definition "ARs =
   rule_UX \<squnion>
   rule_UXOccurs \<squnion>
   rule_Subst \<squnion>
+  rule_SubstRec \<squnion>
+  rule_DefEliml \<squnion>
+  rule_DefElimr \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

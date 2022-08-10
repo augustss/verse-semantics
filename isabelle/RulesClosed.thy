@@ -85,6 +85,36 @@ lemma rel_closed_rule_UXOccurs: "rel_closed rule_UXOccurs"
 lemma rel_closed_rule_Subst: "rel_closed rule_Subst"
   by (auto intro!: rel_closed.intros elim!: rule_Subst.cases)
 
+lemma rel_closed_rule_SubstRec: "rel_closed rule_SubstRec"
+  by (auto intro!: rel_closed.intros elim!: rule_SubstRec.cases
+        simp add: occursE_liftE)
+
+lemma depthEC_replicate[simp]: "depthEC (replicate n ece) = n * depthECE ece"
+  by (auto simp add: depthEC_def sum_list_replicate)
+
+lemma depthEC_delEC[simp]: "depthEC (delEC n ec) = depthEC ec"
+  sorry
+
+lemma occursV_delV[simp]: "\<not> occursV n v \<Longrightarrow>
+  occursV k (delV n v) = (if k < n then occursV k v else occursV (Suc k) v)"
+  sorry
+
+lemma occursEC_delEC[simp]: "\<not> occursEC n ec \<Longrightarrow>
+  occursEC k (delEC n ec) = (if k < n then occursEC k ec else occursEC (Suc k) ec)"
+  sorry
+
+lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
+  by (induction n arbitrary: k) (auto simp add: occursECE_def)
+
+lemma rel_closed_rule_DefEliml: "rel_closed rule_DefEliml"
+  by (auto intro!: rel_closed.intros elim!: rule_DefEliml.cases
+        simp add: occursE_liftE)
+
+lemma rel_closed_rule_DefElimr: "rel_closed rule_DefElimr"
+  by (auto intro!: rel_closed.intros elim!: rule_DefElimr.cases
+        simp add: occursE_liftE)
+
+
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
 by (intro rel_closed_sup2
@@ -97,6 +127,9 @@ by (intro rel_closed_sup2
    rel_closed_rule_UX
    rel_closed_rule_UXOccurs
    rel_closed_rule_Subst
+   rel_closed_rule_SubstRec
+   rel_closed_rule_DefEliml
+   rel_closed_rule_DefElimr
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr
