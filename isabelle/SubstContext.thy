@@ -152,17 +152,21 @@ lemma occursE_appEC[simp]:
   apply (simp add: ab_semigroup_add_class.add_ac(1) add.commute)
   done
 
-lemma occursVCE_liftVCE[simp]: "occursVCE n (liftVCE k 0 vce) \<longleftrightarrow>
-    (if n < k then False else occursVCE (n - k) vce)"
+lemma occursVCE_liftVCE[simp]: "occursVCE n (liftVCE k j vce) \<longleftrightarrow>
+    (if n < j then occursVCE n vce else if n < j + k then False else occursVCE (n - k) vce)"
   by (cases vce) (auto simp add: occursV_liftV)
 
-lemma occursVC_liftVC[simp]: "occursVC n (liftVC k 0 vc) \<longleftrightarrow>
-    (if n < k then False else occursVC (n - k) vc)"
+lemma occursVC_liftVC[simp]: "occursVC n (liftVC k j vc) \<longleftrightarrow>
+    (if n < j then occursVC n vc else if n < j + k then False else occursVC (n - k) vc)"
   by (auto simp add: occursVC_def liftVC_def)
+
+lemma occursECE_liftECE[simp]: "occursECE n (liftECE k j ece) \<longleftrightarrow>
+    (if n < j then occursECE n ece else if n < j + k then False else occursECE (n - k) ece)"
+  by (cases ece) (auto simp add: occursECE_def occursV_liftV occursE_liftE)
 
 lemma occursEC_liftEC[simp]: "occursEC n (liftEC k j ec) \<longleftrightarrow>
     (if n < j then occursEC n ec else if n < j + k then False else occursEC (n - k) ec)"
-  sorry
+ by (induction k j ec arbitrary: n rule: liftEC.induct) auto
 
 lemma occursVCE_delEC[simp]: "\<not> occursVCE n vce \<Longrightarrow>
   occursVCE k (delVCE n vce) = (if k < n then occursVCE k vce else occursVCE (Suc k) vce)"
