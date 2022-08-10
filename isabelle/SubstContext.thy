@@ -22,11 +22,35 @@ lemma depthEC_replicate[simp]: "depthEC (replicate n ece) = n * depthECE ece"
   by (auto simp add: depthEC_def sum_list_replicate)
 
 
-fun liftVCE :: "nat \<Rightarrow> vce \<Rightarrow> vce" where
-  "liftVCE n (CTup vs1 vs2) = CTup (map (liftV n 0) vs1) (map (liftV n 0) vs2)"
+fun liftVCE :: "nat \<Rightarrow> nat \<Rightarrow> vce \<Rightarrow> vce" where
+  "liftVCE n k (CTup vs1 vs2) = CTup (map (liftV n k) vs1) (map (liftV n k) vs2)"
 
-definition liftVC :: "nat \<Rightarrow> vc \<Rightarrow> vc" where
-  "liftVC n vc = map (liftVCE n) vc"
+definition liftVC :: "nat \<Rightarrow> nat \<Rightarrow> vc \<Rightarrow> vc" where
+  "liftVC n k vc = map (liftVCE n k) vc"
+
+fun liftECE :: "nat \<Rightarrow> nat \<Rightarrow> ece \<Rightarrow> ece" where
+  "liftECE n k (CVal vc) = CVal (liftVC n k vc)"
+| "liftECE n k CDef = CDef"
+| "liftECE n k (CAppl vc v2) = CAppl (liftVC n k vc) (liftV n k v2)"
+| "liftECE n k (CAppr v1 vc) = CAppr (liftV n k v1) (liftVC n k vc)"
+| "liftECE n k (CSeql e2) = CSeql (liftE n k e2)"
+| "liftECE n k (CSeqr e1) = CSeqr (liftE n k e1)"
+| "liftECE n k (CBarl e2) = CBarl (liftE n k e2)"
+| "liftECE n k (CBarr e1) = CBarr (liftE n k e1)"
+| "liftECE n k (CUnil e2) = CUnil (liftE n k e2)"
+| "liftECE n k (CUnir e1) = CUnir (liftE n k e1)"
+| "liftECE n k COne = COne"
+| "liftECE n k CAll = CAll"
+
+fun liftEC :: "nat \<Rightarrow> nat \<Rightarrow> ec \<Rightarrow> ec" where
+  "liftEC n k [] = []" 
+| "liftEC n k (ece#ec) = liftECE n k ece # liftEC n (depthECE ece + k) ec" 
+
+lemma depthECE_liftECE[simp]: "depthECE (liftECE n k ece) = depthECE ece"
+  by (cases ece) auto
+
+lemma depthEC_liftEC [simp]: "depthEC (liftEC n k ec) = depthEC ec"
+  by (induction n k ec rule: liftEC.induct) (auto simp add: depthEC_def)
 
 fun delVCE :: "nat \<Rightarrow> vce \<Rightarrow> vce" where
   "delVCE n (CTup vs1 vs2) = CTup (map (delV n) vs1) (map (delV n) vs2)"
@@ -107,6 +131,7 @@ fun occursEC where
   "occursEC n [] = False"
 | "occursEC n (ece # ec) \<longleftrightarrow> occursECE n ece \<or> occursEC (depthECE ece + n) ec"
 
+
 lemma occursV_appVCE[simp]:
   "occursV n (appVCE vce v) \<longleftrightarrow> occursV n v \<or> occursVCE n vce"
   by (cases vce) auto
@@ -127,13 +152,17 @@ lemma occursE_appEC[simp]:
   apply (simp add: ab_semigroup_add_class.add_ac(1) add.commute)
   done
 
-lemma occursVCE_liftVCE[simp]: "occursVCE n (liftVCE k vce) \<longleftrightarrow>
+lemma occursVCE_liftVCE[simp]: "occursVCE n (liftVCE k 0 vce) \<longleftrightarrow>
     (if n < k then False else occursVCE (n - k) vce)"
   by (cases vce) (auto simp add: occursV_liftV)
 
-lemma occursVC_liftVC[simp]: "occursVC n (liftVC k vc) \<longleftrightarrow>
+lemma occursVC_liftVC[simp]: "occursVC n (liftVC k 0 vc) \<longleftrightarrow>
     (if n < k then False else occursVC (n - k) vc)"
- by (auto simp add: occursVC_def liftVC_def)
+  by (auto simp add: occursVC_def liftVC_def)
+
+lemma occursEC_liftEC[simp]: "occursEC n (liftEC k j ec) \<longleftrightarrow>
+    (if n < j then occursEC n ec else if n < j + k then False else occursEC (n - k) ec)"
+  sorry
 
 lemma occursVCE_delEC[simp]: "\<not> occursVCE n vce \<Longrightarrow>
   occursVCE k (delVCE n vce) = (if k < n then occursVCE k vce else occursVCE (Suc k) vce)"

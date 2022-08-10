@@ -69,7 +69,7 @@ inductive rule_Subst where
 inductive rule_SubstRec where
   rule_SubstRec: "occursE (n + 1) e \<Longrightarrow>
       e1 = substE (n+2) (Var 1) (\<up>\<^sub>e 2 0 e) \<Longrightarrow>
-      rhs = Val (appVC (liftVC 2 vc) e1) \<Longrightarrow>
+      rhs = Val (appVC (liftVC 2 0 vc) e1) \<Longrightarrow>
       e2 = substE (n+1) (Var 0) (\<up>\<^sub>e 1 0 e) \<Longrightarrow>
     rule_SubstRec
       (Uni (Val (Var n)) (Val (appVC vc e)))
@@ -93,8 +93,13 @@ inductive rule_DefElimr where
       (Def (appEC (replicate n CDef) (appEC ec (Uni (Val v) (Val (Var n))))))
            (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
 
+(* hnf = x \<rightarrow> x = hnf *)
 inductive rule_Swap where
   rule_SwapK: "isHNF v \<Longrightarrow> rule_Swap (Uni (Val v) (Val (Var n))) (Uni (Val (Var n)) (Val v))"
+
+(* X[\<exists>x.e] \<rightarrow> \<exists>x. X[e] *)
+inductive rule_DefFloat where
+  rule_DefFloat: "isX ec \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (liftEC 1 0 ec) e))"
 
 section \<open>All rules\<close>
 
@@ -112,6 +117,7 @@ definition "ARs =
   rule_DefEliml \<squnion>
   rule_DefElimr \<squnion>
   rule_Swap \<squnion>
+  rule_DefFloat \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"
