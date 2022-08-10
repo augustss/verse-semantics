@@ -18,6 +18,10 @@ lemma depthECE_isXE[simp]: "isXE ece \<Longrightarrow> depthECE ece = 0"
 lemma depthEC_isX[simp]: "isX ec \<Longrightarrow> depthEC ec = 0"
   by (induction ec) (auto simp add: isX_def depthEC_def)
 
+lemma depthEC_replicate[simp]: "depthEC (replicate n ece) = n * depthECE ece"
+  by (auto simp add: depthEC_def sum_list_replicate)
+
+
 fun liftVCE :: "nat \<Rightarrow> vce \<Rightarrow> vce" where
   "liftVCE n (CTup vs1 vs2) = CTup (map (liftV n 0) vs1) (map (liftV n 0) vs2)"
 
@@ -47,6 +51,13 @@ fun delECE :: "nat \<Rightarrow> ece \<Rightarrow> ece" where
 fun delEC :: "nat \<Rightarrow> ec \<Rightarrow> ec" where
   "delEC n [] = []" 
 | "delEC n (ece#ec) = delECE n ece # delEC (depthECE ece + n) ec" 
+
+
+lemma depthECE_delECE[simp]: "depthECE (delECE n ece) = depthECE ece"
+  by (induction ece) auto
+
+lemma depthEC_delEC[simp]: "depthEC (delEC n ec) = depthEC ec"
+  by (induction n ec rule: delEC.induct) (auto simp add: depthEC_def)
 
 
 fun substVCE :: "nat \<Rightarrow> val \<Rightarrow> vce \<Rightarrow> vce" where
@@ -124,6 +135,21 @@ lemma occursVC_liftVC[simp]: "occursVC n (liftVC k vc) \<longleftrightarrow>
     (if n < k then False else occursVC (n - k) vc)"
  by (auto simp add: occursVC_def liftVC_def)
 
+lemma occursVCE_delEC[simp]: "\<not> occursVCE n vce \<Longrightarrow>
+  occursVCE k (delVCE n vce) = (if k < n then occursVCE k vce else occursVCE (Suc k) vce)"
+  by (cases vce) auto
+
+lemma occursVC_delVC[simp]: "\<not> occursVC n vc \<Longrightarrow>
+  occursVC k (delVC n vc) = (if k < n then occursVC k vc else occursVC (Suc k) vc)"
+ by (auto simp add: occursVC_def delVC_def)
+
+lemma occursECE_delEC[simp]: "\<not> occursECE n ece \<Longrightarrow>
+  occursECE k (delECE n ece) = (if k < n then occursECE k ece else occursECE (Suc k) ece)"
+ by (cases ece) (auto simp add: occursECE_def)
+
+lemma occursEC_delEC[simp]: "\<not> occursEC n ec \<Longrightarrow>
+  occursEC k (delEC n ec) = (if k < n then occursEC k ec else occursEC (Suc k) ec)"
+ by (induction n ec arbitrary: k rule: delEC.induct) auto
 
 lemma occursVCE_substVCE[simp]:
   "occursVCE i (substVCE n v vce) \<longleftrightarrow> 

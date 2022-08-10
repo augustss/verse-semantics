@@ -93,6 +93,12 @@ lemma occursE_liftE: "occursE n (\<up>\<^sub>e k j e) \<longleftrightarrow>
   by (induction k j e and k j v arbitrary: n and n rule: liftE_liftV.induct)
      (auto simp add: Suc_diff_le)
 
+lemma occursE_delE[simp]: "\<not> occursE n e \<Longrightarrow>
+  occursE k (delE n e) = (if k < n then occursE k e else occursE (Suc k) e)"
+and occursV_delV[simp]: "\<not> occursV n v \<Longrightarrow>
+  occursV k (delV n v) = (if k < n then occursV k v else occursV (Suc k) v)"
+  by (induction n e and n v arbitrary: k and k rule: delE_delV.induct) auto
+
 lemma occursE_substE[simp]:
   "occursE i (substE n v e) \<longleftrightarrow> 
   (i \<noteq> n \<and> occursE i e) \<or> (occursE n e \<and> occursV i v)"

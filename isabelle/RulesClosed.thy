@@ -89,20 +89,6 @@ lemma rel_closed_rule_SubstRec: "rel_closed rule_SubstRec"
   by (auto intro!: rel_closed.intros elim!: rule_SubstRec.cases
         simp add: occursE_liftE)
 
-lemma depthEC_replicate[simp]: "depthEC (replicate n ece) = n * depthECE ece"
-  by (auto simp add: depthEC_def sum_list_replicate)
-
-lemma depthEC_delEC[simp]: "depthEC (delEC n ec) = depthEC ec"
-  sorry
-
-lemma occursV_delV[simp]: "\<not> occursV n v \<Longrightarrow>
-  occursV k (delV n v) = (if k < n then occursV k v else occursV (Suc k) v)"
-  sorry
-
-lemma occursEC_delEC[simp]: "\<not> occursEC n ec \<Longrightarrow>
-  occursEC k (delEC n ec) = (if k < n then occursEC k ec else occursEC (Suc k) ec)"
-  sorry
-
 lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
   by (induction n arbitrary: k) (auto simp add: occursECE_def)
 
