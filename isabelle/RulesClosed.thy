@@ -79,6 +79,12 @@ lemma rel_closed_rule_UTup: "rel_closed rule_UTup"
 lemma rel_closed_rule_UX: "rel_closed rule_UX"
   by (auto intro!: rel_closed.intros elim!: rule_UX.cases)
 
+lemma rel_closed_rule_UXOccurs: "rel_closed rule_UXOccurs"
+  by (auto intro!: rel_closed.intros elim!: rule_UXOccurs.cases)
+
+lemma rel_closed_rule_Subst: "rel_closed rule_Subst"
+  by (auto intro!: rel_closed.intros elim!: rule_Subst.cases)
+
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
 by (intro rel_closed_sup2
@@ -89,6 +95,8 @@ by (intro rel_closed_sup2
    rel_closed_rule_ULit
    rel_closed_rule_UTup
    rel_closed_rule_UX
+   rel_closed_rule_UXOccurs
+   rel_closed_rule_Subst
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr

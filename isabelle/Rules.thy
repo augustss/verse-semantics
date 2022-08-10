@@ -1,5 +1,5 @@
 theory Rules
-  imports Syntax CongruenceClosure Subst
+  imports Syntax CongruenceClosure SubstContext
 begin
 
 section \<open>The actual rules\<close>
@@ -61,6 +61,17 @@ inductive rule_UX where
 | rule_UX6C: "rule_UX (Uni (Val (Const k)) (Val (Op op))) Fail"
 | rule_UX6T: "rule_UX (Uni (Val (Tup vs))  (Val (Op op))) Fail"
 
+(* x = V[x] \<rightarrow> fail *)
+inductive rule_UXOccurs where
+  rule_UXOccurs: "rule_UXOccurs (Uni (Val (Var n)) (Val (appVC' vc (Var n)))) Fail"
+
+(* X[x = v] \<rightarrow> X{v/x}[x = v] *)
+inductive rule_Subst where
+  rule_Subst: "isX ec \<Longrightarrow> rule_Subst
+      (appEC ec               (Uni (Val (Var n)) (Val v)))
+      (appEC (substEC n v ec) (Uni (Val (Var n)) (Val v)))"
+
+
 section \<open>All rules\<close>
 
 definition "ARs =
@@ -71,6 +82,8 @@ definition "ARs =
   rule_ULit \<squnion>
   rule_UTup \<squnion>
   rule_UX \<squnion>
+  rule_UXOccurs \<squnion>
+  rule_Subst \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

@@ -119,5 +119,13 @@ lemma All_eq_appECE_simp[simp]:
   "(All e = appECE ece c) \<longleftrightarrow> (ece = CAll \<and> c = e)"
   by (cases ece) auto
 
+inductive isXE :: "ece \<Rightarrow> bool" where
+  "isXE (CSeql e2)"
+| "isXE (CSeqr e1)"
+| "isXE (CUnil e2)"
+| "isXE (CUnir e1)"
+
+definition isX :: "ec \<Rightarrow> bool" where
+  "isX ec \<longleftrightarrow> (\<forall> ece \<in> set ec. isXE ece)"
 
 end

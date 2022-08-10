@@ -20,6 +20,24 @@ where
 | "\<up>\<^sub>v n k (Lam e) = Lam (\<up>\<^sub>e n (k+1) e)"
 | "\<up>\<^sub>v n k (Op op) = Op op"
 
+fun substE :: "nat \<Rightarrow> val \<Rightarrow> exp \<Rightarrow> exp"
+and substV :: "nat \<Rightarrow> val \<Rightarrow> val \<Rightarrow> val"
+where
+  "substE n v (Val v1) = Val (substV n v v1)"
+| "substE n v (Seq e1 e2) = Seq (substE n v e1) (substE n v e2)"
+| "substE n v (Bar e1 e2) = Bar (substE n v e1) (substE n v e2)"
+| "substE n v (Uni e1 e2) = Uni (substE n v e1) (substE n v e2)"
+| "substE n v (App v1 v2) = App (substV n v v1) (substV n v v2)"
+| "substE n v (Def e) = Def (substE (n+1) (\<up>\<^sub>v 1 0 v) e)"
+| "substE n v (One e) = One (substE n v e)"
+| "substE n v (All e) = All (substE n v e)"
+| "substE n v Fail = Fail"
+| "substV n v (Var i) = (if i = n then v else Var i)"
+| "substV n v (Const k) = Const k"
+| "substV n v (Tup vs) = Tup (map (substV n v) vs)"
+| "substV n v (Lam e) = Lam (substE (n+1) (\<up>\<^sub>v 1 0 v) e)"
+| "substV n v (Op k) = Op k"
+
 
 fun occursE :: "nat \<Rightarrow> exp \<Rightarrow> bool"
 and occursV :: "nat \<Rightarrow> val \<Rightarrow> bool"
@@ -54,5 +72,14 @@ lemma occursE_liftE: "occursE n (\<up>\<^sub>e k j e) \<longleftrightarrow>
     (if n < j then occursV n v else if n < j + k then False else  occursV (n - k) v)"
   by (induction k j e and k j v arbitrary: n and n rule: liftE_liftV.induct)
      (auto simp add: Suc_diff_le)
+
+lemma occursE_substE[simp]:
+  "occursE i (substE n v e) \<longleftrightarrow> 
+  (i \<noteq> n \<and> occursE i e) \<or> (occursE n e \<and> occursV i v)"
+and occursV_substV[simp]:
+  "occursV i (substV n v v') \<longleftrightarrow> 
+  (i \<noteq> n \<and> occursV i v') \<or> (occursV n v' \<and> occursV i v)"
+  by (induction n v e and n v v' arbitrary: i and i rule: substE_substV.induct)
+     (auto simp add: occursV_liftV)
   
 end
