@@ -141,6 +141,19 @@ inductive rule_OneValue where
 inductive rule_All where
   rule_All: "rule_All (All (bars (map Val vs))) (Val (Tup vs))"
 
+inductive rule_FailL where
+  rule_FailL: "isSXE ece \<Longrightarrow> rule_FailL (appECE ece (Bar Fail e)) (appECE ece Fail)"
+
+inductive rule_FailR where
+  rule_FailR: "isSXE ece \<Longrightarrow> rule_FailR (appECE ece (Bar e Fail)) (appECE ece Fail)"
+
+inductive rule_AssocChoice where
+  rule_AssocChoice: "isSXE ece \<Longrightarrow>
+  rule_AssocChoice (appECE ece (Bar (Bar e1 e2) e3)) (appECE ece (Bar e1 (Bar e2 e3)))"
+
+inductive rule_Choose where
+  rule_Choose: "isSXE ece \<Longrightarrow> isCX ec \<Longrightarrow>
+  rule_Choose (appECE ece (appEC ec (Bar e1 e2))) (appECE ece (Bar (appEC ec e1) (appEC ec e2)))"
 
 section \<open>All rules\<close>
 
@@ -168,7 +181,11 @@ definition "ARs =
   rule_OneFail \<squnion>
   rule_OneChoice \<squnion>
   rule_OneValue \<squnion>
-  rule_All
+  rule_All \<squnion>
+  rule_FailL \<squnion>
+  rule_FailR \<squnion>
+  rule_AssocChoice \<squnion>
+  rule_Choose
 "
 
 section \<open>The rules as used in the local confluence proof\<close>

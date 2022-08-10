@@ -130,6 +130,18 @@ lemma rel_closed_rule_OneValue: "rel_closed rule_OneValue"
 lemma rel_closed_rule_All: "rel_closed rule_All"
   by (auto intro!: rel_closed.intros elim!: rule_All.cases)
 
+lemma rel_closed_rule_FailL: "rel_closed rule_FailL"
+  by (auto intro!: rel_closed.intros elim!: rule_FailL.cases)
+
+lemma rel_closed_rule_FailR: "rel_closed rule_FailR"
+  by (auto intro!: rel_closed.intros elim!: rule_FailR.cases)
+
+lemma rel_closed_rule_AssocChoice: "rel_closed rule_AssocChoice"
+  by (auto intro!: rel_closed.intros elim!: rule_AssocChoice.cases)
+
+lemma rel_closed_rule_Choose: "rel_closed rule_Choose"
+  by (auto intro!: rel_closed.intros elim!: rule_Choose.cases)
+
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
 by (intro rel_closed_sup2
@@ -158,6 +170,10 @@ by (intro rel_closed_sup2
    rel_closed_rule_OneChoice
    rel_closed_rule_OneValue
    rel_closed_rule_All
+   rel_closed_rule_FailL
+   rel_closed_rule_FailR
+   rel_closed_rule_AssocChoice
+   rel_closed_rule_Choose
 )
 
 

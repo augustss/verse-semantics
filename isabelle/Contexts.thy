@@ -128,5 +128,28 @@ inductive isXE :: "ece \<Rightarrow> bool" where
 definition isX :: "ec \<Rightarrow> bool" where
   "isX ec \<longleftrightarrow> (\<forall> ece \<in> set ec. isXE ece)"
 
+inductive isChoiceFree :: "exp \<Rightarrow> bool" where
+  "isChoiceFree (Val v)"
+| "isChoiceFree e1 \<Longrightarrow> isChoiceFree e2 \<Longrightarrow> isChoiceFree (Uni e1 e2)"
+| "isChoiceFree e1 \<Longrightarrow> isChoiceFree e2 \<Longrightarrow> isChoiceFree (Seq e1 e2)"
+| "isChoiceFree (One e)"
+| "isChoiceFree (All e)"
+
+inductive isCXE :: "ece \<Rightarrow> bool" where
+  "isCXE (CSeql e2)"
+| "isChoiceFree e1 \<Longrightarrow> isCXE (CSeqr e1)"
+| "isCXE (CUnil e2)"
+| "isChoiceFree e1 \<Longrightarrow> isCXE (CUnir e1)"
+| "isCXE CDef"
+
+definition isCX :: "ec \<Rightarrow> bool" where
+  "isCX ec \<longleftrightarrow> (\<forall> ece \<in> set ec. isCXE ece)"
+
+inductive isSXE :: "ece \<Rightarrow> bool" where
+  "isSXE (CBarl e2)"
+| "isSXE (CBarr e1)"
+| "isSXE COne"
+| "isSXE CAll"
+
 
 end
