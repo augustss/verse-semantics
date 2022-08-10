@@ -61,15 +61,6 @@ lemma rel_closed_rule_App_Tup: "rel_closed rule_App_Tup"
   by (auto 4 4 intro!: rel_closed.intros elim!: rule_App_Tup.cases
       simp add:  nth_enumerate_eq set_conv_nth )
 
-lemma rel_closed_rule_Seq: "rel_closed rule_Seq"
-  by (auto intro!: rel_closed.intros elim!: rule_Seq.cases)
-
-lemma rel_closed_rule_Unify_Seql: "rel_closed rule_Unify_Seql"
-  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seql.cases)
-
-lemma rel_closed_rule_Unify_Seqr: "rel_closed rule_Unify_Seqr"
-  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seqr.cases)
-
 lemma rel_closed_rule_ULit: "rel_closed rule_ULit"
   by (auto intro!: rel_closed.intros elim!: rule_ULit.cases)
 
@@ -106,6 +97,21 @@ lemma rel_closed_rule_Swap: "rel_closed rule_Swap"
 lemma rel_closed_rule_DefFloat: "rel_closed rule_DefFloat"
   by (auto intro!: rel_closed.intros elim!: rule_DefFloat.cases)
 
+lemma rel_closed_rule_Seq: "rel_closed rule_Seq"
+  by (auto intro!: rel_closed.intros elim!: rule_Seq.cases)
+
+lemma rel_closed_rule_Unify_Seql: "rel_closed rule_Unify_Seql"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seql.cases)
+
+lemma rel_closed_rule_Unify_Seqr: "rel_closed rule_Unify_Seqr"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Seqr.cases)
+
+lemma rel_closed_rule_Unify_Unifyl: "rel_closed rule_Unify_Unifyl"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Unifyl.cases simp add: occursE_liftE)
+
+lemma rel_closed_rule_Unify_Unifyr: "rel_closed rule_Unify_Unifyr"
+  by (auto intro!: rel_closed.intros elim!: rule_Unify_Unifyr.cases simp add: occursE_liftE)
+
 lemma rel_closed_rule_Fail: "rel_closed rule_Fail"
   by (auto intro!: rel_closed.intros elim!: rule_Fail.cases)
 
@@ -127,11 +133,12 @@ by (intro rel_closed_sup2
    rel_closed_rule_DefElimr
    rel_closed_rule_Swap
    rel_closed_rule_DefFloat
-   rel_closed_rule_Fail
-
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr
+   rel_closed_rule_Unify_Unifyl
+   rel_closed_rule_Unify_Unifyr
+   rel_closed_rule_Fail
 )
 
 

@@ -21,18 +21,6 @@ inductive rule_App_Beta where
 inductive rule_App_Tup where
   rule_App_Tup: "rule_App_Tup (App (Tup vs) v) (bars (map (\<lambda>(k, v'). Seq (Uni (Val v) (Val (Const i))) (Val v')) (enumerate 0 vs)))"
 
-(* v;e \<rightarrow> e *)
-inductive rule_Seq where
-  rule_Seq: "rule_Seq (Seq (Val v) e) e"
-
-(* (e1;e2) = e3 \<rightarrow> e1 ; (e2=e3) *)
-inductive rule_Unify_Seql where
-  rule_Unify_Seql: "rule_Unify_Seql (Uni (Seq e1 e2) e3) (Seq e1 (Uni e2 e3))"
-
-(* v = (e1;e2) \<rightarrow> e1 ; (v=e2) *)
-inductive rule_Unify_Seqr where
-  rule_Unify_Seqr: "rule_Unify_Seqr (Uni (Val v) (Seq e1 e2)) (Seq e1 (Uni (Val v) e2))"
-
 (* k1 = k2 \<rightarrow> \<dots> *)
 inductive rule_ULit  where
   rule_ULit_eq: "k1 = k2 \<Longrightarrow> rule_ULit (Uni (Val (Const k1)) (Val (Const k2))) (Val (Const k1))"
@@ -105,6 +93,34 @@ inductive rule_DefFloat where
 inductive rule_Fail where
   rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
 
+(* v;e \<rightarrow> e *)
+inductive rule_Seq where
+  rule_Seq: "rule_Seq (Seq (Val v) e) e"
+
+(* (e1;e2) = e3 \<rightarrow> e1 ; (e2=e3) *)
+inductive rule_Unify_Seql where
+  rule_Unify_Seql: "rule_Unify_Seql (Uni (Seq e1 e2) e3) (Seq e1 (Uni e2 e3))"
+
+(* v = (e1;e2) \<rightarrow> e1 ; (v=e2) *)
+inductive rule_Unify_Seqr where
+  rule_Unify_Seqr: "rule_Unify_Seqr (Uni (Val v) (Seq e1 e2)) (Seq e1 (Uni (Val v) e2))"
+
+(* (e1 = e2) = e3 \<rightarrow> \<exists> x. x = e1; x = e2; x = e3 *)
+inductive rule_Unify_Unifyl where
+  rule_Unify_Unifyl: "rule_Unify_Unifyl
+    (Uni (Uni e1 e2) e3)
+    (Def (Seq (Uni (Val (Var 0)) (liftE 1 0 e1))
+         (Seq (Uni (Val (Var 0)) (liftE 1 0 e2))
+              (Uni (Val (Var 0)) (liftE 1 0 e3)))))"
+
+(* e1 = (e2 = e3) \<rightarrow> \<exists> x. x = e1; x = e2; x = e3 *)
+inductive rule_Unify_Unifyr where
+  rule_Unify_Unifyr: "rule_Unify_Unifyr
+    (Uni e1 (Uni e2 e3))
+    (Def (Seq (Uni (Val (Var 0)) (liftE 1 0 e1))
+         (Seq (Uni (Val (Var 0)) (liftE 1 0 e2))
+              (Uni (Val (Var 0)) (liftE 1 0 e3)))))"
+
 
 section \<open>All rules\<close>
 
@@ -123,10 +139,12 @@ definition "ARs =
   rule_DefElimr \<squnion>
   rule_Swap \<squnion>
   rule_DefFloat \<squnion>
-  rule_Fail \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
-  rule_Unify_Seqr"
+  rule_Unify_Seqr \<squnion>
+  rule_Unify_Unifyl \<squnion>
+  rule_Unify_Unifyr \<squnion>
+  rule_Fail"
 
 section \<open>The rules as used in the local confluence proof\<close>
 
