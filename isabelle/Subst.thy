@@ -20,6 +20,10 @@ where
 | "\<up>\<^sub>v n k (Lam e) = Lam (\<up>\<^sub>e n (k+1) e)"
 | "\<up>\<^sub>v n k (Op op) = Op op"
 
+lemma liftV_eq_Var[simp]:
+    "(\<up>\<^sub>v n k v = Var i) \<longleftrightarrow> (\<exists> l. (v = Var l \<and> i = (if l < k then l else l + n)))"
+  by (cases v) auto
+
 
 fun delE :: "nat \<Rightarrow> exp \<Rightarrow> exp"
 and delV :: "nat \<Rightarrow> val \<Rightarrow> val"

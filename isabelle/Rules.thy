@@ -48,7 +48,7 @@ inductive rule_UXOccurs where
 
 (* X[x = v] \<rightarrow> X{v/x}[x = v] *)
 inductive rule_Subst where
-  rule_Subst: "isX ec \<Longrightarrow> rule_Subst
+  rule_Subst: "isX ec \<Longrightarrow> occursEC n ec \<Longrightarrow> \<not> occursV n v \<Longrightarrow> rule_Subst
       (appEC ec               (Uni (Val (Var n)) (Val v)))
       (appEC (substEC n v ec) (Uni (Val (Var n)) (Val v)))"
 

@@ -8,5 +8,6 @@ session Verse = Nominal2 +
 session Verse = HOL +
 theories
   RulesClosed
+  RulesNonTrivial
   LocalConfluence
   "U-E-confluence"
