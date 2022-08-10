@@ -38,13 +38,13 @@ inductive rule_UX where
   rule_UX1: "rule_UX (Uni (Val (Const k)) (Val (Tup vs))) Fail"
 | rule_UX2: "rule_UX (Uni (Val (Tup vs)) (Val (Const k))) Fail"
 | rule_UX3: "isHNF v \<Longrightarrow> rule_UX (Uni (Val (Lam e)) (Val v)) Fail"
-| rule_UX4: "isHNF v \<Longrightarrow>rule_UX (Uni (Val v) (Val (Lam e))) Fail"
+| rule_UX4: "isHNF v \<Longrightarrow> rule_UX (Uni (Val v) (Val (Lam e))) Fail"
 | rule_UX5: "isHNF v \<Longrightarrow> rule_UX (Uni (Val (Op op)) (Val v)) Fail"
 | rule_UX6: "isHNF v \<Longrightarrow> rule_UX (Uni (Val v) (Val (Op op))) Fail"
 
 (* x = V[x] \<rightarrow> fail *)
 inductive rule_UXOccurs where
-  rule_UXOccurs: "rule_UXOccurs (Uni (Val (Var n)) (Val (appVC' vc (Var n)))) Fail"
+  rule_UXOccurs: "vc \<noteq> [] \<Longrightarrow> rule_UXOccurs (Uni (Val (Var n)) (Val (appVC' vc (Var n)))) Fail"
 
 (* X[x = v] \<rightarrow> X{v/x}[x = v] *)
 inductive rule_Subst where
@@ -152,7 +152,7 @@ inductive rule_AssocChoice where
   rule_AssocChoice (appECE ece (Bar (Bar e1 e2) e3)) (appECE ece (Bar e1 (Bar e2 e3)))"
 
 inductive rule_Choose where
-  rule_Choose: "isSXE ece \<Longrightarrow> isCX ec \<Longrightarrow>
+  rule_Choose: "isSXE ece \<Longrightarrow> isCX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow>
   rule_Choose (appECE ece (appEC ec (Bar e1 e2))) (appECE ece (Bar (appEC ec e1) (appEC ec e2)))"
 
 section \<open>All rules\<close>
