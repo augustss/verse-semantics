@@ -99,7 +99,12 @@ inductive rule_Swap where
 
 (* X[\<exists>x.e] \<rightarrow> \<exists>x. X[e] *)
 inductive rule_DefFloat where
-  rule_DefFloat: "isX ec \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (liftEC 1 0 ec) e))"
+  rule_DefFloat: "isX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (liftEC 1 0 ec) e))"
+
+(* X[fail] \<rightarrow> fail *)
+inductive rule_Fail where
+  rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
+
 
 section \<open>All rules\<close>
 
@@ -118,6 +123,7 @@ definition "ARs =
   rule_DefElimr \<squnion>
   rule_Swap \<squnion>
   rule_DefFloat \<squnion>
+  rule_Fail \<squnion>
   rule_Seq \<squnion>
   rule_Unify_Seql \<squnion>
   rule_Unify_Seqr"

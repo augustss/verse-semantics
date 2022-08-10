@@ -106,6 +106,10 @@ lemma rel_closed_rule_Swap: "rel_closed rule_Swap"
 lemma rel_closed_rule_DefFloat: "rel_closed rule_DefFloat"
   by (auto intro!: rel_closed.intros elim!: rule_DefFloat.cases)
 
+lemma rel_closed_rule_Fail: "rel_closed rule_Fail"
+  by (auto intro!: rel_closed.intros elim!: rule_Fail.cases)
+
+
 theorem ARs_closed: "rel_closed ARs"
 unfolding ARs_def
 by (intro rel_closed_sup2
@@ -123,6 +127,8 @@ by (intro rel_closed_sup2
    rel_closed_rule_DefElimr
    rel_closed_rule_Swap
    rel_closed_rule_DefFloat
+   rel_closed_rule_Fail
+
    rel_closed_rule_Seq
    rel_closed_rule_Unify_Seql
    rel_closed_rule_Unify_Seqr
