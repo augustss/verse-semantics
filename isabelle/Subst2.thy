@@ -85,6 +85,56 @@ proof-
   finally show ?thesis.
 qed
 
+lemma renumber_congr:
+  fixes x :: "'a::has_vars"
+  assumes "unused S x"
+  assumes "\<And> x. x \<notin> S \<Longrightarrow> f x = g x"
+  shows "renumber f x = renumber g x"
+  using assms(1) unfolding renumber_def
+  by (rule bind_congr) (simp add: assms(2))
+
+(* The set of unused sets form an ideal *)
+lemma unused_empty:
+  fixes x :: "'a::has_vars"
+  shows "unused {} x"
+ unfolding unused_def..
+
+lemma unused_subset:
+  fixes x :: "'a::has_vars"
+  assumes "unused S1 x"
+  assumes "S2 \<subseteq> S1"
+  shows "unused S2 x"
+  using assms(2)
+  by (auto intro!: renumber_congr[OF assms(1)] simp add: bumpsAt_def unused_def)
+
+lemma unused_union:
+  fixes x :: "'a::has_vars"
+  assumes "unused S1 x"
+  assumes "unused S2 x"
+  shows "unused (S1 \<union> S2) x"
+proof-
+  have "renumber (bumpsAt (S1 \<union> S2)) x = renumber (bumpsAt S2) x"
+    by (rule renumber_congr[OF assms(1)]) (auto simp add: bumpsAt_def)
+  also have "\<dots> = renumber (bumpsAt {}) x"
+    by (rule renumber_congr[OF assms(2)]) (auto simp add: bumpsAt_def)
+  finally show ?thesis unfolding unused_def.
+qed
+
+(* But it is unclear how to go to the arbitrary union! *)
+
+definition unuseds :: "'a :: has_bind \<Rightarrow> nat set" where
+  "unuseds x = Union { S. unused S x}"
+
+lemma unused_unuseds:
+  fixes x :: "'a::has_vars"
+  shows "unused (unuseds x) x"
+  sorry
+
+(* Can this be shown? Infinite unions are hard!
+
+Probably it does not hold.
+*)
+
 definition fvs :: "'a :: has_bind \<Rightarrow> nat set" where
   "fvs x = { n. \<forall> S. unused S x \<longrightarrow> n \<notin> S}"
 
