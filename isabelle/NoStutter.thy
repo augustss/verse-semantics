@@ -31,22 +31,22 @@ lemma rel_no_stutter_rule_PGt: "rel_no_stutter rule_PGt"
 lemma rel_no_stutter_rule_App_Beta: "rel_no_stutter rule_App_Beta"
   by (auto simp add: rel_no_stutter_def elim!: rule_App_Beta.cases simp add: occursV_liftV)
 
+lemma App_eq_bars[simp]:
+  "App v1 v2 = bars es \<longleftrightarrow> es = [App v1 v2]"
+  by (induction es rule:bars.induct) auto
+
 lemma rel_no_stutter_rule_App_Tup: "rel_no_stutter rule_App_Tup" 
-  apply (auto simp add: rel_no_stutter_def elim!: rule_App_Tup.cases)
-  apply (case_tac vs; simp)
-  apply (case_tac list; simp)
-  done
+  by (auto simp add: rel_no_stutter_def elim!: rule_App_Tup.cases)
 
 lemma rel_no_stutter_rule_ULit: "rel_no_stutter rule_ULit"
   by (auto simp add: rel_no_stutter_def elim!: rule_ULit.cases)
 
+lemma Uni_eq_seqs[simp]:
+  "Uni e1 e2 = seqs es \<longleftrightarrow> es = [Uni e1 e2]"
+  by (induction es rule:seqs.induct) auto
+
 lemma rel_no_stutter_rule_UTup: "rel_no_stutter rule_UTup"
-  apply (auto simp add: rel_no_stutter_def elim!: rule_UTup.cases in_set_zipE)
-  apply (case_tac vs1; simp)
-  apply (case_tac vs2; simp)
-  apply (case_tac list; simp)
-  apply (case_tac lista; simp)
-  done
+  by (auto simp add: rel_no_stutter_def elim!: rule_UTup.cases in_set_zipE)
 
 lemma rel_no_stutter_rule_UX: "rel_no_stutter rule_UX"
   by (auto simp add: rel_no_stutter_def elim!: rule_UX.cases)
@@ -121,12 +121,6 @@ lemma size_exp_delE[simp]: "size_exp (delE n e) = size_exp e"
   by (induction n e and n v rule:delE_delV.induct) auto
 
 
-lemma rel_no_stutter_rule_SubstRec: "rel_no_stutter rule_SubstRec"
-  apply (auto simp add: rel_no_stutter_def elim!: rule_SubstRec.cases)
-  apply (drule arg_cong[where f = size_exp])
-  apply auto
-  done
-
 lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
   by (induction n arbitrary: k) (auto simp add: occursECE_def)
 
@@ -173,17 +167,16 @@ lemma sizeECE_delECE[simp]: "sizeECE (delECE n ece) = sizeECE ece"
 lemma sizeEC_delEC[simp]: "sizeEC (delEC n ec) = sizeEC ec"
   by (induction n ec rule: delEC.induct) (auto simp add: sizeEC_def)
 
+lemmas size_differsE = arg_cong[where f = size_exp, elim_format]
+
+lemma rel_no_stutter_rule_SubstRec: "rel_no_stutter rule_SubstRec"
+  by (auto simp add: rel_no_stutter_def elim!: rule_SubstRec.cases elim!: size_differsE)
+
 lemma rel_no_stutter_rule_DefEliml: "rel_no_stutter rule_DefEliml"
-  apply (auto simp add: rel_no_stutter_def elim!: rule_DefEliml.cases)
-  apply (drule arg_cong[where f = size_exp])
-  apply auto
-  done
+  by (auto simp add: rel_no_stutter_def elim!: rule_DefEliml.cases elim!: size_differsE)
 
 lemma rel_no_stutter_rule_DefElimr: "rel_no_stutter rule_DefElimr"
-  apply (auto simp add: rel_no_stutter_def elim!: rule_DefElimr.cases)
-  apply (drule arg_cong[where f = size_exp])
-  apply auto
-  done
+  by (auto simp add: rel_no_stutter_def elim!: rule_DefElimr.cases elim!: size_differsE)
 
 lemma rel_no_stutter_rule_Swap: "rel_no_stutter rule_Swap"
   by (auto simp add: rel_no_stutter_def elim!: rule_Swap.cases)
@@ -237,10 +230,7 @@ lemma rel_no_stutter_rule_AssocChoice: "rel_no_stutter rule_AssocChoice"
   by (auto simp add: rel_no_stutter_def elim!: rule_AssocChoice.cases)
 
 lemma rel_no_stutter_rule_Choose: "rel_no_stutter rule_Choose"
-  apply (auto simp add: rel_no_stutter_def elim!: rule_Choose.cases)
-  apply (drule arg_cong[where f = size_exp])
-  apply auto
-  done
+  by (auto simp add: rel_no_stutter_def elim!: rule_Choose.cases elim!: size_differsE)
 
 theorem ARs_no_stutter: "rel_no_stutter ARs"
 unfolding ARs_def
