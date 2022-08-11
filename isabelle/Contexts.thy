@@ -110,6 +110,9 @@ lemma App_eq_appECE_simp[simp]:
 lemma Def_eq_appECE_simp[simp]:
   "(Def e = appECE ece c) \<longleftrightarrow> (ece = CDef \<and> c = e)"
   by (cases ece) auto
+lemma Def_eq_appECE_simp'[simp]:
+  "(appECE ece c = Def e) \<longleftrightarrow> (ece = CDef \<and> c = e)"
+  by (cases ece) auto
 
 lemma One_eq_appECE_simp[simp]:
   "(One e = appECE ece c) \<longleftrightarrow> (ece = COne \<and> c = e)"
@@ -118,6 +121,14 @@ lemma One_eq_appECE_simp[simp]:
 lemma All_eq_appECE_simp[simp]:
   "(All e = appECE ece c) \<longleftrightarrow> (ece = CAll \<and> c = e)"
   by (cases ece) auto
+
+lemma appECE_eq_Fail[simp]:
+  "\<not> appECE ece e = Fail"
+  by (cases ece) auto
+
+lemma appEC_eq_Fail[simp]:
+  "appEC ec e = Fail \<longleftrightarrow> ec = [] \<and> e = Fail"
+  by (cases ec) (auto simp add: appEC_def)
 
 inductive isXE :: "ece \<Rightarrow> bool" where
   "isXE (CSeql e2)"

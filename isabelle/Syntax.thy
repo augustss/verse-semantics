@@ -27,6 +27,8 @@ inductive isHNF where
 | "isHNF (Lam e)"
 | "isHNF (Op op)"
 
+inductive_cases isHNF_Var[elim]:
+  "isHNF (Var v)"
 
 type_synonym red = "exp \<Rightarrow> exp \<Rightarrow> bool"
 

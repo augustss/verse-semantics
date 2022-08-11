@@ -123,7 +123,7 @@ inductive rule_DefFail where
 
 (* X[fail] \<rightarrow> fail *)
 inductive rule_Fail where
-  rule_Fail: "isX ec \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
+  rule_Fail: "isX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow> rule_Fail (appEC ec Fail) Fail"
 
 (* one{fail} \<rightarrow> fail *)
 inductive rule_OneFail where

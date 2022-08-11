@@ -104,35 +104,95 @@ by (induction n v ec rule: substEC.induct) (auto simp add: )
 lemma rel_non_trivial_rule_Subst: "rel_non_trivial rule_Subst"
   by (auto simp add: rel_non_trivial_def elim!: rule_Subst.cases)
 
+lemma size_list_congr[cong]:
+  "(\<And> x. x \<in> set xs \<Longrightarrow> f x = g x) \<Longrightarrow> size_list f xs = size_list g xs"
+  by (induction xs) auto
+
 lemma size_exp_substE_Var[simp]: "size_exp (substE n (Var k) e) = size_exp e"
-  sorry
+and size_var_substV_Var[simp]: "size_val (substV n (Var k) v) = size_val v"
+  by (induction e and v arbitrary: n k and n k) auto
 
 lemma size_exp_liftE[simp]: "size_exp (liftE n k e) = size_exp e"
-  sorry
+  and size_var_liftV[simp]: "size_val (liftV n k v) = size_val v"
+  by (induction n k e and n k v rule:liftE_liftV.induct) auto
+
+lemma size_exp_delE[simp]: "size_exp (delE n e) = size_exp e"
+  and size_var_delV[simp]: "size_val (delV n v) = size_val v"
+  by (induction n e and n v rule:delE_delV.induct) auto
 
 
 lemma rel_non_trivial_rule_SubstRec: "rel_non_trivial rule_SubstRec"
   apply (auto simp add: rel_non_trivial_def elim!: rule_SubstRec.cases)
-  apply (drule arg_cong[where f =  size_exp])
-  apply (auto)
+  apply (drule arg_cong[where f = size_exp])
+  apply auto
   done
 
 lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
   by (induction n arbitrary: k) (auto simp add: occursECE_def)
 
+definition "sizeVCE ece = size_val (appVCE ece (Const 0))"
+
+lemma size_val_appVCE[simp]:
+  "size_val (appVCE vce v) = sizeVCE vce + size_val v"
+by (cases vce) (auto simp add: sizeVCE_def)
+
+definition "sizeVC vc = size_val (appVC vc Fail)"
+
+lemma size_val_appVC[simp]:
+  "size_val (appVC vc e) = sizeVC vc + size_exp e"
+by (induction vc) (auto simp add: sizeVC_def appVC_def appVC'_def)
+
+
+definition "sizeECE ece = size_exp (appECE ece Fail)"
+
+lemma size_exp_appECE[simp]:
+  "size_exp (appECE ece e) = sizeECE ece + size_exp e"
+  by (cases ece) (auto simp add: sizeECE_def)
+
+lemma sizeECE_gt_0[simp]: "sizeECE ece > 0"
+  by (cases ece) (auto simp add: sizeECE_def)
+
+definition "sizeEC ec = sum_list (map sizeECE ec)"
+
+lemma sizeEC_eq_0[simp]: "sizeEC ec = 0  \<longleftrightarrow> ec = []"
+  by (cases ec) (auto simp add: sizeEC_def)
+
+lemma size_exp_appEC[simp]:
+  "size_exp (appEC ec e) = sizeEC ec + size_exp e"
+  by (induction ec) (auto simp add: sizeEC_def appEC_def)
+
+lemma sizeVCE_delVCE[simp]: "sizeVCE (delVCE n vce) = sizeVCE vce"
+  by (induction vce) (auto simp add: sizeVCE_def)
+
+lemma sizeVC_delVC[simp]: "sizeVC (delVC n vc) = sizeVC vc"
+  unfolding sizeVC_def delVC_def  by (induction vc) auto
+
+lemma sizeECE_delECE[simp]: "sizeECE (delECE n ece) = sizeECE ece"
+  by (induction ece) (auto simp add: sizeECE_def)
+
+lemma sizeEC_delEC[simp]: "sizeEC (delEC n ec) = sizeEC ec"
+  by (induction n ec rule: delEC.induct) (auto simp add: sizeEC_def)
+
 lemma rel_non_trivial_rule_DefEliml: "rel_non_trivial rule_DefEliml"
-  by (auto simp add: rel_non_trivial_def elim!: rule_DefEliml.cases
-        simp add: occursE_liftE)
+  apply (auto simp add: rel_non_trivial_def elim!: rule_DefEliml.cases)
+  apply (drule arg_cong[where f = size_exp])
+  apply auto
+  done
 
 lemma rel_non_trivial_rule_DefElimr: "rel_non_trivial rule_DefElimr"
-  by (auto simp add: rel_non_trivial_def elim!: rule_DefElimr.cases
-        simp add: occursE_liftE)
+  apply (auto simp add: rel_non_trivial_def elim!: rule_DefElimr.cases)
+  apply (drule arg_cong[where f = size_exp])
+  apply auto
+  done
 
 lemma rel_non_trivial_rule_Swap: "rel_non_trivial rule_Swap"
   by (auto simp add: rel_non_trivial_def elim!: rule_Swap.cases)
 
 lemma rel_non_trivial_rule_DefFloat: "rel_non_trivial rule_DefFloat"
-  by (auto simp add: rel_non_trivial_def elim!: rule_DefFloat.cases)
+  apply (auto simp add: rel_non_trivial_def elim!: rule_DefFloat.cases)
+  apply (case_tac ec; simp)
+  apply (auto simp add: isX_def appEC_def isXE.simps)
+  done
 
 lemma rel_non_trivial_rule_Seq: "rel_non_trivial rule_Seq"
   by (auto simp add: rel_non_trivial_def elim!: rule_Seq.cases)
@@ -177,7 +237,10 @@ lemma rel_non_trivial_rule_AssocChoice: "rel_non_trivial rule_AssocChoice"
   by (auto simp add: rel_non_trivial_def elim!: rule_AssocChoice.cases)
 
 lemma rel_non_trivial_rule_Choose: "rel_non_trivial rule_Choose"
-  by (auto simp add: rel_non_trivial_def elim!: rule_Choose.cases)
+  apply (auto simp add: rel_non_trivial_def elim!: rule_Choose.cases)
+  apply (drule arg_cong[where f = size_exp])
+  apply auto
+  done
 
 theorem ARs_non_trivial: "rel_non_trivial ARs"
 unfolding ARs_def
