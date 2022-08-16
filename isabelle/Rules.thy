@@ -56,12 +56,11 @@ inductive rule_Subst where
 (* This is hairy with de-Brujin-indices *)
 inductive rule_SubstRec where
   rule_SubstRec: "occursE (n + 1) e \<Longrightarrow>
-      e1 = substE (n+2) (Var 1) (\<up>\<^sub>e 2 0 e) \<Longrightarrow>
-      rhs = Val (appVC (liftVC 2 0 vc) e1) \<Longrightarrow>
+      rhs = substV (n+2) (Var 1) (\<up>\<^sub>v 2 0 (appVC vc e)) \<Longrightarrow>
       e2 = substE (n+1) (Var 0) (\<up>\<^sub>e 1 0 e) \<Longrightarrow>
     rule_SubstRec
       (Uni (Val (Var n)) (Val (appVC vc e)))
-      (Uni (Val (Var n)) (Val (appVC vc (Def (Seq (Uni (Val (Var 0)) rhs) e2)))))"
+      (Uni (Val (Var n)) (Val (appVC vc (Def (Seq (Uni (Val (Var 0)) (Val rhs)) e2)))))"
 
 inductive rule_DefEliml where
   rule_DefEliml: "

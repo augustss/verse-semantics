@@ -78,7 +78,7 @@ lemma rel_closed_rule_Subst: "rel_closed rule_Subst"
 
 lemma rel_closed_rule_SubstRec: "rel_closed rule_SubstRec"
   by (auto intro!: rel_closed.intros elim!: rule_SubstRec.cases
-        simp add: occursE_liftE)
+        simp add: occursE_liftE occursV_liftV)
 
 lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
   by (induction n arbitrary: k) (auto simp add: occursECE_def)
