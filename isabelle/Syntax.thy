@@ -21,6 +21,9 @@ and val =
 | Lam exp
 | Op op
 
+abbreviation VLet :: "val \<Rightarrow> exp \<Rightarrow> exp" where
+  "VLet v e \<equiv> Def (Seq (Uni (Val (Var 0)) (Val v)) e)"
+
 inductive isHNF where
   "isHNF (Const k)"
 | "isHNF (Tup vs)"
