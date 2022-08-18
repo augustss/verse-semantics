@@ -3,7 +3,7 @@ imports Syntax
 begin
 
 (*
-This is a partial experiment to see if we can derive all opertions like
+This is a partial experiment to see if we can derive all operations like
 subst, lift, del, fvs, and their lemmas, from a single bind operation with simple laws.
 
 The hope is that for each thing with names (expressions, values, the various contexs) only
@@ -42,6 +42,14 @@ definition unBump :: "(nat \<Rightarrow> 'a) \<Rightarrow> (nat \<Rightarrow> 'a
 lemma unBump_bumpsAt[simp]:
   "unBump f g (bumpsAt S i) = (if i \<in> S then f i else g i)"
   unfolding unBump_def bumpsAt_def by simp
+
+
+(*
+This looks promising, but unclear how to obtain the existance of this set
+
+definition fvs where
+  "fvs e = (THE S. \<forall> f. e = bind f e \<longleftrightarrow> (\<forall> n \<in> S. f n = Var n))"
+*)
 
 definition unused :: "nat set \<Rightarrow> 'a::has_bind \<Rightarrow> bool" where
   "unused S x \<longleftrightarrow> renumber (bumpsAt S) x = renumber (bumpsAt {}) x"

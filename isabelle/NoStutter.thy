@@ -58,71 +58,40 @@ lemma map_eq:
   "xs = map f xs \<longleftrightarrow> (\<forall> x \<in> set xs. x = f x)"
   by (induction xs) auto
 
-lemma appVCE_substVCE_eq[simp]:
-  "appVCE vce e1 = appVCE (substVCE n v vce) e2 \<longleftrightarrow> vce = substVCE n v vce \<and> e1 = e2"
+lemma appVCE_bind_eq[simp]:
+  "appVCE vce e1 = appVCE (bind f vce) e2 \<longleftrightarrow> vce = bind f vce \<and> e1 = e2"
 by (cases vce) auto
 
-lemma appVC'_substVC_eq[simp]:
-  "appVC' vc e1 = appVC' (substVC n v vc) e2 \<longleftrightarrow> vc = substVC n v vc \<and> e1 = e2"
-by (induction vc arbitrary: n v e1 e2) (auto simp add: substVC_def appVC'_def)
+lemma appVC'_bind_eq[simp]:
+  "appVC' vc e1 = appVC' (bind f vc) e2 \<longleftrightarrow> vc = bind f vc \<and> e1 = e2"
+by (induction vc) (auto simp add: appVC'_def)
 
-lemma appVC_substVC_eq[simp]:
-  "appVC vc e1 = appVC (substVC n v vc) e2 \<longleftrightarrow> vc = substVC n v vc \<and> e1 = e2"
-by (simp add:  appVC_def)
+lemma appVC_bind_eq[simp]:
+  "appVC vc e1 = appVC (bind f vc) e2 \<longleftrightarrow> vc = bind f vc \<and> e1 = e2"
+by (simp add: appVC_def)
 
-lemma appECE_substECE_eq[simp]:
-  "appECE ece e1 = appECE (substECE n v ece) e2 \<longleftrightarrow> ece = substECE n v ece \<and> e1 = e2"
+lemma appECE_bind_eq[simp]:
+  "appECE ece e1 = appECE (bind f ece) e2 \<longleftrightarrow> ece = bind f ece \<and> e1 = e2"
 by (cases ece) auto
 
-lemma appEC_substEC_eq[simp]:
-  "appEC ec e1 = appEC (substEC n v ec) e2 \<longleftrightarrow> ec = substEC n v ec \<and> e1 = e2"
-  by (induction n v ec arbitrary: e1 e2 rule: substEC.induct)
+lemma appEC_bind_eq[simp]:
+  "appEC ec e1 = appEC (bind f ec) e2 \<longleftrightarrow> ec = bind f ec \<and> e1 = e2"
+  by (induction f ec arbitrary: e1 e2 rule: bind_list.induct)
      (auto simp add: appEC_def)
 
-lemma substE_eq[simp]:
-  "e = substE n v e \<longleftrightarrow> (occursE n e \<longrightarrow> v = Var n)" 
-and  substV_eq[simp]:
-  "v' = substV n v v' \<longleftrightarrow> (occursV n v' \<longrightarrow> v = Var n)"
-by(induction n v e and n v v' rule: substE_substV.induct) (auto simp add: map_eq)
-
-lemma substVCE_eq[simp]:
-  "vce = substVCE n v vce \<longleftrightarrow> (occursVCE n vce \<longrightarrow> v = Var n)"
-by (induction vce) (auto simp add: map_eq)
-
-lemma substVC_eq[simp]:
-  "vc = substVC n v vc \<longleftrightarrow> (occursVC n vc \<longrightarrow> v = Var n)"
-by (auto simp add: substVC_def occursVC_def map_eq)
-
-lemma substECE_eq[simp]:
-  "ece = substECE n v ece \<longleftrightarrow> (occursECE n ece \<longrightarrow> v = Var n)"
-by (cases ece) (auto simp add: occursECE_def)
-
-lemma substEC_eq[simp]:
-  "ec = substEC n v ec \<longleftrightarrow> (occursEC n ec \<longrightarrow> v = Var n)"
-by (induction n v ec rule: substEC.induct) (auto simp add: )
-
 lemma rel_no_stutter_rule_Subst: "rel_no_stutter rule_Subst"
-  by (auto simp add: rel_no_stutter_def elim!: rule_Subst.cases)
+  by (auto 4 4 simp add: rel_no_stutter_def elim!: rule_Subst.cases simp add: bind_id_iff2)
 
 lemma size_list_congr[cong]:
   "(\<And> x. x \<in> set xs \<Longrightarrow> f x = g x) \<Longrightarrow> size_list f xs = size_list g xs"
   by (induction xs) auto
 
-lemma size_exp_substE_Var[simp]: "size_exp (substE n (Var k) e) = size_exp e"
-and size_var_substV_Var[simp]: "size_val (substV n (Var k) v) = size_val v"
-  by (induction e and v arbitrary: n k and n k) auto
+lemma size_exp_renumberE[simp]: "size_exp (renumber f e) = size_exp e"
+  and size_var_renumberV[simp]: "size_val (renumber f v) = size_val v"
+  by (induction e and v arbitrary: f and f) (auto)
 
-lemma size_exp_liftE[simp]: "size_exp (liftE n k e) = size_exp e"
-  and size_var_liftV[simp]: "size_val (liftV n k v) = size_val v"
-  by (induction n k e and n k v rule:liftE_liftV.induct) auto
-
-lemma size_exp_delE[simp]: "size_exp (delE n e) = size_exp e"
-  and size_var_delV[simp]: "size_val (delV n v) = size_val v"
-  by (induction n e and n v rule:delE_delV.induct) auto
-
-
-lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
-  by (induction n arbitrary: k) (auto simp add: occursECE_def)
+lemma occursEC_replicate_CDef[simp]: "\<not> occurs k (replicate n CDef)"
+  by (induction n arbitrary: k) (auto simp add: occurs_ece_def)
 
 definition "sizeVCE ece = size_val (appVCE ece (Const 0))"
 
@@ -155,17 +124,17 @@ lemma size_exp_appEC[simp]:
   "size_exp (appEC ec e) = sizeEC ec + size_exp e"
   by (induction ec) (auto simp add: sizeEC_def appEC_def)
 
-lemma sizeVCE_delVCE[simp]: "sizeVCE (delVCE n vce) = sizeVCE vce"
-  by (induction vce) (auto simp add: sizeVCE_def)
+lemma sizeVCE_delVCE[simp]: "sizeVCE (renumber f vce) = sizeVCE vce"
+  unfolding sizeVCE_def by (induction vce) auto
 
-lemma sizeVC_delVC[simp]: "sizeVC (delVC n vc) = sizeVC vc"
-  unfolding sizeVC_def delVC_def  by (induction vc) auto
+lemma sizeVC_renumber[simp]: "sizeVC (renumber f vc) = sizeVC vc"
+  unfolding sizeVC_def by (induction vc arbitrary: f) auto
 
-lemma sizeECE_delECE[simp]: "sizeECE (delECE n ece) = sizeECE ece"
+lemma sizeECE_renumber[simp]: "sizeECE (renumber f ece) = sizeECE ece"
   by (induction ece) (auto simp add: sizeECE_def)
 
-lemma sizeEC_delEC[simp]: "sizeEC (delEC n ec) = sizeEC ec"
-  by (induction n ec rule: delEC.induct) (auto simp add: sizeEC_def)
+lemma sizeEC_renumber[simp]: "sizeEC (renumber f ec) = sizeEC ec"
+  unfolding sizeEC_def by (induction ec arbitrary: f) auto
 
 lemmas size_differsE = arg_cong[where f = size_exp, elim_format]
 

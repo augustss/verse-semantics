@@ -5,7 +5,7 @@ begin
 section \<open>A relation is closed if it does not invent fresh free names\<close>
 
 inductive rel_closed :: "red \<Rightarrow> bool"  where
-  rel_closedI: "(\<And> e1 e2 n. R e1 e2 \<Longrightarrow> occursE n e2 \<Longrightarrow> occursE n e1) \<Longrightarrow> rel_closed R"
+  rel_closedI: "(\<And> e1 e2 n. R e1 e2 \<Longrightarrow> occurs n e2 \<Longrightarrow> occurs n e1) \<Longrightarrow> rel_closed R"
 
 lemma rel_closed_OO[simp]:
   assumes "rel_closed R" and "rel_closed S"
@@ -17,8 +17,8 @@ lemma rel_closed_star[simp]:
   shows "rel_closed R\<^sup>*\<^sup>*"
 proof
   fix x y n
-  assume "R\<^sup>*\<^sup>* x y" and "occursE n y"
-  then show "occursE n x"
+  assume "R\<^sup>*\<^sup>* x y" and "occurs n y"
+  then show "occurs n x"
     using `rel_closed R`
     by (induction rule: converse_rtranclp_induct) (auto simp add: rel_closed.simps)
 qed
@@ -35,13 +35,13 @@ lemma rel_closed_cc:
   shows "rel_closed (cc R)"
 proof
   fix x y n
-  assume "cc R x y" and "occursE n y"
+  assume "cc R x y" and "occurs n y"
   from `cc R x y`
-  show "occursE n x"
+  show "occurs n x"
   proof
     fix x' y' C
     assume "x = appEC C x'" and "y = appEC C y'" and "R x' y'"
-    show ?thesis using `occursE n y` unfolding `x = _` `y = _`
+    show ?thesis using `occurs n y` unfolding `x = _` `y = _`
       using `R x' y'` `rel_closed R` by (auto simp add: rel_closed.simps)
   qed
 qed
@@ -55,7 +55,7 @@ lemma rel_closed_rule_PGt: "rel_closed rule_PGt"
   by (auto intro!: rel_closed.intros elim!: rule_PGt.cases)
 
 lemma rel_closed_rule_App_Beta: "rel_closed rule_App_Beta"
-  by (auto intro!: rel_closed.intros elim!: rule_App_Beta.cases simp add: occursV_liftV)
+  by (auto intro!: rel_closed.intros elim!: rule_App_Beta.cases simp add: occurs_renumber)
 
 lemma rel_closed_rule_App_Tup: "rel_closed rule_App_Tup" 
   by (auto 4 4 intro!: rel_closed.intros elim!: rule_App_Tup.cases
@@ -78,18 +78,16 @@ lemma rel_closed_rule_Subst: "rel_closed rule_Subst"
 
 lemma rel_closed_rule_SubstRec: "rel_closed rule_SubstRec"
   by (auto intro!: rel_closed.intros elim!: rule_SubstRec.cases
-        simp add: occursE_liftE occursV_liftV)
+        simp add: occurs_renumber id_def if_split)
 
-lemma occursEC_replicate_CDef[simp]: "\<not> occursEC k (replicate n CDef)"
-  by (induction n arbitrary: k) (auto simp add: occursECE_def)
+lemma occursEC_replicate_CDef[simp]: "\<not> occurs k (replicate n CDef)"
+  by (induction n arbitrary: k) (auto simp add: occurs_ece_def)
 
 lemma rel_closed_rule_DefEliml: "rel_closed rule_DefEliml"
-  by (auto intro!: rel_closed.intros elim!: rule_DefEliml.cases
-        simp add: occursE_liftE)
+  by (auto intro!: rel_closed.intros elim!: rule_DefEliml.cases)
 
 lemma rel_closed_rule_DefElimr: "rel_closed rule_DefElimr"
-  by (auto intro!: rel_closed.intros elim!: rule_DefElimr.cases
-        simp add: occursE_liftE)
+  by (auto intro!: rel_closed.intros elim!: rule_DefElimr.cases)
 
 lemma rel_closed_rule_Swap: "rel_closed rule_Swap"
   by (auto intro!: rel_closed.intros elim!: rule_Swap.cases)
@@ -175,7 +173,5 @@ by (intro rel_closed_sup2
    rel_closed_rule_AssocChoice
    rel_closed_rule_Choose
 )
-
-
 
 end

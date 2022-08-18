@@ -15,7 +15,7 @@ inductive rule_PGt where
 
 (* (\<lambda>x. e)@v \<rightarrow> \<exists> x. x=v;e *)
 inductive rule_App_Beta where
-  rule_App_Beta: "rule_App_Beta (App (Lam e) v) (Def (Seq (Uni (Val (Var 0)) (Val (\<up>\<^sub>v 1 0 v))) e))"
+  rule_App_Beta: "rule_App_Beta (App (Lam e) v) (Def (Seq (Uni (Val (Var 0)) (Val (\<up> v))) e))"
 
 (* <vs>@v \<rightarrow> \<dots> *)
 inductive rule_App_Tup where
@@ -48,16 +48,16 @@ inductive rule_UXOccurs where
 
 (* X[x = v] \<rightarrow> X{v/x}[x = v] *)
 inductive rule_Subst where
-  rule_Subst: "isX ec \<Longrightarrow> occursEC n ec \<Longrightarrow> \<not> occursV n v \<Longrightarrow> rule_Subst
-      (appEC ec               (Uni (Val (Var n)) (Val v)))
-      (appEC (substEC n v ec) (Uni (Val (Var n)) (Val v)))"
+  rule_Subst: "isX ec \<Longrightarrow> occurs n ec \<Longrightarrow> \<not> occurs n v \<Longrightarrow> rule_Subst
+      (appEC ec             (Uni (Val (Var n)) (Val v)))
+      (appEC (subst n v ec) (Uni (Val (Var n)) (Val v)))"
 
 (* x = V[\<lambda>z. e] \<rightarrow> x = V[\<lambda>z. \<exists>x. x = V[\<lambda>z. e]; e] *)
 (* This is hairy with de-Brujin-indices *)
 inductive rule_SubstRec where
-  rule_SubstRec: "occursE (n + 1) e \<Longrightarrow>
-      rhs = substV (n+2) (Var 0) (\<up>\<^sub>v 2 0 (appVC vc e)) \<Longrightarrow>
-      e2 = substE (n+2) (Var 0) (\<up>\<^sub>e 1 0 e) \<Longrightarrow>
+  rule_SubstRec: "occurs (n + 1) e \<Longrightarrow>
+      rhs = renumber (id(n+2 := 0)) (\<up> (\<up> (appVC vc e))) \<Longrightarrow>
+      e2  = renumber (id(n+2 := 0)) (\<up> e) \<Longrightarrow>
     rule_SubstRec
       (Uni (Val (Var n)) (Val (appVC vc e)))
       (Uni (Val (Var n)) (Val (appVC vc (VLet rhs e2))))"
@@ -65,20 +65,20 @@ inductive rule_SubstRec where
 inductive rule_DefEliml where
   rule_DefEliml: "
       isX ec \<Longrightarrow>
-      \<not> occursEC n ec \<Longrightarrow>
-      \<not> occursV n v \<Longrightarrow>
+      \<not> occurs n ec \<Longrightarrow>
+      \<not> occurs n v \<Longrightarrow>
     rule_DefEliml
       (Def (appEC (replicate n CDef) (appEC ec (Uni (Val (Var n)) (Val v)))))
-           (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
+           (appEC (replicate n CDef) (appEC (del n ec) (Val (del n v))))"
 
 inductive rule_DefElimr where
   rule_DefElimr: "
       isX ec \<Longrightarrow>
-      \<not> occursEC n ec \<Longrightarrow>
-      \<not> occursV n v \<Longrightarrow>
+      \<not> occurs n ec \<Longrightarrow>
+      \<not> occurs n v \<Longrightarrow>
     rule_DefElimr
       (Def (appEC (replicate n CDef) (appEC ec (Uni (Val v) (Val (Var n))))))
-           (appEC (replicate n CDef) (appEC (delEC n ec) (Val (delV n v))))"
+           (appEC (replicate n CDef) (appEC (del n ec) (Val (del n v))))"
 
 (* hnf = x \<rightarrow> x = hnf *)
 inductive rule_Swap where
@@ -86,7 +86,7 @@ inductive rule_Swap where
 
 (* X[\<exists>x.e] \<rightarrow> \<exists>x. X[e] *)
 inductive rule_DefFloat where
-  rule_DefFloat: "isX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (liftEC 1 0 ec) e))"
+  rule_DefFloat: "isX ec \<Longrightarrow> ec \<noteq> [] \<Longrightarrow> rule_DefFloat (appEC ec (Def e)) (Def (appEC (\<up>ec) e))"
 
 (* v;e \<rightarrow> e *)
 inductive rule_Seq where
@@ -104,17 +104,17 @@ inductive rule_Unify_Seqr where
 inductive rule_Unify_Unifyl where
   rule_Unify_Unifyl: "rule_Unify_Unifyl
     (Uni (Uni e1 e2) e3)
-    (Def (Seq (Uni (Val (Var 0)) (liftE 1 0 e1))
-         (Seq (Uni (Val (Var 0)) (liftE 1 0 e2))
-              (Uni (Val (Var 0)) (liftE 1 0 e3)))))"
+    (Def (Seq (Uni (Val (Var 0)) (\<up> e1))
+         (Seq (Uni (Val (Var 0)) (\<up> e2))
+              (Uni (Val (Var 0)) (\<up> e3)))))"
 
 (* e1 = (e2 = e3) \<rightarrow> \<exists> x. x = e1; x = e2; x = e3 *)
 inductive rule_Unify_Unifyr where
   rule_Unify_Unifyr: "rule_Unify_Unifyr
     (Uni e1 (Uni e2 e3))
-    (Def (Seq (Uni (Val (Var 0)) (liftE 1 0 e1))
-         (Seq (Uni (Val (Var 0)) (liftE 1 0 e2))
-              (Uni (Val (Var 0)) (liftE 1 0 e3)))))"
+    (Def (Seq (Uni (Val (Var 0)) (\<up> e1))
+         (Seq (Uni (Val (Var 0)) (\<up> e2))
+              (Uni (Val (Var 0)) (\<up> e3)))))"
 
 (* \<exists>x. fail \<rightarrow> fail *)
 inductive rule_DefFail where
