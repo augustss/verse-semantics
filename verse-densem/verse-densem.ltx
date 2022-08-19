@@ -485,10 +485,10 @@ $$
 \text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{w_2}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}} \\
 \text{One}  & \mone(s) & = & \shead( s )\\
 \text{All}  & \mall(s) & = & \stuple( s ) \\
-\multicolumn{3}{l}{\text{Some pseudo Haskell the generates the cartesian product.}} \\
-\multicolumn{3}{l}{     cart [] = \{ \emptyset \} } \\
-\multicolumn{3}{l}{     cart ((x,ys) : xyss) = \{ \{(x,y)\} \cup f \vb y \in ys, f \in cart(xyss) \} } \\
-\multicolumn{3}{l}{\text{\emph{func} takes a set of pairs and makes the cortresponding function.}} \\
+\multicolumn{4}{l}{\text{Some pseudo Haskell the generates the cartesian product.}} \\
+\multicolumn{4}{l}{     cart [] = \{ \emptyset \} } \\
+\multicolumn{4}{l}{     cart ((x,ys) : xyss) = \{ \{(x,y)\} \cup f \vb y \in ys, f \in cart(xyss) \} } \\
+\multicolumn{4}{l}{\text{\emph{func} takes a set of pairs and makes the corresponding function.}} \\
 \end{array}
 %cart [] = [[]]
 %cart ((x, ys) : xyss) = [ (x, y) : f | y <- ys , f <- cart xyss ]
