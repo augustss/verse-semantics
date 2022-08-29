@@ -620,9 +620,27 @@
 
 ;; example5 append
 
+(define simon1
+  (term (add (arr 3 8))))
 
+(define simon2
+  (term (= (arr 2 3) (arr 2 8))))
 
-(module+ test
+(define simon3
+  (term (exists x (seq (= x 3) (add (arr x 1))))))
+
+(define simon4
+  (term (exists* (x y) (seq* (= y (++ x 1)) (= x 3) y))))
+
+(define simon5
+  (term (all (:= x (bar 2 27) (:= y (bar 99 4) (++ x y))))))
+
+(define (tr a)
+  (traces rules* a))
+(define (st a)
+  (stepper rules* a))
+
+(module+ xtest
   (testred test0 (term 2))
   (testred test1 (term (arr 2 1)))
   (testred test2 (term 4))
