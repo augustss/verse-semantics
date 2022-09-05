@@ -57,12 +57,23 @@ opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = ["array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "of", "option", "set", "then", "type", "var", "where"]
+           , "in", "let", "of", "option", "set", "then", "var", "where"] ++
+           macros
+
+macros :: [String]
+macros = ["all", "one", "type"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
   w <- pWord
   guard (w == s)
+
+pMacroName :: P Ident
+pMacroName = try $ do
+  l <- getSourcePos
+  w <- pWord
+  guard (w `elem` macros)
+  pure $ Ident l w
 
 pKeywordOpt :: String -> P ()
 pKeywordOpt s = pKeyword s <|> pure ()
@@ -108,7 +119,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
 pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
-               , Parens <$> pParens pExprSeq, pArray, pTypedef
+               , Parens <$> pParens pExprSeq, pArray, pMacro1
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
@@ -117,8 +128,10 @@ pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
 pArray :: P Expr
 pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
-pTypedef :: P Expr
-pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
+--pTypedef :: P Expr
+--pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
+pMacro1 :: P Expr
+pMacro1 = Macro1 <$> pMacroName <*> pBlockM
 
 pEffects :: P Expr
 pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pIdent) <*> pBlockM)

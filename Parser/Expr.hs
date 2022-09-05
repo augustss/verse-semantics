@@ -10,6 +10,7 @@ module Expr(
   Expr(..),
   pattern Fail,
   pattern Unit,
+  pattern Typedef,
 --  pattern Range,
   Block,
   Eff,
@@ -72,12 +73,14 @@ data Expr
   | Case1 Block               -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function [(Expr, [Eff])] Block -- function(e)<eff>...{e}
-  | Typedef Block             -- typedef{e}
+--  | Typedef Block             -- type{e}
   | Block [Expr]              -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
   | Parens Expr               -- (e)
   | Set Expr Ident Expr       -- set e1 = e2
   | MVar Ident Expr Expr      -- var i : t = e
+  -- Some 1-argument macros
+  | Macro1 Ident Block        -- m{e}
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -95,6 +98,9 @@ pattern Fail :: Expr
 pattern Fail = Range Unit
 pattern Unit :: Expr
 pattern Unit = Array []
+pattern Typedef :: Block -> Expr
+pattern Typedef e <- Macro1 (Ident _ "type") e
+  where Typedef e = Macro1 (Ident noLoc "type") e
 
 type Eff = Ident
 
@@ -154,10 +160,10 @@ instance Pretty Expr where
                                                       text "else",
                                                         indent $ ppr 0 e3]
           For1 e1 -> maybeParens (p > 0) $ text "for" <+> ppB e1
-          For2 e1 e2 -> maybeParens (p > 0) $ sep [text "for" <+> parens (ppr 0 e1) <+> text "in",
+          For2 e1 e2 -> maybeParens (p > 0) $ sep [text "for" <+> parens (ppr 0 e1) <+> text "do",
                                                       indent $ ppr 0 e2]
           Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1),
-                                                   text "in",
+                                                   text "do",
                                                      indent $ ppr 0 e2]
           Do e1 -> maybeParens (p > 0) $ sep [text "do" <+> indent (ppr 0 e1)]
           Case1 bs ->
@@ -169,11 +175,12 @@ instance Pretty Expr where
             where ppArs (e, rs) = parens (pPrintL l e) <> effs
                      where effs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
           Block es -> braces $ ppSeq l es
-          Typedef e -> text "type" <> ppB e
+--          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e -> parens (ppr 0 e)
           Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
           MVar i t e -> text "var" <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
+          Macro1 (Ident _ m) e -> text m <> ppB e
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
@@ -262,10 +269,11 @@ compos f (Function ers b) = Function <$> traverse g ers <*> f b
   where g (e, r) = (,) <$> f e <*> pure r
 compos f (Block es) = Block <$> traverse f es
 compos f (Option me) = Option <$> traverse f me
-compos f (Typedef b) = Typedef <$> f b
+--compos f (Typedef b) = Typedef <$> f b
 compos f (Parens e) = Parens <$> f e
 compos f (Set e1 op e2) = Set <$> f e1 <*> pure op <*> f e2
 compos f (MVar i e1 e2) = MVar i <$> f e1 <*> f e2
+compos f (Macro1 m b) = Macro1 m <$> f b
 compos f (Define i e) = Define i <$> f e
 compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2

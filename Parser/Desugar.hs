@@ -112,6 +112,7 @@ dsD = expr
       e' <- expr e
       e'' <- dsM e' (Variable y)
       pure $ primFcn y e''
+    expr (Macro1 m e) = Macro1 m <$> expr e
 
     -- Conditionals
     -- D[if{e}] = D[if(e) else false]
@@ -260,7 +261,8 @@ dsM expr y =
       e1' <- dsM e1 y
       e2' <- dsM e2 y
       pure $ unify e1' e2'
-    Typedef{} -> dflt
+--    Typedef{} -> dflt
+    Macro1{} -> dflt
     Define i e -> Define i <$> dsM e y
     Define2 j i e -> do
       e' <- dsM e y
@@ -583,7 +585,8 @@ anfS = anf
       (ess, vs) <- unzip <$> mapM value es
       pure (concat ess, Array vs)
     value e@Function{} = ([],) <$> anf e
-    value e@Typedef{} = ([],) <$> anf e
+--    value e@Typedef{} = ([],) <$> anf e
+    value e@Macro1{} = ([],) <$> anf e
     value e@AnyT{} = pure ([], e)
     value (Define i e) = do
       -- Special version of next case; no need for a new variable
@@ -616,7 +619,8 @@ getVisible (Let _ e) = getVisible e
 getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (Typedef _) = []
+--getVisible (Typedef _) = []
+getVisible (Macro1 _ _) = []
 getVisible (Define i e) = i : getVisible e
 getVisible (Define2 i j e) = i : j : getVisible e
 getVisible Choice{} = []
@@ -640,7 +644,8 @@ getVar (Let _ e) = getVar e
 getVar Do{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar (Where e1 e2) = getVar e1 ++ getVar e2
-getVar (Typedef _) = []
+--getVar (Typedef _) = []
+getVar (Macro1 _ _) = []
 getVar (Define _ e) = getVar e
 getVar (Define2 _ _ e) = getVar e
 getVar Choice{} = []
@@ -742,7 +747,8 @@ scopeErrs s = expr
     expr (Define2 _ _ e) = expr e
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
     expr (Range e1) = expr e1
-    expr (Typedef e1) = expr (Do e1)
+--    expr (Typedef e1) = expr (Do e1)
+    expr (Macro1 _ e1) = expr (Do e1)
     expr AnyT = []
     expr e = impossible e
 
@@ -784,7 +790,8 @@ addDeref = pure . exprD S.empty
       where op = Ident l ("in'" ++ sop ++ "'")
     expr s (MVar i t e) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
     expr s (Range e1) = Range (expr s e1)
-    expr s (Typedef e1) = Typedef (exprD s e1)
+--    expr s (Typedef e1) = Typedef (exprD s e1)
+    expr s (Macro1 m e1) = Macro1 m (exprD s e1)
     expr _ AnyT = AnyT
     expr _ e = impossible e
 
