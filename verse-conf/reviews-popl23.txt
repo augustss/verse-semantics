@@ -1,0 +1,278 @@
+POPL 2023 Paper #123 Reviews and Comments
+===========================================================================
+Paper #123 The Verse Calculus: a Core Calculus for Functional Logic
+Programming
+
+
+Review #123A
+===========================================================================
+
+Overall merit
+-------------
+A. Accept
+
+Reviewer expertise
+------------------
+Y. Knowledgeable
+
+Paper summary
+-------------
+The paper describes the Verse calculus (VC), a calculus which is essentially functional, but allows to express logical variables and unification.
+The basic idea is similar to that used in call-by-need calculi, where pending evaluations are represented in the program itself through let-rec. Here, the program contains subterms of shape, e.g., \exists x y z. x = <y,3>; x = <2,z>; y, where equations are solved by unification, providing a much more powerful form of pattern-matching. A key idea is that non-determinism which obviously arises since equations may have many solutions is handled by a choice construct e1|e2, and two constructs one{e}, which returns the first solution, and all{e}, which returns, roughly, a tuple (sequence) with all the solutions, roughly in the way set-comprehension works in Haskell. Thus, as the authors say, choices are laid out in the syntax of terms.
+
+Assessment
+----------
+I did not know about functional logic programming before reading the paper. However, I find the design of the calculus really beatiful, notably the way logical equations and unification are smoothly embedded in a functional calculus, non-determinism is represented in the term itself, and a careful operational semantics allows to obtain the expected effect. 
+
+The main criticism is that there is no theorem in the paper, nothing proving in some way that the calculus is "reasonable" (the section on metatheory is work-in-progress), and there is no implementation available, even though the authors say there is one. However, I think that the novel ideas in the design are very nice.
+
+Comments for author
+-------------------
+Line 19: from this first example the question immediately arises: which is the semantics in case the equations have more than one solution? so you could maybe anticipate a little bit.
+
+Line 25-26: reduction under lambdas is not allowed in call-by-value or call-by-name which are those used in programming languages. What does happen is that lambdas (which are values) can be open terms, that is, contain free variables.
+
+Line 91: you mean that every lambda calculus lambda term has the same semantics it has in the lambda calculus (with call-b-value semantics I guess?) This statement of course would need to be refined formally (do you just mean the same result, or a simulation of steps?), and in the following I do not see any corresponding theorem.
+
+Line 128: I do not understand how do you get the full lambda calculus. For instance, how do you obtain ((lambda x.x) (lambda x.x)) (lambda x.x)?
+
+Line 150: "logical variables are not mutable" also the other variables are not mutable, this calculus is purely functional
+
+Line 233: I would write \lambda <zs,ys> ... zs = <x,xs> to have correspondence with the Haskell code 
+
+Line 333: please explain the abbreviation ANF already here
+
+Figure 3: The way common list functions can be encoded is really nice.
+
+Line 443 "non-strict" you never mentioned this aspect, can you explain?
+
+Line 454-460 I do not see the difference between (small steps) operational semantics and rewrite semantics. Perhaps you mean that in the configurations of the small-step semantics are just language terms (what is usually called a "calculus"). 
+
+Line 714: I do not see metavariable ce in Fig.1
+
+Proposition 5.3-5.4: If I understand well, these are just conjectures, so they should be stated as Conjecture 5.3-5.4.
+
+929: why not to make available the Haskell implementation? which is the strategy used in this implementation?
+
+5.5 Why do not prove these expected properties? (assuming confluence)
+
+Typos
+
+Line 9: one does -> one does with
+
+Line 124 a tuple, -> a tuple
+
+Line 290: evaluation -> evaluate
+
+Line 625: an value -> a value
+
+Line 720: we lose -> we loose 
+
+Line 1214: why not a "normal" type system? Why do not provide a link to the whole Verse language?
+
+
+
+Review #123B
+===========================================================================
+
+Overall merit
+-------------
+B. Weak Accept
+
+Reviewer expertise
+------------------
+Z. Outsider
+
+Paper summary
+-------------
+Functional logic programming combines the expressiveness of functional
+and logic programming. However, reasoning about functional logic
+programming can be tricky as the semantics is often defined using
+sophisticated mechanisms like narrowing, backtracking, etc. This paper
+proposes a new core calculus VC for functional logic programming,
+subsuming the lambda calculus and featuring logical variables,
+equalities, and choice. The calculus VC uses constructive choices,
+which are collected using the operators `one` and `all`. The language
+design promises economy of concepts, as it has only one equality, and
+language constructs like if-expressions can be defined as syntactic
+sugar. Following the language design, VC's semantics are defined as a
+set of small-step term-rewriting rules. Such rewriting semantics is
+helpful for programmers to reason about programs. In developing the
+semantics, the paper also presents various examples and discusses the
+conjecture of confluence.
+
+Assessment
+----------
++ The paper is well-written, mostly self-contained, and easy to follow
+  even for people with little background. The discussion contains lots
+  of examples helpful for understanding the concepts better. The paper
+  also includes an extensive comparison with related work.
+
++ The calculus presents some interesting language designs: using
+  unification (and failures) to represent booleans, encoding
+  if-expressions using the one operator, etc. The novel small-step
+  term-rewriting rules are helpful for programmers to understand and
+  reason about functional logic programs.
+  
+- Many of the rules are motivated by confluence, but the confluence
+  proof is, in fact, incomplete. Could you briefly explain the
+  challenges in the proof?  
+  
+  The intensive discussion on confluence-driven rule design also makes
+  me feel that some rule designs are rather "ad-hoc" and are only
+  there to make the proof go through. But this may just be a matter of
+  presentation.
+  
+- There is no other metatheory discussion beyond confluence. I am not
+  an expert in this area, but I am thinking of things like:
+  1. Termination of rules (if, say, without recursion).
+  2. Analysis of what kind of a program can (not) get stuck. Now it
+     feels like you just try all the rules, and if it gets stuck, it
+     gets stuck. The discussion in Section 4.7 is one example where
+     the semantics feels confusing.
+
+Comments for author
+-------------------
+I have a few questions regarding the language design:
+
+1. The interpretation of `=` as unification instead of equality
+   testing is interesting. On the upside, the calculus needs to model
+   fewer concepts. Is there any downside? I imagine booleans are a
+   useful construct in a language, so you may as well include them
+   anyway. Also, How would you model negation for inequity testing?
+
+2. It is unclear to me why APP-BETA requires an existential binder and
+   an equality for the binder. Can you directly do the substitution
+   as:
+
+        (\x. e) v --> e[x=v]
+
+   Then the example in Section 4.2 becomes
+
+        exists y. y = 3 + 4; (\x. x + 1)(y)
+        --> exists y. y = 3 + 4; (x + 1){y/x} == exists y. y = 3 + 4; y + 1
+
+3. I have another question for tuples. The paper advocates a
+   minimalist design, but I wonder if you need tuples as a built-in
+   construct. In particular, as tuples are essentially a function
+   waiting for an index, can you model tuples using choices of
+   functions over indices? For instance, the example `t = <27 | 10 |
+   27>` in Section 2.6 is equivalent to
+
+        t = (\x. x = 0; 27) | (\x. x = 1; 10) | (\x. x = 2; 27)
+
+   Now it feels more natural that `exists i. t(i)` reduces to what you wanted:
+
+        t = (\x. x = 0; 27) | (\x. x = 1; 10) | (\x. x = 2; 27); t i
+        -->
+        (t = (\x. x = 0; 27) ; t i) | (t = (\x. x = 1; 10); t i) | (t= (\x. x = 2; 27); t i)
+        -->
+        (i = 0; 27) | (i = 1; 10) | (i = 2; 27)
+
+4. You mentioned that you used QuickCheck to search for
+   non-confluence. How does that work, given that the lemma requires
+   searching for existential expressions (e3, e4, e5, e6 in Definition
+   5.2)? Maybe you just explore all possible expressions, but that
+   sounds inefficient.
+
+
+Minor
+
+- l128: extra line break
+- l1040: please briefly introduce the syntax. Is this essentially a
+  `first` function?
+
+
+
+Review #123C
+===========================================================================
+
+Overall merit
+-------------
+B. Weak Accept
+
+Reviewer expertise
+------------------
+Y. Knowledgeable
+
+Paper summary
+-------------
+This paper is about a small-step rewrite semantics for a functional logic core calculus.
+
+Residuation is “leaving stuck expressions aside, and executing other parts of the program” and is central to making progress on the meaning of a term.
+
+The language covers logic variable and unification, choice, pattern matching, conditionals and ‘one’ (which behaves according to whether its subexpression fails or succeeds), tuples and ‘all’ (which collects results in a tuple).
+
+The paper covers some examples, the rewrite rules, discussion of confluence and equational theory, reflections and discussions of alternative designs.
+
+Assessment
+----------
+The need for a rewrite semantics for functional logic programming is convincing. Already, I gained a lot of intuition for the paradigm by studying the paper.
+
+The theorem of confluence up to equivalence has not been fully proved. I think the rules could keep being adjusted until that is settled. This omission makes the paper incomplete.
+
+The design is not evaluated. It’s great that there is a discussion of alternative designs but there is no sense in which the chosen design is canonical. The text contains phrases like "for now" which gives an impression that the calculus is still very in flux.
+
+Having a small core augmented with desugarings make concrete examples possible and quite concise.
+
+l. 791 “Formalising an evaluation strategy for VC is beyond the scope of this paper” — why?
+
+The semantics of “choice”, which is so central to logic programming, is interesting. It is not new — it builds on previous work and appears to simplify it. The idea is that “choices are laid out in space(in the syntax of the term), rather than being explored by non-deterministic selection.”
+
+Comments for author
+-------------------
+l. 140 — couldn’t a let be also written as a desugared lambda?
+
+l. 449 — can you elaborate on the challenges of denotational semantics?
+
+l. 1008 —  “its treatment of equality and thus logical variables is rather different to ours.” — can you elaborate?
+
+
+
+Review #123D
+===========================================================================
+
+Overall merit
+-------------
+A. Accept
+
+Reviewer expertise
+------------------
+X. Expert
+
+Paper summary
+-------------
+This paper presents a new take (the Verse calculus/VC) on a calculus for functional logic programming. The functional and logic programming paradigms have been mixed in various forms in the past decades, in languages like MiniKanren, Mercury, TOY and Curry. This last is perhaps the longest-standing FLP language, and VC seems to be most closely inspired by it.
+
+A notable aspect of the paper are that VC’s semantics is not presented in terms of backtracking. Instead, the rewriting-based semantics captures the nondeterminism of VC in a deterministic way, holding on to all results simultaneously. This requires careful scoping of unification variables and containing each unification to the choice (branch) where it occurs.
+
+Also interesting (and useful) are that VC is equipped with two primitive control operators, one and all, to restrict a nondeterministic choice to one result and to reify all results in a list respectively. These are not typically included in primitive calculi for FLP (or LP — though available in practical Prolog implementations as once/1 and findall3, setof/3, bagof/3). These allow additional high-level constructors like conditionals and equivalence of finite choices and lists.
+
+The semantics of FLP, which brings together two paradigms that are relatively simple to define, is surprisingly tricky. The paper gives more than 30 oriented rewrite rules for VC; these are not a deterministic evaluation strategy. The rewrite rules overlap and can be executed in different orders. The calculus is nonterminating, even without an explicit recursion operator, due to the interplay of unification and functions (which can also be witnessed in the type inference of Haskell type-level functions)—-it would be useful to mention this before or near line 820. 
+The authors believe that the rewrite semantics is confluent modulo a further equational theory, and are working on a proof.
+An evaluation strategy (deterministic semantics) and type system are future work.
+
+VC’s semantics gets stuck in a number of different ways. The classic one is that it does not allow unification of functions — this could be backed up with references regarding its undecidability, which is not mentioned. Others are determined by unification variables not being known and thus primitives like + and > being stuck; to preserve the order of results, VC is not willing to defer such stuck operations. Variables quantified outside of one/all cannot be unified inside them; this is different from Prolog. I wonder whether this restriction solves more problems than it creates. More experience with the language would be required to evaluate this design choice.
+
+Assessment
+----------
+I find this new take on FLP very refreshing and inspiring. The presentation is very thoughtful and accessible. I have enjoyed reading it and I think it would be worthwhile presenting this work at POPL.
+
++ refreshing new approach to FLP semantics
++ thoughtful study, presentation and discussion
+
+- no proofs, no operational semantics/implementation (but there is already plenty of content in the paper)
+
+Comments for author
+-------------------
+Other remarks:
+
+The paper does not shed much light on the intended applications of VC. Some indication would have been nice.
+
+The split construct reminds me of the msplit operator in the paper "Backtracking, interleaving, and terminating monad transformers: (functional pearl)” by Kiselyov et al. It is the same?
+
+Constraint Logic Programming techniques would be a way around some ways of getting stuck.
+
+A point of attention with lazy FLP is whether you silently ignore potentially failing unifications.
+
+The related work is perhaps a bit narrowly focused on Curry.
