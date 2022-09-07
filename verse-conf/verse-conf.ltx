@@ -291,7 +291,7 @@
   Verse calculus, \versecalc{}, a new core calculus for functional
   logical programming. Our main contribution is to equip \versecalc{} with a
   small-step rewrite semantics, so that we can reason
-  about a \versecalc{} program in the same way as one does lambda
+  about a \versecalc{} program in the same way as one does with lambda
   calculus; that is, by applying successive rewrites to it.
   This semantics elegantly fills the gap between very high level
   ``magical'' semantics, and very low-level operational semantics.
@@ -500,7 +500,7 @@ It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Head-normal forms}.
-  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple,
+  A head-normal form, |hnf|, is a conventional value: a built-in constant |k| or operator |op|, a tuple
   |tup (v_1,dots,v_n)|, or a lambda term |lam x e|.
 For the built-in constants and operators we use only integer constants, and two representative
 functions |gt| and |add|.
@@ -508,11 +508,9 @@ functions |gt| and |add|.
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
-}
-
-  Remembering that a value can be a lambda, this gives us the full lambda calculus.
-  \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
+For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple. }
+Remembering that a value can be a lambda, this gives us the full lambda calculus.
+\item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 \end{itemize}
 Expressions also include two other key collections of constructs:
 logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
@@ -1165,7 +1163,7 @@ unification would yield an infinitely-nested pair.
 $$
     \rulename{ux-occurs} \quad |x=V^[x]| \; \movesto \; |fail| \quad \text{if }|V| \ne |hole|
 $$
-In this rule, |V| is an \emph{value context}, defined in \cref{fig:syntax}.
+In this rule, |V| is a \emph{value context}, defined in \cref{fig:syntax}.
 So \rulename{ux-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
 that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
 
@@ -1708,10 +1706,10 @@ Our logical variables, introduced by |defKW|, are often called
 are typically introduced as variables that appear on the right-hand side of a function
 definition, but are not bound on the left.  For example, in Curry we can write
 \begin{verbatim}
-     f x | x =:= (a,b) = a where a,b free
+     first x | x =:= (a,b) = a where a,b free
 \end{verbatim}
 Here \verb!a! and \verb!b! are logical variables, not bound on the left; they
-get their values through unification.   In Curry they are explicitly introduced
+get their values through unification (written ``\verb!=:=!'').   In Curry they are explicitly introduced
 by the ``\verb!where a,b free!'' clause, while in many other papers their
 introduction is implicit in the top-level rules, simply by not being bound
 on the left.  Logical variables are
