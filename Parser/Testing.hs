@@ -1,4 +1,5 @@
 module Testing(main) where
+
 import Control.Exception
 import Control.Monad
 import GHC.Stack
@@ -65,7 +66,7 @@ assertEquiv' expectOK name p1 p2 = do
             putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
         else do
             if expectOK
-            then do
+              then do
                 putStrLn $ pos ++ " failure:"
                 putStrLn "The expression"
                 pp p1
@@ -81,7 +82,7 @@ assertEquiv' expectOK name p1 p2 = do
                     print v1
                     putStrLn "resp."
                     print v2
-            else do
+              else do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
       ) (\e -> do
             putStrLn $ pos ++ " failure:"
