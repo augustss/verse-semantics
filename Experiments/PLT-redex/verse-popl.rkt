@@ -2,6 +2,8 @@
 (require redex)
 ; (check-redundancy #t)
 
+; The syntax for e include split, even when not used.
+; Otherwise it cannot occur in the metafunctions; they are not extensible.
 (define-language verse
   (k ::= number)
   (x ::= variable-not-otherwise-mentioned)
@@ -16,6 +18,8 @@
      fail
      (one e)
      (all e)
+     ;; Only used in the SPLIT version
+     (split e v_1 v_2)
      )
   (v ::= x hnf)
   (hnf ::=
@@ -24,7 +28,10 @@
        (arr v ...)
        (lam x e)
        )
-  (op ::= gt add mul mapap)
+  (op ::= gt add sub mul mapap
+      ;; Only used in the SPLIT version
+      cons
+  )
   #:binding-forms
   (lam x e #:refers-to x)
   (exists x e #:refers-to x)
@@ -35,6 +42,10 @@
 (define-metafunction verse
   ++ : v v -> e
   [(++ v_1 v_2) (add (arr v_1 v_2))]
+  )
+(define-metafunction verse
+  -- : v v -> e
+  [(-- v_1 v_2) (sub (arr v_1 v_2))]
   )
 (define-metafunction verse
   ** : v v -> e
@@ -79,6 +90,7 @@
   [(fvs-e fail) ()]
   [(fvs-e (one e)) (fvs-e e)]
   [(fvs-e (all e)) (fvs-e e)]
+  [(fvs-e (split e v_1 v_2)) (union (fvs-e e) (union (fvs-v v_1) (fvs-v v_2)))]
   )
 
 (define-metafunction verse
@@ -179,6 +191,8 @@
       (bar e hole)
       (one hole)
       (all hole)
+      ;; Only used in the SPLIT version
+      (split hole v_1 v_2)
       )
   (CX ::=
       hole
@@ -194,6 +208,8 @@
       (seq ce_1 ce_2)
       (one e)
       (all e)
+      ;; Only used in the SPLIT version
+      (split e v_1 v_2)
       )
   ; Extra context for an arbitrary number of exists
   (Es ::=
@@ -201,6 +217,7 @@
       (exists x Es)
       )
   ; Evaluation context, reduce anywhere except under lambda
+  ; and after bar.
   (E ::=
      hole
      (= E e)
@@ -209,9 +226,16 @@
      (seq e E)
      (exists x E)
      (bar E e)
-     (bar v E) ; don't do second alternative until first is done
+     ; Note: There is no (bar e E).  Evaluating the second
+     ; operand of bar make 'one' uneffective in cutting off
+     ; evaluation that is not needed.
+     ; When using (split f e g) this works, when using (all e)
+     ; we need (bar v E), but that can make (one e) loop when
+     ; using recursion.
      (one E)
      (all E)
+     ;; Only used in the SPLIT version
+     (split E v_1 v_2)
      )
   )
 
@@ -270,6 +294,9 @@
    (--> (add (arr k_1 k_2))
         ,(+ (term k_1) (term k_2))
         "p-add")
+   (--> (sub (arr k_1 k_2))
+        ,(- (term k_1) (term k_2))
+        "p-sub")
    (--> (mul (arr k_1 k_2))
         ,(* (term k_1) (term k_2))
         "p-mul")
@@ -345,7 +372,11 @@
         (where () (intersect (fvs-v v) (x)))
         "subst"
         )
-   ;; XXX missing subst-rec
+   (--> (= x_1 (in-hole V (lam x_2 e)))
+        (= x_1 (in-hole V (lam x_2 (exists x_1 (seq (= x_1 (in-hole V (lam x_2 e))) e)))))
+        (where (x) (intersect (x_1) (fvs-e e)))
+        "subst-rec"
+        )
    (--> (exists x (in-hole Es (in-hole X (= x v))))
         (in-hole Es (in-hole X v))
         (where () (intersect (x) (union (fvs-X X) (fvs-v v))))
@@ -393,6 +424,36 @@
         (side-condition (not (equal? (term X) (term hole))))
         "fail"
         )
+   (--> (in-hole SX (bar fail e))
+        (in-hole SX e)
+        "fail-l"
+        )
+   (--> (in-hole SX (bar e fail))
+        (in-hole SX e)
+        "fail-r"
+        )
+   (--> (in-hole SX (bar (bar e_1 e_2) e_3))
+        (in-hole SX (bar e_1 (bar e_2 e_3)))
+        "assoc-choice"
+        )
+   (--> (in-hole SX (in-hole CX (bar e_1 e_2)))
+        (in-hole SX (bar (in-hole CX e_1) (in-hole CX e_2)))
+        (side-condition (not (equal? (term CX) (term hole))))
+        "choose"
+        )
+   ))
+
+(define-extended-language verse-oneall verse+context
+  (E ::= ....
+     (bar v E)
+  )
+)
+
+(define rules-oneall
+  (extend-reduction-relation
+   rules
+   verse-oneall
+   #:domain e
    ;; One and all
    (--> (one fail)
         fail
@@ -419,38 +480,88 @@
         (arr v)
         "all-value"
         )
-   (--> (in-hole SX (bar fail e))
-        (in-hole SX e)
-        "fail-l"
-        )
-   (--> (in-hole SX (bar e fail))
-        (in-hole SX e)
-        "fail-r"
-        )
-   (--> (in-hole SX (bar (bar e_1 e_2) e_3))
-        (in-hole SX (bar e_1 (bar e_2 e_3)))
-        "assoc-choice"
-        )
-   (--> (in-hole SX (in-hole CX (bar e_1 e_2)))
-        (in-hole SX (bar (in-hole CX e_1) (in-hole CX e_2)))
-        (side-condition (not (equal? (term CX) (term hole))))
-        "choose"
-        )
-   ))
+  )
+)
 
-(define rules*
-  (context-closure rules verse+context E))
+;;;;;;;;;;; SPLIT ;;;;;;;;;;;;;;;;;;;
 
-(define (reduce e)
-  (apply-reduction-relation* rules*
+(define rules-split
+  (extend-reduction-relation
+   rules
+   verse+context
+   #:domain e
+   ;; Primitive operations
+   (--> (split fail v_1 v_2)
+        (v_1 (arr))
+        "split-fail")
+   (--> (split v_0 v_1 v_2)
+        (exists t (seq (= t (v_2 v_0)) (t (lam x fail))))
+        (fresh t)
+        (fresh x)
+        "split-value")
+   (--> (split (bar v_0 e) v_1 v_2)
+        (exists t (seq (= t (v_2 v_0)) (t (lam x e))))
+        (fresh t)
+        (fresh x)
+        "split-choice")
+   (--> (cons (arr v_1 (arr v_2 ...)))
+        (arr v_1 v_2 ...)
+        "cons")
+   (--> (one e)
+        (split e (lam x fail) (lam x (lam y x)))
+        (fresh x)
+        (fresh y)
+        "one")
+   (--> (all e)
+        (exists*
+         (f g)
+         (seq*
+          (= f (lam x (arr)))
+          (= g
+            (lam x
+              (lam y
+                (exists* (t a)
+                  (seq* (= t (split (y (arr)) f g))
+                        (= a (arr x t))
+                        (cons a))))))
+          (split e f g)
+          )
+         )
+        (fresh f)
+        (fresh g)
+        (fresh t)
+        (fresh a)
+        (fresh x)
+        (fresh y)
+        "all")
+  )
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define rules-oneall*
+  (context-closure rules-oneall verse-oneall E))
+
+(define rules-split*
+  (context-closure rules-split verse+context E))
+
+(define (reduce e r)
+  (apply-reduction-relation* r
                              e
                              ;; #:all? #t
                              #:cache-all? #t
                              ;; #:error-on-multiple? #t
    )) 
 
+(define rules-test rules-oneall*)
+; (define test-rules rules-split*)  ;; this is very slow
+
+
 (define (testred x y)
-  (test-equal (reduce x) (list y)))
+  (test-equal (reduce x rules-test) (list y)))
+
+(define (testred1 x y)
+  (test-->>E rules-test x y))
 
 (define test0
   (term (exists a (seq (= a 1) (++ a a)))))
@@ -464,6 +575,10 @@
   (term (if* () (>> 1 2) 2 3)))
 (define test5
   (term (if* (a) (= a 2) a 3)))
+(define test6
+  (term (exists f (seq (= f (lam x (one (bar (= x 0) (:= y (-- x 1) (f y)))))) (f 1)))))
+(define test7
+  (term (exists f (seq (= f (lam x (if* () (= x 0) 99 (:= y (-- x 1) (f y))))) (f 1)))))
 
 (define example1
   (term (exists* (x y z) (seq* (= x (arr y 3)) (= x (arr 2 z)) y))))
@@ -498,16 +613,17 @@
   (testred test3 (term 2))
   (testred test4 (term 3))
   (testred test5 (term 2))
+  (testred1 test6 (term 0))
   ;;;;
   (testred example1 (term 2))
   ;; slow (testred example2 (term 2))
-  (test-->>E rules* example2 (term 2))
+  (testred1 example2 (term 2))
   (testred example3 (term (arr (arr 3 7) (arr 3 5))))
   (testred example4 (term (arr 4 8)))
   (testred example5 (term (arr 27)))
   (testred example6 (term (arr)))
   ;; slow (testred example7 (term (arr 27 10 27)))
-  (test-->>E rules* example7 (term (arr 27 10 27)))
+  (testred1 example7 (term (arr 27 10 27)))
   )
 
 (module+ test
