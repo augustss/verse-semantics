@@ -1,0 +1,205 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+
+\newcommand{\figureRulesI}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
+% The quad indents the lines
+% The \hspace{-..} removes redundant space between rule name column and LHS column
+% that arises because the longest rule name and the longer LHS are not on the same line
+% The \; reduces the spacing around the arrow
+% The >{$} turns on math mode for the arrow column
+
+\rulegroupname{Primitive operations}
+
+\rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
+    $\begin{cases}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{cases}$ \\
+
+\iffullverse
+    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
+    $\left\{\begin{array}{@@{}ll}
+      |()| & \text{if |hnf| is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array}\right.$
+\fi
+
+\rulegroupname{Application}
+
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
+          & if $x \not\in \freevars{v}$ \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\\[-2mm]
+\rulegroupname{Unification}
+
+\rulename{ulit} & |k_1 == k_2| & \movesto
+    & \largerhs{$\begin{cases}
+        |k_1| & \text{if $k_1=k_2$} \\
+        |fail| & \text{otherwise}
+      \end{cases}$} \\
+\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
+    % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
+    & \movesto & \largerhs{$\begin{cases}
+        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
+            & \text{if $m=n$} \\
+        |fail| & \text{otherwise}
+      \end{cases}
+    $}\\
+\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
+\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
+\rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
+\rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
+\rulename{ux5} & |op == hnf| & \movesto & |fail|\\
+\rulename{ux6} & |hnf == op| & \movesto & |fail|\\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & if $|V| \ne |hole|$ \\
+
+\\[-2mm]
+\rulegroupname{Unification variables}
+
+\rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
+    & if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$ \\
+\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
+    &&&& if $|x| \in \freevars{e}$ \\
+\rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
+\rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
+\rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+\rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
+    & if $|X| \ne \hole,\,  x \notin \freevars{X}$\\
+
+\\[-2mm]
+\rulegroupname{Sequencing}
+
+\rulename{seq} & |v ; e| & \movesto & |e| \\
+\rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+\rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+\rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+
+\\[-2mm]
+\rulegroupname{Fail propagation}
+
+\rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
+\rulename{fail}     & |X^[fail]| & \movesto & |fail| & if $|X| \ne \hole$
+
+\end{longtable}
+
+  \caption{The Verse calculus: rewrite rules (1)}
+    \label{fig:general-axioms} \label{fig:rules1}
+\end{figure}
+}
+
+\newcommand{\figureContexts}{
+\begin{figure}
+  $$
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+\iffullverse
+    && \vb & |succeeds hole| \vb |decides hole| \\
+\fi
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
+    \vb |one e| \vb |all e|
+  \end{array}
+   $$
+  \caption{The syntax of contexts}
+    \label{fig:contexts}
+\end{figure}
+}
+
+\newcommand{\figureRulesII}{
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{One and all} \\
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \end{array} \hspace{5mm}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{all-fail} & |all fail| & \movesto & |tup ()| \\
+    \rulename{all-choice} &
+      |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
+    \rulename{all-value} & |all v| & \movesto & |tup v| \\
+    \end{array} \\
+
+    \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+
+\iffullverse
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+\fi
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (2)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+}
+
+% ---------------------- Commenting out the wrong rules ------------------
+% \begin{figure}
+%   $$
+%   \begin{array}{l}
+%     \textbf{Syntax extension} \\
+%     \begin{array}{lr@@{\;}c@@{\;}l}
+%       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+%     \end{array} \\
+%     \\
+%     \textbf{Axiom extension} \\
+%     \begin{array}{lr@@{\;}c@@{\;}ll}
+%     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
+%     \rulename{unify-wrong-1} & |(lam x_1 e_1) = (lam x_2 e_2)| & \movesto & |wrong| \\
+%     \rulename{unify-wrong-2} & |(lam x e) == hnf| & \movesto & |wrong|\\
+%     \rulename{unify-wrong-3} & |hnf == (lam x e)| & \movesto & |wrong|\\
+%     \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
+% \iffullverse
+%     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+% \fi
+%     \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
+%     \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
+%     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
+%     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
+%     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
+%     \end{array}
+%   \end{array}
+%   $$
+% \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+% \end{figure}

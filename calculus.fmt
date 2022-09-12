@@ -95,6 +95,7 @@
 %format defKW = "\exists"
 %format def (x) (y) = "\exists" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
+%format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format storeKW = "\textbf{store}"
 %format store (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\,\{" y "\}"

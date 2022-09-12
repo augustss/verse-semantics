@@ -1,0 +1,49 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Syntax} \label{sec:syntax}
+
+\begin{figure}[t]
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\text{Integers}     & k \\
+\text{Variables}    & \multicolumn{3}{l}{x,y,z,f,g} \\
+\text{Tuples}       & s, t  & ::= & k \vb x \vb |arr (t_1, dots, t_n)| \\
+\text{Values}       & v     & ::= & t \vb |lam x e| \\
+\text{Constraints}  & c     & ::= & |v_1 == v_2| \\
+\text{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
+                                    |e_1 choice e_2| \vb |one e| \vb |all e| \\
+\text{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\[0.05in]
+\text{Results}      & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
+\end{array}$$
+\caption{\textbf{The Syntax of the Fresh Verse Calculus.} Values can have
+arbitrarily nested tuples but $\lambda$-terms are never inside a tuple.}
+\label{fig:syntax}
+\end{figure}
+
+
+\begin{figure}[t]
+$$\begin{array}{lcl}
+% \toprule
+\mbox{VC} & & \mbox{FC} \\
+\midrule
+|e_1 == e_2| & \equiv & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| \\
+|e_1; e_2|   & \equiv & |llet _   e_1 e_2                          | \\
+% \bottomrule
+\end{array}$$
+%
+\caption{\textbf{Desugaring VC into FC.} In the above |llet x e_1 e_2| abbreviates |apply1N (lam x e_2) e_1|.}
+\label{fig:desugar}
+%
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcl}
+        \rulename{swap-e} & |v_1 == v_2|     & \equiv & |v_2 == v_1| \\
+        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| \\
+        \rulename{swap-c} & c_1; c_2; e    & \equiv & c_2; c_1; e \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences}}\label{fig:structural-equiv}
+\end{figure}
