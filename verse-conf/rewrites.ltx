@@ -36,7 +36,7 @@
 \rulegroupname{Application}
 
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
-          & if $x \not\in \freevars{v}$ \\
+          & if $x \not\in \freevars{|v|}$ \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
 
 \\[-2mm]
@@ -67,16 +67,16 @@
 \rulegroupname{Unification variables}
 
 \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
-    & if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$ \\
+    & if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$ \\
 \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
-    &&&& if $|x| \in \freevars{e}$ \\
+    &&&& if $|x| \in \freevars{|e|}$ \\
 \rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
-    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
+    & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}$ \\
 \rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
-    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
+    & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}$ \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
-    & if $|X| \ne \hole,\,  x \notin \freevars{X}$\\
+    & if $|X| \ne \hole,\,  x \notin \freevars{|X|}$\\
 
 \\[-2mm]
 \rulegroupname{Sequencing}

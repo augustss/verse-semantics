@@ -76,7 +76,7 @@
 \usepackage[capitalize]{cleveref}   % \cref and \Cref
 \usepackage{textgreek} % \textalpha etc.
 \usepackage{longtable}
-
+\usepackage{xspace}
 
 
 % ---------------- Boxed figures ------------------
@@ -120,6 +120,10 @@
 \newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
 \newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
 
+\newcommand{\calcname}{Fresh Calculus\xspace}
+\newcommand{\calcshort}{FC\xspace}
+\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}
+
 % ----------------- Author comments ---------------------
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \definecolor{dkgreen}{rgb}{0,0.3,0}
@@ -142,6 +146,9 @@
 \newcommand{\ranjit}[1]{}
 \fi
 
+
+\input{rewrites}
+
 \begin{document}
 
 \title{A Fresh Calculus for Functional Logic Programming}
@@ -152,7 +159,8 @@
 %% I. value-constraints
 
 \input{01-syntax}
-% \input{02-semantics}
+\input{02-semantics}
+
 % \input{03-examples}
 % \input{04-proof}
 

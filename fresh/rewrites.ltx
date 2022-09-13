@@ -4,99 +4,99 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
-\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+\newcommand{\rulegroupname}[1]{\multicolumn{5}{l}{\textit{#1}}\\}
+
+\newcommand{\figureSyntaxI}{
+\begin{figure}[t]
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\text{Integers}     & k \\
+\text{Variables}    & \multicolumn{3}{l}{x,y,z,f,g} \\
+\text{Tuples}       & s, t  & ::= & k \vb x \vb |arr (t_1, dots, t_n)| \\
+\text{Values}       & v     & ::= & t \vb |lam x e| \\
+\text{Constraints}  & c     & ::= & |v_1 == v_2| \\
+\text{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
+                                    |e_1 choice e_2| \vb |one e| \vb |all e| \\
+\text{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\[0.05in]
+\text{Results}      & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
+\end{array}$$
+\caption{\textbf{\calcname: Syntax.}}
+\label{fig:syntax}
+\end{figure}
+
+\mypara{Note:} Values can have arbitrarily nested tuples but $\lambda$-terms are never inside a tuple.
+
+\begin{figure}[t]
+$$\begin{array}{lcl}
+\mbox{VC} & & \mbox{FC} \\
+\midrule
+|e_1 == e_2| & \equiv & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| \\
+|e_1; e_2|   & \equiv & |llet _   e_1 e_2                          | \\
+\end{array}$$
+%
+\caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.}
+\label{fig:desugar}
+%
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcl}
+        \rulename{swap-e} & |v_1 == v_2|     & \equiv & |v_2 == v_1| \\
+        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| \\
+        \rulename{swap-c} & c_1; c_2; e    & \equiv & c_2; c_1; e \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences}}\label{fig:structural-equiv}
+\end{figure}
+}
 
 \newcommand{\figureRulesI}{
 \begin{figure}
-\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
+% \begin{longtable}{l r >{$}c<{$} l l}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+% \begin{longtable}{lrcll}
 % The quad indents the lines
 % The \hspace{-..} removes redundant space between rule name column and LHS column
 % that arises because the longest rule name and the longer LHS are not on the same line
 % The \; reduces the spacing around the arrow
 % The >{$} turns on math mode for the arrow column
 
-\rulegroupname{Primitive operations}
+\rulegroupname{Unification}
 
-\rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
-\rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
-    $\begin{cases}
-      |k_1| & \text{if $k_1 > k_2$} \\
-      |fail| & \text{otherwise}
-      \end{cases}$ \\
+\rulename{ulit} & |k == k ; e|                                    & \movesto & e \\
+\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & |v_1==v1';dots;v_n==v_n'; e| \\[0.05in]
 
-\iffullverse
-    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
-    $\left\{\begin{array}{@@{}ll}
-      |()| & \text{if |hnf| is an integer} \\
-      |fail| & \text{otherwise}
-      \end{array}\right.$
-\fi
+\rulegroupname{Substitution}
+
+\rulename{subst-t}         & |x == t ;  E^[x]| & \movesto & |x == t ; E^[t]| \\
+\rulename{subst-$\lambda$} & |x == (lam y e) ;  A^[x]| & \movesto & |x == (lam y e) ; A^[lam y e]| \\[0.05in]
 
 \rulegroupname{Application}
 
-\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
-          & if $x \not\in \freevars{v}$ \\
-\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
+% \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
 
-\\[-2mm]
-\rulegroupname{Unification}
+\rulegroupname{Consolidation}
 
-\rulename{ulit} & |k_1 == k_2| & \movesto
-    & \largerhs{$\begin{cases}
-        |k_1| & \text{if $k_1=k_2$} \\
-        |fail| & \text{otherwise}
-      \end{cases}$} \\
-\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
-    % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
-    & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
-            & \text{if $m=n$} \\
-        |fail| & \text{otherwise}
-      \end{cases}
-    $}\\
-\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
-\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
-\rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
-\rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
-\rulename{ux5} & |op == hnf| & \movesto & |fail|\\
-\rulename{ux6} & |hnf == op| & \movesto & |fail|\\
-\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & if $|V| \ne |hole|$ \\
+\rulename{cons-def}     & |c ; def x e|             & \movesto & |def x (c ; e)|          & if $|x| \not \in \freevars{|c|}$\\
+\rulename{cons-fun-cst} & |apply1 (c ; e_1) e_2|    & \movesto & |c; apply1 e_1 e_2| \\
+\rulename{cons-fun-def} & |apply1 (def x e_1) e_2|  & \movesto & |def x (apply1 e_1 e_2)| & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{cons-arg-cst} & |apply1 e_1 (c ; e_2)|    & \movesto & |c ; apply1 e_1 e_2| \\
+\rulename{cons-arg-def} & |apply1 e_1 (def x e_2)|  & \movesto & |def x (apply1 e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\[0.05in]
 
-\\[-2mm]
-\rulegroupname{Unification variables}
+\rulegroupname{Elimination}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if $\forall i. |x_i| \not \in \freevars{|e|}$\\[0.05in]
 
-\rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
-    & if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$ \\
-\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
-    &&&& if $|x| \in \freevars{e}$ \\
-\rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
-    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
-\rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
-    & if $|x| \notin \freevars{X}\cup \freevars{v}$ \\
-\rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
-\rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
-    & if $|X| \ne \hole,\,  x \notin \freevars{X}$\\
-
-\\[-2mm]
-\rulegroupname{Sequencing}
-
-\rulename{seq} & |v ; e| & \movesto & |e| \\
-\rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
-\rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
-\rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
-
-\\[-2mm]
-\rulegroupname{Fail propagation}
-
-\rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
-\rulename{fail}     & |X^[fail]| & \movesto & |fail| & if $|X| \ne \hole$
-
+\rulegroupname{Obliteration}
+% [FAIL-U]   l = <...>; e    -> FAIL
+% [FAIL-U]   l = l’; e       -> FAIL
+% [FAIL-U]   \_._ = \_._ ; e -> FAIL
+% [FAIL-U]   \_._ = <…> ; e  -> FAIL
+% [FAIL-OCC] x=t; e          -> FAIL                  IF x in FV(t), x != v
+% [FAIL-C]   FAIL; e         -> FAIL
+% [FAIL-E]   c; FAIL         -> FAIL
+% [FAIL-D]   ex x. FAIL      -> FAIL
 \end{longtable}
-
-  \caption{The Verse calculus: rewrite rules (1)}
-    \label{fig:general-axioms} \label{fig:rules1}
+\caption{\textbf{\calcname: Rewrite Rules.}}\label{fig:rules}
 \end{figure}
 }
 
@@ -164,42 +164,3 @@
     \label{fig:rules2}  \label{fig:choice}
 \end{figure}
 }
-
-% ---------------------- Commenting out the wrong rules ------------------
-% \begin{figure}
-%   $$
-%   \begin{array}{l}
-%     \textbf{Syntax extension} \\
-%     \begin{array}{lr@@{\;}c@@{\;}l}
-%       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
-%     \end{array} \\
-%     \\
-%     \textbf{Axiom extension} \\
-%     \begin{array}{lr@@{\;}c@@{\;}ll}
-%     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-%     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
-%     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
-%     \rulename{unify-wrong-1} & |(lam x_1 e_1) = (lam x_2 e_2)| & \movesto & |wrong| \\
-%     \rulename{unify-wrong-2} & |(lam x e) == hnf| & \movesto & |wrong|\\
-%     \rulename{unify-wrong-3} & |hnf == (lam x e)| & \movesto & |wrong|\\
-%     \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
-% \iffullverse
-%     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
-%     \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
-%     \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
-%     \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
-%     \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
-% \fi
-%     \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
-%     \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
-%     \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
-%     \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
-%     \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
-%     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
-%     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
-%     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
-%     \end{array}
-%   \end{array}
-%   $$
-% \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
-% \end{figure}
