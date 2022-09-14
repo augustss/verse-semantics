@@ -48,6 +48,10 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
+%format xs = "\overline{x}"
+%format cs = "\overline{c}"
+%format rs = "\overline{r}"
+%format vs = "\overline{\mathit{v}}"
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"
@@ -248,6 +252,20 @@
 %format p_1
 %format p_2
 %format p_n
+
+%format t_0
+%format t_1
+%format t_2
+%format t_k
+%format t_n
+
+%format r_0
+%format r_1
+%format r_2
+%format r_k
+%format r_n
+
+
 
 %format fun = "\mathit{fun}"
 
