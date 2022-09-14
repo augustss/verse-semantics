@@ -21,7 +21,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Constraints}  & c     & ::= & |v_1 == v_2| \\
 \textit{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
                                     |e_1 choice e_2| \vb |one e| \vb |all e| \\
-\textit{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\[0.05in]
+\textit{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
 \textit{Results}      & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
 \end{array}$$
 \caption{\textbf{\calcname: Syntax.} Note no $\lambda$-terms in tuples.}
@@ -110,7 +110,7 @@ $$\begin{array}{lrcl}
 \begin{figure}
 \begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
   \rulegroupname{Decision}
-    \rulename{choose}     & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| \\
+    \rulename{choose}     & |D^[e_1 choice e_2]| & \movesto & |D^[e_1] choice D^[e_2]| \\
     \rulename{choose-l}   & |e choice fail|       & \movesto & |e| \\
     \rulename{choose-r}   & |fail choice e|       & \movesto & |e| \\[0.05in]
 
@@ -128,28 +128,39 @@ $$\begin{array}{lrcl}
 
 \newcommand{\figureContexts}{
 \begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Value Contexts}      & V & ::= & \hole \vb |tup (t_1, dots ,V, dots, t_n)| \vb |lam x E| \\
+\textit{Constraint Contexts} & C & ::= & |V == v| \vb |v == V| \\
+\textit{Expression Contexts} & E & ::= & V \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1 E e| \vb |apply1 e E| \\
+                             &   & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+\textit{Decision Contexts}   & D & ::= & \hole \vb |def x D| \vb |c ; D| \vb |apply1 D e| \vb |apply1 e D| \\
+\end{array}$$
+\caption{\textbf{The Syntax of contexts}} \label{fig:contexts}
+\end{figure}
+}
+
+\newcommand{\figureWellformed}{
+\begin{figure}
 \begin{verbatim}
-(val-ctx)  V ::= * | <t…,V,t…> | \x.E
-(cst-ctx)  C ::= V = v | v = V
-(exp-ctx)  E ::= V | ex x. E | C; e | c; E |  E e | e E
-(dec-ctx)  D ::= * | ex x. D | c; D | D e | e D
+ ------------------------[WF-Val]
+ |- v ~> (\emp, \emp, v)
+
+ |- r ~> (xs ; cs ; v)
+ ----------------------------[WF-Def]
+ |- ex x. r ~> (x,xs ; cs ; v)
+
+ |- r ~> (xs; cs; v)  x not in xs
+ --------------------------------------[WF-Lam]
+ |- x = lam ... ; r ~>  (xs; x=lam ... , c; v)
+
+ |- r ~> (\cdot, \cdot, \cdot)
+ ----------------------------[WF-one]
+ |- r
+
+ |- r ~> (xs; cs; v)    |- rs ~> (xs', cs', vs')
+ ---------------------------------------------[WF-many]
+ |- r,rs ~> (xs,xs' ; cs,cs ; v,vs')
 \end{verbatim}
-  % $$
-  %   \begin{array}{lr@@{\;}c@@{\;}l}
-  %   \textit{Expression  Contexts} & E & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-  %   \textit{Application Contexts} & A & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
-  %   \textit{Decision Contexts}    & D & ::= & \hole \vb
-
-  %   D = * | ex x. D | c; D | D e | e D
-
-  %   \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-  %   \vb |one hole| \vb |all hole| \\
-
-  %   \textit{Decision Contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-  %   \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
-  %   \vb |one e| \vb |all e|
-  % \end{array}
-  %  $$
-  \caption{\textbf{The syntax of contexts}} \label{fig:contexts}
+\caption{\textbf{Well-formedness of Results}}
 \end{figure}
 }
