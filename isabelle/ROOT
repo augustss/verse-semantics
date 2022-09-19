@@ -10,4 +10,5 @@ theories
   RulesClosed
   NoStutter
   LocalConfluence
+  Beta
   "U-E-confluence"
