@@ -11,6 +11,7 @@
   (e ::=
      v
      (v_1 v_2)
+     (v)
      (= e_1 e_2)
      (seq e_1 e_2)
      (exists x e)
@@ -20,6 +21,7 @@
      (all e)
      ;; Only used in the SPLIT version
      (split e v_1 v_2)
+     (cons v_1 v_2)
      )
   (v ::= x hnf)
   (hnf ::=
@@ -27,10 +29,11 @@
        op
        (arr v ...)
        (lam x e)
+       (thunk e)
        )
   (op ::= gt add sub mul mapap
       ;; Only used in the SPLIT version
-      cons
+      ;; cons
   )
   #:binding-forms
   (lam x e #:refers-to x)
@@ -83,6 +86,7 @@
   fvs-e : e -> (x ...)
   [(fvs-e v) (fvs-v v)]
   [(fvs-e (v_1 v_2)) (union (fvs-v v_1) (fvs-v v_2))]
+  [(fvs-e (v)) (fvs-v v)]
   [(fvs-e (= e_1 e_2)) (union (fvs-e e_1) (fvs-e e_2))]
   [(fvs-e (seq e_1 e_2)) (union (fvs-e e_1) (fvs-e e_2))]
   [(fvs-e (exists x e)) (subtract (fvs-e e) (x))]
@@ -91,6 +95,7 @@
   [(fvs-e (one e)) (fvs-e e)]
   [(fvs-e (all e)) (fvs-e e)]
   [(fvs-e (split e v_1 v_2)) (union (fvs-e e) (union (fvs-v v_1) (fvs-v v_2)))]
+  [(fvs-e (cons v_1 v_2)) (union (fvs-v v_1) (fvs-v v_2))]
   )
 
 (define-metafunction verse
@@ -105,6 +110,7 @@
   [(fvs-hnf op) ()]
   [(fvs-hnf (arr v ...)) (unions (fvs-v v) ...)]
   [(fvs-hnf (lam x e)) (subtract (fvs-e e) (x))]
+  [(fvs-hnf (thunk e)) (fvs-e e)]
   )
 
 (define-metafunction verse
@@ -136,14 +142,14 @@
 (define-metafunction verse
   if* : (x ...) e e e -> e
   [(if* (x ...) e_1 e_2 e_3)
-   (exists vvv (seq (= vvv (one (bar (exists* (x ...) (seq e_1 (lam dummy e_2))) (lam dummy e_3))))
-                    (vvv (arr))))
+   (exists vvv (seq (= vvv (one (bar (exists* (x ...) (seq e_1 (thunk* e_2))) (thunk* e_3))))
+                    (force* vvv)))
    ] ;; (fresh vvv)
   )
 
 (define-metafunction verse
   for* : (x ...) e e -> e
-  [(for* (x ...) e_1 e_2) (:= aaa (all (exists* (x ...) (seq e_1 (lam dummy e_2)))) (mapap aaa))
+  [(for* (x ...) e_1 e_2) (:= aaa (all (exists* (x ...) (seq e_1 (thunk* e_2)))) (mapap aaa))
   ] ;; (fresh aaa)
   )
 
@@ -308,14 +314,18 @@
         fail
         (side-condition (not (> (term k_1) (term k_2))))
         "p-gt-2")
-   (--> (mapap (arr (lam x e) ...))
+   (--> (mapap (arr (thunk* e) ...))
         (array e ...)
         "p-map-ap")
    ;; Application
    (--> ((lam x e) v)
-        (exists t (seq (= t v) (substitute e x t)))
-        (fresh t)  ;; Use a fresh variable instead of a fvs side condition
+        ;; (exists t (seq (= t v) (substitute e x t)))
+        ;; (fresh t)  ;; Use a fresh variable instead of a fvs side condition
+        (substitute e x v) ;; More direct (and faster) beta rule
         "app-beta")
+   (--> ((thunk e))
+        e
+        "app-thunk")
    (--> ((arr v_1 ...) v_2)
         (arr-index v_2 0 (v_1 ...))
         "app-arr"
@@ -485,6 +495,16 @@
 
 ;;;;;;;;;;; SPLIT ;;;;;;;;;;;;;;;;;;;
 
+(define-metafunction verse
+  thunk* : e -> v
+  [(thunk* e) (thunk e)]
+)
+
+(define-metafunction verse
+  force* : v -> e
+  [(force* v) (v)]
+)
+
 (define rules-split
   (extend-reduction-relation
    rules
@@ -492,39 +512,37 @@
    #:domain e
    ;; Primitive operations
    (--> (split fail v_1 v_2)
-        (v_1 (arr))
+        (force* v_1)
         "split-fail")
    (--> (split v_0 v_1 v_2)
-        (exists t (seq (= t (v_2 v_0)) (t (lam x fail))))
+        (exists t (seq (= t (v_2 v_0)) (t (thunk* fail))))
         (fresh t)
         (fresh x)
         "split-value")
    (--> (split (bar v_0 e) v_1 v_2)
-        (exists t (seq (= t (v_2 v_0)) (t (lam x e))))
+        (exists t (seq (= t (v_2 v_0)) (t (thunk* e))))
         (fresh t)
         (fresh x)
         "split-choice")
-   (--> (cons (arr v_1 (arr v_2 ...)))
+   (--> (cons v_1 (arr v_2 ...))
         (arr v_1 v_2 ...)
         "cons")
    (--> (one e)
-        (split e (lam x fail) (lam x (lam y x)))
+        (split e (thunk* fail) (lam x (lam y x)))
         (fresh x)
         (fresh y)
         "one")
    (--> (all e)
         (exists*
-         (f g)
+         (g)
          (seq*
-          (= f (lam x (arr)))
           (= g
             (lam x
               (lam y
-                (exists* (t a)
-                  (seq* (= t (split (y (arr)) f g))
-                        (= a (arr x t))
-                        (cons a))))))
-          (split e f g)
+                (exists* (t)
+                  (seq* (= t (split (force* y) (thunk* (arr)) g))
+                        (cons x t))))))
+          (split e (thunk* (arr)) g)
           )
          )
         (fresh f)
