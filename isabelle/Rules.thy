@@ -177,6 +177,7 @@ definition "ARs =
   rule_Unify_Unifyl \<squnion>
   rule_Unify_Unifyr \<squnion>
   rule_DefFail \<squnion>
+  rule_Fail \<squnion>
   rule_OneFail \<squnion>
   rule_OneChoice \<squnion>
   rule_OneValue \<squnion>

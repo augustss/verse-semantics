@@ -47,5 +47,7 @@ fun seqs :: "exp list \<Rightarrow> exp" where
 | "seqs [x] = x"
 | "seqs (x#xs) = Seq x (seqs xs)"
 
+lemma seqs_Cons[simp]: "xs \<noteq> [] \<Longrightarrow> seqs (x#xs) = Seq x (seqs xs)"
+  by (induction xs) auto
 
 end

@@ -11,4 +11,5 @@ theories
   NoStutter
   LocalConfluence
   Beta
+  OccursCheck
   "U-E-confluence"
