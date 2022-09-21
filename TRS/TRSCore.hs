@@ -30,7 +30,7 @@ instance Show Expr where
   show (a :=: b)        = show' a ++ " = " ++ show' b
   show (a :>: b)        = show' a ++ "; " ++ show' b
   show (a :|: b)        = show' a ++ " | " ++ show' b
-  show (a :@: b)        = show a ++ "@" ++ show b
+  show (a :@: b)        = show a ++ "(" ++ show b ++ ")"
   show Fail             = "fail"
   show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
   show (One a)          = "one {" ++ show a ++ "}"
@@ -41,7 +41,7 @@ instance Parens Expr where
   parens (_ :=: _) = True
   parens (_ :>: _) = True
   parens (_ :|: _) = True
-  parens (_ :@: _) = True
+  parens (_ :@: _) = False
   parens _         = False
 
 instance Eq Expr where
@@ -112,6 +112,16 @@ instance Ord Expr where
     EQ & c = c
     c  & _ = c
 
+hasFail :: Expr -> Bool
+hasFail Fail = True
+hasFail (a :=: b) = hasFail a || hasFail b
+hasFail (a :>: b) = hasFail a || hasFail b
+hasFail (a :|: b) = hasFail a || hasFail b
+hasFail (Def (Bind _ a)) = hasFail a
+hasFail (One a) = hasFail a
+hasFail (All a) = hasFail a
+hasFail _ = False
+
 --------------------------------------------------------------------------------
 
 data Value
@@ -128,8 +138,16 @@ data HNF
 
 data Op
   = Gt
+  | Ge
+  | Lt
+  | Le
+  | Ne
   | Add
+  | Sub
+  | Mul
+  | Div
   | IsInt
+  | MapAp
  deriving ( Eq, Ord )
 
 instance Show Value where
@@ -144,8 +162,16 @@ instance Show HNF where
 
 instance Show Op where
   show Gt    = "gt"
+  show Ge    = "ge"
+  show Lt    = "lt"
+  show Le    = "le"
+  show Ne    = "ne"
   show Add   = "add"
+  show Sub   = "sub"
+  show Mul   = "mul"
+  show Div   = "div"
   show IsInt = "isInt"
+  show MapAp = "mapAp"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -160,8 +186,16 @@ pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
 pattern VLAM v e= HNF (Lam (Bind v e))
 pattern ADD     = HNF (Op Add)
+pattern SUB     = HNF (Op Sub)
+pattern MUL     = HNF (Op Mul)
+pattern DIV     = HNF (Op Div)
 pattern GRT     = HNF (Op Gt)
+pattern GRE     = HNF (Op Ge)
+pattern LST     = HNF (Op Lt)
+pattern LSE     = HNF (Op Le)
+pattern NEQ     = HNF (Op Ne)
 pattern IsINT   = HNF (Op IsInt)
+pattern MAPAP   = HNF (Op MapAp)
 
 --------------------------------------------------------------------------------
 

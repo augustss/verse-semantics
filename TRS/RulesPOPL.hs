@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module RulesPOPL where
 
 import TRS
@@ -129,8 +132,39 @@ rulesPrimOps lhs =
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
  ++
+  do SUB :@: VARR [VINT k1, VINT k2] <- [lhs]
+     pure (INT (k1-k2))
+ ++
+  do MUL :@: VARR [VINT k1, VINT k2] <- [lhs]
+     pure (INT (k1*k2))
+ ++
+  do DIV :@: VARR [VINT k1, VINT k2] <- [lhs]
+     if k2 /= 0
+       then pure (INT (k1+k2))
+       else pure Fail
+ ++
   do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 > k2
+       then pure (INT k1)
+       else pure Fail
+ ++
+  do GRE :@: VARR [VINT k1, VINT k2] <- [lhs]
+     if k1 >= k2
+       then pure (INT k1)
+       else pure Fail
+ ++
+  do LST :@: VARR [VINT k1, VINT k2] <- [lhs]
+     if k1 < k2
+       then pure (INT k1)
+       else pure Fail
+ ++
+  do LSE :@: VARR [VINT k1, VINT k2] <- [lhs]
+     if k1 <= k2
+       then pure (INT k1)
+       else pure Fail
+ ++
+  do NEQ :@: VARR [VINT k1, VINT k2] <- [lhs]
+     if k1 /= k2
        then pure (INT k1)
        else pure Fail
  ++
@@ -138,6 +172,21 @@ rulesPrimOps lhs =
      case hnf of
        Int _ -> pure (ARR [])
        _     -> pure Fail
+ ++
+  do MAPAP :@: VARR vs <- [lhs]
+     pure (mapAp vs)
+
+mapAp :: [Value] -> Expr
+mapAp vs =
+  let xs = take (length vs) $ identsNotIn $ free vs
+      unit = HNF (Arr [])
+  in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
+
+defs :: [Ident] -> Expr -> Expr
+defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
+
+seqs :: [Expr] -> Expr
+seqs = foldl1 (:>:)
 
 --------------------------------------------------------------------------------
 
