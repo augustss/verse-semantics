@@ -154,7 +154,7 @@ core (For2 e1 e2) = do
   ee <- coreD (seqE [e1, e2'])
   ea <- cAll ee
   xa <- newTmp
-  pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp") (Var xa)]
+  pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp$") (Var xa)]
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3

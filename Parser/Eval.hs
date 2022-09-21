@@ -545,7 +545,7 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
                           | otherwise = CFail
 
     -- Use in 'all' desugaring.  mapAp = map ($())
-    f (CUnOp  "mapAp" (VArray vs)) = mkArr vs
+    f (CUnOp  "mapAp$" (VArray vs)) = mkArr vs
 
     -- XXX Stricter than necessary?
     f (CApply (VPrim "cons$") v) | VArray [v1, VArray vs] <- v = CArray $ v1 : vs
