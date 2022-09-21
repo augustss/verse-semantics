@@ -197,7 +197,7 @@ rulesUnificationVariables lhs =
  ++
   do (ctx, Def (Bind x e)) <- execX1 lhs
      let freeX = free (ctx blob)
-         x'    = identNotIn freeX
+         x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
        then pure (Def (Bind x' (ctx (subst [(x,Var x')] e))))
        else pure (Def (Bind x (ctx e)))
