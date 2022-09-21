@@ -106,7 +106,7 @@ instance Ord Expr where
      where
       n  = length vs
       m  = length ws
-    
+    compH xs ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
     compH xs ys a b = a `compare` b
 
     EQ & c = c
@@ -123,6 +123,7 @@ data HNF
   = Int Integer
   | Op Op
   | Arr [Value]
+  | Lam (Bind Expr)
  deriving ( Eq, Ord )
 
 data Op
@@ -139,6 +140,7 @@ instance Show HNF where
   show (Int k)  = show k
   show (Op op)  = show op
   show (Arr vs) = "arr{" ++ intercalate ", " (map show vs) ++ "}"
+  show (Lam (Bind x e)) = "(\\" ++ show x ++ "." ++ show e ++ ")"
 
 instance Show Op where
   show Gt    = "gt"
@@ -156,6 +158,7 @@ pattern ARR vs = Val (VARR vs)
 -- Value
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
+pattern VLAM v e= HNF (Lam (Bind v e))
 pattern ADD     = HNF (Op Add)
 pattern GRT     = HNF (Op Gt)
 pattern IsINT   = HNF (Op IsInt)
@@ -224,6 +227,7 @@ instance Free Value where
 
 instance Free HNF where
   free (Arr vs) = free vs
+  free (Lam bnd)= free bnd
   free _        = []
 
 {-
@@ -250,6 +254,7 @@ instance Term Value where
 
 instance Term HNF where
   subst sub (Arr vs) = Arr (map (subst sub) vs)
+  subst sub (Lam bnd)= Lam (substBind Var subst sub bnd)
   subst sub a        = a
 
 instance Term Expr where

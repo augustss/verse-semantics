@@ -144,6 +144,18 @@ rulesPrimOps lhs =
 rulesApplication lhs =
   do VARR vs :@: v <- [lhs]
      pure (foldr (:|:) Fail [ (Val v :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+ ++
+  do VLAM x e :@: v <- [lhs]
+     let freeV = free v
+         beta y b = Def (Bind y ((VAR y :=: Val v) :>: b))
+     if x `notElem` freeV then
+       pure (beta x e)
+      else do
+       -- The x has to be renamed to avoid capture
+       let freeE = free e
+           x' = identNotIn (freeV ++ freeE)
+           e' = subst [(x, Var x')] e
+       pure (beta x' e')
 
 --------------------------------------------------------------------------------
 

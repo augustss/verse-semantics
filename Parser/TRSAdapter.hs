@@ -2,7 +2,7 @@ module TRSAdapter(rewrite) where
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
-import Rules(rules)
+import RulesPOPL(rules)
 import TRS(normalFormsFuel)
 import Expr(Ident(..), noLoc)
 import Core
@@ -39,7 +39,7 @@ coreToTrsH HRat{} = undefined
 coreToTrsH (HPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
 coreToTrsH (HArray vs) = T.Arr $ map coreToTrsV vs
-coreToTrsH HLam{} = undefined
+coreToTrsH (HLam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
 
 coreToTrsI :: Ident -> T.Ident
 coreToTrsI (Ident _ s) = T.Name s
@@ -70,10 +70,30 @@ trsToCoreH :: T.HNF -> HNF
 trsToCoreH (T.Int i) = HInt i
 trsToCoreH (T.Op op) = HPrim $ fromMaybe undefined $ lookup op allOps
 trsToCoreH (T.Arr vs) = HArray $ map trsToCoreV vs
+trsToCoreH (T.Lam (T.Bind x e)) = HLam (trsToCoreI x) (trsToCore e)
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
 trsToCoreI _ = undefined
 
 allOps :: [(T.Op, String)]
-allOps = [(T.Gt, "in'>'"), (T.Add, "in'+'"), (T.IsInt, "isInt$")]
+allOps = [
+{-
+  (T.Gt, "intGT$"),
+  (T.Le, "intGE$"),
+  (T.Lt, "intLT$"),
+  (T.Le, "intLE$"),
+  (T.Ne, "intNE$"),
+-}
+  (T.Gt, "in'>'"),
+  (T.Le, "in'>='"),
+  (T.Lt, "in'<'"),
+  (T.Le, "in'<='"),
+  (T.Ne, "in'<>'"),
+  (T.Add, "in'+'"),
+  (T.Sub, "in'-'"),
+  (T.Mul, "in'*'"),
+  (T.Div, "in'/'"),
+  (T.IsInt, "isInt$"),
+  (T.MapAp, "mapAp$")
+  ]
