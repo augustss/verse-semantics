@@ -20,6 +20,7 @@ isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
 isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+isChoiceFree Wrong     = True
 isChoiceFree _         = False
 -- KC: what about @?
 

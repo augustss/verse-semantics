@@ -119,7 +119,7 @@ runTestFile flg = runTests flg <=< readTests
 
 test :: Bool -> IO ()
 test True = runTestFile defaultFlags "tests.versetest"
-test False = runTestFile defaultFlags{ fSplit = False, fRewrite = True } "tests.versetest"
+test False = runTestFile defaultFlags{ fRewrite = True } "tests.versetest"
 
 main :: IO ()
 main = do
