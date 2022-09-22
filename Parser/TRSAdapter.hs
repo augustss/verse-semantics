@@ -27,7 +27,8 @@ coreToTrs (CDef [] e) = coreToTrs e
 coreToTrs (CDef (i:is) e) = T.Def $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e)
 coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
 coreToTrs CWrong{} = T.Wrong
-coreToTrs e = impossible e
+coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
+coreToTrs e@CMacro{} = impossible e
 
 coreToTrsV :: Value -> T.Value
 coreToTrsV (Var i) = T.Var $ coreToTrsI i
@@ -61,6 +62,7 @@ trsToCore ee@T.Def{} = flat [] ee
 trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
+trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCoreV f) (trsToCoreV g)
 
 trsToCoreV :: T.Value -> Value
 trsToCoreV (T.Var i) = Var (trsToCoreI i)
@@ -95,5 +97,6 @@ allOps = [
   (T.Mul, "in'*'"),
   (T.Div, "in'/'"),
   (T.IsInt, "isInt$"),
-  (T.MapAp, "mapAp$")
+  (T.MapAp, "mapAp$"),
+  (T.Cons, "cons$")
   ]

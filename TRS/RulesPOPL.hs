@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 module RulesPOPL where
@@ -19,6 +19,7 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
+isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
 isChoiceFree _         = False
 -- KC: what about @?
 
@@ -110,6 +111,9 @@ scopeX lhs =
  ++
   do All hole <- [lhs]
      pure (All, hole)
+ ++
+  do Split hole f g <- [lhs]
+     pure (\ e -> Split e f g, hole)
 
 -- value contexts
 -- V context
@@ -135,6 +139,7 @@ rules = rulesPrimOps
     +++ rulesOne
     +++ rulesAll
     +++ rulesFail
+    +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -197,12 +202,16 @@ rulesPrimOps lhs =
   "P-MAPAP" `name`
   do MAPAP :@: VARR vs <- [lhs]
      pure (mapAp vs)
+ ++
+  "P-CONS" `name`
+  do CONS :@: VARR [v, VARR vs] <- [lhs]
+     pure (ARR (v:vs))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-      unit = HNF (Arr [])
+      unit = VARR []
       defs :: [Ident] -> Expr -> Expr
       defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
       seqs :: [Expr] -> Expr
@@ -255,11 +264,11 @@ rulesUnification lhs =
      pure Fail
  ++
   "UX3" `name`
-  do Val (HNF (Lam _)) :=: Val (HNF _) <- [lhs]
+  do Val (VLAM _ _) :=: Val (HNF _) <- [lhs]
      pure Fail
  ++
   "UX4" `name`
-  do Val (HNF _) :=: Val (HNF (Lam _)) <- [lhs]
+  do Val (HNF _) :=: Val (VLAM _ _) <- [lhs]
      pure Fail
  ++
   "UX5" `name`
@@ -292,9 +301,9 @@ rulesUnificationVariables lhs =
  ++
   "SUBST-REC" `name`
   do VAR x :=: Val v <- [lhs]
-     (ctx, HNF (Lam (Bind y e))) <- valueX v
+     (ctx, VLAM y e) <- valueX v
      guard (x `elem` free e)
-     pure (VAR x :=: Val (ctx (HNF (Lam (Bind y (Def (Bind x (lhs :>: e))))))))
+     pure (VAR x :=: Val (ctx (VLAM y (Def (Bind x (lhs :>: e))))))
  ++
   "DEF-ELIML" `name`
   do Def (Bind x a) <- [lhs]
@@ -408,7 +417,6 @@ rulesOne lhs =
   do One (Val v) <- [lhs]
      pure (Val v)
 
--- XXX wrong, not like the paper
 rulesAll :: ERule
 rulesAll lhs =
   "ALL-FAIL" `name`
@@ -426,6 +434,26 @@ rulesAll lhs =
   "ALL-VAL" `name`
   do All (Val v) <- [lhs]
      pure (ARR [v])
+
+rulesSplit :: ERule
+rulesSplit lhs =
+  "SPLIT-FAIL" `name`
+  do Split Fail f g <- [lhs]
+     pure (f :@: VARR [])
+ ++
+  "SPLIT-CHOICE" `name`
+  do Split (Val v :|: e) f g <- [lhs]
+     let x:h:_ = identsNotIn (free lhs)
+         gv = VAR h :=: (g :@: v)
+         hlam = Var h :@: VLAM x e
+     pure (Def (Bind h (gv :>: hlam)))
+ ++
+  "SPLIT-VAL" `name`
+  do Split (Val v) f g <- [lhs]
+     let x:h:_ = identsNotIn (free lhs)
+         gv = VAR h :=: (g :@: v)
+         hlam = Var h :@: VLAM x Fail
+     pure (Def (Bind h (gv :>: hlam)))
 
 --------------------------------------------------------------------------------
 
