@@ -11,8 +11,6 @@ import Data.Maybe
 
 --------------------------------------------------------------------------------
 
--- TODO: Lambda's (left out for now to get a first simple version)
-
 data Expr
   = Val Value
   | Expr :=: Expr
