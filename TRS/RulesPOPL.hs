@@ -411,17 +411,21 @@ rulesOne lhs =
 -- XXX wrong, not like the paper
 rulesAll :: ERule
 rulesAll lhs =
-  "ALL-*" `name`
-  do All es <- [lhs]
-     vs     <- choiceVals es
+  "ALL-FAIL" `name`
+  do All Fail <- [lhs]
+     pure (ARR [])
+ ++
+  "ALL-CHOICE" `name`
+  do All es@(_ :|: _) <- [lhs]
+     let choiceVals (Val v) = [[v]]
+         choiceVals (Val v :|: es) = [ v : vs | vs <- choiceVals es ]
+         choiceVals _ = []
+     vs <- choiceVals es
      pure (ARR vs)
- where
-  -- Return [vs] if all are values, or [] is some are non-values
-  choiceVals :: Expr -> [[Value]]
-  choiceVals Fail      = [[]]
-  choiceVals (a :|: b) = [ vs1 ++ vs2 | vs1 <- choiceVals a, vs2 <- choiceVals b ]
-  choiceVals (Val v)   = [[v]]
-  choiceVals _         = []
+ ++
+  "ALL-VAL" `name`
+  do All (Val v) <- [lhs]
+     pure (ARR [v])
 
 --------------------------------------------------------------------------------
 
