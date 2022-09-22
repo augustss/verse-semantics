@@ -92,8 +92,8 @@ testeq(SEq) {all{x:(1,2,3); x}}                        {1,2,3}
 testeq(SEq) {all{x:= :(1,2,3); x}}                     {1,2,3}
 testeq(SEq) {all{x:(1,2,3)}}                           {1,2,3}
 
-testeq(SEq) {t:=type{0|1}; f(x:t):=x+1; f[0]}     {1}
-testeq(SEq) {t:=type{0|1}; f(x:t):=x+1; f[2]}     {:false}
+testeq(SEq) {one{t:=type{0|1}; f(x:t):=x+1; f[0]}}     {1}
+testeq(SEq) {one{t:=type{0|1}; f(x:t):=x+1; f[2]}}     {:false}
 testeq(SEq) {t:=type{:int}; f(x:t):=x+1; f[0]}    {1}
 testeq(SEq) {t:=type{:int}; f(x:t):=x+1; f[()]}   {:false}
 testeq(SEq) {t:=type{:int => :int}; f(x:t):=x[0]; succ(x:int):=x+1; f[succ]}   {1}
@@ -155,8 +155,8 @@ testeq(SEq) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
             for(x := 0|1|2|3)  {(even(x), odd(x))}
             }
             {((1,0), (0,1), (1,0), (0,1))}
-testeq(SEq) {pair := (1, function(n:int){pair[0]}); pair[0]}  {1}
-testeq(SEq) {pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}  {120}
+testeq(SEq) {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
+testeq(SEq) {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
 
 # Function argument matching
 testeq(SEq) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}

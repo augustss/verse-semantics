@@ -373,16 +373,19 @@ rulesFail lhs =
 rulesChoice :: ERule
 rulesChoice lhs =
   "FAIL-L" `name`
-  do Fail :|: e <- [lhs]  -- XXX wrong, no SX
-     pure e
+  do (sx, e) <- scopeX lhs
+     Fail :|: e <- [e]
+     pure (sx e)
  ++
   "FAIL-R" `name`
-  do e :|: Fail <- [lhs]  -- XXX wrong, no SX
-     pure e
+  do (sx, e) <- scopeX lhs
+     e :|: Fail <- [e]
+     pure (sx e)
  ++
   "ASSOC-CHOICE" `name`
-  do (e1 :|: e2) :|: e3 <- [lhs] -- XXX wrong, no SX
-     pure (e1 :|: (e2 :|: e3))
+  do (sx, e) <- scopeX lhs
+     (e1 :|: e2) :|: e3 <- [e]
+     pure (sx (e1 :|: (e2 :|: e3)))
  ++
   "CHOOSE" `name`
   do (sx, e)         <- scopeX lhs
