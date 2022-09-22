@@ -18,8 +18,12 @@ isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
+isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
 isChoiceFree _         = False
 -- KC: what about @?
+
+isChoiceFreeOp :: Op -> Bool
+isChoiceFreeOp _ = True
 
 isVar :: Expr -> Bool
 isVar (VAR _) = True
