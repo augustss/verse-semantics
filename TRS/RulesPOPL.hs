@@ -289,6 +289,12 @@ rulesUnificationVariables lhs =
      guard (x `notElem` freeV)
      pure (subst sub (ctx (VAR x0 :=: Val v)))
  ++
+  "SUBST-REC" `name`
+  do VAR x :=: Val v <- [lhs]
+     (ctx, HNF (Lam (Bind y e))) <- valueX v
+     guard (x `elem` free e)
+     pure (VAR x :=: Val (ctx (HNF (Lam (Bind y (Def (Bind x (lhs :>: e))))))))
+ ++
   "DEF-ELIML" `name`
   do Def (Bind x a) <- [lhs]
      (ctx, VAR x' :=: Val v) <- defX a
