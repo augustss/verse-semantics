@@ -5,7 +5,7 @@ module Eval(
   eval,
   evalSeq,
   replacePrelude,
-  Flags(..)
+  EFlags(..)
   ) where
 import Control.Monad.Identity
 import Control.Monad.State.Strict
@@ -58,13 +58,13 @@ newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
 
-data Flags = Flags
+data EFlags = EFlags
   { traceEval   :: !Bool
   , underLambda :: !Bool
   }
   deriving (Show)
 
-type EvalCore = Flags -> Core -> Core
+type EvalCore = EFlags -> Core -> Core
 
 evalTrace :: String -> (Core -> Core) -> EvalCore
 evalTrace s f flg e | not (traceEval flg) = e'
