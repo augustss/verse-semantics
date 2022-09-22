@@ -144,7 +144,7 @@ rulesPrimOps lhs =
  ++
   do DIV :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k2 /= 0
-       then pure (INT (k1+k2))
+       then pure (INT (k1 `div` k2))
        else pure Fail
  ++
   do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
@@ -233,6 +233,12 @@ rulesUnification lhs =
      pure Fail
  ++
   do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
+     pure Fail
+ ++
+  do Val (HNF (Lam _)) :=: Val (HNF _) <- [lhs]
+     pure Fail
+ ++
+  do Val (HNF _) :=: Val (HNF (Lam _)) <- [lhs]
      pure Fail
  ++
   do VAR x :=: Val val <- [lhs]
