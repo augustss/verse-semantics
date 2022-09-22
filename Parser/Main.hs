@@ -211,7 +211,7 @@ cRewrite c s =
   cTransform (Cores . rewrite 10000 . compile (flags s)) c s
 
 compile :: Flags -> SomeExpr -> Core
-compile s = (if fSimplify s then simpCore else id) . replacePrelude . asCore s
+compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
 
 cDefine :: Run CState
 cDefine =
