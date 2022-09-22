@@ -113,10 +113,10 @@ scopeX lhs =
 
 -- value contexts
 -- V context
-valueX :: Value -> [(Value->Value, Value)]
-valueX lhs =
-  do pure (id, lhs)
- ++
+valueX, valueX1 :: Value -> [(Value->Value, Value)]
+valueX lhs = valueX1 lhs ++ [(id, lhs)]
+  
+valueX1 lhs =
   do VARR vs <- [lhs]
      i <- [0..length vs-1]
      pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs), vs!!i)
@@ -271,8 +271,9 @@ rulesUnification lhs =
      pure Fail
  ++
   "UX-OCCURS" `name`
-  do VAR x :=: Val val <- [lhs]
-     guard (val /= Var x && x `elem` free val)
+  do VAR x :=: Val v <- [lhs]
+     (_, Var x') <- valueX1 v
+     guard (x == x')
      pure Fail
  
 --------------------------------------------------------------------------------
@@ -404,9 +405,10 @@ rulesOne lhs =
   do One (Val v) <- [lhs]
      pure (Val v)
 
--- LA: I think this rule hides problems with the paper rewrite rules.
+-- XXX wrong, not like the paper
 rulesAll :: ERule
 rulesAll lhs =
+  "ALL-*" `name`
   do All es <- [lhs]
      vs     <- choiceVals es
      pure (ARR vs)
