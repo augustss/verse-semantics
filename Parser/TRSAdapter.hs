@@ -8,8 +8,15 @@ import Expr(Ident(..), noLoc)
 import Core
 import Error
 
+import Debug.Trace
+import Print
+
 rewrite :: Int -> Core -> [Core]
-rewrite n = map trsToCore . normalFormsFuel n rules . coreToTrs
+rewrite n = map (trsToCore . snd) . checkOne . normalFormsFuel n rules . coreToTrs
+ where
+  checkOne [x] = [x]
+  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e)) nes)
+                       nes
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)

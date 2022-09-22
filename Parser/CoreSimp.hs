@@ -19,7 +19,7 @@ simpCore =
 -- Get rid of values in Seq
 simpSeq :: Core -> Core
 simpSeq = evalSeq flg
-  where flg = EFlags { underLambda = True, traceEval = False }
+  where flg = EFlags { underLambda = True, traceEval = False, steps = 1000 }
 
 -- This is a version of APP-LAM for inlined 'any'.
 -- I.e., any[e] = e

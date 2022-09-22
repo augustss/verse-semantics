@@ -198,13 +198,13 @@ pattern CONS    = HNF (Op Cons)
 --------------------------------------------------------------------------------
 
 instance Rec Expr where
-  rec r (a :=: b)        = [ a' :=: b | a' <- r a ] ++ [ a :=: b' | b' <- r b ]
-  rec r (a :|: b)        = [ a' :|: b | a' <- r a ] ++ [ a :|: b' | b' <- r b ]
-  rec r (a :>: b)        = [ a' :>: b | a' <- r a ] ++ [ a :>: b' | b' <- r b ]
-  rec r (Def (Bind x a)) = [ Def (Bind x a') | a' <- r a ]
-  rec r (One a)          = [ One a' | a' <- r a]
-  rec r (All a)          = [ All a' | a' <- r a]
-  rec r (Split e f g)    = [ Split e' f g | e' <- r e ]
+  rec r (a :=: b)        = [ (n,a' :=: b) | (n,a') <- r a ] ++ [ (n,a :=: b') | (n,b') <- r b ]
+  rec r (a :|: b)        = [ (n,a' :|: b) | (n,a') <- r a ] ++ [ (n,a :|: b') | (n,b') <- r b ]
+  rec r (a :>: b)        = [ (n,a' :>: b) | (n,a') <- r a ] ++ [ (n,a :>: b') | (n,b') <- r b ]
+  rec r (Def (Bind x a)) = [ (n,Def (Bind x a')) | (n,a') <- r a ]
+  rec r (One a)          = [ (n,One a') | (n,a') <- r a]
+  rec r (All a)          = [ (n,All a') | (n,a') <- r a]
+  rec r (Split e f g)    = [ (n,Split e' f g) | (n,e') <- r e ]
   rec r _                = []
 
 {-

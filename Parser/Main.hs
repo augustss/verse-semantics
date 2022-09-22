@@ -198,12 +198,12 @@ cRun c s = cTransform (Cored . run (flags s) . asCore (flags s)) c s
 cEval :: Run CState
 cEval c s =
   cTransform (Cored . eval flg . compile (flags s)) c s
-  where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s) }
+  where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
 
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
-      flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s) }
+      flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
   cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
 
 cRewrite :: Run CState

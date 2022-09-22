@@ -61,6 +61,7 @@ newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 data EFlags = EFlags
   { traceEval   :: !Bool
   , underLambda :: !Bool
+  , steps       :: !Int
   }
   deriving (Show)
 
@@ -76,7 +77,7 @@ evalTrace s f flg e | not (traceEval flg) = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop 1000 $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop (steps trc) $ evalTrace "eval" (const ea) trc (CWrong"")
   where
     -- HACK: Recognizer when we have loaded the prelude.verse file
     hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False

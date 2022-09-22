@@ -6,7 +6,7 @@ import qualified Data.Set as S
 
 --------------------------------------------------------------------------------
 
-type Rule a = a -> [a]
+type Rule a = a -> [(String, a)]
 
 (+++) :: Rule a -> Rule a -> Rule a
 r1 +++ r2 = \x -> r1 x ++ r2 x
@@ -15,19 +15,19 @@ r1 +++ r2 = \x -> r1 x ++ r2 x
 -- At the moment this is just documentation,
 --  but could be incorporated into the Rule.
 infix 6 `name`   -- must bind tighter than ++
-name :: String -> a -> a
-name _ a = a
+name :: String -> [a] -> [(String, a)]
+name s as = [(s,a) | a <- as]
 
 --------------------------------------------------------------------------------
 
 class Rec t where
-  rec :: (t -> [t]) -> t -> [t]
+  rec :: Rule t -> Rule t
 
 step1 :: Rec a => Rule a -> a -> Maybe a
 step1 rule t =
   case apply t of
-    t' : _ -> Just t'
-    _      -> Nothing
+    (_,t') : _ -> Just t'
+    _           -> Nothing
  where
   apply t = rule t ++ rec apply t
 
@@ -36,26 +36,30 @@ steps rule t = t : case step1 rule t of
                      Nothing -> []
                      Just t' -> steps rule t'
 
-step :: (Ord a, Rec a) => Rule a -> a -> [a]
+step :: (Ord a, Rec a) => Rule a -> Rule a
 step rule t = nub (apply t)
  where
   apply t = rule t ++ rec apply t
 
-normalForms :: (Ord a, Rec a) => Rule a -> a -> [a]
+normalForms :: (Ord a, Rec a) => Rule a -> a -> [(String, a)]
 normalForms rule t = normalFormsFuel (-1) rule t
 
-normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [a]
-normalFormsFuel n rule t = go n S.empty [t]
+normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [(String,a)]
+normalFormsFuel n rule t =
+    case step rule t of
+      [] -> [("refl", t)]
+      ts -> go n S.empty ts
  where
   go 0 _    _           = []
   go n seen []          = []
-  go n seen (t:ts)
+  go n seen ((name,t):ts)
     | t `S.member` seen = go n seen ts
-    | null ts'          = t : go n seen' ts
+    | null ts'          = (name,t) : go n seen' ts
     | otherwise         = go (n-1) seen' (ts' ++ ts)
    where
     seen' = S.insert t seen
-    ts'   = step rule t
+    ts'   = map tag $ step rule t
+    tag (x,y) = (name ++ ";" ++ x, y)
 
 --
 
