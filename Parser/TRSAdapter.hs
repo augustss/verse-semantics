@@ -74,7 +74,7 @@ trsToCoreH (T.Lam (T.Bind x e)) = HLam (trsToCoreI x) (trsToCore e)
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
-trsToCoreI _ = undefined
+trsToCoreI (T.Prim i) = Ident noLoc $ "$" ++ show i
 
 allOps :: [(T.Op, String)]
 allOps = [
@@ -86,7 +86,7 @@ allOps = [
   (T.Ne, "intNE$"),
 -}
   (T.Gt, "in'>'"),
-  (T.Le, "in'>='"),
+  (T.Ge, "in'>='"),
   (T.Lt, "in'<'"),
   (T.Le, "in'<='"),
   (T.Ne, "in'<>'"),
