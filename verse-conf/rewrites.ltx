@@ -114,6 +114,9 @@
     \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
     \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
   \end{array}
    $$
   \caption{The syntax of contexts}
