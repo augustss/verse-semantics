@@ -11,6 +11,13 @@ type Rule a = a -> [a]
 (+++) :: Rule a -> Rule a -> Rule a
 r1 +++ r2 = \x -> r1 x ++ r2 x
 
+-- This is used to give rules names.
+-- At the moment this is just documentation,
+--  but could be incorporated into the Rule.
+infix 6 `name`   -- must bind tighter than ++
+name :: String -> a -> a
+name _ a = a
+
 --------------------------------------------------------------------------------
 
 class Rec t where
