@@ -149,12 +149,16 @@ core (Define i e) = cUnify (CVar i) <$> core e
 core AnyT = undefined
 core Fail = pure $ CBar []
 core (For2 e1 e2) = do
-  e2' <- thunk e2
+  useSplit <- ask
+  if useSplit then
+    forSplit e1 e2
+   else do
+    e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
-  ee <- coreD (seqE [e1, e2'])
-  ea <- cAll ee
-  xa <- newTmp
-  pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp$") (Var xa)]
+    ee <- coreD (seqE [e1, e2'])
+    ea <- cAll ee
+    xa <- newTmp
+    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp$") (Var xa)]
 core (If3 e1 e2 e3) = do
   e2' <- thunk e2
   e3' <- thunk e3
@@ -174,6 +178,31 @@ coreEffs [] e = pure e
 coreEffs [Ident _ "decides"] e = cDecides e
 coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
+
+forSplit :: Expr -> Expr -> C Core
+forSplit e1 e2 = do
+  f <- newTmp
+  g <- newTmp
+  u <- newTmp
+  x <- newTmp
+  y <- newTmp
+  a <- newTmp
+  b <- newTmp
+  let vs = getVisible e1
+  e1' <- coreD (Seq [e1, Array $ map Variable vs])
+  e2' <- coreD e2
+  let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
+      gDef e = CDef [g] (cSeq [CUnify (CVar g) $
+                               CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
+                                  CUnify (CVar x) (CArray $ map Var vs),
+                                  CUnify (CVar a) e2',
+                                  CUnify (CVar b) (CSplit (CApply (Var y) (VArray [])) (Var f) (Var g)),
+                                  CApply (VPrim "cons$") (VArray [Var a, Var b])
+                                  ],
+                               e
+                              ])
+
+  pure $ fDef $ gDef $ CSplit e1' (Var f) (Var g)
 
 cOne :: Core -> C Core
 cOne e = do
