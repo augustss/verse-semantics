@@ -2,6 +2,8 @@
 module TRS where
 
 import qualified Data.Set as S
+import Data.List ( intercalate )
+import Control.Monad( when )
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
@@ -46,20 +48,38 @@ normalForms rule t = normalFormsFuel (-1) rule t
 
 normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [(String,a)]
 normalFormsFuel n rule t =
-    case step rule t of
-      [] -> [("refl", t)]
-      ts -> go n S.empty ts
+  [ (sequ (filter (not . null) (map fst tr)), snd (last tr))
+  | tr <- normalFormsFuelTrace n rule t
+  ]
+ where
+  sequ [] = "refl"
+  sequ as = intercalate ";" as
+
+-- traces are produced in reverse order, i.e. final result first
+normalFormsTrace :: (Ord a, Rec a) => Rule a -> a -> [[(String, a)]]
+normalFormsTrace rule t = normalFormsFuelTrace (-1) rule t
+
+normalFormsFuelTrace :: (Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
   go 0 _    _           = []
   go n seen []          = []
-  go n seen ((name,t):ts)
-    | t `S.member` seen = go n seen ts
-    | null ts'          = (name,t) : go n seen' ts
-    | otherwise         = go (n-1) seen' (ts' ++ ts)
+  go n seen (tr@((_,t):_):trs)
+    | t `S.member` seen = go n seen trs
+    | null ts'          = tr : go n seen' trs
+    | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
    where
     seen' = S.insert t seen
-    ts'   = map tag $ step rule t
-    tag (x,y) = (name ++ ";" ++ x, y)
+    ts'   = step rule t
+
+printTrace :: (Show a) => [(String,a)] -> IO ()
+printTrace tr =
+  sequence_
+  [ do print t
+       when (not (null n)) $
+         putStrLn ("  <--" ++ n ++ "--")
+  | (n,t) <- tr
+  ]
 
 --
 

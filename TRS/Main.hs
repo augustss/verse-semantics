@@ -5,6 +5,7 @@ import RulesPOPL
 import TRS
 import Bind
 import Test.QuickCheck
+import qualified Data.Map as M
 
 --------------------------------------------------------------------------------
 
@@ -20,11 +21,15 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 main = quickCheck prop_NormalForms
 
 prop_NormalForms p =
-  let qs = normalFormsFuel 999 rules p in
-    case nub (map norm qs) of
-      []          -> whenFail (print "DOES NOT TERMINATE") False
-      q1 : q2 : _ -> whenFail (print (qs!!0) >> print (qs!!1)) False
-      _           -> property True
+  let trs = normalFormsFuelTrace 99 rules p in
+    case M.toList (M.fromList [ (norm q,tr) | tr@((_,q):_) <- trs ]) of
+      (_,tr1):(_,tr2):_ ->
+        whenFail (do printTrace tr1
+                     putStrLn "----"
+                     printTrace tr2) False
+
+      [] -> whenFail (print "DOES NOT TERMINATE") True
+      _  -> property True
 
 --------------------------------------------------------------------------------
 
