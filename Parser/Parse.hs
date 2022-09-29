@@ -6,7 +6,7 @@ module Parse(
   P) where
 
 import Control.Monad
-import Control.Monad.Combinators.Expr
+import OpParser
 import Data.Char
 import Data.Maybe
 import Data.Void
@@ -56,8 +56,8 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
-keywords = ["array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "of", "option", "set", "then", "var", "where"] ++
+keywords = ["and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
+           , "in", "let", "not", "of", "or", "option", "set", "then", "var", "where"] ++
            macros
 
 macros :: [String]
@@ -286,32 +286,49 @@ operatorTablePost =
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
-  [ [preOp ":", preOp "!", preOp "?", preOp "[]"],
+  [ [preOp ":", preOp "not", preOp "?", preOp "[]"],
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
-    [op InfixR "|", op InfixR "~>", op InfixN ".."],
-    [op InfixR ":"] ++ map (op InfixR) [">=", "<=", "<", ">", "<>"],
-    [op InfixR "&&"],
-    [op InfixR "||"],
-    [op InfixN ":=", op InfixL "=", op InfixL ">>"
-    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="],
+    [op InfixR "~>", op InfixN ".."],
+    [op InfixR "|", op InfixN ":"],
+    [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
+    [op InfixR "and"],
+    [op InfixR "or"],
+    [op InfixR ":=", op InfixR ">>"
+    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="
+    ,InfixR defOp
+    ],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
-    [op InfixR "=>"],
-    [op InfixN ":-"]
+    [op InfixR "=>"]
+--  , [op InfixN ":-"]
   ]
   where
     preOp :: String -> Operator P Expr
-    preOp s = Prefix (app <$> pOpL s)
-      where app l x = PrefixOp (Ident l s) x
+    preOp s = Prefix app
+      where app = do
+              l <- oper s
+              pure $ \ x -> PrefixOp (Ident l s) x
 
-    op :: (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
-    op fx s = fx (app <$> oper)
-      where app l x y = InfixOp x (Ident l s) y
-            oper | isAlpha (head s) = getSourcePos <* pKeyword s
-                 | otherwise = pOpL s
+    op :: ((Expr -> P (Expr -> Expr -> Expr)) -> Operator P Expr) -> String -> Operator P Expr
+    op fx s = fx app
+      where
+        app (InfixOp _ (Ident _ ":") _) | s == "=" = fail ":e="
+        app _ = do
+          l <- oper s
+          pure $ \ x y -> InfixOp x (Ident l s) y
+
+    oper s | isAlpha (head s) = getSourcePos <* pKeyword s
+           | otherwise = pOpL s
 
     pOpL s = getSourcePos <* pOp s
+
+    defOp :: Expr -> P (Expr -> Expr -> Expr)
+    defOp (InfixOp _ (Ident _ ":") _) = do
+      l <- pOpL "="
+      traceM "defOp"
+      pure $ \ x y -> InfixOp x (Ident l ":=") y
+    defOp _ = fail "defOp"
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
