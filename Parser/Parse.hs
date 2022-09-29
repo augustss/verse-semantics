@@ -326,7 +326,6 @@ operatorTable =
     defOp :: Expr -> P (Expr -> Expr -> Expr)
     defOp (InfixOp _ (Ident _ ":") _) = do
       l <- pOpL "="
-      traceM "defOp"
       pure $ \ x y -> InfixOp x (Ident l ":=") y
     defOp _ = fail "defOp"
 
