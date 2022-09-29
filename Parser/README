@@ -1,3 +1,11 @@
+A simple interpreter for the pure fragment of Verse.
+It desugars the source Verse expression into Core
+and can run it using
+  :eval      uses the rules, but with various shortcuts to make
+             it more efficient
+  :rewrite   uses exactly the POPL rules and explores all possible
+             execution paths to make sure they all agree
+
 Installing necessary Haskell stuff:
   Get ghcup:
     see https://www.haskell.org/ghcup/
