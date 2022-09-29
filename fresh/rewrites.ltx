@@ -10,6 +10,10 @@
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
 \newcommand{\wff}[4]{\ensuremath{\vdash #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
 \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
+\newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
+\newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
+
 
 \newcommand{\figureSyntaxI}{
 \begin{figure}[t]
@@ -145,32 +149,43 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Head Values}         & hnf & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
 \textit{Choice-free Expr.}   & ce  & ::= & v \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
 \end{array}$$
-\caption{\textbf{The Syntax of contexts}} \label{fig:contexts}
+\caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
 \end{figure}
 }
 
 \newcommand{\figureWellformed}{
 \begin{figure}
-\begin{verbatim}
- ------------------------[WF-Val]
- |- v ~> (\emp, \emp, v)
+% \judgementHead{Wellformedness of Results}{\wf{r}}
+\begin{mathpar}
+\inferrule
+  { \wff{r}{|xs|}{|cs|}{|v|}}
+  { \wf{r} }
+  { \rulename{WF} }
 
- |- r ~> (xs ; cs ; v)
- ----------------------------[WF-Def]
- |- ex x. r ~> (x,xs ; cs ; v)
+\inferrule
+  { }
+  { \wff{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \rulename{WF-Val}}
 
- |- r ~> (xs; cs; v)  x not in xs
- --------------------------------------[WF-Lam]
- |- x = lam ... ; r ~>  (xs; x=lam ... , c; v)
+\inferrule
+  { \wff{r}{|xs|}{|cs|}{|v|} }
+  { \wff{|def x r|}{|x,xs|}{|cs|}{|v|} }
+  { \rulename{WF-Def} }
 
- |- r ~> (\cdot, \cdot, \cdot)
- ----------------------------[WF-one]
- |- r
+\inferrule
+  {\wff{r}{|xs|}{|cs|}{|v|} \quad
+   x \not \in |xs|
+  }
+  {\wff{|x == lam y e; r|}{|xs|}{|x == lam y e, cs|}{|v|}}
+  {\rulename{WF-Lam}}
 
- |- r ~> (xs; cs; v)    |- rs ~> (xs', cs', vs')
- ---------------------------------------------[WF-many]
- |- r,rs ~> (xs,xs' ; cs,cs ; v,vs')
-\end{verbatim}
+\inferrule
+  { \wff{r}{\overline{x}}{\overline{c}}{|v|}
+    \wff{rs}{\overline{x'}}{\overline{c'}}{|vs|}
+  }
+  { \wff{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
+  {\rulename{WF-many}}
+\end{mathpar}
 \caption{\textbf{Well-formedness of Results}}
 \end{figure}
 }
