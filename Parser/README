@@ -1,0 +1,19 @@
+Installing necessary Haskell stuff:
+  Get ghcup:
+    see https://www.haskell.org/ghcup/
+  Install ghc:
+    ghcup install ghc
+  Install cabal:
+    ghcup install cabal
+  Install packages:
+    cabal v1-install megaparsec
+    cabal v1-install QuickCheck
+
+Build:
+  make
+
+Run:  (The UI is a bit sucky.)
+  ./verse
+
+Run tests:
+  ./tests
