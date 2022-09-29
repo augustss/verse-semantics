@@ -90,8 +90,37 @@ pBrackets = between (symbol "[") (symbol "]")
 pAngles :: P a -> P a
 pAngles = between (pOp "<") (pOp ">")
 
+pLiteral :: P Expr
+pLiteral = choice
+  [ LitInt <$> pDecimal
+  , LitChar <$> pChar
+  , LitStr <$> pString
+  ]
+
 pDecimal :: P Integer
 pDecimal = L.decimal <* skip
+
+pChar :: P Char
+pChar = pQuotedChar <|> pCharCode
+
+pQuotedChar :: P Char
+pQuotedChar = char '\'' *> (pPrintableChar <|> pBackslashChar) <* char '\''
+  where pPrintableChar = satisfy isPrint
+        pBackslashChar :: P Char
+        pBackslashChar = do
+          _ <- char '\\'
+          c <- satisfy (const True)
+          case lookup c escs of
+            Nothing -> fail "pQuotedChar"
+            Just c' -> pure c'
+        escs = [('r', '\r'), ('n', '\n'), ('t', '\t')] ++
+               map (\ c -> (c, c)) "'\\{}#<>&~"
+
+pCharCode :: P Char
+pCharCode = fail "unimplemented"
+
+pString :: P String
+pString = fail "pString unimplemented"
 
 -- XXX Needs works
 --pString :: P String
@@ -118,7 +147,7 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
+pAtom = choice [ Variable <$> pIdent, pLiteral, pEmpty
                , Parens <$> pParens pExprSeq, pArray, pMacro1
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))

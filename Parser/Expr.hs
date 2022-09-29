@@ -53,6 +53,8 @@ instance Pretty Ident where
 data Expr
   = LitInt Integer            -- d
   | LitRat Rational           -- d.d
+  | LitChar Char              -- 'c'
+  | LitStr String             -- "str"
   | Variable Ident            -- x
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
@@ -134,6 +136,8 @@ instance Pretty Expr where
           LitRat r
             | denominator r == 1 -> text $ show (numerator r)
             | otherwise -> maybeParens (p >= 9) $ text $ show (numerator r) ++ "/" ++ show (denominator r)
+          LitChar c -> text (show c)
+          LitStr s -> text (show s)
           Array es -> text "array" <> braces (ppSeq l es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
@@ -245,6 +249,8 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 compos _ e@LitInt{} = pure e
 compos _ e@LitRat{} = pure e
+compos _ e@LitChar{} = pure e
+compos _ e@LitStr{} = pure e
 compos _ e@Variable{} = pure e
 compos f (Array es) = Array <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
