@@ -48,6 +48,12 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
+%format xs = "\overline{x}"
+%format cs = "\overline{c}"
+%format rs = "\overline{r}"
+%format vs = "\overline{\mathit{v}}"
+
+
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"
@@ -95,6 +101,7 @@
 %format defKW = "\exists"
 %format def (x) (y) = "\exists" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
+%format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
 %format storeKW = "\textbf{store}"
 %format store (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\,\{" y "\}"
@@ -247,6 +254,20 @@
 %format p_1
 %format p_2
 %format p_n
+
+%format t_0
+%format t_1
+%format t_2
+%format t_k
+%format t_n
+
+%format r_0
+%format r_1
+%format r_2
+%format r_k
+%format r_n
+
+
 
 %format fun = "\mathit{fun}"
 
