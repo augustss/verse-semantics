@@ -207,7 +207,7 @@ dsD = expr
       e' <- expr e
       e'' <- dsM e' (Variable y)
       b' <- expr b
-      pure $ primFcn y $ seqE [e'', Do b']
+      pure $ primFcn y $ If3 e'' b' Fail
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -291,7 +291,7 @@ dsM expr y =
     dflt = pure $ unify y expr
 
 useKnown :: Bool
-useKnown = True
+useKnown = False -- True
 
 data ArrayElem = EElems [Expr] | ESplice Expr
   deriving (Show)
@@ -516,6 +516,7 @@ primOps :: [Ident]
 primOps = map (Ident noLoc)
   [ "isInt$", "isFlt$", "isStr$", "isPtr$", "isArr$", "isFcn$"
   , "in'+'", "in'-'", "in'*'", "in'/'"
+  , "in'<'", "in'<='", "in'>'", "in'>='"
   , "in'<>'"
   , "pre'-'"
   , "post'?'"
@@ -523,7 +524,7 @@ primOps = map (Ident noLoc)
   , "length"
   , "known$"  -- This is a horrible hack
   , "alloc$", "read$", "write$"
-  , "intGT$", "intGE$", "intLT$", "intLE$"
+--  , "intGT$", "intGE$", "intLT$", "intLE$"
   , "in'..'"
   , "wrong"
   , "in'+='", "in'-='", "in'*='", "in'/='"

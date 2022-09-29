@@ -11,8 +11,6 @@ import Data.Maybe
 
 --------------------------------------------------------------------------------
 
--- TODO: Lambda's (left out for now to get a first simple version)
-
 data Expr
   = Val Value
   | Expr :=: Expr
@@ -24,24 +22,26 @@ data Expr
   | All Expr
   | Fail
   | Wrong
+  | Split Expr Value Value
 
 instance Show Expr where
   show (Val v)          = show v
   show (a :=: b)        = show' a ++ " = " ++ show' b
   show (a :>: b)        = show' a ++ "; " ++ show' b
   show (a :|: b)        = show' a ++ " | " ++ show' b
-  show (a :@: b)        = show a ++ "@" ++ show b
+  show (a :@: b)        = show a ++ "(" ++ show b ++ ")"
   show Fail             = "fail"
   show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
   show (One a)          = "one {" ++ show a ++ "}"
   show (All a)          = "all {" ++ show a ++ "}"
   show Wrong            = "wrong"
+  show (Split e v1 v2)  = "split {" ++ show e ++ ", " ++ show v1 ++ ", " ++ show v2 ++ "}"
 
 instance Parens Expr where
   parens (_ :=: _) = True
   parens (_ :>: _) = True
   parens (_ :|: _) = True
-  parens (_ :@: _) = True
+  parens (_ :@: _) = False
   parens _         = False
 
 instance Eq Expr where
@@ -87,6 +87,10 @@ instance Ord Expr where
     comp xs ys (All a) _       = LT
     comp xs ys _       (All b) = GT
     
+    comp xs ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
+    comp xs ys (Split _ _ _) _ = LT
+    comp xs ys _ (Split _ _ _) = GT
+
     comp xs ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
 
     compV xs ys (Var x) (Var y) =
@@ -106,7 +110,7 @@ instance Ord Expr where
      where
       n  = length vs
       m  = length ws
-    
+    compH xs ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
     compH xs ys a b = a `compare` b
 
     EQ & c = c
@@ -123,12 +127,22 @@ data HNF
   = Int Integer
   | Op Op
   | Arr [Value]
+  | Lam (Bind Expr)
  deriving ( Eq, Ord )
 
 data Op
   = Gt
+  | Ge
+  | Lt
+  | Le
+  | Ne
   | Add
+  | Sub
+  | Mul
+  | Div
   | IsInt
+  | MapAp
+  | Cons
  deriving ( Eq, Ord )
 
 instance Show Value where
@@ -139,11 +153,21 @@ instance Show HNF where
   show (Int k)  = show k
   show (Op op)  = show op
   show (Arr vs) = "arr{" ++ intercalate ", " (map show vs) ++ "}"
+  show (Lam (Bind x e)) = "(\\" ++ show x ++ "." ++ show e ++ ")"
 
 instance Show Op where
   show Gt    = "gt"
+  show Ge    = "ge"
+  show Lt    = "lt"
+  show Le    = "le"
+  show Ne    = "ne"
   show Add   = "add"
+  show Sub   = "sub"
+  show Mul   = "mul"
+  show Div   = "div"
   show IsInt = "isInt"
+  show MapAp = "mapAp"
+  show Cons  = "cons"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -152,23 +176,35 @@ instance Show Op where
 pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
+pattern LAM v e= Val (VLAM v e)
 
 -- Value
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
+pattern VLAM v e= HNF (Lam (Bind v e))
 pattern ADD     = HNF (Op Add)
+pattern SUB     = HNF (Op Sub)
+pattern MUL     = HNF (Op Mul)
+pattern DIV     = HNF (Op Div)
 pattern GRT     = HNF (Op Gt)
+pattern GRE     = HNF (Op Ge)
+pattern LST     = HNF (Op Lt)
+pattern LSE     = HNF (Op Le)
+pattern NEQ     = HNF (Op Ne)
 pattern IsINT   = HNF (Op IsInt)
+pattern MAPAP   = HNF (Op MapAp)
+pattern CONS    = HNF (Op Cons)
 
 --------------------------------------------------------------------------------
 
 instance Rec Expr where
-  rec r (a :=: b)        = [ a' :=: b | a' <- r a ] ++ [ a :=: b' | b' <- r b ]
-  rec r (a :|: b)        = [ a' :|: b | a' <- r a ] ++ [ a :|: b' | b' <- r b ]
-  rec r (a :>: b)        = [ a' :>: b | a' <- r a ] ++ [ a :>: b' | b' <- r b ]
-  rec r (Def (Bind x a)) = [ Def (Bind x a') | a' <- r a ]
-  rec r (One a)          = [ One a' | a' <- r a]
-  rec r (All a)          = [ All a' | a' <- r a]
+  rec r (a :=: b)        = [ (n,a' :=: b) | (n,a') <- r a ] ++ [ (n,a :=: b') | (n,b') <- r b ]
+  rec r (a :|: b)        = [ (n,a' :|: b) | (n,a') <- r a ] ++ [ (n,a :|: b') | (n,b') <- r b ]
+  rec r (a :>: b)        = [ (n,a' :>: b) | (n,a') <- r a ] ++ [ (n,a :>: b') | (n,b') <- r b ]
+  rec r (Def (Bind x a)) = [ (n,Def (Bind x a')) | (n,a') <- r a ]
+  rec r (One a)          = [ (n,One a') | (n,a') <- r a]
+  rec r (All a)          = [ (n,All a') | (n,a') <- r a]
+  rec r (Split e f g)    = [ (n,Split e' f g) | (n,e') <- r e ]
   rec r _                = []
 
 {-
@@ -216,6 +252,7 @@ instance Free Expr where
   free (Def bnd) = free bnd
   free (One a)   = free a
   free (All a)   = free a
+  free (Split e f g) = free e `union` free f `union` free g
   free _         = []
 
 instance Free Value where
@@ -224,6 +261,7 @@ instance Free Value where
 
 instance Free HNF where
   free (Arr vs) = free vs
+  free (Lam bnd)= free bnd
   free _        = []
 
 {-
@@ -250,6 +288,7 @@ instance Term Value where
 
 instance Term HNF where
   subst sub (Arr vs) = Arr (map (subst sub) vs)
+  subst sub (Lam bnd)= Lam (substBind Var subst sub bnd)
   subst sub a        = a
 
 instance Term Expr where
@@ -262,6 +301,7 @@ instance Term Expr where
   subst sub (Def bnd) = Def (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
+  subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst sub Wrong     = Wrong
 
 --------------------------------------------------------------------------------
@@ -327,6 +367,9 @@ instance Arbitrary Expr where
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
   shrink (All a)   = [a, ARR []] ++ [All a'| a'<-shrink a]
   shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
+  shrink (Split e f g) = [e, Val f, Val g] ++ [Split e' f g | e' <- shrink e]
+                                           ++ [Split e f' g | f' <- shrink f]
+                                           ++ [Split e f g' | g' <- shrink g]
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
@@ -341,10 +384,12 @@ arbExpr n xs =
   , (n, Def <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
+  , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
   n1 = n-1
   n2 = n `div` 2
+  n3 = n `div` 3
 
 arbBind :: Int -> [Ident] -> Gen (Bind Expr)
 arbBind n xs =

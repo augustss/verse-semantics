@@ -4,3 +4,4 @@
 :set -package parser-combinators
 :set -package haskeline
 :set -package QuickCheck
+:set -package uniplate

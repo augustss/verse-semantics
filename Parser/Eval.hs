@@ -4,7 +4,8 @@
 module Eval(
   eval,
   evalSeq,
-  Flags(..)
+  replacePrelude,
+  EFlags(..)
   ) where
 import Control.Monad.Identity
 import Control.Monad.State.Strict
@@ -57,13 +58,14 @@ newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
 
 -------------
 
-data Flags = Flags
+data EFlags = EFlags
   { traceEval   :: !Bool
   , underLambda :: !Bool
+  , steps       :: !Int
   }
   deriving (Show)
 
-type EvalCore = Flags -> Core -> Core
+type EvalCore = EFlags -> Core -> Core
 
 evalTrace :: String -> (Core -> Core) -> EvalCore
 evalTrace s f flg e | not (traceEval flg) = e'
@@ -75,7 +77,7 @@ evalTrace s f flg e | not (traceEval flg) = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop 1000 $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop (steps trc) $ evalTrace "eval" (const ea) trc (CWrong"")
   where
     -- HACK: Recognizer when we have loaded the prelude.verse file
     hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False
@@ -107,7 +109,7 @@ evalSteps hasPRELUDE t =
   evalDefFloat t . evalAll t . evalChoice t . evalSplit t .
   evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
-  (if hasPRELUDE then id else replacePrelude t)
+  (if hasPRELUDE then id else replPrelude t)
 
 -- Handle CBar
 --  CHOOSE
@@ -515,10 +517,16 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
     f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
                                             | otherwise = CInt $ i1 `div` i2
+{-
     f (CBinOp "intLT$"  v1 v2) = cmpU (<)  v1 v2
     f (CBinOp "intLE$"  v1 v2) = cmpU (<=) v1 v2
     f (CBinOp "intGT$"  v1 v2) = cmpU (>)  v1 v2
     f (CBinOp "intGE$"  v1 v2) = cmpU (>=) v1 v2
+-}
+    f (CBinOp "in'<'"   v1 v2) = cmp  (<)  v1 v2
+    f (CBinOp "in'<='"  v1 v2) = cmp  (<=) v1 v2
+    f (CBinOp "in'>'"   v1 v2) = cmp  (>)  v1 v2
+    f (CBinOp "in'>='"  v1 v2) = cmp  (>=) v1 v2
     f (CBinOp "in'<>'"  v1 v2) = cmp  (/=) v1 v2
 
     f (CBinOp "in'..'"  v1 v2) = enum v1 v2
@@ -545,7 +553,7 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
                           | otherwise = CFail
 
     -- Use in 'all' desugaring.  mapAp = map ($())
-    f (CUnOp  "mapAp" (VArray vs)) = mkArr vs
+    f (CUnOp  "mapAp$" (VArray vs)) = mkArr vs
 
     -- XXX Stricter than necessary?
     f (CApply (VPrim "cons$") v) | VArray [v1, VArray vs] <- v = CArray $ v1 : vs
@@ -566,10 +574,11 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     cmp op (VInt i1) (VInt i2) | op i1 i2  = CInt i1
                                | otherwise = CFail
     cmp _ _ _ = CFail   -- CWrong?
+{-
     cmpU op (VInt i1) (VInt i2) | op i1 i2  = CUnit
                                 | otherwise = CFail
     cmpU _ _ _ = CFail   -- CWrong?
-
+-}
     enum (VInt lo) (VInt hi) = CBar [CInt i | i <- [lo .. hi ]]
     enum _ _ = CFail
 
@@ -602,8 +611,11 @@ evalKnown flg = evalTrace "evalKnown" f flg
 -- Until we get a proper prelude, just hack it.
 -- XXX This doesn't really work, it only replaces in applications.
 -- Could just put the prelude as a prefix to the program.
-replacePrelude :: EvalCore
-replacePrelude = evalTrace "replacePrelude" f
+replPrelude :: EvalCore
+replPrelude = evalTrace "replacePrelude" replacePrelude
+
+replacePrelude :: Core -> Core
+replacePrelude = f
   where
     f (CApply (Var (Ident _ i)) v) | Just p <- lookup i prelude = CApply p v
     f (CVar (Ident _ i)) | Just p <- lookup i prelude = CValue p
@@ -617,10 +629,12 @@ prelude =
   ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
   ,("in'->'", arrowV)
   ,("false", VArray [])                                      -- ()
+{-
   ,("in'>'",  cmpV "intGT$")
   ,("in'>='", cmpV "intGE$")
   ,("in'<'",  cmpV "intLT$")
   ,("in'<='", cmpV "intLE$")
+-}
   ,("new", newV)
 --  ,("pre'[]'", unimplemented "pre []")
 --  ,("pre'^'", unimplemented "pre ^")
@@ -646,9 +660,10 @@ prelude =
                   CApply (Var t) (Var gsy)
                   ]
               ]
-        [st, s, t, g, y, sy, gsy, x, xy] =
+        [st, s, t, g, y, sy, gsy, x, _xy] =
            map (Ident noLoc) ["st","s","t","g","y","sy","gsy","x", "xy"]
 
+{-
         cmpV op =
           VLam xy $
             CDef [x, y] $
@@ -657,7 +672,7 @@ prelude =
               app op (Var xy),
               CVar x
               ]
-
+-}
         newV =
           VLam t $ CLam x $
             CDef [y] $

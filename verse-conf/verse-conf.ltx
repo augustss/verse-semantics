@@ -708,7 +708,7 @@ failing when we try to unify |x| with |7|?  Not only is that not what we intende
 non-deterministic: the result is affected by the order in which we did unifications!
 
 To address this, we give |if| a special property: in the expression |if e_1 then e_2 else e_3|, unifications inside |e_1| (the condition of the |if|)
-can only unify variables |defKW|'d inside |e_1|; variables bound outside |e_1| are called ``rigid.''  So in our example, the |x| in |(x=0)| is
+can only unify variables bound inside |e_1|; variables bound outside |e_1| are called ``rigid.''  So in our example, the |x| in |(x=0)| is
 rigid and cannot be unified.  Instead, the |if| is stuck, and we move on to unify |x=7|.  That unblocks
 the |if| and all is well.  This special property is precisely the local propagation rule that we sketched for
 choice (\cref{sec:mixing}).

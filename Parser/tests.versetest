@@ -61,10 +61,10 @@ testeq(SEq) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
 testeq(SEq) {i~>x := 2; (i, x)}                   {2,2}
 testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
 # Array LHS splicing
-testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq(SEq) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq(SEq) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+### SPLICE testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+### SPLICE testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+### SPLICE testeq(SEq) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+### SPLICE testeq(SEq) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq(SEq) {(x:int) = 5}                         {5}
@@ -76,24 +76,24 @@ testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 #testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
 testeq(SEq) {x? : int}                            { x : ?int }
 testeq(SEq) {x[] : int}                           { x : []int }
-testeq(SEq) {i~>x:(3,4,5); (i, x)}                {(0,3)|(1,4)|(2,5)}
+testeq(SEq) {all{i~>x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 # DESUGAR HOW?
 #testeq(SEq) {p^[](:int):int}                      {0}
 
 testeq(SEq) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
 
 # Array expression splicing
-testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+### SPLICE testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+### SPLICE testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 
 #
-testeq(SEq) {:(1,2,3)}                            {1|2|3}
-testeq(SEq) {x:(1,2,3); x}                        {1|2|3}
-testeq(SEq) {x:= :(1,2,3); x}                     {1|2|3}
-testeq(SEq) {x:(1,2,3)}                           {1|2|3}
+testeq(SEq) {all{:(1,2,3)}}                            {1,2,3}
+testeq(SEq) {all{x:(1,2,3); x}}                        {1,2,3}
+testeq(SEq) {all{x:= :(1,2,3); x}}                     {1,2,3}
+testeq(SEq) {all{x:(1,2,3)}}                           {1,2,3}
 
-testeq(SEq) {t:=type{0|1}; f(x:t):=x+1; f[0]}     {1}
-testeq(SEq) {t:=type{0|1}; f(x:t):=x+1; f[2]}     {:false}
+testeq(SEq) {one{t:=type{0|1}; f(x:t):=x+1; f[0]}}     {1}
+testeq(SEq) {one{t:=type{0|1}; f(x:t):=x+1; f[2]}}     {:false}
 testeq(SEq) {t:=type{:int}; f(x:t):=x+1; f[0]}    {1}
 testeq(SEq) {t:=type{:int}; f(x:t):=x+1; f[()]}   {:false}
 testeq(SEq) {t:=type{:int => :int}; f(x:t):=x[0]; succ(x:int):=x+1; f[succ]}   {1}
@@ -120,13 +120,13 @@ testeq(SEq) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
 testeq(SEq) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
 testeq(SEq) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
 
-testeq(SEq) {0[0]}                                {wrong}
-testeq(SEq) {operator'/'(1,0)}                    {wrong}
+### WRONG testeq(SEq) {0[0]}                                {wrong}
+### WRONG testeq(SEq) {operator'/'(1,0)}                    {wrong}
 
 testeq(SEq) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
-testeq(SEq) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
+### WRONG testeq(SEq) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
-testeq(SEq) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
+### WRONG testeq(SEq) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
 testeq(SEq) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
 
 # Joachim's tests
@@ -155,8 +155,8 @@ testeq(SEq) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
             for(x := 0|1|2|3)  {(even(x), odd(x))}
             }
             {((1,0), (0,1), (1,0), (0,1))}
-testeq(SEq) {pair := (1, function(n:int)  {pair[0]}); pair[0]}  {1}
-testeq(SEq) {pair := (1, function(n:int)  {if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}  {120}
+testeq(SEq) {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
+testeq(SEq) {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
 
 # Function argument matching
 testeq(SEq) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}

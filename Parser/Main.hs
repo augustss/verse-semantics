@@ -1,9 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
-module Main(main, test) where
+module Main(main, test, testr) where
 import Control.Exception
 import Control.Monad
+import Data.List
 import Data.Maybe
+import Text.Printf
 
 import Print
 import Desugar
@@ -15,6 +17,7 @@ import CoreSimp
 import Eval
 import qualified Testing
 import TRSAdapter
+import Run
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -27,12 +30,11 @@ tryIt iob aiob ioa = do
 
 -------------------
 
--- Use CSplit instead of COne/CAll
-useSplit :: Bool
-useSplit = True
-
 test :: IO ()
-test = Testing.main
+test = Testing.test True
+
+testr :: IO ()
+testr = Testing.test False
 
 main :: IO ()
 main = runCommand command
@@ -40,9 +42,9 @@ main = runCommand command
 data CState = CState
   { lastExpr    :: !SomeExpr
   , lastFile    :: !(Maybe FilePath)
-  , tracing     :: !Bool
   , definitions :: ![Expr]
   , prelude     :: !(Maybe Expr)
+  , flags       :: !Flags
   }
 
 data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
@@ -58,16 +60,11 @@ asDesugared :: SomeExpr -> Expr
 asDesugared (Parsed e) = desugar e
 asDesugared e = asExpr e
 
-asCore :: SomeExpr -> Core
-asCore = asCore' useSplit
-
-type UseSplit = Bool
-
-asCore' :: UseSplit -> SomeExpr -> Core
-asCore' _ (Cored e) = e
-asCore' _ (Cores [e]) = e
-asCore' _ Cores{} = error "Multiple Core values"
-asCore' b e = exprToCore b $ asDesugared e
+asCore :: Flags -> SomeExpr -> Core
+asCore _ (Cored e) = e
+asCore _ (Cores [e]) = e
+asCore _ Cores{} = error "Multiple Core values"
+asCore s e = exprToCore (fSplit s) $ asDesugared e
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
@@ -95,31 +92,50 @@ command = Command
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
       , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
-      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "compile [EXPR]"       "Generate core for [last] expression"   cCompile
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
-      , Cmd "trace"                "Turn on evaluation tracing"            (cTrace True)
-      , Cmd "notrace"              "Turn off evaluation tracing"           (cTrace False)
-      , Cmd "rewrite"              "Rewrite [last] expression with accurate rules"           cRewrite
+      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with accurate rules"           cRewrite
+      , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
       , Cmd "clear"                "Clear global defs"                     cClear
       , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
       , Cmd "display"              "Show current global defs"              cDisplay
       , Cmd "prelude"              "Load prelude.verse"                    cPrelude
+      , Cmd "set"                  "Turn on flag"                          (cSet True)
+      , Cmd "unset"                "Turn off flag"                         (cSet False)
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
   , c_greet = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye = "Bye!"
   , c_prompt = "> "
-  , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, tracing = False, definitions = [], prelude = Nothing }
+  , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
+                     , prelude = Nothing, flags = defaultFlags }
   , c_history = Just ".versei"
   }
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
 updateLastExpr s e = pure s{ lastExpr = e }
 
-cTrace :: Bool -> Run CState
-cTrace trc _ s = pure s{ tracing = trc }
+cSet :: Bool -> Run CState
+cSet _ "" s = do
+  let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (flags s) then "on" else "off"
+  putStr $ concatMap f flagTable
+  pure s
+cSet b l s =
+  case find (isPrefixOf l . fst) flagTable of
+    Nothing -> do putStrLn "Unknown flag"; pure s
+    Just (_, (_, set)) -> pure $ s{ flags = set b (flags s) }
+
+flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
+flagTable =
+  [("rewrite",     (fRewrite,      \ b s -> s{fRewrite=b}))
+  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
+  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
+  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
+  ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
+  ]
 
 cRead :: Run CState
 cRead afn s = do
@@ -168,25 +184,34 @@ cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
 
 cCoreSimplify :: Run CState
-cCoreSimplify = cTransform (Cored . simpCore . asCore)
+cCoreSimplify c s = cTransform (Cored . simpCore . asCore (flags s)) c s
 
 cCore :: Run CState
-cCore = cTransform (Cored . exprToCore useSplit . asDesugared)
+cCore c s = cTransform (Cored . asCore (flags s)) c s
+
+cCompile :: Run CState
+cCompile c s = cTransform (Cored . compile (flags s)) c s
+
+cRun :: Run CState
+cRun c s = cTransform (Cored . run (flags s) . asCore (flags s)) c s
 
 cEval :: Run CState
 cEval c s =
-  cTransform (Cored . eval flg . asCore) c s
-  where flg = Flags { underLambda = False, traceEval = tracing s }
+  cTransform (Cored . eval flg . compile (flags s)) c s
+  where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
 
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
-      flg = Flags { underLambda = False, traceEval = tracing s }
-  cTransform (Cored . eval flg . simpCore . asCore . Parsed . addDefs . asExpr) c s
+      flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
+  cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
 
 cRewrite :: Run CState
-cRewrite =
-  cTransform (Cores . rewrite 1000 . asCore' False)
+cRewrite c s =
+  cTransform (Cores . rewrite 10000 . compile (flags s)) c s
+
+compile :: Flags -> SomeExpr -> Core
+compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
 
 cDefine :: Run CState
 cDefine =

@@ -278,5 +278,23 @@ lemma occurs_subst[simp]:
 lemma lifted_bind[simp]: "lifted n k (\<lambda>i. bind f (g i)) = (\<lambda>i. bind (lifted n k f) (lifted n k g i))"
   by rule (auto intro!: arg_cong2[where f = bind] simp add: lifted_def renumber_def bind_bind bumpAt_def)
 
+lemma bumpAt_1_0[simp]:
+  "bumpAt (Suc 0) 0 = Suc"
+  by rule (auto simp add: bumpAt_def)
+
+lemma bumpAt_lt[simp]:
+  "i < k \<Longrightarrow> bumpAt n k i = i"
+  unfolding bumpAt_def by auto
+
+lemma del_lift[simp]:
+  "del 0 (\<up> e) = e"
+  unfolding renumber_def delN_def
+  by (simp add: bind_bind)
+
+
+lemma liftedN_bumpAt[simp]:
+  "liftedN l 0 (bumpAt n k) = bumpAt n (l + k)"
+  unfolding liftedN_def bumpAt_def
+  by rule auto
 
 end

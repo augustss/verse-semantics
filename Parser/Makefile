@@ -1,16 +1,20 @@
 PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -i../TRS
-.PHONY: clean all testing
+FLAGS = -Wall --make -odir objs
+.PHONY: clean all test testr
 
 all:	verse tests
 
 verse: *.hs ../TRS/*.hs
-	ghc -Wall --make $(PKGS) Main.hs -o verse
+	ghc $(FLAGS) $(PKGS) Main.hs -o verse
 
 tests: *.hs ../TRS/*.hs
-	ghc -Wall --make $(PKGS) Testing.hs -main-is Testing -o tests
+	ghc $(FLAGS) $(PKGS) Testing.hs -main-is Testing -o tests
 
-testing: tests
+test: tests
 	./tests
+
+testr: tests
+	./tests -
 
 clean:
 	rm -f *.o *.hi verse verse.exe tests tests.exe

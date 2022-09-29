@@ -2,14 +2,21 @@ module TRSAdapter(rewrite) where
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
-import Rules(rules)
+import RulesPOPL(rules)
 import TRS(normalFormsFuel)
 import Expr(Ident(..), noLoc)
 import Core
 import Error
 
+import Debug.Trace
+import Print
+
 rewrite :: Int -> Core -> [Core]
-rewrite n = map trsToCore . normalFormsFuel n rules . coreToTrs
+rewrite n = map (trsToCore . snd) . checkOne . normalFormsFuel n rules . coreToTrs
+ where
+  checkOne [x] = [x]
+  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e)) nes)
+                       nes
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)
@@ -27,7 +34,8 @@ coreToTrs (CDef [] e) = coreToTrs e
 coreToTrs (CDef (i:is) e) = T.Def $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e)
 coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
 coreToTrs CWrong{} = T.Wrong
-coreToTrs e = impossible e
+coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
+coreToTrs e@CMacro{} = impossible e
 
 coreToTrsV :: Value -> T.Value
 coreToTrsV (Var i) = T.Var $ coreToTrsI i
@@ -39,7 +47,7 @@ coreToTrsH HRat{} = undefined
 coreToTrsH (HPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
 coreToTrsH (HArray vs) = T.Arr $ map coreToTrsV vs
-coreToTrsH HLam{} = undefined
+coreToTrsH (HLam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
 
 coreToTrsI :: Ident -> T.Ident
 coreToTrsI (Ident _ s) = T.Name s
@@ -61,6 +69,7 @@ trsToCore ee@T.Def{} = flat [] ee
 trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
+trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCoreV f) (trsToCoreV g)
 
 trsToCoreV :: T.Value -> Value
 trsToCoreV (T.Var i) = Var (trsToCoreI i)
@@ -70,10 +79,31 @@ trsToCoreH :: T.HNF -> HNF
 trsToCoreH (T.Int i) = HInt i
 trsToCoreH (T.Op op) = HPrim $ fromMaybe undefined $ lookup op allOps
 trsToCoreH (T.Arr vs) = HArray $ map trsToCoreV vs
+trsToCoreH (T.Lam (T.Bind x e)) = HLam (trsToCoreI x) (trsToCore e)
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
-trsToCoreI _ = undefined
+trsToCoreI (T.Prim i) = Ident noLoc $ "$" ++ show i
 
 allOps :: [(T.Op, String)]
-allOps = [(T.Gt, "in'>'"), (T.Add, "in'+'"), (T.IsInt, "isInt$")]
+allOps = [
+{-
+  (T.Gt, "intGT$"),
+  (T.Le, "intGE$"),
+  (T.Lt, "intLT$"),
+  (T.Le, "intLE$"),
+  (T.Ne, "intNE$"),
+-}
+  (T.Gt, "in'>'"),
+  (T.Ge, "in'>='"),
+  (T.Lt, "in'<'"),
+  (T.Le, "in'<='"),
+  (T.Ne, "in'<>'"),
+  (T.Add, "in'+'"),
+  (T.Sub, "in'-'"),
+  (T.Mul, "in'*'"),
+  (T.Div, "in'/'"),
+  (T.IsInt, "isInt$"),
+  (T.MapAp, "mapAp$"),
+  (T.Cons, "cons$")
+  ]
