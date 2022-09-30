@@ -172,7 +172,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
 pAtom = choice [ Variable <$> pIdent, pLiteral, pEmpty
-               , Parens <$> pParens pExprSeq, pArray, pMacro1
+               , Parens <$> pParens pExprSeq, pArray, pMacro
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
@@ -183,8 +183,11 @@ pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 --pTypedef :: P Expr
 --pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
-pMacro1 :: P Expr
-pMacro1 = Macro1 <$> pMacroName <*> many pAttr <*> pBlockM
+pMacro :: P Expr
+pMacro = do
+  n <- pMacroName
+  (Macro1 n <$> many pAttr <*> pBlockM) <|>
+   (Macro2 n <$> pParens pExprSeq <*> pBlockM)
 
 pAttr :: P Ident
 pAttr = pAngles pEffectId

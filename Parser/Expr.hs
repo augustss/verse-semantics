@@ -83,6 +83,7 @@ data Expr
   | MVar Ident Expr Expr      -- var i : t = e
   -- Some 1-argument macros
   | Macro1 Ident [Eff] Block  -- m<a>{e}
+  | Macro2 Ident Expr Block   -- m(e1){e2}
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -185,6 +186,7 @@ instance Pretty Expr where
           Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
           MVar i t e -> text "var" <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
           Macro1 (Ident _ m) rs e -> text m <> ppEffs rs <> ppB e
+          Macro2 (Ident _ m) e1 e2 -> text m <> parens (ppr 0 e1) <> ppB e2
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
@@ -280,6 +282,7 @@ compos f (Parens e) = Parens <$> f e
 compos f (Set e1 op e2) = Set <$> f e1 <*> pure op <*> f e2
 compos f (MVar i e1 e2) = MVar i <$> f e1 <*> f e2
 compos f (Macro1 m as b) = Macro1 m as <$> f b
+compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Define i e) = Define i <$> f e
 compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
