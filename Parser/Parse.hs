@@ -33,7 +33,7 @@ symbol :: String -> P String
 symbol = L.symbol skip
 
 pWord :: P String
-pWord = lexeme ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "identifier")
+pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
 pIdent :: P Ident
 pIdent = try $ do
