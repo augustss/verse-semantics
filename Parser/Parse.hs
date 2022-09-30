@@ -160,7 +160,10 @@ pArray = pKeyword "array" *> (Array <$> pBlockEs)
 --pTypedef :: P Expr
 --pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
 pMacro1 :: P Expr
-pMacro1 = Macro1 <$> pMacroName <*> pBlockM
+pMacro1 = Macro1 <$> pMacroName <*> many pAttr <*> pBlockM
+
+pAttr :: P Ident
+pAttr = pAngles pIdent
 
 pEffects :: P Expr
 pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pIdent) <*> pBlockM)
@@ -171,7 +174,7 @@ pTerm = do
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
              (flip ApplyS <$> pParens pExprSeq) <|>
-             (flip EffAttr <$> try (pAngles pIdent))
+             (flip EffAttr <$> try pAttr)
       apply a f = f a
   foldl apply fn <$> many pArg
 
