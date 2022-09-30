@@ -48,7 +48,7 @@ normalForms rule t = normalFormsFuel (-1) rule t
 
 normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [(String,a)]
 normalFormsFuel n rule t =
-  [ (sequ (filter (not . null) (map fst tr)), snd (last tr))
+  [ (sequ (filter (not . null) (map fst tr)), snd (head tr))
   | tr <- normalFormsFuelTrace n rule t
   ]
  where
