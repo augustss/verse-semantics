@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 module Type where
 
 import Bind
@@ -36,11 +37,11 @@ wrap unr bad e (a :-> b) =
       ex `asVal` \x ->
         f :@: x
 
-unr = VAR (ident "UNR")
-bad = VAR (ident "BAD")
+pattern UNR = VAR (Name "UNR")
+pattern BAD = VAR (Name "BAD")
 
 hasType :: Expr -> Type -> Expr
-hasType e t = wrap unr bad e t
+hasType e t = wrap UNR BAD e t
 
 check :: Expr -> Type -> IO ()
 check e t =
@@ -48,7 +49,7 @@ check e t =
      print ("Type: " ++ show t)
      print ("Wrap: " ++ show et)
      print ("Norm: " ++ show et')
-     if ident "BAD" `elem` free et'
+     if BAD `elem` map VAR (free et')
        then putStrLn "*** TYPE CHECK FAILED"
        else putStrLn "+++ TYPE CHECK SUCCEEDED"
  where
