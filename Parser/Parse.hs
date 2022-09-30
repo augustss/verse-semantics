@@ -245,13 +245,15 @@ pIf :: P Expr
 pIf = pKeyword "if" *> (
   (mkIf <$> pParens pExprSeq1 <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
-  (If1 <$> pBlockM)
+  (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
   where
     mkIf _  Nothing   Nothing   = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
     mkIf e1 (Just e2) Nothing   = If2  e1 e2
-    mkIf e1 Nothing   (Just e3) = If2E e1 e3
+    mkIf _e1 Nothing   (Just _e3) = unimplemented "if()else" -- If2E e1 e3 -- XXX is this correct?
     mkIf e1 (Just e2) (Just e3) = If3  e1 e2 e3
+    mkIfC e1 Nothing            = If1  e1
+    mkIfC e1 (Just e2)          = If2E e1 e2
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
@@ -297,6 +299,7 @@ pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
+{-
 pTermPost :: P Expr
 pTermPost = do
   let pPost = do
@@ -308,7 +311,6 @@ pTermPost = do
   ops <- many pPost
   pure $ foldl (flip ($)) a ops
 
-{-
 pTermPost :: P Expr
 pTermPost = makeExprParser pAtom operatorTablePost
 
