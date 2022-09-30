@@ -293,7 +293,7 @@ operatorTable =
   [ [preOp ":", preOp "not", preOp "?", preOp "[]", preOp "-"],
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
-    [op InfixR "~>", op InfixN ".."],
+    [op InfixR "->", op InfixR ".."],
     [op InfixR "|", op InfixN ":"],
     [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
     [op InfixR "and"],

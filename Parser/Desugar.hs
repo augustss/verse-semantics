@@ -380,7 +380,7 @@ dsColon l (PostfixOp f op@(Ident _ "?")) t =
 dsColon l (ApplyD f (Array [])) t =
   dsColon l f (PrefixOp (Ident l "[]") t)
 -- L[p~>q] t = P[p~>q] (:t)
-dsColon _ p@(InfixOp _ (Ident _ "~>") _) t =
+dsColon _ p@(InfixOp _ (Ident _ "->") _) t =
   (p, t)
 dsColon l f _ = syntaxError l $ "bad LHS of :, " ++ prettyShow f
 
@@ -430,7 +430,7 @@ dsP l (PostfixOp e1 (Ident _ "^")) e = do
 -- FIX L: update for splices
 -- P[lhs1, ... lhsn] = ...
 dsP l (Array lhss) e = dsPArr l lhss e
-dsP l (InfixOp i (Ident _ "~>") x) e = do
+dsP l (InfixOp i (Ident _ "->") x) e = do
   (i', di) <-
     case i of
       Variable i' -> pure (i', [])
