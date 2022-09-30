@@ -3,7 +3,8 @@ module Parse(
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces,
   pIdent, pExprSeq,
-  P) where
+  P,
+  testp, parseString) where
 
 import Control.Monad
 import OpParser
@@ -353,8 +354,8 @@ parseDie p fn file =
     Left err -> error $ errorBundlePretty err
     Right x -> x
 
-_testp :: P a -> String -> a
-_testp p = parseDie p "<string>"
+testp :: P a -> String -> a
+testp p = parseDie p "<string>"
 
-_parseString :: String -> Expr
-_parseString = parseDie pFile "<string>"
+parseString :: String -> Expr
+parseString = parseDie pFile "<string>"
