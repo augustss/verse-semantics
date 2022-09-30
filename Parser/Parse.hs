@@ -19,6 +19,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import Error
 import Expr
+import Print(prettyShow)
 
 type P = Parsec Void String
 
@@ -200,11 +201,17 @@ pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pEffectId) <*> pBlo
 
 pTerm :: P Expr
 pTerm = do
-  fn <- pTermPost
+  fn <- pAtom
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
              (flip ApplyS <$> pParens pExprSeq) <|>
-             (flip EffAttr <$> try pAttr)
+             (flip EffAttr <$> try pAttr) <|>
+             pPost
+      pPost = do
+        l <- getSourcePos
+        let op s = pOp s *> pure (\ x -> PostfixOp x (Ident l s))
+            dot = (\ i x -> InfixOp x (Ident l ".") (Variable i)) <$> (pOp "." *> pIdent)
+        choice [op "^", op "?", dot]
       apply a f = f a
   foldl apply fn <$> many pArg
 
