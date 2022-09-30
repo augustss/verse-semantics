@@ -169,8 +169,8 @@ core (If3 e1 e2 e3) = do
   pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core (Do e) = coreD e
-core (Macro1 (Ident _ "all") e) = cAll =<< coreD e
-core (Macro1 (Ident _ "one") e) = cOne =<< coreD e
+core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
+core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
 core e = impossible e
 
 coreEffs :: [Ident] -> Core -> C Core

@@ -2,3 +2,4 @@ parser
 verse
 tests
 .versei
+objs-*/*
