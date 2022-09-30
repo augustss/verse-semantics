@@ -62,7 +62,7 @@ keywords = ["and", "array", "block", "do", "else", "effects", "for", "fn", "func
            macros
 
 macros :: [String]
-macros = ["all", "one", "type"]
+macros = ["all", "allow", "assume", "one", "type"]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
