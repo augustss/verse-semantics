@@ -280,8 +280,9 @@ pVar :: P Expr
 pVar = pKeyword "var" *> do
   e <- pExprT
   case e of
-    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ "=") e3 -> pure $ MVar i1 e2 e3
-    _ -> fail "var not followed by x : t = e"
+    -- XXX using := here isn't quite right.  It will allow 'var x:t:=e' to work.
+    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ ":=") e3 -> pure $ MVar i1 e2 e3
+    _ -> fail $ "var not followed by x : t = e\n" ++ prettyShow e
 
 pExpr1 :: P Expr
 pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
