@@ -45,10 +45,10 @@ hasType e t = wrap UNR BAD e t
 
 check :: Expr -> Type -> IO ()
 check e t =
-  do print ("Expr: " ++ show e)
-     print ("Type: " ++ show t)
-     print ("Wrap: " ++ show et)
-     print ("Norm: " ++ show et')
+  do putStrLn ("Expr: " ++ show e)
+     putStrLn ("Type: " ++ show t)
+     putStrLn ("Wrap: " ++ show et)
+     putStrLn ("Norm: " ++ show et')
      if BAD `elem` map VAR (free et')
        then putStrLn "*** TYPE CHECK FAILED"
        else putStrLn "+++ TYPE CHECK SUCCEEDED"
@@ -62,7 +62,29 @@ int = VLAM x ((IsINT :@: (Var x)) :>: VAR x)
   x = ident "x"
 
 typeRules :: Rule Expr
-typeRules = rules
+typeRules = rules +++ rulesUNR
+
+rulesUNR :: Rule Expr
+rulesUNR lhs =
+  "UNR-seq-L" `name`
+    do UNR :>: _ <- [lhs]
+       return UNR
+ ++
+  "UNR-seq-R" `name`
+    do _ :>: UNR <- [lhs]
+       return UNR
+ ++
+  "UNR-unif-L" `name`
+    do UNR :=: _ <- [lhs]
+       return UNR
+ ++
+  "UNR-unif-R" `name`
+    do _ :=: UNR <- [lhs]
+       return UNR
+ ++
+  "UNR-def" `name`
+    do Def (Bind _ UNR) <- [lhs]
+       return UNR
 
 main :: IO ()
 main =
