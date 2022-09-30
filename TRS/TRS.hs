@@ -71,6 +71,7 @@ normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
    where
     seen' = S.insert t seen
     ts'   = step rule t
+  go _ _ _ = error "impossible"
 
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =

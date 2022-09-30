@@ -207,7 +207,7 @@ dsD = expr
       e' <- expr e
       e'' <- dsM e' (Variable y)
       b' <- expr b
-      pure $ primFcn y $ seqE [e'', Do b']
+      pure $ primFcn y $ If3 e'' b' Fail
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr

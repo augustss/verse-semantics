@@ -1,0 +1,191 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rulegroupname}[1]{\multicolumn{5}{l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{l}{#1}}
+
+\newcommand{\wf}[1]{\ensuremath{\vdash #1}}
+\newcommand{\wff}[4]{\ensuremath{\vdash #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
+\newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
+\newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
+
+
+\newcommand{\figureSyntaxI}{
+\begin{figure}[t]
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Integers}     & k \\
+\textit{Variables}    & \multicolumn{3}{l}{x,y,z,f,g} \\
+\textit{Tuples}       & s, t  & ::= & k \vb x \vb |arr (t_1, dots, t_n)| \\
+\textit{Values}       & v     & ::= & t \vb |lam x e| \\
+\textit{Constraints}  & c     & ::= & |v_1 == v_2| \vb \lvc{|v == e|} \\
+\textit{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
+                                    |e_1 choice e_2| \vb |one e| \vb |all e| \\
+\textit{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+\textit{Results}      & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
+\end{array}$$
+\caption{\textbf{Syntax.} \lvc{Grey text} indicates \emph{lenient} extension. Tuples are $\lambda$-free.}
+\label{fig:syntax}
+\end{figure}
+
+% \mypara{Note:} Values can have arbitrarily nested tuples but $\lambda$-terms are never inside a tuple.
+
+\begin{figure}[t]
+$$\begin{array}{lcl}
+\mbox{\vcname} &        & \mbox{\calcname} \\
+\midrule
+|e_1 == e_2|   & \equiv & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| \\
+|e_1; e_2|     & \equiv & |llet _   e_1 e_2                          | \\
+\end{array}$$
+%
+\caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.}
+\label{fig:desugar}
+%
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcl}
+        \rulename{swap-e} & |v_1 == v_2|     & \equiv & |v_2 == v_1| \\
+        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| \\
+        \rulename{swap-c} & c_1; c_2; e    & \equiv & c_2; c_1; e \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences}}\label{fig:structural-equiv}
+\end{figure}
+}
+
+\newcommand{\figureRulesI}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Unification}
+\rulename{ulit} & |k == k ; e|                                    & \movesto & e \\
+\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\[0.05in]
+
+\rulegroupname{Substitution}
+\rulename{subst-t}         & |x == t ;  E^[x]|         & \movesto & |x == t ; E^[t]| \\
+\rulename{subst-$\lambda$} & |x == (lam y e) ;  A^[x]| & \movesto & \largerhs{|x == (lam y e) ; A^[lam y e]|} \\[0.05in]
+
+\rulegroupname{Application}
+\rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
+% \rulename{app-tup} & |apply1N (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\rulegroupname{Conjunction}
+\rulename{conj-def}     & |c ; def x e|                 & \movesto & |def x (c ; e)|          & if $|x| \not \in \freevars{|c|}$\\
+\rulename{conj-fun-cst} & |apply1N (c ; e_1) e_2|       & \movesto & |c; apply1N e_1 e_2| \\
+\rulename{conj-fun-def} & |apply1N (def x e_1) e_2|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{conj-arg-cst} & |apply1N e_1 (c ; e_2)|       & \movesto & |c ; apply1N e_1 e_2| \\
+\rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+\lvc{\rulename{conj-cst-def}} & |v == (def y e_1); e_2| & \movesto & |def y (v == e_1; e_2)|   & if $|y| \not \in \freevars{|e2|}$ \\
+\lvc{\rulename{conj-cst-cst}} & |v == (c; e_1); e_2|    & \movesto & |c; v = e_1; e_2| & \\[0.05in]
+
+\rulegroupname{Elimination}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
+
+\rulegroupname{Explosion}
+\rulename{fail-t-l}       & |k == tup (dots) ; e| & \movesto & |fail| \\
+\rulename{fail-l-l}       & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{fail-$\lambda$} & |v == lam y e ; e'|   & \movesto & |fail| & if $|v| \not \equiv |x|$ \\
+\rulename{fail-occ}       & |x == t ; e|          & \movesto & |fail| & if $x \in \freevars{t},\ x \not \equiv t$ \\
+\rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
+\rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
+\rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
+
+\rulegroupname{Decision}
+\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\[0.05in]
+
+\rulegroupname{Collection}
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
+\rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{|rs|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{r}{|xs|}{|cs|}{|v|}\\
+\end{longtable}
+% \caption{\textbf{\calcname: Rules for Unification, Substitution and Application}}\label{fig:rulesI}
+\caption{\textbf{Rules for Evaluation}}\label{fig:rulesI}
+\end{figure}
+}
+
+\newcommand{\figureRulesII}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
+  \rulegroupname{Decision}
+    \rulename{choose}       & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+    \rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose-r}     & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+    \rulename{choose-l}     & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\[0.05in]
+
+  \rulegroupname{Collection}
+    \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+    \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
+    \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
+    \rulename{all-fail}   & |all fail|                         & \movesto & |tup ()| \\
+    \rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (v_1, dots, v_n)|  & if \wff{|r_1 dots r_n|}{|xs|}{|cs|}{|v_1 dots v_n|} \\
+    \rulename{all-value}  & |all r|                            & \movesto & |def xs cs ; tup v|                 & if \wff{r}{|xs|}{|cs|}{|v|}\\
+\end{longtable}
+\caption{\textbf{Rules for Decision and Collection}}\label{fig:rulesII}
+\end{figure}
+}
+
+\newcommand{\figureContexts}{
+\begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Value Context}       & V  & ::= & \hole \vb |tup (t_1, dots ,V, dots, t_n)| \vb |lam x E| \\
+\textit{Constraint Context}  & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
+\textit{Expression Context}  & E  & ::= & V \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
+                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+\textit{Application Context} & A  & ::= & |hole e| \vb |hole == hnf; e| \vb |def x A | \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
+\textit{Choice Context}      & CX & ::= & \hole \vb |def x CX| \vb |v == v' ; CX| \vb |apply1N CX e| \vb |apply1N ce CX| \\
+                             &    & \vb & \lvc{|v == CX; e|} \vb \lvc{|v == ce; CX|} \\
+\textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\[0.05in]
+
+\textit{Head Values}         & hnf & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
+\textit{Choice-free Expr.}   & ce  & ::= & v \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
+\end{array}$$
+\caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
+\end{figure}
+}
+
+\newcommand{\figureWellformed}{
+\begin{figure}
+% \judgementHead{Wellformedness of Results}{\wf{r}}
+\begin{mathpar}
+\inferrule
+  { \wff{r}{|xs|}{|cs|}{|v|}}
+  { \wf{r} }
+  { \rulename{WF} }
+
+\inferrule
+  { }
+  { \wff{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \rulename{WF-Val}}
+
+\inferrule
+  { \wff{r}{|xs|}{|cs|}{|v|} }
+  { \wff{|def x r|}{|x,xs|}{|cs|}{|v|} }
+  { \rulename{WF-Def} }
+
+\inferrule
+  {\wff{r}{|xs|}{|cs|}{|v|} \quad
+   x \not \in |xs|
+  }
+  {\wff{|x == lam y e; r|}{|xs|}{|x == lam y e, cs|}{|v|}}
+  {\rulename{WF-Lam}}
+
+\inferrule
+  { \wff{r}{\overline{x}}{\overline{c}}{|v|}
+    \wff{rs}{\overline{x'}}{\overline{c'}}{|vs|}
+  }
+  { \wff{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
+  {\rulename{WF-many}}
+\end{mathpar}
+\caption{\textbf{Well-formedness of Results}}
+\end{figure}
+}
