@@ -122,7 +122,8 @@ addPrecLevel term ops =
 -- allowed to fail, in this case 'id' is used.
 pTerm :: MonadPlus m => m (a -> a) -> m a -> m (a -> a) -> m a
 pTerm prefix term postfix = do
-  pre <- option id prefix
+  pres <- many prefix
+  let pre = foldr (.) id pres
   x <- term
   post <- option id postfix
   pure . post . pre $ x
