@@ -121,7 +121,16 @@ test :: Bool -> IO ()
 test True = runTestFile defaultFlags "tests.versetest"
 test False = runTestFile defaultFlags{ fRewrite = True } "tests.versetest"
 
+-- Just parse
+ptest :: FilePath -> IO ()
+ptest fn = do
+  file <- readFile fn
+  let e = parseDie pFile fn file
+  if e == e then putStrLn $ "parsed " ++ fn else undefined
+  pure ()
+
 main :: IO ()
 main = do
   args <- getArgs
   test (null args)
+  ptest "test1.verse"

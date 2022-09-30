@@ -980,7 +980,7 @@ $$
   |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
   |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
   |De (functionKW a (eff r) b)| & = & |De (functionKW a (r^[b]))| & \\
-  |De (function e () b)| & = & |function(x:any)()((De e = x; De (do b))| & \text{|x| fresh} \\
+  |De (function e () b)| & = & |function(x:any)()((if (De e = x) then b else :false)| & \text{|x| fresh} \\
   \\
   \multicolumn{1}{l}{\textbf{Types}} \\
   |De (:t)| & = & |De t^[x:any]| & \text{|x| fresh} \\

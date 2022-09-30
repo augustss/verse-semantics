@@ -1,12 +1,13 @@
 module Parse(
   parseDie, pFile,
   -- Exports for further parsing
-  pKeyword, skip, eof, many, pParens, pBraces,
+  pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq,
-  P) where
+  P,
+  testp, parseString) where
 
 import Control.Monad
-import Control.Monad.Combinators.Expr
+import OpParser
 import Data.Char
 import Data.Maybe
 import Data.Void
@@ -18,6 +19,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import Error
 import Expr
+import Print(prettyShow)
 
 type P = Parsec Void String
 
@@ -32,7 +34,7 @@ symbol :: String -> P String
 symbol = L.symbol skip
 
 pWord :: P String
-pWord = lexeme ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "identifier")
+pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
 pIdent :: P Ident
 pIdent = try $ do
@@ -56,12 +58,16 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
-keywords = ["array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "of", "option", "set", "then", "var", "where"] ++
-           macros
+keywords = ["and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
+           , "in", "let", "not", "of", "or", "option", "set", "then", "var", "where"]
+           ++ macros
 
 macros :: [String]
-macros = ["all", "one", "type"]
+macros = ["all", "allow", "assume", "expect", "first", "one", "type", "unify"]
+         ++ effects
+
+effects :: [String]
+effects = [ "decides", "diverges", "fails", "succeeds" ]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -73,6 +79,13 @@ pMacroName = try $ do
   l <- getSourcePos
   w <- pWord
   guard (w `elem` macros)
+  pure $ Ident l w
+
+pEffectName :: P Ident
+pEffectName = try $ do
+  l <- getSourcePos
+  w <- pWord
+  guard (w `elem` effects)
   pure $ Ident l w
 
 pKeywordOpt :: String -> P ()
@@ -90,8 +103,49 @@ pBrackets = between (symbol "[") (symbol "]")
 pAngles :: P a -> P a
 pAngles = between (pOp "<") (pOp ">")
 
+pLiteral :: P Expr
+pLiteral = choice
+  [ LitInt <$> pDecimal
+  , LitChar <$> pChar
+  , LitStr <$> pString
+  ]
+
 pDecimal :: P Integer
 pDecimal = L.decimal <* skip
+
+pChar :: P Char
+pChar = (pQuotedChar <|> pCharCode) <* skip
+
+-- Char inside '
+pQuotedChar :: P Char
+pQuotedChar = char '\'' *> (pPrintableChar '\'' <|> pBackslashChar) <* char '\''
+
+-- Any printable Char, except the quote and \
+pPrintableChar :: Char -> P Char
+pPrintableChar quote = satisfy $ \ c -> isPrint c && c /= quote && c /= '\\'
+
+-- A \x sequence
+pBackslashChar :: P Char
+pBackslashChar = do
+  _ <- char '\\'
+  ch <- satisfy (const True)
+  let escs = [('r', '\r'), ('n', '\n'), ('t', '\t')] ++
+             map (\ c -> (c, c)) "'\"\\{}#<>&~"
+  case lookup ch escs of
+    Nothing -> fail "pQuotedChar"
+    Just c' -> pure c'
+
+-- A character without quotes
+pCharCode :: P Char
+pCharCode = fail "unimplemented"
+
+pString :: P String
+pString = do
+  _ <- char '"'
+  cs <- many (pPrintableChar '"' <|> pBackslashChar)
+  _ <- char '"'
+  skip
+  pure cs
 
 -- XXX Needs works
 --pString :: P String
@@ -118,8 +172,8 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [ Variable <$> pIdent, LitInt <$> pDecimal, pEmpty
-               , Parens <$> pParens pExprSeq, pArray, pMacro1
+pAtom = choice [ Variable <$> pIdent, pLiteral, pEmpty
+               , Parens <$> pParens pExprSeq, pArray, pMacro
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
@@ -130,19 +184,34 @@ pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 --pTypedef :: P Expr
 --pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
-pMacro1 :: P Expr
-pMacro1 = Macro1 <$> pMacroName <*> pBlockM
+pMacro :: P Expr
+pMacro = do
+  n <- pMacroName
+  (Macro1 n <$> many pAttr <*> pBlockM) <|>
+   (Macro2 n <$> pParens pExprSeq <*> pBlockM)
+
+pAttr :: P Ident
+pAttr = pAngles pEffectId
+
+pEffectId :: P Ident
+pEffectId = pIdent <|> pEffectName
 
 pEffects :: P Expr
-pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pIdent) <*> pBlockM)
+pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pEffectId) <*> pBlockM)
 
 pTerm :: P Expr
 pTerm = do
-  fn <- pTermPost
+  fn <- pAtom
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
              (flip ApplyS <$> pParens pExprSeq) <|>
-             (flip EffAttr <$> try (pAngles pIdent))
+             (flip EffAttr <$> try pAttr) <|>
+             pPost
+      pPost = do
+        l <- getSourcePos
+        let op s = pOp s *> pure (\ x -> PostfixOp x (Ident l s))
+            dot = (\ i x -> InfixOp x (Ident l ".") (Variable i)) <$> (pOp "." *> pIdent)
+        choice [op "^", op "?", dot]
       apply a f = f a
   foldl apply fn <$> many pArg
 
@@ -150,7 +219,7 @@ pFunction :: P Expr
 pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
   where
     pArg :: P (Expr, [Eff])
-    pArg = (,) <$> pParens pExprSeq <*> many (pAngles pIdent)
+    pArg = (,) <$> pParens pExprSeq <*> many pAttr
 
 pBlockEs :: P [Expr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))
@@ -176,13 +245,15 @@ pIf :: P Expr
 pIf = pKeyword "if" *> (
   (mkIf <$> pParens pExprSeq1 <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
-  (If1 <$> pBlockM)
+  (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
   where
     mkIf _  Nothing   Nothing   = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
     mkIf e1 (Just e2) Nothing   = If2  e1 e2
-    mkIf e1 Nothing   (Just e3) = If2E e1 e3
+    mkIf _e1 Nothing   (Just _e3) = unimplemented "if()else" -- If2E e1 e3 -- XXX is this correct?
     mkIf e1 (Just e2) (Just e3) = If3  e1 e2 e3
+    mkIfC e1 Nothing            = If1  e1
+    mkIfC e1 (Just e2)          = If2E e1 e2
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
@@ -218,8 +289,9 @@ pVar :: P Expr
 pVar = pKeyword "var" *> do
   e <- pExprT
   case e of
-    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ "=") e3 -> pure $ MVar i1 e2 e3
-    _ -> fail "var not followed by x : t = e"
+    -- XXX using := here isn't quite right.  It will allow 'var x:t:=e' to work.
+    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ ":=") e3 -> pure $ MVar i1 e2 e3
+    _ -> fail $ "var not followed by x : t = e\n" ++ prettyShow e
 
 pExpr1 :: P Expr
 pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
@@ -227,6 +299,7 @@ pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
+{-
 pTermPost :: P Expr
 pTermPost = do
   let pPost = do
@@ -238,7 +311,6 @@ pTermPost = do
   ops <- many pPost
   pure $ foldl (flip ($)) a ops
 
-{-
 pTermPost :: P Expr
 pTermPost = makeExprParser pAtom operatorTablePost
 
@@ -257,32 +329,48 @@ operatorTablePost =
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
-  [ [preOp ":", preOp "!", preOp "?", preOp "[]"],
+  [ [preOp ":", preOp "not", preOp "?", preOp "[]", preOp "-"],
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
-    [op InfixR "|", op InfixR "~>", op InfixN ".."],
-    [op InfixR ":"] ++ map (op InfixR) [">=", "<=", "<", ">", "<>"],
-    [op InfixR "&&"],
-    [op InfixR "||"],
-    [op InfixN ":=", op InfixL "=", op InfixL ">>"
-    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="],
+    [op InfixR "->", op InfixR ".."],
+    [op InfixR "|", op InfixN ":"],
+    [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
+    [op InfixR "and"],
+    [op InfixR "or"],
+    [op InfixR ":=", op InfixR ">>"
+    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="
+    ,InfixR defOp
+    ],
     [op InfixL "where"],  -- XXX precedence
     [preOp ".."],
-    [op InfixR "=>"],
-    [op InfixN ":-"]
+    [op InfixR "=>"]
+--  , [op InfixN ":-"]
   ]
   where
     preOp :: String -> Operator P Expr
-    preOp s = Prefix (app <$> pOpL s)
-      where app l x = PrefixOp (Ident l s) x
+    preOp s = Prefix app
+      where app = do
+              l <- oper s
+              pure $ \ x -> PrefixOp (Ident l s) x
 
-    op :: (P (Expr -> Expr -> Expr) -> Operator P Expr) -> String -> Operator P Expr
-    op fx s = fx (app <$> oper)
-      where app l x y = InfixOp x (Ident l s) y
-            oper | isAlpha (head s) = getSourcePos <* pKeyword s
-                 | otherwise = pOpL s
+    op :: ((Expr -> P (Expr -> Expr -> Expr)) -> Operator P Expr) -> String -> Operator P Expr
+    op fx s = fx app
+      where
+        app (InfixOp _ (Ident _ ":") _) | s == "=" = fail ":e="
+        app _ = do
+          l <- oper s
+          pure $ \ x y -> InfixOp x (Ident l s) y
+
+    oper s | isAlpha (head s) = getSourcePos <* pKeyword s
+           | otherwise = pOpL s
 
     pOpL s = getSourcePos <* pOp s
+
+    defOp :: Expr -> P (Expr -> Expr -> Expr)
+    defOp (InfixOp _ (Ident _ ":") _) = do
+      l <- pOpL "="
+      pure $ \ x y -> InfixOp x (Ident l ":=") y
+    defOp _ = fail "defOp"
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
@@ -305,8 +393,8 @@ parseDie p fn file =
     Left err -> error $ errorBundlePretty err
     Right x -> x
 
-_testp :: P a -> String -> a
-_testp p = parseDie p "<string>"
+testp :: P a -> String -> a
+testp p = parseDie p "<string>"
 
-_parseString :: String -> Expr
-_parseString = parseDie pFile "<string>"
+parseString :: String -> Expr
+parseString = parseDie pFile "<string>"

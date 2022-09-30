@@ -53,6 +53,8 @@ instance Pretty Ident where
 data Expr
   = LitInt Integer            -- d
   | LitRat Rational           -- d.d
+  | LitChar Char              -- 'c'
+  | LitStr String             -- "str"
   | Variable Ident            -- x
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
@@ -80,7 +82,8 @@ data Expr
   | Set Expr Ident Expr       -- set e1 = e2
   | MVar Ident Expr Expr      -- var i : t = e
   -- Some 1-argument macros
-  | Macro1 Ident Block        -- m{e}
+  | Macro1 Ident [Eff] Block  -- m<a>{e}
+  | Macro2 Ident Expr Block   -- m(e1){e2}
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
@@ -99,8 +102,8 @@ pattern Fail = Range Unit
 pattern Unit :: Expr
 pattern Unit = Array []
 pattern Typedef :: Block -> Expr
-pattern Typedef e <- Macro1 (Ident _ "type") e
-  where Typedef e = Macro1 (Ident noLoc "type") e
+pattern Typedef e <- Macro1 (Ident _ "type") [] e
+  where Typedef e = Macro1 (Ident noLoc "type") [] e
 
 type Eff = Ident
 
@@ -118,6 +121,7 @@ instance Pretty Expr where
       ppB (Block es) = braces $ ppSeq l es
       ppB e = braces (ppr 0 e)
       ppEs = commaSep l 1
+      ppEffs rs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
       ppOp = ppr 0
@@ -134,6 +138,8 @@ instance Pretty Expr where
           LitRat r
             | denominator r == 1 -> text $ show (numerator r)
             | otherwise -> maybeParens (p >= 9) $ text $ show (numerator r) ++ "/" ++ show (denominator r)
+          LitChar c -> text (show c)
+          LitStr s -> text (show s)
           Array es -> text "array" <> braces (ppSeq l es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
@@ -172,15 +178,15 @@ instance Pretty Expr where
             maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $ text "fn" <> hcat (map ppArs ars) <> ppB b
-            where ppArs (e, rs) = parens (pPrintL l e) <> effs
-                     where effs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
+            where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
           Block es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e -> parens (ppr 0 e)
           Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
           MVar i t e -> text "var" <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
-          Macro1 (Ident _ m) e -> text m <> ppB e
+          Macro1 (Ident _ m) rs e -> text m <> ppEffs rs <> ppB e
+          Macro2 (Ident _ m) e1 e2 -> text m <> parens (ppr 0 e1) <> ppB e2
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
@@ -245,6 +251,8 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 compos _ e@LitInt{} = pure e
 compos _ e@LitRat{} = pure e
+compos _ e@LitChar{} = pure e
+compos _ e@LitStr{} = pure e
 compos _ e@Variable{} = pure e
 compos f (Array es) = Array <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
@@ -273,7 +281,8 @@ compos f (Option me) = Option <$> traverse f me
 compos f (Parens e) = Parens <$> f e
 compos f (Set e1 op e2) = Set <$> f e1 <*> pure op <*> f e2
 compos f (MVar i e1 e2) = MVar i <$> f e1 <*> f e2
-compos f (Macro1 m b) = Macro1 m <$> f b
+compos f (Macro1 m as b) = Macro1 m as <$> f b
+compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Define i e) = Define i <$> f e
 compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
