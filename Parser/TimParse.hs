@@ -10,7 +10,7 @@ pFileTimTest :: P [TimTest]
 pFileTimTest = skip *> many pTimTest <* eof
 
 pTimTest :: P TimTest
-pTimTest = TimTest <$> (pKeyword "test" *> pParens pIdent) <*> pBraces pExprSeq
+pTimTest = TimTest <$> (pKeyword "test" *> pParens pIdent) <*> pBraces pExprSeq <* optional (symbol ";")
 
 main :: IO ()
 main = do

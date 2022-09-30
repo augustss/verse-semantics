@@ -1,7 +1,7 @@
 module Parse(
   parseDie, pFile,
   -- Exports for further parsing
-  pKeyword, skip, eof, many, pParens, pBraces,
+  pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq,
   P,
   testp, parseString) where
