@@ -58,11 +58,15 @@ opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = ["and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "not", "of", "or", "option", "set", "then", "var", "where"] ++
-           macros
+           , "in", "let", "not", "of", "or", "option", "set", "then", "var", "where"]
+           ++ macros
 
 macros :: [String]
-macros = ["all", "allow", "assume", "one", "type"]
+macros = ["all", "allow", "assume", "expect", "first", "one", "type", "unify"]
+         ++ effects
+
+effects :: [String]
+effects = [ "decides", "diverges", "fails", "succeeds" ]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -74,6 +78,13 @@ pMacroName = try $ do
   l <- getSourcePos
   w <- pWord
   guard (w `elem` macros)
+  pure $ Ident l w
+
+pEffectName :: P Ident
+pEffectName = try $ do
+  l <- getSourcePos
+  w <- pWord
+  guard (w `elem` effects)
   pure $ Ident l w
 
 pKeywordOpt :: String -> P ()
@@ -176,10 +187,13 @@ pMacro1 :: P Expr
 pMacro1 = Macro1 <$> pMacroName <*> many pAttr <*> pBlockM
 
 pAttr :: P Ident
-pAttr = pAngles pIdent
+pAttr = pAngles pEffectId
+
+pEffectId :: P Ident
+pEffectId = pIdent <|> pEffectName
 
 pEffects :: P Expr
-pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pIdent) <*> pBlockM)
+pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pEffectId) <*> pBlockM)
 
 pTerm :: P Expr
 pTerm = do
@@ -195,7 +209,7 @@ pFunction :: P Expr
 pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
   where
     pArg :: P (Expr, [Eff])
-    pArg = (,) <$> pParens pExprSeq <*> many (pAngles pIdent)
+    pArg = (,) <$> pParens pExprSeq <*> many pAttr
 
 pBlockEs :: P [Expr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))
