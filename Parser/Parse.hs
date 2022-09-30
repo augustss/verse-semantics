@@ -102,26 +102,38 @@ pDecimal :: P Integer
 pDecimal = L.decimal <* skip
 
 pChar :: P Char
-pChar = pQuotedChar <|> pCharCode
+pChar = (pQuotedChar <|> pCharCode) <* skip
 
+-- Char inside '
 pQuotedChar :: P Char
-pQuotedChar = char '\'' *> (pPrintableChar <|> pBackslashChar) <* char '\''
-  where pPrintableChar = satisfy isPrint
-        pBackslashChar :: P Char
-        pBackslashChar = do
-          _ <- char '\\'
-          c <- satisfy (const True)
-          case lookup c escs of
-            Nothing -> fail "pQuotedChar"
-            Just c' -> pure c'
-        escs = [('r', '\r'), ('n', '\n'), ('t', '\t')] ++
-               map (\ c -> (c, c)) "'\\{}#<>&~"
+pQuotedChar = char '\'' *> (pPrintableChar '\'' <|> pBackslashChar) <* char '\''
 
+-- Any printable Char, except the quote and \
+pPrintableChar :: Char -> P Char
+pPrintableChar quote = satisfy $ \ c -> isPrint c && c /= quote && c /= '\\'
+
+-- A \x sequence
+pBackslashChar :: P Char
+pBackslashChar = do
+  _ <- char '\\'
+  ch <- satisfy (const True)
+  let escs = [('r', '\r'), ('n', '\n'), ('t', '\t')] ++
+             map (\ c -> (c, c)) "'\"\\{}#<>&~"
+  case lookup ch escs of
+    Nothing -> fail "pQuotedChar"
+    Just c' -> pure c'
+
+-- A character without quotes
 pCharCode :: P Char
 pCharCode = fail "unimplemented"
 
 pString :: P String
-pString = fail "pString unimplemented"
+pString = do
+  _ <- char '"'
+  cs <- many (pPrintableChar '"' <|> pBackslashChar)
+  _ <- char '"'
+  skip
+  pure cs
 
 -- XXX Needs works
 --pString :: P String
