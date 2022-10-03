@@ -15,12 +15,16 @@ pTimTest = TimTest <$> (pKeyword "test" *> pParens pIdent) <*> pBraces pExprSeq 
 main :: IO ()
 main = do
   args <- getArgs
-  let fn =
+  let (fn1, fn2) =
         case args of
-          [] -> "VerseTestFiles/TimVerse-tests.verse"
-          [s] -> s
-          _ -> error "Use 0 or 1 argument"
-  file <- readFile fn
-  let tests = parseDie pFileTimTest fn file
-  putStrLn $ "Read " ++ fn ++ ", parsed tests: " ++ show (length tests)
+          [] -> ("VerseTestFiles/TimVerse-tests.verse", "VerseTestFiles/TimAbout.verse")
+          [s1, s2] -> (s1, s2)
+          _ -> error "Use 0 or 2 arguments"
+  file1 <- readFile fn1
+  let tests1 = parseDie pFileTimTest fn1 file1
+  putStrLn $ "Read " ++ fn1 ++ ", parsed tests: " ++ show (length tests1)
+  file2 <- readFile fn2
+  let tests2 = parseDie pFile fn2 file2
+  if tests2 == tests2 then pure () else undefined
+  putStrLn $ "Parsed " ++ fn2
   
