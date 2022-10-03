@@ -42,15 +42,17 @@ $$\begin{array}{lcl}
 |e_1; e_2|     & \equiv & |llet _   e_1 e_2                          | \\
 \end{array}$$
 %
-\caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.}
+  \caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.
+    \lennart{Why not it into |x = e_1; e_2|?}
+  }
 \label{fig:desugar}
 %
 \end{figure}
 
 \begin{figure}
-$$\begin{array}{lrcl}
+$$\begin{array}{lrcll}
         \rulename{swap-e} & |v_1 == v_2|     & \equiv & |v_2 == v_1| \\
-        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| \\
+        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| & \text{\lennart{|def (x ^^ y)| not explained}} \\
         \rulename{swap-c} & c_1; c_2; e    & \equiv & c_2; c_1; e \\
 \end{array}$$
 \caption{\textbf{Structural Equivalences}}\label{fig:structural-equiv}
@@ -83,6 +85,8 @@ $$\begin{array}{lrcl}
 
 \rulegroupname{Elimination}
 \rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+                        & \multicolumn{3}{l}\text{\lennart{Above rule is debatable.}} \\
+                        & \multicolumn{3}{l}\text{\lennart{Allows removing unused variables.}} \\
 \rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
 \rulegroupname{Explosion}
