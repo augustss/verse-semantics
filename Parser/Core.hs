@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Core(
   Core(..),
-  pattern COne, pattern CAll, pattern CSucceeds, pattern CFail,
+  pattern COne, pattern CAll, pattern CSucceeds,
   pattern CVar, pattern VPrim, pattern VArray, pattern CArray,
   pattern VLam, pattern CLam,
   Value(..),
@@ -10,7 +10,7 @@ module Core(
   compos, composOp,
   exprToCore,
   coreToRedex,
-  cSeq, cDef,
+  cSeq, cDef, cBar,
   isValue,
   fvs, fvsV, cfvs, cfvsV,
   subst,
@@ -37,7 +37,8 @@ data Core
   | CUnify Core Core
   | CSeq [Core]
   | CApply Value Value
-  | CBar [Core]
+  | CBar Core Core
+  | CFail
   | CMacro Ident Core
   | CDef Heap Core
   | CWrong String
@@ -83,8 +84,6 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
 pattern CDecides :: Core -> Core
 pattern CDecides c <- CMacro (Ident _ "decides") c
   where CDecides e = CMacro (Ident noLoc "decides") e
-pattern CFail :: Core
-pattern CFail = CBar []
 pattern VLam :: Ident -> Core -> Value
 pattern VLam i e = HNF (HLam i e)
 pattern CLam :: Ident -> Core -> Core
@@ -99,6 +98,11 @@ cSeq es = CSeq es
 cDef :: [Ident] -> Core -> Core
 cDef [] e = e
 cDef is e = CDef is e
+
+cBar :: [Core] -> Core
+cBar [] = CFail
+cBar [e] = e
+cBar (e:es) = CBar e $ cBar es
 
 isValue :: Core -> Bool
 isValue CValue{} = True
@@ -141,13 +145,13 @@ core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
 core (ApplyEff rs e) = coreEffs rs =<< coreD e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
-core e@Choice{} = CBar <$> mapM coreD (flat e)
+core e@Choice{} = cBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
 core (Define i AnyT) = pure $ CVar i
 core (Define i e) = cUnify (CVar i) <$> core e
 core AnyT = undefined
-core Fail = pure $ CBar []
+core Fail = pure $ CFail
 core (For2 e1 e2) = do
   useSplit <- ask
   if useSplit then
@@ -164,7 +168,7 @@ core (If3 e1 e2 e3) = do
   e3' <- thunk e3
   l <- coreD (seqE [e1, e2'])
   r <- core e3'
-  fn <- cOne $ CBar [l, r]
+  fn <- cOne $ CBar l r
   i <- newTmp
   pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
@@ -317,7 +321,7 @@ instance Pretty Core where
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
   pPrintPrec _ _ CFail = text "fail"
-  pPrintPrec l p (CBar cs) = maybeParens (p > 7) $ fsep (punctuate (text " |") (map (pPrintPrec l 7) cs))
+  pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
     maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is <+> text "in", pPrintPrec l 0 e]
@@ -351,7 +355,8 @@ compos f (CValue v) = CValue <$> appV f v
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
 compos f (CSeq es) = CSeq <$> traverse f es
 compos f (CApply e1 e2) = CApply <$> appV f e1 <*> appV f e2
-compos f (CBar es) = CBar <$> traverse f es
+compos f (CBar e1 e2) = CBar <$> f e1 <*> f e2
+compos _ CFail = pure CFail
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
@@ -376,7 +381,8 @@ composC _  fv _  (CValue v) = CValue <$> fv v
 composC fc _fv _  (CUnify e1 e2) = CUnify <$> fc e1 <*> fc e2
 composC fc _  _  (CSeq es) = CSeq <$> traverse fc es
 composC _  fv _  (CApply e1 e2) = CApply <$> fv e1 <*> fv e2
-composC fc _  _  (CBar es) = CBar <$> traverse fc es
+composC fc _  _  (CBar e1 e2) = CBar <$> fc e1 <*> fc e2
+composC _  _  _  CFail = pure CFail
 composC fc _  _  (CMacro i e) = CMacro i <$> fc e
 composC fc _  _  (CDef h e) = CDef h <$> fc e
 composC _  _  _   e@CWrong{} = pure e
@@ -415,7 +421,8 @@ cfvs (CValue v) = cfvsV v
 cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CSeq es) = concatMap cfvs es
 cfvs (CApply e1 e2) = cfvsV e1 ++ cfvsV e2
-cfvs (CBar es) = concatMap cfvs es
+cfvs (CBar e1 e2) = cfvs e1 ++ cfvs e2
+cfvs CFail = []
 cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvsV f ++ cfvsV g
@@ -443,7 +450,8 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
     sub (CSeq es) = CSeq $ map sub es
     sub (CApply e1 e2) = CApply (subV e1) (subV e2)
-    sub (CBar es) = CBar $ map sub es
+    sub (CBar e1 e2) = CBar (sub e1) (sub e2)
+    sub CFail = CFail
     sub (CMacro i e) = CMacro i $ sub e
     sub a@(CDef h e) | x `elem` h = a
                      | null (intersect bs h) = CDef h $ sub e
@@ -470,7 +478,8 @@ alphaConvert vs = alpha []
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
     alpha m (CSeq es) = CSeq (map (alpha m) es)
     alpha m (CApply e1 e2) = CApply (alphaV m e1) (alphaV m e2)
-    alpha m (CBar es) = CBar (map (alpha m) es)
+    alpha m (CBar e1 e2) = CBar (alpha m e1) (alpha m e2)
+    alpha _ CFail = CFail
     alpha m (CMacro i e) = CMacro i (alpha m e)
     alpha m (CDef h e) = CDef h' (alpha m' e)
       where h' = map fresh h
