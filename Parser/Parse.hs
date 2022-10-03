@@ -7,12 +7,17 @@ module Parse(
   testp, parseString) where
 
 import Control.Monad
+import qualified Control.Monad.State.Strict as S
 import OpParser
 import Data.Char
+import Data.List
 import Data.Maybe
+--import Data.Ratio(numerator)
+--import Data.Scientific(isInteger)
 import Data.Void
 --import Epic.Print hiding (char)
-import Text.Megaparsec
+import Text.Megaparsec hiding(try)
+import qualified Text.Megaparsec as M
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 --import Text.Read (readMaybe)
@@ -21,11 +26,57 @@ import Error
 import Expr
 import Print(prettyShow)
 
-type P = Parsec Void String
+-- import Debug.Trace
+
+data LexState = LexState
+  { lastInd   :: !(Maybe String)
+  , blkIndent :: ![String]        -- current block indentation
+  }
+  deriving (Show)
+
+initLexState :: LexState
+initLexState = LexState { blkIndent = [], lastInd = Nothing }
+
+type P = ParsecT Void String (S.State LexState)
+
+-- The regular try combinator does not backtrack the LexState.
+-- This version has an error handler that resets the LexState.
+try :: P a -> P a
+try p = do
+  ls <- S.get -- Get initial state.
+  let err e = do
+        S.put ls -- Reset state,
+        parseError e -- and signal error.
+  M.try (withRecovery err p) -- Use 'try' with special error handler.
+
+---------------------------------------------------------
+
+isNL :: Char -> Bool
+isNL c = c == '\n' || c == '\r'
+
+isHSpace :: Char -> Bool
+isHSpace c = isSpace c && not (isNL c)
+
+---------------------------------------------------------
 
 -- Skip space and comments
 skip :: P ()
-skip = L.space space1 (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
+skip = do
+  S.modify $ \ ls -> ls { lastInd = Nothing }
+  L.space aspace (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
+  where aspace = do
+          c <- spaceChar
+          when (isNL c) $ do
+            s <- takeWhileP (Just "white space") isHSpace
+            S.modify $ \ ls -> ls { lastInd = Just s }
+
+pNLSpace :: P String
+pNLSpace = do
+  _ <- takeWhile1P (Just "white space") isNL
+  takeWhileP (Just "white space") isHSpace
+
+skipH :: P ()
+skipH = L.space hspace1 (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
 
 lexeme :: P a -> P a
 lexeme = L.lexeme skip
@@ -108,13 +159,19 @@ pLiteral = choice
   [ LitInt <$> pDecimal
   , LitChar <$> pChar
   , LitStr <$> pString
+  , (LitRat <$> L.scientific <*> many letterChar) <* skip
   ]
 
 pDecimal :: P Integer
-pDecimal = L.decimal <* skip
+pDecimal = choice
+  [ try (char '0' *> char' 'x' *> L.hexadecimal)
+  , try (char '0' *> char' 'o' *> L.octal)
+  , try (char '0' *> char' 'b' *> L.binary)
+  , try (L.decimal <* notFollowedBy (char '.'))
+  ] <* skip
 
 pChar :: P Char
-pChar = (pQuotedChar <|> pCharCode) <* skip
+pChar = (pQuotedChar {- <|> pCharCode -}) <* skip
 
 -- Char inside '
 pQuotedChar :: P Char
@@ -136,8 +193,8 @@ pBackslashChar = do
     Just c' -> pure c'
 
 -- A character without quotes
-pCharCode :: P Char
-pCharCode = fail "unimplemented"
+--pCharCode :: P Char
+--pCharCode = fail "unimplemented pCharCode"
 
 pString :: P String
 pString = do
@@ -152,7 +209,7 @@ pString = do
 --pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
 
 pOp :: String -> P String
-pOp ":" = pOp' ":" "=-"
+pOp ":" = pOp' ":" "=-)"
 pOp "=" = pOp' "=" ">"
 pOp "<" = pOp' "<" ">="
 pOp ">" = pOp' ">" ">="
@@ -172,10 +229,13 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [ Variable <$> pIdent, pLiteral, pEmpty
+pAtom = choice [ Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
                , Parens <$> pParens pExprSeq, pArray, pMacro
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
+
+pQualVariable :: P Expr
+pQualVariable = try (QualVariable <$> pParens (pExprT <* char ':') <*> pIdent)
 
 -- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
 -- A trailing ';' can be used, but not a trailing ','.
@@ -204,7 +264,7 @@ pTerm = do
   fn <- pAtom
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
-             (flip ApplyS <$> pParens pExprSeq) <|>
+             (flip ApplyS <$> try (pParens pExprSeq)) <|>
              (flip EffAttr <$> try pAttr) <|>
              pPost
       pPost = do
@@ -228,13 +288,40 @@ pBlock :: P Block
 pBlock = pBlockM <|> pExprT
 
 pBlockM :: P Block
-pBlockM = Block <$> pBlockEs
+pBlockM = Block <$> (pBlockEs  <|> pIndBlock)
+
+pIndBlock :: P [Expr]
+pIndBlock = do
+  s <- try (char ':' *> skipH *> pNLSpace)
+  S.modify $ \ ls -> ls { blkIndent = s : blkIndent ls }
+  pIndBlock'
+
+pIndBlock' :: P [Expr]
+pIndBlock' = do
+  es <- sepEndBy pExprT (pSemi <|> pSameInd)
+  pLessInd <|> eof
+  pure es
+  where
+    pSemi = pOp ";" *> pure ()
+    pSameInd = do
+      ls <- S.get
+--      traceM ("pSameInd " ++ show ls)
+      case ls of
+        LexState { lastInd = Just s, blkIndent = s' : _ } | s == s' ->
+          S.put ls{ lastInd = Nothing }
+        _ -> fail "indentation"
+    pLessInd = do
+      ls <- S.get
+      case ls of
+        LexState { lastInd = Just s, blkIndent = s' : bs } | s `isPrefixOf` s' ->
+          S.put ls{ blkIndent = bs }  -- exit this block
+        _ -> fail "indentation"
 
 pExprSeq :: P Expr
 pExprSeq = seqS <$> sepEndBy pExprT (pOp ";")
 
-pExprSeq1 :: P Expr
-pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
+--pExprSeq1 :: P Expr
+--pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
 
 seqS :: [Expr] -> Expr
 seqS [] = Array []
@@ -243,7 +330,7 @@ seqS es = Seq es
 
 pIf :: P Expr
 pIf = pKeyword "if" *> (
-  (mkIf <$> pParens pExprSeq1 <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
+  (mkIf <$> pParens pExprSeq <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
   (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
@@ -257,7 +344,7 @@ pIf = pKeyword "if" *> (
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
-  (For2 <$> pParens pExprSeq1 <*> (pKeywordOpt "do" *> pBlock))
+  (For2 <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
   <|>
   (For1 <$> pBlockM)
   )
@@ -266,7 +353,7 @@ pLet :: P Expr
 pLet = pKeyword "let" *> (Let <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
 
 pCase :: P Expr
-pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq1) <*> (pKeywordOpt "of" *> pBlockM))
+pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeywordOpt "of" *> pBlockM))
   where mkCase Nothing e2 = Case1 e2
         mkCase (Just e1) e2 = Case2 e1 e2
 
@@ -274,7 +361,7 @@ pDo :: P Expr
 pDo = pKeyword "block" *> (Do <$> pBlockM)
 
 pOption :: P Expr
-pOption = pKeyword "option" *> (Option <$> optional pExprSeq1)
+pOption = pKeyword "option" *> (Option <$> optional pExprSeq)
 
 pSet :: P Expr
 pSet = pKeyword "set" *> do
@@ -376,7 +463,12 @@ pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
 
 pFile :: P Expr
-pFile = skip *> pExprSeq <* eof
+--pFile = skip *> pExprSeq <* eof
+pFile = skip *> p <* eof
+  where
+    p = do
+      S.modify $ \ ls -> ls{ blkIndent = [""] }
+      seqS <$> pIndBlock'
 
 arrayS :: [Expr] -> Expr
 arrayS [e] = e
@@ -385,7 +477,7 @@ arrayS es = Array es
 ------
 
 runP :: P a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
-runP = runParser
+runP pa fn s = S.evalState (runParserT pa fn s) initLexState
 
 parseDie :: P a -> FilePath -> String -> a
 parseDie p fn file =

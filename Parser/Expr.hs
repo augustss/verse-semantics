@@ -22,6 +22,7 @@ import Control.Monad.Identity
 import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
+import Data.Scientific(Scientific)
 import Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
@@ -52,10 +53,11 @@ instance Pretty Ident where
 
 data Expr
   = LitInt Integer            -- d
-  | LitRat Rational           -- d.d
+  | LitRat Scientific String    -- d.d
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
   | Variable Ident            -- x
+  | QualVariable Expr Ident   -- (e:)x
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
@@ -135,14 +137,13 @@ instance Pretty Expr where
           LitInt i
             | i >= 0 -> ppr p i
             | otherwise -> maybeParens (p >= 10) $ text $ show i
-          LitRat r
-            | denominator r == 1 -> text $ show (numerator r)
-            | otherwise -> maybeParens (p >= 9) $ text $ show (numerator r) ++ "/" ++ show (denominator r)
+          LitRat r s -> text (show r ++ s)
           LitChar c -> text (show c)
           LitStr s -> text (show s)
           Array es -> text "array" <> braces (ppSeq l es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
+          QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
             where (q, ql, _) = fixity "()"
           ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
@@ -254,6 +255,7 @@ compos _ e@LitRat{} = pure e
 compos _ e@LitChar{} = pure e
 compos _ e@LitStr{} = pure e
 compos _ e@Variable{} = pure e
+compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
 compos f (Array es) = Array <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
 compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2

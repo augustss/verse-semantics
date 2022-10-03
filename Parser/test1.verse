@@ -1,6 +1,11 @@
 1;
-# 1.2;  no LitRat yet
+0x10;
+0o10;
+0b10;
+1.2;
+1.2d;
 x;
+(y:)x;
 array{1;2;3};
 array{4};
 array{};
