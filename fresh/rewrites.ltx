@@ -35,11 +35,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 % \mypara{Note:} Values can have arbitrarily nested tuples but $\lambda$-terms are never inside a tuple.
 
 \begin{figure}[t]
-$$\begin{array}{lcl}
-\mbox{\vcname} &        & \mbox{\calcname} \\
+$$\begin{array}{lll}
+\mbox{\vcname} & \mbox{\calcname}  & \mbox{\lcalcname} \\
 \midrule
-|e_1 == e_2|   & \equiv & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| \\
-|e_1; e_2|     & \equiv & |llet _   e_1 e_2                          | \\
+|e_1 == e_2|   & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| & \lvc{|def x (x == e_1; x == e_2; x)|} \\
+|e_1; e_2|     & |llet _   e_1 e_2                          |    & \lvc{|def x (x == e_1; e_2)|} \\
 \end{array}$$
 %
 \caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.}
