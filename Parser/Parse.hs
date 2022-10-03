@@ -111,7 +111,10 @@ pLiteral = choice
   ]
 
 pDecimal :: P Integer
-pDecimal = L.decimal <* skip
+pDecimal = choice
+  [ try (char '0' *> char' 'x' *> L.hexadecimal <* skip)
+  , L.decimal <* skip
+  ]
 
 pChar :: P Char
 pChar = (pQuotedChar <|> pCharCode) <* skip
