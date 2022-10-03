@@ -7,12 +7,15 @@ module Parse(
   testp, parseString) where
 
 import Control.Monad
+import qualified Control.Monad.State.Strict as S
 import OpParser
 import Data.Char
+import Data.List
 import Data.Maybe
 import Data.Void
 --import Epic.Print hiding (char)
-import Text.Megaparsec
+import Text.Megaparsec hiding(try)
+import qualified Text.Megaparsec as M
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 --import Text.Read (readMaybe)
@@ -21,11 +24,57 @@ import Error
 import Expr
 import Print(prettyShow)
 
-type P = Parsec Void String
+import Debug.Trace
+
+data LexState = LexState
+  { lastInd   :: !(Maybe String)
+  , blkIndent :: ![String]        -- current block indentation
+  }
+  deriving (Show)
+
+initLexState :: LexState
+initLexState = LexState { blkIndent = [], lastInd = Nothing }
+
+type P = ParsecT Void String (S.State LexState)
+
+-- The regular try combinator does not backtrack the LexState.
+-- This version has an error handler that resets the LexState.
+try :: P a -> P a
+try p = do
+  ls <- S.get -- Get initial state.
+  let err e = do
+        S.put ls -- Reset state,
+        parseError e -- and signal error.
+  M.try (withRecovery err p) -- Use 'try' with special error handler.
+
+---------------------------------------------------------
+
+isNL :: Char -> Bool
+isNL c = c == '\n' || c == '\r'
+
+isHSpace :: Char -> Bool
+isHSpace c = isSpace c && not (isNL c)
+
+---------------------------------------------------------
 
 -- Skip space and comments
 skip :: P ()
-skip = L.space space1 (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
+skip = do
+  S.modify $ \ ls -> ls { lastInd = Nothing }
+  L.space aspace (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
+  where aspace = do
+          c <- spaceChar
+          when (isNL c) $ do
+            s <- takeWhileP (Just "white space") isHSpace
+            S.modify $ \ ls -> ls { lastInd = Just s }
+
+pNLSpace :: P String
+pNLSpace = do
+  _ <- takeWhile1P (Just "white space") isNL
+  takeWhileP (Just "white space") isHSpace
+
+skipH :: P ()
+skipH = L.space hspace1 (L.skipLineComment "#") (L.skipBlockCommentNested "<#" "#>")
 
 lexeme :: P a -> P a
 lexeme = L.lexeme skip
@@ -117,7 +166,7 @@ pDecimal = choice
   ]
 
 pChar :: P Char
-pChar = (pQuotedChar <|> pCharCode) <* skip
+pChar = (pQuotedChar {- <|> pCharCode -}) <* skip
 
 -- Char inside '
 pQuotedChar :: P Char
@@ -139,8 +188,8 @@ pBackslashChar = do
     Just c' -> pure c'
 
 -- A character without quotes
-pCharCode :: P Char
-pCharCode = fail "unimplemented"
+--pCharCode :: P Char
+--pCharCode = fail "unimplemented pCharCode"
 
 pString :: P String
 pString = do
@@ -231,7 +280,34 @@ pBlock :: P Block
 pBlock = pBlockM <|> pExprT
 
 pBlockM :: P Block
-pBlockM = Block <$> pBlockEs
+pBlockM = Block <$> (pBlockEs  <|> pIndBlock)
+
+pIndBlock :: P [Expr]
+pIndBlock = do
+  s <- try (char ':' *> skipH *> pNLSpace)
+  S.modify $ \ ls -> ls { blkIndent = s : blkIndent ls }
+  pIndBlock'
+
+pIndBlock' :: P [Expr]
+pIndBlock' = do
+  es <- sepEndBy pExprT (pSemi <|> pSameInd)
+  pLessInd <|> eof
+  pure es
+  where
+    pSemi = pOp ";" *> pure ()
+    pSameInd = do
+      ls <- S.get
+      traceM ("pSameInd " ++ show ls)
+      case ls of
+        LexState { lastInd = Just s, blkIndent = s' : _ } | s == s' ->
+          S.put ls{ lastInd = Nothing }
+        _ -> fail "indentation"
+    pLessInd = do
+      ls <- S.get
+      case ls of
+        LexState { lastInd = Just s, blkIndent = s' : bs } | s `isPrefixOf` s' ->
+          S.put ls{ blkIndent = bs }  -- exit this block
+        _ -> fail "indentation"
 
 pExprSeq :: P Expr
 pExprSeq = seqS <$> sepEndBy pExprT (pOp ";")
@@ -379,7 +455,12 @@ pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
 
 pFile :: P Expr
-pFile = skip *> pExprSeq <* eof
+--pFile = skip *> pExprSeq <* eof
+pFile = skip *> p <* eof
+  where
+    p = do
+      S.modify $ \ ls -> ls{ blkIndent = [""] }
+      seqS <$> pIndBlock'
 
 arrayS :: [Expr] -> Expr
 arrayS [e] = e
@@ -388,7 +469,7 @@ arrayS es = Array es
 ------
 
 runP :: P a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
-runP = runParser
+runP pa fn s = S.evalState (runParserT pa fn s) initLexState
 
 parseDie :: P a -> FilePath -> String -> a
 parseDie p fn file =
