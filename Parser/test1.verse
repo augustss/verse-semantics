@@ -1,5 +1,5 @@
 1;
-# 1.2;  no LitRat yet
+1.2;
 x;
 array{1;2;3};
 array{4};

@@ -12,6 +12,8 @@ import OpParser
 import Data.Char
 import Data.List
 import Data.Maybe
+--import Data.Ratio(numerator)
+--import Data.Scientific(isInteger)
 import Data.Void
 --import Epic.Print hiding (char)
 import Text.Megaparsec hiding(try)
@@ -24,7 +26,7 @@ import Error
 import Expr
 import Print(prettyShow)
 
-import Debug.Trace
+-- import Debug.Trace
 
 data LexState = LexState
   { lastInd   :: !(Maybe String)
@@ -157,13 +159,16 @@ pLiteral = choice
   [ LitInt <$> pDecimal
   , LitChar <$> pChar
   , LitStr <$> pString
+  , (LitRat <$> L.scientific <*> many letterChar) <* skip
   ]
 
 pDecimal :: P Integer
 pDecimal = choice
-  [ try (char '0' *> char' 'x' *> L.hexadecimal <* skip)
-  , L.decimal <* skip
-  ]
+  [ try (char '0' *> char' 'x' *> L.hexadecimal)
+  , try (char '0' *> char' 'o' *> L.octal)
+  , try (char '0' *> char' 'b' *> L.binary)
+  , try (L.decimal <* notFollowedBy (char '.'))
+  ] <* skip
 
 pChar :: P Char
 pChar = (pQuotedChar {- <|> pCharCode -}) <* skip
@@ -297,7 +302,7 @@ pIndBlock' = do
     pSemi = pOp ";" *> pure ()
     pSameInd = do
       ls <- S.get
-      traceM ("pSameInd " ++ show ls)
+--      traceM ("pSameInd " ++ show ls)
       case ls of
         LexState { lastInd = Just s, blkIndent = s' : _ } | s == s' ->
           S.put ls{ lastInd = Nothing }

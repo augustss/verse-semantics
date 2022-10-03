@@ -22,6 +22,7 @@ import Control.Monad.Identity
 import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
+import Data.Scientific(Scientific)
 import Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
@@ -52,7 +53,7 @@ instance Pretty Ident where
 
 data Expr
   = LitInt Integer            -- d
-  | LitRat Rational           -- d.d
+  | LitRat Scientific String    -- d.d
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
   | Variable Ident            -- x
@@ -135,9 +136,7 @@ instance Pretty Expr where
           LitInt i
             | i >= 0 -> ppr p i
             | otherwise -> maybeParens (p >= 10) $ text $ show i
-          LitRat r
-            | denominator r == 1 -> text $ show (numerator r)
-            | otherwise -> maybeParens (p >= 9) $ text $ show (numerator r) ++ "/" ++ show (denominator r)
+          LitRat r s -> text (show r ++ s)
           LitChar c -> text (show c)
           LitStr s -> text (show s)
           Array es -> text "array" <> braces (ppSeq l es)

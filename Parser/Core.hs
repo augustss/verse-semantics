@@ -288,7 +288,7 @@ val e = CValue <$> value e
 
 value :: Expr -> C Value
 value (LitInt i) = pure (HNF $ HInt i)
-value (LitRat i) = pure (HNF $ HRat i)
+value (LitRat i _) = pure (HNF $ HRat $ toRational i)
 value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
                                | otherwise = pure (Var i)
 value (Array es) = HNF . HArray <$> mapM value es
