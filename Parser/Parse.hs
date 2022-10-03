@@ -236,8 +236,8 @@ pBlockM = Block <$> pBlockEs
 pExprSeq :: P Expr
 pExprSeq = seqS <$> sepEndBy pExprT (pOp ";")
 
-pExprSeq1 :: P Expr
-pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
+--pExprSeq1 :: P Expr
+--pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
 
 seqS :: [Expr] -> Expr
 seqS [] = Array []
@@ -246,7 +246,7 @@ seqS es = Seq es
 
 pIf :: P Expr
 pIf = pKeyword "if" *> (
-  (mkIf <$> pParens pExprSeq1 <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
+  (mkIf <$> pParens pExprSeq <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
   (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
@@ -260,7 +260,7 @@ pIf = pKeyword "if" *> (
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
-  (For2 <$> pParens pExprSeq1 <*> (pKeywordOpt "do" *> pBlock))
+  (For2 <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
   <|>
   (For1 <$> pBlockM)
   )
@@ -269,7 +269,7 @@ pLet :: P Expr
 pLet = pKeyword "let" *> (Let <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
 
 pCase :: P Expr
-pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq1) <*> (pKeywordOpt "of" *> pBlockM))
+pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeywordOpt "of" *> pBlockM))
   where mkCase Nothing e2 = Case1 e2
         mkCase (Just e1) e2 = Case2 e1 e2
 
@@ -277,7 +277,7 @@ pDo :: P Expr
 pDo = pKeyword "block" *> (Do <$> pBlockM)
 
 pOption :: P Expr
-pOption = pKeyword "option" *> (Option <$> optional pExprSeq1)
+pOption = pKeyword "option" *> (Option <$> optional pExprSeq)
 
 pSet :: P Expr
 pSet = pKeyword "set" *> do
