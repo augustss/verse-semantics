@@ -209,7 +209,7 @@ pString = do
 --pString = lexeme $ char '"' *> many (satisfy (/= '"')) <* char '"'
 
 pOp :: String -> P String
-pOp ":" = pOp' ":" "=-"
+pOp ":" = pOp' ":" "=-)"
 pOp "=" = pOp' "=" ">"
 pOp "<" = pOp' "<" ">="
 pOp ">" = pOp' ">" ">="
@@ -229,10 +229,13 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [ Variable <$> pIdent, pLiteral, pEmpty
+pAtom = choice [ Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
                , Parens <$> pParens pExprSeq, pArray, pMacro
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
+
+pQualVariable :: P Expr
+pQualVariable = try (QualVariable <$> pParens (pExprT <* char ':') <*> pIdent)
 
 -- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
 -- A trailing ';' can be used, but not a trailing ','.
@@ -261,7 +264,7 @@ pTerm = do
   fn <- pAtom
   let pArg :: P (Expr -> Expr)
       pArg = (flip ApplyD <$> pBrackets pExprSeq) <|>
-             (flip ApplyS <$> pParens pExprSeq) <|>
+             (flip ApplyS <$> try (pParens pExprSeq)) <|>
              (flip EffAttr <$> try pAttr) <|>
              pPost
       pPost = do

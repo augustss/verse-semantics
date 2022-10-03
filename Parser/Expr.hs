@@ -57,6 +57,7 @@ data Expr
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
   | Variable Ident            -- x
+  | QualVariable Expr Ident   -- (e:)x
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
@@ -142,6 +143,7 @@ instance Pretty Expr where
           Array es -> text "array" <> braces (ppSeq l es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
+          QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
             where (q, ql, _) = fixity "()"
           ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
@@ -253,6 +255,7 @@ compos _ e@LitRat{} = pure e
 compos _ e@LitChar{} = pure e
 compos _ e@LitStr{} = pure e
 compos _ e@Variable{} = pure e
+compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
 compos f (Array es) = Array <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
 compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2
