@@ -341,7 +341,7 @@ seqS es = Seq es
 
 pIf :: P Expr
 pIf = pKeyword "if" *> (
-  (mkIf <$> getSourcePos <*> pParenBlock <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
+  (mkIf <$> getSourcePos <*> pParenBlock <*> optional (pKeywordOptDot "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
   (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
@@ -355,7 +355,7 @@ pIf = pKeyword "if" *> (
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
-  (For2 <$> pParenBlock <*> (pKeywordOpt "do" *> pBlock))
+  (For2 <$> pParenBlock <*> (pKeywordOptDot "do" *> pBlock))
   <|>
   (For1 <$> pBlockM)
   )
