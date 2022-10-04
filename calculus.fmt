@@ -67,6 +67,9 @@
 %%format choice = "\boldsymbol{|}"
 %%format `choice` = "\mathop{\boldsymbol{|}}"
 
+%format hastype (x) (y) = x "\," hastypeKW "\," y
+%format hastypeKW = "{\bf hastype}"
+
 %format srcand = "\&\&"
 %format srcor = "||"
 %format hat = "\hat{\hspace{0.8em}}"
@@ -115,6 +118,7 @@
 %format iterates (e) = "\textbf{iterates}\,\{" e "\}"
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
+%format square(x) = x "^2"
 
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
