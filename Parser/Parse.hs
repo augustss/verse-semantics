@@ -10,6 +10,7 @@ import Control.Monad
 import qualified Control.Monad.State.Strict as S
 import OpParser
 import Data.Char
+import Data.Functor
 import Data.List
 import Data.Maybe
 --import Data.Ratio(numerator)
@@ -387,12 +388,16 @@ pSet = pKeyword "set" *> do
     _ -> fail "set not followed by assignment operator"
 
 pVar :: P Expr
-pVar = pKeyword "var" *> do
+pVar = pVRA >>= \ con -> do
   e <- pExprT
   case e of
     -- XXX using := here isn't quite right.  It will allow 'var x:t:=e' to work.
-    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ ":=") e3 -> pure $ MVar i1 e2 e3
-    _ -> fail $ "var not followed by x : t = e\n" ++ prettyShow e
+    InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ ":=") e3 -> pure $ con i1 (Just e2) (Just e3)
+    InfixOp (Variable i1) (Ident _ ":") e2 -> pure $ con i1 (Just e2) Nothing
+    InfixOp (Variable i1) (Ident _ "=") e2 -> pure $ con i1 Nothing (Just e2)
+    _ -> fail $ "var/ref not followed by x : t [= e]\n" ++ prettyShow e
+ where
+   pVRA = choice [pKeyword "var" $> MVar, pKeyword "ref" $> MRef, pKeyword "alias" $> MAlias]
 
 pExpr1 :: P Expr
 pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
