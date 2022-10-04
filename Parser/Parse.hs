@@ -161,8 +161,8 @@ pLiteral :: P Expr
 pLiteral = choice
   [ LitInt <$> pDecimal
   , LitChar <$> pChar
-  , LitStr <$> pString
   , (LitRat <$> L.scientific <*> many letterChar) <* skip
+  , pString
   ]
 
 pDecimal :: P Integer
@@ -178,11 +178,11 @@ pChar = (pQuotedChar {- <|> pCharCode -}) <* skip
 
 -- Char inside '
 pQuotedChar :: P Char
-pQuotedChar = char '\'' *> (pPrintableChar '\'' <|> pBackslashChar) <* char '\''
+pQuotedChar = char '\'' *> (pPrintableChar "'\\" <|> pBackslashChar) <* char '\''
 
 -- Any printable Char, except the quote and \
-pPrintableChar :: Char -> P Char
-pPrintableChar quote = satisfy $ \ c -> isPrint c && c /= quote && c /= '\\'
+pPrintableChar :: String -> P Char
+pPrintableChar spec = satisfy $ \ c -> isPrint c && c `notElem` spec
 
 -- A \x sequence
 pBackslashChar :: P Char
@@ -199,13 +199,19 @@ pBackslashChar = do
 --pCharCode :: P Char
 --pCharCode = fail "unimplemented pCharCode"
 
-pString :: P String
+pString :: P Expr
 pString = do
+  let pStr = some (pPrintableChar "\"\\{" <|> pBackslashChar)
+      pInterp = pBraces pExprSeq
+      conc [] = LitStr ""
+      conc [e] = e
+      conc es = ApplyD (Variable (Ident noLoc "strConc$")) (Array es)
+      toStr e = Macro1 (Ident noLoc "toStr$") [] e
   _ <- char '"'
-  cs <- many (pPrintableChar '"' <|> pBackslashChar)
+  cs <- many ((LitStr <$> pStr) <|> (toStr <$> pInterp))
   _ <- char '"'
   skip
-  pure cs
+  pure $ conc cs
 
 -- XXX Needs works
 --pString :: P String
