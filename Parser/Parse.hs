@@ -399,8 +399,11 @@ pVar = pVRA >>= \ con -> do
  where
    pVRA = choice [pKeyword "var" $> MVar, pKeyword "ref" $> MRef, pKeyword "alias" $> MAlias]
 
+pReturn :: P Expr
+pReturn = pKeyword "return" *> (Return <$> pExpr2)
+
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
