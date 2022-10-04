@@ -13,12 +13,13 @@
 \newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
 \newcommand{\univ}{\ensuremath{\mathcal{E}}}
 \newcommand{\join}[2]{{#1} \sim {#2}}
+\newcommand{\dia}{\ensuremath{\diamond}}
 
 \section{Confluence} \label{sec:confluence}
 
 \subsection{Preliminaries}
 
-\mypara{Reductions and Normal Forms} A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+\begin{definition}[Reductions and Normal Forms] A \emph{reduction} \rr is a binary relation on a set of terms \univ.
 We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$ for the reflexive
 and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
 %
@@ -33,10 +34,11 @@ $\rsteps{\rr}{a}{b}$ ($a$ \emph{reduces to} $b$) if $(x, y) \in \rr^{*}$.
 %
 A term $a$ is an $\rr$-\emph{Normal Form} if there does not exist any $b$
 such that $\rstep{\rr}{a}{b}$.
-%
+\end{definition}
+
 For clarity, we will omit the reduction $\rr$ when it is clear from the context.
 
-\mypara{Diamond Property and Confluence}
+\begin{definition}[Diamond Property and Confluence]
 %
 A reduction satisfies the \emph{diamond} property if whenever
 $\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, there is a $d$ such
@@ -50,6 +52,7 @@ $\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, we have $\join{b}{c}$.
 %
 A reduction is \emph{confluent} if whenever
 $\rsteps{}{a}{b}$ and $\rsteps{}{a}{c}$, we have $\join{b}{c}$.
+\end{definition}
 
 \begin{figure}[h]
 \begin{minipage}[t]{0.30\textwidth}
@@ -100,6 +103,14 @@ $\rsteps{}{a}{b}$ and $\rsteps{}{a}{c}$, we have $\join{b}{c}$.
 \begin{lemma}[Confluent-NF] \label{lem:nf}
     If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
+
+% [Barendregt 1976] [Huet 1980]
+\begin{lemma}[Confluent-Closure] \label{lem:closure}
+    If $\rr$ is confluent then $\rr^{*}$ is confluent.
+\end{lemma}
+
+
+
 
 \mypara{Commutativity}
 %
@@ -239,55 +250,86 @@ then $\cup_{i=0}^n R_i$ is confluent.
 \newcommand{\runi}{\ensuremath{R_U}}
 \newcommand{\rapp}{\ensuremath{R_A}}
 \newcommand{\rcon}{\ensuremath{R_C}}
-\newcommand{\rrem}{\ensuremath{R_E}}
-\newcommand{\rexp}{\ensuremath{R_F}}
-\newcommand{\rdec}{\ensuremath{R_D}}
-\newcommand{\rcol}{\ensuremath{R_V}}
+\newcommand{\reli}{\ensuremath{R_E}}
+\newcommand{\rexc}{\ensuremath{R_F}}
 
-The confluence proof follows the strategy outlined in \cref{lem:comm-n}: we partition
-the reduction relation induced by the rules in \cref{fig:rulesI} into
+% \newcommand{\rdec}{\ensuremath{R_D}}
+% \newcommand{\rcol}{\ensuremath{R_V}}
+
+\begin{definition}[Reductions] \label{def:reductions}
+Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \reli \cup \rexc$,
+each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rulesI}
 %
 \begin{itemize}
-\item $\runi$ (Unification),
-\item $\rapp$ (Application),
-\item $\rcon$ (Conjunction),
-\item $\rrem$ (Elimination),
-\item $\rexp$ (Explosion),
-\item $\rdec$ (Decision),
-\item $\rcol$ (Collection),
+\item $\runi$ : Unification,
+\item $\rapp$ : Application,
+\item $\rcon$ : Conjunction,
+\item $\reli$ : Elimination,
+\item $\rexc$ : Exception.
+% \item $\rdec$ (Decision),
+% \item $\rcol$ (Collection),
 \end{itemize}
 %
-prove them confluent in isolation and then pairwise commutative, after which \cref{lem:comm-n}
-yields confluence for their union.
+\end{definition}
 
-\begin{lemma}[Diamond-Confluent] \label{lem:diamond-confluent}
-%
-The following relations are confluent.
-%
-\begin{itemize}
-\item \rcon
-\item \rrem
-\item \rexp
-\item \rdec
-\item \rcol
-\end{itemize}
-\end{lemma}
+\begin{figure}
+\begin{tabular}{llllll}
+\toprule
+	  & \runi 				& \rapp 				& \rcon & \rexc & \reli    \\
+\midrule
+\runi & \ref{lem:uni-conf}  & \ref{lem:uni-app-com} & \dia  & \dia  & \dia \\
+\rapp &      				& \ref{lem:app-conf}    & \dia  & \dia  & \dia \\
+\rcon &      				&                       & \dia  & \dia  & \dia \\
+\rexc &      				&                       &       & \dia  & \dia \\
+\reli &      				&                       &       &       & \dia \\
+\bottomrule
+\end{tabular}
+\caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
+The $\diamond$ on the diagonal indicates that the relation satisfies the diamond property
+and hence is confluent via \cref{lem:diamond}. The $\diamond$ on non-diagonal entries
+indicates that the pair of relations strongly commute.}
+\label{fig:confluence-summary}
+\end{figure}
+
+\begin{theorem}[Confluence] \label{thm:confluence}
+The reduction relation $\rr$ is confluent.
+\end{theorem}
 
 \begin{proof}
-Via diamond property for the respective reduction \cref{lem:diamond}.
+First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rexc$,
+and $\reli$.
+%
+Next, we show that each of these relations is confluent, and pairwise
+\emph{strongly} commutative.
+%
+Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
 
-\begin{lemma}[$\runi$-Confluent]
+% \begin{lemma}[Diamond-Confluent] \label{lem:diamond-confluent}
+% %
+% The following relations are confluent.
+% %
+% \begin{itemize}
+% \item \rcon
+% \item \reli
+% \item \rexc
+% % \item \rdec
+% % \item \rcol
+% \end{itemize}
+% \end{lemma}
+
+% \begin{proof}
+% Via diamond property for the respective reduction \cref{lem:diamond}.
+% \end{proof}
+
+\begin{lemma}[$\runi$-Confluent]\label{lem:uni-conf}
     $\runi$ is confluent.
 \end{lemma}
 
-\begin{proof}
-    Via
-\end{proof}
-
-\begin{lemma}[$\rapp$-Confluent]
+\begin{lemma}[$\rapp$-Confluent]\label{lem:app-conf}
     $\rapp$ is confluent.
 \end{lemma}
-\begin{proof}
-    Via
-\end{proof}
+
+\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:uni-app-com}
+    $\runi$ and $\rapp$ strongly commute.
+\end{lemma}
