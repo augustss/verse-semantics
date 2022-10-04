@@ -142,6 +142,9 @@ pEffectName = try $ do
 pKeywordOpt :: String -> P ()
 pKeywordOpt s = pKeyword s <|> pure ()
 
+pKeywordOptDot :: String -> P ()
+pKeywordOptDot s = pKeyword s <|> void (pOp ".") <|> pure ()
+
 pParens :: P a -> P a
 pParens = between (symbol "(") (symbol ")")
 
@@ -302,7 +305,7 @@ pIndBlock' = do
   pLessInd <|> eof
   pure es
   where
-    pSemi = pOp ";" *> pure ()
+    pSemi = void (pOp ";")
     pSameInd = do
       ls <- S.get
 --      traceM ("pSameInd " ++ show ls)
@@ -330,27 +333,30 @@ seqS es = Seq es
 
 pIf :: P Expr
 pIf = pKeyword "if" *> (
-  (mkIf <$> pParens pExprSeq <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
+  (mkIf <$> getSourcePos <*> pParenBlock <*> optional (pKeywordOpt "then" *> pBlock) <*> optional (pKeyword "else" *> pBlock))
    <|>
   (mkIfC <$> pBlockM <*> optional (pKeyword "else" *> pBlock))
   )
   where
-    mkIf _  Nothing   Nothing   = syntaxError noLoc "if(e) must have a 'then' and/or 'else'"
-    mkIf e1 (Just e2) Nothing   = If2  e1 e2
-    mkIf _e1 Nothing   (Just _e3) = unimplemented "if()else" -- If2E e1 e3 -- XXX is this correct?
-    mkIf e1 (Just e2) (Just e3) = If3  e1 e2 e3
+    mkIf l _  Nothing   Nothing   = syntaxError l "if(e) must have a 'then' and/or 'else'"
+    mkIf _ e1 (Just e2) Nothing   = If2  e1 e2
+    mkIf _ _e1 Nothing   (Just _e3) = unimplemented "if()else" -- If2E e1 e3 -- XXX is this correct?
+    mkIf _ e1 (Just e2) (Just e3) = If3  e1 e2 e3
     mkIfC e1 Nothing            = If1  e1
     mkIfC e1 (Just e2)          = If2E e1 e2
 
 pFor :: P Expr
 pFor = pKeyword "for" *> (
-  (For2 <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
+  (For2 <$> pParenBlock <*> (pKeywordOpt "do" *> pBlock))
   <|>
   (For1 <$> pBlockM)
   )
 
 pLet :: P Expr
-pLet = pKeyword "let" *> (Let <$> pParens pExprSeq <*> (pKeywordOpt "do" *> pBlock))
+pLet = pKeyword "let" *> (Let <$> pParenBlock <*> (pKeywordOptDot "do" *> pBlock))
+
+pParenBlock :: P Expr
+pParenBlock = pParens pExprSeq <|> (seqS <$> pIndBlock)
 
 pCase :: P Expr
 pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeywordOpt "of" *> pBlockM))
