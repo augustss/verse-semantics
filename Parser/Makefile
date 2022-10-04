@@ -19,6 +19,9 @@ test: tests
 testr: tests
 	./tests -
 
+testt: timparse
+	./timparse
+
 clean:
 	rm -f *.o *.hi verse verse.exe tests tests.exe timparse timparse.exe
 	rm -rf objs-*
