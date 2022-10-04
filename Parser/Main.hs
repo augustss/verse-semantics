@@ -18,6 +18,7 @@ import Eval
 import qualified Testing
 import TRSAdapter
 import Run
+import DenSem
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -96,6 +97,7 @@ command = Command
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with accurate rules"           cRewrite
+      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
       , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
       , Cmd "clear"                "Clear global defs"                     cClear
@@ -209,6 +211,10 @@ cDefEval c s = do
 cRewrite :: Run CState
 cRewrite c s =
   cTransform (Cores . rewrite 10000 . compile (flags s)) c s
+
+cDenSem :: Run CState
+cDenSem c s =
+  cTransform (Cores . denSem . compile (flags s)) c s
 
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
