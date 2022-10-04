@@ -116,7 +116,7 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assert", "assume", "expect", "first", "logic", "one", "type", "unify"]
+macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "one", "type", "unify"]
          ++ effects
 
 effects :: [String]
