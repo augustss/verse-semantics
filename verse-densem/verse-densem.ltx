@@ -412,7 +412,7 @@ As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
 \begin{figure}
 $
 \begin{array}{l}
-  \begin{array}{rcl}
+  \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
@@ -421,10 +421,10 @@ $
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
-  \semapp{E}{|one e|}{\rho} & = & \munit(\mone (\semapp{E}{e}{\rho})) \\
+  \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
-    r & \text{if $\semapp{E}{e_2}{\rho}(r) = r$} \\
+    r & \text{if $\semapp{E}{|def (x_1 x_2) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
       \wrong & \text{otherwise} \\
       \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
         \end{array} \\
@@ -434,6 +434,7 @@ $
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{|op|}{\rho} & = & op  \\
   \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = &
      \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}}
@@ -454,14 +455,14 @@ apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtype \\
 \\ \\
 \text{Different interpretations of $\mtype$ and its operations lead to different semantics}
 \\
-\begin{array}{lrcl}
+\begin{array}{lrcll}
 \text{Empty}        & \mempty & : &  \mtype \\
 \text{Singleton}    & \munit & : & \Value \rightarrow \mtype \\
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \text{Product}      & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-\text{One}          &   \mone  & : & \mtype \rightarrow \Value \\
-\text{All}          &   \mone  & : & \mtype \rightarrow \tuple{\Value}
+\text{One}          &   \mone  & : & \mtype \rightarrow \mtype & \text{The result is either empty or a singleton}\\
+\text{All}          &   \mall  & : & \mtype \rightarrow \tuple{\Value}
 \end{array}
 
 \end{array}
@@ -535,7 +536,13 @@ doesn't make sense of |all| (in what order should the bag be enumerated?) but ot
 
 The equations themselves, in \cref{fig:den-sem1}
 are beautifully simple and compositional, as a denotational semantics should be.
-The equations for $\semfun{V}$ should be self-explanatory, but those for $\semfun{E}$ are more interesting.
+
+The equations for $\semfun{V}$ are mostly self-explanatory, but an equation like $\semapp{V}{|k|}{\rho} = k$ needs some
+explanation: the $k$ on the left hand side (e.g. ``|3|'') is a piece of \emph{syntax}, but the $k$ on the right is the corresponding
+element of the \emph{semantic world of values} $\Value$ (e.g. $3$). As is conventional, albeit a bit confusing,
+we use the same $k$ for both.  Same for $op$, where the semantic equivalent is the corresponding mathematical function.
+
+The equations for $\semfun{E}$ are more interesting.
 \begin{itemize}
 \item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
 The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
@@ -550,7 +557,13 @@ The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
   uses a bag comprehension.  Again it does a cartesian product, but without the equality constraint of $\mintersect$.
 \item Function application $\semapp{E}{|apply1N v_1 v_2|}{\rho}$ is easy, because $\semfun{V}$ returns a single value: just apply
   the meaning of the function to the meaning of the argument.  The $\apply$ function is defined in \Cref{fig:den-sem1}.
-\item |one| and |all| are straightforward; but are non-deterministic for bags, something we will fix in \Cref{sec:order-sensitive}.
+\item The semantics of |(one e)| simply applies the semantic function $\mone : \mtype \rightarrow \mtype$ to the
+  collection of values returned by |e|.  If |e| returns no values, so does |(one e)|; but if |e| returns one or more values,
+  |(one e)| returns the first.  Of course that begs the question of what ``the first'' means -- for bags
+  it would be non-deterministic. We will fix this problem in \Cref{sec:order-sensitive}, but for now we simply ignore it.
+\item The semantics of |(all e)| is similar, but it always returns a singleton collection
+  (hence the $\munit$ in the semantics of |all|) whose
+  element is a (possibly-empty) tuple that contains all the values in the collection returned by |e|.
 \end{itemize}
 The fact that unification ``|=|'' maps onto intersection, and choice ``|choice|'' onto union, is
 very satisfying.
@@ -625,6 +638,21 @@ enumerates all possible values of x \emph{in some arbitrary order}, and takes th
 of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
 the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
 And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
+
+\section{Getting $\wrong$ right}
+
+Getting $\wrong$ right is a bit tricky.
+
+
+\begin{itemize}
+\item What is the value of |(3 = emptytup)|?  The intersection semantics would say $\mempty$, the empty collection
+  of results, but we might want to say $\wrong$.
+\item Should $\wrong$ be an element of $\Value$ or of $\mtype$?  We probably want |(one (3 `choice` wrong)|
+  to return a $\munit(3)$ rather then $\wrong$?
+\item What about |apply1 fst (tup (3,wrong))|?  Is that wrong or 3?
+\end{itemize}
+
+There is probably more than one possible choice here.
 
 % -------------------------------------
 \section{An order-sensitive denotational semantics} \label{sec:order-sensitive}

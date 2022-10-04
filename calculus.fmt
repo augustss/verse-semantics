@@ -78,6 +78,7 @@
 %format he = "he"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
+%format wront = "\wrong"
 %format do = "\textbf{do}"
 %format if = "\textbf{if}"
 %format collect = "\textbf{collect}"
