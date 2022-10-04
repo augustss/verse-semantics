@@ -109,12 +109,13 @@ opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
-keywords = ["and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "not", "of", "or", "option", "set", "then", "var", "where"]
-           ++ macros
+keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
+           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"]
+           ++ macros)
+           \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assume", "expect", "first", "one", "type", "unify"]
+macros = ["all", "allow", "assert", "assume", "expect", "first", "logic", "one", "type", "unify"]
          ++ effects
 
 effects :: [String]
@@ -238,8 +239,8 @@ pOp' :: String -> [Char] -> P String
 pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
-pAtom = choice [ Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
-               , Parens <$> pParens pExprSeq, pArray, pMacro
+pAtom = choice [ pMacro, Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
+               , Parens <$> pParens pExprSeq, pArray
                , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
@@ -253,8 +254,9 @@ pArray = pKeyword "array" *> (Array <$> pBlockEs)
 
 --pTypedef :: P Expr
 --pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
+-- XXX remove try by combining with Variable
 pMacro :: P Expr
-pMacro = do
+pMacro = try $ do
   n <- pMacroName
   (Macro1 n <$> many pAttr <*> pBlockM) <|>
    (Macro2 n <$> pParens pExprSeq <*> pBlockM)
