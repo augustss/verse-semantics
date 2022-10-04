@@ -203,9 +203,9 @@ instance Pretty Expr where
           Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
       ppVRA _ _ Nothing  Nothing  = undefined
-      ppVAR s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
-      ppVAR s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
-      ppVar s i (Just t) (Just e) = text s <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
+      ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
+      ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
+      ppVRA s i (Just t) (Just e) = text s <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
