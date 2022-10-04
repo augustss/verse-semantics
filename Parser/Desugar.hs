@@ -172,13 +172,7 @@ dsD = expr
       dsD $ ApplyD (eAssign l) $ Array [e1, e2]
 -}
     expr (Set e1 op e2) = Set <$> expr e1 <*> pure op <*> expr e2
-    expr (MVar i t e) = MVar i <$> expr t <*> expr e
-      {-
-      do
-      t' <- expr t
-      e' <- expr e
-      pure $ Define i $ ApplyD (applyPrimD "new" t') e'
-      -}
+    expr (MVar i t e) = MVar i <$> traverse expr t <*> traverse expr e
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
@@ -651,7 +645,7 @@ getVar (Define _ e) = getVar e
 getVar (Define2 _ _ e) = getVar e
 getVar Choice{} = []
 getVar (Set _ _ e) = getVar e
-getVar (MVar i t e) = i : getVar t ++ getVar e
+getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e) = getVar e
 getVar AnyT = []
 getVar Function{} = []
@@ -790,7 +784,7 @@ addDeref = pure . exprD S.empty
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
       where op = Ident l ("in'" ++ sop ++ "'")
-    expr s (MVar i t e) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
+    expr s (MVar i (Just t) (Just e)) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
