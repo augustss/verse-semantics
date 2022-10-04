@@ -420,7 +420,6 @@ $
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
-  \semapp{E}{|lam x e|}{\rho} & = & \munit(\lambda w.\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}) \\
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \munit(\mone (\semapp{E}{e}{\rho})) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
@@ -435,7 +434,7 @@ $
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
-  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\rho \circ (x \mapsto w)) \\
+  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = &
      \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}}
   \end{array}
@@ -445,7 +444,7 @@ $
 \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & Ident \rightarrow \Value \\
 \\
-apply & : & (W \times W) \rightarrow W \\
+apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
@@ -577,7 +576,15 @@ The meaning of |(hastype e_1 e_2)| is the meaning of |e_1|, provided the meaning
 
 The big excitement is the treatment of |defKW|. We must extend $\rho$, but what should we bind |x| to?  (Compare the
 equation for $\semapp{V}{|lam x e|}{}$, where we have a value $w$ to hand.)
-Our answer is simple: \emph{try all possible values, and union the results}.
+Our answer is simple: \emph{try all possible values, and union the results}:
+$$
+\semapp{E}{|def x e|}{\rho} \; = \; \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}
+$$
+That $\bigcup_{w \in \Value}$ means: enumerate all values in $w \in \Value$, in some arbitrary order,
+and for each: bind $x$ to $w$, find the semantics of $e$ for that value of $x$, namely
+$\semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}$, and take the union
+(in the sense of $\munion$) of the results.
+
 Of course we can't possibly implement it like this, but it makes a great specification.
 For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
 the semantics is a singleton sequence $[3]$.
