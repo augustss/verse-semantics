@@ -396,6 +396,7 @@ pVar = pVRA >>= \ con -> do
     InfixOp (InfixOp (Variable i1) (Ident _ ":") e2) (Ident _ ":=") e3 -> pure $ con i1 (Just e2) (Just e3)
     InfixOp (Variable i1) (Ident _ ":") e2 -> pure $ con i1 (Just e2) Nothing
     InfixOp (Variable i1) (Ident _ "=") e2 -> pure $ con i1 Nothing (Just e2)
+    Variable i1 | eref@(MRef _ _ _) <- con i1 Nothing Nothing -> pure eref
     _ -> fail $ "var/ref not followed by x : t [= e]\n" ++ prettyShow e
  where
    pVRA = choice [pKeyword "var" $> MVar, pKeyword "ref" $> MRef, pKeyword "alias" $> MAlias]
