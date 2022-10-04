@@ -280,6 +280,7 @@
 
 %format s_1
 %format s_2
+%format s_n
 
 %format r_1
 %format r_2

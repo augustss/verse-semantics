@@ -20,8 +20,8 @@
 $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Integers}     & k \\
 \textit{Variables}    & \multicolumn{3}{l}{x,y,z,f,g} \\
-\textit{Tuples}       & s, t  & ::= & k \vb x \vb |arr (t_1, dots, t_n)| \\
-\textit{Values}       & v     & ::= & t \vb |lam x e| \\
+\textit{Scalars}      & s     & ::= & k \vb x \\
+\textit{Values}       & |v|   & ::= & s \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
 \textit{Constraints}  & c     & ::= & |v_1 == v_2| \vb \lvc{|v == e|} \\
 \textit{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
                                     |e_1 choice e_2| \vb |one e| \vb |all e| \\
@@ -43,8 +43,7 @@ $$\begin{array}{lll}
 \end{array}$$
 %
   \caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.
-    \lennart{Why not it into |x = e_1; e_2|?}
-  }
+    In \lcalcname we desugar |llet x e_1 e_2| into |def x e_1; e_2|.}
 \label{fig:desugar}
 %
 \end{figure}
@@ -63,12 +62,18 @@ $$\begin{array}{lrcll}
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification}
-\rulename{ulit} & |k == k ; e|                                    & \movesto & e \\
-\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\[0.05in]
-
-\rulegroupname{Substitution}
-\rulename{subst-t}         & |x == t ;  E^[x]|         & \movesto & |x == t ; E^[t]| \\
-\rulename{subst-$\lambda$} & |x == (lam y e) ;  A^[x]| & \movesto & \largerhs{|x == (lam y e) ; A^[lam y e]|} \\[0.05in]
+\rulename{ulit}     & |k == k ; e|                                    & \movesto & e \\
+\rulename{utup}     & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
+\rulename{ulit-t}   & |k == tup (dots) ; e| & \movesto & |fail| \\
+\rulename{ulit-l}   & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{ulam}     & |hnf == lam y e ; e'|   & \movesto & |fail| & \\
+%
+% ALLOW occurrences of x in t, lazy data structures!
+% \rulename{fail-occ} & |x == t ; e|          & \movesto & |fail| & if $x \in \freevars{t},\ x \not \equiv t$ \\
+%
+%
+\rulename{subst-s} & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{subst-v} & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\[0.05in]
 
 \rulegroupname{Application}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
@@ -85,15 +90,12 @@ $$\begin{array}{lrcll}
 
 \rulegroupname{Elimination}
 \rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
-                        & \multicolumn{3}{l}\text{\lennart{Above rule is debatable.}} \\
-                        & \multicolumn{3}{l}\text{\lennart{Allows removing unused variables.}} \\
+  \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
+  \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
+
 \rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
-\rulegroupname{Explosion}
-\rulename{fail-t-l}       & |k == tup (dots) ; e| & \movesto & |fail| \\
-\rulename{fail-l-l}       & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
-\rulename{fail-$\lambda$} & |v == lam y e ; e'|   & \movesto & |fail| & if $|v| \not \equiv |x|$ \\
-\rulename{fail-occ}       & |x == t ; e|          & \movesto & |fail| & if $x \in \freevars{t},\ x \not \equiv t$ \\
+\rulegroupname{Exception}
 \rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
 \rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
 \rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
@@ -141,16 +143,19 @@ $$\begin{array}{lrcll}
 \newcommand{\figureContexts}{
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Value Context}       & V  & ::= & \hole \vb |tup (t_1, dots ,V, dots, t_n)| \vb |lam x E| \\
+\textit{Value Context}       & V  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \\
 \textit{Constraint Context}  & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
 \textit{Expression Context}  & E  & ::= & V \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
-                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
-\textit{Application Context} & A  & ::= & |hole e| \vb |hole == hnf; e| \vb |def x A | \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
+%                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+% \textit{Constraint Context}  & C  & ::= & |hole == v| \vb |v == hole| \vb \lvc{|hole == e|} \vb \lvc{|v == E|} \\
+% \textit{Expression Context}  & E  & ::= & |hole| \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
+%
+\textit{Application Context} & A  & ::= & |hole| \vb |def x A | \vb |hole == hnf; e| \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
 \textit{Choice Context}      & CX & ::= & \hole \vb |def x CX| \vb |v == v' ; CX| \vb |apply1N CX e| \vb |apply1N ce CX| \\
                              &    & \vb & \lvc{|v == CX; e|} \vb \lvc{|v == ce; CX|} \\
 \textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\[0.05in]
 
-\textit{Head Values}         & hnf & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
+\textit{Head Values}         & |hnf| & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
 \textit{Choice-free Expr.}   & ce  & ::= & v \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
 \end{array}$$
 \caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
@@ -180,7 +185,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
   {\wff{r}{|xs|}{|cs|}{|v|} \quad
    x \not \in |xs|
   }
-  {\wff{|x == lam y e; r|}{|xs|}{|x == lam y e, cs|}{|v|}}
+  % {\wff{|x == lam y e; r|}{|xs|}{|x == lam y e, cs|}{|v|}}
+  {\wff{|x == hnf; r|}{|xs|}{|x == hnf, cs|}{|v|}}
   {\rulename{WF-Lam}}
 
 \inferrule

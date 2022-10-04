@@ -1,0 +1,293 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rr}{\ensuremath{R}}
+\newcommand{\go}[1]{{\rightarrow}_{#1}}
+\newcommand{\gos}[1]{{\twoheadrightarrow}_{#1}}
+\newcommand{\gok}[2]{{\twoheadrightarrow}_{#1}^{#2}}
+\newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
+\newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
+\newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+\newcommand{\univ}{\ensuremath{\mathcal{E}}}
+\newcommand{\join}[2]{{#1} \sim {#2}}
+
+\section{Confluence} \label{sec:confluence}
+
+\subsection{Preliminaries}
+
+\mypara{Reductions and Normal Forms} A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$ for the reflexive
+and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+%
+We write
+%
+$\rstep{\rr}{a}{b}$ ($a$ \emph{steps to} $b$) if $(a, b) \in \rr$,
+%
+$\rstepk{\rr}{k}{a}{b}$ ($a$ \emph{$k$-steps to} $b$) if $(a, b) \in \rr^{k}$, and
+%
+$\rsteps{\rr}{a}{b}$ ($a$ \emph{reduces to} $b$) if $(x, y) \in \rr^{*}$.
+%
+%
+A term $a$ is an $\rr$-\emph{Normal Form} if there does not exist any $b$
+such that $\rstep{\rr}{a}{b}$.
+%
+For clarity, we will omit the reduction $\rr$ when it is clear from the context.
+
+\mypara{Diamond Property and Confluence}
+%
+A reduction satisfies the \emph{diamond} property if whenever
+$\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, there is a $d$ such
+that $\rstep{}{b}{d}$ and $\rstep{}{c}{d}$.
+%
+We say that two terms $b$, $c$ can be \emph{joined}, written $\join{b}{c}$,
+if there is a $d$ such that $\rsteps{}{b}{d}$ and $\rsteps{}{c}{d}$.
+%
+A reduction is \emph{locally confluent} if whenever
+$\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, we have $\join{b}{c}$.
+%
+A reduction is \emph{confluent} if whenever
+$\rsteps{}{a}{b}$ and $\rsteps{}{a}{c}$, we have $\join{b}{c}$.
+
+\begin{figure}[h]
+\begin{minipage}[t]{0.30\textwidth}
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4Il0sWzAsMSwieV8xIl0sWzIsMSwieV8yIl0sWzEsMiwieiJdLFswLDJdLFswLDFdLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
+\[\begin{tikzcd}
+	& a \\
+	b && {c} \\
+	& d
+	\arrow[from=1-2, to=2-3]
+	\arrow[from=1-2, to=2-1]
+	\arrow[dotted, from=2-1, to=3-2]
+	\arrow[dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\begin{minipage}[t]{0.30\textwidth}
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4Il0sWzAsMSwieV8xIl0sWzIsMSwieV8yIl0sWzEsMiwieiJdLFswLDJdLFswLDFdLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow[from=1-2, to=2-3]
+	\arrow[from=1-2, to=2-1]
+	\arrow[dotted, two heads, from=2-1, to=3-2]
+	\arrow[dotted, two heads, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\begin{minipage}[t]{0.30\textwidth}
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4Il0sWzAsMSwieV8xIl0sWzIsMSwieV8yIl0sWzEsMiwieiJdLFswLDIsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow[two heads, from=1-2, to=2-3]
+	\arrow[two heads, from=1-2, to=2-1]
+	\arrow[dotted, two heads, from=2-1, to=3-2]
+	\arrow[dotted, two heads, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\caption{\textbf{Diamond Property (L), Local Confluence (M), and Confluence (R)}}
+\end{figure}
+
+% [Barendregt 1976]
+\begin{lemma}[Diamond-Confluence] \label{lem:diamond}
+    If $\rr$ satisfies the diamond property then $\rr$ is confluent.
+\end{lemma}
+
+% [Barendregt 1976] [Huet 1980]
+\begin{lemma}[Confluent-NF] \label{lem:nf}
+    If $\rr$ is confluent then every term reduces to at most one normal form.
+\end{lemma}
+
+\mypara{Commutativity}
+%
+Two reductions $R$ and $S$ are \emph{commutative} if for all terms
+$a, b, c$ such that $\rsteps{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{R}{c}{d}$,
+as illustrated on the left in \cref{fig:commutativity}.
+%
+Two reductions $R$ and $S$ are \emph{strongly commutative} if for all terms
+$a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{R}{a}{c}$
+there exists $d$ such that $\rstep{S}{b}{d}$ and $\rstep{R}{c}{d}$,
+as illustrated on the right in \cref{fig:commutativity}.
+%$R \cup S$ satisfies the diamond property.
+
+\begin{figure}[h]
+%
+\begin{minipage}[t]{0.45\textwidth}
+%% COMMUTATIVE
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMSwyLCJkIl0sWzAsMiwiUyIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow["S", two heads, from=1-2, to=2-3]
+	\arrow["R"', two heads, from=1-2, to=2-1]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-2]
+	\arrow["R", dotted, two heads, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\begin{minipage}[t]{0.45\textwidth}
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMSwyLCJkIl0sWzAsMiwiUyJdLFswLDEsIlIiLDJdLFsxLDMsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJTIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow["S", from=1-2, to=2-3]
+	\arrow["R"', from=1-2, to=2-1]
+	\arrow["S"', dotted, from=2-1, to=3-2]
+	\arrow["R", dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\caption{\textbf{Commutativity (L) and Strong Commutativity (R)}}
+\label{fig:commutativity}
+\end{figure}
+
+% [Huet 1980]
+\begin{lemma}[Strong-Commutativity] If $R$ and $S$ strongly commute then $R$ and $S$ commute.
+\end{lemma}
+
+\begin{proof}
+Via the following ``chase'' diagram.
+
+    % https://q.uiver.app/?q=WzAsMTYsWzAsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFswLDIsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbMSwwLCJcXGJ1bGxldCJdLFsyLDAsIlxcYnVsbGV0Il0sWzMsMCwiXFxidWxsZXQiXSxbMSwxLCJcXGJ1bGxldCJdLFsyLDEsIlxcYnVsbGV0Il0sWzMsMSwiXFxidWxsZXQiXSxbMSwyLCJcXGJ1bGxldCJdLFsyLDIsIlxcYnVsbGV0Il0sWzMsMiwiXFxidWxsZXQiXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzMsMywiXFxidWxsZXQiXSxbMCw0LCJTIl0sWzQsNSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFs1LDYsIlMiXSxbMCwxLCJSIiwyXSxbMSwyLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzIsMywiUiIsMl0sWzEsNywiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNyw4LCJTIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzgsOSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs1LDgsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNiw5LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzksMTIsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifX19XSxbOCwxMSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFs3LDEwLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzIsMTAsIlMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMywxMywiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMywxNCwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFsxMCwxMywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMSwxNCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMiwxNSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxNCwxNSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMCwxMSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFsxMSwxMiwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet
+	\arrow["S", from=1-1, to=1-2]
+	\arrow["S", dashed, from=1-2, to=1-3]
+	\arrow["S", from=1-3, to=1-4]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dashed, from=2-1, to=3-1]
+	\arrow["R"', from=3-1, to=4-1]
+	\arrow["S", dotted, from=2-1, to=2-2]
+	\arrow["R"', dotted, from=1-2, to=2-2]
+	\arrow["S", dashed, from=2-2, to=2-3]
+	\arrow["S", dotted, from=2-3, to=2-4]
+	\arrow["R"', dotted, from=1-3, to=2-3]
+	\arrow["R"', dotted, from=1-4, to=2-4]
+	\arrow["R"', dashed, from=2-4, to=3-4]
+	\arrow["R"', dashed, from=2-3, to=3-3]
+	\arrow["R"', dashed, from=2-2, to=3-2]
+	\arrow["S", dotted, from=3-1, to=3-2]
+	\arrow["S", dotted, from=4-1, to=4-2]
+	\arrow["S", dashed, from=4-2, to=4-3]
+	\arrow["R"', dotted, from=3-2, to=4-2]
+	\arrow["R"', dotted, from=3-3, to=4-3]
+	\arrow["R"', dotted, from=3-4, to=4-4]
+	\arrow["S", dotted, from=4-3, to=4-4]
+	\arrow["S", dashed, from=3-2, to=3-3]
+	\arrow["S", dotted, from=3-3, to=3-4]
+\end{tikzcd}\]
+\end{proof}
+
+% Classical "commutativity lemma"
+\begin{lemma}[Commutativity] \label{lem:comm}
+If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
+\end{lemma}
+
+\begin{lemma}[Union] \label{lem:comm-union}
+    If $R$ and $S_1$ commute and $R$ and $S_2$ commute then $R$ and $S_1 \cup S_2$ commute.
+\end{lemma}
+
+\begin{proof}
+Via the following chase diagram (probably a standard result.)
+
+% https://q.uiver.app/?q=WzAsMTIsWzAsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMywwLCJcXGJ1bGxldCJdLFsxLDEsIlxcYnVsbGV0Il0sWzIsMSwiXFxidWxsZXQiXSxbMywxLCJcXGJ1bGxldCJdLFs0LDAsIlxcYnVsbGV0Il0sWzUsMCwiXFxidWxsZXQiXSxbNCwxLCJcXGJ1bGxldCJdLFs1LDEsIlxcYnVsbGV0Il0sWzAsMiwiU18xIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiU18yIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw1LCJTXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw2LCJTXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDYsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw4LCJTXzEiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCw5LCJTXzIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCwxMCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOSwxMSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMCwiU18xIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCwxMSwiU18yIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet & \bullet & \bullet
+	\arrow["{S_1}", two heads, from=1-1, to=1-2]
+	\arrow["{S_2}", two heads, from=1-2, to=1-3]
+	\arrow[dashed, two heads, from=1-3, to=1-4]
+	\arrow["R"', two heads, from=1-1, to=2-1]
+	\arrow["{S_1}", dotted, two heads, from=2-1, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["{S_2}", dotted, two heads, from=2-2, to=2-3]
+	\arrow[dotted, two heads, from=2-3, to=2-4]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R"', dotted, two heads, from=1-4, to=2-4]
+	\arrow["{S_1}", two heads, from=1-4, to=1-5]
+	\arrow["{S_2}", two heads, from=1-5, to=1-6]
+	\arrow["R"', dotted, two heads, from=1-5, to=2-5]
+	\arrow["R"', dotted, two heads, from=1-6, to=2-6]
+	\arrow["{S_1}", dotted, two heads, from=2-4, to=2-5]
+	\arrow["{S_2}", dotted, two heads, from=2-5, to=2-6]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}[N-Commutativity] \label{lem:comm-n}
+If
+%
+(i)~$\forall 0 \leq i \leq n$, the reduction $R_i$ is confluent, and
+%
+(ii)~$\forall 0 \leq i < j \leq n$, the reductions $R_i$ and $R_j$ commute
+%
+then $\cup_{i=0}^n R_i$ is confluent.
+\end{lemma}
+
+\begin{proof}
+    By induction on $n$ using \cref{lem:comm} and \cref{lem:comm-union}.
+\end{proof}
+
+\subsection{Confluence for \calcname}
+
+\newcommand{\runi}{\ensuremath{R_U}}
+\newcommand{\rapp}{\ensuremath{R_A}}
+\newcommand{\rcon}{\ensuremath{R_C}}
+\newcommand{\rrem}{\ensuremath{R_E}}
+\newcommand{\rexp}{\ensuremath{R_F}}
+\newcommand{\rdec}{\ensuremath{R_D}}
+\newcommand{\rcol}{\ensuremath{R_V}}
+
+The confluence proof follows the strategy outlined in \cref{lem:comm-n}: we partition
+the reduction relation induced by the rules in \cref{fig:rulesI} into
+%
+\begin{itemize}
+\item $\runi$ (Unification),
+\item $\rapp$ (Application),
+\item $\rcon$ (Conjunction),
+\item $\rrem$ (Elimination),
+\item $\rexp$ (Explosion),
+\item $\rdec$ (Decision),
+\item $\rcol$ (Collection),
+\end{itemize}
+%
+prove them confluent in isolation and then pairwise commutative, after which \cref{lem:comm-n}
+yields confluence for their union.
+
+\begin{lemma}[Diamond-Confluent] \label{lem:diamond-confluent}
+%
+The following relations are confluent.
+%
+\begin{itemize}
+\item \rcon
+\item \rrem
+\item \rexp
+\item \rdec
+\item \rcol
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+Via diamond property for the respective reduction \cref{lem:diamond}.
+\end{proof}
+
+\begin{lemma}[$\runi$-Confluent]
+    $\runi$ is confluent.
+\end{lemma}
+
+\begin{proof}
+    Via
+\end{proof}
+
+\begin{lemma}[$\rapp$-Confluent]
+    $\rapp$ is confluent.
+\end{lemma}
+\begin{proof}
+    Via
+\end{proof}
