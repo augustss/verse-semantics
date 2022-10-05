@@ -1,12 +1,15 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 module DenSem where
-import Expr(Ident(..))
+import Data.List((\\))
+import Expr(Ident(..), noLoc)
 import Core
 import Print(prettyShow)
 
 denSem :: Core -> [Core]
-denSem e = map (CValue . valueW) $ evalE emptyEnv e
+denSem e = map (CValue . valueW) $ noAlts $ evalE emptyEnv e
 
 valueW :: W -> Value
 valueW (WInt i) = HNF (HInt i)
@@ -16,6 +19,10 @@ valueW w = error $ "valueW " ++ show w
 pattern CHasType :: Core -> Core -> Core
 pattern CHasType e1 e2 <- CMacro (Ident _ "hastype") (CSeq [e1, e2])
 
+newVars :: String -> [Ident] -> [Ident]
+newVars s vs = [ Ident noLoc $ "$" ++ s ++ show n | n <- [0::Int ..] ] \\ vs
+
+#if 0
 type S a = [a]
 
 unit :: a -> S a
@@ -47,6 +54,52 @@ succeeds :: S W -> S W
 succeeds [x] = [x]
 succeeds _ = [Wrong "succeeds"]
 
+noAlts :: S W -> [W]
+noAlts w = w
+
+#else
+data LR = L | R deriving (Eq, Ord, Show)
+type S a = [([LR], a)]
+
+unit :: a -> S a
+unit a = [([],a)]
+
+empty :: S a
+empty = []
+
+union :: S a -> S a -> S a
+union s1 s2 = [(L:l,w) | (l,w) <- s1] ++ [(R:l,w) | (l,w) <- s2]
+
+unions :: [S a] -> S a
+unions ss = concat ss
+
+isect :: Eq a => S a -> S a -> S a
+isect s1 s2 = [ (l1,w1) | (l1,w1) <- s1, (_l2,w2) <- s2, w1 == w2 ]
+
+sequ :: S a -> S a -> S a
+sequ s1 s2 = [ (l1 ++ l2, w2) | (l1,_w1) <- s1, (l2,w2) <- s2 ]
+
+sOne :: S a -> S a
+sOne [] = []
+sOne ws = unit $ head $ ssort ws
+
+sAll :: S W -> W
+sAll ws = WTuple $ ssort ws
+
+ssort :: S a -> [a]
+ssort [] = []
+ssort ws = [w | ([],w) <- ws ] ++
+           ssort [(l,w) | (L:l,w) <- ws ] ++
+           ssort [(l,w) | (R:l,w) <- ws ]
+
+succeeds :: S W -> S W
+succeeds [x] = [x]
+succeeds _ = unit $ Wrong "succeeds"
+
+noAlts :: S W -> [W]
+noAlts = ssort
+#endif
+
 data W
   = WInt Integer
   | WTuple [W]
@@ -75,7 +128,7 @@ apFunc (Func f) a = f a
 instance Eq (Func W (S W)) where
   f == g = and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
-      eqs ws1 ws2 | length ws1 == length ws2 = and $ zipWith eq ws1 ws2
+      eqs ws1 ws2 | length ws1 == length ws2 = and $ zipWith eq (noAlts ws1) (noAlts ws2)
                   | otherwise = False
       eq WFunction{} WFunction{} = True  -- pretend all function are equal
       eq w1 w2 = w1 == w2
@@ -98,9 +151,11 @@ evalE r (CDef [] e) = evalE r e
 evalE r (CDef (x:xs) e) = unions [ evalE (ext r x w) (CDef xs e) | w <- allW ]
 evalE r (COne e) = sOne (evalE r e)
 evalE r (CAll e) = unit (sAll (evalE r e))
-evalE r (CHasType e1 e2) | undefined = undefined -- evalE r (CDef [x1, x2]
-                         | otherwise = unit (Wrong "hastype")
+evalE r e@(CHasType e1 e2)
+  | evalE r (CDef [x, t] $ cSeq [CUnify (CVar x) e1, CUnify (CVar t) e2, CApply (Var t) (Var x)]) == u = u
+  | otherwise = unit (Wrong "hastype")
   where u = evalE r e1
+        x:t:_ = newVars "x" (fvs e)
 evalE r (CSucceeds e) = succeeds $ evalE r e
 evalE _ e = error $ "evalE " ++ prettyShow e
 
