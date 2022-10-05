@@ -196,6 +196,8 @@ dsD = expr
             s' = p ++ "'" ++ s ++ "'"
 
     -- Handle function(e){b}
+    --function e b | trace ("function " ++ show (e, b)) False = undefined
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) b = primFcn y <$> expr b
     function e b = do
       y <- newIdent noLoc "y"
       e' <- expr e
