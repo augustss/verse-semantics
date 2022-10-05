@@ -435,11 +435,11 @@ $
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
   \semapp{V}{|add|}{\rho} & = &  \begin{array}[t]{ll}
-                                    \lambda w . |k_1+k_2| & \text{if } |w = tup (k_1,k_2)|  \\
+                                    \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
                                     \lambda w . \mempty & \text{otherwise}
                                  \end{array} \\
   \semapp{V}{|gt|}{\rho}  & = &  \begin{array}[t]{ll}
-                                    \lambda w . |k_1| & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
+                                    \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
                                     \lambda w . \mempty & \text{otherwise}  \\
                                  \end{array} \\
   \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
