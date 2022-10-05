@@ -427,24 +427,22 @@ $
     r & \text{if $\semapp{E}{|def (x_1 x_2) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
       \wrong & \text{otherwise} \\
       \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
-        \end{array} \\
+        \end{array}
 %  \semapp{E}{|lam (x:=e_1) e_2|}{\rho} & = &
 %    func (cart [ (w, \semapp{E}{e_2}{(\rho \circ (x \mapsto w))}) \vb w \in \semapp{E}{e_1}{\rho} ]) \\
-          \\
+  \end{array}          \\ \\
+
+  \begin{array}{rcll}
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
-  \semapp{V}{|add|}{\rho} & = &  \begin{array}[t]{ll}
-                                    \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
-                                    \lambda w . \mempty & \text{otherwise}
-                                 \end{array} \\
-  \semapp{V}{|gt|}{\rho}  & = &  \begin{array}[t]{ll}
-                                    \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
-                                    \lambda w . \mempty & \text{otherwise}  \\
-                                 \end{array} \\
   \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = &
-     \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}}
+     \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
+  \semapp{V}{|add|}{\rho} & = &  \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
+                          & = &      \lambda w . \mempty & \text{otherwise}\\
+  \semapp{V}{|gt|}{\rho}  & = &  \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
+                          & = &  \lambda w . \mempty & \text{otherwise}  \\
   \end{array}
   \\ \\
 \begin{array}{rcll}
