@@ -177,6 +177,8 @@ core e@Function{} = val e
 core (Do e) = coreD e
 core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
+core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
+core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
 core e = impossible e
 
 coreEffs :: [Ident] -> Core -> C Core
