@@ -214,7 +214,8 @@ cRewrite c s =
 
 cDenSem :: Run CState
 cDenSem c s =
-  cTransform (Cores . denSem . compile (flags s)) c s
+  cTransform (Cores . denSem . compile flgs) c s
+  where flgs = (flags s){ fSplit = False, fSimplify = True }
 
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
