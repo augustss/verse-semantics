@@ -14,7 +14,9 @@ denSem e = map (CValue . valueW) $ noAlts $ evalE emptyEnv e
 valueW :: W -> Value
 valueW (WInt i) = HNF (HInt i)
 valueW (WTuple ws) = VArray (map valueW ws)
-valueW w = error $ "valueW " ++ show w
+valueW (Wrong s) = Var (Ident noLoc ("WRONG: " ++ s))
+valueW (WFunction _) = Var (Ident noLoc "FUNCTION")
+--valueW w = error $ "valueW " ++ show w
 
 pattern CHasType :: Core -> Core -> Core
 pattern CHasType e1 e2 <- CMacro (Ident _ "hastype") (CSeq [e1, e2])
@@ -112,11 +114,13 @@ allW = ints ++ tuples ++ fcns
   where
     ints = [WInt i | i <- [0 .. 3]]
     tuples = [WTuple []] ++ [WTuple [w1,w2] | w1 <- ints, w2 <- ints]
-    fcns = map WFunction $ [wAdd, wGt, wMul, wId, wInc, wGt0] ++
+    fcns = map WFunction $ [wAdd, wGt, wMul, wId, wInc, wGt0, wIsInt, wFst, wSnd] ++
                            [ func (const (unit i)) | i <- ints ]
     wId = func $ unit
     wInc = func $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wGt0 = func $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
+    wFst = func $ \case (WTuple [w,_]) -> unit w; _ -> empty
+    wSnd = func $ \case (WTuple [_,w]) -> unit w; _ -> empty
 
 newtype Func a b = Func (a -> b)
 instance Show (Func a b) where show _ = "Func"
@@ -167,6 +171,7 @@ evalV r (VArray vs) = WTuple $ map (evalV r) vs
 evalV _ (VPrim "in'+'") = WFunction wAdd
 evalV _ (VPrim "in'>'") = WFunction wGt
 evalV _ (VPrim "in'*'") = WFunction wMul
+evalV _ (VPrim "isInt$") = WFunction wIsInt
 evalV _ _ = undefined
 
 wAdd :: Func W (S W)
@@ -182,6 +187,11 @@ wGt = func f
 wMul :: Func W (S W)
 wMul = func f
   where f (WTuple [WInt x, WInt y]) = unit $ WInt $ x*y
+        f _ = empty
+
+wIsInt :: Func W (S W)
+wIsInt = func f
+  where f (WInt x) = unit $ WInt x
         f _ = empty
 
 apply :: W -> W -> S W
