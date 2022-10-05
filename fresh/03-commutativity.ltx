@@ -1,0 +1,266 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsection{Commutativity} \label{sec:commutativity}
+
+\begin{definition}[Size] The \emph{size} of a reduction $\rsteps{}{a}{b}$
+is the smallest $i$ such that $\rstepk{}{i}{a}{b}$.
+\end{definition}
+
+\begin{definition}[Commutativity]
+A reduction $R$ \emph{commutes} with $S$ if for all terms
+$a, b, c$ such that $\rsteps{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{R}{c}{d}$,
+as illustrated on the left in \cref{fig:commutativity}.
+\end{definition}
+
+\begin{definition}[Strong Commutativity]
+A reduction $R$ \emph{strongly commutes} with $S$ if for all terms
+$a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{R}{a}{c}$
+there exists $d$ such that $\rstep{S}{b}{d}$ and $\rstep{R}{c}{d}$,
+as illustrated in the middle in \cref{fig:commutativity}.
+\end{definition}
+
+\begin{figure}[h]
+%
+\begin{minipage}[t]{0.30\textwidth}
+%% COMMUTATIVE
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMSwyLCJkIl0sWzAsMiwiUyIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow["S", two heads, from=1-2, to=2-3]
+	\arrow["R"', two heads, from=1-2, to=2-1]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-2]
+	\arrow["R", dotted, two heads, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\begin{minipage}[t]{0.30\textwidth}
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMSwyLCJkIl0sWzAsMiwiUyJdLFswLDEsIlIiLDJdLFsxLDMsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJTIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow["S", from=1-2, to=2-3]
+	\arrow["R"', from=1-2, to=2-1]
+	\arrow["S"', dotted, from=2-1, to=3-2]
+	\arrow["R", dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\begin{minipage}[t]{0.30\textwidth}
+	% https://q.uiver.app/?q=WzAsNCxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMSwyLCJkIl0sWzAsMiwiUyJdLFswLDEsIlIiLDJdLFsxLDMsIlNfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	& d
+	\arrow["S", from=1-2, to=2-3]
+	\arrow["R"', from=1-2, to=2-1]
+	\arrow["{S_k}"', dotted, from=2-1, to=3-2]
+	\arrow["R", dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{minipage}
+\caption{\textbf{Commutativity (L), Strong Commutativity (C), $k$-Commutativity (R)}}
+\label{fig:commutativity}
+\end{figure}
+
+% [Huet 1980]
+\begin{lemma}[Strong-Commutativity] If $R$ strongly commutes with $S$ then $R$ commutes with $S$.
+\end{lemma}
+
+\begin{proof}
+Via the following ``chase'' diagram.
+
+    % https://q.uiver.app/?q=WzAsMTYsWzAsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFswLDIsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbMSwwLCJcXGJ1bGxldCJdLFsyLDAsIlxcYnVsbGV0Il0sWzMsMCwiXFxidWxsZXQiXSxbMSwxLCJcXGJ1bGxldCJdLFsyLDEsIlxcYnVsbGV0Il0sWzMsMSwiXFxidWxsZXQiXSxbMSwyLCJcXGJ1bGxldCJdLFsyLDIsIlxcYnVsbGV0Il0sWzMsMiwiXFxidWxsZXQiXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzMsMywiXFxidWxsZXQiXSxbMCw0LCJTIl0sWzQsNSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFs1LDYsIlMiXSxbMCwxLCJSIiwyXSxbMSwyLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzIsMywiUiIsMl0sWzEsNywiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNyw4LCJTIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzgsOSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs1LDgsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNiw5LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzksMTIsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifX19XSxbOCwxMSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFs3LDEwLCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV0sWzIsMTAsIlMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMywxMywiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMywxNCwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFsxMCwxMywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMSwxNCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMiwxNSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxNCwxNSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxMCwxMSwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFsxMSwxMiwiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet
+	\arrow["S", from=1-1, to=1-2]
+	\arrow["S", dashed, from=1-2, to=1-3]
+	\arrow["S", from=1-3, to=1-4]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dashed, from=2-1, to=3-1]
+	\arrow["R"', from=3-1, to=4-1]
+	\arrow["S", dotted, from=2-1, to=2-2]
+	\arrow["R"', dotted, from=1-2, to=2-2]
+	\arrow["S", dashed, from=2-2, to=2-3]
+	\arrow["S", dotted, from=2-3, to=2-4]
+	\arrow["R"', dotted, from=1-3, to=2-3]
+	\arrow["R"', dotted, from=1-4, to=2-4]
+	\arrow["R"', dashed, from=2-4, to=3-4]
+	\arrow["R"', dashed, from=2-3, to=3-3]
+	\arrow["R"', dashed, from=2-2, to=3-2]
+	\arrow["S", dotted, from=3-1, to=3-2]
+	\arrow["S", dotted, from=4-1, to=4-2]
+	\arrow["S", dashed, from=4-2, to=4-3]
+	\arrow["R"', dotted, from=3-2, to=4-2]
+	\arrow["R"', dotted, from=3-3, to=4-3]
+	\arrow["R"', dotted, from=3-4, to=4-4]
+	\arrow["S", dotted, from=4-3, to=4-4]
+	\arrow["S", dashed, from=3-2, to=3-3]
+	\arrow["S", dotted, from=3-3, to=3-4]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}[Union] \label{lem:comm-union}
+    If $R$ and $S_1$ commute and $R$ and $S_2$ commute then $R$ and $S_1 \cup S_2$ commute.
+\end{lemma}
+
+\begin{proof}
+Via the following chase diagram (probably a standard result.)
+
+% https://q.uiver.app/?q=WzAsMTIsWzAsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMywwLCJcXGJ1bGxldCJdLFsxLDEsIlxcYnVsbGV0Il0sWzIsMSwiXFxidWxsZXQiXSxbMywxLCJcXGJ1bGxldCJdLFs0LDAsIlxcYnVsbGV0Il0sWzUsMCwiXFxidWxsZXQiXSxbNCwxLCJcXGJ1bGxldCJdLFs1LDEsIlxcYnVsbGV0Il0sWzAsMiwiU18xIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiU18yIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw1LCJTXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw2LCJTXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDYsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw4LCJTXzEiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCw5LCJTXzIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCwxMCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOSwxMSwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMCwiU18xIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCwxMSwiU18yIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet & \bullet & \bullet & \bullet & \bullet
+	\arrow["{S_1}", two heads, from=1-1, to=1-2]
+	\arrow["{S_2}", two heads, from=1-2, to=1-3]
+	\arrow[dashed, two heads, from=1-3, to=1-4]
+	\arrow["R"', two heads, from=1-1, to=2-1]
+	\arrow["{S_1}", dotted, two heads, from=2-1, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["{S_2}", dotted, two heads, from=2-2, to=2-3]
+	\arrow[dotted, two heads, from=2-3, to=2-4]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R"', dotted, two heads, from=1-4, to=2-4]
+	\arrow["{S_1}", two heads, from=1-4, to=1-5]
+	\arrow["{S_2}", two heads, from=1-5, to=1-6]
+	\arrow["R"', dotted, two heads, from=1-5, to=2-5]
+	\arrow["R"', dotted, two heads, from=1-6, to=2-6]
+	\arrow["{S_1}", dotted, two heads, from=2-4, to=2-5]
+	\arrow["{S_2}", dotted, two heads, from=2-5, to=2-6]
+\end{tikzcd}\]
+\end{proof}
+
+
+\subsection{$k$-Commutativity}
+
+\begin{definition}[$k$-Commutativity] \label{def:k-comm}
+A reduction $R$ $k$-commutes with $S$ if for all terms
+$a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
+there exists $d$ such that $\rstepk{S}{k}{b}{d}$ and $\rstep{R}{c}{d}$
+(right in \cref{fig:commutativity}.)
+\end{definition}
+
+\begin{lemma}  \label{lem:k-comm-1}
+	If $R$ $k$-commutes with $S$ then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$.
+\end{lemma}
+
+\begin{proof}
+By induction on the size of the reduction $\rsteps{S}{a}{c}$.
+
+\emph{(Base case)} Here $c$ is the same as $a$, so just pick $d = b$.
+
+\emph{(Inductive Case)} Assume the lemma for reductions of size less than or equal to $n$.
+Suppose that $\rstepk{S}{n+1}{a}{c}$. Then there exists $c'$ such that
+$\rstepk{S}{n}{a}{c'}$ and $\rstep{S}{c'}{c}$. The proof is completed by the diagram:
+% https://q.uiver.app/?q=WzAsNixbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMnIl0sWzEsMiwiZCciXSxbMywyLCJjIl0sWzIsMywiZCJdLFswLDIsIlNebiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDJdLFsxLDMsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIklIIiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMiw0LCJTIl0sWzMsNSwiU15rIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzQsNSwiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDUsImRlZjprLWNvbW0iLDIseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\[\begin{tikzcd}
+	& a \\
+	b && {c'} \\
+	& {d'} && c \\
+	&& d
+	\arrow["{S^n}", two heads, from=1-2, to=2-3]
+	\arrow["R"', from=1-2, to=2-1]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-2]
+	\arrow["R", dotted, from=2-3, to=3-2]
+	\arrow["IH"{description, pos=0.9}, draw=none, from=1-2, to=3-2]
+	\arrow["S", from=2-3, to=3-4]
+	\arrow["{S^k}"', two heads, dotted, from=3-2, to=4-3]
+	\arrow["R", dotted, from=3-4, to=4-3]
+	\arrow["\ref{def:k-comm}"{description, pos=0.9}, draw=none, from=2-3, to=4-3]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}  \label{lem:k-comm-2}
+	If $R$ $k$-commutes with $S$ then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rstep{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{R}{c}{d}$.
+\end{lemma}
+
+\begin{proof}
+By induction on the size of the reduction $\rsteps{R}{a}{b}$.
+
+\emph{(Base case)} Here $b$ is the same as $a$, so just pick $d = c$.
+
+\emph{(Inductive case)} Assume the lemma for reductions of size less than or equal to $n$.
+Suppose that $\rstepk{R}{n+1}{a}{b}$. Then there exists some $b'$ such that
+$\rstepk{R}{n}{a}{b'}$ and $\rstep{R}{b'}{b}$. The proof is completed by the diagram below.
+
+% https://q.uiver.app/?q=WzAsNixbMiwwLCJhIl0sWzEsMSwiYiciXSxbMywxLCJjIl0sWzIsMiwiZCciXSxbMCwyLCJiIl0sWzEsMywiYiJdLFswLDIsIlMiXSxbMCwxLCJSXm4iLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsNCwiUiIsMl0sWzQsNSwiUyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDUsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJJSCIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzEsNSwiYm9vIiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	&& a \\
+	& {b'} && c \\
+	b && {d'} \\
+	& d
+	\arrow["S", from=1-3, to=2-4]
+	\arrow["{R^n}"', two heads, from=1-3, to=2-2]
+	\arrow["S"', dotted, two heads, from=2-2, to=3-3]
+	\arrow["R", dotted, two heads, from=2-4, to=3-3]
+	\arrow["R"', from=2-2, to=3-1]
+	\arrow["S"', dotted, two heads, from=3-1, to=4-2]
+	\arrow["R", dotted, from=3-3, to=4-2]
+	\arrow["IH"{description, pos=0.9}, draw=none, from=1-3, to=3-3]
+	\arrow["\ref{lem:k-comm-1}"{description, pos=0.9}, draw=none, from=2-2, to=4-2]
+\end{tikzcd}\]
+\end{proof}
+
+% Probably known but ???
+\begin{lemma}[$k$-Commutativity] \label{lem:k-comm}
+	If $R$ $k$-commutes with $S$ then $R$ commutes with $S$.
+\end{lemma}
+
+\begin{proof}
+By induction on the size of the reduction $\rsteps{S}{a}{c}$.
+
+\emph{(Base case)} Here $c$ is the same as $a$, so just pick $d = b$.
+
+\emph{(Inductive case)} Assume the lemma for reductions of size less than or equal to $n$.
+Suppose that $\rstepk{S}{n+1}{a}{c}$. Then there exists some $c'$ such that $\rstepk{S}{n}{a}{c'}$
+and $\rstep{S}{c'}{c}$. The proof is completed by the diagram below.
+% https://q.uiver.app/?q=WzAsNixbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMnIl0sWzEsMiwiZCciXSxbMywyLCJjIl0sWzIsMywiZCJdLFswLDIsIlNebiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiSUgiLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDQsIlMiXSxbMyw1LCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNSwibGVtOmstY29tbS0yIiwyLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	& a \\
+	b && {c'} \\
+	& {d'} && c \\
+	&& d
+	\arrow["{S^n}", two heads, from=1-2, to=2-3]
+	\arrow["R"', two heads, from=1-2, to=2-1]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-2]
+	\arrow["R", dotted, two heads, from=2-3, to=3-2]
+	\arrow["IH"{description, pos=0.9}, draw=none, from=1-2, to=3-2]
+	\arrow["S", from=2-3, to=3-4]
+	\arrow["S"', dotted, two heads, from=3-2, to=4-3]
+	\arrow["R", dotted, two heads, from=3-4, to=4-3]
+	\arrow["\ref{lem:k-comm-2}"'{description, pos=0.9}, draw=none, from=2-3, to=4-3]
+\end{tikzcd}\]
+\end{proof}
+
+
+\subsection{Commutativity and Confluence}
+
+% Classical "commutativity lemma"
+\begin{lemma}[Commutativity] \label{lem:comm}
+If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
+\end{lemma}
+
+% Generalize to N relations
+\begin{lemma}[N-Commutativity] \label{lem:comm-n}
+If
+%
+(i)~$\forall 0 \leq i \leq n$, the reduction $R_i$ is confluent, and
+%
+(ii)~$\forall 0 \leq i < j \leq n$, the reductions $R_i$ and $R_j$ commute
+%
+then $\cup_{i=0}^n R_i$ is confluent.
+\end{lemma}
+
+\begin{proof}
+    By induction on $n$ using \cref{lem:comm} and \cref{lem:comm-union}.
+\end{proof}
