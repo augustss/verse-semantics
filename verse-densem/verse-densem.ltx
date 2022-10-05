@@ -412,6 +412,15 @@ As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
 \begin{figure}
 $
 \begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \wrong \\
+\tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\ \\
+\text{\bf Semantics of expressions and values} \\
+
   \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
@@ -436,20 +445,12 @@ $
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{op}\rho & = & \semapp{O}{op} \\
   \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
-  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = &
-     \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
-  \semapp{V}{|add|}{\rho} & = &  \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
-                          & = &      \lambda w . \mempty & \text{otherwise}\\
-  \semapp{V}{|gt|}{\rho}  & = &  \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
-                          & = &  \lambda w . \mempty & \text{otherwise}  \\
+  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
   \end{array}
   \\ \\
 \begin{array}{rcll}
-\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \wrong \\
-\tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
-\Env & = & Ident \rightarrow \Value \\
-\\
 apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
@@ -474,6 +475,19 @@ apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtype \\
 $
 \caption{Expression semantics}
 \label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  \semapp{O}{|op|}{} & : & \Env \rightarrow \Value \\
+  \semapp{O}{|add|} & = &  \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
+                          & = &      \lambda w . \mempty & \text{otherwise}\\
+  \semapp{O}{|gt|}  & = &  \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
+                          & = &  \lambda w . \mempty & \text{otherwise}  \\
+\end{array}
+$$
+\caption{Semantics of primitive operators} \label{fig:primops}
 \end{figure}
 
 \begin{figure}
