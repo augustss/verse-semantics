@@ -11,7 +11,7 @@ denSem e = map (CValue . valueW) $ evalE emptyEnv e
 valueW :: W -> Value
 valueW (WInt i) = HNF (HInt i)
 valueW (WTuple ws) = VArray (map valueW ws)
-valueW _ = undefined
+valueW w = error $ "valueW " ++ show w
 
 pattern CHasType :: Core -> Core -> Core
 pattern CHasType e1 e2 <- CMacro (Ident _ "hastype") (CSeq [e1, e2])
@@ -43,25 +43,30 @@ sOne (a:_) = [a]
 sAll :: S W -> W
 sAll ws = WTuple ws
 
+succeeds :: S W -> S W
+succeeds [x] = [x]
+succeeds _ = [Wrong "succeeds"]
+
 data W
   = WInt Integer
   | WTuple [W]
   | WFunction (Func W (S W))
-  | Wrong
-  deriving (Eq)
+  | Wrong String
+  deriving (Eq, Show)
 
 allW :: [W]
-allW = ints ++ tuples ++ fcns ++ [Wrong]
+allW = ints ++ tuples ++ fcns
   where
     ints = [WInt i | i <- [0 .. 3]]
     tuples = [WTuple []] ++ [WTuple [w1,w2] | w1 <- ints, w2 <- ints]
-    fcns = map WFunction $ [wAdd, wGt, wId, wInc, wGt0] ++
+    fcns = map WFunction $ [wAdd, wGt, wMul, wId, wInc, wGt0] ++
                            [ func (const (unit i)) | i <- ints ]
     wId = func $ unit
     wInc = func $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wGt0 = func $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
 
 newtype Func a b = Func (a -> b)
+instance Show (Func a b) where show _ = "Func"
 func :: (a -> b) -> Func a b
 func f = Func f
 apFunc :: Func a b -> a -> b
@@ -93,10 +98,10 @@ evalE r (CDef [] e) = evalE r e
 evalE r (CDef (x:xs) e) = unions [ evalE (ext r x w) (CDef xs e) | w <- allW ]
 evalE r (COne e) = sOne (evalE r e)
 evalE r (CAll e) = unit (sAll (evalE r e))
-evalE r (CHasType e1 _e2) | undefined = u
-                         | otherwise = unit Wrong
+evalE r (CHasType e1 e2) | undefined = undefined -- evalE r (CDef [x1, x2]
+                         | otherwise = unit (Wrong "hastype")
   where u = evalE r e1
-evalE r (CSucceeds e) = evalE r e  -- XXX
+evalE r (CSucceeds e) = succeeds $ evalE r e
 evalE _ e = error $ "evalE " ++ prettyShow e
 
 evalV :: Env -> Value -> W
@@ -106,6 +111,7 @@ evalV r (VLam x e) = WFunction $ func $ \ w -> evalE (ext r x w) e
 evalV r (VArray vs) = WTuple $ map (evalV r) vs
 evalV _ (VPrim "in'+'") = WFunction wAdd
 evalV _ (VPrim "in'>'") = WFunction wGt
+evalV _ (VPrim "in'*'") = WFunction wMul
 evalV _ _ = undefined
 
 wAdd :: Func W (S W)
@@ -118,8 +124,13 @@ wGt = func f
   where f (WTuple [WInt x, WInt y]) | x > y = unit $ WInt x
         f _ = empty
 
+wMul :: Func W (S W)
+wMul = func f
+  where f (WTuple [WInt x, WInt y]) = unit $ WInt $ x*y
+        f _ = empty
+
 apply :: W -> W -> S W
-apply WInt{} _ = unit Wrong
-apply WTuple{} _ = unit Wrong -- XXX
+apply WInt{} _ = unit (Wrong "apply WInt")
+apply WTuple{} _ = unit (Wrong "apply WTuple") -- XXX
 apply (WFunction f) w = apFunc f w
-apply Wrong _ = unit Wrong
+apply (Wrong s) _ = unit (Wrong $ "apply Wrong " ++ s)
