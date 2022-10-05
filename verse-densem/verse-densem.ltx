@@ -368,10 +368,7 @@
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
-    \text{Primops} & op  & ::= & |gt| \vb |add|
-\iffullverse
-    \vb |isInt|
-\fi
+    \text{Primops} & op  & ::= & |gt| \vb |add| \vb |int|
     \end{array} \\
     \\[-3mm]
     \text{\emph{Concrete syntax}:} \;\;
@@ -484,6 +481,8 @@ $$
   \semapp{O}{|add|} & = &  \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
                           & = &      \lambda w . \mempty & \text{otherwise}\\
   \semapp{O}{|gt|}  & = &  \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
+                          & = &  \lambda w . \mempty & \text{otherwise}  \\
+  \semapp{O}{|int|}  & = &  \lambda w . \munit(w) & \text{if } w \in k  \\
                           & = &  \lambda w . \mempty & \text{otherwise}  \\
 \end{array}
 $$
