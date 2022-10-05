@@ -705,6 +705,7 @@ $$
 \text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
 \\
 \text{Sort} & \msort & : & \LblValue^{*} \rightarrow \Value^{*} \\
+& \msort( [] ) & = & [] \\
 & \msort( s ) & = & \mcompr{w}{\mbind{([],w)}{s}} \\
   &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblleft:l,w)}{s}} \\
   &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblright:l,w)}{s}} \\
