@@ -4,7 +4,15 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\rr}{\ensuremath{R}}
+\newcommand{\rnk}{\ensuremath{\rho}}
+\newcommand{\rord}{\ensuremath{\runi_\rnk}}
+\newcommand{\runi}{\ensuremath{\mathcal{U}}}
+\newcommand{\rapp}{\ensuremath{\mathcal{A}}}
+\newcommand{\rcon}{\ensuremath{\mathcal{C}}}
+\newcommand{\reli}{\ensuremath{\mathcal{E}}}
+\newcommand{\rexc}{\ensuremath{\mathcal{F}}}
+\newcommand{\rspc}{\ensuremath{\mathcal{S}}}
+\newcommand{\rr}{\ensuremath{\mathcal{R}}}
 \newcommand{\go}[1]{{\rightarrow}_{#1}}
 \newcommand{\gos}[1]{{\twoheadrightarrow}_{#1}}
 \newcommand{\gok}[2]{{\twoheadrightarrow}_{#1}^{#2}}
@@ -242,89 +250,3 @@ then $\cup_{i=0}^n R_i$ is confluent.
 \begin{proof}
     By induction on $n$ using \cref{lem:comm} and \cref{lem:comm-union}.
 \end{proof}
-
-\section{Confluence for \calcname} \label{sec:confluence}
-
-\newcommand{\runi}{\ensuremath{R_U}}
-\newcommand{\rapp}{\ensuremath{R_A}}
-\newcommand{\rcon}{\ensuremath{R_C}}
-\newcommand{\reli}{\ensuremath{R_E}}
-\newcommand{\rexc}{\ensuremath{R_F}}
-\newcommand{\rspc}{\ensuremath{R_S}}
-
-\begin{definition}[Reductions] \label{def:reductions}
-Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \reli \cup \rexc$,
-each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rulesI}
-%
-\begin{itemize}
-\item $\runi$ : Unification,
-\item $\rapp$ : Application,
-\item $\rcon$ : Conjunction,
-\item $\reli$ : Elimination,
-\item $\rexc$ : Fail Propagation.
-\item $\rspc$ : Speculation.
-\end{itemize}
-%
-\end{definition}
-
-\begin{figure}
-\begin{tabular}{rlllllll}
-\toprule
-& 	  & \runi 				& \rapp 				& \rcon & \rexc & \reli & \rspc \\
-\midrule
-Unification & \runi & \ref{lem:uni-conf}  & \ref{lem:uni-app-com} & \dia  & \dia  & \dia & \dia \\
-Application & \rapp &      				& \ref{lem:app-conf}    & \dia  & \dia  & \dia & \dia \\
-Conjunction & \rcon &      				&                       & \dia  & \dia  & \dia & \dia \\
-Fail Propagation & \rexc &      				&                       &       & \dia  & \dia & \dia \\
-Elimination & \reli &      				&                       &       &       & \dia & \dia \\
-Speculation & \rspc &						& 						& 		& 		& 	   & \ref{lem:spc-conf} \\
-\bottomrule
-\end{tabular}
-\caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
-The $\diamond$ on the diagonal indicates that the relation satisfies the diamond property
-and hence is confluent via \cref{lem:diamond}. The $\diamond$ on non-diagonal entries
-indicates that the pair of relations strongly commute.}
-\label{fig:confluence-summary}
-\end{figure}
-
-\begin{theorem}[Confluence] \label{thm:confluence}
-The reduction relation $\rr$ is confluent.
-\end{theorem}
-
-\begin{proof}
-First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rexc$,
-$\reli$ and $\rspc$.
-%
-Next, we show that each of these relations is confluent, and pairwise
-\emph{strongly} commutative.
-%
-Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
-\end{proof}
-
-\subsubsection{Unification and Application}
-
-\begin{lemma}[$\runi$-Confluent]\label{lem:uni-conf}
-    $\runi$ is confluent.
-\end{lemma}
-
-\begin{proof}
-	By \cref{lem:uni-conf-1} and \cref{lem:uni-conf-2}.
-\end{proof}
-
-
-
-
-
-
-\subsubsection{Application}
-\begin{lemma}[$\rapp$-Confluent]\label{lem:app-conf}
-    $\rapp$ is confluent.
-\end{lemma}
-
-\begin{lemma}[$\rspc$-Confluent]\label{lem:spc-conf}
-    $\rspc$ is confluent.
-\end{lemma}
-
-\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:uni-app-com}
-    $\runi$ and $\rapp$ strongly commute.
-\end{lemma}

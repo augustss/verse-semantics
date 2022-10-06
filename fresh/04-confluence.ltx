@@ -1,0 +1,106 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Confluence for \calcname} \label{sec:confluence}
+
+\begin{definition}[Reductions] \label{def:reductions}
+Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \reli \cup \rexc$,
+each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rulesI}
+%
+\begin{itemize}
+\item $\runi$ : Unification,
+\item $\rapp$ : Application,
+\item $\rcon$ : Conjunction,
+\item $\reli$ : Elimination,
+\item $\rexc$ : Fail Propagation.
+\item $\rspc$ : Speculation.
+\end{itemize}
+%
+\end{definition}
+
+\begin{figure}
+\begin{tabular}{rlllllll}
+\toprule
+& 	  & \runi 				& \rapp 				& \rcon & \rexc & \reli & \rspc \\
+\midrule
+Unification & \runi & \ref{lem:uni-conf}  & \ref{lem:uni-app-com} & \dia  & \dia  & \dia & \dia \\
+Application & \rapp &      				& \ref{lem:app-conf}    & \dia  & \dia  & \dia & \dia \\
+Conjunction & \rcon &      				&                       & \dia  & \dia  & \dia & \dia \\
+Fail Propagation & \rexc &      				&                       &       & \dia  & \dia & \dia \\
+Elimination & \reli &      				&                       &       &       & \dia & \dia \\
+Speculation & \rspc &						& 						& 		& 		& 	   & \ref{lem:spc-conf} \\
+\bottomrule
+\end{tabular}
+\caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
+The $\diamond$ on the diagonal indicates that the relation satisfies the diamond property
+and hence is confluent via \cref{lem:diamond}. The $\diamond$ on non-diagonal entries
+indicates that the pair of relations strongly commute.}
+\label{fig:confluence-summary}
+\end{figure}
+
+\begin{theorem}[Confluence] \label{thm:confluence}
+The reduction relation $\rr$ is confluent.
+\end{theorem}
+
+\begin{proof}
+First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rexc$,
+$\reli$ and $\rspc$.
+%
+Next, we show that each of these relations is confluent, and pairwise
+\emph{strongly} commutative.
+%
+Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
+\end{proof}
+
+\subsection{Unification}
+
+\begin{lemma}[$\runi$-Confluent]\label{lem:uni-conf}
+    $\runi$ is confluent.
+\end{lemma}
+
+\begin{proof}
+%
+\textbf{Step 1:} We define a relation $\rord$ that is parameterized
+by a rank function $\rnk$ that maps each identifier name to a rank,
+and restricts \rulename{deref-s} to only allow substituting |x| for
+|y| if |x| is \emph{ranked below} |y|.
+%
+\textbf{Step 2:} Next, via \verb|TODO: [Deref-Com-1]| and \verb|TODO: [Deref-Com-2]|
+(which depends on \verb|TODO: [Eq-Join]|) we show that $\rord$
+is \emph{locally} confluent.
+%
+\textbf{Step 3:} Next we show that $\rord$ is terminating \verb|TODO: [uni-term]|
+and hence by Newman's lemma \cite{Barendregt} $\rord$ is confluent.
+%
+\textbf{Step 4:} Finally, define $\runi'$ as $\exists \rnk. \rord^{*}$.
+By \cref{lem:closure}, $\runi'$, and hence, its reflexive transitive
+closure, $\rr$ are confluent.
+\end{proof}
+
+\subsection{Unification and Application}
+
+\subsubsection{Application}
+
+\begin{lemma}[$\rapp$-Confluent]\label{lem:app-conf}
+    $\rapp$ is confluent.
+\end{lemma}
+
+\begin{proof}
+Lemma \verb|TODO: [Beta-Comm]| shows that $\rapp$ satisfies
+the diamond property and hence is confluent by \cref{lem:diamond}.
+\end{proof}
+
+\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:uni-app-com}
+    $\runi$ and $\rapp$ strongly commute.
+\end{lemma}
+
+\begin{proof}
+Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
+\end{proof}
+
+\begin{lemma}[$\rspc$-Confluent]\label{lem:spc-conf}
+    $\rspc$ is confluent.
+\end{lemma}

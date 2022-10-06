@@ -67,13 +67,8 @@ $$\begin{array}{lrcll}
 \rulename{ulit-t}   & |k == tup (dots) ; e| & \movesto & |fail| \\
 \rulename{ulit-l}   & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
 \rulename{ulam}     & |hnf == lam y e ; e'|   & \movesto & |fail| & \\
-%
-% ALLOW occurrences of x in t, lazy data structures!
-% \rulename{fail-occ} & |x == t ; e|          & \movesto & |fail| & if $x \in \freevars{t},\ x \not \equiv t$ \\
-%
-%
-\rulename{subst-s} & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
-\rulename{subst-v} & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\[0.05in]
+\rulename{deref-s} & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{deref-v} & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\[0.05in]
 
 \rulegroupname{Application}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
@@ -95,18 +90,16 @@ $$\begin{array}{lrcll}
 
 \rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
-\rulegroupname{Exception}
+\rulegroupname{Fail Propagation}
 \rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
 \rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
 \rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
 
-\rulegroupname{Decision}
+\rulegroupname{Speculation}
 \rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
 \rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
 \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
-\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\[0.05in]
-
-\rulegroupname{Collection}
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
 \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
 \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
 \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
