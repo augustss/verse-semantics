@@ -447,24 +447,21 @@ $\rsteps{}{a}{b}$ and $\rsteps{}{a}{c}$, we have $\join{b}{c}$.
 \caption{\textbf{Diamond Property (L), Local Confluence (M), and Confluence (R)}}
 \end{figure}
 
-% [Barendregt 1976]
-\begin{lemma}[Diamond-Confluence] \label{lem:diamond}
+\begin{lemma}[Diamond-Confluence \cite{Barendregt}] \label{lem:diamond}
     If $\rr$ satisfies the diamond property then $\rr$ is confluent.
 \end{lemma}
 
 % [Barendregt 1976] [Huet 1980]
-\begin{lemma}[Confluent-NF] \label{lem:nf}
+\begin{lemma}[Confluent-NF \cite{Barendregt}] \label{lem:nf}
     If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
 
 % [Barendregt 1976] [Huet 1980]
-\begin{lemma}[Confluent-Closure] \label{lem:closure}
+\begin{lemma}[Confluent-Closure \cite{Barendregt}] \label{lem:closure}
     If $\rr$ is confluent then $\rr^{*}$ is confluent.
 \end{lemma}
 
 \subsection{Commutativity} \label{sec:commutativity}
-
-
 
 \begin{definition}[Commutativity]
 A reduction $R$ \emph{commutes} with $S$ if for all terms
@@ -696,7 +693,6 @@ and $\rstep{S}{c'}{c}$. The proof is completed by the diagram below.
 	\arrow["\ref{lem:k-comm-2}"'{description, pos=0.9}, draw=none, from=2-3, to=4-3]
 \end{tikzcd}\]
 \end{proof}
-
 
 \subsection{Commutativity and Confluence}
 
