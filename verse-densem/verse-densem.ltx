@@ -162,6 +162,7 @@
 
 % The collection type
 \newcommand{\mtype}{\Value^{*}}
+\newcommand{\mtyped}{\Value^{?}}
 \newcommand{\mempty}{\mathit{empty}}
 \newcommand{\munit}{\mathit{unit}}
 \newcommand{\mintersect}{\Cap}
@@ -362,6 +363,7 @@
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
        \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
        & & \vb & |hastype e_1 e_2| \\
+       & & \vb & |lam x (def (y_1 dots y_n) (where e_0 dot e_1))| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -433,9 +435,25 @@ $
     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
       \wrong & \text{otherwise} \\
       \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
-        \end{array}
-%  \semapp{E}{|lam (x:=e_1) e_2|}{\rho} & = &
-%    func (cart [ (w, \semapp{E}{e_2}{(\rho \circ (x \mapsto w))}) \vb w \in \semapp{E}{e_1}{\rho} ]) \\
+        \end{array} \\
+
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_0 dot e_1))|} & = &
+    \begin{array}[t]{ll}
+      [ f 
+        \vb \mbind{f}{(\Value \rightarrow \Value)} , \\
+        \forall x \in \semapp{E}{|def (y_1 dots y_n) e_0|}{\rho} . \\
+        \exists z \in f(x) . \\
+        \forall |w_1 dots w_n| . \,
+          \begin{array}[t]{l}
+            x = \semapp{E}{e_0}{\extendrho{\rho}{y_1 \mapsto w_1 |dots|}} \implies \\
+            z = \semapp{E}{e_1}{\extendrho{\rho}{y_1 \mapsto w_1 |dots|}} \\
+          \end{array} \\
+      ] \\
+    \end{array} \\
+  \multicolumn{4}{l}{\text{\lennart{The |y_i| variables are syntax, the |w_i| variables are semantic.}}} \\
+  \multicolumn{4}{l}{\text{\lennart{The result type of $f$ should probably be $\mtyped$, denoting 0/1 results.}}} \\
+  \multicolumn{4}{l}{\text{\lennart{Then $\mtyped$ is a subtype of $\mtype$, and types still make sense.}}} \\
+
   \end{array}          \\ \\
 
   \begin{array}{rcll}
