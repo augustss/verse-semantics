@@ -15,7 +15,7 @@ valueW :: W -> Value
 valueW (WInt i) = HNF (HInt i)
 valueW (WTuple ws) = VArray (map valueW ws)
 valueW (Wrong s) = Var (Ident noLoc ("WRONG: " ++ s))
-valueW (WFunction _) = Var (Ident noLoc "FUNCTION")
+valueW (WFunction f) = Var (Ident noLoc $ show f)
 --valueW w = error $ "valueW " ++ show w
 
 pattern CHasType :: Core -> Core -> Core
@@ -115,22 +115,24 @@ allW = ints ++ tuples ++ fcns
     ints = [WInt i | i <- [0 .. 3]]
     tuples = [WTuple []] ++ [WTuple [w1,w2] | w1 <- ints, w2 <- ints]
     fcns = map WFunction $ [wAdd, wGt, wMul, wId, wInc, wGt0, wIsInt, wFst, wSnd] ++
-                           [ func (const (unit i)) | i <- ints ]
-    wId = func $ unit
-    wInc = func $ \case WInt x -> unit (WInt (x+1)); _ -> empty
-    wGt0 = func $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
-    wFst = func $ \case (WTuple [w,_]) -> unit w; _ -> empty
-    wSnd = func $ \case (WTuple [_,w]) -> unit w; _ -> empty
+                           [ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- ints ]
+    wId  = func "id"  $ unit
+    wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
+    wGt0 = func "gt0" $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
+    wFst = func "fst" $ \case (WTuple [w,_]) -> unit w; _ -> empty
+    wSnd = func "snd" $ \case (WTuple [_,w]) -> unit w; _ -> empty
 
-newtype Func a b = Func (a -> b)
-instance Show (Func a b) where show _ = "Func"
-func :: (a -> b) -> Func a b
-func f = Func f
+data Func a b = Func !String !(a -> b)
+instance Show (Func a b) where show (Func s _) = "Func:" ++ s
+func :: String -> (a -> b) -> Func a b
+func = Func
 apFunc :: Func a b -> a -> b
-apFunc (Func f) a = f a
+apFunc (Func _ f) a = f a
 
 instance Eq (Func W (S W)) where
-  f == g = and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
+  f@(Func sf _) == g@(Func sg _) =
+    sf == sg ||
+    and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
       eqs ws1 ws2 | length ws1 == length ws2 = and $ zipWith eq (noAlts ws1) (noAlts ws2)
                   | otherwise = False
@@ -166,7 +168,7 @@ evalE _ e = error $ "evalE " ++ prettyShow e
 evalV :: Env -> Value -> W
 evalV r (Var i) = r i
 evalV _ (HNF (HInt i)) = WInt i
-evalV r (VLam x e) = WFunction $ func $ \ w -> evalE (ext r x w) e
+evalV r f@(VLam x e) = WFunction $ func ("(" ++ prettyShow f ++ ")") $ \ w -> evalE (ext r x w) e
 evalV r (VArray vs) = WTuple $ map (evalV r) vs
 evalV _ (VPrim "in'+'") = WFunction wAdd
 evalV _ (VPrim "in'>'") = WFunction wGt
@@ -175,22 +177,22 @@ evalV _ (VPrim "isInt$") = WFunction wIsInt
 evalV _ _ = undefined
 
 wAdd :: Func W (S W)
-wAdd = func f
+wAdd = func "add" f
   where f (WTuple [WInt x, WInt y]) = unit $ WInt $ x+y
         f _ = empty
 
 wGt :: Func W (S W)
-wGt = func f
+wGt = func "gt" f
   where f (WTuple [WInt x, WInt y]) | x > y = unit $ WInt x
         f _ = empty
 
 wMul :: Func W (S W)
-wMul = func f
+wMul = func "mul" f
   where f (WTuple [WInt x, WInt y]) = unit $ WInt $ x*y
         f _ = empty
 
 wIsInt :: Func W (S W)
-wIsInt = func f
+wIsInt = func "isInt" f
   where f (WInt x) = unit $ WInt x
         f _ = empty
 
