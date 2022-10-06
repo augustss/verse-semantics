@@ -131,18 +131,18 @@ dsD = expr
     expr (For2 e1 e2) = For2 <$> expr e1 <*> expr e2
 
     -- Operators
-    -- D[!e] = D[if(e)then :false else false]
-    expr (PrefixOp (Ident _ "!") e) = If3 <$> expr e <*> pure Fail <*> pure Unit
+    -- D[not e] = D[if(e)then :false else false]
+    expr (PrefixOp (Ident _ "not") e) = If3 <$> expr e <*> pure Fail <*> pure Unit
     -- D[op e] = op D[e]
     expr (PrefixOp (Ident l op) e) = expr $ call "pre" l op e
     -- D[e op] = D[e] op
     expr (PostfixOp e (Ident l op)) = expr $ call "post" l op e
     expr (InfixOp e1 (Ident l op) e2) =
       case op of
-        -- D[e1 && e2] = D[e1]; D[e2]
-        "&&" -> expr $ seqE [e1, e2]
-        -- D[e1 || e2] = D[if(e1)else e2]
-        "||" -> expr $ If2E e1 e2
+        -- D[e1 and e2] = D[e1]; D[e2]
+        "and" -> expr $ seqE [e1, e2]
+        -- D[e1 or e2] = D[if(e1)else e2]
+        "or" -> expr $ If2E e1 e2
         -- D[e1 op e2] = D[e1] op D[e2]
         _    -> expr $ call "in" l op $ Array [e1, e2]
 
@@ -196,6 +196,8 @@ dsD = expr
             s' = p ++ "'" ++ s ++ "'"
 
     -- Handle function(e){b}
+    --function e b | trace ("function " ++ show (e, b)) False = undefined
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) b = primFcn y <$> expr b
     function e b = do
       y <- newIdent noLoc "y"
       e' <- expr e

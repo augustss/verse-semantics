@@ -25,12 +25,6 @@ pattern CUnOp op v <- CApply (VPrim op) v@HNF{}
 pattern CBinOp :: String -> Value -> Value -> Core
 pattern CBinOp op v1 v2 <- CApply (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
 
-pattern VInt :: Integer -> Value
-pattern VInt i = HNF (HInt i)
-
-pattern CInt :: Integer -> Core
-pattern CInt i = CValue (VInt i)
-
 pattern CDecides :: Core -> Core
 pattern CDecides c <- CMacro (Ident _ "decides") c
   where CDecides e = CMacro (Ident noLoc "decides") e

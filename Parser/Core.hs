@@ -4,7 +4,7 @@ module Core(
   Core(..),
   pattern COne, pattern CAll, pattern CSucceeds,
   pattern CVar, pattern VPrim, pattern VArray, pattern CArray,
-  pattern VLam, pattern CLam,
+  pattern VLam, pattern CLam, pattern CInt, pattern VInt,
   Value(..),
   HNF(..),
   compos, composOp,
@@ -58,9 +58,11 @@ data HNF
   | HLam Ident Core
   deriving (Show, Eq)
 
-{-
 pattern CInt :: Integer -> Core
 pattern CInt x = CValue (HNF (HInt x))
+pattern VInt :: Integer -> Value
+pattern VInt i = HNF (HInt i)
+{-
 pattern CRat :: Rational -> Core
 pattern CRat x = CValue (HNF (HRat x))
 -}
