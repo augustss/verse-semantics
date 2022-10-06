@@ -37,7 +37,7 @@ Speculation & \rspc &						& 						& 		& 		& 	   & \ref{lem:spc-conf} \\
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
 The $\diamond$ on the diagonal indicates that the relation satisfies the diamond property
 and hence is confluent via \cref{lem:diamond}. The $\diamond$ on non-diagonal entries
-indicates that the pair of relations strongly commute.}
+indicates that the pair of relations commute.}
 \label{fig:confluence-summary}
 \end{figure}
 
@@ -49,8 +49,8 @@ The reduction relation $\rr$ is confluent.
 First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rexc$,
 $\reli$ and $\rspc$.
 %
-Next, we show that each of these relations is confluent, and pairwise
-\emph{strongly} commutative.
+Next, we show that each of these relations is confluent and pairwise
+commutative.
 %
 Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
