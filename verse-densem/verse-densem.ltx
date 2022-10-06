@@ -440,7 +440,7 @@ $
   \semapp{E}{|lam x (def (y_1 dots y_n) (where e_0 dot e_1))|} & = &
     \begin{array}[t]{ll}
       [ f 
-        \vb \mbind{f}{(\Value \rightarrow \Value)} , \\
+        \vb \mbind{f}{(\Value \rightarrow \mtyped)} , \\
         \forall x \in \semapp{E}{|def (y_1 dots y_n) e_0|}{\rho} . \\
         \exists z \in f(x) . \\
         \forall |w_1 dots w_n| . \,
@@ -451,8 +451,8 @@ $
       ] \\
     \end{array} \\
   \multicolumn{4}{l}{\text{\lennart{The |y_i| variables are syntax, the |w_i| variables are semantic.}}} \\
-  \multicolumn{4}{l}{\text{\lennart{The result type of $f$ should probably be $\mtyped$, denoting 0/1 results.}}} \\
-  \multicolumn{4}{l}{\text{\lennart{Then $\mtyped$ is a subtype of $\mtype$, and types still make sense.}}} \\
+  \multicolumn{4}{l}{\text{\lennart{The result type of $f$ is $\mtyped$, denoting 0/1 results.}}} \\
+  \multicolumn{4}{l}{\text{\lennart{$\mtyped$ is a subtype of $\mtype$, and types still make sense.}}} \\
 
   \end{array}          \\ \\
 
