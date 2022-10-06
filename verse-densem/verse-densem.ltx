@@ -470,7 +470,8 @@ apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
-apply( \tuple{v_1, \ldots, v_n}, w) & = & \wrong \\
+apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+  & = &  \wrong & \text{otherwise} \\
 apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtype \\
 \end{array}
 \\ \\
