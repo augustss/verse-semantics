@@ -6,6 +6,7 @@ data Flags = Flags
   , fSimplify     :: !Bool
   , fUnderLambda  :: !Bool
   , fRewrite      :: !Bool
+  , fTimLambda    :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -18,6 +19,7 @@ defaultFlags = Flags
   , fSimplify     = False
   , fUnderLambda  = False
   , fRewrite      = False
+  , fTimLambda    = False
   , fRewriteSteps = 10000
   , fEvalSteps    = 1000
   }

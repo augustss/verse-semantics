@@ -35,6 +35,7 @@ coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
 coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
+coreToTrs e@CLambda{} = impossible e
 
 coreToTrsV :: Value -> T.Value
 coreToTrsV (Var i) = T.Var $ coreToTrsI i

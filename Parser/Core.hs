@@ -44,6 +44,7 @@ data Core
   | CDef Heap Core
   | CWrong String
   | CSplit Core Value Value
+  | CLambda Ident [Ident] Core Core
   deriving (Show, Eq)
 
 type Heap = [Ident]
@@ -180,6 +181,15 @@ core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
+core (Lambda i [] e1 e2) = do
+  timLam <- asks fTimLambda
+  if timLam then do
+    let is = getVisible e1
+    e1' <- core e1
+    e2' <- core e2
+    pure $ CLambda i is e1' e2'
+  else
+    core $ Function [(Define i AnyT, [])] $ If3 e1 e2 Fail
 core e = impossible e
 
 coreEffs :: [Ident] -> Core -> C Core
@@ -335,6 +345,8 @@ instance Pretty Core where
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
                                  pPrintPrec l 0 f <> text ",",
                                  pPrintPrec l 0 g <> text ","])
+  pPrintPrec l _ (CLambda x ys e1 e2) =
+    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+> text "." <+> pPrintPrec l 0 e2
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -366,6 +378,7 @@ compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> appV f n <*> appV f g
+compos f (CLambda i is e1 e2) = CLambda i is <$> f e1 <*> f e2
 
 appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
 appV _ v@Var{} = pure v
@@ -392,6 +405,7 @@ composC fc _  _  (CMacro i e) = CMacro i <$> fc e
 composC fc _  _  (CDef h e) = CDef h <$> fc e
 composC _  _  _   e@CWrong{} = pure e
 composC fc fv _  (CSplit e f g) = CSplit <$> fc e <*> fv f <*> fv g
+composC fc _  _  (CLambda i is e1 e2) = CLambda i is <$> fc e1 <*> fc e2
 
 composV :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Value -> f Value
 composV _  _  _  v@Var{} = pure v
@@ -432,6 +446,7 @@ cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvsV f ++ cfvsV g
 cfvs CWrong{} = []
+cfvs (CLambda i is e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
 
 cfvsV :: Value -> [Ident]
 cfvsV (Var i) = [i]
@@ -463,6 +478,10 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (subV f) (subV g)
+    sub e@(CLambda i is e1 e2)
+      | x `elem` (i:is) = e
+      | null (intersect (i:is) bs) = CLambda i is (sub e1) (sub e2)
+      | otherwise = sub $ alphaConvert bs e
 
     subV v@(Var i) | i == x = b
                    | otherwise = v
@@ -491,6 +510,10 @@ alphaConvert vs = alpha []
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
     alpha m (CSplit e f g) = CSplit (alpha m e) (alphaV m f) (alphaV m g)
+    alpha m (CLambda i is e1 e2) = CLambda i' is' (alpha m' e1) (alpha m' e2)
+      where i' = fresh i
+            is' = map fresh is'
+            m' = foldr add m (zip (i:is) (i':is'))
 
     alphaV m (Var i) = Var $ fromMaybe i $ lookup i m
     alphaV m (HNF h) = HNF (alphaH m h)

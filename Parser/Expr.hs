@@ -97,6 +97,7 @@ data Expr
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
   | Where Expr Expr           -- e1 where e2
+  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}
   | AnyT                      -- :any
   deriving (Eq, Ord, Show, Data)
 
@@ -181,8 +182,12 @@ instance Pretty Expr where
           Case2 e bs ->
             maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
                                            indent $ ppr 0 bs ]
-          Function ars b -> maybeParens (p > 0) $ text "fn" <> hcat (map ppArs ars) <> ppB b
+          Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
+          Lambda i rs e1 e2 -> maybeParens (p > 10) $
+            text "fn" <> parens (pPrintL l i <> text ":any" <+> ppw e1) <> ppEffs rs <> ppB e2
+            where ppw (Array []) = empty
+                  ppw e = text "where" <+> pPrintL l e
           Block es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -304,6 +309,7 @@ compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
+compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
 compos _ AnyT = pure AnyT
 
 composOp :: (Expr -> Expr) -> Expr -> Expr

@@ -106,12 +106,12 @@ dsD = expr
     -- Types
     -- D[:t] = : D[t], also change constructor
     expr (PrefixOp (Ident _ ":") t) = Range <$> expr t
-    -- D[typedef{e}] = typedef{D[e]}
+    -- D[type{e}] = type{D[e]}
     expr (Typedef e) = do
       y <- newIdent noLoc "y"
       e' <- expr e
       e'' <- dsM e' (Variable y)
-      pure $ primFcn y e''
+      pure $ primFcn y e'' --  Lambda y [] e'' (Variable y)
     expr (Macro1 m rs e) = Macro1 m rs <$> expr e
 
     -- Conditionals
@@ -197,13 +197,15 @@ dsD = expr
 
     -- Handle function(e){b}
     --function e b | trace ("function " ++ show (e, b)) False = undefined
-    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) b = primFcn y <$> expr b
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) b =
+      Lambda y [] (Array []) <$> expr b
+      --primFcn y <$> expr b
     function e b = do
       y <- newIdent noLoc "y"
       e' <- expr e
       e'' <- dsM e' (Variable y)
       b' <- expr b
-      pure $ primFcn y $ If3 e'' b' Fail
+      pure $ Lambda y [] e'' b'
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -282,6 +284,7 @@ dsM expr y =
         pure $ If3 (applyPrimD "known$" y) known unknown
        else
         pure known
+    Lambda i [] e1 e2 -> dsM (Function [(Where (tAny noLoc i) e1, [])] e2) y
     _ -> impossible expr
   where
     dflt = pure $ unify y expr
@@ -624,6 +627,7 @@ getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible AnyT = []
 getVisible Function{} = []
+getVisible Lambda{} = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -651,6 +655,7 @@ getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e) = getVar e
 getVar AnyT = []
 getVar Function{} = []
+getVar Lambda{} = []
 getVar e = impossible e
 
 {-
@@ -747,6 +752,9 @@ scopeErrs s = expr
 --    expr (Typedef e1) = expr (Do e1)
     expr (Macro1 _ [] e1) = expr (Do e1)
     expr (Macro1 _ _ _) = unimplemented "Macro1 with effects"
+    expr (Lambda i _ e1 e2) = errs ++ scopeErrs s'' e1 ++ scopeErrs s'' (Do e2)
+      where (errs, s') = defs e1
+            s'' = S.insert i s'
     expr AnyT = []
     expr e = impossible e
 
@@ -790,6 +798,8 @@ addDeref = pure . exprD S.empty
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
+    expr s (Lambda i rs e1 e2) = Lambda i rs (expr s' e1) (expr s' e2)
+      where s' = defs s e1
     expr _ AnyT = AnyT
     expr _ e = impossible e
 

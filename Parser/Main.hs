@@ -79,7 +79,7 @@ instance Pretty SomeExpr where
   pPrintPrec l p (Parsed e) = pPrintPrec l p e
   pPrintPrec l p (Desugared e) = pPrintPrec l p e
   pPrintPrec l p (Cored e) = pPrintPrec l p e
-  pPrintPrec _ _ (Cores []) = text "No reduction results !?!"
+  pPrintPrec _ _ (Cores []) = text "No results"
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
                                      map (pPrintPrec l 0) es
@@ -137,6 +137,7 @@ flagTable =
   ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
+  ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
   ]
 
 cRead :: Run CState
@@ -215,7 +216,7 @@ cRewrite c s =
 cDenSem :: Run CState
 cDenSem c s =
   cTransform (Cores . denSem . compile flgs) c s
-  where flgs = (flags s){ fSplit = False, fSimplify = True }
+  where flgs = (flags s){ fSplit = False, fSimplify = True, fTimLambda = True }
 
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
