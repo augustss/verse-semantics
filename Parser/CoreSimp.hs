@@ -13,8 +13,10 @@ import Eval
 -- Do some Core simplifications to enhance readability.
 simpCore :: Core -> Core
 simpCore =
+  simpFail .
   simpSeq . simpAlias .
-  simpSeq . simpAlias . simpAny
+  simpSeq . simpAlias .
+  simpAny
 
 -- Get rid of values in Seq
 simpSeq :: Core -> Core
@@ -27,6 +29,12 @@ simpAny :: Core -> Core
 simpAny = f
   where
     f (CApply (Var (Ident _ "any")) v) = f $ CValue v
+    f e = composOp f e
+
+simpFail :: Core -> Core
+simpFail = f
+  where
+    f (CDef [x] (CApply (VArray []) (Var x'))) | x == x' = CFail
     f e = composOp f e
 
 -- When there are definitions of the form x=y,
