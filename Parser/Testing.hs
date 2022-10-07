@@ -50,8 +50,8 @@ assertEquiv' :: HasCallStack => Bool -> Flags -> Ident -> Expr -> Expr -> IO ()
 assertEquiv' expectOK flg name p1 p2 = do
     let d1 = desugar p1
     let d2 = desugar p2
-    let c1 = exprToCore (fSplit flg) d1
-    let c2 = exprToCore (fSplit flg) d2
+    let c1 = exprToCore flg d1
+    let c2 = exprToCore flg d2
     let v1 = run flg c1
     let v2 = run flg c2
 

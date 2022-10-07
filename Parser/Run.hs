@@ -6,29 +6,8 @@ module Run(
 import Core(Core)
 import CoreSimp(simpCore)
 import Eval(eval, replacePrelude, EFlags(..))
+import Flags
 import TRSAdapter(rewrite)
-
-data Flags = Flags
-  { fTrace        :: !Bool
-  , fSplit        :: !Bool
-  , fSimplify     :: !Bool
-  , fUnderLambda  :: !Bool
-  , fRewrite      :: !Bool
-  , fRewriteSteps :: !Int
-  , fEvalSteps    :: !Int
-  }
-  deriving (Show)
-
-defaultFlags :: Flags
-defaultFlags = Flags
-  { fTrace        = False
-  , fSplit        = True
-  , fSimplify     = False
-  , fUnderLambda  = False
-  , fRewrite      = False
-  , fRewriteSteps = 10000
-  , fEvalSteps    = 1000
-  }
 
 run :: Flags -> Core -> Core
 run f e | fRewrite f = one $ rewrite (fRewriteSteps f) e'

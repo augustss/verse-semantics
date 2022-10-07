@@ -29,6 +29,7 @@ import Print
 import Expr hiding (compos, composOp)
 import Desugar(primOps, getVisible)
 import Error
+import Flags
 import SExp
 --import Debug.Trace
 
@@ -113,7 +114,7 @@ isValue _ = False
 vEmpty :: Value
 vEmpty = HNF $ HArray []
 
-type C = ReaderT Bool (State Int)
+type C = ReaderT Flags (State Int)
 
 seqC :: [Core] -> Core
 seqC acs =
@@ -132,8 +133,8 @@ newTmp = do
   put $! n+1
   pure i
 
-exprToCore :: Bool -> Expr -> Core
-exprToCore useSplit = flip evalState 1 . flip runReaderT useSplit . coreD
+exprToCore :: Flags -> Expr -> Core
+exprToCore flg = flip evalState 1 . flip runReaderT flg . coreD
 
 core :: Expr -> C Core
 core e@LitInt{} = val e
@@ -155,7 +156,7 @@ core (Define i e) = cUnify (CVar i) <$> core e
 core AnyT = undefined
 core Fail = pure $ CFail
 core (For2 e1 e2) = do
-  useSplit <- ask
+  useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
    else do
@@ -214,7 +215,7 @@ forSplit e1 e2 = do
 
 cOne :: Core -> C Core
 cOne e = do
- useSplit <- ask
+ useSplit <- asks fSplit
  if not useSplit then pure $ COne e
  else do
   u1 <- newTmp
@@ -224,7 +225,7 @@ cOne e = do
 
 cAll :: Core -> C Core
 cAll e = do
- useSplit <- ask
+ useSplit <- asks fSplit
  if not useSplit then pure $ CAll e
  else do
   f <- newTmp
@@ -247,7 +248,7 @@ cAll e = do
                                 
 cSucceeds :: Core -> C Core
 cSucceeds e = do
- useSplit <- ask
+ useSplit <- asks fSplit
  if not useSplit then pure $ CSucceeds e
  else do
   u1 <- newTmp
@@ -265,7 +266,7 @@ cSucceeds e = do
 
 cDecides :: Core -> C Core
 cDecides e = do
- useSplit <- ask
+ useSplit <- asks fSplit
  if not useSplit then pure $ CDecides e
  else do
   u1 <- newTmp

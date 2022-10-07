@@ -65,7 +65,7 @@ asCore :: Flags -> SomeExpr -> Core
 asCore _ (Cored e) = e
 asCore _ (Cores [e]) = e
 asCore _ Cores{} = error "Multiple Core values"
-asCore s e = exprToCore (fSplit s) $ asDesugared e
+asCore s e = exprToCore s $ asDesugared e
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
