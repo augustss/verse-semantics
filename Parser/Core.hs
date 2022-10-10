@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Core(
@@ -13,7 +14,7 @@ module Core(
   cSeq, cDef, cBar,
   isValue,
   fvs, fvsV, cfvs, cfvsV,
-  subst,
+  subst, substV,
   alphaConvert, alphaConvertV, alphaConvertH,
   composC, composV, composH,
   composOpC, composOpV, composOpH,
@@ -493,6 +494,9 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                       | i `notElem` bs = HLam i $ sub e
                       | otherwise = subH $ alphaConvertH bs a
     subH v = v
+
+substV :: Ident -> Value -> Value -> Value
+substV i x v = let CValue v' = subst i x (CValue v) in v'
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.

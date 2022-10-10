@@ -6,14 +6,21 @@ module DenSem where
 import Control.Monad
 import Data.List((\\))
 import qualified Data.List as L
+import Data.Maybe
 import Expr(Ident(..), noLoc)
 import Core
-import Print(prettyShow)
+import Print(Pretty(..), prettyShow, text)
 
 import Debug.Trace
 
+traceDen :: Bool
+traceDen = False
+
+trace' :: String -> a -> a
+trace' s a = if s==s then trace s a else undefined
+
 denSem :: Core -> [Core]
-denSem e | trace ("-----\ndenSem: " ++ prettyShow e ++ "\n-----") False = undefined
+denSem e | trace ("-----\ndenSem:\n" ++ prettyShow e ++ "\n-----") False = undefined
 denSem e = map (CValue . valueW) $ noAlts $ evalE emptyEnv e
 
 valueW :: W -> Value
@@ -67,7 +74,11 @@ noAlts w = w
 #else
 data LR = L | R deriving (Eq, Ord, Show)
 
-newtype S a = S [([LR], a)]
+instance Pretty LR where pPrintPrec _ _ = text . show
+
+newtype S a = S [([LR], a)] deriving (Show)
+
+instance Pretty a => Pretty (S a) where pPrintPrec l p (S x) = pPrintPrec l p x
 
 unit :: a -> S a
 unit a = S [([],a)]
@@ -101,18 +112,23 @@ isect (S s1) (S s2)  = S [ (l1,w1) | (l1,w1) <- s1, (_l2,w2) <- s2, w1 == w2 ]
 sequ :: S a -> S a -> S a
 sequ (S s1) (S s2) = S [ (l1 ++ l2, w2) | (l1,_w1) <- s1, (l2,w2) <- s2 ]
 
-sOne :: S a -> S a
+sOne :: S W -> S W
 sOne (S []) = empty
 sOne ws = unit $ head $ ssort ws
 
 sAll :: S W -> W
 sAll ws = WTuple $ ssort ws
 
-ssort :: S a -> [a]
-ssort (S []) = []
-ssort (S ws) = [w | ([],w) <- ws ] ++
-               ssort (S [(l,w) | (L:l,w) <- ws ]) ++
-               ssort (S [(l,w) | (R:l,w) <- ws ])
+ssort :: (Pretty a) => S a -> [a]
+ssort sa = srt sa
+  where
+    srt (S []) = []
+    srt (S ws) = notMany [w | ([],w) <- ws] ++
+                 srt (S [(l,w) | (L:l,w) <- ws ]) ++
+                 srt (S [(l,w) | (R:l,w) <- ws ])
+    notMany [] = []
+    notMany [x] = [x]
+    notMany _ = error $ "ssort: multiple unlabelled" ++ prettyShow sa
 
 succeeds :: S W -> S W
 succeeds (S [x]) = S [x]
@@ -136,6 +152,8 @@ data W
   | Wrong String
   deriving (Eq, Show)
 
+instance Pretty W where pPrintPrec l p = pPrintPrec l p . valueW
+
 allW :: [W]
 allW = allInts ++ allTuples ++ allFuncs
 
@@ -143,19 +161,27 @@ allInts :: [W]
 allInts = [WInt i | i <- [0 .. 3]]
 
 allTuples :: [W]
-allTuples = [WTuple []] ++ [WTuple [w1,w2] | w1 <- allInts, w2 <- allInts]
+allTuples =
+     [WTuple []]
+  ++ [WTuple [w1,w2] | w1 <- allInts, w2 <- allInts]
+  ++ [WTuple [w1,w2,w3] | w1 <- allInts, w2 <- allInts, w3 <- allInts]
+  ++ [WTuple [w] | w <- constFuncs]
+  ++ [WTuple [w1,w2] | w1 <- constFuncs, w2 <- constFuncs]
+  ++ [WTuple [w1,w2,w3] | w1 <- constFuncs, w2 <- constFuncs, w3 <- constFuncs]
 
 allFuncs :: [W]
-allFuncs = fcns
+allFuncs = fcns ++ constFuncs
   where
-    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wGt0, wIsInt, wFst, wSnd, wTy0] ++
-                           [ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- allInts ]
+    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wGt0, wIsInt, wFst, wSnd, wTy0]
     wId  = func "id"  $ unit
     wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wGt0 = func "gt0" $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
     wFst = func "fst" $ \case WTuple [w,_] -> unit w; _ -> empty
     wSnd = func "snd" $ \case WTuple [_,w] -> unit w; _ -> empty
     wTy0 = func "ty0" $ \case WInt 0 -> unit (WInt 0); _ -> empty
+
+constFuncs :: [W]
+constFuncs = [ WFunction $ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- allInts ]
 
 data Func a b = Func !String !(a -> b)
 instance Show (Func a b) where show (Func s _) = "Func:" ++ s
@@ -166,7 +192,7 @@ apFunc (Func _ f) a = f a
 
 instance Eq (Func W (S W)) where
   f@(Func sf _) == g@(Func sg _) =
-    sf == sg ||
+    sf == sg ||    -- compare function names
     and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
       eqs ws1 ws2 | length x1 == length x2 = and $ zipWith eq x1 x2
@@ -176,47 +202,60 @@ instance Eq (Func W (S W)) where
       eq WFunction{} WFunction{} = True  -- pretend all function are equal
       eq w1 w2 = w1 == w2
 
-type Env = Ident -> W
+type Env = [(Ident, W)]
 ext :: Ident -> W -> Env -> Env
-ext x w r = \ x' -> if x == x' then w else r x'
+ext x w r = (x, w) : r
 exts :: Env -> [(Ident, W)] -> Env
 exts = foldr (uncurry ext)
 emptyEnv :: Env
-emptyEnv x = error $ "emptyEnv " ++ show x
+emptyEnv = []
+lookEnv :: Env -> Ident -> W
+lookEnv r i = fromMaybe (error $ "lookEnv: " ++ show i) $ lookup i r
 
 evalE :: Env -> Core -> S W
-evalE r (CValue v) = unit $ evalV r v
-evalE r (CBar e1 e2) = evalE r e1 `union` evalE r e2
-evalE _ CFail = empty
-evalE r (CUnify e1 e2) = evalE r e1 `isect` evalE r e2
-evalE r (CSeq [e]) = evalE r e
-evalE r (CSeq (e: es)) = evalE r e `sequ` evalE r (CSeq es)
-evalE r (CApply v1 v2) = apply (evalV r v1) (evalV r v2)
-evalE r (CDef [] e) = evalE r e
-evalE r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- allW ]
-evalE r (COne e) = sOne (evalE r e)
-evalE r (CAll e) = unit (sAll (evalE r e))
-evalE r (CSucceeds e) = succeeds $ evalE r e
-evalE r (CLambda i is e0 e1) = aset
+evalE r e | traceDen =
+  let ws = evalE' r e
+      msg = "evalE: " ++ prettyShow (e, ws)
+  in  if msg==msg then trace msg ws else undefined
+evalE r e = evalE' r e
+
+evalE' :: Env -> Core -> S W
+evalE' r (CValue v) = unit $ evalV r v
+evalE' r (CBar e1 e2) = evalE r e1 `union` evalE r e2
+evalE' _ CFail = empty
+evalE' r (CUnify e1 e2) = evalE r e1 `isect` evalE r e2
+evalE' r (CSeq [e]) = evalE r e
+evalE' r (CSeq (e: es)) = evalE r e `sequ` evalE r (CSeq es)
+evalE' r (CApply v1 v2) = apply r (evalV r v1) (evalV r v2)
+evalE' r (CDef [] e) = evalE r e
+evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- allW ]
+evalE' r (COne e) = sOne (evalE r e)
+evalE' r (CAll e) =
+  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
+  unit (sAll (evalE r e))
+evalE' r (CSucceeds e) = succeeds $ evalE r e
+evalE' r (CLambda i is e0 e1) = aset
   [ f | f <- allFuncs,
     forAll (1 + length is) $ \ ws@(w:_) ->
       let r' = exts r (zip (i:is) ws) in
       nonEmpty (evalE r' e0) `implies`
-      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
+      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply r f w))
   ]
-evalE _ e = error $ "evalE " ++ prettyShow e
+evalE' _ e = error $ "evalE " ++ prettyShow e
 
 evalV :: Env -> Value -> W
-evalV r (Var i) = r i
+evalV r (Var i) = lookEnv r i
 evalV _ (HNF (HInt i)) = WInt i
-evalV r f@(VLam x e) = WFunction $ func ("(" ++ prettyShow f ++ ")") $ \ w -> evalE (ext x w r) e
+evalV r f@(VLam x e) = WFunction $ func ("(" ++ prettyShow f' ++ ")") $ \ w -> evalE (ext x w r) e
+  where f' = foldr (\ (i, w) c -> substV i (valueW w) c) f r
 evalV r (VArray vs) = WTuple $ map (evalV r) vs
 evalV _ (VPrim "in'+'") = WFunction wAdd
 evalV _ (VPrim "in'>'") = WFunction wGt
 evalV _ (VPrim "in'*'") = WFunction wMul
 evalV _ (VPrim "in'/'") = WFunction wDiv
 evalV _ (VPrim "isInt$") = WFunction wIsInt
-evalV _ _ = undefined
+evalV _ (VPrim "mapAp$") = WFunction wMapAp
+evalV _ v = error $ "evalV: " ++ prettyShow v
 
 wAdd :: Func W (S W)
 wAdd = func "add" f
@@ -243,11 +282,24 @@ wIsInt = func "isInt" f
   where f (WInt x) = unit $ WInt x
         f _ = empty
 
-apply :: W -> W -> S W
-apply WInt{} _ = unit (Wrong "apply WInt")
-apply WTuple{} _ = unit (Wrong "apply WTuple") -- XXX
-apply (WFunction f) w = apFunc f w
-apply (Wrong s) _ = unit (Wrong $ "apply Wrong " ++ s)
+-- XXX Hack
+wMapAp :: Func W (S W)
+wMapAp = func "mapAp$" (\ _ -> error "wMapAp called")
+
+apply :: Env -> W -> W -> S W
+apply _ WInt{} _ = unit (Wrong "apply WInt")
+apply _ WTuple{} _ = unit (Wrong "apply WTuple") -- XXX
+apply r (WFunction (Func "mapAp$" _)) w =
+  case w of
+    WTuple fs -> unit $ WTuple $ map one fs
+    _ -> undefined
+  where
+    one f =
+      case apply r f (WTuple []) of
+        S [([], x)] -> x
+        x -> error $ "mapAp$: " ++ prettyShow x
+apply _ (WFunction f) w = apFunc f w
+apply _ (Wrong s) _ = unit (Wrong $ "apply Wrong " ++ s)
 
 forAll :: Int -> ([W] -> Bool) -> Bool
 forAll n p = all p $ replicateM n allW
