@@ -13,7 +13,7 @@ import Print(prettyShow)
 import Debug.Trace
 
 denSem :: Core -> [Core]
-denSem e | trace ("denSem: " ++ prettyShow e) False = undefined
+denSem e | trace ("-----\ndenSem: " ++ prettyShow e ++ "\n-----") False = undefined
 denSem e = map (CValue . valueW) $ noAlts $ evalE emptyEnv e
 
 valueW :: W -> Value
