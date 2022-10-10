@@ -10,6 +10,7 @@ import Data.Maybe
 import Expr(Ident(..), noLoc)
 import Core
 import Print(Pretty(..), prettyShow, text)
+import GHC.Stack
 
 import Debug.Trace
 
@@ -107,7 +108,7 @@ unions :: (Eq a) => [S a] -> S a
 unions ss = S $ foldr (\ (S s) -> L.union s) [] ss
 
 isect :: Eq a => (Eq a) => S a -> S a -> S a
-isect (S s1) (S s2)  = S [ (l1,w1) | (l1,w1) <- s1, (_l2,w2) <- s2, w1 == w2 ]
+isect (S s1) (S s2)  = S [ (l1 ++ l2,w1) | (l1,w1) <- s1, (l2,w2) <- s2, w1 == w2 ]
 
 sequ :: S a -> S a -> S a
 sequ (S s1) (S s2) = S [ (l1 ++ l2, w2) | (l1,_w1) <- s1, (l2,w2) <- s2 ]
@@ -209,7 +210,7 @@ exts :: Env -> [(Ident, W)] -> Env
 exts = foldr (uncurry ext)
 emptyEnv :: Env
 emptyEnv = []
-lookEnv :: Env -> Ident -> W
+lookEnv :: HasCallStack => Env -> Ident -> W
 lookEnv r i = fromMaybe (error $ "lookEnv: " ++ show i) $ lookup i r
 
 evalE :: Env -> Core -> S W
@@ -231,7 +232,7 @@ evalE' r (CDef [] e) = evalE r e
 evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- allW ]
 evalE' r (COne e) = sOne (evalE r e)
 evalE' r (CAll e) =
-  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
+--  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
   unit (sAll (evalE r e))
 evalE' r (CSucceeds e) = succeeds $ evalE r e
 evalE' r (CLambda i is e0 e1) = aset
@@ -288,7 +289,14 @@ wMapAp = func "mapAp$" (\ _ -> error "wMapAp called")
 
 apply :: Env -> W -> W -> S W
 apply _ WInt{} _ = unit (Wrong "apply WInt")
-apply _ WTuple{} _ = unit (Wrong "apply WTuple") -- XXX
+apply _ (WTuple vs) w = bars $ zipWith one [0..] vs
+  where
+    one :: Integer -> W -> S W
+    one i v = (unit w `isect` unit (WInt i)) `sequ` unit v
+    bars :: [S W] -> S W
+    bars [] = empty
+    bars [x] = x
+    bars (x:xs) = x `union` bars xs
 apply r (WFunction (Func "mapAp$" _)) w =
   case w of
     WTuple fs -> unit $ WTuple $ map one fs
