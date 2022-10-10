@@ -12,9 +12,9 @@ each of which is defined as the reduction relation induced by the respective rul
 %
 \begin{itemize}
 \item $\runi$ : Unification,
-\item $\rapp$ : Application,
+\item $\rapp$ : $\beta$-Application,
 \item $\rcon$ : Conjunction,
-\item $\rgc$ : Elimination,
+\item $\rgc$ : Garbage Collection,
 \item $\rfail$ : Fail Propagation.
 \item $\rspc$ : Speculation.
 \end{itemize}
@@ -26,11 +26,11 @@ each of which is defined as the reduction relation induced by the respective rul
 \toprule
 					& 	  	& \runi 		 & \rapp 		   & \rcon 			 & \rfail 		   & \rgc 			 & \rspc \\
 \midrule
-Unification 		& \runi & \ref{lem:u-c}  & \ref{lem:u-a-c} & \ref{lem:u-c-c} & \ref{lem:u-f-c} & \ref{lem:u-e-c} & \ref{lem:u-s-c} \\
-$\beta$-Application & \rapp &      			 & \ref{lem:a-c}   & \ref{lem:a-c-c} & \ref{lem:a-f-c} & \ref{lem:a-e-c} & \ref{lem:a-s-c} \\
-Conjunction 		& \rcon &      			 &                 & \ref{lem:c-c}   & \ref{lem:c-f-c} & \ref{lem:c-e-c} & \ref{lem:c-s-c} \\
-Fail Propagation	& \rfail &      	         &                 &                 & \ref{lem:f-c}   & \ref{lem:f-e-c} & \ref{lem:f-s-c} \\
-Elimination 		& \rgc &      		     &                 &                 &                 & \ref{lem:e-c}   & \ref{lem:e-s-c} \\
+Unification 		& \runi & \ref{lem:u-c}  & \ref{lem:u-a-c} & \ref{lem:u-c-c} & \ref{lem:u-f-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
+$\beta$-Application & \rapp &      			 & \ref{lem:a-c}   & \ref{lem:a-c-c} & \ref{lem:a-f-c} & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
+Conjunction 		& \rcon &      			 &                 & \ref{lem:c-c}   & \ref{lem:c-f-c} & \ref{lem:c-g-c} & \ref{lem:c-s-c} \\
+Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-g-c} & \ref{lem:f-s-c} \\
+Garbage Collection  & \rgc  &      		     &                 &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
 Speculation 		& \rspc &				 & 			       & 	             & 	   			   &           	     & \ref{lem:s-c}   \\
 \bottomrule
 \end{tabular}
@@ -54,45 +54,75 @@ commutative.
 Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
 
-\subsection{Unification}
+\subsection{Ordered Unification} % --------------------------------------------------------------------------
+
+We will use Newman's lemma \ref{lem:local} to prove that $\runi$ is confluent (\cref{lem:u-c}).
+However, $\runi$ is not Noetherian: it has infinite reduction sequences which
+simply swap between the two ``equal'' variables
+$$ |x == y; x| \movesto |x == y; y| \movesto |x == y; x| \ldots$$
+%
+Thus, we will establish confluence of $\runi$ in two steps.
+%
+First, we define a \emph{ordered} sub-relation $\rord$ of $\runi$ which
+\emph{is} Noetherian and locally confluent, and hence confluent by
+Newman's lemma.
+%
+Next, we show that $\runi$ is confluent by showing that it is
+is the transitive closure of $\rord$ (\cref{lem:closure}).
+
+
+\begin{definition}[Ordered Unification] \label{def:ordered-unification}
+%
+A \emph{rank function} $\rnk$ is an injective (one-to-one) function from the set
+of variable identifiers to the set of natural numbers.
+%
+Let $\runi_\rnk$ be the unification relation induced by restricting
+the rule $\rulename{deref-s}$ to $\rulename{deref-s-\rnk}$
+%
+$$\rulename{deref-s-\rnk} \quad |x == y ;  E^[x]| \ \movesto\ |x == y ; E^[y]| \quad\ \mbox{if}\ \rnk{x} < \rnk{y}$$
+%
+Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
+\end{definition}
+
+\begin{lemma}[$\rord$-Local-Confluent]\label{lem:ord-lc}
+    $\rord$ is locally confluent.
+\end{lemma}
+
+\begin{proof}
+\verb|TODO: [Deref-Com-1]| and \verb|TODO: [Deref-Com-2]|
+(which depends on \verb|TODO: [Eq-Join]|) we show that $\rord$ is \emph{locally} confluent.
+\end{proof}
+
+\begin{lemma}[$\rord$-Noetherian]\label{lem:ord-term}
+    $\rord$ is Noetherian.
+\end{lemma}
+
+\begin{proof}
+	TODO
+\end{proof}
+
+\begin{corollary}[$\rord$-Confluent]\label{lem:ord-confluent}
+    $\rord$ is confluent.
+\end{corollary}
+
+\begin{proof}
+	Via \cref{lem:ord-lc} and \cref{lem:ord-term} and Newman's lemma \cref{lem:local}.
+\end{proof}
+
+
+\subsection{Unification} % --------------------------------------------------------------------------
 
 \begin{lemma}[$\runi$-Confluent]\label{lem:u-c}
     $\runi$ is confluent.
 \end{lemma}
 
 \begin{proof}
-%
-\textbf{Step 1:} We define a relation $\rord$ that is parameterized
-by a rank function $\rnk$ that maps each identifier name to a rank,
-and restricts \rulename{deref-s} to only allow substituting |x| for
-|y| if |x| is \emph{ranked below} |y|.
-%
-\textbf{Step 2:} Next, via \verb|TODO: [Deref-Com-1]| and \verb|TODO: [Deref-Com-2]|
-(which depends on \verb|TODO: [Eq-Join]|) we show that $\rord$
-is \emph{locally} confluent.
-%
-\textbf{Step 3:} Next we show that $\rord$ is terminating \verb|TODO: [uni-term]|
-and hence by Newman's lemma \cite{Barendregt} $\rord$ is confluent.
-%
-\textbf{Step 4:} Finally, define $\runi'$ as $\exists \rnk. \rord^{*}$.
-By \cref{lem:closure}, $\runi'$, and hence, its reflexive transitive
-closure, $\rr$ are confluent.
+	By \cref{lem:ord-confluent} and \cref{lem:closure} we have $\rord^{*}$ is confluent.
+	Hence, as $\runi^{*} = \rord^{*}$, we can conclude that $\runi$ is confluent.
 \end{proof}
 
-\subsection{Unification and Application}
 
-\subsubsection{Application}
-
-\begin{lemma}[$\rapp$-Confluent]\label{lem:a-c}
-    $\rapp$ is confluent.
-\end{lemma}
-
-\begin{proof}
-Lemma \verb|TODO: [Beta-Comm]| shows that $\rapp$ satisfies
-the diamond property and hence is confluent by \cref{lem:diamond}.
-\end{proof}
-
-\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:u-a-c}
+\begin{lemma}[$\runi$-$\rapp$-Comm]\label{lem:u-a-c}
     $\runi$ and $\rapp$ strongly commute.
 \end{lemma}
 
@@ -100,19 +130,6 @@ the diamond property and hence is confluent by \cref{lem:diamond}.
 Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
 \end{proof}
 
-\begin{lemma}[$\rspc$-Confluent]\label{lem:s-c}
-    $\rspc$ is confluent.
-\end{lemma}
-
-\subsection{Pairwise Commutativity}
-
-\begin{lemma}[$\rspc$-Conf] \label{lem:s-c}
-	$\rspc$ is confluent.
-\end{lemma}
-
-\begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
-\end{proof}
 
 \begin{lemma}[$\runi-\rcon$-Comm] \label{lem:u-c-c}
 	$\runi$ and $\rcon$ commute.
@@ -130,7 +147,7 @@ Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
 
-\begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-e-c}
+\begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-g-c}
 	$\runi$ and $\rgc$ commute.
 \end{lemma}
 
@@ -140,6 +157,140 @@ Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
 
 \begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
 	$\runi$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+
+\subsection{Application} % --------------------------------------------------------------------------
+
+\begin{lemma}[$\rapp$-Confluent]\label{lem:a-c}
+    $\rapp$ is confluent.
+\end{lemma}
+
+\begin{proof}
+Lemma \verb|TODO: [Beta-Comm]| shows that $\rapp$ satisfies
+the diamond property and hence is confluent by \cref{lem:diamond}.
+\end{proof}
+
+\begin{lemma}[$\rapp-\rcon$-Comm] \label{lem:a-c-c}
+	$\rapp$ and $\rcon$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+
+\begin{lemma}[$\rapp-\rfail$-Comm] \label{lem:a-f-c}
+	$\rapp$ and $\rfail$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rapp-\rgc$-Comm] \label{lem:a-g-c}
+	$\rapp$ and $\rgc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rapp-\rspc$-Comm] \label{lem:a-s-c}
+	$\rapp$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\subsection{Conjunction} % --------------------------------------------------------------------------
+
+\begin{lemma}[$\rcon$-Confluent]\label{lem:c-c}
+    $\rcon$ is confluent.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf} $\rcon$ satisfies the diamond property, hence confluent by \cref{lem:diamond}.
+\end{proof}
+
+\begin{lemma}[$\rcon-\rfail$-Comm] \label{lem:c-f-c}
+	$\rcon$ and $\rfail$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rcon-\rgc$-Comm] \label{lem:c-g-c}
+	$\rcon$ and $\rgc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rcon-\rspc$-Comm] \label{lem:c-s-c}
+	$\rcon$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\subsection{Fail Propagation} % --------------------------------------------------------------------------
+
+\begin{lemma}[$\rfail$-Confluent] \label{lem:f-c}
+	$\rfail$ is confluent.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rfail-\rgc$-Comm] \label{lem:f-g-c}
+	$\rfail$ and $\rgc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rfail-\rspc$-Comm] \label{lem:f-s-c}
+	$\rfail$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\subsection{Garbage Collection} % --------------------------------------------------------------------------
+
+\begin{lemma}[$\rgc$-Confluent] \label{lem:g-c}
+	$\rgc$ is confluent.
+\end{lemma}
+
+\begin{proof}
+By \cref{lem:diamond} after showing that $\rgc$ satisfies the diamond property.
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\rgc-\rspc$-Comm] \label{lem:g-s-c}
+	$\rgc$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\subsection{Speculation} % --------------------------------------------------------------------------
+
+\begin{lemma}[$\rspc$-Conf] \label{lem:s-c}
+	$\rspc$ is confluent.
 \end{lemma}
 
 \begin{proof}
