@@ -50,6 +50,8 @@ dsD = expr
     -- Basic forms
     -- D[k] = k
     expr e | isLiteral e = pure e
+    -- D[false] = ()   This isn't necessary, but makes simple examples nicer
+    expr (Variable (Ident _ "false")) = pure $ Array []
     -- D[x] = x
     expr e@Variable{} = pure e
     -- D[e1,...,en] = ???
@@ -549,6 +551,9 @@ dsDo = f
       x <- newIdent noLoc "w"
       pure $ Seq [define noLoc x e1, e2, Variable x]
 
+    -- D[:()] = empty
+    f (Range (Array [])) =
+      pure EmptyT
     -- D[:t] = t[x:any]
     f (Range e) = do
       r <- newIdent noLoc "r"
@@ -626,6 +631,7 @@ getVisible (Define2 i j e) = i : j : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible AnyT = []
+getVisible EmptyT = []
 getVisible Function{} = []
 getVisible Lambda{} = []
 getVisible e = impossible e
@@ -654,6 +660,7 @@ getVar (Set _ _ e) = getVar e
 getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e) = getVar e
 getVar AnyT = []
+getVar EmptyT = []
 getVar Function{} = []
 getVar Lambda{} = []
 getVar e = impossible e

@@ -190,6 +190,7 @@ core (Lambda i [] e1 e2) = do
     pure $ CLambda i is e1' e2'
   else
     core $ Function [(Define i AnyT, [])] $ If3 e1 e2 Fail
+core EmptyT = pure CFail
 core e = impossible e
 
 coreEffs :: [Ident] -> Core -> C Core

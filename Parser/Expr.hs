@@ -99,6 +99,7 @@ data Expr
   | Where Expr Expr           -- e1 where e2
   | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}
   | AnyT                      -- :any
+  | EmptyT                    -- :false
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -207,6 +208,7 @@ instance Pretty Expr where
           Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
           Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
+          EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -311,6 +313,7 @@ compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
 compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
 compos _ AnyT = pure AnyT
+compos _ EmptyT = pure EmptyT
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)
@@ -321,4 +324,3 @@ seqE = mk . concatMap flat
         flat e = [e]
         mk [e] = e
         mk es = Seq es
-
