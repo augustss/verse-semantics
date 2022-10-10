@@ -16,6 +16,7 @@ simpCore =
   simpFail .
   simpSeq . simpAlias .
   simpSeq . simpAlias .
+  simpSeq . simpAlias .
   simpAny
 
 -- Get rid of values in Seq
