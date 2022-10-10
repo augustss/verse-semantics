@@ -7,37 +7,36 @@
 \section{Confluence for \calcname} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
-Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \reli \cup \rexc$,
+Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$,
 each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rulesI}
 %
 \begin{itemize}
 \item $\runi$ : Unification,
 \item $\rapp$ : Application,
 \item $\rcon$ : Conjunction,
-\item $\reli$ : Elimination,
-\item $\rexc$ : Fail Propagation.
+\item $\rgc$ : Elimination,
+\item $\rfail$ : Fail Propagation.
 \item $\rspc$ : Speculation.
 \end{itemize}
 %
 \end{definition}
 
 \begin{figure}
-\begin{tabular}{rlllllll}
+\begin{tabular}{rrrrrrrr}
 \toprule
-& 	  & \runi 				& \rapp 				& \rcon & \rexc & \reli & \rspc \\
+					& 	  	& \runi 		 & \rapp 		   & \rcon 			 & \rfail 		   & \rgc 			 & \rspc \\
 \midrule
-Unification & \runi & \ref{lem:uni-conf}  & \ref{lem:uni-app-com} & \dia  & \dia  & \dia & \dia \\
-Application & \rapp &      				& \ref{lem:app-conf}    & \dia  & \dia  & \dia & \dia \\
-Conjunction & \rcon &      				&                       & \dia  & \dia  & \dia & \dia \\
-Fail Propagation & \rexc &      				&                       &       & \dia  & \dia & \dia \\
-Elimination & \reli &      				&                       &       &       & \dia & \dia \\
-Speculation & \rspc &						& 						& 		& 		& 	   & \ref{lem:spc-conf} \\
+Unification 		& \runi & \ref{lem:u-c}  & \ref{lem:u-a-c} & \ref{lem:u-c-c} & \ref{lem:u-f-c} & \ref{lem:u-e-c} & \ref{lem:u-s-c} \\
+$\beta$-Application & \rapp &      			 & \ref{lem:a-c}   & \ref{lem:a-c-c} & \ref{lem:a-f-c} & \ref{lem:a-e-c} & \ref{lem:a-s-c} \\
+Conjunction 		& \rcon &      			 &                 & \ref{lem:c-c}   & \ref{lem:c-f-c} & \ref{lem:c-e-c} & \ref{lem:c-s-c} \\
+Fail Propagation	& \rfail &      	         &                 &                 & \ref{lem:f-c}   & \ref{lem:f-e-c} & \ref{lem:f-s-c} \\
+Elimination 		& \rgc &      		     &                 &                 &                 & \ref{lem:e-c}   & \ref{lem:e-s-c} \\
+Speculation 		& \rspc &				 & 			       & 	             & 	   			   &           	     & \ref{lem:s-c}   \\
 \bottomrule
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
-The $\diamond$ on the diagonal indicates that the relation satisfies the diamond property
-and hence is confluent via \cref{lem:diamond}. The $\diamond$ on non-diagonal entries
-indicates that the pair of relations commute.}
+The lemmas on the diagonal (resp. non-diagonal) entries establish confluence (resp. commutativity)
+for the respective relation (resp. pairs of relations).}
 \label{fig:confluence-summary}
 \end{figure}
 
@@ -46,8 +45,8 @@ The reduction relation $\rr$ is confluent.
 \end{theorem}
 
 \begin{proof}
-First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rexc$,
-$\reli$ and $\rspc$.
+First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rfail$,
+$\rgc$ and $\rspc$.
 %
 Next, we show that each of these relations is confluent and pairwise
 commutative.
@@ -57,7 +56,7 @@ Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 
 \subsection{Unification}
 
-\begin{lemma}[$\runi$-Confluent]\label{lem:uni-conf}
+\begin{lemma}[$\runi$-Confluent]\label{lem:u-c}
     $\runi$ is confluent.
 \end{lemma}
 
@@ -84,7 +83,7 @@ closure, $\rr$ are confluent.
 
 \subsubsection{Application}
 
-\begin{lemma}[$\rapp$-Confluent]\label{lem:app-conf}
+\begin{lemma}[$\rapp$-Confluent]\label{lem:a-c}
     $\rapp$ is confluent.
 \end{lemma}
 
@@ -93,7 +92,7 @@ Lemma \verb|TODO: [Beta-Comm]| shows that $\rapp$ satisfies
 the diamond property and hence is confluent by \cref{lem:diamond}.
 \end{proof}
 
-\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:uni-app-com}
+\begin{lemma}[$\runi$-$\rapp$-Commute]\label{lem:u-a-c}
     $\runi$ and $\rapp$ strongly commute.
 \end{lemma}
 
@@ -101,6 +100,48 @@ the diamond property and hence is confluent by \cref{lem:diamond}.
 Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
 \end{proof}
 
-\begin{lemma}[$\rspc$-Confluent]\label{lem:spc-conf}
+\begin{lemma}[$\rspc$-Confluent]\label{lem:s-c}
     $\rspc$ is confluent.
 \end{lemma}
+
+\subsection{Pairwise Commutativity}
+
+\begin{lemma}[$\rspc$-Conf] \label{lem:s-c}
+	$\rspc$ is confluent.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\runi-\rcon$-Comm] \label{lem:u-c-c}
+	$\runi$ and $\rcon$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\runi-\rfail$-Comm] \label{lem:u-f-c}
+	$\runi$ and $\rfail$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-e-c}
+	$\runi$ and $\rgc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
+
+\begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
+	$\runi$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:Fresh-Verse.pdf}
+\end{proof}
