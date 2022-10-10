@@ -825,7 +825,7 @@ $
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
-  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
+  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\rho, \semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
@@ -842,12 +842,15 @@ $
   \end{array}
   \\ \\
 \begin{array}{rcll}
-apply & : & (\Value \times \Value) \rightarrow \mtype \\
-apply( \bot, w) & = & \bot \\
-apply( \wrong, w) & = & \wrong \\
-apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
-apply( \tuple{v_1, \ldots, v_n}, w) & = & \wrong \\
-apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtype \\
+apply & : & (\Env \times \Value \times \Value) \rightarrow \mtype \\
+apply( \rho, \bot, w) & = & \bot \\
+apply( \rho, \wrong, w) & = & \wrong \\
+apply( \rho, k, w) & = & \wrong & k \in \mathbb{Z} \\
+apply( \rho, \tuple{v_0, \ldots, v_n}, w) & = &
+  \semapp{E}{|(w = 0; v_0) choice dots choice (w = n; v_n)|}{\rho}
+  \\
+\multicolumn{3}{l}{\text{\lennart{This is not compositional, but can be made so.}}} \\
+apply( \rho, f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \end{array}
 \\ \\
 \begin{array}{lrcll}
@@ -881,13 +884,15 @@ $$
 \text{Concatenation} &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\
 \text{Intersection} &  s_1 \mintersect s_2 & = & \scompr{(l_1,w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
+&&& \text{\lennart{I suspect the result should be $(\lblsemi{l_1}{l_2},w)$ instead.}} \\
 \text{Sequencing}   &  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\
 \text{One}  & \mone(s) & = & \shead (\msort( s)) \\
 \text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
 \\
 \text{Sort} & \msort & : & \LblValue^{*} \rightarrow [\Value] \\
 & \msort( {} ) & = & [] \\
-& \msort( s ) & = & \mcompr{w}{\sbind{([],w)}{s}} & \text{\lennart{Order?}} \\
+& \msort( s ) & = & \mcompr{w}{\sbind{([],w)}{s}} \\
+  &&& \text{\lennart{The list above should have 0 or 1 element, anything else is WRONG.}} \\
   &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
   &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
 \\
