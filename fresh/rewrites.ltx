@@ -62,11 +62,11 @@ $$\begin{array}{lrcll}
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification}
-\rulename{ulit}     & |k == k ; e|                                    & \movesto & e \\
-\rulename{utup}     & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
-\rulename{ulit-t}   & |k == tup (dots) ; e| & \movesto & |fail| \\
-\rulename{ulit-l}   & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
-\rulename{ulam}     & |hnf == lam y e ; e'|   & \movesto & |fail| & \\
+\rulename{u-lit}   & |k == k ; e|                                    & \movesto & e \\
+\rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
+\rulename{u-lit-t} & |k == tup (dots) ; e| & \movesto & |fail| \\
+\rulename{u-lit-l} & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-lam}   & |hnf == lam y e ; e'|   & \movesto & |fail| & \\
 \rulename{deref-s} & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
 \rulename{deref-v} & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\[0.05in]
 

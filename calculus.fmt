@@ -279,6 +279,10 @@
 %format r_k
 %format r_n
 
+%format E_1
+%format V_1
+
+
 
 
 %format fun = "\mathit{fun}"

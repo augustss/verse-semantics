@@ -57,9 +57,10 @@ Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \subsection{Ordered Unification} % --------------------------------------------------------------------------
 
 We will use Newman's lemma \ref{lem:local} to prove that $\runi$ is confluent (\cref{lem:u-c}).
-However, $\runi$ is not Noetherian: it has infinite reduction sequences which
-simply swap between the two ``equal'' variables
-$$ |x == y; x| \movesto |x == y; y| \movesto |x == y; x| \ldots$$
+However, $\runi$ is not Noetherian. For example, it has infinite reduction sequences which
+``toggle'' between equal variables
+%
+$$ |x == y; x| \movesto |x == y; y| \movesto \ldots \movesto |x == y; x| \movesto \ldots$$
 %
 Thus, we will establish confluence of $\runi$ in two steps.
 %
@@ -79,7 +80,7 @@ of variable identifiers to the set of natural numbers.
 Let $\runi_\rnk$ be the unification relation induced by restricting
 the rule $\rulename{deref-s}$ to $\rulename{deref-s-\rnk}$
 %
-$$\rulename{deref-s-\rnk} \quad |x == y ;  E^[x]| \ \movesto\ |x == y ; E^[y]| \quad\ \mbox{if}\ \rnk{x} < \rnk{y}$$
+$$\rulename{deref-s-\rnk} \quad |x == y ;  E^[x]| \ \movesto\ |x == y ; E^[y]| \quad\ \mbox{if}\ \rnk(x) < \rnk(y)$$
 %
 Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
 \end{definition}
@@ -123,11 +124,160 @@ Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
 
 
 \begin{lemma}[$\runi$-$\rapp$-Comm]\label{lem:u-a-c}
-    $\runi$ and $\rapp$ strongly commute.
+    $\runi$ and $\rapp$ commute.
 \end{lemma}
 
 \begin{proof}
-Lemma \verb|TODO: [Deref-Beta]| shows that $\runi$ and $\rapp$ strongly commute.
+We show that $\runi$ 2-commutes with $\rapp$ and hence commutes via \cref{lem:k-comm}.
+%
+Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ respectively.
+
+\begin{description}
+\item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint]
+Here $e \equiv \ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots$. Hence, we have
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJcXGxkb3RzIFxccmR4e1xccnVuaX0gXFxsZG90cyBcXHJkeHtcXHJhcHB9IFxcbGRvdHMiXSxbMCwxLCJcXGxkb3RzIFxccmR4e1xccnVuaX0nIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzIsMSwiXFxsZG90cyBcXHJkeHtcXHJ1bml9IFxcbGRvdHMgXFxyZHh7XFxyYXBwfScgXFxsZG90cyJdLFsxLDIsIlxcbGRvdHMgXFxyZHh7XFxydW5pfScgXFxsZG90cyBcXHJkeHtcXHJhcHB9JyBcXGxkb3RzIl0sWzAsMiwiXFxyYXBwIl0sWzAsMSwiXFxydW5pIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	& {\ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots} \\
+	{\ldots \rdx{\runi}' \ldots \rdx{\rapp} \ldots} && {\ldots \rdx{\runi} \ldots \rdx{\rapp}' \ldots} \\
+	& {\ldots \rdx{\runi}' \ldots \rdx{\rapp}' \ldots}
+	\arrow["\rapp", from=1-2, to=2-3]
+	\arrow["\runi"', from=1-2, to=2-1]
+	\arrow[dotted, from=2-1, to=3-2]
+	\arrow[dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+
+\item[Case: $\rdx{\runi} \subset \rdx{\rapp}$]
+Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
+
+\begin{description}
+	\item[Case: $\rdx{\rapp} \subset |v|$] \ie $|v| \equiv V[\rdx{\rapp}]$
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gZSlcXCBWW1xccmR4e1xccnVuaX1dIl0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gVltcXHJkeHtcXHJ1bml9XTtcXCBlIl0sWzIsMSwiKFxcbGFtYmRhIHguIGUpXFwgVltcXHJkeHtcXHJ1bml9J10iXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSBWW1xccmR4e1xccnVuaX0nXTtcXCBlIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	& {(\lambda x. e)\ V[\rdx{\runi}]} \\
+	{\exists x.\ x = V[\rdx{\runi}];\ e} && {(\lambda x. e)\ V[\rdx{\runi}']} \\
+	& {\exists x.\ x = V[\rdx{\runi}'];\ e}
+	\arrow["\runi", from=1-2, to=2-3]
+	\arrow["\rapp"', from=1-2, to=2-1]
+	\arrow["\runi", dotted, from=2-1, to=3-2]
+	\arrow["\rapp", dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+
+	\item[Case: $\rdx{\rapp} \subset |e|$] \ie $|e| \equiv E[\rdx{\rapp}]$
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gRVtcXHJkeHtcXHJ1bml9XSlcXCB2Il0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gdjtcXCBFW1xccmR4e1xccnVuaX1dIl0sWzIsMSwiKFxcbGFtYmRhIHguIEVbXFxyZHh7XFxydW5pfSddKVxcIHYiXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSB2O1xcIEVbXFxyZHh7XFxydW5pfSddIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	& {(\lambda x. E[\rdx{\runi}])\ v} \\
+	{\exists x.\ x = v;\ E[\rdx{\runi}]} && {(\lambda x. E[\rdx{\runi}'])\ v} \\
+	& {\exists x.\ x = v;\ E[\rdx{\runi}']}
+	\arrow["\runi", from=1-2, to=2-3]
+	\arrow["\rapp"', from=1-2, to=2-1]
+	\arrow["\runi", dotted, from=2-1, to=3-2]
+	\arrow["\rapp"', dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{description}
+
+\item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] Let $\rapp \equiv |apply1N (lam y e_1) v_1|$. Split cases on $\runi$ reduction
+
+\begin{description}
+	\item[Case: (\rulename{u-*}) $\rdx{\runi} \equiv |c; e| \movesto |c'; e| \equiv \rdx{\runi}'$]
+	%
+	If $\rdx{\rapp} \subset e$ \ie $e \equiv E_1[\rdx{\rapp}]$
+	then join at $|c';| E_1[\rdx{\rapp}']$ (which may be $|fail|$ if $|c'|$ is $|fail|$).
+	%
+	If $\rdx{\rapp} \subset c$ (\rulename{ulam}) then join at |fail|.
+
+	\item[Case: (\rulename{deref-s}) $\rdx{\runi} \equiv |x == s; E^[x]|$]
+	%
+	Here $\rdx{\rapp} \subset |E^[x]|$ as we cannot have a $\beta$-redex inside a scalar $s$.
+    %
+	Split cases on where $x$ occurs relative to $\rdx{\rapp}$
+	%
+	\begin{description}
+		\item[Case: $\rdx{\runi} \equiv |x == s;| \ldots |x| \ldots \rdx{\rapp} \ldots$]
+		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD1zO1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXM7XFwgXFxsZG90cyBzIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieD1zO1xcIFxcbGRvdHMgcyBcXGxkb3RzIFxccmR4e1xccmFwcH0gXFxsZG90cyJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+		& {x=s;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
+		{x=s;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots} \\
+		& {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots}
+		\arrow["\runi", from=1-2, to=2-3]
+		\arrow["\rapp"', from=1-2, to=2-1]
+		\arrow["\runi", dotted, from=2-1, to=3-2]
+		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+		\end{tikzcd}\]
+
+		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y e_1) V_1^[x]]|$]
+		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVt4XSBdICJdLFswLDEsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3hdO1xcIGVfMV0iXSxbMiwxLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVtzXSBdICJdLFsxLDIsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3NdO1xcIGVfMV0iXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+		& {x=s;\ E[(\lambda y. e_1)\ V_1[x] ] } \\
+		{x = s;\ E[\exists y.\ y = V_1[x];\ e_1]} && {x=s;\ E[(\lambda y. e_1)\ V_1[s] ] } \\
+		& {x = s;\ E[\exists y.\ y = V_1[s];\ e_1]}
+		\arrow["\runi", from=1-2, to=2-3]
+		\arrow["\rapp"', from=1-2, to=2-1]
+		\arrow["\runi", dotted, from=2-1, to=3-2]
+		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+		\end{tikzcd}\]
+
+		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y E_1^[x]) v_1]|$]
+		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gRV8xW3hdKVxcIHZfMV0gIl0sWzAsMSwieCA9IHM7XFwgRVtcXGV4aXN0cyB5LlxcIHkgPSB2XzE7XFwgRV8xW3hdXSJdLFsyLDEsIng9cztcXCBFWyhcXGxhbWJkYSB5LiBFXzFbc10pXFwgdl8xXSAiXSxbMSwyLCJ4ID0gcztcXCBFW1xcZXhpc3RzIHkuXFwgeSA9IHZfMTtcXCBFXzFbc11dIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+		& {x=s;\ E[(\lambda y. E_1[x])\ v_1] } \\
+		{x = s;\ E[\exists y.\ y = v_1;\ E_1[x]]} && {x=s;\ E[(\lambda y. E_1[s])\ v_1] } \\
+		& {x = s;\ E[\exists y.\ y = v_1;\ E_1[s]]}
+		\arrow["\runi", from=1-2, to=2-3]
+		\arrow["\rapp"', from=1-2, to=2-1]
+		\arrow["\runi", dotted, from=2-1, to=3-2]
+		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+		\end{tikzcd}\]
+	\end{description}
+
+	\item[Case: (\rulename{deref-v}) $\rdx{\runi} \equiv |x == v; A^[x]|$]
+	Split cases on where $\rdx{\rapp}$ occurs in $v$ or $|A^[x]|$.
+
+	\begin{description}
+		\item[Case:] $v \equiv V[\rdx{\rapp}]$ In this case we have
+		% https://q.uiver.app/?q=WzAsNSxbMSwwLCJ4PVZbXFxyZHh7XFxyYXBwfV07XFwgQVt4XSAiXSxbMCwxLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbeF0gIl0sWzIsMSwieD1WW1xccmR4e1xccmFwcH1dO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzEsMywieD1WW1xccmR4e1xccmFwcH0nXTtcXCBBW1ZbXFxyZHh7XFxyYXBwfSddXSAiXSxbMiwyLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMiw0LCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNCwzLCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJ1bmkiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+		& {x=V[\rdx{\rapp}];\ A[x] } \\
+		{x=V[\rdx{\rapp}'];\ A[x] } && {x=V[\rdx{\rapp}];\ A[V[\rdx{\rapp}]] } \\
+		&& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}]] } \\
+		& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}']] }
+		\arrow["\runi", from=1-2, to=2-3]
+		\arrow["\rapp"', from=1-2, to=2-1]
+		\arrow["\rapp", dotted, from=2-3, to=3-3]
+		\arrow["\rapp", dotted, from=3-3, to=4-2]
+		\arrow["\runi"', dotted, from=2-1, to=4-2]
+		\end{tikzcd}\]
+
+		\item[Case:] $A[x] \equiv \ldots x \ldots \rdx{\rapp}$ (|x| occurs outside $\rapp$) Trivial.
+        % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD12O1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXY7XFwgXFxsZG90cyB2IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieCA9IHY7IFxcbGRvdHMgdiBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+        \[\begin{tikzcd}
+        	& {x=v;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
+        	{x=v;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=v;\ \ldots v \ldots \rdx{\rapp} \ldots} \\
+        	& {x = v; \ldots v \ldots \rdx{\rapp}' \ldots}
+        	\arrow["\runi", from=1-2, to=2-3]
+        	\arrow["\rapp"', from=1-2, to=2-1]
+        	\arrow["\runi"', dotted, from=2-1, to=3-2]
+        	\arrow["\rapp", dotted, from=2-3, to=3-2]
+        \end{tikzcd}\]
+
+		\item[Case:] $A[x] \equiv A[(\lambda y_1. A_1[x]) v_1]$ (|x| occurs inside $\rapp$'s $\lambda$)
+		Impossible as application contexts do not go under a $\lambda$.
+
+		\item[Case:] $A[x] \equiv A[(\lambda y_1. e_1) V_1[x]]$ (|x| occurs inside $\rapp$'s argument)
+		By definition of application context, the only possible case is when $V_1[x] \equiv x$.
+		In this case we have
+		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgQVsoXFxsYW1iZGEgeS4gZV8xKVxcIHhdIl0sWzAsMSwieD12O1xcIEFbXFxleGlzdHMgeS5cXCB5ID0geDtcXCBlXzFdIl0sWzIsMSwieD12O1xcIEFbKFxcbGFtYmRhIHkuIGVfMSlcXCB2XSJdLFsxLDIsIng9djtcXCBBW1xcZXhpc3RzIHkuXFwgeSA9IHY7XFwgZV8xXSJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+		& {x=v;\ A[(\lambda y. e_1)\ x]} \\
+		{x=v;\ A[\exists y.\ y = x;\ e_1]} && {x=v;\ A[(\lambda y. e_1)\ v]} \\
+		& {x=v;\ A[\exists y.\ y = v;\ e_1]}
+		\arrow["\runi", from=1-2, to=2-3]
+		\arrow["\rapp"', from=1-2, to=2-1]
+		\arrow["\runi"', dotted, from=2-1, to=3-2]
+		\arrow["\rapp", dotted, from=2-3, to=3-2]
+		\end{tikzcd}\]
+	\end{description}
+\end{description}
+\end{description}
 \end{proof}
 
 
