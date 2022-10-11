@@ -7,7 +7,7 @@ import Data.Maybe
 import Expr(Ident(..))
 import Core
 import Eval
---import Print
+import Print
 --import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.
@@ -46,6 +46,10 @@ simpAlias :: Core -> Core
 simpAlias = fc . g
   where
     fc (CDef h e) | Just d <- bind h e = fc d
+    fc (CLambda i is e1 e2) =  -- CLambda has weird scoping, temporarily change it
+      case fc (CLam i (CDef is (CSeq [e1, e2]))) of
+        CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' e1' e2'
+        e -> error $ "simpAlias: CLambda " ++ prettyShow e
     fc e = composOpC fc fv fh e
     fh (HLam x (CDef h e)) | Just d <- lam x h e = fh d
     fh e = composOpH fc fv fh e
