@@ -3,8 +3,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 module DenSem where
+import Control.Applicative((<|>))
 import Control.Monad
-import Data.List((\\))
+import Data.List((\\), intersect)
 import qualified Data.List as L
 import Data.Maybe
 import Expr(Ident(..), noLoc)
@@ -16,6 +17,10 @@ import Debug.Trace
 
 traceDen :: Bool
 traceDen = False
+
+-- Try to limit the number of values to iterate over
+forallHack :: Bool
+forallHack = True
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
@@ -193,6 +198,7 @@ apFunc (Func _ f) a = f a
 
 instance Eq (Func W (S W)) where
   f@(Func sf _) == g@(Func sg _) =
+    --trace' ("eq " ++ show (sf, sg)) $
     sf == sg ||    -- compare function names
     and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
@@ -224,12 +230,15 @@ evalE' :: Env -> Core -> S W
 evalE' r (CValue v) = unit $ evalV r v
 evalE' r (CBar e1 e2) = evalE r e1 `union` evalE r e2
 evalE' _ CFail = empty
-evalE' r (CUnify e1 e2) = evalE r e1 `isect` evalE r e2
+evalE' r (CUnify e1 e2) =
+  --trace' ("unify " ++ prettyShow (e1, e2, evalE r e1, evalE r e2)) $
+  evalE r e1 `isect` evalE r e2
 evalE' r (CSeq [e]) = evalE r e
 evalE' r (CSeq (e: es)) = evalE r e `sequ` evalE r (CSeq es)
-evalE' r (CApply v1 v2) = apply r (evalV r v1) (evalV r v2)
+evalE' r (CApply v1 v2) = apply (evalV r v1) (evalV r v2)
 evalE' r (CDef [] e) = evalE r e
-evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- allW ]
+evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- ws ]
+  where ws = possibleValues xs r x e
 evalE' r (COne e) = sOne (evalE r e)
 evalE' r (CAll e) =
 --  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
@@ -239,8 +248,9 @@ evalE' r (CLambda i is e0 e1) = aset
   [ f | f <- allFuncs,
     forAll (1 + length is) $ \ ws@(w:_) ->
       let r' = exts r (zip (i:is) ws) in
+--      trace ("CLambda " ++ prettyShow (f, w, e0, evalE r' e0, nonEmpty (evalE r' e0), evalE r' e1, getSing (apply f w), maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w)))) $
       nonEmpty (evalE r' e0) `implies`
-      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply r f w))
+      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
   ]
 evalE' _ e = error $ "evalE " ++ prettyShow e
 
@@ -257,6 +267,17 @@ evalV _ (VPrim "in'/'") = WFunction wDiv
 evalV _ (VPrim "isInt$") = WFunction wIsInt
 evalV _ (VPrim "mapAp$") = WFunction wMapAp
 evalV _ v = error $ "evalV: " ++ prettyShow v
+
+possibleValues :: [Ident] -> Env -> Ident -> Core -> [W]
+possibleValues is r i ee | not forallHack = allW
+                         | otherwise = maybe allW (vals . evalE r) (get (i:is) ee)
+  where
+    vals (S xs) = map snd xs
+    get xs (CUnify (CVar i') e) | i == i' && null (intersect (fvs e) xs) = Just e
+    get xs (CUnify e1 e2) = get xs e1 <|> get xs e2
+    get xs (CSeq es) = foldr (<|>) Nothing $ map (get xs) es
+    get xs (CDef vs e) = get (vs ++ xs) e
+    get _ _ = Nothing
 
 wAdd :: Func W (S W)
 wAdd = func "add" f
@@ -287,9 +308,9 @@ wIsInt = func "isInt" f
 wMapAp :: Func W (S W)
 wMapAp = func "mapAp$" (\ _ -> error "wMapAp called")
 
-apply :: Env -> W -> W -> S W
-apply _ WInt{} _ = unit (Wrong "apply WInt")
-apply _ (WTuple vs) w = bars $ zipWith one [0..] vs
+apply :: W -> W -> S W
+apply WInt{} _ = unit (Wrong "apply WInt")
+apply (WTuple vs) w = bars $ zipWith one [0..] vs
   where
     one :: Integer -> W -> S W
     one i v = (unit w `isect` unit (WInt i)) `sequ` unit v
@@ -297,17 +318,17 @@ apply _ (WTuple vs) w = bars $ zipWith one [0..] vs
     bars [] = empty
     bars [x] = x
     bars (x:xs) = x `union` bars xs
-apply r (WFunction (Func "mapAp$" _)) w =
+apply (WFunction (Func "mapAp$" _)) w =
   case w of
     WTuple fs -> unit $ WTuple $ map one fs
     _ -> undefined
   where
     one f =
-      case apply r f (WTuple []) of
+      case apply f (WTuple []) of
         S [([], x)] -> x
         x -> error $ "mapAp$: " ++ prettyShow x
-apply _ (WFunction f) w = apFunc f w
-apply _ (Wrong s) _ = unit (Wrong $ "apply Wrong " ++ s)
+apply (WFunction f) w = apFunc f w
+apply (Wrong s) _ = unit (Wrong $ "apply Wrong " ++ s)
 
 forAll :: Int -> ([W] -> Bool) -> Bool
 forAll n p = all p $ replicateM n allW
