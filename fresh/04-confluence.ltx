@@ -321,8 +321,60 @@ Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
 \end{lemma}
 
 \begin{proof}
-Lemma \verb|TODO: [Beta-Comm]| shows that $\rapp$ satisfies
-the diamond property and hence is confluent by \cref{lem:diamond}.
+We show that $\rapp$ satisfies the diamond property and hence, is confluent by \cref{lem:diamond}.
+Suppose that
+%
+$\rstep{\rapp}{e}{e_1}$ via the redux $\Delta_1 \movesto \Delta_1'$ and
+%
+$\rstep{\rapp}{e}{e_1}$ via the redux $\Delta_2 \movesto \Delta_2'$.
+%
+Let us split cases on the relative positions of $\Delta_1$ and $\Delta_2$.
+%
+\begin{description}
+\item[Case $\Delta_1$ disjoint from $\Delta_2$:] Trivial, as $e \equiv \ldots \Delta_1 \ldots \Delta_2 \ldots$ so join at $\ldots \Delta_1' \ldots \Delta_2' \ldots$.
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJcXGxkb3RzIFxccmR4e31fMSBcXGxkb3RzIFxccmR4e31fMiBcXGxkb3RzIl0sWzAsMSwiXFxsZG90cyBcXHJkeHt9XzEnIFxcbGRvdHMgXFxyZHh7fV8yIFxcbGRvdHMiXSxbMiwxLCJcXGxkb3RzIFxccmR4e31fMSBcXGxkb3RzIFxccmR4e31fMicgXFxsZG90cyJdLFsxLDIsIlxcbGRvdHMgXFxyZHh7fV8xJyBcXGxkb3RzIFxccmR4e31fMicgXFxsZG90cyJdLFswLDIsIlxccmFwcF8yIl0sWzAsMSwiXFxyYXBwXzEiLDJdLFsxLDMsIlxccmFwcF8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	& {\ldots \Delta_1 \ldots \Delta_2 \ldots} \\
+	{\ldots \Delta_1' \ldots \Delta_2 \ldots} && {\ldots \Delta_1 \ldots \Delta_2' \ldots} \\
+	& {\ldots \Delta_1' \ldots \Delta_2' \ldots}
+	\arrow["{\rapp_2}", from=1-2, to=2-3]
+	\arrow["{\rapp_1}"', from=1-2, to=2-1]
+	\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
+	\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
+\end{tikzcd}\]
+
+
+\item[Case $\Delta_2 \subset \Delta_1$:] Let $\Delta_1 \equiv |apply1N (lam x e_1) v_1|$, and split cases on where $\Delta_2$ occurs in $\Delta_1$.
+	\begin{description}
+		\item[Case: $\Delta_2 \subset e_1$] \ie $e_1 \equiv E_1[\Delta_2]$, so we have:
+        % https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC5cXCBFXzFbXFxyZHh7fV8yXSlcXCB2XzEiXSxbMCwxLCJcXGV4aXN0cyB4LlxcIHggPSB2XzE7XFwgRV8xW1xccmR4e31fMl0pIl0sWzIsMSwiKFxcbGFtYmRhIHguXFwgRV8xW1xccmR4e31fMiddKVxcIHZfMSJdLFsxLDIsIlxcZXhpc3RzIHguXFwgeCA9IHZfMTtcXCBFXzFbXFxyZHh7fV8yJ10pIl0sWzAsMiwiXFxyYXBwXzIiXSxbMCwxLCJcXHJhcHBfMSIsMl0sWzEsMywiXFxyYXBwXzIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHBfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+        \[\begin{tikzcd}
+        	& {(\lambda x.\ E_1[\Delta_2])\ v_1} \\
+        	{\exists x.\ x = v_1;\ E_1[\Delta_2])} && {(\lambda x.\ E_1[\Delta_2'])\ v_1} \\
+        	& {\exists x.\ x = v_1;\ E_1[\Delta_2'])}
+        	\arrow["{\rapp_2}", from=1-2, to=2-3]
+        	\arrow["{\rapp_1}"', from=1-2, to=2-1]
+        	\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
+        	\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
+        \end{tikzcd}\]
+
+		\item[Case: $\Delta_2 \subset v_1$] \ie $v_1 \equiv V_1[\Delta_2]$, so we have:
+		% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC5cXCBlXzEpXFwgVl8xW1xccmR4e31fMl0iXSxbMCwxLCJcXGV4aXN0cyB4LlxcIHggPSBWXzFbXFxyZHh7fV8yXTtcXCBlXzEiXSxbMiwxLCIoXFxsYW1iZGEgeC5cXCBlXzEpXFwgVl8xW1xccmR4e31fMiddIl0sWzEsMiwiXFxleGlzdHMgeC5cXCB4ID0gVl8xW1xccmR4e31fMiddO1xcIGVfMSJdLFswLDIsIlxccmFwcF8yIl0sWzAsMSwiXFxyYXBwXzEiLDJdLFsxLDMsIlxccmFwcF8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+		\[\begin{tikzcd}
+			& {(\lambda x.\ e_1)\ V_1[\Delta_2]} \\
+			{\exists x.\ x = V_1[\Delta_2];\ e_1} && {(\lambda x.\ e_1)\ V_1[\Delta_2']} \\
+			& {\exists x.\ x = V_1[\Delta_2'];\ e_1}
+			\arrow["{\rapp_2}", from=1-2, to=2-3]
+			\arrow["{\rapp_1}"', from=1-2, to=2-1]
+			\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
+			\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
+		\end{tikzcd}\]
+	\end{description}
+
+\item[Case $\Delta_1 \subset \Delta_2$:] Symmetric to the previous case.
+
+\end{description}
+
 \end{proof}
 
 \begin{lemma}[$\rapp-\rcon$-Comm] \label{lem:a-c-c}
