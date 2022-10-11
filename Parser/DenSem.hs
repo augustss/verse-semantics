@@ -178,9 +178,10 @@ allTuples =
 allFuncs :: [W]
 allFuncs = fcns ++ constFuncs
   where
-    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp]
+    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp]
     wId  = func "id"  $ unit
     wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
+    wDec = func "dec" $ \case WInt x -> unit (WInt (x-1)); _ -> empty
     wDbl = func "dbl" $ \case WInt x -> unit (WInt (x*2)); _ -> empty
     wGt0 = func "gt0" $ \case WInt x | x > 0 -> unit (WInt x); _ -> empty
     wFst = func "fst" $ \case WTuple [w,_] -> unit w; _ -> empty
