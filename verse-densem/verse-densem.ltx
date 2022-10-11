@@ -761,6 +761,8 @@ $$
 
 \section{All about TimLambda}
 
+\newcommand{\munits}[1]{\eta(#1)}
+
 \begin{figure}
   $$
   \begin{array}{l}
@@ -820,7 +822,7 @@ $
 
   \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
+  \semapp{E}{|v|}{\rho} & = & \munits{\semapp{V}{v}{\rho}} \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
@@ -828,7 +830,7 @@ $
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
-  \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
+  \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
   \semapp{E}{|lam x (def (y_1 dots y_n) (where e_0 dot e_1))|} & = & \text{See below, figure \ref{fig:tim-lambda}} \\
   \end{array}          \\
 \\
@@ -848,8 +850,8 @@ apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
 apply( \tuple{v_0, \ldots, v_n}, w) & = &
      \multicolumn{2}{l}{
-     ((\munit(w) \mintersect \munit(0)) \msemi \munit(v_0)) \; \munion |dots| \; \munion
-     ((\munit(w) \mintersect \munit(n)) \msemi \munit(v_n))
+     ((\munits{w} \mintersect \munits{0}) \msemi \munits{v_0}) \; \munion |dots| \; \munion
+     ((\munits{w} \mintersect \munits{n}) \msemi \munits{v_n})
      }
   \\
 apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
@@ -857,7 +859,7 @@ apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \\ \\
 \begin{array}{lrcll}
 \text{Empty}        & \mempty & : &  \mtyped \\
-\text{Singleton}    & \munit & : & \Value \rightarrow \mtyped \\
+\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtyped \\
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \text{Product}      & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
@@ -881,8 +883,8 @@ $$
 \end{array} \\
 \\
 \begin{array}{rrcll}
-\text{Empty} & \mempty(w) & = & \varnothing \\
-\text{Unit} & \munit(w) & = & \setform{ ([], w) } \\
+\text{Empty} & \mempty & = & \varnothing \\
+\text{Unit} & \munits{w} & = & \setform{ ([], w) } \\
 \text{Concatenation} &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\
 \text{Intersection} &  s_1 \mintersect s_2 & = & \scompr{(l_1,w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
@@ -900,7 +902,7 @@ $$
 \\
 \text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
              & \shead [] & = & empty \\
-             & \shead (w \scons s) & = & \munit(w) \\
+             & \shead (w \scons s) & = & \munits{w} \\
 \text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
      & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
   \end{array} \\
@@ -965,6 +967,7 @@ $$
     \end{array}
     \\
     && \} \\
+  \text{Note that $f(w)$ has 0 or 1 elements.} \\
   \end{array}          \\
 
 \end{array}
