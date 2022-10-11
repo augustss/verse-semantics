@@ -369,11 +369,11 @@ that $\rstep{}{b}{d}$ and $\rstep{}{c}{d}$.
 
 \begin{definition}[Confluence]
 %
-Two terms $b$, $c$ can be \emph{joined}, written $\join{b}{c}$,
-if there is a $d$ such that $\rsteps{}{b}{d}$ and $\rsteps{}{c}{d}$.
+Two terms $b$, $c$ can be $\rr$-\emph{joined} written $\join{\rr}{b}{c}$,
+if there is a $d$ such that $\rsteps{\rr}{b}{d}$ and $\rsteps{\rr}{c}{d}$.
 %
-A reduction is \emph{confluent} if whenever
-$\rsteps{}{a}{b}$ and $\rsteps{}{a}{c}$, we have $\join{b}{c}$.
+A reduction $\rr$ is \emph{confluent} if whenever
+$\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{definition}
 
 
@@ -438,8 +438,8 @@ sequence $a_0 \go{\rr} a_1 \go{\rr} \ldots \go{\rr} a_n \go{\rr} \ldots$.
 
 \begin{definition}[Local Confluence]
 %
-A reduction is \emph{locally confluent} if whenever
-$\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, we have $\join{b}{c}$.
+A reduction $\rr$ is \emph{locally confluent} if whenever
+$\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 %
 \end{definition}
 

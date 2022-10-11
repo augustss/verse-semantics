@@ -85,8 +85,8 @@ $$\begin{array}{lrcll}
 
 \rulegroupname{Garbage Collection:~$\rgc$}
 \rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
-  \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
-  \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
+%  \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
+%  \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
 
 \rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
