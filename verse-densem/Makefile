@@ -13,7 +13,7 @@ verse-densem.tex: verse-densem.ltx ../calculus.fmt
 
 verse-densem.pdf: $(PAPERSRC)
 	$(LATEX) verse-densem
-	bibtex verse-densem
+	-bibtex verse-densem
 	$(LATEX) verse-densem
 	$(LATEX) verse-densem
 

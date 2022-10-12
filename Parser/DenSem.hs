@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 module DenSem where
@@ -20,7 +21,7 @@ traceDen = False
 
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
-forallHack = True
+forallHack = False
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined

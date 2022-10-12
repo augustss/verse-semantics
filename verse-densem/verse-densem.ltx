@@ -830,7 +830,7 @@ Here |e_1| is called the \emph{domain expression} of the lambda, while |e_2| is 
   a lambda is an expression |e| yielding many values.
 
 \item Informally |(lam x (def (y_1 dots y_n) (where e_1 dot e_2)))|
-  stands for the set of all functions $f : \Value \rightarrow \Value$ (i.e. taking a single value to a single value),
+  stands for the set of all functions $f : \Value \rightarrow \mtyped$ (i.e. taking a single value to a single value or failing),
   such that for all arguments $w$ to the function,
   when |e_1| denotes a non-empty set then the result of the function $f(w)$ is an element of the denotation of |e_2|.
 
@@ -854,15 +854,16 @@ set with the function that is the successor for integer arguments, and that fail
 (i.e., it means exactly what you think it means).  I.e.,
 
 $$
-\semapp{E}{succ}{\rho} = \left\{ \begin{array}{ll}
+\semapp{E}{succ}{\rho} = \munits{\left\{ \begin{array}{ll}
   \lambda x . \munits{x+1} & \text{if $x \in k$ } \\
   \lambda x . \varnothing & \text{otherwise}
 \end{array}
-\right.
+\right. }
 $$
 \simon{What is $\munits$?}
+\lennart{What is called \textit{unit} above, but that name was too long.}
 
-Reading off the final result, we can see that the denotation is the set of all functions |\Value \right \ValueD|
+Reading off the final result, we can see that the denotation is the set of all functions $\Value \rightarrow \mtyped$
 such that if the argument is an integer the result is the singleton set with the successor of the argument.
 If the argument is not an integer the function can do anything.
 
