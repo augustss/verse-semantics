@@ -135,8 +135,10 @@ Consider the case where $\rdx{2} \subset \rdx{1}$
 (the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
 There are two possibilities.
 %
-First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots E[x]$.
-Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots E[v_1]$.
+First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
+where $C$ is either an $E$ or $A$ depending on whether $v_1$
+is a scalar or not.
+Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
 
 Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
 $e \equiv |x == v_1; x == v_2; e'|$.
@@ -336,8 +338,6 @@ Hence, let us assume both are tuples and split cases on the positions of the use
 		\end{tikzcd}\]
 	\end{description}
 \end{description}
-
-
 \end{proof}
 
 \begin{lemma}[Deref-Comm-2] \label{lem:deref-comm-2}
@@ -345,9 +345,127 @@ If $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ are two \rulename{deref-*
 with distinct definitions $x_1$ and $x_2$ then $\join{\rord}{e_1}{e_2}$.
 \end{lemma}
 
-
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+Let $\txi{1}$ and $\txi{2}$ denote the reducts for the two reductions $\rstep{\rord}{e}{e_1}$
+and $\rstep{\rord}{e}{e_2}$ respectively. Further, let us assume that the reducts respectively
+use the constraints $|x_1 = v_1|$ and $|x_2 = v_2|$ respectively.
+%
+The case when the reducts are disjoint is trivial, as
+${e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots}$,
+${e_1 \equiv \ldots \rdx{1}' \ldots \rdx{2} \ldots}$,
+${e_2 \equiv \ldots \rdx{1} \ldots \rdx{2}' \ldots}$,
+and $e_1$ and $e_2$ can be joined at
+${\ldots \rdx{1}' \ldots \rdx{2}' \ldots}$.
+
+Consider the case where $\rdx{2} \subset \rdx{1}$
+(the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
+There are two possibilities.
+%
+First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
+where $C$ is either an $E$ or $A$ depending on whether $v_1$
+is a scalar or not.
+%
+Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
+
+Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
+$e \equiv |x_1 == v_1; x_2 == v_2; e'|$.
+%
+Let us split cases on whether $v_1$ and $v_2$ are scalars
+or head values ($\lambda$s or tuples).
+
+\begin{description}
+\item[Case: $v_1$ is a scalar and $v_2$ is a scalar]
+Here $e \equiv |x_1==s_1;x_2==s_2;e'|$.
+Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+%
+	\begin{description}
+	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $s_1$]
+	\ranjit{impossible due to ordering}
+	Here we have $s_1 \equiv x_2$ and $s_2 \equiv x_1$ and so we can join the reductions
+	as follows:
+	% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4XzEgPSB4XzIgO1xcIHhfMiA9IHhfMTtcXCBlJyJdLFswLDEsInhfMSA9IHhfMiA7XFwgeF8yID0geF8yO1xcIGUnIl0sWzIsMSwieF8xID0geF8xIDtcXCB4XzIgPSB4XzE7XFwgZSciXSxbMSwyLCJ4XzEgPSB4XzI7XFwgZSciXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+	\[\begin{tikzcd}[column sep=tiny]
+		& {x_1 = x_2 ;\ x_2 = x_1;\ e'} \\
+		{x_1 = x_2 ;\ x_2 = x_2;\ e'} && {x_1 = x_1 ;\ x_2 = x_1;\ e'} \\
+		& {x_1 = x_2;\ e'}
+		\arrow["2", from=1-2, to=2-3]
+		\arrow["1"', from=1-2, to=2-1]
+		\arrow[dotted, from=2-1, to=3-2]
+		\arrow[dotted, from=2-3, to=3-2]
+	\end{tikzcd}\]
+
+	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $e'$] Join the reductions as
+	% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0geF8xO1xcIEVbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSB4XzE7XFwgRVt4XzFdIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IHNfMTtcXCBFW3hfMV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gc18xO1xcIEVbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBzXzE7XFwgRVtzXzFdIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+	\[\begin{tikzcd}
+		{x_1 = s_1;\ x_2 = x_1;\ E[x_2]} \\
+		{x_1 = s_1;\ x_2 = s_1;\ E[x_2]} & {x_1 = s_1;\ x_2 = x_1;\ E[x_1]} \\
+		& {x_1 = s_1;\ x_2 = s_1;\ E[x_1]} \\
+		{x_1 = s_1;\ x_2 = s_1;\ E[s_1]}
+		\arrow["2", from=1-1, to=2-2]
+		\arrow[dotted, from=2-2, to=3-2]
+		\arrow["1"', from=1-1, to=2-1]
+		\arrow[dotted, from=3-2, to=4-1]
+		\arrow[dotted, from=2-1, to=4-1]
+	\end{tikzcd}\]
+
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$] Symmetric to the previous case.
+
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$] As the variables are different, the uses
+	must also be different, hence $e \equiv x_1 = s_1; x_2 = s_2; \ldots E_1[x_1] \ldots E_2[x_2] \ldots$
+	and we can join at $x_1 = s_1; x_2 = s_2; \ldots E_1[s_1] \ldots E_2[s_2] \ldots$.
+
+	\end{description}
+
+\item[Case: $v_1$ is a scalar $s_1$ and $v_2$ is non-scalar] Here $e \equiv |x_1==s_1;x_2==h_2;e'|$.
+Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+	\begin{description}
+	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $s_1$]
+	Here we have $e \equiv |x_1 == x_2; x_2==v_2;e'|$; the
+	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+
+	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
+	Here we have $e \equiv |x_1 == s_1; x_2==V[x_1]; A^[x_2]|$,
+	and we can join the reductions as
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0gVlt4XzFdO1xcIEFbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3hfMV07XFwgQVtWW3hfMV1dIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IFZbc18xXTtcXCBBW1ZbeF8xXV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gVltzXzFdO1xcIEFbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3NfMV07XFwgQVtWW3hfMV1dIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+	\[\begin{tikzcd}
+		{x_1 = s_1;\ x_2 = V[x_1];\ A[x_2]} \\
+		{x_1 = s_1;\ x_2 = V[s_1];\ A[x_2]} & {x_1 = s_1;\ x_2 = V[x_1];\ A[V[x_1]]} \\
+		& {x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]} \\
+		{x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]}
+		\arrow["2", from=1-1, to=2-2]
+		\arrow[dotted, from=2-2, to=3-2]
+		\arrow["1"', from=1-1, to=2-1]
+		\arrow[dotted, from=3-2, to=4-1]
+		\arrow[dotted, from=2-1, to=4-1]
+	\end{tikzcd}\]
+
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$]
+	Here we have $e \equiv |x_1 == x_2; x_2==v_2;E[x_1]|$; the
+	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
+	As the variables are different, the uses
+	must also be different, hence $e \equiv x_1 = s_1; x_2 = v_2; \ldots E[x_1] \ldots A[x_2] \ldots$
+	and we can join at $x_1 = s_1; x_2 = v_2; \ldots E[s_1] \ldots A[v_2] \ldots$.
+	\end{description}
+
+\item[Case: $v_1$ is non-scalar and $v_2$ is scalar $s_2$] Symmetric to the above case.
+
+\item[Case: $v_1$ is non-scalar and $v_2$ is non-scalar]
+Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+	\begin{description}
+	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $v_1$]
+	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
+	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
+	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $v_1$]
+	Impossible: substitutes non-scalar ($v_2$) in non-scalar ($v_1$).
+	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
+	As the variables are different, the uses
+	must also be different, hence $e \equiv x_1 = v_1; x_2 = v_2; \ldots x_1 \ldots x_2 \ldots$
+	and we can join at $x_1 = v_1; x_2 = v_2; \ldots v_1 \ldots v_2 \ldots$.
+	\end{description}
+\end{description}
 \end{proof}
 
 \begin{lemma}[Eq-Join] \label{lem:eq-join}
