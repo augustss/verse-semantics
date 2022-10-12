@@ -838,6 +838,13 @@ Here |e_1| is called the \emph{domain expression} of the lambda, while |e_2| is 
   when |e_1| denotes a non-empty set then the result of the function $f(w)$ is an element of the denotation of |e_2|.
 
   \Cref{fig:tim-den-sem1} gives several attempts at formalising this idea.
+
+\item Since the denotation of a $\lambda$-expression is a set of functions, it means that the denotation
+  of a function application, $f(w)$, is also a set.  But if the function range is single valued, then all
+  the functions in the set have the same result when the argument is in the domain.
+  Thus, the set $f(w)$ is a singleton set if $w$ is in the domain.
+  This means that the meaning of TimLambdas agree with regular lambdas for values in the domain.
+
 \end{itemize}
 
 % ------------------------------------------------------------

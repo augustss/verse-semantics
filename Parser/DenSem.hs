@@ -21,7 +21,7 @@ traceDen = False
 
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
-forallHack = False
+forallHack = True
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
@@ -121,28 +121,30 @@ sequ (S s1) (S s2) = S [ (l1 ++ l2, w2) | (l1,_w1) <- s1, (l2,w2) <- s2 ]
 
 sOne :: S W -> S W
 sOne (S []) = empty
-sOne ws = unit $ head $ ssort ws
+sOne ws = unit $ either Wrong head $ ssort ws
 
 sAll :: S W -> W
-sAll ws = WTuple $ ssort ws
+sAll ws = either Wrong WTuple $ ssort ws
 
-ssort :: (Pretty a) => S a -> [a]
+ssort :: (Pretty a) => S a -> Either String [a]
 ssort sa = srt sa
   where
-    srt (S []) = []
-    srt (S ws) = notMany [w | ([],w) <- ws] ++
-                 srt (S [(l,w) | (L:l,w) <- ws ]) ++
-                 srt (S [(l,w) | (R:l,w) <- ws ])
-    notMany [] = []
-    notMany [x] = [x]
-    notMany _ = error $ "ssort: multiple unlabelled" ++ prettyShow sa
+    srt (S []) = pure []
+    srt (S ws) = do
+      s <- notMany [w | ([],w) <- ws]
+      ls <- srt (S [(l,w) | (L:l,w) <- ws ])
+      rs <- srt (S [(l,w) | (R:l,w) <- ws ])
+      pure $ s ++ ls ++ rs
+    notMany [] = pure []
+    notMany [x] = pure [x]
+    notMany _ = Left $ "ssort: multiple unlabelled" ++ prettyShow sa
 
 succeeds :: S W -> S W
 succeeds (S [x]) = S [x]
 succeeds _ = unit $ Wrong "succeeds"
 
 noAlts :: S W -> [W]
-noAlts = ssort
+noAlts = either error id . ssort
 
 eqSet :: (Eq a) => S a -> S a -> Bool
 eqSet s1 s2 = subset s1 s2 && subset s2 s1
@@ -317,7 +319,7 @@ apply WInt{} _ = unit (Wrong "apply WInt")
 apply (WTuple vs) w = bars $ zipWith one [0..] vs
   where
     one :: Integer -> W -> S W
-    one i v = (unit w `isect` unit (WInt i)) `sequ` unit v
+    one i v = if w == WInt i then unit v else empty
     bars :: [S W] -> S W
     bars [] = empty
     bars [x] = x
