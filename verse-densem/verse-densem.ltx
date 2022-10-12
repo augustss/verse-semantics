@@ -364,7 +364,7 @@
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
        & & \vb & |hastype e_1 e_2| \\
 % SPJ Omitting for now
@@ -762,216 +762,7 @@ $$
 \newcommand{\munits}[1]{\eta(#1)}
 
 \section{All about TimLambda}
-A $\lambda$-expression has the following (complex) syntax
-$$
-|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|
-$$
-Informally this stands for the set of all functions, such that for all arguments to the function,
-when |e_1| denotes a non-empty set then the result of the function is in the denotation of |e_2|.
-The |e_1| can bind variables, |y_1 dots y_n|, that are bound in |e_2|.
 
-Below, we will omit the existential quantifier when there are |y_i|.
-
-E.g., the source Verse function |0 eqgt 1| stands for the the TimLambda |lam x (where x = 0 dot 1)|.
-The denotation of this is the set of all functions that when given |0| returns |1|.
-This is an infinite set, among its members is the successor function and the constant 1 function.
-
-The source Verse function |(x:int) eqgt x| stands for the the TimLambda |lam x (def y (where y = int(x) dot y))|.
-The denotation of this is the set of all functions that when given an |int| returns that |int|.
-This is an infinite set, among its members is the identity function and the |int| type test.
-
-Figure \ref{fig:tim-example1} has a full example of the source Verse function |(x:succ) => x|,
-where the denotation of |succ| is singleton
-set with the function that is the successor for integer arguments, and that fails for other arguments
-(i.e., it means exactly what you think it means).  I.e.,
-
-$$
-\semapp{E}{succ}{\rho} = \left\{ \begin{array}{ll}
-  \lambda x . \munits{x+1} & \text{if $x \in k$ } \\
-  \lambda x . \varnothing & \text{otherwise}
-\end{array}
-\right.
-$$
-Reading off the final result, we can see that the denotation is the set of all functions |\Value \right \ValueD|
-such that if the argument is an integer the result is the singleton set with the successor of the argument.
-If the argument is not an integer the function can do anything.
-
-\begin{figure}
-\begin{footnotesize}
-  $$
-  \begin{array}{lcl}
-    \semapp{E}{|(x:succ) => x|}{\rho} & = & \text{ desugar } \\
-    \semapp{E}{|lam x (def y (where y = succ(x) dot y))|}{\rho} & = & \text { semantic equation for |lam| } \\
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, \\
-            z \in \semapp{E}{|x|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ semantic equation for |x|} \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, \\
-            z \in \munits{\semapp{V}{|x|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}}} \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{semantic equation} \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z \in \munits{|w_1|} \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ set theory } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ semantic equation for |=| } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|y|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \mintersect \\
-            \semapp{E}{|succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ semantic equations } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \munits{w_1} \mintersect 
-            \semapp{E}{|succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ semantic equations } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \munits{w_1} \mintersect 
-            \apply (\semapp{E}{|succ|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}}, w)
-            \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ semantics of |succ| } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \munits{w_1} \mintersect 
-            \apply (\lambda x . |if| x \in k |then| \munits{x+1} |else| \varnothing, w)
-            \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ beta } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            \munits{w_1} \mintersect 
-            (|if| w \in k |then| \munits{w+1} |else| \varnothing)
-            \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ simplify } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            (|if| w \in k |then| \munits{w_1} \mintersect \munits{w+1} |else| \varnothing)
-            \neq \varnothing \implies \\
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ simplify } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w w_1| \in |W| . \\
-          \begin{array}[t]{l}
-            w \in k, w_1 = w+1 \implies 
-            \exists z \in f(w) . \, 
-            z = w_1 \\
-          \end{array} 
-    \\
-    \end{array} \\
-    \} & = & \text{ simplify } \\
-
-    \{ \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) ,
-        \forall |w| \in |W| . 
-          \begin{array}[t]{l}
-            w \in k \implies 
-            f(w) = \munits{w+1}
-          \end{array} 
-    \\
-    \end{array} 
-    \} \\
-
-  \end{array}
-  $$
-\end{footnotesize}
-\caption{TimLambda: Example} \label{fig:tim-example1}
-\end{figure}
-  
 
 \begin{figure}
   $$
@@ -982,7 +773,7 @@ If the argument is not an integer the function can do anything.
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
        & & \vb & |lam x (def (y_1 dots y_n) (where e_1 dot e_2))| \\
 % SPJ Omitting for now
@@ -1017,6 +808,245 @@ If the argument is not an integer the function can do anything.
 \caption{TimLambda: The Verse calculus: syntax} \label{fig:tim-syntax}
 \end{figure}
 
+This section dicusses TimLambda.
+
+\subsection{Overview}
+
+The syntax is given in \Cref{fig:tim-syntax}.
+
+\begin{itemize}
+\item A $\lambda$-expression has the following (complex) syntax
+$$
+|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|
+$$
+Here |e_1| is called the \emph{domain expression} of the lambda, while |e_2| is called the \emph{range expression}.
+
+\item The bound variables |x| and |y_1 dots y_n| scope over both |e_1| and |e_2|.
+  The domain expression |e_1| can give values to the existential variables, |y_1 dots y_n|, typically
+  derived from the value of the argument |x|.
+  We will omit the existential quantifier when there are no |y_i|.
+
+\item Note that, instead of being a value |v| yielding one value (as in \Cref{fig:syntax}),
+  a lambda is an expression |e| yielding many values.
+
+\item Informally |(lam x (def (y_1 dots y_n) (where e_1 dot e_2)))|
+  stands for the set of all functions $f : \Value \rightarrow \Value$ (i.e. taking a single value to a single value),
+  such that for all arguments $w$ to the function,
+  when |e_1| denotes a non-empty set then the result of the function $f(w)$ is an element of the denotation of |e_2|.
+
+  \Cref{fig:tim-den-sem1} gives several attempts at formalising this idea.
+\end{itemize}
+
+% ------------------------------------------------------------
+\subsection{Examples}
+
+E.g., the source Verse function |0 eqgt 1| stands for the the TimLambda |lam x (where x = 0 dot 1)|.
+The denotation of this is the set of all functions that when given |0| returns |1|.
+This is an infinite set, among its members is the successor function and the constant 1 function.
+
+The source Verse function |(x:int) eqgt x| stands for the the TimLambda |lam x (def y (where y = int(x) dot y))|.
+The denotation of this is the set of all functions that when given an |int| returns that |int|.
+This is an infinite set, among its members is the identity function and the |int| type test.
+
+Figure \ref{fig:tim-example1} has a full example of the source Verse function |(x:succ) => x|,
+where the denotation of |succ| is singleton
+set with the function that is the successor for integer arguments, and that fails for other arguments
+(i.e., it means exactly what you think it means).  I.e.,
+
+$$
+\semapp{E}{succ}{\rho} = \left\{ \begin{array}{ll}
+  \lambda x . \munits{x+1} & \text{if $x \in k$ } \\
+  \lambda x . \varnothing & \text{otherwise}
+\end{array}
+\right.
+$$
+\simon{What is $\munits$?}
+
+Reading off the final result, we can see that the denotation is the set of all functions |\Value \right \ValueD|
+such that if the argument is an integer the result is the singleton set with the successor of the argument.
+If the argument is not an integer the function can do anything.
+
+\begin{figure}
+\begin{footnotesize}
+  $$
+  \begin{array}{lcl}
+    \semapp{E}{|(x:succ) => x|}{\rho} & = & \text{ desugar } \\
+    \semapp{E}{|lam x (def y (where y = succ(x) dot y))|}{\rho} & = & \text { semantic equation for |lam| } \\
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \, \\
+            z \in \semapp{E}{|x|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ semantic equation for |x|} \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \, \\
+            z \in \munits{\semapp{V}{|x|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}}} \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{semantic equation} \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z \in \munits{|w_1|} \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ set theory } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|y = succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ semantic equation for |=| } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|y|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \mintersect \\
+            \semapp{E}{|succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ semantic equations } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \munits{w_1} \mintersect
+            \semapp{E}{|succ^(x)|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ semantic equations } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \munits{w_1} \mintersect
+            \apply (\semapp{E}{|succ|}{\extendrho{\rho}{|x| \mapsto w, |y| \mapsto w_1}}, w)
+            \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ semantics of |succ| } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \munits{w_1} \mintersect
+            \apply (\lambda x . |if| x \in k |then| \munits{x+1} |else| \varnothing, w)
+            \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ beta } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            \munits{w_1} \mintersect
+            (|if| w \in k |then| \munits{w+1} |else| \varnothing)
+            \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ simplify } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            (|if| w \in k |then| \munits{w_1} \mintersect \munits{w+1} |else| \varnothing)
+            \neq \varnothing \implies \\
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ simplify } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w w_1| \in |W| . \\
+          \begin{array}[t]{l}
+            w \in k, w_1 = w+1 \implies
+            \exists z \in f(w) . \,
+            z = w_1 \\
+          \end{array}
+    \\
+    \end{array} \\
+    \} & = & \text{ simplify } \\
+
+    \{ \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) ,
+        \forall |w| \in |W| .
+          \begin{array}[t]{l}
+            w \in k \implies
+            f(w) = \munits{w+1}
+          \end{array}
+    \\
+    \end{array}
+    \} \\
+
+  \end{array}
+  $$
+\end{footnotesize}
+\caption{TimLambda: Example} \label{fig:tim-example1}
+\end{figure}
+
+
+% ------------------------------------------------------------
+\subsection{Denotational semantics of TimLambda}
+
+\Cref{fig:tim-den-sem1} and \ref{fig:tim-den-sem2} describe the denotational semantics of TimLambda.
 
 \begin{figure}
 $
@@ -1041,7 +1071,7 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|} & = & \text{See below, figure \ref{fig:tim-lambda}} \\
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \text{See below, figure \ref{fig:tim-lambda}} \\
   \end{array}          \\
 \\
   \begin{array}{rcll}
@@ -1081,6 +1111,75 @@ $
 \label{fig:tim-den-sem1}
 \end{figure}
 
+
+
+\begin{figure}
+$$
+\begin{array}{l}
+  \text{\bf Transcribed from notes, CORRECTED version} \\
+  \text{Clearly wrong, since syntatic |x| doesn't occur.} \\
+  \begin{array}{rcll}
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = &
+    \begin{array}[t]{ll}
+      \{ f
+        \vb f \in (\Value \rightarrow \mtyped) , \\
+        \forall x \in \semapp{E}{|def (y_1 dots y_n) e_1|}{\rho} . \\
+        \exists z \in f(x) . \\
+        \forall |w_1 dots w_n| . \,
+          \begin{array}[t]{l}
+            x = \semapp{E}{|e_1|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \implies \\
+            z = \semapp{E}{|e_2|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \\
+          \end{array} \\
+      \} \\
+    \end{array} \\
+  \end{array}          \\
+\\
+
+  \text{\bf Transcribed from notes, rephrased slightly version} \\
+  \text{Clearly wrong, since $f(w)$ is a set, not a value.} \\
+  \begin{array}{rcll}
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
+    \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) , \\
+        \forall |w w_1 dots w_n| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
+            f(w) \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
+          \end{array} \\
+    \end{array}
+    \\
+    && \} \\
+  \end{array}          \\
+
+  \text{\bf Maybe correct version} \\
+  \begin{array}{rcll}
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
+    \begin{array}[t]{ll}
+      f
+        \vb f \in (\Value \rightarrow \mtyped) , \\
+        \forall |w w_1 dots w_n| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \, \\
+            z \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
+          \end{array} \\
+    \end{array}
+    \\
+    && \} \\
+  \text{Note that $f(w)$ has 0 or 1 elements.} \\
+  \end{array}          \\
+
+\end{array}
+$$
+\caption{Different takes on TimLambda}
+\label{fig:tim-den-sem2}
+\end{figure}
+
+% ------------------------------------------------------------
+\subsection{Labelled semantics for TimLambda}
+
+
 \begin{figure}
 $$
 \begin{array}{l}
@@ -1119,72 +1218,10 @@ $$
 \end{array}
 $$
 \caption{Labelled expression semantics}
-\label{fig:tim-den-sem2}
+\label{fig:tim-labelled-sem}
 \end{figure}
 
-
-\begin{figure}
-$$
-\begin{array}{l}
-  \text{\bf Transcribed from notes, CORRECTED version} \\
-  \text{Clearly wrong, since syntatic |x| doesn't occur.} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = &
-    \begin{array}[t]{ll}
-      \{ f
-        \vb f \in (\Value \rightarrow \mtyped) , \\
-        \forall x \in \semapp{E}{|def (y_1 dots y_n) e_1|}{\rho} . \\
-        \exists z \in f(x) . \\
-        \forall |w_1 dots w_n| . \,
-          \begin{array}[t]{l}
-            x = \semapp{E}{|e_1|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \implies \\
-            z = \semapp{E}{|e_2|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-      \} \\
-    \end{array} \\
-  \end{array}          \\
-\\
-
-  \text{\bf Transcribed from notes, rephrased slightly version} \\
-  \text{Clearly wrong, since $f(w)$ is a set, not a value.} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
-    \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) , \\
-        \forall |w w_1 dots w_n| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
-            f(w) \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-    \end{array}
-    \\
-    && \} \\
-  \end{array}          \\
-
-  \text{\bf Maybe correct version} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
-    \begin{array}[t]{ll}
-      f 
-        \vb f \in (\Value \rightarrow \mtyped) , \\
-        \forall |w w_1 dots w_n| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, \\
-            z \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-    \end{array}
-    \\
-    && \} \\
-  \text{Note that $f(w)$ has 0 or 1 elements.} \\
-  \end{array}          \\
-
-\end{array}
-$$
-\caption{Different takes on TimLambda}
-\label{fig:tim-lambda}
-\end{figure}
+See \Cref{fig:tim-labelled-sem}
 
 \end{document}
 
