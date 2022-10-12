@@ -815,6 +815,9 @@ This section dicusses TimLambda.
 The syntax is given in \Cref{fig:tim-syntax}.
 
 \begin{itemize}
+\item In the TimLambda semantics the meaning of $\mtype$ is a set of values.
+The necessary sequencing for choice is handle by labelling (as above).
+  
 \item A $\lambda$-expression has the following (complex) syntax
 $$
 |lam x (def (y_1 dots y_n) (where e_1 dot e_2))|
@@ -1090,10 +1093,11 @@ apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
 apply( \tuple{v_0, \ldots, v_n}, w) & = &
-     \multicolumn{2}{l}{
-     ((\munits{w} \mintersect \munits{0}) \msemi \munits{v_0}) \; \munion |dots| \; \munion
-     ((\munits{w} \mintersect \munits{n}) \msemi \munits{v_n})
-     }
+%     \multicolumn{2}{l}{
+%     ((\munits{w} \mintersect \munits{0}) \msemi \munits{v_0}) \; \munion |dots| \; \munion
+%     ((\munits{w} \mintersect \munits{n}) \msemi \munits{v_n})
+%     }
+  \{ v_0 \vb w=0 \} \; \munion \; |dots| \; \munion \; \{ v_n \vb w=n \}
   \\
 apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \end{array}
