@@ -144,11 +144,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Value Context}       & V  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \\
 \textit{Constraint Context}  & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
 \textit{Expression Context}  & E  & ::= & V \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
-%                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
 % \textit{Constraint Context}  & C  & ::= & |hole == v| \vb |v == hole| \vb \lvc{|hole == e|} \vb \lvc{|v == E|} \\
-% \textit{Expression Context}  & E  & ::= & |hole| \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
 %
 \textit{Application Context} & A  & ::= & |hole| \vb |def x A | \vb |hole == hnf; e| \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
+                             &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
 \textit{Choice Context}      & CX & ::= & \hole \vb |def x CX| \vb |v == v' ; CX| \vb |apply1N CX e| \vb |apply1N ce CX| \\
                              &    & \vb & \lvc{|v == CX; e|} \vb \lvc{|v == ce; CX|} \\
 \textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\[0.05in]
