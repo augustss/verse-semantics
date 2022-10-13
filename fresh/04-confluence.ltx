@@ -144,7 +144,7 @@ Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
 $e \equiv |x == v_1; x == v_2; e'|$.
 %
 Let us split cases on whether $v_1$ and $v_2$ are scalars ($k$ or $y$)
-or head values ($\lambda$s or tuples).
+or non-scalars ($\lambda$s or tuples).
 
 \begin{description}
 \item[Case: $v_1 \equiv s_1$ and $v_2 \equiv s_2$]
@@ -164,14 +164,14 @@ Split cases on the \emph{uses} of $x$:
 	\arrow[dotted, from=2-3, to=3-3]
 	\arrow[dotted, two heads, from=3-1, to=4-2]
 	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 	\end{tikzcd}\]
 
 	\item[\rdx{1} use is $x^2$, \rdx{2} use is $e'$] Here we have
 	% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgRV8yW3hdIl0sWzAsMSwieCA9IHNfMTtcXCBzXzEgPSBzXzI7XFwgRV8yW3hdIl0sWzIsMSwieD1zXzE7XFwgeD1zXzI7XFwgRV8yW3NfMl0iXSxbMCwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFXzJbc18xXSJdLFsyLDIsInggPSBzXzE7XFwgc18xID0gc18yO1xcIEVfMltzXzJdIl0sWzEsMywiXFxidWxsZXQiXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw1LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
 	\[\begin{tikzcd}
 	& {x = s_1;\ x = s_2;\ E_2[x]} \\
-	{x = s_1;\ s_1 = s_2;\ E_2[x]} && {x=s_1;\ x=s_2;\ E_2[s_2]} \\
+	{x = s_1;\ s_1 = s_2;\ E_2[x]} && {x = s_1;\ x = s_2;\ E_2[s_2]} \\
 	{x = s_1;\ s_1 = s_2;\ E_2[s_1]} && {x = s_1;\ s_1 = s_2;\ E_2[s_2]} \\
 	& \bullet
 	\arrow["2", from=1-2, to=2-3]
@@ -180,7 +180,7 @@ Split cases on the \emph{uses} of $x$:
 	\arrow[dotted, from=2-3, to=3-3]
 	\arrow[dotted, two heads, from=3-1, to=4-2]
 	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 	\end{tikzcd}\]
 
 	\item[\rdx{1} use is $e'$, \rdx{2} use is $x^1$] Symmetric with previous case.
@@ -198,7 +198,7 @@ Split cases on the \emph{uses} of $x$:
 	\arrow[dotted, from=2-3, to=3-3]
 	\arrow[dotted, two heads, from=3-1, to=4-2]
 	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 	\end{tikzcd}\]
 
 	\item[\rdx{1} use is $e'$, \rdx{2} use is $e'$, at different position] Here we have
@@ -273,8 +273,8 @@ Split cases on the \emph{uses} of $x$:
 			\arrow[dotted, from=2-3, to=3-2]
 		\end{tikzcd}\]
 	\end{description}
-\item[Case: $v_1$ and $v_2$ are head values] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
-Hence, let us assume both are tuples and split cases on the positions of the uses of $x$ in $\rdx{1}$ and $\rdx{2}$.
+\item[Case: $v_1$ and $v_2$ are non-scalar] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
+Hence, let us assume both are \emph{tuples} and split cases on the positions of the uses of $x$ in $\rdx{1}$ and $\rdx{2}$.
 	\begin{description}
 		\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$]
 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIGUnIl0sWzAsMSwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgZSciXSxbMCwyLCJ2XzEgPSB2XzI7XFwgeCA9IHZfMTtcXCBlJyJdLFsyLDIsInZfMSA9IHZfMjtcXCB4ID0gdl8yO1xcIGUnIl0sWzEsMywiXFxidWxsZXQiXSxbMiwxLCJ2XzIgPSB2XzE7XFwgeCA9IHZfMjtcXCBlJyJdLFswLDEsIjEiLDJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiMiJdLFs1LDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDQsIlxcY3JlZntsZW06ZXEtam9pbn0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
@@ -289,7 +289,7 @@ Hence, let us assume both are tuples and split cases on the positions of the use
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 		\item[\rdx{1} use is $x^2$, \rdx{2} use is in $e'$]
 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIEFfMlt4XSJdLFswLDEsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt4XSJdLFswLDIsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt2XzFdIl0sWzIsMiwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInheMSA9IHZfMTtcXCB4XjIgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
@@ -304,7 +304,7 @@ Hence, let us assume both are tuples and split cases on the positions of the use
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 
 		\item[\rdx{1} use is in $e'$, \rdx{2} use is $x^1$] Symmetric to previous case.
@@ -322,7 +322,7 @@ Hence, let us assume both are tuples and split cases on the positions of the use
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 
 		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at different positions]
@@ -371,7 +371,7 @@ Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
 $e \equiv |x_1 == v_1; x_2 == v_2; e'|$.
 %
 Let us split cases on whether $v_1$ and $v_2$ are scalars
-or head values ($\lambda$s or tuples).
+or non-scalars ($\lambda$s or tuples).
 
 \begin{description}
 \item[Case: $v_1$ is a scalar and $v_2$ is a scalar]
@@ -468,17 +468,100 @@ Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redex
 \end{description}
 \end{proof}
 
-\begin{lemma}[Eq-Join] \label{lem:eq-join}
-If $e \equiv {v = v'; E[v]}$,
-	   $e_2 \equiv {v_1 = v_2; E[v_2]}$
-then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or
-	 $\rsteps{\rord}{e_1,e_2}{|cs|; E[v]}$.
+% \begin{lemma}[Eq-Join] \label{lem:eq-join}
+% If $e \equiv {v = v'; E[v]}$,
+% 	   $e_2 \equiv {v_1 = v_2; E[v_2]}$
+% then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or
+% 	 $\exists v.\ \rsteps{\rord}{e_1,e_2}{|cs|; E[v]}$.
+% \end{lemma}
+
+% \begin{proof}
+% By splitting cases on whether $v$ and $v'$ are scalar or non-scalar and applying
+% \cref{lem:join-s-s}, \cref{lem:join-s-h}, \cref{lem:join-h-h}.
+% \end{proof}
+
+% \begin{lemma}[Join-S-V] \label{lem:join-s-h}
+% If $e_1 \equiv {s = v; E[s]}$ and $e_2 \equiv {s = v; E[v]}$
+% then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or $\rstep{\rord}{e_1,e_2}{s=h; E[v]}$.
+% \end{lemma}
+
+% \begin{proof}
+% Split cases on whether $s$ is a literal or identifier.
+% \begin{description}
+% \item[Case $s \equiv k$] Join at $|fail|$ via \rulename{u-lit-t} or \rulename{u-lit-lam}.
+% \item[Case $s \equiv x$]
+% \end{description}
+% \end{proof}
+
+\begin{lemma}[Join-S-S] \label{lem:join-s-s}
+If $e_1 \equiv {s_1 = s_2; E[s_1]}$ and $e_2 \equiv {s_1 = s_2; E[s_2]}$
+then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or $\rsteps{\rord}{e_1,e_2}{s_1=s_2; E[s]}$.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+If $s_1 \equiv s_2$ then $e_1, e_2$ are trivially joined.
+Suppose that $s_1 \not \equiv s_2$ and split cases on whether they are variables or literals.
+
+\begin{description}
+\item[Case $s_1 \equiv k_1$ and $s_2 \equiv k_2$] Join at $|fail|$ as $k_1 \not \equiv k_2$.
+\item[Case $s_1 \equiv k$ and $s_2 \equiv x$] Join at $e_1$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
+\item[Case $s_1 \equiv x$ and $s_2 \equiv k$] Join at $e_2$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
+\item[Case $s_1 \equiv x_1$ and $s_2 \equiv x_2$] Join at $e_{3-j}$ where $\rnk{x_j} < \rnk{x_{3-j}}$, as $\rstep{}{x_1 = x_2; E[x_j]}{x_1 = x_2; E[x_{3-j}]}$.
+\end{description}
 \end{proof}
 
+\begin{lemma}[Join-V-V] \label{lem:join-v-v}
+Let $v$ and $v'$ be two non-scalars.
+If $e \equiv {v = v'; E[v]}$ and
+   $e' \equiv {v = v'; E[v']}$
+then $\rsteps{\rord}{e,e'}{|fail|}$ or
+     $\rsteps{\rord}{e,e'}{ s_1 = s_1'; \ldots; s_n = s_n'; E[v^*]}$.
+\end{lemma}
+
+\begin{proof}
+If either $v$ or $v'$ are $\lambda$-terms then we can join at $|fail|$.
+%
+If $v$ and $v'$ are tuples of \emph{different} sizes we can join at $|fail|$.
+%
+Hence, assume that $v \equiv |arr (s_1, dots, s_n)|$ and $v' \equiv |arr (s'_1, dots, s'_n)|$.
+%
+Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; E[v]$
+and $s_1 = s_1'; \ldots; s_n = s_n'; E[v']$.
+%
+From \cref{lem:join-s-s} we have that for all $0 \leq i \leq n$ the terms
+	$e_i \equiv s_i == s_i'; s_i$ and $e_i' \equiv s_i = s_i'; s_i'$
+	join at $|fail|$ or at some $s_i = s_i'; s_i^{*}$.
+%
+If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$ then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
+%
+Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$ using $n$ applications
+of \cref{lem:eq-scalar}.
+%
+% TODO HEREHEREHERHERE
+% \begin{verbatim}
+% e -> ... -> e_i -> ... -> e_n == e^* <- e_n' <- ... <- e_i' <- ... <- e'
+% where ei := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s_{i+1}, ..., sn>] and
+% 	  ei' := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s'_{i+1}, ..., sn'>>
+% 	  and each step follows from lem:eq-scalar with
+% 	  	s_{i+1} = s_{i+1}'; s_{i+1}  & E = E[<s1*...si*, HOLE, ... sn>]
+% 	  	s_{i+1} = s_{i+1}'; s_{i+1}' & E = E[<s1*...si*, HOLE, ... sn'>]
+% \end{verbatim}
+%
+\end{proof}
+
+\begin{lemma}[Eq-Scalar-Fail]\label{lem:eq-scalar-fail}
+	If $\rsteps{}{s=s'; s}{|fail|}$ then $\rsteps{}{s=s'; e}{|fail|}$.
+\end{lemma}
+\begin{proof}
+Premise only holds when $s \equiv k$ and $s' \equiv k'$ and $k \not = k$.
+\end{proof}
+
+\begin{lemma}[Eq-Scalar]\label{lem:eq-scalar}
+	If $\rstep{\rord}{s=s'; s}{s=s'; s'}$ then $\rstep{\rord}{s=s'; E[s]}{s=s'; E[s']}$.
+\end{lemma}
+\begin{proof}
+Split cases on $s$ and $s'$ and use \rulename{deref-s}.
+\end{proof}
 
 \begin{lemma}[$\rord$-Noetherian]\label{lem:ord-term}
     $\rord$ is Noetherian.

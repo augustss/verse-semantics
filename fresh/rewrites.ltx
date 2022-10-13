@@ -62,13 +62,17 @@ $$\begin{array}{lrcll}
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification:~\runi}
-\rulename{u-lit}   & |k == k ; e|                                    & \movesto & e \\
-\rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
-\rulename{u-lit-t} & |k == tup (dots) ; e| & \movesto & |fail| \\
-\rulename{u-lit-l} & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
-\rulename{u-lam}   & |hnf == lam y e ; e'|   & \movesto & |fail| & \\
-\rulename{deref-s} & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
-\rulename{deref-v} & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\[0.05in]
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{deref-v}  & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\
+\rulename{u-lit}    & |k == k ; e|                                    & \movesto & e \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
+\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m') ; e| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-fail-l}   & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-fail-f} & |lam x e == lam y e' ; e''|   & \movesto & |fail| & \\
+\rulename{u-fail-l-t} & |k == tup (dots) ; e| & \movesto & |fail| \\
+\rulename{u-fail-l-f} & |k == lam y e ; e'|   & \movesto & |fail| & \\
+\rulename{u-fail-t-f} & |tup (dots) == lam y e ; e'|   & \movesto & |fail| & \\[0.05in]
+
 
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
@@ -85,8 +89,9 @@ $$\begin{array}{lrcll}
 
 \rulegroupname{Garbage Collection:~$\rgc$}
 \rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
-\multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
-\multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
+% \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
+% \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
+\multicolumn{4}{l}\text{\ranjit{fix GC to allow other head values}} \\
 
 \rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
