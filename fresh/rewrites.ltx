@@ -29,7 +29,10 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
                                     |e_1 choice e_2| \vb |one e| \vb |all e| \\
 \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-\textit{Results}       & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
+% \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
+% \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
+\textit{Results}       & r     & ::= & |def xs (cs; v) | \\
+
 \end{array}$$
 \caption{\textbf{Syntax of \calcname}.}% \lvc{Grey text} indicates \emph{lenient} extension. Tuples are $\lambda$-free.}
 \label{fig:syntax}
