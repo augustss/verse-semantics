@@ -7,6 +7,7 @@ data Flags = Flags
   , fUnderLambda  :: !Bool
   , fRewrite      :: !Bool
   , fTimLambda    :: !Bool
+  , fDenSem       :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -20,6 +21,7 @@ defaultFlags = Flags
   , fUnderLambda  = False
   , fRewrite      = False
   , fTimLambda    = False
+  , fDenSem       = False
   , fRewriteSteps = 10000
   , fEvalSteps    = 1000
   }

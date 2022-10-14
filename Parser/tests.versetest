@@ -49,8 +49,8 @@ testeq(SEq) {x:=1}                                {1}
 testeq(SEq) {x:=1; x}                             {1}
 testeq(SEq) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
 testeq(SEq) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
-testeq(SEq) {:int:=5}                             {5}
-testeq(SEq) {:int:=(1,2)}                         {:false}
+testeq(SEq) {:int:=5}                             {5}       # LA is this even allowed
+testeq(SEq) {:int:=(1,2)}                         {:false}  # LA is this even allowed
 testeq(SEq) {x:int:=1}                            {1}
 testeq(SEq) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
 testeq(SEq) {succ(x:any):=x+1; y:succ:=1; y}      {2}

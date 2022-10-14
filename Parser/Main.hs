@@ -138,6 +138,7 @@ flagTable =
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
+  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
   ]
 
 cRead :: Run CState
@@ -196,7 +197,9 @@ cCompile :: Run CState
 cCompile c s = cTransform (Cored . compile (flags s)) c s
 
 cRun :: Run CState
-cRun c s = cTransform (Cored . run (flags s) . asCore (flags s)) c s
+cRun c s = cTransform (Cored . run flg' . asCore flg') c s
+  where flg = flags s
+        flg' = if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
 
 cEval :: Run CState
 cEval c s =
@@ -215,7 +218,7 @@ cRewrite c s =
 
 cDenSem :: Run CState
 cDenSem c s =
-  cTransform (Cores . denSem . compile flgs) c s
+  cTransform (Cored . denSem . compile flgs) c s
   where flgs = (flags s){ fSplit = False, fSimplify = True, fTimLambda = True }
 
 compile :: Flags -> SomeExpr -> Core

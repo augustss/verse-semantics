@@ -187,7 +187,7 @@ core (Lambda i [] e1 e2) = do
   if timLam then do
     let is = getVisible e1
     e1' <- core e1
-    e2' <- core e2
+    e2' <- coreD e2
     pure $ CLambda i is e1' e2'
   else
     core $ Function [(Define i AnyT, [])] $ If3 e1 e2 Fail

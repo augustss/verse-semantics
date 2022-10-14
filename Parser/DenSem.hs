@@ -19,6 +19,9 @@ import Debug.Trace
 traceDen :: Bool
 traceDen = False
 
+traceInput :: Bool
+traceInput = True
+
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
 forallHack = True
@@ -26,9 +29,23 @@ forallHack = True
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
 
-denSem :: Core -> [Core]
-denSem e | trace ("-----\ndenSem:\n" ++ prettyShow e ++ "\n-----") False = undefined
-denSem e = map (CValue . valueW) $ noAlts $ evalE emptyEnv e
+denSem :: Core -> Core
+denSem = denSem' . semSimp
+
+semSimp :: Core -> Core
+semSimp = f
+  where
+    f (CApply (VLam x (CSeq [CApply is@(VPrim "isInt$") (Var x'), CVar x''])) a) | x == x' && x == x'' =
+      f $ CApply is a
+    f e = composOp f e
+
+denSem' :: Core -> Core
+denSem' e | traceInput && trace ("-----\ndenSem':\n" ++ prettyShow e ++ "\n-----") False = undefined
+denSem' e = flat $ map (CValue . valueW) $ noAlts $ evalE emptyEnv e
+  where
+    flat [] = CFail
+    flat [x] = x
+    flat xs = cBar xs
 
 valueW :: W -> Value
 valueW (WInt i) = HNF (HInt i)
@@ -181,7 +198,7 @@ allTuples =
 allFuncs :: [W]
 allFuncs = fcns ++ constFuncs
   where
-    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp]
+    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp, wDblW]
     wId  = func "id"  $ unit
     wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wDec = func "dec" $ \case WInt x -> unit (WInt (x-1)); _ -> empty
@@ -191,6 +208,7 @@ allFuncs = fcns ++ constFuncs
     wSnd = func "snd" $ \case WTuple [_,w] -> unit w; _ -> empty
     wTy0 = func "ty0" $ \case WInt 0 -> unit (WInt 0); _ -> empty
     wAp  = func "ap"  $ \case WTuple [f,a] -> apply f a; _ -> empty
+    wDblW= func "dblW" $ \case WInt x -> unit (WInt (x*2)); _ -> unit (Wrong "wDblW")
 
 constFuncs :: [W]
 constFuncs = [ WFunction $ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- allInts ]
@@ -275,9 +293,11 @@ evalV _ (VPrim "mapAp$") = WFunction wMapAp
 evalV _ v = error $ "evalV: " ++ prettyShow v
 
 possibleValues :: [Ident] -> Env -> Ident -> Core -> [W]
+--possibleValues is _ i ee | trace ("possibleValues " ++ prettyShow (i, is, ee)) False = undefined
 possibleValues is r i ee | not forallHack = allW
-                         | otherwise = maybe allW (vals . evalE r) (get (i:is) ee)
+                         | otherwise = maybe allW (vals . evalE r . hacking) (get (i:is) ee)
   where
+    hacking e = {-trace ("traceHack " ++ prettyShow (i, e))-} e
     vals (S xs) = map snd xs
     get xs (CUnify (CVar i') e) | i == i' && null (intersect (fvs e) xs) = Just e
     get xs (CUnify e1 e2) = get xs e1 <|> get xs e2

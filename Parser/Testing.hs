@@ -132,5 +132,17 @@ ptest fn = do
 main :: IO ()
 main = do
   args <- getArgs
-  test (null args)
+  let (flg, args') =
+        case args of
+          "-"        : r -> (defaultFlags{ fRewrite = True }, r)
+          "-rewrite" : r -> (defaultFlags{ fRewrite = True }, r)
+          "-eval"    : r -> (defaultFlags,                    r)
+          "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
+          r              -> (defaultFlags,                    r)
+  let fn =
+        case args' of
+          [] ->  "tests.versetest"
+          [s] -> s
+          _ -> error $ "Usage: tests [-rewrite|-densem|-eval] [file]"
+  runTestFile flg fn
   ptest "test1.verse"
