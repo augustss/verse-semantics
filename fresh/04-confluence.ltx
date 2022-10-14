@@ -98,7 +98,7 @@ Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
 \begin{definition}[Def-Use] \label{def:def-use}
 %
 Let $|x == s ; E^[x]|$ (resp. $|x == v ; A^[v]|$)
-be a redex for \rulename{deref-s} (resp. \rulename{deref-v}).
+be a redex for \rulename{deref-s} (resp. \rulename{deref-h}).
 %
 We respectively call $x$ the \emph{variable}
 the constraint $|x == s|$ (resp. $|x == v|$) the \emph{definition}
@@ -218,7 +218,7 @@ Split cases on the \emph{uses} of $x$:
 	If $s$ is literal $k$ then we can trivially join at $|fail|$ via \rulename{u-lit-t} or \rulename{u-lam}.
     Thus, assume that $s \equiv y$, and split cases on the uses of $x$.
 	\begin{description}
-		\item[$\rdx{2}$ use is $x^1$] Impossible as \rulename{deref-v}
+		\item[$\rdx{2}$ use is $x^1$] Impossible as \rulename{deref-h}
 		cannot substitute $x^1$ in $x^1 = y$ as the RHS $y$ is not
 		a head value.
 		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $x^2=v$ on the left]
@@ -698,7 +698,7 @@ Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
 		\end{tikzcd}\]
 	\end{description}
 
-	\item[Case: (\rulename{deref-v}) $\rdx{\runi} \equiv |x == v; A^[x]|$]
+	\item[Case: (\rulename{deref-h}) $\rdx{\runi} \equiv |x == v; A^[x]|$]
 	Split cases on where $\rdx{\rapp}$ occurs in $v$ or $|A^[x]|$.
 
 	\begin{description}
