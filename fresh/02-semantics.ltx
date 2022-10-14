@@ -11,20 +11,20 @@ Invariants that are maintained by the contexts and rules
 %
 \mypara{Stratification of Values}
 %
-We layer values into scalars (integers, variables)
-and tuples and $\lambda$-terms.
+We layer values into \emph{scalars} (integers, variables)
+and \emph{heap values} (tuples and $\lambda$-terms).
 %
-Only scalars are allowed inside tuples.
+Only scalars are allowed inside tuples (\ie no tuples or $\lambda$-terms in tuples).
 %
-Note this is not a limitation, you can simply ANF to name the
+Note this is not a limitation: you can ANF to name the
 inner elements (tuples or $\lambda$-terms).
 %
 Use \rulename{utup} to first destruct or ``unpack'' the tuple and
-then you can access the values. (We)
+then you can access the values.
 %
 We do this stratification to prevent the following undesirable behaviors.
 
-\mypara{Example: JB POPL 5.3}
+\mypara{Non-Confluence: JB POPL 5.3}
 Substituting $\lambda$ under tuples (and tuples under $\lambda$)
 breaks confluence as shown below. (The same happens just with mutually
 recursive $\lambda$-under-$\lambda$~\cite{Ariola2002}.)
@@ -37,12 +37,13 @@ ex x,y. x = <1,y>; y = \z.x; x
 -->> ex x. y = \z.<1, y>; <1, y>    (2)
 \end{verbatim}
 
-\mypara{Example: JB on Slack}
+\mypara{Divergence: JB on Slack}
+%
 Even just substituting tuple under tuple can lead to non-termination
 which breaks the confluence via Newman's lemma route for the
 unification-rules fragment. Note we need termination as we can only
 directly prove \emph{local} confluence for the unification reductions
-as [Eq-Join] requires multiple steps to reach a peak.
+as \cref{lem:join-h-h} requires multiple steps to reach a peak.
 
 \begin{verbatim}
     ex x, y. x = <1,y>; y = <2,x>; x
@@ -55,9 +56,10 @@ as [Eq-Join] requires multiple steps to reach a peak.
 \mypara{Well-formedness}
 %
 The WF predicate checks each variable is defined \emph{once};
-you \emph{can} have cyclic dependencies and those do not fail!
-Lemma [Self-Tuple] from the notes is not needed, it was only
-required when substituting a tuple under a tuple.
+you \emph{can} have cyclic dependencies and those do not fail.
+%
+(Lemma [Self-Tuple] from the notes is not needed, it was only
+required when substituting a tuple under a tuple.)
 
 
 \mypara{Example: Lazy List}
