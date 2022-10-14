@@ -150,7 +150,7 @@
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
 \newcommand{\malt}{\diamond}
 
-\newcommand{\setform}[1]{\{ #1 \}}
+\newcommand{\setform}[1]{\left\{ #1 \right\}}
 \newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
 \newcommand{\sbind}[2]{ #1 \in #2 }
 
@@ -1245,6 +1245,8 @@ $$
 %%% %format univ (x) (y) = "\forall" x ".\," y
 %format ANY = "\textbf{W}"
 \renewcommand{\mempty}{\varnothing}
+\newcommand{\mtag}{\mathit{tag}}
+\newcommand{\mtage}[1]{([],#1)}
 
 
 This section describes micro-lambdas ($\mu\lambda$s ?), see figure \ref{fig:micro-syntax} for syntax.
@@ -1271,7 +1273,7 @@ Some examples:
   \item |lam 0 1 = lam 1 0| is a (set of) function that maps 0 to 1 and 1 to 0, but otherwise unspecified.
   \item |lam 0 1 = lam 1 0 = domain(0 `choice` 1)| is a function that maps 0 to 1, 1 to 0, and fails for all other inputs.
   \item |(x : int) => x+1| is a (set of) function that computes the successor for an integer argument.
-    It desugars to |quantA x (:int) (quantE y (x+1) (lam x y))|.
+    It desugars to |quantA x (:int) (quantE y ((x+1)) (lam x y))|.
 \end{itemize}
 
 \begin{figure}
@@ -1302,7 +1304,7 @@ Some examples:
           \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
-          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+%%          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
@@ -1339,19 +1341,23 @@ $
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
-  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+%  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
-  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-\multicolumn{4}{l}{\text{\lennart{The two equations above are wrong. The $\mtype$ is a set of labelled values, but $w$ should be a value.}}} \\
+%  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = &
+    \bigcup \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+%  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = &
+    \bigcap \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
   \semapp{E}{|lam v_1 v_2|}{\rho} & = &
-    \{ f \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_1|}{\rho} \in f(\semapp{V}{|v_2|}{\rho}) \}
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_1|}{\rho} \in f(\semapp{V}{|v_2|}{\rho}) \}
     \\
   \semapp{E}{|domain e|}{\rho} & = &
-    \{ f \mid f \in \Value \rightarrow \mtyped, \forall w |dot| (w \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
-  \semapp{E}{|ANY|}{\rho} & = & \{ w \mid w \in W \} \\
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \forall w |dot| ((\_,w) \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
+  \semapp{E}{|ANY|}{\rho} & = & \{ \mtage{w} \mid w \in W \} \\
 \multicolumn{4}{l}{\text{\lennart{Again, labelling makes the three above wrong.}}} \\  
   \end{array}          \\
 \\
@@ -1380,17 +1386,58 @@ apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \end{array}
 \\ \\
 \begin{array}{lrcll}
-\text{Empty}        & \mempty & : &  \mtyped \\
-\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtyped \\
+\text{Empty}        & \mempty & : &  \mtype \\
+\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-\text{Product}      & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+%%% \text{Product}      & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 \end{array}
 
 \end{array}
 $
 \caption{MicroLambda: Expression semantics}
 \label{fig:micro-den-sem1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Labelled sets $\mtype$} \\
+\begin{array}{rcll}
+\mtype & = & \setform{\LblValue} \\
+\mtyped & = & \setform{\Value} & \text{Set with 0 or 1 elements} \\
+\LblValue & = & [ \Lbl ] \times \Value & \text{Sequence of $\Lbl$ and a value} \\
+\Lbl & = & \lblleft \domplus \lblright \\
+\end{array} \\
+\\
+\begin{array}{rrcll}
+\text{Empty} & \mempty & = & \varnothing \\
+\text{Unit} & \munits{w} & = & \setform{ ([], w) } \\
+\text{Concatenation} &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\
+\text{Intersection} &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
+\text{Tagging} & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\
+%%\text{Sequencing}   &  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\
+\text{One}  & \mone(s) & = & \shead (\msort( s)) \\
+\text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
+\\
+\text{Sort} & \msort & : & \LblValue^{*} \rightarrow [\Value] \\
+& \msort( {} ) & = & [] \\
+& \msort( s ) & = & \mcompr{w}{\sbind{([],w)}{s}} \\
+  &&& \text{\lennart{The list above should have 0 or 1 element, anything else is WRONG.}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
+\\
+\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
+             & \shead [] & = & empty \\
+             & \shead (w \scons s) & = & \munits{w} \\
+\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+  \end{array} \\
+\end{array}
+$$
+\caption{Labelled expression semantics}
+\label{fig:micro-labelled-sem}
 \end{figure}
 
 \begin{figure}
