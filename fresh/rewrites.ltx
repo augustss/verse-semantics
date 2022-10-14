@@ -8,7 +8,7 @@
 \newcommand{\largerhs}[1]{\multicolumn{2}{l}{#1}}
 
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
-\newcommand{\wff}[4]{\ensuremath{\vdash #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -123,8 +123,8 @@ $$\begin{array}{lrcll}
 \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
 \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{|rs|}{|xs|}{|cs|}{|vs|} \\
-\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{r}{|xs|}{|cs|}{|v|}\\
+\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{}{|rs|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{}{r}{|xs|}{|cs|}{|v|}\\
 \end{longtable}
 % \caption{\textbf{\calcname: Rules for Unification, Substitution and Application}}\label{fig:rulesI}
 \caption{\textbf{Rules for Evaluation}}\label{fig:rulesI}
@@ -145,8 +145,8 @@ $$\begin{array}{lrcll}
     \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
     \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
     \rulename{all-fail}   & |all fail|                         & \movesto & |tup ()| \\
-    \rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (v_1, dots, v_n)|  & if \wff{|r_1 dots r_n|}{|xs|}{|cs|}{|v_1 dots v_n|} \\
-    \rulename{all-value}  & |all r|                            & \movesto & |def xs cs ; tup v|                 & if \wff{r}{|xs|}{|cs|}{|v|}\\
+    \rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (v_1, dots, v_n)|  & if \wff{}{|r_1 dots r_n|}{|xs|}{|cs|}{|v_1 dots v_n|} \\
+    \rulename{all-value}  & |all r|                            & \movesto & |def xs cs ; tup v|                 & if \wff{}{r}{|xs|}{|cs|}{|v|}\\
 \end{longtable}
 \caption{\textbf{Rules for Decision and Collection}}\label{fig:rulesII}
 \end{figure}
@@ -166,8 +166,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Choice Context}      & CX & ::= & \hole \vb |def x CX| \vb |v == v' ; CX| \vb |apply1N CX e| \vb |apply1N ce CX| \\
                              &    & \vb & \lvc{|v == CX; e|} \vb \lvc{|v == ce; CX|} \\
 \textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
-\textit{Choice-free Expr.}   & ce  & ::= & v \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
-% \textit{Head Values}         & |hnf| & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
+\textit{Choice-free Expr.}   & ce  & ::= & |v| \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
 \end{array}$$
 \caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
 \end{figure}
@@ -178,32 +177,33 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
 \begin{mathpar}
 \inferrule
-  { \wff{r}{|xs|}{|cs|}{|v|}}
+  { \wff{\emptyset}{r}{|xs|}{|cs|}{|v|}}
   { \wf{r} }
   { \rulename{WF} }
 
 \inferrule
   { }
-  { \wff{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \wff{\Gamma}{|v|}{\emptyset}{\emptyset}{|v|} }
   { \rulename{WF-Val}}
 
 \inferrule
-  { \wff{r}{|xs|}{|cs|}{|v|} }
-  { \wff{|def x r|}{|x,xs|}{|cs|}{|v|} }
+  { x \not \in \Gamma \quad
+    \wff{\Gamma, x}{r}{|xs|}{|cs|}{|v|} }
+  { \wff{\Gamma}{|def x r|}{|x,xs|}{|cs|}{|v|} }
   { \rulename{WF-Def} }
 
 \inferrule
-  {\wff{r}{|xs|}{|cs|}{|v|} \quad
-   x \not \in |xs|
+  {x \in \Gamma \quad
+   \wff{\Gamma - x}{r}{|xs|}{|cs|}{|v|}
   }
-  {\wff{|x == h; r|}{|xs|}{|x == h, cs|}{|v|}}
-  {\rulename{WF-Lam}}
+  {\wff{\Gamma}{|x == h; r|}{|xs|}{|x == h, cs|}{|v|}}
+  {\rulename{WF-Cst}}
 
 \inferrule
-  { \wff{r}{\overline{x}}{\overline{c}}{|v|}
-    \wff{rs}{\overline{x'}}{\overline{c'}}{|vs|}
+  { \wff{\emptyset}{r}{\overline{x}}{\overline{c}}{|v|} \quad
+    \wff{}{rs}{\overline{x'}}{\overline{c'}}{|vs|}
   }
-  { \wff{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
+  { \wff{}{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
   {\rulename{WF-many}}
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}

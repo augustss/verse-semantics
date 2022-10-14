@@ -144,7 +144,7 @@ Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
 $e \equiv |x == v_1; x == v_2; e'|$.
 %
 Let us split cases on whether $v_1$ and $v_2$ are scalars ($k$ or $y$)
-or non-scalars ($\lambda$s or tuples).
+or heap values ($\lambda$s or tuples).
 
 \begin{description}
 \item[Case: $v_1 \equiv s_1$ and $v_2 \equiv s_2$]
@@ -273,7 +273,7 @@ Split cases on the \emph{uses} of $x$:
 			\arrow[dotted, from=2-3, to=3-2]
 		\end{tikzcd}\]
 	\end{description}
-\item[Case: $v_1$ and $v_2$ are non-scalar] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
+\item[Case: $v_1$ and $v_2$ are heap-values] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
 Hence, let us assume both are \emph{tuples} and split cases on the positions of the uses of $x$ in $\rdx{1}$ and $\rdx{2}$.
 	\begin{description}
 		\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$]
@@ -289,7 +289,7 @@ Hence, let us assume both are \emph{tuples} and split cases on the positions of 
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 		\item[\rdx{1} use is $x^2$, \rdx{2} use is in $e'$]
 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIEFfMlt4XSJdLFswLDEsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt4XSJdLFswLDIsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt2XzFdIl0sWzIsMiwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInheMSA9IHZfMTtcXCB4XjIgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
@@ -304,7 +304,7 @@ Hence, let us assume both are \emph{tuples} and split cases on the positions of 
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 
 		\item[\rdx{1} use is in $e'$, \rdx{2} use is $x^1$] Symmetric to previous case.
@@ -322,7 +322,7 @@ Hence, let us assume both are \emph{tuples} and split cases on the positions of 
 			\arrow[dotted, two heads, from=3-3, to=4-2]
 			\arrow["2", from=1-2, to=2-3]
 			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-v-v}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
 		\end{tikzcd}\]
 
 		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at different positions]
@@ -371,7 +371,7 @@ Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
 $e \equiv |x_1 == v_1; x_2 == v_2; e'|$.
 %
 Let us split cases on whether $v_1$ and $v_2$ are scalars
-or non-scalars ($\lambda$s or tuples).
+or heap values ($\lambda$s or tuples).
 
 \begin{description}
 \item[Case: $v_1$ is a scalar and $v_2$ is a scalar]
@@ -510,34 +510,34 @@ Suppose that $s_1 \not \equiv s_2$ and split cases on whether they are variables
 \end{description}
 \end{proof}
 
-\begin{lemma}[Join-V-V] \label{lem:join-v-v}
-Let $v$ and $v'$ be two non-scalars.
-If $e \equiv {v = v'; E[v]}$ and
-   $e' \equiv {v = v'; E[v']}$
+\begin{lemma}[Join-H-H] \label{lem:join-h-h}
+Let $h$ and $h'$ be two heap values.
+If $e \equiv {h = h'; E[h]}$ and
+   $e' \equiv {h = h'; E[h']}$
 then $\rsteps{\rord}{e,e'}{|fail|}$ or
-     $\rsteps{\rord}{e,e'}{ s_1 = s_1'; \ldots; s_n = s_n'; E[v^*]}$.
+     $\rsteps{\rord}{e,e'}{s_1 = s_1'; \ldots; s_n = s_n'; E[h^*]}$.
 \end{lemma}
 
 \begin{proof}
-If either $v$ or $v'$ are $\lambda$-terms then we can join at $|fail|$.
+If either $h$ or $h'$ are $\lambda$-terms then we can join at $|fail|$.
 %
-If $v$ and $v'$ are tuples of \emph{different} sizes we can join at $|fail|$.
+If $h$ and $h'$ are tuples of \emph{different} sizes we can join at $|fail|$.
 %
-Hence, assume that $v \equiv |arr (s_1, dots, s_n)|$ and $v' \equiv |arr (s'_1, dots, s'_n)|$.
+Hence, assume that $h \equiv |arr (s_1, dots, s_n)|$ and $h' \equiv |arr (s'_1, dots, s'_n)|$.
 %
-Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; E[v]$
-and $s_1 = s_1'; \ldots; s_n = s_n'; E[v']$.
+Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; E[h]$
+and $s_1 = s_1'; \ldots; s_n = s_n'; E[h']$.
 %
 From \cref{lem:join-s-s} we have that for all $0 \leq i \leq n$ the terms
 	$e_i \equiv s_i == s_i'; s_i$ and $e_i' \equiv s_i = s_i'; s_i'$
 	join at $|fail|$ or at some $s_i = s_i'; s_i^{*}$.
 %
-If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$ then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
+If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$
+then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
 %
-Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$ using $n$ applications
-of \cref{lem:eq-scalar}.
+Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$
+using $n$ applications of \cref{lem:eq-scalar}.
 %
-% TODO HEREHEREHERHERE
 % \begin{verbatim}
 % e -> ... -> e_i -> ... -> e_n == e^* <- e_n' <- ... <- e_i' <- ... <- e'
 % where ei := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s_{i+1}, ..., sn>] and
