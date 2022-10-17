@@ -125,7 +125,7 @@ test False = runTestFile defaultFlags{ fRewrite = True } verseTest
 -- Just parse
 ptest :: FilePath -> IO ()
 ptest fn = do
-  file <- tryReadFile fn
+  file <- readFile fn
   let e = parseDie pFile fn file
   if e == e then putStrLn $ "parsed " ++ fn else undefined
   pure ()
@@ -133,15 +133,8 @@ ptest fn = do
 main :: IO ()
 main = do
   (flg, fn) <- testArgs
-
   runTestFile flg fn
   ptest test1
-
-testWith :: Flags -> FilePath -> IO ()
-testWith flg fn = do
-  runTestFile flg fn
-  ptest test1
-
 
 testArgs :: IO (Flags, FilePath)
 testArgs = do
