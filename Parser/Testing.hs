@@ -35,7 +35,7 @@ pTestFile = skip *> many pTest <* eof
 
 readTests :: FilePath -> IO [Test]
 readTests fn = do
-  file <- tryReadFile fn
+  file <- readFile fn
   let tests = parseDie pTestFile fn file
   pure tests
 
@@ -165,10 +165,3 @@ verseTest :: FilePath
 verseTest = "tests.versetest"
 test1 :: FilePath
 test1     = "test1.verse"
-
-tryReadFile :: FilePath -> IO String
-tryReadFile fn = do
-  exists <- doesFileExist fn
-  if exists
-    then readFile fn
-    else readFile ("Parser/" ++ fn)
