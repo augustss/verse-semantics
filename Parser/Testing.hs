@@ -132,6 +132,19 @@ ptest fn = do
 
 main :: IO ()
 main = do
+  (flg, fn) <- testArgs
+
+  runTestFile flg fn
+  ptest test1
+
+testWith :: Flags -> FilePath -> IO ()
+testWith flg fn = do
+  runTestFile flg fn
+  ptest test1
+
+
+testArgs :: IO (Flags, FilePath)
+testArgs = do
   args <- getArgs
   let (flg, args') =
         case args of
@@ -145,10 +158,12 @@ main = do
           [] ->  verseTest
           [s] -> s
           _ -> error $ "Usage: tests [-rewrite|-densem|-eval] [file]"
-  runTestFile flg fn
-  ptest test1
+  when (fRewrite flg) $ putStrLn "rewrite mode"
+  pure (flg, fn)
 
+verseTest :: FilePath
 verseTest = "tests.versetest"
+test1 :: FilePath
 test1     = "test1.verse"
 
 tryReadFile :: FilePath -> IO String

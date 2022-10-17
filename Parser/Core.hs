@@ -257,7 +257,7 @@ cAll e = do
                                    ]),
              CSplit e (Var f) (Var g)
              ]
-                                
+
 cSucceeds :: Core -> C Core
 cSucceeds e = do
  useSplit <- asks fSplit
@@ -320,7 +320,7 @@ value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
-  
+
 --eVar :: String -> Expr
 --eVar = Variable . Ident noLoc
 
@@ -544,4 +544,3 @@ alphaConvertV vs v =
   case alphaConvert vs (CValue v) of
     CValue v' -> v'
     _ -> impossible ()
-

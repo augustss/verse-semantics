@@ -120,7 +120,7 @@ scopeX lhs =
 -- V context
 valueX, valueX1 :: Value -> [(Value->Value, Value)]
 valueX lhs = valueX1 lhs ++ [(id, lhs)]
-  
+
 valueX1 lhs =
   do VARR vs <- [lhs]
      i <- [0..length vs-1]
@@ -285,7 +285,7 @@ rulesUnification lhs =
      (_, Var x') <- valueX1 v
      guard (x == x')
      pure Fail
- 
+
 --------------------------------------------------------------------------------
 
 rulesUnificationVariables :: ERule
@@ -377,7 +377,7 @@ rulesFail lhs =
   "FAIL" `name`
   do (cx, Fail) <- execX1 lhs
      pure Fail
-  
+
 --------------------------------------------------------------------------------
 
 rulesChoice :: ERule
@@ -478,9 +478,8 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
   vs  = filter (`elem` xs) (free a)
   ys  = [ ident ("x" ++ show (index x vs)) | x <- xs ]
   sub = [ (x, Var y) | (x,y) <- xs `zip` ys ]
-  
+
   index x zs = head $ [ i | (z,i) <- zs `zip` [1..], z == x ] ++ [0]
-  
+
   defs []     a = a
   defs (x:xs) a = Def (Bind x (defs xs a))
-  

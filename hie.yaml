@@ -1,6 +1,10 @@
 cradle:
-  stack:
-    - path: "Parser/"
-      component: "verse:exe"
-    - path: "TRS/"
-      component: "verse:exe"
+  cabal:
+    - path: "TRS"
+      component: "verse:lib:trs"
+
+    - path: "Parser/Main.hs"
+      component: "verse:exe:verse"
+
+    - path: "Parser/Testing.hs"
+      component: "verse:exe:verse"

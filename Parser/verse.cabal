@@ -25,7 +25,6 @@ common shared-properties
 
 common parser-properties
   import: shared-properties
-  hs-source-dirs: Parser
   build-depends:  trs
   other-modules:  Command
                   Core
@@ -47,7 +46,7 @@ common parser-properties
 
 library trs
   import: shared-properties
-  hs-source-dirs: TRS
+  hs-source-dirs: ../TRS
   exposed-modules: Bind
                    TRS
                    TRSCore
@@ -56,7 +55,6 @@ library trs
 
 executable verse
   import: parser-properties
-  hs-source-dirs: Parser
   main-is:        Main.hs
   other-modules:  Testing
 

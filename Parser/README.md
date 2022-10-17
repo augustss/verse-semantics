@@ -2,14 +2,23 @@
 
 ## Build
 
-```
+```sh
+$ stack build
 $ cabal v2-build
-````
+```
 
 ## Run
 
-```
-$ cabal v2-exec verse
-$ cabal v2-exec tests
+```sh
+$ stack run
+$ cabal v2-run
 ```
 
+## Test
+
+(or just leave out the arguments/options)
+
+```
+$ stack test --fast --test-arguments -rewrite
+$ cabal v2-test --test-options -rewrite
+```
