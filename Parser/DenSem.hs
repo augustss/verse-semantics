@@ -20,11 +20,11 @@ traceDen :: Bool
 traceDen = False
 
 traceInput :: Bool
-traceInput = True
+traceInput = False
 
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
-forallHack = True
+forallHack = False -- True
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
