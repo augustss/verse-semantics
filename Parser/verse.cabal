@@ -20,7 +20,8 @@ common shared-properties
                        haskeline,
                        containers,
                        megaparsec,
-                       QuickCheck
+                       QuickCheck,
+		       scientific
   other-modules:       Bind
                        Command
                        Core
