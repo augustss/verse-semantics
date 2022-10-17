@@ -20,8 +20,8 @@ common shared-properties
                        haskeline,
                        containers,
                        megaparsec,
-                       QuickCheck,
-		       scientific
+                       scientific,
+                       QuickCheck
   other-modules:       Bind
                        Command
                        Core
@@ -40,15 +40,18 @@ common shared-properties
                        TRS
                        TRSAdapter
                        TRSCore
-
+                       RulesPOPL
+                       Run
+                       DenSem
+                       Flags
+                       OpParser
 executable verse
   import: shared-properties
-  main-is:             Main.hs
+  main-is:             ../Parser/Main.hs
   other-modules:       Testing
 
-executable tests
-    import:     shared-properties
-    main-is:    Testing.hs
-    ghc-options: -main-is Testing
-
-
+test-suite tests
+  import:     shared-properties
+  type:             exitcode-stdio-1.0
+  main-is:          ../Parser/Testing.hs
+  ghc-options: -main-is Testing

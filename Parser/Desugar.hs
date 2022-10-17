@@ -170,7 +170,7 @@ dsD = expr
                                                                     (Array [t])
 
 {-
-    expr (Set e1 (Ident l "=") e2) = 
+    expr (Set e1 (Ident l "=") e2) =
       dsD $ ApplyD (eAssign l) $ Array [e1, e2]
 -}
     expr (Set e1 op e2) = Set <$> expr e1 <*> pure op <*> expr e2
@@ -459,7 +459,7 @@ dsPArr l lhss e =
 
     [ESplice lhs] ->
       dsP l lhs e
-    
+
     [EElems ls1, ESplice lhs] -> do
       (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
