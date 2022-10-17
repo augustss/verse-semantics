@@ -4,7 +4,6 @@ import Control.Exception
 import Control.Monad
 import GHC.Stack
 import System.Environment
-import System.Directory (doesFileExist)
 
 import Expr
 import Parse
@@ -151,7 +150,6 @@ testArgs = do
           [] ->  verseTest
           [s] -> s
           _ -> error $ "Usage: tests [-rewrite|-densem|-eval] [file]"
-  when (fRewrite flg) $ putStrLn "rewrite mode"
   pure (flg, fn)
 
 verseTest :: FilePath
