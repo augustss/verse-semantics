@@ -115,9 +115,8 @@ rules = rulesChoice
 
 rulesChoice :: Rule Expr
 rulesChoice lhs =
-  do
-    Fail :|: e <- [lhs]
-    pure e
+  do Fail :|: e <- [lhs]
+     pure e
  ++
   do e :|: Fail <- [lhs]
      pure e
