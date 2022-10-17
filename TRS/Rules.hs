@@ -101,21 +101,23 @@ scopeX lhs =
 
 rules :: Rule Expr
 rules = rulesChoice
-    +++ rulesPrimOps
-    +++ rulesSequencing
-    +++ rulesApplication
-    +++ rulesOne
-    +++ rulesAll
-    +++ rulesUnification
-    +++ rulesDef
-    +++ rulesFail
-    +++ rulesWrong
+    -- +++ rulesPrimOps
+   --  +++ rulesSequencing
+   --  +++ rulesApplication
+   --  +++ rulesOne
+   --  +++ rulesAll
+   --  +++ rulesUnification
+   --  +++ rulesDef
+   --  +++ rulesFail
+   --  +++ rulesWrong
 
 --------------------------------------------------------------------------------
 
+rulesChoice :: Rule Expr
 rulesChoice lhs =
-  do Fail :|: e <- [lhs]
-     pure e
+  do
+    Fail :|: e <- [lhs]
+    pure e
  ++
   do e :|: Fail <- [lhs]
      pure e
@@ -129,6 +131,7 @@ rulesChoice lhs =
 
 --------------------------------------------------------------------------------
 
+-- rulesPrimOps :: Rule Expr
 rulesPrimOps lhs =
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))

@@ -4,6 +4,7 @@ import Control.Exception
 import Control.Monad
 import GHC.Stack
 import System.Environment
+import System.Directory (doesFileExist)
 
 import Expr
 import Parse
@@ -34,7 +35,7 @@ pTestFile = skip *> many pTest <* eof
 
 readTests :: FilePath -> IO [Test]
 readTests fn = do
-  file <- readFile fn
+  file <- tryReadFile fn
   let tests = parseDie pTestFile fn file
   pure tests
 
@@ -118,13 +119,13 @@ runTestFile :: Flags -> FilePath -> IO ()
 runTestFile flg = runTests flg <=< readTests
 
 test :: Bool -> IO ()
-test True = runTestFile defaultFlags "tests.versetest"
-test False = runTestFile defaultFlags{ fRewrite = True } "tests.versetest"
+test True = runTestFile defaultFlags verseTest
+test False = runTestFile defaultFlags{ fRewrite = True } verseTest
 
 -- Just parse
 ptest :: FilePath -> IO ()
 ptest fn = do
-  file <- readFile fn
+  file <- tryReadFile fn
   let e = parseDie pFile fn file
   if e == e then putStrLn $ "parsed " ++ fn else undefined
   pure ()
@@ -141,8 +142,18 @@ main = do
           r              -> (defaultFlags,                    r)
   let fn =
         case args' of
-          [] ->  "tests.versetest"
+          [] ->  verseTest
           [s] -> s
           _ -> error $ "Usage: tests [-rewrite|-densem|-eval] [file]"
   runTestFile flg fn
-  ptest "test1.verse"
+  ptest test1
+
+verseTest = "tests.versetest"
+test1     = "test1.verse"
+
+tryReadFile :: FilePath -> IO String
+tryReadFile fn = do
+  exists <- doesFileExist fn
+  if exists
+    then readFile fn
+    else readFile ("Parser/" ++ fn)
