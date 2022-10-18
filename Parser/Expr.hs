@@ -257,6 +257,8 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "post^"  10
       , inn "post?"  10
       , inn "."      10
+      , inn "pre-"   11
+      , inn "pre+"   11
       , inn "pre^"   11
       , inn "pre?"   11
       , inn "pre:"   11

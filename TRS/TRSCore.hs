@@ -140,6 +140,8 @@ data Op
   | Sub
   | Mul
   | Div
+  | Neg
+  | Plus
   | IsInt
   | MapAp
   | Cons
@@ -165,6 +167,8 @@ instance Show Op where
   show Sub   = "sub"
   show Mul   = "mul"
   show Div   = "div"
+  show Neg   = "neg"
+  show Plus  = "plus"
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
@@ -186,6 +190,8 @@ pattern ADD     = HNF (Op Add)
 pattern SUB     = HNF (Op Sub)
 pattern MUL     = HNF (Op Mul)
 pattern DIV     = HNF (Op Div)
+pattern NEG     = HNF (Op Neg)
+pattern PLUS    = HNF (Op Plus)
 pattern GRT     = HNF (Op Gt)
 pattern GRE     = HNF (Op Ge)
 pattern LST     = HNF (Op Lt)

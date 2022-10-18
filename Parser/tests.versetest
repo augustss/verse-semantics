@@ -176,3 +176,27 @@ testeq(SEq) {if(y:int; y=1) y else 23}  {1}
 # Confluence: Needs local substitution
 testeq(SEq) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
             {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
+
+# Various combinations ';', '=', and application.
+testeq(SEq) { (1=1) = (1=1) }         {1}
+testeq(SEq) { (1=1) = (2;1) }         {1}
+testeq(SEq) { (1=1) = ( +1) }         {1}
+testeq(SEq) { (2;1) = (1=1) }         {1}
+testeq(SEq) { (2;1) = (2;1) }         {1}
+testeq(SEq) { (2;1) = ( +1) }         {1}
+testeq(SEq) { ( +1) = (1=1) }         {1}
+testeq(SEq) { ( +1) = (2;1) }         {1}
+testeq(SEq) { ( +1) = ( +1) }         {1}
+testeq(SEq) { (1=1) ; (1=1) }         {1}
+testeq(SEq) { (1=1) ; (2;1) }         {1}
+testeq(SEq) { (1=1) ; ( +1) }         {1}
+testeq(SEq) { (2;1) ; (1=1) }         {1}
+testeq(SEq) { (2;1) ; (2;1) }         {1}
+testeq(SEq) { (2;1) ; ( +1) }         {1}
+testeq(SEq) { ( +1) ; (1=1) }         {1}
+testeq(SEq) { ( +1) ; (2;1) }         {1}
+testeq(SEq) { ( +1) ; ( +1) }         {1}
+# Cannot have = in the function part, it is WRONG
+testeq(SEq) {       + (1=1) }         {1}
+testeq(SEq) {       + (2;1) }         {1}
+testeq(SEq) {       + ( +1) }         {1}

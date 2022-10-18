@@ -113,6 +113,8 @@ allOps = [
   (T.Sub, "in'-'"),
   (T.Mul, "in'*'"),
   (T.Div, "in'/'"),
+  (T.Neg, "pre'-'"),
+  (T.Plus, "pre'+'"),
   (T.IsInt, "isInt$"),
   (T.MapAp, "mapAp$"),
   (T.Cons, "cons$")
