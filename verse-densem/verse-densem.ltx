@@ -884,8 +884,6 @@ $$
 \end{array}
 \right. }
 $$
-\simon{What is $\munits$?}
-\lennart{What is called \textit{unit} above, but that name was too long.}
 
 Reading off the final result, we can see that the denotation is the set of all functions $\Value \rightarrow \mtyped$
 such that if the argument is an integer the result is the singleton set with the successor of the argument.
@@ -1240,9 +1238,9 @@ See \Cref{fig:tim-labelled-sem}
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |quantE x e_1 e_2| \vb |quantA x e_1 e_2| \\
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |def x e| \vb |univ x e| \\
        && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
-       \vb |domain e| \vb |ANY|
+       \vb |domain e|
        \\
 % SPJ Omitting for now
 \iffullverse
@@ -1267,8 +1265,8 @@ See \Cref{fig:tim-labelled-sem}
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |quantE (x_1 ^^ x_2 dots x_n) e_1 e_2| & \text{means} & |quantE x_1 e_1 (quantE (x_2 dots x_n) e_1 e_2)| \\
-      |quantA (x_1 ^^ x_2 dots x_n) e_1 e_2| & \text{means} & |quantA x_1 e_1 (quantE (x_2 dots x_n) e_1 e_2)| \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def (x_2 dots x_n) e)| \\
+      |univ (x_1 ^^ x_2 dots x_n) e| & \text{means} & |univ x_1 (univ (x_2 dots x_n) e)| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
@@ -1284,14 +1282,13 @@ $
   \text{\bf Desugaring, ``source'' to core, ignoring scope} \\
   \begin{array}{rcll}
     |x:e| & \equiv & |x := :e| \\
-    |:e| & \equiv & |quantE x ANY (apply1 e x)| & \text{|x| fresh} \\
-    |x:=e_1; e_2| & \equiv & |quantE x e_1 e_2| \\
-    |(x:=e_1) eqgt e_2| & \equiv & |quantA x e_1 (quantE y e_2 (mlam x y))| & \text{|y| fresh} \\
-    |e_1; e_2| & \equiv & |quantE x e_1 e_2| & \text{|x| fresh} \\
+    |x := e_1; e_2| & \equiv & |def x (x = e_1; e_2)| \\
+    |:e| & \equiv & |def x (apply1 e x)| & \text{|x| fresh} \\
+    |(x:=e_1) eqgt e_2| & \equiv & |univ x (x = e_1; def y (y = e_2); mlam x y)| \\
    \\
    \multicolumn{4}{l}{\text{TimLambda for nostalgia}} \\
     |lam x (def (y_1 dots y_n) (where e_1 dot e_2))| & \equiv &
-    |quantA (x y_1 dots y_n) ANY (e_1; quantE z e_2 (mlam x z))| & \text{|z| fresh} \\
+    |univ (x y_1 dots y_n) (e_1; def z (z = e_2); mlam x z)| & \text{|z| fresh} \\
     \\
   \end{array} \\
 \end{array}
@@ -1322,11 +1319,8 @@ $
 %  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
 %  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = &
-    \bigcup \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
-%  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = &
-    \bigcap \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semapp{E}{|univ x e|}{\rho} & = & \bigcap_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
 
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
@@ -1335,8 +1329,6 @@ $
     \\
   \semapp{E}{|domain e|}{\rho} & = &
     \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \forall w |dot| ((\_,w) \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
-  \semapp{E}{|ANY|}{\rho} & = & \{ \mtage{w} \mid w \in W \} \\
-\multicolumn{4}{l}{\text{\lennart{Again, labelling makes the three above wrong.}}} \\
   \end{array}          \\
 \\
   \begin{array}{rcll}
@@ -1354,7 +1346,7 @@ apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
 apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
-  & = &  \wrong & \text{otherwise} \\
+  & = & \mempty & \text{otherwise} \\
 apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \end{array}
 \end{array}
@@ -1420,6 +1412,75 @@ The denotational semantics is in \Cref{fig:micro-den-sem}.
 \item Do $\bot$ and $\wrong$ live in $\mtype$ as well as $\Value$?  Or would it
   be $\munit(\wrong)$?
 \end{itemize}
+
+\appendix
+\cleardoublepage
+
+\section{Old versions}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtyped) + \wrong \\
+\tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\ \\
+\text{\bf Semantics of expressions and values} \\
+
+  \begin{array}{rcll}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|v|}{\rho} & = & \munits{\semapp{V}{v}{\rho}} \\
+  \semapp{E}{|fail|}{\rho} & = & \mempty \\
+  \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
+%  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
+%  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = &
+    \bigcup \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+%  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = &
+    \bigcap \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+
+  \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
+  \semapp{E}{|mlam v_1 v_2|}{\rho} & = &
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_2|}{\rho} \in f(\semapp{V}{|v_1|}{\rho}) \}
+    \\
+  \semapp{E}{|domain e|}{\rho} & = &
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \forall w |dot| ((\_,w) \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
+  \semapp{E}{|ANY|}{\rho} & = & \{ \mtage{w} \mid w \in W \} \\
+\multicolumn{4}{l}{\text{\lennart{Again, labelling makes the three above wrong.}}} \\
+  \end{array}          \\
+\\
+  \begin{array}{rcll}
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{op}\rho & = & \semapp{O}{op} & \text{See \Cref{fig:primops} for $\semapp{O}{}$} \\
+%%%  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
+  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
+  \end{array}
+  \\ \\
+\begin{array}{rcll}
+apply & : & (\Value \times \Value) \rightarrow \mtype \\
+apply( \bot, w) & = & \bot \\
+apply( \wrong, w) & = & \wrong \\
+apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
+apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+  & = &  \wrong & \text{otherwise} \\
+apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
+\end{array}
+\end{array}
+$
+\caption{MicroLambda: Expression semantics, with bounded quantifiers}
+\label{fig:micro-den-sem-bounded}
+\end{figure}
+
+
 
 \end{document}
 

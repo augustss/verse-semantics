@@ -121,6 +121,7 @@
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
+%format univ (x) (y) = "\forall" x ".\," y
 
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
