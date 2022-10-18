@@ -371,7 +371,7 @@
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
-       & & \vb & |hastype e_1 e_2| \\
+%       & & \vb & |hastype e_1 e_2| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -425,7 +425,7 @@ $
 \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
-\\ \\
+\\[3mm]
 \text{\bf Semantics of expressions and values} \\
 
   \begin{array}{rcll}
@@ -439,11 +439,12 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
-  \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
-    r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
-      \wrong & \text{otherwise} \\
-      \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
-        \end{array} \\
+% Commenting out hastype for now
+%   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
+%     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
+%       \wrong & \text{otherwise} \\
+%      \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
+%         \end{array} \\
 
   \end{array}          \\ \\
 
@@ -707,8 +708,8 @@ $$
  &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
 \text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 &  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
-\text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
-& \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
+% \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
+% & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
 & \mone(s) & = & \shead (\msort( s)) \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
