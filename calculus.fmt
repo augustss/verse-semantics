@@ -34,6 +34,7 @@
 %format space = "\hspace{1mm}"
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
+%format mlam (e1) (e2) = "\mu\hspace{0.1mm}" e1 ".\," e2
 %format thunk (e) = "\lambda x.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
