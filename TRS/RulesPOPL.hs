@@ -130,31 +130,29 @@ valueX1 lhs =
 type ERule = Rule Expr
 
 rulesPOPL :: ERule
-rulesPOPL
-   =   rulesPrimOps
-   +++ rulesApplication
-   +++ rulesUnification
-   +++ rulesUnificationVariables
-   +++ rulesSequencing
-   +++ rulesChoice
-   +++ rulesOne
-   +++ rulesAll
-   +++ rulesFail
-   +++ rulesSplit
+rulesPOPL = rulesPrimOps
+        +++ rulesApplication
+        +++ rulesUnification
+        +++ rulesUnificationVariables
+        +++ rulesSequencing
+        +++ rulesChoice
+        +++ rulesOne
+        +++ rulesAll
+        +++ rulesFail
+        +++ rulesSplit
 
 --------------------------------------------------------------------------------
 rulesFRESH :: ERule
-rulesFRESH
-   =   rulesPrimOps
-   +++ rulesApplication
-   +++ rulesUnificationNoOcc
-   -- +++ rulesUnificationVariables
-   -- +++ rulesSequencing
-   +++ rulesChoice
-   +++ rulesOne
-   +++ rulesAll
-   +++ rulesFail
-   +++ rulesSplit
+rulesFRESH = rulesPrimOps
+         +++ rulesApplication
+         +++ rulesUnificationNoOcc
+         -- +++ rulesUnificationVariables
+         -- +++ rulesSequencing
+         +++ rulesChoice
+         +++ rulesOne
+         +++ rulesAll
+         +++ rulesFail
+         +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -256,9 +254,8 @@ rulesApplication lhs =
 
 --------------------------------------------------------------------------------
 rulesUnification :: ERule
-rulesUnification lhs =
-   rulesUnificationNoOcc lhs
-   ++ rulesUnificationOcc lhs
+rulesUnification = rulesUnificationNoOcc
+               +++ rulesUnificationOcc
 
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc lhs =
@@ -506,6 +503,9 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
 
 
 --------------------------------------------------------------------------------
+-- Fresh Rules
+--------------------------------------------------------------------------------
+
 dsFresh :: Expr -> Expr
 dsFresh = go
   where
