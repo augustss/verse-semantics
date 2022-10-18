@@ -112,7 +112,11 @@ runTest flg (TestEvalEq n e1 e2) =
     Ident _ s -> error $ "Unknown test type " ++ show s
 
 runTests :: Flags -> [Test] -> IO ()
-runTests flg = mapM_ (runTest flg)
+runTests flg = mapM_ (runTest flg) . chop
+  where
+    chop
+      | Just n <- fFresh flg = take n
+      | otherwise  = id
 
 runTestFile :: Flags -> FilePath -> IO ()
 runTestFile flg = runTests flg <=< readTests
@@ -144,6 +148,7 @@ testArgs = do
           "-rewrite" : r -> (defaultFlags{ fRewrite = True }, r)
           "-eval"    : r -> (defaultFlags,                    r)
           "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
+          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = Just 2 }, r)
           r              -> (defaultFlags,                    r)
   let fn =
         case args' of

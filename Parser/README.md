@@ -22,3 +22,13 @@ $ cabal v2-run
 $ stack test --fast --test-arguments -rewrite
 $ cabal v2-test --test-options -rewrite
 ```
+
+## TODO: Fresh Rules
+
+- [ ] `isFresh :: Expr -> Bool`
+- [ ] `DsFresh :: Expr -> {e:Expr|isFresh e}`
+- [ ] `rulesSubstitution`
+  - [ ] `App-Ctx` (`A`)
+  - [ ] `Exp-Ctx` (`E`)
+- [ ] `rulesConjunction`
+- [ ] `rulesGarbageCollection`

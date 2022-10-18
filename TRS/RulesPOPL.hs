@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 module RulesPOPL where
 
@@ -130,17 +129,32 @@ valueX1 lhs =
 
 type ERule = Rule Expr
 
-rules :: ERule
-rules = rulesPrimOps
-    +++ rulesApplication
-    +++ rulesUnification
-    +++ rulesUnificationVariables
-    +++ rulesSequencing
-    +++ rulesChoice
-    +++ rulesOne
-    +++ rulesAll
-    +++ rulesFail
-    +++ rulesSplit
+rulesPOPL :: ERule
+rulesPOPL
+   =   rulesPrimOps
+   +++ rulesApplication
+   +++ rulesUnification
+   +++ rulesUnificationVariables
+   +++ rulesSequencing
+   +++ rulesChoice
+   +++ rulesOne
+   +++ rulesAll
+   +++ rulesFail
+   +++ rulesSplit
+
+--------------------------------------------------------------------------------
+rulesFRESH :: ERule
+rulesFRESH
+   =   rulesPrimOps
+   +++ rulesApplication
+   +++ rulesUnificationNoOcc
+   -- +++ rulesUnificationVariables
+   -- +++ rulesSequencing
+   +++ rulesChoice
+   +++ rulesOne
+   +++ rulesAll
+   +++ rulesFail
+   +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -241,9 +255,13 @@ rulesApplication lhs =
      pure (foldr (:|:) Fail [ (Val v :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
-
 rulesUnification :: ERule
 rulesUnification lhs =
+   rulesUnificationNoOcc lhs
+   ++ rulesUnificationOcc lhs
+
+rulesUnificationNoOcc :: ERule
+rulesUnificationNoOcc lhs =
   "ULIT" `name`
   do INT k1 :=: INT k2 <- [lhs]
      if k1 == k2
@@ -279,12 +297,14 @@ rulesUnification lhs =
   "UX6" `name`
   do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
      pure Fail
- ++
-  "UX-OCCURS" `name`
-  do VAR x :=: Val v <- [lhs]
-     (_, Var x') <- valueX1 v
-     guard (x == x')
-     pure Fail
+
+rulesUnificationOcc :: ERule
+rulesUnificationOcc lhs =
+   "UX-OCCURS" `name`
+   do VAR x :=: Val v <- [lhs]
+      (_, Var x') <- valueX1 v
+      guard (x == x')
+      pure Fail
 
 --------------------------------------------------------------------------------
 
@@ -483,3 +503,56 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
 
   defs []     a = a
   defs (x:xs) a = Def (Bind x (defs xs a))
+
+
+--------------------------------------------------------------------------------
+dsFresh :: Expr -> Expr
+dsFresh = go
+  where
+   go (ex :=: ex') = dsEq ex ex'
+   go (ex :>: ex') = dsSeq ex ex'
+   go (ex :|: ex') = go ex :|: go ex'
+   go (Def bi)     = dsBind bi
+   go (One ex)     = One (go ex)
+   go (All ex)     = All (go ex)
+   go e            = e
+
+-- | `e1 == e2` ===> `ex x . x == e1; x == e2; x`
+dsEq :: Expr -> Expr -> Expr
+dsEq e1 e2
+  | isVal e1  = e1 :=: e2
+  | isVal e2  = e2 :=: e1
+  | otherwise = Def (Bind x (cst x e1' :>: cst x e2' :>: Val (Var x)))
+  where
+    x   = identNotIn (free [e1', e2'])
+    e1' = dsFresh e1
+    e2' = dsFresh e2
+
+isVal :: Expr -> Bool
+isVal (Val _) = True
+isVal _       = False
+
+isCst :: Expr -> Bool
+isCst (_ :=: _) = True
+isCst _         = False
+
+-- | `e1; e2` ===> `ex x . x == e1; e2`
+dsSeq :: Expr -> Expr -> Expr
+
+dsSeq e1 e2
+  | isCst e1' = e1' :>: e2'
+  | otherwise = Def (Bind x (cst x e1' :>: e2'))
+  where
+     x   = identNotIn (free [e1', e2'])
+     e1' = dsFresh e1
+     e2' = dsFresh e2
+
+-- |
+dsBind :: Bind Expr -> Expr
+dsBind (Bind x e) = Def (Bind x (dsFresh e))
+
+freshIdent :: Expr -> Ident
+freshIdent e = identNotIn (free e)
+
+cst :: Ident -> Expr -> Expr
+cst x e = Val (Var x) :=: e

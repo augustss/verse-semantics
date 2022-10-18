@@ -2,21 +2,32 @@ module TRSAdapter(rewrite) where
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
-import RulesPOPL(rules)
+import qualified RulesPOPL
 import TRS(normalFormsFuel)
 import Expr(Ident(..), noLoc)
 import Core
 import Error
+import Flags
 
 import Debug.Trace
 import Print
 
-rewrite :: Int -> Core -> [Core]
-rewrite n = map (trsToCore . snd) . checkOne . normalFormsFuel n rules . coreToTrs
+rewrite :: Flags -> Core -> [Core]
+rewrite flg = map (trsToCore . snd) . checkOne . normalFormsFuel n (rules flg) . ds flg . coreToTrs
  where
+  n            = fRewriteSteps flg
   checkOne [x] = [x]
   checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e)) nes)
                        nes
+
+ds :: Flags -> T.Expr -> T.Expr
+ds flg
+  | isJust(fFresh flg) = RulesPOPL.dsFresh
+  | otherwise          = id
+
+rules flg
+  | isJust(fFresh flg) = RulesPOPL.rulesFRESH
+  | otherwise          = RulesPOPL.rulesPOPL
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)

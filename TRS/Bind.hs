@@ -15,10 +15,10 @@ instance Show Ident where
   show (Prim n) = "$" ++ show n
 
 ident :: String -> Ident
-ident x = Name x
+ident = Name
 
 prim :: Int -> Ident
-prim n = Prim n
+prim = Prim
 
 identsNotIn :: [Ident] -> [Ident]
 identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
@@ -58,10 +58,10 @@ substBind :: (Free s, Free t)
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
-  | otherwise   = Bind x (subst sub' t) 
+  | otherwise   = Bind x (subst sub' t)
  where
   sub' = [ (y,t) | (y,t) <- sub, y /= x ]
-  vs   = free (map snd sub') 
+  vs   = free (map snd sub')
   zs   = map fst sub' ++ vs ++ free t
   x'   = identNotIn zs
 
@@ -81,4 +81,3 @@ bindWith vs f = Bind x t
   x  = identNotIn ys
 
 --------------------------------------------------------------------------------
-
