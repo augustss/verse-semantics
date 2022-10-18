@@ -6,7 +6,8 @@ import TRS
 import Bind
 import TRSCore
 import Control.Monad( guard )
-import Data.List( sort )
+import Data.List( sort, find, union, (\\) )
+import Data.Functor.Classes (Show1(liftShowList))
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -149,8 +150,9 @@ rulesFRESH = rulesPrimOps
          +++ rulesApplication
          +++ rulesUnificationNoOcc
          +++ rulesSubstitution
-         -- +++ rulesUnificationVariables
-         -- +++ rulesSequencing
+         +++ rulesStructural
+         +++ rulesSequencing
+         +++ rulesGarbageCollection
          +++ rulesChoice
          +++ rulesOne
          +++ rulesAll
@@ -227,12 +229,16 @@ rulesPrimOps lhs =
 mapAp :: [Value] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-      unit = VARR []
-      defs :: [Ident] -> Expr -> Expr
-      defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
-      seqs :: [Expr] -> Expr
-      seqs = foldl1 (:>:)
   in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
+
+defs :: [Ident] -> Expr -> Expr
+defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
+
+unit :: Value
+unit = VARR []
+
+seqs :: [Expr] -> Expr
+seqs = foldl1 (:>:)
 
 --------------------------------------------------------------------------------
 
@@ -509,9 +515,29 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
 -- Fresh Rules
 --------------------------------------------------------------------------------
 
+rulesStructural :: ERule
+rulesStructural lhs =
+  "SWAP-E-1" `name`
+  do (VAR y :=: VAR x) <- [lhs]
+     guard (x < y)
+     pure (VAR x :=: VAR y)
+  ++
+  "SWAP-E-2" `name`
+  do (HVAL h :=: VAR x) <- [lhs]
+     pure (VAR x :=: HVAL h)
+  ++
+  "SWAP-C"  `name`
+  do (e1 :>: ((VAR x :=: HVAL v) :>: e3)) <- [lhs]
+     guard (not (valueConstraint e1))
+     pure ((VAR x :=: HVAL v) :>: (e1 :>: e3))
+
+valueConstraint :: Expr -> Bool
+valueConstraint (VAR _ :=: HVAL _) = True
+valueConstraint _                  = False
+
 rulesSubstitution :: ERule
 rulesSubstitution lhs =
-  "DEREF-S-K" `name`
+ "DEREF-S-K" `name`
   do (VAR x :=: INT k :>: e) <- [lhs]
      (eCtx, Var x') <- derefE e
      guard (x == x')
@@ -523,6 +549,39 @@ rulesSubstitution lhs =
      guard (x < y)
      guard (x == x')
      pure ((VAR x :=: VAR y) :>: eCtx (Var y))
+
+rulesGarbageCollection :: ERule
+rulesGarbageCollection lhs =
+   "ELIM-DEF" `name`
+   do Def (Bind x e) <- [lhs]
+      guard (x `notElem` free e)
+      pure e
+   ++
+   "ELIM-CST" `name`
+   do Def _ <- [lhs]
+      (xs, cs, e) <- gcDefs lhs
+      pure (gc xs cs e)
+
+gcDefs :: Expr -> [([Ident], [(Ident, HNF)], Expr)]
+gcDefs e = do
+   do let (xs, e')  = goD e
+      let (cs, e'') = goC e'
+      guard (not (null xs))
+      guard (not (null cs))
+      pure (xs, cs, e'')
+   where
+      goD (Def (Bind x e)) = (x:xs, e') where (xs, e') = goD e
+      goD e                = ([], e)
+      goC ((VAR x :=: HVAL h) :>: e) = ((x,h) : cs, e') where (cs, e') = goC e
+      goC e                          = ([], e)
+
+gc :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+gc xs cs e = go (free e) cs e
+   where
+      go :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+      go live cands e = case find (\(xi,_) -> xi `elem` live) cands of
+         Nothing       -> defs [x | x <- xs, x `elem` live] e
+         Just (xi, hi) -> go (live `union` free hi) (cands \\ [(xi, hi)]) (VAR xi :=: HVAL hi :>: e)
 
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -559,10 +618,8 @@ derefE lhs =
       (ctx, v)    <- derefV v2
       pure ((v1 :@:) . ctx, v)
 
-
 -- (paper) C ::= V = v | v = V | V = e | v = E
 -- (TRS)   C ::= E = e | e = E
-
 
 derefC :: Expr -> [(Value -> Expr, Value)]
 derefC lhs =
@@ -582,9 +639,17 @@ derefC lhs =
    --    pure ((e1 :=:) . ctx, v)
    -- -- ++
 
+-- (paper) V ::= □ | 𝜆x. E | ⟨s1, · · · , □, · · · , sn⟩
+-- (TRS)   V ::= □ |
 derefV :: Value -> [(Value -> Value, Value)]
-derefV = _ -- error "TODO: derefV"
+derefV = valueX
 
+--   do Var x <- [lhs]
+--      pure (id, Var x)
+--   ++
+--   do VLAM v e  <- [lhs]
+--      (ctx, v') <- derefE e
+--      pure (VLAM v . ctx, v')
 {-
   x = s; E [x] ===> x = s; E[s]
 -}

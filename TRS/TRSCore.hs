@@ -177,6 +177,7 @@ pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
+pattern HVAL v = Val (HNF v)
 
 -- Value
 pattern VINT n  = HNF (Int n)
