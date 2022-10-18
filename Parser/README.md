@@ -32,3 +32,21 @@ $ cabal v2-test --test-options -rewrite
   - [ ] `Exp-Ctx` (`E`)
 - [ ] `rulesConjunction`
 - [ ] `rulesGarbageCollection`
+
+
+x := 1; x
+
+```haskell
+def x, $1 in
+  $1 = (def $1 in $1 = x; $1 = 1; $1);
+  x
+
+-->
+
+def x, $1 in
+  $1 = (def $1 in $1 = x; x = 1; x);
+  x
+
+
+
+```

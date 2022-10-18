@@ -37,6 +37,8 @@ type Context = Expr -> Expr
 
 -- scope contexts
 
+-- X ::= * | X = e | e = X | X;e | e;X
+
 execX, execX1 :: Expr -> [(Context, Expr)]
 -- X context
 execX lhs = execX1 lhs ++ [(id,lhs)]
@@ -146,6 +148,7 @@ rulesFRESH :: ERule
 rulesFRESH = rulesPrimOps
          +++ rulesApplication
          +++ rulesUnificationNoOcc
+         +++ rulesSubstitution
          -- +++ rulesUnificationVariables
          -- +++ rulesSequencing
          +++ rulesChoice
@@ -506,6 +509,86 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
 -- Fresh Rules
 --------------------------------------------------------------------------------
 
+rulesSubstitution :: ERule
+rulesSubstitution lhs =
+  "DEREF-S-K" `name`
+  do (VAR x :=: INT k :>: e) <- [lhs]
+     (eCtx, Var x') <- derefE e
+     guard (x == x')
+     pure ((VAR x :=: INT k) :>: eCtx (VINT k))
+  ++
+  "DEREF-S-V" `name`
+  do (VAR x :=: VAR y :>: e) <- [lhs]
+     (eCtx, Var x') <- derefE e
+     guard (x < y)
+     guard (x == x')
+     pure ((VAR x :=: VAR y) :>: eCtx (Var y))
+
+
+{- | Expression Contexts `E` ----------------------------------------------
+   V ::= □ | ⟨s1, · · · , □, · · · , sn⟩ | 𝜆x. E
+   C ::= V = v | v = V | V = e | v = E
+   E ::= 𝑉 | ∃x.E | C;e | c;E | E e | e E
+       | E + e | e + E | all{E} | one{E}
+-}
+type VContext = Value -> Expr
+
+derefE :: Expr -> [(VContext, Value)]
+derefE lhs =
+   do Val v     <- [lhs]
+      (ctx, v') <- derefV v
+      pure (Val . ctx, v')
+   ++
+   do Def (Bind x e) <- [lhs]
+      (ctx, v)       <- derefE e
+      pure (Def . Bind x . ctx, v)
+   ++
+   do (c :>: e) <- [lhs]
+      (ctx, v)  <- derefC e
+      pure ((:>: e) . ctx, v)
+   ++
+   do (c :>: e) <- [lhs]
+      (ctx, v)  <- derefE e
+      pure ((c :>:) . ctx, v)
+   ++
+   do (v1 :@: v2) <- [lhs]
+      (ctx, v)    <- derefV v1
+      pure ((:@: v2) . ctx, v)
+   ++
+   do (v1 :@: v2) <- [lhs]
+      (ctx, v)    <- derefV v2
+      pure ((v1 :@:) . ctx, v)
+
+
+-- (paper) C ::= V = v | v = V | V = e | v = E
+-- (TRS)   C ::= E = e | e = E
+
+
+derefC :: Expr -> [(Value -> Expr, Value)]
+derefC lhs =
+   do (Val v :=: e) <- [lhs]
+      (ctx, v')   <- derefV v
+      pure ((:=: e) . Val . ctx, v)
+   ++
+   do (v :=: e) <- [lhs]
+      (ctx, v')   <- derefE e
+      pure ((v :=:). ctx, v')
+   -- do (e1 :=: e2) <- [lhs]
+   --    (ctx, v)    <- derefE e1
+   --    pure ((:=: e2) . ctx, v)
+   -- ++
+   -- do (e1 :=: e2) <- [lhs]
+   --    (ctx, v)    <- derefE e2
+   --    pure ((e1 :=:) . ctx, v)
+   -- -- ++
+
+derefV :: Value -> [(Value -> Value, Value)]
+derefV = _ -- error "TODO: derefV"
+
+{-
+  x = s; E [x] ===> x = s; E[s]
+-}
+
 dsFresh :: Expr -> Expr
 dsFresh = go
   where
@@ -522,7 +605,7 @@ dsEq :: Expr -> Expr -> Expr
 dsEq e1 e2
   | isVal e1  = e1 :=: e2
   | isVal e2  = e2 :=: e1
-  | otherwise = Def (Bind x (cst x e1' :>: cst x e2' :>: Val (Var x)))
+  | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2') :>: VAR x))
   where
     x   = identNotIn (free [e1', e2'])
     e1' = dsFresh e1
@@ -541,18 +624,14 @@ dsSeq :: Expr -> Expr -> Expr
 
 dsSeq e1 e2
   | isCst e1' = e1' :>: e2'
-  | otherwise = Def (Bind x (cst x e1' :>: e2'))
+  | otherwise = Def (Bind x ((VAR x :=: e1') :>: e2'))
   where
      x   = identNotIn (free [e1', e2'])
      e1' = dsFresh e1
      e2' = dsFresh e2
 
--- |
 dsBind :: Bind Expr -> Expr
 dsBind (Bind x e) = Def (Bind x (dsFresh e))
 
 freshIdent :: Expr -> Ident
 freshIdent e = identNotIn (free e)
-
-cst :: Ident -> Expr -> Expr
-cst x e = Val (Var x) :=: e

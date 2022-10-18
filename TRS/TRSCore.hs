@@ -88,8 +88,8 @@ instance Ord Expr where
     comp xs ys _       (All b) = GT
 
     comp xs ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
-    comp xs ys (Split _ _ _) _ = LT
-    comp xs ys _ (Split _ _ _) = GT
+    comp xs ys Split {} _ = LT
+    comp xs ys _ Split {} = GT
 
     comp xs ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
 
