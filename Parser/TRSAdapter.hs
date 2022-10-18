@@ -25,6 +25,7 @@ ds flg
   | isJust(fFresh flg) = RulesPOPL.dsFresh
   | otherwise          = id
 
+rules :: Flags -> RulesPOPL.ERule
 rules flg
   | isJust(fFresh flg) = RulesPOPL.rulesFRESH
   | otherwise          = RulesPOPL.rulesPOPL
