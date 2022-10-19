@@ -182,6 +182,14 @@ rulesPrimOps lhs =
        then pure (INT (k1 `div` k2))
        else pure Fail
  ++
+  "P-NEG" `name`
+  do NEG :@: VINT k <- [lhs]
+     pure (INT k)
+ ++
+  "P-PLUS" `name`
+  do PLUS :@: VINT k <- [lhs]
+     pure (INT k)
+ ++
   "P-GRT" `name`
   do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 > k2

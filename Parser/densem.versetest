@@ -11,6 +11,11 @@ testeq(SEq) {array{1;2;3}}                        {1,2,3}
 testeq(SEq) {array{}}                             {()}
 testeq(SEq) {(x:int => x+1)[2]}                   {3}
 testeq(SEq) {x:int:=1}                            {1}
-testeq(SEq) {succ(x:int):=x+1; y:succ:=1; y}      {2}
-testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
-testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq(SEq) {x:=1; y:= if(x=2) then 0 else 3; y}  {3}
+testeq(SEq) {y:= if(x=2) then 0 else 3; x:=1; y}  {3}
+testeq(SEq) {for{:false}}                         {()}
+testeq(SEq) {for{1}}	                          {array{1}}
+testeq(SEq) {for{1|2}}	                          {(1,2)}
+#testeq(SEq) {succ(x:int):=x+1; y:succ:=1; y}      {2}
+#testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
+#testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}

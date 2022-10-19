@@ -191,6 +191,7 @@ dsD = expr
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
+                             "pre'+'",  -- XXX not really right
                              "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
                              "length","in'..'"] = ApplyD
@@ -520,6 +521,7 @@ primOps = map (Ident noLoc)
   , "in'<'", "in'<='", "in'>'", "in'>='"
   , "in'<>'"
   , "pre'-'"
+  , "pre'+'"
   , "post'?'"
   , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
   , "length"

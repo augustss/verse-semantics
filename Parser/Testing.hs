@@ -157,7 +157,7 @@ testArgs = do
         case args' of
           [] ->  verseTest
           [s] -> s
-          _ -> error $ "Usage: tests [-rewrite|-densem|-eval] [file]"
+          _ -> error $ "Usage: tests [-rewrite|-densem|-eval|-fresh] [file]"
   pure (flg, fn)
 
 verseTest :: FilePath
