@@ -290,6 +290,7 @@ evalV _ (VPrim "in'*'") = WFunction wMul
 evalV _ (VPrim "in'/'") = WFunction wDiv
 evalV _ (VPrim "isInt$") = WFunction wIsInt
 evalV _ (VPrim "mapAp$") = WFunction wMapAp
+evalV _ (VPrim "pre'+'") = WFunction wIsInt
 evalV _ v = error $ "evalV: " ++ prettyShow v
 
 possibleValues :: [Ident] -> Env -> Ident -> Core -> [W]
