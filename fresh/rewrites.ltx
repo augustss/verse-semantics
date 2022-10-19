@@ -76,6 +76,105 @@ $$\begin{array}{lrcll}
 \end{figure}
 }
 
+\newcommand{\figureSyntaxPOPL}{
+\begin{figure}[t]
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Integers}      & k \\
+\textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
+\textit{Scalar Values} & s     & ::= & k \vb x \\
+\textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Head-normal forms}   & hnf     & ::= & h \vb k \\
+\textit{Values}        & |v|   & ::= & s \vb h \\ % |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |e_1 = e_2|
+                                         \vb |e_1 choice e_2| \vb |apply1N e_1 e_2| \\
+  &                            & \vb & |one e| \vb |all e| \\
+\textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+% \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
+% \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
+\textit{Results}       & r     & ::= & |def xs (cs; v) | \\
+                       & c     & ::= & |x = h| \\
+
+\end{array}$$
+\caption{\textbf{Syntax of POPL-stye calculus}}
+\label{fig:popl-syntax}
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcll}
+        \rulename{swap-e} & |v_1 == v_2|      & \equiv & |v_2 == v_1| \\
+        \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| & \\
+        % \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| & \text{\lennart{|def (x ^^ y)| not explained}} \\
+        \rulename{swap-c} & |v = v'; c ; e|   & \equiv & |c; v = v'; e| \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences (POPL style)}}\label{fig:popl-structural-equiv}
+\end{figure}
+}
+
+\newcommand{\figureRulesPOPL}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Unification:~\runi}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{deref-h}  & |x == h ;  A^[h]| & \movesto & |x == h ; A^[h]| \\
+\rulename{u-lit}    & |k == k |                                    & \movesto & k \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'|} \\
+\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| & \\
+\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
+\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\[0.05in]
+
+
+\rulegroupname{Application:~\rapp}
+\rulename{app-beta} & |apply1N (lam x e_1) e_1| & \movesto & |def x (x=e_1; e_2)|  & if $|x| \not \in \freevars{|v|}$ \\[0.05in]
+% \rulename{app-tup} & |apply1N (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\rulegroupname{Conjunction:~\rcon}
+\rulename{conj-semi-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
+\rulename{conj-semi-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{conj-fun-def} & |apply1N (def x e_1) e_2|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+\lvc{\rulename{conj-cst-defr}} & |e_1 == (def y e_2)| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\lvc{\rulename{conj-cst-defl}} & |(def y e_1) == e_2| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_1|}$ \\
+\rulename{conj-fun-cst} & |apply1N (e_1 ; e_2) e_3|       & \movesto & |e_1; apply1N e_2 e_3| \\
+\rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2| \\
+\lvc{\rulename{unify-seql}} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+\lvc{\rulename{unify-seqr}} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+\lvc{\rulename{unify-unifyl}} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\lvc{\rulename{unify-unifyr}} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
+\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\[0.05in]
+
+\rulegroupname{Garbage Collection:~$\rgc$}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-cst}     & |def (x_1 ^^ dots) x_1 == h_1; dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
+% \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
+% \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
+% \multicolumn{4}{l}\text{\ranjit{fix GC to allow other head values}} \\
+
+
+\rulegroupname{Fail Propagation:~\rfail}
+\rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
+\rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
+\rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
+
+\rulegroupname{Speculation:~\rspc}
+\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
+\rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{}{|rs|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{}{r}{|xs|}{|cs|}{|v|}\\
+\end{longtable}
+% \caption{\textbf{\calcname: Rules for Unification, Substitution and Application}}\label{fig:rulesI}
+\caption{\textbf{POPL-style rules for Evaluation}}\label{fig:popl-rulesI}
+\end{figure}
+}
+
 \newcommand{\figureRulesI}{
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
