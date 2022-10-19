@@ -8,4 +8,43 @@
 
 \figureSyntaxPOPL
 \figureRulesPOPL
+\figureRulesPOPLconj
 
+For the POPL-style rules:
+\begin{itemize}
+\item \Cref{fig:popl-syntax} (c.f. \Cref{fig:syntax}) gives the POPL-style syntax.  We have no ``|c|'' form (except in the syntax of results |r|, an dit is optional even there).  Sequencing, unification, function application all have expressions on both sides.
+
+\item \Cref{fig:popl-structural-equiv} (c.f. \Cref{fig:structural-equiv}) gives the structural rules.
+  The old \rulename{swap-e} has become \rulename{conj-swap-eq} in the
+  non-structural (directed) rules.
+
+\item There are no desugaring rules (c.f. \Cref{fig:desugar}).
+
+\item \Cref{fig:popl-rulesI} are the main rewrite rule. Just the same as the Fresh-style ones (\Cref{fig:rulesI}) except
+  for fixing \rulename{app-beta}.
+
+\item \Cref{fig:popl-rulesN} and \ref{fig:popl-rulesN-alt} are two alternative sets of ``conjunction'' rules, which
+  float existentials and equalities out of expressions:
+  \begin{itemize}
+  \item \Cref{fig:popl-rulesN} tackles it head on.
+  \item \Cref{fig:popl-rulesN-alt} uses \rulename{conj-flat-eq} and \rulename{conj-falt-fun} to normalise equalities and function applications to have a value on the LHS.  That reduces the number of other rules, and makes them simpler too.  In effect,
+    a rule like \rulename{conj-arg-cst} has to do flattening on the fly.
+  \end{itemize}
+  Lennart and I like the second set best, and it's nearest to your existing syntax.  Indeed, if you want, the two flattening rules can be applied ``at the start'', yielding a language in which equality always has form |(v = e)|, and function application always has form |(v e)|.  Once the expression is in this form, no rewrite destroys the form.
+\end{itemize}
+The six existential-floating rules could be replaced with one if we had a suitable context
+$$
+X ::= |hole| \vb |X == e| \vb |e == X| \vb |X; e| \vb |e ; X| \vb |apply1N X e| \vb |apply1N e X|
+$$
+The six existential-floating rules could be replaced with one if we had a suitable context
+$$
+X ::= |hole| \vb |X == e| \vb |e == X| \vb |X; e| \vb |e ; X| \vb |apply1N X e| \vb |apply1N e X|
+$$
+The six existential-floating rules could be replaced with one if we had a suitable context
+$$
+X ::= |hole| \vb |X == e| \vb |e == X| \vb |X; e| \vb |e ; X| \vb |apply1N X e| \vb |apply1N e X|
+$$
+The six existential-floating rules could be replaced with one if we had a suitable context
+$$
+X ::= |hole| \vb |X == e| \vb |e == X| \vb |X; e| \vb |e ; X| \vb |apply1N X e| \vb |apply1N e X|
+$$
