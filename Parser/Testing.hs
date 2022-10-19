@@ -166,6 +166,10 @@ test1 :: FilePath
 test1     = "test1.verse"
 
 -------------
+freshmain :: IO ()
+freshmain = do
+  testFRESH "{(x:int => y:int => x+2*y)[2][3]}"
+
 testFRESH :: String -> IO ()
 testFRESH s = do
   let e = parseFresh s
@@ -173,7 +177,7 @@ testFRESH s = do
   mapM_ (\tr -> printTrace tr >> putStrLn"----------") trs
 
 parseFresh :: String -> T.Expr
-parseFresh = coreToTrs . exprToCore flags . desugar . parseDie pExprSeq ""
+parseFresh = coreToTrs . exprToCore flags . desugar . parseDie (pBraces pExprSeq) ""
   where
     flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 30 }
 ------
