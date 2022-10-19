@@ -23,6 +23,15 @@ $ stack test --fast --test-arguments -rewrite
 $ cabal v2-test --test-options -rewrite
 ```
 
+or to use the plain `Makefile`
+
+```sh
+$ make test
+$ make testr # popl-rewrite-rules
+$ make testt # tim-parser
+$ make testf # fresh-rewrite-rules
+```
+
 ## TODO: Fresh Rules
 
 ```haskell
