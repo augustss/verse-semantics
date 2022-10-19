@@ -528,7 +528,7 @@ rulesStructural :: ERule
 rulesStructural lhs =
   "SWAP-E-1" `name`
   do (VAR y :=: VAR x) <- [lhs]
-     guard (x < y)
+     -- guard (x < y)
      pure (VAR x :=: VAR y)
   ++
   "SWAP-E-2" `name`
