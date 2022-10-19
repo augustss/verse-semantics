@@ -502,6 +502,8 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
 
     --
     f (CUnOp  "pre'-'" (VInt i)) = CInt $ -i
+    f (CUnOp  "pre'+'" v) | VInt i <- v = CInt i
+                          | otherwise   = CFail
     f (CBinOp "in'+'"  v1 v2) = arith (+) v1 v2
     f (CBinOp "in'-'"  v1 v2) = arith (-) v1 v2
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2

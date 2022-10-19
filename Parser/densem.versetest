@@ -1,0 +1,21 @@
+testeq(SEq) {2}                                   {2}
+testeq(SEq) {x:=1; x}                             {1}
+testeq(SEq) {3+4}                                 {7}
+testeq(SEq) {1*2}                                 {2}
+testeq(SEq) {8/4}                                 {2}
+testeq(SEq) {1/0}                                 {:false}
+testeq(SEq) {3>4}                                 {:false}
+testeq(SEq) {3>3}                                 {:false}
+testeq(SEq) {3>2}                                 {3}
+testeq(SEq) {array{1;2;3}}                        {1,2,3}
+testeq(SEq) {array{}}                             {()}
+testeq(SEq) {(x:int => x+1)[2]}                   {3}
+testeq(SEq) {x:int:=1}                            {1}
+testeq(SEq) {x:=1; y:= if(x=2) then 0 else 3; y}  {3}
+testeq(SEq) {y:= if(x=2) then 0 else 3; x:=1; y}  {3}
+testeq(SEq) {for{:false}}                         {()}
+testeq(SEq) {for{1}}	                          {array{1}}
+testeq(SEq) {for{1|2}}	                          {(1,2)}
+#testeq(SEq) {succ(x:int):=x+1; y:succ:=1; y}      {2}
+#testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
+#testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}

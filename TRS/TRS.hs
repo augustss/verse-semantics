@@ -3,7 +3,8 @@ module TRS where
 
 import qualified Data.Set as S
 import Data.List ( intercalate )
-import Control.Monad( when )
+import Control.Monad( when, unless )
+import Debug.Trace (trace)
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
@@ -43,10 +44,10 @@ step rule t = nub (apply t)
  where
   apply t = rule t ++ rec apply t
 
-normalForms :: (Ord a, Rec a) => Rule a -> a -> [(String, a)]
+normalForms :: (Show a, Ord a, Rec a) => Rule a -> a -> [(String, a)]
 normalForms rule t = normalFormsFuel (-1) rule t
 
-normalFormsFuel :: (Ord a, Rec a) => Int -> Rule a -> a -> [(String,a)]
+normalFormsFuel :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [(String,a)]
 normalFormsFuel n rule t =
   [ (sequ (filter (not . null) (map fst tr)), snd (head tr))
   | tr <- normalFormsFuelTrace n rule t
@@ -56,28 +57,32 @@ normalFormsFuel n rule t =
   sequ as = intercalate ";" as
 
 -- traces are produced in reverse order, i.e. final result first
-normalFormsTrace :: (Ord a, Rec a) => Rule a -> a -> [[(String, a)]]
+normalFormsTrace :: (Show a, Ord a, Rec a) => Rule a -> a -> [[(String, a)]]
 normalFormsTrace rule t = normalFormsFuelTrace (-1) rule t
 
-normalFormsFuelTrace :: (Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+normalFormsFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
 normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
-  go 0 _    _           = []
-  go n seen []          = []
+  go 0 _    _           = traceShow "fuel 0" []
+  go n seen []          = traceShow "stuck" []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
     | null ts'          = tr : go n seen' trs
     | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
    where
     seen' = S.insert t seen
-    ts'   = step rule t
+    ts'   = traceShow "NFT" $ step rule t
   go _ _ _ = error "impossible"
+
+
+traceShow :: Show a => String -> a -> a
+traceShow msg x = {- trace ("TRACE: " ++ msg ++ " : " ++ show x ++ "\n") -} x
 
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =
   sequence_
   [ do print t
-       when (not (null n)) $
+       unless (null n) $
          putStrLn ("  <--" ++ n ++ "--")
   | (n,t) <- tr
   ]
@@ -93,4 +98,3 @@ nub xs = go S.empty xs
     | otherwise         = x : go (S.insert x seen) xs
 
 --------------------------------------------------------------------------------
-

@@ -170,7 +170,7 @@ dsD = expr
                                                                     (Array [t])
 
 {-
-    expr (Set e1 (Ident l "=") e2) = 
+    expr (Set e1 (Ident l "=") e2) =
       dsD $ ApplyD (eAssign l) $ Array [e1, e2]
 -}
     expr (Set e1 op e2) = Set <$> expr e1 <*> pure op <*> expr e2
@@ -191,6 +191,7 @@ dsD = expr
     call p l s e = con (Variable (Ident l s')) e
       where con | s' `elem` ["in'/'","pre'!'","post'?'",
                              "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
+                             "pre'+'",  -- XXX not really right
                              "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
                              "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
                              "length","in'..'"] = ApplyD
@@ -448,7 +449,8 @@ dsP l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" +
 
 -- Handle ..l, l
 dsPArr :: Loc -> [Expr] -> SExpr -> D SExpr
-dsPArr l lhss e =
+dsPArr l lhss ea = do
+  e <- dsD ea
   case exprElems lhss of
     -- P[lhs0,...,lhsn] e = P[lhs0]x0; ...; P[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
@@ -458,8 +460,8 @@ dsPArr l lhss e =
       pure $ Seq $ els ++ [eun]
 
     [ESplice lhs] ->
-      dsP l lhs e
-    
+      dsP l lhs ea
+
     [EElems ls1, ESplice lhs] -> do
       (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
       let
@@ -520,6 +522,7 @@ primOps = map (Ident noLoc)
   , "in'<'", "in'<='", "in'>'", "in'>='"
   , "in'<>'"
   , "pre'-'"
+  , "pre'+'"
   , "post'?'"
   , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
   , "length"
@@ -625,7 +628,7 @@ getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
-getVisible (Macro1 _ _ _) = []
+getVisible Macro1 {} = []
 getVisible (Define i e) = i : getVisible e
 getVisible (Define2 i j e) = i : j : getVisible e
 getVisible Choice{} = []
@@ -652,7 +655,7 @@ getVar Do{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar (Where e1 e2) = getVar e1 ++ getVar e2
 --getVar (Typedef _) = []
-getVar (Macro1 _ _ _) = []
+getVar Macro1 {} = []
 getVar (Define _ e) = getVar e
 getVar (Define2 _ _ e) = getVar e
 getVar Choice{} = []
@@ -758,7 +761,7 @@ scopeErrs s = expr
     expr (Range e1) = expr e1
 --    expr (Typedef e1) = expr (Do e1)
     expr (Macro1 _ [] e1) = expr (Do e1)
-    expr (Macro1 _ _ _) = unimplemented "Macro1 with effects"
+    expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (Lambda i _ e1 e2) = errs ++ scopeErrs s'' e1 ++ scopeErrs s'' (Do e2)
       where (errs, s') = defs e1
             s'' = S.insert i s'

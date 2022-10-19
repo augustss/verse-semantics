@@ -11,7 +11,10 @@ import Core
 import Print
 import Desugar
 import Run
-
+import qualified RulesPOPL
+import qualified TRSCore as T
+import TRS(normalFormsTrace, printTrace)
+import TRSAdapter(coreToTrs)
 --------------
 
 data Test
@@ -112,14 +115,18 @@ runTest flg (TestEvalEq n e1 e2) =
     Ident _ s -> error $ "Unknown test type " ++ show s
 
 runTests :: Flags -> [Test] -> IO ()
-runTests flg = mapM_ (runTest flg)
+runTests flg = mapM_ (runTest flg) . chop
+  where
+    chop
+      | Just n <- fFresh flg = take n
+      | otherwise  = id
 
 runTestFile :: Flags -> FilePath -> IO ()
 runTestFile flg = runTests flg <=< readTests
 
 test :: Bool -> IO ()
-test True = runTestFile defaultFlags "tests.versetest"
-test False = runTestFile defaultFlags{ fRewrite = True } "tests.versetest"
+test True = runTestFile defaultFlags verseTest
+test False = runTestFile defaultFlags{ fRewrite = True } verseTest
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -131,6 +138,46 @@ ptest fn = do
 
 main :: IO ()
 main = do
+  (flg, fn) <- testArgs
+  runTestFile flg fn
+  ptest test1
+
+testArgs :: IO (Flags, FilePath)
+testArgs = do
   args <- getArgs
-  test (null args)
-  ptest "test1.verse"
+  let (flg, args') =
+        case args of
+          "-"        : r -> (defaultFlags{ fRewrite = True }, r)
+          "-rewrite" : r -> (defaultFlags{ fRewrite = True }, r)
+          "-eval"    : r -> (defaultFlags,                    r)
+          "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
+          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 50 }, r)
+          r              -> (defaultFlags,                    r)
+  let fn =
+        case args' of
+          [] ->  verseTest
+          [s] -> s
+          _ -> error $ "Usage: tests [-rewrite|-densem|-eval|-fresh] [file]"
+  pure (flg, fn)
+
+verseTest :: FilePath
+verseTest = "tests.versetest"
+test1 :: FilePath
+test1     = "test1.verse"
+
+-------------
+freshmain :: IO ()
+freshmain = do
+  testFRESH "{(x:int => y:int => x+2*y)[2][3]}"
+
+testFRESH :: String -> IO ()
+testFRESH s = do
+  let e = parseFresh s
+  let trs = normalFormsTrace RulesPOPL.rulesFRESH e
+  mapM_ (\tr -> printTrace tr >> putStrLn"----------") trs
+
+parseFresh :: String -> T.Expr
+parseFresh = coreToTrs . exprToCore flags . desugar . parseDie (pBraces pExprSeq) ""
+  where
+    flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 30 }
+------

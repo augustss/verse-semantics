@@ -113,6 +113,12 @@ isValue :: Core -> Bool
 isValue CValue{} = True
 isValue _ = False
 
+isValue' :: Core -> Bool
+isValue' (CSeq [e]) = isValue' e
+isValue' (CSeq (e:es)) = isValue' e && isValue' (CSeq es)
+isValue' CValue{} = True
+isValue' _ = False
+
 vEmpty :: Value
 vEmpty = HNF $ HArray []
 
@@ -136,7 +142,7 @@ newTmp = do
   pure i
 
 exprToCore :: Flags -> Expr -> Core
-exprToCore flg = flip evalState 1 . flip runReaderT flg . coreD
+exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
 
 core :: Expr -> C Core
 core e@LitInt{} = val e
@@ -169,13 +175,17 @@ core (For2 e1 e2) = do
     xa <- newTmp
     pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp$") (Var xa)]
 core (If3 e1 e2 e3) = do
-  e2' <- thunk e2
-  e3' <- thunk e3
-  l <- coreD (seqE [e1, e2'])
-  r <- core e3'
-  fn <- cOne $ CBar l r
-  i <- newTmp
-  pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
+  c1 <- core e1
+  if isValue' c1 then
+    core e2
+   else do
+    e2' <- thunk e2
+    e3' <- thunk e3
+    l <- coreD (seqE [e1, e2'])
+    r <- core e3'
+    fn <- cOne $ CBar l r
+    i <- newTmp
+    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
 core e@Function{} = val e
 core (Do e) = coreD e
 core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
@@ -187,7 +197,7 @@ core (Lambda i [] e1 e2) = do
   if timLam then do
     let is = getVisible e1
     e1' <- core e1
-    e2' <- core e2
+    e2' <- coreD e2
     pure $ CLambda i is e1' e2'
   else
     core $ Function [(Define i AnyT, [])] $ If3 e1 e2 Fail
@@ -257,7 +267,7 @@ cAll e = do
                                    ]),
              CSplit e (Var f) (Var g)
              ]
-                                
+
 cSucceeds :: Core -> C Core
 cSucceeds e = do
  useSplit <- asks fSplit
@@ -320,7 +330,7 @@ value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
-  
+
 --eVar :: String -> Expr
 --eVar = Variable . Ident noLoc
 
@@ -544,4 +554,3 @@ alphaConvertV vs v =
   case alphaConvert vs (CValue v) of
     CValue v' -> v'
     _ -> impossible ()
-

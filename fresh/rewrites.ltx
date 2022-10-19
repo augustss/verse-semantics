@@ -8,8 +8,10 @@
 \newcommand{\largerhs}[1]{\multicolumn{2}{l}{#1}}
 
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
-\newcommand{\wff}[4]{\ensuremath{\vdash #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
-\newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\lvc}[1]{#1}
 \newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
 \newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
 \newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
@@ -18,59 +20,205 @@
 \newcommand{\figureSyntaxI}{
 \begin{figure}[t]
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Integers}     & k \\
-\textit{Variables}    & \multicolumn{3}{l}{x,y,z,f,g} \\
-\textit{Scalars}      & s     & ::= & k \vb x \\
-\textit{Values}       & |v|   & ::= & s \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
-\textit{Constraints}  & c     & ::= & |v_1 == v_2| \vb \lvc{|v == e|} \\
-\textit{Expressions}  & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
+\textit{Integers}      & k \\
+\textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
+\textit{Scalar Values} & s     & ::= & k \vb x \\
+\textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Values}        & |v|   & ::= & s \vb h \\ % |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Constraints}   & c     & ::= & \lvc{|v == e|} \\ % |v_1 == v_2| \vb  \\
+\textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |c ; e| \vb |apply1N e_1 e_2| \vb
                                     |e_1 choice e_2| \vb |one e| \vb |all e| \\
-\textit{Programs}     & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-\textit{Results}      & r     & ::= & v \vb |(x == lam y e) ; r| \vb |def x r| \\
+\textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+% \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
+% \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
+\textit{Results}       & r     & ::= & |def xs (cs; v) | \\
+
 \end{array}$$
-\caption{\textbf{Syntax.} \lvc{Grey text} indicates \emph{lenient} extension. Tuples are $\lambda$-free.}
+\caption{\textbf{Syntax of \calcname}.}% \lvc{Grey text} indicates \emph{lenient} extension. Tuples are $\lambda$-free.}
 \label{fig:syntax}
 \end{figure}
 
-% \mypara{Note:} Values can have arbitrarily nested tuples but $\lambda$-terms are never inside a tuple.
-
 \begin{figure}[t]
-$$\begin{array}{lll}
-\mbox{\vcname} & \mbox{\calcname}  & \mbox{\lcalcname} \\
+$$\begin{array}{ll}
+\mbox{\vcname} & \mbox{\calcname} \\
 \midrule
-|e_1 == e_2|   & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| & \lvc{|def x (x == e_1; x == e_2; x)|} \\
-|e_1; e_2|     & |llet _   e_1 e_2                          |    & \lvc{|def x (x == e_1; e_2)|} \\
+|e_1 == e_2|   & \lvc{|def x (x == e_1; x == e_2; x)|} \\
+|e_1; e_2|     & \lvc{|def x (x == e_1; e_2)|} \\
 \end{array}$$
 %
-  \caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.
-    In \lcalcname we desugar |llet x e_1 e_2| into |def x e_1; e_2|.}
+\caption{\textbf{Desugaring VC into \calcname.}}
 \label{fig:desugar}
 %
 \end{figure}
 
+% \begin{figure}[t]
+% $$\begin{array}{lll}
+% \mbox{\vcname} & \mbox{\calcname}                                & \mbox{\lcalcname} \\
+% \midrule
+% |e_1 == e_2|   & |llet x_1 e_1 (llet x_2 e_2 (x_1 == x_2; x_1))| & \lvc{|def x (x == e_1; x == e_2; x)|} \\
+% |e_1; e_2|     & |llet _   e_1 e_2                          |    & \lvc{|def x (x == e_1; e_2)|} \\
+% \end{array}$$
+% %
+%   \caption{\textbf{Desugaring VC into \calcshort.} We write |llet x e_1 e_2| to abbreviate |apply1N (lam x e_2) e_1|.
+%     In \lcalcname we desugar |llet x e_1 e_2| into |def x e_1; e_2|.}
+% \label{fig:desugar}
+% %
+% \end{figure}
+
 \begin{figure}
 $$\begin{array}{lrcll}
-        \rulename{swap-e} & |v_1 == v_2|     & \equiv & |v_2 == v_1| \\
-        \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| & \text{\lennart{|def (x ^^ y)| not explained}} \\
-        \rulename{swap-c} & c_1; c_2; e    & \equiv & c_2; c_1; e \\
+        \rulename{swap-e} & |v_1 == v_2|      & \equiv & |v_2 == v_1| \\
+        \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| & \\
+        % \rulename{swap-d} & |def (x ^^ y) e| & \equiv & |def (y ^^ x) e| & \text{\lennart{|def (x ^^ y)| not explained}} \\
+        \rulename{swap-c} & |v = v'; c ; e|   & \equiv & |c; v = v'; e| \\
 \end{array}$$
 \caption{\textbf{Structural Equivalences}}\label{fig:structural-equiv}
 \end{figure}
 }
+
+\newcommand{\figureSyntaxPOPL}{
+\begin{figure}[t]
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Integers}      & k \\
+\textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
+\textit{Scalar Values} & s     & ::= & k \vb x \\
+\textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Head Values}  & hnf     & ::= & h \vb k \\
+\textit{Values}        & |v|   & ::= & x \vb hnf \\ % |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |e_1 = e_2|
+                                         \vb |e_1 choice e_2| \vb |apply1N e_1 e_2|
+  \vb |one e| \vb |all e| \\
+\textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+% \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
+% \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
+\textit{Results}       & r     & ::= & |def xs (cs; v) | \\
+                       & c     & ::= & |x = h| \\
+
+\end{array}$$
+\caption{\textbf{Syntax of POPL-stye calculus}}
+\label{fig:popl-syntax}
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcll}
+        \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| & \\
+        \rulename{swap-c} & |e; x = v| & \equiv & |x = v; e|  \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences (POPL style)}}\label{fig:popl-structural-equiv}
+\end{figure}
+}
+
+%  ----------------------------------------------------------
+%                    POPL style rules
+%  ----------------------------------------------------------
+
+\newcommand{\figureRulesPOPL}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Unification:~\runi}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{deref-h}  & |x == h ;  A^[h]| & \movesto & |x == h ; A^[h]| \\
+\rulename{u-lit}    & |k == k |                                    & \movesto & k \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'|} \\
+\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| & \\
+\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
+\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\[0.05in]
+
+
+\rulegroupname{Application:~\rapp}
+\rulename{app-beta} & |apply1N (lam x e_1) e_2| & \movesto & |def x (x=e_2; e_1)|  & if $|x| \not \in \freevars{|e_2|}$ \\[0.05in]
+% \rulename{app-tup} & |apply1N (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\rulegroupname{Garbage Collection:~$\rgc$}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-cst}     & |def (x_1 ^^ dots) x_1 == h_1; dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
+
+\rulegroupname{Fail Propagation:~\rfail}
+\rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
+\rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
+\rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
+
+\rulegroupname{Speculation:~\rspc}
+\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
+\rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{}{|rs|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{}{r}{|xs|}{|cs|}{|v|}
+\end{longtable}
+\caption{\textbf{POPL-style rules for Evaluation}}\label{fig:popl-rulesI}
+\end{figure}
+}
+
+\newcommand{\figureRulesPOPLconj}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Conjunction:~\rcon}
+\rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
+\rulename{conj-seq-swap}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
+\rulename{conj-seq-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{conj-fun-def} & |apply1N (def x e_1) e_2|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+\lvc{\rulename{conj-cst-defr}} & |e_1 == (def y e_2)| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\lvc{\rulename{conj-cst-defl}} & |(def y e_1) == e_2| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_1|}$ \\
+\rulename{conj-fun-cst} & |apply1N (e_1 ; e_2) e_3|       & \movesto & |e_1; apply1N e_2 e_3| \\
+\rulename{conj-arg-cst} & |apply1N e_1 (e_2 ; e_3)|       & \movesto & |def f (f == e_1 ; e_2 ; apply1N f e_2)|  & |f| fresh \\
+\lvc{\rulename{unify-seql}} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+\lvc{\rulename{unify-seqr}} & |e_1 == (e_2 ; e_3)| & \movesto & |def x (x == e_1 ; e_2 ; x == e_3)|  & |x| fresh\\
+\lvc{\rulename{unify-unifyl}} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\lvc{\rulename{unify-unifyr}} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
+\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\[0.05in]
+
+\end{longtable}
+\caption{\textbf{POPL-style rules for normalisation}}\label{fig:popl-rulesN}
+\end{figure}
+
+\begin{figure}
+\begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
+\rulegroupname{Conjunction:~\rcon}
+\rulename{conj-flat-eq}     & |e_1 == e_2| & \movesto & |def x (x == e_1 ; x == e_2)|     & if |e_1| is not a value; |x| fresh \\
+\rulename{conj-flat-fun}    & |apply1N e_1 e_2| & \movesto & |def f (f == e_1 ; apply1N f e_2)|     & if |e_1| is not a value; |f| fresh \\
+\rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
+\rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
+\rulename{conj-seq-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+\lvc{\rulename{conj-cst-defr}} & |e_1 == (def y e_2)| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
+\lvc{\rulename{unify-seqr}} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_3| \\
+\lvc{\rulename{unify-unifyr}} & |v == (e_1 == e_2)| & \movesto & |v == e_1; v == e_2| & \\
+\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
+\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\[0.05in]
+
+\end{longtable}
+\caption{\textbf{Alternative POPL-style rules for normalisation}}\label{fig:popl-rulesN-alt}
+\end{figure}
+}
+
+
+%  ----------------------------------------------------------
+%                    Fresh style rules
+%  ----------------------------------------------------------
 
 \newcommand{\figureRulesI}{
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification:~\runi}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
-\rulename{deref-v}  & |x == v ;  A^[x]| & \movesto & |x == v ; A^[v]| \\
+\rulename{deref-h}  & |x == h ;  A^[h]| & \movesto & |x == h ; A^[h]| \\
 \rulename{u-lit}    & |k == k ; e|                                    & \movesto & e \\
 \rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n') ; e| & \movesto & \largerhs{|v_1==v1';dots;v_n==v_n'; e|} \\
 \rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m') ; e| & \movesto & |fail|& if $n \not = m$ \\
 \rulename{u-fail-l}   & |k_1 == k_2 ; e |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
-\rulename{u-fail-f} & |lam x e == lam y e' ; e''|   & \movesto & |fail| & \\
-\rulename{u-fail-l-t} & |k == tup (dots) ; e| & \movesto & |fail| \\
-\rulename{u-fail-l-f} & |k == lam y e ; e'|   & \movesto & |fail| & \\
+\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 ; e|   & \movesto & |fail| & \\
+\rulename{u-fail-l-h} & |k == h ; e| & \movesto & |fail| \\
 \rulename{u-fail-t-f} & |tup (dots) == lam y e ; e'|   & \movesto & |fail| & \\[0.05in]
 
 
@@ -89,11 +237,11 @@ $$\begin{array}{lrcll}
 
 \rulegroupname{Garbage Collection:~$\rgc$}
 \rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-cst}     & |def (x_1 ^^ dots) x_1 == h_1; dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 % \multicolumn{4}{l}\text{\lennart{Above rule is debatable: allows removing unused variables}} \\
 % \multicolumn{4}{l}\text{\ranjit{this mirrors def-elim in POPL-VC?}} \\
-\multicolumn{4}{l}\text{\ranjit{fix GC to allow other head values}} \\
+% \multicolumn{4}{l}\text{\ranjit{fix GC to allow other head values}} \\
 
-\rulename{elim-rec}     & |def (x_1 ^^ dots) x_1 == (lam y_1 e_1); dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}
 \rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
@@ -109,8 +257,8 @@ $$\begin{array}{lrcll}
 \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
 \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{|rs|}{|xs|}{|cs|}{|vs|} \\
-\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{r}{|xs|}{|cs|}{|v|}\\
+\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{}{|rs|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{}{r}{|xs|}{|cs|}{|v|}\\
 \end{longtable}
 % \caption{\textbf{\calcname: Rules for Unification, Substitution and Application}}\label{fig:rulesI}
 \caption{\textbf{Rules for Evaluation}}\label{fig:rulesI}
@@ -131,8 +279,8 @@ $$\begin{array}{lrcll}
     \rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
     \rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
     \rulename{all-fail}   & |all fail|                         & \movesto & |tup ()| \\
-    \rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (v_1, dots, v_n)|  & if \wff{|r_1 dots r_n|}{|xs|}{|cs|}{|v_1 dots v_n|} \\
-    \rulename{all-value}  & |all r|                            & \movesto & |def xs cs ; tup v|                 & if \wff{r}{|xs|}{|cs|}{|v|}\\
+    \rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (v_1, dots, v_n)|  & if \wff{}{|r_1 dots r_n|}{|xs|}{|cs|}{|v_1 dots v_n|} \\
+    \rulename{all-value}  & |all r|                            & \movesto & |def xs cs ; tup v|                 & if \wff{}{r}{|xs|}{|cs|}{|v|}\\
 \end{longtable}
 \caption{\textbf{Rules for Decision and Collection}}\label{fig:rulesII}
 \end{figure}
@@ -144,17 +292,15 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Value Context}       & V  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \\
 \textit{Constraint Context}  & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
 \textit{Expression Context}  & E  & ::= & V \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
-%                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+                             &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
 % \textit{Constraint Context}  & C  & ::= & |hole == v| \vb |v == hole| \vb \lvc{|hole == e|} \vb \lvc{|v == E|} \\
-% \textit{Expression Context}  & E  & ::= & |hole| \vb |def x E| \vb |C ; e| \vb |c ; E| \vb |apply1N E e| \vb |apply1N e E| \\
 %
-\textit{Application Context} & A  & ::= & |hole| \vb |def x A | \vb |hole == hnf; e| \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
+\textit{Application Context} & A  & ::= & |hole| \vb |def x A | \vb |hole == h; e| \vb |hole == k; e| \vb |c; A| \vb |A e| \vb |e A| \vb \lvc{|v = A; e|} \\
+                             &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
 \textit{Choice Context}      & CX & ::= & \hole \vb |def x CX| \vb |v == v' ; CX| \vb |apply1N CX e| \vb |apply1N ce CX| \\
                              &    & \vb & \lvc{|v == CX; e|} \vb \lvc{|v == ce; CX|} \\
-\textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\[0.05in]
-
-\textit{Head Values}         & |hnf| & ::= & k \vb |tup (t_1, dots t_n)| \vb |lam x e| \\
-\textit{Choice-free Expr.}   & ce  & ::= & v \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
+\textit{Scope Context}       & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
+\textit{Choice-free Expr.}   & ce  & ::= & |v| \vb |v == v' ; ce| \vb |def x ce| \vb |ce ce| \vb |one e| \vb |all e| \\
 \end{array}$$
 \caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
 \end{figure}
@@ -165,33 +311,33 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
 \begin{mathpar}
 \inferrule
-  { \wff{r}{|xs|}{|cs|}{|v|}}
+  { \wff{\emptyset}{r}{|xs|}{|cs|}{|v|}}
   { \wf{r} }
   { \rulename{WF} }
 
 \inferrule
   { }
-  { \wff{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \wff{\Gamma}{|v|}{\emptyset}{\emptyset}{|v|} }
   { \rulename{WF-Val}}
 
 \inferrule
-  { \wff{r}{|xs|}{|cs|}{|v|} }
-  { \wff{|def x r|}{|x,xs|}{|cs|}{|v|} }
+  { x \not \in \Gamma \quad
+    \wff{\Gamma, x}{r}{|xs|}{|cs|}{|v|} }
+  { \wff{\Gamma}{|def x r|}{|x,xs|}{|cs|}{|v|} }
   { \rulename{WF-Def} }
 
 \inferrule
-  {\wff{r}{|xs|}{|cs|}{|v|} \quad
-   x \not \in |xs|
+  {x \in \Gamma \quad
+   \wff{\Gamma - x}{r}{|xs|}{|cs|}{|v|}
   }
-  % {\wff{|x == lam y e; r|}{|xs|}{|x == lam y e, cs|}{|v|}}
-  {\wff{|x == hnf; r|}{|xs|}{|x == hnf, cs|}{|v|}}
-  {\rulename{WF-Lam}}
+  {\wff{\Gamma}{|x == h; r|}{|xs|}{|x == h, cs|}{|v|}}
+  {\rulename{WF-Cst}}
 
 \inferrule
-  { \wff{r}{\overline{x}}{\overline{c}}{|v|}
-    \wff{rs}{\overline{x'}}{\overline{c'}}{|vs|}
+  { \wff{\emptyset}{r}{\overline{x}}{\overline{c}}{|v|} \quad
+    \wff{}{rs}{\overline{x'}}{\overline{c'}}{|vs|}
   }
-  { \wff{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
+  { \wff{}{r,rs}{\overline{x},\overline{x'}}{\overline{c},\overline{c'}}{|v,vs|} }
   {\rulename{WF-many}}
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}

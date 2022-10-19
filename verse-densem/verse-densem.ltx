@@ -150,7 +150,7 @@
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
 \newcommand{\malt}{\diamond}
 
-\newcommand{\setform}[1]{\{ #1 \}}
+\newcommand{\setform}[1]{\left\{ #1 \right\}}
 \newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
 \newcommand{\sbind}[2]{ #1 \in #2 }
 
@@ -169,12 +169,17 @@
 \newcommand{\mtyped}{\Value^{?}}
 \newcommand{\mempty}{\mathit{empty}}
 \newcommand{\munit}{\mathit{unit}}
+\newcommand{\munits}[1]{\munit(#1)}
 \newcommand{\mintersect}{\Cap}
 \newcommand{\munion}{\Cup}
 \newcommand{\msemi}{\fatsemi}
 \newcommand{\mone}{\mathit{one}}
 \newcommand{\mall}{\mathit{all}}
-
+\newcommand{\mtag}{\mathit{tag}}
+\newcommand{\mtage}[1]{([],#1)}
+\newcommand{\mlift}[1]{#1_{\bot}}
+\newcommand{\mplus}{\oplus}
+\newcommand{\powerset}[1]{{\mathcal P}(#1)}
 \newcommand{\wrong}{\mathrm{WRONG}}
 \newcommand{\apply}{\mathit{apply}}
 
@@ -366,7 +371,7 @@
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
-       & & \vb & |hastype e_1 e_2| \\
+%       & & \vb & |hastype e_1 e_2| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -416,11 +421,11 @@ $
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \Value^{*}) + \wrong \\
+\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
 \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
-\\ \\
+\\[5mm]
 \text{\bf Semantics of expressions and values} \\
 
   \begin{array}{rcll}
@@ -434,11 +439,12 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
-  \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
-    r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
-      \wrong & \text{otherwise} \\
-      \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
-        \end{array} \\
+% Commenting out hastype for now
+%   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
+%     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
+%       \wrong & \text{otherwise} \\
+%      \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
+%         \end{array} \\
 
   \end{array}          \\ \\
 
@@ -480,9 +486,10 @@ $
 \end{figure}
 
 \begin{figure}
+\simon{ToDo: the if's are in the wrong place}
 $$
 \begin{array}{rcll}
-  \semapp{O}{|op|}{} & : & \Env \rightarrow \Value \\
+  \semapp{O}{|op|}{} & : & \Value \\
   \semapp{O}{|add|} & = &  \lambda w . \munit(k_1+k_2) & \text{if } |w = tup (k_1,k_2)|  \\
                           & = &      \lambda w . \mempty & \text{otherwise}\\
   \semapp{O}{|gt|}  & = &  \lambda w . \munit(k_1) & \text{if } |w = tup (k_1,k_2), k_1 > k_2|  \\
@@ -497,17 +504,18 @@ $$
 \begin{figure}
 $$
 \begin{array}{l}
-\text{\bf Bags or sequences $\Value^{*}$} \\
-\mtype =  \bot + [] + (\Value \times \mtype) \\
+\text{\bf Set semantics for $\mtype$} \\
+\mtype =  \mlift{(\wrong + \powerset{\Value})} \\
 \\
-\begin{array}{rrcl}
-\text{Empty} & \mempty & = & [ \, ] \\
-\text{Unit} & \munit(w) & = & [ \, w \, ] \\
-\text{Concatenation} &  s_1 \munion s_2 & = & s_1 \sconcat s_2 \\
-\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{w_1}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}, w_1=w_2} \\
-\text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{w_2}{\mbind{w_1}{s_1}, \mbind{w_2}{s_2}} \\
-\text{One}  & \mone(s) & = & \shead( s )\\
-\text{All}  & \mall(s) & = & \stuple( s ) \\
+\begin{array}{rrcll}
+\text{Empty} & \mempty & = & \{ \, \} \\
+\text{Unit} & \munit(w) & = & \{ w  \} \\
+\text{Concatenation} &  s_1 \munion s_2 & = & s_1 \cup s_2 \\
+\text{Intersection} &  s_1 \mintersect s_2 & = & s_1 \cap s_2 \\
+\text{Sequencing}   &  s_1 \msemi s_2 & = & s_2 & \text{ if $s_1$ is non-empty} \\
+            &          & = & \{\,\} & \text{otherwise} \\
+\text{One}  & \mone(s) & = & ??? \\
+\text{All}  & \mall(s) & = & ??? \\
 
 % \multicolumn{4}{l}{\text{Some pseudo Haskell the generates the cartesian product.}} \\
 % \multicolumn{4}{l}{     cart [] = \{ \emptyset \} } \\
@@ -516,21 +524,9 @@ $$
 %cart [] = [[]]
 %cart ((x, ys) : xyss) = [ (x, y) : f | y <- ys , f <- cart xyss ]
 \end{array}
-\\ \\
-\begin{array}{rrcl}
-\text{Creation} & [w_1,\cdots,w_n] & & (n >= 0) \\
-\text{Comprehension} & \mcompr{e}{\mbind{x}{s}, \cdots} \\
-\text{Cons} &  (\scons) & : & \Value \rightarrow \Value^{*} \rightarrow \Value^{*}\\
-\text{Concatenation} &  \sconcat & : & \Value^{*} \rightarrow \Value^{*} \rightarrow \Value^{*}\\
-\text{Head}  & \shead & : & \Value^{*} \rightarrow \Value^{*} \\
-             & \shead [] & = & [] \\
-             & \shead (w \scons s) & = & [ w ] \\
-\text{To tuple} & \stuple & : & \Value^{*} \rightarrow \tuple{\Value} \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
-\end{array}
 \end{array}
 $$
-\caption{Bag or sequence semantics}
+\caption{Set semantics}
 \label{fig:sequences}
 \end{figure}
 
@@ -692,33 +688,53 @@ There is probably more than one possible choice here.
 \begin{figure}
 $$
 \begin{array}{l}
-\text{\bf Labelled sequences $\mtype$} \\
-\begin{array}{rcl}
-\mtype & = & \bot + \mathds{1} + (\LblValue \times \mtype) \\
-\LblValue & = & \Lbl^{*} \times \Value \\
+\text{\bf Labelled sets $\mtype$} \\
+\begin{array}{rcll}
+\mtype & = & \mlift{(\wrong + \powerset{\LblValue})} \\
+\mtyped & = & \setform{\Value} & \text{Set with 0 or 1 elements} \\
+\LblValue & = & [ \Lbl ] \times \Value & \text{Sequence of $\Lbl$ and a value} \\
 \Lbl & = & \lblleft \domplus \lblright \\
 \end{array} \\
 \\
-\begin{array}{rrcl}
-\text{Empty} & \mempty(w) & = & [ \,] \\
-\text{Unit} & \munit(w) & = & [ \, ([], w) \, ] \\
-\text{Concatenation} &  s_1 \munion s_2 & = & \mcompr{(\lblleft \scons l,w)}{\mbind{(l,w)}{s_1}} \cup
-                                             \mcompr{(\lblright \scons l, w)}{\mbind{(l,w)}{s_2}} \\
-\text{Intersection} &  s_1 \mintersect s_2 & = & \mcompr{(l_1,w_1)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
-\text{Sequencing}   &  s_1 \msemi s_2 & = & \mcompr{(\lblsemi{l_1}{l_2}, w_2)}{\mbind{(l_1,w_1)}{s_1}, \mbind{(l_2,w_2)}{s_2}} \\
-\text{One}  & \mone(s) & = & \shead (\msort( s)) \\
-\text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+    & \mempty & = & \varnothing \\[1mm]
+\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
+     & \munits{w} & = & \setform{ ([], w) } \\[1mm]
+\text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
+\text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+&  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
+% \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
+% & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
+\text{One}  & \mone & : & \mtype \rightarrow \mtype \\
+& \mone(s) & = & \shead (\msort( s)) \\[1mm]
+\text{All}  & \mall & : & \mtype \rightarrow \mtype \\
+ & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
+\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
+             & \shead [] & = & empty \\
+             & \shead (w \scons s) & = & \munits{w} \\[1mm]
+\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+  \end{array} \\
 \\
-\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \Value^{*} \\
-& \msort( [] ) & = & [] \\
-& \msort( s ) & = & \mcompr{w}{\mbind{([],w)}{s}} \\
-  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblleft:l,w)}{s}} \\
-  &&& \sconcat \msort \mcompr{(l,w)}{\mbind{(\lblright:l,w)}{s}} \\
-  \end{array}
+\begin{array}{rrcll}
+\text{Sort} & \msort & : & \LblValue^{*} \rightarrow ([\Value] + \wrong)\\
+& \msort(s) & = & []  & \text{if $s$ is empty} \\
+&  & = & \wrong & \text{if $ws$ has more than one element} \\
+&& = & ws & \text{otherwise} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
+&& \multicolumn{3}{l}{\text{where $ws = \mcompr{w}{\sbind{([],w)}{s}}$}}
+\end{array}
+
 \end{array}
 $$
-\caption{Labelled expression semantics}
-\label{fig:den-sem2}
+\caption{Labelled set semantics}
+\label{fig:micro-labelled-sem}
 \end{figure}
 
 \Cref{fig:den-sem2} give a new denotational semantics that \emph{does} account for order.
@@ -759,7 +775,6 @@ $$
 \semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
 $$
 
-\newcommand{\munits}[1]{\eta(#1)}
 
 \section{All about TimLambda}
 
@@ -817,7 +832,7 @@ The syntax is given in \Cref{fig:tim-syntax}.
 \begin{itemize}
 \item In the TimLambda semantics the meaning of $\mtype$ is a set of values.
 The necessary sequencing for choice is handle by labelling (as above).
-  
+
 \item A $\lambda$-expression has the following (complex) syntax
 $$
 |lam x (def (y_1 dots y_n) (where e_1 dot e_2))|
@@ -870,8 +885,6 @@ $$
 \end{array}
 \right. }
 $$
-\simon{What is $\munits$?}
-\lennart{What is called \textit{unit} above, but that name was too long.}
 
 Reading off the final result, we can see that the denotation is the set of all functions $\Value \rightarrow \mtyped$
 such that if the argument is an integer the result is the singleton set with the successor of the argument.
@@ -1083,7 +1096,17 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \text{See below, figure \ref{fig:tim-lambda}} \\
+  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
+    \begin{array}[t]{ll}
+      f
+        \mid f \in (\Value \rightarrow \mtyped) , \\
+        \forall |w w_1 dots w_n| \in |W| . \\
+          \begin{array}[t]{l}
+            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
+            \exists z \in f(w) . \, \\
+            z \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
+          \end{array} \\
+    \end{array}
   \end{array}          \\
 \\
   \begin{array}{rcll}
@@ -1125,115 +1148,75 @@ $
 \end{figure}
 
 
-
-\begin{figure}
-$$
-\begin{array}{l}
-  \text{\bf Transcribed from notes, CORRECTED version} \\
-  \text{Clearly wrong, since syntatic |x| doesn't occur.} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = &
-    \begin{array}[t]{ll}
-      \{ f
-        \mid f \in (\Value \rightarrow \mtyped) , \\
-        \forall x \in \semapp{E}{|def (y_1 dots y_n) e_1|}{\rho} . \\
-        \exists z \in f(x) . \\
-        \forall |w_1 dots w_n| . \,
-          \begin{array}[t]{l}
-            x = \semapp{E}{|e_1|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \implies \\
-            z = \semapp{E}{|e_2|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-      \} \\
-    \end{array} \\
-  \end{array}          \\
-\\
-
-  \text{\bf Transcribed from notes, rephrased slightly version} \\
-  \text{Clearly wrong, since $f(w)$ is a set, not a value.} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
-    \begin{array}[t]{ll}
-      f
-        \mid f \in (\Value \rightarrow \mtyped) , \\
-        \forall |w w_1 dots w_n| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
-            f(w) \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-    \end{array}
-    \\
-    && \} \\
-  \end{array}          \\
-
-  \text{\bf Maybe correct version} \\
-  \begin{array}{rcll}
-  \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
-    \begin{array}[t]{ll}
-      f
-        \mid f \in (\Value \rightarrow \mtyped) , \\
-        \forall |w w_1 dots w_n| \in |W| . \\
-          \begin{array}[t]{l}
-            \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
-            \exists z \in f(w) . \, \\
-            z \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
-          \end{array} \\
-    \end{array}
-    \\
-    && \} \\
-  \text{Note that $f(w)$ has 0 or 1 elements.} \\
-  \end{array}          \\
-
-\end{array}
-$$
-\caption{Different takes on TimLambda}
-\label{fig:tim-den-sem2}
-\end{figure}
+% 
+% \begin{figure}
+% $$
+% \begin{array}{l}
+%   \text{\bf Transcribed from notes, CORRECTED version} \\
+%   \text{Clearly wrong, since syntatic |x| doesn't occur.} \\
+%   \begin{array}{rcll}
+%   \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = &
+%     \begin{array}[t]{ll}
+%       \{ f
+%         \mid f \in (\Value \rightarrow \mtyped) , \\
+%         \forall x \in \semapp{E}{|def (y_1 dots y_n) e_1|}{\rho} . \\
+%         \exists z \in f(x) . \\
+%         \forall |w_1 dots w_n| . \,
+%           \begin{array}[t]{l}
+%             x = \semapp{E}{|e_1|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \implies \\
+%             z = \semapp{E}{|e_2|}{\extendrho{\rho}{|y_1| \mapsto w_1 |dots|}} \\
+%           \end{array} \\
+%       \} \\
+%     \end{array} \\
+%   \end{array}          \\
+% \\
+% 
+%   \text{\bf Transcribed from notes, rephrased slightly version} \\
+%   \text{Clearly wrong, since $f(w)$ is a set, not a value.} \\
+%   \begin{array}{rcll}
+%   \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
+%     \begin{array}[t]{ll}
+%       f
+%         \mid f \in (\Value \rightarrow \mtyped) , \\
+%         \forall |w w_1 dots w_n| . \\
+%           \begin{array}[t]{l}
+%             \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
+%             f(w) \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
+%           \end{array} \\
+%     \end{array}
+%     \\
+%     && \} \\
+%   \end{array}          \\
+% 
+%   \text{\bf Maybe correct version} \\
+%   \begin{array}{rcll}
+%   \semapp{E}{|lam x (def (y_1 dots y_n) (where e_1 dot e_2))|}{\rho} & = & \{
+%     \begin{array}[t]{ll}
+%       f
+%         \mid f \in (\Value \rightarrow \mtyped) , \\
+%         \forall |w w_1 dots w_n| \in |W| . \\
+%           \begin{array}[t]{l}
+%             \semapp{E}{|e_1|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \neq \varnothing \implies \\
+%             \exists z \in f(w) . \, \\
+%             z \in \semapp{E}{|e_2|}{\extendrho{\rho}{|x| \mapsto w, |y_1| \mapsto w_1 |dots|}} \\
+%           \end{array} \\
+%     \end{array}
+%     \\
+%     && \} \\
+%   \text{Note that $f(w)$ has 0 or 1 elements.} \\
+%   \end{array}          \\
+% 
+% \end{array}
+% $$
+% \caption{Different takes on TimLambda}
+% \label{fig:tim-den-sem2}
+% \end{figure}
 
 % ------------------------------------------------------------
 \subsection{Labelled semantics for TimLambda}
 See \Cref{fig:tim-labelled-sem}
 
 
-\begin{figure}
-$$
-\begin{array}{l}
-\text{\bf Labelled sets $\mtype$} \\
-\begin{array}{rcll}
-\mtype & = & \setform{\LblValue} \\
-\mtyped & = & \setform{\LblValue} & \text{Set with 0 or 1 elements} \\
-\LblValue & = & [ \Lbl ] \times \Value & \text{Sequence of $\Lbl$ and a value} \\
-\Lbl & = & \lblleft \domplus \lblright \\
-\end{array} \\
-\\
-\begin{array}{rrcll}
-\text{Empty} & \mempty & = & \varnothing \\
-\text{Unit} & \munits{w} & = & \setform{ ([], w) } \\
-\text{Concatenation} &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
-                                             \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\
-\text{Intersection} &  s_1 \mintersect s_2 & = & \scompr{(l_1,w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\
-&&& \text{\lennart{I suspect the result should be $(\lblsemi{l_1}{l_2},w)$ instead.}} \\
-\text{Sequencing}   &  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\
-\text{One}  & \mone(s) & = & \shead (\msort( s)) \\
-\text{All}  & \mall(s) & = & \stuple (\msort( s) ) \\
-\\
-\text{Sort} & \msort & : & \LblValue^{*} \rightarrow [\Value] \\
-& \msort( {} ) & = & [] \\
-& \msort( s ) & = & \mcompr{w}{\sbind{([],w)}{s}} \\
-  &&& \text{\lennart{The list above should have 0 or 1 element, anything else is WRONG.}} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
-\\
-\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
-             & \shead [] & = & empty \\
-             & \shead (w \scons s) & = & \munits{w} \\
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
-  \end{array} \\
-\end{array}
-$$
-\caption{Labelled expression semantics}
-\label{fig:tim-labelled-sem}
-\end{figure}
 
 % ------------------------------------------------------------
 \clearpage
@@ -1244,35 +1227,8 @@ $$
 %format domain (x) = "\textbf{domain}\{" x "\}"
 %%% %format univ (x) (y) = "\forall" x ".\," y
 %format ANY = "\textbf{W}"
-\renewcommand{\mempty}{\varnothing}
 
 
-This section describes micro-lambdas ($\mu\lambda$s ?), see figure \ref{fig:micro-syntax} for syntax.
-
-\begin{itemize}
-\item The denotation of an expression is a set of (tagged) values.
-\item A micro-lambda has the syntax |lam v_1 v_2|.  It stands for the set of all
-  functions that map the input |v_1| to the output |v_2|, but is otherwise unspecified.
-  No variables get bound in this construct!
-% \item There is a universal quantifier, |univ x e|.  It is the intersection of all
-%  denotations of |e_2| as |x| ranges over all values.  The |x| may not occur in |e_1|.  
-\item The existential quantifier has a domain, |quantE x e_1 e_2|, where |x| will range over
- the values in the denotation of |e_1|.  The |x| may not occur in |e_1|.
-\item There is a universal quantifier, |quantA x e_1 e_2|.  It is the intersection of all
- denotations of |e_2| as |x| ranges of the denotation of |e_1|.  The |x| may not occur in |e_1|.
-\item The expression |domain e| is the set of functions that are unspecified when the argument is
-  in the denotation of |e|, and fails when it is not.
-\end{itemize}
-
-\lennart{The propagation of labels when there are quantifiers needs some thought.}
-
-Some examples:
-\begin{itemize}
-  \item |lam 0 1 = lam 1 0| is a (set of) function that maps 0 to 1 and 1 to 0, but otherwise unspecified.
-  \item |lam 0 1 = lam 1 0 = domain(0 `choice` 1)| is a function that maps 0 to 1, 1 to 0, and fails for all other inputs.
-  \item |(x : int) => x+1| is a (set of) function that computes the successor for an integer argument.
-    It desugars to |quantA x (:int) (quantE y (x+1) (lam x y))|.
-\end{itemize}
 
 \begin{figure}
   $$
@@ -1283,15 +1239,15 @@ Some examples:
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |quantE x e_1 e_2| \vb |quantA x e_1 e_2| \\
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb |def x e| \vb |univ x e| \\
        && \vb & |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
-       \vb |domain e| \vb |ANY|
+       \vb |domain e|
        \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
 \fi
-       & & \vb & |lam v_1 v_2| \\
+       & & \vb & |mlam v_1 v_2| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \\
     \text{Primops} & op  & ::= & |gt| \vb |add| \vb |int|
@@ -1302,7 +1258,7 @@ Some examples:
           \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
-          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+%%          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\ \\[-3mm]
     \textbf{Shorthand} \\
     \begin{array}{rcl}
@@ -1310,8 +1266,8 @@ Some examples:
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |quantE (x_1 ^^ x_2 dots x_n) e_1 e_2| & \text{means} & |quantE x_1 e_1 (quantE (x_2 dots x_n) e_1 e_2)| \\
-      |quantA (x_1 ^^ x_2 dots x_n) e_1 e_2| & \text{means} & |quantA x_1 e_1 (quantE (x_2 dots x_n) e_1 e_2)| \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def (x_2 dots x_n) e)| \\
+      |univ (x_1 ^^ x_2 dots x_n) e| & \text{means} & |univ x_1 (univ (x_2 dots x_n) e)| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
@@ -1320,6 +1276,28 @@ Some examples:
   $$
 \caption{MicroLambda: The Verse calculus: syntax} \label{fig:micro-syntax}
 \end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+  \text{\bf Desugaring, ``source'' to core, ignoring scope} \\
+  \begin{array}{rcll}
+    |x:e| & \equiv & |x := :e| \\
+    |x := e_1; e_2| & \equiv & |def x (x = e_1; e_2)| \\
+    |:e| & \equiv & |def x (apply1 e x)| & \text{|x| fresh} \\
+    |(x:=e_1) eqgt e_2| & \equiv & |univ x (x = e_1; def y (y = e_2); mlam x y)| \\
+   \\
+   \multicolumn{4}{l}{\text{TimLambda for nostalgia}} \\
+    |lam x (def (y_1 dots y_n) (where e_1 dot e_2))| & \equiv &
+    |univ (x y_1 dots y_n) (e_1; def z (z = e_2); mlam x z)| & \text{|z| fresh} \\
+    \\
+  \end{array} \\
+\end{array}
+$
+\caption{MicroLambda: Some desugaring}
+\label{fig:micro-desugar}
+\end{figure}
+
 
 \begin{figure}
 $
@@ -1339,27 +1317,26 @@ $
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
-  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+%  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
-  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
-\multicolumn{4}{l}{\text{\lennart{The two equations above are wrong. The $\mtype$ is a set of labelled values, but $w$ should be a value.}}} \\
+%  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semapp{E}{|univ x e|}{\rho} & = & \bigcap_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
-  \semapp{E}{|lam v_1 v_2|}{\rho} & = &
-    \{ f \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_1|}{\rho} \in f(\semapp{V}{|v_2|}{\rho}) \}
+  \semapp{E}{|mlam v_1 v_2|}{\rho} & = &
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_2|}{\rho} \in f(\semapp{V}{|v_1|}{\rho}) \}
     \\
   \semapp{E}{|domain e|}{\rho} & = &
-    \{ f \mid f \in \Value \rightarrow \mtyped, \forall w |dot| (w \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
-  \semapp{E}{|ANY|}{\rho} & = & \{ w \mid w \in W \} \\
-\multicolumn{4}{l}{\text{\lennart{Again, labelling makes the three above wrong.}}} \\  
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \forall w |dot| ((\_,w) \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
   \end{array}          \\
 \\
   \begin{array}{rcll}
   \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
   \semapp{V}{|x|}{\rho} & = & \rho(x) \\
   \semapp{V}{|k|}{\rho} & = & k \\
-  \semapp{V}{op}\rho & = & \semapp{O}{op} \\
+  \semapp{V}{op}\rho & = & \semapp{O}{op} & \text{See \Cref{fig:primops} for $\semapp{O}{}$} \\
 %%%  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
   \end{array}
@@ -1369,49 +1346,141 @@ apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( \bot, w) & = & \bot \\
 apply( \wrong, w) & = & \wrong \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
-apply( \tuple{v_0, \ldots, v_n}, w) & = &
-%     \multicolumn{2}{l}{
-%     ((\munits{w} \mintersect \munits{0}) \msemi \munits{v_0}) \; \munion |dots| \; \munion
-%     ((\munits{w} \mintersect \munits{n}) \msemi \munits{v_n})
-%     }
-  \{ v_0 \mid w=0 \} \; \munion \; |dots| \; \munion \; \{ v_n \mid w=n \}
-  \\
+apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+  & = & \mempty & \text{otherwise} \\
 apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
 \end{array}
-\\ \\
-\begin{array}{lrcll}
-\text{Empty}        & \mempty & : &  \mtyped \\
-\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtyped \\
-\text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-\text{Product}      & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-\end{array}
-
 \end{array}
 $
 \caption{MicroLambda: Expression semantics}
-\label{fig:micro-den-sem1}
+\label{fig:micro-den-sem}
 \end{figure}
+
+
+This section describes micro-lambdas.  See figure \ref{fig:micro-syntax} for syntax,
+and \Cref{fig:micro-desugar} for some desugaring rules.
+
+\subsection{Informal semantics, and examples}
+
+\begin{itemize}
+\item The denotation of an expression is a set of (tagged) values.
+\item A micro-lambda has the syntax |mlam v_1 v_2|.  It stands for the set of all
+  functions that map the input |v_1| to the output |v_2|, but is otherwise unspecified.
+  No variables get bound in this construct! For example |mlam x x| has two (bound) occurrences of |x|,
+  not (as would normally be the case) a binding site and a bound occurrence.
+% \item There is a universal quantifier, |univ x e|.  It is the intersection of all
+%  denotations of |e_2| as |x| ranges over all values.  The |x| may not occur in |e_1|.
+\item The existential quantifier has a domain, |quantE x e_1 e_2|, where |x| will range over
+ the values in the denotation of |e_1|.  The |x| may not occur in |e_1|.
+\item There is a universal quantifier, |quantA x e_1 e_2|.  It is the intersection of all
+ denotations of |e_2| as |x| ranges of the denotation of |e_1|.  The |x| may not occur in |e_1|.
+\item The expression |domain e| is the set of functions that are unspecified when the argument is
+  in the denotation of |e|, and fails when it is not.
+\item Note that semicolon ``|;|'' is desugared away into $\exists$.
+  We could alternatively have the old (unbounded) $\exists$ and and ``|;|'', by desugaring
+  |(quantE x e_1 e_2)| to |def x (x=e_1; e2)|.  Then we also would not need |ANY| in |e|.  This acutally
+  seems nicer (more orthogonal).
+\end{itemize}
+
+\lennart{The propagation of labels when there are quantifiers needs some thought.}
+
+Some examples:
+\begin{itemize}
+  \item |mlam 0 1| denotes the set of all functions |f| that map |0| to |1|,
+  but is otherwise unspecified. For example, this set includes |lam x (x+1)| and |lam x 1| and |lam x (x*200 + 1)|.
+
+  \item |mlam 0 1 = mlam 1 0| is a (set of) function that maps 0 to 1
+    and 1 to 0, but otherwise unspecified.  This looks pretty odd!  But remember that equality |=| takes the \emph{intersection} of the denotations of its arguments.
+
+  \item |mlam 0 1 = mlam 1 0 = domain(0 `choice` 1)| is a function
+    that maps 0 to 1, 1 to 0, and fails for all other inputs.  The ``fail everywhere else'' part is
+    done by the |domain|.
+
+  \item The source expression |(x : int) => x+1| is a (set of) all functions that compute the successor for an integer argument; and have unspecified behaviour for non-integer arguments.
+    It desugars to |quantA x (:int) (quantE y ((x+1)) (mlam x y))|.
+\end{itemize}
+
+\subsection{Denotational semantics}
+
+The denotational semantics is in \Cref{fig:micro-den-sem}.
+
+\begin{itemize}
+\item The function part of the domain of values $\Value$ is $\Value
+  \rightarrow \mtyped$; that is the function returns 0 or 1 value;
+  that is, it is (isomorphic to) a \emph{partial function}.  We aren't
+  quite sure about this.  Would $\Value \rightarrow \Value$ work?
+
+\item Do $\bot$ and $\wrong$ live in $\mtype$ as well as $\Value$?  Or would it
+  be $\munit(\wrong)$?
+\end{itemize}
+
+\appendix
+\cleardoublepage
+
+\section{Old versions}
 
 \begin{figure}
 $
 \begin{array}{l}
-  \text{\bf Desugaring, ``source'' to core, ignoring scope} \\
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \bot + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtyped) + \wrong \\
+\tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\ \\
+\text{\bf Semantics of expressions and values} \\
+
   \begin{array}{rcll}
-    |x:e| & \equiv & |x := :e| \\
-    |:e| & \equiv & |quantE x ANY (apply1 e x)| & \text{|x| fresh} \\
-    |x:=e_1; e_2| & \equiv & |quantE x e_1 e_2| \\
-    |(x:=e_1) eqgt e_2| & \equiv & |quantA x e_1 (quantE y e_2 (lam x y))| & \text{|y| fresh} \\
-    |lam x (def (y_1 dots y_n) (where e_1 dot e_2))| & \equiv &
-    |quantA (x y_1 dots y_n) ANY (e_1; quantE z e_2 (lam x z))| & \text{|z| fresh} \\
-    |e_1; e_2| & \equiv & |quantE x e_1 e_2| & \text{|x| fresh} \\
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|v|}{\rho} & = & \munits{\semapp{V}{v}{\rho}} \\
+  \semapp{E}{|fail|}{\rho} & = & \mempty \\
+  \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
+%  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
+%  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = & \bigcup_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantE x e_1 e_2|}{\rho} & = &
+    \bigcup \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+%  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = & \bigcap_{w \in \semapp{E}{|e_1|}{\rho}}\, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})} \\
+  \semapp{E}{|quantA x e_1 e_2|}{\rho} & = &
+    \bigcap \setform{\mtag(l, \semapp{E}{|e_2|}{(\extendrho{\rho}{|x| \mapsto w})}) \mid (l,w) \in \semapp{E}{|e_1|}{\rho} } \\
+
+  \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|all e|}{\rho} & = & \munits{\mall (\semapp{E}{e}{\rho})} \\
+  \semapp{E}{|mlam v_1 v_2|}{\rho} & = &
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \semapp{V}{|v_2|}{\rho} \in f(\semapp{V}{|v_1|}{\rho}) \}
     \\
-  \end{array} \\
+  \semapp{E}{|domain e|}{\rho} & = &
+    \{ \mtage{f} \mid f \in \Value \rightarrow \mtyped, \forall w |dot| ((\_,w) \not\in \semapp{E}{e}{\rho} \implies f(w) = \mempty) \} \\
+  \semapp{E}{|ANY|}{\rho} & = & \{ \mtage{w} \mid w \in W \} \\
+\multicolumn{4}{l}{\text{\lennart{Again, labelling makes the three above wrong.}}} \\
+  \end{array}          \\
+\\
+  \begin{array}{rcll}
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{op}\rho & = & \semapp{O}{op} & \text{See \Cref{fig:primops} for $\semapp{O}{}$} \\
+%%%  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
+  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
+  \end{array}
+  \\ \\
+\begin{array}{rcll}
+apply & : & (\Value \times \Value) \rightarrow \mtype \\
+apply( \bot, w) & = & \bot \\
+apply( \wrong, w) & = & \wrong \\
+apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
+apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+  & = &  \wrong & \text{otherwise} \\
+apply( f, w ) & = & f\, w & f \in \Value \rightarrow \mtyped \\
+\end{array}
 \end{array}
 $
-\caption{MicroLambda: Some desugaring}
-\label{fig:micro-desugar}
+\caption{MicroLambda: Expression semantics, with bounded quantifiers}
+\label{fig:micro-den-sem-bounded}
 \end{figure}
+
 
 
 \end{document}

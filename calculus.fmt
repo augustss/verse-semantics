@@ -34,6 +34,7 @@
 %format space = "\hspace{1mm}"
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
+%format mlam (e1) (e2) = "\mu\hspace{0.1mm}" e1 ".\," e2
 %format thunk (e) = "\lambda x.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
@@ -120,6 +121,7 @@
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
+%format univ (x) (y) = "\forall" x ".\," y
 
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
@@ -161,7 +163,7 @@
 %format write = "\textbf{write}"
 %format any = "\textbf{any}"
 %format dots = "\cdots"
-%format hnf = "\hnf"
+%format hnf = "\mathit{hnf}"
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"
@@ -187,6 +189,9 @@
 %format x_3
 %format x_i
 %format x_n
+
+%format h_1
+%format h_n
 
 %format y_0
 %format y_1

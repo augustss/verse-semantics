@@ -12,17 +12,17 @@ import Data.Maybe
 --------------------------------------------------------------------------------
 
 data Expr
-  = Val Value
-  | Expr :=: Expr
-  | Expr :>: Expr
-  | Expr :|: Expr
-  | Value :@: Value
-  | Def (Bind Expr)
-  | One Expr
-  | All Expr
-  | Fail
-  | Wrong
-  | Split Expr Value Value
+  = Val Value                   -- ^ v
+  | Expr :=: Expr               -- ^ e1 = e2
+  | Expr :>: Expr               -- ^ e1; e2
+  | Expr :|: Expr               -- ^ e1 | e2
+  | Value :@: Value             -- ^ v1(v2)
+  | Def (Bind Expr)             -- ^ ex x. e
+  | One Expr                    -- ^ one { e }
+  | All Expr                    -- ^ all { e }
+  | Fail                        -- ^ fail
+  | Wrong                       -- ^ wrong
+  | Split Expr Value Value      -- ^ split { e, v1, v2 }
 
 instance Show Expr where
   show (Val v)          = show v
@@ -46,7 +46,7 @@ instance Parens Expr where
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
-  
+
 instance Ord Expr where
   a `compare` b = comp [] [] a b
    where
@@ -54,11 +54,11 @@ instance Ord Expr where
     comp xs ys Wrong Wrong = EQ
     comp xs ys Wrong _     = LT
     comp xs ys _     Wrong = GT
-    
+
     comp xs ys Fail Fail = EQ
     comp xs ys Fail _    = LT
     comp xs ys _    Fail = GT
-    
+
     comp xs ys (Val v) (Val w) = compV xs ys v w
     comp xs ys (Val v) _       = LT
     comp xs ys _       (Val w) = GT
@@ -66,30 +66,30 @@ instance Ord Expr where
     comp xs ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
     comp xs ys (a:=:b) _       = LT
     comp xs ys _       (c:=:d) = GT
-    
+
     comp xs ys (a:>:b) (c:>:d) = comp xs ys a c & comp xs ys b d
     comp xs ys (a:>:b) _       = LT
     comp xs ys _       (c:>:d) = GT
-    
+
     comp xs ys (a:|:b) (c:|:d) = comp xs ys a c & comp xs ys b d
     comp xs ys (a:|:b) _       = LT
     comp xs ys _       (c:|:d) = GT
-    
+
     comp xs ys (a:@:b) (c:@:d) = compV xs ys a c & compV xs ys b d
     comp xs ys (a:@:b) _       = LT
     comp xs ys _       (c:@:d) = GT
-    
+
     comp xs ys (One a) (One b) = comp xs ys a b
     comp xs ys (One a) _       = LT
     comp xs ys _       (One b) = GT
-    
+
     comp xs ys (All a) (All b) = comp xs ys a b
     comp xs ys (All a) _       = LT
     comp xs ys _       (All b) = GT
-    
+
     comp xs ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
-    comp xs ys (Split _ _ _) _ = LT
-    comp xs ys _ (Split _ _ _) = GT
+    comp xs ys Split {} _ = LT
+    comp xs ys _ Split {} = GT
 
     comp xs ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
 
@@ -103,7 +103,7 @@ instance Ord Expr where
     compV xs ys _       (Var _) = GT
 
     compV xs ys (HNF a) (HNF b) = compH xs ys a b
-    
+
     compH xs ys (Arr vs) (Arr ws)
       | n == m    = head (dropWhile (==EQ) (zipWith (compV xs ys) vs ws) ++ [EQ])
       | otherwise = n `compare` m
@@ -140,6 +140,8 @@ data Op
   | Sub
   | Mul
   | Div
+  | Neg
+  | Plus
   | IsInt
   | MapAp
   | Cons
@@ -165,6 +167,8 @@ instance Show Op where
   show Sub   = "sub"
   show Mul   = "mul"
   show Div   = "div"
+  show Neg   = "neg"
+  show Plus  = "plus"
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
@@ -177,6 +181,9 @@ pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
+pattern HVAL v = Val (HNF v)
+
+pattern DEF x e = Def (Bind x e)
 
 -- Value
 pattern VINT n  = HNF (Int n)
@@ -186,6 +193,8 @@ pattern ADD     = HNF (Op Add)
 pattern SUB     = HNF (Op Sub)
 pattern MUL     = HNF (Op Mul)
 pattern DIV     = HNF (Op Div)
+pattern NEG     = HNF (Op Neg)
+pattern PLUS    = HNF (Op Plus)
 pattern GRT     = HNF (Op Gt)
 pattern GRE     = HNF (Op Ge)
 pattern LST     = HNF (Op Lt)
@@ -356,7 +365,7 @@ arbValue n xs =
 ---
 
 instance Arbitrary Expr where
-  arbitrary = sized (`arbExpr` []) -- closed by default 
+  arbitrary = sized (`arbExpr` []) -- closed by default
 
   shrink (Val v)   = [ Val v' | v' <- shrink v ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
@@ -401,7 +410,5 @@ arbBind n xs =
   [ (4, do let x = identNotIn xs
            Bind x <$> arbExpr n (x:xs))
   ]
-  
+
 --------------------------------------------------------------------------------
-
-
