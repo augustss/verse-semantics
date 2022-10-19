@@ -179,19 +179,29 @@ P-ADD;ELIM-CST;DEREF-S-K;P-MUL;ELIM-CST;APP-BETA;ELIM-CST;DEREF-H;ONE-CHOICE;SEQ
 
 P-ADD;ELIM-CST;DEREF-S-K;P-MUL;ELIM-CST;APP-BETA;ELIM-CST;DEREF-H;ONE-CHOICE;SEQ;P-IsINT;ELIM-CST;DEREF-S-K;CONJ-SEMI;UNIFY-SEQR;ELIM-CST;DEREF-S-K;APP-BETA;ELIM-CST;DEREF-S-K;APP-BETA;ELIM-CST;DEREF-H;ELIM-CST;APP-BETA;ELIM-CST;DEREF-H;ONE-CHOICE;SEQ;P-IsINT;ELIM-CST;DEREF-S-K;DEREF-S-K;CONJ-SEMI;UNIFY-SEQR;ELIM-CST;DEREF-S-K;DEREF-S-K;APP-BETA;ELIM-CST;DEREF-S-K;APP-BETA;ELIM-CST;DEREF-H;SWAP-C;CONJ-SEMI;UNIFY-SEQR: 8
 
-```haskell
-def $a3 in {
-  def $a4 in {
-    ($a3 = ((
-      $a4 = (\$y1.def $c2 in {
-        ($c2 = one {
-          def x in {(x = (\x.isInt(x); x)($y1)); (\_.(\$y2.def $c1 in {($c1 = one {def y in {(y = (\x.isInt(x); x)($y2)); (\_.def $a5 in {($a5 = mul(arr{2, y})); add(arr{x, $a5})})} | (\_.fail)}); $c1(arr{})}))} | (\_.fail)
-        }); $c2(arr{})})
+TRACE: ds :
 
-    );
-    $a4(2))
-    );
-    $a3(3)
+def x in {def $r1 in {(5 = ((x = ($r1; (\x.isInt(x); x)($r1))); x)); 5}}
+
+
+def
+5 = (x = y);
+x
+```haskell
+def a in {def r1 in {(5 = ((a = (r1; (def x. x = r1; isInt(x); x))); a)); 5}}
+
+
+
+
+
+  def x in {
+    def $r1 in {
+      (5 = (x = ($r1;
+                  (\x.isInt(x); x)($r1)
+                )
+           )
+      );
+      5
+    }
   }
-}
 ```

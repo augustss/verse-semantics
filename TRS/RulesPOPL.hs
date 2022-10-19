@@ -399,7 +399,7 @@ rulesSequencing lhs =
   "UNIFY-UNIFYR" `name`
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3))))
+     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3) :>: VAR x)))
 
 --------------------------------------------------------------------------------
 
@@ -734,14 +734,14 @@ derefV lhs xx =
 -- TODO: replace with `FLAT-EQ` from Simon-Lennart doc: e1 = e2 ==> ex x. x = e1 ; x = e2; x
 
 dsFresh :: Expr -> Expr
-dsFresh e = {- trace ("TRACE: ds : " ++ show e') $ -} e'
+dsFresh e = trace ("TRACE: ds : " ++ show e') $ e'
   where e' = dsFresh' e
 
 dsFresh' :: Expr -> Expr
 dsFresh' = go
   where
    go (ex :=: ex') = dsEq ex ex'
-   go (ex :>: ex') = dsSeq ex ex'
+   go (ex :>: ex') = go ex :>: go ex' -- dsSeq ex ex'
    go (ex :|: ex') = go ex :|: go ex'
    go (Def bi)     = dsBind bi
    go (One ex)     = One (go ex)
@@ -751,8 +751,8 @@ dsFresh' = go
 -- | `e1 == e2` ===> `ex x . x == e1; x == e2; x`
 dsEq :: Expr -> Expr -> Expr
 dsEq e1 e2
-  | isVal e1  = e1 :=: e2
-  | isVal e2  = e2 :=: e1
+  | isVal e1  = (e1 :=: e2') :>: e1
+  | isVal e2  = (e2 :=: e1') :>: e2
   | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2') :>: VAR x))
   where
     x   = identNotIn (free [e1', e2'])

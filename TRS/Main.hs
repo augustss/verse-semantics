@@ -35,7 +35,7 @@ prop_NormalForms p =
 --------------------------------------------------------------------
 
 runFresh :: Expr -> [(String, Expr)]
-runFresh = normalFormsFuel 99 rulesFRESH
+runFresh = normalFormsFuel 99 rulesFRESH . dsFresh
 
 dumpCtx :: (Show a, Show b) => (t -> [(Value -> a, b)]) -> t -> IO ()
 dumpCtx c e = mapM_ print [ (ctx (iVar "#") , v) | (ctx, v) <- c e]
@@ -51,6 +51,9 @@ lam = LAM (ident "_")
 
 iLAM :: String -> Expr -> Expr
 iLAM = LAM . ident
+
+iLam :: String -> Expr -> Value
+iLam x e = HNF (Lam (Bind (ident x) e))
 
 iVAR :: String -> Expr
 iVAR = VAR . ident
@@ -76,3 +79,31 @@ e0' = iDEFs ["f", "f1", "f2"]
           (iVAR "f1" :=: (iVar "f"  :@: VINT 2)) :>:
           (iVAR "f2" :=: (iVar "f1" :@: VINT 3)) :>:
           iVAR "f2" )
+
+e1 =
+  iDEFs ["x", "$r1"]
+    (
+      (INT 5 :=:
+        (iVAR "x" :=:
+          (
+            (iVAR "$r1" :>:
+              ( (iLam "x" ((IsINT :@: (iVar "x")) :>: iVAR "x")) :@: iVar "$r1" )
+            )
+          )
+        )
+      )
+    )
+
+e1' =
+  iDEFs ["x", "y"]
+    (
+      (INT 5 :=: (iVAR "x" :=: iVAR "y") )
+      :>:
+      iVAR "x"
+    )
+{-
+-- def x in {def $r1 in {5 = (x = ($r1; (\x.isInt(x); x)($r1)))}}
+
+ex x, r1.
+  5 = (x = (r1; (\x.isInt(x); x)(r1)))
+-}

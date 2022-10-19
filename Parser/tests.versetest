@@ -2,6 +2,7 @@
 #  SEq  evaluate the two expressions and expect them to be equal
 #  FEq  evaluate the two expressions,
 #       they should be equal but currently the test fails
+testeq(SEq) {(xx:int) = 5}                         {5}
 
 # Trivial tests
 testeq(SEq) {2}                                   {2}
