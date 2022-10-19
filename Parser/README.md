@@ -25,14 +25,6 @@ $ cabal v2-test --test-options -rewrite
 
 ## TODO: Fresh Rules
 
-- [ ] `isFresh :: Expr -> Bool`
-- [ ] `DsFresh :: Expr -> {e:Expr|isFresh e}`
-- [ ] `rulesSubstitution`
-  - [ ] `App-Ctx` (`A`)
-  - [ ] `Exp-Ctx` (`E`)
-- [ ] `rulesConjunction`
-- [ ] `rulesGarbageCollection`
-
 ```haskell
 TRACE: NFT :
 
@@ -48,8 +40,6 @@ TRACE: NFT :
   def $a2 in
     {($a2 = (\$y1.def $c1 in {($c1 = one {def x in {(x = (\x.isInt(x); x)($y1)); (\_.add(arr{x, 1}))} | (\_.fail)}); $c1(arr{})})); def $y1 in {($y1 = 2); def $c1 in {($c1 = one {def x in {(x = def x in {($y1 = x); (isInt(x); x)}); (\_.add(arr{x, 1}))} | (\_.fail)}); $c1(arr{})}}})]
 
-
-
  [("ELIM-CST",
 
     def $y1 in
@@ -57,9 +47,6 @@ TRACE: NFT :
       def $c1 in
         {($c1 = one { def x in {(x = def x in {($y1 = x); (isInt(x); x)}); (\_.add(arr{x, 1}))} | (\_.fail)});
           $c1(arr{})}}),
-
-
-
 
   ("ELIM-CST",def $a2 in {($a2 = (\$y1.def $c1 in {($c1 = one {def x in {(x = (\x.isInt(x); x)($y1)); (\_.add(arr{x, 1}))} | (\_.fail)}); $c1(arr{})})); def $y1 in {($y1 = 2); def $c1 in {($c1 = one {def x in {(x = def x in {($y1 = x); (isInt(x); x)}); (\_.add(arr{x, 1}))} | (\_.fail)}); $c1(arr{})}}})
  ]
