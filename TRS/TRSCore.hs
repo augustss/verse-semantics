@@ -179,6 +179,8 @@ pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
 pattern HVAL v = Val (HNF v)
 
+pattern DEF x e = Def (Bind x e)
+
 -- Value
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
