@@ -552,22 +552,24 @@ rulesSubstitution :: ERule
 rulesSubstitution lhs =
  "DEREF-S-K" `name`
   do (VAR x :=: INT k :>: e) <- [lhs]
-     (eCtx, Var x') <- derefE e
-     guard (x == x')
-     pure ((VAR x :=: INT k) :>: eCtx (VINT k))
+     eCtx <- derefE e x
+     pure ((VAR x :=: INT k) :>: plug eCtx (VINT k))
   ++
   "DEREF-S-V" `name`
   do (VAR x :=: VAR y :>: e) <- [lhs]
-     (eCtx, Var x') <- derefE e
+     eCtx <- derefE e x
      guard (x < y)
-     guard (x == x')
-     pure ((VAR x :=: VAR y) :>: eCtx (Var y))
+     pure ((VAR x :=: VAR y) :>: plug eCtx (Var y))
   ++
   "DEREF-H" `name`
   do (VAR x :=: HVAL h :>: e) <- [lhs]
-     (aCtx, Var x') <- derefA e
-     guard (x == x')
-     pure ((VAR x :=: HVAL h) :>: aCtx (HNF h))
+     aCtx <- derefA e x
+     pure ((VAR x :=: HVAL h) :>: plug aCtx (HNF h))
+
+plug :: VContext -> Value -> Expr
+plug ctx v = subst [(hole,v)] (ctx (Var hole))
+  where
+   hole    = ident "$HOLE$"
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection lhs =
@@ -612,30 +614,32 @@ gc xs cs e = go (free e) cs e
 
 -}
 
-derefA :: Expr -> [(VContext, Value)]
-derefA lhs =
+derefA :: Expr -> Ident -> [VContext]
+derefA lhs xx =
    do (Var x :@: v) <- [lhs]
-      pure ( (:@: v), Var x)
+      guard (x == xx)
+      pure (:@: v)
    ++
    do (VAR x :=: HVAL h) <- [lhs]
-      pure ( (:=: HVAL h) . Val, Var x)
+      guard (x == xx)
+      pure ( (:=: HVAL h) . Val)
    ++
    do Def (Bind x e) <- [lhs]
-      (ctx, v) <- derefA e
-      pure (Def . Bind x . ctx, v)
+      guard (x /= xx)
+      ctx <- derefA e xx
+      pure (Def . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      (ctx, v) <- derefA e1
-      pure ((:>: e2) . ctx, v)
+      ctx <- derefA e1 xx
+      pure ((:>: e2) . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      (ctx, v) <- derefA e2
-      pure ((e1 :>:) . ctx, v)
+      ctx <- derefA e2 xx
+      pure ((e1 :>:) . ctx)
    ++
    do (VAR x :=: e) <- [lhs]
-      (ctx, v')   <- derefA e
-      pure ((VAR x :=:) . ctx, v')
-
+      ctx <- derefA e xx
+      pure ((VAR x :=:) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
    V ::= □ | ⟨s1, · · · , □, · · · , sn⟩ | 𝜆x. E
@@ -645,79 +649,83 @@ derefA lhs =
 -}
 type VContext = Value -> Expr
 
-derefE :: Expr -> [(VContext, Value)]
-derefE lhs =
-   do Val v     <- [lhs]
-      (ctx, v') <- derefV v
-      pure (Val . ctx, v')
+derefE :: Expr -> Ident -> [VContext]
+derefE lhs xx =
+   do Val v <- [lhs]
+      ctx <- derefV v xx
+      pure (Val . ctx)
    ++
    do Def (Bind x e) <- [lhs]
-      (ctx, v)       <- derefE e
-      pure (Def . Bind x . ctx, v)
+      guard (x /= xx)
+      ctx       <- derefE e xx
+      pure (Def . Bind x . ctx)
    ++
    do (c :>: e) <- [lhs]
-      (ctx, v)  <- derefC c
-      pure ((:>: e) . ctx, v)
+      ctx  <- derefC c xx
+      pure ((:>: e) . ctx)
    ++
    do (c :>: e) <- [lhs]
-      (ctx, v)  <- derefE e
-      pure ((c :>:) . ctx, v)
+      ctx  <- derefE e xx
+      pure ((c :>:) . ctx)
    ++
    do (v1 :@: v2) <- [lhs]
-      (ctx, v)    <- derefV v1
-      pure ((:@: v2) . ctx, v)
+      ctx    <- derefV v1 xx
+      pure ((:@: v2) . ctx)
    ++
    do (v1 :@: v2) <- [lhs]
-      (ctx, v)    <- derefV v2
-      pure ((v1 :@:) . ctx, v)
+      ctx    <- derefV v2 xx
+      pure ((v1 :@:) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      (ctx, v)    <- derefE e1
-      pure ((:|: e2) . ctx, v)
+      ctx    <- derefE e1 xx
+      pure ((:|: e2) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      (ctx, v)    <- derefE e2
-      pure ((e1 :|:) . ctx, v)
+      ctx    <- derefE e2 xx
+      pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      (ctx, v) <- derefE e
-      pure (One . ctx, v)
+      ctx <- derefE e xx
+      pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      (ctx, v) <- derefE e
-      pure (All . ctx, v)
+      ctx <- derefE e xx
+      pure (All . ctx)
 
 -- (paper) C ::= V = v | v = V | V = e | v = E
 -- (TRS)   C ::= E = e | e = E
 
-derefC :: Expr -> [(Value -> Expr, Value)]
-derefC lhs =
+derefC :: Expr -> Ident -> [Value -> Expr]
+derefC lhs xx =
    do (Val v :=: e) <- [lhs]
-      (ctx, v')   <- derefV v
-      pure ((:=: e) . Val . ctx, v)
+      ctx   <- derefV v xx
+      pure ((:=: e) . Val . ctx)
    ++
    do (v :=: e) <- [lhs]
-      (ctx, v')   <- derefE e
-      pure ((v :=:). ctx, v')
+      ctx   <- derefE e xx
+      pure ((v :=:). ctx)
    ++
    -- (TRS) to allow (e1; e2)
    do e <- [lhs]
-      derefE e
+      derefE e xx
 
 -- (paper) V ::= □ | 𝜆x. E | ⟨s1, · · · , □, · · · , sn⟩
 -- (TRS)   V ::= □ |
-derefV :: Value -> [(Value -> Value, Value)]
-derefV lhs =
+derefV :: Value -> Ident -> [Value -> Value]
+derefV lhs xx =
   do Var x <- [lhs]
-     pure (id, Var x)
+     guard (x == xx)
+     pure id
   ++
   do VLAM v e  <- [lhs]
-     (ctx, v') <- derefE e
-     pure (VLAM v . ctx, v')
+     guard (v /= xx)
+     ctx <- derefE e xx
+     pure (VLAM v . ctx)
   ++
   do VARR vs <- [lhs]
      (i, x) <- [ (i, x) | i <- [0..length vs-1], Var x <- [vs !! i]]
-     pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs), Var x)
+     guard (x == xx)
+     pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs))
 
 {-
   x = s; E [x] ===> x = s; E[s]
