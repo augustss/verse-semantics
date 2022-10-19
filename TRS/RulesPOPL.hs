@@ -6,7 +6,9 @@ import TRS
 import Bind
 import TRSCore
 import Control.Monad( guard )
-import Data.List( sort )
+import Data.List( sort, find, union, (\\) )
+import Data.Functor.Classes (Show1(liftShowList))
+import Debug.Trace (trace)
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -36,6 +38,8 @@ isVar _       = False
 type Context = Expr -> Expr
 
 -- scope contexts
+
+-- X ::= * | X = e | e = X | X;e | e;X
 
 execX, execX1 :: Expr -> [(Context, Expr)]
 -- X context
@@ -130,31 +134,31 @@ valueX1 lhs =
 type ERule = Rule Expr
 
 rulesPOPL :: ERule
-rulesPOPL
-   =   rulesPrimOps
-   +++ rulesApplication
-   +++ rulesUnification
-   +++ rulesUnificationVariables
-   +++ rulesSequencing
-   +++ rulesChoice
-   +++ rulesOne
-   +++ rulesAll
-   +++ rulesFail
-   +++ rulesSplit
+rulesPOPL = rulesPrimOps
+        +++ rulesApplication
+        +++ rulesUnification
+        +++ rulesUnificationVariables
+        +++ rulesSequencing
+        +++ rulesChoice
+        +++ rulesOne
+        +++ rulesAll
+        +++ rulesFail
+        +++ rulesSplit
 
 --------------------------------------------------------------------------------
 rulesFRESH :: ERule
-rulesFRESH
-   =   rulesPrimOps
-   +++ rulesApplication
-   +++ rulesUnificationNoOcc
-   -- +++ rulesUnificationVariables
-   -- +++ rulesSequencing
-   +++ rulesChoice
-   +++ rulesOne
-   +++ rulesAll
-   +++ rulesFail
-   +++ rulesSplit
+rulesFRESH = rulesPrimOps
+         +++ rulesApplication
+         +++ rulesUnificationNoOcc
+         +++ rulesSubstitution
+         +++ rulesStructural
+         +++ rulesSequencing
+         +++ rulesGarbageCollection
+         +++ rulesChoice
+         +++ rulesOne
+         +++ rulesAll
+         +++ rulesFail
+         +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -234,12 +238,16 @@ rulesPrimOps lhs =
 mapAp :: [Value] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-      unit = VARR []
-      defs :: [Ident] -> Expr -> Expr
-      defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
-      seqs :: [Expr] -> Expr
-      seqs = foldl1 (:>:)
   in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
+
+defs :: [Ident] -> Expr -> Expr
+defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
+
+unit :: Value
+unit = VARR []
+
+seqs :: [Expr] -> Expr
+seqs = foldl1 (:>:)
 
 --------------------------------------------------------------------------------
 
@@ -264,9 +272,8 @@ rulesApplication lhs =
 
 --------------------------------------------------------------------------------
 rulesUnification :: ERule
-rulesUnification lhs =
-   rulesUnificationNoOcc lhs
-   ++ rulesUnificationOcc lhs
+rulesUnification = rulesUnificationNoOcc
+               +++ rulesUnificationOcc
 
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc lhs =
@@ -514,8 +521,224 @@ normDef xs a                = defs (sort ys) (norm (subst sub a))
 
 
 --------------------------------------------------------------------------------
+-- Fresh Rules
+--------------------------------------------------------------------------------
+
+rulesStructural :: ERule
+rulesStructural lhs =
+  "SWAP-E-1" `name`
+  do (VAR y :=: VAR x) <- [lhs]
+     -- guard (x < y)
+     pure (VAR x :=: VAR y)
+  ++
+  "SWAP-E-2" `name`
+  do (HVAL h :=: VAR x) <- [lhs]
+     pure (VAR x :=: HVAL h)
+  ++
+  "SWAP-C"  `name`
+  do (e1 :>: ((VAR x :=: HVAL v) :>: e3)) <- [lhs]
+     guard (not (valueConstraint e1))
+     pure ((VAR x :=: HVAL v) :>: (e1 :>: e3))
+  ++
+  "CONJ-SEMI" `name`
+  do ((e1 :>: e2) :>: e3) <- [lhs]
+     pure (e2 :>: (e1 :>: e3))
+
+valueConstraint :: Expr -> Bool
+valueConstraint (VAR _ :=: HVAL _) = True
+valueConstraint _                  = False
+
+rulesSubstitution :: ERule
+rulesSubstitution lhs =
+ "DEREF-S-K" `name`
+  do (VAR x :=: INT k :>: e) <- [lhs]
+     eCtx <- derefE e x
+     pure ((VAR x :=: INT k) :>: plug eCtx (VINT k))
+  ++
+  "DEREF-S-V" `name`
+  do (VAR x :=: VAR y :>: e) <- [lhs]
+     eCtx <- derefE e x
+     guard (x < y)
+     pure ((VAR x :=: VAR y) :>: plug eCtx (Var y))
+  ++
+  "DEREF-H" `name`
+  do (VAR x :=: HVAL h :>: e) <- [lhs]
+     aCtx <- derefA e x
+     pure ((VAR x :=: HVAL h) :>: plug aCtx (HNF h))
+
+plug :: VContext -> Value -> Expr
+plug ctx v = subst [(hole,v)] (ctx (Var hole))
+  where
+   hole    = ident "$HOLE$"
+
+rulesGarbageCollection :: ERule
+rulesGarbageCollection lhs =
+   "ELIM-DEF" `name`
+   do Def (Bind x e) <- [lhs]
+      guard (x `notElem` free e)
+      pure e
+   ++
+   "ELIM-CST" `name`
+   do Def _ <- [lhs]
+      (xs, cs, e) <- gcDefs lhs
+      pure (gc xs cs e)
+
+gcDefs :: Expr -> [([Ident], [(Ident, HNF)], Expr)]
+gcDefs e = do
+   do let (xs, e')  = goD e
+      let (cs, e'') = goC e'
+      guard (not (null xs))
+      guard (not (null cs))
+      pure (xs, cs, e'')
+   where
+      goD (Def (Bind x e)) = (x:xs, e') where (xs, e') = goD e
+      goD e                = ([], e)
+      goC ((VAR x :=: HVAL h) :>: e) = ((x,h) : cs, e') where (cs, e') = goC e
+      goC e                          = ([], e)
+
+gc :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+gc xs cs e = go (free e) cs e
+   where
+      go :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+      go live cands e = case find (\(xi,_) -> xi `elem` live) cands of
+         Nothing       -> defs [x | x <- xs, x `elem` live] e
+         Just (xi, hi) -> go (live `union` free hi) (cands \\ [(xi, hi)]) (VAR xi :=: HVAL hi :>: e)
+
+{- | Application Contexts
+
+   (paper) A ::= □ | ∃x.A | □ = h  e | □ = k;e | c;A | A e | e A | v = A ; e
+              | A + e | e + A | all{A} | one{A}
+
+   (TRS)   A ::= □ v | □ = h | □ = k | ∃x.A | A; e | e;A | A e | e A | v = A
+              | A + e | e + A | all{A} | one{A}
+
+-}
+
+derefA :: Expr -> Ident -> [VContext]
+derefA lhs xx =
+   do (Var x :@: v) <- [lhs]
+      guard (x == xx)
+      pure (:@: v)
+   ++
+   do (VAR x :=: HVAL h) <- [lhs]
+      guard (x == xx)
+      pure ( (:=: HVAL h) . Val)
+   ++
+   do Def (Bind x e) <- [lhs]
+      guard (x /= xx)
+      ctx <- derefA e xx
+      pure (Def . Bind x . ctx)
+   ++
+   do (e1 :>: e2) <- [lhs]
+      ctx <- derefA e1 xx
+      pure ((:>: e2) . ctx)
+   ++
+   do (e1 :>: e2) <- [lhs]
+      ctx <- derefA e2 xx
+      pure ((e1 :>:) . ctx)
+   ++
+   do (VAR x :=: e) <- [lhs]
+      ctx <- derefA e xx
+      pure ((VAR x :=:) . ctx)
+
+{- | Expression Contexts `E` ----------------------------------------------
+   V ::= □ | ⟨s1, · · · , □, · · · , sn⟩ | 𝜆x. E
+   C ::= V = v | v = V | V = e | v = E
+   E ::= 𝑉 | ∃x.E | C;e | c;E | E e | e E
+       | E + e | e + E | all{E} | one{E}
+-}
+type VContext = Value -> Expr
+
+derefE :: Expr -> Ident -> [VContext]
+derefE lhs xx =
+   do Val v <- [lhs]
+      ctx <- derefV v xx
+      pure (Val . ctx)
+   ++
+   do Def (Bind x e) <- [lhs]
+      guard (x /= xx)
+      ctx       <- derefE e xx
+      pure (Def . Bind x . ctx)
+   ++
+   do (c :>: e) <- [lhs]
+      ctx  <- derefC c xx
+      pure ((:>: e) . ctx)
+   ++
+   do (c :>: e) <- [lhs]
+      ctx  <- derefE e xx
+      pure ((c :>:) . ctx)
+   ++
+   do (v1 :@: v2) <- [lhs]
+      ctx    <- derefV v1 xx
+      pure ((:@: v2) . ctx)
+   ++
+   do (v1 :@: v2) <- [lhs]
+      ctx    <- derefV v2 xx
+      pure ((v1 :@:) . ctx)
+   ++
+   do (e1 :|: e2) <- [lhs]
+      ctx    <- derefE e1 xx
+      pure ((:|: e2) . ctx)
+   ++
+   do (e1 :|: e2) <- [lhs]
+      ctx    <- derefE e2 xx
+      pure ((e1 :|:) . ctx)
+   ++
+   do (One e) <- [lhs]
+      ctx <- derefE e xx
+      pure (One . ctx)
+   ++
+   do (All e) <- [lhs]
+      ctx <- derefE e xx
+      pure (All . ctx)
+
+-- (paper) C ::= V = v | v = V | V = e | v = E
+-- (TRS)   C ::= E = e | e = E
+
+derefC :: Expr -> Ident -> [Value -> Expr]
+derefC lhs xx =
+   do (Val v :=: e) <- [lhs]
+      ctx   <- derefV v xx
+      pure ((:=: e) . Val . ctx)
+   ++
+   do (v :=: e) <- [lhs]
+      ctx   <- derefE e xx
+      pure ((v :=:). ctx)
+   ++
+   -- (TRS) to allow (e1; e2)
+   do e <- [lhs]
+      derefE e xx
+
+-- (paper) V ::= □ | 𝜆x. E | ⟨s1, · · · , □, · · · , sn⟩
+-- (TRS)   V ::= □ |
+derefV :: Value -> Ident -> [Value -> Value]
+derefV lhs xx =
+  do Var x <- [lhs]
+     guard (x == xx)
+     pure id
+  ++
+  do VLAM v e  <- [lhs]
+     guard (v /= xx)
+     ctx <- derefE e xx
+     pure (VLAM v . ctx)
+  ++
+  do VARR vs <- [lhs]
+     (i, x) <- [ (i, x) | i <- [0..length vs-1], Var x <- [vs !! i]]
+     guard (x == xx)
+     pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs))
+
+{-
+  x = s; E [x] ===> x = s; E[s]
+-}
+
+-- TODO: replace with `FLAT-EQ` from Simon-Lennart doc: e1 = e2 ==> ex x. x = e1 ; x = e2; x
+
 dsFresh :: Expr -> Expr
-dsFresh = go
+dsFresh e = {- trace ("TRACE: ds : " ++ show e') $ -} e'
+  where e' = dsFresh' e
+
+dsFresh' :: Expr -> Expr
+dsFresh' = go
   where
    go (ex :=: ex') = dsEq ex ex'
    go (ex :>: ex') = dsSeq ex ex'
@@ -530,11 +753,11 @@ dsEq :: Expr -> Expr -> Expr
 dsEq e1 e2
   | isVal e1  = e1 :=: e2
   | isVal e2  = e2 :=: e1
-  | otherwise = Def (Bind x (cst x e1' :>: cst x e2' :>: Val (Var x)))
+  | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2') :>: VAR x))
   where
     x   = identNotIn (free [e1', e2'])
-    e1' = dsFresh e1
-    e2' = dsFresh e2
+    e1' = dsFresh' e1
+    e2' = dsFresh' e2
 
 isVal :: Expr -> Bool
 isVal (Val _) = True
@@ -546,21 +769,16 @@ isCst _         = False
 
 -- | `e1; e2` ===> `ex x . x == e1; e2`
 dsSeq :: Expr -> Expr -> Expr
-
 dsSeq e1 e2
   | isCst e1' = e1' :>: e2'
-  | otherwise = Def (Bind x (cst x e1' :>: e2'))
+  | otherwise = Def (Bind x ((VAR x :=: e1') :>: e2'))
   where
      x   = identNotIn (free [e1', e2'])
-     e1' = dsFresh e1
-     e2' = dsFresh e2
+     e1' = dsFresh' e1
+     e2' = dsFresh' e2
 
--- |
 dsBind :: Bind Expr -> Expr
-dsBind (Bind x e) = Def (Bind x (dsFresh e))
+dsBind (Bind x e) = Def (Bind x (dsFresh' e))
 
 freshIdent :: Expr -> Ident
 freshIdent e = identNotIn (free e)
-
-cst :: Ident -> Expr -> Expr
-cst x e = Val (Var x) :=: e

@@ -1,9 +1,9 @@
-module TRSAdapter(rewrite) where
+module TRSAdapter(rewrite, coreToTrs) where
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
 import qualified RulesPOPL
-import TRS(normalFormsFuel)
+import TRS(normalFormsFuel, normalFormsTrace, printTrace)
 import Expr(Ident(..), noLoc)
 import Core
 import Error
@@ -11,6 +11,8 @@ import Flags
 
 import Debug.Trace
 import Print
+import Parse (parseDie, pExprSeq)
+import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
 rewrite flg = map (trsToCore . snd) . checkOne . normalFormsFuel n (rules flg) . ds flg . coreToTrs

@@ -11,7 +11,10 @@ import Core
 import Print
 import Desugar
 import Run
-
+import qualified RulesPOPL
+import qualified TRSCore as T
+import TRS(normalFormsTrace, printTrace)
+import TRSAdapter(coreToTrs)
 --------------
 
 data Test
@@ -148,7 +151,7 @@ testArgs = do
           "-rewrite" : r -> (defaultFlags{ fRewrite = True }, r)
           "-eval"    : r -> (defaultFlags,                    r)
           "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
-          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = Just 2 }, r)
+          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 50 }, r)
           r              -> (defaultFlags,                    r)
   let fn =
         case args' of
@@ -161,3 +164,20 @@ verseTest :: FilePath
 verseTest = "tests.versetest"
 test1 :: FilePath
 test1     = "test1.verse"
+
+-------------
+freshmain :: IO ()
+freshmain = do
+  testFRESH "{(x:int => y:int => x+2*y)[2][3]}"
+
+testFRESH :: String -> IO ()
+testFRESH s = do
+  let e = parseFresh s
+  let trs = normalFormsTrace RulesPOPL.rulesFRESH e
+  mapM_ (\tr -> printTrace tr >> putStrLn"----------") trs
+
+parseFresh :: String -> T.Expr
+parseFresh = coreToTrs . exprToCore flags . desugar . parseDie (pBraces pExprSeq) ""
+  where
+    flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 30 }
+------
