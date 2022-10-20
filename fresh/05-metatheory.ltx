@@ -1,0 +1,90 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\section{Metatheory} \label{sec:metatheory}
+
+The rules of our rewrite semantics can be applied anywhere,
+in any order, and they give meaning to programs without
+committing to a particular evaluation strategy.
+%
+But then it had better be the case that no matter how the
+rules are applied, one always obtains the same result!
+%
+If the rewrite rules were terminating, then we would expect
+that all possible execution paths lead to the same normal form.
+%
+However, since \calcname has recursion, we instead show that
+the rules are \emph{confluent}.
+%
+% which means that whenever
+% $e_2 \movesfrom^\ast e_1 \ movesto^\ast e_3$,
+% there exists a $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$.
+
+\begin{definition}[Reductions] A \emph{reduction} \rr is a binary
+    relation on a set of terms \univ. We write $\rr^{k}$ for the $k$-step
+    closure of $\rr$ and $\rr^{*}$ for the reflexive and transitive closure
+    of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+    %
+    We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
+    $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
+\end{definition}
+
+\begin{definition}[Confluence]
+%
+Two terms $e_1$, $e_2$ can be $\rr$-\emph{joined} written $\join{\rr}{e_1}{e_2}$,
+if there is a $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.
+%
+A reduction $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
+we have $\join{\rr}{e_1}{e_2}$.
+\end{definition}
+
+Confluence gives us the assurance that we will not get
+different results when choosing different rules, or get
+stuck with some rules and not with others.
+
+\mypara{Normal Forms}
+%
+A term $e$ is an $\rr$-\emph{Normal Form} if there does
+not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
+Confluence implies that ultimately, rewriting terminates
+with at most one unique normal form, regardless of the
+evaluation strategy.
+
+\begin{lemma}[Unique-Normal-Forms~\cite{Barendregt}] \label{lem:nf}
+If $\rr$ is confluent then every term reduces to at most one normal form.
+\end{lemma}
+
+Our main result is that the reduction relation $\rr$ for \calcname,
+defined as the union of the reduction relations
+$\runi$ (Unification),
+$\rapp$ ($\beta$-Application),
+$\rcon$ (Conjunction),
+$\rgc$  (Garbage Collection),
+$\rfail$ (Fail Propagation) and
+$\rspc$ (Speculation)
+in \cref{FIXME} % \cref{fig:rulesI}
+is confluent.
+
+\begin{theorem}[Confluence] \label{thm:confluence}
+The reduction relation $\rr \equiv \runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$ is confluent.
+\end{theorem}
+
+We establish confluence by proving each sub-relation is confluent, and that they \emph{commute}.
+
+\begin{definition}[Commutativity]
+%
+A reduction $R$ \emph{commutes} with $S$ if for all terms
+$e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
+there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
+%%
+\end{definition}
+
+
+\begin{lemma}[Commutativity \cite{Huet80}] \label{lem:comm}
+If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
+\end{lemma}
