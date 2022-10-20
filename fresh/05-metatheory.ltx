@@ -25,24 +25,21 @@ the rules are \emph{confluent}.
 % $e_2 \movesfrom^\ast e_1 \ movesto^\ast e_3$,
 % there exists a $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$.
 
-\begin{definition}[Reductions] A \emph{reduction} \rr is a binary
-    relation on a set of terms \univ. We write $\rr^{k}$ for the $k$-step
-    closure of $\rr$ and $\rr^{*}$ for the reflexive and transitive closure
-    of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
-    %
-    We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
-    $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
-\end{definition}
+\subsection{Confluence}
 
-\begin{definition}[Confluence]
+\mypara{Reductions and Confluence}
 %
-Two terms $e_1$, $e_2$ can be $\rr$-\emph{joined} written $\join{\rr}{e_1}{e_2}$,
-if there is a $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.
+A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+%
+We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
+for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+%
+We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
+$\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
 %
 A reduction $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
-we have $\join{\rr}{e_1}{e_2}$.
-\end{definition}
-
+there exists an $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.
+%
 Confluence gives us the assurance that we will not get
 different results when choosing different rules, or get
 stuck with some rules and not with others.
@@ -53,9 +50,9 @@ A term $e$ is an $\rr$-\emph{Normal Form} if there does
 not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
 Confluence implies that ultimately, rewriting terminates
 with at most one unique normal form, regardless of the
-evaluation strategy.
+evaluation strategy \cite{Barendregt}.
 
-\begin{lemma}[Unique-Normal-Forms~\cite{Barendregt}] \label{lem:nf}
+\begin{lemma}[Unicity] \label{lem:nf}
 If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
 
@@ -74,17 +71,74 @@ is confluent.
 The reduction relation $\rr \equiv \runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$ is confluent.
 \end{theorem}
 
-We establish confluence by proving each sub-relation is confluent, and that they \emph{commute}.
-
-\begin{definition}[Commutativity]
-%
 A reduction $R$ \emph{commutes} with $S$ if for all terms
 $e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
 there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
-%%
-\end{definition}
+%
+We establish confluence by proving each sub-relation is confluent,
+and that they pairwise commute \cite{Huet}.
 
-
-\begin{lemma}[Commutativity \cite{Huet80}] \label{lem:comm}
+\begin{lemma}[Commutativity] \label{lem:comm}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
+
+\subsection{Design}
+
+\calcname's rewrite rules we carefully designed to ensure confluence.
+%
+\calcname layers values into \emph{scalars} (integers, variables)
+and \emph{heap values} (tuples and $\lambda$-terms) and then only
+allows scalars (no tuples or $\lambda$-terms) in tuples
+to ensure confluence.
+%
+Further, the \rulename{deref-h} rule prevents substituting heap values
+under $\lambda$ and tuples, and prevents ``copying'' heap values
+in constraints as all of these lead to non-confluence.
+
+\mypara{Non-Confluence}
+Suppose we eliminated \rulename{deref-h} and instead used a single
+rule like \rulename{deref-s} for \emph{all} values.
+%
+Then we could substitute $\lambda$ under tuples (and tuples under $\lambda$)
+which would violate confluence as shown by the following example.
+%
+\begin{verbatim}
+ex x,y. x = <1,y>; y = \z.x; x
+-->> ex x. x = <1, \z.x>; x         (1)
+
+ex x,y. x = <1,y>; y = \z.x; x
+-->> ex x. y = \z.<1, y>; <1, y>    (2)
+\end{verbatim}
+%
+(A similar phenomenon arises just with inlining mutually recursive
+$\lambda$-terms~\cite{Ariola2002}.)
+
+\mypara{Divergence: JB on Slack}
+%
+Even just substituting tuple under tuple can lead to non-termination
+which breaks the confluence via Newman's lemma route for the
+unification-rules fragment. Note we need termination as we can only
+directly prove \emph{local} confluence for the unification reductions
+as \cref{lem:join-h-h} requires multiple steps to reach a peak.
+
+\begin{verbatim}
+    ex x, y. x = <1,y>; y = <2,x>; x
+--> ex x, y. x = <1,y>; y = <2,x>; <1,y>
+--> ex x, y. x = <1,y>; y = <2,x>; <1,<2,x>>
+--> ex x, y. x = <1,y>; y = <2,x>; <1,<2,<1,y>>>
+--> ...
+\end{verbatim}
+
+
+Value stratification is not a limitation: in essence we ANF to name the
+inner elements (tuples or $\lambda$-terms), and then use the
+unification rule \rulename{utup} to destruct or ``unpack'' the
+tuple and to access its contents.
+%
+However, not substituting under lambda is a tiresome restriction: e.g.,
+compilers will certainly want to do so. \ranjit{Simon -- add more discussion here? Skew Confluence?}
+
+%
+
+
+First, w
