@@ -84,7 +84,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Scalar Values} & s     & ::= & k \vb x \\
 \textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
 \textit{Head Values}  & hnf     & ::= & h \vb k \\
-\textit{Values}        & |v|   & ::= & x \vb hnf \\ % |arr (s_1, dots, s_n)| \vb |lam x e| \\
+\textit{Values}        & |v|   & ::= & s \vb h \\ 
 \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |e_1 = e_2|
                                          \vb |e_1 choice e_2| \vb |apply1N e_1 e_2|
   \vb |one e| \vb |all e| \\
@@ -102,7 +102,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \begin{figure}
 $$\begin{array}{lrcll}
         \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| & \\
-        \rulename{swap-c} & |e; x = v| & \equiv & |x = v; e|  \\
+        \rulename{swap-c} & |x_1=v_1; x_2 = v_2; e| & \equiv & |x_2 = v_2; x_1=v_1; e|  \\
 \end{array}$$
 \caption{\textbf{Structural Equivalences (POPL style)}}\label{fig:popl-structural-equiv}
 \end{figure}
@@ -161,7 +161,10 @@ $$\begin{array}{lrcll}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Conjunction:~\rcon}
 \rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
-\rulename{conj-seq-swap}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e|          & if |e| is not of form |x' == s'|\\
+\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
+\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\
 \rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{conj-seq-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{conj-fun-def} & |apply1N (def x e_1) e_2|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_2|}$ \\
@@ -173,9 +176,7 @@ $$\begin{array}{lrcll}
 \lvc{\rulename{unify-seql}} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
 \lvc{\rulename{unify-seqr}} & |e_1 == (e_2 ; e_3)| & \movesto & |def x (x == e_1 ; e_2 ; x == e_3)|  & |x| fresh\\
 \lvc{\rulename{unify-unifyl}} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
-\lvc{\rulename{unify-unifyr}} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
-\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
-\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\[0.05in]
+\lvc{\rulename{unify-unifyr}} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\[0.05in]
 
 \end{longtable}
 \caption{\textbf{POPL-style rules for normalisation}}\label{fig:popl-rulesN}
@@ -187,15 +188,17 @@ $$\begin{array}{lrcll}
 \rulename{conj-flat-eq}     & |e_1 == e_2| & \movesto & |def x (x == e_1 ; x == e_2)|     & if |e_1| is not a value; |x| fresh \\
 \rulename{conj-flat-fun}    & |apply1N e_1 e_2| & \movesto & |def f (f == e_1 ; apply1N f e_2)|     & if |e_1| is not a value; |f| fresh \\
 \rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
+\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e|          & if |e| is not of form |x' == x'|\\
+\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
+\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\
 \rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{conj-seq-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
 \lvc{\rulename{conj-cst-defr}} & |e_1 == (def y e_2)| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
 \rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
 \lvc{\rulename{unify-seqr}} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_3| \\
-\lvc{\rulename{unify-unifyr}} & |v == (e_1 == e_2)| & \movesto & |v == e_1; v == e_2| & \\
-\lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
-\lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\[0.05in]
+\lvc{\rulename{unify-unifyr}} & |v == (e_1 == e_2)| & \movesto & |v == e_1; v == e_2| & \\[0.05in]
 
 \end{longtable}
 \caption{\textbf{Alternative POPL-style rules for normalisation}}\label{fig:popl-rulesN-alt}
