@@ -61,6 +61,7 @@ testeq(SEq) {x? := 1/0; x}                        {array{}}
 testeq(SEq) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
 testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
 testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq(SEq) { x := ((:any) => 1)[x+1] }           {1}
 # Array LHS splicing
 ### SPLICE testeq(SEq) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 ### SPLICE testeq(SEq) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
@@ -201,3 +202,5 @@ testeq(SEq) { ( +1) ; ( +1) }         {1}
 testeq(SEq) {       + (1=1) }         {1}
 testeq(SEq) {       + (2;1) }         {1}
 testeq(SEq) {       + ( +1) }         {1}
+
+#

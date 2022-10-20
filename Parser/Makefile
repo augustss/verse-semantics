@@ -25,6 +25,9 @@ testt: timparse
 testf: tests
 	./tests -fresh
 
+testd: tests
+	./tests -densem densem.versetest
+
 clean:
 	rm -f *.o *.hi verse verse.exe tests tests.exe timparse timparse.exe
 	rm -rf objs-*
