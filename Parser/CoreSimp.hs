@@ -49,6 +49,7 @@ simpAlias = fc . g
     fc (CLambda i is e1 e2) =  -- CLambda has weird scoping, temporarily change it
       case fc (CLam i (CDef is (CSeq [e1, e2]))) of
         CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' e1' e2'
+        CLam i' (CSeq [e1', e2']) -> CLambda i' [] e1' e2'
         e -> error $ "simpAlias: CLambda " ++ prettyShow e
     fc e = composOpC fc fv fh e
     fh (HLam x (CDef h e)) | Just d <- lam x h e = fh d
