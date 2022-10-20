@@ -11,8 +11,8 @@ import Flags
 
 import Debug.Trace
 import Print
-import Parse (parseDie, pExprSeq)
-import Desugar (desugar)
+--import Parse (parseDie, pExprSeq)
+--import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
 rewrite flg = map (trsToCore . snd) . checkOne . normalFormsFuel n (rules flg) . ds flg . coreToTrs

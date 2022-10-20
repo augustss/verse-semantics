@@ -1,4 +1,4 @@
-module Testing(main, test) where
+module Testing(main, test, freshmain, testFRESH, parseFresh) where
 
 import Control.Exception
 import Control.Monad

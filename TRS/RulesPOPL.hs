@@ -7,8 +7,8 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 import Data.List( sort, find, union, (\\) )
-import Data.Functor.Classes (Show1(liftShowList))
-import Debug.Trace (trace)
+--import Data.Functor.Classes (Show1(liftShowList))
+--import Debug.Trace (trace)
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions

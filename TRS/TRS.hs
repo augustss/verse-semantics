@@ -3,8 +3,8 @@ module TRS where
 
 import qualified Data.Set as S
 import Data.List ( intercalate )
-import Control.Monad( when, unless )
-import Debug.Trace (trace)
+import Control.Monad( unless )
+--import Debug.Trace (trace)
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
