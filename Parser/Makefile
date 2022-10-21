@@ -17,7 +17,7 @@ test: tests
 	./tests
 
 testr: tests
-	./tests -
+	./tests -rewrite
 
 testt: timparse
 	./timparse
