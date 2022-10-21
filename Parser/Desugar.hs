@@ -50,6 +50,7 @@ dsD = expr
     -- Basic forms
     -- D[k] = k
     expr e | isLiteral e = pure e
+    expr (Variable (Ident l "wrong")) = pure $ Wrong $ "called: " ++ prettyShow l
     -- D[false] = ()   This isn't necessary, but makes simple examples nicer
     expr (Variable (Ident _ "false")) = pure $ Array []
     -- D[x] = x
@@ -537,7 +538,6 @@ primOps = map (Ident noLoc)
   , "alloc$", "read$", "write$"
 --  , "intGT$", "intGE$", "intLT$", "intLE$"
   , "in'..'"
-  , "wrong"
   , "in'+='", "in'-='", "in'*='", "in'/='"
   , "print$"
   ]

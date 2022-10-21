@@ -149,7 +149,7 @@ exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
 core :: HasCallStack => Expr -> C Core
 core e@LitInt{} = val e
 core e@LitRat{} = val e
-core (Variable (Ident l "wrong")) = pure $ CWrong $ "called: " ++ prettyShow l
+core (Wrong s) = pure $ CWrong s
 core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
@@ -209,7 +209,7 @@ core (Lambda i rs e1 e2) = do
       if trivial e1 then
         Seq [e1, e2]
       else
-        If3 e1 e2 (if covariant then Fail else Variable (Ident noLoc "wrong"))
+        If3 e1 e2 (if covariant then Fail else Wrong "outside domain")
 core EmptyT = pure CFail
 core e = impossible e
 

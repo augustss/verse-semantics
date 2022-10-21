@@ -100,6 +100,7 @@ data Expr
   | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}
   | AnyT                      -- :any
   | EmptyT                    -- :false
+  | Wrong String              -- wrong
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -209,6 +210,7 @@ instance Pretty Expr where
           Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
           EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
+          Wrong s -> text $ "WRONG'" ++ s ++ "'"
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -316,6 +318,7 @@ compos f (Range e) = Range <$> f e
 compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
 compos _ AnyT = pure AnyT
 compos _ EmptyT = pure EmptyT
+compos _ e@Wrong{} = pure e
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)
