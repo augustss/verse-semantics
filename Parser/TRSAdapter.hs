@@ -38,7 +38,7 @@ coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (CSeq []) = undefined
 coreToTrs (CSeq [e]) = coreToTrs e
 coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
-coreToTrs (CApply v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
+coreToTrs (CApplyVV v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
 coreToTrs (CBar e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
 coreToTrs CFail = T.Fail
 coreToTrs (COne e) = T.One $ coreToTrs e
@@ -50,6 +50,7 @@ coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
+coreToTrs e@CApply{} = impossible e
 
 coreToTrsV :: Value -> T.Value
 coreToTrsV (Var i) = T.Var $ coreToTrsI i
@@ -73,7 +74,7 @@ trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
 trsToCore (e1 T.:|: e2) = CBar (trsToCore e1) (trsToCore e2)
-trsToCore (e1 T.:@: e2) = CApply (trsToCoreV e1) (trsToCoreV e2)
+trsToCore (e1 T.:@: e2) = CApplyVV (trsToCoreV e1) (trsToCoreV e2)
 trsToCore T.Fail = CFail
 trsToCore ee@T.Def{} = flat [] ee
   where flat vs (T.Def (T.Bind x e)) = flat (vs ++ [x]) e

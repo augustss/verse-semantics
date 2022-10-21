@@ -35,8 +35,8 @@ denSem = denSem' . semSimp
 semSimp :: Core -> Core
 semSimp = f
   where
-    f (CApply (VLam x (CSeq [CApply is@(VPrim "isInt$") (Var x'), CVar x''])) a) | x == x' && x == x'' =
-      f $ CApply is a
+    f (CApplyVV (VLam x (CSeq [CApplyVV is@(VPrim "isInt$") (Var x'), CVar x''])) a) | x == x' && x == x'' =
+      f $ CApplyVV is a
     f e = composOp f e
 
 denSem' :: Core -> Core
@@ -263,7 +263,7 @@ evalE' r (CUnify e1 e2) =
   evalE r e1 `isect` evalE r e2
 evalE' r (CSeq [e]) = evalE r e
 evalE' r (CSeq (e: es)) = evalE r e `sequ` evalE r (CSeq es)
-evalE' r (CApply v1 v2) = apply (evalV r v1) (evalV r v2)
+evalE' r (CApplyVV v1 v2) = apply (evalV r v1) (evalV r v2)
 evalE' r (CDef [] e) = evalE r e
 evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- ws ]
   where ws = possibleValues xs r x e

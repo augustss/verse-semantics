@@ -29,13 +29,13 @@ simpSeq = evalSeq flg
 simpAny :: Core -> Core
 simpAny = f
   where
-    f (CApply (Var (Ident _ "any")) v) = f $ CValue v
+    f (CApplyVV (Var (Ident _ "any")) v) = f $ CValue v
     f e = composOp f e
 
 simpFail :: Core -> Core
 simpFail = f
   where
-    f (CDef [x] (CApply (VArray []) (Var x'))) | x == x' = CFail
+    f (CDef [x] (CApplyVV (VArray []) (Var x'))) | x == x' = CFail
     f e = composOp f e
 
 -- When there are definitions of the form x=y,

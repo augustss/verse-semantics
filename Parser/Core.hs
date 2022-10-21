@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Core(
   Core(..),
+  pattern CApplyVV, pattern CUnifyVE,
   pattern COne, pattern CAll, pattern CSucceeds,
   pattern CVar, pattern VPrim, pattern VArray, pattern CArray,
   pattern VLam, pattern CLam, pattern CInt, pattern VInt,
@@ -39,7 +40,7 @@ data Core
   = CValue Value
   | CUnify Core Core
   | CSeq [Core]
-  | CApply Value Value
+  | CApply Core Core
   | CBar Core Core
   | CFail
   | CMacro Ident Core
@@ -62,6 +63,10 @@ data HNF
   | HLam Ident Core
   deriving (Show, Eq)
 
+pattern CApplyVV :: Value -> Value -> Core
+pattern CApplyVV v1 v2 = CApply (CValue v1) (CValue v2)
+pattern CUnifyVE :: Value -> Core -> Core
+pattern CUnifyVE v e = CUnify (CValue v) e
 pattern CInt :: Integer -> Core
 pattern CInt x = CValue (HNF (HInt x))
 pattern VInt :: Integer -> Value
@@ -154,7 +159,8 @@ core e@Variable{} = val e
 core e@Array{} = val e
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
-core (ApplyD e1 e2) = CApply <$> value e1 <*> value e2
+core (ApplyD e1 e2) = --CApplyVV <$> value e1 <*> value e2
+                      CApply <$> core e1 <*> core e2
 core (ApplyEff rs e) = coreEffs rs =<< coreD e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = val e
@@ -175,7 +181,7 @@ core (For2 e1 e2) = do
     ee <- coreD (seqE [e1, e2'])
     ea <- cAll ee
     xa <- newTmp
-    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (VPrim "mapAp$") (Var xa)]
+    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApplyVV (VPrim "mapAp$") (Var xa)]
 core (If3 e1 e2 e3) = do
   c1 <- core e1
   if isValue' c1 then
@@ -187,7 +193,7 @@ core (If3 e1 e2 e3) = do
     r <- core e3'
     fn <- cOne $ CBar l r
     i <- newTmp
-    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
+    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApplyVV (Var i) vEmpty]
 --core e@Function{} = val e
 core (Do e) = coreD e
 core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
@@ -243,8 +249,8 @@ forSplit e1 e2 = do
                                CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
                                   CUnify (CVar x) (CArray $ map Var vs),
                                   CUnify (CVar a) e2',
-                                  CUnify (CVar b) (CSplit (CApply (Var y) (VArray [])) (Var f) (Var g)),
-                                  CApply (VPrim "cons$") (VArray [Var a, Var b])
+                                  CUnify (CVar b) (CSplit (CApplyVV (Var y) (VArray [])) (Var f) (Var g)),
+                                  CApplyVV (VPrim "cons$") (VArray [Var a, Var b])
                                   ],
                                e
                               ])
@@ -278,8 +284,8 @@ cAll e = do
              CUnify (CVar g) (CLam v $ CLam r $
                                CDef [x] $
                                  CSeq [
-                                   CUnify (CVar x) (CSplit (CApply (Var r) (VArray [])) (Var f) (Var g)),
-                                   CApply (VPrim "cons$") (VArray [Var v, Var x])
+                                   CUnify (CVar x) (CSplit (CApplyVV (Var r) (VArray [])) (Var f) (Var g)),
+                                   CApplyVV (VPrim "cons$") (VArray [Var v, Var x])
                                    ]),
              CSplit e (Var f) (Var g)
              ]
@@ -297,7 +303,7 @@ cSucceeds e = do
   y <- newTmp
   pure $ CSplit e
                 (VLam u1 (CWrong "succeeds-fail"))
-                (VLam x $ CLam y $ CSplit (CApply (Var y) (VArray []))
+                (VLam x $ CLam y $ CSplit (CApplyVV (Var y) (VArray []))
                                           (VLam u2 (CVar x))
                                           (VLam u3 $ CLam u4 $ CWrong "succeed-many")
                 )
@@ -315,7 +321,7 @@ cDecides e = do
   y <- newTmp
   pure $ CSplit e
                 (VLam u1 CFail)
-                (VLam x $ CLam y $ CSplit (CApply (Var y) (VArray []))
+                (VLam x $ CLam y $ CSplit (CApplyVV (Var y) (VArray []))
                                           (VLam u2 (CVar x))
                                           (VLam u3 $ CLam u4 $ CWrong "succeed-many")
                 )
@@ -405,7 +411,7 @@ compos :: (Applicative f) => (Core -> f Core) -> Core -> f Core
 compos f (CValue v) = CValue <$> appV f v
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
 compos f (CSeq es) = CSeq <$> traverse f es
-compos f (CApply e1 e2) = CApply <$> appV f e1 <*> appV f e2
+compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
 compos f (CBar e1 e2) = CBar <$> f e1 <*> f e2
 compos _ CFail = pure CFail
 compos f (CMacro i e) = CMacro i <$> f e
@@ -432,7 +438,7 @@ composC :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> 
 composC _  fv _  (CValue v) = CValue <$> fv v
 composC fc _fv _  (CUnify e1 e2) = CUnify <$> fc e1 <*> fc e2
 composC fc _  _  (CSeq es) = CSeq <$> traverse fc es
-composC _  fv _  (CApply e1 e2) = CApply <$> fv e1 <*> fv e2
+composC fc _  _  (CApply e1 e2) = CApply <$> fc e1 <*> fc e2
 composC fc _  _  (CBar e1 e2) = CBar <$> fc e1 <*> fc e2
 composC _  _  _  CFail = pure CFail
 composC fc _  _  (CMacro i e) = CMacro i <$> fc e
@@ -473,7 +479,7 @@ cfvs :: Core -> [Ident]
 cfvs (CValue v) = cfvsV v
 cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CSeq es) = concatMap cfvs es
-cfvs (CApply e1 e2) = cfvsV e1 ++ cfvsV e2
+cfvs (CApply e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CBar e1 e2) = cfvs e1 ++ cfvs e2
 cfvs CFail = []
 cfvs (CMacro _ e) = cfvs e
@@ -503,7 +509,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     sub (CValue v) = CValue $ subV v
     sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
     sub (CSeq es) = CSeq $ map sub es
-    sub (CApply e1 e2) = CApply (subV e1) (subV e2)
+    sub (CApply e1 e2) = CApply (sub e1) (sub e2)
     sub (CBar e1 e2) = CBar (sub e1) (sub e2)
     sub CFail = CFail
     sub (CMacro i e) = CMacro i $ sub e
@@ -538,7 +544,7 @@ alphaConvert vs = alpha []
     alpha m (CValue v) = CValue (alphaV m v)
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
     alpha m (CSeq es) = CSeq (map (alpha m) es)
-    alpha m (CApply e1 e2) = CApply (alphaV m e1) (alphaV m e2)
+    alpha m (CApply e1 e2) = CApply (alpha m e1) (alpha m e2)
     alpha m (CBar e1 e2) = CBar (alpha m e1) (alpha m e2)
     alpha _ CFail = CFail
     alpha m (CMacro i e) = CMacro i (alpha m e)
