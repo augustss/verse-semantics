@@ -25,6 +25,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Data.List
 import Data.Maybe
+import GHC.Stack(HasCallStack)
 
 import Print
 import Expr hiding (compos, composOp)
@@ -142,9 +143,10 @@ newTmp = do
   pure i
 
 exprToCore :: Flags -> Expr -> Core
+--exprToCore _ e | trace ("exprToCore: " ++ prettyShow e) False = undefined
 exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
 
-core :: Expr -> C Core
+core :: HasCallStack => Expr -> C Core
 core e@LitInt{} = val e
 core e@LitRat{} = val e
 core (Variable (Ident l "wrong")) = pure $ CWrong $ "called: " ++ prettyShow l
@@ -309,15 +311,15 @@ cUnify :: Core -> Core -> Core
 cUnify e (CValue (VPrim ":any")) = e
 cUnify e1 e2 = CUnify e1 e2
 
-coreD :: Expr -> C Core
+coreD :: HasCallStack => Expr -> C Core
 coreD e | null is = core e
         | otherwise = CDef is <$> core e
   where is = getVisible e
 
-val :: Expr -> C Core
+val :: HasCallStack => Expr -> C Core
 val e = CValue <$> value e
 
-value :: Expr -> C Value
+value :: HasCallStack => Expr -> C Value
 value (LitInt i) = pure (HNF $ HInt i)
 value (LitRat i _) = pure (HNF $ HRat $ toRational i)
 value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
@@ -338,7 +340,8 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ Function [(Define i AnyT, [])] e
+  pure $ -- Function [(Define i AnyT, [])] e
+         Lambda i [] (Array []) e
 
 ------
 
