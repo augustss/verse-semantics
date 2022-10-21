@@ -33,6 +33,8 @@ prop_NormalForms p =
       _  -> property True
 
 --------------------------------------------------------------------
+-- Stuff to help debug rewrite rules in GHCi
+--------------------------------------------------------------------
 
 freshTrace :: Expr -> IO ()
 freshTrace e = print status >> printTrace' tr
@@ -76,6 +78,10 @@ iDEF = DEF . ident
 
 iDEFs :: [String] -> Expr -> Expr
 iDEFs = defs . map ident
+
+-------------------------------------------------------------------------------------
+-- examples
+-------------------------------------------------------------------------------------
 
 e0 :: Expr
 e0 = iDEFs ["f", "f1", "f2"]
@@ -130,11 +136,3 @@ e1'' =
     (
       INT 5 :=: ((iVAR "x" :=: iVAR "y") :>: iVAR "x")
     )
-
-
-{-
--- def x in {def $r1 in {5 = (x = ($r1; (\x.isInt(x); x)($r1)))}}
-
-ex x, r1.
-  5 = (x = (r1; (\x.isInt(x); x)(r1)))
--}
