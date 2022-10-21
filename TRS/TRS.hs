@@ -4,7 +4,7 @@ module TRS where
 import qualified Data.Set as S
 import Data.List ( intercalate )
 import Control.Monad( unless )
---import Debug.Trace (trace)
+import Debug.Trace (trace)
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
