@@ -152,6 +152,33 @@
 
 \newcommand{\figureContexts}{
 \begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+% % \textit{Value Context}      & V  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \\
+% % \textit{Constraint Context} & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
+\textit{Expression Context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| \\
+                                &    & \vb & |E == e| \vb |e == E| \vb |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E| \\
+                                &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+\textit{Application Context}    & A  & ::= & |hole v| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
+                                &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
+\textit{Scope Context}          & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
+\textit{Choice Context}         & CX & ::= & \hole \vb |v == CX| \vb |CX; e| \vb |ce ; CX|  \vb |def x CX| \\
+\textit{Choice-free Exprs}      & ce & ::= & |v| \vb |v == ce| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
+                                             %%% NOTE: the following is not in the POPL submission,
+                                             %%% but needed to make progress in (1,2)[x:int]
+                                             \vb |apply1 op v|
+
+                                             \color{red}{\vb |def x ce|}
+
+                                             \\
+
+\end{array}$$
+\caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
+\end{figure}
+}
+
+
+\newcommand{\figureContextsPoplSubmission}{
+\begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
@@ -162,8 +189,7 @@
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
     \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
-    \vb |one e| \vb |all e|
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
     %%% NOTE: the following is not in the POPL submission,
     %%% but needed to make progress in (1,2)[x:int]
     \vb |apply1 op v|
@@ -275,7 +301,7 @@ $$
     \textit{Heap Values}   & h     & ::= & \op \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
     \textit{Head Values}   & \hnf  & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
-    \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |e_1 = e_2|
+    \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |v == e|
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     % \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
