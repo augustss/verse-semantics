@@ -63,7 +63,7 @@ normalFormsTrace rule t = normalFormsFuelTrace (-1) rule t
 normalFormsFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
 normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
-  go 0 _    _           = traceShow "fuel 0" []
+  go 0 _    (tr:_)      = traceShow "fuel 0" []
   go n seen []          = traceShow "stuck" []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
@@ -71,7 +71,40 @@ normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
     | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
    where
     seen' = S.insert t seen
-    ts'   = traceShow "NFT" $ step rule t
+    ts'   = step rule t
+  go _ _ _ = error "impossible"
+
+type Trace a = [(String, a)]
+
+type Path a = (Result, Trace a)
+data Result = NoFuel | Stuck | NormalForm deriving (Show)
+
+dfs :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> Path a
+dfs n rule t = go n S.empty [("",t)]
+ where
+  go 0 _    tr   = (NoFuel, tr)
+  go n seen tr@((_,t):_)
+    | null ts'   = (NormalForm, tr)
+    | null ts''  = (Stuck, tr)
+    | otherwise  = go (n-1) seen' (head ts'' : tr)
+    where
+      seen' = S.insert t seen
+      ts'   = [t' | t' <- step rule t]
+      ts''  = filter ((`S.notMember` seen) . snd) ts'
+  go _ _ _ = error "impossible"
+
+normalFormsFuelTrace' :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> Either (Trace a) [[(String,a)]]
+normalFormsFuelTrace' n rule t = go n S.empty [[("",t)]]
+ where
+  go 0 _    trs         = Left (head trs)
+  go n seen []          = Right []
+  go n seen (tr@((_,t):_):trs)
+    | t `S.member` seen = go n seen trs
+    | null ts'          = (tr :) <$> go n seen' trs
+    | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
+   where
+    seen' = S.insert t seen
+    ts'   = step rule t
   go _ _ _ = error "impossible"
 
 
@@ -85,6 +118,14 @@ printTrace tr =
        unless (null n) $
          putStrLn ("  <--" ++ n ++ "--")
   | (n,t) <- tr
+  ]
+
+printTrace' :: (Show a) => [(String,a)] -> IO ()
+printTrace' tr =
+  sequence_
+  [ do unless (null n) $ putStrLn ("  ---" ++ n ++ "-->")
+       print t
+  | (n,t) <- reverse tr
   ]
 
 --

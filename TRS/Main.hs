@@ -34,6 +34,16 @@ prop_NormalForms p =
 
 --------------------------------------------------------------------
 
+freshTrace :: Expr -> IO ()
+freshTrace e = print status >> printTrace' tr
+  where
+    (status, tr) = dfs 99 rulesPOPL e
+
+freshTraces :: Expr -> IO ()
+freshTraces e = case normalFormsFuelTrace' 99 rulesFRESH e of
+  Left tr -> print NoFuel >> printTrace' tr
+  Right x0 -> print NormalForm >> mapM_ (\tr -> printTrace' tr >> putStrLn "--------") x0
+
 runFresh :: Expr -> [(String, Expr)]
 runFresh = normalFormsFuel 99 rulesFRESH . dsFresh
 
@@ -81,10 +91,10 @@ e0' = iDEFs ["f", "f1", "f2"]
           iVAR "f2" )
 
 e1 =
-  iDEFs ["x", "$r1"]
+  iDEFs ["a", "$r1"]
     (
       (INT 5 :=:
-        (iVAR "x" :=:
+        (iVAR "a" :=:
           (
             (iVAR "$r1" :>:
               ( (iLam "x" ((IsINT :@: (iVar "x")) :>: iVAR "x")) :@: iVar "$r1" )
@@ -94,6 +104,19 @@ e1 =
       )
     )
 
+e1''' =
+  iDEFs ["$r1", "x"]
+    (
+      (INT 5 :=: ((iVAR "$r1" :=: iVAR "x") :>: ((IsINT :@: iVar "x") :>: iVAR "x")))
+      :>:
+      (iVAR "$r1" :>: INT 5)
+    )
+
+e1_4 =
+  iDEFs ["$r1", "x"]
+    ((iVAR "x" :=: INT 5) :>: (((iVAR "$r1" :=: INT 5) :>: INT 5) :>: INT 5))
+
+
 e1' =
   iDEFs ["x", "y"]
     (
@@ -101,6 +124,14 @@ e1' =
       :>:
       iVAR "x"
     )
+
+e1'' =
+  iDEFs ["x", "y"]
+    (
+      INT 5 :=: ((iVAR "x" :=: iVAR "y") :>: iVAR "x")
+    )
+
+
 {-
 -- def x in {def $r1 in {5 = (x = ($r1; (\x.isInt(x); x)($r1)))}}
 
