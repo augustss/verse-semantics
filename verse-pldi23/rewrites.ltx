@@ -7,6 +7,56 @@
 \newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
 \newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
 
+\newcommand{\figureSyntaxPoplSubmission}{
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
+    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+% SPJ Omitting for now
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
+    \text{Values} & v & ::= & x  \vb \hnf \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add|
+\iffullverse
+    \vb |isInt|
+\fi
+    \end{array} \\
+    \\[-3mm]
+    \text{\emph{Concrete syntax}:} \;\;
+    \begin{array}[t]{l}
+          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+          \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+    \end{array} \\ \\[-3mm]
+    \textbf{Shorthand} \\
+    \begin{array}{rcl}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+     \end{array} \\
+  \\[-2mm]
+  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:syntax}
+\end{figure}
+}
+
+
+
 \newcommand{\figureRulesI}{
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
