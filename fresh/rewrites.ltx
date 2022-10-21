@@ -206,6 +206,7 @@ $$\begin{array}{lrcll}
 
 \begin{figure}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
+\fbox{\wff{\Gamma}{e}{|xs|}{|cs|}{|v|}}
 \begin{mathpar}
 \inferrule
   { }
@@ -215,7 +216,7 @@ $$\begin{array}{lrcll}
 \inferrule
   { }
   {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
-  {\rulename{WF-Cst2}}
+  {\rulename{WF-Eq-Val}}
 
 \\
 \inferrule
@@ -229,7 +230,7 @@ $$\begin{array}{lrcll}
    \wff{\Gamma - x}{e}{|xs|}{|cs|}{|v|}
   }
   {\wff{\Gamma}{|x == h; e|}{|xs|}{|x == h, cs|}{|v|}}
-  {\rulename{WF-Cst1}}
+  {\rulename{WF-Eq}}
 
 \\
 
