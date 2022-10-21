@@ -82,7 +82,7 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 
 \calcname deliberately layers values into \emph{scalars} (integers, variables)
 and \emph{heap values} (tuples and $\lambda$-terms) and then only
-allows scalars (no tuples or $\lambda$-terms) in tuples to ensure 
+allows scalars (no tuples or $\lambda$-terms) in tuples to ensure
 confluence.
 %
 Further, the \rulename{deref-h} rule prevents substituting heap values
@@ -121,7 +121,7 @@ three properties.
 First, it is \emph{locally} confluent, meaning if $e$ (single-)steps to $e_1$
 and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
 %
-Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies 
+Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies
 the relation is confluent (and hence, so is its reflexive transitive closure.)
 %
 Third, that the \emph{closure} of the sub-relation is the same as the full reduction

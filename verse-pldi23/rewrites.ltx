@@ -1,0 +1,445 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+
+\newcommand{\figureSyntaxPoplSubmission}{
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
+       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
+    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+% SPJ Omitting for now
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
+    \text{Values} & v & ::= & x  \vb \hnf \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add|
+\iffullverse
+    \vb |isInt|
+\fi
+    \end{array} \\
+    \\[-3mm]
+    \text{\emph{Concrete syntax}:} \;\;
+    \begin{array}[t]{l}
+          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+          \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+    \end{array} \\ \\[-3mm]
+    \textbf{Shorthand} \\
+    \begin{array}{rcl}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+     \end{array} \\
+  \\[-2mm]
+  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:syntax-popl-sub}
+\end{figure}
+}
+
+\newcommand{\figureRulesI}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Unification:~\runi}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s$, $x,s$ free in |E^[hole]| \\
+\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x,\freevars{h}$ free in |A^[hole]|\\
+\rulename{u-lit}    & |k == k |                                    & \movesto & k \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & {|v_1==v1';dots;v_n==v_n'|} \\
+\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| & \\
+\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
+\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\[0.05in]
+
+\rulegroupname{Application:~\rapp}
+\rulename{app-beta} & |apply1N (lam x e_1) e_2| & \movesto & |def x (x=e_2; e_1)|  & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{app-tup}  & |apply1N (tup (v_0,dots v_n)) v| & \movesto & \largerhs{\ |(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\[0.05in]
+
+\rulegroupname{Garbage Collection:~$\rgc$}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-cst}     & |def (x_1 ^^ dots) x_1 == h_1; dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
+
+\rulegroupname{Fail Propagation:~\rfail}
+\rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
+\rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
+\rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
+
+\rulegroupname{Speculation:~\rspc}
+\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{|xs|}{|cs|}{|v|}
+\end{longtable}
+\caption{\textbf{The Verse Calculus: Rewrite Rules (1)}}\label{fig:rulesI}
+\end{figure}
+}
+
+\newcommand{\figureRulesII}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
+\rulegroupname{Normalization:~\rcon}
+% \rulename{conj-flat-eq}     & |e_1 == e_2| & \movesto & |def x (x == e_1 ; x == e_2)|     & if |e_1| is not a value; |x| fresh \\
+% \rulename{conj-flat-fun}    & |apply1N e_1 e_2| & \movesto & |def f (f == e_1 ; apply1N f e_2)|     & if |e_1| is not a value; |f| fresh \\
+% \rulename{conj-flat-arg}    & |apply1N v_1 e_2| & \movesto & |def x (x == e_2 ; apply1N v_1 x)|     & if |e_2| is not a value; |x| fresh \\
+\rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
+\rulename{norm-seq-swap1} & |e ; x = v|           & \movesto & |x == v; e; x|         & if |e| is not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e ; x = s|           & \movesto & |x == s; e; x|         & if |e| is not of form |x' == s'|\\
+\rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|             & \\
+\rulename{norm-val}       & |v ; e|               & \movesto & |e|                    & \\
+\rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
+\rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; v == e_3| \\
+\rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |v == e_1; v == e_2|   & \\[0.05in]
+% \rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+% \rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
+\end{longtable}
+% \caption{\textbf{Alternative POPL-style rules for normalisation}}\label{fig:popl-rulesN-alt}
+\caption{\textbf{The Verse Calculus: Rewrite Rules (2)}}\label{fig:rulesII}
+\end{figure}
+%
+\begin{figure}
+% \judgementHead{Wellformedness of Results}{\wf{r}}
+\fbox{\wff{\Gamma}{e}{|xs|}{|cs|}{|v|}}
+\begin{mathpar}
+\inferrule
+  { }
+  { \wff{\emptyset}{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \rulename{WF-Val}}
+
+\inferrule
+  { }
+  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\rulename{WF-Eq-Val}}
+
+\\
+\inferrule
+  { x \not \in \Gamma \quad
+    \wff{\Gamma, x}{e}{|xs|}{|cs|}{|v|} }
+  { \wff{\Gamma}{|def x e|}{|x,xs|}{|cs|}{|v|} }
+  { \rulename{WF-Def} }
+
+\inferrule
+  {x \in \Gamma \quad
+   \wff{\Gamma - x}{e}{|xs|}{|cs|}{|v|}
+  }
+  {\wff{\Gamma}{|x == h; e|}{|xs|}{|x == h, cs|}{|v|}}
+  {\rulename{WF-Eq}}
+
+\\
+
+\inferrule
+  { \wff{\Gamma}{e}{|xs|}{|cs|}{|vs|} \quad
+    \wff{\Gamma,|xs|}{|es|}{|xs|'}{|cs|'}{|vs|}
+  }
+  { \wff{\Gamma}{|e|,|es|}{|xs|,|xs|'}{|cs|,|cs|'}{|v,vs|} }
+  {\rulename{WF-many}}
+\end{mathpar}
+\caption{\textbf{Well-formedness of Results}}\label{fig:wf}
+\end{figure}
+}
+
+
+\newcommand{\figureRulesIPoplSubmission}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
+% The quad indents the lines
+% The \hspace{-..} removes redundant space between rule name column and LHS column
+% that arises because the longest rule name and the longer LHS are not on the same line
+% The \; reduces the spacing around the arrow
+% The >{$} turns on math mode for the arrow column
+
+\rulegroupname{Primitive operations}
+
+\rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
+    $\begin{cases}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{cases}$ \\
+
+\iffullverse
+    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
+    $\left\{\begin{array}{@@{}ll}
+      |()| & \text{if |hnf| is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array}\right.$
+\fi
+
+\rulegroupname{Application}
+
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
+          & if $x \not\in \freevars{|v|}$ \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\\[-2mm]
+\rulegroupname{Unification}
+
+\rulename{ulit} & |k_1 == k_2| & \movesto
+    & \largerhs{$\begin{cases}
+        |k_1| & \text{if $k_1=k_2$} \\
+        |fail| & \text{otherwise}
+      \end{cases}$} \\
+\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
+    % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
+    & \movesto & \largerhs{$\begin{cases}
+        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
+            & \text{if $m=n$} \\
+        |fail| & \text{otherwise}
+      \end{cases}
+    $}\\
+\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
+\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
+\rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
+\rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
+\rulename{ux5} & |op == hnf| & \movesto & |fail|\\
+\rulename{ux6} & |hnf == op| & \movesto & |fail|\\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & if $|V| \ne |hole|$ \\
+
+\\[-2mm]
+\rulegroupname{Unification variables}
+
+\rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
+    & if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$ \\
+\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
+    &&&& if $|x| \in \freevars{|e|}$ \\
+\rulename{def-eliml} & |def (x y_1 dots y_n) (X^[x==v])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+    & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}$ \\
+\rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
+    & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}$ \\
+\rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+\rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
+    & if $|X| \ne \hole,\,  x \notin \freevars{|X|}$\\
+
+\\[-2mm]
+\rulegroupname{Sequencing}
+
+\rulename{seq} & |v ; e| & \movesto & |e| \\
+\rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
+\rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+\rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+\rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & |x| fresh\\
+
+\\[-2mm]
+\rulegroupname{Fail propagation}
+
+\rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
+\rulename{fail}     & |X^[fail]| & \movesto & |fail| & if $|X| \ne \hole$
+
+\end{longtable}
+
+  \caption{The Verse calculus: rewrite rules (1)}
+    \label{fig:general-axioms} \label{fig:rules1}
+\end{figure}
+}
+
+\newcommand{\figureContexts}{
+\begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+% % \textit{Value Context}      & V  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \\
+% % \textit{Constraint Context} & C  & ::= & |V == v| \vb |v == V| \vb \lvc{|V == e|} \vb \lvc{|v == E|} \\
+\textit{Expression Context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| \\
+                                &    & \vb & |E == e| \vb |e == E| \vb |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E| \\
+                                &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+\textit{Application Context}    & A  & ::= & |hole v| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
+                                &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
+\textit{Scope Context}          & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
+\textit{Choice Context}         & CX & ::= & \hole \vb |v == CX| \vb |CX; e| \vb |ce ; CX|  \vb |def x CX| \\
+\textit{Choice-free Exprs}      & ce & ::= & |v| \vb |v == ce| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
+                                             %%% NOTE: the following is not in the POPL submission,
+                                             %%% but needed to make progress in (1,2)[x:int]
+                                             \vb |apply1 op v|
+                                             %%% Ranjit: shouldn't we add this?
+                                             \color{red}{\vb |def x ce|} \\
+\end{array}$$
+\caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
+\end{figure}
+}
+
+
+\newcommand{\figureContextsPoplSubmission}{
+\begin{figure}
+  $$
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+\iffullverse
+    && \vb & |succeeds hole| \vb |decides hole| \\
+\fi
+    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
+  \end{array}
+   $$
+  \caption{The syntax of contexts}
+    \label{fig:contexts}
+\end{figure}
+}
+
+\newcommand{\figureRulesIIPoplSubmission}{
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{One and all} \\
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \end{array} \hspace{5mm}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{all-fail} & |all fail| & \movesto & |tup ()| \\
+    \rulename{all-choice} &
+      |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
+    \rulename{all-value} & |all v| & \movesto & |tup v| \\
+    \end{array} \\
+
+    \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+
+\iffullverse
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+\fi
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (2)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+}
+
+% ---------------------- Commenting out the wrong rules ------------------
+% \begin{figure}
+%   $$
+%   \begin{array}{l}
+%     \textbf{Syntax extension} \\
+%     \begin{array}{lr@@{\;}c@@{\;}l}
+%       \text{Expressions} & e  & ::= \cdots \vb |wrong| \\
+%     \end{array} \\
+%     \\
+%     \textbf{Axiom extension} \\
+%     \begin{array}{lr@@{\;}c@@{\;}ll}
+%     \rulename{p-add-wrong} & |add^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{p-gt-wrong} & |gt^(hnf_1,hnf_2) | & \movesto & |wrong| & \text{if $|hnf_1| \neq k$ or $|hnf_2| \neq k$} \\
+%     \rulename{app-const-wrong} & |k^(e) | & \movesto & |wrong| \\
+%     \rulename{unify-wrong-1} & |(lam x_1 e_1) = (lam x_2 e_2)| & \movesto & |wrong| \\
+%     \rulename{unify-wrong-2} & |(lam x e) == hnf| & \movesto & |wrong|\\
+%     \rulename{unify-wrong-3} & |hnf == (lam x e)| & \movesto & |wrong|\\
+%     \rulename{occurs-check} & |x=V^[x]| & \movesto & |wrong| & \text{if }|V| \ne |hole|\\
+% \iffullverse
+%     \rulename{succeeds-fail} & |succeeds fail| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-2} & |succeeds (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{succeeds-choice-n} & |succeeds (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-2} & |decides (v_1 choice v_2)| & \movesto & |wrong| \\
+%     \rulename{decides-choice-n} & |decides (v_1 choice v_2 choice e)| & \movesto & |wrong| \\
+% \fi
+%     \rulename{wrong-seql} & |wrong; e| & \movesto & |wrong|  \\
+%     \rulename{wrong-seqr} & |e; wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyl} & |wrong = e| & \movesto & |wrong|  \\
+%     \rulename{wrong-unifyr} & |e = wrong| & \movesto & |wrong|  \\
+%     \rulename{wrong-def} & |def x wrong| & \movesto & |wrong|  \\
+%     \rulename{one-wrong} & |one wrong| & \movesto & |wrong| \\
+%     \rulename{all-wrong} & |all (dots choice wrong choice dots)| & \movesto & |wrong| \\
+%     \rulename{succeeds-wrong} & |succeeds wrong| & \movesto & |wrong| \\
+%     \end{array}
+%   \end{array}
+%   $$
+% \caption{The Verse calculus: axioms for |wrong|} \label{fig:wrong-axioms}
+% \end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% FRESH STYLE SYNTAX & RULES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\figureSyntaxPOPL}{
+\begin{figure}[t]
+
+$$
+\begin{array}{l}
+  \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \textit{Integers}      & k \\
+    \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
+    \textit{Scalar Values} & s     & ::= & k \vb x \\
+    \textit{Heap Values}   & h     & ::= & \op \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
+    \textit{Head Values}   & \hnf  & ::= & h \vb k \\
+    \textit{Values}        & |v|   & ::= & s \vb h \\
+    \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |v == e|
+                                             \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+    \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    % \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
+    % \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
+    \textit{Bindings}       & c     & ::= & |x = h| \\
+\end{array} \\
+\\[-3mm]
+\text{\emph{Concrete syntax}:} \;\;
+    \begin{array}[t]{l}
+          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+          \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+    \end{array} \\ \\[-3mm]
+\textbf{Shorthand} \\
+    \begin{array}{rcll}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
+      |apply1N e_1 e_2| & \text{means} & |def f (f == e_1 ; apply1N f e_2)|  & \text{if}\ |e_1|\ \text{is not a value;}\ |f|\ \text{fresh} \\
+      |apply1N v_1 e_2| & \text{means} & |def x (x == e_2 ; apply1N v_1 x)|  & \text{if}\ |e_2|\ \text{is not a value;}\ |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2)|       & \text{if}\ |e_1|\ \text{is not a value;}\ |x|\ \text{fresh} \\
+     \end{array} \\
+  \\[-2mm]
+  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+$$
+\caption{\textbf{The Verse Calculus: Syntax}}
+\label{fig:syntax}
+\end{figure}
+}
