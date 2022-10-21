@@ -59,8 +59,8 @@
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification:~\runi}
-\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
-\rulename{deref-h}  & |x == h ;  A^[h]| & \movesto & |x == h ; A^[h]| \\
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s$, $x,s$ free in |E^[hole]| \\
+\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x,\freevars{h}$ free in |A^[hole]|\\
 \rulename{u-lit}    & |k == k |                                    & \movesto & k \\
 \rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & {|v_1==v1';dots;v_n==v_n'|} \\
 \rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
