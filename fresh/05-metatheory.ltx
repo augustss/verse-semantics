@@ -156,9 +156,10 @@ For example, consider the term
 \end{verbatim}
 %
 We avoid this problem by preventing \rulename{deref-h} from substituting
-tuples under tuples. Instead these are leaf as ``heap-constraints'' which
+tuples under tuples. Instead these are left as ``heap-constraints'' which
 can be used whenever we actually need to access the contents of the tuple
-via pattern matching.
+via pattern matching (or eliminated via the garbage collection rules once
+no longer required.)
 
 \mypara{Heap-Copying in Constraints}
 %
