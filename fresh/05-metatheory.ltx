@@ -136,11 +136,11 @@ different reduction steps can be joined at a common
 term in a fixed number of steps.
 %
 But for unification, we require multiple steps to reach
-a common join if we have a term $x == |arr(s_1,...s_n)|; x == |arr(s_1',...,s_n')|; E[x]$,
+a common join if we have a term $x = |arr(s_1,...s_n)|; x = |arr(t_1,...,t_n)|; E[x]$,
 which can be reduced to $e_1$ and $e_2$ by respectively substituting
 the first or second tuple in \rulename{deref-h}, and which must then
 be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
-and $E[|arr(s_1',...,s_n')|]$.
+and $E[|arr(t_1,...,t_n)|]$.
 
 As we need potentially unbounded steps to join, we require using Newman's
 lemma, and hence, that $\runi$ terminates. However, just substituting tuples
@@ -158,8 +158,7 @@ For example, consider the term
 We avoid this problem by preventing \rulename{deref-h} from substituting
 tuples under tuples. Instead these are left as ``heap-constraints'' which
 can be used whenever we actually need to access the contents of the tuple
-via pattern matching (or eliminated via the garbage collection rules once
-no longer required.)
+via pattern matching (or eliminated via the garbage collection rules.)
 
 \mypara{Heap-Copying in Constraints}
 %
