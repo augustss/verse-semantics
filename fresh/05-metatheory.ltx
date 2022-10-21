@@ -20,10 +20,6 @@ that all possible execution paths lead to the same normal form.
 %
 However, since \calcname has recursion, we instead show that
 the rules are \emph{confluent}.
-%
-% which means that whenever
-% $e_2 \movesfrom^\ast e_1 \ movesto^\ast e_3$,
-% there exists a $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$.
 
 \subsection{Confluence}
 
@@ -96,11 +92,14 @@ under $\lambda$ and tuples, and prevents ``copying'' heap values
 in constraints as all of these lead to non-confluence.
 
 \mypara{Non-Confluence}
+%
 Suppose we eliminated \rulename{deref-h} and instead used a single
 rule like \rulename{deref-s} for \emph{all} values.
 %
 Then we could substitute $\lambda$ under tuples (and tuples under $\lambda$)
 which would violate confluence as shown by the following example.
+%
+\ranjit{TODO:flesh out steps}
 %
 \begin{verbatim}
 ex x,y. x = <1,y>; y = \z.x; x
@@ -113,14 +112,41 @@ ex x,y. x = <1,y>; y = \z.x; x
 (A similar phenomenon arises just with inlining mutually recursive
 $\lambda$-terms~\cite{Ariola2002}.)
 
-\mypara{Divergence: JB on Slack}
+\mypara{Divergence}
 %
-Even just substituting tuple under tuple can lead to non-termination
-which breaks the confluence via Newman's lemma route for the
-unification-rules fragment. Note we need termination as we can only
-directly prove \emph{local} confluence for the unification reductions
-as \cref{lem:join-h-h} requires multiple steps to reach a peak.
+It is possible to prove confluence even for potentially diverging
+(non-terminating) reductions, most famously, the $\lambda$-calculus.
+%
+One general strategy is to find a \emph{sub-relation} that satisfies
+three properties.
+%
+First, it is \emph{locally} confluent, meaning if $e$ (single-)steps to $e_1$
+and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
+%
+Second, it is terminating, Newman's Lemma \cite{Barendregt}, shows the relation
+and hence, its  reflexive transitive closure is confluent.
+%
+Third, that the \emph{closure} of this sub-relation is the same as the full reduction
+relation, which implies that the full reduction relation is also confluent.
 
+We follow this route to establish the confluence of the $\runi$
+reductions. The other relations can be proved confluence by
+establishing a stronger \emph{diamond} property, namely, two
+different reduction steps can be joined at a common
+term in a fixed number of steps.
+%
+But for unification, we require multiple steps to reach
+a common join if we have a term $x == |arr(s_1,...s_n)|; x == |arr(s_1',...,s_n')|; E[x]$,
+which can be reduced to $e_1$ and $e_2$ by respectively substituting
+the first or second tuple in \rulename{deref-h}, and which must then
+be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
+and $E[|arr(s_1',...,s_n')|]$.
+
+As we need potentially unbounded steps to join, we require using Newman's
+lemma, and hence, that $\runi$ terminates. However, just substituting tuples
+under tuples leads to divergence which blocks this proof strategy.
+For example, consider the term
+%
 \begin{verbatim}
     ex x, y. x = <1,y>; y = <2,x>; x
 --> ex x, y. x = <1,y>; y = <2,x>; <1,y>
@@ -128,8 +154,50 @@ as \cref{lem:join-h-h} requires multiple steps to reach a peak.
 --> ex x, y. x = <1,y>; y = <2,x>; <1,<2,<1,y>>>
 --> ...
 \end{verbatim}
+%
+We avoid this problem by preventing \rulename{deref-h} from substituting
+tuples under tuples. Instead these are leaf as ``heap-constraints'' which
+can be used whenever we actually need to access the contents of the tuple
+via pattern matching.
 
+\mypara{Heap-Copying in Constraints}
+%
+Finally, notice that we disallow ``copying'' heap values in constraints.
+%
+That is, \rulename{deref-h} does not allow substituting heap values (e.g. $x = h$)
+into variable-variable equalities (e.g. $y = x$).
+%
+This is because such copying could prevent confluence
+as some reductions might fail while others succeed.
+%
+For example consider the term $|x == (lam y e); x == y; y == x|$.
+%
+\begin{verbatim}
+      (ex x,y. x = \z. z; y = x; x = y; x) 3
+-->   ex f. f = (ex x,y. x = \z. z; y = x; x = y; x); f 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; f 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; x 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; (\z.z) 3
+-->>  3
+\end{verbatim}
+%
+However, if we \emph{allow} copying heap values, then the above term could also fail
+%
+\begin{verbatim}
+     (ex x,y. x = \z. z; y = x; x = y; x) 3
+-->  (ex x,y. x = \z. z; y = \z.z; x = y; x) 3
+-->> (ex x,y. x = \z. z; y = \z.z; \z.z = \z.z; x) 3
+-->  FAIL
+\end{verbatim}
+%
+An alternate ``big-step'' strategy that substituted
+identifiers with values \emph{everywhere} they were
+in a single swoop would avoid the above problem, but
+we were unable to prove confluence using such a ``big-step''
+rule.
 
+\mypara{Discussion}
+%
 Value stratification is not a limitation: in essence we ANF to name the
 inner elements (tuples or $\lambda$-terms), and then use the
 unification rule \rulename{utup} to destruct or ``unpack'' the
@@ -137,8 +205,3 @@ tuple and to access its contents.
 %
 However, not substituting under lambda is a tiresome restriction: e.g.,
 compilers will certainly want to do so. \ranjit{Simon -- add more discussion here? Skew Confluence?}
-
-%
-
-
-First, w
