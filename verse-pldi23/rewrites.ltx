@@ -55,9 +55,119 @@
 \end{figure}
 }
 
-
-
 \newcommand{\figureRulesI}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Unification:~\runi}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| \\
+\rulename{deref-h}  & |x == h ;  A^[h]| & \movesto & |x == h ; A^[h]| \\
+\rulename{u-lit}    & |k == k |                                    & \movesto & k \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & {|v_1==v1';dots;v_n==v_n'|} \\
+\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
+\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| & \\
+\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
+\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\[0.05in]
+
+\rulegroupname{Application:~\rapp}
+\rulename{app-beta} & |apply1N (lam x e_1) e_2| & \movesto & |def x (x=e_2; e_1)|  & if $|x| \not \in \freevars{|e_2|}$ \\
+\rulename{app-tup}  & |apply1N (tup (v_0,dots v_n)) v| & \movesto & \largerhs{\ |(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\[0.05in]
+
+\rulegroupname{Garbage Collection:~$\rgc$}
+\rulename{elim-def}     & |def x e| & \movesto & |e| & if $|x| \not \in \freevars{|e|}$ \\
+\rulename{elim-cst}     & |def (x_1 ^^ dots) x_1 == h_1; dots; e| & \movesto & |e| & if every $|x_i| \not \in \freevars{|e|}$\\[0.05in]
+
+\rulegroupname{Fail Propagation:~\rfail}
+\rulename{fail-cst}       & |fail ; e|            & \movesto & |fail| \\
+\rulename{fail-exp}       & |c ; fail|            & \movesto & |fail| \\
+\rulename{fail-def}       & |def x fail|          & \movesto & |fail| \\[0.05in]
+
+\rulegroupname{Speculation:~\rspc}
+\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
+\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{|xs|}{|cs|}{|v|}
+\end{longtable}
+\caption{\textbf{The Verse Calculus: Rewrite Rules (1)}}\label{fig:rulesI}
+\end{figure}
+}
+
+\newcommand{\figureRulesII}{
+\begin{figure}
+\begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
+\rulegroupname{Normalization:~\rcon}
+% \rulename{conj-flat-eq}     & |e_1 == e_2| & \movesto & |def x (x == e_1 ; x == e_2)|     & if |e_1| is not a value; |x| fresh \\
+% \rulename{conj-flat-fun}    & |apply1N e_1 e_2| & \movesto & |def f (f == e_1 ; apply1N f e_2)|     & if |e_1| is not a value; |f| fresh \\
+% \rulename{conj-flat-arg}    & |apply1N v_1 e_2| & \movesto & |def x (x == e_2 ; apply1N v_1 x)|     & if |e_2| is not a value; |x| fresh \\
+\rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
+\rulename{norm-seq-swap1} & |e ; x = v|           & \movesto & |x == v; e; x|         & if |e| is not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e ; x = s|           & \movesto & |x == s; e; x|         & if |e| is not of form |x' == s'|\\
+\rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|             & \\
+\rulename{norm-val}       & |v ; e|               & \movesto & |e|                    & \\
+\rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
+\rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; v == e_3| \\
+\rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |v == e_1; v == e_2|   & \\[0.05in]
+% \rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+% \rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
+\end{longtable}
+% \caption{\textbf{Alternative POPL-style rules for normalisation}}\label{fig:popl-rulesN-alt}
+\caption{\textbf{The Verse Calculus: Rewrite Rules (2)}}\label{fig:rulesII}
+\end{figure}
+%
+\begin{figure}
+% \judgementHead{Wellformedness of Results}{\wf{r}}
+\fbox{\wff{\Gamma}{e}{|xs|}{|cs|}{|v|}}
+\begin{mathpar}
+\inferrule
+  { }
+  { \wff{\emptyset}{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \rulename{WF-Val}}
+
+\inferrule
+  { }
+  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\rulename{WF-Eq-Val}}
+
+\\
+\inferrule
+  { x \not \in \Gamma \quad
+    \wff{\Gamma, x}{e}{|xs|}{|cs|}{|v|} }
+  { \wff{\Gamma}{|def x e|}{|x,xs|}{|cs|}{|v|} }
+  { \rulename{WF-Def} }
+
+\inferrule
+  {x \in \Gamma \quad
+   \wff{\Gamma - x}{e}{|xs|}{|cs|}{|v|}
+  }
+  {\wff{\Gamma}{|x == h; e|}{|xs|}{|x == h, cs|}{|v|}}
+  {\rulename{WF-Eq}}
+
+\\
+
+\inferrule
+  { \wff{\Gamma}{e}{|xs|}{|cs|}{|vs|} \quad
+    \wff{\Gamma,|xs|}{|es|}{|xs|'}{|cs|'}{|vs|}
+  }
+  { \wff{\Gamma}{|e|,|es|}{|xs|,|xs|'}{|cs|,|cs|'}{|v,vs|} }
+  {\rulename{WF-many}}
+\end{mathpar}
+\caption{\textbf{Well-formedness of Results}}\label{fig:wf}
+\end{figure}
+}
+
+
+\newcommand{\figureRulesIPoplSubmission}{
 \begin{figure}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
 % The quad indents the lines
@@ -166,11 +276,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
                                              %%% NOTE: the following is not in the POPL submission,
                                              %%% but needed to make progress in (1,2)[x:int]
                                              \vb |apply1 op v|
-
-                                             \color{red}{\vb |def x ce|}
-
-                                             \\
-
+                                             %%% Ranjit: shouldn't we add this?
+                                             \color{red}{\vb |def x ce|} \\
 \end{array}$$
 \caption{\textbf{The Syntax of Contexts}} \label{fig:contexts}
 \end{figure}
@@ -200,7 +307,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \end{figure}
 }
 
-\newcommand{\figureRulesII}{
+\newcommand{\figureRulesIIPoplSubmission}{
 \begin{figure}
   $$
   \begin{array}{l}
