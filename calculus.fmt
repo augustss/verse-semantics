@@ -53,8 +53,7 @@
 %format cs = "\overline{c}"
 %format rs = "\overline{r}"
 %format vs = "\overline{\mathit{v}}"
-
-
+%format es = "\overline{\mathit{e}}"
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"

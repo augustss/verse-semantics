@@ -91,8 +91,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
 % \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
 % \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
-\textit{Results}       & r     & ::= & |def xs (cs; v) | \\
-                       & c     & ::= & |x = h| \\
+\textit{Bindings}       & c     & ::= & |x = h| \\
 
 \end{array}$$
 \caption{\textbf{Syntax of POPL-stye calculus}}
@@ -146,11 +145,11 @@ $$\begin{array}{lrcll}
 \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
 \rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
 \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
-\rulename{one-choice} & |one (r `choice` e)| & \movesto & |r| & if \wf{r} \\
-\rulename{one-value}  & |one r|              & \movesto & |r| & if \wf{r} \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (r_1 choice dots choice r_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{}{|rs|}{|xs|}{|cs|}{|vs|} \\
-\rulename{all-value}  & |all r|              & \movesto & |def xs cs ; tup v|     & if \wff{}{r}{|xs|}{|cs|}{|v|}
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{|vs|} \\
+\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{POPL-style rules for Evaluation}}\label{fig:popl-rulesI}
 \end{figure}
@@ -161,8 +160,8 @@ $$\begin{array}{lrcll}
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Conjunction:~\rcon}
 \rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
-\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
-\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e|          & if |e| is not of form |x' == s'|\\
+\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e; x|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e; x|          & if |e| is not of form |x' == s'|\\
 \lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
 \lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\
 \rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
@@ -187,21 +186,61 @@ $$\begin{array}{lrcll}
 \rulegroupname{Conjunction:~\rcon}
 \rulename{conj-flat-eq}     & |e_1 == e_2| & \movesto & |def x (x == e_1 ; x == e_2)|     & if |e_1| is not a value; |x| fresh \\
 \rulename{conj-flat-fun}    & |apply1N e_1 e_2| & \movesto & |def f (f == e_1 ; apply1N f e_2)|     & if |e_1| is not a value; |f| fresh \\
+\rulename{conj-flat-arg}    & |apply1N v_1 e_2| & \movesto & |def x (x == e_2 ; apply1N v_1 x)|     & if |e_2| is not a value; |x| fresh \\
 \rulename{conj-seq-assoc}     & |(e_1 ; e_2) ; e_3|                 & \movesto & |e_1 ; (e_2 ; e_3)|          & \\
-\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e|          & if |e| is not of form |x' == v'|\\
-\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e|          & if |e| is not of form |x' == x'|\\
+\rulename{conj-seq-swap1}     & |e ; x = v|                 & \movesto & |x == v; e; x|          & if |e| is not of form |x' == v'|\\
+\rulename{conj-seq-swap2}     & |e ; x = s|                 & \movesto & |x == s; e; x|          & if |e| is not of form |x' == s'|\\
 \lvc{\rulename{conj-swap-eq}} & |hnf == x|    & \movesto & |x == hnf| & \\
 \lvc{\rulename{conj-val}} & |v ; e|    & \movesto & |e| & \\
 \rulename{conj-seq-defr}     & |(def x e_1); e_2|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{conj-seq-defl}     & |e_1 ; (def x e_2)|                 & \movesto & |def x (e_1 ; e_2)|          & if $|x| \not \in \freevars{|e_1|}$\\
-\rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
+% \rulename{conj-arg-def} & |apply1N e_1 (def x e_2)|     & \movesto & |def x (apply1N e_1 e_2)| & if $|x| \not \in \freevars{|e_1|}$ \\
 \lvc{\rulename{conj-cst-defr}} & |e_1 == (def y e_2)| & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
-\rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
+% \rulename{conj-arg-cst} & |apply1N v (e_1 ; e_2)|       & \movesto & |e_1 ; apply1N v e_2|  \\
 \lvc{\rulename{unify-seqr}} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_3| \\
 \lvc{\rulename{unify-unifyr}} & |v == (e_1 == e_2)| & \movesto & |v == e_1; v == e_2| & \\[0.05in]
 
 \end{longtable}
 \caption{\textbf{Alternative POPL-style rules for normalisation}}\label{fig:popl-rulesN-alt}
+\end{figure}
+
+\begin{figure}
+% \judgementHead{Wellformedness of Results}{\wf{r}}
+\begin{mathpar}
+\inferrule
+  { }
+  { \wff{\emptyset}{|v|}{\emptyset}{\emptyset}{|v|} }
+  { \rulename{WF-Val}}
+
+\inferrule
+  { }
+  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\rulename{WF-Cst2}}
+
+\\
+\inferrule
+  { x \not \in \Gamma \quad
+    \wff{\Gamma, x}{e}{|xs|}{|cs|}{|v|} }
+  { \wff{\Gamma}{|def x e|}{|x,xs|}{|cs|}{|v|} }
+  { \rulename{WF-Def} }
+
+\inferrule
+  {x \in \Gamma \quad
+   \wff{\Gamma - x}{e}{|xs|}{|cs|}{|v|}
+  }
+  {\wff{\Gamma}{|x == h; e|}{|xs|}{|x == h, cs|}{|v|}}
+  {\rulename{WF-Cst1}}
+
+\\
+
+\inferrule
+  { \wff{\Gamma}{e}{|xs|}{|cs|}{|vs|} \quad
+    \wff{\Gamma,|xs|}{|es|}{|xs|'}{|cs|'}{|vs|}
+  }
+  { \wff{\Gamma}{|e|,|es|}{|xs|,|xs|'}{|cs|,|cs|'}{|v,vs|} }
+  {\rulename{WF-many}}
+\end{mathpar}
+\caption{\textbf{POPL version: well-formedness of Results}}
 \end{figure}
 }
 
