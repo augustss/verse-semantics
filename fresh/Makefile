@@ -3,7 +3,7 @@
 
 LATEX=pdflatex -halt-on-error
 PAPERTEX=fresh.tex
-PAPERSRC=$(PAPERTEX) rewrites.tex 01-syntax.tex 02-semantics.tex 03-preliminaries.tex 04-confluence.tex ../verse.bib
+PAPERSRC=$(PAPERTEX) rewrites.tex 01-syntax.tex 02-semantics.tex 02a-POPL-style.tex 03-preliminaries.tex 04-confluence.tex 05-metatheory.tex ../verse.bib
 
 # Top-level target
 pdf: $(PAPERSRC)

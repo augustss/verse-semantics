@@ -4,6 +4,8 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newpage
+
 \section{Preliminaries} \label{sec:preliminaries}
 
 \begin{definition}[Reductions] A \emph{reduction} \rr is a binary relation on a set of terms \univ.
@@ -24,7 +26,6 @@ We write
 \begin{definition}[Size] The \emph{size} of a reduction $\rsteps{}{a}{b}$
 is the smallest $i$ such that $\rstepk{}{i}{a}{b}$.
 \end{definition}
-
 
 \begin{definition}[Normal Forms]
 A term $a$ is an $\rr$-\emph{Normal Form} if there does not exist any $b$
@@ -49,8 +50,6 @@ if there is a $d$ such that $\rsteps{\rr}{b}{d}$ and $\rsteps{\rr}{c}{d}$.
 A reduction $\rr$ is \emph{confluent} if whenever
 $\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{definition}
-
-
 
 
 \begin{figure}[h]

@@ -449,7 +449,8 @@ dsP l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" +
 
 -- Handle ..l, l
 dsPArr :: Loc -> [Expr] -> SExpr -> D SExpr
-dsPArr l lhss e =
+dsPArr l lhss ea = do
+  e <- dsD ea
   case exprElems lhss of
     -- P[lhs0,...,lhsn] e = P[lhs0]x0; ...; P[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
@@ -459,7 +460,7 @@ dsPArr l lhss e =
       pure $ Seq $ els ++ [eun]
 
     [ESplice lhs] ->
-      dsP l lhs e
+      dsP l lhs ea
 
     [EElems ls1, ESplice lhs] -> do
       (v, bv) <- case e of Variable{} -> pure (e, []); _ -> do v <- newIdent l "d"; pure (Variable v, [define l v e])
