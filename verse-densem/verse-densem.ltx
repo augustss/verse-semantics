@@ -512,7 +512,7 @@ $$
 \end{array}
 $$
 \caption{Set semantics for $\mtype$}
-\label{fig:sequences}
+\label{fig:set-sem}
 \end{figure}
 
 The denotational semantics is given in \cref{fig:den-sem1}.
@@ -529,12 +529,13 @@ The denotational semantics is given in \cref{fig:den-sem1}.
 \subsection{What is a ``collection of values''?} \label{sec:collection}
 
 The semantics is parameterised over the meaning of a ``collection of values $\mtype$''.
-The signature of $\mtype$ (i.e. the operations it supports) are given in \cref{fig:den-sem1}.
-We will successively refine this type.
+To a first approximation, think of $\mtype$ a (possibly infinite) set of values $\Value$,
+with union, intersection etc having their ordinary meaning.
 
-However, to a first approximation, think of $\mtype$ a (possibly infinite) bag of values $\Value$,
-with union, intersection etc having their ordinary meaning on bags.  The bag-interpretation
-doesn't make sense of |all| (in what order should the bag be enumerated?) but otherwise it works fine.
+Our first interpretation,
+given in \Cref{fig:set-sem}, is a little more refined: $\mtype$ includes $\bot$ and $\wrong$ as
+well as a set of values.  Our second interpretation is given in \Cref{fig:labelled-sem}, and
+discussed in \Cref{sec:order-sensitive}.
 
 \subsection{The equations}
 
@@ -551,13 +552,13 @@ The equations for $\semfun{E}$ are more interesting.
 \item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
 The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
 \item Choice $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the union (written $\munion$) of the values
-  returned by |e_1| and |e_2| respectively.  For bags this union operator is just bag union (\Cref{fig:sequences}).
+  returned by |e_1| and |e_2| respectively.  For bags this union operator is just bag union (\Cref{fig:set-sem}).
 \item Unification $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the \emph{intersection} of the
   values returned by |e_1| and |e_2| respectively. For bags, this ``intersection'' operator $\mintersect$
-  is defined in \cref{fig:sequences}. In this definition, the equality is mathematical equality of functions;
+  is defined in \cref{fig:set-sem}. In this definition, the equality is mathematical equality of functions;
   which we can't implement for functions; see \Cref{sec:unification-and-equality}.
 \item Sequencing $\semapp{E}{|e_1 ; e_2|}{\rho}$. Again we use an auxiliary function $\msemi$ to combine
-  the meanings of |e_1| and |e_2|. For bags, the function $\msemi$ (\cref{fig:sequences} again)
+  the meanings of |e_1| and |e_2|. For bags, the function $\msemi$ (\cref{fig:set-sem} again)
   uses a bag comprehension.  Again it does a cartesian product, but without the equality constraint of $\mintersect$.
 \item Function application $\semapp{E}{|apply1N v_1 v_2|}{\rho}$ is easy, because $\semfun{V}$ returns a single value: just apply
   the meaning of the function to the meaning of the argument.  The $\apply$ function is defined in \Cref{fig:den-sem1}.
@@ -580,14 +581,14 @@ collection, whose only element is a function value. But that function value has
 type $\Value \rightarrow \mtype$; that is, it is a function that takes a single
 value and returns a \emph{collection} of values.  This is not TimLambda, but it's simple and well-understood.
 
-\subsection{Hastype}
-
-The meaning of |(hastype e_1 e_2)| is the meaning of |e_1|, provided the meaning
- of |(apply1N e_1 e_2)| has the same meaning.  If not, the expression has meaning $\wrong$.
- The ``has the same meaning'' test takes places in the mathematical world, so it means
- ``the same in all contexts''.  It follows that |(hastype e_1 e_2)| should yield $\wrong$ if $e_1$ can differ
- from |(apply1N e_1 e_2)| \emph{in any context}.  If not (and the verifier can prove this) we can
- simply replace |(hastype e_1 e_2)| by |e_1|.
+% \subsection{Hastype}
+% 
+% The meaning of |(hastype e_1 e_2)| is the meaning of |e_1|, provided the meaning
+%  of |(apply1N e_1 e_2)| has the same meaning.  If not, the expression has meaning $\wrong$.
+%  The ``has the same meaning'' test takes places in the mathematical world, so it means
+%  ``the same in all contexts''.  It follows that |(hastype e_1 e_2)| should yield $\wrong$ if $e_1$ can differ
+%  from |(apply1N e_1 e_2)| \emph{in any context}.  If not (and the verifier can prove this) we can
+%  simply replace |(hastype e_1 e_2)| by |e_1|.
 
 \subsection{Existentials} \label{sec:unification-and-equality}
 
@@ -605,6 +606,8 @@ $\semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}$, and take the union
 Of course we can't possibly implement it like this, but it makes a great specification.
 For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
 the semantics is a singleton sequence $[3]$.
+
+\subsection{The denotational semantics is un-implementable}
 
 This semantics is nice and simple, but we definitely can't implement it!  Consider
 $$
@@ -635,15 +638,7 @@ So our touchstone must be:
 
 This reminded Koen of something that Esterelle does.  (Details, Koen?)
 
-\subsection{Order sensitivity}
-
-There is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
-enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
-of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
-the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
-And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
-
-\section{Getting $\wrong$ right}
+\subsection{Getting $\wrong$ right}
 
 Getting $\wrong$ right is a bit tricky.
 
@@ -657,6 +652,7 @@ Getting $\wrong$ right is a bit tricky.
 \end{itemize}
 
 There is probably more than one possible choice here.
+
 
 % -------------------------------------
 \section{An order-sensitive denotational semantics} \label{sec:order-sensitive}
@@ -724,6 +720,12 @@ $$
 \label{fig:labelled-sem}
 \end{figure}
 
+There is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
+of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
+the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
+And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
+
 \Cref{fig:labelled-sem} give a new denotational semantics that \emph{does} account for order.
 The key idea (due to Joachim) is this: return a sequence of \emph{labelled} values;
 and then sort that sequence (in $\mone$ and $\mall$) into canonical order
@@ -734,8 +736,8 @@ precisely as they are in \Cref{fig:den-sem1}.
 However the semantics of a collection of values, $\mtype$, does change, and is given in \Cref{fig:labelled-sem}:
 \begin{itemize}
 \item
-A collection of values $\mtype$ is
-a \emph{set of labelled values}, each of type $\LblValue$; or $\bot$ or $\wrong$ as before.
+A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
+a \emph{set of labelled values}, each of type $\LblValue$.
 \item A labelled value (of type $\LblValue$)
 is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
 \item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
@@ -902,6 +904,7 @@ $
 \label{fig:micro-den-sem}
 \end{figure}
 
+\simon{From here on the presentation becomes much more flaky and speculative.}
 
 This section describes micro-lambdas.  See figure \ref{fig:micro-syntax} for syntax,
 and \Cref{fig:micro-desugar} for some desugaring rules.
