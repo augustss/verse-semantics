@@ -269,13 +269,17 @@ evalE' r (CAll e) =
 --  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
   unit (sAll (evalE r e))
 evalE' r (CSucceeds e) = succeeds $ evalE r e
-evalE' r (CLambda i is e0 e1) = aset
+evalE' r (CLambda i is cov e0 e1) = aset
   [ f | f <- allFuncs,
     forAll (1 + length is) $ \ ws@(w:_) ->
-      let r' = exts r (zip (i:is) ws) in
+      let r' = exts r (zip (i:is) ws)
 --      trace ("CLambda " ++ prettyShow (f, w, e0, evalE r' e0, nonEmpty (evalE r' e0), evalE r' e1, getSing (apply f w), maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w)))) $
-      nonEmpty (evalE r' e0) `implies`
-      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
+          cond1 = nonEmpty (evalE r' e0)
+          cond2 = maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
+      in
+      if cov then
+        if cond1 then cond2 else isNothing (getSing (apply f w))
+      else cond1 `implies` cond2
   ]
 evalE' _ e = error $ "evalE " ++ prettyShow e
 

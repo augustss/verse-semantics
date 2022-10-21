@@ -29,7 +29,7 @@ import GHC.Stack(HasCallStack)
 
 import Print
 import Expr hiding (compos, composOp)
-import Desugar(primOps, getVisible)
+import Desugar(primOps, getVisible, covariantId)
 import Error
 import Flags
 import SExp
@@ -46,7 +46,7 @@ data Core
   | CDef Heap Core
   | CWrong String
   | CSplit Core Value Value
-  | CLambda Ident [Ident] Core Core
+  | CLambda Ident [Ident] Bool Core Core
   deriving (Show, Eq)
 
 type Heap = [Ident]
@@ -188,23 +188,37 @@ core (If3 e1 e2 e3) = do
     fn <- cOne $ CBar l r
     i <- newTmp
     pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (Var i) vEmpty]
-core e@Function{} = val e
+--core e@Function{} = val e
 core (Do e) = coreD e
 core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
-core (Lambda i [] e1 e2) = do
+core (Lambda i [] (Array []) e) = val $ Function [(Define i AnyT, [])] e
+core (Lambda i rs e1 e2) = do
+--  traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
+  let covariant = covariantId `elem` rs || True -- XXX
   if timLam then do
     let is = getVisible e1
     e1' <- core e1
     e2' <- coreD e2
-    pure $ CLambda i is e1' e2'
+    pure $ CLambda i is covariant e1' e2'
   else
-    core $ Function [(Define i AnyT, [])] $ If3 e1 e2 Fail
+    val $ Function [(Define i AnyT, [])] $
+      if trivial e1 then
+        Seq [e1, e2]
+      else
+        If3 e1 e2 (if covariant then Fail else Variable (Ident noLoc "wrong"))
 core EmptyT = pure CFail
 core e = impossible e
+
+-- Is the expression non-failing and contains no binders
+trivial :: Expr -> Bool
+trivial Array{} = True
+trivial (ApplyD (Variable (Ident _ "any")) _) = True
+trivial _ = False
+
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -320,14 +334,17 @@ val :: HasCallStack => Expr -> C Core
 val e = CValue <$> value e
 
 value :: HasCallStack => Expr -> C Value
+--value e | trace ("value:\n" ++ prettyShow e) False = undefined
 value (LitInt i) = pure (HNF $ HInt i)
 value (LitRat i _) = pure (HNF $ HRat $ toRational i)
 value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
                                | otherwise = pure (Var i)
 value (Array es) = HNF . HArray <$> mapM value es
+{-
 value (Typedef e) = do
   i <- newTmp
   HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
+-}
 value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
 value AnyT = pure (HNF $ HPrim ":any")
@@ -360,8 +377,10 @@ instance Pretty Core where
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
                                  pPrintPrec l 0 f <> text ",",
                                  pPrintPrec l 0 g <> text ","])
-  pPrintPrec l _ (CLambda x ys e1 e2) =
-    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+> text "." <+> pPrintPrec l 0 e2
+  pPrintPrec l _ (CLambda x ys cov e1 e2) =
+    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
+             (if cov then text "<covariant> " else text "") <>
+             text "." <+> pPrintPrec l 0 e2
 
 instance Pretty Value where
   pPrintPrec l p (Var i) = pPrintPrec l p i
@@ -393,7 +412,7 @@ compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> appV f n <*> appV f g
-compos f (CLambda i is e1 e2) = CLambda i is <$> f e1 <*> f e2
+compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
 
 appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
 appV _ v@Var{} = pure v
@@ -420,7 +439,7 @@ composC fc _  _  (CMacro i e) = CMacro i <$> fc e
 composC fc _  _  (CDef h e) = CDef h <$> fc e
 composC _  _  _   e@CWrong{} = pure e
 composC fc fv _  (CSplit e f g) = CSplit <$> fc e <*> fv f <*> fv g
-composC fc _  _  (CLambda i is e1 e2) = CLambda i is <$> fc e1 <*> fc e2
+composC fc _  _  (CLambda i is cov e1 e2) = CLambda i is cov <$> fc e1 <*> fc e2
 
 composV :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Value -> f Value
 composV _  _  _  v@Var{} = pure v
@@ -461,7 +480,7 @@ cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvsV f ++ cfvsV g
 cfvs CWrong{} = []
-cfvs (CLambda i is e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
+cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
 
 cfvsV :: Value -> [Ident]
 cfvsV (Var i) = [i]
@@ -493,9 +512,9 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (subV f) (subV g)
-    sub e@(CLambda i is e1 e2)
+    sub e@(CLambda i is cov e1 e2)
       | x `elem` (i:is) = e
-      | null (intersect (i:is) bs) = CLambda i is (sub e1) (sub e2)
+      | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
       | otherwise = sub $ alphaConvert bs e
 
     subV v@(Var i) | i == x = b
@@ -528,7 +547,7 @@ alphaConvert vs = alpha []
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
     alpha m (CSplit e f g) = CSplit (alpha m e) (alphaV m f) (alphaV m g)
-    alpha m (CLambda i is e1 e2) = CLambda i' is' (alpha m' e1) (alpha m' e2)
+    alpha m (CLambda i is cov e1 e2) = CLambda i' is' cov (alpha m' e1) (alpha m' e2)
       where i' = fresh i
             is' = map fresh is'
             m' = foldr add m (zip (i:is) (i':is'))
