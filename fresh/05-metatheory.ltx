@@ -80,18 +80,16 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 
 \subsection{Design}
 
-\calcname's rewrite rules we carefully designed to ensure confluence.
-%
-\calcname layers values into \emph{scalars} (integers, variables)
+\calcname deliberately layers values into \emph{scalars} (integers, variables)
 and \emph{heap values} (tuples and $\lambda$-terms) and then only
-allows scalars (no tuples or $\lambda$-terms) in tuples
-to ensure confluence.
+allows scalars (no tuples or $\lambda$-terms) in tuples to ensure 
+confluence.
 %
 Further, the \rulename{deref-h} rule prevents substituting heap values
 under $\lambda$ and tuples, and prevents ``copying'' heap values
 in constraints as all of these lead to non-confluence.
 
-\mypara{Non-Confluence}
+\mypara{Non-Confluence due to nested $\lambda$}
 %
 Suppose we eliminated \rulename{deref-h} and instead used a single
 rule like \rulename{deref-s} for \emph{all} values.
@@ -112,10 +110,10 @@ ex x,y. x = <1,y>; y = \z.x; x
 (A similar phenomenon arises just with inlining mutually recursive
 $\lambda$-terms~\cite{Ariola2002}.)
 
-\mypara{Divergence}
+\mypara{Non-confluence due to nested tuples}
 %
 It is possible to prove confluence even for potentially diverging
-(non-terminating) reductions, most famously, the $\lambda$-calculus.
+(non-terminating) reductions, most famously, for the $\lambda$-calculus.
 %
 One general strategy is to find a \emph{sub-relation} that satisfies
 three properties.
@@ -123,11 +121,11 @@ three properties.
 First, it is \emph{locally} confluent, meaning if $e$ (single-)steps to $e_1$
 and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
 %
-Second, it is terminating, Newman's Lemma \cite{Barendregt}, shows the relation
-and hence, its  reflexive transitive closure is confluent.
+Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies 
+the relation is confluent (and hence, so is its reflexive transitive closure.)
 %
-Third, that the \emph{closure} of this sub-relation is the same as the full reduction
-relation, which implies that the full reduction relation is also confluent.
+Third, that the \emph{closure} of the sub-relation is the same as the full reduction
+relation, which then implies that the full reduction relation is also confluent.
 
 We follow this route to establish the confluence of the $\runi$
 reductions. The other relations can be proved confluence by
@@ -160,7 +158,7 @@ tuples under tuples. Instead these are left as ``heap-constraints'' which
 can be used whenever we actually need to access the contents of the tuple
 via pattern matching (or eliminated via the garbage collection rules.)
 
-\mypara{Heap-Copying in Constraints}
+\mypara{Non-confluence due to Heap Copying}
 %
 Finally, notice that we disallow ``copying'' heap values in constraints.
 %
