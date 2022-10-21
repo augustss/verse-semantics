@@ -24,7 +24,7 @@ traceInput = False
 
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
-forallHack = False -- True
+forallHack = True
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
@@ -198,7 +198,7 @@ allTuples =
 allFuncs :: [W]
 allFuncs = fcns ++ constFuncs
   where
-    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp, wDblW, wFail]
+    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp, wDblW, wFail, w0'1, wHack, wTy01]
     wId  = func "id"  $ unit
     wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wDec = func "dec" $ \case WInt x -> unit (WInt (x-1)); _ -> empty
@@ -210,6 +210,9 @@ allFuncs = fcns ++ constFuncs
     wAp  = func "ap"  $ \case WTuple [f,a] -> apply f a; _ -> empty
     wDblW= func "dblW" $ \case WInt x -> unit (WInt (x*2)); _ -> unit (Wrong "wDblW")
     wFail= func "fail" $ const empty
+    w0'1 = func "0->1" $ \case WInt 0 -> unit (WInt 1); _ -> empty
+    wHack= func "0->1" $ \case WInt 0 -> unit (WInt 1); WInt 1 -> unit (WInt 2); _ -> empty
+    wTy01= func "ty0|1" $ \case WInt x | x==0 || x==1 -> unit (WInt x); _ -> empty
 
 constFuncs :: [W]
 constFuncs = [ WFunction $ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- allInts ]
@@ -223,7 +226,7 @@ apFunc (Func _ f) a = f a
 
 instance Eq (Func W (S W)) where
   f@(Func sf _) == g@(Func sg _) =
-    --trace' ("eq " ++ show (sf, sg)) $
+    -- trace' ("eq " ++ show (sf, sg)) $
     sf == sg ||    -- compare function names
     and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
