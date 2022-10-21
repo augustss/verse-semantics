@@ -399,7 +399,17 @@ rulesSequencing lhs =
   "UNIFY-UNIFYR" `name`
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3))))
+     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3) :>: VAR x)))
+  -- for FRESH
+ ++ "CONJ-CST-DEFR" `name` -- e1 = (ex y. e2) --> ex y. e1 = e2
+  do (e1 :=: Def (Bind y e2)) <- [lhs]
+     let y' = identNotIn (free e2 ++ free e2)
+     if y `elem` free e1
+       then pure (Def (Bind y' (e1 :=: subst [(y,Var y')] e2)))
+       else pure (Def (Bind y (e1 :=: e2)))
+-- ++ "CONJ-SEQ-ASSOC" `name`
+--  do (e1 :>: e2) :>: e3 <- [lhs]
+--     pure (e1 :>: (e2 :>: e3))
 
 --------------------------------------------------------------------------------
 
@@ -528,7 +538,7 @@ rulesStructural :: ERule
 rulesStructural lhs =
   "SWAP-E-1" `name`
   do (VAR y :=: VAR x) <- [lhs]
-     -- guard (x < y)
+     guard (x < y)
      pure (VAR x :=: VAR y)
   ++
   "SWAP-E-2" `name`
@@ -581,7 +591,9 @@ rulesGarbageCollection lhs =
    "ELIM-CST" `name`
    do Def _ <- [lhs]
       (xs, cs, e) <- gcDefs lhs
-      pure (gc xs cs e)
+      let (n, e') = gc xs cs e
+      guard (n < length xs)
+      pure e'
 
 gcDefs :: Expr -> [([Ident], [(Ident, HNF)], Expr)]
 gcDefs e = do
@@ -596,12 +608,12 @@ gcDefs e = do
       goC ((VAR x :=: HVAL h) :>: e) = ((x,h) : cs, e') where (cs, e') = goC e
       goC e                          = ([], e)
 
-gc :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+gc :: [Ident] -> [(Ident, HNF)] -> Expr -> (Int, Expr)
 gc xs cs e = go (free e) cs e
    where
-      go :: [Ident] -> [(Ident, HNF)] -> Expr -> Expr
+      go :: [Ident] -> [(Ident, HNF)] -> Expr -> (Int, Expr)
       go live cands e = case find (\(xi,_) -> xi `elem` live) cands of
-         Nothing       -> defs [x | x <- xs, x `elem` live] e
+         Nothing       -> (length live, defs [x | x <- xs, x `elem` live] e)
          Just (xi, hi) -> go (live `union` free hi) (cands \\ [(xi, hi)]) (VAR xi :=: HVAL hi :>: e)
 
 {- | Application Contexts
@@ -734,14 +746,14 @@ derefV lhs xx =
 -- TODO: replace with `FLAT-EQ` from Simon-Lennart doc: e1 = e2 ==> ex x. x = e1 ; x = e2; x
 
 dsFresh :: Expr -> Expr
-dsFresh e = {- trace ("TRACE: ds : " ++ show e') $ -} e'
+dsFresh e = trace ("TRACE: ds : " ++ show e') $ e'
   where e' = dsFresh' e
 
 dsFresh' :: Expr -> Expr
 dsFresh' = go
   where
    go (ex :=: ex') = dsEq ex ex'
-   go (ex :>: ex') = dsSeq ex ex'
+   go (ex :>: ex') = go ex :>: go ex' -- dsSeq ex ex'
    go (ex :|: ex') = go ex :|: go ex'
    go (Def bi)     = dsBind bi
    go (One ex)     = One (go ex)
@@ -751,8 +763,8 @@ dsFresh' = go
 -- | `e1 == e2` ===> `ex x . x == e1; x == e2; x`
 dsEq :: Expr -> Expr -> Expr
 dsEq e1 e2
-  | isVal e1  = e1 :=: e2
-  | isVal e2  = e2 :=: e1
+  | isVal e1  = (e1 :=: e2') :>: e1
+  | isVal e2  = (e2 :=: e1') :>: e2
   | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2') :>: VAR x))
   where
     x   = identNotIn (free [e1', e2'])
