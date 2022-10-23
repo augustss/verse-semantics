@@ -52,6 +52,7 @@
   \end{array}
   $$
 \caption{The Verse calculus: syntax} \label{fig:syntax-popl-sub}
+
 \end{figure}
 }
 
@@ -441,5 +442,13 @@ $$
 $$
 \caption{\textbf{The Verse Calculus: Syntax}}
 \label{fig:syntax}
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{lrcll}
+        \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| & \\
+        \rulename{swap-c} & |x_1=v_1; x_2 = v_2; e| & \equiv & |x_2 = v_2; x_1=v_1; e|  \\
+\end{array}$$
+\caption{\textbf{Structural Equivalences (POPL style)}}\label{fig:popl-structural-equiv}
 \end{figure}
 }
