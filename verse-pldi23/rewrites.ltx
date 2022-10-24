@@ -4,6 +4,55 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+\newcommand{\op}{\mathit{op}}
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+
+\newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
+\newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
+\newcommand{\go}[1]{\xrightarrow{}_{#1}}
+\newcommand{\gos}[1]{\xrightarrowdbl{}_{#1}}
+\newcommand{\gok}[2]{\xrightarrowdbl{#2}_{#1}}
+\newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
+\newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
+\newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+\newcommand{\univ}{\ensuremath{\mathcal{E}}}
+\newcommand{\join}[3]{{#2} \sim_{#1} {#3}}
+\newcommand{\dia}{\ensuremath{\diamond}}
+
+\newcommand{\rnk}{\ensuremath{\rho}}
+\newcommand{\rord}{\ensuremath{\mathcal{O}}}
+\newcommand{\runi}{\ensuremath{\mathcal{U}}}
+\newcommand{\rapp}{\ensuremath{\mathcal{A}}}
+\newcommand{\rcon}{\ensuremath{\mathcal{N}}}
+\newcommand{\rgc}{\ensuremath{\mathcal{G}}}
+\newcommand{\rfail}{\ensuremath{\mathcal{F}}}
+\newcommand{\rspc}{\ensuremath{\mathcal{S}}}
+
+\newcommand{\rdx}[1]{\ensuremath{\Delta_{#1}}}
+\newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
+\newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
+
+
+\newcommand{\wf}[1]{\ensuremath{\vdash #1}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\lvc}[1]{#1}
+\newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
+\newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
+\newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
+
+
 \newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
 \newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
 
