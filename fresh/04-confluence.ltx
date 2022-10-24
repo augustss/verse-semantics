@@ -847,7 +847,6 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rfail}$ or vice 
 \end{description}
 \end{proof}
 
-ANCHOR
 
 \begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-g-c}
 	$\runi$ and $\rgc$ commute.
@@ -861,6 +860,7 @@ Let $\tx{\runi}$ and $\tx{\rgc}$ denote the reducts for $\runi$ and $\rgc$ respe
 If the reducts are disjoint then terms can be trivially joined.
 %
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice versa.
+%
 \begin{description}
 	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$:
 		Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
@@ -875,14 +875,78 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice ve
 %
 \end{proof}
 
+ANCHOR
+
 \begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
 	$\runi$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rspc$ 2-commutes with $\runi$, and hence by \cref{lem:k-comm}, $\runi$ commutes wth $\rspc$.
+%
+Let $\tx{\runi}$ and $\tx{\rspc}$ denote the reducts for $\runi$ and $\rspc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined.
+%
+Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice versa.
+%
+\begin{description}
+\item[Case] $\rdx{\runi} \subset \rdx{\rspc}$ Split cases on the rule used in $\rspc$
+	\begin{description}
+	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
+	Let us split cases on where $\rdx{\runi}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
+		\item[Case] $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
+		\item[Case] $\rdx{\runi} \subset CX$ :
+
+		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\runi} \cdots |e_1 choice e_2|$
+		so
+		with two $\runi$ steps we can join at $|SX^[e_1' choice e_2']$ where
+		$e_i' \equiv \cdots \rdx{\runi}' \cdots e_i$.
+		\end{description}
+
+
+	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
+	Let us split cases on where $\rdx{\runi}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
+		\item[Case] $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
+		\item[Case] $\rdx{\runi} \subset e_3$, \ie $\runi : e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
+		\end{description}
+
+	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
+	Here, $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$ so join at $SX[e']$.
+
+	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
+	Hence, by \cref{lem:gc-result}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
+
+	\item[Case] \rulename{all-choice}
+	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e$ where $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$.
+	Hence, by \cref{lem:gc-result}, $\rdx{\runi} \not \subset \rdx{\rspc}$.
+
+	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Trivially $\rdx{\runi} \not \subset \rdx{\rspc}$.
+
+\end{description}
+
+\item[Case] $\rdx{\rspc} \subset \rdx{\runi}$ Split cases on the rule used in $\runi$
+\begin{description}
+	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
+		If $\rdx{\rspc} \subset |v|$, \ie $\rspc : |v| \movesto |v'|$, then join (with two $\rspc$ steps) at $x = |v'|; E[|v'|]$.
+		If $\rdx{\rcon} \subset E[|x|]$, \ie $\rcon : E[|x|] \movesto E'[|x|]$, then join at $x = |v|; E'[|v|]$.
+	\item[Case:] \rulename{u-tup} \ie $\rspc \not \subset \runi$.
+	\item[Case:] \rulename{u-*} \ie~$\tx{\runi} \equiv c \movesto |fail|$; so join at |fail|.
+\end{description}
+
 \end{proof}
 
+\begin{lemma}[GC-Result] \label{lem:gc-result}
+If $\wff{\emptyset}{e}{|xs|}{|xs|}{\hnf}$ then $e$ is an $\runi$-Normal Form.
+\end{lemma}
+
+\ranjit{TODO: modify GC rules to ensure above, by (1) replacing $x=h$ with $x=v$ where v is not literal, (2) "tail" is HNF.}
 
 \subsection{Application} % --------------------------------------------------------------------------
 
