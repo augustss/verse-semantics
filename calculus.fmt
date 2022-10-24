@@ -223,8 +223,10 @@
 
 %format e_0
 %format e_1
+%format e_1'
 %format e1'
 %format e_2
+%format e_2'
 %format e_3
 %format e_4
 %format e_5
@@ -235,6 +237,8 @@
 %format e_x
 %format e_y
 %format e_i
+
+
 
 %format h_1
 %format h_2
