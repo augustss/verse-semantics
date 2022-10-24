@@ -1192,11 +1192,11 @@ non-recursive, and \rulename{subst} can apply.
 % Not sure which is the optimal order, but it makes sense to keep them together?
 
 The syntax of \Cref{fig:syntax} allows |(def x e)| and |(v == e)| to occur anywhere
-an expression can. But to make other rules more applicable, it may be necessary to
+in expression. But to make other rules more applicable, it may be necessary to
 ``float'' these expression upward.  For example, we can't use |(x == (y == h))|
 to substitute for |x| via rule \rulename{deref-h}, because the RHS of the equality is not a value.
-But if we were to float the equality outwards, to give |(x == y; x == h)|, we will
-be able to substitute for both |x| and |y|.
+But if we were to float the equality outwards, to give |(x == y; x == h)|, we can
+substitute for both |x| and |y| (rule \rulename{norm-unifyr}.
 
 \Cref{fig:rules-normalize} gives a collection of rules that systematically move both
 existentials and unifications upward and to the left.  The net effect is to normalise
