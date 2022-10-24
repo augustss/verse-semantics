@@ -470,7 +470,7 @@ $
 apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
 apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
-  & = &  \wrong & \text{otherwise} \\
+  & = &  \mempty & \text{otherwise} \\
 apply( f, w ) & = & f(w) & f \in \Value \rightarrow \mtype \\
 \end{array}
 \end{array}
@@ -750,6 +750,8 @@ So the labels specify where in the tree the value comes from.
 an empty label, then the values whose label starts with $\lblleft$ (notice the
 recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
 Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
+\item Note that if $\msort$ encounters a set with more than one unlabelled element then this
+considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
 \end{itemize}
 Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
 |defKW| binds |x| to |3| and then |4|. The meaning of
