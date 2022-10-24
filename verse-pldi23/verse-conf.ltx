@@ -106,30 +106,6 @@
 % ---------------- Useful macros ----------------
 \renewcommand{\arraystretch}{1.1}
 
-% Name of the language
-\newcommand{\versecalc}{$\mathcal{VC}$}
-\newcommand{\calcname}{\versecalc\xspace}
-% \newcommand{\calcname}{Fresh Calculus\xspace}
-% \newcommand{\lcalcname}{Lenient Calculus\xspace}
-% \newcommand{\calcshort}{FC\xspace}
-% \newcommand{\vcname}{Verse Calculus\xspace}
-% \newcommand{\vcshort}{VC\xspace}
-\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}
-
-
-% Right arrow for rewrites
-\newcommand{\movesto}{\longrightarrow}
-\newcommand{\movestoX}{\rightsquigarrow}
-\newcommand{\movesfromX}{\leftsquigarrow}
-\newcommand{\movesfrom}{\longleftarrow}
-\newcommand{\convertible}{\longleftrightarrow^{\ast}}
-
-% Arrows with explanation, including the common cases of one, two or a repated rule
-\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
-\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
-\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
-\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
-
 % ----------------- Author comments ---------------------
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \definecolor{dkgreen}{rgb}{0,0.3,0}
@@ -152,17 +128,7 @@
 \newcommand{\ranjit}[1]{}
 \fi
 
-% Stuff from fresh-calc ---------------------------------
-
-
-% \newcommand{\rightarrowdbl}{\rightarrow\mathrel{\mkern-14mu}\rightarrow}
-\newcommand{\xrightarrowdbl}[2][]{%
-  \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
-}
-
 % ---------------- End of comments -----------------
-
-
 
 % Loads the rewrite figures.
 % They still need to be placed using \figureGeneralAxioms etc.

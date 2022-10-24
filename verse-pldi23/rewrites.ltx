@@ -16,6 +16,35 @@
 \newcommand{\op}{\mathit{op}}
 \newcommand{\subst}[3]{#1\{#3/#2\}}
 
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+\newcommand{\calcname}{\versecalc\xspace}
+\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}
+
+% \newcommand{\calcname}{Fresh Calculus\xspace}
+% \newcommand{\lcalcname}{Lenient Calculus\xspace}
+% \newcommand{\calcshort}{FC\xspace}
+% \newcommand{\vcname}{Verse Calculus\xspace}
+% \newcommand{\vcshort}{VC\xspace}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Arrows with explanation, including the common cases of one, two or a repated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+
+\newcommand{\rightarrowdbl}{\rightarrow\mathrel{\mkern-14mu}\rightarrow}
+\newcommand{\xrightarrowdbl}[2][]{%
+  \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+}
 
 \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
 \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
