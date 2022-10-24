@@ -216,7 +216,7 @@ cRewrite :: Run CState
 cRewrite c s =
   cTransform (Cores . rewrite flg . compile (flags s)) c s
   where
-    flg = defaultFlags { fRewriteSteps = 10000}
+    flg = (flags s){ fRewriteSteps = 10000}
 
 cDenSem :: Run CState
 cDenSem c s =
