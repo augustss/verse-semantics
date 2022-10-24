@@ -409,13 +409,14 @@ functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
 contrasts with functional programming, where one can say ``just apply
 rewrite rules, such as beta reduction, let-inlining, and
-case-of-known-constructor.''  Moreover, these rewrite rules apply even
-in the presence of free variables; {\eg}, under lambdas.
+case-of-known-constructor.''
+% Moreover, these rewrite rules apply even
+% in the presence of free variables; {\eg}, under lambdas.
 
 We therefore seek a precise expression of functional logic programming as
 a term-rewriting system, to give us both a formal semantics (via small-step reductions),
 and a powerful set of equivalences that programmers can use to reason about their programs,
-and compilers can use to optimize them.
+and that compilers can use to optimize them.
 
 We make the following contributions in this paper.
 First, we describe a new core calculus, the Verse calculus or \versecalc{} for short,
@@ -438,7 +439,7 @@ Like any functional logic language,
   This makes \versecalc{} \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
   In \versecalc{} choices are laid out in \emph{space},
-  in the syntax of the term, rather than being explored by non-deterministic selection.
+  in the syntax of the term, rather than in \emph{time}, explored by non-deterministic selection.
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distills the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
@@ -500,11 +501,6 @@ Rules may be applied anywhere they match, again just like the lambda calculus. T
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
-\versecalc{} is modeled on the lambda calculus, and indeed the lambda calculus is
-a sub-language of \versecalc{}.  \emph{Every lambda calculus term is a \versecalc{} term},
-and has the same semantics. Just like the lambda calculus, \versecalc{} is untyped;
-adding a type system is an excellent goal, but is the subject of another paper.
-
 The syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
@@ -518,10 +514,17 @@ functions |gt| and |add|.
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we usually write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple. }
-Remembering that a value can be a lambda, this gives us the full lambda calculus.
+For clarity we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple. }
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 \end{itemize}
+The formal syntax for |e| allows only applications of \emph{values}, |v_1 v_2|, but the desugaring
+rules in \Cref{fig:syntax} show how to desugar general applications |e_1 e_2|. This ANF-like
+normalisation is not fundamental; it simply reduces the number of rewrite rules we need.
+Modulo this desugaring,
+\emph{every lambda calculus term is a \versecalc{} term},
+and has the same semantics. Just like the lambda calculus, \versecalc{} is untyped;
+adding a type system is an excellent goal, but is the subject of another paper.
+
 Expressions also include two other key collections of constructs:
 logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
 The details of choice and unification, and especially their
@@ -532,12 +535,14 @@ precise.
 \subsection{Logical variables and unification} \label{sec:unify}
 
 The Verse calculus includes first class logical variables and unification:
-you can bring a fresh logical variable into scope with |defKW|; equate two expressions with |e_1 = e_2|; and
-sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
+you can bring a fresh logical variable into scope with |defKW|; equate two expressions
+with |v == e|,
+sequence two expressions with |e_1 ; e_2| (see \Cref{fig:syntax})\footnote{Similar to applications, the shorthand in \Cref{fig:syntax}
+  desugars the more general |(e_1 == e_2)| into this simpler form.}.
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
 |def x (x=e_1; e_2)| in \versecalc{}.
 
-\emph{A program executes by solving its equations} to get values for some of the logical variables.
+\emph{A program executes by solving its equations}.
 For example,
 $$
 |def (x ^^ y ^^ z) (x=tup(y,3); x=tup(2,z); y)|
@@ -545,7 +550,7 @@ $$
 is solved by unifying |x| with |tup(y,3)| and with |tup(2,z)|; that in turn unifies |tup(y,3)| with |tup(2,z)|, which
 unifies |y| with |2| and |z| with |3|.  Finally |2| is returned as the result.
 Note carefully that, like any declarative language,
-\emph{logical variables are not mutable}.
+\emph{logical variables are not mutable}; a logical variable stands for a single, immutable value.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
 mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
 
@@ -557,9 +562,9 @@ unification does the job.  For example we can define |first| like this:
 $$
 |first = lam pr (def (a ^^ b) (pr = tup (a,b); a))|
 $$
-The lambda unifies its argument (presumably a pair)
-with |tup(a,b)|, where |a,b| are fresh logical
-variables in the body of the lambda; and returns the first of the two, namely |a|.
+% The lambda unifies its argument (presumably a pair)
+%with |tup(a,b)|, where |a,b| are fresh logical
+% variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, in this presentation we allow ourselves to write a term like
 |applyN first (2,5)|, where we define |first| separately. Formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first = ...); e|;
@@ -597,7 +602,7 @@ The expression |fail| yields no values; a head-normal form |hnf| or a logical va
 and the choice |e_1 choice e_2| yields all the values
 yielded by |e_1| and all the values yielded by |e_2|.
 Duplicates are not eliminated and, as we shall see in \cref{sec:for}, order is maintained; in short,
-an expression yields a sequence of values, not a bag, and certainly not a set.
+an expression yields a \emph{sequence} of values, not a bag, and certainly not a set.
 
 The equations we saw in \cref{sec:unify} can fail, if the arguments
 are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3|,
@@ -656,7 +661,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 \subsection{Pattern matching and narrowing}
 
 We remarked in \Cref{sec:unify} that we can desugar the pattern matching of a high-level
-language into unification. But what about pattern matching with multiple equations, such as this definition in Haskell:
+language into unification. But what about multi-equation pattern matching, such as this definition in Haskell:
 \begin{code}
   append []      ys = ys
   append (x:xs)  ys = x : append xs ys
@@ -788,165 +793,166 @@ first choice. So, supposing that |loop| is a non-terminating function,
 
 \section{Some Verse examples} \label{sec:verse}
 \versecalc{} is a fairly small language, but it is quite expressive.
-We will illustrate this with a few examples.
+For example, we can define the typical list functions one would expect from functional programming
+by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
+A tuple can be turned into choices by indexing with a logical variable |i|.
+Conversely, choices can be turned into a tuple using |allKW|.
+The choice operator, |choice|, serves as both |cons| and |append| for choices.
 
-\subsection{Syntactic sugar}
+% \subsection{Syntactic sugar}
+% 
+% \begin{figure}
+% % no space needed around math environments in a figure
+% \setlength{\abovedisplayskip}{0pt}%
+% \setlength{\belowdisplayskip}{0pt}%
+%   $$
+%     \begin{array}{r@@{\;}c@@{\;}ll}
+%       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
+%       |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
+%       |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x ^^ y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
+%       |apply1 e_1 e_2| & \equiv & |def (x ^^ y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
+%       |tup (e_1, e_2)| & \equiv & |def (x ^^ y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
+% % already in the first figure
+% %      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
+% %      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
+%       |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh}
+% % only used in sectino about for, and there the equation is repeated
+% %      |for e_1 do e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
+%     \end{array}
+%   $$
+% \caption{Syntactic sugar}
+% \label{fig:sugar}
+% \end{figure}
+% 
+% The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
+% not arbitrary expressions, in tuple literals and applications \cite{felleisen:anf}.
+% To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
+% \begin{itemize}
+% \item With |:=| we simultaneously introduce and ``assign'' a variable
+%   an initial value. (Which later unification and choice may sharpen up
+%   or constrain.)
+% \item When defining functions, we allow simple patterns on the left of |:=|
+% \item We allow the use of |if|, as explained in \cref{sec:if}.
+% % \item We allow the use of |for|, as we will explain in \cref{sec:for}.
+% \end{itemize}
 
-\begin{figure}
-% no space needed around math environments in a figure
-\setlength{\abovedisplayskip}{0pt}%
-\setlength{\belowdisplayskip}{0pt}%
-  $$
-    \begin{array}{r@@{\;}c@@{\;}ll}
-      |x := e; dots| & \equiv & |def x (x = e; dots)| \\
-      |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
-      |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x ^^ y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
-      |apply1 e_1 e_2| & \equiv & |def (x ^^ y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
-      |tup (e_1, e_2)| & \equiv & |def (x ^^ y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
-% already in the first figure
-%      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
-%      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
-      |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh}
-% only used in sectino about for, and there the equation is repeated
-%      |for e_1 do e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
-    \end{array}
-  $$
-\caption{Syntactic sugar}
-\label{fig:sugar}
-\end{figure}
-
-The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
-not arbitrary expressions, in tuple literals and applications \cite{felleisen:anf}.
-To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
-\begin{itemize}
-\item With |:=| we simultaneously introduce and ``assign'' a variable
-  an initial value. (Which later unification and choice may sharpen up
-  or constrain.)
-\item When defining functions, we allow simple patterns on the left of |:=|
-\item In function applications we allow ourselves to write |apply1 e_1 e_2|,
-  rather that insisting on both function and argument being a value, and
-  likewise for pairs |tup (e_1,e_2)|.
-\item We allow the use of |if|, as explained in \cref{sec:if}.
-% \item We allow the use of |for|, as we will explain in \cref{sec:for}.
-\end{itemize}
+% \subsection{List functions}
 
 \begin{figure}
   $$
   \begin{array}{l}
-    \begin{array}{l@@{\;}l}
-      |apply1 head xs| & :=  |apply1 xs 0| \\
-      |apply1 tail xs| & :=  |all (def i (i > 0; apply1 xs i))| \\
-      |applyN cons (x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
-      |applyN append (xs, ys)| & :=  |all ((def i (apply1 xs i)) `choice` (def i (apply1 ys i)))| \\
-      |applyN flatMap (f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
-      |applyN map (f, xs)| & :=  |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
-      |applyN filter (p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN find (p, xs)| & :=  |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN every (p, xs)| & :=  |applyN map (p,xs)| \\
+    \textbf{Notation}\\
+    \begin{array}{rcll}
+      |apply1 f x := e| & \text{means} & |f == lam x e| \\
+      |applyN f (x,y) := e| & \text{means} &
+        |f = lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
+     \end{array} \\ \\[-3mm]
+
+    \begin{array}{rcl}
+      |apply1 head xs| & :=  & |apply1 xs 0| \\
+      |apply1 tail xs| & :=  & |all (def i (i > 0; apply1 xs i))| \\
+      |applyN cons (x,xs)| & :=  & |all (x `choice` def i (apply1 xs i))| \\
+      |applyN append (xs, ys)| & :=  & |all ((def i (apply1 xs i)) `choice` (def i (apply1 ys i)))| \\
+      |applyN flatMap (f,xs)| & := & |all (def i (apply1 f (apply1 xs i)))| \\
+      |applyN map (f, xs)| & :=  & |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
+      |applyN filter (p, xs)| & := & |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |applyN find (p, xs)| & := & |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
+      |applyN every (p, xs)| & := & |applyN map (p,xs)| \\
+      |applyN fromTo (lo,hi)| & := & |all (if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi)))|
     \end{array}
   \end{array}
   $$
 \caption{Common list functions} \label{fig:list-functions}
 \end{figure}
 
-\subsection{List functions}
-
-We can define the typical list functions one would expect from functional programming
-by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
-A tuple can be turned into choices by indexing with a logical variable |i|.
-Conversely, choices can be turned into a tuple using |allKW|.
-The choice operator, |choice|, serves as both |cons| and |append| for choices.
 %and |oneKW| is like |head| for choices.
-With that in mind, here is how to understand
-the definitions in \cref{fig:list-functions}:
-\begin{itemize}
-\item |head|.
-To obtain the first element of a tuple, we can simply use array indexing. This fails if the tuple is empty.
+% With that in mind, here is how to understand
+% the definitions in \cref{fig:list-functions}:
+% \begin{itemize}
+% \item |head|.
+% To obtain the first element of a tuple, we can simply use array indexing. This fails if the tuple is empty.
+% 
+% \item |tail|.
+% To get the tail of a tuple, we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
+% This way, the expression fails at the first value and only the other values are collected by |allKW|.
+% It returns the empty tuple if |xs| is empty or not even a tuple.
+% 
+% \item |cons| and |append|.
+% We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|
+% or all the elements of |xs|, and similarly we can define |append|.
+% 
+% \item |flatMap|.
+% For the function |map|, which applies a function to each element of a tuple and collects the results,
+% two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
+% |flatMap| flattens the choices from iterating through |xs| with
+% the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
+% 
+% \item |map|.
+% But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
+% to affect the whole expression and obtain the cartesian product of these choices.
+% The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
+% We get that behaviour if we simply define |map| much like in any other functional programming language:
+% if taking the head of the tuple fails, we return an empty tuple.
+% Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
+% 
+% \item |filter|.
+% How can we filter a tuple with a predicate |p|?
+% We turn the tuple into the sequence of choices, and let those fail where |p| fails before collecting the other values into a tuple.
+% 
+% \item |find|.
+% If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the tuple,
+% and returns the first matching element, or fails if |p| does not hold for any element.
+% 
+% \item |every|.
+% To test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
+% If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
+% \end{itemize}
 
-\item |tail|.
-To get the tail of a tuple, we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
-This way, the expression fails at the first value and only the other values are collected by |allKW|.
-It returns the empty tuple if |xs| is empty or not even a tuple.
+\subsection{|for| loops} \label{sec:for}
 
-\item |cons| and |append|.
-We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|
-or all the elements of |xs|, and similarly we can define |append|.
-
-\item |flatMap|.
-For the function |map|, which applies a function to each element of a tuple and collects the results,
-two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
-|flatMap| flattens the choices from iterating through |xs| with
-the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
-
-\item |map|.
-But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
-to affect the whole expression and obtain the cartesian product of these choices.
-The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
-We get that behaviour if we simply define |map| much like in any other functional programming language:
-if taking the head of the tuple fails, we return an empty tuple.
-Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
-
-\item |filter|.
-How can we filter a tuple with a predicate |p|?
-We turn the tuple into the sequence of choices, and let those fail where |p| fails before collecting the other values into a tuple.
-
-\item |find|.
-If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the tuple,
-and returns the first matching element, or fails if |p| does not hold for any element.
-
-\item |every|.
-To test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
-If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
-\end{itemize}
-
-\subsection{Choice comprehensions} \label{sec:for}
-
-Source languages can use this to build more featureful constructs like |for|,
-mimicking the list comprehension in languages like Haskell or Python:
-The expression |for^(e_1) do e_2| will evaluate |e_2| for each of the choices in |e_1|.
-The |e_1| is called the \emph{domain} of the loop.
-
+The expression |for^(e_1) do e_2| will evaluate |e_2| for each of the choices in |e_1|,
+rather like a list comprehension in languages like Haskell or Python.
+% The |e_1| is called the \emph{domain} of the loop.
 The scoping is peculiar\footnote{But similar to C++.}
 in that variables bound in |e_1| also scope over |e_2|.
 So, {\eg}, |for^(def x (x = 2 `choice` 3 `choice` 5)) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
-This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
+% This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
 
-Like list comprehension, it supports filtering, but in Verse this falls out naturally by just using
-a possibly failing expression in the domain.
-So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to the tuple |tup (4,6)|.
+Like list comprehension, |for| supports filtering; in Verse this falls out naturally by just using
+a possibly failing expression in |e_1|.
+So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
 
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |for^(def (x,y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
-Just like |if| is defined in terms of the primitive |oneKW|, we can define |for|
-in terms of the primitive |all e|.
+Just as |if| is defined in terms of the primitive |oneKW| (\Cref{sec:if}), we can define |for|
+in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
 apply each element of the tuple to |emptytup| afterwards, using the |map| function defined above.
-The full desugaring is thus
+The full desugaring is
 \[
-|for^(e_1) do e_2| \equiv |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
+|for^(e_1) do e_2| \; \equiv \; |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
-
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
-So, {\eg}, |for^(x:=10 `choice` 20) do {x `choice` x+1}| will reduce to
+So, {\eg}, |for^(def x (x==10 `choice` 20)) do {x `choice` x+1}| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial to use |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def i (x := apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.
+For example |for^(def (i,x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.
 
 
-\subsection{Enumerations}
-Making a choice between a sequence of numbers can be expressed like this
-$$
-\begin{array}{l@@{\;}c@@{\;}l}
-  |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
-\end{array}
-$$
-so |all (applyN fromTo (1,5))| will reduce to the tuple |tup (1,2,3,4,5)|.
+% \subsection{Enumerations}
+% Making a choice between a sequence of numbers can be expressed like this
+% $$
+% \begin{array}{l@@{\;}c@@{\;}l}
+%   |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
+% \end{array}
+% $$
+% so |all (applyN fromTo (1,5))| will reduce to the tuple |tup (1,2,3,4,5)|.
 
 %% \subsection{Handling out-of-bounds errors}
 %% Indexing out-of-bounds of a tuple results in |fail|.
@@ -1025,20 +1031,17 @@ has the following properties:
   right-hand side of a rule are bound on the left.
 \end{itemize}
 
-The rewrite rules are given in Figures~\ref{fig:rules1} and \ref{fig:rules2},
-and are described next.
+The rewrite rules are given in Figure~\ref{fig:rules1}, and are described next.
 
 \figureRulesI
-\figureContexts
 
 
-\subsection{Primitive rewrites}
+\subsection{Functions and function application} \label{sec:beta}
 
-Looking at \cref{fig:general-axioms}, rules \rulename{p-add} and \rulename{p-gt}
-should be familiar: they simply rewrite applications of |add| and |gt| to integer
-constants.  For example $|applyN add (3,4)| \movesto |7|$.  The only unusual point is
-that |gt| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional),
-and returns |k_1| otherwise.
+Looking at \cref{fig:rulesI}, rule \rulename{app-add}
+should be familiar: it simply rewrites an application of |add| to integer
+constants.  For example $|applyN add (3,4)| \movesto |7|$.  Rules \rulename{app-gt} and
+\rulename{app-gt-fail} are more interesting: |applyN gt (k_1,k_2)| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional), and returns |k_1| otherwise (rather than returning |True|).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -1046,13 +1049,6 @@ and returns |k_1| otherwise.
 % \[
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
-
-Sequencing (rule \rulename{seq}) is very simple: |(v;e)| discards |v|, leaving just |e|.
-The rule only fires with a \emph{value} on the left; we must rewrite the expression on
-the left for effects.
-
-\subsection{Function application} \label{sec:beta}
-
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
 only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
 and an equality |(x=v)| to bind |x| to the argument.
@@ -1077,44 +1073,46 @@ does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
 
-\subsection{Unification: the easy bits}
+\subsection{Unification}
 
-Next we study unification, again in \cref{fig:general-axioms}.
-Rules \rulename{ulit}, \rulename{utup}, \rulename{ux1} and \rulename{ux2}
+Next we study unification, again in \cref{fig:rulesI}.
+Rules \rulename{u-lit} and \rulename{u-tup}, and the \rulename{u-fail} rules
 are the standard rules for unification, going back at least 40 years \cite{MartelliMontanari82}.
 The only special thing
 to note is that |(k_1 = k_2)| either fails if the values differ,
 or yields common value if they are the same; and similarly for
-tuples.%
+tuples
 \footnote{An alternative choice would
 for unification to yield |emptytup| on success; but it does not make much difference
 either way.}.
-\rulename{ux1} and \rulename{ux2} make unification fail if
+\rulename{u-fail-l-h} makes unification fail if
 you attempt to unify an integer with a tuple.
 Slightly less obviously,
-\rulename{ux3} through \rulename{ux6} make unification fail if you attempt to unify a
-lambda or a built-in operation with any other value.  We discuss this design choice further in \cref{sec:unifying-lambda}.
+\rulename{u-fail-t-f} and \rulename{u-fail-f} make unification fail if you attempt to unify a
+lambda or a built-in operation with any other value -- see \Cref{sec:unifying-lambda}.
 
-Failure, written |fail|, propagates upwards, as \rulename{fail-def} and \rulename{fail} show.
-The latter rule makes use of an \emph{execution context}, |X|,
-whose syntax is given in \cref{fig:contexts}.
-In general, a ``context'' is a syntactic construct (in this case an expression)
-containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
-The notation |X^[e]| is the expression obtained by filling the hole
-in |X| with |e|.
-For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
-gives the expression $|X^[99]| \equiv |(y = tup (99,4))|$.
-So \rulename{fail} says that if |fail| occurs in an |X|-context, thus |X^[fail]|, we can rewrite
-it to |fail|, discarding |X| altogether. For example |(x=y; fail; 3)| rewrites to |fail|.
+% Failure, written |fail|, propagates upwards, as \rulename{fail-def} and \rulename{fail} show.
+% The latter rule makes use of an \emph{execution context}, |X|,
+% whose syntax is given in \cref{fig:contexts}.
+% In general, a ``context'' is a syntactic construct (in this case an expression)
+% containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
+% The notation |X^[e]| is the expression obtained by filling the hole
+% in |X| with |e|.
+% For example |(y = tup (hole, 4))| is a possible execution context, |X|; filling its hole with 99
+% gives the expression $|X^[99]| \equiv |(y = tup (99,4))|$.
+% So \rulename{fail} says that if |fail| occurs in an |X|-context, thus |X^[fail]|, we can rewrite
+% it to |fail|, discarding |X| altogether. For example |(x=y; fail; 3)| rewrites to |fail|.
 
-\subsection{Unification: the \rulename{subst} rule}
+% \subsection{Unification: the \rulename{subst} rule}
 
 The key innovation in \versecalc{} is the way bindings (that is, just ordinary equalities)
 of logical variables are propagated.
-The key rule is \rulename{subst}:
+The key rules are \rulename{subst}:
 $$
-\rulename{subst} \quad |X^[x=v]|  \movesto  |(subst X x v)^[x=v]|
-        \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+\begin{array}{rrcll}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & \text{$x \not \equiv s$, $x,s$ free in |E|} \\
+\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & \text{$x,\freevars{h}$ free in |A|}
+\end{array}
 $$
 The notation |subst X x v| is the context obtained by replacing all
 free occurrences of |x| in |X| by |v|.
@@ -1186,33 +1184,55 @@ we create a new local binding for |x| under the lambda.  Now the original equali
 non-recursive, and \rulename{subst} can apply.
 
 
-\subsection{Unification: administrative rules}
+\subsection{Normalization rules}
+
+\figureRulesII
 
 %JB: I have reordered this to match the order of the rules in the figure.
 % Not sure which is the optimal order, but it makes sense to keep them together?
 
-If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
-the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
-and the unification equation, and similarly \rulename{def-elimr} if the equation is ordered the other way.
+The syntax of \Cref{fig:syntax} allows |(def x e)| and |(v == e)| to occur anywhere
+an expression can. But to make other rules more applicable, it may be necessary to
+``float'' these expression upward.  For example, we can't use |(x == (y == h))|
+to substitute for |x| via rule \rulename{deref-h}, because the RHS of the equality is not a value.
+But if we were to float the equality outwards, to give |(x == y; x == h)|, we will
+be able to substitute for both |x| and |y|.
 
+\Cref{fig:rules-normalize} gives a collection of rules that systematically move both
+existentials and unifications upward and to the left.  The net effect is to normalise
+the term to a form with existentials at the top, then the scalar equalities, and then
+the heap equalities, thus
+$$
+|def (x_1,dots,x_n) (x_1 = s_1 ; dots ; x_i = h_i ; x_n = h_n; e)|
+$$
+Normalization also:
+\begin{itemize}
+  \item Drops a value to the left of a ``|;|'' (rule \rulename{seq}).
+  The rule only fires with a \emph{value} on the left, meaning that there are no residual unifications to perform.
+  \item Propagates |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}.
+  \item Discards redundant existentials (rules \rulename{elim-def} and \rulename{elim-cst}).
+\end{itemize}
 
-A number of rules shuffle expressions about in order to make
-the main unification rules apply.
-The rule \rulename{swap} swaps the arguments to unification to put the variable on the left.
-
-Rule \rulename{def-float} moves an |defKW| ``out of the way.'' For example,
-the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
-we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
-
-Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
-again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
-same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
-
-Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
-Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
-rewrites it to |((x=y);(y=1);y>0|, thus exposing |y=1| for further use by \rulename{subst}. Furthermore, in order
-to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
-as discussed in \cref{sec:conf-move-eqn}.
+% If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
+% the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
+% and the unification equation, and similarly \rulename{def-elimr} if the equation is ordered the other way.
+%
+% A number of rules shuffle expressions about in order to make
+% the main unification rules apply.
+% The rule \rulename{swap} swaps the arguments to unification to put the variable on the left.
+% Rule \rulename{def-float} moves an |defKW| ``out of the way.'' For example,
+% the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
+% we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
+% 
+% Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
+% again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
+% same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
+% 
+% Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
+% Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
+% rewrites it to |((x=y);(y=1);y>0|, thus exposing |y=1| for further use by \rulename{subst}. Furthermore, in order
+% to prove confluence, we need to be able to freely move the equation |(v_1=v_2)|,
+% as discussed in \cref{sec:conf-move-eqn}.
 %% The \label has been commented out.
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
@@ -1261,8 +1281,6 @@ stuck, because \rulename{global-subst} cannot rewrite it.
 We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
 This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
 the simpler \rulename{global-subst}: to establish confluence.
-
-\figureRulesII
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 

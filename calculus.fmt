@@ -191,6 +191,7 @@
 
 %format h_1
 %format h_n
+%format h_i
 
 %format y_0
 %format y_1
