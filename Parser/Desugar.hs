@@ -206,7 +206,7 @@ dsD = expr
 
     -- Handle function(e){b}
     --function e b | trace ("function " ++ show (e, b)) False = undefined
-    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) [] b =
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) [i] b | i == covariantId =
       Lambda y [] (Array []) <$> expr b
       --primFcn y <$> expr b
     function e rs b = do
