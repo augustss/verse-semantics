@@ -61,10 +61,12 @@ normalFormsTrace :: (Show a, Ord a, Rec a) => Rule a -> a -> [[(String, a)]]
 normalFormsTrace rule t = normalFormsFuelTrace (-1) rule t
 
 normalFormsFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+--normalFormsFuelTrace n _ _ | trace ("normalFormsFuelTrace: " ++ show n) False = undefined
 normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
-  go 0 _    (tr:_)      = traceShow "fuel 0" []
-  go n seen []          = traceShow "stuck" []
+  go 0 _    (tr:_)      = --traceShow "fuel 0" []
+                          trace ("fuel 0\n" ++ showReductionTrace show tr) []
+  go n seen []          = [] -- traceShow "stuck" []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
     | null ts'          = tr : go n seen' trs
@@ -74,10 +76,21 @@ normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
     ts'   = step rule t
   go _ _ _ = error "impossible"
 
+showReductionTrace :: (a -> String) -> Trace a -> String
+showReductionTrace sh xs = msg
+  where
+    msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
+    pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
+
+
 type Trace a = [(String, a)]
 
 type Path a = (Result, Trace a)
 data Result = NoFuel | Stuck | NormalForm deriving (Show)
+
+-- Like normalFormsFuelTrace, but only does a depth first search
+normalFormFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+normalFormFuelTrace n rule t = [snd (dfs n rule t)]
 
 dfs :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> Path a
 dfs n rule t = go n S.empty [("",t)]

@@ -136,13 +136,13 @@ testeq(SEq) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swa
 testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
 testeq(SEq) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
 testeq(SEq) {x:any; y:any; x = y; x = y; x = 1}  {1}
-testeq(SEq) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
+# Is this WRONG? testeq(SEq) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # If BIND is implemented in parallel, it may forget to substitute in the substitutions
 testeq(SEq) {x:any; y:any; x=y; y=1}  {1}
 testeq(SEq) {x:any; y:any; x=1; y=x}  {1}
-testeq(SEq) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
-testeq(SEq) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+# Needs alpha conversion testeq(SEq) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+# Needs alpha conversion testeq(SEq) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
 
 # Array access via choices
 testeq(SEq) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}

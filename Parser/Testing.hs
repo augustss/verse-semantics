@@ -1,4 +1,4 @@
-module Testing(main, test, freshmain, testFRESH, parseFresh) where
+module Testing(main, test, freshmain, testFRESH, parseFresh, testf) where
 
 import Control.Exception
 import Control.Monad
@@ -11,7 +11,7 @@ import Core
 import Print
 import Desugar
 import Run
-import qualified RulesPOPL
+import qualified RulesPLDI
 import qualified TRSCore as T
 import TRS(normalFormsTrace, printTrace)
 import TRSAdapter(coreToTrs)
@@ -84,6 +84,7 @@ assertEquiv' expectOK flg name p1 p2 = do
                     print v1
                     putStrLn "resp."
                     print v2
+                --undefined
               else do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
       ) (\e -> do
@@ -95,6 +96,7 @@ assertEquiv' expectOK flg name p1 p2 = do
             putStrLn "caused an exception:"
             print (e :: SomeException)
             putStrLn ""
+            --undefined
       )
 
 -- | Equivalence on values (or stuck expressions)
@@ -115,11 +117,7 @@ runTest flg (TestEvalEq n e1 e2) =
     Ident _ s -> error $ "Unknown test type " ++ show s
 
 runTests :: Flags -> [Test] -> IO ()
-runTests flg = mapM_ (runTest flg) . chop
-  where
-    chop
-      | Just n <- fFresh flg = take n
-      | otherwise  = id
+runTests flg = mapM_ (runTest flg)
 
 runTestFile :: Flags -> FilePath -> IO ()
 runTestFile flg = runTests flg <=< readTests
@@ -127,6 +125,9 @@ runTestFile flg = runTests flg <=< readTests
 test :: Bool -> IO ()
 test True = runTestFile defaultFlags verseTest
 test False = runTestFile defaultFlags{ fRewrite = True } verseTest
+
+testf :: IO ()
+testf = runTestFile defaultFlags{ fRewrite = True, fSplit = False, fFresh = True } verseTest
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -148,10 +149,10 @@ testArgs = do
   let (flg, args') =
         case args of
           "-"        : r -> (defaultFlags{ fRewrite = True }, r)
-          "-rewrite" : r -> (defaultFlags{ fRewrite = True }, r)
+          "-rewrite" : r -> (defaultFlags{ fRewrite = True, fSplit = False }, r)
           "-eval"    : r -> (defaultFlags,                    r)
           "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
-          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 50 }, r)
+          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = True }, r)
           r              -> (defaultFlags,                    r)
   let fn =
         case args' of
@@ -173,11 +174,11 @@ freshmain = do
 testFRESH :: String -> IO ()
 testFRESH s = do
   let e = parseFresh s
-  let trs = normalFormsTrace RulesPOPL.rulesFRESH e
+  let trs = normalFormsTrace RulesPLDI.rulesPLDI e
   mapM_ (\tr -> printTrace tr >> putStrLn"----------") trs
 
 parseFresh :: String -> T.Expr
 parseFresh = coreToTrs . exprToCore flags . desugar . parseDie (pBraces pExprSeq) ""
   where
-    flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = Just 30 }
+    flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = True }
 ------
