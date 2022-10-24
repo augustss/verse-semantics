@@ -60,7 +60,7 @@ We will use Newman's lemma \ref{lem:local} to prove that $\runi$ is confluent (\
 However, $\runi$ is not Noetherian. For example, it has infinite reduction sequences which
 ``toggle'' between equal variables
 %
-$$ |x == y; x| \movesto |x == y; y| \movesto \ldots \movesto |x == y; x| \movesto \ldots$$
+$$ |x == y; y == x; x| \movesto |x == y; y == x; y| \movesto \ldots \movesto |x == y; y == x; x| \movesto \ldots$$
 %
 Thus, we will establish confluence of $\runi$ in two steps.
 %
@@ -70,7 +70,6 @@ Newman's lemma.
 %
 Next, we show that $\runi$ is confluent by showing that it is
 is the transitive closure of $\rord$ (\cref{lem:closure}).
-
 
 \begin{definition}[Ordered Unification] \label{def:ordered-unification}
 %
@@ -90,8 +89,12 @@ Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
 \end{lemma}
 
 \begin{proof}
-\verb|TODO: [Deref-Com-1]| and \verb|TODO: [Deref-Com-2]|
-(which depends on \verb|TODO: [Eq-Join]|) we show that $\rord$ is \emph{locally} confluent.
+Via \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
+%
+Note that the former requires \cref{lem:join-s-s}
+and \cref{lem:join-h-h}, that latter of which
+requires an unbounded number of steps
+to join two terms.
 \end{proof}
 
 
@@ -571,7 +574,22 @@ Split cases on $s$ and $s'$ and use \rulename{deref-s}.
 \end{lemma}
 
 \begin{proof}
-	TODO
+Each term has a finite number of free variable occurrences.
+%
+Every reduction in $\rord$ makes progress by doing one of the following:
+%
+(1)~replaces a variable with a heap value (under which no further heap substitutions occur);
+%
+(2)~replaces a variable with a scalar value (under which no further scalar substitutions occur);
+%
+(3)~replaces a variable with a higher-ranked variable;
+%
+or
+%
+(4)~destructs a pair of unified tuples, replacing them with their components.
+%
+Each of the above can only occur finitely often, thereby ensuring
+that $\rord$ terminates, \ie is Noetherian.
 \end{proof}
 
 \begin{corollary}[$\rord$-Confluent]\label{lem:ord-confluent}
