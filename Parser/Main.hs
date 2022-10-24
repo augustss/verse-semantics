@@ -214,9 +214,8 @@ cDefEval c s = do
 
 cRewrite :: Run CState
 cRewrite c s =
-  cTransform (Cores . rewrite flg . compile (flags s)) c s
-  where
-    flg = (flags s){ fRewriteSteps = 10000}
+  cTransform (Cores . rewrite flg . compile flg) c s
+  where flg = flags s
 
 cDenSem :: Run CState
 cDenSem c s =
