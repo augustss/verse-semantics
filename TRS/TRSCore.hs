@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-type-defaults -Wno-unused-matches -Wno-missing-signatures -Wno-missing-pattern-synonym-signatures -Wno-name-shadowing #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module TRSCore where
 
 import Show
@@ -181,7 +182,16 @@ pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
-pattern HVAL v = Val (HNF v)
+pattern HVAL :: HNF -> Expr
+pattern HVAL v <- Val (getH -> Just v)
+  where HVAL h = Val (HNF h)
+
+getH :: Value -> Maybe HNF
+getH (HNF v@Arr{}) = Just v
+getH (HNF v@Lam{}) = Just v
+getH _ = Nothing
+
+
 
 pattern DEF x e = Def (Bind x e)
 
@@ -189,6 +199,7 @@ pattern DEF x e = Def (Bind x e)
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
 pattern VLAM v e= HNF (Lam (Bind v e))
+pattern VOP o   = HNF (Op o)
 pattern ADD     = HNF (Op Add)
 pattern SUB     = HNF (Op Sub)
 pattern MUL     = HNF (Op Mul)

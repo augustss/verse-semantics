@@ -3,7 +3,8 @@ import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
 import qualified RulesPOPL
-import TRS(normalFormsFuel, normalFormsTrace, printTrace)
+import qualified RulesPLDI
+import TRS
 import Expr(Ident(..), noLoc)
 import Core
 import Error
@@ -15,22 +16,30 @@ import Print
 --import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . snd) . checkOne . normalFormsFuel n (rules flg) . ds flg . coreToTrs
+rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . normalFormsFuelTrace n (rules flg) . ds flg . coreToTrs
  where
   n            = fRewriteSteps flg
+  tr           = fTrace flg
   checkOne [x] = [x]
-  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e)) nes)
+  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
                        nes
+  rtrace xs | not tr = snd (head xs)
+            | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) (snd (head xs))
 
 ds :: Flags -> T.Expr -> T.Expr
 ds flg
-  | isJust(fFresh flg) = RulesPOPL.dsFresh
-  | otherwise          = id
+  | fFresh flg = RulesPLDI.dsFreshFP
+  | otherwise  = id
+
+sub :: Flags -> T.Expr -> T.Expr
+sub flg
+  | fFresh flg = RulesPLDI.finalSubst
+  | otherwise  = id
 
 rules :: Flags -> RulesPOPL.ERule
 rules flg
-  | isJust(fFresh flg) = RulesPOPL.rulesFRESH
-  | otherwise          = RulesPOPL.rulesPOPL
+  | fFresh flg = RulesPLDI.rulesPLDI
+  | otherwise  = RulesPOPL.rulesPOPL
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)
