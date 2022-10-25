@@ -20,8 +20,8 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . nf n (rules flg) .
  where
   n              = fRewriteSteps flg
   tr             = fTrace flg
-  nf | fDfs flg  = normalFormsFuelTrace
-     | otherwise = normalFormFuelTrace
+  nf | fDfs flg  = normalFormFuelTrace
+     | otherwise = normalFormsFuelTrace
   checkOne [x]   = [x]
   checkOne nes   = trace (unlines $
                           "Multiple:" :
