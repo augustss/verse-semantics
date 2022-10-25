@@ -140,6 +140,7 @@ flagTable =
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
   ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
   ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
+  ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ]
 
 cRead :: Run CState

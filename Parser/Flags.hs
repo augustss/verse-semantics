@@ -9,6 +9,7 @@ data Flags = Flags
   , fFresh        :: !Bool
   , fTimLambda    :: !Bool
   , fDenSem       :: !Bool
+  , fDfs          :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -24,6 +25,7 @@ defaultFlags = Flags
   , fFresh        = False
   , fTimLambda    = False
   , fDenSem       = False
+  , fDfs          = False
   , fRewriteSteps = 10000
   , fEvalSteps    = 1000
   }

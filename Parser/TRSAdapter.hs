@@ -16,15 +16,20 @@ import Print
 --import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . normalFormsFuelTrace n (rules flg) . ds flg . coreToTrs
+rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . nf n (rules flg) . ds flg . coreToTrs
  where
-  n            = fRewriteSteps flg
-  tr           = fTrace flg
-  checkOne [x] = [x]
-  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
-                       nes
-  rtrace xs | not tr = snd (head xs)
-            | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) (snd (head xs))
+  n              = fRewriteSteps flg
+  tr             = fTrace flg
+  nf | fDfs flg  = normalFormsFuelTrace
+     | otherwise = normalFormFuelTrace
+  checkOne [x]   = [x]
+  checkOne nes   = trace (unlines $
+                          "Multiple:" :
+                          map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
+                         nes
+  rtrace xs | not tr = res
+            | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res
+    where res = snd (head xs)
 
 ds :: Flags -> T.Expr -> T.Expr
 ds flg
