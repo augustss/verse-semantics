@@ -142,7 +142,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textit{Expression Context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| \\
                                 &    & \vb & |E == e| \vb |e == E| \vb |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E| \\
                                 &    & \vb & |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
-\textit{Application Context}    & A  & ::= & |hole v| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
+\textit{Application Context}    & A  & ::= & |apply1N hole v| \vb |apply1N op hole| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
                                 &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
 \textit{Scope Context}          & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
 \textit{Choice Context}         & CX & ::= & \hole \vb |v == CX| \vb |CX; e| \vb |ce ; CX|  \vb |def x CX| \\
@@ -193,11 +193,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \begin{figure}
 \begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Normalization:~\rcon}
-\rulename{norm-val}       & |v ; e|               & \movesto & |e|                    & \\
+\rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
 \rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
-\rulename{norm-seq-swap1} & |e ; x = v|           & \movesto & |x == v; e; x|         & if |e| is not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e ; x = s|           & \movesto & |x == s; e; x|         & if |e| is not of form |x' == s'|\\
-\rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|             & \\
+\rulename{norm-seq-swap1} & |e_1 ; x = v; e_2|    & \movesto & |x == v; e_1; e_2|     & if |e_1| is not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e_1 ; x = s; e_2|    & \movesto & |x == s; e_1; e_2|     & if |e_1| is not of form |x' == s'|\\
+\rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
