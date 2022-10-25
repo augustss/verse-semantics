@@ -708,10 +708,6 @@ rulesFailFP lhs =
   "FAIL-UNIFY" `name`
   do _ :=: Fail <- [lhs]
      pure Fail
- ++
-  "FAIL-DEF" `name`
-  do Def (Bind x Fail) <- [lhs]
-     pure Fail
 
 rulesOneFP :: ERule
 rulesOneFP lhs =
