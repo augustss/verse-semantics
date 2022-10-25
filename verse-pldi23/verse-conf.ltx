@@ -949,7 +949,7 @@ has the following properties:
   right-hand side of a rule are bound on the left.
 \end{itemize}
 
-The rewrite rules are given in Figure~\ref{fig:rules1}, and are described next.
+The rewrite rules are given in Figure~\ref{fig:rewrite-rules}, and are described next.
 
 \figureRulesI
 
@@ -1110,25 +1110,36 @@ non-recursive, and \rulename{subst} can apply.
 % Not sure which is the optimal order, but it makes sense to keep them together?
 
 The syntax of \Cref{fig:syntax} allows |(def x e)| and |(v == e)| to occur anywhere
-in expression. But to make other rules more applicable, it may be necessary to
+in an expression. But to make other rules more applicable, it may be necessary to
 ``float'' these expression upward.  For example, we can't use |(x == (y == h))|
 to substitute for |x| via rule \rulename{deref-h}, because the RHS of the equality is not a value.
-But if we were to float the equality outwards, to give |(x == y; x == h)|, we can
-substitute for both |x| and |y| (rule \rulename{norm-unifyr}.
+But if we were to float the equality outwards (rule \rulename{norm-unifyr}), to give |(x == y; x == h)|, we can
+substitute for |x|, and then for |y|.
 
 \Cref{fig:rules-normalize} gives a collection of rules that systematically move both
 existentials and unifications upward and to the left.  The net effect is to normalise
 the term to a form with existentials at the top, then the scalar equalities, and then
 the heap equalities, thus
 $$
-|def (x_1,dots,x_n) (x_1 = s_1 ; dots ; x_i = h_i ; x_n = h_n; e)|
+|def (x_1,dots,x_n) (x_1 == v_1 ; dots ; x_n == v_n; e)|
 $$
-Normalization also:
+You can think of this form as ``an expression |e| wrapped in some heap bindings |x_i==v_i|''. The
+heap bindings express, as a term, the possibly-recursive value of the |x_i|, but the right-hand
+sides |v_i| are all values, so there is no computation left in the heap.  This decomposition is
+so important that we define a judgement $\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}$ in \Cref{fig:wf},
+which decomposes an expression $|e_1|$ into its heap, specified by |xs| and |cs| and the expression
+wrapped in that heap, |e_2|.  (The non-terminal |c| is just short for |x==v| (\Cref{fig:syntax}).
+Notice that, if invoked with $\Gamma = \emptyset$, this judgement checks that that the existentals
+bind precisely the same variables as are defined by the |cs|, no more and no less.
+
+One useful consequence of this decomposition is \rulename{elim-def} in \Cref{fig:rules-normalize},
+which allows an entire heap of possibly-recursive bindings to be discarded if none of its variables are used.
+
+The normalization rules also:
 \begin{itemize}
-  \item Drops a value to the left of a ``|;|'' (rule \rulename{seq}).
-  The rule only fires with a \emph{value} on the left, meaning that there are no residual unifications to perform.
-  \item Propagates |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}.
-  \item Discards redundant existentials (rules \rulename{elim-def} and \rulename{elim-cst}).
+  \item Associate ``|;|'' to the right.
+  \item Drop a value to the left of a ``|;|'' (rule \rulename{seq}).
+  \item Propagate |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}.
 \end{itemize}
 
 % If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
