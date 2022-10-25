@@ -303,6 +303,7 @@
 %format l_1
 %format l_2
 
+%format s_0
 %format s_1
 %format s_2
 %format s_n

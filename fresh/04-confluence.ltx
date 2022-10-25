@@ -618,7 +618,7 @@ that $\rord$ terminates, \ie is Noetherian.
 \end{lemma}
 
 \begin{proof}
-We show that $\runi$ 2-commutes with $\rapp$ and hence commutes via \cref{lem:k-comm}.
+We show that $\runi$ $*$-commutes with $\rapp$ and hence commutes via \cref{lem:star-comm}.
 %
 Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ respectively.
 
@@ -776,7 +776,7 @@ Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
 \end{lemma}
 
 \begin{proof}
-We show that $\runi$ 2-commutes with $\rcon$ and hence commutes via \cref{lem:k-comm}.
+We show that $\runi$ $*$-commutes with $\rcon$ and hence commutes via \cref{lem:star-comm}.
 %
 Let $\tx{\runi}$ and $\tx{\rcon}$ denote the reducts for $\runi$ and $\rcon$ respectively.
 %
@@ -880,7 +880,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice ve
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ 2-commutes with $\runi$, and hence by \cref{lem:k-comm}, $\runi$ commutes wth $\rspc$.
+We show that $\rspc$ $*$-commutes with $\runi$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rspc$.
 %
 Let $\tx{\runi}$ and $\tx{\rspc}$ denote the reducts for $\runi$ and $\rspc$ respectively.
 %
@@ -948,7 +948,6 @@ If $\wff{\emptyset}{e}{|xs|}{|xs|}{\hnf}$ then $e$ is a $\runi$-Normal Form.
 
 \subsection{Application} % --------------------------------------------------------------------------
 
-ANCHOR
 
 \begin{lemma}[$\rapp$-Confluent]\label{lem:a-c}
     $\rapp$ is confluent.
@@ -1016,9 +1015,9 @@ Let us split cases on the relative positions of $\Delta_1$ and $\Delta_2$.
 \end{lemma}
 
 \begin{proof}
-We show that $\rapp$ strongly commutes with $\rcon$.
+We show that $\rapp$ $*$-commutes with $\rcon$, hence commutes via \cref{lem:star-comm}.
 %
-Let $\tx{\runi}$ and $\tx{\rcon}$ denote the reducts for $\runi$ and $\rcon$ respectively.
+Let $\tx{\rapp}$ and $\tx{\rcon}$ denote the reducts for $\rapp$ and $\rcon$ respectively.
 %
 If the reducts are disjoint then terms can be trivially joined in a single step.
 %
@@ -1047,7 +1046,17 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 		If $\rdx{\rapp} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
 		If $\rdx{\rapp} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
 	\end{description}
-\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$]
+\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] Split cases on the rule used in $\rapp$.
+	\begin{description}
+	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
+		If $\rdx{\rcon} \subset |e|$, \ie $\rcon : e \movesto e'$, then join at $|def x (x == v; e')|$.
+		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |e|'$, then join at $|def x (x == v'; e)|$.
+	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |v == 0; s_0 `choice` dots `choice` v == n; s_n|$.
+		Here, $\rdx{\rcon} \not \subset s_i$.
+		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v|'$, then join (in $n$-steps) at
+		$|v' == 0; s_0 `choice` dots `choice` v' == n; s_n|$.
+	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rcon} \not\subset \rdx{\rapp}$.
+	\end{description}
 \end{description}
 \end{proof}
 
@@ -1057,7 +1066,28 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rapp$ strongly commutes with $\rfail$.
+%
+Let $\tx{\rapp}$ and $\tx{\rfail}$ denote the reducts for $\rapp$ and $\rfail$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice versa.
+
+\begin{description}
+\item[Case $\rdx{\rapp} \subset \rdx{\rfail}$] Split cases on the rule used for $\rfail$.
+	\begin{description}
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv |fail|; e \movesto |fail|$.
+		  	Here $\rdx{\rapp} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv e; |fail| \movesto |fail|$.
+		  	Here $\rdx{\rapp} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-eq} \ie $\tx{\rfail} \equiv x = |fail| \movesto |fail|$.
+			Here $\rdx{\rapp} \not \subset \rdx{\rfail}$.
+	\end{description}
+
+\item[Case $\rdx{\rfail} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
+\ranjit{ANCHOR- F < A like N < A}
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rapp-\rgc$-Comm] \label{lem:a-g-c}
@@ -1076,7 +1106,7 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
 
-\subsection{Conjunction} % --------------------------------------------------------------------------
+\subsection{Normalization} % --------------------------------------------------------------------------
 
 \begin{lemma}[$\rcon$-Confluent]\label{lem:c-c}
     $\rcon$ is confluent.
