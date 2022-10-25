@@ -418,7 +418,7 @@ elimCst ee =
           g' = filter ((/= i) . fst) g
       in  dfs g' (vs ++ is) -- continue with more reachable
     -- del are the variables to delete, must be unreachable and defined here
-    del = intersect xs unr
+    del = filter (`elem` xs) unr
     xs' = filter (`notElem` del) xs
     bs' = filter ((`notElem` del) . fst) bs
     res = foldr (\ x e -> Def (Bind x e)) b xs'
