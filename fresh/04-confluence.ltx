@@ -1327,16 +1327,19 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
 		If $\rdx{\rfail} \subset e_3$, \ie $\rfail: e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
 		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-l}
-			then join at $|fail|$.
-		If $e_2 \equiv |fail|$ and $\rdx{\fail} \subset e_1; e_2$ via \rulename{fail-seq-r}
-			then join at $|fail|$.
+			then join at $|fail|$ via multiple $\rfail$ steps.
+		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-r}
+			then join at $|fail|$ via multiple $\rfail$ steps.
 
+		HEREHEREHEREHEREHERE
 
 	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\rapp} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\rapp} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+		If $\rdx{\rfail} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
+		If $\rdx{\rfail} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+
 	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
 		Here $\rdx{\rapp} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
+
 	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
 		If $\rdx{\rapp} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
