@@ -800,7 +800,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rcon}$ or vice v
 		If $\rdx{\runi} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
 		If $\rdx{\runi} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
 		If $\rdx{\runi} \subset |x == v; e_2|$, \ie $\runi : |x == v| \movesto x = |v|; e_2'$, then join at $x = |v|; e_1; e_2'$.
-	\item[Case:] \rulename{norm-eq-swap} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
+	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
 		Here $\rdx{\runi} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
 	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
@@ -891,7 +891,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 \begin{description}
 \item[Case] $\rdx{\runi} \subset \rdx{\rspc}$ Split cases on the rule used in $\rspc$
 	\begin{description}
-	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
+	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
 	Let us split cases on where $\rdx{\runi}$ occurs.
 		\begin{description}
 		\item[Case] $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
@@ -900,7 +900,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 
 		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\runi} \cdots |e_1 choice e_2|$
 		so
-		with two $\runi$ steps we can join at $|SX^[e_1' choice e_2']$ where
+		with two $\runi$ steps we can join at $|SX^[e_1' choice e_2']|$ where
 		$e_i' \equiv \cdots \rdx{\runi}' \cdots e_i$.
 		\end{description}
 
@@ -926,8 +926,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 
 	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
 	Trivially $\rdx{\runi} \not \subset \rdx{\rspc}$.
-
-\end{description}
+	\end{description}
 
 \item[Case] $\rdx{\rspc} \subset \rdx{\runi}$ Split cases on the rule used in $\runi$
 \begin{description}
@@ -937,7 +936,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 	\item[Case:] \rulename{u-tup} \ie $\rspc \not \subset \runi$.
 	\item[Case:] \rulename{u-*} \ie~$\tx{\runi} \equiv c \movesto |fail|$; so join at |fail|.
 \end{description}
-
+\end{description}
 \end{proof}
 
 \begin{lemma}[GC-Result] \label{lem:gc-result}
@@ -1026,7 +1025,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice v
 \begin{description}
 \item[Case $\rdx{\rapp} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$. Crucially,
 the $\rapp$ rules apply at application sites which are disjoint from any of the $\rcon$ sites, hence
-the proof is similar to but simpler than the case of $\rdx{\rapp} \subset \rdx{\rcon}$ in \cref{lem:a-c-c}
+the proof is similar to but simpler than the case of $\rdx{\runi} \subset \rdx{\rcon}$ in \cref{lem:u-c-c}
 as each $\rapp$-reduct must be strictly under \emph{one} of the components of the $\rcon$-reduct.
 	\begin{description}
 		\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
@@ -1039,7 +1038,7 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
 		If $\rdx{\rapp} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
 		If $\rdx{\rapp} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-	\item[Case:] \rulename{norm-eq-swap} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
+	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
 		Here $\rdx{\rapp} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
 	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
@@ -1051,10 +1050,10 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
 		If $\rdx{\rcon} \subset |e|$, \ie $\rcon : e \movesto e'$, then join at $|def x (x == v; e')|$.
 		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |e|'$, then join at $|def x (x == v'; e)|$.
-	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |v == 0; s_0 `choice` dots `choice` v == n; s_n|$.
+	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x ==v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
 		Here, $\rdx{\rcon} \not \subset s_i$.
-		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v|'$, then join (in $n$-steps) at
-		$|v' == 0; s_0 `choice` dots `choice` v' == n; s_n|$.
+		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v|'$, then join at
+		$|def x (x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
 	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rcon} \not\subset \rdx{\rapp}$.
 	\end{description}
 \end{description}
@@ -1086,7 +1085,16 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice 
 	\end{description}
 
 \item[Case $\rdx{\rfail} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
-\ranjit{ANCHOR- F < A like N < A}
+	\begin{description}
+	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
+		If $\rdx{\rfail} \subset |e|$, \ie $\rfail : e \movesto e'$, then join at $|def x (x == v; e')|$.
+		If $\rdx{\rfail} \subset |v|$, \ie $\rfail : |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
+	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
+		Here, $\rdx{\rfail} \not \subset s_i$.
+		If $\rdx{\rfail} \subset |v|$, \ie $\rfail : |v| \movesto |v|'$, then join at
+		$|def x (x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
+	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rfail} \not\subset \rdx{\rapp}$.
+	\end{description}
 \end{description}
 \end{proof}
 
@@ -1095,7 +1103,31 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice 
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rapp$ $*$-commutes with $\rgc$.
+%
+Let $\tx{\rapp}$ and $\tx{\rgc}$ denote the reducts for $\rapp$ and $\rgc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rgc}$ or vice versa.
+
+\begin{description}
+\item[Case $\rdx{\rapp} \subset \rdx{\rgc}$]
+	Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
+	If $\rdx{\rapp} \subset e$, \ie $\rapp: e \movesto e'$, then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
+	If $\rdx{\rapp} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
+\item[Case $\rdx{\rgc} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
+	\begin{description}
+	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
+		If $\rdx{\rgc} \subset |e|$, \ie $\rgc: e \movesto e'$, then join at $|def x (x == v; e')|$.
+		If $\rdx{\rgc} \subset |v|$, \ie $\rgc: |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
+	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
+		Here, $\rdx{\rgc} \not \subset s_i$.
+		If $\rdx{\rgc} \subset |v|$, \ie $\rgc: |v| \movesto |v|'$, then join at
+		$|def x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
+	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rgc} \not\subset \rdx{\rapp}$.
+	\end{description}
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rapp-\rspc$-Comm] \label{lem:a-s-c}
@@ -1103,7 +1135,66 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice 
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rspc$ $*$-commutes with $\rapp$, hence commutes by \cref{lem:star-comm}.
+%
+Let $\tx{\rapp}$ and $\tx{\rspc}$ denote the reducts for $\rapp$ and $\rspc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice versa.
+%
+\begin{description}
+\item[Case $\rdx{\rspc} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
+	\begin{description}
+	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
+		If $\rdx{\rspc} \subset |e|$, \ie $\rspc: e \movesto e'$, then join at $|def x (x == v; e')|$.
+		If $\rdx{\rspc} \subset |v|$, \ie $\rspc: |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
+	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
+		Here, $\rdx{\rspc} \not \subset s_i$.
+		If $\rdx{\rspc} \subset |v|$, \ie $\rspc: |v| \movesto |v|'$, then join at
+		$|def x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
+	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rspc} \not\subset \rdx{\rapp}$.
+	\end{description}
+
+\item[Case $\rdx{\rapp} \subset \rdx{\rspc}$] Split cases on the rule used in $\rspc$
+	\begin{description}
+	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
+	Let us split cases on where $\rdx{\rapp}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\rapp} \subset e_1$, \ie $\rapp: e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
+		\item[Case] $\rdx{\rapp} \subset e_2$, \ie $\rapp: e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
+		\item[Case] $\rdx{\rapp} \subset CX$ :
+		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\rapp} \cdots |e_1 choice e_2|$
+		so with two $\rapp$ steps we can join at $|SX^[e_1' choice e_2']|$ where
+		$e_i' \equiv \cdots \rdx{\rapp}' \cdots e_i$.
+		\end{description}
+
+
+	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
+	Let us split cases on where $\rdx{\rapp}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
+		\item[Case] $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
+		\item[Case] $\rdx{\rapp} \subset e_3$, \ie $\rapp : e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
+		\end{description}
+
+	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
+	Here, $\rdx{\rapp} \subset e$, \ie $\rapp: e \movesto e'$ so join at $SX[e']$.
+
+	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
+	If $\rdx{\rapp} \subset e_1$, \ie $\rapp: e_1 \movesto e_1'$, then join at $e_1'$.
+	If $\rdx{\rapp} \subset e_2$, then join at $e_1$.
+
+	\item[Case] \rulename{all-choice}
+	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e$ where $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$.
+	Hence, by \cref{lem:gc-result}, $\rdx{\rapp} \not \subset \rdx{\rspc}$. \ranjit{TODO}
+
+	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Trivially $\rdx{\rapp} \not \subset \rdx{\rspc}$.
+	\end{description}
+\end{description}
+%
 \end{proof}
 
 \subsection{Normalization} % --------------------------------------------------------------------------
@@ -1113,15 +1204,145 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice 
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf} $\rcon$ satisfies the diamond property, hence confluent by \cref{lem:diamond}.
+We will show that $\rcon$ is locally confluent \cref{lem:c-local} and terminating \cref{lem:c-term},
+and hence confluent by Newman's \cref{lem:local}.
 \end{proof}
+
+\begin{lemma}[$\rcon$-Noetherian] label{lem:c-term}
+    $\rcon$ is Noetherian.
+\end{lemma}
+
+\begin{proof}
+Each step of $\rcon$ brings the term closer to a canonical \emph{normal form}
+defined by the following grammar, where each expression has
+%
+existentials at the top,
+then |x == s| bindings,
+then |x == h| bindings, and
+no |v| to the left of a semicolon.
+%
+Once a term is in this normalized form, no further $\rcon$ steps are possible.
+%
+% e1 := exists x.e1 | e2
+% e2 := (x=s); e2 | e3
+% e3 := (x=v); e3 | e4
+% e4 := v | nv  | v = nv
+% nv := v1 v2 | (e1 | e2)
+%
+\end{proof}
+
+
+\begin{lemma}[$\rcon$-Local Confluent]\label{lem:c-local}
+    $\rcon$ is locally confluent.
+\end{lemma}
+
+\begin{proof}
+Suppose we have to $\rcon$-steps:
+$\tx{1}$ via the redux $\rdx{1} \movesto \rdx{1}'$ and
+$\tx{2}$ via the redux $\rdx{2} \movesto \rdx{2}'$.
+%
+Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
+%
+The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
+%
+Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
+%
+Split cases on the $\rcon$ rule used in $\rdx{2}$.
+%
+\begin{description}
+\item[Case:] \rulename{norm-val} \ie $\tx{2} \equiv |v; e| \movesto |e|$.
+		If $\rdx{1} \subset |v|$, \ie $\rcon_1: |v| \movesto |v'|$, then join at $|e|$.
+		If $\rdx{1} \subset |e|$, \ie $\rcon_1: |e| \movesto |e'|$, then join at $|e'|$.
+\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{2} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
+		If $\rdx{1} \subset e_1$, \ie $\rcon_{1}: e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
+		If $\rdx{1} \subset e_2$, \ie $\rcon_{1}: e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
+		If $\rdx{1} \subset e_3$, \ie $\rcon_{1}: e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
+		If $e_1 \equiv |def x e_1'|$ and $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defr}
+			then join at $|def x (e_1'; (e_2; e_3))|$.
+		If $e_2 \equiv |def x e_2'|$ and $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defl}
+			then join at $|def x (e_1; (e_2'; e_3))|$.
+
+\item[Case:] \rulename{norm-seq-swap} \ie $\tx{2} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
+		If $\rdx{1} \subset |e_1|$, \ie $\rcon_{1}: e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
+		If $\rdx{1} \subset |e_2|$, \ie $\rcon_{1}: e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+		If $e_1 \equiv |def y e_1'|$ and $\rdx{1} \subset |e_1; (x == v; e_2)|$ via \rulename{norm-seq-defr}
+			then join at $|def y (x == |v|; e_1'; e_2)|$.
+		If $e_2 \equiv |def y e_2'|$ and $\rdx{1} \subset |e_1; (x == v; e_2)|$ via \rulename{norm-seq-defl}
+			then join at $|def y (x == |v|; e_1; e_2')|$.
+
+\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
+		Here $\rdx{1} \subset \hnf$, \ie $\rcon_{1}: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
+
+\item[Case:] \rulename{norm-seq-defr} \ie $\tx{2} \equiv |def x e_1; e_2| \movesto |def x (e_1; e_2)|$.
+		If $\rdx{1} \subset e_1$, \ie $\rcon_{1} : e_1 \movesto e_1'$, then join at $|def x e_1'; e_2|$.
+		If $\rdx{1} \subset e_2$, \ie $\rcon_{1} : e_2 \movesto e_2'$, then join at $|def x e_1; e_2'|$.
+		If $e_2 \equiv |def y e_2'|$ and $\rdx{1} \subset |def x e_1; e_2|$ via \rulename{norm-seq-defl}
+			then join at $|def x (def y (e_1; e_2'))|$ (using structural equivalance \rulename{swap-d}).
+
+\item[Case:] \rulename{norm-seq-defl} \ie $\tx{2} \equiv |e_1; def x e_2| \movesto |def x (e_1; e_2)|$.
+		Symmetric to the previous case.
+
+\item[Case:] \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
+		In this case $\tx{\rcon} \equiv C[|v|, e_1, e_2] \movesto C'[|v|, e_1, e_2]$.
+		If $\rdx{1} \subset v$,   \ie $\rcon_{1} : v \movesto v'$, then join at $C'[|v|', e_1', e_2]$.
+		If $\rdx{1} \subset e_1$, \ie $\rcon_{1} : e_1 \movesto e_1'$, then join at $C'[|v|, e_1', e_2]$.
+		If $\rdx{1} \subset e_2$, \ie $\rcon_{1} : e_2 \movesto e_2'$, then join at $C'[|v|, e_1, e_2']$.
+\end{description}
+\end{proof}
+
 
 \begin{lemma}[$\rcon-\rfail$-Comm] \label{lem:c-f-c}
 	$\rcon$ and $\rfail$ commute.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rcon$ \emph{semi-commutes} with $\rfail$, and hence $\rcon \cup \rfail$ is confluent via \cref{lem:semi-comm}.
+%
+Let $\tx{\rcon}$ and $\tx{\rfail}$ denote the reducts for $\rcon$ and $\rfail$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice versa.
+
+\begin{description}
+\item[Case $\rdx{\rcon} \subset \rdx{\rfail}$] Split cases on the rule used in $\rfail$.
+	\begin{description}
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv |fail|; e \movesto |fail|$.
+		  	Here $\rdx{\rcon} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv e; |fail| \movesto |fail|$.
+		  	Here $\rdx{\rcon} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-eq} \ie $\tx{\rfail} \equiv x = |fail| \movesto |fail|$.
+			Here $\rdx{\rcon} \not \subset \rdx{\rfail}$.
+	\end{description}
+
+\item[Case $\rdx{\rfail} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$.
+	\begin{description}
+
+	\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
+		If $\rdx{\rfail} \subset |v|$, \ie $\rfail: |v| \movesto |v'|$, then join at $|e|$.
+		If $\rdx{\rfail} \subset |e|$, \ie $\rfail: |e| \movesto |e'|$, then join at $|e'|$.
+
+	\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
+		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
+		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
+		If $\rdx{\rfail} \subset e_3$, \ie $\rfail: e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
+		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-l}
+			then join at $|fail|$.
+		If $e_2 \equiv |fail|$ and $\rdx{\fail} \subset e_1; e_2$ via \rulename{fail-seq-r}
+			then join at $|fail|$.
+
+
+	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
+		If $\rdx{\rapp} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
+		If $\rdx{\rapp} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
+		Here $\rdx{\rapp} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
+	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
+		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
+		If $\rdx{\rapp} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
+		If $\rdx{\rapp} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
+	\end{description}
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rcon-\rgc$-Comm] \label{lem:c-g-c}

@@ -193,7 +193,7 @@ as illustrated in the middle in \cref{fig:commutativity}.
 \end{figure}
 
 % [Huet 1980]
-\begin{lemma}[Strong-Commutativity] If $R$ strongly commutes with $S$ then $R$ commutes with $S$.
+\begin{lemma}[Strong-Commutativity] \label{lem:strong-commute} If $R$ strongly commutes with $S$ then $R$ commutes with $S$.
 \end{lemma}
 
 \begin{proof}
@@ -262,6 +262,50 @@ Via the following chase diagram (probably well known?)
 \end{tikzcd}\]
 \end{proof}
 
+\subsection{Semi-Commutativity}
+
+\begin{definition}[Semi-Commutativity] \label{def:semi-comm}
+A reduction $R$ \emph{semi-commutes} with $S$ if for all terms
+$a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
+there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
+(right in \cref{fig:commutativity}. \ranjit{TODO})
+\end{definition}
+
+\begin{lemma}  \label{lem:semi-comm-1}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{S}{a}{c}$.
+\end{proof}
+
+\begin{lemma}  \label{lem:semi-comm-2}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rstep{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{R}{a}{b}$, using \cref{lem:semi-comm-2}.
+\end{proof}
+
+\begin{lemma}  \label{lem:semi-comm-3}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{S}{a}{c}$ using \cref{lem:semi-comm-2}.
+\end{proof}
+
+\begin{lemma} \label{lem:semi-comm}
+	If $R$ semi-commutes with $S$ and $R,S$ are confluent
+	then $R \cup S$ is confluent.
+\end{lemma}
+
+\begin{proof}
+	Via the following chase diagram \ranjit{TODO similary to \cref{lem:strong-commute}}.
+\end{proof}
 
 \subsection{$*$-Commutativity}
 
@@ -271,7 +315,6 @@ $a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
 there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
 (right in \cref{fig:commutativity}.)
 \end{definition}
-
 
 \begin{lemma}  \label{lem:star-comm-1}
 	If $R$ $*$-commutes with $S$ then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
