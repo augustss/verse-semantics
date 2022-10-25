@@ -64,8 +64,8 @@ normalFormsFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(Strin
 --normalFormsFuelTrace n _ _ | trace ("normalFormsFuelTrace: " ++ show n) False = undefined
 normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
-  go 0 _    (tr:_)      = --traceShow "fuel 0" []
-                          trace ("fuel 0\n" ++ showReductionTrace show tr) []
+  go 0 _    (tr:_)      = traceShow "fuel 0" []
+                          --trace ("fuel 0\n" ++ showReductionTrace show tr) []
   go n seen []          = [] -- traceShow "stuck" []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
