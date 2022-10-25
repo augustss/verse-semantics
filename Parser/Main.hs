@@ -6,6 +6,7 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import Text.Printf
+import Text.Read(readMaybe)
 
 import Print
 import Desugar
@@ -124,7 +125,10 @@ cSet :: Bool -> Run CState
 cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (flags s) then "on" else "off"
   putStr $ concatMap f flagTable
+  printf "  %-12s %d\n" "steps" (fRewriteSteps (flags s))
   pure s
+cSet True l s | Just l' <- stripPrefix "steps=" l, Just n <- readMaybe l' =
+  pure $ s{ flags = (flags s){fRewriteSteps = n} }
 cSet b l s =
   case find (isPrefixOf l . fst) flagTable of
     Nothing -> do putStrLn "Unknown flag"; pure s
