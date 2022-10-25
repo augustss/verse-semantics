@@ -155,6 +155,10 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \end{array}$$
 
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\rulegroupname{Structural rules}
+        \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| &  \\
+        \rulename{swap-c} & |x_1=v_1; x_2 = v_2; e| & \equiv & |x_2 = v_2; x_1=v_1; e|  \\[0.05in]
+
 \rulegroupname{Unification:~\runi}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s$, $x,s$ free in |E^[hole]| \\
 \rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x,\freevars{h}$ free in |A^[hole]|\\
@@ -185,7 +189,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{\overline{|v|}} \\
 \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
-\caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rulesI}
+\caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
 \end{figure}
 }
 
@@ -196,7 +200,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
 \rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
 \rulename{norm-seq-swap1} & |e_1 ; x = v; e_2|    & \movesto & |x == v; e_1; e_2|     & if |e_1| is not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e_1 ; x = s; e_2|    & \movesto & |x == s; e_1; e_2|     & if |e_1| is not of form |x' == s'|\\
+% \rulename{norm-seq-swap2} & |e_1 ; x = s; e_2|    & \movesto & |x == s; e_1; e_2|     & if |e_1| is not of form |x' == s'|\\
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
@@ -227,7 +231,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \inferrule
   { }
-  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\wff{x}{|x == v|}{\emptyset}{|x == v|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
@@ -513,7 +517,7 @@ $$
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     % \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
     % \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
-    \textit{Bindings}       & c     & ::= & |x = h| \\
+    \textit{Bindings}       & c     & ::= & |x = v| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
