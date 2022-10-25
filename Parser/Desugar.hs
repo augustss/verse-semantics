@@ -462,10 +462,13 @@ dsPArr l lhss ea = do
   case exprElems lhss of
     -- P[lhs0,...,lhsn] e = P[lhs0]x0; ...; P[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
-      xs <- mapM (const $ newIdent l "d") ls
+      -- Avoid new variables when possible
+      let asId (Variable i) = pure i
+          asId _ = newIdent l "d"
+      xs <- mapM asId ls
       let eun = Unify (Array (map (tAny l) xs)) e
-      els <- zipWithM (\ lhs x -> dsP l lhs (Variable x)) ls xs
-      pure $ Seq $ els ++ [eun]
+      elss <- zipWithM (\ lhs x -> if lhs == Variable x then pure [] else (:[]) <$> dsP l lhs (Variable x)) ls xs
+      pure $ Seq $ concat elss ++ [eun]
 
     [ESplice lhs] ->
       dsP l lhs ea
