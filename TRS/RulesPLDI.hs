@@ -702,7 +702,7 @@ rulesAllFP lhs =
 -- 0 or 1 result
 wfRes :: Expr -> [([Ident], [Expr], Value)]
 wfRes = maybeToList . wf []
-  where wf _ (Val v) = pure ([], [], v)
+  where wf _ (Val v@HNF{}) = pure ([], [], v)
         wf g (Def (Bind x r)) = do
           guard (x `notElem` g)
           (xs, es, v) <- wf (x:g) r
@@ -727,6 +727,7 @@ mkRess as = loop [] [] [] as
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
+
 rulesNormalization :: ERule
 rulesNormalization lhs =
   "NORM-SEQ-ASSOC" `name`
