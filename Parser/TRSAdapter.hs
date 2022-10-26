@@ -1,4 +1,6 @@
 module TRSAdapter(rewrite, coreToTrs) where
+import Data.Function(on)
+import Data.List(nubBy)
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
@@ -16,7 +18,7 @@ import Print
 --import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . nf n (rules flg) . ds flg . coreToTrs
+rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
  where
   n              = fRewriteSteps flg
   tr             = fTrace flg
@@ -36,10 +38,17 @@ ds flg
   | fFresh flg = RulesPLDI.dsFreshFP
   | otherwise  = id
 
+subs :: Flags -> [Trace T.Expr] -> [Trace T.Expr]
+subs flg ts
+  | fFresh flg =
+    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = RulesPLDI.finalSubst e]
+        ts'' = nubBy ((==) `on` fst) ts'
+    in  map snd ts''
+  | otherwise  = ts
+
 sub :: Flags -> T.Expr -> T.Expr
-sub flg
-  | fFresh flg = RulesPLDI.finalSubst
-  | otherwise  = id
+sub flg | fFresh flg = RulesPLDI.finalSubst
+        | otherwise = id
 
 rules :: Flags -> RulesPOPL.ERule
 rules flg
