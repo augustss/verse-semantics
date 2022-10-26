@@ -73,7 +73,8 @@
 
 
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
-\newcommand{\wff}[6]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5 \mid #6)}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+\newcommand{\wffv}[4]{\ensuremath{\vdash_v #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -198,12 +199,12 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
 \rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
 \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
-\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{\emptyset}{|xs|}{|cs|}{|v|} \\
-\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{\emptyset}{|xs|}{|cs|}{|v|} \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wffv{|e_1|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wffv{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
 \rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|
-               & if \wff{\emptyset}{|es|}{\emptyset}{|xs|}{|cs|}{\overline{|v|}} \\
-\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{\emptyset}{|xs|}{|cs|}{|v|}
+               & if \wffv{|es|}{|xs|}{|cs|}{\overline{|v|}} \\
+\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
 \end{figure}
@@ -230,7 +231,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{fail-eq}        & |v == fail|           & \movesto & |fail| \\[0.5mm]
 \rulegroupname{Garbage Collection:~$\rgc$}
 \rulename{elim-def}     & |e_1| & \movesto & \multicolumn{2}{l}
-         {|e_2| \quad \quad if $\wff{\emptyset}{|e_1|}{\Gamma}{|xs|}{|cs|}{|e_2|}$
+         {|e_2| \quad \quad if $\wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|e_2|}$
              and $|xs| \not\in \freevars{|e_2|}$} \\
 \rulegroupname{Structural rules}
         \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| &  \\
@@ -242,39 +243,47 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 %
 \begin{figure}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
-\fbox{\wff{\Gamma}{|e_1|}{\Gamma'}{|xs|}{|cs|}{|e_2|}}
+\fbox{\wffv{|e|}{|xs|}{|cs|}{|v|}}
+\begin{mathpar}
+\inferrule
+  { \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \quad |xs| = \boundvars{|cs|} }
+  { \wffv{|e|}{|xs|}{|cs|}{|v|} }
+  { \rulename{WF-Val}}
+\end{mathpar}
+
+\fbox{\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}}
 \begin{mathpar}
 \inferrule
   { }
-  { \wff{\Gamma}{|e|}{\Gamma}{\emptyset}{\emptyset}{|e|} }
+  { \wff{\Gamma}{|e|}{\emptyset}{\emptyset}{|e|} }
   { \rulename{WF-Exp}}
 
 \inferrule
   { x \in \Gamma }
-  {\wff{\Gamma}{|x == h|}{\Gamma - x}{\emptyset}{|x == h|}{|x|}}
+  {\wff{\Gamma}{|x == h|}{\emptyset}{|x == h|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
 \inferrule
-  { \wff{\Gamma, x}{e_1}{\Gamma'}{|xs|}{|cs|}{|e_2|} \quad
+  { \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \quad
     x \not \in |xs|}
-  { \wff{\Gamma}{|def x e_1|}{\Gamma'}{|x,xs|}{|cs|}{|e_2|} }
+  { \wff{\Gamma}{|def x e_1|}{|x,xs|}{|cs|}{|e_2|} }
   { \rulename{WF-Def} }
 
 \inferrule
   {x \in \Gamma \quad
-   \wff{\Gamma - x}{|e_1|}{\Gamma'}{|xs|}{|cs|}{|e_2|}
+   \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|}
   }
-  {\wff{\Gamma}{|x == h; e_1|}{\Gamma'}{|xs|}{|x == h, cs|}{|e_2|}}
+  {\wff{\Gamma}{|x == h; e_1|}{|xs|}{|x == h, cs|}{|e_2|}}
   {\rulename{WF-Eq}}
 
 \\
 
 \inferrule
-  { \wff{\Gamma}{e_1}{\Gamma'_1}{|xs|}{|cs|}{|e_2|} \quad
-    \wff{\Gamma,|xs|}{|es_1|}{\Gamma'_2}{|xs|'}{|cs|'}{|es_2|}
+  { \wff{\Gamma}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+    \wff{\Gamma,|xs|}{|es_1|}{|xs|'}{|cs|'}{|es_2|}
   }
-  { \wff{\Gamma}{|e_1|,|es_1|}{\Gamma'_1,\Gamma'_2}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
+  { \wff{\Gamma}{|e_1|,|es_1|}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
   {\rulename{WF-many}}
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}\label{fig:wf}
