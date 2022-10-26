@@ -909,13 +909,15 @@ $$
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
+\figureRewriteRules
+
 How can we give a precise semantics to a non-strict functional
 programming language?  Here are some possibilities:
 \begin{itemize}
 \item \emph{A denotational semantics} is the classical approach,
-  but it is hard to see how to give a (perspicuous) denotational semantics to a functional logic language,
-  because of the logical variables; see \cite{christiansen:denotational} for one approach.
-  As a way to explain a programmer what their program means, it has its challenges.
+  but it is tricky to give a (perspicuous) denotational semantics to a functional logic language,
+  because of the logical variables.  We have such a denotational semantics under development,
+  which we offer for completeness in \Cref{sec:den-sem}, but that is the subject of another paper.
 \item \emph{A big-step operational semantics} typically involves explaining how a (heap, expression) starting point
   evaluates to a (heap, value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
 \item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, the big-step approach
@@ -931,27 +933,22 @@ programming language?  Here are some possibilities:
   Indeed teachers almost always explain the execution of Haskell or ML programs as a succession of rewrites
  of the program ({\eg}, inline this call, simplify this |case| expression, \etc).
 \end{itemize}
-
 Up to this point there has been no satisfying rewrite semantics for functional logic languages
 (see \cref{sec:related} for previous work).
 Our main technical contribution is to fill this gap with a rewrite semantics for \versecalc{}, one that
 has the following properties:
 \begin{itemize}
-\item The semantics is expressed as a set of rewrite rules.
+\item The semantics is expressed as a set of rewrite rules (\Cref{fig:rewrite-rules} and \ref{fig:normalization-rules}).
 \item Any rule can be applied, in either direction,
   anywhere in the program term (including under lambdas) to obtain an equivalent program.
 \item The rules are oriented, with the intent that using them left-to-right makes progress.
 \item Even given this orientation, the rules do not say which rule should be
-  applied where; that is the task of a separate \emph{evaluation strategy}.
+  applied where; that is the task of a separate \emph{evaluation strategy} (\Cref{sec:eval-strategy}).
 \item The rules can be applied by programmers, to reason about what their program does;
   and by compilers, to transform (and hopefully optimise) the program.
 \item There is no ``magical rewriting'' (\cref{sec:magical}): all the variables on the
   right-hand side of a rule are bound on the left.
 \end{itemize}
-
-The rewrite rules are given in Figure~\ref{fig:rewrite-rules}, and are described next.
-
-\figureRewriteRules
 
 
 \subsection{Functions and function application} \label{sec:beta}
@@ -961,7 +958,7 @@ should be familiar: it simply rewrites an application of |add| to integer
 constants.  For example $|applyN add (3,4)| \movesto |7|$.  Rules \rulename{app-gt} and
 \rulename{app-gt-fail} are more interesting: |applyN gt (k_1,k_2)| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional), and returns |k_1| otherwise (rather than returning |True|).
 An amusing consequence is that |(10 > x > 0)| succeeds
-iff |x| is between |10| and |0| --- |(>)| is right-associative).
+iff |x| is between |10| and |0| --- comparison is right-associative).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -973,7 +970,7 @@ Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
 only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
 and an equality |(x=v)| to bind |x| to the argument.
 The rule may appear to use call-by-value, because the argument is a value |v|,
-but remember that values include variables, and that variable may be bound to an
+but remember that values include variables, which may be bound to an
 as-yet-unevaluated expression.  For example:
 $$
 |def y (y = 3+4; apply1 (lam x (x+1)) y)|
@@ -1026,11 +1023,11 @@ lambda or a built-in operation with any other value -- see \Cref{sec:unifying-la
 
 The key innovation in \versecalc{} is the way bindings (that is, just ordinary equalities)
 of logical variables are propagated.
-The key rules are \rulename{subst}:
+The key rules are:
 $$
 \begin{array}{rrcll}
-\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & x \not \equiv s; x,s \not\in \boundvars{|E|} \\
-\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & x,\freevars{h} \not\in \boundvars{A}
+\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|} \\
+\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}
 \end{array}
 $$
 These rules make use of so-called \emph{contexts}, |E| and |A|,
@@ -1050,7 +1047,7 @@ There are several things to notice:
   that is, a variable or integer literal. That is because |E| allows the occurrence of |x| to be
   in places that only syntactically allow scalars. \rulename{defref-h} allows substitution of heap values, but
   again only in places that syntactically allow such expressions.
-\item Both rules only fires when the RHS is a value, so that the substitution does not risk duplicating either work or choices. This
+\item Both rules only fire when the RHS is a value, so that the substitution does not risk duplicating either work or choices. This
 restriction is precisely the same as the \rulename{let-v} rule of \cite{ariola:call-by-need},
 and (by not duplicating choices) it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
@@ -1061,37 +1058,26 @@ suffice to express the necessary sharing.
   |E = (y=hole+1; z=x+3)|.  We must not drop the |(x=v)| because there may be other occurrences of |x|,
   such as the |x+3| in this example.  When there are no remaining occurrences of |x| we may garbage collect
   the binding: see \Cref{sec:gc}.
-\item \simon{Simon's wavefront}
-\item \rulename{subst} does not specify how big the execution context |X| is:
-  it can be anything from a local expression immediately surrounding the |(x=v)| to an
-  arbitrarily large expression.
-But note carefully  that \emph{execution contexts |X| do not include |oneKW|, |allKW|, and choice} (\cref{fig:contexts}).
-That restriction is the key to localizing unification (\cref{sec:mixing}), and
-the flexible/rigid distinction of
-\cref{sec:rigid}. For example, consider the expression
-|(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
-We must not propagate the binding |(x=3)| to the expression |(x+1)|,
-because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
-But rule \rulename{subst}
-\emph{can} propagate it locally
-within the first arm of the choice, thus\footnote{
-You may wonder if this local propagation is useful, a point we return
-to in \cref{sec:local-subst}.}:
-$$
-|y = ((x=3; x*2) choice (x=4)); tup (x+1,y)|
-\movesto
-|y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
-$$
-To make further progress, we need a rule for choice, see \cref{sec:choice-rules}.
-\item The $x \in \freevars{X}$ in \rulename{subst} prevents the rule from
-  firing infinitely often, doing nothing each time.  The other guard $x \not\in \freevars{v}$
-  also prevents \rulename{subst} from applying infinitely often, this time unrolling a recursive loop; but
-  see \cref{sec:recursion}.
+\item Both rules substitute only to the \emph{right} of a binding.  How can we rewrite |(y=x+1; x=3)|,
+  where the occurrence of |x| is to the left of its binding?
+  Answer, by moving the |x=3| binding to the left, a process we call normalization, discussed in \Cref{sec:normalization}.
+
+\item The $x \not\equiv s$ in \rulename{deref-s} prevents a binding |x=x| from substituting
+  infinitely often, doing nothing each time.  The guard $x \not\in \boundvars{E}$
+  ensures that |x| is actually free in |E^[x]|, and $s \not\in \boundvars{E}$ ensures that |s| is not captured by |E| in |E^[s]|.
+
+\item \rulename{deref-s} substitutes a scalar anywhere, but \rulename{deref-h} is much more parsimonous:
+  it never substitutes a heap value |h| under a lambda or inside a tuple, as can be seen by examining
+  the syntax of application contexts |A|.  Substituting inside a tuple would be syntactically invalid, because
+  the components of tuples are scalars (\Cref{fig:syntax}).  Not substituting under a lambda is a technincal
+  device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
+  \Cref{sec:recursion}.
 \end{itemize}
 
 
 \subsection{Unification: recursion and the occurs check} \label{sec:occurs} \label{sec:recursion}
 
+\simon{Simon's wavefront}
 The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=tup(x,3))| fail, because the only successful
 unification would yield an infinitely-nested pair.
 $$
@@ -1110,7 +1096,7 @@ we create a new local binding for |x| under the lambda.  Now the original equali
 non-recursive, and \rulename{subst} can apply.
 
 
-\subsection{Normalization rules} \label{sec:gc}
+\subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
 
 \figureNormalizationRules
 
@@ -1124,21 +1110,43 @@ to substitute for |x| via rule \rulename{deref-h}, because the RHS of the equali
 But if we were to float the equality outwards (rule \rulename{norm-unifyr}), to give |(x == y; x == h)|, we can
 substitute for |x|, and then for |y|.
 
-\Cref{fig:rules-normalize} gives a collection of rules that systematically move both
+\Cref{fig:normalization-rules} gives a collection of rules that systematically move
 existentials and unifications upward and to the left.  The net effect is to normalise
-the term to a form with existentials at the top, then the scalar equalities, and then
-the heap equalities, thus
+the term to a form with existentials at the top, then scalar equalities, and then
+heap equalities, thus
 $$
-|def (x_1,dots,x_n) (x_1 == v_1 ; dots ; x_n == v_n; e)|
+|def (x_1,dots,x_n) (x_1 == s_1 ; dots ; x_i = h_i; x_n == h_n; e)|
 $$
 You can think of this form as ``an expression |e| wrapped in some heap bindings |x_i==v_i|''. The
 heap bindings express, as a term, the possibly-recursive value of the |x_i|, but the right-hand
 sides |v_i| are all values, so there is no computation left in the heap.  This decomposition is
 so important that we define a judgement $\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}$ in \Cref{fig:wf},
 which decomposes an expression $|e_1|$ into its heap, specified by |xs| and |cs| and the expression
-wrapped in that heap, |e_2|.  (The non-terminal |c| is just short for |x==v| (\Cref{fig:syntax}).
+wrapped in that heap, |e_2|.  (The non-terminal |c| is just short for |x==v|; \Cref{fig:syntax}).
 Notice that, if invoked with $\Gamma = \emptyset$, this judgement checks that that the existentals
 bind precisely the same variables as are defined by the |cs|, no more and no less.
+
+But note carefully  that \emph{the normalisation rules do not float equalities or existentials out of choices}.
+For example, consider |def x ((x=3; x+1) choice (x=4; x*2)); x)|.
+
+
+That restriction is the key to localizing unification (\cref{sec:mixing}), and
+the flexible/rigid distinction of
+\cref{sec:rigid}. For example, consider the expression
+|(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
+We must not propagate the binding |(x=3)| to the expression |(x+1)|,
+because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
+But rule \rulename{subst}
+\emph{can} propagate it locally
+within the first arm of the choice, thus\footnote{
+You may wonder if this local propagation is useful, a point we return
+to in \cref{sec:local-subst}.}:
+$$
+|y = ((x=3; x*2) choice (x=4)); tup (x+1,y)|
+\movesto
+|y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
+$$
+To make further progress, we need a rule for choice, see \cref{sec:choice-rules}.
 
 One useful consequence of this decomposition is \rulename{elim-def} in \Cref{fig:rules-normalize},
 which allows an entire heap of possibly-recursive bindings to be discarded if none of its variables are used.
@@ -2186,11 +2194,24 @@ but they are not included here.
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
 
-\iffalse
+\cleardoublepage
 
 \appendix
 
-\cleardoublepage
+\section{Confluence proof}
+
+\simon{Ranjit to fill in here}
+
+% ----------------------- Denotational semantics  -----
+\section{Denotational semantics} \label{sec:den-sem}
+
+\simon{Add our denotational semantics here}.
+
+See \cite{christiansen:denotational} for another approach.
+
+
+% ----------------------- Updatable references  -----
+\iffalse
 
 \section{Updateable references} \label{sec:store}
 
@@ -2314,90 +2335,6 @@ We also need some extra expressions that modify this set as the store ``moves'' 
 \lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
 \fi
 
-% JB: Removed, given that even the very first step turned out to not help with out system
-% and then not much of value can be said there
-\iffalse
-\section{Confluence proof plan}\label{sec:confluence-proof-plan}
-
-In this section we outline our strategy for a rigorous proof of \cref{thm:confluence}, which is still in the making. The main steps are:
-\begin{itemize}
-\item Split the depth-preserving unification rules from the depth-collapsing evaluation rules (\ref{sec:conf-proof-split}).
-\item The unification fragment is terminating, assuming we cut at a given depth (\ref{sec:conf-proof-term}).
-\item Furthermore, it is confluent if we add the additional rules (\ref{sec:conf-proof-u}).
-\item The additional rules and the depths-cutting can be moved to the end of any sequence (\ref{sec:conf-proof-split}).
-\end{itemize}
-
-\subsection{Notation}
-
-We briefly recapitulate some standard notation about abstract rewriting. If $\rightarrow$ is a relation on a set $A$, then $\leftarrow$ is its inverse, $\rightarrow^\ast$ its reflexive transitive closure and $\rightarrow^=$ its reflexive closure. If $\rightsquigarrow$ is also a relation on $A$, then $\leftarrow;\rightsquigarrow$ is its composition.
-
-Relations $\rightarrow$ and $\rightsquigarrow$ commute if $\leftarrow^\ast;\rightsquigarrow^\ast\subseteq \rightsquigarrow^\ast;\leftarrow^\ast$. A self-commuting relation is confluent. A relation $\rightarrow$ has the diamond property if $\leftarrow;\rightarrow\subseteq \rightarrow;\leftarrow$.
-
-% If $A$ is a set of terms and $\underset{R}\rightarrow$ is defined as the congruence closure of a set of rules $R$, then $\underset{R||||}\rightarrow$ is the parallel application of the rules $R$ at disjoint positions.
-
-\subsection{Separating the evaluation rules}
-\label{sec:conf-proof-split}
-
-The first problem we need to deal with is that, as discussed in \cref{sec:confluence-and-recursion}, we can only hope for confluence up to a certain depth $n$. But simply fixing a single depth for the whole proof is unlikely to work, as rule \rulename{app-beta} collapses one layer of lambdas. The more beta-reductions are still to happen, the deeper we have to unroll fixpoints.
-
-We can address this problem with the following general lemma (which we have proven using Isabelle)
-\begin{lemma}\label{lem:u-e}
-Let |stepA|, |stepB| and |cute n|, $n\in \mathbb{N}$, be relations on a common set. If
-\begin{enumerate}
-\item |cute n| is an equivalence relation
-\item |cute n; stepA `ss` stepAe; cute n|
-\item |cute (n+1);stepB `ss` stepB; cute n|
-\item |stepArs;stepAs `ss` stepAs;cute n;stepArs|
-\item |stepBr;stepB `ss` stepB;stepBr|
-\item |stepAr;stepB `ss` stepB;stepArs|
-\end{enumerate}
-then |stepAB := (stepA `cup` stepB)| is confluent up to |cute n|; {\ie},
-|stepABrs;stepABs `ss` stepABs; cute n; stepABrs|.
-\end{lemma}
-
-We divide our relation $\movesto$ into two sets:
-\begin{enumerate}
-\item The unification and choice fragment, consisting of the rules from sections Unification,  Unification variables, Sequencing, Choice and fail propagation, as well as the extra rules mentioned in \cref{fig:rules-confluence}. This becomes the |stepA| of \cref{lem:u-e}.
-
-This fragment respects $\equiv_n$, as it does not look under lambdas.
-
-\item The remaining rules, {\ie}, resolving applications and |oneKW| and |allKW|, form the evaluation fragment.
-
-These rules look under at most one level of lambdas, so take terms related by |cutr (n+1)| to terms related by |cutr (n)|.
-
-Furthermore, the rules are \emph{orthogonal} (they do not overlap) and left-linear, so not only is this fragment on its own confluent, but its parallel application has the diamond property and still reduces the depth of expressions at most one level.
-% JB: The second half of the previous sentence is wrong, and the reason I am removing this section
-The \emph{parallel} application becomes the |stepB| of \cref{lem:u-e}.
-\end{enumerate}
-
-The two relations  commute, and crucially, commuting them does not increase the number of (parallel) evaluation steps needed. By \cref{lem:u-e} it remains to show that |stepA| is confluent up to |cute n|.
-
-Because |stepA| respects $\equiv_n$, we can equivalently prove that the relation |stepUn := stepA; cutr n| is confluent. This brings us to the world of “conventional” confluence.
-
-\subsection{Termination of the unification fragment}
-\label{sec:conf-proof-term}
-
-With the evaluation rules, in particular \rulename{app-beta}, out of the way, and only a fixed depth $n$ to worry about, do the remaining rules (not including the extra rules from \cref{fig:rules-confluence}) terminate?
-
-This seems to be the case. For the unification rules this is not immediate, but note that they mimic the standard unification algorithm applied to set of equations in an expression $e$
-\[
-\operatorname{Eqns}(e) \coloneqq \{|v_1 = v_2| \mid |e === X^[v_1 = v_2]| \text{ where } |v_1| \not\equiv v_2\}.
-\]
-and allude to the termination of the standard unification algorithm here.
-
-\subsection{Confluence of the unification rules}
-\label{sec:conf-proof-u}
-
-Unfortunately, the relation is not locally confluent, as we have seen in \cref{sec:confluence-extra}, and we need the extra rules in \cref{fig:rules-confluence} to equate them. Lemma 11 in \Citep{ohlebusch:modulo}, gives us elementary diagrams to complete in order to show confluence up-to these extra rules.
-
-It may help to keep the termination argument simpler by proving confluence of the core unification rules separately from the choice rules, and then prove that they commute.
-
-\subsection{Moving equivalences to the end}
-\label{sec:conf-proof-moving}
-
-Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decreasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
-
-\fi % confluence appendix
 
 \end{document}
 
