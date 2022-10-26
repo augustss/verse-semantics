@@ -95,7 +95,7 @@
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
-%format (tup (x)) = "\langle" x "\rangle"
+%format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
 
 %format tuple = "\textbf{tup}"
@@ -315,6 +315,8 @@
 %format s_m
 
 %format s_1'
+%format sone = "s_1"
+%format sone'
 %format s_2'
 %format s_n'
 %format s_m'

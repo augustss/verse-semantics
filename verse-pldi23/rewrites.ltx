@@ -73,7 +73,7 @@
 
 
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
-\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+\newcommand{\wff}[6]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5 \mid #6)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -173,9 +173,10 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Unification:~\runi}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
 \rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}$ \\
+\rulename{u-var}    & |x == x |                                    & \movesto & x \\
 \rulename{u-lit}    & |k == k |                                    & \movesto & k \\
-\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & {|v_1==v1';dots;v_n==v_n'|} \\
-\rulename{u-fail-t} & |tup (v_1,dots,v_n) == tup (v1',dots,v_m')| & \movesto & |fail|& if $n \not = m$ \\
+\rulename{u-tup}    & |tup (s_1,dots,s_n) == tup ( sone' ,dots,s_n')| & \movesto & {|s_1==sone';dots;s_n==s_n'|} \\
+\rulename{u-fail-t} & |tup (s_1,dots,s_n) == tup (sone',dots,s_m')| & \movesto & |fail|& if $n \not = m$ \\
 \rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
 \rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
 \rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\
@@ -197,11 +198,12 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
 \rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
 \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
-\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
-\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{\emptyset}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{\emptyset}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|  & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{\overline{|v|}} \\
-\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{|xs|}{|cs|}{|v|}
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|
+               & if \wff{\emptyset}{|es|}{\emptyset}{|xs|}{|cs|}{\overline{|v|}} \\
+\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wff{\emptyset}{e}{\emptyset}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
 \end{figure}
@@ -225,54 +227,54 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Fail Propagation:~\rfail}
 \rulename{fail-seq}       & |fail ; e|            & \movesto & |fail| \\
 % \rulename{fail-seq-r}       & |e ; fail|            & \movesto & |fail| \\
-\rulename{fail-eq}        & |v == fail|           & \movesto & |fail| \\[0.05in]
-
+\rulename{fail-eq}        & |v == fail|           & \movesto & |fail| \\[0.5mm]
 \rulegroupname{Garbage Collection:~$\rgc$}
 \rulename{elim-def}     & |e_1| & \movesto & \multicolumn{2}{l}
-  {|e_2| \quad \quad \text{if $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|e_2|}$ and $|xs| \not\in \freevars{|e_2|}$}} \\
+         {|e_2| \quad \quad if $\wff{\emptyset}{|e_1|}{\Gamma}{|xs|}{|cs|}{|e_2|}$
+             and $|xs| \not\in \freevars{|e_2|}$} \\
 \rulegroupname{Structural rules}
         \rulename{swap-d} & |def x (def y e)| & \equiv & |def y (def x e)| &  \\
         \rulename{swap-c} & |x_1=v_1; x_2 = v_2; e| & \equiv & |x_2 = v_2; x_1=v_1; e|
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Normalization Rules}}\label{fig:normalization-rules}
+
 \end{figure}
 %
 \begin{figure}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
-\fbox{\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}}
+\fbox{\wff{\Gamma}{|e_1|}{\Gamma'}{|xs|}{|cs|}{|e_2|}}
 \begin{mathpar}
 \inferrule
   { }
-  { \wff{\emptyset}{|e|}{\emptyset}{\emptyset}{|e|} }
+  { \wff{\Gamma}{|e|}{\Gamma}{\emptyset}{\emptyset}{|e|} }
   { \rulename{WF-Exp}}
 
 \inferrule
-  { }
-  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  { x \in \Gamma }
+  {\wff{\Gamma}{|x == h|}{\Gamma - x}{\emptyset}{|x == h|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
 \inferrule
-  { x \not \in \Gamma \quad
-    \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+  { \wff{\Gamma, x}{e_1}{\Gamma'}{|xs|}{|cs|}{|e_2|} \quad
     x \not \in |xs|}
-  { \wff{\Gamma}{|def x e_1|}{|x,xs|}{|cs|}{|e_2|} }
+  { \wff{\Gamma}{|def x e_1|}{\Gamma'}{|x,xs|}{|cs|}{|e_2|} }
   { \rulename{WF-Def} }
 
 \inferrule
   {x \in \Gamma \quad
-   \wff{\Gamma - x}{e_1}{|xs|}{|cs|}{|e_2|}
+   \wff{\Gamma - x}{|e_1|}{\Gamma'}{|xs|}{|cs|}{|e_2|}
   }
-  {\wff{\Gamma}{|x == h; e_1|}{|xs|}{|x == h, cs|}{|e_2|}}
+  {\wff{\Gamma}{|x == h; e_1|}{\Gamma'}{|xs|}{|x == h, cs|}{|e_2|}}
   {\rulename{WF-Eq}}
 
 \\
 
 \inferrule
-  { \wff{\Gamma}{e_1}{|xs|}{|cs|}{|e_2|} \quad
-    \wff{\Gamma,|xs|}{|es_1|}{|xs|'}{|cs|'}{|es_2|}
+  { \wff{\Gamma}{e_1}{\Gamma'_1}{|xs|}{|cs|}{|e_2|} \quad
+    \wff{\Gamma,|xs|}{|es_1|}{\Gamma'_2}{|xs|'}{|cs|'}{|es_2|}
   }
-  { \wff{\Gamma}{|e_1|,|es_1|}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
+  { \wff{\Gamma}{|e_1|,|es_1|}{\Gamma'_1,\Gamma'_2}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
   {\rulename{WF-many}}
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}\label{fig:wf}
