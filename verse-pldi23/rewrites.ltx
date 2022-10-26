@@ -216,15 +216,15 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| is not of form |x' == v'|\\
 \rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| is not of form |x' == s'|\\
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
-\rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
-\rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
+\rulename{norm-seq-def}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
+% \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y (e_1 == e_2)|   & if $|y| \not \in \freevars{|e_2|}$ \\
 \rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; v == e_2| \\
 \rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |v == e_1; v == e_2|   & \\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}
-\rulename{fail-seq-l}       & |fail ; e|            & \movesto & |fail| \\
-\rulename{fail-seq-r}       & |e ; fail|            & \movesto & |fail| \\
+\rulename{fail-seq}       & |fail ; e|            & \movesto & |fail| \\
+% \rulename{fail-seq-r}       & |e ; fail|            & \movesto & |fail| \\
 \rulename{fail-eq}        & |v == fail|           & \movesto & |fail| \\[0.05in]
 
 \rulegroupname{Garbage Collection:~$\rgc$}
