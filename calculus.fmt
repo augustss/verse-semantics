@@ -49,6 +49,9 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
+
+%% Sequences e1; ...; en; v
+%format se = "es"
 %format xs = "\overline{x}"
 %format cs = "\overline{c}"
 %format rs = "\overline{r}"

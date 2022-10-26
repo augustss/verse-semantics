@@ -94,7 +94,7 @@
 $$
 \begin{array}{l}
   \textbf{Abstract syntax} \\
-    \begin{array}{lr@@{\;}c@@{\;}l}
+    \begin{array}{lrcl}
     \textit{Integers}      & k \\
     \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
     \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
@@ -102,12 +102,11 @@ $$
     \textit{Heap Values}   & h     & ::= & \op \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
     \textit{Head Values}   & \hnf  & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
-    \textit{Expressions}   & e     & ::= & |fail| \vb |v| \vb |def x e| \vb |e_1 ; e_2| \vb |v == e|
+    \textit{Expressions}   & e     & ::= & |se| \vb |fail| \vb |def x e| \vb |v == e|
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+    \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    % \textit{Results}       & r     & ::= & |v| \vb |x == h ; r| \vb |def x r| \\
-    % \textit{Results}       & r     & ::= & |def (x_1 ^^ dots ^^ x_n) (x_1 == h_1 ; dots ; x_n == h_n; v) | \\
-    \textit{Bindings}       & c     & ::= & |x = v| \\
+    \textit{Bindings}      & c     & ::= & |x = v| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
@@ -123,10 +122,11 @@ $$
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
-      |apply1N e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e2; apply1N f a)|  & |f,a|\ \text{fresh} \\
+      |apply1N e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1N f a)|  & |f,a|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2)|       & |x|\ \text{fresh} \\
+      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
       |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
 
       |if e_1 then e_2 else e_3| & \text{means}
@@ -213,10 +213,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Normalization:~\rcon}
 \rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
 \rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
-% \rulename{norm-seq-swap1} & |e_1 ; x = v; e_2|    & \movesto & |x == v; e_1; e_2|     & if |e_1| is not of form |x' == v'|\\
-% \rulename{norm-seq-swap2} & |e_1 ; x = s; e_2|    & \movesto & |x == s; e_1; e_2|     & if |e_1| is not of form |x' == s'|\\
-\rulename{norm-seq-swap1} & |e ; x = v|    & \movesto & |x == v; e; x|     & if |e| is not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e ; x = s|    & \movesto & |x == s; e; x|     & if |e| is not of form |x' == s'|\\
+\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| is not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| is not of form |x' == s'|\\
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
