@@ -1,6 +1,7 @@
 module Operational where
 
 import Data.Map( Map )
+import Control.Monad ( when, guard )
 
 --------------------------------------------------------------------------------
 {-
@@ -122,13 +123,18 @@ eval h1 (p :|: q) =
       do return (v, h2, p' :|: q)
 
 eval h1 (Def x p) =
-  error "don't know this yet"
+  do (v, h2, p') <- eval h1' p
+     let (_, h2') = hide x h2
+     
+ where
+  (x',h1') = hide x h1
 
 eval h Fail =
   Nothing
 
 eval h (One p) =
   do (v, _, _) <- eval h p
+     guard (null (free v))
      return (v, h, Fail)
 
 eval h (All p) =
@@ -137,7 +143,8 @@ eval h (All p) =
       return (Arr [], h, Fail)
     
     Just (v, _, p') ->
-      do (Arr vs, _, _) <- eval h (All p')
+      do guard (null (free v))
+         (Arr vs, _, _) <- eval h (All p')
          return (Arr (v:vs), h, Fail)
 
 eval h1 (Fix p) =
@@ -153,6 +160,12 @@ unify = undefined
 
 look :: Value -> Heap -> Value
 look = undefined
+
+rename :: Ident -> Heap -> (Ident, Heap)
+rename = undefined
+
+hide :: Ident -> Heap -> Heap
+hide = undefined
 
 --------------------------------------------------------------------------------
 
