@@ -298,54 +298,6 @@ rulesChoice lhs =
      (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
 
---------------------------------------------------------------------------------
--- Fresh Rules
---------------------------------------------------------------------------------
-
-{-
-rulesStructural :: ERule
-rulesStructural lhs =
-  "SWAP-E-1" `name`
-  do (VAR y :=: VAR x) <- [lhs]
-     guard (x < y)
-     pure (VAR x :=: VAR y)
-  ++
-  "SWAP-E-2" `name`
-  do (HVAL h :=: VAR x) <- [lhs]
-     pure (VAR x :=: HVAL h)
-  ++
-  "SWAP-C"  `name`
-  do (e1 :>: ((VAR x :=: HVAL v) :>: e3)) <- [lhs]
-     guard (not (valueConstraint e1))
-     pure ((VAR x :=: HVAL v) :>: (e1 :>: e3))
-  ++
-  "CONJ-SEMI" `name`
-  do ((e1 :>: e2) :>: e3) <- [lhs]
-     pure (e2 :>: (e1 :>: e3))
-
-valueConstraint :: Expr -> Bool
-valueConstraint (VAR _ :=: HVAL _) = True
-valueConstraint _                  = False
-
-rulesSubstitution :: ERule
-rulesSubstitution lhs =
- "DEREF-S-K" `name`
-  do (VAR x :=: INT k :>: e) <- [lhs]
-     eCtx <- derefE e x
-     pure ((VAR x :=: INT k) :>: plug eCtx (VINT k))
-  ++
-  "DEREF-S-V" `name`
-  do (VAR x :=: VAR y :>: e) <- [lhs]
-     eCtx <- derefE e x
-     guard (x < y)
-     pure ((VAR x :=: VAR y) :>: plug eCtx (Var y))
-  ++
-  "DEREF-H" `name`
-  do (VAR x :=: HVAL h :>: e) <- [lhs]
-     aCtx <- derefA e x
-     pure ((VAR x :=: HVAL h) :>: plug aCtx (HNF h))
--}
-
 plug :: VContext -> Value -> Expr
 plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
@@ -435,33 +387,6 @@ elimCst ee =
     else
       [res]
 
-{-
-      (xs, cs, e) <- gcDefs lhs
-      let (n, e') = gc xs cs e
-      guard (n < length xs)
-      pure e'
-
-gcDefs :: Expr -> [([Ident], [(Ident, HNF)], Expr)]
-gcDefs e = do
-   do let (xs, e')  = goD e
-      let (cs, e'') = goC e'
-      guard (not (null xs))
-      guard (not (null cs))
-      pure (xs, cs, e'')
-   where
-      goD (Def (Bind x e)) = (x:xs, e') where (xs, e') = goD e
-      goD e                = ([], e)
-      goC ((VAR x :=: HVAL h) :>: e) = ((x,h) : cs, e') where (cs, e') = goC e
-      goC e                          = ([], e)
-
-gc :: [Ident] -> [(Ident, HNF)] -> Expr -> (Int, Expr)
-gc xs cs e = go (free e) cs e
-   where
-      go :: [Ident] -> [(Ident, HNF)] -> Expr -> (Int, Expr)
-      go live cands e = case find (\(xi,_) -> xi `elem` live) cands of
-         Nothing       -> (length live, defs [x | x <- xs, x `elem` live] e)
-         Just (xi, hi) -> go (live `union` free hi) (cands \\ [(xi, hi)]) (VAR xi :=: HVAL hi :>: e)
--}
 
 {- | Application Contexts
 
@@ -585,19 +510,7 @@ derefE lhs xx =
 
 derefC :: Expr -> Ident -> [Value -> Expr]
 derefC lhs xx = derefE lhs xx
-{-
-   do (Val v :=: e) <- [lhs]
-      ctx   <- derefV v xx
-      pure ((:=: e) . Val . ctx)
-   ++
-   do (v :=: e) <- [lhs]
-      ctx   <- derefE e xx
-      pure ((v :=:). ctx)
-   ++
-   -- (TRS) to allow (e1; e2)
-   do e <- [lhs]
-      derefE e xx
--}
+
 -- (paper) V ::= □ | 𝜆x. E | ⟨s1, · · · , □, · · · , sn⟩
 -- (TRS)   V ::= □ |
 derefV :: Value -> Ident -> [Value -> Value]
@@ -620,8 +533,6 @@ derefV lhs xx =
   x = s; E [x] ===> x = s; E[s]
 -}
 
--- TODO: replace with `FLAT-EQ` from Simon-Lennart doc: e1 = e2 ==> ex x. x = e1 ; x = e2; x
-
 isVal :: Expr -> Bool
 isVal (Val _) = True
 isVal _       = False
@@ -630,7 +541,7 @@ dsFreshFP :: Expr -> Expr
 dsFreshFP = ds
   where
     ds (ex :=: ex') = dsEqu ex ex'
-    ds (ex :>: ex') = ds ex :>: val (ds ex') -- dsSeq ex ex'
+    ds (ex :>: ex') = ds ex :>: val (ds ex')
     ds (ex :|: ex') = ds ex :|: ds ex'
     ds (Def (Bind x e)) = Def (Bind x (val (ds e)))
     ds (One ex)     = One (ds ex)
@@ -684,10 +595,6 @@ isS :: Value -> Bool
 isS VINT{} = True
 isS Var{} = True
 isS _ = False
-
---isK :: Value -> Bool
---isK VINT{} = True
---isK _ = False
 
 rulesDerefFP :: ERule
 rulesDerefFP lhs =
@@ -778,7 +685,6 @@ mkRes :: [Ident] -> [Expr] -> Expr -> Expr
 mkRes is es r = foldr (\ i e -> Def (Bind i e)) r' is
   where r' = foldr (:>:) r es
 
--- XXX This is wrong, it captures variables
 mkRess :: [([Ident], [Expr], Value)] -> ([Ident], [Expr], [Value])
 mkRess as = loop [] [] [] as
   where
@@ -789,16 +695,6 @@ mkRess as = loop [] [] [] as
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
-{-
-mkRess :: [([Ident], [Expr])] -> Expr -> Expr
-mkRess = uncurry mkRes . combine [] []
-  where
-    combine :: [Ident] -> [Expr] -> [([Ident], [Expr])] -> ([Ident], [Expr])
-    combine ris res [] = (ris, res)
-    combine ris res ((is, es) : isess) = combine (is' ++ ris) (es' ++ res) isess
-      where (is', es') = (is, es) -- XXX wrong
--}
-
 rulesNormalization :: ERule
 rulesNormalization lhs =
   "NORM-SEQ-ASSOC" `name`
