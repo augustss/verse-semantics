@@ -8,7 +8,7 @@
 
 \begin{definition}[Reductions] \label{def:reductions}
 Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$,
-each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rulesI}
+each of which is defined as the reduction relation induced by the respective rules in \cref{fig:rewrite-rules}
 %
 \begin{itemize}
 \item $\runi$ : Unification,
@@ -28,7 +28,7 @@ each of which is defined as the reduction relation induced by the respective rul
 \midrule
 Unification 		& \runi & \ref{lem:u-c}  & \ref{lem:u-a-c} & \ref{lem:u-c-c} & \ref{lem:u-f-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
 $\beta$-Application & \rapp &      			 & \ref{lem:a-c}   & \ref{lem:a-c-c} & \ref{lem:a-f-c} & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
-Conjunction 		& \rcon &      			 &                 & \ref{lem:c-c}   & \ref{lem:c-f-c} & \ref{lem:c-g-c} & \ref{lem:c-s-c} \\
+Conjunction 		& \rcon &      			 &                 & \ref{lem:cf-c}  & \ref{lem:cf-c}  & \ref{lem:c-g-c} & \ref{lem:c-s-c} \\
 Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-g-c} & \ref{lem:f-s-c} \\
 Garbage Collection  & \rgc  &      		     &                 &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
 Speculation 		& \rspc &				 & 			       & 	             & 	   			   &           	     & \ref{lem:s-c}   \\
@@ -1206,7 +1206,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 
 \newcommand{\rconfail}{\rcon \cup \rfail}
 
-\begin{lemma}[$\rconfail$-Confluent]\label{lem:c-c}
+\begin{lemma}[$\rconfail$-Confluent]\label{lem:cf-c}
     $\rconfail$ is confluent.
 \end{lemma}
 
