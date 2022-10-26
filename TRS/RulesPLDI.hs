@@ -765,9 +765,11 @@ wfRes :: Expr -> [([Ident], [Expr], Value)]
 wfRes = maybeToList . wf []
   where wf _ (Val v) = pure ([], [], v)
         wf g (Def (Bind x r)) = do
+          guard (x `notElem` g)
           (xs, es, v) <- wf (x:g) r
           pure (x:xs, es, v)
-        wf g (c@(VAR x :=: e@HVAL{}) :>: r) = do
+        wf g (c@(VAR x :=: e@Val{}) :>: r) = do
+          guard (x `elem` g)
           (xs, es, v) <- wf (delete x g) r
           pure (xs, c:es, v)
         wf _ _ = Nothing
