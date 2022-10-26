@@ -6,6 +6,7 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import Text.Printf
+import Text.Read(readMaybe)
 
 import Print
 import Desugar
@@ -124,7 +125,10 @@ cSet :: Bool -> Run CState
 cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (flags s) then "on" else "off"
   putStr $ concatMap f flagTable
+  printf "  %-12s %d\n" "steps" (fRewriteSteps (flags s))
   pure s
+cSet True l s | Just l' <- stripPrefix "steps=" l, Just n <- readMaybe l' =
+  pure $ s{ flags = (flags s){fRewriteSteps = n} }
 cSet b l s =
   case find (isPrefixOf l . fst) flagTable of
     Nothing -> do putStrLn "Unknown flag"; pure s
@@ -139,6 +143,8 @@ flagTable =
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
   ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
+  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
+  ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ]
 
 cRead :: Run CState
@@ -214,9 +220,8 @@ cDefEval c s = do
 
 cRewrite :: Run CState
 cRewrite c s =
-  cTransform (Cores . rewrite flg . compile (flags s)) c s
-  where
-    flg = defaultFlags { fRewriteSteps = 10000}
+  cTransform (Cores . rewrite flg . compile flg) c s
+  where flg = flags s
 
 cDenSem :: Run CState
 cDenSem c s =

@@ -18,46 +18,54 @@
 %include ../calculus.fmt
 
 \newcommand{\ie}{\emph{i.e.}\xspace}	% \mbox keeps the last period from
-\newcommand{\Ie}{\emph{I.e.}\xs}	% looking like an end-of-sentence.
-\newcommand{\eg}{\emph{e.g.}\xs}
-\newcommand{\Eg}{\emph{E.g.}\xs}
+\newcommand{\Ie}{\emph{I.e.}\xspace}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}\xspace}
+\newcommand{\Eg}{\emph{E.g.}\xspace}
 \newcommand{\etc}{\emph{etc.}}
 \newcommand{\etal}{\emph{et al.}}
 \newcommand{\vs}{\emph{vs.}}
 
 % \newcommand{\rightarrowdbl}{\rightarrow\mathrel{\mkern-14mu}\rightarrow}
-\newcommand{\xrightarrowdbl}[2][]{%
-  \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
-}
+% \newcommand{\xrightarrowdbl}[2][]{%
+%   \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+% }
 
-\newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
-\newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
+% \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
+% \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
 
-% \newcommand{\go}[1]{{\rightarrow}_{#1}}
-% \newcommand{\gos}[1]{{\twoheadrightarrow}_{#1}}
-\newcommand{\go}[1]{\xrightarrow{#1}}
-\newcommand{\gos}[1]{\xrightarrowdbl{#1}}
-\newcommand{\gok}[2]{\xrightarrowdbl[#2]{#1}}
+% % \newcommand{\go}[1]{{\rightarrow}_{#1}}
+% % \newcommand{\gos}[1]{{\twoheadrightarrow}_{#1}}
 
-\newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
-\newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
-\newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
-\newcommand{\univ}{\ensuremath{\mathcal{E}}}
-\newcommand{\join}[3]{{#2} \sim_{#1} {#3}}
-\newcommand{\dia}{\ensuremath{\diamond}}
+% \newcommand{\go}[1]{\xrightarrow{}_{#1}}
+% \newcommand{\gos}[1]{\xrightarrowdbl{}_{#1}}
+% \newcommand{\gok}[2]{\xrightarrowdbl{#2}_{#1}}
 
-\newcommand{\rnk}{\ensuremath{\rho}}
-\newcommand{\rord}{\ensuremath{\mathcal{O}}}
-\newcommand{\runi}{\ensuremath{\mathcal{U}}}
-\newcommand{\rapp}{\ensuremath{\mathcal{A}}}
-\newcommand{\rcon}{\ensuremath{\mathcal{C}}}
-\newcommand{\rgc}{\ensuremath{\mathcal{G}}}
-\newcommand{\rfail}{\ensuremath{\mathcal{F}}}
-\newcommand{\rspc}{\ensuremath{\mathcal{S}}}
 
-\newcommand{\rdx}[1]{\ensuremath{\Delta_{#1}}}
-\newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
-\newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
+% % \newcommand{\go}[1]{\xrightarrow{#1}}
+% % \newcommand{\gos}[1]{\xrightarrowdbl{#1}}
+% % \newcommand{\gok}[2]{\xrightarrowdbl[#2]{#1}}
+
+
+
+% \newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
+% \newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
+% \newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+% \newcommand{\univ}{\ensuremath{\mathcal{E}}}
+% \newcommand{\join}[3]{{#2} \sim_{#1} {#3}}
+% \newcommand{\dia}{\ensuremath{\diamond}}
+
+% \newcommand{\rnk}{\ensuremath{\rho}}
+% \newcommand{\rord}{\ensuremath{\mathcal{O}}}
+% \newcommand{\runi}{\ensuremath{\mathcal{U}}}
+% \newcommand{\rapp}{\ensuremath{\mathcal{A}}}
+% \newcommand{\rcon}{\ensuremath{\mathcal{C}}}
+% \newcommand{\rgc}{\ensuremath{\mathcal{G}}}
+% \newcommand{\rfail}{\ensuremath{\mathcal{F}}}
+% \newcommand{\rspc}{\ensuremath{\mathcal{S}}}
+
+% \newcommand{\rdx}[1]{\ensuremath{\Delta_{#1}}}
+% \newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
+% \newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
 
 
 \RequirePackage[utf8]{inputenc}
@@ -133,39 +141,35 @@
 \renewcommand{\arraystretch}{1.1}
 
 % Name of the language
-\newcommand{\versecalc}{$\mathcal{VC}$}
-
 % Typesetting rewrite rules
-\newcommand{\rulename}[1]{\textsc{\small #1}}
-\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
-\newcommand{\hole}{\square}
-\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
-\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
-\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
-\newcommand{\disjoint}{\;\#\;}
-\newcommand{\subst}[3]{#1\{#3/#2\}}
+% \newcommand{\rulename}[1]{\textsc{\small #1}}
+% \newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+% \newcommand{\hole}{\square}
+% \newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+% \newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+% \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+% \newcommand{\disjoint}{\;\#\;}
+% \newcommand{\subst}[3]{#1\{#3/#2\}}
 
 
-% Right arrow for rewrites
-\newcommand{\movesto}{\longrightarrow}
-\newcommand{\movestoX}{\rightsquigarrow}
-\newcommand{\movesfromX}{\leftsquigarrow}
-\newcommand{\movesfrom}{\longleftarrow}
-\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+% % Right arrow for rewrites
+% \newcommand{\movesto}{\longrightarrow}
+% \newcommand{\movestoX}{\rightsquigarrow}
+% \newcommand{\movesfromX}{\leftsquigarrow}
+% \newcommand{\movesfrom}{\longleftarrow}
+% \newcommand{\convertible}{\longleftrightarrow^{\ast}}
 
-% Arrows with explanation, including the common cases of one, two or a repated rule
-\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
-\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
-\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
-\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+% % Arrows with explanation, including the common cases of one, two or a repated rule
+% \newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+% \newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+% \newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+% \newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
 
-\newcommand{\lcalcname}{Lenient Calculus\xspace}
-\newcommand{\calcname}{Fresh Calculus\xspace}
-\newcommand{\calcshort}{FC\xspace}
+% \newcommand{\lcalcname}{Lenient Calculus\xspace}
+% \newcommand{\calcname}{Fresh Calculus\xspace}
+% \newcommand{\calcshort}{FC\xspace}
 \newcommand{\vcname}{Verse Calculus\xspace}
 \newcommand{\vcshort}{VC\xspace}
-
-\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}
 
 % ----------------- Author comments ---------------------
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
@@ -190,7 +194,7 @@
 \fi
 
 
-\input{rewrites}
+\input{../verse-pldi23/rewrites}
 
 \begin{document}
 
@@ -198,9 +202,7 @@
 
 \maketitle
 
-\input{01-syntax}
-\input{02-semantics}
-\input{02a-POPL-style}
+\input{01-language}
 \input{03-preliminaries}
 \input{04-confluence}
 

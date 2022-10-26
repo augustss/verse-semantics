@@ -16,6 +16,15 @@ testeq(SEq) {y:= if(x=2) then 0 else 3; x:=1; y}  {3}
 testeq(SEq) {for{:false}}                         {()}
 testeq(SEq) {for{1}}	                          {array{1}}
 testeq(SEq) {for{1|2}}	                          {(1,2)}
-#testeq(SEq) {succ(x:int):=x+1; y:succ:=1; y}      {2}
-#testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
-#testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq(SEq) {succ(x:int):=x+1; y:succ:=1; y}      {2}
+testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
+# SLOW testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq(SEq) {(x:int) = 2}                         {2}
+testeq(SEq) {all{:(1,2,3)}}                            {1,2,3}
+testeq(SEq) {all{x:(1,2,3); x}}                        {1,2,3}
+testeq(SEq) {all{x:= :(1,2,3); x}}                     {1,2,3}
+testeq(SEq) {all{x:(1,2,3)}}                           {1,2,3}
+testeq(SEq) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[0]}}     {1}
+testeq(SEq) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[2]}}     {:false}
+
+testeq(SEq) { x := ((:any) => 1)[x+1] }           {1}

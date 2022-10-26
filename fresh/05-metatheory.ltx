@@ -1,0 +1,205 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\section{Metatheory} \label{sec:metatheory}
+
+The rules of our rewrite semantics can be applied anywhere,
+in any order, and they give meaning to programs without
+committing to a particular evaluation strategy.
+%
+But then it had better be the case that no matter how the
+rules are applied, one always obtains the same result!
+%
+If the rewrite rules were terminating, then we would expect
+that all possible execution paths lead to the same normal form.
+%
+However, since \calcname has recursion, we instead show that
+the rules are \emph{confluent}.
+
+\subsection{Confluence}
+
+\mypara{Reductions and Confluence}
+%
+A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+%
+We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
+for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+%
+We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
+$\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
+%
+A reduction $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
+there exists an $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.
+%
+Confluence gives us the assurance that we will not get
+different results when choosing different rules, or get
+stuck with some rules and not with others.
+
+\mypara{Normal Forms}
+%
+A term $e$ is an $\rr$-\emph{Normal Form} if there does
+not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
+Confluence implies that ultimately, rewriting terminates
+with at most one unique normal form, regardless of the
+evaluation strategy \cite{Barendregt}.
+
+\begin{lemma}[Unicity] \label{lem:nf}
+If $\rr$ is confluent then every term reduces to at most one normal form.
+\end{lemma}
+
+Our main result is that the reduction relation $\rr$ for \calcname,
+defined as the union of the reduction relations
+$\runi$ (Unification),
+$\rapp$ ($\beta$-Application),
+$\rcon$ (Conjunction),
+$\rgc$  (Garbage Collection),
+$\rfail$ (Fail Propagation) and
+$\rspc$ (Speculation)
+in \cref{fig:rulesI} and \cref{fig:rules-normalize}
+is confluent.
+
+\begin{theorem}[Confluence] \label{thm:confluence}
+The reduction relation $\rr \equiv \runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$ is confluent.
+\end{theorem}
+
+A reduction $R$ \emph{commutes} with $S$ if for all terms
+$e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
+there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
+%
+We establish confluence by proving each sub-relation is confluent,
+and that they pairwise commute \cite{Huet}.
+
+\begin{lemma}[Commutativity] \label{lem:comm}
+If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
+\end{lemma}
+
+\subsection{Design}
+
+\calcname deliberately layers values into \emph{scalars} (integers, variables)
+and \emph{heap values} (tuples and $\lambda$-terms) and then only
+allows scalars (no tuples or $\lambda$-terms) in tuples to ensure
+confluence.
+%
+Further, the \rulename{deref-h} rule prevents substituting heap values
+under $\lambda$ and tuples, and prevents ``copying'' heap values
+in constraints as all of these lead to non-confluence.
+
+\mypara{Non-Confluence due to nested $\lambda$}
+%
+Suppose we eliminated \rulename{deref-h} and instead used a single
+rule like \rulename{deref-s} for \emph{all} values.
+%
+Then we could substitute $\lambda$ under tuples (and tuples under $\lambda$)
+which would violate confluence as shown by the following example.
+%
+\ranjit{TODO:flesh out steps}
+%
+\begin{verbatim}
+ex x,y. x = <1,y>; y = \z.x; x
+-->> ex x. x = <1, \z.x>; x         (1)
+
+ex x,y. x = <1,y>; y = \z.x; x
+-->> ex x. y = \z.<1, y>; <1, y>    (2)
+\end{verbatim}
+%
+(A similar phenomenon arises just with inlining mutually recursive
+$\lambda$-terms~\cite{Ariola2002}.)
+
+\mypara{Non-confluence due to nested tuples}
+%
+It is possible to prove confluence even for potentially diverging
+(non-terminating) reductions, most famously, for the $\lambda$-calculus.
+%
+One general strategy is to find a \emph{sub-relation} that satisfies
+three properties.
+%
+First, it is \emph{locally} confluent, meaning if $e$ (single-)steps to $e_1$
+and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
+%
+Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies
+the relation is confluent (and hence, so is its reflexive transitive closure.)
+%
+Third, that the \emph{closure} of the sub-relation is the same as the full reduction
+relation, which then implies that the full reduction relation is also confluent.
+
+We follow this route to establish the confluence of the $\runi$
+reductions. The other relations can be proved confluence by
+establishing a stronger \emph{diamond} property, namely, two
+different reduction steps can be joined at a common
+term in a fixed number of steps.
+%
+But for unification, we require multiple steps to reach
+a common join if we have a term $x = |arr(s_1,...s_n)|; x = |arr(t_1,...,t_n)|; E[x]$,
+which can be reduced to $e_1$ and $e_2$ by respectively substituting
+the first or second tuple in \rulename{deref-h}, and which must then
+be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
+and $E[|arr(t_1,...,t_n)|]$.
+
+As we need potentially unbounded steps to join, we require using Newman's
+lemma, and hence, that $\runi$ terminates. However, just substituting tuples
+under tuples leads to divergence which blocks this proof strategy.
+For example, consider the term
+%
+\begin{verbatim}
+    ex x, y. x = <1,y>; y = <2,x>; x
+--> ex x, y. x = <1,y>; y = <2,x>; <1,y>
+--> ex x, y. x = <1,y>; y = <2,x>; <1,<2,x>>
+--> ex x, y. x = <1,y>; y = <2,x>; <1,<2,<1,y>>>
+--> ...
+\end{verbatim}
+%
+We avoid this problem by preventing \rulename{deref-h} from substituting
+tuples under tuples. Instead these are left as ``heap-constraints'' which
+can be used whenever we actually need to access the contents of the tuple
+via pattern matching (or eliminated via the garbage collection rules.)
+
+\mypara{Non-confluence due to Heap Copying}
+%
+Finally, notice that we disallow ``copying'' heap values in constraints.
+%
+That is, \rulename{deref-h} does not allow substituting heap values (e.g. $x = h$)
+into variable-variable equalities (e.g. $y = x$).
+%
+This is because such copying could prevent confluence
+as some reductions might fail while others succeed.
+%
+For example consider the term $|x == (lam y e); x == y; y == x|$.
+%
+\begin{verbatim}
+      (ex x,y. x = \z. z; y = x; x = y; x) 3
+-->   ex f. f = (ex x,y. x = \z. z; y = x; x = y; x); f 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; f 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; x 3
+-->>  ex f,x,y. x = \z. z; y = x; f = x; (\z.z) 3
+-->>  3
+\end{verbatim}
+%
+However, if we \emph{allow} copying heap values, then the above term could also fail
+%
+\begin{verbatim}
+     (ex x,y. x = \z. z; y = x; x = y; x) 3
+-->  (ex x,y. x = \z. z; y = \z.z; x = y; x) 3
+-->> (ex x,y. x = \z. z; y = \z.z; \z.z = \z.z; x) 3
+-->  FAIL
+\end{verbatim}
+%
+An alternate ``big-step'' strategy that substituted
+identifiers with values \emph{everywhere} they were
+in a single swoop would avoid the above problem, but
+we were unable to prove confluence using such a ``big-step''
+rule.
+
+\mypara{Discussion}
+%
+Value stratification is not a limitation: in essence we ANF to name the
+inner elements (tuples or $\lambda$-terms), and then use the
+unification rule \rulename{utup} to destruct or ``unpack'' the
+tuple and to access its contents.
+%
+However, not substituting under lambda is a tiresome restriction: e.g.,
+compilers will certainly want to do so. \ranjit{Simon -- add more discussion here? Skew Confluence?}

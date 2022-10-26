@@ -24,7 +24,7 @@ traceInput = False
 
 -- Try to limit the number of values to iterate over
 forallHack :: Bool
-forallHack = False -- True
+forallHack = True
 
 trace' :: String -> a -> a
 trace' s a = if s==s then trace s a else undefined
@@ -35,8 +35,8 @@ denSem = denSem' . semSimp
 semSimp :: Core -> Core
 semSimp = f
   where
-    f (CApply (VLam x (CSeq [CApply is@(VPrim "isInt$") (Var x'), CVar x''])) a) | x == x' && x == x'' =
-      f $ CApply is a
+    f (CApplyVV (VLam x (CSeq [CApplyVV is@(VPrim "isInt$") (Var x'), CVar x''])) a) | x == x' && x == x'' =
+      f $ CApplyVV is a
     f e = composOp f e
 
 denSem' :: Core -> Core
@@ -198,7 +198,7 @@ allTuples =
 allFuncs :: [W]
 allFuncs = fcns ++ constFuncs
   where
-    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp, wDblW]
+    fcns = map WFunction $ [wAdd, wGt, wMul, wDiv, wId, wInc, wDec, wDbl, wGt0, wIsInt, wFst, wSnd, wTy0, wAp, wDblW, wFail, w0'1, wHack, wTy01]
     wId  = func "id"  $ unit
     wInc = func "inc" $ \case WInt x -> unit (WInt (x+1)); _ -> empty
     wDec = func "dec" $ \case WInt x -> unit (WInt (x-1)); _ -> empty
@@ -209,6 +209,10 @@ allFuncs = fcns ++ constFuncs
     wTy0 = func "ty0" $ \case WInt 0 -> unit (WInt 0); _ -> empty
     wAp  = func "ap"  $ \case WTuple [f,a] -> apply f a; _ -> empty
     wDblW= func "dblW" $ \case WInt x -> unit (WInt (x*2)); _ -> unit (Wrong "wDblW")
+    wFail= func "fail" $ const empty
+    w0'1 = func "0->1" $ \case WInt 0 -> unit (WInt 1); _ -> empty
+    wHack= func "0->1" $ \case WInt 0 -> unit (WInt 1); WInt 1 -> unit (WInt 2); _ -> empty
+    wTy01= func "ty0|1" $ \case WInt x | x==0 || x==1 -> unit (WInt x); _ -> empty
 
 constFuncs :: [W]
 constFuncs = [ WFunction $ func ("const" ++ show i) (const (unit w)) | w@(WInt i) <- allInts ]
@@ -222,7 +226,7 @@ apFunc (Func _ f) a = f a
 
 instance Eq (Func W (S W)) where
   f@(Func sf _) == g@(Func sg _) =
-    --trace' ("eq " ++ show (sf, sg)) $
+    -- trace' ("eq " ++ show (sf, sg)) $
     sf == sg ||    -- compare function names
     and [eqs (apFunc f w) (apFunc g w) | w <- allW ]
     where
@@ -259,7 +263,7 @@ evalE' r (CUnify e1 e2) =
   evalE r e1 `isect` evalE r e2
 evalE' r (CSeq [e]) = evalE r e
 evalE' r (CSeq (e: es)) = evalE r e `sequ` evalE r (CSeq es)
-evalE' r (CApply v1 v2) = apply (evalV r v1) (evalV r v2)
+evalE' r (CApplyVV v1 v2) = apply (evalV r v1) (evalV r v2)
 evalE' r (CDef [] e) = evalE r e
 evalE' r (CDef (x:xs) e) = unions [ evalE (ext x w r) (CDef xs e) | w <- ws ]
   where ws = possibleValues xs r x e
@@ -268,13 +272,17 @@ evalE' r (CAll e) =
 --  trace' ("CAll " ++ prettyShow (e, evalE r e)) $
   unit (sAll (evalE r e))
 evalE' r (CSucceeds e) = succeeds $ evalE r e
-evalE' r (CLambda i is e0 e1) = aset
+evalE' r (CLambda i is cov e0 e1) = aset
   [ f | f <- allFuncs,
     forAll (1 + length is) $ \ ws@(w:_) ->
-      let r' = exts r (zip (i:is) ws) in
+      let r' = exts r (zip (i:is) ws)
 --      trace ("CLambda " ++ prettyShow (f, w, e0, evalE r' e0, nonEmpty (evalE r' e0), evalE r' e1, getSing (apply f w), maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w)))) $
-      nonEmpty (evalE r' e0) `implies`
-      maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
+          cond1 = nonEmpty (evalE r' e0)
+          cond2 = maybe False (\ z -> z `member` evalE r' e1 ) (getSing (apply f w))
+      in
+      if cov then
+        if cond1 then cond2 else isNothing (getSing (apply f w))
+      else cond1 `implies` cond2
   ]
 evalE' _ e = error $ "evalE " ++ prettyShow e
 

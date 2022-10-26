@@ -1,9 +1,12 @@
 module TRSAdapter(rewrite, coreToTrs) where
+import Data.Function(on)
+import Data.List(nubBy)
 import Data.Maybe
 import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
 import qualified Bind as T(Bind(..), Ident(..))
 import qualified RulesPOPL
-import TRS(normalFormsFuel, normalFormsTrace, printTrace)
+import qualified RulesPLDI
+import TRS
 import Expr(Ident(..), noLoc)
 import Core
 import Error
@@ -11,26 +14,46 @@ import Flags
 
 import Debug.Trace
 import Print
-import Parse (parseDie, pExprSeq)
-import Desugar (desugar)
+--import Parse (parseDie, pExprSeq)
+--import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . snd) . checkOne . normalFormsFuel n (rules flg) . ds flg . coreToTrs
+rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
  where
-  n            = fRewriteSteps flg
-  checkOne [x] = [x]
-  checkOne nes = trace (unlines $ "Multiple:" : map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e)) nes)
-                       nes
+  n              = fRewriteSteps flg
+  tr             = fTrace flg
+  nf | fDfs flg  = normalFormFuelTrace
+     | otherwise = normalFormsFuelTrace
+  checkOne [x]   = [x]
+  checkOne nes   = trace (unlines $
+                          "Multiple:" :
+                          map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
+                         nes
+  rtrace xs | not tr = res
+            | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res
+    where res = snd (head xs)
 
 ds :: Flags -> T.Expr -> T.Expr
 ds flg
-  | isJust(fFresh flg) = RulesPOPL.dsFresh
-  | otherwise          = id
+  | fFresh flg = RulesPLDI.dsFreshFP
+  | otherwise  = id
+
+subs :: Flags -> [Trace T.Expr] -> [Trace T.Expr]
+subs flg ts
+  | fFresh flg =
+    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = RulesPLDI.finalSubst e]
+        ts'' = nubBy ((==) `on` fst) ts'
+    in  map snd ts''
+  | otherwise  = ts
+
+sub :: Flags -> T.Expr -> T.Expr
+sub flg | fFresh flg = RulesPLDI.finalSubst
+        | otherwise = id
 
 rules :: Flags -> RulesPOPL.ERule
 rules flg
-  | isJust(fFresh flg) = RulesPOPL.rulesFRESH
-  | otherwise          = RulesPOPL.rulesPOPL
+  | fFresh flg = RulesPLDI.rulesPLDI
+  | otherwise  = RulesPOPL.rulesPOPL
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)
@@ -38,7 +61,7 @@ coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (CSeq []) = undefined
 coreToTrs (CSeq [e]) = coreToTrs e
 coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
-coreToTrs (CApply v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
+coreToTrs (CApplyVV v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
 coreToTrs (CBar e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
 coreToTrs CFail = T.Fail
 coreToTrs (COne e) = T.One $ coreToTrs e
@@ -50,6 +73,7 @@ coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
+coreToTrs e@CApply{} = impossible e
 
 coreToTrsV :: Value -> T.Value
 coreToTrsV (Var i) = T.Var $ coreToTrsI i
@@ -73,7 +97,7 @@ trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
 trsToCore (e1 T.:|: e2) = CBar (trsToCore e1) (trsToCore e2)
-trsToCore (e1 T.:@: e2) = CApply (trsToCoreV e1) (trsToCoreV e2)
+trsToCore (e1 T.:@: e2) = CApplyVV (trsToCoreV e1) (trsToCoreV e2)
 trsToCore T.Fail = CFail
 trsToCore ee@T.Def{} = flat [] ee
   where flat vs (T.Def (T.Bind x e)) = flat (vs ++ [x]) e

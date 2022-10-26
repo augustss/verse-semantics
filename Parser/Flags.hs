@@ -6,9 +6,10 @@ data Flags = Flags
   , fSimplify     :: !Bool
   , fUnderLambda  :: !Bool
   , fRewrite      :: !Bool
-  , fFresh        :: !(Maybe Int)
+  , fFresh        :: !Bool
   , fTimLambda    :: !Bool
   , fDenSem       :: !Bool
+  , fDfs          :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -21,9 +22,10 @@ defaultFlags = Flags
   , fSimplify     = False
   , fUnderLambda  = False
   , fRewrite      = False
-  , fFresh        = Nothing
+  , fFresh        = False
   , fTimLambda    = False
   , fDenSem       = False
-  , fRewriteSteps = 10000
+  , fDfs          = False
+  , fRewriteSteps = 20000
   , fEvalSteps    = 1000
   }

@@ -29,13 +29,13 @@ simpSeq = evalSeq flg
 simpAny :: Core -> Core
 simpAny = f
   where
-    f (CApply (Var (Ident _ "any")) v) = f $ CValue v
+    f (CApplyVV (Var (Ident _ "any")) v) = f $ CValue v
     f e = composOp f e
 
 simpFail :: Core -> Core
 simpFail = f
   where
-    f (CDef [x] (CApply (VArray []) (Var x'))) | x == x' = CFail
+    f (CDef [x] (CApplyVV (VArray []) (Var x'))) | x == x' = CFail
     f e = composOp f e
 
 -- When there are definitions of the form x=y,
@@ -46,9 +46,10 @@ simpAlias :: Core -> Core
 simpAlias = fc . g
   where
     fc (CDef h e) | Just d <- bind h e = fc d
-    fc (CLambda i is e1 e2) =  -- CLambda has weird scoping, temporarily change it
+    fc (CLambda i is cov e1 e2) =  -- CLambda has weird scoping, temporarily change it
       case fc (CLam i (CDef is (CSeq [e1, e2]))) of
-        CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' e1' e2'
+        CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' cov e1' e2'
+        CLam i' (CSeq [e1', e2']) -> CLambda i' [] cov e1' e2'
         e -> error $ "simpAlias: CLambda " ++ prettyShow e
     fc e = composOpC fc fv fh e
     fh (HLam x (CDef h e)) | Just d <- lam x h e = fh d

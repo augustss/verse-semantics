@@ -33,9 +33,21 @@ prop_NormalForms p =
       _  -> property True
 
 --------------------------------------------------------------------
+-- Stuff to help debug rewrite rules in GHCi
+--------------------------------------------------------------------
+
+freshTrace :: Expr -> IO ()
+freshTrace e = print status >> printTrace' tr
+  where
+    (status, tr) = dfs 99 rulesPOPL e
+
+freshTraces :: Expr -> IO ()
+freshTraces e = case normalFormsFuelTrace' 99 rulesFRESH e of
+  Left tr -> print NoFuel >> printTrace' tr
+  Right x0 -> print NormalForm >> mapM_ (\tr -> printTrace' tr >> putStrLn "--------") x0
 
 runFresh :: Expr -> [(String, Expr)]
-runFresh = normalFormsFuel 99 rulesFRESH
+runFresh = normalFormsFuel 99 rulesFRESH . dsFresh
 
 dumpCtx :: (Show a, Show b) => (t -> [(Value -> a, b)]) -> t -> IO ()
 dumpCtx c e = mapM_ print [ (ctx (iVar "#") , v) | (ctx, v) <- c e]
@@ -52,6 +64,9 @@ lam = LAM (ident "_")
 iLAM :: String -> Expr -> Expr
 iLAM = LAM . ident
 
+iLam :: String -> Expr -> Value
+iLam x e = HNF (Lam (Bind (ident x) e))
+
 iVAR :: String -> Expr
 iVAR = VAR . ident
 
@@ -63,6 +78,10 @@ iDEF = DEF . ident
 
 iDEFs :: [String] -> Expr -> Expr
 iDEFs = defs . map ident
+
+-------------------------------------------------------------------------------------
+-- examples
+-------------------------------------------------------------------------------------
 
 e0 :: Expr
 e0 = iDEFs ["f", "f1", "f2"]
@@ -76,3 +95,44 @@ e0' = iDEFs ["f", "f1", "f2"]
           (iVAR "f1" :=: (iVar "f"  :@: VINT 2)) :>:
           (iVAR "f2" :=: (iVar "f1" :@: VINT 3)) :>:
           iVAR "f2" )
+
+e1 =
+  iDEFs ["a", "$r1"]
+    (
+      (INT 5 :=:
+        (iVAR "a" :=:
+          (
+            (iVAR "$r1" :>:
+              ( (iLam "x" ((IsINT :@: (iVar "x")) :>: iVAR "x")) :@: iVar "$r1" )
+            )
+          )
+        )
+      )
+    )
+
+e1''' =
+  iDEFs ["$r1", "x"]
+    (
+      (INT 5 :=: ((iVAR "$r1" :=: iVAR "x") :>: ((IsINT :@: iVar "x") :>: iVAR "x")))
+      :>:
+      (iVAR "$r1" :>: INT 5)
+    )
+
+e1_4 =
+  iDEFs ["$r1", "x"]
+    ((iVAR "x" :=: INT 5) :>: (((iVAR "$r1" :=: INT 5) :>: INT 5) :>: INT 5))
+
+
+e1' =
+  iDEFs ["x", "y"]
+    (
+      (INT 5 :=: (iVAR "x" :=: iVAR "y") )
+      :>:
+      iVAR "x"
+    )
+
+e1'' =
+  iDEFs ["x", "y"]
+    (
+      INT 5 :=: ((iVAR "x" :=: iVAR "y") :>: iVAR "x")
+    )

@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Desugar(desugar, simplify, primOps, getVisible) where
+module Desugar(desugar, simplify, primOps, getVisible, covariantId) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 import Data.List
@@ -50,6 +50,7 @@ dsD = expr
     -- Basic forms
     -- D[k] = k
     expr e | isLiteral e = pure e
+    expr (Variable (Ident l "wrong")) = pure $ Wrong $ "called: " ++ prettyShow l
     -- D[false] = ()   This isn't necessary, but makes simple examples nicer
     expr (Variable (Ident _ "false")) = pure $ Array []
     -- D[x] = x
@@ -98,10 +99,12 @@ dsD = expr
 
     -- Functions
     -- D[e1 => e2] = D[fn(e1){e2}]
-    expr (InfixOp e1 (Ident _ "=>") e2) = expr $ Function [(e1, [])] e2
+    expr (InfixOp e1 (Ident _ "=>") e2) = expr $ Function [(e1, [covariantId])] e2
     -- See below
-    expr (Function [(e, [])] b) = function e b
-    expr (Function [(e, rs)] b) = expr $ Function [(e, [])] $ ApplyEff rs b
+    expr (Function [(e, rs)] b)
+      | all isLambdaEffect rs = function e rs b
+      | otherwise = expr $ Function [(e, rs')] $ ApplyEff rs'' b
+      where (rs', rs'') = partition isLambdaEffect rs
     -- D[fn a1 a2 ... {b}] = D[fn a1 (fn a2 ... {e})]
     expr (Function (a:as) b) = expr $ Function [a] $ Function as b
 
@@ -111,9 +114,12 @@ dsD = expr
     -- D[type{e}] = type{D[e]}
     expr (Typedef e) = do
       y <- newIdent noLoc "y"
+      r <- newIdent noLoc "r"
       e' <- expr e
-      e'' <- dsM e' (Variable y)
-      pure $ primFcn y e'' --  Lambda y [] e'' (Variable y)
+      e'' <- define noLoc r <$> dsM e' (Variable y)
+      pure $ -- primFcn y e'' --  Lambda y [] e'' (Variable y)
+             -- Function [(tAny noLoc y, [])] e
+             Lambda y [covariantId] e'' (Variable r)
     expr (Macro1 m rs e) = Macro1 m rs <$> expr e
 
     -- Conditionals
@@ -200,15 +206,15 @@ dsD = expr
 
     -- Handle function(e){b}
     --function e b | trace ("function " ++ show (e, b)) False = undefined
-    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) b =
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) [i] b | i == covariantId =
       Lambda y [] (Array []) <$> expr b
       --primFcn y <$> expr b
-    function e b = do
+    function e rs b = do
       y <- newIdent noLoc "y"
       e' <- expr e
       e'' <- dsM e' (Variable y)
       b' <- expr b
-      pure $ Lambda y [] e'' b'
+      pure $ Lambda y rs e'' b'
 
     -- Splice together ArrayElems
     arrSplice :: [ArrayElem] -> D SExpr
@@ -223,8 +229,8 @@ unify AnyT e = e
 unify e AnyT = e
 unify e1 e2 = Unify e1 e2
 
-primFcn :: Ident -> SExpr -> SExpr
-primFcn y e = Function [(tAny noLoc y, [])] e
+--primFcn :: Ident -> SExpr -> SExpr
+--primFcn y e = Function [(tAny noLoc y, [])] e
 
 dsM :: SExpr -> SExpr -> D SExpr
 dsM expr y =
@@ -271,23 +277,25 @@ dsM expr y =
     Choice e1 e2 -> Choice <$> dsM e1 y <*> dsM e2 y
     Range e -> pure $ ApplyD e y
     AnyT -> dflt
-    Function [(fexpr, [])] gexpr -> do
+    Function [(fexpr, rs)] gexpr -> do
       known <- do
         let h = y
         vy <- newIdent noLoc "y"
         x <- newIdent noLoc "x"
         z <- newIdent noLoc "z"
+        r <- newIdent noLoc "r"
         ex <- define noLoc x <$> dsM fexpr (Variable vy)
         let ez = define noLoc z $ ApplyD h (Variable x)
-        res <- dsM gexpr (Variable z)
-        pure $ Function [(tAny noLoc vy, [])] $ seqE [ex, ez, Do res]
+        er <- (define noLoc r . Do) <$> dsM gexpr (Variable z)
+        pure $ -- Function [(tAny noLoc vy, rs)] $ seqE [ex, ez, er]
+               Lambda vy rs (seqE [ex, ez, er]) (Variable r)
       unknown <-
         Unify y <$> dsD expr
       if useKnown then
         pure $ If3 (applyPrimD "known$" y) known unknown
        else
         pure known
-    Lambda i [] e1 e2 -> dsM (Function [(Where (tAny noLoc i) e1, [])] e2) y
+    Lambda i rs e1 e2 -> dsM (Function [(Where (tAny noLoc i) e1, rs)] e2) y
     _ -> impossible expr
   where
     dflt = pure $ unify y expr
@@ -454,10 +462,13 @@ dsPArr l lhss ea = do
   case exprElems lhss of
     -- P[lhs0,...,lhsn] e = P[lhs0]x0; ...; P[lhsn]xn; (x0:any,...,xn:any) = e
     [EElems ls] -> do
-      xs <- mapM (const $ newIdent l "d") ls
+      -- Avoid new variables when possible
+      let asId (Variable i) = pure i
+          asId _ = newIdent l "d"
+      xs <- mapM asId ls
       let eun = Unify (Array (map (tAny l) xs)) e
-      els <- zipWithM (\ lhs x -> dsP l lhs (Variable x)) ls xs
-      pure $ Seq $ els ++ [eun]
+      elss <- zipWithM (\ lhs x -> if lhs == Variable x then pure [] else (:[]) <$> dsP l lhs (Variable x)) ls xs
+      pure $ Seq $ concat elss ++ [eun]
 
     [ESplice lhs] ->
       dsP l lhs ea
@@ -530,7 +541,6 @@ primOps = map (Ident noLoc)
   , "alloc$", "read$", "write$"
 --  , "intGT$", "intGE$", "intLT$", "intLE$"
   , "in'..'"
-  , "wrong"
   , "in'+='", "in'-='", "in'*='", "in'/='"
   , "print$"
   ]
@@ -594,7 +604,6 @@ anfS = anf
       pure (concat ess, Array vs)
     value e@Function{} = ([],) <$> anf e
 --    value e@Typedef{} = ([],) <$> anf e
-    value e@Macro1{} = ([],) <$> anf e
     value e@AnyT{} = pure ([], e)
     value (Define i e) = do
       -- Special version of next case; no need for a new variable
@@ -725,7 +734,12 @@ scopeCheck e = do
 
 knownEffects :: [Ident]
 knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "covariant"
+  ]
+
+isLambdaEffect :: Ident -> Bool
+isLambdaEffect i = elem i [
+  covariantId
   ]
 
 scopeErrs :: S.Set Ident -> Expr -> [ScopeErr]
@@ -851,3 +865,6 @@ e1:=e2 <-->  e1:typedef{e2}
 e1 := e2  -->  e1 := :typedef{e2}  -->  e1:typedef{e2}
 
 -}
+
+covariantId :: Ident
+covariantId = Ident noLoc "covariant"

@@ -4,6 +4,8 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newpage
+
 \section{Preliminaries} \label{sec:preliminaries}
 
 \begin{definition}[Reductions] A \emph{reduction} \rr is a binary relation on a set of terms \univ.
@@ -24,7 +26,6 @@ We write
 \begin{definition}[Size] The \emph{size} of a reduction $\rsteps{}{a}{b}$
 is the smallest $i$ such that $\rstepk{}{i}{a}{b}$.
 \end{definition}
-
 
 \begin{definition}[Normal Forms]
 A term $a$ is an $\rr$-\emph{Normal Form} if there does not exist any $b$
@@ -49,8 +50,6 @@ if there is a $d$ such that $\rsteps{\rr}{b}{d}$ and $\rsteps{\rr}{c}{d}$.
 A reduction $\rr$ is \emph{confluent} if whenever
 $\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{definition}
-
-
 
 
 \begin{figure}[h]
@@ -185,16 +184,16 @@ as illustrated in the middle in \cref{fig:commutativity}.
 	& d
 	\arrow["S", from=1-2, to=2-3]
 	\arrow["R"', from=1-2, to=2-1]
-	\arrow["{S_k}"', dotted, from=2-1, to=3-2]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-2]
 	\arrow["R", dotted, from=2-3, to=3-2]
 \end{tikzcd}\]
 \end{minipage}
-\caption{\textbf{Commutativity (L), Strong Commutativity (C), $k$-Commutativity (R)}}
+\caption{\textbf{Commutativity (L), Strong Commutativity (C), $*$-Commutativity (R)}}
 \label{fig:commutativity}
 \end{figure}
 
 % [Huet 1980]
-\begin{lemma}[Strong-Commutativity] If $R$ strongly commutes with $S$ then $R$ commutes with $S$.
+\begin{lemma}[Strong-Commutativity] \label{lem:strong-commute} If $R$ strongly commutes with $S$ then $R$ commutes with $S$.
 \end{lemma}
 
 \begin{proof}
@@ -263,18 +262,62 @@ Via the following chase diagram (probably well known?)
 \end{tikzcd}\]
 \end{proof}
 
+\subsection{Semi-Commutativity}
 
-\subsection{$k$-Commutativity}
-
-\begin{definition}[$k$-Commutativity] \label{def:k-comm}
-A reduction $R$ $k$-commutes with $S$ if for all terms
+\begin{definition}[Semi-Commutativity] \label{def:semi-comm}
+A reduction $R$ \emph{semi-commutes} with $S$ if for all terms
 $a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
-there exists $d$ such that $\rstepk{S}{k}{b}{d}$ and $\rstep{R}{c}{d}$
+there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
+(right in \cref{fig:commutativity}. \ranjit{TODO})
+\end{definition}
+
+\begin{lemma}  \label{lem:semi-comm-1}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{S}{a}{c}$.
+\end{proof}
+
+\begin{lemma}  \label{lem:semi-comm-2}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rstep{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{R}{a}{b}$, using \cref{lem:semi-comm-2}.
+\end{proof}
+
+\begin{lemma}  \label{lem:semi-comm-3}
+	If $R$ semi-commutes with $S$ and $S$ is confluent
+	then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{S}{c}{d}$.
+\end{lemma}
+\begin{proof}
+	By induction on the size of $\rsteps{S}{a}{c}$ using \cref{lem:semi-comm-2}.
+\end{proof}
+
+\begin{lemma} \label{lem:semi-comm}
+	If $R$ semi-commutes with $S$ and $R,S$ are confluent
+	then $R \cup S$ is confluent.
+\end{lemma}
+
+\begin{proof}
+	Via the following chase diagram \ranjit{TODO similary to \cref{lem:strong-commute}}.
+\end{proof}
+
+\subsection{$*$-Commutativity}
+
+\begin{definition}[$*$-Commutativity] \label{def:star-comm}
+A reduction $R$ $*$-commutes with $S$ if for all terms
+$a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
+there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
 (right in \cref{fig:commutativity}.)
 \end{definition}
 
-\begin{lemma}  \label{lem:k-comm-1}
-	If $R$ $k$-commutes with $S$ then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
+\begin{lemma}  \label{lem:star-comm-1}
+	If $R$ $*$-commutes with $S$ then for all $a, b, c$ if $\rstep{R}{a}{b}$ and $\rsteps{S}{a}{c}$
 	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$.
 \end{lemma}
 
@@ -300,17 +343,17 @@ $\rstepk{S}{n}{a}{c'}$ and $\rstep{S}{c'}{c}$. The proof is completed by the dia
 	\arrow["R", dotted, from=2-3, to=3-2]
 	\arrow["IH"{description, pos=0.9}, draw=none, from=1-2, to=3-2]
 	\arrow["S", from=2-3, to=3-4]
-	\arrow["{S^k}"', two heads, dotted, from=3-2, to=4-3]
+	\arrow["{S}"', two heads, dotted, from=3-2, to=4-3]
 	\arrow["R", dotted, from=3-4, to=4-3]
-	\arrow["\ref{def:k-comm}"{description, pos=0.9}, draw=none, from=2-3, to=4-3]
+	\arrow["\ref{def:star-comm}"{description, pos=0.9}, draw=none, from=2-3, to=4-3]
 \end{tikzcd}\]
 
 \end{description}
 
 \end{proof}
 
-\begin{lemma}  \label{lem:k-comm-2}
-	If $R$ $k$-commutes with $S$ then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rstep{S}{a}{c}$
+\begin{lemma}  \label{lem:star-comm-2}
+	If $R$ $*$-commutes with $S$ then for all $a, b, c$ if $\rsteps{R}{a}{b}$ and $\rstep{S}{a}{c}$
 	then there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{R}{c}{d}$.
 \end{lemma}
 
@@ -339,14 +382,14 @@ $\rstepk{R}{n}{a}{b'}$ and $\rstep{R}{b'}{b}$. The proof is completed by the dia
 	\arrow["S"', dotted, two heads, from=3-1, to=4-2]
 	\arrow["R", dotted, from=3-3, to=4-2]
 	\arrow["IH"{description, pos=0.9}, draw=none, from=1-3, to=3-3]
-	\arrow["\ref{lem:k-comm-1}"{description, pos=0.9}, draw=none, from=2-2, to=4-2]
+	\arrow["\ref{lem:star-comm-1}"{description, pos=0.9}, draw=none, from=2-2, to=4-2]
 \end{tikzcd}\]
 \end{description}
 \end{proof}
 
 % Probably known but ???
-\begin{lemma}[$k$-Commutativity] \label{lem:k-comm}
-	If $R$ $k$-commutes with $S$ then $R$ commutes with $S$.
+\begin{lemma}[$*$-Commutativity] \label{lem:star-comm}
+	If $R$ $*$-commutes with $S$ then $R$ commutes with $S$.
 \end{lemma}
 
 \begin{proof}
@@ -372,7 +415,7 @@ and $\rstep{S}{c'}{c}$. The proof is completed by the diagram below.
 	\arrow["S", from=2-3, to=3-4]
 	\arrow["S"', dotted, two heads, from=3-2, to=4-3]
 	\arrow["R", dotted, two heads, from=3-4, to=4-3]
-	\arrow["\ref{lem:k-comm-2}"'{description, pos=0.9}, draw=none, from=2-3, to=4-3]
+	\arrow["\ref{lem:star-comm-2}"'{description, pos=0.9}, draw=none, from=2-3, to=4-3]
 \end{tikzcd}\]
 \end{description}
 \end{proof}

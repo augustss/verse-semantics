@@ -52,9 +52,9 @@
 %format xs = "\overline{x}"
 %format cs = "\overline{c}"
 %format rs = "\overline{r}"
-%format vs = "\overline{\mathit{v}}"
-
-
+%format vs = "\overline{v}"
+%format es = "\overline{e}"
+%format hnf = "\mathit{hnf}"
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"
@@ -163,7 +163,6 @@
 %format write = "\textbf{write}"
 %format any = "\textbf{any}"
 %format dots = "\cdots"
-%format hnf = "\mathit{hnf}"
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"
@@ -192,6 +191,7 @@
 
 %format h_1
 %format h_n
+%format h_i
 
 %format y_0
 %format y_1
@@ -223,8 +223,10 @@
 
 %format e_0
 %format e_1
+%format e_1'
 %format e1'
 %format e_2
+%format e_2'
 %format e_3
 %format e_4
 %format e_5
@@ -235,6 +237,8 @@
 %format e_x
 %format e_y
 %format e_i
+
+
 
 %format h_1
 %format h_2
@@ -299,10 +303,17 @@
 %format l_1
 %format l_2
 
+%format s_0
 %format s_1
 %format s_2
 %format s_n
 %format s_m
+
+%format s_1'
+%format s_2'
+%format s_n'
+%format s_m'
+
 
 %format r_1
 %format r_2

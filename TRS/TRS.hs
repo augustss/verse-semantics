@@ -3,7 +3,7 @@ module TRS where
 
 import qualified Data.Set as S
 import Data.List ( intercalate )
-import Control.Monad( when, unless )
+import Control.Monad( unless )
 import Debug.Trace (trace)
 --import Data.Set( Set )
 
@@ -61,22 +61,68 @@ normalFormsTrace :: (Show a, Ord a, Rec a) => Rule a -> a -> [[(String, a)]]
 normalFormsTrace rule t = normalFormsFuelTrace (-1) rule t
 
 normalFormsFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+--normalFormsFuelTrace n _ _ | trace ("normalFormsFuelTrace: " ++ show n) False = undefined
 normalFormsFuelTrace n rule t = go n S.empty [[("",t)]]
  where
-  go 0 _    _           = traceShow "fuel 0" []
-  go n seen []          = traceShow "stuck" []
+  go 0 _    (tr:_)      = traceShow "fuel 0" []
+                          --trace ("fuel 0\n" ++ showReductionTrace show tr) []
+  go n seen []          = [] -- traceShow "stuck" []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
     | null ts'          = tr : go n seen' trs
     | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
    where
     seen' = S.insert t seen
-    ts'   = traceShow "NFT" $ step rule t
+    ts'   = step rule t
+  go _ _ _ = error "impossible"
+
+showReductionTrace :: (a -> String) -> Trace a -> String
+showReductionTrace sh xs = msg
+  where
+    msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
+    pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
+
+
+type Trace a = [(String, a)]
+
+type Path a = (Result, Trace a)
+data Result = NoFuel | Stuck | NormalForm deriving (Show)
+
+-- Like normalFormsFuelTrace, but only does a depth first search
+normalFormFuelTrace :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> [[(String,a)]]
+normalFormFuelTrace n rule t = [snd (dfs n rule t)]
+
+dfs :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> Path a
+dfs n rule t = go n S.empty [("",t)]
+ where
+  go 0 _    tr   = (NoFuel, tr)
+  go n seen tr@((_,t):_)
+    | null ts'   = (NormalForm, tr)
+    | null ts''  = (Stuck, tr)
+    | otherwise  = go (n-1) seen' (head ts'' : tr)
+    where
+      seen' = S.insert t seen
+      ts'   = [t' | t' <- step rule t]
+      ts''  = filter ((`S.notMember` seen) . snd) ts'
+  go _ _ _ = error "impossible"
+
+normalFormsFuelTrace' :: (Show a, Ord a, Rec a) => Int -> Rule a -> a -> Either (Trace a) [[(String,a)]]
+normalFormsFuelTrace' n rule t = go n S.empty [[("",t)]]
+ where
+  go 0 _    trs         = Left (head trs)
+  go n seen []          = Right []
+  go n seen (tr@((_,t):_):trs)
+    | t `S.member` seen = go n seen trs
+    | null ts'          = (tr :) <$> go n seen' trs
+    | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
+   where
+    seen' = S.insert t seen
+    ts'   = step rule t
   go _ _ _ = error "impossible"
 
 
 traceShow :: Show a => String -> a -> a
-traceShow msg x = {- trace ("TRACE: " ++ msg ++ " : " ++ show x ++ "\n") -} x
+traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
 
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =
@@ -85,6 +131,14 @@ printTrace tr =
        unless (null n) $
          putStrLn ("  <--" ++ n ++ "--")
   | (n,t) <- tr
+  ]
+
+printTrace' :: (Show a) => [(String,a)] -> IO ()
+printTrace' tr =
+  sequence_
+  [ do unless (null n) $ putStrLn ("  ---" ++ n ++ "-->")
+       print t
+  | (n,t) <- reverse tr
   ]
 
 --
