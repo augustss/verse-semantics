@@ -159,8 +159,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
                                              %%% NOTE: the following is not in the POPL submission,
                                              %%% but needed to make progress in (1,2)[x:int]
                                              \vb |apply1 op v|
-                                             %%% Ranjit: shouldn't we add this?
-                                             \color{red}{\vb |def x ce|} \\
+                                             \vb |def x ce| \\
 \end{array}$$
 
 \begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
@@ -181,8 +180,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
-\rulename{app-tup}  & |apply1N (tup (s_0,dots s_n)) v| & \movesto
-    & \largerhs{\ |def x (x == v; ((x = 0; s_0) choice dots choice (x = n; s_n))|} \\
+\rulename{app-tup}  & |apply1N (tup (s_0 dots s_n)) v| & \movesto
+	& \largerhs{\ |def x (x == v; (x = 0; s_0 choice dots choice x = n; s_n)|} \ if $|x| \not \in \freevars{|v|}$ \\
 \rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\[0.05in]
