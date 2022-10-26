@@ -57,6 +57,8 @@
 %format rs = "\overline{r}"
 %format vs = "\overline{v}"
 %format es = "\overline{e}"
+%format es_1
+%format es_2
 %format hnf = "\mathit{hnf}"
 
 %% Old version: | for BNF, [] for choice

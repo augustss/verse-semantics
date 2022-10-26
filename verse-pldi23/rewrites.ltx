@@ -106,7 +106,7 @@ $$
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \textit{Bindings}      & c     & ::= & |x = v| \\
+    \textit{Bindings}      & c     & ::= & |x = h| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
@@ -248,13 +248,14 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \inferrule
   { }
-  {\wff{x}{|x == v|}{\emptyset}{|x == v|}{|x|}}
+  {\wff{x}{|x == h|}{\emptyset}{|x == h|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
 \inferrule
   { x \not \in \Gamma \quad
-    \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} }
+    \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+    x \not \in |xs|}
   { \wff{\Gamma}{|def x e_1|}{|x,xs|}{|cs|}{|e_2|} }
   { \rulename{WF-Def} }
 
@@ -262,16 +263,16 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
   {x \in \Gamma \quad
    \wff{\Gamma - x}{e_1}{|xs|}{|cs|}{|e_2|}
   }
-  {\wff{\Gamma}{|x == v; e_1|}{|xs|}{|x == v, cs|}{|e_2|}}
+  {\wff{\Gamma}{|x == h; e_1|}{|xs|}{|x == h, cs|}{|e_2|}}
   {\rulename{WF-Eq}}
 
 \\
 
 \inferrule
-  { \wff{\Gamma}{e}{|xs|}{|cs|}{|v|} \quad
-    \wff{\Gamma,|xs|}{|es|}{|xs|'}{|cs|'}{|vs|}
+  { \wff{\Gamma}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+    \wff{\Gamma,|xs|}{|es_1|}{|xs|'}{|cs|'}{|es_2|}
   }
-  { \wff{\Gamma}{|e|,|es|}{|xs|,|xs|'}{|cs|,|cs|'}{|v,vs|} }
+  { \wff{\Gamma}{|e_1|,|es_1|}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
   {\rulename{WF-many}}
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}\label{fig:wf}
