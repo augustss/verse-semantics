@@ -38,6 +38,8 @@ testeq(SEq) {3=2}                                 {:false}
 testeq(SEq){array{1;2;3}}                         {1,2,3}
 testeq(SEq){array{}}                              {()}
 
+testeq(SEq){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
+
 # Functions
 testeq(SEq){(x:int => x+1)[2]}                    {3}
 testeq(SEq){(x:any => y:any => x+2*y)[2][3]}      {8}
