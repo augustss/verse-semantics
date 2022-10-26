@@ -28,11 +28,9 @@ class Rec t where
 
 step1 :: Rec a => Rule a -> a -> Maybe a
 step1 rule t =
-  case apply t of
+  case rec rule t of
     (_,t') : _ -> Just t'
     _           -> Nothing
- where
-  apply t = rule t ++ rec apply t
 
 steps :: Rec a => Rule a -> a -> [a]
 steps rule t = t : case step1 rule t of
@@ -40,9 +38,7 @@ steps rule t = t : case step1 rule t of
                      Just t' -> steps rule t'
 
 step :: (Ord a, Rec a) => Rule a -> Rule a
-step rule t = nub (apply t)
- where
-  apply t = rule t ++ rec apply t
+step rule t = nub (rec rule t)
 
 normalForms :: (Show a, Ord a, Rec a) => Rule a -> a -> [(String, a)]
 normalForms rule t = normalFormsFuel (-1) rule t
