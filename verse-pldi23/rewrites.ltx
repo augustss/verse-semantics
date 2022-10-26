@@ -181,7 +181,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\
 \rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| &
 \end{longtable}
-\begin{longtable}[l]{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
 \rulename{app-tup}  & |apply1N (tup (s_0 dots s_n)) v| & \movesto
@@ -190,7 +190,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
 \end{longtable}
-\begin{longtable}[l]{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+\begin{longtable}[l]{@@{\quad} l  r >{$}c<{$} l l}
 \rulegroupname{Speculation:~\rspc}
 \rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
 \rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
