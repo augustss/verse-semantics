@@ -651,18 +651,19 @@ dsFreshFP = ds
 
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
-finalSubst ee =
+finalSubst ee | Just e <- getDone ee = e
+              | otherwise =
   case findArr ee of
     Nothing -> ee
     Just (x, a) -> finalSubst $ subst [(x, a)] $ dropDef x $ dropBind x ee
   where
     dropDef x (Def (Bind x' e)) | x == x' = e
                                 | otherwise = Def (Bind x' (dropDef x e))
-    dropDef x e = error $ "dropDef: " ++ show (x, e)
+    dropDef x e = error $ "dropDef: " ++ show (ee, x, e)
     dropBind x (Def (Bind i e)) = Def (Bind i (dropBind x e))
     dropBind x (b@(VAR x' :=: _) :>: r) | x == x' = r
                                         | otherwise = b :>: dropBind x r
-    dropBind x e = error $ "dropBind: " ++ show (x, e)
+    dropBind x e = error $ "dropBind: " ++ show (ee, x, e)
     findArr (Def (Bind _ e)) = findArr e
     findArr ((VAR x :=: Val a) :>: r) | isGnd a = Just (x, a)
                                       | otherwise = findArr r
@@ -671,6 +672,11 @@ finalSubst ee =
     isGnd (VARR vs) = all isGnd vs
     isGnd VOP{} = True
     isGnd _ = False
+
+    getDone (Def (Bind _ e)) = getDone e
+    getDone (_ :>: e) = getDone e
+    getDone e@(Val v) | isGnd v = Just e
+    getDone _ = Nothing
 
 ----------------------
 
