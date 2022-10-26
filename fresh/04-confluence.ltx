@@ -24,7 +24,7 @@ each of which is defined as the reduction relation induced by the respective rul
 \begin{figure}
 \begin{tabular}{rrrrrrrr}
 \toprule
-					& 	  	& \runi 		 & \rapp 		   & \rcon 			 & \rfail 		   & \rgc 			 & \rspc \\
+					& 	  	& \runi 		 & \rapp 		   & \rcon 		 & \rfail 		   & \rgc 			 & \rspc \\
 \midrule
 Unification 		& \runi & \ref{lem:u-c}  & \ref{lem:u-a-c} & \ref{lem:u-c-c} & \ref{lem:u-f-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
 $\beta$-Application & \rapp &      			 & \ref{lem:a-c}   & \ref{lem:a-c-c} & \ref{lem:a-f-c} & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
@@ -918,11 +918,16 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 
 	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
 	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	Hence, by \cref{lem:gc-result}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
+	Hence, by \cref{lem:gc-step}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
 
 	\item[Case] \rulename{all-choice}
-	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e$ where $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$.
-	Hence, by \cref{lem:gc-result}, $\rdx{\runi} \not \subset \rdx{\rspc}$.
+ 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
+	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
+	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
+	If $\rdx{\runi} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
+	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	so we can join by concatenating the binders, constraints and value
+	of $e_1,\dots,e_i',\dots,e_n$.
 
 	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
 	Trivially $\rdx{\runi} \not \subset \rdx{\rspc}$.
@@ -938,12 +943,6 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 \end{description}
 \end{description}
 \end{proof}
-
-\begin{lemma}[GC-Result] \label{lem:gc-result}
-If $\wff{\emptyset}{e}{|xs|}{|xs|}{\hnf}$ then $e$ is a $\runi$-Normal Form.
-\end{lemma}
-
-\ranjit{TODO: modify GC rules to ensure above, by (1) replacing $x=h$ with $x=v$ where v is not literal, (2) "tail" is HNF.}
 
 \subsection{Application} % --------------------------------------------------------------------------
 
@@ -1039,11 +1038,11 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 		If $\rdx{\rapp} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
 		If $\rdx{\rapp} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
 	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\rapp} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
+		Here $\rdx{\rapp} \subset \hnf$, \ie $\rapp: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
 	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\rapp} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\rapp} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
+		If $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
+		If $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
 	\end{description}
 \item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] Split cases on the rule used in $\rapp$.
 	\begin{description}
@@ -1187,8 +1186,14 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 	If $\rdx{\rapp} \subset e_2$, then join at $e_1$.
 
 	\item[Case] \rulename{all-choice}
-	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e$ where $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$.
-	Hence, by \cref{lem:gc-result}, $\rdx{\rapp} \not \subset \rdx{\rspc}$. \ranjit{TODO}
+ 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
+	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
+	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
+	If $\rdx{\rapp} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
+	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	so we can join by concatenating the binders, constraints and value
+	of $e_1,\dots,e_i',\dots,e_n$.
+
 
 	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
 	Trivially $\rdx{\rapp} \not \subset \rdx{\rspc}$.
@@ -1197,47 +1202,54 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 %
 \end{proof}
 
-\subsection{Normalization} % --------------------------------------------------------------------------
+\subsection{Normalization and Fail Propagation} % --------------------------------------------------------------------------
 
-\begin{lemma}[$\rcon$-Confluent]\label{lem:c-c}
-    $\rcon$ is confluent.
+\newcommand{\rconfail}{\rcon \cup \rfail}
+
+\begin{lemma}[$\rconfail$-Confluent]\label{lem:c-c}
+    $\rconfail$ is confluent.
 \end{lemma}
 
 \begin{proof}
-We will show that $\rcon$ is locally confluent \cref{lem:c-local} and terminating \cref{lem:c-term},
-and hence confluent by Newman's \cref{lem:local}.
+We will show that $\rconfail$ is locally confluent
+via \cref{lem:c-local}, \cref{lem:f-c} and \cref{lem:c-f-local},
+and terminating \cref{lem:c-term}, and hence confluent by Newman's \cref{lem:local}.
 \end{proof}
 
-\begin{lemma}[$\rcon$-Noetherian] label{lem:c-term}
-    $\rcon$ is Noetherian.
+\begin{lemma}[$\rconfail$-Noetherian] label{lem:c-term}
+    $\rconfail$ is Noetherian.
 \end{lemma}
 
 \begin{proof}
-Each step of $\rcon$ brings the term closer to a canonical \emph{normal form}
-defined by the following grammar, where each expression has
+Each step of $\rconfail$ brings the term closer to a canonical \emph{normal form}
+defined by the following grammar,
 %
+\begin{verbatim}
+% e0 := fail | e1
+% e1 := exists x.e1 | e2
+% e2 := (x=s); e2 | e3
+% e3 := (x=v); e3 | e4
+% e4 := v | nv | v = nv
+% nv := v1 v2 | (e0 | e0) | one {e0} | all {e0}
+\end{verbatim}
+%
+where each expression is
+either |fail| or has
 existentials at the top,
 then |x == s| bindings,
 then |x == h| bindings, and
 no |v| to the left of a semicolon.
 %
-Once a term is in this normalized form, no further $\rcon$ steps are possible.
-%
-% e1 := exists x.e1 | e2
-% e2 := (x=s); e2 | e3
-% e3 := (x=v); e3 | e4
-% e4 := v | nv  | v = nv
-% nv := v1 v2 | (e1 | e2)
+Once a term is in this normalized form, no further $\rconfail$ steps are possible.
 %
 \end{proof}
 
-
-\begin{lemma}[$\rcon$-Local Confluent]\label{lem:c-local}
-    $\rcon$ is locally confluent.
+\begin{lemma}[$\rcon$-LC]\label{lem:c-local}
+$\rcon$ is locally confluent.
 \end{lemma}
 
 \begin{proof}
-Suppose we have to $\rcon$-steps:
+Suppose we have two $\rcon$-steps:
 $\tx{1}$ via the redux $\rdx{1} \movesto \rdx{1}'$ and
 $\tx{2}$ via the redux $\rdx{2} \movesto \rdx{2}'$.
 %
@@ -1291,12 +1303,12 @@ Split cases on the $\rcon$ rule used in $\rdx{2}$.
 \end{proof}
 
 
-\begin{lemma}[$\rcon-\rfail$-Comm] \label{lem:c-f-c}
-	$\rcon$ and $\rfail$ commute.
+\begin{lemma}[$\rcon-\rfail$-LC] \label{lem:c-f-local}
+If $\rstep{\rcon}{e}{e_1}$ and $\rstep{\rfail}{e}{e_2}$ then $\join{\rconfail}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-We show that $\rcon$ \emph{semi-commutes} with $\rfail$, and hence $\rcon \cup \rfail$ is confluent via \cref{lem:semi-comm}.
+We show that $\rcon$ is locally confluent with $\rfail$.
 %
 Let $\tx{\rcon}$ and $\tx{\rfail}$ denote the reducts for $\rcon$ and $\rfail$ respectively.
 %
@@ -1331,19 +1343,21 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-r}
 			then join at $|fail|$ via multiple $\rfail$ steps.
 
-		HEREHEREHEREHEREHERE
-
 	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
 		If $\rdx{\rfail} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
 		If $\rdx{\rfail} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-l}
+			then join at $|fail|$ via multiple $\rfail$ steps.
+		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-r}
+			then join at $|fail|$ via multiple $\rfail$ steps.
 
 	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\rapp} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
+		Here $\rdx{\rfail} \subset \hnf$, \ie $\rfail: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
 
 	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\rapp} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\rapp} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
+		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
+		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
 	\end{description}
 \end{description}
 \end{proof}
@@ -1364,14 +1378,33 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
 
-\subsection{Fail Propagation} % --------------------------------------------------------------------------
-
 \begin{lemma}[$\rfail$-Confluent] \label{lem:f-c}
 	$\rfail$ is confluent.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rfail$ has the diamond property hence is confluent.
+%
+Suppose we have two $\rfail$-steps:
+$\tx{1}$ via the redux $\rdx{1} \movesto \rdx{1}'$ and
+$\tx{2}$ via the redux $\rdx{2} \movesto \rdx{2}'$.
+%
+Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
+%
+The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
+%
+Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
+%
+Split cases on the $\rfail$ rule used in $\rdx{2}$.
+%
+\begin{description}
+\item[Case] \rulename{fail-seq-l} \ie $\tx{2} \equiv |fail|; e \movesto |fail|$.
+		  	Here $\rdx{1} \subset e$ so join at $|fail|$.
+\item[Case] \rulename{fail-seq-l} \ie $\tx{2} \equiv e; |fail| \movesto |fail|$.
+		  	Here $\rdx{1} \subset e$ so join at $|fail|$.
+\item[Case] \rulename{fail-eq} \ie $\tx{2} \equiv x = |fail| \movesto |fail|$.
+			Here $\rdx{1} \not \subset \rdx{\rfail}$.
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rfail-\rgc$-Comm] \label{lem:f-g-c}
@@ -1379,7 +1412,33 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rfail$ strongly commutes with $\rgc$.
+%
+Let $\tx{\rfail}$ and $\tx{\rgc}$ denote the reducts for $\rfail$ and $\rgc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rfail}$ occurs under $\rdx{\rgc}$ or vice versa.
+%
+\begin{description}
+\item[Case $\rdx{\rgc} \subset \rdx{\rfail}$] Split cases on the rule used in $\rdx{\rfail}$.
+	\begin{description}
+	\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv |fail|; e \movesto |fail|$.
+		  	Here $\rdx{\rgc} \subset e$ so join at $|fail|$.
+	\item[Case] \rulename{fail-seq-r} \ie $\tx{\rfail} \equiv e; |fail| \movesto |fail|$.
+		  	Here $\rdx{\rgc} \subset e$ so join at $|fail|$.
+	\item[Case] \rulename{fail-eq} \ie $\tx{\rfail} \equiv x = |fail| \movesto |fail|$.
+			Here $\rdx{\rgc} \not \subset \rdx{\rfail}$.
+	\end{description}
+
+\item[Case $\rdx{\rfail} \subset \rdx{\rgc}$]
+	Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$,
+	where no $x_i \in \freevars{e}$.
+	If $\rdx{\rfail} \subset e$, \ie $\rfail: e \movesto e'$,
+		then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
+	If $\rdx{\rapp} \subset v_i$, \ie $\runi : v_i \movesto v_i'$,
+		then we can join at $e$.
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rfail-\rspc$-Comm] \label{lem:f-s-c}
@@ -1387,7 +1446,70 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rspc$ $*$-commutes with $\rfail$, and hence commutes via \cref{lem:star-comm}.
+%
+Let $\tx{\rspc}$ and $\tx{\rfail}$ denote the reducts for $\rspc$ and $\rfail$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rfail}$ or vice versa.
+%
+\begin{description}
+\item[Case $\rdx{\rspc} \subset \rfail$] Split cases on the rule used in $\rfail$.
+	\begin{description}
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv |fail|; e \movesto |fail|$.
+		  	Here $\rdx{\rspc} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv e; |fail| \movesto |fail|$.
+		  	Here $\rdx{\rspc} \subset e$ so join at $|fail|$.
+		\item[Case] \rulename{fail-eq} \ie $\tx{\rfail} \equiv x = |fail| \movesto |fail|$.
+			Here $\rdx{\rspc} \not \subset \rdx{\rfail}$.
+	\end{description}
+
+\item[Case $\rdx{\rfail} \subset \rspc$] Split cases on the rule used in $\rspc$
+	\begin{description}
+	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
+	Let us split cases on where $\rdx{\rfail}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\rfail} \subset e_1$, \ie $\rfail : e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
+		\item[Case] $\rdx{\rfail} \subset e_2$, \ie $\rfail : e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
+		\item[Case] $\rdx{\rfail} \subset CX$ :
+
+		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\rfail} \cdots |e_1 choice e_2|$
+		so
+		with two $\rfail$ steps we can join at $|SX^[e_1' choice e_2']|$ where
+		$e_i' \equiv \cdots \rdx{\rfail}' \cdots e_i$.
+		\end{description}
+
+
+	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
+	Let us split cases on where $\rdx{\rfail}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
+		\item[Case] $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
+		\item[Case] $\rdx{\rfail} \subset e_3$, \ie $\rfail: e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
+		\end{description}
+
+	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
+	Here, $\rdx{\rfail} \subset e$, \ie $\rfail : e \movesto e'$ so join at $SX[e']$.
+
+	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
+	If $\rdx{\rfail} \subset e_1$ then $\rfail : e_1 \movesto e_1'$ and by \cref{lem:gc-step} we can join at $e_1'$.
+	Otherwise, $\rdx{\rfail} \subset e_2$ so $\rfail : e_2 \movesto e_2'$ so join at $e_1$.
+
+	\item[Case] \rulename{all-choice}
+	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
+	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
+	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
+	If $\rdx{\rfail} \subset e_i$ then $\rfail : e_i \movesto e_i'$ and
+	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	so we can join by concatenating the binders, constraints and value
+	of $e_1,\dots,e_i',\dots,e_n$.
+
+	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Trivially $\rdx{\rfail} \not \subset \rdx{\rspc}$.
+	\end{description}
+\end{description}
 \end{proof}
 
 \subsection{Garbage Collection} % --------------------------------------------------------------------------
@@ -1398,7 +1520,24 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 
 \begin{proof}
 By \cref{lem:diamond} after showing that $\rgc$ satisfies the diamond property.
-\ranjit{TODO:Fresh-Verse.pdf}
+Suppose we have two $\rgc$-steps:
+$\tx{1}$ via the redux $\rdx{1} \movesto \rdx{1}'$ and
+$\tx{2}$ via the redux $\rdx{2} \movesto \rdx{2}'$.
+%
+Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
+%
+The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
+%
+Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
+%
+Suppose that $\tx{2} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$,
+where no $x_i \in \freevars{e}$.
+If $\rdx{1} \subset e$, \ie $\rgc_1: e \movesto e'$,
+	then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
+If $\rdx{1} \subset v_i$, \ie $\runi : v_i \movesto v_i'$,
+	then we can join at $e$.
+If \ranjit{TODO:overlapping GC} xs,ys,e1  vs xs, zs, e2
+	then orig expr is xs,ys,zs, (common-tail e1 e2) and join at common-tail e1 e2.
 \end{proof}
 
 \begin{lemma}[$\rgc-\rspc$-Comm] \label{lem:g-s-c}
@@ -1408,6 +1547,17 @@ By \cref{lem:diamond} after showing that $\rgc$ satisfies the diamond property.
 \begin{proof}
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
+
+\begin{lemma}[GC-Step] \label{lem:gc-step}
+If $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$ and $\rstep{\rr}{e}{e'}$ then
+   $\wff{\emptyset}{e'}{|xs|'}{|cs|'}{\hnf'}$.
+\end{lemma}
+
+\begin{proof}
+By induction on the derivation of $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$,
+splitting cases on the rule used for $\rstep{\rr}{e}{e'}$.
+\end{proof}
+
 
 \subsection{Speculation} % --------------------------------------------------------------------------
 
