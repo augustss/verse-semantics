@@ -305,6 +305,14 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection lhs =
+ if False then [] else
+ if True then
+   "ELIM-DEF" `name`
+   do e@Def{} <- [lhs]
+      (is, _, v) <- wfRes e
+      guard (null (intersect is (free v)))
+      pure (Val v)
+ else
    "ELIM-DEF" `name`
    do Def (Bind x e) <- [lhs]
       guard (x `notElem` free e)
@@ -367,8 +375,10 @@ elimCst ee =
     (bs, e'') = getBs [] e'
     -- deps is the dependency graph from the bindings
     deps = [(x, free e) | (x, e) <- bs]
+    -- Since the bindings are really unifications, the LHS is reachable from the RHS
+    deps' = [] -- [(y, [x]) | (x, ys) <- deps, y <- ys ]
     -- unr are the identifiers not reachable from e''
-    unr = dfs deps (free e'')
+    unr = dfs (deps ++ deps') (free e'')
     dfs g [] = map fst g   -- anything remaining is unreachable
     dfs g (i:is) =
       let vs = [ v | (i', vs) <- g, i == i', v <- vs ]
@@ -378,15 +388,37 @@ elimCst ee =
     del = filter (`elem` xs) unr
     xs' = filter (`notElem` del) xs
     bs' = filter ((`notElem` del) . fst) bs
-    res = foldr (\ x e -> Def (Bind x e)) b xs'
-      where b = foldr (\ (x, v) e -> (VAR x :=: v) :>: e) e'' bs'
+    res = existBind xs' bs' e''
+    isAlias (_, VAR{}) = True
+    isAlias _ = False
   in
---    if length xs == 6 && not (null del) then error (show (xs, unr, free e'', e'', deps)) else
-    if null del || anySame del then
-      []
-    else
-      [res]
+    case simpleCst xs bs e'' of
+      [] -> 
+        if null del || anySame del || any isAlias bs then
+          []
+        else
+          [res]
+      es -> es
 
+existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
+existBind xs bs ee = mkRes xs (map (\ (x, v) -> VAR x :=: v) bs) ee
+
+-- Remove bindings of the form 'x=e' where x occurs nowhere else.
+simpleCst :: [Ident] -> [(Ident, Expr)] -> Expr -> [Expr]
+simpleCst xs bs e =
+  let evs = free e
+      ts = filter isTriv xs
+      isTriv x | x `elem` evs = False
+               | otherwise =
+        case partition ((== x) . fst) bs of
+          ([_], obs) -> x `notElem` (free (map snd obs) ++ map fst obs) -- single binding, no other occurrences
+          _ -> False
+      xs' = filter  (`notElem` ts) xs
+      bs' = filter ((`notElem` ts) . fst) bs
+  in  if xs' /= xs then
+        [existBind xs' bs' e]
+      else
+        []
 
 {- | Application Contexts
 
@@ -670,7 +702,7 @@ rulesAllFP lhs =
 -- 0 or 1 result
 wfRes :: Expr -> [([Ident], [Expr], Value)]
 wfRes = maybeToList . wf []
-  where wf _ (Val v) = pure ([], [], v)
+  where wf _ (Val v@HNF{}) = pure ([], [], v)
         wf g (Def (Bind x r)) = do
           guard (x `notElem` g)
           (xs, es, v) <- wf (x:g) r
@@ -695,6 +727,7 @@ mkRess as = loop [] [] [] as
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
+
 rulesNormalization :: ERule
 rulesNormalization lhs =
   "NORM-SEQ-ASSOC" `name`

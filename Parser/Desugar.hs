@@ -407,6 +407,8 @@ dsP :: Loc -> Expr -> Expr -> D SExpr
 dsP _ e1 e2 | doTrace && trace ("dsP " ++ prettyShow (e1, e2)) False = undefined
 -- P[f(a)<r>...] e = P[f] (function(a)<r>...{e2})
 dsP l e1 e2 | Just (f, a, rs) <- getFun e1 = dsP l f $ Function [(a, rs)] e2
+-- P[x] (: any) = x := :any
+dsP l (Variable x) (Range (Variable (Ident _ "any"))) = pure $ tAny l x
 -- P[x] e = x := D[e]
 dsP l (Variable x) e = define l x <$> dsD e
 -- P[:t] e = P[x:t] e, x fresh
