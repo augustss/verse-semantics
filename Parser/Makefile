@@ -1,5 +1,5 @@
 PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -i../TRS
-FLAGS = -Wall --make
+FLAGS = -O -Wall --make
 .PHONY: clean all test testr timtests
 
 all:	verse tests timparse
