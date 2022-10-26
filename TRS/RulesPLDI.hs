@@ -231,6 +231,11 @@ rulesApplication lhs =
 
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc lhs =
+  "UVAR" `name`
+  do VAR x :=: VAR x' <- [lhs]
+     guard (x == x')
+     pure (VAR x)
+ ++
   "ULIT" `name`
   do INT k1 :=: INT k2 <- [lhs]
      if k1 == k2
