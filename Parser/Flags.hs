@@ -26,6 +26,6 @@ defaultFlags = Flags
   , fTimLambda    = False
   , fDenSem       = False
   , fDfs          = False
-  , fRewriteSteps = 10000
+  , fRewriteSteps = 25000
   , fEvalSteps    = 1000
   }
