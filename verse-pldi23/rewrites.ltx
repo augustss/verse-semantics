@@ -108,6 +108,10 @@ $$
 %     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \textit{Bindings}      & c     & ::= & |x = h| \\
+    \multicolumn{4}{l}{\text{\lennart{Alternative expression syntax}}} \\
+    \textit{Expressions, not |=|}   & ne     & ::= & |v| \vb |e ; ne| \vb |fail| \vb |def x e|
+                                             \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+    \textit{Expressions}   & e     & ::= & ne  \vb |v == e| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
