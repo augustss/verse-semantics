@@ -133,6 +133,7 @@ $$
       |if e_1 then e_2 else e_3| & \text{means}
       & |def v (v == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v)| & \text{|v,x| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+      |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
