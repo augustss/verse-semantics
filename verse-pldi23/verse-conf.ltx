@@ -581,8 +581,8 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 We remarked in \Cref{sec:unify} that we can desugar the pattern matching of a high-level
 language into unification. But what about multi-equation pattern matching, such as this definition in Haskell:
 \begin{code}
-  append []      ys = ys
-  append (x:xs)  ys = x : append xs ys
+  append []      ysl = ysl
+  append (x:xsl)  ysl = x : append xsl ysl
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly\footnote{
@@ -590,15 +590,15 @@ We use the empty tuple |emptytup| to represent the empty list and pairs to repre
 and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x ^^ y) (p = tup (x,y); body)|
   }:
 $$
-|append =lam (tup (xs,ys))
-  ((xs = emptytup; ys) space choice space
-   (def (x ^^ xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys)))))|
+|append =lam (tup (xsl,ysl))
+  ((xsl = emptytup; ysl) space choice space
+   (def (x ^^ xrest) (xsl = tup (x,xrest); tup (x, applyN append (xrest, ysl)))))|
 $$
-If |xs| is |emptytup|, the left-hand choice succeeds, returning |ys|; and the right-hand choice
+If |xsl| is |emptytup|, the left-hand choice succeeds, returning |ysl|; and the right-hand choice
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
-If |xs| is of the form |tup (x,xrest)|,
+If |xsl| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
+Finally if |xsl| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results at all.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
