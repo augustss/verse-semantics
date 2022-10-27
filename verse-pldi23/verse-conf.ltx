@@ -761,21 +761,21 @@ The choice operator, |choice|, serves as both |cons| and |append| for choices.
   \begin{array}{l}
     \textbf{Notation}\\
     \begin{array}{rcll}
-      |apply1 f x := e| & \text{means} & |f == lam x e| \\
+      |apply1 f x := e| & \text{means} & |f := lam x e| \\
       |applyN f (x,y) := e| & \text{means} &
-        |f = lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
+        |f := lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
      \end{array} \\ \\[-3mm]
 
     \begin{array}{rcl}
-      |apply1 head xs| & :=  & |apply1 xs 0| \\
-      |apply1 tail xs| & :=  & |all (def i (i > 0; apply1 xs i))| \\
-      |applyN cons (x,xs)| & :=  & |all (x `choice` def i (apply1 xs i))| \\
-      |applyN append (xs, ys)| & :=  & |all ((def i (apply1 xs i)) `choice` (def i (apply1 ys i)))| \\
-      |applyN flatMap (f,xs)| & := & |all (def i (apply1 f (apply1 xs i)))| \\
-      |applyN map (f, xs)| & :=  & |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
-      |applyN filter (p, xs)| & := & |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN find (p, xs)| & := & |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN every (p, xs)| & := & |applyN map (p,xs)| \\
+      |apply1 head xsl| & :=  & |apply1 xsl 0| \\
+      |apply1 tail xsl| & :=  & |all (def i (i > 0; apply1 xsl i))| \\
+      |applyN cons (x,xsl)| & :=  & |all (x `choice` def i (apply1 xsl i))| \\
+      |applyN append (xsl, ysl)| & :=  & |all ((def i (apply1 xsl i)) `choice` (def i (apply1 ysl i)))| \\
+      |applyN flatMap (f,xsl)| & := & |all (def i (apply1 f (apply1 xsl i)))| \\
+      |applyN map (f, xsl)| & :=  & |if x := apply1 head xsl then applyN cons (apply1 f x, applyN map (f,apply1 tail xsl)) else emptytup| \\
+      |applyN filter (p, xsl)| & := & |all (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
+      |applyN find (p, xsl)| & := & |one (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
+      |applyN every (p, xsl)| & := & |applyN map (p,xsl)| \\
       |applyN fromTo (lo,hi)| & := & |all (if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi)))|
     \end{array}
   \end{array}
