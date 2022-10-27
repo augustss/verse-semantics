@@ -57,6 +57,7 @@
 %format rs = "\overline{r}"
 %format vs = "\overline{v}"
 %format es = "\overline{e}"
+%format ys = "\overline{y}"
 %format es_1
 %format es_2
 %format hnf = "\mathit{hnf}"
