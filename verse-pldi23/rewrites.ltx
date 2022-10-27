@@ -204,7 +204,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
 \rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)|
-               & if \wff{\emptyset}{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
+               & if \wff{}{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
 %% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
