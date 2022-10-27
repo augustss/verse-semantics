@@ -3,7 +3,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module TRSCore where
 
-import Show
 import TRS
 import Bind
 import Test.QuickCheck
@@ -25,25 +24,24 @@ data Expr
   | Wrong                       -- ^ wrong
   | Split Expr Value Value      -- ^ split { e, v1, v2 }
 
-instance Show Expr where
-  show (Val v)          = show v
-  show (a :=: b)        = show' a ++ " = " ++ show' b
-  show (a :>: b)        = show' a ++ "; " ++ show' b
-  show (a :|: b)        = show' a ++ " | " ++ show' b
-  show (a :@: b)        = show a ++ "(" ++ show b ++ ")"
-  show Fail             = "fail"
-  show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
-  show (One a)          = "one {" ++ show a ++ "}"
-  show (All a)          = "all {" ++ show a ++ "}"
-  show Wrong            = "wrong"
-  show (Split e v1 v2)  = "split {" ++ show e ++ ", " ++ show v1 ++ ", " ++ show v2 ++ "}"
+infixr 1 :>:
+infixr 2 :|:
+infix  3 :=:
+infixl 4 :@:
 
-instance Parens Expr where
-  parens (_ :=: _) = True
-  parens (_ :>: _) = True
-  parens (_ :|: _) = True
-  parens (_ :@: _) = False
-  parens _         = False
+instance Show Expr where
+  showsPrec p (Val v)          = showsPrec p v
+  showsPrec p (a :=: b)        = showParen (p > 3) $ showsPrec 4 a . showString " = " . showsPrec 4 b
+  showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
+  showsPrec p (a :|: b)        = showParen (p > 2) $ showsPrec 3 a . showString " | " . showsPrec 2 b
+  showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
+  showsPrec _ Fail             = showString "fail"
+  showsPrec _ (Def (Bind x a)) = showString "def " . showsPrec 0 x . showString " in {" . showsPrec 0 a . showString "}"
+  showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
+  showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
+  showsPrec _ Wrong            = showString "wrong"
+  showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
+                                 showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
