@@ -219,8 +219,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Normalization:~\rcon}
 \rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
 \rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
-\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| is not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| is not of form |x' == s'|\\
+\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| not of form |x' == s'|\\
 \rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
