@@ -250,7 +250,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \fbox{\wffv{|e|}{|xs|}{|cs|}{|v|}}
 \begin{mathpar}
 \inferrule
-  { \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \quad |xs| = \boundvars{|cs|} }
+  { \wff{\emptyset}{|e|}{|xs|}{\overline{|y=h|}}{|v|} \quad |xs| = \overline{|y|}\; \text{(ignoring order)} }
   { \wffv{|e|}{|xs|}{|cs|}{|v|} }
   { \rulename{WF-Val}}
 \end{mathpar}
