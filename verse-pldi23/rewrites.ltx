@@ -75,6 +75,7 @@
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
 \newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
 \newcommand{\wffv}[4]{\ensuremath{\vdash_v #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wffmany}[4]{\ensuremath{\vdash_{\!*} #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -182,7 +183,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 %\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
 %\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\
 %\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| &
-\rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if none of the \rulename{u-} rules above match} \\
+\rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
 \end{longtable}
 \begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Application:~\rapp}
@@ -205,7 +206,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
 \rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)|
-               & if \wff{}{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
+               & if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
 %% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
@@ -254,12 +255,12 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
   { \wff{\Gamma}{|e|}{\emptyset}{\emptyset}{|e|} }
   { \rulename{WF-Exp}}
 
-%\inferrule
-%  { x \in \Gamma }
-%  {\wff{\Gamma}{|x == h|}{\emptyset}{|x == h|}{|x|}}
-%  {\rulename{WF-Eq-Val}}
-%
-%\\
+\inferrule
+  { x \in \Gamma }
+  {\wff{\Gamma}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\rulename{WF-Eq-Val}}
+
+\\
 \inferrule
   { \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \quad
     x \not \in |xs|}
@@ -289,7 +290,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
     \quad
     \text{all |x_i| distinct}
   }
-  { \wff{}{|r_1, dots, r_n|}{|xs|_1, |dots, xs|_n}{|cs|_1, |dots, cs|_n}{|e_1, dots, e_n|} }
+  { \wffmany{|r_1, dots, r_n|}{|xs|_1, |dots, xs|_n}{|cs|_1, |dots, cs|_n}{|e_1, dots, e_n|} }
   {\rulename{WF-many} }
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}\label{fig:wf}
