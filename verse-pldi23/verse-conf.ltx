@@ -1393,10 +1393,10 @@ A complete reduction sequence for a small example can be found in figure \ref{fi
 This example shows how constraining the output of a function call can constrain the argument.
 While most of the reductions are administrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
-Step \circlednum{3} gets the argument in place for pattern matching.  Step \circlednum{4} liberates a nested unification,
-so that at \circlednum{5} the actual unification can happen.
-At \circlednum{6} and \circlednum{7} we finally get the values into the result,
-and the rest of the reductions just get rid of terms that are no longer needed.
+
+Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
+At \circlednum{5} and \circlednum{6} the actual numbers are inline.
+After removing some garbage we reach the result at \circlednum{7}.
 \begin{figure}
 \begin{scriptsize}
 % no space needed around math environments in a figure
@@ -1404,29 +1404,35 @@ and the rest of the reductions just get rid of terms that are no longer needed.
 \setlength{\belowdisplayskip}{0pt}%
 $$
 \begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-               &                           & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-               & \movestoR{desugar}        & |def (swap) (swap = (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))); def (p) (apply1 swap p = tup(2,3); p))| \\
-\circlednum{1} & \movestoR{subst}          & |def (swap) (swap = (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-               & \movestoR{def-eliml}      & |(               (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))); def (p) (((apply1 (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))) p) = tup(2,3)); p))| \\
-               & \movestoR{seq}            & |def (p) (((apply1 (lam xy (def (x ^^ y) (xy = tup(x,y); tup(y,x)))) p)) = tup(2,3); p)| \\
-\circlednum{2} & \movestoR{app-beta}       & |def (p) ((def (xy) (xy = p; def (x ^^ y) (xy = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-\circlednum{3} & \movestoR{subst}          & |def (p) ((def (xy) (xy = p; def (x ^^ y) ( p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-               & \movestoR{def-eliml}      & |def (p)     (((p; def (x ^^ y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-               & \movestoR{def-float}      & |def (p ^^ x)   (((p; def   (y) (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-               & \movestoR{def-float}      & |def (p ^^ x ^^ y) (((p;           (p = tup(x,y); tup(y,x)))) = tup(2,3); p)| \\
-               & \movestoR{subst}          & |def (p ^^ x ^^ y) (((tup(x,y);    (p = tup(x,y); tup(y,x)))) = tup(2,3); tup(x,y))| \\
-               & \movestoR{seq}            & |def (p ^^ x ^^ y) ((              (p = tup(x,y); tup(y,x)))  = tup(2,3); tup(x,y))| \\
-\circlednum{4} & \movestoR{unify-seql}     & |def (p ^^ x ^^ y) ((p = tup(x,y); (tup(y,x) = tup(2,3)));    tup(x,y))| \\
-\circlednum{5} & \movestoR{utup}           & |def (p ^^ x ^^ y) ((p = tup(x,y); (y = 2; x = 3; tup(y,x))); tup(x,y))| \\
-\circlednum{6} & \movestoR{subst}          & |def (p ^^ x ^^ y) ((p = tup(x,2); (y = 2; x = 3; tup(2,x))); tup(x,2))| \\
-               & \movestoR{def-eliml}      & |def (p ^^ x)   ((p = tup(x,2); (    2; x = 3; tup(2,x))); tup(x,2))| \\
-\circlednum{7} & \movestoR{subst}          & |def (p ^^ x)   ((p = tup(3,2); (    2; x = 3; tup(2,3))); tup(3,2))| \\
-               & \movestoR{def-eliml}      & |def (p)     ((p = tup(3,2); (    2;     3; tup(2,3))); tup(3,2))| \\
-               & \movestoR{def-eliml}      & |            (     tup(3,2); (    2;     3; tup(2,3));  tup(3,2))| \\
-%              & \movestoR{seq}            & |            (               (    2;     3; tup(2,3));  tup(3,2))| \\
-%              & \movestoR{seq}            & |            (               (           3; tup(2,3));  tup(3,2))| \\
-%              & \movestoR{seq}            & |                                           tup(2,3);   tup(3,2)| \\
-               & \movestoR{seq $\times$ 4} & |                                                       tup(3,2)| \\
+  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+
+
+  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
+\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
+  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
+  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
+\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
+\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
+\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
+\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
+  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
 \end{array}
 $$
 \end{scriptsize}
