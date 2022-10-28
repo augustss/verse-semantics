@@ -180,16 +180,25 @@ pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
+pattern EHNF h = Val (HNF h)
+pattern OP o   = Val (VOP o)
 pattern HVAL :: HNF -> Expr
 pattern HVAL v <- Val (getH -> Just v)
   where HVAL h = Val (HNF h)
+pattern SCL :: Value -> Expr
+pattern SCL v <- Val (getS -> Just v)
+  where SCL v = Val v
 
 getH :: Value -> Maybe HNF
 getH (HNF v@Arr{}) = Just v
 getH (HNF v@Lam{}) = Just v
+getH (HNF v@Op{}) = Just v
 getH _ = Nothing
 
-
+getS :: Value -> Maybe Value
+getS v@VINT{} = Just v
+getS v@Var{} = Just v
+getS _ = Nothing
 
 pattern DEF x e = Def (Bind x e)
 
