@@ -51,6 +51,7 @@ library trs
                    TRSCore
                    Show
                    RulesPOPL
+                   RulesPLDI
 
 executable verse
   import: parser-properties
