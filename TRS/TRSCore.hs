@@ -225,41 +225,43 @@ pattern CONS    = HNF (Op Cons)
 --------------------------------------------------------------------------------
 
 instance Rec Expr where
-  rec r (a :=: b) =
-       [ (n, a' :=: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :=: b') | (n,b') <- rec r b ]
+  rec r e = r e ++
+    case e of
+      a :=: b ->
+           [ (n, a' :=: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :=: b') | (n,b') <- rec r b ]
     
-  rec r (a :|: b) =
-       [ (n, a' :|: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :|: b') | (n,b') <- rec r b ]
+      a :|: b ->
+           [ (n, a' :|: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :|: b') | (n,b') <- rec r b ]
 
-  rec r (a :>: b) =
-       [ (n, a' :>: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
+      a :>: b ->
+           [ (n, a' :>: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
 
-  rec r (Def (Bind x a)) =
-       [ (n, Def (Bind x a')) | (n,a') <- r a ]
+      Def (Bind x a) ->
+           [ (n, Def (Bind x a')) | (n,a') <- r a ]
 
-  rec r (f :@: a) =
-       [ (n,f' :@: a)  | (n,f') <- vrec r f ]
-    ++ [ (n,f  :@: a') | (n,a') <- vrec r a ]
+      f :@: a ->
+           [ (n,f' :@: a)  | (n,f') <- vrec r f ]
+        ++ [ (n,f  :@: a') | (n,a') <- vrec r a ]
   
-  rec r (Val v) =
-       [ (n,Val v') | (n,v') <- vrec r v ]
+      Val v ->
+           [ (n,Val v') | (n,v') <- vrec r v ]
   
-  rec r (One a) = [ (n, One a') | (n,a') <- rec r a ]
-  rec r (All a) = [ (n, All a') | (n,a') <- rec r a ]
-  rec r _       = []
+      One a -> [ (n, One a') | (n,a') <- rec r a ]
+      All a -> [ (n, All a') | (n,a') <- rec r a ]
+      _     -> []
+   where
+    vrec r (Var x) = []
+    vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
 
-vrec r (Var x) = []
-vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
-
-hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
-                          | (i,a) <- [0..] `zip` as
-                          , (n,a') <- vrec r a
-                          ]
-hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
-hrec r _                = []
+    hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
+  	                          | (i,a) <- [0..] `zip` as
+  	                          , (n,a') <- vrec r a
+  	                          ]
+    hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
+    hrec r _                = []
 
 {-
   rec r (Split e f g) = [ (n,Split e' f g) | (n,e') <- r e ]
