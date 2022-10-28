@@ -667,7 +667,7 @@ wfResE :: Expr -> [([Ident], [Expr], Expr)]
 wfResE = maybeToList . wf []
   where
     -- WF-EQ-VAL
-    wf g (c@(VAR x :=: EHNF h)) = do
+    wf g (c@(VAR x :=: Val{})) = do
       guard (x `elem` g)
       pure ([], [c], VAR x)
     -- WF-DEF
@@ -676,7 +676,7 @@ wfResE = maybeToList . wf []
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
     -- WF-EQ
-    wf g (c@(VAR x :=: EHNF h) :>: e1) = do
+    wf g (c@(VAR x :=: Val h) :>: e1) = do
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
