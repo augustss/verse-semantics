@@ -1388,57 +1388,6 @@ so we leave evaluation strategy and compilation for future work.
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
 
-\subsection{Example}
-A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
-This example shows how constraining the output of a function call can constrain the argument.
-While most of the reductions are administrative in nature, these are the highlights:
-At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
-
-Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
-At \circlednum{5} and \circlednum{6} the actual numbers are inline.
-After removing some garbage we reach the result at \circlednum{7}.
-\begin{figure}
-\begin{scriptsize}
-% no space needed around math environments in a figure
-\setlength{\abovedisplayskip}{0pt}%
-\setlength{\belowdisplayskip}{0pt}%
-$$
-\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-
-
-  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
-\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
-\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
-  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
-  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
-  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
-\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
-\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
-\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
-\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
-  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
-\end{array}
-$$
-\end{scriptsize}
-\caption{Sample reduction sequence} \label{fig:sample-reductions}
-\end{figure}
-
 
 
 \section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}
@@ -2000,6 +1949,128 @@ FLC also uses the same construct for a different purpose, to
 bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
 In contrast, |def x e| seems more direct.
 
+\section{Looking back, looking forward}
+
+The semantics of \versecalc{} is designed at a level intended to capture the
+\emph{computational model} of the language; not all formal semantics do so.
+Defining a language by giving its low-level semantics is \emph{precise} but not necessarily \emph{illuminating}.
+For example, giving a reference compiler that compiles
+the program to x86 instructions is precise, but is not helpful
+to a human who is trying to understand exactly what the original program
+meant. Likewise, a high-level semantics simply provides the eventual answer
+produced by the program, without insight into the \emph{computational steps}
+that got us from program start to program completion.
+
+The moral here is that \emph{formal specifications can be obfuscatory---or
+illuminating.} The latter kind shed light because they are defined \emph{in
+terms of the intended mechanisms of the language}. \versecalc{} does this; it
+respects the conceptual structures of the Verse language.
+
+Note that when we say ``illuminating'' we mean that in multiple ways.
+A semantics can be illuminating for humans who are trying to understand
+what a particular program does, or how a proposed change to the language
+will affect the language. It can drive analyses that help the compiler
+optimize programs. It underlies the use of formal methods and verification
+to provide machine-derived and -checkable proofs of correctness. All of
+these applications depend on the semantics being defined at the appropriate
+level: the level of the computational model that underlies the language.
+This has been our goal in this work.
+
+We have much left to do.  The full Verse language has
+statically checked types.  In the dynamic semantics, the types can be
+represented by partial identity functions---identity of the values of
+the type and |fail| otherwise.  This gives a distinctive new
+perspective on type systems, one that we intend to develop in future
+work.  The full Verse language also has a statically-checked effect system,
+including both mutable references and input/output.  All these effects
+must be \emph{transactional}, {\eg}, when the condition of an |if|
+fails, any store effects in the condition must be rolled back.
+We have preliminary reduction rules for updateable references,
+but they are not included here.
+
+% -------------------- Acknowledgements ----------------
+\begin{acks}                            %% acks environment is optional
+                                        %% contents suppressed with 'anonymous'
+  We thank our colleagues for their helpful and specific
+  feedback on earlier drafts of this paper,
+  including
+  Jessica Augustsson,
+  Francisco L\'opez-Fraguas,
+  Andy Gordon,
+  Michael Hanus,
+  Juan Rodr\'iguez Hortal\'a,
+  Ranjit Jhala,
+  Dale Miller,
+  Niklas R\"ojemo,
+  Jaime S\'anches-Hern\'andez.
+  and Andrew Scheidecker.
+\end{acks}
+
+% -------------------- Bibliography ----------------
+\bibliography{../verse}
+
+\appendix
+
+\section{Confluence proof}
+
+\simon{Ranjit to fill in here}
+
+% ----------------------- Example
+
+\section{Example}
+A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
+This example shows how constraining the output of a function call can constrain the argument.
+While most of the reductions are administrative in nature, these are the highlights:
+At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
+
+Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
+At \circlednum{5} and \circlednum{6} the actual numbers are inline.
+After removing some garbage we reach the result at \circlednum{7}.
+\begin{figure}
+\begin{scriptsize}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
+$$
+\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+
+
+  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
+\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
+  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
+  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
+\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
+\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
+\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
+\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
+  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
+\end{array}
+$$
+\end{scriptsize}
+\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\end{figure}
+
+
+% ----------------------- Variations
+
 \section{Variations and choices} \label{sec:variations}
 
 %% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
@@ -2143,73 +2214,6 @@ pairs), from which we may pick the first and discard the rest.
 
 A lazy variant of \versecalc{} looks entirely feasible, but we have not worked out the details.
 
-\section{Looking back, looking forward}
-
-The semantics of \versecalc{} is designed at a level intended to capture the
-\emph{computational model} of the language; not all formal semantics do so.
-Defining a language by giving its low-level semantics is \emph{precise} but not necessarily \emph{illuminating}.
-For example, giving a reference compiler that compiles
-the program to x86 instructions is precise, but is not helpful
-to a human who is trying to understand exactly what the original program
-meant. Likewise, a high-level semantics simply provides the eventual answer
-produced by the program, without insight into the \emph{computational steps}
-that got us from program start to program completion.
-
-The moral here is that \emph{formal specifications can be obfuscatory---or
-illuminating.} The latter kind shed light because they are defined \emph{in
-terms of the intended mechanisms of the language}. \versecalc{} does this; it
-respects the conceptual structures of the Verse language.
-
-Note that when we say ``illuminating'' we mean that in multiple ways.
-A semantics can be illuminating for humans who are trying to understand
-what a particular program does, or how a proposed change to the language
-will affect the language. It can drive analyses that help the compiler
-optimize programs. It underlies the use of formal methods and verification
-to provide machine-derived and -checkable proofs of correctness. All of
-these applications depend on the semantics being defined at the appropriate
-level: the level of the computational model that underlies the language.
-This has been our goal in this work.
-
-We have much left to do.  The full Verse language has
-statically checked types.  In the dynamic semantics, the types can be
-represented by partial identity functions---identity of the values of
-the type and |fail| otherwise.  This gives a distinctive new
-perspective on type systems, one that we intend to develop in future
-work.  The full Verse language also has a statically-checked effect system,
-including both mutable references and input/output.  All these effects
-must be \emph{transactional}, {\eg}, when the condition of an |if|
-fails, any store effects in the condition must be rolled back.
-We have preliminary reduction rules for updateable references,
-but they are not included here.
-
-% -------------------- Acknowledgements ----------------
-\begin{acks}                            %% acks environment is optional
-                                        %% contents suppressed with 'anonymous'
-  We thank our colleagues for their helpful and specific
-  feedback on earlier drafts of this paper,
-  including
-  Jessica Augustsson,
-  Francisco L\'opez-Fraguas,
-  Andy Gordon,
-  Michael Hanus,
-  Juan Rodr\'iguez Hortal\'a,
-  Ranjit Jhala,
-  Dale Miller,
-  Niklas R\"ojemo,
-  Jaime S\'anches-Hern\'andez.
-  and Andrew Scheidecker.
-\end{acks}
-
-% -------------------- Bibliography ----------------
-\bibliography{../verse}
-
-\cleardoublepage
-
-\appendix
-
-\section{Confluence proof}
-
-\simon{Ranjit to fill in here}
 
 % ----------------------- Denotational semantics  -----
 \section{Denotational semantics} \label{sec:den-sem}
