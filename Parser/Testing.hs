@@ -149,7 +149,7 @@ testArgs = do
   let (flg, args') =
         case args of
           "-"        : r -> (defaultFlags{ fRewrite = True }, r)
-          "-rewrite" : r -> (defaultFlags{ fRewrite = True, fSplit = False }, r)
+          "-rewrite" : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = False }, r)
           "-eval"    : r -> (defaultFlags,                    r)
           "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
           "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = True }, r)

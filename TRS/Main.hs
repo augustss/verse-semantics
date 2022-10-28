@@ -1,7 +1,7 @@
 module Main where
 
 import TRSCore
-import RulesPOPL
+import RulesPLDI
 import TRS
 import Bind
 import Test.QuickCheck
@@ -22,11 +22,12 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 main = quickCheck prop_NormalForms
 
 prop_NormalForms p =
-  let trs = normalFormsFuelTrace 99 rulesPOPL p in
-    case M.toList (M.fromList [ (norm q,tr) | tr@((_,q):_) <- trs ]) of
+  let trs = normalFormsFuelTrace 99 rulesPLDI p in
+    case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
-        whenFail (do printTrace tr1
-                     putStrLn "----"
+        whenFail (do putStrLn "===trace:1==="
+                     printTrace tr1
+                     putStrLn "===trace:2==="
                      printTrace tr2) False
 
       [] -> whenFail (print "DOES NOT TERMINATE") True
@@ -36,6 +37,7 @@ prop_NormalForms p =
 -- Stuff to help debug rewrite rules in GHCi
 --------------------------------------------------------------------
 
+{-
 freshTrace :: Expr -> IO ()
 freshTrace e = print status >> printTrace' tr
   where
@@ -72,6 +74,8 @@ iVAR = VAR . ident
 
 iVar :: String -> Value
 iVar = Var . ident
+
+
 
 iDEF :: String -> Expr -> Expr
 iDEF = DEF . ident
@@ -136,3 +140,4 @@ e1'' =
     (
       INT 5 :=: ((iVAR "x" :=: iVAR "y") :>: iVAR "x")
     )
+-}

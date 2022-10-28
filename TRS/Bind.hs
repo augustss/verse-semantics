@@ -44,6 +44,10 @@ instance (Free a, Free b, Free c) => Free (a,b,c) where
 instance Free a => Free [a] where
   free = foldr union [] . map free
 
+-- This simplifies some code
+instance Free Ident where
+  free i = [i]
+
 --------------------------------------------------------------------------------
 
 data Bind t = Bind Ident t

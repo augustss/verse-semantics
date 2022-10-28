@@ -118,7 +118,8 @@ normalFormsFuelTrace' n rule t = go n S.empty [[("",t)]]
 
 
 traceShow :: Show a => String -> a -> a
-traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
+--traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
+traceShow msg x = x
 
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =

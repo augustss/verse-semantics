@@ -1,9 +1,10 @@
 module TRSAdapter(rewrite, coreToTrs) where
+import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
 import Data.Maybe
-import qualified TRSCore as T(Expr(..), Value(..), HNF(..), Op(..))
-import qualified Bind as T(Bind(..), Ident(..))
+import qualified TRSCore as T
+import qualified Bind as T
 import qualified RulesPOPL
 import qualified RulesPLDI
 import TRS
@@ -22,6 +23,7 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
  where
   n              = fRewriteSteps flg
   tr             = fTrace flg
+  latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace
      | otherwise = normalFormsFuelTrace
   checkOne [x]   = [x]
@@ -30,6 +32,7 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
                           map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
                          nes
   rtrace xs | not tr = res
+            | latex = trace (latexTrace xs) res
             | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res
     where res = snd (head xs)
 
@@ -145,3 +148,43 @@ allOps = [
   (T.MapAp, "mapAp$"),
   (T.Cons, "cons$")
   ]
+
+----------------------------------------------
+
+latexTrace :: Trace T.Expr -> String
+latexTrace = unlines . map one . reverse
+  where one (s, e) = "  & \\movestoR{" ++ map toLower s ++ "} & |" ++ showLatex e ++ "| \\\\"
+
+-- Show with the special notation used in the papers.
+-- The string excludes the || used to indicate preprocessing.
+showLatex :: T.Expr -> String
+showLatex ee = expr 0 ee ""
+  where
+    expr :: Int -> T.Expr -> ShowS
+    expr p (T.Val v) = value p v
+    expr p (a T.:=: b) = showParen (p > 3) $ expr 4 a . showString " == " . expr 4 b
+    expr p (a T.:>: b) = showParen (p > 1) $ expr 2 a . showString " ; "  . expr 1 b
+    expr p (a T.:|: b) = showParen (p > 2) $ expr 3 a . showString " `choose` " . expr 2 b
+    expr _ (a T.:@: b) = showString "apply1 " . value 4 a . showString "(" . value 0 b . showString ")"
+    expr _ T.Fail      = showString "fail"
+    expr p e@T.Def{}   = showString "def (" . shxs . showString ") (" . expr p a . showString ")"
+      where (xs, a) = getXs e
+            getXs (T.DEF y b) = (y:ys, c) where (ys, c) = getXs b
+            getXs b = ([], b)
+            shxs = foldr1 (\ x s -> x . showString " ^^ " . s) (map ident xs)
+    expr _ (T.One a)   = showString "one (" . expr 0 a . showString ")"
+    expr _ (T.All a)   = showString "all (" . expr 0 a . showString ")"
+    expr _ _ = undefined
+
+    value :: Int -> T.Value -> ShowS
+    value _ (T.Var x) = ident x
+    value p (T.HNF h) = hnf p h
+
+    ident = showString . show
+
+    hnf :: Int -> T.HNF -> ShowS
+    hnf _ (T.Int k) = showString (show k)
+    hnf _ (T.Op o)  = showString (show o)
+    hnf _ (T.Arr []) = showString "tup ()"
+    hnf _ (T.Arr vs) = showString "tup (" . foldr1 (\ x s -> x . showString "," . s) (map (value 0) vs) . showString ")"
+    hnf p (T.Lam (T.Bind x e)) = showParen (p>0) $ showString "lam " . ident x . showString " (" . expr 0 e . showString ")"

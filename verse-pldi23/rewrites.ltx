@@ -75,6 +75,7 @@
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
 \newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
 \newcommand{\wffv}[4]{\ensuremath{\vdash_|v| #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wffmany}[4]{\ensuremath{\vdash_{\!*} #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -101,13 +102,13 @@ $$
     \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
     \textit{Scalar Values} & s     & ::= & k \vb x \\
     \textit{Heap Values}   & h     & ::= & \op \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
-    \textit{Head Values}   & \hnf  & ::= & h \vb k \\
+    \textit{Head Values}   & |hnf| & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
     \textit{Expressions}   & e     & ::= & |v| \vb |e_1 ; e_2| \vb |fail| \vb |def x e| \vb |v == e|
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
 %     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \textit{Bindings}      & c     & ::= & |x = h| \\
+    \textit{Bindings}      & c     & ::= & |x = v| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
@@ -133,6 +134,7 @@ $$
       |if e_1 then e_2 else e_3| & \text{means}
       & |def v (v == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v)| & \text{|v,x| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+      |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
@@ -174,20 +176,16 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Unification:~\runi}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
 \rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}$ \\
-\rulename{u-var}    & |x == x|                                    & \movesto & |x| \\
-\rulename{u-lit}    & |k == k|                                    & \movesto & |k| \\
-\rulename{u-tup}    & |tup (s_1,dots,s_n) == tup ( sone' ,dots,s_n')| & \movesto & {|s_1==sone';dots;s_n==s_n'|} \\
-\rulename{u-fail-t} & |tup (s_1,dots,s_n) == tup (sone',dots,s_m')| & \movesto & |fail|& if $n \not = m$ \\
-\rulename{u-fail-l}   & |k_1 == k_2  |     & \movesto & |fail| & if $k_1 \not = k_2$ \\
-\rulename{u-fail-l-h} & |k == h | & \movesto & |fail| \\
-\rulename{u-fail-t-f} & |tup (dots) == lam y e |   & \movesto & |fail| & \\
-\rulename{u-fail-f} & |lam x_1 e_1 == lam x_2 e_2 |   & \movesto & |fail| &
+\rulename{u-scalar} & |s == s |                                    & \movesto & s \\
+\rulename{u-tup}    & |tup (s_1,dots,s_n) == tup (sone' ,dots,s_n')| & \movesto & \multicolumn{2}{l} {|s_1==sone';dots;s_n==s_n'; tup (s_1,dots,s_n)|} \\
+\rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
 \end{longtable}
 \begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
+\rulename{app-tup0} & |apply1N (tup ()) v| & \movesto & |fail| \\
 \rulename{app-tup}  & |apply1N (tup (s_0 dots s_n)) v| & \movesto
-	& |def x (x == v; (x = 0; s_0 choice dots choice x = n; s_n)| & if $|x| \not \in \freevars{|v|}$ \\
+	& |def x (x == v; (x = 0; s_0 choice dots choice x = n; s_n)| & if $|x| \not \in \freevars{|v|}, n \geq 0$ \\
 \rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
@@ -199,12 +197,12 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
 \rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
 \rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
-\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wffv{|e_1|}{|xs|}{|cs|}{|v|} \\
-\rulename{one-value}  & |one e|              & \movesto & |e| & if \wffv{|e|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
+\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; tup (vs)|
-               & if \wffv{|es|}{|xs|}{|cs|}{\overline{|v|}} \\
-\rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)|
+               & if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
+%% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}\label{fig:rewrite-rules}
 \end{figure}
@@ -222,9 +220,9 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
-\rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y ((e_1 == e_2))|   & if $|y| \not \in \freevars{|e_2|}$ \\
+\rulename{norm-defr}      & |v == (def y e)|      & \movesto & |def y ((v == e))|   & if $|y| \not \in \freevars{|v|}$ \\
 \rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |def x (x == v; x == e_1; v == e_2)| & if $|x| \not \in \freevars{|v|,|e_1|,|e_2|}$\\[0.05in]
+\rulename{norm-unifyr}    & |v_1 == (v_2 == e)|   & \movesto & |def x (x == v_1; x == v_2; x == e)|   & $|x|$ fresh \\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}
 \rulename{fail-seql}      & |fail ; e|            & \movesto & |fail| \\
@@ -244,13 +242,6 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 %
 \begin{figure}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
-\fbox{\wffv{|e|}{|xs|}{|cs|}{|v|}}
-\begin{mathpar}
-\inferrule
-  { \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \quad |xs| = \boundvars{|cs|} }
-  { \wffv{|e|}{|xs|}{|cs|}{|v|} }
-  { \rulename{WF-Val}}
-\end{mathpar}
 
 \fbox{\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}}
 \begin{mathpar}
@@ -261,7 +252,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \inferrule
   { x \in \Gamma }
-  {\wff{\Gamma}{|x == h|}{\emptyset}{|x == h|}{|x|}}
+  {\wff{\Gamma}{|x == v|}{\emptyset}{|x == v|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
@@ -273,19 +264,29 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \inferrule
   {x \in \Gamma \quad
-   \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|}
+    \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|} \quad
+    \freevars{h} \not\in |xs|
   }
-  {\wff{\Gamma}{|x == h; e_1|}{|xs|}{|x == h, cs|}{|e_2|}}
+  {\wff{\Gamma}{|x == v; e_1|}{|xs|}{|x == v, cs|}{|e_2|}}
   {\rulename{WF-Eq}}
 
 \\
 
+%\inferrule
+%  { \wff{\Gamma}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+%    \wff{\Gamma,|xs|}{|es_1|}{|xs|'}{|cs|'}{|es_2|}
+%  }
+%  { \wff{\Gamma}{|e_1|,|es_1|}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
+%  {\rulename{WF-many}}
 \inferrule
-  { \wff{\Gamma}{e_1}{|xs|}{|cs|}{|e_2|} \quad
-    \wff{\Gamma,|xs|}{|es_1|}{|xs|'}{|cs|'}{|es_2|}
+  { \wff{\emptyset}{r_1}{|xs|_1}{|cs|_1}{|e_1|} \quad
+    |dots| \quad
+    \wff{\emptyset}{r_n}{|xs|_n}{|cs|_n}{|e_n|} \quad
+    \quad
+    \text{all |x_i| distinct}
   }
-  { \wff{\Gamma}{|e_1|,|es_1|}{|xs|,|xs|'}{|cs|,|cs|'}{|e_2,es_2|} }
-  {\rulename{WF-many}}
+  { \wffmany{|r_1, dots, r_n|}{|xs|_1, |dots, xs|_n}{|cs|_1, |dots, cs|_n}{|e_1, dots, e_n|} }
+  {\rulename{WF-many} }
 \end{mathpar}
 \caption{\textbf{Well-formedness of Results}}\label{fig:wf}
 \end{figure}

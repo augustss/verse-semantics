@@ -57,9 +57,14 @@
 %format rs = "\overline{r}"
 %format vs = "\overline{v}"
 %format es = "\overline{e}"
+%format ys = "\overline{y}"
 %format es_1
 %format es_2
 %format hnf = "\mathit{hnf}"
+
+%% xs etc stole syntax used in examples.
+%format xsl = " xs "
+%format ysl = " ys "
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"

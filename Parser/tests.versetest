@@ -34,11 +34,40 @@ testeq(SEq) {3=4}                                 {:false}
 testeq(SEq) {3=3}                                 {3}
 testeq(SEq) {3=2}                                 {:false}
 
+# Failing unifications
+# Values to consider: K, op, tuple, lambda
+# K
+testeq(SEq) {1=2}                                 {:false}
+testeq(SEq) {1=prefix'-'}                         {:false}
+testeq(SEq) {1=(1,2)}                             {:false}
+testeq(SEq) {1=(x:any=>x)}                        {:false}
+# op
+testeq(SEq) {prefix'-'=1}                         {:false}
+testeq(SEq) {prefix'-'=prefix'+'}                 {:false}
+testeq(SEq) {prefix'-'=(1,2,3)}                   {:false}
+testeq(SEq) {prefix'-'=(x:any=>x)}                {:false}
+# tuple
+testeq(SEq) {(1,2)=1}                             {:false}
+testeq(SEq) {(1,2)=prefix'-'}                     {:false}
+testeq(SEq) {(1,2)=(1,2,3)}                       {:false}
+testeq(SEq) {(1,2)=(x:any=>x)}                    {:false}
+# lambda
+testeq(SEq) {(x:any=>x)=1}                        {:false}
+testeq(SEq) {(x:any=>x)=prefix'-'}                {:false}
+testeq(SEq) {(x:any=>x)=(1,2,3)}                  {:false}
+testeq(SEq) {(x:any=>x)=(x:any=>1)}               {:false}
+# Unification with equal values
+testeq(SEq) {1=1}                                 {1}
+testeq(SEq) {prefix'-'=prefix'-'}                 {:false}  # or maybe this works?
+testeq(SEq) {(1,2)=(1,2)}                         {(1,2)}
+testeq(SEq) {(x:any=>x)=(x:any=>x)}               {:false}
+
 # Arrays
 testeq(SEq){array{1;2;3}}                         {1,2,3}
 testeq(SEq){array{}}                              {()}
 
 testeq(SEq){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
+testeq(SEq){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 
 # Functions
 testeq(SEq){(x:int => x+1)[2]}                    {3}

@@ -3,7 +3,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module TRSCore where
 
-import Show
 import TRS
 import Bind
 import Test.QuickCheck
@@ -25,25 +24,24 @@ data Expr
   | Wrong                       -- ^ wrong
   | Split Expr Value Value      -- ^ split { e, v1, v2 }
 
-instance Show Expr where
-  show (Val v)          = show v
-  show (a :=: b)        = show' a ++ " = " ++ show' b
-  show (a :>: b)        = show' a ++ "; " ++ show' b
-  show (a :|: b)        = show' a ++ " | " ++ show' b
-  show (a :@: b)        = show a ++ "(" ++ show b ++ ")"
-  show Fail             = "fail"
-  show (Def (Bind x a)) = "def " ++ show x ++ " in {" ++ show a ++ "}"
-  show (One a)          = "one {" ++ show a ++ "}"
-  show (All a)          = "all {" ++ show a ++ "}"
-  show Wrong            = "wrong"
-  show (Split e v1 v2)  = "split {" ++ show e ++ ", " ++ show v1 ++ ", " ++ show v2 ++ "}"
+infixr 1 :>:
+infixr 2 :|:
+infix  3 :=:
+infixl 4 :@:
 
-instance Parens Expr where
-  parens (_ :=: _) = True
-  parens (_ :>: _) = True
-  parens (_ :|: _) = True
-  parens (_ :@: _) = False
-  parens _         = False
+instance Show Expr where
+  showsPrec p (Val v)          = showsPrec p v
+  showsPrec p (a :=: b)        = showParen (p > 3) $ showsPrec 4 a . showString " = " . showsPrec 4 b
+  showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
+  showsPrec p (a :|: b)        = showParen (p > 2) $ showsPrec 3 a . showString " | " . showsPrec 2 b
+  showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
+  showsPrec _ Fail             = showString "fail"
+  showsPrec _ (Def (Bind x a)) = showString "def " . showsPrec 0 x . showString " in {" . showsPrec 0 a . showString "}"
+  showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
+  showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
+  showsPrec _ Wrong            = showString "wrong"
+  showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
+                                 showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -155,7 +153,7 @@ instance Show Value where
 instance Show HNF where
   show (Int k)  = show k
   show (Op op)  = show op
-  show (Arr vs) = "arr{" ++ intercalate ", " (map show vs) ++ "}"
+  show (Arr vs) = "<" ++ intercalate ", " (map show vs) ++ ">"
   show (Lam (Bind x e)) = "(\\" ++ show x ++ "." ++ show e ++ ")"
 
 instance Show Op where
@@ -182,16 +180,25 @@ pattern VAR v  = Val (Var v)
 pattern INT n  = Val (VINT n)
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
+pattern EHNF h = Val (HNF h)
+pattern OP o   = Val (VOP o)
 pattern HVAL :: HNF -> Expr
 pattern HVAL v <- Val (getH -> Just v)
   where HVAL h = Val (HNF h)
+pattern SCL :: Value -> Expr
+pattern SCL v <- Val (getS -> Just v)
+  where SCL v = Val v
 
 getH :: Value -> Maybe HNF
 getH (HNF v@Arr{}) = Just v
 getH (HNF v@Lam{}) = Just v
+getH (HNF v@Op{}) = Just v
 getH _ = Nothing
 
-
+getS :: Value -> Maybe Value
+getS v@VINT{} = Just v
+getS v@Var{} = Just v
+getS _ = Nothing
 
 pattern DEF x e = Def (Bind x e)
 
@@ -218,41 +225,43 @@ pattern CONS    = HNF (Op Cons)
 --------------------------------------------------------------------------------
 
 instance Rec Expr where
-  rec r (a :=: b) =
-       [ (n, a' :=: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :=: b') | (n,b') <- rec r b ]
+  rec r e = r e ++
+    case e of
+      a :=: b ->
+           [ (n, a' :=: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :=: b') | (n,b') <- rec r b ]
     
-  rec r (a :|: b) =
-       [ (n, a' :|: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :|: b') | (n,b') <- rec r b ]
+      a :|: b ->
+           [ (n, a' :|: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :|: b') | (n,b') <- rec r b ]
 
-  rec r (a :>: b) =
-       [ (n, a' :>: b)  | (n,a') <- rec r a ]
-    ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
+      a :>: b ->
+           [ (n, a' :>: b)  | (n,a') <- rec r a ]
+        ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
 
-  rec r (Def (Bind x a)) =
-       [ (n, Def (Bind x a')) | (n,a') <- r a ]
+      Def (Bind x a) ->
+           [ (n, Def (Bind x a')) | (n,a') <- rec r a ]
 
-  rec r (f :@: a) =
-       [ (n,f' :@: a)  | (n,f') <- vrec r f ]
-    ++ [ (n,f  :@: a') | (n,a') <- vrec r a ]
+      f :@: a ->
+           [ (n,f' :@: a)  | (n,f') <- vrec r f ]
+        ++ [ (n,f  :@: a') | (n,a') <- vrec r a ]
   
-  rec r (Val v) =
-       [ (n,Val v') | (n,v') <- vrec r v ]
+      Val v ->
+           [ (n,Val v') | (n,v') <- vrec r v ]
   
-  rec r (One a) = [ (n, One a') | (n,a') <- rec r a ]
-  rec r (All a) = [ (n, All a') | (n,a') <- rec r a ]
-  rec r _       = []
+      One a -> [ (n, One a') | (n,a') <- rec r a ]
+      All a -> [ (n, All a') | (n,a') <- rec r a ]
+      _     -> []
+   where
+    vrec r (Var x) = []
+    vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
 
-vrec r (Var x) = []
-vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
-
-hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
-                          | (i,a) <- [0..] `zip` as
-                          , (n,a') <- vrec r a
-                          ]
-hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
-hrec r _                = []
+    hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
+                              | (i,a) <- [0..] `zip` as
+                              , (n,a') <- vrec r a
+                              ]
+    hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
+    hrec r _                = []
 
 {-
   rec r (Split e f g) = [ (n,Split e' f g) | (n,e') <- r e ]
@@ -365,9 +374,10 @@ instance Arbitrary Op where
 instance Arbitrary HNF where
   arbitrary = arbIdents >>= (sized . flip arbHNF)
 
-  shrink (Int n)  = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
-  shrink (Arr vs) = [ Arr vs' | vs' <- shrink vs ]
-  shrink _        = []
+  shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
+  shrink _         = []
 
 arbIdents :: Gen [Ident]
 arbIdents =
@@ -428,7 +438,8 @@ arbExpr n xs =
   frequency
   [ (1, Val `fmap` arbValue n xs)
   , (1, return Fail) -- maybe not have this?
-  , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
   , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbValue n2 xs <*> arbValue n2 xs)
