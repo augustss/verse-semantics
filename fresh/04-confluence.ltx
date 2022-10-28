@@ -889,58 +889,40 @@ If the reducts are disjoint then terms can be trivially joined.
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice versa.
 %
 \begin{description}
-\item[Case] $\rdx{\runi} \subset \rdx{\rspc}$ Split cases on the rule used in $\rspc$
-	\begin{description}
-	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
-	Let us split cases on where $\rdx{\runi}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
-		\item[Case] $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
-		\item[Case] $\rdx{\runi} \subset CX$ :
-
-		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\runi} \cdots |e_1 choice e_2|$
-		so
-		with two $\runi$ steps we can join at $|SX^[e_1' choice e_2']|$ where
-		$e_i' \equiv \cdots \rdx{\runi}' \cdots e_i$.
-		\end{description}
-
-
-	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
-	Let us split cases on where $\rdx{\runi}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
-		\item[Case] $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
-		\item[Case] $\rdx{\runi} \subset e_3$, \ie $\runi : e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
-		\end{description}
-
-	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
-	Here, $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$ so join at $SX[e']$.
-
-	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
-	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	Hence, by \cref{lem:gc-step-2}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
-
-	\item[Case] \rulename{all-choice}
- 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
-	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
-	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
-	If $\rdx{\runi} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
-	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
-	so we can join by concatenating the binders, constraints and value
-	of $e_1,\dots,e_i',\dots,e_n$.
-
-	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
-	Trivially $\rdx{\runi} \not \subset \rdx{\rspc}$.
-	\end{description}
-
-\item[Case] $\rdx{\rspc} \subset \rdx{\runi}$ Split cases on the rule used in $\runi$
-\begin{description}
-	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
-		If $\rdx{\rspc} \subset |v|$, \ie $\rspc : |v| \movesto |v'|$, then join (with two $\rspc$ steps) at $x = |v'|; E[|v'|]$.
-		If $\rdx{\rcon} \subset E[|x|]$, \ie $\rcon : E[|x|] \movesto E'[|x|]$, then join at $x = |v|; E'[|v|]$.
-	\item[Case:] \rulename{u-tup} \ie $\rspc \not \subset \runi$.
-	\item[Case:] \rulename{u-*} \ie~$\tx{\runi} \equiv c \movesto |fail|$; so join at |fail|.
+\item[Case] $\rdx{\runi} \subset \rdx{\rspc}$ via \cref{lem:under-s}.
+\item[Case] $\rdx{\rspc} \subset \rdx{\runi}$ via \cref{lem:under-u}.
 \end{description}
+\end{proof}
+
+\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+Let $\rr' \equiv \rr - \runi$.
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rsteps{\rr'}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in $\runi$.
+\begin{description}
+	\item[Case:] \rulename{u-scalar}, \rulename{u-tup} \ie $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ is impossible.
+	\item[Case:] \rulename{u-fail}, \ie~$\tx{\runi} \equiv \hnf_1 = \hnf_2 \movesto |fail|$ \ie $\rdx{} \subset \hnf_i$
+		hence, $\rdx{\runi}'' \equiv |fail|$.
+	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
+		If $\rdx{} \subset |v|$, \ie $\rr': |v| \movesto |v'|$, then join (with two $\rr'$ steps) at $\rdx{\runi}'' \equiv x = |v'|; E[|v'|]$.
+		If $\rdx{} \subset E[|x|]$, \ie $\rr' : E[|x|] \movesto E'[|x|]$, then join at $\rdx{\runi}'' \equiv x = |v|; E'[|v|]$.
+	% \ranjit{moved "choose" to UNIFICATION for duplication}
+	\item[Case:] \rulename{choose} \ie $\tx{\runi} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1]\ |choice|\ CX[e_2]]$.
+		Split cases on where $\rdx{}$ occurs.
+	 	\begin{description}
+	 	\item[Case] $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1']\ |choice|\ CX[e_2]]$.
+	 	\item[Case] $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1]\ |choice|\ CX[e_2']]$.
+	 	\item[Case] $\rdx{} \subset CX$ : Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{} \cdots [|e_1 choice e_2|]$
+	     	so with two $\rr'$ steps we can join at $\rdx{\runi}'' \equiv |SX^[e1' choice e2']|$ where
+	     	$e_i' \equiv \cdots \rdx{}' \cdots [e_i]$ for $i$ in $\{1,2\}$.
+	    \end{description}
 \end{description}
 \end{proof}
 
@@ -1573,13 +1555,29 @@ Hence, we can perform a second GC step from each of the terms above and join the
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
 
-\begin{lemma}[WF-Elim] \label{lem:gc-step}
-% If $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$ and $\rstep{\rr}{e}{e'}$ then
-%    $\wff{\emptyset}{e'}{|xs|'}{|cs|'}{\hnf'}$.
-If $\wff{\emptyset}{e_1}{|xs|}{|cs|}{e_2}$ where $|xs| \not \in \freevars{e_2}$
-   and $\rstep{\rr \setminus \rgc}{e_1}{e_1'}$
-then $\rstepo{\rr \setminus \rgc}{e_2}{e_2'}$ such that
-     $\wff{\emptyset}{e_1'}{|xs|}{|cs|'}{e_2'}$.
+\begin{lemma}[Under-$\rgc$] \label{lem:under-g}
+If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
+   $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rgc}''$ such that
+   $\rstepo{\rr}{\rdx{\rgc}'}{\rdx{\rgc}''}$ and
+   $\rstep{\gc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+HEREHEREHERE
+\end{proof}
+
+
+\begin{lemma}[WF-Step] \label{lem:wf-step}
+If $\wff{\emptyset}{e_1}{|xs|}{c_1 \dots c_n}{e_2}$
+   and $\rstep{}{e_1}{e_1'}$
+then $\wff{\emptyset}{e_1'}{|xs|}{c_1' \dots c_n'}{e_2'}$ where either
+%
+(a) there exists $i$ such that  $\rstep{}{c_i}{c_i'}$ and $\forall j \neq i.\ c_j \equiv c_j'$ and $e_2 \equiv e_2'$,
+or
+(b) $\forall j.\ c_j \equiv c_j'$ and $\rstep{}{e_2}{e_2'}$.
+%
 \end{lemma}
 
 \begin{proof}
@@ -1590,10 +1588,56 @@ splitting cases on the rule used for $\rstep{\rr}{e_1}{e_1'}$.
 
 \subsection{Speculation} % --------------------------------------------------------------------------
 
-\begin{lemma}[$\rspc$-Conf] \label{lem:s-c-todo}
+\begin{lemma}[$\rspc$-Conf] \label{lem:s-c}
 	$\rspc$ is confluent.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+\cref{lem:under-s} shows that $\rspc$ has the diamond property (as $\rspc \subset \rr$), and hence $\rspc$ is confluent via \cref{lem:diamond}.
+\end{proof}
+
+\begin{lemma}[Under-$\rspc$] \label{lem:under-s}
+If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
+   $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rspc}''$ such that
+   $\rstepo{\rr}{\rdx{\rspc}'}{\rdx{\rspc}''}$ and
+   $\rstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
+
+\begin{description}
+
+	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
+	Let us split cases on where $\rdx{}$ occurs.
+		\begin{description}
+		\item[Case] $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ so  $\rdx{\rspc}'' \equiv SX[e_1' |choice| (e_2 |choice| e_3)]$.
+		\item[Case] $\rdx{} \subset e_2$, \ie $\rr : e_2 \movesto e_2'$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| (e_2' |choice| e_3)]$.
+		\item[Case] $\rdx{} \subset e_3$, \ie $\rr : e_3 \movesto e_3'$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| (e_2 |choice| e_3')]$.
+		\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| e_3)]$.
+		\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so  $\rdx{\rspc}'' \equiv SX[e_2 |choice| e_3)]$.
+		\end{description}
+
+	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
+	Here, $\rdx{} \subset e$, \ie $\rr : e \movesto e'$ so $\rdx{\rspc}'' \equiv SX[e']$.
+
+	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|v|}$.
+	If $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ then by \cref{lem:wf-step}, $\rdx{\rspc}'' \equiv e_1'$.
+	If $\rdx{} \subset e_2$, then join at $e_1$.
+
+	\item[Case] \rulename{all-choice}
+ 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e'$
+	where each $\wff{\emptyset}{e_i}{\overline{x_i}}{\overline{c_i}}{\overline{|v|_i}}$ and $e'$
+	is the concatenation of binders, constraints and values of each $e_i$.
+	If $\rdx{} \subset e_i$ ie $\rr : e_i \movesto e_i'$ then by \cref{lem:wf-step}
+	$\wff{\emptyset}{e_i'}{\overline{x_i}}{\overline{c'_i}}{|v|_i'}$
+	so $\rdx{\rspc}''$ is obtained by suitably concatenating the above binders, constraints and value
+	with those of the other $e_j$.
+
+	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Trivially $\rdx{} \not \subset \rdx{\rspc}$.
+\end{description}
 \end{proof}
