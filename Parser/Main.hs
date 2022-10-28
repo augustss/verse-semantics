@@ -144,6 +144,7 @@ flagTable =
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
   ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
   ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
+  ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ]
 
