@@ -438,7 +438,8 @@ arbExpr n xs =
   frequency
   [ (1, Val `fmap` arbValue n xs)
   , (1, return Fail) -- maybe not have this?
-  , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
   , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbValue n2 xs <*> arbValue n2 xs)
