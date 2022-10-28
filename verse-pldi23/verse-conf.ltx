@@ -1347,16 +1347,24 @@ Laziness would be another possible design choice, one that is even more expressi
 
 \subsection{Evaluation strategy} \label{sec:eval-strategy}
 
-The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
-rewrite rule to apply next if you want to execute the program. That is
-the role of an \emph{evaluation strategy} that, given a closed term, says which redex
-to rewrite first.  For example, in the pure lambda calculus, \emph{normal-order reduction},
-sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
-guarantees to terminate if any strategy does so.
+Any rewrite rule can apply anywhere in the term, at any time.  For example in the term |(x=3+4; y=3*2; x+y)|
+the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |3*2| $\rightarrow$ |6|,
+or the other way around.
+The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
+the \rulename{deref} rules only fire when the RHS is a value.
+By choosing rewrite rules carefully, we can for example express call-by-name,
+call-by-name, and call-by-need
+\cite{ariola:call-by-need}.
 
+An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
+out of the many possible redexes, should I rewrite next to make progress towards the result?
 Any decent evaluation strategy should (a) guarantee to terminate if there
 is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code.
+For example, in the pure lambda calculus, \emph{normal-order reduction},
+sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
+guarantees to terminate if any strategy does so.
+
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
@@ -1822,7 +1830,7 @@ for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 
 In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can still make progress, by floating out the
-choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
+choice (rule \rulename{choose} in \cref{fig:rewrite-rules}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
@@ -1860,8 +1868,8 @@ Second, even under the reification of |allKW|,
 \versecalc{} is \emph{deterministic}.  Choice is not
 non-deterministic: \versecalc{} takes pains to maintain order, so that
 when reifying choice into a tuple, the order of elements in that
-tuple is completely determined.  Anything else would leak
-non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
+tuple is completely determined.
+This determinism has a price: as we saw in \cref{sec:mixing}
 and \cref{sec:choice-rules}, we have to take care to maintain the
 left-to-right order of choices.
 However, maintaining that order has other payoffs. For example, it is relatively easy to add
@@ -1875,15 +1883,15 @@ and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
-they are ``rigid.''  This notion is nicely captured by the execution context |X|, which limits the
-scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and |allKW|.
+they are ``rigid.''  This notion is nicely captured by the fact that equalities
+cannot float outside |oneKW| and |allKW| (\cref{sec:normalization}).
 
 \subsection{The semantics of logical variables} \label{sec:magical}
 
 Our logical variables, introduced by |defKW|, are often called
 \emph{extra variables} in the literature, because they
-are typically introduced as variables that appear on the right-hand side of a function
-definition, but are not bound on the left.  For example, in Curry we can write
+are typically introduced as variables that appear on the right-hand side of a
+function definition, but are not bound on the left.  For example, in Curry we can write
 \begin{verbatim}
      first x | x =:= (a,b) = a where a,b free
 \end{verbatim}
@@ -1891,7 +1899,7 @@ Here \verb!a! and \verb!b! are logical variables, not bound on the left; they
 get their values through unification (written ``\verb!=:=!'').   In Curry they are explicitly introduced
 by the ``\verb!where a,b free!'' clause, while in many other papers their
 introduction is implicit in the top-level rules, simply by not being bound
-on the left.  Logical variables are
+on the left.  These extra variables (our logical variables) are
 at the heart of the ``logic'' part of functional logic programming.
 
 Constructor-based ReWrite Logic (CRWL) \cite{crwl} is the brand leader for
@@ -1965,10 +1973,10 @@ distinguished from ordinary variables. As Hanus describes, it is possible
 to translate a higher-order program into a first-order
 form\footnote{
   Hanus does not mention this, but for a language with arbitrarily nested lambdas
-  one would need to do lambda-lifting as well, but that is a small point.}
+  one would need to do lambda-lifting as well, but that is perhaps a minor point.}
 using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
-Sadly, this encoding is hardly a natural rendition of the lambda calculus:
+Sadly, this encoding is hardly a natural rendition of the lambda calculus, and
 it obstructs the goal of using rewrite rules to explain to programmers how
 their program might execute. In contrast, a strength of our \versecalc{}
 presentation is that it deals natively with the full lambda calculus.
@@ -2008,7 +2016,7 @@ lambdas are semantically identical.  The problem, obviously, is that it is hard
 to tell if they \emph{are} semantically identical.
 
 We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that rewrites in two different ways, depending on which equality we \rulename{subst} first:
+Here is an expression that rewrites in two different ways, depending on which equality we \rulename{deref-h} first:
 \[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
@@ -2018,8 +2026,20 @@ Here is an expression that rewrites in two different ways, depending on which eq
 % \end{array}
 % $$
 These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
-lead to |fail|, and confluence is restored.  A perhaps-unexpected consequence is that we cannot add a rule
-$\rulename{urefl}\; |(x=x)| \movesto |x|$, because that would lead to non-confluence if |x| turns out to be a lambda.
+lead to |fail|, and confluence is restored.
+
+There is a very delicate interaction with the apparently-innocuous
+rule \rulename{u-scalar} (\cref{fig:rewrite-rules}).
+Consider |(def x (x==(lam y y); x==x))|.
+If we apply \rulename{u-scalar}, and then \rulename{deref-h} we get |(lam y y)|. But if we \emph{first}
+apply \rulename{deref-h}, twice, we get |((lam y y) == (lam y y))|, and that fails.  Yikes!
+
+But in fact all is well: the |A| context (\cref{fig:rewrite-rules}) \emph{only
+  allows \rulename{deref-h} to apply in positions where the value is immediately
+  consumed in some way}, by being applied to an argument, or being
+unified with a value.  So in our example, \rulename{deref-h} simply does not apply. Only \rulename{u-scalar} does,
+so we get |(def x (x==(lam y y); x))| and that's it.  Confluence is restored.
+But the ice is thin here, so it is reassuring that we have a proof of confluence.
 
 % JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
 
@@ -2053,24 +2073,14 @@ would require many more rules, to describe how to distribute, {\eg}, application
 Restricting to values involves no loss of expressive power:
 it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
-We could take the ANF idea a bit further, by restricting the syntax of equalities so
-that the left-hand-side is always a value.
-Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form,
-by desugaring |(e_1 = e_2)| to |(def x (x = e_1; x = e_2))|.
-The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
-We have chosen not to do this, mainly because it makes |(=)| asymmetrical and adds a lot of clutter;
-a debatable decision, but one of no great consequence.
-
 \subsection{Dead existentials}
 
-Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-eliml} comes closest,
-but it insists that every existential is given a value. It would be easy to add a rule to discard an existential
-whose bound variable is not used in its body, and so far as we know, doing so would not lead to
-new difficulties for (say) confluence.  It is mostly a philosophical issue.  For example, the term
+Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
+argue that it should instead be stuck.
+For example, the term
 |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
   solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
-For now, we make a conservative choice, and insist that every existential gets a value:
-only \rulename{def-eliml} and \rulename{def-elimr} eliminate an existential.
+It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
 
 \subsection{Ordering and choices}
 
@@ -2078,13 +2088,13 @@ As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than 
 First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
 the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
 $$
-\rulename{simpler-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[e_1] choice X^[e_2]|
+\rulename{simpler-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[e_1] choice CX^[e_2]|
 $$
 The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
 Another possibility would be to accept that results may come out in the ``wrong'' order, but have
 some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
 $$
-\rulename{labeled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
+\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[L; e_1] choice CX^[R; e_2]|
 $$
 Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
 labelled expressions, something in the spirit of
