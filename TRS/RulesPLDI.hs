@@ -11,11 +11,6 @@ import Data.Maybe( maybeToList, fromMaybe )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
-anySame :: (Eq a) => [a] -> Bool
-anySame [] = False
-anySame [_] = False
-anySame (x:xs) = x `elem` xs || anySame xs
-
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
 
@@ -121,73 +116,73 @@ rulesSpeculation =
 
 rulesPrimOps :: ERule
 rulesPrimOps lhs =
-  "P-ADD" `name`
+  "APP-ADD" `name`
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
  ++
-  "P-SUB" `name`
+  "APP-SUB" `name`
   do SUB :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1-k2))
  ++
-  "P-MUL" `name`
+  "APP-MUL" `name`
   do MUL :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1*k2))
  ++
-  "P-DIV" `name`
+  "APP-DIV" `name`
   do DIV :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k2 /= 0
        then pure (INT (k1 `div` k2))
        else pure Fail
  ++
-  "P-NEG" `name`
+  "APP-NEG" `name`
   do NEG :@: VINT k <- [lhs]
      pure (INT k)
  ++
-  "P-PLUS" `name`
+  "APP-PLUS" `name`
   do PLUS :@: VINT k <- [lhs]
      pure (INT k)
  ++
-  "P-GRT" `name`
+  "APP-GT" `name`
   do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 > k2
        then pure (INT k1)
        else pure Fail
  ++
-  "P-GRE" `name`
+  "APP-GE" `name`
   do GRE :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 >= k2
        then pure (INT k1)
        else pure Fail
  ++
-  "P-LST" `name`
+  "APP-LT" `name`
   do LST :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 < k2
        then pure (INT k1)
        else pure Fail
  ++
-  "P-LSE" `name`
+  "APP-LE" `name`
   do LSE :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 <= k2
        then pure (INT k1)
        else pure Fail
  ++
-  "P-NEQ" `name`
+  "APP-NE" `name`
   do NEQ :@: VARR [VINT k1, VINT k2] <- [lhs]
      if k1 /= k2
        then pure (INT k1)
        else pure Fail
  ++
-  "P-IsINT" `name`
+  "APP-ISINT" `name`
   do IsINT :@: (HNF hnf) <- [lhs]
      case hnf of
        Int _ -> pure (ARR [])
        _     -> pure Fail
  ++
-  "P-MAPAP" `name`
+  "APP-MAPAP" `name`
   do MAPAP :@: VARR vs <- [lhs]
      pure (mapAp vs)
  ++
-  "P-CONS" `name`
+  "APP-CONS" `name`
   do CONS :@: VARR [v, VARR vs] <- [lhs]
      pure (ARR (v:vs))
 
@@ -223,15 +218,16 @@ rulesApplication lhs =
            e' = subst [(x, Var x')] e
        pure (beta x' e')
  ++
+  "APP-TUP0" `name`
+  do VARR [] :@: _ <- [lhs]
+     pure Fail
+ ++
   "APP-TUP" `name`
-  do VARR vs :@: v <- [lhs]
-     case vs of
-       [] -> pure Fail
-       _  ->
-         let x = identNotIn (free lhs)
-             xe = VAR x
-             e = foldr1 (:|:) [ (xe :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ]
-         in  pure (Def (Bind x ((xe :=: Val v) :>: e)))
+  do VARR vs@(_:_) :@: v <- [lhs]
+     let x = identNotIn (free lhs)
+         xe = VAR x
+         e = foldr1 (:|:) [ (xe :=: INT i) :>: Val vi | (i, vi) <- [0..] `zip` vs ]
+     pure (Def (Bind x ((xe :=: Val v) :>: e)))
 
 --------------------------------------------------------------------------------
 
@@ -310,25 +306,25 @@ rulesUnificationNoOcc lhs =
 
 rulesChoice :: ERule
 rulesChoice lhs =
-  "FAIL-L" `name`
-  do (sx, e) <- scopeX lhs
-     Fail :|: e <- [e]
-     pure (sx e)
- ++
-  "FAIL-R" `name`
-  do (sx, e) <- scopeX lhs
-     e :|: Fail <- [e]
-     pure (sx e)
+  "CHOOSE" `name`
+  do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX1 e
+     pure (sx (cx e1 :|: cx e2))
  ++
   "CHOOSE-ASSOC" `name`
   do (sx, e) <- scopeX lhs
      (e1 :|: e2) :|: e3 <- [e]
      pure (sx (e1 :|: (e2 :|: e3)))
  ++
-  "CHOOSE" `name`
-  do (sx, e)         <- scopeX lhs
-     (cx, e1 :|: e2) <- choiceX1 e
-     pure (sx (cx e1 :|: cx e2))
+  "CHOOSE-R" `name`
+  do (sx, e) <- scopeX lhs
+     Fail :|: e <- [e]
+     pure (sx e)
+ ++
+  "CHOOSE-L" `name`
+  do (sx, e) <- scopeX lhs
+     e :|: Fail <- [e]
+     pure (sx e)
 
 -- Put v into ctx, alpha-converting binders in ctx
 -- when necessary to avoid capture.
@@ -366,95 +362,6 @@ elimDead ee =
     (bs, e'') = getBs [] e'
   in
     simpleCst xs bs e''
-{-
- else
-   "ELIM-DEF" `name`
-   do Def (Bind x e) <- [lhs]
-      guard (x `notElem` free e)
-      pure e
-   ++
-   "ELIM-CST" `name`
-   do Def _ <- [lhs]
---      traceM $ show (lhs, elimCst lhs)
-      elimCst lhs
--}
-
-{-
--- This is exactly as in the paper, it is wrong.
--- It does not allow the bindings to be a permutation of the defs.
-elimCst_1 :: Expr -> [Expr]
-elimCst_1 e =
-  let
-    getXs rs (Def (Bind x e)) = getXs (x:rs) e
-    getXs rs e = (reverse rs, e)
-    (xs, e') = getXs [] e
-    vs = free e'
-    checkEs [] r = [r]
-    checkEs (x:xs) ((VAR x' :=: HVAL _) :>: r) | x == x', x `notElem` vs = checkEs xs r
-    checkEs _ _ = []
-  in
-    checkEs xs e'
-
--- As in the paper, but
---  * allow permutations
---  * eliminate v (hot h)
--- Still wrong, since it is too picky
-elimCst_2 :: Expr -> [Expr]
-elimCst_2 e =
-  let
-    getXs rs (Def (Bind x e)) = getXs (x:rs) e
-    getXs rs e = (rs, e)
-    (xs, e') = getXs [] e
-    checkEs [] r | null (intersect xs (free r)) = [r]
-    checkEs is ((VAR x :=: Val _) :>: r) |
-      x `elem` is = checkEs (delete x is) r
-    checkEs _ _ = []
-  in
---    trace ("elimCst: " ++ show (e, xs, e')) $
-    checkEs xs e'
--}
-
--- In a "def x1,x2,... in y1=e1; ...; e"
--- find all variables y_i where y_i is in xs,
--- and y_i is not reachable from e.
--- The y_i must also be unique.
-elimCst :: Expr -> [Expr]
-elimCst ee =
-  let
-    getXs rs (Def (Bind x e)) = getXs (x:rs) e
-    getXs rs e = (reverse rs, e)
-    getBs bs ((VAR x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
-    getBs bs e = (reverse bs, e)
-    -- xs are the initial defined variables
-    (xs, e') = getXs [] ee
-    -- bs are the bindings
-    (bs, e'') = getBs [] e'
-    -- deps is the dependency graph from the bindings
-    deps = [(x, free e) | (x, e) <- bs]
-    -- Since the bindings are really unifications, the LHS is reachable from the RHS
-    deps' = [] -- [(y, [x]) | (x, ys) <- deps, y <- ys ]
-    -- unr are the identifiers not reachable from e''
-    unr = dfs (deps ++ deps') (free e'')
-    dfs g [] = map fst g   -- anything remaining is unreachable
-    dfs g (i:is) =
-      let vs = [ v | (i', vs) <- g, i == i', v <- vs ]
-          g' = filter ((/= i) . fst) g
-      in  dfs g' (vs ++ is) -- continue with more reachable
-    -- del are the variables to delete, must be unreachable and defined here
-    del = filter (`elem` xs) unr
-    xs' = filter (`notElem` del) xs
-    bs' = filter ((`notElem` del) . fst) bs
-    res = existBind xs' bs' e''
-    isAlias (_, VAR{}) = True
-    isAlias _ = False
-  in
-    case simpleCst xs bs e'' of
-      [] -> 
-        if null del || anySame del || any isAlias bs then
-          []
-        else
-          [res]
-      es -> es
 
 existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs bs ee = mkRes xs (map (\ (x, v) -> VAR x :=: v) bs) ee
@@ -759,6 +666,10 @@ wfRes e = do
 wfResE :: Expr -> [([Ident], [Expr], Expr)]
 wfResE = maybeToList . wf []
   where
+    -- WF-EQ-VAL
+    wf g (c@(VAR x :=: EHNF h)) = do
+      guard (x `elem` g)
+      pure ([], [c], VAR x)
     -- WF-DEF
     wf g (DEF x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
@@ -770,15 +681,10 @@ wfResE = maybeToList . wf []
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
       pure (xs, c:cs, e2)
-    -- WF-EQ-VAL
-    wf g (c@(VAR x :=: EHNF h)) = do
-      guard (x `elem` g)
-      pure ([], [c], VAR x)
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
     -- For now, just be eager, i.e., do the above first.
     wf g e = do
---      guard (null (free e \\ g))
       pure ([], [], e)
     -- Not WF
 --    wf _ _ = Nothing
@@ -808,7 +714,6 @@ rulesNormalization lhs =
   do (e1 :>: e2) :>: e3 <- [lhs]
      pure (e1 :>: (e2 :>: e3))
  ++
-  -- NOTE: not like the paper, added e2
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(VAR x :=: Val v) :>: e2) <- [lhs]
      let valid | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
