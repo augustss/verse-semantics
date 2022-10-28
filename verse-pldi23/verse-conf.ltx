@@ -656,7 +656,7 @@ $$
 If |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't right:
 what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
-which wraps the then and else branches in a thunk:
+given in \Cref{fig:syntax}, which wraps the then and else branches in a thunk:
 $$
 |apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
@@ -666,8 +666,7 @@ As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| wi
 remain un-evaluated until the choice is made, just as we expect.
 
 We use the same local-propagation rule for |oneKW| that we do for choice (\Cref{sec:mixing});
-together with the desugaring for |if| into |oneKW|,
-we get the ``special property'' of |if| described above.
+together with the desugaring for |if| into |oneKW|, we get the ``special property'' of |if| described above.
 
 \subsection{Tuples and |allKW|} \label{sec:tuple}
 The main data structure in \versecalc{} is the tuple.
@@ -990,7 +989,7 @@ does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
 
-\subsection{Unification}
+\subsection{Unification} \label{sec:unification-rules}
 
 Next we study unification, again in \cref{fig:rewrite-rules}.
 Rules \rulename{u-scalar} and \rulename{u-tup}
@@ -1073,27 +1072,81 @@ the components of tuples are scalars (\Cref{fig:syntax}).  Not substituting unde
 device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
 \Cref{sec:confluence}.
 
-\item Perhaps surprisingly, there is no ``occurs check''.  It is very important to allow
+\item Perhaps surprisingly, there is no ``occurs check'', leading to |fail|.  It is very important to allow
   allow bindings like |(f == lam x (dots (apply1 f (x-1)) dots))| to substitute,
   because that is how we define a recursive function!  We even allow |(x == tup (1, x))|. Of course,
   recursive bindings can lead to infinite rewriting sequences; it is up to the evaluation strategy
   to avoid this (\Cref{sec:eval-strategy}).
 \end{itemize}
 
+\subsection{Local substitution} \label{sec:local-subst}
+
+Consider this (extremely) tricky term:
+$$
+|def x (x = if (x=0; x>1) then 33 else 55)|
+$$
+What should this do? At first you might think it was stuck; how can we simplify the |if|
+when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{deref-s} allows
+us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
+$$
+\begin{array}{l@@{\;}l}
+                                & |def x (x = if (x=0; x>1) then 33 else 55)| \\
+\movestoR{deref-s}              & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
+\movestoR{u-fail,fail-seql}     & |def x (x = if fail then 33 else 55)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55)| \\
+\movestoR{def-elim}            & |55|
+\end{array}
+$$
+Minor variants of the same example get stuck instead of reducing. For example, if you replace
+the |(x=0)| with |(x=100)| then rewriting gets stuck, as the reader may verify; and yet there
+is a solution to the equations, namely $x=55$.
+And if you replace |(x=0)| with |(x=55)| then rewriting again
+gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
+Perhaps this is not surprising: we cannot reasonably expect the program to solve arbitrary equations.
+For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
+
+% It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
+% substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
+% $$
+% \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
+%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+% $$
+% Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
+% $$
+% |def x (x = if (def y (y=x; y=0; y>1)) then 33 else 55)|
+% $$
+% In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
+% Suppose we use \rulename{global-subst} instead of \rulename{subst}.  Then we can rewrite this term in two
+% different ways:
+% \begin{itemize}
+% \item Use \rulename{global-subst} on |(y=x)|; doing so recovers the original tricky term, which is
+% stuck, because \rulename{global-subst} cannot rewrite it.
+% \item Use \rulename{global-subst} on |(y=0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
+% \end{itemize}
+% We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
+% This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
+% the simpler \rulename{global-subst}: to establish confluence.
+
 \subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
 
 \figureNormalizationRules
 
-\simon{Wavefront}
-
-The syntax of \Cref{fig:syntax} allows |(def x e)| and |(v == e)| to occur anywhere
+The syntax of \Cref{fig:syntax} allows |(def x e)|, |(v == e)|, and |(e_1;e_2)|
+to occur anywhere
 in an expression. But to make other rules more applicable, it may be necessary to
-``float'' these expression upward.  For example, we can't use |(x == (e; 3))|
-to substitute for |x| via rule \rulename{deref-h}, because the RHS of the |x|-equality is not a value.
-But if we were to float the equality outwards (rule \rulename{norm-seqr}), to give |(e; x = 3)|, we can
-substitute for |x|, and then for |y|.
+``float'' these expression upward.  For example, we can't use \rulename{deref-h} to
+substitute for |x| in |(x == (e; 3); x+2)|,
+because the RHS of the |x|-equality is not a value.
+But if we were to float the semicolon outwards to give |(e; x = 3; x+2)|, we could then
+substitute for |x|.
 
-\Cref{fig:normalization-rules} gives a collection of rules that systematically move
+%
+% Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
+% \rulename{norm-seqr} gives us |(y==x+1; x==3; y)|; to make further progress we must
+% move the |x==3| to the left, using \rulename{norm-seq-swap2}, giving |(x==3; y==x+1; y)|.
+% Now we can substitute for |x|, and then for |y|.
+
+Thus motivated, \Cref{fig:normalization-rules} gives a collection of rules that systematically move
 existentials and unifications upward and to the left.  The net effect is to normalise
 the term to a form with existentials at the top, then scalar equalities, and then
 heap equalities, thus
@@ -1101,25 +1154,37 @@ $$
 |def (x_1,dots,x_n) (x_1 == s_1 ; dots ; x_i = h_i; x_n == h_n; e)|
 $$
 You can think of this form as ``an expression |e| wrapped in some heap bindings |x_i==v_i|''. The
-heap bindings express, as a term, the possibly-recursive value of the |x_i|, but the right-hand
+heap bindings express, as a term, the possibly-recursive values of the |x_i|, but the right-hand
 sides |v_i| are all values, so there is no computation left in the heap.  This decomposition is
 so important that we define a judgement $\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}$ in \Cref{fig:wf},
-which decomposes an expression $|e_1|$ into its heap, specified by |xs| and |cs| and the expression
+which decomposes an expression $|e_1|$ into its heap, specified by |xs| and |cs|, and the expression
 wrapped in that heap, |e_2|.  (The non-terminal |c| is just short for |x==v|; \Cref{fig:syntax}).
-Notice that, if invoked with $\Gamma = \emptyset$, this judgement checks that that the existentals
-bind precisely the same variables as are defined by the |cs|, no more and no less.
+Notice that, if invoked with $\Gamma = \emptyset$, this judgement checks that that the equalities
+|cs| fix only variables bound by one of the existentials |xs|; and moreover that there is only
+one such equality.
 
-But note carefully  that \emph{the normalisation rules do not float equalities or existentials out of choices}.
-For example, consider |def x ((x=3; x+1) choice (x=4; x*2)); x)|.
+One very useful application of this decomposition is \rulename{elim-def} in \Cref{fig:normalization-rules},
+which allows an entire heap of possibly-recursive bindings to be discarded if none of its variables are used.
+However \rulename{elim-def} just allows you to tidy up an expression; is not necessary for progress,
+and you can omit it entirely if you want.
 
-
+The normalization rules also
+\begin{itemize}
+  \item Associate ``|;|'' to the right (rule \rulename{norm-seq-assoc}).
+  \item Drop a value to the left of a ``|;|'' (rule \rulename{seq}).
+  \item Propagate |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}).
+  \item Put a variable on the LHS of an equality, where possible (rule \rulename{norm-swap-eq}).
+\end{itemize}
+Note that the normalization rules preserve the left-to-right sequencing of expressions,
+which matters because choices are made left-to-right as we saw in \Cref{sec:mixing}.
+Moreover, note that \emph{the normalisation rules do not float equalities or existentials out of choices}.
 That restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
 We must not propagate the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
-But rule \rulename{subst}
+But rule \rulename{deref-s}
 \emph{can} propagate it locally
 within the first arm of the choice, thus\footnote{
 You may wonder if this local propagation is useful, a point we return
@@ -1130,16 +1195,6 @@ $$
 |y = ((x=3; 3*2) choice (x=4)); tup (x+1,y)|
 $$
 To make further progress, we need a rule for choice, see \cref{sec:choice-rules}.
-
-One useful consequence of this decomposition is \rulename{elim-def} in \Cref{fig:rules-normalize},
-which allows an entire heap of possibly-recursive bindings to be discarded if none of its variables are used.
-
-The normalization rules also:
-\begin{itemize}
-  \item Associate ``|;|'' to the right.
-  \item Drop a value to the left of a ``|;|'' (rule \rulename{seq}).
-  \item Propagate |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}.
-\end{itemize}
 
 % If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
 % the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
@@ -1164,53 +1219,10 @@ The normalization rules also:
 %% The \label has been commented out.
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
-\subsection{Local substitution} \label{sec:local-subst}
-
-Consider this (extremely) tricky term:
-$$
-|def x (x = if (x=0; x>1) then 33 else 55)|
-$$
-What should this do? At first you might think it was stuck; how can we simplify the |if|
-when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
-us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
-$$
-\begin{array}{l@@{\;}l}
-                                & |def x (x = if (x=0; x>1) then 33 else 55)| \\
-\movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
-\movestoR{fail}                 & |def x (x = if fail then 33 else 55)|\\
-\movestoC{\text{simplify |if|}} & |def x (x = 55)| \\
-\movestoR{def-eliml}            & |55|
-\end{array}
-$$
-Minor variants of the same example get stuck instead of reducing. For example, if you replace
-the |(x=0)| with |(x=100)| then rewriting gets stuck, as the reader may verify; and yet there
-is a solution to the equations, namely $x=55$.
-But if you replace |(x=0)| with |(x=55)| then rewriting again
-gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
-
-It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
-substitution over the entire scope of the |defKW|, and combining it with \rulename{def-eliml} thus:
-$$
-\rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
-        \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
-$$
-Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
-$$
-|def x (x = if (def y (y=x; y=0; y>1)) then 33 else 55)|
-$$
-In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
-Suppose we use \rulename{global-subst} instead of \rulename{subst}.  Then we can rewrite this term in two
-different ways:
-\begin{itemize}
-\item Use \rulename{global-subst} on |(y=x)|; doing so recovers the original tricky term, which is
-stuck, because \rulename{global-subst} cannot rewrite it.
-\item Use \rulename{global-subst} on |(y=0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
-\end{itemize}
-We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
-This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
-the simpler \rulename{global-subst}: to establish confluence.
 
 \subsection{Rules for choice} \label{sec:choice-rules}
+
+\simon{Wavefront}
 
 The rules for choice are given in \cref{fig:choice}.
 Rules \rulename{one-value}, \rulename{one-choice}
@@ -1243,8 +1255,7 @@ $$
  \movestoR{subst}                & |def x ((if (1>0)  then 55 else 44); (x=1); (77 choice 99))|\\
  \movestoC{\text{simplify |if|}} & |def x (55; (x=1); (77 choice 99))|\\
  \movestoR{seq}                  & |def x ((x=1); (77 choice 99))|\\
-% \movestoR{def-eliml}           & |1; (77 choice 99)|\\
- \movestoRR{def-eliml}{seq}      & |77 choice 99|\\
+ \movestoRR{def-elim}{seq}      & |77 choice 99|\\
 \end{array}
 $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
@@ -1424,7 +1435,7 @@ $$
 
 
 
-\section{Metatheory} \label{sec:metatheory}
+\section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}
 
 The rules of our rewrite semantics can be applied anywhere,
 in any order, and they give meaning to programs without
@@ -1439,7 +1450,8 @@ that all possible execution paths lead to the same normal form.
 However, since \calcname has recursion, we instead show that
 the rules are \emph{confluent}.
 
-
+\simon{Check that the forward reference from the next-to-last bullet in \Cref{sec:unification-rules} makes sense.}
+  
 \subsection{Confluence}
 
 \mypara{Reductions and Confluence}
