@@ -260,14 +260,15 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \\
 \inferrule
-  { \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \quad
+  { \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \\
     x \not \in |xs|}
   { \wff{\Gamma}{|def x e_1|}{|x,xs|}{|cs|}{|e_2|} }
   { \rulename{WF-Def} }
 
 \inferrule
-  {x \in \Gamma \quad
-    \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|} \quad
+  { x \in \Gamma \quad v \not= x \\
+    \text{if $v = s$ then $x \not\in \freevars{|e_1|}$} \\\\
+    \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|} \\
     \freevars{h} \not\in |xs|
   }
   {\wff{\Gamma}{|x == v; e_1|}{|xs|}{|x == v, cs|}{|e_2|}}
