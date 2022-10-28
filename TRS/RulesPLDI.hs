@@ -7,7 +7,7 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
-import Data.Maybe( maybeToList )
+import Data.Maybe( maybeToList, fromMaybe )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
@@ -204,7 +204,7 @@ unit :: Value
 unit = VARR []
 
 seqs :: [Expr] -> Expr
-seqs = foldl1 (:>:)
+seqs = foldr1 (:>:)
 
 --------------------------------------------------------------------------------
 
@@ -225,52 +225,84 @@ rulesApplication lhs =
  ++
   "APP-TUP" `name`
   do VARR vs :@: v <- [lhs]
-     pure (foldr (:|:) Fail [ (Val v :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+     case vs of
+       [] -> pure Fail
+       _  ->
+         let x = identNotIn (free lhs)
+             xe = VAR x
+             e = foldr1 (:|:) [ (xe :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ]
+         in  pure (Def (Bind x ((xe :=: Val v) :>: e)))
 
 --------------------------------------------------------------------------------
 
+-- There 4 kinds of values: k, op, tuple, lambda
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc lhs =
-  "UVAR" `name`
-  do VAR x :=: VAR x' <- [lhs]
-     guard (x == x')
-     pure (VAR x)
+--
+-- Equal values
+-- x=x, k=k
+  "U-SCALAR" `name`
+  do v@(SCL s1) :=: SCL s2 <- [lhs]
+     guard (s1 == s2)
+     pure v
  ++
-  "ULIT" `name`
+-- tuple=tuple
+  "U-TUP" `name`
+  do v@(ARR ss) :=: ARR ss' <- [lhs]
+     guard (length ss == length ss')
+     pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+ ++
+  "U-FAIL-OP-OP" `name`
+  do OP{} :=: OP{} <- [lhs]
+     pure Fail
+ ++
+  "U-FAIL-LAM-LAM" `name`
+  do LAM{} :=: LAM{} <- [lhs]
+     pure Fail
+--
+-- Unequal values
+ ++
+  "U-FAIL" `name`
+  do EHNF h1 :=: EHNF h2 <- [lhs]
+     guard (case (h1, h2) of (Arr ss1, Arr ss2) -> length ss1 /= length ss2; _ -> True)
+     guard (h1 /= h2)
+     pure Fail
+{-
+ ++
+  "U-FAIL-K-K" `name`
   do INT k1 :=: INT k2 <- [lhs]
-     if k1 == k2
-       then pure (INT k1)
-       else pure Fail
- ++
-  "UTUP" `name`
-  do ARR vs :=: ARR vs' <- [lhs]
-     if length vs == length vs'
-       then pure (foldr (:>:) (ARR vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
-       else pure Fail
- ++
-  "UX1" `name`
-  do INT k :=: ARR vs <- [lhs]
+     guard(k1 /= k2)
      pure Fail
  ++
-  "UX2" `name`
-  do ARR vs :=: INT k <- [lhs]
+  "U-FAIL-K-H" `name`
+  do INT{} :=: HVAL{} <- [lhs]
      pure Fail
  ++
-  "UX3" `name`
-  do Val (VLAM _ _) :=: Val (HNF _) <- [lhs]
+  "U-FAIL-OP-V" `name`
+  do OP{} :=: EHNF{} <- [lhs]
      pure Fail
  ++
-  "UX4" `name`
-  do Val (HNF _) :=: Val (VLAM _ _) <- [lhs]
+  "U-FAIL-T-K" `name`
+  do ARR ss :=: INT{} <- [lhs]
      pure Fail
  ++
-  "UX5" `name`
-  do Val (HNF (Op _)) :=: Val (HNF _) <- [lhs]
+  "U-FAIL-T-O" `name`
+  do ARR ss :=: OP{} <- [lhs]
      pure Fail
  ++
-  "UX6" `name`
-  do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
+  "U-FAIL-T-T" `name`
+  do ARR ss :=: ARR ss' <- [lhs]
+     guard (length ss /= length ss')
      pure Fail
+ ++
+  "U-FAIL-T-L" `name`
+  do ARR{} :=: LAM{} <- [lhs]
+     pure Fail
+ ++
+  "U-FAIL-L-V" `name`
+  do LAM{} :=: EHNF{} <- [lhs]
+     pure Fail
+-}
 
 --------------------------------------------------------------------------------
 
@@ -298,6 +330,8 @@ rulesChoice lhs =
      (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
 
+-- Put v into ctx, alpha-converting binders in ctx
+-- when necessary to avoid capture.
 plug :: VContext -> Value -> Expr
 plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
@@ -305,13 +339,34 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection lhs =
- if False then [] else
- if True then
-   "ELIM-DEF" `name`
-   do e@Def{} <- [lhs]
-      (is, _, v) <- wfRes e
-      guard (null (intersect is (free v)))
-      pure (Val v)
+  "ELIM-DEF-DEAD" `name`
+  do e@Def{} <- [lhs]
+     elimDead e
+ ++
+  "ELIM-DEF" `name`
+  do e@Def{} <- [lhs]
+     (xs, _, e) <- wfResE e
+     guard (null (intersect xs (free e)))
+     pure e
+
+-- ELIM-DEF together with the structural SWAP rules
+-- is able to remove all unused bindings.
+-- Without the structural rules this doesn't happen.
+-- So we deal with them separately.
+elimDead :: Expr -> [Expr]
+elimDead ee =
+  let
+    getXs rs (Def (Bind x e)) = getXs (x:rs) e
+    getXs rs e = (reverse rs, e)
+    getBs bs ((VAR x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
+    getBs bs e = (reverse bs, e)
+    -- xs are the initial defined variables
+    (xs, e') = getXs [] ee
+    -- bs are the bindings
+    (bs, e'') = getBs [] e'
+  in
+    simpleCst xs bs e''
+{-
  else
    "ELIM-DEF" `name`
    do Def (Bind x e) <- [lhs]
@@ -322,6 +377,7 @@ rulesGarbageCollection lhs =
    do Def _ <- [lhs]
 --      traceM $ show (lhs, elimCst lhs)
       elimCst lhs
+-}
 
 {-
 -- This is exactly as in the paper, it is wrong.
@@ -569,13 +625,14 @@ isVal :: Expr -> Bool
 isVal (Val _) = True
 isVal _       = False
 
+-- XXX should deal with arrays too
 dsFreshFP :: Expr -> Expr
 dsFreshFP = ds
   where
     ds (ex :=: ex') = dsEqu ex ex'
-    ds (ex :>: ex') = ds ex :>: val (ds ex')
+    ds (ex :>: ex') = ds ex :>: ds ex'
     ds (ex :|: ex') = ds ex :|: ds ex'
-    ds (Def (Bind x e)) = Def (Bind x (val (ds e)))
+    ds (Def (Bind x e)) = Def (Bind x (ds e))
     ds (One ex)     = One (ds ex)
     ds (All ex)     = All (ds ex)
     ds e            = e
@@ -589,37 +646,25 @@ dsFreshFP = ds
         e1' = ds e1
         e2' = ds e2
 
-    val (e@(x :=: _)) = e :>: x
-    val e = e
-
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
-finalSubst ee | Just e <- getDone ee = e
-              | otherwise =
-  case findArr ee of
-    Nothing -> ee
-    Just (x, a) -> finalSubst $ subst [(x, a)] $ dropDef x $ dropBind x ee
+finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val v <- cs] vv
+              | otherwise = ee
   where
-    dropDef x (Def (Bind x' e)) | x == x' = e
-                                | otherwise = Def (Bind x' (dropDef x e))
-    dropDef x e = error $ "dropDef: " ++ show (ee, x, e)
-    dropBind x (Def (Bind i e)) = Def (Bind i (dropBind x e))
-    dropBind x (b@(VAR x' :=: _) :>: r) | x == x' = r
-                                        | otherwise = b :>: dropBind x r
-    dropBind x e = error $ "dropBind: " ++ show (ee, x, e)
-    findArr (Def (Bind _ e)) = findArr e
-    findArr ((VAR x :=: Val a) :>: r) | isGnd a = Just (x, a)
-                                      | otherwise = findArr r
-    findArr _ = Nothing
+    inline :: [(Ident, Value)] -> Value -> Value
+    inline bs v | isGnd v = v
+                | otherwise = inline bs (inl v)
+      where
+        inl (Var x) = fromMaybe undefined $ lookup x bs
+        inl e@VINT{} = e
+        inl e@VOP{} = e
+        inl (VARR vs) = VARR (map inl vs)
+        inl _ = undefined
+    isGnd :: Value -> Bool
     isGnd VINT{} = True
     isGnd (VARR vs) = all isGnd vs
     isGnd VOP{} = True
     isGnd _ = False
-
-    getDone (Def (Bind _ e)) = getDone e
-    getDone (_ :>: e) = getDone e
-    getDone e@(Val v) | isGnd v = Just e
-    getDone _ = Nothing
 
 ----------------------
 
@@ -646,11 +691,11 @@ rulesDerefFP lhs =
 
 rulesFailFP :: ERule
 rulesFailFP lhs =
-  "FAIL-CST" `name`
+  "FAIL-SEQL" `name`
   do Fail :>: _ <- [lhs]
      pure Fail
  ++
-  "FAIL-EXP" `name`
+  "FAIL-SEQR" `name`
   do _ :>: Fail <- [lhs]
      pure Fail
  ++
@@ -659,6 +704,7 @@ rulesFailFP lhs =
   do _ :=: Fail <- [lhs]
      pure Fail
  ++
+  -- Not needed when we have GC
   "FAIL-DEF" `name`
   do Def (Bind _ Fail) <- [lhs]
      pure Fail
@@ -686,32 +732,56 @@ rulesAllFP lhs =
      pure (ARR [])
  ++
   "ALL-CHOICE" `name`
-  do All es@(_ :|: _) <- [lhs]
+  do All es <- [lhs]
      let choiceRes e | [r] <- wfRes e = [[r]]
          choiceRes (e :|: es) | [r] <- wfRes e = [ r : rs | rs <- choiceRes es ]
          choiceRes _ = []
      rs <- choiceRes es
-     let (is, es, vs) = mkRess rs
-     pure (mkRes is es (ARR vs))
+     let r@(is, es, vs) = mkRess rs
+         ys = take (length vs) (identsNotIn (free r))
+         b = mkRes ys (zipWith (\ y v -> VAR y :=: Val v) ys vs) (ARR (map Var ys))
+     pure (mkRes is es b)
+{-
  ++
   "ALL-VAL" `name`
   do All e <- [lhs]
      (is, es, v) <- wfRes e
      pure (mkRes is es (ARR [v]))
+-}
 
--- 0 or 1 result
 wfRes :: Expr -> [([Ident], [Expr], Value)]
-wfRes = maybeToList . wf []
-  where wf _ (Val v@HNF{}) = pure ([], [], v)
-        wf g (Def (Bind x r)) = do
-          guard (x `notElem` g)
-          (xs, es, v) <- wf (x:g) r
-          pure (x:xs, es, v)
-        wf g (c@(VAR x :=: e@Val{}) :>: r) = do
-          guard (x `elem` g)
-          (xs, es, v) <- wf (delete x g) r
-          pure (xs, c:es, v)
-        wf _ _ = Nothing
+wfRes e = do
+  --traceM ("wfRes " ++ show (e, wfResE e))
+  (is, es, Val v) <- wfResE e
+  pure (is, es, v)
+
+ -- 0 or 1 result
+wfResE :: Expr -> [([Ident], [Expr], Expr)]
+wfResE = maybeToList . wf []
+  where
+    -- WF-DEF
+    wf g (DEF x e1) = do
+      (xs, cs, e2) <- wf (x:g) e1
+      guard (x `notElem` xs)
+      pure (x:xs, cs, e2)
+    -- WF-EQ
+    wf g (c@(VAR x :=: EHNF h) :>: e1) = do
+      guard (x `elem` g)
+      (xs, cs, e2) <- wf (delete x g) e1
+      guard (null (intersect (free h) xs))
+      pure (xs, c:cs, e2)
+    -- WF-EQ-VAL
+    wf g (c@(VAR x :=: EHNF h)) = do
+      guard (x `elem` g)
+      pure ([], [c], VAR x)
+    -- WF-EXP
+    -- This judgement makes WF non-deterministic.
+    -- For now, just be eager, i.e., do the above first.
+    wf g e = do
+--      guard (null (free e \\ g))
+      pure ([], [], e)
+    -- Not WF
+--    wf _ _ = Nothing
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
 mkRes is es r = foldr (\ i e -> Def (Bind i e)) r' is
@@ -720,7 +790,7 @@ mkRes is es r = foldr (\ i e -> Def (Bind i e)) r' is
 mkRess :: [([Ident], [Expr], Value)] -> ([Ident], [Expr], [Value])
 mkRess as = loop [] [] [] as
   where
-    fvs = free [ (es, v) | (_, es, v) <- as ]
+    fvs = free as
     loop ris res rvs [] = (reverse ris, reverse res, reverse rvs)
     loop ris res rvs ((is, es, v) : xs) = loop (is' ++ ris) (es' ++ res) (v' : rvs) xs
       where is' = take (length is) $ identsNotIn (ris ++ fvs)
@@ -730,6 +800,10 @@ mkRess as = loop [] [] [] as
 
 rulesNormalization :: ERule
 rulesNormalization lhs =
+  "NORM-VAL" `name`
+  do Val _ :>: e <- [lhs]
+     pure e
+ ++
   "NORM-SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
      pure (e1 :>: (e2 :>: e3))
@@ -737,20 +811,25 @@ rulesNormalization lhs =
   -- NOTE: not like the paper, added e2
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(VAR x :=: Val v) :>: e2) <- [lhs]
-     let valid --x | isK v     = case e1 of VAR _ :=: Val s | isK s -> False; _ -> True  -- NOTE: not in paper
-               | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
+     let valid | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
                | otherwise = case e1 of VAR _ :=: Val _         -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)
      guard valid
      pure (xv :>: (e1 :>: e2))
  ++
+  "NORM-EQ" `name`
+  do e :>: c@(VAR x :=: Val{}) <- [lhs]
+     pure (e :>: (c :>: VAR x))
+{-
+ ++
+  "NORM-DEF-EQ" `name`
+  do DEF y c@(VAR x :=: Val{}) <- [lhs]
+     pure (DEF y (c :>: VAR x))
+-}
+ ++
   "NORM-SWAP-EQ" `name`
   do h@(Val HNF{}) :=: x@VAR{} <- [lhs]
      pure (x :=: h)
- ++
-  "NORM-VAL" `name`
-  do Val _ :>: e <- [lhs]
-     pure e
  ++
   "NORM-SEQ-DEFR" `name`
   do Def (Bind x e1) :>: e2 <- [lhs]
@@ -772,7 +851,7 @@ rulesNormalization lhs =
              in  (x', subst [(x, Var x')] e2)
      pure (Def (Bind nx (e1 :>: ne2)))
  ++
-  "NORM-DEFL" `name`
+  "NORM-DEFR" `name`
   do e1 :=: Def (Bind x e2) <- [lhs]
      let (nx, ne2) =
            if x `notElem` free e1 then
@@ -787,5 +866,7 @@ rulesNormalization lhs =
      pure (e1 :>: (v :=: e2))
  ++
   "NORM-UNIFYR" `name`
-  do v@Val{} :=: (e1 :=: e2) <- [lhs]
-     pure ((v :=: e1) :>: (v :=: e2))
+  do v1@Val{} :=: (v2@Val{} :=: e) <- [lhs]
+     let x = identNotIn (free lhs)
+         xe = VAR x
+     pure (Def (Bind x ((xe :=: v1) :>: ((xe :=: v2) :>: (xe :=: e)))))
