@@ -108,7 +108,7 @@ $$
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
 %     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \textit{Bindings}      & c     & ::= & |x = hnf| \\
+    \textit{Bindings}      & c     & ::= & |x = v| \\
 \end{array} \\
 \\[-3mm]
 \textbf{Concrete syntax:} \;\;
@@ -258,7 +258,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 
 \inferrule
   { x \in \Gamma }
-  {\wff{\Gamma}{|x == hnf|}{\emptyset}{|x == hnf|}{|x|}}
+  {\wff{\Gamma}{|x == v|}{\emptyset}{|x == v|}{|x|}}
   {\rulename{WF-Eq-Val}}
 
 \\
@@ -273,7 +273,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
     \wff{\Gamma - x}{|e_1|}{|xs|}{|cs|}{|e_2|} \quad
     \freevars{h} \not\in |xs|
   }
-  {\wff{\Gamma}{|x == hnf; e_1|}{|xs|}{|x == hnf, cs|}{|e_2|}}
+  {\wff{\Gamma}{|x == v; e_1|}{|xs|}{|x == v, cs|}{|e_2|}}
   {\rulename{WF-Eq}}
 
 \\

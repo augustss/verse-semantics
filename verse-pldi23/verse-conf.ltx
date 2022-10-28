@@ -431,8 +431,8 @@ functions |gt| and |add|.
 \item \emph{Values.}
 In a functional logic language an expression may evaluate to an as-yet-unknown logical variable,
 so a \emph{value} |v| is either a head-normal form, or a variable |x|.
-\item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.\footnote{
-For clarity we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple. }
+\item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|.
+For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |v_1 v_2|, but the desugaring
@@ -940,7 +940,7 @@ has the following properties:
 \item Any rule can be applied, in either direction,
   anywhere in the program term (including under lambdas) to obtain an equivalent program.
 \item The rules are oriented, with the intent that using them left-to-right makes progress.
-\item Even given this orientation, the rules do not say which rule should be
+\item Despite this orientation, the rules do not say which rule should be
   applied where; that is the task of a separate \emph{evaluation strategy} (\Cref{sec:eval-strategy}).
 \item The rules can be applied by programmers, to reason about what their program does;
   and by compilers, to transform (and hopefully optimise) the program.
@@ -958,7 +958,7 @@ should be familiar: it simply rewrites an application of |add| to integer
 constants.  For example $|applyN add (3,4)| \movesto |7|$.  Rules \rulename{app-gt} and
 \rulename{app-gt-fail} are more interesting: |applyN gt (k_1,k_2)| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional), and returns |k_1| otherwise (rather than returning |True|).
 An amusing consequence is that |(10 > x > 0)| succeeds
-iff |x| is between |10| and |0| --- comparison is right-associative).
+iff |x| is between |10| and |0| (comparison is right-associative).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -967,8 +967,8 @@ iff |x| is between |10| and |0| --- comparison is right-associative).
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
 Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
-only unusual feature is that we use a |defKW| to bind |x| on the right-hand side,
-and an equality |(x=v)| to bind |x| to the argument.
+only unusual feature is that on the RHS of the rule we use a |defKW| to bind |x|,
+together with |(x=v)| to equate |x| to the argument.
 The rule may appear to use call-by-value, because the argument is a value |v|,
 but remember that values include variables, which may be bound to an
 as-yet-unevaluated expression.  For example:
@@ -993,18 +993,16 @@ a suspending semantics would be equally easy to express.
 \subsection{Unification}
 
 Next we study unification, again in \cref{fig:rewrite-rules}.
-Rules \rulename{u-lit} and \rulename{u-tup}, and the \rulename{u-fail} rules
+Rules \rulename{u-scalar} and \rulename{u-tup}
 are the standard rules for unification, going back at least 40 years \cite{MartelliMontanari82}.
-The only special thing
-to note is that |(k_1 = k_2)| fails if the values differ,
-\emph{but yields common value if they are the same}; and similarly for
-tuples\footnote{An alternative choice would
-for unification to yield |emptytup| on success; but it does not make much difference
+Rule \rulename{u-fail} makes unification fail on two different head-normal forms (see
+\Cref{fig:syntax} for the syntax of |hnf|).
+Note that
+\emph{when unification succeeds it yields the common value}; hence |s == s| rewrites
+to |s|\footnote{An alternative choice would
+for unification to yield |emptytup| on success.  It does not make much difference
 either way.}.
-\rulename{u-fail-l-h} makes unification fail if
-you attempt to unify an integer with a tuple.
-Slightly less obviously,
-\rulename{u-fail-t-f} and \rulename{u-fail-f} make unification fail if you attempt to unify a
+Also note that unification fails if you attempt to unify a
 lambda or a built-in operation with any other value -- see \Cref{sec:unifying-lambda}.
 
 % Failure, written |fail|, propagates upwards, as \rulename{fail-def} and \rulename{fail} show.
@@ -1031,9 +1029,9 @@ $$
 \end{array}
 $$
 These rules make use of so-called \emph{contexts}, |E| and |A|,
-whose syntax is given in \cref{fig:rewrite-rules}.
+whose syntax is given in \cref{fig:rewrite-rules} \cite{felleisen:contexts1,felleisen:contexts2}.
 In general, a context is a syntactic construct (in this case an expression)
-containing a single hole, written |hole| \cite{felleisen:contexts1,felleisen:contexts2}.
+containing a single hole, written |hole|.
 The notation |E^[s]| is the expression obtained by filling the hole
 in |E| with |s|.
 % For example |(y = tup (hole, 4))| is a possible execution context, |E|; filling its hole with 99
@@ -1043,11 +1041,12 @@ So \rulename{deref-s} says that if we have an equality |(x=s)| to the left of a 
 mentions |x|, we can replace that (single) occurrence of |x| with |s|, yielding |E^[s]| instead.
 There are several things to notice:
 \begin{itemize}
-\item \rulename{deref-s} fire only when the right-hand side of the unification is a \emph{scalar value} |s|;
+\item \rulename{deref-s} fires only when the right-hand side of the unification is a \emph{scalar value} |s|;
   that is, a variable or integer literal. That is because |E| allows the occurrence of |x| to be
-  in places that only syntactically allow scalars. \rulename{defref-h} allows substitution of heap values, but
+  in places that only syntactically allow scalars. Rule \rulename{defref-h} allows substitution of heap values, but
   again only in places that syntactically allow such expressions.
-\item Both rules only fire when the RHS is a value, so that the substitution does not risk duplicating either work or choices. This
+\item Both rules fire only when the RHS is a value, so that the substitution does not risk
+  duplicating either work or choices. This
 restriction is precisely the same as the \rulename{let-v} rule of \cite{ariola:call-by-need},
 and (by not duplicating choices) it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
@@ -1064,50 +1063,34 @@ suffice to express the necessary sharing.
 
 \item The $x \not\equiv s$ in \rulename{deref-s} prevents a binding |x=x| from substituting
   infinitely often, doing nothing each time.  The guard $x \not\in \boundvars{E}$
-  ensures that |x| is actually free in |E^[x]|, and $s \not\in \boundvars{E}$ ensures that |s| is not captured by |E| in |E^[s]|.
+  ensures that |x| is actually free in |E^[x]|, while
+  $s \not\in \boundvars{E}$ ensures that |s| is not captured by |E| in |E^[s]|.
 
 \item \rulename{deref-s} substitutes a scalar anywhere, but \rulename{deref-h} is much more parsimonous:
-  it never substitutes a heap value |h| under a lambda or inside a tuple, as can be seen by examining
-  the syntax of application contexts |A|.  Substituting inside a tuple would be syntactically invalid, because
-  the components of tuples are scalars (\Cref{fig:syntax}).  Not substituting under a lambda is a technincal
-  device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
-  \Cref{sec:recursion}.
+\emph{it never substitutes a heap value |h| under a lambda or inside a tuple}, as can be seen by examining
+the syntax of application contexts |A|.  Substituting inside a tuple would be syntactically invalid, because
+the components of tuples are scalars (\Cref{fig:syntax}).  Not substituting under a lambda is a technincal
+device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
+\Cref{sec:confluence}.
+
+\item Perhaps surprisingly, there is no ``occurs check''.  It is very important to allow
+  allow bindings like |(f == lam x (dots (apply1 f (x-1)) dots))| to substitute,
+  because that is how we define a recursive function!  We even allow |(x == tup (1, x))|. Of course,
+  recursive bindings can lead to infinite rewriting sequences; it is up to the evaluation strategy
+  to avoid this (\Cref{sec:eval-strategy}).
 \end{itemize}
-
-
-\subsection{Unification: recursion and the occurs check} \label{sec:occurs} \label{sec:recursion}
-
-\simon{Simon's wavefront}
-The classic ``occurs check'', rule \rulename{ux-occurs}, makes an equality like |(x=tup(x,3))| fail, because the only successful
-unification would yield an infinitely-nested pair.
-$$
-    \rulename{ux-occurs} \quad |x=V^[x]| \; \movesto \; |fail| \quad \text{if }|V| \ne |hole|
-$$
-In this rule, |V| is a \emph{value context}, defined in \cref{fig:syntax}.
-So \rulename{ux-occurs} says that the equality fails if there is a |V| such the equality looks like |(x=V^[x])|;
-that is, if |x| occurs under a ``shell'' of tuples.  The guard $|V| \ne |hole|$ is to avoid failure for |x=x|.
-
-What if |x| occurs inside a lambda?  That is very useful, and we do not want to fail; for example
-$$
-|factorial = lam n (if (n=0) then 1 else n * apply1 factorial (n-1))|
-$$
-Our solution, \rulename{subst-rec}, is standard: if the occurrence of |x| is inside a lambda |(lam y e)|,
-we create a new local binding for |x| under the lambda.  Now the original equality is
-non-recursive, and \rulename{subst} can apply.
-
 
 \subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
 
 \figureNormalizationRules
 
-%JB: I have reordered this to match the order of the rules in the figure.
-% Not sure which is the optimal order, but it makes sense to keep them together?
+\simon{Wavefront}
 
 The syntax of \Cref{fig:syntax} allows |(def x e)| and |(v == e)| to occur anywhere
 in an expression. But to make other rules more applicable, it may be necessary to
-``float'' these expression upward.  For example, we can't use |(x == (y == h))|
-to substitute for |x| via rule \rulename{deref-h}, because the RHS of the equality is not a value.
-But if we were to float the equality outwards (rule \rulename{norm-unifyr}), to give |(x == y; x == h)|, we can
+``float'' these expression upward.  For example, we can't use |(x == (e; 3))|
+to substitute for |x| via rule \rulename{deref-h}, because the RHS of the |x|-equality is not a value.
+But if we were to float the equality outwards (rule \rulename{norm-seqr}), to give |(e; x = 3)|, we can
 substitute for |x|, and then for |y|.
 
 \Cref{fig:normalization-rules} gives a collection of rules that systematically move
