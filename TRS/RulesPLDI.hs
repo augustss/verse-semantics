@@ -677,6 +677,7 @@ wfResE = maybeToList . wf []
       pure (x:xs, cs, e2)
     -- WF-EQ
     wf g (c@(VAR x :=: Val h) :>: e1) = do
+      guard (extraPrecond x h e1)
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
@@ -686,8 +687,19 @@ wfResE = maybeToList . wf []
     -- For now, just be eager, i.e., do the above first.
     wf g e = do
       pure ([], [], e)
+
     -- Not WF
 --    wf _ _ = Nothing
+
+extraPrecond :: Ident -> Value -> Expr -> Bool
+extraPrecond x v e = v /= Var x && not (not (isScalar v) || x `notElem` free e)
+
+isScalar :: Value -> Bool
+isScalar v = case v of
+  Var id  -> True
+  HNF hnf -> case hnf of
+    Int n -> True
+    _ -> False
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
 mkRes is es r = foldr (\ i e -> Def (Bind i e)) r' is
