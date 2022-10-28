@@ -153,7 +153,7 @@ instance Show Value where
 instance Show HNF where
   show (Int k)  = show k
   show (Op op)  = show op
-  show (Arr vs) = "arr{" ++ intercalate ", " (map show vs) ++ "}"
+  show (Arr vs) = "<" ++ intercalate ", " (map show vs) ++ ">"
   show (Lam (Bind x e)) = "(\\" ++ show x ++ "." ++ show e ++ ")"
 
 instance Show Op where
@@ -240,7 +240,7 @@ instance Rec Expr where
         ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
 
       Def (Bind x a) ->
-           [ (n, Def (Bind x a')) | (n,a') <- r a ]
+           [ (n, Def (Bind x a')) | (n,a') <- rec r a ]
 
       f :@: a ->
            [ (n,f' :@: a)  | (n,f') <- vrec r f ]
@@ -257,9 +257,9 @@ instance Rec Expr where
     vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
 
     hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
-  	                          | (i,a) <- [0..] `zip` as
-  	                          , (n,a') <- vrec r a
-  	                          ]
+                              | (i,a) <- [0..] `zip` as
+                              , (n,a') <- vrec r a
+                              ]
     hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
     hrec r _                = []
 
@@ -374,9 +374,10 @@ instance Arbitrary Op where
 instance Arbitrary HNF where
   arbitrary = arbIdents >>= (sized . flip arbHNF)
 
-  shrink (Int n)  = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
-  shrink (Arr vs) = [ Arr vs' | vs' <- shrink vs ]
-  shrink _        = []
+  shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
+  shrink _         = []
 
 arbIdents :: Gen [Ident]
 arbIdents =
