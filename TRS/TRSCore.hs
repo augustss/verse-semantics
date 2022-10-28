@@ -251,6 +251,10 @@ instance Rec Expr where
   
       One a -> [ (n, One a') | (n,a') <- rec r a ]
       All a -> [ (n, All a') | (n,a') <- rec r a ]
+      Split a f g ->
+           [ (n, Split a' f g) | (n,a') <- rec r a ]
+        ++ [ (n, Split a f' g) | (n,f') <- vrec r f ]
+        ++ [ (n, Split a f g') | (n,g') <- vrec r g ]
       _     -> []
    where
     vrec r (Var x) = []
