@@ -918,14 +918,14 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 
 	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
 	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	Hence, by \cref{lem:gc-step}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
+	Hence, by \cref{lem:gc-step-2}, $\rdx{\runi} \subset e_2$ so join at $e_1'$.
 
 	\item[Case] \rulename{all-choice}
  	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
 	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
 	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
 	If $\rdx{\runi} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
-	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
 	so we can join by concatenating the binders, constraints and value
 	of $e_1,\dots,e_i',\dots,e_n$.
 
@@ -1190,7 +1190,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
 	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
 	If $\rdx{\rapp} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
-	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
 	so we can join by concatenating the binders, constraints and value
 	of $e_1,\dots,e_i',\dots,e_n$.
 
@@ -1368,6 +1368,19 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 
 \begin{proof}
 \ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rcon$ and $\rgc$ strongly commute, and hence commute.
+Let $\tx{\rcon}$ and $\tx{\rgc}$ denote the reducts for $\rcon$ and $\rgc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rgc}$ or vice versa.
+\begin{description}
+
+	\item[Case $\rdx{\rgc} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$.
+
+\item[Case $\rdx{\rcon} \subset \rdx{\rgc}$] Split cases on the rule used in $\rgc$.
+
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rcon-\rspc$-Comm] \label{lem:c-s-c-todo}
@@ -1494,7 +1507,7 @@ Let us split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rfail}$ or vice 
 
 	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
 	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	If $\rdx{\rfail} \subset e_1$ then $\rfail : e_1 \movesto e_1'$ and by \cref{lem:gc-step} we can join at $e_1'$.
+	If $\rdx{\rfail} \subset e_1$ then $\rfail : e_1 \movesto e_1'$ and by \cref{lem:gc-step-2} we can join at $e_1'$.
 	Otherwise, $\rdx{\rfail} \subset e_2$ so $\rfail : e_2 \movesto e_2'$ so join at $e_1$.
 
 	\item[Case] \rulename{all-choice}
@@ -1502,7 +1515,7 @@ Let us split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rfail}$ or vice 
 	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
 	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
 	If $\rdx{\rfail} \subset e_i$ then $\rfail : e_i \movesto e_i'$ and
-	by \cref{lem:gc-step} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
+	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
 	so we can join by concatenating the binders, constraints and value
 	of $e_1,\dots,e_i',\dots,e_n$.
 
@@ -1560,14 +1573,18 @@ Hence, we can perform a second GC step from each of the terms above and join the
 \ranjit{TODO:Fresh-Verse.pdf}
 \end{proof}
 
-\begin{lemma}[GC-Step] \label{lem:gc-step}
-If $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$ and $\rstep{\rr}{e}{e'}$ then
-   $\wff{\emptyset}{e'}{|xs|'}{|cs|'}{\hnf'}$.
+\begin{lemma}[WF-Elim] \label{lem:gc-step}
+% If $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$ and $\rstep{\rr}{e}{e'}$ then
+%    $\wff{\emptyset}{e'}{|xs|'}{|cs|'}{\hnf'}$.
+If $\wff{\emptyset}{e_1}{|xs|}{|cs|}{e_2}$ where $|xs| \not \in \freevars{e_2}$
+   and $\rstep{\rr \setminus \rgc}{e_1}{e_1'}$
+then $\rstepo{\rr \setminus \rgc}{e_2}{e_2'}$ such that
+     $\wff{\emptyset}{e_1'}{|xs|}{|cs|'}{e_2'}$.
 \end{lemma}
 
 \begin{proof}
-By induction on the derivation of $\wff{\emptyset}{e}{|xs|}{|cs|}{\hnf}$,
-splitting cases on the rule used for $\rstep{\rr}{e}{e'}$.
+By induction on the derivation of $\wff{\emptyset}{e_1}{|xs|}{|cs|}{e_2}$,
+splitting cases on the rule used for $\rstep{\rr}{e_1}{e_1'}$.
 \end{proof}
 
 
