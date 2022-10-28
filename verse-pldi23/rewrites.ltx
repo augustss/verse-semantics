@@ -74,7 +74,7 @@
 
 \newcommand{\wf}[1]{\ensuremath{\vdash #1}}
 \newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
-\newcommand{\wffv}[4]{\ensuremath{\vdash_v #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wffv}[4]{\ensuremath{\vdash_|v| #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 % \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
 \newcommand{\lvc}[1]{#1}
@@ -216,15 +216,15 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Normalization:~\rcon}
 \rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
 \rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
-\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| is not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| is not of form |x' == s'|\\
+\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| not of form |x' == s'|\\
 \rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
 \rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{norm-defr}      & |e_1 == (def y e_2)|  & \movesto & |def y ((e_1 == e_2))|   & if $|y| \not \in \freevars{|e_2|}$ \\
 \rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |v == e_1; v == e_2|   & \\[0.05in]
+\rulename{norm-unifyr}    & |v == (e_1 == e_2)|   & \movesto & |def x (x == v; x == e_1; v == e_2)| & if $|x| \not \in \freevars{|v|,|e_1|,|e_2|}$\\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}
 \rulename{fail-seql}      & |fail ; e|            & \movesto & |fail| \\
