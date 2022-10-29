@@ -11,6 +11,9 @@ import Data.Maybe( maybeToList, fromMaybe )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
+implies :: Bool -> Bool -> Bool
+b1 `implies` b2 = b1 <= b2
+
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
 
@@ -677,6 +680,8 @@ wfResE = maybeToList . wf []
       pure (x:xs, cs, e2)
     -- WF-EQ
     wf g (c@(VAR x :=: Val h) :>: e1) = do
+      guard (h /= Var x)                                -- eliminate x=x before WFF
+      guard (isS h `implies` (x `notElem` free e1))     -- subst scalars before WFF
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
@@ -686,6 +691,7 @@ wfResE = maybeToList . wf []
     -- For now, just be eager, i.e., do the above first.
     wf g e = do
       pure ([], [], e)
+
     -- Not WF
 --    wf _ _ = Nothing
 

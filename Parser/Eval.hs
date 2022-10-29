@@ -413,6 +413,7 @@ evalAll flg = evalTrace "evalAll" f flg
     f (CAll e) | Just vs  <- getValues e = CArray vs
     f e = composOpLam (underLambda flg) f e
     getValues (CBar e1 e2) = (++) <$> getValues e1 <*> getValues e2
+    getValues CFail = Just []
     getValues (CValue v) = Just [v]
     getValues _ = Nothing
 
