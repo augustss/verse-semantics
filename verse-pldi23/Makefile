@@ -6,7 +6,7 @@ all: verse-conf.pdf
 
 LATEX=pdflatex -halt-on-error
 
-PAPERTEX = verse-conf.tex rewrites.tex
+PAPERTEX = verse-conf.tex rewrites.tex densem-pldi.tex
 PAPERSRC = $(PAPERTEX) ../verse.bib
 
 rewrites.tex:   rewrites.ltx   ../calculus.fmt

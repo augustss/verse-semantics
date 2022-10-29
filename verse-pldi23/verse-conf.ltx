@@ -443,7 +443,8 @@ logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choi
 The details of choice and unification, and especially their
 interaction, are rather tricky, so this section will do a lot of
 arm-waving.  But fear not: \cref{sec:rewrite-rules} will make all this
-precise.
+precise.  We only have space to describe one incarnation of \versecalc{}; \cref{sec:variations}
+explores some possible alternative design choices.
 
 \subsection{Logical variables and unification} \label{sec:unify}
 
@@ -2119,15 +2120,15 @@ But the ice is thin here, so it is reassuring that we have a proof of confluence
 % the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
 
 
-\subsection{Administrative normal form}
-
-We have chosen to restrict tuple formation and function application to
-\emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
-|e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
-It would be entirely straightforward to allow expressions rather than values, but doing so
-would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
-Restricting to values involves no loss of expressive power:
-it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
+% \subsection{Administrative normal form}
+%
+% We have chosen to restrict tuple formation and function application to
+% \emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
+% |e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
+% It would be entirely straightforward to allow expressions rather than values, but doing so
+% would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
+% Restricting to values involves no loss of expressive power:
+% it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
 \subsection{Dead existentials}
 
@@ -2181,14 +2182,16 @@ to avoid confusing the presentation with these higher-order encodings, but we do
 \subsection{Laziness} \label{sec:laziness}
 
 As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
-For example this
-program does not yield a value:
-$$
-|def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
-$$
-Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
-|1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
-|ones = tup(1,ones)|, which has an ``occurs check.''
+For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
+yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
+prevent the expression from returning a value.
+% $$
+% |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+% $$
+% Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
+% |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
+% |ones = tup(1,ones)|, which has an ``occurs check.''
+
 Remembering the duality between values and choices,
 one might also want |allKW| to return a lazy stream
 of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
@@ -2203,11 +2206,8 @@ A lazy variant of \versecalc{} looks entirely feasible, but we have not worked o
 
 
 % ----------------------- Denotational semantics  -----
-\section{Denotational semantics} \label{sec:den-sem}
+\input{densem-pldi}
 
-\simon{Add our denotational semantics here}.
-
-See \cite{christiansen:denotational} for another approach.
 
 
 % ----------------------- Updatable references  -----
