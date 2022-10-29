@@ -812,7 +812,10 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rcon}$ or vice v
 	\begin{description}
 	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
 		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v'|$, then join (with two $\rcon$ steps) at $x = |v'|; E[|v'|]$.
-		If $\rdx{\rcon} \subset E[|x|]$, \ie $\rcon : E[|x|] \movesto E'[|x|]$, then join at $x = |v|; E'[|v|]$.
+		If $\rdx{\rcon} \subset E[|x|]$:
+			if $\rcon : E[|x|] \movesto E'[|x|]$, then join at $x = |v|; E'[|v|]$.
+			else if $\rcon : E[|x|] \movesto e'$ where, via \rulename{norm-val}
+			that occurrence of $x$ is deleted then join at $x = |v|; e'$.
 	\item[Case:] \rulename{u-tup} \ie $\rcon \not \subset \runi$.
 	\item[Case:] \rulename{u-*} \ie~$\tx{\runi} \equiv c \movesto |fail|$; so join at |fail|.
 	\end{description}
@@ -1116,7 +1119,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rgc}$ or vice ve
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ $*$-commutes with $\rapp$, hence commutes by \cref{lem:star-comm}.
+We show that $\rspc$ strongly commutes with $\rapp$.
 %
 Let $\tx{\rapp}$ and $\tx{\rspc}$ denote the reducts for $\rapp$ and $\rspc$ respectively.
 %
@@ -1137,49 +1140,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rspc} \not\subset \rdx{\rapp}$.
 	\end{description}
 
-\item[Case $\rdx{\rapp} \subset \rdx{\rspc}$] Split cases on the rule used in $\rspc$
-	\begin{description}
-	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
-	Let us split cases on where $\rdx{\rapp}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\rapp} \subset e_1$, \ie $\rapp: e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
-		\item[Case] $\rdx{\rapp} \subset e_2$, \ie $\rapp: e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
-		\item[Case] $\rdx{\rapp} \subset CX$ :
-		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\rapp} \cdots |e_1 choice e_2|$
-		so with two $\rapp$ steps we can join at $|SX^[e_1' choice e_2']|$ where
-		$e_i' \equiv \cdots \rdx{\rapp}' \cdots e_i$.
-		\end{description}
-
-
-	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
-	Let us split cases on where $\rdx{\rapp}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
-		\item[Case] $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
-		\item[Case] $\rdx{\rapp} \subset e_3$, \ie $\rapp : e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
-		\end{description}
-
-	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
-	Here, $\rdx{\rapp} \subset e$, \ie $\rapp: e \movesto e'$ so join at $SX[e']$.
-
-	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
-	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	If $\rdx{\rapp} \subset e_1$, \ie $\rapp: e_1 \movesto e_1'$, then join at $e_1'$.
-	If $\rdx{\rapp} \subset e_2$, then join at $e_1$.
-
-	\item[Case] \rulename{all-choice}
- 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
-	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
-	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
-	If $\rdx{\rapp} \subset e_i$ then $\runi: e_i \movesto e_i'$ and
-	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
-	so we can join by concatenating the binders, constraints and value
-	of $e_1,\dots,e_i',\dots,e_n$.
-
-
-	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
-	Trivially $\rdx{\rapp} \not \subset \rdx{\rspc}$.
-	\end{description}
+\item[Case $\rdx{\rapp} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
 \end{description}
 %
 \end{proof}
@@ -1198,7 +1159,7 @@ via \cref{lem:c-local}, \cref{lem:f-c} and \cref{lem:c-f-local},
 and terminating \cref{lem:c-term}, and hence confluent by Newman's \cref{lem:local}.
 \end{proof}
 
-\begin{lemma}[$\rconfail$-Noetherian] label{lem:c-term}
+\begin{lemma}[$\rconfail$-Noetherian] \label{lem:c-term}
     $\rconfail$ is Noetherian.
 \end{lemma}
 
@@ -1326,8 +1287,8 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 			then join at $|fail|$ via multiple $\rfail$ steps.
 
 	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\rfail} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\rfail} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
+		If $\rdx{\rfail} \subset |e_1|$, \ie $\rfail : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
+		If $\rdx{\rfail} \subset |e_2|$, \ie $\rfail : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
 		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-l}
 			then join at $|fail|$ via multiple $\rfail$ steps.
 		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-r}
@@ -1394,7 +1355,7 @@ If $\rdx{} \subset |e_2|$, \ie $\rr' : e_2 \movesto e_2'$, then $\rdx{\rcon}'' \
 If $\rdx{} \subset |x==v;e_2|$ \ie via \rulename{deref-s} $\rr' : |x==v;e_2| \movesto |x==v;e_2'|$, then $\rdx{\rcon}'' \equiv |x==v; (e_1; e_2')|$.
 
 \item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-Here $\rdx{} \subset \hnf$, \ie $\r': \hnf \movesto \hnf'$, hence $\rdx{\rcon}'' \equiv x = \hnf'$.
+Here $\rdx{} \subset \hnf$, \ie $\rr': \hnf \movesto \hnf'$, hence $\rdx{\rcon}'' \equiv x = \hnf'$.
 
 \item[Case:] \rulename{norm-seq-def*}, \ie $\rdx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2] \equiv \rdx{\rcon}'$.
 If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv C'[e_1', e_2]$.
@@ -1532,7 +1493,7 @@ Let us split cases on whether $\rdx{\rfail}$ occurs under $\rdx{\rgc}$ or vice v
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ $*$-commutes with $\rfail$, and hence commutes via \cref{lem:star-comm}.
+We show that $\rspc$ strongly commutes with $\rfail$.
 %
 Let $\tx{\rspc}$ and $\tx{\rfail}$ denote the reducts for $\rspc$ and $\rfail$ respectively.
 %
@@ -1551,50 +1512,8 @@ Let us split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rfail}$ or vice 
 			Here $\rdx{\rspc} \not \subset \rdx{\rfail}$.
 	\end{description}
 
-\item[Case $\rdx{\rfail} \subset \rspc$] Split cases on the rule used in $\rspc$
-	\begin{description}
-	\item[Case] \rulename{choose} \ie $\tx{\rspc} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1] |choice| CX[e_2]]$.
-	Let us split cases on where $\rdx{\rfail}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\rfail} \subset e_1$, \ie $\rfail : e_1 \movesto e_1'$ so join at $SX[CX[e_1'] |choice| CX[e_2]]$.
-		\item[Case] $\rdx{\rfail} \subset e_2$, \ie $\rfail : e_2 \movesto e_2'$ so join at $SX[CX[e_1] |choice| CX[e_2']]$.
-		\item[Case] $\rdx{\rfail} \subset CX$ :
+\item[Case $\rdx{\rfail} \subset \rspc$] via \cref{lem:under-s}.
 
-		Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{\rfail} \cdots |e_1 choice e_2|$
-		so
-		with two $\rfail$ steps we can join at $|SX^[e_1' choice e_2']|$ where
-		$e_i' \equiv \cdots \rdx{\rfail}' \cdots e_i$.
-		\end{description}
-
-
-	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
-	Let us split cases on where $\rdx{\rfail}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$ so join at $SX[e_1' |choice| (e_2 |choice| e_3)]$.
-		\item[Case] $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$ so join at $SX[e_1 |choice| (e_2' |choice| e_3)]$.
-		\item[Case] $\rdx{\rfail} \subset e_3$, \ie $\rfail: e_3 \movesto e_3'$ so join at $SX[e_1 |choice| (e_2 |choice| e_3')]$.
-		\end{description}
-
-	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
-	Here, $\rdx{\rfail} \subset e$, \ie $\rfail : e \movesto e'$ so join at $SX[e']$.
-
-	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
-	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{\hnf}$.
-	If $\rdx{\rfail} \subset e_1$ then $\rfail : e_1 \movesto e_1'$ and by \cref{lem:gc-step-2} we can join at $e_1'$.
-	Otherwise, $\rdx{\rfail} \subset e_2$ so $\rfail : e_2 \movesto e_2'$ so join at $e_1$.
-
-	\item[Case] \rulename{all-choice}
-	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e_{1,n}$
-	where each $\wff{\emptyset}{e_i}{|xs|}{|cs|}{\hnf_i}$ and $e_{1,n}$
-	is the concatenation binders, constraints and value of $e_1, \dots, e_n$.
-	If $\rdx{\rfail} \subset e_i$ then $\rfail : e_i \movesto e_i'$ and
-	by \cref{lem:gc-step-2} $\wff{\emptyset}{e_i'}{|xs|_i}{|cs|_i}{\hnf_i}$
-	so we can join by concatenating the binders, constraints and value
-	of $e_1,\dots,e_i',\dots,e_n$.
-
-	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
-	Trivially $\rdx{\rfail} \not \subset \rdx{\rspc}$.
-	\end{description}
 \end{description}
 \end{proof}
 
