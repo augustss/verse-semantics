@@ -1290,7 +1290,7 @@ If $\rstep{\rcon}{e}{e_1}$ and $\rstep{\rfail}{e}{e_2}$ then $\join{\rconfail}{e
 \end{lemma}
 
 \begin{proof}
-We show that $\rcon$ is locally confluent with $\rfail$.
+We show that $\rcon$ $*$-commutes with $\rfail$, hence commutes via \cref{lem:star-comm}.
 %
 Let $\tx{\rcon}$ and $\tx{\rfail}$ denote the reducts for $\rcon$ and $\rfail$ respectively.
 %
@@ -1336,41 +1336,132 @@ Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice 
 	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
 		Here $\rdx{\rfail} \subset \hnf$, \ie $\rfail: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
 
-	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
+	\item[Case:] \rulename{norm-seq-def*}
 		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
 		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
 		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
+
+	% FIXME \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}
+	\item[Case:] \rulename{norm-defr} \ie $\rdx{\rcon} \equiv |v| = |(def y e)| \movesto |def y (v == e)|$.
+		If $\rdx{\rfail} \subset v$, \ie $\rfail: v \movesto v'$, then join at $|def y (v' == e)|$.
+		If $\rdx{\rfail} \subset v$, \ie $\rfail: v \movesto e'$, then join at $|def y (v == e')|$.
+
+	\item[Case:] \rulename{norm-seqr} \ie $\rdx{\rcon} \equiv |v == (e_1; e_2)| \movesto |e_1; v == e2|$.
+		If $\rdx{\rfail} \subset v$,   \ie $\rfail: v \movesto v'$,     then join at $|e_1; v' == e2|$.
+		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $|e_1'; v == e_2|$.
+		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $|e_1; v == e_2'|$.
+
+	\item[Case:] \rulename{norm-unifyr} \ie $\rdx{\rcon} \equiv |v_1 == (v_2 == e)| \movesto |def x (x == v_1; x == v_2; x == e)|$.
+		If $\rdx{\rfail} \subset v_1$, \ie $\rfail: v_1 \movesto v_1'$, then join at $|def x (x == v_1'; x == v_2; x == e)|$.
+		If $\rdx{\rfail} \subset v_2$, \ie $\rfail: v_2 \movesto v_2'$, then join at $|def x (x == v_1; x == v_2'; x == e)|$.
+		If $\rdx{\rfail} \subset e$  , \ie $\rfail: e   \movesto e'$,   then join at $|def x (x == v_1; x == v_2; x == e')|$.
+		If $\rdx{\rfail} \subset |v_2 == e|$ via \rulename{fail-eq}, \ie $e \equiv |fail|$ hence join at $|fail|$ via multiple $\rfail$ steps.
+
 	\end{description}
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\rcon-\rgc$-Comm] \label{lem:c-g-c-todo}
+\begin{lemma}[Under-$\rcon$] \label{lem:under-c}
+%
+Let $\rr' = \rr - \rfail$.
+%
+If $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
+   $\rdx{\rcon} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rcon}''$ such that
+   $\rstep{\rr'}{\rdx{\rcon}'}{\rdx{\rcon}''}$ and
+   $\rstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$.
+\begin{description}
+%
+\item[Case:] \rulename{norm-val} \ie $\rdx{\rcon} \equiv |v; e| \movesto |e| \equiv \rdx{\rcon}'$.
+%
+If $\rdx{} \subset |v|$, \ie $\rr': |v| \movesto |v'|$, then $\rdx{\rcon}'' \equiv |e|$.
+If $\rdx{} \subset |e|$, \ie $\rr': |e| \movesto |e'|$, then $\rdx{\rcon}'' \equiv |e'|$.
+
+\item[Case:] \rulename{norm-seq-assoc} \ie $\rdx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3) \equiv \rdx{\rcon}'$.
+If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv (e_1'; (e_2; e_3)$.
+If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv (e_1; (e_2'; e_3)$.
+If $\rdx{} \subset e_3$, \ie $\rr': e_3 \movesto e_3'$, then $\rdx{\rcon}'' \equiv (e_1; (e_2; e_3'))$.
+If $\rdx{} \subset e_1;e_2$ \ie via \rulename{deref-s} $\rr' : e_1;e_2 \movesto e_1;e_2'$, then $\rdx{\rcon}'' \equiv e_1;(e_2';e_3)$.
+
+\item[Case:] \rulename{norm-seq-swap-*} \ie $\rdx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2| \equiv \rdx{\rcon}'$.
+If $\rdx{} \subset |e_1|$, \ie $\rr' : e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv x = |v|; e_1'; e_2$.
+If $\rdx{} \subset |e_2|$, \ie $\rr' : e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv x = |v|; e_1; e_2'$.
+If $\rdx{} \subset |x==v;e_2|$ \ie via \rulename{deref-s} $\rr' : |x==v;e_2| \movesto |x==v;e_2'|$, then $\rdx{\rcon}'' \equiv |x==v; (e_1; e_2')|$.
+
+\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
+Here $\rdx{} \subset \hnf$, \ie $\r': \hnf \movesto \hnf'$, hence $\rdx{\rcon}'' \equiv x = \hnf'$.
+
+\item[Case:] \rulename{norm-seq-def*}, \ie $\rdx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2] \equiv \rdx{\rcon}'$.
+If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv C'[e_1', e_2]$.
+If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv C'[e_1, e_2']$.
+%
+\ranjit{TODO: elim-def overlap}
+
+\item[Case:] \rulename{norm-defr} \ie $\rdx{\rcon} \equiv |v| = |(def y e)| \movesto |def y (v == e)|$.
+If $\rdx{} \subset v$, \ie $\rr': v \movesto v'$, then $\rdx{\rcon}'' \equiv |def y (v' == e)|$.
+If $\rdx{} \subset v$, \ie $\rr': v \movesto e'$, then $\rdx{\rcon}'' \equiv |def y (v == e')|$.
+%
+\ranjit{TODO: elim-def overlap}
+
+\item[Case:] \rulename{norm-seqr} \ie $\rdx{\rcon} \equiv |v == e_1; e_2| \movesto |e_1; v == e2|$.
+If $\rdx{} \subset v$, \ie $\rr': v \movesto v'$, then $\rdx{\rcon}'' \equiv |e_1; v' == e2|$.
+If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv |e_1'; v == e_2|$.
+If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv |e_1; v == e_2'|$.
+
+\item[Case:] \rulename{norm-unifyr} \ie $\rdx{\rcon} \equiv |v_1 == (v_2 == e)| \movesto |def x (x == v_1; x == v_2; x == e)|$.
+If $\rdx{} \subset v_1$, \ie $\rr': v_1 \movesto v_1'$, then $\rdx{\rcon}'' \equiv |def x (x == v_1'; x == v_2; x == e)|$.
+If $\rdx{} \subset v_2$, \ie $\rr': v_2 \movesto v_2'$, then $\rdx{\rcon}'' \equiv |def x (x == v_1; x == v_2'; x == e)|$.
+If $\rdx{} \subset e$  , \ie $\rr': e   \movesto e'$,   then $\rdx{\rcon}'' \equiv |def x (x == v_1; x == v_2; x == e')|$.
+
+\end{description}
+\end{proof}
+
+\begin{lemma}[$\rcon-\rgc$-Comm] \label{lem:c-g-c}
 	$\rcon$ and $\rgc$ commute.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
 We show that $\rcon$ and $\rgc$ strongly commute, and hence commute.
 Let $\tx{\rcon}$ and $\tx{\rgc}$ denote the reducts for $\rcon$ and $\rgc$ respectively.
 %
 If the reducts are disjoint then terms can be trivially joined in a single step.
 %
 Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rgc}$ or vice versa.
+%
 \begin{description}
-
-	\item[Case $\rdx{\rgc} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$.
-
-\item[Case $\rdx{\rcon} \subset \rdx{\rgc}$] Split cases on the rule used in $\rgc$.
-
+%
+\item[Case $\rdx{\rgc} \subset \rdx{\rcon}$] via \cref{lem:under-c}.
+%
+\item[Case $\rdx{\rcon} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
+%
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\rcon-\rspc$-Comm] \label{lem:c-s-c-todo}
+\begin{lemma}[$\rcon-\rspc$-Comm] \label{lem:c-s-c}
 	$\rcon$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rcon$ and $\rspc$ strongly commute, and hence commute.
+%
+Let $\tx{\rcon}$ and $\tx{\rspc}$ denote the reducts for $\rcon$ and $\rspc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rspc}$ or vice versa.
+%
+\begin{description}
+%
+\item[Case $\rdx{\rspc} \subset \rdx{\rcon}$] via \cref{lem:under-c}.
+%
+\item[Case $\rdx{\rcon} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
+%
+\end{description}
 \end{proof}
 
 \begin{lemma}[$\rfail$-Confluent] \label{lem:f-c}
@@ -1547,12 +1638,24 @@ Hence, we can perform a second GC step from each of the terms above and join the
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\rgc-\rspc$-Comm] \label{lem:g-s-c-todo}
+\begin{lemma}[$\rgc-\rspc$-Comm] \label{lem:g-s-c}
 	$\rgc$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:Fresh-Verse.pdf}
+We show that $\rgc$ and $\rspc$ strongly commute.
+%
+Let $\tx{\rgc}$ and $\tx{\rspc}$ denote the reducts for $\rgc$ and $\rgc$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice versa.
+%
+\begin{description}
+\item[Case $\rdx{\rgc} \subset \rdx{\rspc}$:] via \cref{lem:under-s}.
+\item[Case $\rdx{\rspc} \subset \rdx{\rgc}$:] via \cref{lem:under-g}.
+\end{description}
+%
 \end{proof}
 
 \begin{lemma}[Under-$\rgc$] \label{lem:under-g}
@@ -1565,9 +1668,22 @@ then there exists $\rdx{\rgc}''$ such that
 \end{lemma}
 
 \begin{proof}
-HEREHEREHERE
+Suppose that $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ is a $\rgc$
+redex via \rulename{elim-def}.
+%
+Then $\wff{\emptyset}{\rdx{\rgc}}{|xs|}{c_1 \dots c_n}{\rdx{\rgc}'}$
+where $|xs| \not \in \freevars{\rdx{\rgc}'}$.
+%
+If $\rr : E[\rdx{}] \movesto E[\rdx{}']$ then by \cref{lem:wf-step}
+we have $\wff{\emptyset}{E[\rdx{}'}{|xs|}{c_1' \dots c_n'}{e_2'}$
+where either
+%
+(a)~$\rdx{\rgc}' \equiv e_2'$ or
+%
+(b)~$\rstep{}{\rdx{\rgc}'}{e_2'}$.
+%
+and hence, picking $\rdx{\rgc}''$ to be $e_2'$ completes the proof.
 \end{proof}
-
 
 \begin{lemma}[WF-Step] \label{lem:wf-step}
 If $\wff{\emptyset}{e_1}{|xs|}{c_1 \dots c_n}{e_2}$
@@ -1593,7 +1709,9 @@ splitting cases on the rule used for $\rstep{\rr}{e_1}{e_1'}$.
 \end{lemma}
 
 \begin{proof}
-\cref{lem:under-s} shows that $\rspc$ has the diamond property (as $\rspc \subset \rr$), and hence $\rspc$ is confluent via \cref{lem:diamond}.
+\cref{lem:under-s} shows that $\rspc$
+has the diamond property (as $\rspc \subset \rr$),
+and hence $\rspc$ is confluent via \cref{lem:diamond}.
 \end{proof}
 
 \begin{lemma}[Under-$\rspc$] \label{lem:under-s}
