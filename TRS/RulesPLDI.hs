@@ -398,6 +398,21 @@ simpleCst xs bs e =
 
 -}
 
+derefB :: Expr -> Ident -> [VContext]
+derefB lhs xx =
+   do VAR x <- [lhs]
+      guard (x == xx)
+      pure Val
+   ++
+   do (e1 :>: e2) <- [lhs]
+      ctx <- derefB e2 xx
+      pure ((e1 :>:) . ctx)
+   ++
+   do Def (Bind x e) <- [lhs]
+      guard (x /= xx)
+      ctx <- derefB e xx
+      pure (Def . Bind x . ctx)
+
 derefA :: Expr -> Ident -> [VContext]
 derefA lhs xx =
    do (Var x :@: v) <- [lhs]
@@ -599,6 +614,11 @@ rulesDerefFP lhs =
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
      ctx <- derefA e x
+     pure (xh :>: plug ctx (HNF h))
+ ++
+  "DEREF-K" `name`
+  do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
+     ctx <- derefB e x
      pure (xh :>: plug ctx (HNF h))
 
 rulesFailFP :: ERule
