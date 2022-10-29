@@ -1222,8 +1222,6 @@ To make further progress, we need a rule for choice, see \cref{sec:choice-rules}
 
 \subsection{Rules for choice} \label{sec:choice-rules}
 
-\simon{Wavefront}
-
 The rules for choice are given in \cref{fig:choice-rules}.
 Rules \rulename{one-value}, \rulename{one-choice}
 and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
@@ -1347,16 +1345,24 @@ Laziness would be another possible design choice, one that is even more expressi
 
 \subsection{Evaluation strategy} \label{sec:eval-strategy}
 
-The rewrite rules say which rewrites are \emph{allowed}, but they do not say which
-rewrite rule to apply next if you want to execute the program. That is
-the role of an \emph{evaluation strategy} that, given a closed term, says which redex
-to rewrite first.  For example, in the pure lambda calculus, \emph{normal-order reduction},
-sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
-guarantees to terminate if any strategy does so.
+Any rewrite rule can apply anywhere in the term, at any time.  For example in the term |(x=3+4; y=3*2; x+y)|
+the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |3*2| $\rightarrow$ |6|,
+or the other way around.
+The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
+the \rulename{deref} rules only fire when the RHS is a value.
+By choosing rewrite rules carefully, we can for example express call-by-name,
+call-by-name, and call-by-need
+\cite{ariola:call-by-need}.
 
+An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
+out of the many possible redexes, should I rewrite next to make progress towards the result?
 Any decent evaluation strategy should (a) guarantee to terminate if there
 is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code.
+For example, in the pure lambda calculus, \emph{normal-order reduction},
+sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
+guarantees to terminate if any strategy does so.
+
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
@@ -1381,57 +1387,6 @@ so we leave evaluation strategy and compilation for future work.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
-
-\subsection{Example}
-A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
-This example shows how constraining the output of a function call can constrain the argument.
-While most of the reductions are administrative in nature, these are the highlights:
-At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
-
-Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
-At \circlednum{5} and \circlednum{6} the actual numbers are inline.
-After removing some garbage we reach the result at \circlednum{7}.
-\begin{figure}
-\begin{scriptsize}
-% no space needed around math environments in a figure
-\setlength{\abovedisplayskip}{0pt}%
-\setlength{\belowdisplayskip}{0pt}%
-$$
-\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-
-
-  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
-\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
-\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
-  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
-  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
-  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
-\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
-\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
-\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
-\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
-  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
-\end{array}
-$$
-\end{scriptsize}
-\caption{Sample reduction sequence} \label{fig:sample-reductions}
-\end{figure}
 
 
 
@@ -1822,7 +1777,7 @@ for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 
 In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can still make progress, by floating out the
-choice (rule \rulename{choose} in \cref{fig:general-axioms}), thus
+choice (rule \rulename{choose} in \cref{fig:rewrite-rules}), thus
 |(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
@@ -1860,8 +1815,8 @@ Second, even under the reification of |allKW|,
 \versecalc{} is \emph{deterministic}.  Choice is not
 non-deterministic: \versecalc{} takes pains to maintain order, so that
 when reifying choice into a tuple, the order of elements in that
-tuple is completely determined.  Anything else would leak
-non-determinism into the language.  This determinism has a price: as we saw in \cref{sec:mixing}
+tuple is completely determined.
+This determinism has a price: as we saw in \cref{sec:mixing}
 and \cref{sec:choice-rules}, we have to take care to maintain the
 left-to-right order of choices.
 However, maintaining that order has other payoffs. For example, it is relatively easy to add
@@ -1875,15 +1830,15 @@ and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
 As we saw in \cref{sec:rigid}, logical variables bound outside |oneKW|/|allKW| cannot be unified inside it;
-they are ``rigid.''  This notion is nicely captured by the execution context |X|, which limits the
-scope of the \rulename{subst} rule, and specifically \emph{excludes} |oneKW| and |allKW|.
+they are ``rigid.''  This notion is nicely captured by the fact that equalities
+cannot float outside |oneKW| and |allKW| (\cref{sec:normalization}).
 
 \subsection{The semantics of logical variables} \label{sec:magical}
 
 Our logical variables, introduced by |defKW|, are often called
 \emph{extra variables} in the literature, because they
-are typically introduced as variables that appear on the right-hand side of a function
-definition, but are not bound on the left.  For example, in Curry we can write
+are typically introduced as variables that appear on the right-hand side of a
+function definition, but are not bound on the left.  For example, in Curry we can write
 \begin{verbatim}
      first x | x =:= (a,b) = a where a,b free
 \end{verbatim}
@@ -1891,7 +1846,7 @@ Here \verb!a! and \verb!b! are logical variables, not bound on the left; they
 get their values through unification (written ``\verb!=:=!'').   In Curry they are explicitly introduced
 by the ``\verb!where a,b free!'' clause, while in many other papers their
 introduction is implicit in the top-level rules, simply by not being bound
-on the left.  Logical variables are
+on the left.  These extra variables (our logical variables) are
 at the heart of the ``logic'' part of functional logic programming.
 
 Constructor-based ReWrite Logic (CRWL) \cite{crwl} is the brand leader for
@@ -1965,10 +1920,10 @@ distinguished from ordinary variables. As Hanus describes, it is possible
 to translate a higher-order program into a first-order
 form\footnote{
   Hanus does not mention this, but for a language with arbitrarily nested lambdas
-  one would need to do lambda-lifting as well, but that is a small point.}
+  one would need to do lambda-lifting as well, but that is perhaps a minor point.}
 using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
-Sadly, this encoding is hardly a natural rendition of the lambda calculus:
+Sadly, this encoding is hardly a natural rendition of the lambda calculus, and
 it obstructs the goal of using rewrite rules to explain to programmers how
 their program might execute. In contrast, a strength of our \versecalc{}
 presentation is that it deals natively with the full lambda calculus.
@@ -1993,147 +1948,6 @@ FLC has let-expressions \verb!(let x=e in b)!, where \versecalc{} uses
 FLC also uses the same construct for a different purpose, to
 bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
 In contrast, |def x e| seems more direct.
-
-\section{Variations and choices} \label{sec:variations}
-
-%% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
-
-In a calculus like \versecalc{} there is room for many design variations.
-We discuss some of them here.
-
-\subsection{Unifying lambdas} \label{sec:unifying-lambda}
-
-In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails---even if the
-lambdas are semantically identical.  The problem, obviously, is that it is hard
-to tell if they \emph{are} semantically identical.
-
-We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that rewrites in two different ways, depending on which equality we \rulename{subst} first:
-\[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
-% $$
-% \begin{array}{lll}
-%  \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
-% &    \movesto \{\textit{use \rulename{SUBST} on first equality}\} & |(lam p 1) = (lam q 2); 1| \\
-% OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
-% \end{array}
-% $$
-These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
-lead to |fail|, and confluence is restored.  A perhaps-unexpected consequence is that we cannot add a rule
-$\rulename{urefl}\; |(x=x)| \movesto |x|$, because that would lead to non-confluence if |x| turns out to be a lambda.
-
-% JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
-
-% \subsection{Choice and failure} \label{sec:choice-and-failure}
-%
-% In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
-% and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
-% only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
-% $$
-% |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
-% $$
-% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-% |if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
-% $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
-% and make progress.  But to do this we must look at the right branch of the choice, before we know whether
-% the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
-% |(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
-% for |x|.
-%
-% An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
-% the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
-
-
-\subsection{Administrative normal form}
-
-We have chosen to restrict tuple formation and function application to
-\emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
-|e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
-It would be entirely straightforward to allow expressions rather than values, but doing so
-would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
-Restricting to values involves no loss of expressive power:
-it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
-
-We could take the ANF idea a bit further, by restricting the syntax of equalities so
-that the left-hand-side is always a value.
-Thus $e ::= \ldots \vb |v = e| \vb \ldots$. It is easy to get the program into this form,
-by desugaring |(e_1 = e_2)| to |(def x (x = e_1; x = e_2))|.
-The payoff is that we can then drop \rulename{unify-seql} and \rulename{unify-unifyl}.
-We have chosen not to do this, mainly because it makes |(=)| asymmetrical and adds a lot of clutter;
-a debatable decision, but one of no great consequence.
-
-\subsection{Dead existentials}
-
-Consider the term |(def x 99)|.  We have no rule to rewrite this to |99|; \rulename{def-eliml} comes closest,
-but it insists that every existential is given a value. It would be easy to add a rule to discard an existential
-whose bound variable is not used in its body, and so far as we know, doing so would not lead to
-new difficulties for (say) confluence.  It is mostly a philosophical issue.  For example, the term
-|(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
-  solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
-For now, we make a conservative choice, and insist that every existential gets a value:
-only \rulename{def-eliml} and \rulename{def-elimr} eliminate an existential.
-
-\subsection{Ordering and choices}
-
-As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
-First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
-the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
-$$
-\rulename{simpler-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[e_1] choice X^[e_2]|
-$$
-The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
-Another possibility would be to accept that results may come out in the ``wrong'' order, but have
-some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
-$$
-\rulename{labeled-choose} \quad   |X^[ e_1 choice e_2 ]| \movesto |X^[L; e_1] choice X^[R; e_2]|
-$$
-Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
-labelled expressions, something in the spirit of
-$$
-\rulename{sort} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
-$$
-We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure
-may be worse than the disease.
-
-\subsection{Generalizing |oneKW| and |allKW|}
-
-In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
-\[\begin{array}{lrcll}
-    \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)| & \text{|x| fresh}  \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)| \\
-\end{array}\]
-The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
-
-Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
-\[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
-\end{array}\]
-For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
-to avoid confusing the presentation with these higher-order encodings, but we do not expect any complications using |splitKW| instead.
-
-\subsection{Laziness} \label{sec:laziness}
-
-As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
-For example this
-program does not yield a value:
-$$
-|def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
-$$
-Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
-|1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
-|ones = tup(1,ones)|, which has an ``occurs check.''
-Remembering the duality between values and choices,
-one might also want |allKW| to return a lazy stream
-of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
-this program would converge:
-$$
-|def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
-$$
-Here we suppose that |allKW| returns a lazy stream of values (represented as nested
-pairs), from which we may pick the first and discard the rest.
-
-A lazy variant of \versecalc{} looks entirely feasible, but we have not worked out the details.
 
 \section{Looking back, looking forward}
 
@@ -2195,13 +2009,211 @@ but they are not included here.
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
 
-\cleardoublepage
-
 \appendix
 
 \section{Confluence proof}
 
 \simon{Ranjit to fill in here}
+
+% ----------------------- Example
+
+\section{Example}
+A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
+This example shows how constraining the output of a function call can constrain the argument.
+While most of the reductions are administrative in nature, these are the highlights:
+At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
+
+Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
+At \circlednum{5} and \circlednum{6} the actual numbers are inline.
+After removing some garbage we reach the result at \circlednum{7}.
+\begin{figure}
+\begin{scriptsize}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
+$$
+\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+
+
+  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
+\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
+\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
+  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
+  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
+  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
+  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
+\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
+\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
+  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
+  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
+  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
+\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
+\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
+  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
+\end{array}
+$$
+\end{scriptsize}
+\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\end{figure}
+
+
+% ----------------------- Variations
+
+\section{Variations and choices} \label{sec:variations}
+
+%% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
+
+In a calculus like \versecalc{} there is room for many design variations.
+We discuss some of them here.
+
+\subsection{Unifying lambdas} \label{sec:unifying-lambda}
+
+In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails---even if the
+lambdas are semantically identical.  The problem, obviously, is that it is hard
+to tell if they \emph{are} semantically identical.
+
+We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
+Here is an expression that rewrites in two different ways, depending on which equality we \rulename{deref-h} first:
+\[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
+% $$
+% \begin{array}{lll}
+%  \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
+% &    \movesto \{\textit{use \rulename{SUBST} on first equality}\} & |(lam p 1) = (lam q 2); 1| \\
+% OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
+% \end{array}
+% $$
+These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
+lead to |fail|, and confluence is restored.
+
+There is a very delicate interaction with the apparently-innocuous
+rule \rulename{u-scalar} (\cref{fig:rewrite-rules}).
+Consider |(def x (x==(lam y y); x==x))|.
+If we apply \rulename{u-scalar}, and then \rulename{deref-h} we get |(lam y y)|. But if we \emph{first}
+apply \rulename{deref-h}, twice, we get |((lam y y) == (lam y y))|, and that fails.  Yikes!
+
+But in fact all is well: the |A| context (\cref{fig:rewrite-rules}) \emph{only
+  allows \rulename{deref-h} to apply in positions where the value is immediately
+  consumed in some way}, by being applied to an argument, or being
+unified with a value.  So in our example, \rulename{deref-h} simply does not apply. Only \rulename{u-scalar} does,
+so we get |(def x (x==(lam y y); x))| and that's it.  Confluence is restored.
+But the ice is thin here, so it is reassuring that we have a proof of confluence.
+
+% JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
+
+% \subsection{Choice and failure} \label{sec:choice-and-failure}
+%
+% In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
+% and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
+% only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
+% $$
+% |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
+% $$
+% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+% |if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+% $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+% and make progress.  But to do this we must look at the right branch of the choice, before we know whether
+% the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
+% |(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
+% for |x|.
+%
+% An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
+% the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
+
+
+\subsection{Administrative normal form}
+
+We have chosen to restrict tuple formation and function application to
+\emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
+|e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
+It would be entirely straightforward to allow expressions rather than values, but doing so
+would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
+Restricting to values involves no loss of expressive power:
+it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
+
+\subsection{Dead existentials}
+
+Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
+argue that it should instead be stuck.
+For example, the term
+|(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
+  solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
+It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
+
+\subsection{Ordering and choices}
+
+As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
+First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
+the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
+$$
+\rulename{simpler-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[e_1] choice CX^[e_2]|
+$$
+The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
+Another possibility would be to accept that results may come out in the ``wrong'' order, but have
+some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
+$$
+\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[L; e_1] choice CX^[R; e_2]|
+$$
+Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
+labelled expressions, something in the spirit of
+$$
+\rulename{sort} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
+$$
+We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure
+may be worse than the disease.
+
+\subsection{Generalizing |oneKW| and |allKW|}
+
+In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
+\[\begin{array}{lrcll}
+    \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)| & \text{|x| fresh}  \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)| \\
+\end{array}\]
+The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
+
+Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
+\[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
+    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
+    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
+\end{array}\]
+For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
+to avoid confusing the presentation with these higher-order encodings, but we do not expect any complications using |splitKW| instead.
+
+\subsection{Laziness} \label{sec:laziness}
+
+As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
+For example this
+program does not yield a value:
+$$
+|def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+$$
+Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
+|1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
+|ones = tup(1,ones)|, which has an ``occurs check.''
+Remembering the duality between values and choices,
+one might also want |allKW| to return a lazy stream
+of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
+this program would converge:
+$$
+|def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
+$$
+Here we suppose that |allKW| returns a lazy stream of values (represented as nested
+pairs), from which we may pick the first and discard the rest.
+
+A lazy variant of \versecalc{} looks entirely feasible, but we have not worked out the details.
+
 
 % ----------------------- Denotational semantics  -----
 \section{Denotational semantics} \label{sec:den-sem}
