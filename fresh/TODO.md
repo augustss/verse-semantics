@@ -1,10 +1,10 @@
 ## TODO
 
 
-- [] TODO <----- HEREHEREHEREHEREHEREHEREHERE
-- [] unify+rspc+semicolon (used in eq-join?)
+- [] elim-def-overlap <----- HEREHEREHEREHEREHEREHEREHERE
 - [] uni-uni see below
-- [] rconfail (undo "merge" - ok to keep apart use star-comm for many fail steps)
+  - [] unify+rspc+semicolon (used in eq-join?)
+
 
 CHECK: In UNI vs. UNI
 
@@ -12,7 +12,7 @@ CHECK: In UNI vs. UNI
 
 Can JOIN deref-h and u-scalar as we never subst lambda into x=x
 
-## Can we modify
+ ## Can we modify
 
 [WF-Eq] to add preconditions
 
