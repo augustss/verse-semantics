@@ -1,0 +1,125 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+\section{Updateable references} \label{sec:store}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{References}         & r \\
+      \text{Expressions}        & e   & ::= & \cdots \vb |store s e| \\
+      \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
+      \text{Head values}        & hnf & ::= & \cdots \vb r \\
+      \text{Execution contexts} & X   & ::= & \cdots \vb |store s X| \\
+      \text{Store}              & s   & ::= & |cell r v| \vb |s,s| \vb |emp| \\
+      \text{Store context}      & S   & ::= & \hole \vb |S,s| \vb |s,S| \\
+    \end{array} \\
+\\
+
+  \textbf{Axiom extensions} \\
+  \textit{Reference ops} \\
+  \begin{array}{lrcll}
+    \rulename{ref-alloc} & |store s (apply1 alloc v)| & \movesto & |store (s, cell r v) r| & \text{|r| fresh} \\
+    \rulename{ref-read} & |store (S^[cell r v]) (apply1 read r)| & \movesto & |store (S^[cell r v]) v| \\
+    \rulename{ref-write} &
+        | store (S^[cell r v_1]) (applyN write (r,v_2))|
+        & \movesto & |store (S^[cell r v_2]) emptytup| \\
+  \end{array} \\
+    \\
+  \textit{Store propagation} \\
+  \begin{array}{lrcll}
+    % SEQ
+    \rulename{st-seq-in} & |store s (e_1; e_2)|  & \movesto & |store s e_1; e_2| \\
+    \rulename{st-seq-r} & |store s v; e|  & \movesto & |v; store s e| \\
+    % UNIFY
+    \rulename{st-unify-in} & |store s (e_1 = e_2)|  & \movesto & |store s e_1 = e_2| \\
+    \rulename{st-unify-r} & |store s v = e|  & \movesto & |v = store s e| \\
+    \rulename{st-unify} & |v_1 = store s v_2|  & \movesto & |v_1 = v_2; store s v_1| \\
+    % CHOICE
+    \rulename{st-choice} & |store s (e_1 `choice` e_2)| & \movesto & |store s e_1 `choice` e_2| \\
+    % DEF
+    \rulename{st-def-in} & |store s (def x e)| & \movesto & |def x (store s e)| & e \not\in v \\
+    \rulename{st-def-out} & |def x (store s v)| & \movesto & |store s (def x v)| \\
+    % SPLIT
+    \rulename{st-split-value} & |split (store s v) f g| & \movesto &
+        |store s (split v f g)| \\
+
+    \rulename{st-split-choice} & |split (store s (v `choice` e)) f g| & \movesto &
+      |store s (split (v `choice` e) f g)| \\
+
+    % FAIL
+    %% \rulename{st-wrong} & |store s wrong| & \movesto & |wrong| \\
+  \end{array} \\
+ \\
+  \textit{Store copying} \\
+  \begin{array}{lrcll}
+    % SPLIT
+    \rulename{st-split-copy} &
+      \begin{array}[t]{@@{}l}
+        | storeTwoLines s (split e f g)|
+      \end{array} & \movesto &
+      \begin{array}[t]{@@{}l}
+        | storeTwoLines s (split (store s e) f g)| \\
+      \end{array} & \text{|canCopy e|} \\
+    % FAIL
+    \rulename{st-fail} & |store s fail| & \movesto & |fail| \\
+    % STORE
+    \rulename{st-store} & |store s_1 (store s_2 v)| & \movesto & |store s_2 v| \\
+  \end{array} \\
+    \\
+    \textit{Unification} \\
+    \begin{array}{lrcll}
+      \text{Extension with the obvious axioms making equal references unify,
+        and anything else fail.}
+    \end{array} \\
+  \\
+  \textit{Top level} \\
+  \begin{array}{lrcll}
+    \text{Start top level reduction of |e| with |store emp e|.}
+  \end{array} \\
+
+    \\
+    \text{|canCopy e| is true if |e| contains no |storeKW|, |e| isn't |v|, |e| isn't |v `choice` e_1|, nor |fail|}
+
+  \end{array}
+   $$
+  \caption{The Verse calculus: store axioms} \label{fig:store-axioms}
+\end{figure}
+
+
+To add updateable references we extend the system with syntax and rules from figure~\ref{fig:store-axioms}.
+The |store s e| indicates that |e| should be reduced using the store |s|.
+A store is simply a mapping from references to values (one mapping being |cell r v|).
+A reference is some opaque type that supports equality (unification) and creation of a new reference.
+
+There are three new operations, |alloc|, |read|, and |write|.
+Their interaction with the store can be seen from the axioms.
+The |apply1 alloc v| operation creates a new reference and adds a binding with |v| to the store.
+The |apply1 read r| operation retrieves the value for reference |r| from the store,
+and |applyN write (r, v)| updates the reference |r| with |v| in the store.
+Note that these reductions only happen when the store is exactly at the operation.
+
+Most of the store axioms just move the store around from left-to-right, ``visiting'' every subexpression,
+and moving on when the subexpression has reduced to a value.
+This way every subexpression (in a non-looping program) will get a ``visit'' and all reference operations
+can reduce.
+
+The interesting rules are those that cover |splitKW|.
+When reducing the |e| in |split e f g| the reduction of |e| is treated as a transaction, {\ie},
+if the reduction fails any changes to the store are rolled back.
+This is handled by a combination of \rulename{st-split-copy}, \rulename{st-fail}, and \rulename{st-store}.
+First, when a |storeKW| is at a |split e f g| then the store is copied to reduce the |e|.
+If the evaluation of |e| fails, then rule \rulename{st-fail} will simply abandon the copy of the store.
+If the evaluation of |e| is successful then the \rulename{st-value} or \rulename{st-choice} will move the store out of the |splitKW|.
+In that position the \rulename{st-store} rule can ``commit'' and throw away the old store, replacing it with the new.
+Note that the \rulename{st-split-copy} has a side condition to stop it from firing when it has just fired,
+and also when the |e| is a result.
+
+To support limited store operations ({\eg}, |read|, but not |write|) we can equip the store with a set of currently allowed operations.
+We also need some extra expressions that modify this set as the store ``moves'' around.
+
+\lennart{These rewrite rules assume that choices/|fail| are always inside a |splitKW|, otherwise the store can get lost.}
