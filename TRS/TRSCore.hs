@@ -192,12 +192,12 @@ pattern SCL v <- Val (getS -> Just v)
 getH :: Value -> Maybe HNF
 getH (HNF v@Arr{}) = Just v
 getH (HNF v@Lam{}) = Just v
-getH (HNF v@Op{}) = Just v
 getH _ = Nothing
 
 getS :: Value -> Maybe Value
-getS v@VINT{} = Just v
 getS v@Var{} = Just v
+getS v@VINT{} = Just v
+getS v@VOP{} = Just v
 getS _ = Nothing
 
 pattern DEF x e = Def (Bind x e)

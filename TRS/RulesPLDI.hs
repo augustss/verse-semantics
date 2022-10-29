@@ -250,10 +250,12 @@ rulesUnificationNoOcc lhs =
   do v@(ARR ss) :=: ARR ss' <- [lhs]
      guard (length ss == length ss')
      pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+{-
  ++
   "U-FAIL-OP-OP" `name`
   do OP{} :=: OP{} <- [lhs]
      pure Fail
+-}
  ++
   "U-FAIL-LAM-LAM" `name`
   do LAM{} :=: LAM{} <- [lhs]
