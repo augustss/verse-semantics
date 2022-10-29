@@ -102,11 +102,11 @@ $$
     \textit{Integers}      & k \\
     \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
     \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
-    \textit{Scalar Values} & s     & ::= & k \vb x \\
-    \textit{Heap Values}   & h     & ::= & \op \vb |arr (s_1, dots, s_n)| \vb |lam x e| \\
+    \textit{Scalar Values} & s     & ::= & x \vb k \vb op \\
+    \textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
     \textit{Head Values}   & |hnf| & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
-    \textit{Expressions}   & e     & ::= & |v| \vb |e_1 ; e_2| \vb |fail| \vb |def x e| \vb |v == e|
+    \textit{Expressions}   & e     & ::= & |v| \vb |e_1 ; e_2| \vb |def x e| \vb |v == e| \vb |fail| 
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
 %     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
@@ -174,6 +174,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
   \end{array}
    }
 \end{array}$$
+\vspace{-6mm}
 \begin{longtable}[l]{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
 \rulegroupname{Unification:~\runi}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
@@ -182,6 +183,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{u-tup}    & |tup (s_1,dots,s_n) == tup (sone' ,dots,s_n')| & \movesto & \multicolumn{2}{l} {|s_1==sone';dots;s_n==s_n'; tup (s_1,dots,s_n)|} \\
 \rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
 \end{longtable}
+\vspace{-4mm}
 \begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
@@ -192,7 +194,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
 \end{longtable}
-\begin{longtable}[l]{@@{\quad} l  r >{$}c<{$} l l}
+\vspace{-4mm}
+\begin{longtable}[l]{@@{\quad} l @@{\;}  r >{$}c<{$} l l}
 \rulegroupname{Speculation:~\rspc}
 \rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
 \rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
@@ -202,8 +205,9 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
 \rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto & |def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)|
-               & if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh \\
+\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto &
+   \multicolumn{2}{l}{|def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)| \;
+               if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh} \\
 %% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}
@@ -220,7 +224,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| not of form |x' == v'|\\
 \rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| not of form |x' == s'|\\
 \rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
-\rulename{norm-swap-eq}   & |hnf == x|            & \movesto & |x == hnf|            & \\
+\rulename{norm-eq-swap}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
 \rulename{norm-defr}      & |v == (def y e)|      & \movesto & |def y ((v == e))|   & if $|y| \not \in \freevars{|v|}$ \\
