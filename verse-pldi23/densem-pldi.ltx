@@ -56,7 +56,7 @@
 \newcommand{\stuple}{\mathit{tuple}}
 \newcommand{\scons}{:}
 
-\section{A denotational semantics for \versecalc}
+\section{A denotational semantics for \versecalc} \label{sec:den-sem}
 
 
 \begin{figure}
@@ -376,7 +376,7 @@ the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it 
 And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
 
 \Cref{fig:labelled-sem} give a new denotational semantics that \emph{does} account for order.
-The key idea (due to Joachim) is this: return a sequence of \emph{labelled} values;
+The key idea (due to Joachim Breitner) is this: return a sequence of \emph{labelled} values;
 and then sort that sequence (in $\mone$ and $\mall$) into canonical order
 before exposing it to the programmer.
 

@@ -397,11 +397,8 @@ $$
 \movestoR{deref-h}       & |def (x ^^ y ^^ z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
 \movestoR{u-tup}          & |def (x ^^ y ^^ z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
 \movestoRn{deref-s}{2}  & |def (x ^^ y ^^ z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-\movestoR{norm-seq-swap,norm-seq-assoc,norm-eq-swap}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
-% \movestoR{seq}           & |                           (2;     3;     tup(2,3)); 2| \\
-% \movestoR{seq}           & |                                  (3;     tup(2,3)); 2| \\
-% \movestoR{seq}           & |                                          tup(2,3);  2| \\
-  \movestoR{norm-val,elim-def}     & |                                                     2|
+\movestoR{norm-seq-swap,norm-seq-assoc,norm-swap-eq}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
+\movestoR{norm-val,elim-def}     & |                                                     2|
 \end{array}
 $$
 %
@@ -429,6 +426,7 @@ some built-in operations and tuples as data constructors:
   introduce the other constructs as we go.
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
+  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
 rules in \cref{fig:syntax} show how to desugar general applications |(e_1 e_2)|. This ANF-like
@@ -671,8 +669,8 @@ The reduction rule for indexing in tuples admits multi-valued index expressions.
 For instance, |def t (t = tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1))| reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
-if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
-the tuple |tup (v_1, dots, v_n)|;
+if |e| reduces to |(s_1 `choice` dots `choice` s_n)| then |all e| reduces to
+the tuple |tup (s_1, dots, s_n)|;
 as a consequence, if $e$ fails, |allKW| produces the empty tuple.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
@@ -714,13 +712,13 @@ Like list comprehension, |for| supports filtering; in Verse this falls out natur
 a possibly failing expression in |e_1|.
 So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(def (x,y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |for^(def (x y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the tuple to |emptytup| afterwards, using the |map| function defined above.
+apply each element of the tuple to |emptytup| afterwards, using the |map| function defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
 |for^(e_1) do e_2| \; \equiv \; |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
@@ -733,7 +731,7 @@ So, {\eg}, |for^(def x (x==10 `choice` 20)) do {x `choice` x+1}| will reduce to
 At this point it is crucial to use |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def (i,x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.
+For example |for^(def (i x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.
 
 
 % \subsection{Enumerations}
@@ -983,6 +981,7 @@ a suspending semantics would be equally easy to express.
 Next we study unification, again in \cref{fig:rewrite-rules}.
 Rules \rulename{u-scalar} and \rulename{u-tup}
 are the standard rules for unification, going back at least 40 years \cite{MartelliMontanari82}.
+\lennart{Shouldn't that be 60 years and a reference to Robinson?}
 Rule \rulename{u-fail} makes unification fail on two different head-normal forms (see
 \cref{fig:syntax} for the syntax of |hnf|).
 Note that
@@ -1157,8 +1156,8 @@ and you can omit it entirely if you want.
 The normalization rules of \cref{fig:normalization-rules} also
 \begin{itemize}
   \item Associate ``|;|'' to the right (rule \rulename{norm-seq-assoc}).
-  \item Drop a value to the left of a ``|;|'' (rule \rulename{seq}).
-  \item Propagate |fail| (rules \rulename{fail-seq-l}, \rulename{fail-seq-r}, and \rulename{fail-eq}).
+  \item Drop a value to the left of a ``|;|'' (rule \rulename{norm-val}).
+  \item Propagate |fail| (rules \rulename{fail-seql}, \rulename{fail-seqr}, and \rulename{fail-eq}).
   \item Put a variable on the LHS of an equality, where possible (rule \rulename{norm-swap-eq}).
 \end{itemize}
 Note that the normalization rules preserve the left-to-right sequencing of expressions,
@@ -1206,12 +1205,15 @@ To make further progress, we need a rule for choice; see \cref{sec:choice-rules}
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 
+\lennart{Somewhere we should mention that the result of a (non-stuck) reduction with be an expression |e| with
+  $\wff{\emptyset}{|e|}{|xs|}{\overline{|x| = |h|}}{|v|}$, i.e., a value with a set of bindings for heap values.}
+
 \subsection{Rules for choice} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:choice-rules}.
 Rules \rulename{one-value}, \rulename{one-choice}
 and \rulename{one-fail} describe the semantics for |oneKW|, just as in \cref{sec:one}.
-Similarly \rulename{all-fail}, \rulename{all-choice} and \rulename{all-value} describe
+Similarly \rulename{all-fail} and \rulename{all-choice} describe
 the semantics of |allKW| (\cref{sec:all}).  These rules use the well-formed-result
 judgement, introduced in \cref{sec:normalization} and defined in \cref{fig:wf},
 to ensure that each arm of the choice(s) consists of a value wrapped in a heap.
@@ -1430,12 +1432,13 @@ Our main result is that the reduction relation $\rr$ for \calcname,
 defined as the union of the reduction relations
 $\runi$ (Unification),
 $\rapp$ ($\beta$-Application),
-$\rcon$ (Conjunction),
+$\rcon$ (Normalization),
 $\rgc$  (Garbage Collection),
 $\rfail$ (Fail Propagation) and
 $\rspc$ (Speculation)
 in \cref{FIXME} % \cref{fig:rulesI}
 is confluent.
+\lennart{It's not confluent without the structural rules.}
 
 \begin{theorem}[Confluence] \label{thm:confluence}
 The reduction relation $\rr \equiv \runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$ is confluent.
@@ -1766,7 +1769,9 @@ for example \cite{schmidt-schauss:non-det1,schmidt-schauss:non-det2}.
 In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can still make progress, by floating out the
 choice (rule \rulename{choose} in \cref{fig:rewrite-rules}), thus
-|(3+20) choice (3+30)|.  In effect, \emph{choices are laid out in space} (in
+|(3+20) choice (3+30)|.
+\lennart{If you want to be picky \rulename{choose} doesn't apply here since we are not in an |SX| context.}
+In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
 it is common in calculi with choice, see {\eg}, ~\citetext{\citealp[Section 6.1]{liguoro:non-det}, \citealp[Section 3]{lago:probabilistic}}
@@ -2166,8 +2171,8 @@ may be worse than the disease.
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)| & \text{|x| fresh}  \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)| \\
+    \rulename{split-choice} & |split (e_1 `choice` e_2) f g| & \movesto & |applyN g (e_1, thunk e_2)| & \text{if } \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|}, \text{|x| fresh}  \\
+    \rulename{split-value} & |split e f g| & \movesto & |applyN g (e, thunk fail)| & \text{if } \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|}, \text{|x| fresh}  \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
@@ -2177,7 +2182,7 @@ Indeed, this is more general, as we can implement |oneKW| and |allKW| with |spli
     |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
-to avoid confusing the presentation with these higher-order encodings, but we do not expect any complications using |splitKW| instead.
+to avoid confusing the presentation with these higher-order encodings, but there are no complications using |splitKW| instead.
 
 \subsection{Laziness} \label{sec:laziness}
 
@@ -2185,6 +2190,7 @@ As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, 
 For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
 yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
 prevent the expression from returning a value.
+\lennart{I would argue that yielding 3 is wrong.  We should not yield 3 until we know there is no failure in |loop|.}
 % $$
 % |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
 % $$
