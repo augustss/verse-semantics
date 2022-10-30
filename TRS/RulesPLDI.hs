@@ -578,22 +578,28 @@ isVal _       = False
 dsFreshFP :: Expr -> Expr
 dsFreshFP = ds
   where
+    ds (Val v)      = Val (dsv v)
     ds (ex :=: ex') = dsEqu ex ex'
     ds (ex :>: ex') = ds ex :>: ds ex'
     ds (ex :|: ex') = ds ex :|: ds ex'
-    ds (Def (Bind x e)) = Def (Bind x (ds e))
+    ds (vx :@: vx') = dsv vx :@: dsv vx'
+    ds (DEF x e)    = DEF x (ds e)
     ds (One ex)     = One (ds ex)
     ds (All ex)     = All (ds ex)
-    ds e            = e
+    ds (Split e f g)= Split (ds e) (dsv f) (dsv g)
+    ds e = e
 
     dsEqu e1 e2
       | isVal e1  = e1 :=: e2'
       | isVal e2  = e2 :=: e1'
-      | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2')))
+      | otherwise = DEF x ((VAR x :=: e1') :>: (VAR x :=: e2'))
       where
         x   = identNotIn (free [e1', e2'])
         e1' = ds e1
         e2' = ds e2
+
+    dsv (VLAM x e) = VLAM x (ds e)
+    dsv v = v
 
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
