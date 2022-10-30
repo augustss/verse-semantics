@@ -109,16 +109,119 @@ Let $\rord$ be the reduction relation $\rord \equiv \exists \rnk. \runi_\rnk$.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO: enumerate ALL cases, e.g. UNI vs. UNI $x = \lambda; x = x ; e$
-Can JOIN deref-h and u-scalar as we never subst lambda into x=x}
+Suppose we have two $\rord$-steps:
+via the redux $\rdx{1} \movesto \rdx{1}'$ and
+via the redux $\rdx{2} \movesto \rdx{2}'$.
 %
-Via \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
+Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
 %
-Note that the former requires \cref{lem:join-s-s}
-and \cref{lem:join-h-h}, that latter of which
-requires an unbounded number of steps
-to join two terms.
+The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
+%
+Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
+%
+Split cases on the $\rord$ rule used in $\rdx{2}$.
+%
+\begin{description}
+\item[Case:] \rulename{u-scalar}, \rulename{u-tup} \ie $\rdx{1} \subset \rdx{2}$ is impossible.
+\item[Case:] \rulename{u-fail}, \ie~$\rord_{1} : \hnf_1 = \hnf_2 \movesto |fail|$ \ie $\rdx{1} \subset \hnf_i$
+	so join at $|fail|$.
+\item[Case:] \rulename{deref-s} \ie $\tx{\runi} \equiv x = |s|; E[x] \movesto x = |s|; E[|s|]$.
+	$\rdx{1} \subset |s|$ is impossible.
+
+	If $\rdx{1} \subset E[|x|]$ and $\rord_{1}$ uses a \rulename{deref-*} rule.
+	Then join using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
+
+
+	If $\rdx{1} \subset E[|x|]$ and $\rord_{1}$ uses a non-\rulename{deref-*} rule.
+	Then by \cref{lem:context-shape} we have two cases:
+	\begin{description}
+		\item[Case:] $\rord_{1} : E[|x|] \movesto E'[|x|]$,
+				then by \cref{lem:context-step-o} join at $x = |s|; E'[|s|]$.
+		\item[Case:] $\rord_{1} : E[|x|] \movesto e'$ such that $E[s] \movesto e'$,
+				then join at $x = |s|; e'$.
+	\end{description}
+
+\item[Case:] \rulename{deref-h} \ie $\tx{\runi} \equiv x = |h|; A[x] \movesto x = |h|; A[|h|]$.
+		If $\rdx{1} \subset |v|$, \ie $\rord_{1} : |h| \movesto |h'|$, then join at $x = |h'|; E[|h'|]$.
+
+		If $\rdx{1} \subset A[|x|]$ and $\rord_{1}$ uses a \rulename{deref-*} rule.
+		Then join using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
+
+		If $\rdx{1} \subset A[|x|]$ and $\rord_{1}$ uses a non-\rulename{deref-*} rule.
+		Then by \cref{lem:context-shape} we have two cases:
+		\begin{description}
+			\item[Case:] $\rord_{1} : A[|x|] \movesto A'[|x|]$
+				then by \cref{lem:context-step-o} join at $x = |h|; A'[|h|]$.
+			\item[Case:] $\rord_{2} : A[|x|] \movesto e'$ such that $A[h] \movesto e'$,
+				then join at $x = |h|; e'$.
+		\end{description}
+
+\item[Case:] \rulename{choose} \ie $\tx{\runi} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1]\ |choice|\ CX[e_2]]$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+	 	\item[Case] $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1']\ |choice|\ CX[e_2]]$.
+	 	\item[Case] $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1]\ |choice|\ CX[e_2']]$.
+	 	\item[Case] $\rdx{} \subset CX$ : Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{} \cdots [|e_1 choice e_2|]$
+	     	so with two $\rr'$ steps we can join at $\rdx{\runi}'' \equiv |SX^[e1' choice e2']|$ where
+	     	$e_i' \equiv \cdots \rdx{}' \cdots [e_i]$ for $i$ in $\{1,2\}$.
+	\end{description}
+\end{description}
+%
+% Via \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
+% %
+% Note that the former requires \cref{lem:join-s-s}
+% and \cref{lem:join-h-h}, that latter of which
+% requires an unbounded number of steps
+% to join two terms.
 \end{proof}
+
+\begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
+Let $\rr' \equiv \rr -$ \rulename{deref-*}.
+\begin{itemize}
+	\item If $\rstep{\rr'}{A[x]}{A'[x]}$ then $\forall h. \rsteps{\rord}{x == h ; A[h]}{x == h ; A'[h]}$.
+	\item If $\rstep{\rr'}{E[x]}{E'[x]}$ then $\forall s. \rsteps{\rord}{x == s ; E[s]}{x == s ; E'[s]}$.
+\end{itemize}
+\end{lemma}
+
+%% \ranjit{ TODO: simplify precondition using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.}
+\begin{proof}
+	By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+	\textbf{NOTE:} This lemma would not hold if allowed $A$ contexts included arbitrary variable
+	occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
+	Then consider $A \equiv |x == hole; e|$.
+	%
+	Now $\rstep{\rord}{A[x]}{x; e}$ but
+	$x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
+	as $\lambda$ comparisons |fail|.
+\end{proof}
+
+
+\begin{lemma}[Context-Step] \label{lem:context-step}
+	Let $\rr' = \rr - \runi$.
+\begin{itemize}
+	\item If $\rstep{\rr'}{A[x]}{A'[x]}$ then $\forall h. \rstep{\rr'}{A[h]}{A'[h]}$.
+	\item If $\rstep{\rr'}{E[x]}{E'[x]}$ then $\forall s. \rstep{\rr'}{E[s]}{E'[s]}$.
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+% Note you may have to do $\alpha$-renaming at $E[|x|]$ to avoid capture, as $\boundvars{E'}$ may contain $\freevars{s}$.
+% Note you may have to do $\alpha$-renaming at $A[|x|]$ to avoid capture, as $\boundvars{A'}$ may contain $\freevars{h}$.
+\end{proof}
+
+
+\begin{lemma}[Context-Shape] \label{lem:context-shape}
+\begin{itemize}
+	\item If $\rstep{}{A[x]}{e'}$ then $e' \equiv A'[x]$ \emph{or} $\forall h. \rstep{}{A[h]}{e'}$.
+	\item If $\rstep{}{E[x]}{e'}$ then $e' \equiv E'[x]$ \emph{or} $\forall s. \rstep{}{E[s]}{e'}$.
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+	By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+\end{proof}
+
 
 
 \begin{definition}[Def-Use] \label{def:def-use}
@@ -659,137 +762,137 @@ Here $e \equiv \ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots$. Hence, we have
 	\arrow[dotted, from=2-3, to=3-2]
 \end{tikzcd}\]
 
-\item[Case: $\rdx{\runi} \subset \rdx{\rapp}$]
-Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
+\item[Case: $\rdx{\runi} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
+% Let $\rdx{\rapp} \equiv |apply1N (lam x e) v|$. There are two sub-cases.
+% \begin{description}
+% 	\item[Case: $\rdx{\runi} \subset |v|$] \ie $|v| \equiv V[\rdx{\runi}]$
+% % https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gZSlcXCBWW1xccmR4e1xccnVuaX1dIl0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gVltcXHJkeHtcXHJ1bml9XTtcXCBlIl0sWzIsMSwiKFxcbGFtYmRhIHguIGUpXFwgVltcXHJkeHtcXHJ1bml9J10iXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSBWW1xccmR4e1xccnVuaX0nXTtcXCBlIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% \[\begin{tikzcd}
+% 	& {(\lambda x. e)\ V[\rdx{\runi}]} \\
+% 	{\exists x.\ x = V[\rdx{\runi}];\ e} && {(\lambda x. e)\ V[\rdx{\runi}']} \\
+% 	& {\exists x.\ x = V[\rdx{\runi}'];\ e}
+% 	\arrow["\runi", from=1-2, to=2-3]
+% 	\arrow["\rapp"', from=1-2, to=2-1]
+% 	\arrow["\runi", dotted, from=2-1, to=3-2]
+% 	\arrow["\rapp", dotted, from=2-3, to=3-2]
+% \end{tikzcd}\]
 
-\begin{description}
-	\item[Case: $\rdx{\rapp} \subset |v|$] \ie $|v| \equiv V[\rdx{\rapp}]$
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gZSlcXCBWW1xccmR4e1xccnVuaX1dIl0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gVltcXHJkeHtcXHJ1bml9XTtcXCBlIl0sWzIsMSwiKFxcbGFtYmRhIHguIGUpXFwgVltcXHJkeHtcXHJ1bml9J10iXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSBWW1xccmR4e1xccnVuaX0nXTtcXCBlIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	& {(\lambda x. e)\ V[\rdx{\runi}]} \\
-	{\exists x.\ x = V[\rdx{\runi}];\ e} && {(\lambda x. e)\ V[\rdx{\runi}']} \\
-	& {\exists x.\ x = V[\rdx{\runi}'];\ e}
-	\arrow["\runi", from=1-2, to=2-3]
-	\arrow["\rapp"', from=1-2, to=2-1]
-	\arrow["\runi", dotted, from=2-1, to=3-2]
-	\arrow["\rapp", dotted, from=2-3, to=3-2]
-\end{tikzcd}\]
+% 	\item[Case: $\rdx{\runi} \subset |e|$] \ie $|e| \equiv E[\rdx{\runi}]$
+% % https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gRVtcXHJkeHtcXHJ1bml9XSlcXCB2Il0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gdjtcXCBFW1xccmR4e1xccnVuaX1dIl0sWzIsMSwiKFxcbGFtYmRhIHguIEVbXFxyZHh7XFxydW5pfSddKVxcIHYiXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSB2O1xcIEVbXFxyZHh7XFxydW5pfSddIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% \[\begin{tikzcd}
+% 	& {(\lambda x. E[\rdx{\runi}])\ v} \\
+% 	{\exists x.\ x = v;\ E[\rdx{\runi}]} && {(\lambda x. E[\rdx{\runi}'])\ v} \\
+% 	& {\exists x.\ x = v;\ E[\rdx{\runi}']}
+% 	\arrow["\runi", from=1-2, to=2-3]
+% 	\arrow["\rapp"', from=1-2, to=2-1]
+% 	\arrow["\runi", dotted, from=2-1, to=3-2]
+% 	\arrow["\rapp"', dotted, from=2-3, to=3-2]
+% \end{tikzcd}\]
+% \end{description}
 
-	\item[Case: $\rdx{\rapp} \subset |e|$] \ie $|e| \equiv E[\rdx{\rapp}]$
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC4gRVtcXHJkeHtcXHJ1bml9XSlcXCB2Il0sWzAsMSwiXFxleGlzdHMgeC5cXCB4ID0gdjtcXCBFW1xccmR4e1xccnVuaX1dIl0sWzIsMSwiKFxcbGFtYmRhIHguIEVbXFxyZHh7XFxydW5pfSddKVxcIHYiXSxbMSwyLCJcXGV4aXN0cyB4LlxcIHggPSB2O1xcIEVbXFxyZHh7XFxydW5pfSddIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	& {(\lambda x. E[\rdx{\runi}])\ v} \\
-	{\exists x.\ x = v;\ E[\rdx{\runi}]} && {(\lambda x. E[\rdx{\runi}'])\ v} \\
-	& {\exists x.\ x = v;\ E[\rdx{\runi}']}
-	\arrow["\runi", from=1-2, to=2-3]
-	\arrow["\rapp"', from=1-2, to=2-1]
-	\arrow["\runi", dotted, from=2-1, to=3-2]
-	\arrow["\rapp"', dotted, from=2-3, to=3-2]
-\end{tikzcd}\]
-\end{description}
+\item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] via \cref{lem:under-u}.
+% Let $\rapp \equiv |apply1N (lam y e_1) v_1|$. Split cases on $\runi$ reduction
 
-\item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] Let $\rapp \equiv |apply1N (lam y e_1) v_1|$. Split cases on $\runi$ reduction
+% \begin{description}
+% 	\item[Case: (\rulename{u-*}) $\rdx{\runi} \equiv |c; e| \movesto |c'; e| \equiv \rdx{\runi}'$]
+% 	%
+% 	If $\rdx{\rapp} \subset e$ \ie $e \equiv E_1[\rdx{\rapp}]$
+% 	then join at $|c';| E_1[\rdx{\rapp}']$ (which may be $|fail|$ if $|c'|$ is $|fail|$).
+% 	%
+% 	If $\rdx{\rapp} \subset c$ (\rulename{ulam}) then join at |fail|.
 
-\begin{description}
-	\item[Case: (\rulename{u-*}) $\rdx{\runi} \equiv |c; e| \movesto |c'; e| \equiv \rdx{\runi}'$]
-	%
-	If $\rdx{\rapp} \subset e$ \ie $e \equiv E_1[\rdx{\rapp}]$
-	then join at $|c';| E_1[\rdx{\rapp}']$ (which may be $|fail|$ if $|c'|$ is $|fail|$).
-	%
-	If $\rdx{\rapp} \subset c$ (\rulename{ulam}) then join at |fail|.
+% 	\item[Case: (\rulename{deref-s}) $\rdx{\runi} \equiv |x == s; E^[x]|$]
+% 	%
+% 	Here $\rdx{\rapp} \subset |E^[x]|$ as we cannot have a $\beta$-redex inside a scalar $s$.
+%     %
+% 	Split cases on where $x$ occurs relative to $\rdx{\rapp}$
+% 	%
+% 	\begin{description}
+% 		\item[Case: $\rdx{\runi} \equiv |x == s;| \ldots |x| \ldots \rdx{\rapp} \ldots$]
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD1zO1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXM7XFwgXFxsZG90cyBzIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieD1zO1xcIFxcbGRvdHMgcyBcXGxkb3RzIFxccmR4e1xccmFwcH0gXFxsZG90cyJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x=s;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
+% 		{x=s;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots} \\
+% 		& {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots}
+% 		\arrow["\runi", from=1-2, to=2-3]
+% 		\arrow["\rapp"', from=1-2, to=2-1]
+% 		\arrow["\runi", dotted, from=2-1, to=3-2]
+% 		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
 
-	\item[Case: (\rulename{deref-s}) $\rdx{\runi} \equiv |x == s; E^[x]|$]
-	%
-	Here $\rdx{\rapp} \subset |E^[x]|$ as we cannot have a $\beta$-redex inside a scalar $s$.
-    %
-	Split cases on where $x$ occurs relative to $\rdx{\rapp}$
-	%
-	\begin{description}
-		\item[Case: $\rdx{\runi} \equiv |x == s;| \ldots |x| \ldots \rdx{\rapp} \ldots$]
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD1zO1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXM7XFwgXFxsZG90cyBzIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieD1zO1xcIFxcbGRvdHMgcyBcXGxkb3RzIFxccmR4e1xccmFwcH0gXFxsZG90cyJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x=s;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
-		{x=s;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots} \\
-		& {x=s;\ \ldots s \ldots \rdx{\rapp} \ldots}
-		\arrow["\runi", from=1-2, to=2-3]
-		\arrow["\rapp"', from=1-2, to=2-1]
-		\arrow["\runi", dotted, from=2-1, to=3-2]
-		\arrow["\rapp"', dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
+% 		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y e_1) V_1^[x]]|$]
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVt4XSBdICJdLFswLDEsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3hdO1xcIGVfMV0iXSxbMiwxLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVtzXSBdICJdLFsxLDIsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3NdO1xcIGVfMV0iXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x=s;\ E[(\lambda y. e_1)\ V_1[x] ] } \\
+% 		{x = s;\ E[\exists y.\ y = V_1[x];\ e_1]} && {x=s;\ E[(\lambda y. e_1)\ V_1[s] ] } \\
+% 		& {x = s;\ E[\exists y.\ y = V_1[s];\ e_1]}
+% 		\arrow["\runi", from=1-2, to=2-3]
+% 		\arrow["\rapp"', from=1-2, to=2-1]
+% 		\arrow["\runi", dotted, from=2-1, to=3-2]
+% 		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
 
-		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y e_1) V_1^[x]]|$]
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVt4XSBdICJdLFswLDEsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3hdO1xcIGVfMV0iXSxbMiwxLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gZV8xKVxcIFZfMVtzXSBdICJdLFsxLDIsInggPSBzO1xcIEVbXFxleGlzdHMgeS5cXCB5ID0gVl8xW3NdO1xcIGVfMV0iXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x=s;\ E[(\lambda y. e_1)\ V_1[x] ] } \\
-		{x = s;\ E[\exists y.\ y = V_1[x];\ e_1]} && {x=s;\ E[(\lambda y. e_1)\ V_1[s] ] } \\
-		& {x = s;\ E[\exists y.\ y = V_1[s];\ e_1]}
-		\arrow["\runi", from=1-2, to=2-3]
-		\arrow["\rapp"', from=1-2, to=2-1]
-		\arrow["\runi", dotted, from=2-1, to=3-2]
-		\arrow["\rapp"', dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
+% 		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y E_1^[x]) v_1]|$]
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gRV8xW3hdKVxcIHZfMV0gIl0sWzAsMSwieCA9IHM7XFwgRVtcXGV4aXN0cyB5LlxcIHkgPSB2XzE7XFwgRV8xW3hdXSJdLFsyLDEsIng9cztcXCBFWyhcXGxhbWJkYSB5LiBFXzFbc10pXFwgdl8xXSAiXSxbMSwyLCJ4ID0gcztcXCBFW1xcZXhpc3RzIHkuXFwgeSA9IHZfMTtcXCBFXzFbc11dIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x=s;\ E[(\lambda y. E_1[x])\ v_1] } \\
+% 		{x = s;\ E[\exists y.\ y = v_1;\ E_1[x]]} && {x=s;\ E[(\lambda y. E_1[s])\ v_1] } \\
+% 		& {x = s;\ E[\exists y.\ y = v_1;\ E_1[s]]}
+% 		\arrow["\runi", from=1-2, to=2-3]
+% 		\arrow["\rapp"', from=1-2, to=2-1]
+% 		\arrow["\runi", dotted, from=2-1, to=3-2]
+% 		\arrow["\rapp"', dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
+% 	\end{description}
 
-		\item[Case: $\rdx{\runi} \equiv |x == s; E^[apply1N (lam y E_1^[x]) v_1]|$]
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXM7XFwgRVsoXFxsYW1iZGEgeS4gRV8xW3hdKVxcIHZfMV0gIl0sWzAsMSwieCA9IHM7XFwgRVtcXGV4aXN0cyB5LlxcIHkgPSB2XzE7XFwgRV8xW3hdXSJdLFsyLDEsIng9cztcXCBFWyhcXGxhbWJkYSB5LiBFXzFbc10pXFwgdl8xXSAiXSxbMSwyLCJ4ID0gcztcXCBFW1xcZXhpc3RzIHkuXFwgeSA9IHZfMTtcXCBFXzFbc11dIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHAiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x=s;\ E[(\lambda y. E_1[x])\ v_1] } \\
-		{x = s;\ E[\exists y.\ y = v_1;\ E_1[x]]} && {x=s;\ E[(\lambda y. E_1[s])\ v_1] } \\
-		& {x = s;\ E[\exists y.\ y = v_1;\ E_1[s]]}
-		\arrow["\runi", from=1-2, to=2-3]
-		\arrow["\rapp"', from=1-2, to=2-1]
-		\arrow["\runi", dotted, from=2-1, to=3-2]
-		\arrow["\rapp"', dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
-	\end{description}
+% 	\item[Case: (\rulename{deref-h}) $\rdx{\runi} \equiv |x == v; A^[x]|$]
+% 	Split cases on where $\rdx{\rapp}$ occurs in $v$ or $|A^[x]|$.
 
-	\item[Case: (\rulename{deref-h}) $\rdx{\runi} \equiv |x == v; A^[x]|$]
-	Split cases on where $\rdx{\rapp}$ occurs in $v$ or $|A^[x]|$.
+% 	\begin{description}
+% 		\item[Case:] $v \equiv V[\rdx{\rapp}]$ In this case we have
+% 		% https://q.uiver.app/?q=WzAsNSxbMSwwLCJ4PVZbXFxyZHh7XFxyYXBwfV07XFwgQVt4XSAiXSxbMCwxLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbeF0gIl0sWzIsMSwieD1WW1xccmR4e1xccmFwcH1dO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzEsMywieD1WW1xccmR4e1xccmFwcH0nXTtcXCBBW1ZbXFxyZHh7XFxyYXBwfSddXSAiXSxbMiwyLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMiw0LCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNCwzLCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJ1bmkiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x=V[\rdx{\rapp}];\ A[x] } \\
+% 		{x=V[\rdx{\rapp}'];\ A[x] } && {x=V[\rdx{\rapp}];\ A[V[\rdx{\rapp}]] } \\
+% 		&& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}]] } \\
+% 		& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}']] }
+% 		\arrow["\runi", from=1-2, to=2-3]
+% 		\arrow["\rapp"', from=1-2, to=2-1]
+% 		\arrow["\rapp", dotted, from=2-3, to=3-3]
+% 		\arrow["\rapp", dotted, from=3-3, to=4-2]
+% 		\arrow["\runi"', dotted, from=2-1, to=4-2]
+% 		\end{tikzcd}\]
 
-	\begin{description}
-		\item[Case:] $v \equiv V[\rdx{\rapp}]$ In this case we have
-		% https://q.uiver.app/?q=WzAsNSxbMSwwLCJ4PVZbXFxyZHh7XFxyYXBwfV07XFwgQVt4XSAiXSxbMCwxLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbeF0gIl0sWzIsMSwieD1WW1xccmR4e1xccmFwcH1dO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzEsMywieD1WW1xccmR4e1xccmFwcH0nXTtcXCBBW1ZbXFxyZHh7XFxyYXBwfSddXSAiXSxbMiwyLCJ4PVZbXFxyZHh7XFxyYXBwfSddO1xcIEFbVltcXHJkeHtcXHJhcHB9XV0gIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyYXBwIiwyXSxbMiw0LCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNCwzLCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJ1bmkiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x=V[\rdx{\rapp}];\ A[x] } \\
-		{x=V[\rdx{\rapp}'];\ A[x] } && {x=V[\rdx{\rapp}];\ A[V[\rdx{\rapp}]] } \\
-		&& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}]] } \\
-		& {x=V[\rdx{\rapp}'];\ A[V[\rdx{\rapp}']] }
-		\arrow["\runi", from=1-2, to=2-3]
-		\arrow["\rapp"', from=1-2, to=2-1]
-		\arrow["\rapp", dotted, from=2-3, to=3-3]
-		\arrow["\rapp", dotted, from=3-3, to=4-2]
-		\arrow["\runi"', dotted, from=2-1, to=4-2]
-		\end{tikzcd}\]
+% 		\item[Case:] $A[x] \equiv \ldots x \ldots \rdx{\rapp}$ (|x| occurs outside $\rapp$) Trivial.
+%         % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD12O1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXY7XFwgXFxsZG90cyB2IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieCA9IHY7IFxcbGRvdHMgdiBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+%         \[\begin{tikzcd}
+%         	& {x=v;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
+%         	{x=v;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=v;\ \ldots v \ldots \rdx{\rapp} \ldots} \\
+%         	& {x = v; \ldots v \ldots \rdx{\rapp}' \ldots}
+%         	\arrow["\runi", from=1-2, to=2-3]
+%         	\arrow["\rapp"', from=1-2, to=2-1]
+%         	\arrow["\runi"', dotted, from=2-1, to=3-2]
+%         	\arrow["\rapp", dotted, from=2-3, to=3-2]
+%         \end{tikzcd}\]
 
-		\item[Case:] $A[x] \equiv \ldots x \ldots \rdx{\rapp}$ (|x| occurs outside $\rapp$) Trivial.
-        % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgXFxsZG90cyB4IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzAsMSwieD12O1xcIFxcbGRvdHMgeCBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMiwxLCJ4PXY7XFwgXFxsZG90cyB2IFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzEsMiwieCA9IHY7IFxcbGRvdHMgdiBcXGxkb3RzIFxccmR4e1xccmFwcH0nIFxcbGRvdHMiXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJhcHAiLDJdLFsxLDMsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccmFwcCIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-        \[\begin{tikzcd}
-        	& {x=v;\ \ldots x \ldots \rdx{\rapp} \ldots} \\
-        	{x=v;\ \ldots x \ldots \rdx{\rapp}' \ldots} && {x=v;\ \ldots v \ldots \rdx{\rapp} \ldots} \\
-        	& {x = v; \ldots v \ldots \rdx{\rapp}' \ldots}
-        	\arrow["\runi", from=1-2, to=2-3]
-        	\arrow["\rapp"', from=1-2, to=2-1]
-        	\arrow["\runi"', dotted, from=2-1, to=3-2]
-        	\arrow["\rapp", dotted, from=2-3, to=3-2]
-        \end{tikzcd}\]
+% 		\item[Case:] $A[x] \equiv A[(\lambda y_1. A_1[x]) v_1]$ (|x| occurs inside $\rapp$'s $\lambda$)
+% 		Impossible as application contexts do not go under a $\lambda$.
 
-		\item[Case:] $A[x] \equiv A[(\lambda y_1. A_1[x]) v_1]$ (|x| occurs inside $\rapp$'s $\lambda$)
-		Impossible as application contexts do not go under a $\lambda$.
-
-		\item[Case:] $A[x] \equiv A[(\lambda y_1. e_1) V_1[x]]$ (|x| occurs inside $\rapp$'s argument)
-		By definition of application context, the only possible case is when $V_1[x] \equiv x$.
-		In this case we have
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgQVsoXFxsYW1iZGEgeS4gZV8xKVxcIHhdIl0sWzAsMSwieD12O1xcIEFbXFxleGlzdHMgeS5cXCB5ID0geDtcXCBlXzFdIl0sWzIsMSwieD12O1xcIEFbKFxcbGFtYmRhIHkuIGVfMSlcXCB2XSJdLFsxLDIsIng9djtcXCBBW1xcZXhpc3RzIHkuXFwgeSA9IHY7XFwgZV8xXSJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x=v;\ A[(\lambda y. e_1)\ x]} \\
-		{x=v;\ A[\exists y.\ y = x;\ e_1]} && {x=v;\ A[(\lambda y. e_1)\ v]} \\
-		& {x=v;\ A[\exists y.\ y = v;\ e_1]}
-		\arrow["\runi", from=1-2, to=2-3]
-		\arrow["\rapp"', from=1-2, to=2-1]
-		\arrow["\runi"', dotted, from=2-1, to=3-2]
-		\arrow["\rapp", dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
-	\end{description}
-\end{description}
+% 		\item[Case:] $A[x] \equiv A[(\lambda y_1. e_1) V_1[x]]$ (|x| occurs inside $\rapp$'s argument)
+% 		By definition of application context, the only possible case is when $V_1[x] \equiv x$.
+% 		In this case we have
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7XFwgQVsoXFxsYW1iZGEgeS4gZV8xKVxcIHhdIl0sWzAsMSwieD12O1xcIEFbXFxleGlzdHMgeS5cXCB5ID0geDtcXCBlXzFdIl0sWzIsMSwieD12O1xcIEFbKFxcbGFtYmRhIHkuIGVfMSlcXCB2XSJdLFsxLDIsIng9djtcXCBBW1xcZXhpc3RzIHkuXFwgeSA9IHY7XFwgZV8xXSJdLFswLDIsIlxccnVuaSJdLFswLDEsIlxccmFwcCIsMl0sWzEsMywiXFxydW5pIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x=v;\ A[(\lambda y. e_1)\ x]} \\
+% 		{x=v;\ A[\exists y.\ y = x;\ e_1]} && {x=v;\ A[(\lambda y. e_1)\ v]} \\
+% 		& {x=v;\ A[\exists y.\ y = v;\ e_1]}
+% 		\arrow["\runi", from=1-2, to=2-3]
+% 		\arrow["\rapp"', from=1-2, to=2-1]
+% 		\arrow["\runi"', dotted, from=2-1, to=3-2]
+% 		\arrow["\rapp", dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
+% 	\end{description}
+% \end{description}
 \end{description}
 \end{proof}
 
@@ -838,17 +941,8 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rcon}$ or vice v
 		If $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
 	\end{description}
 
-\item[Case $\rdx{\rcon} \subset \rdx{\runi}$:] Split cases on the rule used in $\runi$.
-	\begin{description}
-	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
-		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v'|$, then join (with two $\rcon$ steps) at $x = |v'|; E[|v'|]$.
-		If $\rdx{\rcon} \subset E[|x|]$:
-			if $\rcon : E[|x|] \movesto E'[|x|]$, then join at $x = |v|; E'[|v|]$.
-			else if $\rcon : E[|x|] \movesto e'$ where, via \rulename{norm-val}
-			that occurrence of $x$ is deleted then join at $x = |v|; e'$.
-	\item[Case:] \rulename{u-tup} \ie $\rcon \not \subset \runi$.
-	\item[Case:] \rulename{u-*} \ie~$\tx{\runi} \equiv c \movesto |fail|$; so join at |fail|.
-	\end{description}
+\item[Case $\rdx{\rcon} \subset \rdx{\runi}$:] via \cref{lem:under-u}.
+
 \end{description}
 \end{proof}
 
@@ -867,7 +961,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rfail}$ or vice 
 %
 \begin{description}
 	\item[Case] $\rdx{\runi} \subset \rdx{\rfail}$ via \cref{lem:under-f}.
-	\item[Case] $\rdx{\rfail} \subset \rdx{\runi}$: Same as $\rdx{\rcon} \subset \rdx{\runi}$ case of \cref{lem:u-c-c}.
+	\item[Case] $\rdx{\rfail} \subset \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 \end{proof}
 
@@ -895,7 +989,7 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice ve
 		$\tx{\runi} \equiv x_i = |v_i|; E[x_i] \movesto x_i = |v_i|; E[|v_i|]$.
 		However, this $E[x_i]$ is disjoint from $e$ as $x_i \not \in \freevars{e}$,
 		so we can still join at $e$.
-	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: Same as $\rdx{\rcon} \subset \rdx{\runi}$ case of \cref{lem:u-c-c}.
+	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 %
 \end{proof}
@@ -933,11 +1027,30 @@ then there exists $\rdx{\runi}''$ such that
 Split cases on the rule used in $\runi$.
 \begin{description}
 	\item[Case:] \rulename{u-scalar}, \rulename{u-tup} \ie $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ is impossible.
+
 	\item[Case:] \rulename{u-fail}, \ie~$\tx{\runi} \equiv \hnf_1 = \hnf_2 \movesto |fail|$ \ie $\rdx{} \subset \hnf_i$
 		hence, $\rdx{\runi}'' \equiv |fail|$.
-	\item[Case:] \rulename{deref-*} \ie $\tx{\runi} \equiv x = |v|; E[x] \movesto x = |v|; E[|v|]$.
-		If $\rdx{} \subset |v|$, \ie $\rr': |v| \movesto |v'|$, then join (with two $\rr'$ steps) at $\rdx{\runi}'' \equiv x = |v'|; E[|v'|]$.
-		If $\rdx{} \subset E[|x|]$, \ie $\rr' : E[|x|] \movesto E'[|x|]$, then join at $\rdx{\runi}'' \equiv x = |v|; E'[|v|]$.
+
+	\item[Case:] \rulename{deref-s} \ie $\tx{\runi} \equiv x = |s|; E[x] \movesto x = |s|; E[|s|]$.
+		$\rdx{} \subset |s|$ is impossible.
+		If $\rdx{} \subset E[|x|]$, then by \cref{lem:context-shape} we have two cases:
+		\begin{description}
+			\item[Case:] $\rr' : E[|x|] \movesto E'[|x|]$,
+				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |s|; E'[|s|]$.
+			\item[Case:] $\rr' : E[|x|] \movesto e'$ such that $E[s] \movesto e'$,
+				then join at $\rdx{\runi}'' \equiv x = |s|; e'$.
+		\end{description}
+
+	\item[Case:] \rulename{deref-h} \ie $\tx{\runi} \equiv x = |h|; A[x] \movesto x = |h|; A[|h|]$.
+		If $\rdx{} \subset |v|$, \ie $\rr': |h| \movesto |h'|$, then join (with two $\rr'$ steps) at $\rdx{\runi}'' \equiv x = |h'|; E[|h'|]$.
+		If $\rdx{} \subset A[|x|]$, then by \cref{lem:context-shape} we have two cases:
+		\begin{description}
+			\item[Case:] $\rr' : A[|x|] \movesto A'[|x|]$,
+				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |h|; A'[|h|]$.
+			\item[Case:] $\rr' : A[|x|] \movesto e'$ such that $A[h] \movesto e'$,
+				then join at $\rdx{\runi}'' \equiv x = |h|; e'$.
+		\end{description}
+
 	% \ranjit{moved "choose" to UNIFICATION for duplication}
 	\item[Case:] \rulename{choose} \ie $\tx{\runi} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1]\ |choice|\ CX[e_2]]$.
 		Split cases on where $\rdx{}$ occurs.
@@ -1059,17 +1172,7 @@ as each $\rapp$-reduct must be strictly under \emph{one} of the components of th
 		If $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
 		If $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
 	\end{description}
-\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] Split cases on the rule used in $\rapp$.
-	\begin{description}
-	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
-		If $\rdx{\rcon} \subset |e|$, \ie $\rcon : e \movesto e'$, then join at $|def x (x == v; e')|$.
-		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |e|'$, then join at $|def x (x == v'; e)|$.
-	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x ==v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
-		Here, $\rdx{\rcon} \not \subset s_i$.
-		If $\rdx{\rcon} \subset |v|$, \ie $\rcon : |v| \movesto |v|'$, then join at
-		$|def x (x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
-	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rcon} \not\subset \rdx{\rapp}$.
-	\end{description}
+\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
@@ -1089,17 +1192,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice 
 
 \begin{description}
 \item[Case $\rdx{\rapp} \subset \rdx{\rfail}$] via \cref{lem:under-f}.
-\item[Case $\rdx{\rfail} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
-	\begin{description}
-	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
-		If $\rdx{\rfail} \subset |e|$, \ie $\rfail : e \movesto e'$, then join at $|def x (x == v; e')|$.
-		If $\rdx{\rfail} \subset |v|$, \ie $\rfail : |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
-	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
-		Here, $\rdx{\rfail} \not \subset s_i$.
-		If $\rdx{\rfail} \subset |v|$, \ie $\rfail : |v| \movesto |v|'$, then join at
-		$|def x (x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
-	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rfail} \not\subset \rdx{\rapp}$.
-	\end{description}
+\item[Case $\rdx{\rfail} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
@@ -1117,21 +1210,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rgc}$ or vice versa.
 
 \begin{description}
-\item[Case $\rdx{\rapp} \subset \rdx{\rgc}$]
-	Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
-	If $\rdx{\rapp} \subset e$, \ie $\rapp: e \movesto e'$, then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
-	If $\rdx{\rapp} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
-\item[Case $\rdx{\rgc} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
-	\begin{description}
-	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
-		If $\rdx{\rgc} \subset |e|$, \ie $\rgc: e \movesto e'$, then join at $|def x (x == v; e')|$.
-		If $\rdx{\rgc} \subset |v|$, \ie $\rgc: |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
-	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
-		Here, $\rdx{\rgc} \not \subset s_i$.
-		If $\rdx{\rgc} \subset |v|$, \ie $\rgc: |v| \movesto |v|'$, then join at
-		$|def x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
-	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rgc} \not\subset \rdx{\rapp}$.
-	\end{description}
+\item[Case $\rdx{\rapp} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
+\item[Case $\rdx{\rgc} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
@@ -1149,21 +1229,35 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice versa.
 %
 \begin{description}
-\item[Case $\rdx{\rspc} \subset \rdx{\rapp}$] Split cases on the rule used for $\rapp$.
-	\begin{description}
-	\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
-		If $\rdx{\rspc} \subset |e|$, \ie $\rspc: e \movesto e'$, then join at $|def x (x == v; e')|$.
-		If $\rdx{\rspc} \subset |v|$, \ie $\rspc: |v| \movesto |v|'$, then join at $|def x (x == v'; e)|$.
-	\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x == v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
-		Here, $\rdx{\rspc} \not \subset s_i$.
-		If $\rdx{\rspc} \subset |v|$, \ie $\rspc: |v| \movesto |v|'$, then join at
-		$|def x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n)|$.
-	\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{\rspc} \not\subset \rdx{\rapp}$.
-	\end{description}
-
+\item[Case $\rdx{\rspc} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \item[Case $\rdx{\rapp} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
 \end{description}
 %
+\end{proof}
+
+\begin{lemma}[Under-$\rapp$] \label{lem:under-a}
+If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
+   $\rdx{\rapp} \equiv E[\rdx{}]$ and
+   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rapp}''$ such that
+   $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$ and
+   $\rstep{\rapp}{E[\rdx{}']}{\rdx{\rapp}''}$.
+\end{lemma}
+
+\begin{proof} Split cases on the rule used in $\rapp$.
+\begin{description}
+\item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
+		If $\rdx{} \subset |e|$, \ie $\rr : e \movesto e'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v; e')|$.
+		If $\rdx{} \subset |v|$, \ie $\rr : |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v'; e)|$.
+\item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (s_0 dots s_n)| |v| \movesto |def x (x ==v; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
+		Here, $\rdx{} \not \subset s_i$.
+		If $\rdx{} \subset |v|$, \ie $\rr: |v| \movesto |v|'$, then join at
+		$|def x (x == v'; (x == 0; s_0 `choice` dots `choice` x == n; s_n))|$.
+\item[Case:] \rulename{app-tup0} \ie $\tx{\rapp} \equiv |arr ()| |v| \movesto |fail|$.
+		Here, $\rdx{} \subset v$, \ie $\rr: |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |fail|$.
+\item[Case:] \rulename{app-*} In any of the primitive application rules, $\rdx{} \not\subset \rdx{\rapp}$.
+\end{description}
+
 \end{proof}
 
 \subsection{Distillation: Normalization and Garbage Collection} % --------------------------------------------------------------------------
