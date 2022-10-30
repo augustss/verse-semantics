@@ -128,10 +128,6 @@ Split cases on the $\rord$ rule used in $\rdx{2}$.
 \item[Case:] \rulename{deref-s} \ie $\tx{\runi} \equiv x = |s|; E[x] \movesto x = |s|; E[|s|]$.
 	$\rdx{1} \subset |s|$ is impossible.
 
-	If $\rdx{1} \subset E[|x|]$ and $\rord_{1}$ uses a \rulename{deref-*} rule.
-	Then join using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
-
-
 	If $\rdx{1} \subset E[|x|]$ and $\rord_{1}$ uses a non-\rulename{deref-*} rule.
 	Then by \cref{lem:context-shape} we have two cases:
 	\begin{description}
@@ -143,9 +139,6 @@ Split cases on the $\rord$ rule used in $\rdx{2}$.
 
 \item[Case:] \rulename{deref-h} \ie $\tx{\runi} \equiv x = |h|; A[x] \movesto x = |h|; A[|h|]$.
 		If $\rdx{1} \subset |v|$, \ie $\rord_{1} : |h| \movesto |h'|$, then join at $x = |h'|; E[|h'|]$.
-
-		If $\rdx{1} \subset A[|x|]$ and $\rord_{1}$ uses a \rulename{deref-*} rule.
-		Then join using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.
 
 		If $\rdx{1} \subset A[|x|]$ and $\rord_{1}$ uses a non-\rulename{deref-*} rule.
 		Then by \cref{lem:context-shape} we have two cases:
@@ -175,26 +168,79 @@ Split cases on the $\rord$ rule used in $\rdx{2}$.
 % to join two terms.
 \end{proof}
 
+\newcommand{\oA}{\mathit{OA}}
+\newcommand{\oE}{\mathit{OE}}
+
+\mypara{Outer Contexts} Let $\oA$ and $\oE$ be \emph{outer} application and expression contexts
+defined as:
+$$\begin{array}{rcl}
+\oE  & ::= & |hole| \vb |lam x OE| \vb |def x OE| \vb |OE = e| \vb |e == OE|
+ 			 	    \vb |OE ; e| \vb |e ; OE| \vb |apply1N OE v| \vb |apply1N v OE|
+				    \vb |OE choice e| \vb |e choice OE| \vb |all OE| \vb |one OE| \\
+
+\oA  & ::= & |hole| \vb |v == OA| \vb |def x OA| \vb |OA ; e| \vb |e ; OA|
+		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
+\end{array}$$
+
 \begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
-Let $\rr' \equiv \rr -$ \rulename{deref-*}.
 \begin{itemize}
-	\item If $\rstep{\rr'}{A[x]}{A'[x]}$ then $\forall h. \rsteps{\rord}{x == h ; A[h]}{x == h ; A'[h]}$.
-	\item If $\rstep{\rr'}{E[x]}{E'[x]}$ then $\forall s. \rsteps{\rord}{x == s ; E[s]}{x == s ; E'[s]}$.
+\item If $\rstep{\rord}{A[x]}{A'[x]}$ then $\forall h. \join{\rord}{x == h ; OA[A[h]]}{x == h ; OA[A'[h]]}$.
+\item If $\rstep{\rord}{E[x]}{E'[x]}$ then $\forall s. \join{\rord}{x == s ; OE[E[s]]}{x == s ; OE[E'[s]]}$.
 \end{itemize}
 \end{lemma}
 
-%% \ranjit{ TODO: simplify precondition using \cref{lem:deref-comm-1} and \cref{lem:deref-comm-2}.}
 \begin{proof}
-	By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
-	\textbf{NOTE:} This lemma would not hold if allowed $A$ contexts included arbitrary variable
-	occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
-	Then consider $A \equiv |x == hole; e|$.
-	%
-	Now $\rstep{\rord}{A[x]}{x; e}$ but
-	$x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
-	as $\lambda$ comparisons |fail|.
+By induction on the structure of $A$ (symm. $E$), splitting cases on the reduction rule used.
+\begin{description}
+\item{Case $A \equiv |apply1N hole v|$} \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
+	Then join at $x == h ; |apply1N hole v'|$.
+\item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
+
+\item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
+	Then join at $x == h ; |h == hnf'|$.
+
+\item{Case $A \equiv |v == A_1|$} \ie $\rstep{\rord}{|v==A_1^[x]}{|v==A_1'^[x]}$.
+	Then join at $x == h ; |v == A_1'^[h]|$ via IH.
+
+\item{Case $A \equiv |def y A_1|$} \ie $\rstep{\rord}{|def y (A_1^[x])|}{|def y (A_1'^[x])}$
+	Then join at $x == h ; |def y A_1'^[h]|$ via IH.
+
+\item{Case $A \equiv |A_1 ; e|$} \ie $\rstep{\rord}{|A_1^[x]; e|}{|A_1'^[x]; e}$
+	Then join at $x == h ; |A_1'^[h] ; e|$ via IH.
+
+\item{Case $A \equiv |e ; A_1|$} split cases on the possible reductions of $A[x]$
+	\begin{description}
+		\item[Case] $\rstep{\rord}{e; A_1[x]}{e'; A_1[x]}$ then join at $x == h ; |e'; A_1^[h]|$.
+		\item[Case] $\rstep{\rord}{e; A_1[x]}{e; A_1'[x]}$ then join at $x == h ; |e; A_1'^[h]|$ via IH.
+		\item[Case] $e \equiv |y == v|$ and $\rstep{\rord}{y==v; A_1[x]}{y==v; e'}$ via \rulename{deref-*}.
+			Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
+	\end{description}
+\item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
+    \begin{description}
+		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
+			then join at $x == h ; |A_1'^[h] `choice` e|$ via IH.
+		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
+			then join at $x == h ; |A_1^[h] `choice` e'|$.
+	\end{description}
+\item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
+
+\item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
+	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
+
+\item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
+	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
+\end{description}
 \end{proof}
 
+\mypara{NOTE: Preventing $\lambda$-copies}
+%
+\cref{lem:context-step-o} would not hold if allowed $A$ contexts included arbitrary variable
+occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
+Then consider $A \equiv |x == hole; e|$.
+%
+Now $\rstep{\rord}{A[x]}{x; e}$ but
+$x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
+as $\lambda$ comparisons |fail|.
 
 \begin{lemma}[Context-Step] \label{lem:context-step}
 	Let $\rr' = \rr - \runi$.
@@ -205,7 +251,7 @@ Let $\rr' \equiv \rr -$ \rulename{deref-*}.
 \end{lemma}
 
 \begin{proof}
-By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used. % TODO: expand?
 % Note you may have to do $\alpha$-renaming at $E[|x|]$ to avoid capture, as $\boundvars{E'}$ may contain $\freevars{s}$.
 % Note you may have to do $\alpha$-renaming at $A[|x|]$ to avoid capture, as $\boundvars{A'}$ may contain $\freevars{h}$.
 \end{proof}
@@ -213,13 +259,75 @@ By induction on the structure of $A$ (resp. $E$), splitting cases on the reducti
 
 \begin{lemma}[Context-Shape] \label{lem:context-shape}
 \begin{itemize}
-	\item If $\rstep{}{A[x]}{e'}$ then $e' \equiv A'[x]$ \emph{or} $\forall h. \rstep{}{A[h]}{e'}$.
-	\item If $\rstep{}{E[x]}{e'}$ then $e' \equiv E'[x]$ \emph{or} $\forall s. \rstep{}{E[s]}{e'}$.
+	\item If $\rstep{}{A[x]}{e'}$ then \emph{either} $e' \equiv A'[x]$ \emph{or} $\forall h. \rstep{}{A[h]}{e'}$.
+	\item If $\rstep{}{E[x]}{e'}$ then \emph{either} $e' \equiv E'[x]$ \emph{or} $\forall s. \rstep{}{E[s]}{e'}$.
 \end{itemize}
 \end{lemma}
 
 \begin{proof}
-	By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+By induction on the structure of $A$ (resp. $E$),
+splitting cases on the reduction rule used. %TODO: expand?
+%
+Note that we need the second disjunct to account for situations where the occurrence
+of $x$ is \emph{eliminated} by \rulename{elim-def} or |fail| propagation.
+
+\begin{description}
+\item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
+
+\item{Case $A \equiv |apply1N hole v|$}, here \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
+
+\item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
+
+\item{Case $A \equiv |v == A_1|$}.
+	If \ie $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$ then $A' \equiv |v==A_1'|$.
+	If \ie $\rstep{}{|A_1^[x]|}{e_1'}$ then $e' \equiv |v==e_1'|$.
+
+	TODOTODO
+\item{Case $A \equiv |def y A_1|$}. Split cases on the possible reductions.
+	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]}$, then $A' \equiv |def y A_1'|$.
+	If $\rstep{}{|A_1^[x]|}{e_1'}$ then $A' \equiv |def y e_1'|$.
+	If $\rstep{}{|def y (A_1^[x])|}{def y (A_1'[x])}$ (via \rulename{elim-def}) then $A' \equiv |def y A_1'|$.
+	If $\rstep{}{|def y (A_1^[x])|}{e_1'}$ (via \rulename{elim-def}) then $e' \equiv |e_1'|$.
+
+\item{Case $A \equiv |A_1 ; e|$}. Split cases on the possible reductions.
+	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]}$, then $A' \equiv |A_1'; e|$.
+	If $\rstep{}{|e|}{|e'}$, then $A' \equiv |A_1'; e'|$.
+	If $\rstep{}{|def y (A_2^[x]); e|}{|def y (A_2^[x]; e)|}$ (where $A_1 \equiv |def y A_2|$)
+		then $A' \equiv |def y (A_2; e)|$.
+	If $\rstep{}{|A_1^[x]; (def y e_2)|}{|def y (A_1^[x]; e_2)|}$ (where $e \equiv |def y e_2|$)
+		then $A' \equiv |def y (A_1; e_2)|$.
+
+\item{Case $A \equiv |e ; A_1|$} Split cases on the possible reductions of $A[x]$.
+	Several cases are symmetric with previous case.
+	Remainder involve \rulename{deref-*}.
+	\begin{description}
+		\item[Case] $\rstep{\rord}{e; A_1[x]}{e'; A_1[x]}$ then $A' \equiv |e'; A_1|$.
+		\item[Case] $\rstep{\rord}{e; A_1[x]}{e; A_1'[x]}$ then $A' \equiv |e; A_1'|$.
+		\item[Case] $e \equiv |x == h|$ and $\rstep{\rord}{x==h; A_1[x]}{x==h; A_1'[x]}$, then $A' \equiv |x == h; A_1'|$.
+		\item[Case] $e \equiv |x == h|$ and $\rstep{\rord}{x==h; A_1[x]}{x==h; e_1'}$, then $A' \equiv |hole == h; e_1'|$.
+		\item[Case] $e \equiv |y == h|$ and $\rstep{\rord}{y==h; A_1[x]}{y==h; A_1'[x]}$ where $y \not \equiv x$, then $A' \equiv y = h; A_1'$.
+
+		HEREHEREHERE
+
+		via \rulename{deref-*}.
+			Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
+	\end{description}
+
+\item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
+    \begin{description}
+		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
+			then join at $x == h ; |A_1'^[h] `choice` e|$ via IH.
+		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
+			then join at $x == h ; |A_1^[h] `choice` e'|$.
+	\end{description}
+\item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
+
+\item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
+	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
+
+\item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
+	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
+\end{description}
 \end{proof}
 
 
@@ -562,7 +670,7 @@ Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redex
 		{x_1 = s_1;\ x_2 = V[x_1];\ A[x_2]} \\
 		{x_1 = s_1;\ x_2 = V[s_1];\ A[x_2]} & {x_1 = s_1;\ x_2 = V[x_1];\ A[V[x_1]]} \\
 		& {x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]} \\
-		{x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]}
+		{x_1 = s_1;\ x_2 = V[s_1];\ A[V[s_1]]}
 		\arrow["2", from=1-1, to=2-2]
 		\arrow[dotted, from=2-2, to=3-2]
 		\arrow["1"', from=1-1, to=2-1]
@@ -638,7 +746,7 @@ Suppose that $s_1 \not \equiv s_2$ and split cases on whether they are variables
 \item[Case $s_1 \equiv k_1$ and $s_2 \equiv k_2$] Join at $|fail|$ as $k_1 \not \equiv k_2$.
 \item[Case $s_1 \equiv k$ and $s_2 \equiv x$] Join at $e_1$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
 \item[Case $s_1 \equiv x$ and $s_2 \equiv k$] Join at $e_2$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
-\item[Case $s_1 \equiv x_1$ and $s_2 \equiv x_2$] Join at $e_{3-j}$ where $\rnk{x_j} < \rnk{x_{3-j}}$, as $\rstep{}{x_1 = x_2; E[x_j]}{x_1 = x_2; E[x_{3-j}]}$.
+\item[Case $s_1 \equiv x_1$ and $s_2 \equiv x_2$] Join at $e_{3-j}$ where $\rnk{(x_j)} < \rnk{(x_{3-j})}$, as $\rstep{}{x_1 = x_2; E[x_j]}{x_1 = x_2; E[x_{3-j}]}$.
 \end{description}
 \end{proof}
 
