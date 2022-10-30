@@ -627,6 +627,7 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
 isS :: Value -> Bool
 isS VINT{} = True
 isS Var{} = True
+isS VOP{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
