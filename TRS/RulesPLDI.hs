@@ -25,12 +25,13 @@ isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (Def (Bind _ e)) = isChoiceFree e  -- NOTE: new
 isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
-isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+--isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+isChoiceFree (Split _ _ _) = True
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
--- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
+isChoiceFreeOp MapAp = False -- May generate choices from the embedded functions.
 isChoiceFreeOp _ = True
 
 --------------------------------------------------------------------------------
@@ -114,6 +115,7 @@ rulesSpeculation =
       rulesChoice
   +++ rulesOneFP
   +++ rulesAllFP
+  +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -460,6 +462,14 @@ derefA lhs xx =
    do v@VOP{} :@: Var x <- [lhs]
       guard (x == xx)
       pure (v :@:)
+   ++
+   do VOP Cons :@: VARR [v, Var x] <- [lhs]
+      guard (x == xx)
+      pure (\ a -> VOP Cons :@: VARR [v, a])
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefA e xx
+      pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
    V ::= □ | ⟨s1, · · · , □, · · · , sn⟩ | 𝜆x. E
@@ -519,6 +529,18 @@ derefE lhs xx =
    do (All e) <- [lhs]
       ctx <- derefE e xx
       pure (All . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefE e xx
+      pure ((\ e' -> Split e' f g) . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefV f xx
+      pure ((\ f' -> Split e f' g) . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefV g xx
+      pure (Split e f . ctx)
 
 -- (paper) C ::= V = v | v = V | V = e | v = E
 -- (TRS)   C ::= E = e | e = E
@@ -576,7 +598,8 @@ dsFreshFP = ds
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
 finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val v <- cs] vv
-              | otherwise = ee
+              | otherwise = --(if ee /= Fail then trace ("finalSubst: not WF\n" ++ show ee) else id)
+                            ee
   where
     inline :: [(Ident, Value)] -> Value -> Value
     inline bs v | isGnd v = v
@@ -680,6 +703,29 @@ rulesAllFP lhs =
      (is, es, v) <- wfRes e
      pure (mkRes is es (ARR [v]))
 -}
+
+rulesSplit :: ERule
+rulesSplit lhs =
+  "SPLIT-FAIL" `name`
+  do Split Fail f g <- [lhs]
+     pure (f :@: VARR [])
+ ++
+  "SPLIT-CHOICE" `name`
+  do Split (e :|: ee) f g <- [lhs]
+     _ <- wfRes e
+     spl g e ee
+ ++
+  "SPLIT-VAL" `name`
+  do Split e f g <- [lhs]
+     _ <- wfRes e
+     spl g e Fail
+ where
+   spl g e ee =
+     let x:y:h:_ = identsNotIn (free lhs)
+         ve = VAR y :=: e
+         gv = VAR h :=: (g :@: Var y)
+         hlam = Var h :@: VLAM x ee
+     in  pure (DEF h (DEF y (ve :>: gv :>: hlam)))
 
 wfRes :: Expr -> [([Ident], [Expr], Value)]
 wfRes e = do
