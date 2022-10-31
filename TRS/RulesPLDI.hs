@@ -97,25 +97,25 @@ type ERule = Rule Expr
 
 rulesPLDI :: ERule
 rulesPLDI =
-      rulesPrimOps                      -- standard POPL rules
-  +++ rulesUnificationFP
-  +++ rulesApplication
-  +++ rulesGarbageCollection
-  +++ rulesFailFP
-  +++ rulesSpeculation
-  +++ rulesNormalization
+     rulesPrimOps                      -- standard POPL rules
+  <> rulesUnificationFP
+  <> rulesApplication
+  <> rulesGarbageCollection
+  <> rulesFailFP
+  <> rulesSpeculation
+  <> rulesNormalization
 
 rulesUnificationFP :: ERule
 rulesUnificationFP =
-      rulesDerefFP
-  +++ rulesUnificationNoOcc
+     rulesDerefFP
+  <> rulesUnificationNoOcc
 
 rulesSpeculation :: ERule
 rulesSpeculation =
-      rulesChoice
-  +++ rulesOneFP
-  +++ rulesAllFP
-  +++ rulesSplit
+     rulesChoice
+  <> rulesOneFP
+  <> rulesAllFP
+  <> rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -574,7 +574,6 @@ isVal :: Expr -> Bool
 isVal (Val _) = True
 isVal _       = False
 
--- XXX should deal with arrays too
 dsFreshFP :: Expr -> Expr
 dsFreshFP = ds
   where
@@ -598,6 +597,7 @@ dsFreshFP = ds
         e1' = ds e1
         e2' = ds e2
 
+    -- XXX Allows nested tuples.  Maybe this is ok?
     dsv (VLAM x e) = VLAM x (ds e)
     dsv v = v
 

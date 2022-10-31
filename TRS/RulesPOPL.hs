@@ -130,15 +130,15 @@ type ERule = Rule Expr
 
 rulesPOPL :: ERule
 rulesPOPL = rulesPrimOps
-        +++ rulesApplication
-        +++ rulesUnification
-        +++ rulesUnificationVariables
-        +++ rulesSequencing
-        +++ rulesChoice
-        +++ rulesOne
-        +++ rulesAll
-        +++ rulesFail
-        +++ rulesSplit
+         <> rulesApplication
+         <> rulesUnification
+         <> rulesUnificationVariables
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -253,7 +253,7 @@ rulesApplication lhs =
 --------------------------------------------------------------------------------
 rulesUnification :: ERule
 rulesUnification = rulesUnificationNoOcc
-               +++ rulesUnificationOcc
+                <> rulesUnificationOcc
 
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc lhs =

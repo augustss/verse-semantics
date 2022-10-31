@@ -11,12 +11,7 @@ import Control.Monad( unless )
 
 type Rule a = a -> [(String, a)]
 
-(+++) :: Rule a -> Rule a -> Rule a
-(+++) = (<>)
-
 -- This is used to give rules names.
--- At the moment this is just documentation,
---  but could be incorporated into the Rule.
 infix 6 `name`   -- must bind tighter than ++
 name :: String -> [a] -> [(String, a)]
 name s as = [(s,a) | a <- as]
