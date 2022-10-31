@@ -15,16 +15,17 @@ timparse: *.hs
 	ghc $(FLAGS) $(PKGS)  -outputdir objs-timparse TimParse.hs -main-is TimParse -o timparse
 
 test: tests testfast
-	./tests         $(TESTFILE)
-	./tests --split $(TESTFILE)
+	./tests --quiet                  $(TESTFILE)
+	./tests --quiet --split          $(TESTFILE)
+	@echo All tests succeeded
 
 testfast: tests
-	./tests --parse          test1.verse
-	./tests --dfs            $(TESTFILE)
-	./tests --dfs --split    $(TESTFILE)
-	./tests --dfs --simplify $(TESTFILE)
-	./tests --dfs --popl     $(TESTFILE)
-	./tests --eval           $(TESTFILE)
+	./tests --quiet --parse          test1.verse
+	./tests --quiet --dfs            $(TESTFILE)
+	./tests --quiet --dfs --split    $(TESTFILE)
+	./tests --quiet --dfs --simplify $(TESTFILE)
+	./tests --quiet --dfs --popl     $(TESTFILE)
+	./tests --quiet --eval           $(TESTFILE)
 
 testt: timparse
 	./timparse

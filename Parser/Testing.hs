@@ -25,6 +25,7 @@ data TestFlags = TestFlags
   , simplify  :: !Bool                -- use simplifier
 --  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
+  , quiet     :: !Bool                -- Less noisy
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -55,14 +56,16 @@ readTests fn = do
 
 ------------
 
-assertEquiv :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO Bool
+assertEquiv :: HasCallStack => TestFlags -> Ident -> Expr -> Expr -> IO Bool
 assertEquiv = assertEquiv' True
 
-assertFail :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO Bool
+assertFail :: HasCallStack => TestFlags -> Ident -> Expr -> Expr -> IO Bool
 assertFail = assertEquiv' False
 
-assertEquiv' :: HasCallStack => Bool -> Flags -> Ident -> Expr -> Expr -> IO Bool
-assertEquiv' expectOK flg name p1 p2 = do
+assertEquiv' :: HasCallStack => Bool -> TestFlags -> Ident -> Expr -> Expr -> IO Bool
+assertEquiv' expectOK tflg name p1 p2 = do
+    let noisy = not (quiet tflg)
+    let flg = testFlagsToFlags tflg
     let d1 = desugar p1
     let d2 = desugar p2
     let c1 = exprToCore flg d1
@@ -77,7 +80,8 @@ assertEquiv' expectOK flg name p1 p2 = do
     catch
       ( if (v1 `equivValue` v2) == expectOK
         then do
-            putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
+            when noisy $
+              putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
             pure True
         else do
             if expectOK
@@ -124,25 +128,27 @@ equivValue v1 v2 = v1 == v2
 
 --------------
 
-runTest :: Flags -> Test -> IO Bool
-runTest flg (TestEvalEq n e1 e2) =
+runTest :: TestFlags -> Test -> IO Bool
+runTest tflg (TestEvalEq n e1 e2) =
   case n of
-    Ident _ "SEq" -> assertEquiv flg n e1 e2
-    Ident _ "FEq" -> assertFail flg n e1 e2
+    Ident _ "SEq" -> assertEquiv tflg n e1 e2
+    Ident _ "FEq" -> assertFail  tflg n e1 e2
     Ident _ s -> error $ "Unknown test type " ++ show s
 
-runTests :: Flags -> [Test] -> IO Bool
-runTests flg ts = and <$> mapM (runTest flg) ts
+runTests :: TestFlags -> [Test] -> IO Bool
+runTests tflg ts = and <$> mapM (runTest tflg) ts
 
-runTestFile :: Flags -> FilePath -> IO ()
-runTestFile flg fn = do
-  putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags flg
-  ok <- runTests flg =<< readTests fn
+runTestFile :: TestFlags -> FilePath -> IO ()
+runTestFile tflg fn = do
+  putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
+  ok <- runTests tflg =<< readTests fn
   unless ok $
     exitWith (ExitFailure 1)
 
 test :: IO ()
-test = runTestFile defaultFlags verseTest
+test = runTestFile tflg verseTest
+  where tflg = TestFlags { dfs=False, popl=False, denSem=False, split=True
+                         , parse=False, simplify=False, eval=False, quiet=False, fileNames=[] }
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -182,29 +188,38 @@ testFlags = TestFlags
       (  long "eval"
       <> help "Use fast evaluator"
       )
+  <*> switch
+      (  long "quiet"
+      <> help "Be less noisy"
+      )
   <*> many (argument str (metavar "FILES..."))
 
-
+testFlagsToFlags :: TestFlags -> Flags
+testFlagsToFlags t =
+  defaultFlags{ fSplit = split t, fSimplify = simplify t,
+                fRewrite = not (eval t), fFresh = not (popl t),
+                fDenSem = denSem t, fDfs = dfs t }
 main :: IO ()
 main = do
-  (justParse, flg, fns) <- testArgs
-  if justParse then
+  tflg <- testArgs
+  let fns = fileNames tflg
+  if parse tflg then
     mapM_ ptest fns
    else
-    mapM_ (runTestFile flg) fns
+    mapM_ (runTestFile tflg) fns
 
-testArgs :: IO (Bool, Flags, [FilePath])
+testArgs :: IO TestFlags
 testArgs = do
   t <- execParser $ info (testFlags <**> helper)
              ( fullDesc
             <> progDesc "Test Verse rules"
             <> header "tests - testing Verse rules"
              )
-  let flg = defaultFlags{ fSplit = split t, fSimplify = simplify t,
-                          fRewrite = not (eval t), fFresh = not (popl t),
-                          fDenSem = denSem t, fDfs = dfs t }
-      fns = case fileNames t of [] -> [if parse t then test1 else verseTest]; ss -> ss
-  pure (parse t, flg, fns)
+  let t' = 
+        case fileNames t of
+          [] -> t{ fileNames = [if parse t then test1 else verseTest] }
+          _  -> t
+  pure t'
 
 verseTest :: FilePath
 verseTest = "tests.versetest"
