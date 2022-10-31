@@ -1451,7 +1451,7 @@ $e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
 there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
 %
 Then we can establish confluence by proving each sub-relation is confluent,
-and that they pairwise commute \cite{Huet}. \simon{What is this citation?}
+and that they pairwise commute \cite{Huet80}.
 
 \begin{lemma}[Commutativity] \label{lem:comm}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
@@ -1461,7 +1461,7 @@ Proving confluence for $\rr$, $\rapp$, $\rcon$, $\rfail$ and $\rgc$ is easy: the
 all satisfy the \emph{diamond property}, namely, that two
 different reduction steps can be joined at a common
 term in a fixed number of steps.  This property can be verified easily by taking critical pairs.
-Any relation satisfying the diamond property is confluent \simon{need citation}.
+Any relation satisfying the diamond property is confluent \cite{Barendregt}.
 
 The unification relation $\runi$ does not satisfy the diamond property, because
 it may need an unbounded number of steps to join the results of two different
@@ -1472,8 +1472,9 @@ the first or second tuple in \rulename{deref-h}, and which must then
 be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
 and $E[|arr(t_1,...,t_n)|]$ \simon{Not clear.}
 
-Our proof of confluence for $\runi$ works as follows: we find a \emph{sub-relation} that satisfies
-three properties.
+Like several proofs of confluence for the $\lambda$-calculus, 
+our proof of confluence for $\runi$ works as follows: we find 
+a \emph{sub-relation} that satisfies three properties.
 %
 First, it is \emph{locally} confluent, meaning if $e$ single-steps to $e_1$
 and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
@@ -1484,11 +1485,11 @@ the relation is confluent (and hence, so is its reflexive transitive closure.)
 Third, that the \emph{closure} of the sub-relation is the same as the full reduction
 relation, which then implies that the full reduction relation is also confluent.
 
-\simon{I'm afraid that in my refactoring this sentence has gotten oprhaned.
-  I don't see how it fits into the narrative.  It was previously there to
-  explain something about unification...}
-It is possible to prove confluence even for potentially diverging
-(non-terminating) reductions, most famously, for the $\lambda$-calculus.
+% \simon{I'm afraid that in my refactoring this sentence has gotten oprhaned.
+%  I don't see how it fits into the narrative.  It was previously there to
+%  explain something about unification...}
+% It is possible to prove confluence even for potentially diverging
+% (non-terminating) reductions, most famously, for the $\lambda$-calculus.
 
 \subsection{Design for confluence} \label{sec:even-odd}
 

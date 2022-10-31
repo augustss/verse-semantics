@@ -282,7 +282,6 @@ of $x$ is \emph{eliminated} by \rulename{elim-def} or |fail| propagation.
 	If \ie $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$ then $A' \equiv |v==A_1'|$.
 	If \ie $\rstep{}{|A_1^[x]|}{e_1'}$ then $e' \equiv |v==e_1'|$.
 
-	TODOTODO
 \item{Case $A \equiv |def y A_1|$}. Split cases on the possible reductions.
 	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]}$, then $A' \equiv |def y A_1'|$.
 	If $\rstep{}{|A_1^[x]|}{e_1'}$ then $A' \equiv |def y e_1'|$.
@@ -301,24 +300,22 @@ of $x$ is \emph{eliminated} by \rulename{elim-def} or |fail| propagation.
 	Several cases are symmetric with previous case.
 	Remainder involve \rulename{deref-*}.
 	\begin{description}
-		\item[Case] $\rstep{\rord}{e; A_1[x]}{e'; A_1[x]}$ then $A' \equiv |e'; A_1|$.
-		\item[Case] $\rstep{\rord}{e; A_1[x]}{e; A_1'[x]}$ then $A' \equiv |e; A_1'|$.
-		\item[Case] $e \equiv |x == h|$ and $\rstep{\rord}{x==h; A_1[x]}{x==h; A_1'[x]}$, then $A' \equiv |x == h; A_1'|$.
-		\item[Case] $e \equiv |x == h|$ and $\rstep{\rord}{x==h; A_1[x]}{x==h; e_1'}$, then $A' \equiv |hole == h; e_1'|$.
-		\item[Case] $e \equiv |y == h|$ and $\rstep{\rord}{y==h; A_1[x]}{y==h; A_1'[x]}$ where $y \not \equiv x$, then $A' \equiv y = h; A_1'$.
-
-		HEREHEREHERE
-
-		via \rulename{deref-*}.
-			Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
+		\item[Case] $\rstep{}{e; A_1[x]}{e'; A_1[x]}$ then $A' \equiv |e'; A_1|$.
+		\item[Case] $\rstep{}{e; A_1[x]}{e; A_1'[x]}$ then $A' \equiv |e; A_1'|$.
+		\item[Case] $e \equiv |x == h|$ and $\rstep{}{x==h; A_1[x]}{x==h; A_1[h]}$, then $A' \equiv |hole == h; A_1[h]|$ (join using \cref{lem:deref-comm-1})
+		% \item[Case] $e \equiv |y == h|$ and $\rstep{\rord}{y==h; A_1[x]}{y==h; A_1'[x]}$ where $y \not \equiv x$, then $A' \equiv y = h; A_1'$.
+		% via \rulename{deref-*}. Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
 	\end{description}
 
 \item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
     \begin{description}
-		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
-			then join at $x == h ; |A_1'^[h] `choice` e|$ via IH.
+		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
+			then $A' \equiv |A_1' `choice` e|$.
+		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x]|}$ if $e \equiv |fail|$ (via \rulename{choose-l})
+			then $A' \equiv |A_1'|$.
 		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
-			then join at $x == h ; |A_1^[h] `choice` e'|$.
+			then $A' \equiv |A_1 `choice` e'|$.
+		\item[Case] $\rstep{\SX[CX[A_1[x] `choice` e]]
 	\end{description}
 \item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
 
