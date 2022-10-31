@@ -980,8 +980,7 @@ a suspending semantics would be equally easy to express.
 
 Next we study unification, again in \cref{fig:rewrite-rules}.
 Rules \rulename{u-scalar} and \rulename{u-tup}
-are the standard rules for unification, going back at least 40 years \cite{MartelliMontanari82}.
-\lennart{Shouldn't that be 60 years and a reference to Robinson?}
+are the standard rules for unification, going back nearly 60 years \cite{robinson:unification}.
 Rule \rulename{u-fail} makes unification fail on two different head-normal forms (see
 \cref{fig:syntax} for the syntax of |hnf|).
 Note that
@@ -1054,12 +1053,13 @@ suffice to express the necessary sharing.
 
 \item \rulename{deref-s} substitutes a scalar anywhere, but \rulename{deref-h} is much more parsimonous:
 \emph{it never substitutes a heap value |h| under a lambda or inside a tuple}, as can be seen by examining
-the syntax of application contexts |A|.  Substituting inside a tuple would be syntactically invalid, because
-the components of tuples are scalars (\cref{fig:syntax}).  Not substituting under a lambda is a technincal
-device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
-\cref{sec:confluence}.
+the syntax of application contexts |A|. This is a tricky point: see \cref{sec:even-odd}.
+% Substituting inside a tuple would be syntactically invalid, because
+% the components of tuples are scalars (\cref{fig:syntax}).  Not substituting under a lambda is a technical
+% device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
+% \cref{sec:even-odd}.
 
-\item Perhaps surprisingly, there is no ``occurs check'', leading to |fail|.  It is very important to allow
+\item Rather unconventionally, there is no ``occurs check'', leading to |fail|.  It is very important to allow
   allow bindings like |(f == lam x (dots (apply1 f (x-1)) dots))| to substitute,
   because that is how we define a recursive function!  We even allow |(x == tup (1, x))|. Of course,
   recursive bindings can lead to infinite rewriting sequences; it is up to the evaluation strategy
@@ -1388,15 +1388,12 @@ committing to a particular evaluation strategy.
 %
 But then it had better be the case that no matter how the
 rules are applied, one always obtains the same result!
-%
-If the rewrite rules were terminating, then we would expect
-that all possible execution paths lead to the same normal form.
-%
-However, since \calcname has recursion, we instead show that
-the rules are \emph{confluent}.
+\simon{I dropped a distracting sentence here about termination}
+% If the rewrite rules were terminating, then we would expect
+% that all possible execution paths lead to the same normal form.
+% However, since \calcname has recursion, we instead show that
+% the rules are \emph{confluent}.
 
-\simon{Check that the forward reference from the next-to-last bullet in \cref{sec:unification-rules} makes sense.}
-  
 \subsection{Confluence}
 
 \mypara{Reductions and Confluence}
@@ -1427,77 +1424,58 @@ evaluation strategy \cite{Barendregt}.
 \begin{lemma}[Unicity] \label{lem:nf}
 If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
-
-Our main result is that the reduction relation $\rr$ for \calcname,
-defined as the union of the reduction relations
-$\runi$ (Unification),
-$\rapp$ ($\beta$-Application),
-$\rcon$ (Normalization),
-$\rgc$  (Garbage Collection),
-$\rfail$ (Fail Propagation) and
-$\rspc$ (Speculation)
-in \cref{FIXME} % \cref{fig:rulesI}
-is confluent.
-\lennart{It's not confluent without the structural rules.}
+\noindent
+Our main result is that \versecalc{}'s reduction rules are confluent:
+%
+% defined as the union of the reduction relations
+% $\runi$ (Unification),
+% $\rapp$ ($\beta$-Application),
+% $\rcon$ (Normalization),
+% $\rgc$  (Garbage Collection),
+% $\rfail$ (Fail Propagation) and
+% $\rspc$ (Speculation)
+% in \cref{fig:rewrite-rules} and \ref{fig:normalization-rules} % \cref{fig:rulesI}
+% is confluent.
+% \lennart{It's not confluent without the structural rules.}
 
 \begin{theorem}[Confluence] \label{thm:confluence}
-The reduction relation $\rr \equiv \runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$ is confluent.
+  The reduction relation defined by the rules in in \cref{fig:rewrite-rules}
+  and \ref{fig:normalization-rules} is confluence
 \end{theorem}
-
-
-A reduction $R$ \emph{commutes} with $S$ if for all terms
+\noindent
+Our proof strategy is to divide the rules into groups,
+named $\runi$, $\rapp$, etc in the Figures, prove confluence for each separately,
+and then prove that their combination is confluent.
+Given two reduction relations $R$ and $S$, we say that $R$ \emph{commutes} with $S$ if for all terms
 $e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
 there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
 %
-We establish confluence by proving each sub-relation is confluent,
-and that they pairwise commute \cite{Huet}.
+Then we can establish confluence by proving each sub-relation is confluent,
+and that they pairwise commute \cite{Huet}. \simon{What is this citation?}
 
 \begin{lemma}[Commutativity] \label{lem:comm}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
+\noindent
+Proving confluence for $\rr$, $\rapp$, $\rcon$, $\rfail$ and $\rgc$ is easy: they
+all satisfy the \emph{diamond property}, namely, that two
+different reduction steps can be joined at a common
+term in a fixed number of steps.  This property can be verified easily by taking critical pairs.
+Any relation satisfying the diamond property is confluent \simon{need citation}.
 
-\subsection{Design}
+The unification relation $\runi$ does not satisfy the diamond property, because
+it may need an unbounded number of steps to join the results of two different
+one-step reductions.
+To see this, consider the term $x = |arr(s_1,...s_n)|; x = |arr(t_1,...,t_n)|; E[x]$,
+which can be reduced to $e_1$ and $e_2$ by respectively substituting
+the first or second tuple in \rulename{deref-h}, and which must then
+be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
+and $E[|arr(t_1,...,t_n)|]$ \simon{Not clear.}
 
-\calcname deliberately layers values into \emph{scalars} (integers, variables)
-and \emph{heap values} (tuples and $\lambda$-terms) and then only
-allows scalars (no tuples or $\lambda$-terms) in tuples to ensure
-confluence.
-%
-Further, the \rulename{deref-h} rule prevents substituting heap values
-under $\lambda$ and tuples, and prevents ``copying'' heap values
-in constraints as all of these lead to non-confluence.
-
-\mypara{Non-Confluence due to nested $\lambda$}
-%
-Suppose we eliminated \rulename{deref-h} and instead used a single
-rule like \rulename{deref-s} for \emph{all} values.
-%
-Then we could substitute $\lambda$ under tuples (and tuples under $\lambda$)
-which would violate confluence as shown by the following example.
-%
-\ranjit{TODO:flesh out steps}
-%
-\begin{verbatim}
-ex x,y. x = <1,y>; y = \z.x; x
--->> ex x. x = <1, \z.x>; x         (1)
-
-ex x,y. x = <1,y>; y = \z.x; x
--->> ex x. y = \z.<1, y>; <1, y>    (2)
-\end{verbatim}
-%
-(A similar phenomenon arises just with inlining mutually recursive
-$\lambda$-terms~\cite{Ariola2002}.)
-
-
-\mypara{Non-confluence due to nested tuples}
-%
-It is possible to prove confluence even for potentially diverging
-(non-terminating) reductions, most famously, for the $\lambda$-calculus.
-%
-One general strategy is to find a \emph{sub-relation} that satisfies
+Our proof of confluence for $\runi$ works as follows: we find a \emph{sub-relation} that satisfies
 three properties.
 %
-First, it is \emph{locally} confluent, meaning if $e$ (single-)steps to $e_1$
+First, it is \emph{locally} confluent, meaning if $e$ single-steps to $e_1$
 and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
 %
 Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies
@@ -1506,39 +1484,67 @@ the relation is confluent (and hence, so is its reflexive transitive closure.)
 Third, that the \emph{closure} of the sub-relation is the same as the full reduction
 relation, which then implies that the full reduction relation is also confluent.
 
-We follow this route to establish the confluence of the $\runi$
-reductions. The other relations can be proved confluence by
-establishing a stronger \emph{diamond} property, namely, two
-different reduction steps can be joined at a common
-term in a fixed number of steps.
-%
-But for unification, we require multiple steps to reach
-a common join if we have a term $x = |arr(s_1,...s_n)|; x = |arr(t_1,...,t_n)|; E[x]$,
-which can be reduced to $e_1$ and $e_2$ by respectively substituting
-the first or second tuple in \rulename{deref-h}, and which must then
-be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
-and $E[|arr(t_1,...,t_n)|]$.
+\simon{I'm afraid that in my refactoring this sentence has gotten oprhaned.
+  I don't see how it fits into the narrative.  It was previously there to
+  explain something about unification...}
+It is possible to prove confluence even for potentially diverging
+(non-terminating) reductions, most famously, for the $\lambda$-calculus.
 
-As we need potentially unbounded steps to join, we require using Newman's
-lemma, and hence, that $\runi$ terminates. However, just substituting tuples
-under tuples leads to divergence which blocks this proof strategy.
-For example, consider the term
+\subsection{Design for confluence} \label{sec:even-odd}
+
+\versecalc{} is carefully designed to ensure confluence.
+Rule \rulename{deref-h} is particularly important,
+It prevents substituting heap values |h| under lambdas and inside tuples; and
+the |A| context only permits substitution in a place where |h| can be \emph{used}, by
+application or unification.  These restrictions matter for at least three different reasons.
+
+\mypara{Non-confluence due to nested tuples.}
+Our proof strategy for the confluence of $\runi$ requires that $\runi$ terminates.
+But if \rulename{deref-h} substituted inside tuples, or inside lambdas, it doesn't:
+$$
+|def x (x = tup (1,x); x)|
+\; \rightarrow \; |def x (x = tup (1,x); tup (1,x))|
+\; \rightarrow \; |def x (x = tup (1,x); tup (1,tup (1,x)))|
+\; \rightarrow \; \ldots
+$$
+Here, each step makes one substitution for |x|. An exactly analogous example can be made
+for a lambda value.
+We avoid this fruitless divergence
+by preventing \rulename{deref-h} from substituting
+tuples under tuples. Instead an equality like |(x==h)| is left as a ``heap-constraint'' which
+can be used (via \rulename{deref-h}) whenever we actually need to access the contents of the value,
+via pattern matching or indexing; or can be eliminated via the garbage collection rules.
+
+\mypara{Non-confluence due to the odd/even problem.}
+Suppose we combined \rulename{deref-s} and \rulename{deref-h} into a
+a single rule that freely substituted \emph{any} value |v| for an occurrence of |x|.  Then we would
+lose confluence, because of mutual recursion:
+$$
+\begin{array}{lcll}
+ |def (x,y) (x == tup (1, y); y == lam z x; x)|
+& \rightarrow^* & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
+
+ |def (x,y) (x == tup (1, y); y == lam z x; x)|
+& \rightarrow^* & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
+
+\end{array}
+$$
 %
-\begin{verbatim}
-    ex x, y. x = <1,y>; y = <2,x>; x
---> ex x, y. x = <1,y>; y = <2,x>; <1,y>
---> ex x, y. x = <1,y>; y = <2,x>; <1,<2,x>>
---> ex x, y. x = <1,y>; y = <2,x>; <1,<2,<1,y>>>
---> ...
-\end{verbatim}
-%
-We avoid this problem by preventing \rulename{deref-h} from substituting
-tuples under tuples. Instead these are left as ``heap-constraints'' which
-can be used whenever we actually need to access the contents of the tuple
-via pattern matching (or eliminated via the garbage collection rules.)
+The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
+but cannot be joined by rewrite rules.
+This is a well known problem: an exactly similar phenomenon arises with inlining mutually recursive
+$\lambda$-terms.
+Examples like this show that \emph{syntactic} confluence is too strong: what we
+really need is that our rewrites rules are \emph{semantics} preserving --- but of course that requires
+an independent notion of semantics (see \cref{sec:den-sem} for an initial attempt).
+We restore confluence by restricting \rulename{deref-h},
+but an interesting alternative approach would be to seek a weaker form of confluence, such
+as \emph{skew confluence}~\cite{ariola:skew-confluence}.
 
 \mypara{Non-confluence due to Heap Copying}
 %
+\simon{I think this basically the same as C.1 ``Unifying lambdas''.  Is that right?  I don't see how big-swoop substitution would solve this, so I have not merged the two for now.}
+
 Finally, notice that we disallow ``copying'' heap values in constraints.
 %
 That is, \rulename{deref-h} does not allow substituting heap values (\eg $x = h$)
@@ -1572,16 +1578,6 @@ identifiers with values \emph{everywhere} they were
 in a single swoop would avoid the above problem, but
 we were unable to prove confluence using such a ``big-step''
 rule.
-
-\mypara{Discussion}
-%
-Value stratification is not a limitation: in essence we ANF to name the
-inner elements (tuples or $\lambda$-terms), and then use the
-unification rule \rulename{utup} to destruct or ``unpack'' the
-tuple and to access its contents.
-%
-However, not substituting under lambda is a tiresome restriction: e.g.,
-compilers will certainly want to do so. \ranjit{Simon -- add more discussion here? Skew Confluence?}
 
 
 \begin{comment}
@@ -1771,6 +1767,7 @@ And yet |(3 + (20 choice 30))| can still make progress, by floating out the
 choice (rule \rulename{choose} in \cref{fig:rewrite-rules}), thus
 |(3+20) choice (3+30)|.
 \lennart{If you want to be picky \rulename{choose} doesn't apply here since we are not in an |SX| context.}
+\simon{Let's not be picky!}
 In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
@@ -2190,7 +2187,8 @@ As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, 
 For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
 yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
 prevent the expression from returning a value.
-\lennart{I would argue that yielding 3 is wrong.  We should not yield 3 until we know there is no failure in |loop|.}
+There a good reason for this choice: the call to |apply0 loop| might fail, and we should not return |3| until
+we know there is no failure.  With laziness we could easily lose confluence.
 % $$
 % |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
 % $$
@@ -2198,6 +2196,7 @@ prevent the expression from returning a value.
 % |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
 % |ones = tup(1,ones)|, which has an ``occurs check.''
 
+Another place that laziness could play a role is this.
 Remembering the duality between values and choices,
 one might also want |allKW| to return a lazy stream
 of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
@@ -2208,7 +2207,8 @@ $$
 Here we suppose that |allKW| returns a lazy stream of values (represented as nested
 pairs), from which we may pick the first and discard the rest.
 
-A lazy variant of \versecalc{} looks entirely feasible, but we have not worked out the details.
+In short, there are good reasons for lenience, but
+a lazy variant of \versecalc{} could be worth exploring.
 
 
 % ----------------------- Denotational semantics  -----
