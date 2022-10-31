@@ -1,0 +1,444 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+% ------------------- Local notational macros -----------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+
+%%\newcommand{\clamsymx}{\Rightarrow}
+%%\newcommand{\clamsym}{$\clamsymx$}
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{W}
+\newcommand{\Env}{Env}
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+
+\newcommand{\setform}[1]{\left\{ #1 \right\}}
+\newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
+\newcommand{\sbind}[2]{ #1 \in #2 }
+
+\newcommand{\semfun}[1]{\mathcal{#1}}
+\newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
+\newcommand{\cons}{{:}}           % Cons for value sequences, V*
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+
+% extend envt
+\newcommand{\extendrho}[2]{#1[#2]}
+
+% The collection type
+\newcommand{\mtype}{\Value^{*}}
+\newcommand{\mtyped}{\Value^{?}}
+\newcommand{\mempty}{\mathit{empty}}
+\newcommand{\munit}{\mathit{unit}}
+\newcommand{\munits}[1]{\munit(#1)}
+\newcommand{\mintersect}{\Cap}
+\newcommand{\munion}{\Cup}
+\newcommand{\msemi}{\fatsemi}
+\newcommand{\mone}{\mathit{one}}
+\newcommand{\mall}{\mathit{all}}
+\newcommand{\mtag}{\mathit{tag}}
+\newcommand{\mtage}[1]{([],#1)}
+\newcommand{\mlift}[1]{#1_{\bot}}
+\newcommand{\mplus}{\oplus}
+\newcommand{\powerset}[1]{{\mathcal P}(#1)}
+\newcommand{\wrong}{\mathrm{WRONG}}
+\newcommand{\apply}{\mathit{apply}}
+\newcommand{\sconcat}{\bowtie}
+\newcommand{\shead}{\mathit{head}}
+\newcommand{\stuple}{\mathit{tuple}}
+\newcommand{\scons}{:}
+
+\section{A denotational semantics for \versecalc} \label{sec:den-sem}
+
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\[7mm]
+\text{\bf Semantics of expressions and values} \\
+
+  \begin{array}{rcll}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
+  \semapp{E}{|fail|}{\rho} & = & \mempty \\
+  \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|apply1N v_1 v_2|}{\rho} & = & \apply(\semapp{V}{|v_1|}{\rho}, \; \semapp{V}{|v_2|}{\rho}) \\
+  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
+% Commenting out hastype for now
+%   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
+%     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
+%       \wrong & \text{otherwise} \\
+%      \multicolumn{2}{l}{\text{where $r = \semapp{E}{e_1}{\rho}$}}
+%         \end{array} \\
+\\
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & k \\
+  \semapp{V}{op}\rho & = & \semapp{O}{op} \\
+  \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
+  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
+\\
+  \semapp{O}{|op|}{} & : & \Value \\
+  \semapp{O}{|add|} & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+      \,\text{\bf then}\, \munit(k_1+k_2)
+      \,\text{\bf else}\, \wrong \\
+  \semapp{O}{|gt|}  & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)| \wedge k_1 > k_2)
+      \,\text{\bf then}\, \munit(k_1)
+      \,\text{\bf else}\, \mempty \\
+
+  \semapp{O}{|int|}  & = &  \lambda w.\, \text{\bf if}\, (w = k)
+      \,\text{\bf then}\, \munit(k)
+      \,\text{\bf else}\, \mempty
+  \end{array} \\ \\
+  
+\begin{array}{rcll}
+apply & : & (\Value \times \Value) \rightarrow \mtype \\
+apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
+apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+  & = &  \mempty & \text{otherwise} \\
+apply( f, w ) & = & f(w) & f \in \Value \rightarrow \mtype \\
+\end{array}
+\end{array}
+$
+\caption{Expression semantics}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Domains} \\
+\mtype  =  \mlift{(\wrong + \powerset{\Value})} \\[2mm]
+\text{\bf Operations} \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+                    & \mempty & = & \{ \, \} \\[1mm]
+\text{Unit}    & \munit & : & \Value \rightarrow \mtype \\
+               & \munit(w) & = & \{ w  \} \\[1mm]
+\text{Union}   & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+               &  s_1 \munion s_2 & = & s_1 \cup s_2 \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \mintersect s_2 & = & s_1 \cap s_2 \\[1mm]
+\text{Sequencing}   & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \msemi s_2 & = & s_2 & \text{ if $s_1$ is non-empty} \\
+            &          & = & \{\,\} & \text{otherwise} \\[1mm]
+\text{One}          &   \mone  & : & \mtype \rightarrow \mtype & \text{The result is either empty or a singleton}\\
+  & \mone(s) & = & ??? \\[1mm]
+\text{All}          &   \mall  & : & \mtype \rightarrow \tuple{\Value} \\
+  & \mall(s) & = & ??? \\
+\end{array} \\ \\
+\text{All operations over $\mtype$ implicitly propagate $\bot$ and $\wrong$.  E.g.}\\
+  \begin{array}{rcll}
+    s_1 \munion s_2 & = & \bot & \text{if $s_1=\bot$ or $s_2=\bot$} \\
+                    & = & \wrong & \text{if $(s_1=\wrong$ and $s_2 \neq \bot)$ or
+                    $(s_2=\wrong$ and $s_1 \neq \bot)$} \\
+                    & = & s_1 \cup s_2 & \text{otherwise}
+  \end{array}
+\end{array}
+$$
+\caption{Set semantics for $\mtype$}
+\label{fig:set-sem}
+\end{figure}
+
+It is highly desirable to have a denotational semantics for \versecalc{}.
+A denotational semantics says directly what an expression \emph{means} rather than
+how it \emph{behaves}, and that meaning can be very perspicuous.  Equipped with a
+denotational semantics we can, for example, prove that the left hand side and
+right hand side of each rewrite rule have the same denotation; that is, the rewrites
+are meaning-preserving.
+
+But a denotational semantics for a functional logic language is tricky.  Typically one
+writes a denotation function something like
+$$
+\semapp{E}{|e|}{}  :  \Env \rightarrow \Value
+$$
+where $\Env = Ident \rightarrow \Value$.  So $\semfun{E}$ takes an expession
+|e| and an environment $\rho : \Env$ and returns the value, or denotation, of the
+expresssion.  The environment binds each free variable of |e| to its value.
+But what is the semantics of |def x e|?   We need to extend $\rho$ with a binding
+for |x|, but what is |x| bound to?  In a functional logic language |x| is given
+its value by various equalities scattered throughout |e|.
+
+This section sketches our approach to this challenge.  It is not finished work, and
+does not count as a contribution of our paper.  We offer it because we have found it
+an illuminating alternative way to understand \versecalc{}, one that complements
+the rewrite rules that are the substance of the paper.
+
+\subsection{A first attempt at a denotational semantics}  \label{sec:collection}  \label{sec:unification-and-equality}
+
+Our denotational semantics for \versecalc{} is given in \cref{fig:den-sem1}.
+\begin{itemize}
+\item We have one semantic function (here $\semfun{E}$ and $\semfun{V}$) for each syntactic
+  non terminal (here $e$ and $v$ respectively.)
+\item Each function has one equation for each form of the construct.
+\item Both functions take an environment $\rho$ that maps in-scope identifiers to
+  a \emph{single} value; see the definition $\Env = Ident \rightarrow \Value$.
+\item The value function $\semfun{V}$ returns a \emph{single value} $\Value$, while
+  the expression function $\semfun{E}$ returns a \emph{collection of values} $\mtype$ (\cref{sec:collection}).
+\end{itemize}
+
+The semantics is parameterised over the meaning of a ``collection of values $\mtype$''.
+To a first approximation, think of $\mtype$ a (possibly infinite) set of values $\Value$,
+with union, intersection etc having their ordinary meaning.
+
+Our first interpretation,
+given in \Cref{fig:set-sem}, is a little more refined: $\mtype$ includes $\bot$ and $\wrong$ as
+well as a set of values.  Our second interpretation is given in \Cref{fig:labelled-sem}, and
+discussed in \Cref{sec:order-sensitive}.
+
+The equations themselves, in \cref{fig:den-sem1}
+are beautifully simple and compositional, as a denotational semantics should be.
+
+The equations for $\semfun{V}$ are mostly self-explanatory, but an equation like $\semapp{V}{|k|}{\rho} = k$ needs some
+explanation: the $k$ on the left hand side (e.g. ``|3|'') is a piece of \emph{syntax}, but the $k$ on the right is the corresponding
+element of the \emph{semantic world of values} $\Value$ (e.g. $3$). As is conventional, albeit a bit confusing,
+we use the same $k$ for both.  Same for $op$, where the semantic equivalent is the corresponding mathematical function.
+
+The equations for $\semfun{E}$ are more interesting.
+\begin{itemize}
+\item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
+The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
+\item In particular, values include lambdas.  The semantics says that a lambda evaluates to a \emph{singleton}
+collection, whose only element is a function value. But that function value has
+type $\Value \rightarrow \mtype$; that is, it is a function that takes a single
+value and returns a \emph{collection} of values.
+\item Function application $\semapp{E}{|apply1N v_1 v_2|}{\rho}$ is easy, because $\semfun{V}$ returns a single value: just apply
+  the meaning of the function to the meaning of the argument.  The $\apply$ function is defined in \Cref{fig:den-sem1}.
+\item Choice $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the union (written $\munion$) of the values
+  returned by |e_1| and |e_2| respectively.  For bags this union operator is just bag union (\Cref{fig:set-sem}).
+\item Unification $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the \emph{intersection} of the
+  values returned by |e_1| and |e_2| respectively. For bags, this ``intersection'' operator $\mintersect$
+  is defined in \cref{fig:set-sem}. In this definition, the equality is mathematical equality of functions;
+  which we can't implement for functions; see \Cref{sec:unification-and-equality}.
+\item Sequencing $\semapp{E}{|e_1 ; e_2|}{\rho}$. Again we use an auxiliary function $\msemi$ to combine
+  the meanings of |e_1| and |e_2|. For bags, the function $\msemi$ (\cref{fig:set-sem} again)
+  uses a bag comprehension.  Again it does a cartesian product, but without the equality constraint of $\mintersect$.
+\item The semantics of |(one e)| simply applies the semantic function $\mone : \mtype \rightarrow \mtype$ to the
+  collection of values returned by |e|.  If |e| returns no values, so does |(one e)|; but if |e| returns one or more values,
+  |(one e)| returns the first.  Of course that begs the question of what ``the first'' means -- for bags
+  it would be non-deterministic. We will fix this problem in \Cref{sec:order-sensitive}, but for now we simply ignore it.
+\item The semantics of |(all e)| is similar, but it always returns a singleton collection
+  (hence the $\munit$ in the semantics of |all|) whose
+  element is a (possibly-empty) tuple that contains all the values in the collection returned by |e|.
+\end{itemize}
+The fact that unification ``|=|'' maps onto intersection, and choice ``|choice|'' onto union, is
+very satisfying.
+
+The big excitement is the treatment of |defKW|. We must extend $\rho$, but what should we bind |x| to?  (Compare the
+equation for $\semapp{V}{|lam x e|}{}$, where we have a value $w$ to hand.)
+Our answer is simple: \emph{try all possible values, and union the results}:
+$$
+\semapp{E}{|def x e|}{\rho} \; = \; \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}
+$$
+That $\bigcup_{w \in \Value}$ means: enumerate all values in $w \in \Value$, in some arbitrary order,
+and for each: bind $x$ to $w$, find the semantics of $e$ for that value of $x$, namely
+$\semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}$, and take the union
+(in the sense of $\munion$) of the results.
+
+Of course we can't possibly implement it like this, but it makes a great specification.
+For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
+the semantics is a singleton sequence $[3]$.
+
+\subsection{The denotational semantics is un-implementable}
+
+This semantics is nice and simple, but we definitely can't implement it!  Consider
+$$
+|def x ((square x - x - 6) = 0; x|
+$$
+The semantics will iterate over all possible values for |x|, returning all those that satisfy the equality;
+including $3$, for example. But unless our implementation can guarantee to solve quadratic equations,
+we can't expect it to return 3.  Instead it'll get stuck.
+
+Another way in which the implementation might get stuck is through unifying functions:
+$$
+|(lam x (x+x)) = (lam y (y * 2))|
+\quad \text{or even} \quad
+|(lam x (x+1)) = (lam y (y+1))|
+$$
+But not all unification-over-functions is ruled out.  We do expect the implementation to succeed with
+$$
+|def f (((lam x (x+1)) = f); apply1N f 3)|
+$$
+Here the |defKW| will iterate over all values of |f|, and the equality will pick out the (unique) iteration
+in which |f| is bound to the incrementing function.
+
+So our touchstone must be:
+\begin{itemize}
+\item If the implementation returns a value at all, it must be the value given by the semantics.
+\item Ideally, the verifier will guarantee that the implementation does not get stuck, or go $\wrong$.
+\end{itemize}
+
+% This reminded Koen of something that Esterelle does.  (Details, Koen?)
+
+\subsection{Getting $\wrong$ right}
+
+Getting $\wrong$ right is a bit tricky.
+
+\begin{itemize}
+\item What is the value of |(3 = emptytup)|?  The intersection semantics would say $\mempty$, the empty collection
+  of results, but we might want to say $\wrong$.
+\item Should $\wrong$ be an element of $\Value$ or of $\mtype$?  We probably want |(one (3 `choice` wrong)|
+  to return a $\munit(3)$ rather then $\wrong$?
+\item What about |apply1 fst (tup (3,wrong))|?  Is that wrong or 3?
+\end{itemize}
+
+There is probably more than one possible choice here.
+
+
+% -------------------------------------
+\subsection{An order-sensitive denotational semantics} \label{sec:order-sensitive}
+
+\newcommand{\LblValue}{LW}
+\newcommand{\LblSeq}{[ \Lbl ]}
+\newcommand{\Lbl}{L}
+\newcommand{\lblleft}{{\bf L}}
+\newcommand{\lblright}{{\bf R}}
+\newcommand{\lblsemi}[2]{#1 \sconcat #2}
+\newcommand{\lblunit}{\bullet}
+\newcommand{\domplus}{\, + \,}
+\newcommand{\msort}{\mathit{sort}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\mtype & = & \mlift{(\wrong + \powerset{\LblValue})} \\
+\mtyped & = & \setform{\Value} & \text{Set with 0 or 1 elements} \\
+\LblValue & = & \LblSeq \times \Value & \text{Sequence of $\Lbl$ and a value} \\
+\Lbl & = & \lblleft \domplus \lblright \\
+\end{array} \\
+\\
+\text{\bf Operations} \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+    & \mempty & = & \varnothing \\[1mm]
+\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
+     & \munits{w} & = & \setform{ ([], w) } \\[1mm]
+\text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
+\text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+&  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
+% \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
+% & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
+\text{One}  & \mone & : & \mtype \rightarrow \mtype \\
+& \mone(s) & = & \shead (\msort( s)) \\[1mm]
+\text{All}  & \mall & : & \mtype \rightarrow \mtype \\
+ & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
+\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
+             & \shead [] & = & empty \\
+             & \shead (w \scons s) & = & \munits{w} \\[1mm]
+\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+  \end{array} \\
+\\
+\begin{array}{rrcll}
+\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \mlift{([\Value] + \wrong)}\\
+& \msort(s) & = & []  & \text{if $s$ is empty} \\
+&  & = & \wrong & \text{if $ws$ has more than one element} \\
+&& = & ws & \text{otherwise} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
+&& \multicolumn{3}{l}{\text{where $ws = \mcompr{w}{\sbind{([],w)}{s}}$}}
+\end{array}
+
+\end{array}
+$$
+\caption{Labelled set semantics for $\mtype$}
+\label{fig:labelled-sem}
+\end{figure}
+
+There is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
+of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
+the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
+And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
+
+\Cref{fig:labelled-sem} give a new denotational semantics that \emph{does} account for order.
+The key idea (due to Joachim Breitner) is this: return a sequence of \emph{labelled} values;
+and then sort that sequence (in $\mone$ and $\mall$) into canonical order
+before exposing it to the programmer.
+
+We do not change the equations for $\semfun{E}$, $\semfun{V}$, and $\semfun{O}$ at all; they remain
+precisely as they are in \Cref{fig:den-sem1}.
+However the semantics of a collection of values, $\mtype$, does change, and is given in \Cref{fig:labelled-sem}:
+\begin{itemize}
+\item
+A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
+a \emph{set of labelled values}, each of type $\LblValue$.
+\item A labelled value (of type $\LblValue$)
+is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
+\item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
+\item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
+adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
+and a $\lblright$ tag to those coming from the right.
+So the labels specify where in the tree the value comes from.
+\item Sequencing $\msemi$ and $\mintersect$ both concatenate the labels from the values they combine.
+\item Finally $\msort$ puts everything in the ``right'' order: first the values with
+an empty label, then the values whose label starts with $\lblleft$ (notice the
+recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
+Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
+\item Note that if $\msort$ encounters a set with more than one unlabelled element then this
+considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
+\end{itemize}
+Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
+|defKW| binds |x| to |3| and then |4|. The meaning of
+this expression will be
+$$
+\semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
+$$
+Now if we take |allKW| of that expression we will get a singleton sequence
+containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
+$$
+\semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
+$$
+
+\subsection{Related work}
+
+\cite{christiansen:denotational} gives another approach to a denotational semantics
+for a functional logic language.  We are keen to learn of others.
+
+
+
+% LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
+% LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
+% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
+% LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
+% LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xrest zs unary
+% LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
+% LocalWords:  featureful multivalued mapFlat powerset denotational
+% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
+% LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
+% LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
+% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
+% LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
+% LocalWords:  subexpression Claessen equationally eliml fcn elimr
+% LocalWords:  rll redex Formalising equational stepX compositionally
+% LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
+% LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
+% LocalWords:  Smolka flavour FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
+% LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
+% LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
+% LocalWords:  Eqns ohlebusch

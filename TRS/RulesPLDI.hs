@@ -23,14 +23,15 @@ isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
-isChoiceFree (Def (Bind _ e)) = isChoiceFree e  -- NOTE: new
+isChoiceFree (DEF _ e) = isChoiceFree e  -- NOTE: new
 isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
-isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+--isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+isChoiceFree (Split _ _ _) = True
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
--- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
+isChoiceFreeOp MapAp = False -- May generate choices from the embedded functions.
 isChoiceFreeOp _ = True
 
 --------------------------------------------------------------------------------
@@ -65,7 +66,7 @@ choiceX1 lhs =
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)
  ++
-  do Def (Bind x cx) <- [lhs]
+  do DEF x cx <- [lhs]
      (ctx, hole) <- choiceX cx
      pure (Def . Bind x . ctx, hole) -- hopefully this is sound!
 
@@ -114,6 +115,7 @@ rulesSpeculation =
       rulesChoice
   +++ rulesOneFP
   +++ rulesAllFP
+  +++ rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -196,7 +198,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
+defs vs e = foldr (\ x e -> DEF x e) e vs
 
 unit :: Value
 unit = VARR []
@@ -211,7 +213,7 @@ rulesApplication lhs =
   "APP-BETA" `name`
   do VLAM x e :@: v <- [lhs]
      let freeV = free v
-         beta y b = Def (Bind y ((VAR y :=: Val v) :>: b))
+         beta y b = DEF y ((VAR y :=: Val v) :>: b)
      if x `notElem` freeV then
        pure (beta x e)
       else do
@@ -230,7 +232,7 @@ rulesApplication lhs =
      let x = identNotIn (free lhs)
          xe = VAR x
          e = foldr1 (:|:) [ (xe :=: INT i) :>: Val vi | (i, vi) <- [0..] `zip` vs ]
-     pure (Def (Bind x ((xe :=: Val v) :>: e)))
+     pure (DEF x ((xe :=: Val v) :>: e))
 
 --------------------------------------------------------------------------------
 
@@ -250,10 +252,12 @@ rulesUnificationNoOcc lhs =
   do v@(ARR ss) :=: ARR ss' <- [lhs]
      guard (length ss == length ss')
      pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+{-
  ++
   "U-FAIL-OP-OP" `name`
   do OP{} :=: OP{} <- [lhs]
      pure Fail
+-}
  ++
   "U-FAIL-LAM-LAM" `name`
   do LAM{} :=: LAM{} <- [lhs]
@@ -355,7 +359,7 @@ rulesGarbageCollection lhs =
 elimDead :: Expr -> [Expr]
 elimDead ee =
   let
-    getXs rs (Def (Bind x e)) = getXs (x:rs) e
+    getXs rs (DEF x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
     getBs bs ((VAR x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
     getBs bs e = (reverse bs, e)
@@ -396,6 +400,21 @@ simpleCst xs bs e =
 
 -}
 
+derefB :: Expr -> Ident -> [VContext]
+derefB lhs xx =
+   do VAR x <- [lhs]
+      guard (x == xx)
+      pure Val
+   ++
+   do (e1 :>: e2) <- [lhs]
+      ctx <- derefB e2 xx
+      pure ((e1 :>:) . ctx)
+   ++
+   do DEF x e <- [lhs]
+      guard (x /= xx)
+      ctx <- derefB e xx
+      pure (Def . Bind x . ctx)
+
 derefA :: Expr -> Ident -> [VContext]
 derefA lhs xx =
    do (Var x :@: v) <- [lhs]
@@ -410,7 +429,7 @@ derefA lhs xx =
       ctx <- derefA e xx
       pure ( (v :=:) . ctx)
    ++
-   do Def (Bind x e) <- [lhs]
+   do DEF x e <- [lhs]
       guard (x /= xx)
       ctx <- derefA e xx
       pure (Def . Bind x . ctx)
@@ -443,6 +462,14 @@ derefA lhs xx =
    do v@VOP{} :@: Var x <- [lhs]
       guard (x == xx)
       pure (v :@:)
+   ++
+   do VOP Cons :@: VARR [v, Var x] <- [lhs]
+      guard (x == xx)
+      pure (\ a -> VOP Cons :@: VARR [v, a])
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefA e xx
+      pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
    V ::= □ | ⟨s1, · · · , □, · · · , sn⟩ | 𝜆x. E
@@ -458,7 +485,7 @@ derefE lhs xx =
       ctx <- derefV v xx
       pure (Val . ctx)
    ++
-   do Def (Bind x e) <- [lhs]
+   do DEF x e <- [lhs]
       guard (x /= xx)
       ctx       <- derefE e xx
       pure (Def . Bind x . ctx)
@@ -502,6 +529,18 @@ derefE lhs xx =
    do (All e) <- [lhs]
       ctx <- derefE e xx
       pure (All . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefE e xx
+      pure ((\ e' -> Split e' f g) . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefV f xx
+      pure ((\ f' -> Split e f' g) . ctx)
+   ++
+   do Split e f g <- [lhs]
+      ctx <- derefV g xx
+      pure (Split e f . ctx)
 
 -- (paper) C ::= V = v | v = V | V = e | v = E
 -- (TRS)   C ::= E = e | e = E
@@ -539,27 +578,34 @@ isVal _       = False
 dsFreshFP :: Expr -> Expr
 dsFreshFP = ds
   where
+    ds (Val v)      = Val (dsv v)
     ds (ex :=: ex') = dsEqu ex ex'
     ds (ex :>: ex') = ds ex :>: ds ex'
     ds (ex :|: ex') = ds ex :|: ds ex'
-    ds (Def (Bind x e)) = Def (Bind x (ds e))
+    ds (vx :@: vx') = dsv vx :@: dsv vx'
+    ds (DEF x e)    = DEF x (ds e)
     ds (One ex)     = One (ds ex)
     ds (All ex)     = All (ds ex)
-    ds e            = e
+    ds (Split e f g)= Split (ds e) (dsv f) (dsv g)
+    ds e = e
 
     dsEqu e1 e2
       | isVal e1  = e1 :=: e2'
       | isVal e2  = e2 :=: e1'
-      | otherwise = Def (Bind x ((VAR x :=: e1') :>: (VAR x :=: e2')))
+      | otherwise = DEF x ((VAR x :=: e1') :>: (VAR x :=: e2'))
       where
         x   = identNotIn (free [e1', e2'])
         e1' = ds e1
         e2' = ds e2
 
+    dsv (VLAM x e) = VLAM x (ds e)
+    dsv v = v
+
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
 finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val v <- cs] vv
-              | otherwise = ee
+              | otherwise = --(if ee /= Fail then trace ("finalSubst: not WF\n" ++ show ee) else id)
+                            ee
   where
     inline :: [(Ident, Value)] -> Value -> Value
     inline bs v | isGnd v = v
@@ -581,6 +627,7 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
 isS :: Value -> Bool
 isS VINT{} = True
 isS Var{} = True
+isS VOP{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
@@ -597,6 +644,11 @@ rulesDerefFP lhs =
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
      ctx <- derefA e x
+     pure (xh :>: plug ctx (HNF h))
+ ++
+  "DEREF-K" `name`
+  do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
+     ctx <- derefB e x
      pure (xh :>: plug ctx (HNF h))
 
 rulesFailFP :: ERule
@@ -616,7 +668,7 @@ rulesFailFP lhs =
  ++
   -- Not needed when we have GC
   "FAIL-DEF" `name`
-  do Def (Bind _ Fail) <- [lhs]
+  do DEF _ Fail <- [lhs]
      pure Fail
 
 rulesOneFP :: ERule
@@ -659,6 +711,29 @@ rulesAllFP lhs =
      pure (mkRes is es (ARR [v]))
 -}
 
+rulesSplit :: ERule
+rulesSplit lhs =
+  "SPLIT-FAIL" `name`
+  do Split Fail f g <- [lhs]
+     pure (f :@: VARR [])
+ ++
+  "SPLIT-CHOICE" `name`
+  do Split (e :|: ee) f g <- [lhs]
+     _ <- wfRes e
+     spl g e ee
+ ++
+  "SPLIT-VAL" `name`
+  do Split e f g <- [lhs]
+     _ <- wfRes e
+     spl g e Fail
+ where
+   spl g e ee =
+     let x:y:h:_ = identsNotIn (free lhs)
+         ve = VAR y :=: e
+         gv = VAR h :=: (g :@: Var y)
+         hlam = Var h :@: VLAM x ee
+     in  pure (DEF h (DEF y (ve :>: gv :>: hlam)))
+
 wfRes :: Expr -> [([Ident], [Expr], Value)]
 wfRes e = do
   --traceM ("wfRes " ++ show (e, wfResE e))
@@ -696,7 +771,7 @@ wfResE = maybeToList . wf []
 --    wf _ _ = Nothing
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
-mkRes is es r = foldr (\ i e -> Def (Bind i e)) r' is
+mkRes is es r = foldr (\ i e -> DEF i e) r' is
   where r' = foldr (:>:) r es
 
 mkRess :: [([Ident], [Expr], Value)] -> ([Ident], [Expr], [Value])
@@ -743,34 +818,34 @@ rulesNormalization lhs =
      pure (x :=: h)
  ++
   "NORM-SEQ-DEFR" `name`
-  do Def (Bind x e1) :>: e2 <- [lhs]
+  do DEF x e1 :>: e2 <- [lhs]
      let (nx, ne1) =
            if x `notElem` free e2 then
              (x, e1)
            else
              let x' = identNotIn (free [e1, e2])
              in  (x', subst [(x, Var x')] e1)
-     pure (Def (Bind nx (ne1 :>: e2)))
+     pure (DEF nx (ne1 :>: e2))
  ++
   "NORM-SEQ-DEFL" `name`
-  do e1 :>: Def (Bind x e2) <- [lhs]
+  do e1 :>: DEF x e2 <- [lhs]
      let (nx, ne2) =
            if x `notElem` free e1 then
              (x, e2)
            else
              let x' = identNotIn (free [e1, e2])
              in  (x', subst [(x, Var x')] e2)
-     pure (Def (Bind nx (e1 :>: ne2)))
+     pure (DEF nx (e1 :>: ne2))
  ++
   "NORM-DEFR" `name`
-  do e1 :=: Def (Bind x e2) <- [lhs]
+  do e1 :=: DEF x e2 <- [lhs]
      let (nx, ne2) =
            if x `notElem` free e1 then
              (x, e2)
            else
              let x' = identNotIn (free [e1, e2])
              in  (x', subst [(x, Var x')] e2)
-     pure (Def (Bind nx (e1 :=: ne2)))
+     pure (DEF nx (e1 :=: ne2))
  ++
   "NORM-SEQR" `name`
   do v@Val{} :=: (e1 :>: e2) <- [lhs]
@@ -780,4 +855,4 @@ rulesNormalization lhs =
   do v1@Val{} :=: (v2@Val{} :=: e) <- [lhs]
      let x = identNotIn (free lhs)
          xe = VAR x
-     pure (Def (Bind x ((xe :=: v1) :>: ((xe :=: v2) :>: (xe :=: e)))))
+     pure (DEF x ((xe :=: v1) :>: ((xe :=: v2) :>: (xe :=: e))))

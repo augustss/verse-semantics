@@ -4,7 +4,7 @@ module TRS where
 import qualified Data.Set as S
 import Data.List ( intercalate )
 import Control.Monad( unless )
-import Debug.Trace (trace)
+--import Debug.Trace (trace)
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
@@ -12,7 +12,7 @@ import Debug.Trace (trace)
 type Rule a = a -> [(String, a)]
 
 (+++) :: Rule a -> Rule a -> Rule a
-r1 +++ r2 = \x -> r1 x ++ r2 x
+(+++) = (<>)
 
 -- This is used to give rules names.
 -- At the moment this is just documentation,
