@@ -103,7 +103,7 @@ $$
     \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
     \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
     \textit{Scalar Values} & s     & ::= & x \vb k \vb op \\
-    \textit{Heap Values}   & h     & ::= & |arr (s_1, dots, s_n)| \vb |lam x e| \\
+    \textit{Heap Values}   & h     & ::= & |tup (v_1, dots, v_n)| \vb |lam x e| \\
     \textit{Head Values}   & |hnf| & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
     \textit{Expressions}   & e     & ::= & |v| \vb |e_1 ; e_2| \vb |def x e| \vb |v == e| \vb |fail| 
@@ -154,7 +154,7 @@ $$
 \newcommand{\figureRewriteRules}{
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| 
+\textit{Expression context}     & E  & ::= & \hole \vb |tup (v_1, dots , hole , dots, v_n)| \vb |lam x E| \vb |def x E| 
                                               \vb |E == e| \vb |e == E| \\
                                 &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
                                        \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
@@ -181,7 +181,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
 \rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}$ \\
 \rulename{u-scalar} & |s == s |                                    & \movesto & s \\
-\rulename{u-tup}    & |tup (s_1,dots,s_n) == tup (sone' ,dots,s_n')| & \movesto & \multicolumn{2}{l} {|s_1==sone';dots;s_n==s_n'; tup (s_1,dots,s_n)|} \\
+\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1' ,dots, v_n')| & \movesto & \multicolumn{2}{l} {|v_1==v1';dots;v_n==v_n'; tup (v_1,dots,v_n)|} \\
 \rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
 \end{longtable}
 \vspace{-4mm}
@@ -189,8 +189,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulegroupname{Application:~\rapp}
 \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
 \rulename{app-tup0} & |apply1N (tup ()) v| & \movesto & |fail| \\
-\rulename{app-tup}  & |apply1N (tup (s_0 dots s_n)) v| & \movesto
-	& |def x (x == v; (x = 0; s_0 choice dots choice x = n; s_n)| & if $|x| \not \in \freevars{|v|}, n \geq 0$ \\
+\rulename{app-tup}  & |apply1N (tup (v_0 dots v_n)) v| & \movesto
+	& |def x (x == v; (x = 0; v_0 choice dots choice x = n; v_n)| & if $|x| \not \in \freevars{|v|}, n \geq 0$ \\
 \rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
@@ -207,8 +207,8 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
 \rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
 \rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto &
-   \multicolumn{2}{l}{|def xs cs ; def ys ()|$\overline{y=v}$|; tup (ys)| \;
-               if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$, |ys| fresh} \\
+   |def xs cs ; tup (vs)| &
+               if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$ \\
 %% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
 \end{longtable}
 \caption{\textbf{The Verse Calculus: Rewrite Rules}}

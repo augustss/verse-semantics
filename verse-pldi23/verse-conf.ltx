@@ -1054,10 +1054,6 @@ suffice to express the necessary sharing.
 \item \rulename{deref-s} substitutes a scalar anywhere, but \rulename{deref-h} is much more parsimonous:
 \emph{it never substitutes a heap value |h| under a lambda or inside a tuple}, as can be seen by examining
 the syntax of application contexts |A|. This is a tricky point: see \cref{sec:even-odd}.
-% Substituting inside a tuple would be syntactically invalid, because
-% the components of tuples are scalars (\cref{fig:syntax}).  Not substituting under a lambda is a technical
-% device to avoid a tiresome (although semantically benign) form of non confluence, as we discuss in
-% \cref{sec:even-odd}.
 
 \item Rather unconventionally, there is no ``occurs check'', leading to |fail|.  It is very important to allow
   allow bindings like |(f == lam x (dots (apply1 f (x-1)) dots))| to substitute,
