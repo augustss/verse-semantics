@@ -1,21 +1,33 @@
-module Testing(main, test, freshmain, testFRESH, parseFresh, testf) where
+module Testing(main, test) where
 
 import Control.Exception
 import Control.Monad
 import GHC.Stack
-import System.Environment
+import Options.Applicative
+import System.Exit
 
 import Expr
-import Parse
+import Flags
+import Parse hiding (many)
 import Core
-import Print
-import Desugar
+import Print ( prettyShow, pp )
+import Desugar(desugar)
 import Run
-import qualified RulesPLDI
-import qualified TRSCore as T
-import TRS(normalFormsTrace, printTrace)
-import TRSAdapter(coreToTrs)
+
 --------------
+
+data TestFlags = TestFlags
+  { dfs       :: !Bool                -- just find one normal form
+  , popl      :: !Bool                -- use old POPL rules
+  , denSem    :: !Bool                -- evaluate with denotational semantics
+  , split     :: !Bool                -- use split
+  , parse     :: !Bool                -- parse only
+  , simplify  :: !Bool                -- use simplifier
+--  , underLam  :: !Bool                -- reduce under lambda
+  , eval      :: !Bool                -- Use fast evaluator
+  , fileNames :: ![FilePath]          -- input files
+  }
+  deriving (Show)
 
 data Test
   -- Test that two expressions evaluate to the same thing
@@ -43,13 +55,13 @@ readTests fn = do
 
 ------------
 
-assertEquiv :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO ()
+assertEquiv :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO Bool
 assertEquiv = assertEquiv' True
 
-assertFail :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO ()
+assertFail :: HasCallStack => Flags -> Ident -> Expr -> Expr -> IO Bool
 assertFail = assertEquiv' False
 
-assertEquiv' :: HasCallStack => Bool -> Flags -> Ident -> Expr -> Expr -> IO ()
+assertEquiv' :: HasCallStack => Bool -> Flags -> Ident -> Expr -> Expr -> IO Bool
 assertEquiv' expectOK flg name p1 p2 = do
     let d1 = desugar p1
     let d2 = desugar p2
@@ -66,6 +78,7 @@ assertEquiv' expectOK flg name p1 p2 = do
       ( if (v1 `equivValue` v2) == expectOK
         then do
             putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
+            pure True
         else do
             if expectOK
               then do
@@ -87,6 +100,7 @@ assertEquiv' expectOK flg name p1 p2 = do
                 --undefined
               else do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
+            pure False
       ) (\e -> do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
@@ -97,6 +111,7 @@ assertEquiv' expectOK flg name p1 p2 = do
             print (e :: SomeException)
             putStrLn ""
             --undefined
+            pure False
       )
 
 -- | Equivalence on values (or stuck expressions)
@@ -109,25 +124,25 @@ equivValue v1 v2 = v1 == v2
 
 --------------
 
-runTest :: Flags -> Test -> IO ()
+runTest :: Flags -> Test -> IO Bool
 runTest flg (TestEvalEq n e1 e2) =
   case n of
     Ident _ "SEq" -> assertEquiv flg n e1 e2
     Ident _ "FEq" -> assertFail flg n e1 e2
     Ident _ s -> error $ "Unknown test type " ++ show s
 
-runTests :: Flags -> [Test] -> IO ()
-runTests flg = mapM_ (runTest flg)
+runTests :: Flags -> [Test] -> IO Bool
+runTests flg ts = and <$> mapM (runTest flg) ts
 
 runTestFile :: Flags -> FilePath -> IO ()
-runTestFile flg = runTests flg <=< readTests
+runTestFile flg fn = do
+  putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags flg
+  ok <- runTests flg =<< readTests fn
+  unless ok $
+    exitWith (ExitFailure 1)
 
-test :: Bool -> IO ()
-test True = runTestFile defaultFlags verseTest
-test False = runTestFile defaultFlags{ fRewrite = True } verseTest
-
-testf :: IO ()
-testf = runTestFile defaultFlags{ fRewrite = True, fSplit = False, fFresh = True } verseTest
+test :: IO ()
+test = runTestFile defaultFlags verseTest
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -137,48 +152,62 @@ ptest fn = do
   if e == e then putStrLn $ "parsed " ++ fn else undefined
   pure ()
 
+testFlags :: Parser TestFlags
+testFlags = TestFlags
+  <$> switch
+      (  long "dfs"
+      <> help "Only find one normal form"
+      )
+  <*> switch
+      (  long "popl"
+      <> help "Use old POPL rules"
+      )
+  <*> switch
+      (  long "densem"
+      <> help "Use dontational semantics"
+      )
+  <*> switch
+      (  long "split"
+      <> help "Use split"
+      )
+  <*> switch
+      (  long "parse"
+      <> help "Just do parsing"
+      )
+  <*> switch
+      (  long "simplify"
+      <> help "Use simplifier"
+      )
+  <*> switch
+      (  long "eval"
+      <> help "Use fast evaluator"
+      )
+  <*> many (argument str (metavar "FILES..."))
+
+
 main :: IO ()
 main = do
-  (flg, fn) <- testArgs
-  runTestFile flg fn
-  ptest test1
+  (justParse, flg, fns) <- testArgs
+  if justParse then
+    mapM_ ptest fns
+   else
+    mapM_ (runTestFile flg) fns
 
-testArgs :: IO (Flags, FilePath)
+testArgs :: IO (Bool, Flags, [FilePath])
 testArgs = do
-  args <- getArgs
-  let (flg, args') =
-        case args of
-          "-"        : r -> (defaultFlags{ fRewrite = True }, r)
-          "-rewrite" : r -> (defaultFlags{ fRewrite = True, fSplit = False, fFresh = False }, r)
-          "-eval"    : r -> (defaultFlags,                    r)
-          "-densem"  : r -> (defaultFlags{ fDenSem  = True, fTimLambda = True, fSplit = False, fSimplify = True }, r)
-          "-fresh"   : r -> (defaultFlags{ fRewrite = True, fSplit = True, fFresh = True }, r)
-          r              -> (defaultFlags,                    r)
-  let fn =
-        case args' of
-          [] ->  verseTest
-          [s] -> s
-          _ -> error $ "Usage: tests [-rewrite|-densem|-eval|-fresh] [file]"
-  pure (flg, fn)
+  t <- execParser $ info (testFlags <**> helper)
+             ( fullDesc
+            <> progDesc "Test Verse rules"
+            <> header "tests - testing Verse rules"
+             )
+  let flg = defaultFlags{ fSplit = split t, fSimplify = simplify t,
+                          fRewrite = not (eval t), fFresh = not (popl t),
+                          fDenSem = denSem t, fDfs = dfs t }
+      fns = case fileNames t of [] -> [if parse t then test1 else verseTest]; ss -> ss
+  pure (parse t, flg, fns)
 
 verseTest :: FilePath
 verseTest = "tests.versetest"
+
 test1 :: FilePath
 test1     = "test1.verse"
-
--------------
-freshmain :: IO ()
-freshmain = do
-  testFRESH "{(x:int => y:int => x+2*y)[2][3]}"
-
-testFRESH :: String -> IO ()
-testFRESH s = do
-  let e = parseFresh s
-  let trs = normalFormsTrace RulesPLDI.rulesPLDI e
-  mapM_ (\tr -> printTrace tr >> putStrLn"----------") trs
-
-parseFresh :: String -> T.Expr
-parseFresh = coreToTrs . exprToCore flags . desugar . parseDie (pBraces pExprSeq) ""
-  where
-    flags = defaultFlags{ fRewrite = True, fSplit = False, fTrace = True, fFresh = True }
-------

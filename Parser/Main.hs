@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
-module Main(main, test, testr) where
+module Main(main, test) where
 import Control.Exception
 import Control.Monad
 import Data.List
@@ -33,10 +33,7 @@ tryIt iob aiob ioa = do
 -------------------
 
 test :: IO ()
-test = Testing.test True
-
-testr :: IO ()
-testr = Testing.test False
+test = Testing.test
 
 main :: IO ()
 main = runCommand command

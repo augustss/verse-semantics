@@ -1,7 +1,7 @@
 cabal-version:       2.2
 name:                verse
 version:             0.1.0.0
-synopsis:            verse reference implementation
+synopsis:            Verse reference implementation
 license:             MIT
 author:              Lennart Augustsson
 maintainer:          lennart.augustsson@epicgames.com
@@ -19,6 +19,7 @@ common shared-properties
                        haskeline,
                        containers,
                        megaparsec,
+                       optparse-applicative,
                        scientific,
                        QuickCheck
 
