@@ -252,8 +252,9 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \begin{figure}
 % \judgementHead{Wellformedness of Results}{\wf{r}}
 
-\fbox{\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}}
 \begin{mathpar}
+\fbox{\wff{\Gamma}{|e_1|}{|xs|}{|cs|}{|e_2|}}
+
 \inferrule
   { }
   { \wff{\Gamma}{|e|}{\emptyset}{\emptyset}{|e|} }
@@ -263,7 +264,6 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 %   { x \in \Gamma }
 %  {\wff{\Gamma}{|x == v|}{\emptyset}{|x == v|}{|x|}}
 %  {\rulename{WF-Eq-Val}}
-
 \\
 \inferrule
   { \wff{\Gamma, x}{e_1}{|xs|}{|cs|}{|e_2|} \\
