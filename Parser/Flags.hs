@@ -11,6 +11,7 @@ data Flags = Flags
   , fDenSem       :: !Bool
   , fDfs          :: !Bool
   , fLatex        :: !Bool
+  , fFinalInline  :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -28,6 +29,7 @@ defaultFlags = Flags
   , fDenSem       = False
   , fDfs          = False
   , fLatex        = False
+  , fFinalInline  = True
   , fRewriteSteps = 25000
   , fEvalSteps    = 1000
   }

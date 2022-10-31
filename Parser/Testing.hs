@@ -26,6 +26,7 @@ data TestFlags = TestFlags
 --  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
+  , noInline  :: !Bool                -- No final inlining
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -147,7 +148,7 @@ runTestFile tflg fn = do
 
 test :: IO ()
 test = runTestFile tflg verseTest
-  where tflg = TestFlags { dfs=False, popl=False, denSem=False, split=True
+  where tflg = TestFlags { dfs=False, popl=False, denSem=False, split=True, noInline = False
                          , parse=False, simplify=False, eval=False, quiet=False, fileNames=[] }
 
 -- Just parse
@@ -192,13 +193,17 @@ testFlags = TestFlags
       (  long "quiet"
       <> help "Be less noisy"
       )
+  <*> switch
+      (  long "no-final-inline"
+      <> help "Do not do final normalization"
+      )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t), fFresh = not (popl t),
-                fDenSem = denSem t, fDfs = dfs t }
+                fDenSem = denSem t, fDfs = dfs t, fFinalInline = not (noInline t) }
 main :: IO ()
 main = do
   tflg <- testArgs

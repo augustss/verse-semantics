@@ -43,7 +43,7 @@ ds flg
 
 subs :: Flags -> [Trace T.Expr] -> [Trace T.Expr]
 subs flg ts
-  | fFresh flg =
+  | fFinalInline flg && fFresh flg =
     let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = RulesPLDI.finalSubst e]
         ts'' = nubBy ((==) `on` fst) ts'
     in  map snd ts''
