@@ -7,7 +7,7 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
-import Data.Maybe( maybeToList, fromMaybe )
+import Data.Maybe( maybeToList )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
@@ -610,7 +610,8 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
     inline bs v | isGnd v = v
                 | otherwise = inline bs (inl v)
       where
-        inl (Var x) = fromMaybe undefined $ lookup x bs
+        inl (Var x) | Just v@VARR{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
+                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
