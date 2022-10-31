@@ -597,7 +597,6 @@ dsFreshFP = ds
         e1' = ds e1
         e2' = ds e2
 
-    -- XXX Allows nested tuples.  Maybe this is ok?
     dsv (VLAM x e) = VLAM x (ds e)
     dsv v = v
 
@@ -699,10 +698,8 @@ rulesAllFP lhs =
          choiceRes (e :|: es) | [r] <- wfRes e = [ r : rs | rs <- choiceRes es ]
          choiceRes _ = []
      rs <- choiceRes es
-     let r@(is, es, vs) = mkRess rs
-         ys = take (length vs) (identsNotIn (free r))
-         b = mkRes ys (zipWith (\ y v -> VAR y :=: Val v) ys vs) (ARR (map Var ys))
-     pure (mkRes is es b)
+     let (is, es, vs) = mkRess rs
+     pure (mkRes is es (ARR vs))
 {-
  ++
   "ALL-VAL" `name`
