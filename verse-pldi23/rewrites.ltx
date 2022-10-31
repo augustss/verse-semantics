@@ -106,8 +106,9 @@ $$
     \textit{Heap Values}   & h     & ::= & |tup (v_1, dots, v_n)| \vb |lam x e| \\
     \textit{Head Values}   & |hnf| & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
-    \textit{Expressions}   & e     & ::= & |v| \vb |e_1 ; e_2| \vb |def x e| \vb |v == e| \vb |fail| 
+    \textit{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
                                              \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+                           & eu     & ::= & |e| \vb |v == e| \\
 %     \textit{Sequences}     & |se|  & ::= & v \vb |e ; se| \\
     \textit{Programs}      & p     & ::= & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \textit{Bindings}      & c     & ::= & |x = v| \\
@@ -130,7 +131,7 @@ $$
       |apply1N e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1N f a)|  & |f,a|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
-      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2)|       & |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
       |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
 
@@ -221,16 +222,16 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \begin{longtable}{@@{\quad} l r >{$}c<{$} l l}
 \rulegroupname{Normalization:~\rcon}
 \rulename{norm-val}       & |v ; e|               & \movesto & |e|                   & \\
-\rulename{norm-seq-assoc} & |(e_1 ; e_2) ; e_3|   & \movesto & |e_1 ; (e_2 ; e_3)|    & \\
-\rulename{norm-seq-swap1} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & if |e_1| not of form |x' == v'|\\
-\rulename{norm-seq-swap2} & |e_1 ; (x = s; e_2)|    & \movesto & |x == s; (e_1; e_2)|     & if |e_1| not of form |x' == s'|\\
-\rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
-\rulename{norm-eq-swap}   & |hnf == x|            & \movesto & |x == hnf|            & \\
+\rulename{norm-seq-assoc} & |(eu ; e_1) ; e_2|   & \movesto & |eu ; (e_1 ; e_2)|    & \\
+\rulename{norm-seq-swap1} & |eu ; (x = v; e)|    & \movesto & |x == v; (eu; e)|     & if |eu| not of form |x' == v'|\\
+\rulename{norm-seq-swap2} & |eu ; (x = s; e)|    & \movesto & |x == s; (eu; e)|     & if |eu| not of form |x' == s'|\\
+% \rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
+\rulename{norm-eq-swap}   & |hnf == x; e|            & \movesto & |x == hnf; e|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
-\rulename{norm-seq-defl}  & |e_1 ; (def x e_2)|   & \movesto & |def x (e_1 ; e_2)|    & if $|x| \not \in \freevars{|e_1|}$\\
-\rulename{norm-defr}      & |v == (def y e)|      & \movesto & |def y ((v == e))|   & if $|y| \not \in \freevars{|v|}$ \\
-\rulename{norm-seqr}      & |v == (e_1 ; e_2)|    & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{norm-unifyr}    & |v_1 == (v_2 == e)|   & \movesto & |def x (x == v_1; x == v_2; x == e)|   & $|x|$ fresh \\[0.05in]
+\rulename{norm-seq-defl}  & |eu ; (def x e)|   & \movesto & |def x (eu ; e)|    & if $|x| \not \in \freevars{|eu|}$\\
+\rulename{norm-defr}      & |v == (def y e_1); e_2|      & \movesto & |def y (v == e_1; e_2)|   & if $|y| \not \in \freevars{|v,e_2|}$ \\
+\rulename{norm-seqr}      & |v == (eu ; e_1); e_2|    & \movesto & |eu ; (v == e_1); e_2| \\
+% \rulename{norm-unifyr}    & |v_1 == (v_2 == e_1); e_2|   & \movesto & |def x (x == v_1; x == v_2; x == e_1; e_2)|   & $|x|$ fresh \\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}
 \rulename{fail-seql}      & |fail ; e|            & \movesto & |fail| \\
@@ -258,10 +259,10 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
   { \wff{\Gamma}{|e|}{\emptyset}{\emptyset}{|e|} }
   { \rulename{WF-Exp}}
 
-\inferrule
-  { x \in \Gamma }
-  {\wff{\Gamma}{|x == v|}{\emptyset}{|x == v|}{|x|}}
-  {\rulename{WF-Eq-Val}}
+% \inferrule
+%   { x \in \Gamma }
+%  {\wff{\Gamma}{|x == v|}{\emptyset}{|x == v|}{|x|}}
+%  {\rulename{WF-Eq-Val}}
 
 \\
 \inferrule

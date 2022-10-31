@@ -248,7 +248,7 @@
 %format e_y
 %format e_i
 
-
+%format eu = "eu"
 
 %format h_1
 %format h_2
