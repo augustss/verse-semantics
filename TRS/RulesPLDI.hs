@@ -575,29 +575,35 @@ isVal (Val _) = True
 isVal _       = False
 
 dsFreshFP :: Expr -> Expr
-dsFreshFP = ds
+dsFreshFP = ds'
   where
     ds (Val v)      = Val (dsv v)
     ds (ex :=: ex') = dsEqu ex ex'
-    ds (ex :>: ex') = ds ex :>: ds ex'
-    ds (ex :|: ex') = ds ex :|: ds ex'
+    ds (ex :>: ex') = ds ex :>: ds' ex'
+    ds (ex :|: ex') = ds' ex :|: ds' ex'
     ds (vx :@: vx') = dsv vx :@: dsv vx'
-    ds (DEF x e)    = DEF x (ds e)
-    ds (One ex)     = One (ds ex)
-    ds (All ex)     = All (ds ex)
-    ds (Split e f g)= Split (ds e) (dsv f) (dsv g)
+    ds (DEF x e)    = DEF x (ds' e)
+    ds (One ex)     = One (ds' ex)
+    ds (All ex)     = All (ds' ex)
+    ds (Split e f g)= Split (ds' e) (dsv f) (dsv g)
     ds e = e
+
+    -- Make sure :=: not last
+    ds' e =
+      case ds e of
+        c@(v :=: _) -> c :>: v
+        e' -> e'
 
     dsEqu e1 e2
       | isVal e1  = e1 :=: e2'
       | isVal e2  = e2 :=: e1'
-      | otherwise = DEF x ((VAR x :=: e1') :>: (VAR x :=: e2'))
+      | otherwise = DEF x ((VAR x :=: e1' :>: VAR x) :>: (VAR x :=: e2' :>: VAR x))
       where
         x   = identNotIn (free [e1', e2'])
-        e1' = ds e1
-        e2' = ds e2
+        e1' = ds' e1
+        e2' = ds' e2
 
-    dsv (VLAM x e) = VLAM x (ds e)
+    dsv (VLAM x e) = VLAM x (ds' e)
     dsv v = v
 
 -- Make all substitutions that involve variable free arrays.
@@ -742,10 +748,6 @@ wfRes e = do
 wfResE :: Expr -> [([Ident], [Expr], Expr)]
 wfResE = maybeToList . wf []
   where
-    -- WF-EQ-VAL
-    wf g (c@(VAR x :=: Val{})) = do
-      guard (x `elem` g)
-      pure ([], [c], VAR x)
     -- WF-DEF
     wf g (DEF x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
@@ -836,21 +838,15 @@ rulesNormalization lhs =
      pure (DEF nx (e1 :>: ne2))
  ++
   "NORM-DEFR" `name`
-  do e1 :=: DEF x e2 <- [lhs]
+  do (v1 :=: DEF x e2) :>: e3 <- [lhs]
      let (nx, ne2) =
-           if x `notElem` free e1 then
+           if x `notElem` free (v1, e3) then
              (x, e2)
            else
-             let x' = identNotIn (free [e1, e2])
+             let x' = identNotIn (free [v1, e2, e3])
              in  (x', subst [(x, Var x')] e2)
-     pure (DEF nx (e1 :=: ne2))
+     pure (DEF nx ((v1 :=: ne2) :>: e3))
  ++
   "NORM-SEQR" `name`
-  do v@Val{} :=: (e1 :>: e2) <- [lhs]
-     pure (e1 :>: (v :=: e2))
- ++
-  "NORM-UNIFYR" `name`
-  do v1@Val{} :=: (v2@Val{} :=: e) <- [lhs]
-     let x = identNotIn (free lhs)
-         xe = VAR x
-     pure (DEF x ((xe :=: v1) :>: ((xe :=: v2) :>: (xe :=: e))))
+  do (v@Val{} :=: (e1 :>: e2)) :>: e3 <- [lhs]
+     pure (e1 :>: (v :=: e2) :>: e3)
