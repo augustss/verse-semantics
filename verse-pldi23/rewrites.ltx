@@ -128,12 +128,12 @@ $$
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
-      |apply1N e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1N f a)|  & |f,a|\ \text{fresh} \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
+      |apply1 e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1 f a)|  & |f,a|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
-      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
 
       |if e_1 then e_2 else e_3| & \text{means}
       & |def v (v == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v)| & \text{|v,x| fresh} \\

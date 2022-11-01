@@ -397,7 +397,7 @@ $$
 \movestoR{deref-h}       & |def (x ^^ y ^^ z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
 \movestoR{u-tup}          & |def (x ^^ y ^^ z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
 \movestoRn{deref-s}{2}  & |def (x ^^ y ^^ z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-\movestoR{norm-seq-swap,norm-seq-assoc,norm-swap-eq}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
+\movestoR{norm-seq-assoc,norm-swap-eq}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
 \movestoR{norm-val,elim-def}     & |                                                     2|
 \end{array}
 $$
@@ -417,7 +417,7 @@ It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
 \item \emph{Values.}  A value |v| is either a \emph{scalar value} |s|, which can be freely duplicated,
-  or a \emph{heap value} |h|.  A heap value is a lambda or a tuple; and tuples only have scalar components.
+  or a \emph{heap value} |h|.  A heap value is a lambda or a tuple; and tuples only have value components.
   In \versecalc{} a variable counts as a value, because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
 \item \emph{Built-in functions.}
@@ -426,7 +426,7 @@ some built-in operations and tuples as data constructors:
   introduce the other constructs as we go.
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
-  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
+%%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
 rules in \cref{fig:syntax} show how to desugar general applications |(e_1 e_2)|. This ANF-like
@@ -661,7 +661,7 @@ together with the desugaring for |if| into |oneKW|, we get the ``special propert
 
 \subsection{Tuples and |allKW|} \label{sec:tuple}
 The main data structure in \versecalc{} is the tuple.
-A tuple is a finite sequence of scalars, |tup (s_1,dots,s_n)|.
+A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
 For example, |def t (t = tup (10,27,32); apply1 t 1)| reduces to |27| and |apply1 t 3| reduces to |fail|.
@@ -669,8 +669,8 @@ The reduction rule for indexing in tuples admits multi-valued index expressions.
 For instance, |def t (t = tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1))| reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
-if |e| reduces to |(s_1 `choice` dots `choice` s_n)| then |all e| reduces to
-the tuple |tup (s_1, dots, s_n)|;
+if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to
+the tuple |tup (v_1, dots, v_n)|;
 as a consequence, if $e$ fails, |allKW| produces the empty tuple.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
@@ -708,11 +708,11 @@ in that variables bound in |e_1| also scope over |e_2|.
 So, {\eg}, |for^(def x (x = 2 `choice` 3 `choice` 5)) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
 % This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
 
-Like list comprehension, |for| supports filtering; in Verse this falls out naturally by just using
+Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
 So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(def (x y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
@@ -726,7 +726,7 @@ The full desugaring is
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are in a thunk.
-So, {\eg}, |for^(def x (x==10 `choice` 20)) do {x `choice` x+1}| will reduce to
+So, {\eg}, |for^(x:=10 `choice` 20) do {x `choice` x+1}| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial to use |map|, not |flatMap|.
 
@@ -1028,8 +1028,8 @@ There are several things to notice:
 \begin{itemize}
 \item \rulename{deref-s} fires only when the right-hand side of the unification is a \emph{scalar value} |s|;
   that is, a variable or integer literal. That is because |E| allows the occurrence of |x| to be
-  in places that only syntactically allow scalars. Rule \rulename{defref-h} allows substitution of heap values, but
-  again only in places that syntactically allow such expressions.
+  in places that only syntactically allow scalars. \lennart{Is it really true now that |E| can have places where only scalars are allowed?} Rule \rulename{defref-h} allows substitution of heap values, but
+  again only in places that syntactically allow such expressions; also see \cref{sec:design-confluence}.
 \item Both rules fire only when the RHS is a value, so that the substitution does not risk
   duplicating either work or choices. This
 restriction is precisely the same as the \rulename{let-v} rule of \cite{ariola:call-by-need},
@@ -1482,7 +1482,7 @@ relation, which then implies that the full reduction relation is also confluent.
 % It is possible to prove confluence even for potentially diverging
 % (non-terminating) reductions, most famously, for the $\lambda$-calculus.
 
-\subsection{Design for confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
+\subsection{Design for confluence} \label{sec:design-confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
 
 \versecalc{} is carefully designed to ensure confluence.
 Rule \rulename{deref-h} is particularly important.
@@ -1591,8 +1591,6 @@ In contrast, our rules never pick one side or the other of a choice.
 And yet |(3 + (20 choice 30))| can still make progress, by floating out the
 choice (rule \rulename{choose} in \cref{fig:rewrite-rules}), thus
 |(3+20) choice (3+30)|.
-\lennart{If you want to be picky \rulename{choose} doesn't apply here since we are not in an |SX| context.}
-\simon{Let's not be picky!}
 In effect, \emph{choices are laid out in space} (in
 the syntax of the term), rather than being explored by
 non-deterministic selection.  Rule \rulename{choose} is not a new idea:
