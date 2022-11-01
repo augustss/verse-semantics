@@ -447,12 +447,12 @@ explores some possible alternative design choices.
 \subsection{Logical variables and unification} \label{sec:unify}
 
 The Verse calculus includes first class logical variables and unification:
-you can bring a fresh logical variable into scope with |defKW|; equate two expressions
-with |v == e|; and
-sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax})\footnote{Similar to applications, the shorthand in \cref{fig:syntax}
-  desugars the more general |(e_1 == e_2)| into this simpler form.}.
+you can bring a fresh logical variable into scope with |defKW|; equate a value with an expression
+|v == e|; and sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
-|def x (x=e_1; e_2)| in \versecalc{}.
+|def x (x=e_1; e_2)| in \versecalc{}.  A unification |(v=e)| always equates a \emph{value} to an expression,
+and can only appear to the left of a ``|;|'' (see |ue| in \cref{fig:syntax}).
+Again the deugaring rules rewrite a general equality |e_1 == e_2| into this simpler form.
 
 \emph{A program executes by solving its equations}.
 For example,
@@ -497,7 +497,7 @@ is immaterial for equations.
 For example
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
-consider |def (x ^^ y) (x = 3+y; y = 7; x)|.  In \versecalc{} we can only unify |x| with a \emph{value};
+consider |(def (x ^^ y) (x = 3+y; y = 7; x))|.  In \versecalc{} we can only unify |x| with a \emph{value};
 we will see why in \cref{sec:call-time-choice}. So the equation |x=3+y| is stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
 and that in turn unlocks |x = 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
@@ -1384,13 +1384,6 @@ committing to a particular evaluation strategy.
 %
 But then it had better be the case that no matter how the
 rules are applied, one always obtains the same result!
-\simon{I dropped a distracting sentence here about termination}
-% If the rewrite rules were terminating, then we would expect
-% that all possible execution paths lead to the same normal form.
-% However, since \calcname has recursion, we instead show that
-% the rules are \emph{confluent}.
-
-\subsection{Confluence}
 
 \mypara{Reductions and Confluence}
 %
@@ -1420,7 +1413,9 @@ evaluation strategy \cite{Barendregt}.
 \begin{lemma}[Unicity] \label{lem:nf}
 If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
-\noindent
+
+\subsection{Confluence}
+
 Our main result is that \versecalc{}'s reduction rules are confluent:
 %
 % defined as the union of the reduction relations
@@ -1435,19 +1430,20 @@ Our main result is that \versecalc{}'s reduction rules are confluent:
 % \lennart{It's not confluent without the structural rules.}
 
 \begin{theorem}[Confluence] \label{thm:confluence}
-  The reduction relation defined by the rules in in \cref{fig:rewrite-rules}
-  and \ref{fig:normalization-rules} is confluence
+  The reduction relation defined in \cref{fig:rewrite-rules}
+  and \ref{fig:normalization-rules} is confluent.
 \end{theorem}
 \noindent
-Our proof strategy is to divide the rules into groups,
+\emph{Proof sketch.}  Our proof strategy is to divide the rules into groups,
 named $\runi$, $\rapp$, etc in the Figures, prove confluence for each separately,
 and then prove that their combination is confluent.
 Given two reduction relations $R$ and $S$, we say that $R$ \emph{commutes} with $S$ if for all terms
 $e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
 there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
 %
-Then we can establish confluence by proving each sub-relation is confluent,
-and that they pairwise commute \cite{Huet80}.
+We prove each individual sub-relation is confluent;
+and that they pairwise commute. Then confluence of their union follows,
+using \citet{Huet80}:
 
 \begin{lemma}[Commutativity] \label{lem:comm}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
@@ -1456,27 +1452,26 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 Proving confluence for $\rr$, $\rapp$, $\rcon$, $\rfail$ and $\rgc$ is easy: they
 all satisfy the \emph{diamond property}, namely, that two
 different reduction steps can be joined at a common
-term in a fixed number of steps.  This property can be verified easily by taking critical pairs.
+term \emph{by a single step}.  This property can be verified easily by taking critical pairs.
 Any relation satisfying the diamond property is confluent \cite{Barendregt}.
 
-The unification relation $\runi$ does not satisfy the diamond property, because
-it may need an unbounded number of steps to join the results of two different
+Alas, the unification relation $\runi$ does not satisfy the diamond property, because
+it may need multiple steps to join the results of two different
 one-step reductions.
-To see this, consider the term $x = |arr(s_1,...s_n)|; x = |arr(t_1,...,t_n)|; E[x]$,
-which can be reduced to $e_1$ and $e_2$ by respectively substituting
-the first or second tuple in \rulename{deref-h}, and which must then
-be joined by individually unifying the elements of $E[|arr(s_1,...,s_n)|]$
-and $E[|arr(t_1,...,t_n)|]$ \simon{Not clear.}
+For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); x)|$.
+It can be reduced in one step by substituting |x| in the final equality
+by either |arr(1,y)| or |arr(z,2)|.
+After this it will take multiple steps to join the two terms.
 
-Like several proofs of confluence for the $\lambda$-calculus, 
-our proof of confluence for $\runi$ works as follows: we find 
+Following a well-trodden path in proofs of confluence for the $\lambda$-calculus (e.g. \cite{Barendregt}),
+our proof of confluence for $\runi$ works as follows: we find
 a \emph{sub-relation} that satisfies three properties.
 %
 First, it is \emph{locally} confluent, meaning if $e$ single-steps to $e_1$
 and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
 %
 Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies
-the relation is confluent (and hence, so is its reflexive transitive closure.)
+the relation is confluent; and hence so is its reflexive transitive closure.
 %
 Third, that the \emph{closure} of the sub-relation is the same as the full reduction
 relation, which then implies that the full reduction relation is also confluent.
@@ -1487,17 +1482,17 @@ relation, which then implies that the full reduction relation is also confluent.
 % It is possible to prove confluence even for potentially diverging
 % (non-terminating) reductions, most famously, for the $\lambda$-calculus.
 
-\subsection{Design for confluence} \label{sec:even-odd}
+\subsection{Design for confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
 
 \versecalc{} is carefully designed to ensure confluence.
-Rule \rulename{deref-h} is particularly important,
+Rule \rulename{deref-h} is particularly important.
 It prevents substituting heap values |h| under lambdas and inside tuples; and
-the |A| context only permits substitution in a place where |h| can be \emph{used}, by
+the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
 application or unification.  These restrictions matter for at least three different reasons.
 
-\mypara{Non-confluence due to nested tuples.}
+\mypara{Nested tuples.}
 Our proof strategy for the confluence of $\runi$ requires that $\runi$ terminates.
-But if \rulename{deref-h} substituted inside tuples, or inside lambdas, it doesn't:
+But if \rulename{deref-h} substituted inside tuples, or inside lambdas, it \emph{doesn't} terminate:
 $$
 |def x (x = tup (1,x); x)|
 \; \rightarrow \; |def x (x = tup (1,x); tup (1,x))|
@@ -1506,16 +1501,15 @@ $$
 $$
 Here, each step makes one substitution for |x|. An exactly analogous example can be made
 for a lambda value.
-We avoid this fruitless divergence
-by preventing \rulename{deref-h} from substituting
-tuples under tuples. Instead an equality like |(x==h)| is left as a ``heap-constraint'' which
+We avoid this fruitless divergence by preventing \rulename{deref-h} from substituting
+under tuples or lambdas. Instead an equality like |(x==h)| is left as a ``heap-constraint'' which
 can be used (via \rulename{deref-h}) whenever we actually need to access the contents of the value,
-via pattern matching or indexing; or can be eliminated via the garbage collection rules.
+via unification or appliction; or it can be eliminated via the garbage collection rules.
 
-\mypara{Non-confluence due to the odd/even problem.}
+\mypara{The odd/even problem.}
 Suppose we combined \rulename{deref-s} and \rulename{deref-h} into a
 a single rule that freely substituted \emph{any} value |v| for an occurrence of |x|.  Then we would
-lose confluence, because of mutual recursion:
+lose confluence in the case of mutual recursion:
 $$
 \begin{array}{lcll}
  |def (x,y) (x == tup (1, y); y == lam z x; x)|
@@ -1529,7 +1523,7 @@ $$
 %
 The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
 but cannot be joined by rewrite rules.
-This is a well known problem: an exactly similar phenomenon arises with inlining mutually recursive
+This is a well known problem, and an exactly similar phenomenon arises with inlining mutually recursive
 $\lambda$-terms.
 Examples like this show that \emph{syntactic} confluence is too strong: what we
 really need is that our rewrites rules are \emph{semantics} preserving --- but of course that requires
@@ -1538,204 +1532,38 @@ We restore confluence by restricting \rulename{deref-h},
 but an interesting alternative approach would be to seek a weaker form of confluence, such
 as \emph{skew confluence}~\cite{ariola:skew-confluence}.
 
-\mypara{Non-confluence due to Heap Copying}
-%
-\simon{I think this basically the same as C.1 ``Unifying lambdas''.  Is that right?  I don't see how big-swoop substitution would solve this, so I have not merged the two for now.}
+\mypara{Unifying lambdas.} In \versecalc{} an attempt to unify two
+lambdas fails, even if the lambdas are semantically identical (rule
+\rulename{u-fail}). Why? Because semantic identity of functions is
+un-implementable.
+We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
+Here is an expression that rewrites in two different ways, depending on which equality we \rulename{deref-h} first:
+\[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
+% $$
+% \begin{array}{lll}
+%  \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
+% &    \movesto \{\textit{use \rulename{SUBST} on first equality}\} & |(lam p 1) = (lam q 2); 1| \\
+% OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
+% \end{array}
+% $$
+These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
+lead to |fail|, and confluence is restored.
 
-Finally, notice that we disallow ``copying'' heap values in constraints.
-%
-That is, \rulename{deref-h} does not allow substituting heap values (\eg $x = h$)
-into variable-variable equalities (\eg $y = x$).
-%
-This is because such copying could prevent confluence
-as some reductions might fail while others succeed.
-%
-For example, consider the term $|x == (lam y e); x == y; y == x|$.
-%
-\begin{verbatim}
-      (ex x,y. x = \z. z; y = x; x = y; x) 3
--->   ex f. f = (ex x,y. x = \z. z; y = x; x = y; x); f 3
--->>  ex f,x,y. x = \z. z; y = x; f = x; f 3
--->>  ex f,x,y. x = \z. z; y = x; f = x; x 3
--->>  ex f,x,y. x = \z. z; y = x; f = x; (\z.z) 3
--->>  3
-\end{verbatim}
-%
-However, if we \emph{allow} copying heap values, then the above term could also fail
-%
-\begin{verbatim}
-     (ex x,y. x = \z. z; y = x; x = y; x) 3
--->  (ex x,y. x = \z. z; y = \z.z; x = y; x) 3
--->> (ex x,y. x = \z. z; y = \z.z; \z.z = \z.z; x) 3
--->  FAIL
-\end{verbatim}
-%
-An alternate ``big-step'' strategy that substituted
-identifiers with values \emph{everywhere} they were
-in a single swoop would avoid the above problem, but
-we were unable to prove confluence using such a ``big-step''
-rule.
+There is a very delicate interaction between \rulename{u-fail}
+and the apparently-innocuous
+rule \rulename{u-scalar} (\cref{fig:rewrite-rules}).
+Consider |(def x (x==(lam y y); x==x; 0))|.
+If we apply \rulename{u-scalar}, and then \rulename{deref-h} we get |(lam y y)|. But if we \emph{first}
+apply \rulename{deref-h}, twice, we get |((lam y y) == (lam y y); 0)|, and that fails.  Yikes!
 
+But in fact all is well: the |A| context (\cref{fig:rewrite-rules}) \emph{only
+  allows \rulename{deref-h} to apply in positions where the value is immediately
+  consumed in some way}, by being applied to an argument, or being
+unified with a value.  So in our example, \rulename{deref-h} simply does not apply. Only \rulename{u-scalar} does,
+so we get |(def x (x==(lam y y); x; 0))|.
+Confluence is restored.
+But the ice is thin here, so it is reassuring that we have a proof of confluence.
 
-\begin{comment}
-\section{Confluence and equational theory}
-\label{sec:confluence}
-
-The rules of our rewrite semantics can be applied anywhere, in any order, and they give meaning to programs without committing to a particular evaluation strategy. But then it had better be the case that no matter how the rules are applied, one always obtains the same result!
-
-If the rewrite rules were terminating, then we would expect that all possible execution paths lead to the same normal form. But since {\versecalc} has recursion, we can aim for \emph{confluence} instead: If $e_2 \movesfrom^\ast e_1 \movesto^\ast e_3$, can we find $e_4$ so that $e_2 \movesto^\ast e_4 \movesfrom^\ast e_3$?
-
-Confluence would give us the assurance that we will not get different results when choosing different rules, or get stuck with some rules and not with others.
-
-\subsection{subst {\vs} subst, a critical pair}
-
-The main source for possible non-confluence is rule \rulename{subst}: If we have multiple equations for a variable $x$ available, we can use any of them to rewrite. A typical example would be
-\[ |def x (x=v_1; x=v_2; e)| \]
-which we can rewrite by \rulename{subst} (and administrative \rulename{def-eliml} and \rulename{seq}) to either
-\[ |v_1=v_2; subst e x v_1| \quad \text{or} \quad |v_2=v_1; subst e x v_2|. \]
-Can we still join these two expressions? It seems that the unification rules decompose an equality |v_1 = v_2| completely: Either it reduces to |fail|, which will swallow the whole expression, or to a sequence of equalities with a variable on (at least) one side. Using \rulename{subst} on these equations, we can join the occurrences of $v_1$ resp.\ $v_2$ in |subst e x v_1| resp.\ |subst e x v_2|.
-
-Confluence seems to be within reach? Unfortunately, not quite, as we discuss next.
-
-\subsection{Order of quantifiers, position of equations and variable names}
-\label{sec:confluence-extra}
-
-
-There are some sources of non-confluence that we consider insignificant. For example
-| (def x (x=e_1));(def y (y=e_2)) |
-can be reduced to
-| (def (x ^^ y) (x=e_1;y=e_2)) |
-or
-| (def (y ^^ x) (x=e_1;y=e_2)) |. These are different expressions, but they only differ in the order the variables are listed in |defKW|, and that is not a difference we care about. So we want to consider these expression equivalent. To that end we introduce separate rewrite system $\movestoX$, with rules in \cref{fig:rules-confluence}:
-
-\begin{itemize}
-\item \rulename{def-swap} makes the order of |defKW| irrelevant.
-\item As we do not care about where, within the same $X$-context, an equality is asserted, we allow ourselves to move any such equation to the front of its $X$-context, using \rulename{unify-move}. This rule leaves $v_2$ in place, just like \rulename{def-eliml} does.
-\item In the presence of an equation between two variables, we do not care which of the two variables is mentioned, nor the orientation of that equality, and hence \rulename{var-swap}; else we’d get non-confluence from |def x (x=y;x=z)|, which can reduce to |y=z;z| or to |z=y;y|.
-\item We include rule \rulename{seq} in $\movestoX$, so that we can clean up after \rulename{unify-move}.
-\end{itemize}
-We can now consider two expressions the same up to these administrative differences if they are convertible via |stepX|.
-
-\begin{figure}
-% no space needed around math environments in a figure
-\setlength{\abovedisplayskip}{0pt}%
-\setlength{\belowdisplayskip}{0pt}%
-\[\begin{array}{lr@@{\;}c@@{\;}l}
-    \rulename{def-swap} & |def (x ^^ y) e| & \movestoX & |def (y ^^ x) e|\\
-    \rulename{unify-move} & |X^[v_1=v_2]| & \movestoX & |v_1=v_2;X^[v_2]| \\
-    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
-    \rulename{seq} & |v;e| & \movestoX & |e| \\
-\end{array}\]
-  \caption{Additional rewrite rules to relate equivalent expressions}
-    \label{fig:rules-confluence}
-\end{figure}
-
-\label{sec:conf-move-eqn}
-
-\subsection{Recursion}%
-\label{sec:confluence-and-recursion}
-
-There remains still another source of non-confluence, due to recursion. Depending on whether we apply \rulename{subst} first to |x| or |y| we get these two reductions:
-\[ |tup (1,v_y) <-* def (x ^^ y) (x=tup (1,y); y=(lam z x); x) ->* v_x|\]
-where $|v_y| \equiv |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))|$ and $|v_x| \equiv |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))|$.
-%
-%we can apply \rulename{subst} to $x$ first and obtain the following reduction:
-%\[
-%|-> def y (y=(lam z (tup (1,y))); tup (1,y)) -> def y (y=v_y; tup (1,y)) -> tup (1,v_y)|
-%\]
-%where $|v_y| \equiv |(lam z (def y (y = (lam z (tup (1,y))); tup (1,y))))|$.
-%Alternatively, we can apply \rulename{subst} to |y = (lam z x)| first, and obtain
-%\[
-%| -> def x (x=tup (1,lam z x); x) -> def x (x=v_x; x) -> v_x|
-%\]
-%where $|v_x| \equiv |tup (1,lam z (def x (x = tup (1,(lam z x)); x)))|$.
-
-Can we join |tup (1,v_y)| and |v_x|? Note that $|v_x| \movesto^\ast |tup (1,lam z v_x)|$ and $|v_y| \movesto^\ast |lam z (tup (1, v_y))|$, so we get
-\[
-\begin{array}{c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c@@{\,}c}
-& |tup (1,v_y)| & \movesto^\ast & |tup (1,lam z (tup (1, v_y)))| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z (tup (1, v_y))))))| & \movesto^\ast & \cdots \\
-|v_x|     & \movesto^\ast & |tup (1,lam z v_x)| & \movesto^\ast & |tup (1, lam z (tup (1, (lam z v_x))))| & \movesto^\ast && \cdots
-\end{array}
-\]
-and we find that we \emph{cannot} join them; they keep “missing each other”. The relation $\movesto$ is \emph{not} confluent.
-%
-But notice that as we keep evaluating these fixed points, they produce the same “infinite expression” |tup (1, lam z (tup (1, (lam z dots))))|. Put differently, we can reduce the two expressions be equal up to an arbitrary depth, which is good enough.
-
-\begin{definition}[Depth cutting]
-To make this formal, we define a function on terms and values that removes subexpressions at depth $n$ (measured by counting nested lambdas), defined by
-$|cut 0 e| \coloneqq |fail|$, $|cut (n+1) (lam x e)| \coloneqq |(lam x (cut n e))|$ and compositionally otherwise.
-%When we need to write the function as a relation, we use |cutr n|.
-The relation |cute n| is the equivalence relation defined by |cute' n e_1 e_2| iff |cut n e_1 === cut n e_2|.
-\end{definition}
-
-Clearly for every $n \in \mathbb N$ we can find |e_1| and |e_2| so that |tup (1,v_y) ->* e_1 `cuten` e_2 <-* v_x| and this is the notion of confluence we aim for.
-
-\subsection{Confluence}
-
-So although |->| is not confluent on its own, we can say that it is confluent up to |stepX| and |cute n|:
-
-\begin{definition}
-We consider |e_1| and |e_2| to be \emph{joinable}, written |e_1 ~ e_2|, if for every $n \in \mathbb N$ there exist |e_3|, |e_4|, |e_5| and |e_6| so that
-\[
-|e_1 ->* e_3 stepXs e_4 `cuten` e_5 stepXrs e_6 <-* e_2|.
-\]
-\end{definition}
-
-\begin{proposition}[Confluence]
-\label{thm:confluence}%
-For all |e_2 <-* e_1 ->* e_3| we have |e_2 ~ e_3|.
-\end{proposition}
-
-In general, confluence up to an equivalence relation is not necessarily the same as Church-Rosser up-to-an equivalence relation. For \versecalc, we believe both hold:
-
-\begin{proposition}[Church-Rosser]
-\label{thm:church-rosser}%
-|e_1 <-> e_2| implies |e_1 ~ e_2|.
-\end{proposition}
-
-Because {\versecalc} is non-terminating, confluence does not simply follow from local confluence ({\ie}, |e_2 <- e_1 -> e_3| $\implies$ |e_2 ~ e_3|), and requires a more involved proof, which is still work in progress.
-%(see \cref{sec:confluence-proof-plan} for a high-level proof plan).
-%
-We have, however, reasons to be optimistic: our incomplete proof
-effort has already helped us root out various forms of unwanted
-non-confluence. Moreover, we have an implementation of the complete
-reduction semantics in Haskell and we are using property-based testing
-with QuickCheck \citep{quickcheck} to search for non-confluence.
-
-\subsection{Equational theory}
-
-The relation |~| gives rise to an equational theory for {\versecalc}. Assuming our confluence conjecture holds, it is a congruent equivalence relation and and contains all reductions. Furthermore, we expect that this equivalence is respected by substitution,
-\[ |e_1 ~ e_2| \text{ implies }  |subst e_1 x v ~ subst e_2 x v|, \]
-allows equational reasoning with local equations,
-\[ |v_1 = v_2;(subst e x v_1) ~ v_1 = v_2;(subst e x v_2)|, \]
-and even allows rewriting with a local equation within that equation's right-hand side,
-\[ |v_1=(subst v_2 x v_1) ~ v_1=(subst v_2 x (subst v_2 x v_1))|. \]
-
-The joinability relation |~| is still weaker than \emph{contextual equivalence}, which relates expressions that are observably indistinguishable, even if they are not directly joinable. One possible definition of contextual equivalence is that $e_1$ and $e_2$ are contextually equivalent, written |e_1 ~= e_3|, if for all closing contexts $C$, if $C[e_1] \movesto^\ast |fail|$ then $C[e_2] \movesto^\ast |fail|$. We expect that |~=| not only contains |~|, but admits additional useful equations, such as the commutativity of sequencing
-(|(e_1; e_2); e_3 ~= e_1; (e_2; e_3)|),
-naming of subexpressions
-(|e ~= (def x (x = e; x))| if $x \notin\freevars{e}$),
-and the removal of repeated choice-free expressions
-(|(ce;ce) ~= ce|).  The development of this theory is future work.
-
-\subsection{Fixed points}
-
-To conclude this section on metatheory, let use have a closer look at \rulename{subst-rec}, and consider an equation |x = v| that is not failed by the occurs check, {\ie}, |x| may occur in |v|, but only under lambda. Here, \rulename{subst-rec} changes of \emph{some} |(lam y e)| in |v|, not nested under another lambda and with $x\in\freevars{e}$, to |(lam y (def x (x=v;e)))|. Let |(mu x v)| denote the expression where we do this to \emph{every} such lambda simultaneously. This is not quite the same expression that we get by applying \rulename{subst-rec} exhaustively, as that may also affect lambdas nested more deeply, but they are joinable, {\ie}, |x = v ~ x = (mu x v)|.
-%
-This expression behaves much as one would expect from a fixed-point operator:
-\begin{itemize}
-\item $\freevars{|mu x v|} = \freevars v \setminus \{x\}$
-\item If $x \notin \freevars{v}$ then $|(mu x v) === v|$.
-\item The fixpoint can be unrolled: |mu x v ~ subst v x ((mu x v))|.
-\end{itemize}
-
-In the example from \cref{sec:confluence-and-recursion}, we find |v_y === (mu y (lam x (tup(1,y))))| and |v_x === (mu x (tup(1,(lam y x))))| and we can join |tup(1,v_y) ~ v_x| using a general lemma about partially unrolling a fixed point:
-\[
-|mu x(subst v_1 y v_2) ~ subst v_1 y ((mu y (subst v_2 x v_1)))| \quad \text{if } x \notin \freevars{v_1}, y \notin\freevars{v_2}.
-\]
-
-It is satisfying that in {\versecalc} a form of fixed-point operator emerges, without us having to add it explicitly to the syntax of values. In particular, because |(mu x v)| and |v| look the same until you peek under a lambda, we do not need rules dedicated to unrolling |(mu x v)| in equations or applications. The design choice to allow recursion through lambdas, but not recursive (co-inductive) data structures, plays a role here.
-\end{comment}
 
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
@@ -2065,37 +1893,6 @@ $$
 In a calculus like \versecalc{} there is room for many design variations.
 We discuss some of them here.
 
-\subsection{Unifying lambdas} \label{sec:unifying-lambda}
-
-In \versecalc{} we say that any attempt to unify two lambdas (or primitive operations) fails---even if the
-lambdas are semantically identical.  The problem, obviously, is that it is hard
-to tell if they \emph{are} semantically identical.
-
-We cannot say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that rewrites in two different ways, depending on which equality we \rulename{deref-h} first:
-\[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
-% $$
-% \begin{array}{lll}
-%  \multicolumn{3}{l}{|def x (x = (lam p 1); x = (lam q 2); x emptytup)|} \\
-% &    \movesto \{\textit{use \rulename{SUBST} on first equality}\} & |(lam p 1) = (lam q 2); 1| \\
-% OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) = (lam p 1); 2|
-% \end{array}
-% $$
-These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
-lead to |fail|, and confluence is restored.
-
-There is a very delicate interaction with the apparently-innocuous
-rule \rulename{u-scalar} (\cref{fig:rewrite-rules}).
-Consider |(def x (x==(lam y y); x==x))|.
-If we apply \rulename{u-scalar}, and then \rulename{deref-h} we get |(lam y y)|. But if we \emph{first}
-apply \rulename{deref-h}, twice, we get |((lam y y) == (lam y y))|, and that fails.  Yikes!
-
-But in fact all is well: the |A| context (\cref{fig:rewrite-rules}) \emph{only
-  allows \rulename{deref-h} to apply in positions where the value is immediately
-  consumed in some way}, by being applied to an argument, or being
-unified with a value.  So in our example, \rulename{deref-h} simply does not apply. Only \rulename{u-scalar} does,
-so we get |(def x (x==(lam y y); x))| and that's it.  Confluence is restored.
-But the ice is thin here, so it is reassuring that we have a proof of confluence.
 
 % JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
 
