@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 module RulesPLDI(rulesPLDI, dsFreshFP, finalSubst) where
 
@@ -243,6 +244,17 @@ rulesUnificationNoOcc lhs =
 -- Equal values
 -- x=x, k=k
   "U-SCALAR" `name`
+#if USE_UE
+  do (SCL s1 :=: SCL s2) :>: e <- [lhs]
+     guard (s1 == s2)
+     pure e
+ ++
+-- tuple=tuple
+  "U-TUP" `name`
+  do (ARR ss :=: ARR ss') :>: e <- [lhs]
+     guard (length ss == length ss')
+     pure (foldr (:>:) e [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+#else
   do v@(SCL s1) :=: SCL s2 <- [lhs]
      guard (s1 == s2)
      pure v
@@ -252,6 +264,7 @@ rulesUnificationNoOcc lhs =
   do v@(ARR ss) :=: ARR ss' <- [lhs]
      guard (length ss == length ss')
      pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+#endif
 {-
  ++
   "U-FAIL-OP-OP" `name`
