@@ -609,7 +609,7 @@ dsFreshFP = ds'
 
     dsEqu e1 e2
       | isVal e1  = e1 :=: e2'
-      | isVal e2  = e2 :=: e1'
+--x      | isVal e2  = e2 :=: e1'
       | otherwise = DEF x ((VAR x :=: e1' :>: VAR x) :>: (VAR x :=: e2' :>: VAR x))
       where
         x   = identNotIn (free [e1', e2'])
