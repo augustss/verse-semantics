@@ -8,9 +8,15 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
-import Data.Maybe( maybeToList )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
+
+-- Use ue in unification rules
+-- #define USE_UE 1
+-- Use the DEREF-K
+-- #define USE_DEREF_K 1
+-- Use the correct (very slow) definition of WF
+#define USE_CORRECT_WF 1
 
 implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
@@ -413,6 +419,7 @@ simpleCst xs bs e =
 
 -}
 
+#if USE_DEREF_K
 derefB :: Expr -> Ident -> [VContext]
 derefB lhs xx =
    do VAR x <- [lhs]
@@ -427,6 +434,7 @@ derefB lhs xx =
       guard (x /= xx)
       ctx <- derefB e xx
       pure (Def . Bind x . ctx)
+#endif
 
 derefA :: Expr -> Ident -> [VContext]
 derefA lhs xx =
@@ -664,11 +672,13 @@ rulesDerefFP lhs =
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
      ctx <- derefA e x
      pure (xh :>: plug ctx (HNF h))
+#if USE_DEREF_K
  ++
   "DEREF-K" `name`
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
      ctx <- derefB e x
      pure (xh :>: plug ctx (HNF h))
+#endif
 
 rulesFailFP :: ERule
 rulesFailFP lhs =
@@ -757,31 +767,36 @@ wfRes e = do
   (is, es, Val v) <- wfResE e
   pure (is, es, v)
 
- -- 0 or 1 result
 wfResE :: Expr -> [([Ident], [Expr], Expr)]
-wfResE = maybeToList . wf []
+wfResE = wf []
   where
     -- WF-DEF
-    wf g (DEF x e1) = do
+    wf g e@(DEF x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
-      pure (x:xs, cs, e2)
+      [   (x:xs, cs, e2)
+#if USE_CORRECT_WF
+        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+#endif
+        ]
     -- WF-EQ
-    wf g (c@(VAR x :=: Val h) :>: e1) = do
+    wf g e@(c@(VAR x :=: Val h) :>: e1) = do
       guard (h /= Var x)                                -- eliminate x=x before WFF
       guard (isS h `implies` (x `notElem` free e1))     -- subst scalars before WFF
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
-      pure (xs, c:cs, e2)
+      [   (xs, c:cs, e2)
+#if USE_CORRECT_WF
+        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+#endif
+        ]
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
-    -- For now, just be eager, i.e., do the above first.
+    -- With USE_CORRECT_WF we explore all possibilites,
+    -- without we eagerly consume DEF and :=:.
     wf g e = do
       pure ([], [], e)
-
-    -- Not WF
---    wf _ _ = Nothing
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
 mkRes is es r = foldr (\ i e -> DEF i e) r' is
