@@ -21,11 +21,14 @@ name s as = [(s,a) | a <- as]
 class Rec t where
   rec :: Rule t -> Rule t
 
+  norm :: t -> t
+  norm t = t
+
 step1 :: Rec a => Rule a -> a -> Maybe a
 step1 rule t =
   case rec rule t of
-    (_,t') : _ -> Just t'
-    _           -> Nothing
+    (_,t') : _ -> Just (norm t')
+    _          -> Nothing
 
 steps :: Rec a => Rule a -> a -> [a]
 steps rule t = t : case step1 rule t of
@@ -33,7 +36,7 @@ steps rule t = t : case step1 rule t of
                      Just t' -> steps rule t'
 
 step :: (Ord a, Rec a) => Rule a -> Rule a
-step rule t = nub (rec rule t)
+step rule t = nub [ (n,norm t) | (n,t) <- rec rule t ]
 
 normalForms :: (Show a, Ord a, Rec a) => Rule a -> a -> [(String, a)]
 normalForms rule t = normalFormsFuel (-1) rule t

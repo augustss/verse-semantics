@@ -227,7 +227,7 @@ pattern CONS    = HNF (Op Cons)
 instance Rec Expr where
   rec r e =
     r e ++
-    struct e ++
+    structMatch r e ++
     case e of
       a :=: b ->
            [ (n, a' :=: b)  | (n,a') <- rec r a ]
@@ -259,29 +259,6 @@ instance Rec Expr where
         ++ [ (n, Split a f g') | (n,g') <- vrec r g ]
       _     -> []
    where
-    -- structural rules
-    struct (Def (Bind x e)) =
-      [ (n,ctx xe')
-      | (ctx,e') <- structDefs e
-      , (n,xe') <- r (Def (Bind x e'))
-      ]
-     where
-      structDefs (Def (Bind y e)) = (Def . Bind y, e)
-                                  : [ (Def . Bind y . ctx, e') | (ctx,e') <- structDefs e ]
-      structDefs _                = []
-   
-    struct ((Val v1 :=: e1) :>: e) =
-      [ (n,ctx ve')
-      | (ctx,e') <- structSeqs e
-      , (n,ve') <- r ((Val v1 :=: e1) :>: e')
-      ]
-     where
-      structSeqs ((Val v1 :=: e1) :>: e) = (((Val v1 :=: e1) :>:), e)
-                                         : [(((Val v1 :=: e1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
-      structSeqs _                = []
-
-    struct _ = []
-   
     -- recursively rewrite expressions in values
     vrec r (Var x) = []
     vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
@@ -294,43 +271,52 @@ instance Rec Expr where
     hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
     hrec r _                = []
 
-{-
-  rec r (Split e f g) = [ (n,Split e' f g) | (n,e') <- r e ]
+  norm = structNorm
 
+-- structural rules
+-- every structural rule is implemented in 2 parts:
+-- 1. make sure everything matches correctly
+-- 2. make sure terms are "normalized" w.r.t. the rules
 
-
-recAssoc :: (Expr -> [Expr]) -> Expr -> [Expr]
-recAssoc r e =
-     [ a' :=: b  | a :=: b <- es, a' <- r a ]
-  ++ [ a  :=: b' | a :=: b <- es, b' <- r b ]
-  ++ [ a' :>: b  | a :>: b <- es, a' <- r a ]
-  ++ [ a  :>: b' | a :>: b <- es, b' <- r b ]
-  ++ [ a' :|: b  | a :|: b <- es, a' <- r a ]
-  ++ [ a  :|: b' | a :|: b <- es, b' <- r b ]
+structMatch :: Rule Expr -> Rule Expr
+structMatch r = struct
  where
-  es = assoc e
+  struct (Def (Bind x e)) =
+    [ (n,ctx xe')
+    | (ctx,e') <- structDefs e
+    , (n,xe') <- r (Def (Bind x e'))
+    ]
+   where
+    structDefs (Def (Bind y e)) = (Def . Bind y, e)
+                                : [ (Def . Bind y . ctx, e') | (ctx,e') <- structDefs e ]
+    structDefs _                = []
+ 
+  struct ((VAR x1 :=: Val v1) :>: e) =
+    [ (n,ctx ve')
+    | (ctx,e') <- structSeqs e
+    , (n,ve') <- r ((VAR x1 :=: Val v1) :>: e')
+    ]
+   where
+    structSeqs ((VAR x1 :=: Val v1) :>: e) =
+        (((VAR x1 :=: Val v1) :>:), e)
+      : [(((VAR x1 :=: Val v1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
+    structSeqs _ = []
 
--- normalizes associative operators on top-level
-norm :: Expr -> Expr
-norm ((a :=: b) :=: c) = norm (a :=: (b :=: c))
-norm ((a :>: b) :>: c) = norm (a :>: (b :>: c))
-norm ((a :|: b) :|: c) = norm (a :|: (b :|: c))
-norm (a :=: b)         = a :=: norm b
-norm (a :>: b)         = a :>: norm b
-norm (a :|: b)         = a :|: norm b
-norm a                 = a
+  struct _ = []
 
--- mangles associative operators on top-level
-assocs :: Expr -> [Expr]
-assocs e@(a :=: (b :=: c)) = e : assocs ((a :=: b) :=: c)
-assocs e@(a :>: (b :>: c)) = e : assocs ((a :>: b) :>: c)
-assocs e@(a :|: (b :|: c)) = e : assocs ((a :|: b) :|: c)
-assocs e                   = [e]
+structNorm :: Expr -> Expr
+structNorm e =
+  case normalForms (rec rules) e of
+    []       -> e
+    (_,e'):_ -> e'
+ where
+  rules (Def (Bind x (Def (Bind y e)))) | x > y =
+    [ ("SWAP-C", Def (Bind y (Def (Bind x e)))) ]
 
--- matcher to use for associative operators on top-level
-assoc :: Expr -> [Expr]
-assoc = assocs . norm
--}
+  rules ((VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e)) | (x1,v1) > (x2,v2) =
+    [ ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e)) ]
+
+  rules _ = []
 
 --------------------------------------------------------------------------------
 
