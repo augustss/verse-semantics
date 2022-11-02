@@ -156,7 +156,7 @@ $$
 \newcommand{\figureRewriteRules}{
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Expression context}     & E  & ::= & \hole \vb |tup (v_1, dots , hole , dots, v_n)| \vb |lam x E| \vb |def x E| 
+\textit{Expression context}     & E  & ::= & \hole \vb |tup (v_1, dots , E , dots, v_n)| \vb |lam x E| \vb |def x E| 
                                               \vb |E == e| \vb |e == E| \\
                                 &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
                                        \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\

@@ -16,10 +16,13 @@ import Data.List --( sort, find, union, (\\), delete, intersect )
 -- Use the DEREF-K
 -- #define USE_DEREF_K 1
 -- Use the correct (very slow) definition of WF
-#define USE_CORRECT_WF 1
+-- #define USE_CORRECT_WF 1
 
 implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
+
+update :: Int -> a -> [a] -> [a]
+update i v vs = take i vs ++ [v] ++ drop (i+1) vs
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -585,9 +588,9 @@ derefV lhs xx =
      pure (VLAM v . ctx)
   ++
   do VARR vs <- [lhs]
-     (i, x) <- [ (i, x) | i <- [0..length vs-1], Var x <- [vs !! i]]
-     guard (x == xx)
-     pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs))
+     (i, v) <- zip [0..] vs
+     ctx <- derefV v xx
+     pure ((\v -> VARR (update i v vs)) . ctx)
 
 {-
   x = s; E [x] ===> x = s; E[s]
@@ -644,11 +647,12 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
-        inl _ = undefined
+        inl v = v -- undefined
     isGnd :: Value -> Bool
     isGnd VINT{} = True
     isGnd (VARR vs) = all isGnd vs
     isGnd VOP{} = True
+    isGnd VLAM{} = True
     isGnd _ = False
 
 ----------------------
@@ -796,7 +800,7 @@ wfResE = wf []
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
     -- With USE_CORRECT_WF we explore all possibilites,
-    -- without we eagerly consume DEF and :=:.
+    -- without it we eagerly consume DEF and :=:.
     wf g e = do
       pure ([], [], e)
 
