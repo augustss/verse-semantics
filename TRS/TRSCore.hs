@@ -425,7 +425,7 @@ arbValue n xs =
 instance Arbitrary Expr where
   arbitrary = sized (`arbExpr` []) -- closed by default
 
-  shrink (Val v)   = [ Val v' | v' <- shrink v ]
+  shrink (Val v)   = [Val v'|v'<-shrink v] ++ [Def bnd|HNF(Lam bnd)<-[v]]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
@@ -476,7 +476,7 @@ arbBind n xs =
            Bind x <$> arbExpr n xs)
   | not (null xs)
   ] ++
-  [ (4, do let x = identNotIn xs
+  [ (4, do let x:_ = filter (`notElem` xs) (map Name ["x","y","z","v","w"] ++ map Prim [1..])
            Bind x <$> arbExpr n (x:xs))
   ]
 
