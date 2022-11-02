@@ -259,13 +259,34 @@ instance Rec Expr where
         ++ [ (n, Split a f g') | (n,g') <- vrec r g ]
       _     -> []
    where
-    struct e = []
+    -- structural rules
+    struct (Def (Bind x e)) =
+      [ (n,ctx xe')
+      | (ctx,e') <- structDefs e
+      , (n,xe') <- r (Def (Bind x e'))
+      ]
+     where
+      structDefs (Def (Bind y e)) = (Def . Bind y, e)
+                                  : [ (Def . Bind y . ctx, e') | (ctx,e') <- structDefs e ]
+      structDefs _                = []
    
-    -- recursive rewrite expressions in values
+    struct ((Val v1 :=: e1) :>: e) =
+      [ (n,ctx ve')
+      | (ctx,e') <- structSeqs e
+      , (n,ve') <- r ((Val v1 :=: e1) :>: e')
+      ]
+     where
+      structSeqs ((Val v1 :=: e1) :>: e) = (((Val v1 :=: e1) :>:), e)
+                                         : [(((Val v1 :=: e1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
+      structSeqs _                = []
+   
+    struct _ = []
+   
+    -- recursively rewrite expressions in values
     vrec r (Var x) = []
     vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
 
-    -- recursive rewrite expressions in HNFs
+    -- recursively rewrite expressions in HNFs
     hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
                               | (i,a) <- [0..] `zip` as
                               , (n,a') <- vrec r a
@@ -458,7 +479,7 @@ arbExpr n xs =
   , (n, Def <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
-  , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
+  -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
   n1 = n-1
