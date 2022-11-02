@@ -227,11 +227,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
 \rulename{norm-seq-swap1} & |eu ; (x = v; e)|    & \movesto & |x == v; (eu; e)|     & if |eu| not of form |x' == v'|\\
 \rulename{norm-seq-swap2} & |eu ; (x = s; e)|    & \movesto & |x == s; (eu; e)|     & if |eu| not of form |x' == s'|\\
 % \rulename{norm-eq}        & |e ; x=v|            & \movesto & |e ; (x=v; x)|            & \\
-\rulename{norm-eq-swap}   & |hnf == x; e|            & \movesto & |x == hnf; e|            & \\
+\rulename{norm-eq-swap}   & |hnf == x|            & \movesto & |x == hnf|            & \\
 \rulename{norm-seq-defr}  & |(def x e_1); e_2|    & \movesto & |def x ((e_1 ; e_2))|    & if $|x| \not \in \freevars{|e_2|}$\\
 \rulename{norm-seq-defl}  & |eu ; (def x e)|   & \movesto & |def x (eu ; e)|    & if $|x| \not \in \freevars{|eu|}$\\
 \rulename{norm-defr}      & |v == (def y e_1); e_2|      & \movesto & |def y (v == e_1; e_2)|   & if $|y| \not \in \freevars{|v,e_2|}$ \\
-\rulename{norm-seqr}      & |v == (eu ; e_1); e_2|    & \movesto & |eu ; (v == e_1); e_2| \\
+\rulename{norm-seqr}      & |v == (eu ; e_1); e_2|    & \movesto & |eu ; v == e_1; e_2| \\
 % \rulename{norm-unifyr}    & |v_1 == (v_2 == e_1); e_2|   & \movesto & |def x (x == v_1; x == v_2; x == e_1; e_2)|   & $|x|$ fresh \\[0.05in]
 
 \rulegroupname{Fail Propagation:~\rfail}

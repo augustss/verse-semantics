@@ -1473,7 +1473,7 @@ Any relation satisfying the diamond property is confluent \cite{Barendregt}.
 Alas, the unification relation $\runi$ does not satisfy the diamond property, because
 it may need multiple steps to join the results of two different
 one-step reductions.
-For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); x)|$.
+For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); 3)|$.
 It can be reduced in one step by substituting |x| in the final equality
 by either |arr(1,y)| or |arr(z,2)|.
 After this it will take multiple steps to join the two terms.
