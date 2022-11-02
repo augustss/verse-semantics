@@ -11,7 +11,7 @@ import Text.Read(readMaybe)
 import Print
 import Desugar
 import Expr
-import Parse
+import Parse(parseDie, pFile)
 import Command
 import Core
 import CoreSimp
@@ -104,6 +104,7 @@ command = Command
       , Cmd "prelude"              "Load prelude.verse"                    cPrelude
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
+      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -210,6 +211,13 @@ cEval :: Run CState
 cEval c s =
   cTransform (Cored . eval flg . compile (flags s)) c s
   where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
+
+cParseCore :: Run CState
+cParseCore line s =
+  tryIt (pure s) (updateLastExpr s . Cored) $ do
+    let prog = parseDie pCore "<interactive>" line
+    pp prog
+    pure prog
 
 cDefEval :: Run CState
 cDefEval c s = do

@@ -2,14 +2,14 @@ module Parse(
   parseDie, pFile,
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
-  pIdent, pExprSeq,
+  pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
   P,
   testp, parseString) where
 
 import Control.Monad
 import qualified Control.Monad.State.Strict as S
 import OpParser
-import Data.Char
+import Data.Char ( isSpace, isPrint, isAlpha )
 import Data.Functor
 import Data.List
 import Data.Maybe

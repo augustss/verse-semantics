@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Desugar(desugar, simplify, primOps, getVisible, covariantId) where
+module Desugar(desugar, simplify, primOps, getVisible, covariantId, simpleDesugar) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 import Data.List
@@ -27,6 +27,10 @@ doTrace = False
 
 desugar :: Expr -> Expr
 desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< addDeref <=< dsD <=< dropParens)
+  where eval = flip evalState 1
+
+simpleDesugar :: Expr -> Expr
+simpleDesugar = eval . (unifyAnfS <=< anfS)
   where eval = flip evalState 1
 
 type D = State Int
@@ -619,6 +623,24 @@ anfS = anf
       (es1, e1') <- value e1
       (es2, e2') <- value e2
       pure $ seqE $ es1 ++ es2 ++ [con e1' e2']
+
+unifyAnfS :: Expr -> D Expr
+unifyAnfS = anf
+  where
+    anf (Unify e1 e2) = uni e1 e2
+    anf e = compos anf e
+    uni e1 e2 | isVal e1 = Unify <$> anf e1 <*> anf e2
+              | otherwise = do
+      i <- newIdent noLoc "x"
+      e1' <- anf e1
+      e2' <- anf e2
+      pure $ seqE $ [Define i e1', Unify (Variable i) e2', Variable i]
+    isVal LitInt{} = True
+    isVal LitRat{} = True
+    isVal Variable{} = True
+    isVal Array{} = True
+    isVal Function{} = True
+    isVal _ = False
 
 ------------
 

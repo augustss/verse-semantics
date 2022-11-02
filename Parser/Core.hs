@@ -19,6 +19,7 @@ module Core(
   alphaConvert, alphaConvertV, alphaConvertH,
   composC, composV, composH,
   composOpC, composOpV, composOpH,
+  pCore,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
@@ -27,13 +28,19 @@ import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
+import Text.Megaparsec(sepBy1, many, eof, choice, some, optional, (<|>))
+-- import Text.Megaparsec.Char(skip)
 
 import Print
 import Expr hiding (compos, composOp)
 import Desugar(primOps, getVisible, covariantId)
 import Error
+    ( unimplemented, impossible, internalError, internalErrorMsg )
 import Flags
 import SExp
+import Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
+import Desugar(simpleDesugar)
+import Misc(pattern Snoc)
 --import Debug.Trace
 
 data Core
@@ -157,7 +164,9 @@ core e@LitRat{} = val e
 core (Wrong s) = pure $ CWrong s
 core e@Variable{} = val e
 core e@Array{} = val e
-core (Seq es) = seqC <$> mapM core es
+core (Seq (Snoc es e)) = seqC <$> mapM core (Snoc (filter p es) e)
+  where p (Define _ AnyT) = False
+        p _ = True
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = --CApplyVV <$> value e1 <*> value e2
                       CApply <$> core e1 <*> core e2
@@ -582,3 +591,70 @@ alphaConvertV vs v =
   case alphaConvert vs (CValue v) of
     CValue v' -> v'
     _ -> impossible ()
+
+-----------------------------------
+
+-- Parse Core
+pCore :: P Core
+pCore = (exprToCore defaultFlags . simpleDesugar) <$> (skip *> pSeq <* eof)
+
+-- XXX pDef, pLam
+-- XXX primops
+
+pExists :: P Expr
+pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
+  where
+    exists :: [Ident] -> Expr -> Expr
+    exists is e = foldr (\ i r -> Seq [Define i AnyT, r]) e is
+    pQuant = pKeyword "exists" <|> pKeyword "ex" <|> pKeyword "E" <|> void (pOp "∃")
+
+pLam :: P Expr
+pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
+  where
+    lam :: [Ident] -> Expr -> Expr
+    lam is e = foldr (\ i r -> Lambda i [] (Array []) r) e is
+    pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\") <|> pKeyword "λ"
+
+pSeq :: P Expr
+pSeq = choice [ pLam, pExists, cons <$> pEqu <*> optional (pOp ";" *> pSeq) ]
+  where
+    cons e Nothing = e
+    cons e (Just e') = seqE [e, e']
+
+pEqu :: P Expr
+pEqu = try (Define <$> (pIdent <* pOp ":=") <*> pChoice)
+       <|>
+       foldr1 Unify <$> sepBy1 pChoice (pOp "=")
+
+pChoice :: P Expr
+pChoice = foldr1 Choice <$> sepBy1 pApply (pOp "|")
+
+pApply :: P Expr
+pApply = do
+  e1 <- pAtom
+  let app f [] = f
+      app f (a:as) = app (ApplyD f a) as
+      pCall :: P Expr
+      pCall = app e1 <$> many (pParens pComma)
+      pBinOp = do i <- pOper; e2 <- pAtom; pure (ApplyD (Variable i) (Array [e1, e2]))
+  pBinOp <|> pCall
+
+pOper :: P Ident
+pOper = choice $ map (\ o -> const (Ident noLoc ("in'" ++ o ++ "'")) <$> pOp o)
+  [ ">", ">=", "<", "<=", "<>", "+", "-", "*", "/" ]
+
+pComma :: P Expr
+pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
+         <|>
+         pSeq
+  where arr x xs = Array (x:xs)
+
+pAtom :: P Expr
+pAtom = choice [pParens pComma, pLiteral, Variable <$> pIdent, pMacro]
+
+pMacro :: P Expr
+pMacro = mac <$> pMacroName <*> pBraces pSeq
+  where
+    mac i@(Ident _ s) e | s `elem` macros = Macro1 i [] e
+    mac i _ = error $ "Unknown macro " ++ prettyShow i
+    macros = ["one", "all", "succeeds", "decides"]
