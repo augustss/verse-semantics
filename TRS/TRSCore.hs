@@ -225,7 +225,9 @@ pattern CONS    = HNF (Op Cons)
 --------------------------------------------------------------------------------
 
 instance Rec Expr where
-  rec r e = r e ++
+  rec r e =
+    r e ++
+    struct e ++
     case e of
       a :=: b ->
            [ (n, a' :=: b)  | (n,a') <- rec r a ]
@@ -257,9 +259,13 @@ instance Rec Expr where
         ++ [ (n, Split a f g') | (n,g') <- vrec r g ]
       _     -> []
    where
+    struct e = []
+   
+    -- recursive rewrite expressions in values
     vrec r (Var x) = []
     vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
 
+    -- recursive rewrite expressions in HNFs
     hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
                               | (i,a) <- [0..] `zip` as
                               , (n,a') <- vrec r a
@@ -396,8 +402,10 @@ arbHNF n xs =
   [ (1, Int `fmap` arbitrary)
   , (1, Op  `fmap` arbitrary)
   , (n, Arr `fmap` listOf (arbValue n2 xs))
+  , (n, Lam `fmap` arbBind n1 xs)
   ]
  where
+  n1 = n-1
   n2 = n `div` 2
 
 ---
