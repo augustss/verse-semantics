@@ -31,9 +31,9 @@ infixl 4 :@:
 
 instance Show Expr where
   showsPrec p (Val v)          = showsPrec p v
-  showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " = " . showsPrec 4 b
+  showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
   showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
-  showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " | " . showsPrec 3 b
+  showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
   showsPrec _ (Def (Bind x a)) = showString "def " . showsPrec 0 x . showString " in {" . showsPrec 0 a . showString "}"
@@ -279,7 +279,7 @@ instance Rec Expr where
       structSeqs ((Val v1 :=: e1) :>: e) = (((Val v1 :=: e1) :>:), e)
                                          : [(((Val v1 :=: e1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
       structSeqs _                = []
-   
+
     struct _ = []
    
     -- recursively rewrite expressions in values
@@ -354,19 +354,6 @@ instance Free HNF where
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
   free _         = []
-
-{-
--- not using the "bind" trick for now
-instance Binding Expr where
-  binders (a :=: b) = binders a ++ binders b
-  binders (a :>: b) = binders a ++ binders b
-  binders (a :|: b) = binders a ++ binders b
-  binders (a :@: b) = binders a ++ binders b
-  binders (Def bnd) = [bnd]
-  binders (One a)   = binders a
-  binders (All a)   = binders a
-  binders _         = []
--}
 
 --------------------------------------------------------------------------------
 
