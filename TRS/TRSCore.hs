@@ -472,8 +472,8 @@ arbExpr n xs =
   [ (1, Val `fmap` arbValue n xs)
   , (1, return Fail) -- maybe not have this?
   -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
-  , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  -- , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
+  , (n, (:>:) <$> arbExprU n2 xs <*> arbExpr n2 xs)
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbValue n2 xs <*> arbValue n2 xs)
   , (n, Def <$> arbBind n1 xs)
@@ -485,6 +485,16 @@ arbExpr n xs =
   n1 = n-1
   n2 = n `div` 2
   n3 = n `div` 3
+
+-- Either an expression or a unification
+arbExprU :: Int -> [Ident] -> Gen Expr
+arbExprU n xs =
+  frequency
+  [ (1, arbExpr n xs)
+  , (1, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
+  ]
+ where
+  n2 = n `div` 2
 
 arbBind :: Int -> [Ident] -> Gen (Bind Expr)
 arbBind n xs =
