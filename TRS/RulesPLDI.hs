@@ -371,8 +371,9 @@ rulesGarbageCollection lhs =
  ++
 -}
   "ELIM-DEF" `name`
-  do e@Def{} <- [lhs]
-     (xs, _, e) <- wfResE e
+  do ee@Def{} <- [lhs]
+     r@(xs, _, e) <- wfResE ee
+     guard (not (null xs))
      guard (null (intersect xs (free e)))
      pure e
 
