@@ -207,6 +207,21 @@
 }
 \email{koen.claessen@@epicgames.com}          %% \email is recommended
 
+\author{Ranjit Jhala}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{ranjit.jhala@@epicgames.com}          %% \email is recommended
+
 \author{Simon Peyton Jones}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
@@ -352,7 +367,7 @@ Like any functional logic language,
   and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
-\item \versecalc{} uses \emph{constructive choice}, meaning that the choice operator behaves
+\item \versecalc{} uses \emph{spatial choice}, meaning that the choice operator behaves
   a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
   This makes \versecalc{} \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic (\cref{sec:deterministic}).
@@ -383,7 +398,7 @@ But then Ariola {\etal}, in a seminal paper, showed how to \emph{reify the heap 
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic programs, that reifies
 logical variables and unification into the term itself,
-and exploits our notion of constructive choice to replace non-deterministic
+and exploits our notion of spatial choice to replace non-deterministic
 search with a (deterministic) tree of successful results.
 % Just like rewriting for the lambda calculus, this semantics
 % gives programmers a set of equivalences with which
@@ -970,7 +985,7 @@ does not capture any variables free in |v|.  If |x| appears free in |v|, just us
 
 In \versecalc{}, tuples behave like (finite) functions, in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works.
-Notice that \rulename{app-tup} does not require the argument to be an integer $k$; instead
+Notice that \rulename{app-tup} does not require the argument to be evaluated to an integer $k$; instead
 the rule works by narrowing.  So the expression |def x (apply1 (tup(2,3,2,7,9)) x = 2; x)|
 does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
@@ -981,15 +996,15 @@ a suspending semantics would be equally easy to express.
 Next we study unification, again in \cref{fig:rewrite-rules}.
 Rules \rulename{u-scalar} and \rulename{u-tup}
 are the standard rules for unification, going back nearly 60 years \cite{robinson:unification}.
-Rule \rulename{u-fail} makes unification fail on two different head-normal forms (see
-\cref{fig:syntax} for the syntax of |hnf|).
 Note that
-\emph{when unification succeeds it yields the common value}; hence |s == s| rewrites
+when unification succeeds it yields the common value; hence |s == s| rewrites
 to |s|\footnote{An alternative choice would
 for unification to yield |emptytup| on success.  It does not make much difference
 either way.}.
-Also note that unification fails if you attempt to unify a
-lambda or a built-in operation with any other value -- see \cref{sec:unifying-lambda}.
+Rule \rulename{u-fail} makes unification fail on two different head-normal forms (see
+\cref{fig:syntax} for the syntax of |hnf|).
+Note in particular that unification fails if you attempt to unify a
+lambda with any other value (including itself) -- see \cref{sec:unifying-lambda}.
 
 % Failure, written |fail|, propagates upwards, as \rulename{fail-def} and \rulename{fail} show.
 % The latter rule makes use of an \emph{execution context}, |X|,
@@ -1260,7 +1275,7 @@ Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rul
 \emph{decompose} choices.
 So choice behaves a bit like a data constructor, or normal form, of the language.
 For this reason we call
-this approach \emph{constructive choice}, in contrast to approaches that eliminate choice by non-deterministically
+this approach \emph{spatial choice}, in contrast to approaches that eliminate choice by non-deterministically
 picking one branch or the other, which immediately gives up confluence.
 
 The rules for |oneKW| and |allKW| expect multiple choices to be
@@ -1306,7 +1321,7 @@ evaluation, everything is eventually evaluated, but functions can run
 before their arguments have a value.
 Consider a function
 call |apply1 f e|.  In \versecalc{} applications are in administrative normal form (ANF),
-so we must actually write |(x=e; apply1 f x)|. This expression will not return a value until
+so we must actually write |def x (x=e; apply1 f x)|. This expression will not return a value until
 |e| reduces to a value: that is, everything is eventually evaluated.  But even so |apply1 f x| can proceed
 to beta reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 
@@ -1812,8 +1827,9 @@ but they are not included here.
   Andy Gordon,
   Michael Hanus,
   Juan Rodr\'iguez Hortal\'a,
-  Ranjit Jhala,
+  John Launchbury,
   Dale Miller,
+  Andy Pitts,
   Niklas R\"ojemo,
   Jaime S\'anches-Hern\'andez.
   and Andrew Scheidecker.

@@ -119,6 +119,7 @@ $$
     \begin{array}[t]{l}
           \text{Infix operators ``|choice|'', ``;'', ``|=|'', and ``>'' are all right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
+          \text{Function application |(v_1 v_2)| is left-associatve, as usual.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
           \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\
