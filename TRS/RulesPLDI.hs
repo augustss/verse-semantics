@@ -651,7 +651,8 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
-        inl v = v -- undefined
+        inl (VLAM x e) = VLAM x (VLAM (Name "_") e :@: Var (Name "[...]")) -- XXX
+        inl _ = undefined
     isGnd :: Value -> Bool
     isGnd VINT{} = True
     isGnd (VARR vs) = all isGnd vs
