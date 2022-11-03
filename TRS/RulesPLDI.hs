@@ -843,11 +843,11 @@ rulesNormalization lhs =
 --     traceM $ "NORM " ++ show (x, v, e1)
      guard valid
      pure (xv :>: (e1 :>: e2))
+{-
  ++
   "NORM-EQ" `name`
   do e :>: c@(VAR x :=: Val{}) <- [lhs]
      pure (e :>: (c :>: VAR x))
-{-
  ++
   "NORM-DEF-EQ" `name`
   do DEF y c@(VAR x :=: Val{}) <- [lhs]
