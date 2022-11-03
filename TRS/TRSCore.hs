@@ -189,6 +189,9 @@ pattern HVAL v <- Val (getH -> Just v)
 pattern SCL :: Value -> Expr
 pattern SCL v <- Val (getS -> Just v)
   where SCL v = Val v
+pattern VHNF :: HNF -> Value
+pattern VHNF v <- (getH -> Just v)
+  where VHNF h = HNF h
 
 getH :: Value -> Maybe HNF
 getH (HNF v@Arr{}) = Just v

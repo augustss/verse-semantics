@@ -650,7 +650,7 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
     inline bs v | isGnd v = v
                 | otherwise = inline bs (inl v)
       where
-        inl (Var x) | Just v@VARR{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
+        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
                     | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
         inl e@VINT{} = e
         inl e@VOP{} = e
