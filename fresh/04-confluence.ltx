@@ -6,7 +6,7 @@
 
 \newcommand{\rdis}{\ensuremath{\rcon \cup \rgc}}
 
-\section{Confluence for \calcname} \label{sec:confluence}
+\section{Confluence of \calcname} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
 Let $\rr$ be the reduction relation defined as $\runi \cup \rapp \cup \rcon \cup \rgc \cup \rfail$,
@@ -65,8 +65,7 @@ The reduction relation $\rr$ is confluent.
 \end{theorem}
 
 \begin{proof}
-First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon$, $\rfail$,
-$\rgc$ and $\rspc$.
+First, we partition $\rr$ into the relations $\runi$, $\rapp$, $\rcon \cup \rgc$, $\rfail$ and $\rspc$.
 %
 Next, we show that each of these relations is confluent and pairwise
 commutative.
