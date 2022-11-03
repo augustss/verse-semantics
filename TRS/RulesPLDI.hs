@@ -399,6 +399,7 @@ existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs bs ee = mkRes xs (map (\ (x, v) -> VAR x :=: v) bs) ee
 
 -- Remove bindings of the form 'x=e' where x occurs nowhere else.
+-- Also remove unused existentials.
 simpleCst :: [Ident] -> [(Ident, Expr)] -> Expr -> [Expr]
 simpleCst xs bs e =
   let evs = free e
@@ -410,8 +411,10 @@ simpleCst xs bs e =
           _ -> False
       xs' = filter  (`notElem` ts) xs
       bs' = filter ((`notElem` ts) . fst) bs
-  in  if xs' /= xs then
-        [existBind xs' bs' e]
+      avs = free (bs', e)
+      xs'' = filter (`elem` avs) xs'
+  in  if xs'' /= xs then
+        [existBind xs'' bs' e]
       else
         []
 
