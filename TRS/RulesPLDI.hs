@@ -364,12 +364,12 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection lhs =
-{-
+#if USE_ELIM_DEF_DEAD
   "ELIM-DEF-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
  ++
--}
+#endif
   "ELIM-DEF" `name`
   do ee@Def{} <- [lhs]
      r@(xs, _, e) <- wfResE ee
