@@ -398,7 +398,7 @@ arbHNF n xs =
   frequency
   [ (1, Int `fmap` arbitrary)
   , (1, Op  `fmap` arbitrary)
-  , (n, Arr `fmap` listOf (arbValue n2 xs))
+  , (n, Arr `fmap` scale (min 5) (listOf (arbValue n2 xs)))
   , (n, Lam `fmap` arbBind n1 xs)
   ]
  where
@@ -460,7 +460,7 @@ arbExpr n xs =
  where
   n1 = n-1
   n2 = n `div` 2
-  n3 = n `div` 3
+  -- n3 = n `div` 3
 
 -- Either an expression or a unification
 arbExprU :: Int -> [Ident] -> Gen Expr
