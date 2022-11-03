@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 
 import TRSCore
@@ -6,6 +7,9 @@ import TRS
 import Bind
 import Test.QuickCheck
 import qualified Data.Map as M
+import Data.List
+import Data.Function
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -21,8 +25,18 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 main = quickCheck prop_NormalForms
 
+#if NO_STRUCT_RULES
+-- After reduction, inline all heap bindings.
+-- This makes many (not all) things that are should be equal by the structural rules
+-- actually be the same.
+final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, finalSubst a) : sas)
+#else
+final = id
+#endif
+
 prop_NormalForms p =
-  let trs = normalFormsFuelTrace 99 rulesPLDI p in
+  --trace (show p) $
+  let trs = final $ normalFormsFuelTrace 99 rulesPLDI p in
     case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
         whenFail (do putStrLn "===trace:1==="
