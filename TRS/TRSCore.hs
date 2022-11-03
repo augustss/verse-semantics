@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-type-defaults -Wno-unused-matches -Wno-missing-signatures -Wno-missing-pattern-synonym-signatures -Wno-name-shadowing #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module TRSCore where
@@ -188,6 +189,9 @@ pattern HVAL v <- Val (getH -> Just v)
 pattern SCL :: Value -> Expr
 pattern SCL v <- Val (getS -> Just v)
   where SCL v = Val v
+pattern VHNF :: HNF -> Value
+pattern VHNF v <- (getH -> Just v)
+  where VHNF h = HNF h
 
 getH :: Value -> Maybe HNF
 getH (HNF v@Arr{}) = Just v
@@ -281,6 +285,7 @@ instance Rec Expr where
 structMatch :: Rule Expr -> Rule Expr
 structMatch r = struct
  where
+#if !NO_STRUCT_RULES
   struct (Def (Bind x e)) =
     [ (n,ctx xe')
     | (ctx,e') <- structDefs e
@@ -301,7 +306,7 @@ structMatch r = struct
         (((VAR x1 :=: Val v1) :>:), e)
       : [(((VAR x1 :=: Val v1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
     structSeqs _ = []
-
+#endif
   struct _ = []
 
 structNorm :: Expr -> Expr
@@ -310,12 +315,13 @@ structNorm e =
     []       -> e
     (_,e'):_ -> e'
  where
+#if !NO_STRUCT_RULES
   rules (Def (Bind x (Def (Bind y e)))) | x > y =
     [ ("SWAP-C", Def (Bind y (Def (Bind x e)))) ]
 
   rules ((VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e)) | (x1,v1) > (x2,v2) =
     [ ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e)) ]
-
+#endif
   rules _ = []
 
 --------------------------------------------------------------------------------
@@ -395,7 +401,7 @@ arbHNF n xs =
   frequency
   [ (1, Int `fmap` arbitrary)
   , (1, Op  `fmap` arbitrary)
-  , (n, Arr `fmap` listOf (arbValue n2 xs))
+  , (n, Arr `fmap` scale (min 5) (listOf (arbValue n2 xs)))
   , (n, Lam `fmap` arbBind n1 xs)
   ]
  where
@@ -457,7 +463,7 @@ arbExpr n xs =
  where
   n1 = n-1
   n2 = n `div` 2
-  n3 = n `div` 3
+  -- n3 = n `div` 3
 
 -- Either an expression or a unification
 arbExprU :: Int -> [Ident] -> Gen Expr

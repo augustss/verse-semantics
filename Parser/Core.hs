@@ -605,15 +605,17 @@ pExists :: P Expr
 pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
-    exists is e = foldr (\ i r -> Seq [Define i AnyT, r]) e is
-    pQuant = pKeyword "exists" <|> pKeyword "ex" <|> pKeyword "E" <|> void (pOp "∃")
+    exists is e = foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
+    pQuant = pKeyword "exists" <|> pKeyword "ex" <|> pKeyword "E"
+      -- <|> void (pOp "∃")
 
 pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
     lam is e = foldr (\ i r -> Lambda i [] (Array []) r) e is
-    pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\") <|> pKeyword "λ"
+    pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
+      -- <|> pKeyword "λ"
 
 pSeq :: P Expr
 pSeq = choice [ pLam, pExists, cons <$> pEqu <*> optional (pOp ";" *> pSeq) ]
@@ -635,13 +637,18 @@ pApply = do
   let app f [] = f
       app f (a:as) = app (ApplyD f a) as
       pCall :: P Expr
-      pCall = app e1 <$> many (pParens pComma)
+      pCall = app e1 <$> many pTuple
       pBinOp = do i <- pOper; e2 <- pAtom; pure (ApplyD (Variable i) (Array [e1, e2]))
   pBinOp <|> pCall
 
 pOper :: P Ident
 pOper = choice $ map (\ o -> const (Ident noLoc ("in'" ++ o ++ "'")) <$> pOp o)
   [ ">", ">=", "<", "<=", "<>", "+", "-", "*", "/" ]
+
+pTuple :: P Expr
+pTuple = try (pParens (pure (Array [])))
+         <|>
+         pParens pComma
 
 pComma :: P Expr
 pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
@@ -650,7 +657,7 @@ pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
   where arr x xs = Array (x:xs)
 
 pAtom :: P Expr
-pAtom = choice [pParens pComma, pLiteral, Variable <$> pIdent, pMacro]
+pAtom = choice [pTuple, pLiteral, Variable <$> pIdent, pMacro]
 
 pMacro :: P Expr
 pMacro = mac <$> pMacroName <*> pBraces pSeq

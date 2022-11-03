@@ -610,6 +610,7 @@ anfS = anf
       pure (concat ess, Array vs)
     value e@Function{} = ([],) <$> anf e
 --    value e@Typedef{} = ([],) <$> anf e
+    value e@Lambda{} = ([],) <$> anf e
     value e@AnyT{} = pure ([], e)
     value (Define i e) = do
       -- Special version of next case; no need for a new variable

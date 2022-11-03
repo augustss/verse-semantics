@@ -15,14 +15,18 @@ import Data.List --( sort, find, union, (\\), delete, intersect )
 -- #define USE_UE 1
 -- Use the DEREF-K
 -- #define USE_DEREF_K 1
--- Use the correct (very slow) definition of WF
--- #define USE_CORRECT_WF 1
+-- Use the correct definition of WF
+#define USE_CORRECT_WF 1
+-- Use ELIM-DEF-DEAD, a weak substitute for structural rules
+#define USE_ELIM_DEF_DEAD NO_STRUCT_RULES
 
 implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
 
 update :: Int -> a -> [a] -> [a]
-update i v vs = take i vs ++ [v] ++ drop (i+1) vs
+update _ _ [] = undefined
+update 0 v (_:vs) = v:vs
+update i v (v':vs) = v' : update (i-1) v vs
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -364,15 +368,16 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection lhs =
-{-
+#if USE_ELIM_DEF_DEAD
   "ELIM-DEF-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
  ++
--}
+#endif
   "ELIM-DEF" `name`
-  do e@Def{} <- [lhs]
-     (xs, _, e) <- wfResE e
+  do ee@Def{} <- [lhs]
+     r@(xs, _, e) <- wfResE ee
+     guard (not (null xs))
      guard (null (intersect xs (free e)))
      pure e
 
@@ -398,6 +403,7 @@ existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs bs ee = mkRes xs (map (\ (x, v) -> VAR x :=: v) bs) ee
 
 -- Remove bindings of the form 'x=e' where x occurs nowhere else.
+-- Also remove unused existentials.
 simpleCst :: [Ident] -> [(Ident, Expr)] -> Expr -> [Expr]
 simpleCst xs bs e =
   let evs = free e
@@ -409,8 +415,10 @@ simpleCst xs bs e =
           _ -> False
       xs' = filter  (`notElem` ts) xs
       bs' = filter ((`notElem` ts) . fst) bs
-  in  if xs' /= xs then
-        [existBind xs' bs' e]
+      avs = free (bs', e)
+      xs'' = filter (`elem` avs) xs'
+  in  if xs'' /= xs then
+        [existBind xs'' bs' e]
       else
         []
 
@@ -642,12 +650,13 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
     inline bs v | isGnd v = v
                 | otherwise = inline bs (inl v)
       where
-        inl (Var x) | Just v@VARR{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
+        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
                     | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
-        inl v = v -- undefined
+        inl (VLAM x e) = VLAM x (VLAM (Name "_") e :@: Var (Name "[...]")) -- XXX
+        inl _ = undefined
     isGnd :: Value -> Bool
     isGnd VINT{} = True
     isGnd (VARR vs) = all isGnd vs
@@ -780,11 +789,10 @@ wfResE = wf []
     wf g e@(DEF x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
-      [   (x:xs, cs, e2)
+      pure (x:xs, cs, e2)
 #if USE_CORRECT_WF
-        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
-        ]
     -- WF-EQ
     wf g e@(c@(VAR x :=: Val h) :>: e1) = do
       guard (h /= Var x)                                -- eliminate x=x before WFF
@@ -792,16 +800,15 @@ wfResE = wf []
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
-      [   (xs, c:cs, e2)
+      pure (xs, c:cs, e2)
 #if USE_CORRECT_WF
-        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
-        ]
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
     -- With USE_CORRECT_WF we explore all possibilites,
     -- without it we eagerly consume DEF and :=:.
-    wf g e = do
+    wf g e =
       pure ([], [], e)
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
@@ -836,11 +843,11 @@ rulesNormalization lhs =
 --     traceM $ "NORM " ++ show (x, v, e1)
      guard valid
      pure (xv :>: (e1 :>: e2))
+{-
  ++
   "NORM-EQ" `name`
   do e :>: c@(VAR x :=: Val{}) <- [lhs]
      pure (e :>: (c :>: VAR x))
-{-
  ++
   "NORM-DEF-EQ" `name`
   do DEF y c@(VAR x :=: Val{}) <- [lhs]
