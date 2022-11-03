@@ -23,7 +23,8 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 --------------------------------------------------------------------------------
 
-main = quickCheck prop_NormalForms
+main = quickCheckWith args prop_NormalForms
+  where args = stdArgs{ maxSuccess = 1000 }
 
 #if NO_STRUCT_RULES
 -- After reduction, inline all heap bindings.
