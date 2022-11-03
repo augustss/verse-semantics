@@ -24,7 +24,9 @@ implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
 
 update :: Int -> a -> [a] -> [a]
-update i v vs = take i vs ++ [v] ++ drop (i+1) vs
+update _ _ [] = undefined
+update 0 v (_:vs) = v:vs
+update i v (v':vs) = v' : update (i-1) v vs
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
