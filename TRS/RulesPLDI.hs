@@ -15,8 +15,10 @@ import Data.List --( sort, find, union, (\\), delete, intersect )
 -- #define USE_UE 1
 -- Use the DEREF-K
 -- #define USE_DEREF_K 1
--- Use the correct (very slow) definition of WF
--- #define USE_CORRECT_WF 1
+-- Use the correct definition of WF
+#define USE_CORRECT_WF 1
+-- Use ELIM-DEF-DEAD, a weak substitute for structural rules
+#define USE_ELIM_DEF_DEAD !NO_STRUCT_RULES
 
 implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
