@@ -1,0 +1,393 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\rduni}{\ensuremath{\mathcal{D}}\xspace}
+\newcommand{\rlive}{\ensuremath{\mathcal{L}}\xspace}
+
+\newcommand{\parent}[2]{\ensuremath{#1(#2)}}
+\newcommand{\find}[2]{\ensuremath{#1^{*}(#2)}}
+\newcommand{\union}[3]{\ensuremath{#1[#2 := #3]}}
+\newcommand{\repr}[1]{\ensuremath{\mathsf{repr}(#1)}}
+\newcommand{\reprg}[2]{\ensuremath{#1 \circ #2}}
+
+\section{Confluence of Unification}
+
+We start by proving confluence of $\runi$:
+the reduction relation defined by the $\runi$
+rules in \cref{fig:rewrite-rules}.
+
+$\runi$ does not enjoy the \emph{diamond} property, as \eg
+the term $e \equiv x = |arr (a, b)|; x = |arr (c, d)|; x = |(10, 20)|; a + d$
+can step to $e_1 \equiv x = |arr (a, b)|; x = |arr (c, d)|; |arr (a, b)| = |arr (10, 20)|; a + d$
+or to $e_2 \equiv x = |arr (a, b)|; x = |arr (c, d)|; |arr (c, d)| = |arr (10, 20)|; a + d$ which
+require multiple steps to join.
+
+We cannot use Newman's lemma \ref{lem:local} to establish confluence
+as  $\runi$ is non-terminating, as shown by
+%
+$$ |x == y; y == x; x| \movesto |x == y; y == x; y| \movesto \ldots \movesto |x == y; y == x; x| \movesto \ldots$$
+%
+
+\mypara{Strategy: Confluence via Kernel} We prove confluence of $\runi$ by defining
+a confluent relation $\rduni$ (``directed unification'') that is a \emph{kernel} of
+$\runi$ after which the confluence of \runi follows from \cref{thm:kernel-confluence}.
+
+\begin{lemma}[$\runi$-Confluent] \label{lem:u-c}
+$\runi$ is confluent.
+\end{lemma}
+
+\begin{proof}
+Immediate from \cref{lem:d-kernel}, \cref{lem:d-c} and \cref{thm:kernel-confluence}.
+\end{proof}
+
+\subsection{Union-Find Graphs}
+
+Let us recall the notion of union-find graphs, a directed-graph
+based representation of equivalence classes \cite{CLRS}.
+
+\begin{definition}[UF] A \emph{union-find graph} (abbreviated to just graph)
+    is a sequence of bindings $[x_1 \mapsto x_1', \ldots, x_n \mapsto x_n']$
+    such that
+%
+\begin{enumerate}
+%
+\item (Finite Map) $x_1, \ldots, x_n$ are distinct,
+%
+\item (Acyclic) forall $i \leq j$, we have $x_i \not \equiv x_j'$.
+%
+\end{enumerate}
+\end{definition}
+
+\begin{lemma}[UF] \label{lem:uf-find}
+Forall $g \equiv [x \mapsto y; \ldots]$, we have $\find{g}{x} = \find{g}{y}$.
+\end{lemma}
+
+\begin{definition}[FIND]
+%
+Let $g$ be a UF graph.
+%
+We define the \emph{parent} (resp. \emph{representative})
+of $x$ in $g$ written $\parent{g}{x}$ (resp. $\find{g}{x}$)
+as:
+%
+$$\begin{array}{rcl}
+\parent{g}{x} & \doteq & \begin{cases}
+                        y & \text{if}\ x \mapsto y \in g \\
+                        x & \text{otherwise}
+                    \end{cases} \\
+\find{g}{x} & \doteq & \begin{cases}
+                        \find{g}{y} & \text{if}\ x \mapsto y \in g \\
+                        x & \text{otherwise}
+                    \end{cases} \\
+\end{array}$$
+%
+The \emph{Acyclic} invariant ensures that $\find{g}{\cdot}$ is well-defined.
+\end{definition}
+
+\begin{definition}[UNION]
+Let $g$ be a UF graph and $x, y$ be distinct variables. Define the new graph $g' = \union{g}{x}{y}$ as:
+%
+$$\begin{array}{rcl}
+\union{g}{x}{y} & \doteq & \begin{cases}
+    g, x' \mapsto y' & \text{if}\ x' = \find{g}{x}, y' = \find{g}{y}, x' \not \equiv y' \\
+    g & \text{otherwise}
+\end{cases}
+\end{array}$$
+\end{definition}
+
+\subsection{Directed Unification: $\rduni$}
+
+We will use UF graphs to define a directed unification relation $\rduni$ as follows.
+
+\begin{definition}[Representatives]
+We define the \emph{representatives}
+of an expression context $\repr{E}$
+as the UF graph
+%
+$$\begin{array}{lcl}
+\repr{E} & \doteq & \reprg{\emptyset}{E} \\[0.05in]
+\reprg{g}{|hole|}        & \doteq & g  \\
+\reprg{g}{|x = y; E|}    & \doteq & \union{g}{x}{y} \\
+\reprg{g}{|x = E; e|}    & \doteq & \reprg{g}{E} \\
+\reprg{g}{|ue; E|}       & \doteq & \reprg{g}{E} \\
+\reprg{g}{|E v|}         & \doteq & \reprg{g}{E} \\
+\reprg{g}{|v E|}         & \doteq & \reprg{g}{E} \\
+\reprg{g}{|def x E|}     & \doteq & \reprg{g}{E}  \\
+\reprg{g}{|E choice e|}  & \doteq & \reprg{g}{E}  \\
+\reprg{g}{|e choice E|}  & \doteq & \reprg{g}{E}  \\
+\reprg{g}{|all E|}       & \doteq & \reprg{g}{E}  \\
+\reprg{g}{|one E|}       & \doteq & \reprg{g}{E}  \\
+\end{array}$$
+\end{definition}
+
+\begin{definition}[Live Variables]
+%
+A variable $y$ is \emph{live} in $E$ if $y \equiv \find{\repr{E}}{y}$, otherwise $y$ is \emph{dead} in $E$.
+%
+A scalar $s$ is \emph{live} in $E$ if it is a literal or it is a variable that is live in $E$.
+%
+We define a \emph{live dereference} reduction as
+%
+$$\begin{array}{rrcll}
+\rulename{deref-s-live} & E[x = s; E'[x]] & \movesto & E[x = s; E'[s]] & \text{if $y$ is live in $E$} \\
+% \rulename{deref-x-live} & \exists y. E[x = y; E_1[x]] & \movesto & E[x = y; E_1[y]] & \text{if $y$ is live in $E$} \\
+% \rulename{deref-k-live} & x = k; E[x] & \movesto & x = k; E[k] & \\
+\end{array}$$
+%
+\textbf{NOTE:} $e \movesto e'$ via the above rule only when the \emph{entire} expression $e$
+\end{definition}
+
+\begin{definition}[Directed Unification]
+The \emph{directed unification} relation $\rduni$ is defined as the reduction relation obtained from the rules
+$$\rduni \doteq \runi - \rulename{deref-s} + \rulename{deref-*-live}$$
+\end{definition}
+
+\begin{lemma} $\rduni \subseteq \runi$. \label{lem:rduni-subset-runi}
+\end{lemma}
+
+\begin{proof}
+Immediate as the every $\rduni$ reduction is trivially an $\runi$ reduction.
+\end{proof}
+
+\begin{lemma}[$\rduni$-Noetherian] \label{lem:d-noetherian}
+    $\rduni$ is Noetherian.
+\end{lemma}
+
+\begin{proof}
+Define the following \emph{size} function for any term $e$.
+$$\begin{array}{lcl}
+\mathsf{Size}(e)     & \doteq & (\mathsf{FunVars}(e) + \mathsf{HeapVars}(e), \mathsf{Tuples}(e), \mathsf{DeadVars}(e), \mathsf{Vars}(e)) \\[0.05in]
+\mathsf{FunVars}(e)  & \doteq & \text{number of sub-terms of $e$ of the form $x |v|$} \\
+\mathsf{HeapVars}(e) & \doteq & \text{number of sub-terms of $e$ of the form $|x == h|$} \\
+\mathsf{Tuples}(e)   & \doteq & \text{number of sub-terms of $e$ of the form $|arr (dots)|$} \\
+\mathsf{DeadVars}(e) & \doteq & \text{cardinality of the set} \{ E[x] \vb e \equiv E[x], x \ \text{is dead in}\ E \} \\
+\mathsf{Vars}(e)     & \doteq & \text{number of variable occurrences in} $e$ \\
+\end{array}$$
+%
+Each $\rduni$ step $\rstep{\rduni}{e}{e'}$ is such that $\mathsf{Size}(e) < \mathsf{Size}(e')$ \ie each step
+strictly decreases the size of $e$ per the \emph{lexicographic ordering} of tuples thereby proving that $\rduni$
+is well-founded and hence Noetherian.
+\end{proof}
+
+\subsection{\rduni is a Kernel of $\runi$}
+
+To prove that $\rduni$ is a kernel of $\runi$ we first establish
+a more general \emph{canonicalization} property of $\rduni$ which says
+that the relation lets us reduce any term to a form where each
+variable is replaced by its unique \emph{representative}
+in the context in which the variable appears.
+%
+Let $\rlive$ denote the reduction relation induced by \rulename{deref-x-live}
+
+\begin{definition}[Height] The height of a context is defined as
+$$\begin{array}{lcl}
+\mathsf{Height}(|hole|     )  & \doteq & 0  \\
+\mathsf{Height}(|x = y; E| )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|x = E; e| )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|ue; E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|E v|      )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|v E|      )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|def x E|  )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|E choice e|) & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|e choice E|) & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|all E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(|one E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+\end{array}$$
+\end{definition}
+
+\begin{lemma}[Canonicalization] \label{lem:d-canon}
+For all $x, E, E_1$, $\rsteps{\rlive}{E_1[E[x]]}{E_2[E[y]]}$
+
+where
+%
+\begin{enumerate}
+\item $\repr{E_1} = \repr{E_2}$
+\item $y = \find{\repr{E_1}}{x}$
+\item $\freevars{E_1} = \freevars{E_2}$
+\item $\mathsf{Height}(E_1) = \mathsf{Height}(E_2)$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+The proof is by induction on the height of $E_1$.
+%
+\begin{description}
+\item[Case $E_1 \equiv |hole|$]: As $\repr{|hole|} = \emptyset$, we have $y \doteq x$  and $E_2 \doteq E_1$.
+\item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \equiv x$
+\item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \not \equiv x$
+
+\end{description}
+\end{proof}
+
+
+\begin{lemma}[$\rduni$-Kernel] \label{lem:d-kernel}
+    $\rduni$ is a kernel of $\runi$
+\end{lemma}
+
+\begin{proof}
+TODO
+\end{proof}
+
+\subsection{\rduni is (Locally) Confluent}
+
+\begin{lemma}[$\rduni$-Locally Confluent] \label{lem:d-lc}
+    $\rduni$ is locally confluent.
+\end{lemma}
+
+\begin{proof}
+TODO
+\end{proof}
+
+\begin{lemma}[$\rduni$-Confluent] \label{lem:d-c}
+    $\rduni$ is confluent.
+\end{lemma}
+
+\begin{proof}
+By \cref{lem:d-lc}, \cref{lem:d-noetherian} and \cref{lem:local}.
+\end{proof}
+
+\begin{verbatim}
+Theorem: Forall g |- C, exists unique C* = CANON(g, C) such that
+    (1) g |-* C*
+    (2) g |-  C -->> C*
+
+Proof: By induction on C
+
+Case C = |hole|:
+    return C* = C
+
+Case C = ... C' ...:
+
+    C'* = CANON(g, C')
+
+        As g |- C we have g |- C'
+        by IH
+            (1') g |-* C'*
+            (2') g |-  C' -->> C'*
+
+    C*  = ... C'* ...
+
+        From (1') and def of |-* we get
+
+            g |-* ... C'* ...  i.e.  (1)
+
+        Using the context  CC = ... hole ... (such that g . CC = g) (2') is
+
+            g . CC |-  C' -->> C'*
+
+        Hence, from [exch]
+
+            g |- ... C'... -->> ... C'* ...     i.e. (2)
+
+Case C = x = y; C':
+
+    C'' = subst(C', x, y)
+
+        x=y; C' -->> x=y; C''
+
+        As g |- x=y; C'   by [lem:steps-under] we have
+
+            g |- x=y; C' -->> g |- x=y; C''  (a)
+
+        As no free x in C''
+
+            g + [x => y] |- C''              (b)
+
+    C'* = CANON(g, C'')
+
+        By IH we get
+
+             (1') g + [x=>y] |-* C'*
+             (2') g + [x=>y] |-  C'' -->> C'*
+
+    return C* = x = y; C'*
+
+        By (1') we get
+
+            (1) g |-* C*
+
+        By (1') + [exchange]
+
+            (2'') g |- x=y;C'' -->> x=y;C'*
+
+        Combining with (a) and [under-trans] we get
+
+            (2) g |- x = y; C' -->> x = y; C'*
+QED.
+
+-------------------------------------------------------------------------
+
+
+Lem: [exch] IF g . C |- X ->> X' THEN g |- C[X] ->> C[X']
+Proof: By induction on -->> using [exch-one]
+
+Lem: [exch-one] IF g . C |- e1 -> e2 THEN g |- C[e1] -> C[e2]
+Proof: By induction on C. See notes for key case `x = y`.
+
+    case C is x=y; C':
+
+      Given
+
+        g . (x = y; C') |- e1 -> e2
+
+        {- by def of . -}
+
+        (g + [g*(x) => g*(y)]) . C' |- e1 -> e2
+
+        {- by IH -}
+
+        (g + [g*(x) => g*(y)])  |- C'[e1] -> C'[e2]
+
+        {- by [exch-x-y] -}
+
+        g  |- x = y; C'[e1] -> x = y; C'[e2]
+
+        i.e. g |- C[e1] -> C[e2]
+
+    case C is |hole|:
+        Trivial
+
+    case C is ...C'...:
+      Given
+        g . ( ... C' ...) |- e1 -> e2
+
+        {- by def of . -}
+
+        g . C' |- e1 -> e2
+
+        {- by IH -}
+
+        g |- C'[e1] -> C'[e2]
+
+        {- by [exch-id] using C = ... hole ... -}
+
+        g |- ... C'[e1] ... -> ... C'[e2] ...
+QED.
+
+Lemma: [exch-id] If g . C == g and g |- e1 -> e2 then g |- C[e1] -> C[e2]
+Proof: The redux
+
+            g |- e1 -> e2 equiv g |- C'[x = y; E[x]] -> C'[x = y; E[y]]
+
+       where  g . C' |- y
+
+       As g . C[C'] = (g . C) . C' = g . C' we have
+
+            g . C[C'] |- y
+
+       Hence, the redux
+
+            g |- C[e1] -> C[e2] equiv g |- C[C'[x = y; E[x]]] -> C[C'[x = y; E[y]]]
+
+       is also valid.
+QED.
+
+Lemma: [exch-x-y]
+    * IF UNION(g, x, y) |- e -> e' THEN g |- x = y; e -> e'
+    * IF UNION(g, x, y) |- E -> E' THEN g |- x = y; E -> E'
+Proof: "By definition" of . aka of the g |- e1 -> e2 relation. QED.
+
+\end{verbatim}
