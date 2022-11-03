@@ -1,5 +1,5 @@
 PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative -i../TRS
-FLAGS = -O -Wall --make
+FLAGS = -O -Wall --make -DNO_STRUCT_RULES=1
 TESTSFILE=tests.versetest
 .PHONY: clean all test testfast timtests
 
@@ -29,6 +29,9 @@ testfast: tests
 
 testt: timparse
 	./timparse
+
+timing:	tests
+	time ./tests
 
 clean:
 	rm -f *.o *.hi verse verse.exe tests tests.exe timparse timparse.exe
