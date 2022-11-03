@@ -785,11 +785,10 @@ wfResE = wf []
     wf g e@(DEF x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
-      [   (x:xs, cs, e2)
+      pure (x:xs, cs, e2)
 #if USE_CORRECT_WF
-        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
-        ]
     -- WF-EQ
     wf g e@(c@(VAR x :=: Val h) :>: e1) = do
       guard (h /= Var x)                                -- eliminate x=x before WFF
@@ -797,16 +796,15 @@ wfResE = wf []
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free h) xs))
-      [   (xs, c:cs, e2)
+      pure (xs, c:cs, e2)
 #if USE_CORRECT_WF
-        , (xs, cs, e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
-        ]
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
     -- With USE_CORRECT_WF we explore all possibilites,
     -- without it we eagerly consume DEF and :=:.
-    wf g e = do
+    wf g e =
       pure ([], [], e)
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
