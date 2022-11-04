@@ -687,7 +687,7 @@ canon ee = order . head . wfResE $ ee  -- relies of wfResE returning the most ea
           ys = bfs [] (free r)                                          -- Canonical variable order
           is' = filter (`elem` is) ys                                   -- Order existentials  
           cs' = [(VAR y :=: Val v) | y <- ys, Just v <- [lookup y cs] ] -- Order binders
-          r' = canon r  -- In case it's not a value
+          r' = r -- XXX WRONG canon r  -- In case it's not a value
       in  mkRes is' cs' r'
 
 ----------------------
