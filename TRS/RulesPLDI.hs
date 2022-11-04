@@ -1,13 +1,14 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-module RulesPLDI(rulesPLDI, dsFreshFP, finalSubst) where
+module RulesPLDI(rulesPLDI, dsFreshFP, finalSubst, canon) where
 
 import TRS
 import Bind
 import TRSCore
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
+import Data.Maybe
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
@@ -642,7 +643,7 @@ dsFreshFP = ds'
 
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
-finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val v <- cs] vv
+finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
               | otherwise = --(if ee /= Fail then trace ("finalSubst: not WF\n" ++ show ee) else id)
                             ee
   where
@@ -663,6 +664,31 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline [(x, v) | VAR x :=: Val
     isGnd VOP{} = True
     isGnd VLAM{} = True
     isGnd _ = False
+
+-- Make a WF value canonical, i.e., order the quantifiers
+-- and bindings in a predictable order.
+-- If the given value is not WF with the expression being a value then there are no promises.
+canon :: Expr -> Expr
+canon (One e) = One (canon e)
+canon (All e) = All (canon e)
+canon (e1 :|: e2) = canon e1 :|: canon e2
+canon (e1 :>: e2) = canon e1 :>: canon e2
+-- The cases above is just a vague attempt to canonicalize stuck results that are not values.
+canon ee = order . head . wfResE $ ee  -- relies of wfResE returning the most eager result first
+  where
+    order :: ([Ident], [BindV], Expr) -> Expr
+    order ([], [], r) = r
+    order (is, cs, r) =
+      let g = [(x, free e) | (x, e) <- cs ]  -- dependency graph
+          -- Do a breadth first search visiting all used variables.
+          bfs done [] = done
+          bfs done (x : xs) | x `elem` done = bfs done xs
+                            | otherwise  = bfs (x : done) (xs ++ fromMaybe [] (lookup x g))
+          ys = bfs [] (free r)                                          -- Canonical variable order
+          is' = filter (`elem` is) ys                                   -- Order existentials  
+          cs' = [(VAR y :=: Val v) | y <- ys, Just v <- [lookup y cs] ] -- Order binders
+          r' = canon r  -- In case it's not a value
+      in  mkRes is' cs' r'
 
 ----------------------
 
@@ -776,13 +802,17 @@ rulesSplit lhs =
          hlam = Var h :@: VLAM x ee
      in  pure (DEF h (DEF y (ve :>: gv :>: hlam)))
 
-wfRes :: Expr -> [([Ident], [Expr], Value)]
+type BindV = (Ident, Value)
+
+wfRes :: Expr -> [([Ident], [BindV], Value)]
 wfRes e = do
   --traceM ("wfRes " ++ show (e, wfResE e))
   (is, es, Val v) <- wfResE e
   pure (is, es, v)
 
-wfResE :: Expr -> [([Ident], [Expr], Expr)]
+-- Returns a non-empty list WF decompositions of the expression.
+-- The most eager (i.e., most binders and bindings) is first in the list.
+wfResE :: Expr -> [([Ident], [BindV], Expr)]
 wfResE = wf []
   where
     -- WF-DEF
@@ -794,13 +824,13 @@ wfResE = wf []
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
     -- WF-EQ
-    wf g e@(c@(VAR x :=: Val h) :>: e1) = do
-      guard (h /= Var x)                                -- eliminate x=x before WFF
-      guard (isS h `implies` (x `notElem` free e1))     -- subst scalars before WFF
+    wf g e@((VAR x :=: Val v) :>: e1) = do
+      guard (v /= Var x)                                -- eliminate x=x before WFF
+      guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
       guard (x `elem` g)
       (xs, cs, e2) <- wf (delete x g) e1
-      guard (null (intersect (free h) xs))
-      pure (xs, c:cs, e2)
+      guard (null (intersect (free v) xs))
+      pure (xs, (x, v):cs, e2)
 #if USE_CORRECT_WF
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
 #endif
@@ -815,16 +845,17 @@ mkRes :: [Ident] -> [Expr] -> Expr -> Expr
 mkRes is es r = foldr (\ i e -> DEF i e) r' is
   where r' = foldr (:>:) r es
 
-mkRess :: [([Ident], [Expr], Value)] -> ([Ident], [Expr], [Value])
+mkRess :: [([Ident], [BindV], Value)] -> ([Ident], [Expr], [Value])
 mkRess as = loop [] [] [] as
   where
     fvs = free as
     loop ris res rvs [] = (reverse ris, reverse res, reverse rvs)
-    loop ris res rvs ((is, es, v) : xs) = loop (is' ++ ris) (es' ++ res) (v' : rvs) xs
+    loop ris res rvs ((is, cs, v) : xs) = loop (is' ++ ris) (es' ++ res) (v' : rvs) xs
       where is' = take (length is) $ identsNotIn (ris ++ fvs)
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
+            es = [VAR x :=: Val v | (x, v) <- cs]
 
 rulesNormalization :: ERule
 rulesNormalization lhs =
