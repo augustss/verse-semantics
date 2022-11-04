@@ -24,13 +24,13 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 --------------------------------------------------------------------------------
 
 main = quickCheckWith args prop_NormalForms
-  where args = stdArgs{ maxSuccess = 1000 }
+  where args = stdArgs{ maxSuccess = 10000 }
 
 #if NO_STRUCT_RULES
--- After reduction, inline all heap bindings.
+-- After reduction, canonicalize results.
 -- This makes many (not all) things that are should be equal by the structural rules
 -- actually be the same.
-final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, finalSubst a) : sas)
+final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, canon a) : sas)
 #else
 final = id
 #endif
