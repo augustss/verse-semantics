@@ -10,8 +10,19 @@
 \newcommand{\parent}[2]{\ensuremath{#1(#2)}}
 \newcommand{\find}[2]{\ensuremath{#1^{*}(#2)}}
 \newcommand{\union}[3]{\ensuremath{#1[#2 := #3]}}
-\newcommand{\repr}[1]{\ensuremath{\mathsf{repr}(#1)}}
+\newcommand{\skipc}[1]{\ensuremath{\mathsf{Skip}(#1)}}
+% \newcommand{\repr}[1]{\ensuremath{\mathsf{repr}(#1)}}
+\newcommand{\repr}[1]{\reprg{\emptyset}{#1}}
 \newcommand{\reprg}[2]{\ensuremath{#1 \circ #2}}
+\newcommand{\xhole}{\ensuremath{x_{\bullet}}}
+\newcommand{\live}[2]{\ensuremath{#1 \vdash #2}}
+\newcommand{\canon}[2]{\ensuremath{#1 \vdash^{*} #2}}
+
+\newcommand{\runder}[3]{\ensuremath{#1 \vdash \rstep{\rlive}{#2}{#3}}}
+\newcommand{\runders}[3]{\ensuremath{#1 \vdash \rsteps{\rlive}{#2}{#3}}}
+\newcommand{\extg}[3]{#1, #2 \mapsto #3}
+\newcommand{\cnn}[2]{{#2}^{*}_{#1}}
+\newcommand{\mkcnn}[2]{\ensuremath{\mathsf{Canon}(#1, #2)}}
 
 \section{Confluence of Unification}
 
@@ -111,34 +122,52 @@ $$\begin{array}{lcl}
 \repr{E} & \doteq & \reprg{\emptyset}{E} \\[0.05in]
 \reprg{g}{|hole|}        & \doteq & g  \\
 \reprg{g}{|x = y; E|}    & \doteq & \union{g}{x}{y} \\
-\reprg{g}{|x = E; e|}    & \doteq & \reprg{g}{E} \\
-\reprg{g}{|ue; E|}       & \doteq & \reprg{g}{E} \\
-\reprg{g}{|E v|}         & \doteq & \reprg{g}{E} \\
-\reprg{g}{|v E|}         & \doteq & \reprg{g}{E} \\
-\reprg{g}{|def x E|}     & \doteq & \reprg{g}{E}  \\
-\reprg{g}{|E choice e|}  & \doteq & \reprg{g}{E}  \\
-\reprg{g}{|e choice E|}  & \doteq & \reprg{g}{E}  \\
-\reprg{g}{|all E|}       & \doteq & \reprg{g}{E}  \\
-\reprg{g}{|one E|}       & \doteq & \reprg{g}{E}  \\
+\reprg{g}{S[E]}          & \doteq & \reprg{g}{E} \text{where} $\skipc{S}$\\
+
+% \reprg{g}{|x = E; e|}    & \doteq & \reprg{g}{E} \\
+% \reprg{g}{|ue; E|}       & \doteq & \reprg{g}{E} \\
+% \reprg{g}{|E v|}         & \doteq & \reprg{g}{E} \\
+% \reprg{g}{|v E|}         & \doteq & \reprg{g}{E} \\
+% \reprg{g}{|def x E|}     & \doteq & \reprg{g}{E}  \\
+% \reprg{g}{|E choice e|}  & \doteq & \reprg{g}{E}  \\
+% \reprg{g}{|e choice E|}  & \doteq & \reprg{g}{E}  \\
+% \reprg{g}{|all E|}       & \doteq & \reprg{g}{E}  \\
+% \reprg{g}{|one E|}       & \doteq & \reprg{g}{E}  \\[0.05in]
+
+\skipc{|x = hole; e|}    & \doteq & \text{true} \\
+\skipc{|ue; hole|}       & \doteq & \text{true} \\
+\skipc{|hole v|}         & \doteq & \text{true} \\
+\skipc{|v hole|}         & \doteq & \text{true} \\
+\skipc{|def x hole|}     & \doteq & \text{true}  \\
+\skipc{|hole choice e|}  & \doteq & \text{true}  \\
+\skipc{|e choice hole|}  & \doteq & \text{true}  \\
+\skipc{|all hole|}       & \doteq & \text{true}  \\
+\skipc{|one hole|}       & \doteq & \text{true}  \\
+\skipc{E}                & \doteq & \text{false}  \\[0.05in]
 \end{array}$$
 \end{definition}
 
 \begin{definition}[Live Variables]
 %
-A variable $y$ is \emph{live} in $E$ if $y \equiv \find{\repr{E}}{y}$, otherwise $y$ is \emph{dead} in $E$.
+A variable $x$ is \emph{live} in a UF graph $g$, written $\live{g}{x}$ if $x = \find{g}{x}$.
 %
-A scalar $s$ is \emph{live} in $E$ if it is a literal or it is a variable that is live in $E$.
+A scalar $s$ is \emph{live} in $g$ if it is a literal or it is a variable that is live in $g$.
+%
+An expression $e$ is \emph{live} in a UF graph $g$, written $\live{g}{e}$ if $\forall x \in \freevars{e}$ we have $\live{g}{x}$.
+%
+A context $E$ is \emph{live} in a UF graph $g$, written $\live{g}{E}$ if $\forall x \in \freevars{E}$ we have $\live{g}{x}$.
 %
 We define a \emph{live dereference} reduction as
 %
 $$\begin{array}{rrcll}
-\rulename{deref-s-live} & E[x = s; E'[x]] & \movesto & E[x = s; E'[s]] & \text{if $y$ is live in $E$} \\
-% \rulename{deref-x-live} & \exists y. E[x = y; E_1[x]] & \movesto & E[x = y; E_1[y]] & \text{if $y$ is live in $E$} \\
-% \rulename{deref-k-live} & x = k; E[x] & \movesto & x = k; E[k] & \\
+\rulename{deref-s-live} & E[x = s; E'[x]] & \movesto_{\rlive} & E[x = s; E'[s]] & \text{if} $\live{\reprg{\emptyset}{E}}{s}$ \\
 \end{array}$$
 %
-\textbf{NOTE:} $e \movesto e'$ via the above rule only when the \emph{entire} expression $e$
+Where $\rlive$ denotes the reduction relation induced by \rulename{deref-x-live}
+\textbf{NOTE:} $e \movesto_{\rlive} e'$ via the above rule only
+when the \emph{entire} expression $e$ moves to $e'$.
 \end{definition}
+
 
 \begin{definition}[Directed Unification]
 The \emph{directed unification} relation $\rduni$ is defined as the reduction relation obtained from the rules
@@ -172,17 +201,252 @@ strictly decreases the size of $e$ per the \emph{lexicographic ordering} of tupl
 is well-founded and hence Noetherian.
 \end{proof}
 
-\subsection{\rduni is a Kernel of $\runi$}
+
+\subsection{Canonicalization}
 
 To prove that $\rduni$ is a kernel of $\runi$ we first establish
 a more general \emph{canonicalization} property of $\rduni$ which says
 that the relation lets us reduce any term to a form where each
 variable is replaced by its unique \emph{representative}
 in the context in which the variable appears.
-%
-Let $\rlive$ denote the reduction relation induced by \rulename{deref-x-live}
 
-\begin{definition}[Height] The height of a context is defined as
+\mypara{Reduction Under a Graph}
+%
+Recall that $e \movesto_{\rlive} e'$ only holds for entire expressions.
+So unlike other reductions, we cannot assume that $\rsteps{\rlive}{e_1}{e_2}$
+implies that $\rsteps{\rlive}{E[e_1]}{E[e_2]}$.
+%
+We say $\runders{g}{e_1}{e_2}$ or $e_1$ $\rlive$-steps $e_2$ under $g$ if
+\emph{forall} contexts $E$ such that $\repr{E} = g$
+we have $\rsteps{\rlive}{E[e_1]}{E[e_2]}$.
+
+The following fact follows from the above definitions.
+
+\begin{lemma}[Reduction in Context] \label{lem:reduction-in-graph}
+    $\runders{\repr{E}}{e_1}{e_2}$ iff $\rsteps{\rlive}{E[e_1]}{E[e_2]}$.
+\end{lemma}
+
+\begin{proof}
+    By induction on the structure of $E$.
+\end{proof}
+
+\mypara{Reducing Contexts}
+%
+We lift the notion of reduction to contexts as follows: define
+$\rstep{\rlive}{E_1}{E_2}$ if for some special variable $\xhole$
+that does not appear anywhere in $E_1$, we have $\rstep{\rlive}{E_1[\xhole]}{E_2[\xhole]}$.
+
+\begin{lemma}[Context-Step] If $\rstep{\rlive}{E_1}{E_2}$
+    then for all $e$, we have $\rstep{\rlive}{E_1[e]}{E_2[e]}$.
+\end{lemma}
+
+\begin{proof}
+By induction on the structure of $E_1$.
+\begin{description}
+
+\item[Case $E_1 \equiv |hole|$] Impossible.
+
+\item[Case $E_1 \equiv x = y; E_1'$]
+    Here we have $\rstep{\rlive}{x = y; E_1'[\xhole]}{x=y; E_2'[\xhole]}$.
+    By the IH we get $\rstep{\rlive}{x=y; E_1'[e]}{x = y; E_2'[e]}$ \ie
+    $\rstep{\rlive}{E_1[e]}{E_2[e]}$.
+
+\item[Case] $E_1 \equiv S[E_1']$ where $\skipc{S}$
+    Here we split cases on whether the reduction is in $S$ or $E_1'$.
+    \begin{description}
+    \item[Case reduction in $E_1'$] we have
+    \begin{align*}
+        & \rstep{\rlive}{S[E_1'[\xhole]]}{S[E_2'[\xhole]]} \\
+        \intertext{ by \cref{lem:reduction-in-graph} }
+        & \runder{\repr{S}}{E_1'[\xhole]}{E_2'[\xhole]} \\
+        \intertext{ as $\repr{S} = \emptyset$ whenever $\skipc{S}$ we get}
+        & \runder{\emptyset}{E_1'[\xhole]}{E_2'[\xhole]}{E_2'[\xhole]} \\
+        \intertext{ By the definition of $\rlive$ }
+        & \rstep{\rlive}{E_1'[\xhole]}{E_2'[\xhole]} \\
+        \intertext{ by IH }
+        & \rstep{\rlive}{E_1'[e]}{E_2'[e]} \\
+        \intertext{ by the definition of $\rlive$ and as $\repr{S} = \emptyset$ }
+        & \rstep{\rlive}{S[E_1'[e]]}{S[E_2'[e]]} \\
+    \end{align*}
+
+    \item[Case reduction in $S$] we have from the definition of $\rlive$
+    \begin{align*}
+       & \rstep{\rlive}{S[E_1'[\xhole]]}{S'[E_1'[x0]]} \text{ where $\skipc{S'}$ } \\
+       \intertext{ by IH, using $e' \equiv E_1'[e]$ }
+       & \rstep{\rlive}{S[E_1'[e]]}{S'[E_1'[e]]} \\
+    \end{align*}
+    \end{description}
+\end{description}
+\end{proof}
+
+\begin{lemma}[Under-Trans] \label{lem:under-trans}
+\begin{itemize}
+\item If $\runders{g}{e_1}{e_2}$ and $\runders{g}{e_2}{e_3}$ then $\runders{g}{e_1}{e_3}$.
+\item If $\runders{g}{E_1}{E_2}$ and $\runders{g}{E_2}{E_3}$ then $\runders{g}{E_1}{E_3}$.
+\end{itemize}
+\end{lemma}
+
+\begin{proof} By induction on the derivations of $\runders{g}{e_1}{e_2}$ and $\runders{g}{E_1}{E_2}$.
+\end{proof}
+
+\begin{definition}[Canonical Context]
+A context $E$ is canonical under $g$, written $\canon{g}{E}$, if
+$$\begin{array}{rcl}
+    \canon{g}{|hole|}    & \doteq & \text{true} \\
+    \canon{g}{x = y; E'} & \doteq & \live{g}{x} \wedge \live{g}{y} \wedge \canon{\union{g}{x}{y}}{E'} \\
+    \canon{g}{S[E']}     & \doteq & \canon{g}{E'} \ \text{if}\ \skipc{S}  \\
+\end{array}
+$$
+\end{definition}
+
+\begin{theorem}[Canon-Var] \label{thm:canon-var}
+If $\canon{g}{E}$ and $\live{g}{x}$ then
+(a) $\runders{g}{E[E'[x]]}{E[E'[x^{*}]]}$ where
+(b) $x^{*} = \find{(\reprg{g}{E})}{x}$.
+\end{theorem}
+
+\begin{proof}
+By induction on the structure of $E$.
+\begin{description}
+\item[Case] $E \equiv |hole|$ Trivial as
+        \begin{align*}
+           x^{*} & \equiv \find{(\reprg{g}{|hole|})}{x} \\
+        \intertext{ by definition of $\reprg{g}{|hole|}$ }
+                 & = \find{g}{x} \\
+        \intertext{ as $\live{g}{x}$ }
+                 & = x \\
+        \end{align*}
+
+\item[Case] $E \equiv x = z; E_1$
+        By the definition of $\rlive$  \\
+        \begin{align}
+               & \rstep{\rlive}{x = z; E_1[x]}{x = z; E_1[z]} \nonumber \\
+        \intertext{ As $\live{g}{x = z; E_1[x]}$ \cref{lem:step-under} yields }
+               & \runder{g}{x = z; E_1[x]}{x = z; E_1[z]} \nonumber \\
+        \intertext{ By \cref{lem:wrap} we get }
+               & \runder{g}{x = z; E_1[E[x]]}{x = z; E_1'[E[z]]}    \label{eq:canon-var-1} \\
+        \intertext{As $\canon{g}{E}$ we have $\live{g}{z}$. Let}
+            g' & \doteq \union{g}{x}{z} \equiv \extg{g}{x}{z} \nonumber \\
+        \intertext{Hence, $\live{g'}{z}$ and so by the IH we get}
+               & \runders{g'}{E_1[z]}{E_1[z^{*}]}   \label{eq:canon-var-2} \\
+        \intertext{where}
+        z^{*}  & = \find{(\reprg{g'}{E_1})}{z} = \find{(\reprg{g}{E})}{x} \label{eq:canon-var-3} \\
+        \intertext{By \cref{lem:exch}  the \cref{eq:canon-var-2} yields}
+               & \runders{g}{x = z; E_1[z]}{x = z; E_1[z^{*}]}   \label{eq:canon-var-4}
+        \end{align}
+        Sequencing \cref{eq:canon-var-1} and \cref{eq:canon-var-4}
+        using\cref{lem:under-trans} and \cref{eq:canon-var-3}
+        completes the proof.
+
+\item[Case] $E \equiv y = z; E_1$ where $y \not \equiv x$.
+        As $\canon{g}{E}$ we have $\live{g}{y, z}$. Let
+        \begin{align}
+            g' & \doteq \union{g}{y}{z} \equiv \extg{g}{y}{z} \nonumber \\
+        \intertext{As $y \not \equiv x$ we have $\live{g'}{x}$ and by definition $\canon{g'}{E_1}$ so by IH we get}
+               & \runders{g'}{E_1[x]}{E_1[x^{*}]} \label{eq:canon-var-5} \\
+        \intertext{where}
+        x^{*}  & = \find{(\reprg{g'}{E_1})}{x} = \find{(\reprg{g}{E})}{x} \label{eq:canon-var-6} \\
+        \intertext{via \cref{eq:canon-var-5} and \cref{lem:exch} we get the goal}
+               & \runders{g}{y = z; E_1[x]}{y = z; E_1[x^{*}]} \nonumber
+        \end{align}
+
+\item[Case] $E \equiv S[E_1]$ where $\skipc{S}$ Let
+        \begin{align}
+        g' & \doteq \reprg{g}{S} = g \nonumber
+        \intertext{as $\skipc{S}$. Hence $\canon{g}{E_1}$ and by IH we get}
+           & \runders{g}{E_1[x]}{E_1[x^{*}]} \label{eq:canon-var-7} \\
+        \intertext{where}
+        x^{*} & = \find{(\reprg{g}{E_1})}{x} \label{eq:canon-var-8} \\
+        \intertext{Via \cref{lem:exch} we get}
+           & \runders{g}{S[E_1[x]]}{S[E_1[x^{*}]]} \nonumber
+        \end{align}
+        which with \cref{eq:canon-var-7} completes the proof.
+\end{description}
+\end{proof}
+
+\begin{theorem}[Canon-Ctx]
+If \live{g}{E} there is a $\cnn{g}{E}$ such that
+%
+(1) $\canon{g}{\cnn{g}{E}}$ and
+%
+(2) $\runders{g}{E}{\cnn{g}{E}}$
+\end{theorem}
+
+\begin{proof} By induction on the height of $E$ \label{def:height}.
+    The following function $\mkcnn{g}{E}$ \emph{computes} $\cnn{g}{E}$.
+
+$$\begin{array}{lcl}
+\mkcnn{g}{|hole|} & \doteq & |hole| \\[0.05in]
+
+\mkcnn{g}{S[E]}   & \doteq & S[E^{*}]  \\
+\quad \text{where} &   & \\
+\quad \quad E^{*}  & = & \mkcnn{g}{E} \\[0.05in]
+
+\mkcnn{g}{x=y;E}   & \doteq & x=y; \mkcnn{g'}{E'} \\
+\quad \text{where} & & \\
+\quad \quad g'     & = & \union{g}{x}{y} \\
+\quad \quad E'     & = & \subst{E}{x}{y} \\
+\quad \quad E^{*}  & = & \mkcnn{g'}{E'} \\[0.05in]
+
+\subst{E}{x}{y} & \doteq & \text{replace all free occurrences of $x$ in $E$ with $y$} \\
+\end{array}$$
+
+\begin{description}
+\item[Case] $E \equiv |hole|$
+    Let $\cnn{g}{|hole|} \equiv |hole|$; facts (1) and (2) follow trivially.
+
+\item[Case] $E \equiv S[E_1]$ where $\skipc{S}$ Let
+    \begin{align}
+    \cnn{g}{E_1} & \doteq \mkcnn{g}{E_1} \nonumber \\
+    \intertext{As $\live{g}{E}$ we have $\live{g}{E_1}$ and so by the IH we get}
+        & \canon{g}{\cnn{g}{E_1}} \label{eq:canon-ctx-1} \\
+        & \runders{g}{E_1}{\cnn{g}{E_1}} \label{eq:canon-ctx-2} \\
+    \intertext{Now let}
+    \cnn{g}{E} & \doteq S[\cnn{g}{E_1}] \nonumber
+    \intertext{From \cref{eq:canon-ctx-2} and the definition of $\canon{}{}$ we get}
+        \canon{g}{S[\cnn{g}{E_1}]} \ldots (1) \nonumber \\
+    \intertext{as $\skipc{S}$ we have $\reprg{g}{S} = g$ and \cref{eq:canon-ctx-2} is}
+        & \runders{\reprg{g}{S}}{E_1}{\cnn{g}{E_1}} \nonumber \\
+    \intertext{which by \cref{lem:exch} is}
+        & \runders{g}{S[E_1]}{S[\cnn{g}{E_1}]} \ldots (2) \nonumber
+    \end{align}
+
+\item[Case] $E \equiv x = y; E_1$ Let
+    \begin{align}
+    E_1'    & \doteq \subst{E_1}{x}{y} \nonumber \\
+    g'      & \doteq \union{g}{x}{y} \nonumber \\
+    E_1^{*} & \doteq \mkcnn{g'}{E_1'} \nonumber \\
+    \intertext{By \cref{lem:subst-live} we have}
+        & \rsteps{\rlive}{x = y}{E_1}{x = y}{E_1'} \nonumber \\
+    \intertext{As $\live{g}{x=y;E_1}$ by \cref{lem:steps-under} we get}
+        & \runders{g}{x = y}{E_1}{x = y}{E_1'} \label{eq:canon-ctx-var-a} \\
+    \intertext{As $x$ is not free in $E_1'$ we have}
+        & \live{g'}{E_1'} \label{eq:canon-ctx-var-b} \\
+    \intertext{Hence by the IH we get}
+        & \canon{g'}{E_1^{*}} \label{eq:canon-ctx-var-c} \\
+        & \runders{g'}{E_1'}{E_1^{*}} \nonumber \\
+    \intertext{which \cref{lem:exch} turns into}
+        & \runders{g}{x = y; E_1'}{x = y; E_1^{*}} \label{eq:canon-ctx-var-d}\\
+    \intertext{Let}
+    \cnn{g}{E} & \doteq x = y; \cnn{g'}{E_1^{*}} \nonumber
+    \intertext{By \cref{eq:canon-ctx-var-a} and the definition of $g'$ and $\canon{}{}$ we get}
+        & \canon{g}{\cnn{g}{E}} \ldots (1) \nonumber \\
+    \intertext{By sequencing \cref{eq:canon-ctx-var-a} and \cref{eq:canon-ctx-var-d} with \cref{lem:under-trans} we get}
+        & \runders{g}{E}{\cnn{g}{E}} \ldots (2) \nonumber
+    \end{align}
+
+\end{description}
+\end{proof}
+
+\begin{lemma}[subst] \label{lem:subst-live}
+    $\rsteps{\rlive}{x = y; E}{x = y; \subst{E}{x}{y}}$.
+\end{lemma}
+\begin{proof} $y$ is trivially live and so we simply sequentially
+    substitute all the free occurrences of $x$ with $y$
+    using \rulename{deref-x-live} until none remain.
+\end{proof}
+
+\begin{definition}[Height] \label{def:height} The height of a context is defined as
 $$\begin{array}{lcl}
 \mathsf{Height}(|hole|     )  & \doteq & 0  \\
 \mathsf{Height}(|x = y; E| )  & \doteq & 1 + \mathsf{Height}(E) \\
@@ -198,30 +462,31 @@ $$\begin{array}{lcl}
 \end{array}$$
 \end{definition}
 
-\begin{lemma}[Canonicalization] \label{lem:d-canon}
-For all $x, E, E_1$, $\rsteps{\rlive}{E_1[E[x]]}{E_2[E[y]]}$
+% \begin{lemma}[Canonicalization] \label{lem:d-canon}
+% For all $x, E, E_1$, $\rsteps{\rlive}{E_1[E[x]]}{E_2[E[y]]}$
 
-where
-%
-\begin{enumerate}
-\item $\repr{E_1} = \repr{E_2}$
-\item $y = \find{\repr{E_1}}{x}$
-\item $\freevars{E_1} = \freevars{E_2}$
-\item $\mathsf{Height}(E_1) = \mathsf{Height}(E_2)$.
-\end{enumerate}
-\end{lemma}
+% where
+% %
+% \begin{enumerate}
+% \item $\repr{E_1} = \repr{E_2}$
+% \item $y = \find{\repr{E_1}}{x}$
+% \item $\freevars{E_1} = \freevars{E_2}$
+% \item $\mathsf{Height}(E_1) = \mathsf{Height}(E_2)$.
+% \end{enumerate}
+% \end{lemma}
 
-\begin{proof}
-The proof is by induction on the height of $E_1$.
-%
-\begin{description}
-\item[Case $E_1 \equiv |hole|$]: As $\repr{|hole|} = \emptyset$, we have $y \doteq x$  and $E_2 \doteq E_1$.
-\item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \equiv x$
-\item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \not \equiv x$
+% \begin{proof}
+% The proof is by induction on the height of $E_1$.
+% %
+% \begin{description}
+% \item[Case $E_1 \equiv |hole|$]: As $\repr{|hole|} = \emptyset$, we have $y \doteq x$  and $E_2 \doteq E_1$.
+% \item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \equiv x$
+% \item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \not \equiv x$
 
-\end{description}
-\end{proof}
+% \end{description}
+% \end{proof}
 
+\subsection{\rduni is a Kernel of $\runi$}
 
 \begin{lemma}[$\rduni$-Kernel] \label{lem:d-kernel}
     $\rduni$ is a kernel of $\runi$
@@ -249,145 +514,78 @@ TODO
 By \cref{lem:d-lc}, \cref{lem:d-noetherian} and \cref{lem:local}.
 \end{proof}
 
-\begin{verbatim}
-Theorem: Forall g |- C, exists unique C* = CANON(g, C) such that
-    (1) g |-* C*
-    (2) g |-  C -->> C*
+\begin{lemma}[Exchange] \label{lem:exch}
+\begin{itemize}
+\item If $\runders{\reprg{g}{E}}{e_1}{e_2}$ then $\runders{g}{E[e_1]}{E[e_2]}$
+\item If $\runders{\reprg{g}{E}}{E_1}{E_2}$ then $\runders{g}{E[E_1]}{E[E_2]}$
+\end{itemize}
+\end{lemma}
 
-Proof: By induction on C
+\begin{proof}
+By induction on the derivation of $\runders{\reprg{g}{E}}{\cdot}{\cdot}$ using \cref{lem:exch-one}.
+\end{proof}
 
-Case C = |hole|:
-    return C* = C
+\begin{lemma}[Exchange-1]\label{lem:exch-one}
+    If $\runder{\reprg{g}{E}}{e_1}{e_2}$ then $\runder{g}{E[e_1]}{E[e_2]}$.
+\end{lemma}
 
-Case C = ... C' ...:
+\begin{proof} By induction on the structure of $E$.
 
-    C'* = CANON(g, C')
+\begin{description}
+\item[Case] $E \equiv |hole|$ Immediate as the consequence is the same as the hypothesis.
+% \item[Case] $E \equiv x=y; E'$ Given
+%     \begin{align*}
+%         % & \runder{\reprg{g}{x = y; E'}{e_1}{e_2} \\
+%         % \intertext{by the definition of $\reprg{}{}$}
+%         % & \runder{\reprg{\union{g}{x}{y}}{E'}{e_1}{e_2} \\
+%         % \intertext{by the IH}
+%         % & \runder{\reprg{\union{g}{x}{y}}{E'[e_1]}{E'[e_2]} \\
+%         % \intertext{by \cref{lem:exch-x-y}}
+%         % & \runder{g}{x = y; E'[e_1]}{x = y; E'[e_2]} \\
+%         % \intertext{\ie $\runder{g}{E[e_1]}{E[e_2]}$}
+%     \end{align*}
 
-        As g |- C we have g |- C'
-        by IH
-            (1') g |-* C'*
-            (2') g |-  C' -->> C'*
+% \item[Case] $E \equiv S[E']$ where $\skipc{S}$ Given
+%     \begin{align*}
+%         & \runder{\reprg{g}{S[E']}}{e_1}{e_2} \\
+%         \intertext{by the definition of $\reprg{}{}$ as $\skipc{S}$}
+%         & \runder{\reprg{g}{E'}}{e_1}{e_2} \\
+%         \intertext{by the IH}
+%         & \runder{g}{E'[e_1]}{E'[e_2]} \\
+%         \intertext{by \cref{lem:exch-id} using $S$}
+%         & \runder{g}{E[e_1]}{E[e_2]}
+%     \end{align*}
+\end{description}
+\end{proof}
 
-    C*  = ... C'* ...
+\begin{lemma}[exch-id] \label{lem:exch-id}
+    If $\reprg{g}{C} = g$ and $\runder{g}{e_1}{e_2}$ then $\runder{g}{C[e_1]}{C[e_2]}$.
+\end{lemma}
+\begin{proof} Any reduction step
+    \begin{align*}
+        \runder{g}{e_1}{e_2} & \equiv \runder{g}{E[x = y; E'[x]]}{E[x = y; E'[y]]} \\
+        \intertext{where $\live{\reprg{g}{E}}{y}$. As $\reprg{g}{C[E]} = \reprg{\reprg{g}{C}}{E}$ via \cref{lem:repr}
+        and $\reprg{g}{C} = g$ we have}
+        & \live{\reprg{g}{C[E]}{y}} \\
+        \intertext{Hence, the following redux is also valid completing the proof}
+        \runder{g}{C[e_1]}{C[e_2]} & \equiv \runder{g}{C[E[x = y; E'[x]]]}{C[E[x = y; E'[y]]]}
+    \end{align*}
+\end{proof}
 
-        From (1') and def of |-* we get
+\begin{lemma}[repr] \label{lem:repr}
+$\reprg{g}{E_1[E_2]} = \reprg{\reprg{g}{E_1}}{E_2}$.
+\end{lemma}
+\begin{proof}
+    By induction on $E_1$.
+\end{proof}
 
-            g |-* ... C'* ...  i.e.  (1)
+\begin{lemma}[exch-x-y] \label{lem:exch-x-y}
+\begin{itemize}
+\item If $\runders{\union{g}{x}{y}}{e}{e'}$ then \runders{g}{ x = y; e }{x = y; e'}.
+\item If $\runders{\union{g}{x}{y}}{E}{E'}$ then \runders{g}{ x = y; E }{x = y; E'}.
+\end{itemize}
+\end{lemma}
 
-        Using the context  CC = ... hole ... (such that g . CC = g) (2') is
-
-            g . CC |-  C' -->> C'*
-
-        Hence, from [exch]
-
-            g |- ... C'... -->> ... C'* ...     i.e. (2)
-
-Case C = x = y; C':
-
-    C'' = subst(C', x, y)
-
-        x=y; C' -->> x=y; C''
-
-        As g |- x=y; C'   by [lem:steps-under] we have
-
-            g |- x=y; C' -->> g |- x=y; C''  (a)
-
-        As no free x in C''
-
-            g + [x => y] |- C''              (b)
-
-    C'* = CANON(g, C'')
-
-        By IH we get
-
-             (1') g + [x=>y] |-* C'*
-             (2') g + [x=>y] |-  C'' -->> C'*
-
-    return C* = x = y; C'*
-
-        By (1') we get
-
-            (1) g |-* C*
-
-        By (1') + [exchange]
-
-            (2'') g |- x=y;C'' -->> x=y;C'*
-
-        Combining with (a) and [under-trans] we get
-
-            (2) g |- x = y; C' -->> x = y; C'*
-QED.
-
--------------------------------------------------------------------------
-
-
-Lem: [exch] IF g . C |- X ->> X' THEN g |- C[X] ->> C[X']
-Proof: By induction on -->> using [exch-one]
-
-Lem: [exch-one] IF g . C |- e1 -> e2 THEN g |- C[e1] -> C[e2]
-Proof: By induction on C. See notes for key case `x = y`.
-
-    case C is x=y; C':
-
-      Given
-
-        g . (x = y; C') |- e1 -> e2
-
-        {- by def of . -}
-
-        (g + [g*(x) => g*(y)]) . C' |- e1 -> e2
-
-        {- by IH -}
-
-        (g + [g*(x) => g*(y)])  |- C'[e1] -> C'[e2]
-
-        {- by [exch-x-y] -}
-
-        g  |- x = y; C'[e1] -> x = y; C'[e2]
-
-        i.e. g |- C[e1] -> C[e2]
-
-    case C is |hole|:
-        Trivial
-
-    case C is ...C'...:
-      Given
-        g . ( ... C' ...) |- e1 -> e2
-
-        {- by def of . -}
-
-        g . C' |- e1 -> e2
-
-        {- by IH -}
-
-        g |- C'[e1] -> C'[e2]
-
-        {- by [exch-id] using C = ... hole ... -}
-
-        g |- ... C'[e1] ... -> ... C'[e2] ...
-QED.
-
-Lemma: [exch-id] If g . C == g and g |- e1 -> e2 then g |- C[e1] -> C[e2]
-Proof: The redux
-
-            g |- e1 -> e2 equiv g |- C'[x = y; E[x]] -> C'[x = y; E[y]]
-
-       where  g . C' |- y
-
-       As g . C[C'] = (g . C) . C' = g . C' we have
-
-            g . C[C'] |- y
-
-       Hence, the redux
-
-            g |- C[e1] -> C[e2] equiv g |- C[C'[x = y; E[x]]] -> C[C'[x = y; E[y]]]
-
-       is also valid.
-QED.
-
-Lemma: [exch-x-y]
-    * IF UNION(g, x, y) |- e -> e' THEN g |- x = y; e -> e'
-    * IF UNION(g, x, y) |- E -> E' THEN g |- x = y; E -> E'
-Proof: "By definition" of . aka of the g |- e1 -> e2 relation. QED.
-
-\end{verbatim}
+\begin{proof}
+By the definition of the $\reprg{g}{E}$ function (\ie by the definition $\runder{g}{\cdot}{\cdot}$ relation.
+\end{proof}
