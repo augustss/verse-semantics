@@ -205,10 +205,25 @@ is well-founded and hence Noetherian.
 \subsection{Canonicalization}
 
 To prove that $\rduni$ is a kernel of $\runi$ we first establish
-a more general \emph{canonicalization} property of $\rduni$ which says
-that the relation lets us reduce any term to a form where each
-variable is replaced by its unique \emph{representative}
-in the context in which the variable appears.
+a more general \emph{canonicalization} property of $\rduni$ which
+says that given any term of the form $C[E[x]]$ where $E$ is an outer
+context and $E'$ an inner one, we can use $\rlive$ to
+%
+(1) \emph{Canonicalize} the outer context into $E^{*}$ where the equations
+    follow a left-to-right order and
+%
+(2) Replace the variable $x$ in $E'$ with its canonical \emph{representative}
+    in $E^{*}$.
+
+\begin{theorem}[Canon] \label{thm:canon}
+$\rsteps{\rlive}{E[E'[x]]}{\cnn{E}{}[E'{x^{*}}]}$ where $x^{*} = \find{\repr{E}}{x}$.
+\end{theorem}
+
+\begin{proof}
+The above is a corollary of \cref{thm:canon-ctx} and \cref{thm:canon-var}
+which respectively show how to canonicalize a context $E$ and a variable $x$
+but under an arbitrary set of equations summarized by a UF graph $g$.
+\end{proof}
 
 \mypara{Reduction Under a Graph}
 %
@@ -364,12 +379,14 @@ By induction on the structure of $E$.
 \end{description}
 \end{proof}
 
-\begin{theorem}[Canon-Ctx]
+\begin{theorem}[Canon-Ctx] \label{thm:canon-ctx}
 If \live{g}{E} there is a $\cnn{g}{E}$ such that
 %
 (1) $\canon{g}{\cnn{g}{E}}$ and
 %
 (2) $\runders{g}{E}{\cnn{g}{E}}$
+%
+(3) $\reprg{g}{E} = \reprg{g}{\cnn{g}{E}}$.
 \end{theorem}
 
 \begin{proof} By induction on the height of $E$ \label{def:height}.
@@ -393,7 +410,7 @@ $$\begin{array}{lcl}
 
 \begin{description}
 \item[Case] $E \equiv |hole|$
-    Let $\cnn{g}{|hole|} \equiv |hole|$; facts (1) and (2) follow trivially.
+    Let $\cnn{g}{|hole|} \equiv |hole|$; facts (1), (2) and (3) follow trivially.
 
 \item[Case] $E \equiv S[E_1]$ where $\skipc{S}$ Let
     \begin{align}
@@ -401,6 +418,7 @@ $$\begin{array}{lcl}
     \intertext{As $\live{g}{E}$ we have $\live{g}{E_1}$ and so by the IH we get}
         & \canon{g}{\cnn{g}{E_1}} \label{eq:canon-ctx-1} \\
         & \runders{g}{E_1}{\cnn{g}{E_1}} \label{eq:canon-ctx-2} \\
+        & \reprg{g}{E_1} = \reprg{g}{\cnn{g}{E_1}} \label{eq:canon-ctx-2-r} \\
     \intertext{Now let}
     \cnn{g}{E} & \doteq S[\cnn{g}{E_1}] \nonumber
     \intertext{From \cref{eq:canon-ctx-2} and the definition of $\canon{}{}$ we get}
@@ -409,6 +427,7 @@ $$\begin{array}{lcl}
         & \runders{\reprg{g}{S}}{E_1}{\cnn{g}{E_1}} \nonumber \\
     \intertext{which by \cref{lem:exch} is}
         & \runders{g}{S[E_1]}{S[\cnn{g}{E_1}]} \ldots (2) \nonumber
+    \intertext{and (3) follows from \cref{eq:canon-ctx-2-r}, $\skipc{S}$ and the definition of $\reprg{}{}$.}
     \end{align}
 
 \item[Case] $E \equiv x = y; E_1$ Let
@@ -425,6 +444,7 @@ $$\begin{array}{lcl}
     \intertext{Hence by the IH we get}
         & \canon{g'}{E_1^{*}} \label{eq:canon-ctx-var-c} \\
         & \runders{g'}{E_1'}{E_1^{*}} \nonumber \\
+        & \reprg{g'}{E_1'} = \reprg{g'}{E_1^{*}} \label{eq:canon-ctx-g}\\
     \intertext{which \cref{lem:exch} turns into}
         & \runders{g}{x = y; E_1'}{x = y; E_1^{*}} \label{eq:canon-ctx-var-d}\\
     \intertext{Let}
@@ -433,6 +453,7 @@ $$\begin{array}{lcl}
         & \canon{g}{\cnn{g}{E}} \ldots (1) \nonumber \\
     \intertext{By sequencing \cref{eq:canon-ctx-var-a} and \cref{eq:canon-ctx-var-d} with \cref{lem:under-trans} we get}
         & \runders{g}{E}{\cnn{g}{E}} \ldots (2) \nonumber
+    \intertext{and (3) follows from \cref{eq:canon-ctx-g}, the definition of $\reprg{}{}$ and $\live{g}{x}$, $\live{g}{y}$.}
     \end{align}
 
 \end{description}
@@ -450,41 +471,19 @@ $$\begin{array}{lcl}
 $$\begin{array}{lcl}
 \mathsf{Height}(|hole|     )  & \doteq & 0  \\
 \mathsf{Height}(|x = y; E| )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|x = E; e| )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|ue; E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|E v|      )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|v E|      )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|def x E|  )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|E choice e|) & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|e choice E|) & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|all E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
-\mathsf{Height}(|one E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+\mathsf{Height}(S[E])         & & \\
+  \quad \vb\ \skipc{S}  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|x = E; e| )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|ue; E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|E v|      )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|v E|      )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|def x E|  )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|E choice e|) & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|e choice E|) & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|all E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
+% \mathsf{Height}(|one E|    )  & \doteq & 1 + \mathsf{Height}(E) \\
 \end{array}$$
 \end{definition}
-
-% \begin{lemma}[Canonicalization] \label{lem:d-canon}
-% For all $x, E, E_1$, $\rsteps{\rlive}{E_1[E[x]]}{E_2[E[y]]}$
-
-% where
-% %
-% \begin{enumerate}
-% \item $\repr{E_1} = \repr{E_2}$
-% \item $y = \find{\repr{E_1}}{x}$
-% \item $\freevars{E_1} = \freevars{E_2}$
-% \item $\mathsf{Height}(E_1) = \mathsf{Height}(E_2)$.
-% \end{enumerate}
-% \end{lemma}
-
-% \begin{proof}
-% The proof is by induction on the height of $E_1$.
-% %
-% \begin{description}
-% \item[Case $E_1 \equiv |hole|$]: As $\repr{|hole|} = \emptyset$, we have $y \doteq x$  and $E_2 \doteq E_1$.
-% \item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \equiv x$
-% \item[Case $E_1 \equiv x_1 = y_1; E_1'$] when $x_1 \not \equiv x$
-
-% \end{description}
-% \end{proof}
 
 \subsection{\rduni is a Kernel of $\runi$}
 
@@ -533,28 +532,28 @@ By induction on the derivation of $\runders{\reprg{g}{E}}{\cdot}{\cdot}$ using \
 
 \begin{description}
 \item[Case] $E \equiv |hole|$ Immediate as the consequence is the same as the hypothesis.
-% \item[Case] $E \equiv x=y; E'$ Given
-%     \begin{align*}
-%         % & \runder{\reprg{g}{x = y; E'}{e_1}{e_2} \\
-%         % \intertext{by the definition of $\reprg{}{}$}
-%         % & \runder{\reprg{\union{g}{x}{y}}{E'}{e_1}{e_2} \\
-%         % \intertext{by the IH}
-%         % & \runder{\reprg{\union{g}{x}{y}}{E'[e_1]}{E'[e_2]} \\
-%         % \intertext{by \cref{lem:exch-x-y}}
-%         % & \runder{g}{x = y; E'[e_1]}{x = y; E'[e_2]} \\
-%         % \intertext{\ie $\runder{g}{E[e_1]}{E[e_2]}$}
-%     \end{align*}
+\item[Case] $E \equiv x=y; E'$ Given
+    \begin{align*}
+        & \runder{\reprg{g}{x = y; E'}}{e_1}{e_2} \\
+        \intertext{by the definition of $\reprg{}{}$}
+        & \runder{\reprg{\union{g}{x}{y}}{E'}}{e_1}{e_2} \\
+        \intertext{by the IH}
+        & \runder{\reprg{\union{g}{x}{y}}}{E'[e_1]}{E'[e_2]} \\
+        \intertext{by \cref{lem:exch-x-y}}
+        & \runder{g}{x = y; E'[e_1]}{x = y; E'[e_2]} \\
+        \intertext{\ie $\runder{g}{E[e_1]}{E[e_2]}$}
+    \end{align*}
 
-% \item[Case] $E \equiv S[E']$ where $\skipc{S}$ Given
-%     \begin{align*}
-%         & \runder{\reprg{g}{S[E']}}{e_1}{e_2} \\
-%         \intertext{by the definition of $\reprg{}{}$ as $\skipc{S}$}
-%         & \runder{\reprg{g}{E'}}{e_1}{e_2} \\
-%         \intertext{by the IH}
-%         & \runder{g}{E'[e_1]}{E'[e_2]} \\
-%         \intertext{by \cref{lem:exch-id} using $S$}
-%         & \runder{g}{E[e_1]}{E[e_2]}
-%     \end{align*}
+\item[Case] $E \equiv S[E']$ where $\skipc{S}$ Given
+    \begin{align*}
+        & \runder{\reprg{g}{S[E']}}{e_1}{e_2} \\
+        \intertext{by the definition of $\reprg{}{}$ as $\skipc{S}$}
+        & \runder{\reprg{g}{E'}}{e_1}{e_2} \\
+        \intertext{by the IH}
+        & \runder{g}{E'[e_1]}{E'[e_2]} \\
+        \intertext{by \cref{lem:exch-id} using $S$}
+        & \runder{g}{E[e_1]}{E[e_2]}
+    \end{align*}
 \end{description}
 \end{proof}
 
@@ -589,3 +588,66 @@ $\reprg{g}{E_1[E_2]} = \reprg{\reprg{g}{E_1}}{E_2}$.
 \begin{proof}
 By the definition of the $\reprg{g}{E}$ function (\ie by the definition $\runder{g}{\cdot}{\cdot}$ relation.
 \end{proof}
+
+\begin{lemma}[Wrap] \label{lem:wrap}
+If $\runder{g}{E[x]}{E[y]}$ then $\runder{g}{E[E_1[x]]}{E[E_1[y]]}$.
+\end{lemma}
+\begin{proof}
+Assume $\runder{g}{E[x]}{E[y]}$. By inversion we have
+\begin{align*}
+    E & \equiv E'[x = y; E'']  \\
+    \intertext{that is the original reduction is of the form}
+    \runder{g}{E[x]}{E[y]} & \equiv \runder{g}{E'[x = y; E''[x]]}{E'[x=y; E''[y]]}  \\
+    \intertext{where $\live{\reprg{g}{E'}}{y}$. Hence the following reduction is also valid}
+      & \runder{g}{E'[x = y; E''[E_1[x]]]}{E'[x=y; E''[E_1[y]]]}  \\
+    \intertext{that is}
+      & \runder{g}{E[E_1[x]]}{E[E_1[y]]}
+\end{align*}
+\end{proof}
+
+\mypara{Lowering Reductions} Recall that $\rlive$ operates at a ``whole term''
+level, meaning that $\rstep{\rlive}{e}{e'}$ \emph{does not} imply that
+$\rstep{\rlive}{E[e_1]}{E[e_2]}$ for any surrounding context $E$.
+%
+However we show that \emph{if} all the variables in $e$ are \emph{live}
+with respect to $\repr{E}$ then in fact, $\rstep{\rlive}{E[e_1]}{E[e_2]}$.
+%
+This is captured more generally by the following lemma which generalizes
+the surrounding context $E$ with its UF graph $g$.
+
+% crucial
+\begin{lemma}[Steps Under] \label{lem:steps-under}
+\begin{itemize}
+    \item If $\live{g}{e}$ and $\rsteps{\rlive}{e}{e'}$ then $\runders{g}{e}{e'}$.
+    \item If $\live{g}{E}$ and $\rsteps{\rlive}{E}{E'}$ then $\runders{g}{E}{E'}$.
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+By induction on the derivation of $\rsteps{\rlive}{e}{e'}$ (resp. $\rsteps{\rlive}{E}{E'}$)
+using \cref{lem:step-under}.
+\end{proof}
+
+\begin{lemma}[Step Under] \label{lem:step-under}
+    If $\live{g}{e}$ and $\rstep{\rlive}{e}{e'}$ then $\runder{g}{e}{e'}$.
+\end{lemma}
+
+\begin{proof}
+By inversion
+\begin{align*}
+    \rstep{\rlive}{e}{e'} & \equiv \rstep{\rlive}{C[x=y; E[x]]}{C[x=y; E[y]]} \\
+    \intertext{where $\live{\repr{C}}{y}$. As $\live{g}{e}$ we have}
+      & \live{g}{C} \\
+      & \live{g}{y} \\
+    \intertext{and so by \cref{lem:live-under} we get}
+      & \live{\reprg{g}{C}}{y} \\
+    \intertext{Let $\hat{C}$ be any context such that $\repr{\hat{C}} = g$. By \cref{lem:repr}} \\
+      \repr{\hat{C}[C]} & = \reprg{g}{C} \\
+    \intertext{and hence we have}
+      & \live{\repr{\hat{C}[C]}}{y} \\
+    \intertext{Hence, the following reduction is also valid}
+      & \rstep{\rlive}{\hat{C}[C[x=y; E[x]]]}{\hat{C}[C[x=y; E[y]]]} \\
+    \intertext{\ie $\rstep{\rlive}{\hat{C}[e]}{\hat{C}[e']}$.}
+\end{align*}
+\end{proof}
+ANCHOR
