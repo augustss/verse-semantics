@@ -24,7 +24,7 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 --------------------------------------------------------------------------------
 
 main = quickCheckWith args prop_NormalForms
-  where args = stdArgs{ maxSuccess = 1000 }
+  where args = stdArgs{ maxSuccess = 10000 }
 
 #if NO_STRUCT_RULES
 -- After reduction, canonicalize results.
