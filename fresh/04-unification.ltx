@@ -23,6 +23,9 @@
 \newcommand{\extg}[3]{#1, #2 \mapsto #3}
 \newcommand{\cnn}[2]{{#2}^{*}_{#1}}
 \newcommand{\mkcnn}[2]{\ensuremath{\mathsf{Canon}(#1, #2)}}
+\newcommand{\appg}[2]{#1 ++ #2}
+\newcommand{\dom}[1]{\mathsf{dom}(#1)}
+
 
 \section{Confluence of Unification}
 
@@ -60,7 +63,7 @@ Let us recall the notion of union-find graphs, a directed-graph
 based representation of equivalence classes \cite{CLRS}.
 
 \begin{definition}[UF] A \emph{union-find graph} (abbreviated to just graph)
-    is a sequence of bindings $[x_1 \mapsto x_1', \ldots, x_n \mapsto x_n']$
+    $g$ is a sequence of bindings $[x_1 \mapsto x_1', \ldots, x_n \mapsto x_n']$
     such that
 %
 \begin{enumerate}
@@ -70,11 +73,10 @@ based representation of equivalence classes \cite{CLRS}.
 \item (Acyclic) forall $i \leq j$, we have $x_i \not \equiv x_j'$.
 %
 \end{enumerate}
+We write $\dom{g}$ for the domain of $g$, \ie the set $\{x_1, \ldots, x_n\}$.
 \end{definition}
 
-\begin{lemma}[UF] \label{lem:uf-find}
-Forall $g \equiv [x \mapsto y; \ldots]$, we have $\find{g}{x} = \find{g}{y}$.
-\end{lemma}
+
 
 \begin{definition}[FIND]
 %
@@ -85,18 +87,33 @@ of $x$ in $g$ written $\parent{g}{x}$ (resp. $\find{g}{x}$)
 as:
 %
 $$\begin{array}{rcl}
-\parent{g}{x} & \doteq & \begin{cases}
-                        y & \text{if}\ x \mapsto y \in g \\
-                        x & \text{otherwise}
-                    \end{cases} \\
-\find{g}{x} & \doteq & \begin{cases}
-                        \find{g}{y} & \text{if}\ x \mapsto y \in g \\
-                        x & \text{otherwise}
-                    \end{cases} \\
+\find{g}[b_1,\ldots,b_n] & \doteq & \begin{cases}
+    \find{[b_{i+1},\ldots,b_n]}{x'} & \text{if } \exists b_i \equiv x \mapsto x' \\
+    x & \text{otherwise}
+\end{cases}
+% \parent{g}{x} & \doteq & \begin{cases}
+%                         y & \text{if}\ x \mapsto y \in g \\
+%                         x & \text{otherwise}
+%                     \end{cases} \\
+% \find{g}{x} & \doteq & \begin{cases}
+%                         \find{g}{y} & \text{if}\ x \mapsto y \in g \\
+%                         x & \text{otherwise}
+%                     \end{cases} \\
 \end{array}$$
-%
-The \emph{Acyclic} invariant ensures that $\find{g}{\cdot}$ is well-defined.
 \end{definition}
+
+The \emph{Acyclic} and finite map invariants ensure the following property of $\find{g}{\cdot}$.
+
+\begin{lemma} \label{lem:find}
+If $x \not \in \dom{g}$ then $\find{\appg{g}{g'}}{x} = \find{g'}{x}$.
+\end{lemma}
+\begin{proof}
+    Immediate from the definition of $\find{g}{\cdot}$.
+\end{proof}
+
+% \begin{lemma}[UF] \label{lem:uf-find}
+% Forall $g \equiv \appg{[x \mapsto y]}{g'}$, we have $\find{g}{x} = \find{g}{y}$.
+% \end{lemma}
 
 \begin{definition}[UNION]
 Let $g$ be a UF graph and $x, y$ be distinct variables. Define the new graph $g' = \union{g}{x}{y}$ as:
@@ -492,7 +509,25 @@ $$\begin{array}{lcl}
 \end{lemma}
 
 \begin{proof}
-TODO
+$\rduni \subseteq \runi$ is trivial, as every reduction in the former is included in the latter.
+%
+Next, we show that whenever $\rstep{\runi}{e_1}{e_2}$ there exists an $e_3$ such that
+$\rsteps{\rduni}{e_1,e_2}{e_3}$.
+%
+\begin{description}
+    \item[Case] $\rstep{\rduni}{e_1}{e_2}$, here simply pick $e_3 = e_2$.
+    \item[Case] Not $\rstep{\rduni}{e_1}{e_2}$. By inversion we have that
+    \begin{align*}
+        \rstep{\runi}{e_1}{e_2} & \equiv E[x = y; E'[x]] \movesto E[x = y; E'[y]] \text{where not}\ \live{E}{y} \\
+        \intertext{Here, we define}
+        E^* & = \cnn{}{E} \\
+        x^* & = \find{(E^*)}{x} \\
+        y^* & = \find{(E^*)}{y} \\
+        e_3 & = E^*[x^* = y^*; E'[y^*]] \\
+        \intertext{and by repeated applications of \cref{thm:canonical} we have}
+        & \rsteps{\runi}{e_1,e_2}{e_3}
+    \end{align*}
+\end{description}
 \end{proof}
 
 \subsection{\rduni is (Locally) Confluent}
@@ -650,4 +685,31 @@ By inversion
     \intertext{\ie $\rstep{\rlive}{\hat{C}[e]}{\hat{C}[e']}$.}
 \end{align*}
 \end{proof}
-ANCHOR
+
+
+\begin{lemma}[Live Under] \label{lem:live-under}
+    If $\live{g}{e}$ and $\live{g}{x}$ and $\live{\repr{E}}{x}$ then $\live{\reprg{g}{E}}{x}$.
+\end{lemma}
+\begin{proof}
+    By \cref{lem:live-dep} $\reprg{g}{E} = \appg{g}{\repr{E}}$.
+    As $\live{g}{x}$, we have $x \not \in \dom{g}$.
+    As $\live{\repr{E}}{x}$, we have $x \not \in \dom{\repr{E}}$.
+    Hence, $x \not \in \dom{\appg{g}{\repr{E}}}$, \ie
+    $x \not \in \dom{\reprg{g}{E}}$, and so $\live{\reprg{g}{E}}{x}$.
+\end{proof}
+
+\begin{lemma}[Live Dep] \label{lem:live-dep}
+    If $\live{g}{e}$ then $\reprg{g}{E} = \appg{g}{\repr{E}}$.
+\end{lemma}
+\begin{proof}
+    Follows from \cref{lem:live-dep-ind}, with $g' = \emptyset$.
+\end{proof}
+
+\begin{lemma} \label{lem:live-dep-ind}
+    If $\live{g}{e}$ then $\reprg{\appg{g}{g'}}{E} = \appg{g}{\reprg{g'}{E}}$.
+\end{lemma}
+\begin{proof}
+    By induction on the structure of $E$, using the fact (from \cref{lem:find}) that
+    forall $g, x$ if $\live{g}{x}$ then $\find{\appg{g}{g'}}{x} = \find{g'}{x}$.
+    %RJ: TODO copy from my notes.
+\end{proof}

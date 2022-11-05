@@ -241,7 +241,7 @@ By induction on the structure of $A$ (symm. $E$), splitting cases on the reducti
 occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
 Then consider $A \equiv |x == hole; e|$.
 %
-Now $\rstep{\rord}{A[x]}{x; e}$ but
+Now $\rstep{\rord}{A[x]}{x; e}$ \verb+IF YOU ALLOW "x=x -> x"+ but
 $x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
 as $\lambda$ comparisons |fail|.
 
