@@ -912,7 +912,7 @@ Each rule ensures the redex is either under $e_1$ or $e_2$, or
 occurs under a $ce$ in $CX$ and remains choice-free after
 the reduction \cref{lem:ce-step}, or contains a subterm
 $e \equiv CX'[e_1 \vb e_2]$ that is preserved after the
-step allowing us to use \cref{lem:under-cx}.
+step allowing us to use \cref{lem:spec-under-cx}.
 
 \item[Case: $\rr$ via \rulename{fail-seq*}]
 %
@@ -933,7 +933,7 @@ $(e_1 \vb e_2)$ as $CX$ does not go under values.
 \item[Case: $\rr$ via \rulename{choose}]
 The tricky case is when $\rdx{1} \movesto \rdx{1}$
 is also a \rulename{choose} step.
-\cref{lem:choice-under-choice} shows that
+\cref{lem:choose-under-choose} shows that
 the pair of reduction still falls under one
 of the three patterns above.
 %
@@ -946,7 +946,30 @@ Case (h,i) fall in the \cref{lem:spec-under-cx} pattern via \cref{lem:ce-step}.
 \end{proof}
 
 
-\begin{lemma}[spec-under-CX] \label{lem:spec-under-CX}
+\begin{lemma}[choose-under-choose] \label{lem:choose-under-choose}
+If
+  $\rdx{2} \equiv SX_2[CX_2[e_{21} \vb e_{22}]] \movesto SX_2[CX_2[e_{21}] \vb CX_2[e_{22}]]$ and
+  $\rdx{1} \equiv SX_1[CX_1[e_{11} \vb e_{12}]] \movesto SX_1[CX_1[e_{11}] \vb CX_1[e_{12}]]$ and
+  $\rdx{1} \subseteq \rdx{2}$
+Then one of the following must hold
+\begin{itemize}
+    \item{(a)} $SX_1 = SX_2$, $CX_1 = CX_2$ and $\rdx{1}' = \rdx{2}'$.
+    \item{(b)} $\rdx{1} \subseteq e_1$
+    \item{(c)} $\rdx{1} \subseteq e_2$
+    \item{(d)} $SX_1[\ldots] = e_{21} \vb e_{22}$ and $CX_1[\ldots] \subseteq e_{21}$
+    \item{(e)} $SX_1[\ldots] = e_{21} \vb e_{22}$ and $CX_1[\ldots] \subseteq e_{22}$
+    \item{(f)} $CX_2[\ldots] = CX_2'[CX_2''[\ldots] = e]$ and $\rdx{1} \subseteq e$
+    \item{(g)} $CX_2[\ldots] = CX_2'[CX_2''[\ldots] ; e]$ and $\rdx{1} \subseteq e$
+    \item{(h)} $CX_2[\ldots] = CX_2'[ce = CX_2''[\ldots]]$ and $\rdx{1} \subseteq ce$
+    \item{(i)} $CX_2[\ldots] = CX_2'[ce ; CX_2''[\ldots]]$ and $\rdx{1} \subseteq ce$
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+    By induction on the structure of $CX_2$ using \cref{lem:unique-cx}.
+\end{proof}
+
+\begin{lemma}[spec-under-CX] \label{lem:spec-under-cx}
 If for all $e$, we have $\rstep{\rr}{CX[e]}{CX'[e]}$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYJ1tlXzFdfENYJ1tlXzJdXSJdLFswLDIsIlNYW0NYJ1tlXzF8ZV8yXV0iXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iXSxbMSwyLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxccnIiLDJdLFszLDIsIlxccnVsZW5hbWV7Y2hvb3NlfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
 \[\begin{tikzcd}
