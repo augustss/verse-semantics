@@ -770,19 +770,16 @@ If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e][e]}$:
 \end{tikzcd}\]
 \end{lemma}
 
-HEREHEREHERE
-
 \begin{lemma}[Delete] \label{lem:p-del}
 If forall $e$, we have $\rstep{\rr}{OA'[e]}{e'}$:
-
-% https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzEsMSwieD12O09BW09BJ1tBXzFbdl1dXSJdLFswLDIsIng9djtPQVtlXSJdLFswLDEsIlxccnVuaSJdLFsxLDIsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifX19XSxbMCwyLCJcXHJyIiwyXV0=
+% https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMiwieD12O09BW2VdIl0sWzIsMCwieD12O09BW09BJ1tBXzFbdl1dXSJdLFswLDEsIlxccnIiLDJdLFswLDIsIlxccnVuaSJdLFsyLDEsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
 \[\begin{tikzcd}
-	{x=v;OA[OA'[A_1[x]]]} \\
-	& {x=v;OA[OA'[A_1[v]]]} \\
+	{x=v;OA[OA'[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	\\
 	{x=v;OA[e]}
-	\arrow["\runi", from=1-1, to=2-2]
-	\arrow["\rr"', dashed, from=2-2, to=3-1]
 	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["\rr", dotted, from=1-3, to=3-1]
 \end{tikzcd}\]
 \end{lemma}
 
@@ -814,7 +811,7 @@ then there exists $\rdx{\runi}''$ such that
 TODO
 \end{proof}
 
-\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+\begin{lemma}[Under-\rulename{choose}] \label{lem:under-choose}
 If $\rdx{2} \equiv \rstep{}{SX[CX[e_1 \vb e_2]]}{SX[CX[e_1] \vb CX[e_2]]} \equiv \rdx{2}'$ and
    $\rdx{2} \equiv E[\rdx{1}]$ and
    $\rstep{\rr}{\rdx{1}}{\rdx{1}'}$
@@ -827,33 +824,132 @@ then there exists $\rdx{2}''$ such that
 By the definition of $SX$ and $CX$, we have that if
 $\rdx{2} \equiv E[\rdx{1}]$ \ie $\rdx{1} \subset \rdx{2}$
 then $\rstep{\rr}{E[\rdx{1}]}{E[\rdx{1}']}$ falls under one
-of the following cases, with the shown diagram completing the proof
-for that case.
+of the following cases -- depending on whether the step changes
+$CX$ or $e_1$ or $e_2$ -- with the shown diagram completing
+the proof for that case. We show this by splitting cases on
+the possible $\rr$ reduction:
 
 \begin{description}
-\item[Case : ``under $CX$'']
-\item[Case : ``under $e_1$'']
-\item[Case : ``under $e_2$'']
-\end{description}
+\item[Case: $\rr$ via \rulename{deref-*}, \rulename{u-tup}, \rulename{u-lit}, \rulename{u-fail}]
+\cref{lem:spec-under-cx} or \cref{lem:spec-under-1} or \cref{lem:spec-under-2} depending
+on whether the step modifies $CX$ or $e_1$ or $e_2$.
+%
+Note that the \rulename{u-fail} redex must be under $CX$ or $e_1$ or $e_2$ \ie cannot contain
+$(e_1 \vb e_2)$ as $CX$ does not go under values.
 
+
+\item[Case: $\rr$ via \rulename{app-*}]
+%
+\cref{lem:spec-under-cx} or \cref{lem:spec-under-1} or \cref{lem:spec-under-2} depending
+on whether the step modifies $CX$ or $e_1$ or $e_2$.
+
+\item[Case: $\rr$ via \rulename{choose-assoc}, \rulename{choose-r}, \rulename{choose-l}]
+%
+Either the redex occurs under a $ce$ in $CX$ (\cref{lem:spec-under-cx})
+or under $e_1$ or $e_2$ (\cref{lem:spec-under-1} or \cref{lem:spec-under-2}).
+%
+The only way the redex can contain $e_1 \vb e_2$ is if $e_1 \equiv (e_1' \vb e_1'')$
+and $CX \equiv |hole|$ which is impossible by the definition of \rulename{choose}.
+
+\item[Case: $\rr$ via \rulename{one-*}, \rulename{all-*}]
+Either the redex occurs under a $ce$ in $CX$ (\cref{lem:spec-under-cx})
+or under $e_1$ or $e_2$ (\cref{lem:spec-under-1} or \cref{lem:spec-under-2}).
+%
+The |one| and |all| constructs ensure that the redex cannot contain
+$(e_1 \vb e_2)$ as $CX$ does not go under |one| or |all|.
+
+\item[Case: $\rr$ via \rulename{norm-*}]
+%
+Each rule ensures the redex is either under $e_1$ or $e_2$, or
+occurs under a $ce$ in $CX$ and remains choice-free after
+the reduction \cref{lem:ce-step}, or contains a subterm
+$e \equiv CX'[e_1 \vb e_2]$ that is preserved after the
+step allowing us to use \cref{lem:under-cx}.
+
+\item[Case: $\rr$ via \rulename{fail-seq*}]
+%
+Either the redex occurs under a $ce$ in $CX$
+or under an $e$ in $CX$ (\cref{lem:spec-under-cx}),
+or under $e_1$ (\cref{lem:spec-under-1})
+or under $e_2$ (\cref{lem:spec-under-2})
+or occurs at the \emph{top-level} of $CX$
+(\ie $|CX| \equiv |hole; fail|$ or $|CX| \equiv |fail; hole|$)
+in which case we join at $SX[|fail|]$ after two $\rr$ steps.
+
+
+\item[Case: $\rr$ via \rulename{elim-def}]
+%
+Note that the \rulename{elim-def} redex must be under $CX$ or $e_1$ or $e_2$ \ie cannot contain
+$(e_1 \vb e_2)$ as $CX$ does not go under values.
+
+\item[Case: $\rr$ via \rulename{choose}]
 The tricky case is when $\rdx{1} \movesto \rdx{1}$
-is also a \rulename{choice} step.
+is also a \rulename{choose} step.
 \cref{lem:choice-under-choice} shows that
 the pair of reduction still falls under one
 of the three patterns above.
 %
 Case (a) is trivial as the $\rdx{2}'' = \rdx{2}'$.
-Case (b,c,d,e) fall into the ``under-$e_i$'' patterns.
-Case (f,g) fall in the ``under-$CX$'' pattern.
-Case (h,i) fall in the ``under-$CX$'' pattern via \cref{lem:ce-step}.
+Case (b,c,d,e) fall into the \cref{lem:spec-under-1} and \cref{lem:spec-under-2} patterns.
+Case (f,g) fall in the \cref{lem:spec-under-cx} pattern.
+Case (h,i) fall in the \cref{lem:spec-under-cx} pattern via \cref{lem:ce-step}.
 %
+\end{description}
 \end{proof}
+
+
+\begin{lemma}[spec-under-CX] \label{lem:spec-under-CX}
+If for all $e$, we have $\rstep{\rr}{CX[e]}{CX'[e]}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYJ1tlXzFdfENYJ1tlXzJdXSJdLFswLDIsIlNYW0NYJ1tlXzF8ZV8yXV0iXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iXSxbMSwyLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxccnIiLDJdLFszLDIsIlxccnVsZW5hbWV7Y2hvb3NlfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
+\[\begin{tikzcd}
+	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	\\
+	{SX[CX'[e_1|e_2]]} && {SX[CX'[e_1]|CX'[e_2]]}
+	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
+	\arrow["\rr", dotted, two heads, from=1-3, to=3-3]
+	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["{\rulename{choose}}", dotted, from=3-1, to=3-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{lemma}[spec-under-$e_1$] \label{lem:spec-under-1}
+If for all $e_1, e_2$ we have if $\rstep{\rr}{CX[e_1 \vb e_2]}{CX[e_1' \vb e_2]}$
+then $\rstep{\rr}{CX[e_1]}{CX[e_1']}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYW2VfMSddfENYW2VfMl1dIl0sWzAsMiwiU1hbQ1hbZV8xJ3xlXzJdXSJdLFswLDEsIlxccnVsZW5hbWV7Y2hvb3NlfSJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJcXHJyIiwyXSxbMywyLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
+\[\begin{tikzcd}
+	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	\\
+	{SX[CX[e_1'|e_2]]} && {SX[CX[e_1']|CX[e_2]]}
+	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
+	\arrow["\rr", dotted, from=1-3, to=3-3]
+	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["{\rulename{choose}}", dotted, from=3-1, to=3-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{lemma}[spec-under-$e_2$] \label{lem:spec-under-2}
+If for all $e_1, e_2$ we have if $\rstep{\rr}{CX[e_1 \vb e_2]}{CX[e_1 \vb e_2']}$
+then $\rstep{\rr}{CX[e_2]}{CX[e_2']}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYW2VfMV18Q1hbZV8yJ11dIl0sWzAsMiwiU1hbQ1hbZV8xfGVfMiddXSJdLFswLDEsIlxccnVsZW5hbWV7Y2hvb3NlfSJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJcXHJyIiwyXSxbMywyLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
+\[\begin{tikzcd}
+	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	\\
+	{SX[CX[e_1|e_2']]} && {SX[CX[e_1]|CX[e_2']]}
+	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
+	\arrow["\rr", dotted, from=1-3, to=3-3]
+	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["{\rulename{choose}}", dotted, from=3-1, to=3-3]
+\end{tikzcd}\]
+\end{lemma}
 
 \begin{lemma}[$ce$-step] \label{lem:ce-step}
 If $\rstep{\rulename{choose}}{|ce|}{e'}$ then $e'$ is also a choice-free expression.
 \end{lemma}
 \begin{proof}
-    By induction on the structure of $|ce|$.
+By induction on the structure of $|ce|$.
+Note that \rulename{one-value} eliminates a |one| but only does
+so when the underlying $e$ is a choice-free sequence of constraints
+and a tail-value, and hence produces a choice-free expression.
 \end{proof}
 
 \begin{lemma}[Unique-CX] \label{lem:unique-cx}
