@@ -537,7 +537,7 @@ $\rsteps{\rduni}{e_1,e_2}{e_3}$.
 \end{lemma}
 
 \begin{proof}
-Same proof as \cref{lem:u-lc}, except that in the case TODO we use \cref{thm:canonical}
+Same proof as \cref{lem:u-lc-a}, except that in the case TODO we use \cref{thm:canonical}
 to join the two terms. \ranjit{TODO}
 \end{proof}
 
@@ -713,4 +713,45 @@ By inversion
     By induction on the structure of $E$, using the fact (from \cref{lem:find}) that
     forall $g, x$ if $\live{g}{x}$ then $\find{\appg{g}{g'}}{x} = \find{g'}{x}$.
     %RJ: TODO copy from my notes.
+\end{proof}
+
+
+\subsection{\runi is locally confluent} \label{sec:uni-confluent}
+
+\begin{lemma}[$\runi$-Locally Confluent] \label{lem:u-lc-a}
+If $\rstep{\runi}{e}{e_1, e_2}$ then $\rsteps{\runi}{e_1, e_2}{e'}$.
+\end{lemma}
+
+\begin{proof}
+We split cases on where the reductions occur.
+If they are disjoint, the terms $e_1$ and $e_2$ can be trivially joined.
+If they are overlapping, they can by joined via \cref{lem:u-under-u}.
+\end{proof}
+
+\begin{lemma}[$\runi$-Under-$\runi$] \label{lem:u-under-u}
+If $\rstep{\runi}{\rdx{2}}{\rdx{2}'}$ and
+   $\rdx{2} \equiv E[\rdx{1}]$ and
+   $\rstep{\runi}{\rdx{1}}{\rdx{1}'}$
+then there exists $\rdx{2}''$ such that
+   $\rsteps{\runi}{\rdx{2}'}{\rdx{2}''}$ and
+   $\rstep{\runi}{E[\rdx{1}']}{\rdx{2}''}$.
+\end{lemma}
+
+\begin{proof}
+TODO
+\end{proof}
+
+
+\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+Let $\rr' \equiv \rr - \runi$.
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rsteps{\rr'}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
+\end{lemma}
+
+\begin{proof}
+TODO
 \end{proof}
