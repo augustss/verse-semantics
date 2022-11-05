@@ -902,9 +902,9 @@ Case (h,i) fall in the \cref{lem:spec-under-cx} pattern via \cref{lem:ce-step}.
 If for all $e$, we have $\rstep{\rr}{CX[e]}{CX'[e]}$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYJ1tlXzFdfENYJ1tlXzJdXSJdLFswLDIsIlNYW0NYJ1tlXzF8ZV8yXV0iXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iXSxbMSwyLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxccnIiLDJdLFszLDIsIlxccnVsZW5hbWV7Y2hvb3NlfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
 \[\begin{tikzcd}
-	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	{SX[CX[e_1 \vb e_2]]} && {SX[CX[e_1] \vb  CX[e_2]]} \\
 	\\
-	{SX[CX'[e_1|e_2]]} && {SX[CX'[e_1]|CX'[e_2]]}
+	{SX[CX'[e_1 \vb e_2]]} && {SX[CX'[e_1] \vb CX'[e_2]]}
 	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
 	\arrow["\rr", dotted, two heads, from=1-3, to=3-3]
 	\arrow["\rr"', from=1-1, to=3-1]
@@ -917,9 +917,9 @@ If for all $e_1, e_2$ we have if $\rstep{\rr}{CX[e_1 \vb e_2]}{CX[e_1' \vb e_2]}
 then $\rstep{\rr}{CX[e_1]}{CX[e_1']}$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYW2VfMSddfENYW2VfMl1dIl0sWzAsMiwiU1hbQ1hbZV8xJ3xlXzJdXSJdLFswLDEsIlxccnVsZW5hbWV7Y2hvb3NlfSJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJcXHJyIiwyXSxbMywyLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
 \[\begin{tikzcd}
-	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	{SX[CX[e_1 \vb e_2]]} && {SX[CX[e_1] \vb CX[e_2]]} \\
 	\\
-	{SX[CX[e_1'|e_2]]} && {SX[CX[e_1']|CX[e_2]]}
+	{SX[CX[e_1' \vb e_2]]} && {SX[CX[e_1'] \vb CX[e_2]]}
 	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
 	\arrow["\rr", dotted, from=1-3, to=3-3]
 	\arrow["\rr"', from=1-1, to=3-1]
@@ -930,15 +930,15 @@ then $\rstep{\rr}{CX[e_1]}{CX[e_1']}$.
 \begin{lemma}[spec-under-$e_2$] \label{lem:spec-under-2}
 If for all $e_1, e_2$ we have if $\rstep{\rr}{CX[e_1 \vb e_2]}{CX[e_1 \vb e_2']}$
 then $\rstep{\rr}{CX[e_2]}{CX[e_2']}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgfCBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gfCBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYW2VfMV18Q1hbZV8yJ11dIl0sWzAsMiwiU1hbQ1hbZV8xfGVfMiddXSJdLFswLDEsIlxccnVsZW5hbWV7Y2hvb3NlfSJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJcXHJyIiwyXSxbMywyLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJTWFtDWFtlXzEgXFx2YiBlXzJdXSJdLFsyLDAsIlNYW0NYW2VfMV0gXFx2YiBDWFtlXzJdXSJdLFsyLDIsIlNYW0NYW2VfMV0gXFx2YiBDWFtlXzInXV0iXSxbMCwyLCJTWFtDWFtlXzEgXFx2YiBlXzInXV0iXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iXSxbMCwzLCJcXHJyIiwyXSxbMSwyLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsMiwiXFxydWxlbmFtZXtjaG9vc2V9IiwyXV0=
 \[\begin{tikzcd}
-	{SX[CX[e_1 | e_2]]} && {SX[CX[e_1] | CX[e_2]]} \\
+	{SX[CX[e_1 \vb e_2]]} && {SX[CX[e_1] \vb CX[e_2]]} \\
 	\\
-	{SX[CX[e_1|e_2']]} && {SX[CX[e_1]|CX[e_2']]}
+	{SX[CX[e_1 \vb e_2']]} && {SX[CX[e_1] \vb CX[e_2']]}
 	\arrow["{\rulename{choose}}", from=1-1, to=1-3]
-	\arrow["\rr", dotted, from=1-3, to=3-3]
 	\arrow["\rr"', from=1-1, to=3-1]
-	\arrow["{\rulename{choose}}", dotted, from=3-1, to=3-3]
+	\arrow["\rr", dotted, from=1-3, to=3-3]
+	\arrow["{\rulename{choose}}"', from=3-1, to=3-3]
 \end{tikzcd}\]
 \end{lemma}
 
