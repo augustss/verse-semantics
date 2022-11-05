@@ -742,35 +742,37 @@ $$\begin{array}{rcl}
 %		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
 \end{array}$$
 
-\begin{lemma}[Shuffle] \cref{lem:p-shuffle}
+\begin{lemma}[Shuffle] \label{lem:p-shuffle}
 If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e]}$:
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMSwieD12O09BW09BJydbQV8xW3hdXV0iXSxbMiwxLCJ4PXY7T0FbT0EnW0FfMVt2XV1dIl0sWzEsMiwieD12O09BW09BJydbQV8xW3ZdXV0iXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJyIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzIsMCwieD12O09BW09BJ1tBXzFbdl1dXSJdLFsyLDIsIng9djtPQVtPQScnW0FfMVt2XV1dIl0sWzAsMiwieD12O09BW09BJydbQV8xW3hdXV0iXSxbMCwxLCJcXHJ1bmkiXSxbMSwyLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzAsMywiXFxyciIsMl0sWzMsMiwiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d
 \[\begin{tikzcd}
-	& {x=v;OA[OA'[A_1[x]]]} \\
-	{x=v;OA[OA''[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
-	& {x=v;OA[OA''[A_1[v]]]}
-	\arrow["\runi", from=1-2, to=2-3]
-	\arrow["\rr"', from=1-2, to=2-1]
-	\arrow["\runi", dashed, from=2-1, to=3-2]
-	\arrow["\rr"', dashed, from=2-3, to=3-2]
+	{x=v;OA[OA'[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	\\
+	{x=v;OA[OA''[A_1[x]]]} && {x=v;OA[OA''[A_1[v]]]}
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["\rr", dotted, from=1-3, to=3-3]
+	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["\runi", dotted, from=3-1, to=3-3]
 \end{tikzcd}\]
 \end{lemma}
 
-\begin{lemma}[Duplicate] \cref{lem:p-dup}
+\begin{lemma}[Duplicate] \label{lem:p-dup}
 If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e][e]}$:
     % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMSwieD12O09BW09BJydbQV8xW3hdXVtBXzFbeF1dXSJdLFsyLDEsIng9djtPQVtPQSdbQV8xW3ZdXV0iXSxbMSwyLCJ4PXY7T0FbT0EnJ1tBXzFbdl1dW0FfMVt2XV1dIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyciIsMl0sWzEsMywiXFxydW5pIFxcdGltZXMgMiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV1d
 \[\begin{tikzcd}
-	& {x=v;OA[OA'[A_1[x]]]} \\
-	{x=v;OA[OA''[A_1[x]][A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
-	& {x=v;OA[OA''[A_1[v]][A_1[v]]]}
-	\arrow["\runi", from=1-2, to=2-3]
-	\arrow["\rr"', from=1-2, to=2-1]
-	\arrow["{\runi \times 2}", dashed, two heads, from=2-1, to=3-2]
-	\arrow["\rr"', dashed, from=2-3, to=3-2]
+    {x=v;OA[OA'[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	\\
+    {x=v;OA[OA''[A_1[x]][A_1[x]]]} && {x=v;OA[OA''[A_1[v]][A_1[v]]]}
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["\rr", dotted, from=1-3, to=3-3]
+	\arrow["\rr"', from=1-1, to=3-1]
+	\arrow["\runi \times 2", dotted, two heads, from=3-1, to=3-3]
 \end{tikzcd}\]
 \end{lemma}
 
-\begin{lemma}[Delete] \cref{lem:p-del}
+HEREHEREHERE
+
+\begin{lemma}[Delete] \label{lem:p-del}
 If forall $e$, we have $\rstep{\rr}{OA'[e]}{e'}$:
 
 % https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzEsMSwieD12O09BW09BJ1tBXzFbdl1dXSJdLFswLDIsIng9djtPQVtlXSJdLFswLDEsIlxccnVuaSJdLFsxLDIsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifX19XSxbMCwyLCJcXHJyIiwyXV0=
@@ -810,4 +812,81 @@ then there exists $\rdx{\runi}''$ such that
 
 \begin{proof}
 TODO
+\end{proof}
+
+\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+If $\rdx{2} \equiv \rstep{}{SX[CX[e_1 \vb e_2]]}{SX[CX[e_1] \vb CX[e_2]]} \equiv \rdx{2}'$ and
+   $\rdx{2} \equiv E[\rdx{1}]$ and
+   $\rstep{\rr}{\rdx{1}}{\rdx{1}'}$
+then there exists $\rdx{2}''$ such that
+   $\rsteps{\rr}{\rdx{2}'}{\rdx{2}''}$ and
+   $\rstep{\rulename{choice}}{E[\rdx{1}']}{\rdx{2}''}$.
+\end{lemma}
+
+\begin{proof}
+By the definition of $SX$ and $CX$, we have that if
+$\rdx{2} \equiv E[\rdx{1}]$ \ie $\rdx{1} \subset \rdx{2}$
+then $\rstep{\rr}{E[\rdx{1}]}{E[\rdx{1}']}$ falls under one
+of the following cases, with the shown diagram completing the proof
+for that case.
+
+\begin{description}
+\item[Case : ``under $CX$'']
+\item[Case : ``under $e_1$'']
+\item[Case : ``under $e_2$'']
+\end{description}
+
+The tricky case is when $\rdx{1} \movesto \rdx{1}$
+is also a \rulename{choice} step.
+\cref{lem:choice-under-choice} shows that
+the pair of reduction still falls under one
+of the three patterns above.
+%
+Case (a) is trivial as the $\rdx{2}'' = \rdx{2}'$.
+Case (b,c,d,e) fall into the ``under-$e_i$'' patterns.
+Case (f,g) fall in the ``under-$CX$'' pattern.
+Case (h,i) fall in the ``under-$CX$'' pattern via \cref{lem:ce-step}.
+%
+\end{proof}
+
+\begin{lemma}[$ce$-step] \label{lem:ce-step}
+If $\rstep{\rulename{choose}}{|ce|}{e'}$ then $e'$ is also a choice-free expression.
+\end{lemma}
+\begin{proof}
+    By induction on the structure of $|ce|$.
+\end{proof}
+
+\begin{lemma}[Unique-CX] \label{lem:unique-cx}
+If $CX_1[e_{11} \vb e_{12}] = CX_2[e_{21} \vb e_{22}]$
+then $CX_1 = CX_2$ and $e_{11} = e_{21}$ and $e_{12} = e_{22}$.
+\end{lemma}
+\begin{proof}
+By simultaneous induction on the structure of $CX_1$ and $CX_2$, using \cref{lem:ce-not-cx}.
+\begin{description}
+\item[Case] $CX_1 \equiv |hole|, CX_2 \equiv |hole|$: Trivial.
+\item[Case] $CX_1 \equiv |CX_1' = e|, CX_2 \equiv |CX_2' = e|$: By IH.
+\item[Case] $CX_1 \equiv |CX_1' = e|, CX_2 \equiv |ce = CX_2'|$: Impossible by \cref{lem:ce-not-cx}.
+\item[Case] $CX_1 \equiv |ce = CX_1'|, CX_2 \equiv |ce = CX_2'|$: By IH.
+\item[Case] $CX_1 \equiv |CX_1' ; e|, CX_2 \equiv |CX_2' ; e|$: By IH.
+\item[Case] $CX_1 \equiv |CX_1' ; e|, CX_2 \equiv |ce ; CX_2'|$: Impossible by \cref{lem:ce-not-cx}.
+\item[Case] $CX_1 \equiv |ce ; CX_1'|, CX_2 \equiv |ce ; CX_2'|$: By IH.
+\item[Case] $CX_1 \equiv |def x CX_1'|, CX_2 \equiv |def x CX_2'|$: By IH.
+\end{description}
+\end{proof}
+
+\begin{lemma}[ce-not-CX] \label{lem:ce-not-cx}
+$ce \not\equiv CX[e_1 \vb e_2]$.
+\end{lemma}
+
+\begin{proof}
+By induction on the structure of |ce|.
+\begin{description}
+\item[Case] $|ce| \equiv |v|$: impossible by splitting cases on structure of $|CX|$.
+\item[Case] $|ce| \equiv |ce = ce'|$ (symmetric to $|ce; ce'|$):
+    Only possible if $|ce = ce'| \equiv CX'[\ldots] = ce'$ \emph{or}
+                     $|ce = ce'| \equiv ce' = CX'[\ldots]$
+    both of which are impossible by IH.
+\item[Case] $|ce| \equiv |one e|$ (symmetric to $|all e|$):
+    impossible as |one| not allowed at top-level of $CX$.
+\end{description}
 \end{proof}
