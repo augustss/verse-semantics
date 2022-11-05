@@ -728,6 +728,62 @@ If they are disjoint, the terms $e_1$ and $e_2$ can be trivially joined.
 If they are overlapping, they can by joined via \cref{lem:u-under-u}.
 \end{proof}
 
+\newcommand{\oA}{\mathit{OA}}
+\newcommand{\oE}{\mathit{OE}}
+
+\mypara{Outer Contexts} Let $\oA$ be an \emph{outer} application contexts
+defined as:
+$$\begin{array}{rcl}
+\oA  & ::= & |hole| % \vb |lam x OE|
+           \vb |def x OA| \vb |OA = e| \vb |v == OA|
+ 		   \vb |OA ; e| \vb |e ; OA| \vb |apply1N OA v| \vb |apply1N v OA|
+		   \vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
+%\oA  & ::= & |hole| \vb |v == OA| \vb |def x OA| \vb |OA ; e| \vb |e ; OA|
+%		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
+\end{array}$$
+
+\begin{lemma}[Shuffle] \cref{lem:p-shuffle}
+If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e]}$:
+% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMSwieD12O09BW09BJydbQV8xW3hdXV0iXSxbMiwxLCJ4PXY7T0FbT0EnW0FfMVt2XV1dIl0sWzEsMiwieD12O09BW09BJydbQV8xW3ZdXV0iXSxbMCwyLCJcXHJ1bmkiXSxbMCwxLCJcXHJyIiwyXSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	& {x=v;OA[OA'[A_1[x]]]} \\
+	{x=v;OA[OA''[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	& {x=v;OA[OA''[A_1[v]]]}
+	\arrow["\runi", from=1-2, to=2-3]
+	\arrow["\rr"', from=1-2, to=2-1]
+	\arrow["\runi", dashed, from=2-1, to=3-2]
+	\arrow["\rr"', dashed, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{lemma}[Duplicate] \cref{lem:p-dup}
+If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e][e]}$:
+    % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMSwieD12O09BW09BJydbQV8xW3hdXVtBXzFbeF1dXSJdLFsyLDEsIng9djtPQVtPQSdbQV8xW3ZdXV0iXSxbMSwyLCJ4PXY7T0FbT0EnJ1tBXzFbdl1dW0FfMVt2XV1dIl0sWzAsMiwiXFxydW5pIl0sWzAsMSwiXFxyciIsMl0sWzEsMywiXFxydW5pIFxcdGltZXMgMiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn19fV1d
+\[\begin{tikzcd}
+	& {x=v;OA[OA'[A_1[x]]]} \\
+	{x=v;OA[OA''[A_1[x]][A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	& {x=v;OA[OA''[A_1[v]][A_1[v]]]}
+	\arrow["\runi", from=1-2, to=2-3]
+	\arrow["\rr"', from=1-2, to=2-1]
+	\arrow["{\runi \times 2}", dashed, two heads, from=2-1, to=3-2]
+	\arrow["\rr"', dashed, from=2-3, to=3-2]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{lemma}[Delete] \cref{lem:p-del}
+If forall $e$, we have $\rstep{\rr}{OA'[e]}{e'}$:
+
+% https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzEsMSwieD12O09BW09BJ1tBXzFbdl1dXSJdLFswLDIsIng9djtPQVtlXSJdLFswLDEsIlxccnVuaSJdLFsxLDIsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkYXNoZWQifX19XSxbMCwyLCJcXHJyIiwyXV0=
+\[\begin{tikzcd}
+	{x=v;OA[OA'[A_1[x]]]} \\
+	& {x=v;OA[OA'[A_1[v]]]} \\
+	{x=v;OA[e]}
+	\arrow["\runi", from=1-1, to=2-2]
+	\arrow["\rr"', dashed, from=2-2, to=3-1]
+	\arrow["\rr"', from=1-1, to=3-1]
+\end{tikzcd}\]
+\end{lemma}
+
 \begin{lemma}[$\runi$-Under-$\runi$] \label{lem:u-under-u}
 If $\rstep{\runi}{\rdx{2}}{\rdx{2}'}$ and
    $\rdx{2} \equiv E[\rdx{1}]$ and

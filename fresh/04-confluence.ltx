@@ -171,19 +171,6 @@ Split cases on the $\rord$ rule used in $\rdx{2}$.
 
 \end{comment}
 
-\newcommand{\oA}{\mathit{OA}}
-\newcommand{\oE}{\mathit{OE}}
-
-\mypara{Outer Contexts} Let $\oA$ and $\oE$ be \emph{outer} application and expression contexts
-defined as:
-$$\begin{array}{rcl}
-\oE  & ::= & |hole| \vb |lam x OE| \vb |def x OE| \vb |OE = e| \vb |e == OE|
- 			 	    \vb |OE ; e| \vb |e ; OE| \vb |apply1N OE v| \vb |apply1N v OE|
-				    \vb |OE choice e| \vb |e choice OE| \vb |all OE| \vb |one OE| \\
-
-\oA  & ::= & |hole| \vb |v == OA| \vb |def x OA| \vb |OA ; e| \vb |e ; OA|
-		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
-\end{array}$$
 
 \begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
 \begin{itemize}
