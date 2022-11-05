@@ -537,8 +537,9 @@ $\rsteps{\rduni}{e_1,e_2}{e_3}$.
 \end{lemma}
 
 \begin{proof}
-Same proof as \cref{lem:u-lc-a}, except that in the case TODO we use \cref{thm:canonical}
-to join the two terms. \ranjit{TODO}
+Same proof as \cref{lem:u-lc-a}, except that in the case
+\ranjit{TODO}
+we use \cref{thm:canonical} to join the two terms.
 \end{proof}
 
 \begin{lemma}[$\rduni$-Confluent] \label{lem:d-c}
@@ -771,12 +772,12 @@ If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e][e]}$:
 \end{lemma}
 
 \begin{lemma}[Delete] \label{lem:p-del}
-If forall $e$, we have $\rstep{\rr}{OA'[e]}{e'}$:
+If forall $e$, we have $\rstep{\rr}{OA[e]}{e'}$:
 % https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4PXY7T0FbT0EnW0FfMVt4XV1dIl0sWzAsMiwieD12O09BW2VdIl0sWzIsMCwieD12O09BW09BJ1tBXzFbdl1dXSJdLFswLDEsIlxccnIiLDJdLFswLDIsIlxccnVuaSJdLFsyLDEsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=
 \[\begin{tikzcd}
-	{x=v;OA[OA'[A_1[x]]]} && {x=v;OA[OA'[A_1[v]]]} \\
+	{x=v;OA[A_1[x]]} && {x=v;OA[A_1[v]]} \\
 	\\
-	{x=v;OA[e]}
+	{x=v;OA[e']}
 	\arrow["\rr"', from=1-1, to=3-1]
 	\arrow["\runi", from=1-1, to=1-3]
 	\arrow["\rr", dotted, from=1-3, to=3-1]
@@ -808,7 +809,54 @@ then there exists $\rdx{\runi}''$ such that
 \end{lemma}
 
 \begin{proof}
-TODO
+Split cases on the top-level $\runi$ rule.
+%
+If it is any \rulename{u-lit}, \rulename{u-tup}
+or \rulename{u-fail} the property holds trivially.
+%
+If it is \rulename{s-choose} then use \cref{lem:under-choose}.
+%
+Thus, the interesting cases are \rulename{deref-sh}.
+%
+There are two cases: either the $\runi$ "hole" is outside the $\rdx{}$,
+in which the result follows via \cref{lem:p-shuffle}, or the hole is
+inside the $\rdx{}$.
+%
+Next, we split cases on the $\rr'$ rule
+and show that in each case, if the \rulename{deref-sh} hole
+is in the $\rdx{}$ then we can join the reductions via one
+of the patterns
+"shuffle" (\cref{lem:p-shuffle}),
+"p-dup" (\cref{lem:p-dup}), or
+"p-del" (\cref{lem:p-dup}).
+\begin{description}
+\item[Case $\rr$ via \rulename{u-tup}, \rulename{u-fail}]
+    Impossible as no |A| under $h$ or $|hnf|$.
+\item[Case $\rr$ via \rulename{choose}]
+    Via \cref{lem:p-shuffle} if the hole is in $e_1$ or $e_2$
+    or \cref{lem:p-dup} if the hole is in the |CX|.
+\item[Case $\rr$ via \rulename{app-beta}, \rulename{app-tup}]
+    Via \cref{lem:p-shuffle}, as hole is under $|v|$.
+\item[Case $\rr$ via \rulename{app-tup0}]
+    Via \cref{lem:p-del}, as hole is under $|v|$.
+\item[Case $\rr$ via \rulename{app-add}, \rulename{app-gt}, \rulename{app-gt-fail}]
+    Impossible as no |A| under literal.
+\item[Case $\rr$ via \rulename{choose-assoc}, \rulename{choose-*}, \rulename{one-value}, \rulename{all-choice}]
+    Via \cref{lem:p-shuffle}.
+\item[Case $\rr$ via \rulename{one-choice}]
+    Via \cref{lem:p-shuffle} (if the hole is in $e_1$)
+    or \cref{lem:p-del} if the hole is in $e_2$.
+\item[Case $\rr$ via \rulename{one-fail}, \rulename{all-fail}]
+    Impossible as no hole in |fail|.
+\item[Case $\rr$ via \rulename{norm-val}]
+    Via \cref{lem:p-del} if hole is in $|v|$ else \cref{lem:p-shuffle}.
+\item[Case $\rr$ via \rulename{norm-*}]
+    Via \cref{lem:p-shuffle}.
+\item[Case $\rr$ via \rulename{fail-seq*}]
+    Via \cref{lem:p-del}.
+\item[Case $\rr$ via \rulename{elim-def}]
+    Via \cref{lem:p-shuffle} if hole is in $e_2$ else \cref{lem:p-del}.
+\end{description}
 \end{proof}
 
 \begin{lemma}[Under-\rulename{choose}] \label{lem:under-choose}
