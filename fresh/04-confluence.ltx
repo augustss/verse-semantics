@@ -168,534 +168,533 @@ Split cases on the $\rord$ rule used in $\rdx{2}$.
 % requires an unbounded number of steps
 % to join two terms.
 \end{proof}
-
 \end{comment}
 
 
-\begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
-\begin{itemize}
-\item If $\rstep{\rord}{A[x]}{A'[x]}$ then $\forall h. \join{\rord}{x == h ; OA[A[h]]}{x == h ; OA[A'[h]]}$.
-\item If $\rstep{\rord}{E[x]}{E'[x]}$ then $\forall s. \join{\rord}{x == s ; OE[E[s]]}{x == s ; OE[E'[s]]}$.
-\end{itemize}
-\end{lemma}
+% \begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
+% \begin{itemize}
+% \item If $\rstep{\rord}{A[x]}{A'[x]}$ then $\forall h. \join{\rord}{x == h ; OA[A[h]]}{x == h ; OA[A'[h]]}$.
+% \item If $\rstep{\rord}{E[x]}{E'[x]}$ then $\forall s. \join{\rord}{x == s ; OE[E[s]]}{x == s ; OE[E'[s]]}$.
+% \end{itemize}
+% \end{lemma}
 
-\begin{proof}
-By induction on the structure of $A$ (symm. $E$), splitting cases on the reduction rule used.
-\begin{description}
-\item{Case $A \equiv |apply1N hole v|$} \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
-	Then join at $x == h ; |apply1N hole v'|$.
-\item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
+% \begin{proof}
+% By induction on the structure of $A$ (symm. $E$), splitting cases on the reduction rule used.
+% \begin{description}
+% \item{Case $A \equiv |apply1N hole v|$} \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
+% 	Then join at $x == h ; |apply1N hole v'|$.
+% \item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
 
-\item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
-	Then join at $x == h ; |h == hnf'|$.
+% \item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
+% 	Then join at $x == h ; |h == hnf'|$.
 
-\item{Case $A \equiv |v == A_1|$} \ie $\rstep{\rord}{|v==A_1^[x]}{|v==A_1'^[x]}$.
-	Then join at $x == h ; |v == A_1'^[h]|$ via IH.
+% \item{Case $A \equiv |v == A_1|$} \ie $\rstep{\rord}{|v==A_1^[x]}{|v==A_1'^[x]}$.
+% 	Then join at $x == h ; |v == A_1'^[h]|$ via IH.
 
-\item{Case $A \equiv |def y A_1|$} \ie $\rstep{\rord}{|def y (A_1^[x])|}{|def y (A_1'^[x])}$
-	Then join at $x == h ; |def y A_1'^[h]|$ via IH.
+% \item{Case $A \equiv |def y A_1|$} \ie $\rstep{\rord}{|def y (A_1^[x])|}{|def y (A_1'^[x])}$
+% 	Then join at $x == h ; |def y A_1'^[h]|$ via IH.
 
-\item{Case $A \equiv |A_1 ; e|$} \ie $\rstep{\rord}{|A_1^[x]; e|}{|A_1'^[x]; e}$
-	Then join at $x == h ; |A_1'^[h] ; e|$ via IH.
+% \item{Case $A \equiv |A_1 ; e|$} \ie $\rstep{\rord}{|A_1^[x]; e|}{|A_1'^[x]; e}$
+% 	Then join at $x == h ; |A_1'^[h] ; e|$ via IH.
 
-\item{Case $A \equiv |e ; A_1|$} split cases on the possible reductions of $A[x]$
-	\begin{description}
-		\item[Case] $\rstep{\rord}{e; A_1[x]}{e'; A_1[x]}$ then join at $x == h ; |e'; A_1^[h]|$.
-		\item[Case] $\rstep{\rord}{e; A_1[x]}{e; A_1'[x]}$ then join at $x == h ; |e; A_1'^[h]|$ via IH.
-		\item[Case] $e \equiv |y == v|$ and $\rstep{\rord}{y==v; A_1[x]}{y==v; e'}$ via \rulename{deref-*}.
-			Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
-	\end{description}
-\item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
-    \begin{description}
-		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
-			then join at $x == h ; |A_1'^[h] `choice` e|$ via IH.
-		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
-			then join at $x == h ; |A_1^[h] `choice` e'|$.
-	\end{description}
-\item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
+% \item{Case $A \equiv |e ; A_1|$} split cases on the possible reductions of $A[x]$
+% 	\begin{description}
+% 		\item[Case] $\rstep{\rord}{e; A_1[x]}{e'; A_1[x]}$ then join at $x == h ; |e'; A_1^[h]|$.
+% 		\item[Case] $\rstep{\rord}{e; A_1[x]}{e; A_1'[x]}$ then join at $x == h ; |e; A_1'^[h]|$ via IH.
+% 		\item[Case] $e \equiv |y == v|$ and $\rstep{\rord}{y==v; A_1[x]}{y==v; e'}$ via \rulename{deref-*}.
+% 			Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
+% 	\end{description}
+% \item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
+%     \begin{description}
+% 		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
+% 			then join at $x == h ; |A_1'^[h] `choice` e|$ via IH.
+% 		\item[Case] $\rstep{\rord}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
+% 			then join at $x == h ; |A_1^[h] `choice` e'|$.
+% 	\end{description}
+% \item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
 
-\item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
-	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
+% \item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
+% 	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
 
-\item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
-	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
-\end{description}
-\end{proof}
+% \item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
+% 	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
+% \end{description}
+% \end{proof}
 
-\mypara{NOTE: Preventing $\lambda$-copies}
-%
-\cref{lem:context-step-o} would not hold if allowed $A$ contexts included arbitrary variable
-occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
-Then consider $A \equiv |x == hole; e|$.
-%
-Now $\rstep{\rord}{A[x]}{x; e}$ \verb+IF YOU ALLOW "x=x -> x"+ but
-$x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
-as $\lambda$ comparisons |fail|.
+% \mypara{NOTE: Preventing $\lambda$-copies}
+% %
+% \cref{lem:context-step-o} would not hold if allowed $A$ contexts included arbitrary variable
+% occurrences (to allow ``copying'' $\lambda$-terms). Suppose we did allow such copying.
+% Then consider $A \equiv |x == hole; e|$.
+% %
+% Now $\rstep{\rord}{A[x]}{x; e}$ \verb+IF YOU ALLOW "x=x -> x"+ but
+% $x = \lambda; x == \lambda; e$  does not reduce to $x = \lambda; \lambda; e$
+% as $\lambda$ comparisons |fail|.
 
-\begin{lemma}[Context-Step] \label{lem:context-step}
-	Let $\rr' = \rr - \runi$.
-\begin{itemize}
-	\item If $\rstep{\rr'}{A[x]}{A'[x]}$ then $\forall h. \rstep{\rr'}{A[h]}{A'[h]}$.
-	\item If $\rstep{\rr'}{E[x]}{E'[x]}$ then $\forall s. \rstep{\rr'}{E[s]}{E'[s]}$.
-\end{itemize}
-\end{lemma}
+% \begin{lemma}[Context-Step] \label{lem:context-step}
+% 	Let $\rr' = \rr - \runi$.
+% \begin{itemize}
+% 	\item If $\rstep{\rr'}{A[x]}{A'[x]}$ then $\forall h. \rstep{\rr'}{A[h]}{A'[h]}$.
+% 	\item If $\rstep{\rr'}{E[x]}{E'[x]}$ then $\forall s. \rstep{\rr'}{E[s]}{E'[s]}$.
+% \end{itemize}
+% \end{lemma}
 
-\begin{proof}
-By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
-\ranjit{TODO: expand}
-% Note you may have to do $\alpha$-renaming at $E[|x|]$ to avoid capture, as $\boundvars{E'}$ may contain $\freevars{s}$.
-% Note you may have to do $\alpha$-renaming at $A[|x|]$ to avoid capture, as $\boundvars{A'}$ may contain $\freevars{h}$.
-\end{proof}
-
-
-\begin{lemma}[Context-Shape] \label{lem:context-shape}
-\begin{itemize}
-	\item If $\rstep{}{A[x]}{e'}$ then \emph{either} $e' \equiv A'[x]$ \emph{or} $\forall h. \rstep{}{A[h]}{e'}$.
-	\item If $\rstep{}{E[x]}{e'}$ then \emph{either} $e' \equiv E'[x]$ \emph{or} $\forall s. \rstep{}{E[s]}{e'}$.
-\end{itemize}
-\end{lemma}
-
-\begin{proof}
-By induction on the structure of $A$ (resp. $E$),
-splitting cases on the reduction rule used. %TODO: expand?
-%
-Note that we need the second disjunct to account for situations where the occurrence
-of $x$ is \emph{eliminated} by \rulename{elim-def} or |fail| propagation.
-
-\begin{description}
-\item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
-
-\item{Case $A \equiv |apply1N hole v|$}, here \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
-
-\item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
-
-\item{Case $A \equiv |v == A_1|$}.
-	If \ie $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$ then $A' \equiv |v==A_1'|$.
-	If \ie $\rstep{}{|A_1^[x]|}{e_1'}$ then $e' \equiv |v==e_1'|$.
-
-\item{Case $A \equiv |def y A_1|$}. Split cases on the possible reductions.
-	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$, then $A' \equiv |def y A_1'|$.
-	If $\rstep{}{|A_1^[x]|}{e_1'}$ then $A' \equiv |def y e_1'|$.
-	If $\rstep{}{|def y (A_1^[x])|}{|def y (A_1'^[x])|}$ (via \rulename{elim-def}) then $A' \equiv |def y A_1'|$.
-	If $\rstep{}{|def y (A_1^[x])|}{e_1'}$ (via \rulename{elim-def}) then $e' \equiv |e_1'|$.
-
-\item{Case $A \equiv |A_1 ; e|$}. Split cases on the possible reductions.
-	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]}$, then $A' \equiv |A_1'; e|$.
-	If $\rstep{}{|e|}{|e'}$, then $A' \equiv |A_1'; e'|$.
-	If $\rstep{}{|def y (A_2^[x]); e|}{|def y (A_2^[x]; e)|}$ (where $A_1 \equiv |def y A_2|$)
-		then $A' \equiv |def y (A_2; e)|$.
-	If $\rstep{}{|A_1^[x]; (def y e_2)|}{|def y (A_1^[x]; e_2)|}$ (where $e \equiv |def y e_2|$)
-		then $A' \equiv |def y (A_1; e_2)|$.
-
-\item{Case $A \equiv |e ; A_1|$} Split cases on the possible reductions of $A[x]$.
-	Several cases are symmetric with previous case.
-	Remainder involve \rulename{deref-*}.
-	\begin{description}
-		\item[Case] $\rstep{}{e; A_1[x]}{e'; A_1[x]}$ then $A' \equiv |e'; A_1|$.
-		\item[Case] $\rstep{}{e; A_1[x]}{e; A_1'[x]}$ then $A' \equiv |e; A_1'|$.
-		\item[Case] $e \equiv |x == h|$ and $\rstep{}{x==h; A_1[x]}{x==h; A_1[h]}$, then $A' \equiv |hole == h; A_1[h]|$ (join using \cref{lem:deref-comm-1})
-		% \item[Case] $e \equiv |y == h|$ and $\rstep{\rord}{y==h; A_1[x]}{y==h; A_1'[x]}$ where $y \not \equiv x$, then $A' \equiv y = h; A_1'$.
-		% via \rulename{deref-*}. Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
-	\end{description}
-
-\item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
-    \begin{description}
-		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
-			then $A' \equiv |A_1' `choice` e|$.
-		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1'^[x]|}$ if $e \equiv |fail|$ (via \rulename{choose-l})
-			then $A' \equiv |A_1'|$.
-		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
-			then $A' \equiv |A_1 `choice` e'|$.
-		\item[Case] $\rstep{}{SX[CX[e_1 |choice| e_2]]}{SX[CX[e_1] |choice| CX[e_2]]}$
-			where \ranjit{TODO}
-	\end{description}
-\item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
-
-\item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
-	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
-
-\item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
-	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
-
-\end{description}
-\end{proof}
+% \begin{proof}
+% By induction on the structure of $A$ (resp. $E$), splitting cases on the reduction rule used.
+% \ranjit{TODO: expand}
+% % Note you may have to do $\alpha$-renaming at $E[|x|]$ to avoid capture, as $\boundvars{E'}$ may contain $\freevars{s}$.
+% % Note you may have to do $\alpha$-renaming at $A[|x|]$ to avoid capture, as $\boundvars{A'}$ may contain $\freevars{h}$.
+% \end{proof}
 
 
+% \begin{lemma}[Context-Shape] \label{lem:context-shape}
+% \begin{itemize}
+% 	\item If $\rstep{}{A[x]}{e'}$ then \emph{either} $e' \equiv A'[x]$ \emph{or} $\forall h. \rstep{}{A[h]}{e'}$.
+% 	\item If $\rstep{}{E[x]}{e'}$ then \emph{either} $e' \equiv E'[x]$ \emph{or} $\forall s. \rstep{}{E[s]}{e'}$.
+% \end{itemize}
+% \end{lemma}
 
-\begin{definition}[Def-Use] \label{def:def-use}
-%
-Let $|x == s ; E^[x]|$ (resp. $|x == v ; A^[v]|$)
-be a redex for \rulename{deref-s} (resp. \rulename{deref-h}).
-%
-We respectively call $x$ the \emph{variable}
-the constraint $|x == s|$ (resp. $|x == v|$) the \emph{definition}
-and the occurrence of $x$ in $E[x]$ (resp. $A[x]$) the \emph{use} of
-the redex.
-%
-\end{definition}
+% \begin{proof}
+% By induction on the structure of $A$ (resp. $E$),
+% splitting cases on the reduction rule used. %TODO: expand?
+% %
+% Note that we need the second disjunct to account for situations where the occurrence
+% of $x$ is \emph{eliminated} by \rulename{elim-def} or |fail| propagation.
 
-\mypara{Notation:} In the sequel, we will use superscripts
-like $x^1$ or $x^2$ to denote distinct occurrences of the
-\emph{same} variable $x$.
+% \begin{description}
+% \item{Case $A \equiv |apply1N op hole|$} impossible as $|apply1N op x|$ has no reductions.
 
-\begin{lemma}[Deref-Comm-1] \label{lem:deref-comm-1}
-If $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ are two \rulename{deref-*} reductions
-with the same variable $x$, then $\join{\rord}{e_1}{e_2}$.
-\end{lemma}
+% \item{Case $A \equiv |apply1N hole v|$}, here \ie $A' \equiv |apply1N hole v'|$ where $\rstep{\rord}{|v|}{|v'|}$.
 
-\begin{proof}
-Let $\txi{1}$ and $\txi{2}$ denote the reducts for the two reductions
-$\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ respectively.
+% \item{Case $A \equiv |hole == hnf|$} \ie $A' \equiv |hole == hnf'|$ where $\rstep{\rord}{|hnf|}{|hnf'|}$.
 
-The case when the constraints for $\rdx{1}$ and $\rdx{2}$
-are the same is trivial, so let us assume we have two
-separate constraints, $|x == v_1|$ and $|x == v_2|$.
-%
-The case when the reducts are disjoint is trivial, as
-${e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots}$,
-${e_1 \equiv \ldots \rdx{1}' \ldots \rdx{2} \ldots}$,
-${e_2 \equiv \ldots \rdx{1} \ldots \rdx{2}' \ldots}$,
-and $e_1$ and $e_2$ can be joined at
-${\ldots \rdx{1}' \ldots \rdx{2}' \ldots}$.
+% \item{Case $A \equiv |v == A_1|$}.
+% 	If \ie $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$ then $A' \equiv |v==A_1'|$.
+% 	If \ie $\rstep{}{|A_1^[x]|}{e_1'}$ then $e' \equiv |v==e_1'|$.
 
-Consider the case where $\rdx{2} \subset \rdx{1}$
-(the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
-There are two possibilities.
-%
-First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
-where $C$ is either an $E$ or $A$ depending on whether $v_1$
-is a scalar or not.
-Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
+% \item{Case $A \equiv |def y A_1|$}. Split cases on the possible reductions.
+% 	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]|}$, then $A' \equiv |def y A_1'|$.
+% 	If $\rstep{}{|A_1^[x]|}{e_1'}$ then $A' \equiv |def y e_1'|$.
+% 	If $\rstep{}{|def y (A_1^[x])|}{|def y (A_1'^[x])|}$ (via \rulename{elim-def}) then $A' \equiv |def y A_1'|$.
+% 	If $\rstep{}{|def y (A_1^[x])|}{e_1'}$ (via \rulename{elim-def}) then $e' \equiv |e_1'|$.
 
-Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
-$e \equiv |x == v_1; x == v_2; e'|$.
-%
-Let us split cases on whether $v_1$ and $v_2$ are scalars ($k$ or $y$)
-or heap values ($\lambda$s or tuples).
+% \item{Case $A \equiv |A_1 ; e|$}. Split cases on the possible reductions.
+% 	If $\rstep{}{|A_1^[x]|}{|A_1'^[x]}$, then $A' \equiv |A_1'; e|$.
+% 	If $\rstep{}{|e|}{|e'}$, then $A' \equiv |A_1'; e'|$.
+% 	If $\rstep{}{|def y (A_2^[x]); e|}{|def y (A_2^[x]; e)|}$ (where $A_1 \equiv |def y A_2|$)
+% 		then $A' \equiv |def y (A_2; e)|$.
+% 	If $\rstep{}{|A_1^[x]; (def y e_2)|}{|def y (A_1^[x]; e_2)|}$ (where $e \equiv |def y e_2|$)
+% 		then $A' \equiv |def y (A_1; e_2)|$.
 
-\begin{description}
-\item[Case: $v_1 \equiv s_1$ and $v_2 \equiv s_2$]
+% \item{Case $A \equiv |e ; A_1|$} Split cases on the possible reductions of $A[x]$.
+% 	Several cases are symmetric with previous case.
+% 	Remainder involve \rulename{deref-*}.
+% 	\begin{description}
+% 		\item[Case] $\rstep{}{e; A_1[x]}{e'; A_1[x]}$ then $A' \equiv |e'; A_1|$.
+% 		\item[Case] $\rstep{}{e; A_1[x]}{e; A_1'[x]}$ then $A' \equiv |e; A_1'|$.
+% 		\item[Case] $e \equiv |x == h|$ and $\rstep{}{x==h; A_1[x]}{x==h; A_1[h]}$, then $A' \equiv |hole == h; A_1[h]|$ (join using \cref{lem:deref-comm-1})
+% 		% \item[Case] $e \equiv |y == h|$ and $\rstep{\rord}{y==h; A_1[x]}{y==h; A_1'[x]}$ where $y \not \equiv x$, then $A' \equiv y = h; A_1'$.
+% 		% via \rulename{deref-*}. Then join using \cref{lem:deref-comm-1} if $y \equiv x$, and \cref{lem:deref-comm-2} otherwise.
+% 	\end{description}
+
+% \item{Case $A \equiv |A_1 choice e|$} split cases on the possible reductions of $A[x]$.
+%     \begin{description}
+% 		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1'^[x] `choice` e|}$
+% 			then $A' \equiv |A_1' `choice` e|$.
+% 		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1'^[x]|}$ if $e \equiv |fail|$ (via \rulename{choose-l})
+% 			then $A' \equiv |A_1'|$.
+% 		\item[Case] $\rstep{}{|A_1^[x] `choice` e|}{|A_1^[x] `choice` e'|}$
+% 			then $A' \equiv |A_1 `choice` e'|$.
+% 		\item[Case] $\rstep{}{SX[CX[e_1 |choice| e_2]]}{SX[CX[e_1] |choice| CX[e_2]]}$
+% 			where \ranjit{TODO}
+% 	\end{description}
+% \item{Case $A \equiv |e choice A_1|$} symmetric to the above case.
+
+% \item{Case $A \equiv |all A_1|$}, \ie $\rstep{\rord}{|all (A_1^[x])|}{|all (A_1'^[x])|}$.
+% 	Then join at $x == h ; |all (A_1'^[h])|$ via IH.
+
+% \item{Case $A \equiv |one A_1|$}, \ie $\rstep{\rord}{|one (A_1^[x])|}{|one (A_1'[x])|}$.
+% 	Then join at $x == h ; |one (A_1'^[h])|$ via IH.
+
+% \end{description}
+% \end{proof}
 
 
-Here $e \equiv x^1 = s_1; x^2 = s_2; e'$.
-Split cases on the \emph{uses} of $x$:
-	\begin{description}
-	\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$] Here we have
-	% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSBzXzE7XFwgeF4yID0gc18yO1xcIGUnIl0sWzAsMSwieF4xID0gc18xO1xcIHNfMSA9IHNfMjtcXCBlJyJdLFsyLDEsInNfMiA9IHNfMTtcXCB4XjIgPSBzXzI7XFwgZSciXSxbMCwyLCJzXzEgPSBzXzI7XFwgeCA9IHNfMTtcXCBlJyJdLFsyLDIsInNfMSA9IHNfMjtcXCB4ID0gc18yO1xcIGUnIl0sWzEsMywiXFxidWxsZXQiXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzQsNSwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}
-	& {x^1 = s_1;\ x^2 = s_2;\ e'} \\
-	{x^1 = s_1;\ s_1 = s_2;\ e'} && {s_2 = s_1;\ x^2 = s_2;\ e'} \\
-	{s_1 = s_2;\ x = s_1;\ e'} && {s_1 = s_2;\ x = s_2;\ e'} \\
-	& \bullet
-	\arrow["2", from=1-2, to=2-3]
-	\arrow["1"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-1]
-	\arrow[dotted, from=2-3, to=3-3]
-	\arrow[dotted, two heads, from=3-1, to=4-2]
-	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-	\end{tikzcd}\]
 
-	\item[\rdx{1} use is $x^2$, \rdx{2} use is $e'$] Here we have
-	% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgRV8yW3hdIl0sWzAsMSwieCA9IHNfMTtcXCBzXzEgPSBzXzI7XFwgRV8yW3hdIl0sWzIsMSwieD1zXzE7XFwgeD1zXzI7XFwgRV8yW3NfMl0iXSxbMCwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFXzJbc18xXSJdLFsyLDIsInggPSBzXzE7XFwgc18xID0gc18yO1xcIEVfMltzXzJdIl0sWzEsMywiXFxidWxsZXQiXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw1LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}
-	& {x = s_1;\ x = s_2;\ E_2[x]} \\
-	{x = s_1;\ s_1 = s_2;\ E_2[x]} && {x = s_1;\ x = s_2;\ E_2[s_2]} \\
-	{x = s_1;\ s_1 = s_2;\ E_2[s_1]} && {x = s_1;\ s_1 = s_2;\ E_2[s_2]} \\
-	& \bullet
-	\arrow["2", from=1-2, to=2-3]
-	\arrow["1"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-1]
-	\arrow[dotted, from=2-3, to=3-3]
-	\arrow[dotted, two heads, from=3-1, to=4-2]
-	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-	\end{tikzcd}\]
+% \begin{definition}[Def-Use] \label{def:def-use}
+% %
+% Let $|x == s ; E^[x]|$ (resp. $|x == v ; A^[v]|$)
+% be a redex for \rulename{deref-s} (resp. \rulename{deref-h}).
+% %
+% We respectively call $x$ the \emph{variable}
+% the constraint $|x == s|$ (resp. $|x == v|$) the \emph{definition}
+% and the occurrence of $x$ in $E[x]$ (resp. $A[x]$) the \emph{use} of
+% the redex.
+% %
+% \end{definition}
 
-	\item[\rdx{1} use is $e'$, \rdx{2} use is $x^1$] Symmetric with previous case.
+% \mypara{Notation:} In the sequel, we will use superscripts
+% like $x^1$ or $x^2$ to denote distinct occurrences of the
+% \emph{same} variable $x$.
 
-	\item[\rdx{1} use is $e'$, \rdx{2} use is $e'$, at same position] Here we have
-% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgRVt4XSJdLFswLDEsInggPSBzXzE7XFwgeCA9IHNfMjtcXCBFW3NfMV0iXSxbMiwxLCJ4PXNfMTtcXCB4PXNfMjtcXCBFW3NfMl0iXSxbMCwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFW3NfMV0iXSxbMiwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFXzJbc18yXSJdLFsxLDMsIlxcYnVsbGV0Il0sWzAsMiwiMiJdLFswLDEsIjEiLDJdLFsxLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}
-	& {x = s_1;\ x = s_2;\ E[x]} \\
-	{x = s_1;\ x = s_2;\ E[s_1]} && {x=s_1;\ x=s_2;\ E[s_2]} \\
-	{x = s_1;\ s_1 = s_2;\ E[s_1]} && {x = s_1;\ s_1 = s_2;\ E_2[s_2]} \\
-	& \bullet
-	\arrow["2", from=1-2, to=2-3]
-	\arrow["1"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-1]
-	\arrow[dotted, from=2-3, to=3-3]
-	\arrow[dotted, two heads, from=3-1, to=4-2]
-	\arrow[dotted, two heads, from=3-3, to=4-2]
-	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-	\end{tikzcd}\]
+% \begin{lemma}[Deref-Comm-1] \label{lem:deref-comm-1}
+% If $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ are two \rulename{deref-*} reductions
+% with the same variable $x$, then $\join{\rord}{e_1}{e_2}$.
+% \end{lemma}
 
-	\item[\rdx{1} use is $e'$, \rdx{2} use is $e'$, at different position] Here we have
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgXFxsZG90cyBFXzFbeF0gXFxsZG90cyBFXzJbeF0gXFxsZG90cyJdLFswLDEsInggPSBzXzE7XFwgeCA9IHNfMjtcXCBcXGxkb3RzIEVfMVtzXzFdIFxcbGRvdHMgRV8yW3hdIFxcbGRvdHMiXSxbMiwxLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgXFxsZG90cyBFXzFbeF0gXFxsZG90cyBFXzJbc18yXSBcXGxkb3RzIl0sWzEsMiwieCA9IHNfMTtcXCB4ID0gc18yO1xcIFxcbGRvdHMgRV8xW3NfMV0gXFxsZG90cyBFXzJbc18yXSBcXGxkb3RzIl0sWzAsMiwiMiJdLFswLDEsIjEiLDJdLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-\[\begin{tikzcd}[column sep=tiny]
-	& {x = s_1;\ x = s_2;\ E_1[x] \ldots E_2[x] } \\
-	{x = s_1;\ x = s_2;\ E_1[s_1] \ldots E_2[x] } && {x = s_1;\ x = s_2;\ E_1[x] \ldots E_2[s_2] } \\
-	& {x = s_1;\ x = s_2;\ E_1[s_1] \ldots E_2[s_2] }
-	\arrow["2", from=1-2, to=2-3]
-	\arrow["1"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-2]
-	\arrow[dotted, from=2-3, to=3-2]
-\end{tikzcd}\]
-	\end{description}
+% \begin{proof}
+% Let $\txi{1}$ and $\txi{2}$ denote the reducts for the two reductions
+% $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ respectively.
 
-\item[Case: $v_1 \equiv s$ and $v_2$ is a head value $v$]
-	If $s$ is literal $k$ then we can trivially join at $|fail|$ via \rulename{u-lit-t} or \rulename{u-lam}.
-    Thus, assume that $s \equiv y$, and split cases on the uses of $x$.
-	\begin{description}
-		\item[$\rdx{2}$ use is $x^1$] Impossible as \rulename{deref-h}
-		cannot substitute $x^1$ in $x^1 = y$ as the RHS $y$ is not
-		a head value.
-		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $x^2=v$ on the left]
-		% https://q.uiver.app/?q=WzAsNSxbMSwwLCJ4XjEgPSB5O1xcIHheMiA9IHY7XFwgQVt4XjJdIl0sWzAsMSwieF4xID0geTtcXCB5ID0gdjtcXCBBW3heMl0iXSxbMCwyLCJ4ID0geTtcXCB5ID0gdjtcXCBBW3ldIl0sWzEsMywieCA9IHk7XFwgeSA9IHY7XFwgQVt2XSJdLFsxLDEsInheMSA9IHk7XFwgeF4yID0gdjtcXCBBW3ZdIl0sWzAsMSwiMSIsMl0sWzEsMiwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzAsNCwiMiJdLFs0LDMsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-		& {x^1 = y;\ x^2 = v;\ A[x^2]} \\
-		{x^1 = y;\ y = v;\ A[x^2]} & {x^1 = y;\ x^2 = v;\ A[v]} \\
-		{x = y;\ y = v;\ A[y]} \\
-		& {x = y;\ y = v;\ A[v]}
-		\arrow["1"', from=1-2, to=2-1]
-		\arrow[dotted, from=2-1, to=3-1]
-		\arrow[dotted, from=3-1, to=4-2]
-		\arrow["2", from=1-2, to=2-2]
-		\arrow[dotted, from=2-2, to=4-2]
-		\end{tikzcd}\]
-		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $x^2=v$ on the right]
-		% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XjEgPSB5O1xcIHheMiA9IFZbeF4xXTtcXCBBW3heMl0iXSxbMCwzLCJ4XjEgPSB5O1xcIHheMiA9IFZbeV07XFwgQVtWW3ldXSJdLFswLDEsInheMSA9IHk7XFwgeF4yID0gVlt5XTtcXCBBW3heMl0iXSxbMSwxLCJ4XjEgPSB5O1xcIHheMiA9IFZbeF4xXTtcXCBBW1ZbeF4xXV0iXSxbMSwyLCJ4XjEgPSB5O1xcIHheMiA9IFZbeV07XFwgQVtWW3heMV1dIl0sWzAsMiwiMSJdLFsyLDEsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjIiXSxbMyw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNCwxLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			{x^1 = y;\ x^2 = V[x^1];\ A[x^2]} \\
-			{x^1 = y;\ x^2 = V[y];\ A[x^2]} & {x^1 = y;\ x^2 = V[x^1];\ A[V[x^1]]} \\
-			& {x^1 = y;\ x^2 = V[y];\ A[V[x^1]]} \\
-			{x^1 = y;\ x^2 = V[y];\ A[V[y]]}
-			\arrow["1", from=1-1, to=2-1]
-			\arrow[dotted, from=2-1, to=4-1]
-			\arrow["2", from=1-1, to=2-2]
-			\arrow[dotted, from=2-2, to=3-2]
-			\arrow[dotted, from=3-2, to=4-1]
-		\end{tikzcd}\]
-		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $e'$ at same position]
-		% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4ID0geTtcXCB4ID0gdjtcXCBBW3hdIl0sWzAsMywieCA9IHk7XFwgeSA9IHY7XFwgQVt2XSJdLFswLDEsInggPSB5O1xcIHggPSB2O1xcIEFbdl0iXSxbMSwxLCJ4ID0geTtcXCB4ID0gdjtcXCBBW3ldIl0sWzEsMiwieCA9IHk7XFwgeSA9IHY7XFwgQVt5XSJdLFswLDIsIjIiXSxbMiwxLCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCIxIl0sWzMsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzQsMSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			{x = y;\ x = v;\ A[x]} \\
-			{x = y;\ x = v;\ A[v]} & {x = y;\ x = v;\ A[y]} \\
-			& {x = y;\ y = v;\ A[y]} \\
-			{x = y;\ y = v;\ A[v]}
-			\arrow["2", from=1-1, to=2-1]
-			\arrow[dotted, from=2-1, to=4-1]
-			\arrow["1", from=1-1, to=2-2]
-			\arrow[dotted, from=2-2, to=3-2]
-			\arrow[dotted, from=3-2, to=4-1]
-		\end{tikzcd}\]
+% The case when the constraints for $\rdx{1}$ and $\rdx{2}$
+% are the same is trivial, so let us assume we have two
+% separate constraints, $|x == v_1|$ and $|x == v_2|$.
+% %
+% The case when the reducts are disjoint is trivial, as
+% ${e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots}$,
+% ${e_1 \equiv \ldots \rdx{1}' \ldots \rdx{2} \ldots}$,
+% ${e_2 \equiv \ldots \rdx{1} \ldots \rdx{2}' \ldots}$,
+% and $e_1$ and $e_2$ can be joined at
+% ${\ldots \rdx{1}' \ldots \rdx{2}' \ldots}$.
 
-		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $e'$ at different position]
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeF0gXFxsZG90cyBBXzJbeF0iXSxbMiwxLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeF0gXFxsZG90cyBBXzJbdl0iXSxbMCwxLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeV0gXFxsZG90cyBBXzJbeF0iXSxbMSwyLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeV0gXFxsZG90cyBBXzJbdl0iXSxbMCwxLCIyIl0sWzAsMiwiMSIsMl0sWzIsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			& {x = y;\ x = v;\ E_1[x] \ldots A_2[x]} \\
-			{x = y;\ x = v;\ E_1[y] \ldots A_2[x]} && {x = y;\ x = v;\ E_1[x] \ldots A_2[v]} \\
-			& {x = y;\ x = v;\ E_1[y] \ldots A_2[v]}
-			\arrow["2", from=1-2, to=2-3]
-			\arrow["1"', from=1-2, to=2-1]
-			\arrow[dotted, from=2-1, to=3-2]
-			\arrow[dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
-	\end{description}
-\item[Case: $v_1$ and $v_2$ are heap-values] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
-Hence, let us assume both are \emph{tuples} and split cases on the positions of the uses of $x$ in $\rdx{1}$ and $\rdx{2}$.
-	\begin{description}
-		\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$]
-		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIGUnIl0sWzAsMSwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgZSciXSxbMCwyLCJ2XzEgPSB2XzI7XFwgeCA9IHZfMTtcXCBlJyJdLFsyLDIsInZfMSA9IHZfMjtcXCB4ID0gdl8yO1xcIGUnIl0sWzEsMywiXFxidWxsZXQiXSxbMiwxLCJ2XzIgPSB2XzE7XFwgeCA9IHZfMjtcXCBlJyJdLFswLDEsIjEiLDJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiMiJdLFs1LDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDQsIlxcY3JlZntsZW06ZXEtam9pbn0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			& {x^1 = v_1;\ x^2 = v_2;\ e'} \\
-			{x = v_1;\ v_1 = v_2;\ e'} && {v_2 = v_1;\ x = v_2;\ e'} \\
-			{v_1 = v_2;\ x = v_1;\ e'} && {v_1 = v_2;\ x = v_2;\ e'} \\
-			& \bullet
-			\arrow["1"', from=1-2, to=2-1]
-			\arrow[dotted, from=2-1, to=3-1]
-			\arrow[dotted, two heads, from=3-1, to=4-2]
-			\arrow[dotted, two heads, from=3-3, to=4-2]
-			\arrow["2", from=1-2, to=2-3]
-			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-		\end{tikzcd}\]
-		\item[\rdx{1} use is $x^2$, \rdx{2} use is in $e'$]
-		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIEFfMlt4XSJdLFswLDEsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt4XSJdLFswLDIsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt2XzFdIl0sWzIsMiwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInheMSA9IHZfMTtcXCB4XjIgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			& {x^1 = v_1;\ x^2 = v_2;\ A_2[x]} \\
-			{x = v_1;\ v_1 = v_2;\ A_2[x]} && {x^1 = v_1;\ x^2 = v_2;\ A_2[v_2]} \\
-			{x = v_1;\ v_1 = v_2;\ A_2[v_1]} && {x = v_1;\ v_1 = v_2;\ A_2[v_2]} \\
-			& \bullet
-			\arrow["1"', from=1-2, to=2-1]
-			\arrow[dotted, from=2-1, to=3-1]
-			\arrow[dotted, two heads, from=3-1, to=4-2]
-			\arrow[dotted, two heads, from=3-3, to=4-2]
-			\arrow["2", from=1-2, to=2-3]
-			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-		\end{tikzcd}\]
+% Consider the case where $\rdx{2} \subset \rdx{1}$
+% (the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
+% There are two possibilities.
+% %
+% First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
+% where $C$ is either an $E$ or $A$ depending on whether $v_1$
+% is a scalar or not.
+% Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
 
-		\item[\rdx{1} use is in $e'$, \rdx{2} use is $x^1$] Symmetric to previous case.
+% Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
+% $e \equiv |x == v_1; x == v_2; e'|$.
+% %
+% Let us split cases on whether $v_1$ and $v_2$ are scalars ($k$ or $y$)
+% or heap values ($\lambda$s or tuples).
 
-		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at same position]
-		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gdl8xO1xcIHggPSB2XzI7XFwgQVt4XSJdLFswLDEsInggPSB2XzE7XFwgeCA9IHZfMjtcXCBBW3ZfMV0iXSxbMCwyLCJ4ID0gdl8xO1xcIHZfMSA9IHZfMjtcXCBBW3ZfMV0iXSxbMiwyLCJ4ID0gdl8xO1xcIHZfMSA9IHZfMjtcXCBBW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInggPSB2XzE7XFwgeCA9IHZfMjtcXCBBW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}
-			& {x = v_1;\ x = v_2;\ A[x]} \\
-			{x = v_1;\ x = v_2;\ A[v_1]} && {x = v_1;\ x = v_2;\ A[v_2]} \\
-			{x = v_1;\ v_1 = v_2;\ A[v_1]} && {x = v_1;\ v_1 = v_2;\ A[v_2]} \\
-			& \bullet
-			\arrow["1"', from=1-2, to=2-1]
-			\arrow[dotted, from=2-1, to=3-1]
-			\arrow[dotted, two heads, from=3-1, to=4-2]
-			\arrow[dotted, two heads, from=3-3, to=4-2]
-			\arrow["2", from=1-2, to=2-3]
-			\arrow[dotted, from=2-3, to=3-3]
-			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
-		\end{tikzcd}\]
+% \begin{description}
+% \item[Case: $v_1 \equiv s_1$ and $v_2 \equiv s_2$]
 
-		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at different positions]
-		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0gdl8xO1xcIHggPSB2XzI7XFwgQV8xW3hdIFxcbGRvdHMgQV8yW3hdIl0sWzAsMSwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt2XzFdIFxcbGRvdHMgQV8yW3hdIl0sWzIsMSwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt4XSBcXGxkb3RzIEFfMlt2XzJdIl0sWzEsMiwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt2XzFdIFxcbGRvdHMgQV8yW3ZfMl0iXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-		\[\begin{tikzcd}[column sep=tiny]
-			& {x = v_1;\ x = v_2;\ A_1[x] \ldots A_2[x]} \\
-			{x = v_1;\ x = v_2;\ A_1[v_1] \ldots A_2[x]} && {x = v_1;\ x = v_2;\ A_1[x] \ldots A_2[v_2]} \\
-			& {x = v_1;\ x = v_2;\ A_1[v_1] \ldots A_2[v_2]}
-			\arrow["2", from=1-2, to=2-3]
-			\arrow["1"', from=1-2, to=2-1]
-			\arrow[dotted, from=2-1, to=3-2]
-			\arrow[dotted, from=2-3, to=3-2]
-		\end{tikzcd}\]
-	\end{description}
-\end{description}
-\end{proof}
 
-\begin{lemma}[Deref-Comm-2] \label{lem:deref-comm-2}
-If $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ are two \rulename{deref-*} reductions
-with distinct definitions $x_1$ and $x_2$ then $\join{\rord}{e_1}{e_2}$.
-\end{lemma}
+% Here $e \equiv x^1 = s_1; x^2 = s_2; e'$.
+% Split cases on the \emph{uses} of $x$:
+% 	\begin{description}
+% 	\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$] Here we have
+% 	% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSBzXzE7XFwgeF4yID0gc18yO1xcIGUnIl0sWzAsMSwieF4xID0gc18xO1xcIHNfMSA9IHNfMjtcXCBlJyJdLFsyLDEsInNfMiA9IHNfMTtcXCB4XjIgPSBzXzI7XFwgZSciXSxbMCwyLCJzXzEgPSBzXzI7XFwgeCA9IHNfMTtcXCBlJyJdLFsyLDIsInNfMSA9IHNfMjtcXCB4ID0gc18yO1xcIGUnIl0sWzEsMywiXFxidWxsZXQiXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzQsNSwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}
+% 	& {x^1 = s_1;\ x^2 = s_2;\ e'} \\
+% 	{x^1 = s_1;\ s_1 = s_2;\ e'} && {s_2 = s_1;\ x^2 = s_2;\ e'} \\
+% 	{s_1 = s_2;\ x = s_1;\ e'} && {s_1 = s_2;\ x = s_2;\ e'} \\
+% 	& \bullet
+% 	\arrow["2", from=1-2, to=2-3]
+% 	\arrow["1"', from=1-2, to=2-1]
+% 	\arrow[dotted, from=2-1, to=3-1]
+% 	\arrow[dotted, from=2-3, to=3-3]
+% 	\arrow[dotted, two heads, from=3-1, to=4-2]
+% 	\arrow[dotted, two heads, from=3-3, to=4-2]
+% 	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 	\end{tikzcd}\]
 
-\begin{proof}
-Let $\txi{1}$ and $\txi{2}$ denote the reducts for the two reductions $\rstep{\rord}{e}{e_1}$
-and $\rstep{\rord}{e}{e_2}$ respectively. Further, let us assume that the reducts respectively
-use the constraints $|x_1 = v_1|$ and $|x_2 = v_2|$ respectively.
-%
-The case when the reducts are disjoint is trivial, as
-${e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots}$,
-${e_1 \equiv \ldots \rdx{1}' \ldots \rdx{2} \ldots}$,
-${e_2 \equiv \ldots \rdx{1} \ldots \rdx{2}' \ldots}$,
-and $e_1$ and $e_2$ can be joined at
-${\ldots \rdx{1}' \ldots \rdx{2}' \ldots}$.
+% 	\item[\rdx{1} use is $x^2$, \rdx{2} use is $e'$] Here we have
+% 	% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgRV8yW3hdIl0sWzAsMSwieCA9IHNfMTtcXCBzXzEgPSBzXzI7XFwgRV8yW3hdIl0sWzIsMSwieD1zXzE7XFwgeD1zXzI7XFwgRV8yW3NfMl0iXSxbMCwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFXzJbc18xXSJdLFsyLDIsInggPSBzXzE7XFwgc18xID0gc18yO1xcIEVfMltzXzJdIl0sWzEsMywiXFxidWxsZXQiXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw1LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}
+% 	& {x = s_1;\ x = s_2;\ E_2[x]} \\
+% 	{x = s_1;\ s_1 = s_2;\ E_2[x]} && {x = s_1;\ x = s_2;\ E_2[s_2]} \\
+% 	{x = s_1;\ s_1 = s_2;\ E_2[s_1]} && {x = s_1;\ s_1 = s_2;\ E_2[s_2]} \\
+% 	& \bullet
+% 	\arrow["2", from=1-2, to=2-3]
+% 	\arrow["1"', from=1-2, to=2-1]
+% 	\arrow[dotted, from=2-1, to=3-1]
+% 	\arrow[dotted, from=2-3, to=3-3]
+% 	\arrow[dotted, two heads, from=3-1, to=4-2]
+% 	\arrow[dotted, two heads, from=3-3, to=4-2]
+% 	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 	\end{tikzcd}\]
 
-Consider the case where $\rdx{2} \subset \rdx{1}$
-(the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
-There are two possibilities.
-%
-First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
-where $C$ is either an $E$ or $A$ depending on whether $v_1$
-is a scalar or not.
-%
-Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
+% 	\item[\rdx{1} use is $e'$, \rdx{2} use is $x^1$] Symmetric with previous case.
 
-Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
-$e \equiv |x_1 == v_1; x_2 == v_2; e'|$.
-%
-Let us split cases on whether $v_1$ and $v_2$ are scalars
-or heap values ($\lambda$s or tuples).
+% 	\item[\rdx{1} use is $e'$, \rdx{2} use is $e'$, at same position] Here we have
+% % https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgRVt4XSJdLFswLDEsInggPSBzXzE7XFwgeCA9IHNfMjtcXCBFW3NfMV0iXSxbMiwxLCJ4PXNfMTtcXCB4PXNfMjtcXCBFW3NfMl0iXSxbMCwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFW3NfMV0iXSxbMiwyLCJ4ID0gc18xO1xcIHNfMSA9IHNfMjtcXCBFXzJbc18yXSJdLFsxLDMsIlxcYnVsbGV0Il0sWzAsMiwiMiJdLFswLDEsIjEiLDJdLFsxLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}
+% 	& {x = s_1;\ x = s_2;\ E[x]} \\
+% 	{x = s_1;\ x = s_2;\ E[s_1]} && {x=s_1;\ x=s_2;\ E[s_2]} \\
+% 	{x = s_1;\ s_1 = s_2;\ E[s_1]} && {x = s_1;\ s_1 = s_2;\ E_2[s_2]} \\
+% 	& \bullet
+% 	\arrow["2", from=1-2, to=2-3]
+% 	\arrow["1"', from=1-2, to=2-1]
+% 	\arrow[dotted, from=2-1, to=3-1]
+% 	\arrow[dotted, from=2-3, to=3-3]
+% 	\arrow[dotted, two heads, from=3-1, to=4-2]
+% 	\arrow[dotted, two heads, from=3-3, to=4-2]
+% 	\arrow["{\cref{lem:join-s-s}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 	\end{tikzcd}\]
 
-\begin{description}
-\item[Case: $v_1$ is a scalar and $v_2$ is a scalar]
-Here $e \equiv |x_1==s_1;x_2==s_2;e'|$.
-Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
-%
-	\begin{description}
-	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $s_1$]
-	\ranjit{impossible due to ordering}
-	Here we have $s_1 \equiv x_2$ and $s_2 \equiv x_1$ and so we can join the reductions
-	as follows:
-	% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4XzEgPSB4XzIgO1xcIHhfMiA9IHhfMTtcXCBlJyJdLFswLDEsInhfMSA9IHhfMiA7XFwgeF8yID0geF8yO1xcIGUnIl0sWzIsMSwieF8xID0geF8xIDtcXCB4XzIgPSB4XzE7XFwgZSciXSxbMSwyLCJ4XzEgPSB4XzI7XFwgZSciXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}[column sep=tiny]
-		& {x_1 = x_2 ;\ x_2 = x_1;\ e'} \\
-		{x_1 = x_2 ;\ x_2 = x_2;\ e'} && {x_1 = x_1 ;\ x_2 = x_1;\ e'} \\
-		& {x_1 = x_2;\ e'}
-		\arrow["2", from=1-2, to=2-3]
-		\arrow["1"', from=1-2, to=2-1]
-		\arrow[dotted, from=2-1, to=3-2]
-		\arrow[dotted, from=2-3, to=3-2]
-	\end{tikzcd}\]
+% 	\item[\rdx{1} use is $e'$, \rdx{2} use is $e'$, at different position] Here we have
+% % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgXFxsZG90cyBFXzFbeF0gXFxsZG90cyBFXzJbeF0gXFxsZG90cyJdLFswLDEsInggPSBzXzE7XFwgeCA9IHNfMjtcXCBcXGxkb3RzIEVfMVtzXzFdIFxcbGRvdHMgRV8yW3hdIFxcbGRvdHMiXSxbMiwxLCJ4ID0gc18xO1xcIHggPSBzXzI7XFwgXFxsZG90cyBFXzFbeF0gXFxsZG90cyBFXzJbc18yXSBcXGxkb3RzIl0sWzEsMiwieCA9IHNfMTtcXCB4ID0gc18yO1xcIFxcbGRvdHMgRV8xW3NfMV0gXFxsZG90cyBFXzJbc18yXSBcXGxkb3RzIl0sWzAsMiwiMiJdLFswLDEsIjEiLDJdLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% \[\begin{tikzcd}[column sep=tiny]
+% 	& {x = s_1;\ x = s_2;\ E_1[x] \ldots E_2[x] } \\
+% 	{x = s_1;\ x = s_2;\ E_1[s_1] \ldots E_2[x] } && {x = s_1;\ x = s_2;\ E_1[x] \ldots E_2[s_2] } \\
+% 	& {x = s_1;\ x = s_2;\ E_1[s_1] \ldots E_2[s_2] }
+% 	\arrow["2", from=1-2, to=2-3]
+% 	\arrow["1"', from=1-2, to=2-1]
+% 	\arrow[dotted, from=2-1, to=3-2]
+% 	\arrow[dotted, from=2-3, to=3-2]
+% \end{tikzcd}\]
+% 	\end{description}
 
-	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $e'$] Join the reductions as
-	% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0geF8xO1xcIEVbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSB4XzE7XFwgRVt4XzFdIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IHNfMTtcXCBFW3hfMV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gc18xO1xcIEVbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBzXzE7XFwgRVtzXzFdIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}
-		{x_1 = s_1;\ x_2 = x_1;\ E[x_2]} \\
-		{x_1 = s_1;\ x_2 = s_1;\ E[x_2]} & {x_1 = s_1;\ x_2 = x_1;\ E[x_1]} \\
-		& {x_1 = s_1;\ x_2 = s_1;\ E[x_1]} \\
-		{x_1 = s_1;\ x_2 = s_1;\ E[s_1]}
-		\arrow["2", from=1-1, to=2-2]
-		\arrow[dotted, from=2-2, to=3-2]
-		\arrow["1"', from=1-1, to=2-1]
-		\arrow[dotted, from=3-2, to=4-1]
-		\arrow[dotted, from=2-1, to=4-1]
-	\end{tikzcd}\]
+% \item[Case: $v_1 \equiv s$ and $v_2$ is a head value $v$]
+% 	If $s$ is literal $k$ then we can trivially join at $|fail|$ via \rulename{u-lit-t} or \rulename{u-lam}.
+%     Thus, assume that $s \equiv y$, and split cases on the uses of $x$.
+% 	\begin{description}
+% 		\item[$\rdx{2}$ use is $x^1$] Impossible as \rulename{deref-h}
+% 		cannot substitute $x^1$ in $x^1 = y$ as the RHS $y$ is not
+% 		a head value.
+% 		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $x^2=v$ on the left]
+% 		% https://q.uiver.app/?q=WzAsNSxbMSwwLCJ4XjEgPSB5O1xcIHheMiA9IHY7XFwgQVt4XjJdIl0sWzAsMSwieF4xID0geTtcXCB5ID0gdjtcXCBBW3heMl0iXSxbMCwyLCJ4ID0geTtcXCB5ID0gdjtcXCBBW3ldIl0sWzEsMywieCA9IHk7XFwgeSA9IHY7XFwgQVt2XSJdLFsxLDEsInheMSA9IHk7XFwgeF4yID0gdjtcXCBBW3ZdIl0sWzAsMSwiMSIsMl0sWzEsMiwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzAsNCwiMiJdLFs0LDMsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 		& {x^1 = y;\ x^2 = v;\ A[x^2]} \\
+% 		{x^1 = y;\ y = v;\ A[x^2]} & {x^1 = y;\ x^2 = v;\ A[v]} \\
+% 		{x = y;\ y = v;\ A[y]} \\
+% 		& {x = y;\ y = v;\ A[v]}
+% 		\arrow["1"', from=1-2, to=2-1]
+% 		\arrow[dotted, from=2-1, to=3-1]
+% 		\arrow[dotted, from=3-1, to=4-2]
+% 		\arrow["2", from=1-2, to=2-2]
+% 		\arrow[dotted, from=2-2, to=4-2]
+% 		\end{tikzcd}\]
+% 		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $x^2=v$ on the right]
+% 		% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XjEgPSB5O1xcIHheMiA9IFZbeF4xXTtcXCBBW3heMl0iXSxbMCwzLCJ4XjEgPSB5O1xcIHheMiA9IFZbeV07XFwgQVtWW3ldXSJdLFswLDEsInheMSA9IHk7XFwgeF4yID0gVlt5XTtcXCBBW3heMl0iXSxbMSwxLCJ4XjEgPSB5O1xcIHheMiA9IFZbeF4xXTtcXCBBW1ZbeF4xXV0iXSxbMSwyLCJ4XjEgPSB5O1xcIHheMiA9IFZbeV07XFwgQVtWW3heMV1dIl0sWzAsMiwiMSJdLFsyLDEsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjIiXSxbMyw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbNCwxLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			{x^1 = y;\ x^2 = V[x^1];\ A[x^2]} \\
+% 			{x^1 = y;\ x^2 = V[y];\ A[x^2]} & {x^1 = y;\ x^2 = V[x^1];\ A[V[x^1]]} \\
+% 			& {x^1 = y;\ x^2 = V[y];\ A[V[x^1]]} \\
+% 			{x^1 = y;\ x^2 = V[y];\ A[V[y]]}
+% 			\arrow["1", from=1-1, to=2-1]
+% 			\arrow[dotted, from=2-1, to=4-1]
+% 			\arrow["2", from=1-1, to=2-2]
+% 			\arrow[dotted, from=2-2, to=3-2]
+% 			\arrow[dotted, from=3-2, to=4-1]
+% 		\end{tikzcd}\]
+% 		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $e'$ at same position]
+% 		% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4ID0geTtcXCB4ID0gdjtcXCBBW3hdIl0sWzAsMywieCA9IHk7XFwgeSA9IHY7XFwgQVt2XSJdLFswLDEsInggPSB5O1xcIHggPSB2O1xcIEFbdl0iXSxbMSwxLCJ4ID0geTtcXCB4ID0gdjtcXCBBW3ldIl0sWzEsMiwieCA9IHk7XFwgeSA9IHY7XFwgQVt5XSJdLFswLDIsIjIiXSxbMiwxLCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCIxIl0sWzMsNCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzQsMSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			{x = y;\ x = v;\ A[x]} \\
+% 			{x = y;\ x = v;\ A[v]} & {x = y;\ x = v;\ A[y]} \\
+% 			& {x = y;\ y = v;\ A[y]} \\
+% 			{x = y;\ y = v;\ A[v]}
+% 			\arrow["2", from=1-1, to=2-1]
+% 			\arrow[dotted, from=2-1, to=4-1]
+% 			\arrow["1", from=1-1, to=2-2]
+% 			\arrow[dotted, from=2-2, to=3-2]
+% 			\arrow[dotted, from=3-2, to=4-1]
+% 		\end{tikzcd}\]
 
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$] Symmetric to the previous case.
+% 		\item[\rdx{2} use is in $e'$, \rdx{1} use is in $e'$ at different position]
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeF0gXFxsZG90cyBBXzJbeF0iXSxbMiwxLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeF0gXFxsZG90cyBBXzJbdl0iXSxbMCwxLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeV0gXFxsZG90cyBBXzJbeF0iXSxbMSwyLCJ4ID0geTtcXCB4ID0gdjtcXCBFXzFbeV0gXFxsZG90cyBBXzJbdl0iXSxbMCwxLCIyIl0sWzAsMiwiMSIsMl0sWzIsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			& {x = y;\ x = v;\ E_1[x] \ldots A_2[x]} \\
+% 			{x = y;\ x = v;\ E_1[y] \ldots A_2[x]} && {x = y;\ x = v;\ E_1[x] \ldots A_2[v]} \\
+% 			& {x = y;\ x = v;\ E_1[y] \ldots A_2[v]}
+% 			\arrow["2", from=1-2, to=2-3]
+% 			\arrow["1"', from=1-2, to=2-1]
+% 			\arrow[dotted, from=2-1, to=3-2]
+% 			\arrow[dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
+% 	\end{description}
+% \item[Case: $v_1$ and $v_2$ are heap-values] If either $v_1$ or $v_2$ are $\lambda$-terms, then we can join at $|fail|$.
+% Hence, let us assume both are \emph{tuples} and split cases on the positions of the uses of $x$ in $\rdx{1}$ and $\rdx{2}$.
+% 	\begin{description}
+% 		\item[\rdx{1} use is $x^2$, \rdx{2} use is $x^1$]
+% 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIGUnIl0sWzAsMSwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgZSciXSxbMCwyLCJ2XzEgPSB2XzI7XFwgeCA9IHZfMTtcXCBlJyJdLFsyLDIsInZfMSA9IHZfMjtcXCB4ID0gdl8yO1xcIGUnIl0sWzEsMywiXFxidWxsZXQiXSxbMiwxLCJ2XzIgPSB2XzE7XFwgeCA9IHZfMjtcXCBlJyJdLFswLDEsIjEiLDJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiMiJdLFs1LDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDQsIlxcY3JlZntsZW06ZXEtam9pbn0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			& {x^1 = v_1;\ x^2 = v_2;\ e'} \\
+% 			{x = v_1;\ v_1 = v_2;\ e'} && {v_2 = v_1;\ x = v_2;\ e'} \\
+% 			{v_1 = v_2;\ x = v_1;\ e'} && {v_1 = v_2;\ x = v_2;\ e'} \\
+% 			& \bullet
+% 			\arrow["1"', from=1-2, to=2-1]
+% 			\arrow[dotted, from=2-1, to=3-1]
+% 			\arrow[dotted, two heads, from=3-1, to=4-2]
+% 			\arrow[dotted, two heads, from=3-3, to=4-2]
+% 			\arrow["2", from=1-2, to=2-3]
+% 			\arrow[dotted, from=2-3, to=3-3]
+% 			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 		\end{tikzcd}\]
+% 		\item[\rdx{1} use is $x^2$, \rdx{2} use is in $e'$]
+% 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4XjEgPSB2XzE7XFwgeF4yID0gdl8yO1xcIEFfMlt4XSJdLFswLDEsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt4XSJdLFswLDIsInggPSB2XzE7XFwgdl8xID0gdl8yO1xcIEFfMlt2XzFdIl0sWzIsMiwieCA9IHZfMTtcXCB2XzEgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInheMSA9IHZfMTtcXCB4XjIgPSB2XzI7XFwgQV8yW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			& {x^1 = v_1;\ x^2 = v_2;\ A_2[x]} \\
+% 			{x = v_1;\ v_1 = v_2;\ A_2[x]} && {x^1 = v_1;\ x^2 = v_2;\ A_2[v_2]} \\
+% 			{x = v_1;\ v_1 = v_2;\ A_2[v_1]} && {x = v_1;\ v_1 = v_2;\ A_2[v_2]} \\
+% 			& \bullet
+% 			\arrow["1"', from=1-2, to=2-1]
+% 			\arrow[dotted, from=2-1, to=3-1]
+% 			\arrow[dotted, two heads, from=3-1, to=4-2]
+% 			\arrow[dotted, two heads, from=3-3, to=4-2]
+% 			\arrow["2", from=1-2, to=2-3]
+% 			\arrow[dotted, from=2-3, to=3-3]
+% 			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 		\end{tikzcd}\]
 
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$] As the variables are different, the uses
-	must also be different, hence $e \equiv x_1 = s_1; x_2 = s_2; \ldots E_1[x_1] \ldots E_2[x_2] \ldots$
-	and we can join at $x_1 = s_1; x_2 = s_2; \ldots E_1[s_1] \ldots E_2[s_2] \ldots$.
+% 		\item[\rdx{1} use is in $e'$, \rdx{2} use is $x^1$] Symmetric to previous case.
 
-	\end{description}
+% 		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at same position]
+% 		% https://q.uiver.app/?q=WzAsNixbMSwwLCJ4ID0gdl8xO1xcIHggPSB2XzI7XFwgQVt4XSJdLFswLDEsInggPSB2XzE7XFwgeCA9IHZfMjtcXCBBW3ZfMV0iXSxbMCwyLCJ4ID0gdl8xO1xcIHZfMSA9IHZfMjtcXCBBW3ZfMV0iXSxbMiwyLCJ4ID0gdl8xO1xcIHZfMSA9IHZfMjtcXCBBW3ZfMl0iXSxbMSwzLCJcXGJ1bGxldCJdLFsyLDEsInggPSB2XzE7XFwgeCA9IHZfMjtcXCBBW3ZfMl0iXSxbMCwxLCIxIiwyXSxbMSwyLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDUsIjIiXSxbNSwzLCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCw0LCJcXGNyZWZ7bGVtOmVxLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}
+% 			& {x = v_1;\ x = v_2;\ A[x]} \\
+% 			{x = v_1;\ x = v_2;\ A[v_1]} && {x = v_1;\ x = v_2;\ A[v_2]} \\
+% 			{x = v_1;\ v_1 = v_2;\ A[v_1]} && {x = v_1;\ v_1 = v_2;\ A[v_2]} \\
+% 			& \bullet
+% 			\arrow["1"', from=1-2, to=2-1]
+% 			\arrow[dotted, from=2-1, to=3-1]
+% 			\arrow[dotted, two heads, from=3-1, to=4-2]
+% 			\arrow[dotted, two heads, from=3-3, to=4-2]
+% 			\arrow["2", from=1-2, to=2-3]
+% 			\arrow[dotted, from=2-3, to=3-3]
+% 			\arrow["{\cref{lem:join-h-h}}"{description, pos=0.9}, draw=none, from=1-2, to=4-2]
+% 		\end{tikzcd}\]
 
-\item[Case: $v_1$ is a scalar $s_1$ and $v_2$ is non-scalar] Here $e \equiv |x_1==s_1;x_2==h_2;e'|$.
-Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
-	\begin{description}
-	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $s_1$]
-	Here we have $e \equiv |x_1 == x_2; x_2==v_2;e'|$; the
-	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+% 		\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$ at different positions]
+% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4ID0gdl8xO1xcIHggPSB2XzI7XFwgQV8xW3hdIFxcbGRvdHMgQV8yW3hdIl0sWzAsMSwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt2XzFdIFxcbGRvdHMgQV8yW3hdIl0sWzIsMSwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt4XSBcXGxkb3RzIEFfMlt2XzJdIl0sWzEsMiwieCA9IHZfMTtcXCB4ID0gdl8yO1xcIEFfMVt2XzFdIFxcbGRvdHMgQV8yW3ZfMl0iXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 		\[\begin{tikzcd}[column sep=tiny]
+% 			& {x = v_1;\ x = v_2;\ A_1[x] \ldots A_2[x]} \\
+% 			{x = v_1;\ x = v_2;\ A_1[v_1] \ldots A_2[x]} && {x = v_1;\ x = v_2;\ A_1[x] \ldots A_2[v_2]} \\
+% 			& {x = v_1;\ x = v_2;\ A_1[v_1] \ldots A_2[v_2]}
+% 			\arrow["2", from=1-2, to=2-3]
+% 			\arrow["1"', from=1-2, to=2-1]
+% 			\arrow[dotted, from=2-1, to=3-2]
+% 			\arrow[dotted, from=2-3, to=3-2]
+% 		\end{tikzcd}\]
+% 	\end{description}
+% \end{description}
+% \end{proof}
 
-	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
-	Here we have $e \equiv |x_1 == s_1; x_2==V[x_1]; A^[x_2]|$,
-	and we can join the reductions as
-% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0gVlt4XzFdO1xcIEFbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3hfMV07XFwgQVtWW3hfMV1dIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IFZbc18xXTtcXCBBW1ZbeF8xXV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gVltzXzFdO1xcIEFbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3NfMV07XFwgQVtWW3hfMV1dIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-	\[\begin{tikzcd}
-		{x_1 = s_1;\ x_2 = V[x_1];\ A[x_2]} \\
-		{x_1 = s_1;\ x_2 = V[s_1];\ A[x_2]} & {x_1 = s_1;\ x_2 = V[x_1];\ A[V[x_1]]} \\
-		& {x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]} \\
-		{x_1 = s_1;\ x_2 = V[s_1];\ A[V[s_1]]}
-		\arrow["2", from=1-1, to=2-2]
-		\arrow[dotted, from=2-2, to=3-2]
-		\arrow["1"', from=1-1, to=2-1]
-		\arrow[dotted, from=3-2, to=4-1]
-		\arrow[dotted, from=2-1, to=4-1]
-	\end{tikzcd}\]
+% \begin{lemma}[Deref-Comm-2] \label{lem:deref-comm-2}
+% If $\rstep{\rord}{e}{e_1}$ and $\rstep{\rord}{e}{e_2}$ are two \rulename{deref-*} reductions
+% with distinct definitions $x_1$ and $x_2$ then $\join{\rord}{e_1}{e_2}$.
+% \end{lemma}
 
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$]
-	Here we have $e \equiv |x_1 == x_2; x_2==v_2;E[x_1]|$; the
-	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+% \begin{proof}
+% Let $\txi{1}$ and $\txi{2}$ denote the reducts for the two reductions $\rstep{\rord}{e}{e_1}$
+% and $\rstep{\rord}{e}{e_2}$ respectively. Further, let us assume that the reducts respectively
+% use the constraints $|x_1 = v_1|$ and $|x_2 = v_2|$ respectively.
+% %
+% The case when the reducts are disjoint is trivial, as
+% ${e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots}$,
+% ${e_1 \equiv \ldots \rdx{1}' \ldots \rdx{2} \ldots}$,
+% ${e_2 \equiv \ldots \rdx{1} \ldots \rdx{2}' \ldots}$,
+% and $e_1$ and $e_2$ can be joined at
+% ${\ldots \rdx{1}' \ldots \rdx{2}' \ldots}$.
 
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
-	As the variables are different, the uses
-	must also be different, hence $e \equiv x_1 = s_1; x_2 = v_2; \ldots E[x_1] \ldots A[x_2] \ldots$
-	and we can join at $x_1 = s_1; x_2 = v_2; \ldots E[s_1] \ldots A[v_2] \ldots$.
-	\end{description}
+% Consider the case where $\rdx{2} \subset \rdx{1}$
+% (the case where $\rdx{1} \subset \rdx{2}$ is symmetric.)
+% There are two possibilities.
+% %
+% First, $\rdx{1} \equiv x == v_1; \ldots \rdx{2} \ldots C[x]$
+% where $C$ is either an $E$ or $A$ depending on whether $v_1$
+% is a scalar or not.
+% %
+% Here, we join the terms at $x == v_1; \ldots \rdx{2}' \ldots C[v_1]$.
 
-\item[Case: $v_1$ is non-scalar and $v_2$ is scalar $s_2$] Symmetric to the above case.
+% Second, where the two redexes $\rdx{1}$ and $\rdx{2}$ overlap \ie
+% $e \equiv |x_1 == v_1; x_2 == v_2; e'|$.
+% %
+% Let us split cases on whether $v_1$ and $v_2$ are scalars
+% or heap values ($\lambda$s or tuples).
 
-\item[Case: $v_1$ is non-scalar and $v_2$ is non-scalar]
-Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
-	\begin{description}
-	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $v_1$]
-	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
-	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
-	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $v_1$]
-	Impossible: substitutes non-scalar ($v_2$) in non-scalar ($v_1$).
-	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
-	As the variables are different, the uses
-	must also be different, hence $e \equiv x_1 = v_1; x_2 = v_2; \ldots x_1 \ldots x_2 \ldots$
-	and we can join at $x_1 = v_1; x_2 = v_2; \ldots v_1 \ldots v_2 \ldots$.
-	\end{description}
-\end{description}
-\end{proof}
+% \begin{description}
+% \item[Case: $v_1$ is a scalar and $v_2$ is a scalar]
+% Here $e \equiv |x_1==s_1;x_2==s_2;e'|$.
+% Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+% %
+% 	\begin{description}
+% 	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $s_1$]
+% 	\ranjit{impossible due to ordering}
+% 	Here we have $s_1 \equiv x_2$ and $s_2 \equiv x_1$ and so we can join the reductions
+% 	as follows:
+% 	% https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4XzEgPSB4XzIgO1xcIHhfMiA9IHhfMTtcXCBlJyJdLFswLDEsInhfMSA9IHhfMiA7XFwgeF8yID0geF8yO1xcIGUnIl0sWzIsMSwieF8xID0geF8xIDtcXCB4XzIgPSB4XzE7XFwgZSciXSxbMSwyLCJ4XzEgPSB4XzI7XFwgZSciXSxbMCwyLCIyIl0sWzAsMSwiMSIsMl0sWzEsMywiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}[column sep=tiny]
+% 		& {x_1 = x_2 ;\ x_2 = x_1;\ e'} \\
+% 		{x_1 = x_2 ;\ x_2 = x_2;\ e'} && {x_1 = x_1 ;\ x_2 = x_1;\ e'} \\
+% 		& {x_1 = x_2;\ e'}
+% 		\arrow["2", from=1-2, to=2-3]
+% 		\arrow["1"', from=1-2, to=2-1]
+% 		\arrow[dotted, from=2-1, to=3-2]
+% 		\arrow[dotted, from=2-3, to=3-2]
+% 	\end{tikzcd}\]
+
+% 	\item[\rdx{1} use is in $s_2$, \rdx{2} use is in $e'$] Join the reductions as
+% 	% https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0geF8xO1xcIEVbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSB4XzE7XFwgRVt4XzFdIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IHNfMTtcXCBFW3hfMV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gc18xO1xcIEVbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBzXzE7XFwgRVtzXzFdIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}
+% 		{x_1 = s_1;\ x_2 = x_1;\ E[x_2]} \\
+% 		{x_1 = s_1;\ x_2 = s_1;\ E[x_2]} & {x_1 = s_1;\ x_2 = x_1;\ E[x_1]} \\
+% 		& {x_1 = s_1;\ x_2 = s_1;\ E[x_1]} \\
+% 		{x_1 = s_1;\ x_2 = s_1;\ E[s_1]}
+% 		\arrow["2", from=1-1, to=2-2]
+% 		\arrow[dotted, from=2-2, to=3-2]
+% 		\arrow["1"', from=1-1, to=2-1]
+% 		\arrow[dotted, from=3-2, to=4-1]
+% 		\arrow[dotted, from=2-1, to=4-1]
+% 	\end{tikzcd}\]
+
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$] Symmetric to the previous case.
+
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$] As the variables are different, the uses
+% 	must also be different, hence $e \equiv x_1 = s_1; x_2 = s_2; \ldots E_1[x_1] \ldots E_2[x_2] \ldots$
+% 	and we can join at $x_1 = s_1; x_2 = s_2; \ldots E_1[s_1] \ldots E_2[s_2] \ldots$.
+
+% 	\end{description}
+
+% \item[Case: $v_1$ is a scalar $s_1$ and $v_2$ is non-scalar] Here $e \equiv |x_1==s_1;x_2==h_2;e'|$.
+% Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+% 	\begin{description}
+% 	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $s_1$]
+% 	Here we have $e \equiv |x_1 == x_2; x_2==v_2;e'|$; the
+% 	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+
+% 	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
+% 	Here we have $e \equiv |x_1 == s_1; x_2==V[x_1]; A^[x_2]|$,
+% 	and we can join the reductions as
+% % https://q.uiver.app/?q=WzAsNSxbMCwwLCJ4XzEgPSBzXzE7XFwgeF8yID0gVlt4XzFdO1xcIEFbeF8yXSJdLFsxLDEsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3hfMV07XFwgQVtWW3hfMV1dIl0sWzEsMiwieF8xID0gc18xO1xcIHhfMiA9IFZbc18xXTtcXCBBW1ZbeF8xXV0iXSxbMCwxLCJ4XzEgPSBzXzE7XFwgeF8yID0gVltzXzFdO1xcIEFbeF8yXSJdLFswLDMsInhfMSA9IHNfMTtcXCB4XzIgPSBWW3NfMV07XFwgQVtWW3hfMV1dIl0sWzAsMSwiMiJdLFsxLDIsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIjEiLDJdLFsyLDQsIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
+% 	\[\begin{tikzcd}
+% 		{x_1 = s_1;\ x_2 = V[x_1];\ A[x_2]} \\
+% 		{x_1 = s_1;\ x_2 = V[s_1];\ A[x_2]} & {x_1 = s_1;\ x_2 = V[x_1];\ A[V[x_1]]} \\
+% 		& {x_1 = s_1;\ x_2 = V[s_1];\ A[V[x_1]]} \\
+% 		{x_1 = s_1;\ x_2 = V[s_1];\ A[V[s_1]]}
+% 		\arrow["2", from=1-1, to=2-2]
+% 		\arrow[dotted, from=2-2, to=3-2]
+% 		\arrow["1"', from=1-1, to=2-1]
+% 		\arrow[dotted, from=3-2, to=4-1]
+% 		\arrow[dotted, from=2-1, to=4-1]
+% 	\end{tikzcd}\]
+
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $s_1$]
+% 	Here we have $e \equiv |x_1 == x_2; x_2==v_2;E[x_1]|$; the
+% 	$\rdx{2}$ is impossible as as it is a \emph{non-scalar-copy}.
+
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
+% 	As the variables are different, the uses
+% 	must also be different, hence $e \equiv x_1 = s_1; x_2 = v_2; \ldots E[x_1] \ldots A[x_2] \ldots$
+% 	and we can join at $x_1 = s_1; x_2 = v_2; \ldots E[s_1] \ldots A[v_2] \ldots$.
+% 	\end{description}
+
+% \item[Case: $v_1$ is non-scalar and $v_2$ is scalar $s_2$] Symmetric to the above case.
+
+% \item[Case: $v_1$ is non-scalar and $v_2$ is non-scalar]
+% Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redexes.
+% 	\begin{description}
+% 	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $v_1$]
+% 	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
+% 	\item[\rdx{1} use is in $v_2$, \rdx{2} use is in $e'$]
+% 	Impossible: substitutes non-scalar ($v_1$) in non-scalar ($v_2$).
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $v_1$]
+% 	Impossible: substitutes non-scalar ($v_2$) in non-scalar ($v_1$).
+% 	\item[\rdx{1} use is in $e'$, \rdx{2} use is in $e'$]
+% 	As the variables are different, the uses
+% 	must also be different, hence $e \equiv x_1 = v_1; x_2 = v_2; \ldots x_1 \ldots x_2 \ldots$
+% 	and we can join at $x_1 = v_1; x_2 = v_2; \ldots v_1 \ldots v_2 \ldots$.
+% 	\end{description}
+% \end{description}
+% \end{proof}
 
 
 % \begin{lemma}[Eq-Join] \label{lem:eq-join}
@@ -723,118 +722,118 @@ Let us split cases on the \emph{uses} of $x_1$ and $x_2$ in the respective redex
 % \end{description}
 % \end{proof}
 
-\begin{lemma}[Join-S-S] \label{lem:join-s-s}
-If $e_1 \equiv {s_1 = s_2; E[s_1]}$ and $e_2 \equiv {s_1 = s_2; E[s_2]}$
-then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or $\rsteps{\rord}{e_1,e_2}{s_1=s_2; E[s]}$.
-\end{lemma}
+% \begin{lemma}[Join-S-S] \label{lem:join-s-s}
+% If $e_1 \equiv {s_1 = s_2; E[s_1]}$ and $e_2 \equiv {s_1 = s_2; E[s_2]}$
+% then $\rsteps{\rord}{e_1,e_2}{|fail|}$ or $\rsteps{\rord}{e_1,e_2}{s_1=s_2; E[s]}$.
+% \end{lemma}
 
-\begin{proof}
-If $s_1 \equiv s_2$ then $e_1, e_2$ are trivially joined.
-Suppose that $s_1 \not \equiv s_2$ and split cases on whether they are variables or literals.
+% \begin{proof}
+% If $s_1 \equiv s_2$ then $e_1, e_2$ are trivially joined.
+% Suppose that $s_1 \not \equiv s_2$ and split cases on whether they are variables or literals.
 
-\begin{description}
-\item[Case $s_1 \equiv k_1$ and $s_2 \equiv k_2$] Join at $|fail|$ as $k_1 \not \equiv k_2$.
-\item[Case $s_1 \equiv k$ and $s_2 \equiv x$] Join at $e_1$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
-\item[Case $s_1 \equiv x$ and $s_2 \equiv k$] Join at $e_2$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
-\item[Case $s_1 \equiv x_1$ and $s_2 \equiv x_2$] Join at $e_{3-j}$ where $\rnk{(x_j)} < \rnk{(x_{3-j})}$, as $\rstep{}{x_1 = x_2; E[x_j]}{x_1 = x_2; E[x_{3-j}]}$.
-\end{description}
-\end{proof}
+% \begin{description}
+% \item[Case $s_1 \equiv k_1$ and $s_2 \equiv k_2$] Join at $|fail|$ as $k_1 \not \equiv k_2$.
+% \item[Case $s_1 \equiv k$ and $s_2 \equiv x$] Join at $e_1$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
+% \item[Case $s_1 \equiv x$ and $s_2 \equiv k$] Join at $e_2$ as $\rstep{}{k = x; E[x]}{k = x; E[k]}$.
+% \item[Case $s_1 \equiv x_1$ and $s_2 \equiv x_2$] Join at $e_{3-j}$ where $\rnk{(x_j)} < \rnk{(x_{3-j})}$, as $\rstep{}{x_1 = x_2; E[x_j]}{x_1 = x_2; E[x_{3-j}]}$.
+% \end{description}
+% \end{proof}
 
-\begin{lemma}[Join-H-H] \label{lem:join-h-h}
-Let $h$ and $h'$ be two heap values.
-If $e \equiv {h = h'; E[h]}$ and
-   $e' \equiv {h = h'; E[h']}$
-then $\rsteps{\rord}{e,e'}{|fail|}$ or
-     $\rsteps{\rord}{e,e'}{s_1 = s_1'; \ldots; s_n = s_n'; E[h^*]}$.
-\end{lemma}
+% \begin{lemma}[Join-H-H] \label{lem:join-h-h}
+% Let $h$ and $h'$ be two heap values.
+% If $e \equiv {h = h'; E[h]}$ and
+%    $e' \equiv {h = h'; E[h']}$
+% then $\rsteps{\rord}{e,e'}{|fail|}$ or
+%      $\rsteps{\rord}{e,e'}{s_1 = s_1'; \ldots; s_n = s_n'; E[h^*]}$.
+% \end{lemma}
 
-\begin{proof}
-If either $h$ or $h'$ are $\lambda$-terms then we can join at $|fail|$.
-%
-If $h$ and $h'$ are tuples of \emph{different} sizes we can join at $|fail|$.
-%
-Hence, assume that $h \equiv |arr (s_1, dots, s_n)|$ and $h' \equiv |arr (s'_1, dots, s'_n)|$.
-%
-Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; E[h]$
-and $s_1 = s_1'; \ldots; s_n = s_n'; E[h']$.
-%
-From \cref{lem:join-s-s} we have that for all $0 \leq i \leq n$ the terms
-	$e_i \equiv s_i == s_i'; s_i$ and $e_i' \equiv s_i = s_i'; s_i'$
-	join at $|fail|$ or at some $s_i = s_i'; s_i^{*}$.
-%
-If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$
-then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
-%
-Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$
-using $n$ applications of \cref{lem:eq-scalar}.
-%
-% \begin{verbatim}
-% e -> ... -> e_i -> ... -> e_n == e^* <- e_n' <- ... <- e_i' <- ... <- e'
-% where ei := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s_{i+1}, ..., sn>] and
-% 	  ei' := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s'_{i+1}, ..., sn'>>
-% 	  and each step follows from lem:eq-scalar with
-% 	  	s_{i+1} = s_{i+1}'; s_{i+1}  & E = E[<s1*...si*, HOLE, ... sn>]
-% 	  	s_{i+1} = s_{i+1}'; s_{i+1}' & E = E[<s1*...si*, HOLE, ... sn'>]
-% \end{verbatim}
-%
-\end{proof}
+% \begin{proof}
+% If either $h$ or $h'$ are $\lambda$-terms then we can join at $|fail|$.
+% %
+% If $h$ and $h'$ are tuples of \emph{different} sizes we can join at $|fail|$.
+% %
+% Hence, assume that $h \equiv |arr (s_1, dots, s_n)|$ and $h' \equiv |arr (s'_1, dots, s'_n)|$.
+% %
+% Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; E[h]$
+% and $s_1 = s_1'; \ldots; s_n = s_n'; E[h']$.
+% %
+% From \cref{lem:join-s-s} we have that for all $0 \leq i \leq n$ the terms
+% 	$e_i \equiv s_i == s_i'; s_i$ and $e_i' \equiv s_i = s_i'; s_i'$
+% 	join at $|fail|$ or at some $s_i = s_i'; s_i^{*}$.
+% %
+% If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$
+% then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
+% %
+% Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$
+% using $n$ applications of \cref{lem:eq-scalar}.
+% %
+% % \begin{verbatim}
+% % e -> ... -> e_i -> ... -> e_n == e^* <- e_n' <- ... <- e_i' <- ... <- e'
+% % where ei := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s_{i+1}, ..., sn>] and
+% % 	  ei' := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s'_{i+1}, ..., sn'>>
+% % 	  and each step follows from lem:eq-scalar with
+% % 	  	s_{i+1} = s_{i+1}'; s_{i+1}  & E = E[<s1*...si*, HOLE, ... sn>]
+% % 	  	s_{i+1} = s_{i+1}'; s_{i+1}' & E = E[<s1*...si*, HOLE, ... sn'>]
+% % \end{verbatim}
+% %
+% \end{proof}
 
-\begin{lemma}[Eq-Scalar-Fail]\label{lem:eq-scalar-fail}
-	If $\rsteps{}{s=s'; s}{|fail|}$ then $\rsteps{}{s=s'; e}{|fail|}$.
-\end{lemma}
-\begin{proof}
-Premise only holds when $s \equiv k$ and $s' \equiv k'$ and $k \not = k$.
-\end{proof}
+% \begin{lemma}[Eq-Scalar-Fail]\label{lem:eq-scalar-fail}
+% 	If $\rsteps{}{s=s'; s}{|fail|}$ then $\rsteps{}{s=s'; e}{|fail|}$.
+% \end{lemma}
+% \begin{proof}
+% Premise only holds when $s \equiv k$ and $s' \equiv k'$ and $k \not = k$.
+% \end{proof}
 
-\begin{lemma}[Eq-Scalar]\label{lem:eq-scalar}
-	If $\rstep{\rord}{s=s'; s}{s=s'; s'}$ then $\rstep{\rord}{s=s'; E[s]}{s=s'; E[s']}$.
-\end{lemma}
-\begin{proof}
-Split cases on $s$ and $s'$ and use \rulename{deref-s}.
-\end{proof}
+% \begin{lemma}[Eq-Scalar]\label{lem:eq-scalar}
+% 	If $\rstep{\rord}{s=s'; s}{s=s'; s'}$ then $\rstep{\rord}{s=s'; A[s]}{s=s'; A[s']}$.
+% \end{lemma}
+% \begin{proof}
+% Split cases on $s$ and $s'$ and use \rulename{deref-s}.
+% \end{proof}
 
-\begin{lemma}[$\rord$-Noetherian]\label{lem:ord-term}
-    $\rord$ is Noetherian.
-\end{lemma}
+% \begin{lemma}[$\rord$-Noetherian]\label{lem:ord-term}
+%     $\rord$ is Noetherian.
+% \end{lemma}
 
-\begin{proof}
-Each term has a finite number of free variable occurrences.
-%
-Every reduction in $\rord$ makes progress by doing one of the following:
-%
-(1)~replaces a variable with a heap value (under which no further heap substitutions occur);
-%
-(2)~replaces a variable with a scalar value (under which no further scalar substitutions occur);
-%
-(3)~replaces a variable with a higher-ranked variable;
-%
-or
-%
-(4)~destructs a pair of unified tuples, replacing them with their components.
-%
-Each of the above can only occur finitely often, thereby ensuring
-that $\rord$ terminates, \ie is Noetherian.
-\end{proof}
+% \begin{proof}
+% Each term has a finite number of free variable occurrences.
+% %
+% Every reduction in $\rord$ makes progress by doing one of the following:
+% %
+% (1)~replaces a variable with a heap value (under which no further heap substitutions occur);
+% %
+% (2)~replaces a variable with a scalar value (under which no further scalar substitutions occur);
+% %
+% (3)~replaces a variable with a higher-ranked variable;
+% %
+% or
+% %
+% (4)~destructs a pair of unified tuples, replacing them with their components.
+% %
+% Each of the above can only occur finitely often, thereby ensuring
+% that $\rord$ terminates, \ie is Noetherian.
+% \end{proof}
 
-\begin{corollary}[$\rord$-Confluent]\label{lem:ord-confluent}
-    $\rord$ is confluent.
-\end{corollary}
+% \begin{corollary}[$\rord$-Confluent]\label{lem:ord-confluent}
+%     $\rord$ is confluent.
+% \end{corollary}
 
-\begin{proof}
-	Via \cref{lem:ord-lc} and \cref{lem:ord-term} and Newman's lemma \cref{lem:local}.
-\end{proof}
+% \begin{proof}
+% 	Via \cref{lem:ord-lc} and \cref{lem:ord-term} and Newman's lemma \cref{lem:local}.
+% \end{proof}
 
 
 \subsection{Unification} % --------------------------------------------------------------------------
 
-\begin{lemma}[$\runi$-Confluent]\label{lem:u-c}
-    $\runi$ is confluent.
-\end{lemma}
+% \begin{lemma}[$\runi$-Confluent]\label{lem:u-c}
+%     $\runi$ is confluent.
+% \end{lemma}
 
-\begin{proof}
-	By \cref{lem:ord-confluent} and \cref{lem:closure} we have $\rord^{*}$ is confluent.
-	Hence, as $\runi^{*} = \rord^{*}$, we can conclude that $\runi$ is confluent.
-\end{proof}
+% \begin{proof}
+% 	By \cref{lem:ord-confluent} and \cref{lem:closure} we have $\rord^{*}$ is confluent.
+% 	Hence, as $\runi^{*} = \rord^{*}$, we can conclude that $\runi$ is confluent.
+% \end{proof}
 
 
 \begin{lemma}[$\runi$-$\rapp$-Comm]\label{lem:u-a-c}
@@ -1112,56 +1111,56 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 \end{proof}
 
 %%%% RANJIT-CUT: BEGIN
-\begin{lemma}[Under-$\runi$] \label{lem:under-u}
-Let $\rr' \equiv \rr - \runi$.
-If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
-   $\rdx{\runi} \equiv E[\rdx{}]$ and
-   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\runi}''$ such that
-   $\rsteps{\rr'}{\rdx{\runi}'}{\rdx{\runi}''}$ and
-   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
-\end{lemma}
+% \begin{lemma}[Under-$\runi$] \label{lem:under-u}
+% Let $\rr' \equiv \rr - \runi$.
+% If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+%    $\rdx{\runi} \equiv E[\rdx{}]$ and
+%    $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+% then there exists $\rdx{\runi}''$ such that
+%    $\rsteps{\rr'}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+%    $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
+% \end{lemma}
 
-\begin{proof}
-Split cases on the rule used in $\runi$.
-\begin{description}
-	\item[Case:] \rulename{u-scalar}, \rulename{u-tup} \ie $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ is impossible.
+% \begin{proof}
+% Split cases on the rule used in $\runi$.
+% \begin{description}
+% 	\item[Case:] \rulename{u-scalar}, \rulename{u-tup} \ie $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ is impossible.
 
-	\item[Case:] \rulename{u-fail}, \ie~$\tx{\runi} \equiv \hnf_1 = \hnf_2 \movesto |fail|$ \ie $\rdx{} \subset \hnf_i$
-		hence, $\rdx{\runi}'' \equiv |fail|$.
+% 	\item[Case:] \rulename{u-fail}, \ie~$\tx{\runi} \equiv \hnf_1 = \hnf_2 \movesto |fail|$ \ie $\rdx{} \subset \hnf_i$
+% 		hence, $\rdx{\runi}'' \equiv |fail|$.
 
-	\item[Case:] \rulename{deref-s} \ie $\tx{\runi} \equiv x = |s|; E[x] \movesto x = |s|; E[|s|]$.
-		$\rdx{} \subset |s|$ is impossible.
-		If $\rdx{} \subset E[|x|]$, then by \cref{lem:context-shape} we have two cases:
-		\begin{description}
-			\item[Case:] $\rr' : E[|x|] \movesto E'[|x|]$,
-				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |s|; E'[|s|]$.
-			\item[Case:] $\rr' : E[|x|] \movesto e'$ such that $E[s] \movesto e'$,
-				then join at $\rdx{\runi}'' \equiv x = |s|; e'$.
-		\end{description}
+% 	\item[Case:] \rulename{deref-s} \ie $\tx{\runi} \equiv x = |s|; E[x] \movesto x = |s|; E[|s|]$.
+% 		$\rdx{} \subset |s|$ is impossible.
+% 		If $\rdx{} \subset E[|x|]$, then by \cref{lem:context-shape} we have two cases:
+% 		\begin{description}
+% 			\item[Case:] $\rr' : E[|x|] \movesto E'[|x|]$,
+% 				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |s|; E'[|s|]$.
+% 			\item[Case:] $\rr' : E[|x|] \movesto e'$ such that $E[s] \movesto e'$,
+% 				then join at $\rdx{\runi}'' \equiv x = |s|; e'$.
+% 		\end{description}
 
-	\item[Case:] \rulename{deref-h} \ie $\tx{\runi} \equiv x = |h|; A[x] \movesto x = |h|; A[|h|]$.
-		If $\rdx{} \subset |v|$, \ie $\rr': |h| \movesto |h'|$, then join (with two $\rr'$ steps) at $\rdx{\runi}'' \equiv x = |h'|; E[|h'|]$.
-		If $\rdx{} \subset A[|x|]$, then by \cref{lem:context-shape} we have two cases:
-		\begin{description}
-			\item[Case:] $\rr' : A[|x|] \movesto A'[|x|]$,
-				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |h|; A'[|h|]$.
-			\item[Case:] $\rr' : A[|x|] \movesto e'$ such that $A[h] \movesto e'$,
-				then join at $\rdx{\runi}'' \equiv x = |h|; e'$.
-		\end{description}
+% 	\item[Case:] \rulename{deref-h} \ie $\tx{\runi} \equiv x = |h|; A[x] \movesto x = |h|; A[|h|]$.
+% 		If $\rdx{} \subset |v|$, \ie $\rr': |h| \movesto |h'|$, then join (with two $\rr'$ steps) at $\rdx{\runi}'' \equiv x = |h'|; E[|h'|]$.
+% 		If $\rdx{} \subset A[|x|]$, then by \cref{lem:context-shape} we have two cases:
+% 		\begin{description}
+% 			\item[Case:] $\rr' : A[|x|] \movesto A'[|x|]$,
+% 				then by \cref{lem:context-step} join at $\rdx{\runi}'' \equiv x = |h|; A'[|h|]$.
+% 			\item[Case:] $\rr' : A[|x|] \movesto e'$ such that $A[h] \movesto e'$,
+% 				then join at $\rdx{\runi}'' \equiv x = |h|; e'$.
+% 		\end{description}
 
-	% \ranjit{moved "choose" to UNIFICATION for duplication}
-	\item[Case:] \rulename{choose} \ie $\tx{\runi} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1]\ |choice|\ CX[e_2]]$.
-		Split cases on where $\rdx{}$ occurs.
-	 	\begin{description}
-	 	\item[Case] $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1']\ |choice|\ CX[e_2]]$.
-	 	\item[Case] $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1]\ |choice|\ CX[e_2']]$.
-	 	\item[Case] $\rdx{} \subset CX$ : Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{} \cdots [|e_1 choice e_2|]$
-	     	so with two $\rr'$ steps we can join at $\rdx{\runi}'' \equiv |SX^[e1' choice e2']|$ where
-	     	$e_i' \equiv \cdots \rdx{}' \cdots [e_i]$ for $i$ in $\{1,2\}$.
-	    \end{description}
-\end{description}
-\end{proof}
+% 	% \ranjit{moved "choose" to UNIFICATION for duplication}
+% 	\item[Case:] \rulename{choose} \ie $\tx{\runi} \equiv SX[CX[|e_1 choice e_2|]] \movesto SX[CX[e_1]\ |choice|\ CX[e_2]]$.
+% 		Split cases on where $\rdx{}$ occurs.
+% 	 	\begin{description}
+% 	 	\item[Case] $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1']\ |choice|\ CX[e_2]]$.
+% 	 	\item[Case] $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$ so join at $\rdx{\runi}'' \equiv SX[CX[e_1]\ |choice|\ CX[e_2']]$.
+% 	 	\item[Case] $\rdx{} \subset CX$ : Here, $|CX^[e_1 choice e_2]| \equiv \cdots \rdx{} \cdots [|e_1 choice e_2|]$
+% 	     	so with two $\rr'$ steps we can join at $\rdx{\runi}'' \equiv |SX^[e1' choice e2']|$ where
+% 	     	$e_i' \equiv \cdots \rdx{}' \cdots [e_i]$ for $i$ in $\{1,2\}$.
+% 	    \end{description}
+% \end{description}
+% \end{proof}
 
 %%%% RANJIT-CUT: END
 \subsection{Application} % --------------------------------------------------------------------------

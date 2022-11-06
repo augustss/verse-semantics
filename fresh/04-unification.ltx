@@ -54,7 +54,7 @@ $\runi$ is confluent.
 \end{lemma}
 
 \begin{proof}
-Immediate from \cref{lem:d-kernel}, \cref{lem:d-c} and \cref{thm:kernel-confluence}.
+Immediate from \cref{lem:d-kernel}, \cref{lem:rd-c} and \cref{thm:kernel-confluence}.
 \end{proof}
 
 \subsection{Union-Find Graphs}
@@ -537,12 +537,12 @@ $\rsteps{\rduni}{e_1,e_2}{e_3}$.
 \end{lemma}
 
 \begin{proof}
-Same proof as \cref{lem:u-lc-a}, except that in the case
-\ranjit{TODO}
-we use \cref{thm:canon} to join the two terms.
+Same proof as \cref{lem:u-lc-a}, except that in the \textbf{Directed-Join}
+case (discussed in \cref{lem:deref-under-deref}) we use \cref{thm:canon}
+to join the terms.
 \end{proof}
 
-\begin{lemma}[$\rduni$-Confluent] \label{lem:d-c}
+\begin{lemma}[$\rduni$-Confluent] \label{lem:rd-c}
     $\rduni$ is confluent.
 \end{lemma}
 
@@ -725,8 +725,12 @@ If $\rstep{\runi}{e}{e_1, e_2}$ then $\rsteps{\runi}{e_1, e_2}{e'}$.
 
 \begin{proof}
 We split cases on where the reductions occur.
-If they are disjoint, the terms $e_1$ and $e_2$ can be trivially joined.
-If they are overlapping, they can by joined via \cref{lem:u-under-u}.
+If they are disjoint, the terms $e_1$ and $e_2$
+can be trivially joined.
+%
+If they are overlapping, they can by joined via \cref{lem:deref-under-deref}
+(when the outer redux is a \rulename{deref-*})
+or \cref{lem:under-u} for the other cases.
 \end{proof}
 
 \newcommand{\oA}{\mathit{OA}}
@@ -784,22 +788,202 @@ If forall $e$, we have $\rstep{\rr}{OA[e]}{e'}$:
 \end{tikzcd}\]
 \end{lemma}
 
-\begin{lemma}[$\runi$-Under-$\runi$] \label{lem:u-under-u}
-If $\rstep{\runi}{\rdx{2}}{\rdx{2}'}$ and
+\begin{lemma}[Deref-Under-Deref] \label{lem:deref-under-deref}
+Let $\rr' = $ \rulename{deref-sh}.
+If $\rstep{\rr'}{\rdx{2}}{\rdx{2}'}$ and
    $\rdx{2} \equiv E[\rdx{1}]$ and
-   $\rstep{\runi}{\rdx{1}}{\rdx{1}'}$
+   $\rstep{\rr'}{\rdx{1}}{\rdx{1}'}$
 then there exists $\rdx{2}''$ such that
-   $\rsteps{\runi}{\rdx{2}'}{\rdx{2}''}$ and
-   $\rstep{\runi}{E[\rdx{1}']}{\rdx{2}''}$.
+   $\rsteps{\rr'}{\rdx{2}'}{\rdx{2}''}$ and
+   $\rsteps{\rr'}{E[\rdx{1}']}{\rdx{2}''}$.
 \end{lemma}
 
 \begin{proof}
-TODO
+Suppose that $\rdx{2} \equiv x = |v|; A_2[x] \movesto x = |v|; A_2[v] \equiv \rdx{2}'$.
+Let us split cases on where $\rdx{1}$ is located.
+%
+\begin{description}
+\item[Case] $\rdx{1} \subset |v|$ \ie $\rr'_{1} : |v| \movesto |v'|$ then we join as
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJ4PXY7IEFbeF0iXSxbMiwwLCJ4PXY7QVt2XSJdLFswLDEsIng9dic7QVt4XSJdLFsyLDEsIng9dic7QVt2J10iXSxbMCwxLCJcXHJ1bmlfMiJdLFswLDIsIlxccnVuaV8xIiwyXSxbMiwzLCJcXHJ1bmlfMiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsIlxccnVuaV8xIFxcdGltZXMgMiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	{x=v; A_2[x]} && {x=v;A_2[v]} \\
+	{x=v';A_2[x]} && {x=v';A_2[v']}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_1 \times 2}", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+
+\item[Case] $\rdx{1} \subset |A_2[x]|$ but $A_2$ hole \emph{outside} $\rdx{1}$, via \cref{lem:p-shuffle}.
+
+\item[Case] $\rdx{1} \subset |A_2[x]|$ but $A_2$ hole \emph{outside} $\rdx{1}$.
+    Split cases on the structure of $\rdx{1}$
+    \begin{description}
+        \item[Case] $\rdx{1} \equiv y = z; A_1[y]$ where $y \not \equiv x$,
+        and the $x$ hole for $\rdx{2}$ is inside $A_1$ (but different from the
+        the $y$-hole for ($\rdx{1}$) as $x \not \equiv y$).
+        Here, we can join via \cref{lem:p-shuffle}.
+
+        \item[Case] $\rdx{1} \equiv y = \boxed{x}; A_1[y]$ where $y \not \equiv x$, \ie
+        the $\rdx{2}$ $x$-hole \emph{is} the $x$ being used as the payload in $\rdx{1}$.
+        Here we join as shown below, as we can substitute the $|v|$ for the $|y|$
+        as $A_2[y=v; A_1]$ is a valid application context if $A_2$ and $A_1$ are.
+        % https://q.uiver.app/?q=WzAsNCxbMCwwLCJ4PXY7IEFfMlt5PVxcYm94ZWR7eH07QV8xW3ldXSJdLFsyLDAsIng9djsgQV8yW3k9djtBXzFbeV1dIl0sWzAsMSwieD12O0FfMlt5PVxcYm94ZWR7eH07QV8xW3hdXSJdLFsyLDEsIng9djsgQV8yW3k9djsgQV8xW3ZdXSJdLFswLDEsIlxccnVuaV8yIl0sWzAsMiwiXFxydW5pXzEiLDJdLFsyLDMsIlxccnVuaV8yIFxcdGltZXMgMiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJ1bmlfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
+\[\begin{tikzcd}
+	{x=v; A_2[y=\boxed{x};A_1[y]]} && {x=v; A_2[y=v;A_1[y]]} \\
+	{x=v;A_2[y=\boxed{x};A_1[x]]} && {x=v; A_2[y=v; A_1[v]]}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2 \times 2}"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["{\runi_1}", dotted, from=1-3, to=2-3]
+\end{tikzcd}\]
+        \textbf{Note: Directed-Join} In $\rduni$ we may \emph{not} be able directly substitute $y = |v|$
+        in the dotted edge on the right, as $\live{A_2}{|v|}$ may not hold.
+        Instead, we can join the terms as $x = |v|; A_2^*[y^* = v^*; A_1[v^*]]$
+        using \cref{thm:canon}.
+
+        \item[Case] $\rdx{1} \equiv x = v'; A_1[x]$ where the $\rdx{2}$ hole is
+        inside $A_1$ but \emph{different} from the $A_1$ hole for $\rdx{1}$.
+        Join via \cref{lem:p-shuffle}.
+
+        \item[Case] $\rdx{1} \equiv \boxed{x} = v'; A_1[x]$ where the $\rdx{2}$ hole
+        is the $x$ used as the source of the payload in $\rdx{1}$.
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PXY7IEFfMltcXGJveGVke3h9ID0gdic7QV8xW3hdXSJdLFsyLDAsIng9djsgQV8yW3YgPSB2JztBXzFbeF1dIl0sWzAsMSwieD12O0FfMltcXGJveGVke3h9PXYnO0FfMVt2J11dIl0sWzIsMSwieD12O0FfMlt2PXYnO0FfMVt2J11dIl0sWzQsMCwieCA9IHY7IEFfMlt2ID0gdic7IEFfMVt2XV0iXSxbNCwxLCJcXGNyZWZ7bGVtOmpvaW4tdi12fSJdLFswLDEsIlxccnVuaV8yIl0sWzAsMiwiXFxydW5pXzEiLDJdLFsyLDMsIlxccnVuaV8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiXFxydW5pXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	{x=v; A_2[\boxed{x} = v';A_1[x]]} && {x=v; A_2[v = v';A_1[x]]} && {x = v; A_2[v = v'; A_1[v]]} \\
+	{x=v;A_2[\boxed{x}=v';A_1[v']]} && {x=v;A_2[v=v';A_1[v']]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+
+        \item[Case] $\rdx{1} \equiv x = v'; A_1[\boxed{x}]$ where the $\rdx{2}$ hole is
+        inside $A_1$ and \emph{the same as} the $A_1$ hole for $\rdx{1}$.
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PXY7IEFfMlt4ID0gdic7QV8xW1xcYm94ZWR7eH1dXSJdLFsyLDAsIng9djsgQV8yW3ggPSB2JztBXzFbdl1dIl0sWzAsMSwieD12O0FfMlt4PXYnO0FfMVt2J11dIl0sWzIsMSwieD12O0FfMlt2PXYnO0FfMVt2J11dIl0sWzQsMCwieCA9IHY7IEFfMlt2ID0gdic7IEFfMVt2XV0iXSxbNCwxLCJcXGNyZWZ7bGVtOmpvaW4tdi12fSJdLFswLDEsIlxccnVuaV8yIl0sWzAsMiwiXFxydW5pXzEiLDJdLFsyLDMsIlxccnVuaV8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiXFxydW5pXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	{x=v; A_2[x = v';A_1[\boxed{x}]]} && {x=v; A_2[x = v';A_1[v]]} && {x = v; A_2[v = v'; A_1[v]]} \\
+	{x=v;A_2[x=v';A_1[v']]} && {x=v;A_2[v=v';A_1[v']]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+    \end{description}
+ANCHOR
+\end{description}
+\end{proof}
+
+\begin{lemma}[Join-V-V] \label{lem:join-v-v}
+If $e \equiv {A_1[v = v'; A_2[v]]}$ and $e' \equiv {A_1[v = v'; A_2[v']}$
+then $\rsteps{\runi}{e,e'}{e''}$
+\end{lemma}
+
+\begin{proof}
+Split cases on the structure of $v$, $v'$.
+%
+If they are both scalars, use \cref{lem:join-s-s}.
+%
+If they are both heap values, use \cref{lem:join-h-h}.
+\end{proof}
+
+\begin{lemma}[Join-S-H] \label{lem:join-s-h}
+\item If $e \equiv s = h; A[s]]$ and $e' \equiv {s = h; A[h]}$ then $\rsteps{\runi}{e,e'}{e''}$
+\end{lemma}
+
+\begin{proof}
+If $s$ is a literal, join at |fail|.
+Otherwise if $s \equiv x$ then join at $x = h; A[h]$ using \rulename{deref-sh}.
+\end{proof}
+
+
+\begin{lemma}[Join-H-S] \label{lem:join-h-s}
+If $e \equiv s = h; A[s]$ and $e' \equiv {s = h; A[h]}$ then $\rsteps{\runi}{e,e'}{e''}$
+\end{lemma}
+
+\begin{proof}
+If $s$ is a literal, join at |fail|.
+Otherwise if $s \equiv x$ then join at $x = h; A[h]$
+using \rulename{deref-sh} and \rulename{norm-eq-swap}.
+\end{proof}
+
+\begin{lemma}[Join-S-S] \label{lem:join-s-s}
+If $e \equiv {A_1[s = s'; A_2[s]]}$ and $e' \equiv {A_1[s = s'; A_2[s']}$
+then $\rsteps{\runi}{e,e'}{e''}$
+\end{lemma}
+
+\begin{proof}
+If $s \equiv s'$ then $e, e'$ are trivially joined.
+Suppose that $s \not \equiv s'$ and split cases on whether they are variables or literals.
+
+\begin{description}
+\item[Case $s \equiv k$ and $s' \equiv k'$] Join at $|fail|$ as $k_1 \not \equiv k_2$.
+\item[Case $s \equiv k$ and $s' \equiv x$]  Join at ${A_1[x = k; A_2[k]]}$.
+\item[Case $s \equiv k$ and $s' \equiv k$]  Join at ${A_1[x = k; A_2[k]]}$.
+\item[Case $s \equiv x$ and $s' \equiv y$] Join at ${A_1[x = y; A_2[y]]}$ (In $\rduni$, join at $A_1^*[x^* = y^*; A_2[y^*]]$ using \cref{thm:canon}).
+\end{description}
+\end{proof}
+
+\begin{lemma}[Join-H-H] \label{lem:join-h-h}
+Let $h$ and $h'$ be two heap values.
+If $e \equiv {h = h'; A[h]}$ and
+   $e' \equiv {h = h'; A[h']}$
+then $\rsteps{\runi}{e,e'}{|fail|}$ or
+     $\rsteps{\runi}{e,e'}{s_1 = s_1'; \ldots; s_n = s_n'; A[h^*]}$.
+\end{lemma}
+
+\begin{proof}
+If either $h$ or $h'$ are $\lambda$-terms then we can join at $|fail|$.
+%
+If $h$ and $h'$ are tuples of \emph{different} sizes we can join at $|fail|$.
+%
+Hence, assume that $h \equiv |arr (s_1, dots, s_n)|$ and $h' \equiv |arr (s'_1, dots, s'_n)|$.
+%
+Via \rulename{u-tup} $e$ and $e'$ respectively to $s_1 = s_1'; \ldots; s_n = s_n'; A[h]$
+and $s_1 = s_1'; \ldots; s_n = s_n'; A[h']$.
+%
+From \cref{lem:join-s-s} we have that for all $0 \leq i \leq n$ the terms
+	$e_i \equiv s_i == s_i'; s_i$ and $e_i' \equiv s_i = s_i'; s_i'$
+	join at $|fail|$ or at some $s_i = s_i'; s_i^{*}$.
+%
+If there exists some $i$ at which $e_i$ and $e_i'$ join at $|fail|$
+then we can join $e$ and $e'$ at $|fail|$ via \cref{lem:eq-scalar-fail}.
+%
+Otherwise, we can join $e$ and $e'$ at $e^* \equiv s_1 = s_1'; \ldots; s_n = s_n'; E[\langle s_1^*, \ldots, s_n^{*} \rangle]$
+using $n$ applications of \cref{lem:eq-scalar}.
+%
+% \begin{verbatim}
+% e -> ... -> e_i -> ... -> e_n == e^* <- e_n' <- ... <- e_i' <- ... <- e'
+% where ei := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s_{i+1}, ..., sn>] and
+% 	  ei' := s_1 = s_1'; ...; s_i = s_i'; E<s1*...si*, s'_{i+1}, ..., sn'>>
+% 	  and each step follows from lem:eq-scalar with
+% 	  	s_{i+1} = s_{i+1}'; s_{i+1}  & E = E[<s1*...si*, HOLE, ... sn>]
+% 	  	s_{i+1} = s_{i+1}'; s_{i+1}' & E = E[<s1*...si*, HOLE, ... sn'>]
+% \end{verbatim}
+%
+\end{proof}
+
+\begin{lemma}[Eq-Scalar-Fail]\label{lem:eq-scalar-fail}
+	If $\rsteps{}{s=s'; s}{|fail|}$ then $\rsteps{}{s=s'; e}{|fail|}$.
+\end{lemma}
+\begin{proof}
+Premise only holds when $s \equiv k$ and $s' \equiv k'$ and $k \not = k$.
+\end{proof}
+
+\begin{lemma}[Eq-Scalar]\label{lem:eq-scalar}
+	If $\rstep{\rord}{s=s'; s}{s=s'; s'}$ then $\rstep{\rord}{s=s'; A[s]}{s=s'; A[s']}$.
+\end{lemma}
+\begin{proof}
+Split cases on $s$ and $s'$ and use \rulename{deref-sh}.
 \end{proof}
 
 
 \begin{lemma}[Under-$\runi$] \label{lem:under-u}
-Let $\rr' \equiv \rr - \runi$.
+Let $\rr' \equiv \rr -$ \rulename{deref-sh}.
 If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
    $\rdx{\runi} \equiv E[\rdx{}]$ and
    $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
