@@ -220,11 +220,7 @@ core (Lambda i rs e1 e2) = do
     e2' <- coreD e2
     pure $ CLambda i is covariant e1' e2'
   else
-    val $ Function [(Define i AnyT, [])] $
-      if trivial e1 then
-        Seq [e1, e2]
-      else
-        If3 e1 e2 (if covariant then Fail else Wrong "outside domain")
+    val $ lamFunc covariant i e1 e2
 core EmptyT = pure CFail
 core e = impossible e
 
@@ -234,6 +230,13 @@ trivial Array{} = True
 trivial (ApplyD (Variable (Ident _ "any")) _) = True
 trivial _ = False
 
+lamFunc :: Bool -> Ident -> Expr -> Expr -> Expr
+lamFunc cov i e1 e2 =
+  Function [(Define i AnyT, [])] $
+    if trivial e1 then
+      Seq [e1, e2]
+    else
+      If3 e1 e2 (if cov then Fail else Wrong "outside domain")
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -362,6 +365,7 @@ value (Typedef e) = do
 -}
 value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
+value (Lambda i [] e1 e2) = value $ lamFunc True i e1 e2
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
 
