@@ -919,7 +919,12 @@ The cases not directly handled by \cref{lem:p-shuffle} are as follows:
         \begin{description}
             \item[Case] \textbf{H7} $A$ context, \ie $x = h; A[y = \boxed{x}; A_1[y]]$.
                         \textbf{Impossible!} No copying $h$ into equations under $A$.
-            \item[Case] \textbf{H8} $B$ context, \ie $x = h; B[y = \boxed{x}; A_1[y]]$.
+            \item[Case] \textbf{H8} $B$ context, \ie $x = h; B[y = \boxed{x}; A_1[y]]$. \textbf{Aarrgh. FAILS.}
+
+% x = h; B[ y = x; y = z; 10]
+%    --> x = h; B [ y = h; y = z; 10 ]         (e1)
+%    --> x = h; B [ y = x; x = z; 10 ]         (e2)
+
         \end{description}
     \end{description}
 
