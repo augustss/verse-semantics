@@ -671,15 +671,21 @@ pAtom = choice [pTuple, pLiteral, pName, pMacro, pArray]
 
 pName :: P Expr
 pName = do
-  Ident l s <- pIdent
-  let ops = [("gt", "in'>'"), ("lt", "in'<'"), ("add", "in'+'"), ("isInt", "isInt$")]
-  pure $ Variable $ Ident l $ fromMaybe s $ lookup s ops
+  i@(Ident l s) <- pIdent
+  let ops = [ ("fail", Fail)
+            , ("gt", vi "in'>'")
+            , ("lt", vi "in'<'")
+            , ("add", vi "in'+'")
+            , ("isInt", vi "isInt$")
+            ]
+      vi = Variable . Ident l
+  pure $ fromMaybe (Variable i) $ lookup s ops
 
 pArray :: P Expr
 pArray =
-    Array <$> (pKeyword "array" *> pBraces (sepBy pEqu (pOp ",")))
+    Array <$> (pKeyword "array" *> pBraces (sepBy pSeq (pOp ",")))
   <|>
-    pOp "<" *> (Array <$> sepBy pEqu (pOp ",")) <* pOp ">"
+    pOp "<" *> (Array <$> sepBy pSeq (pOp ",")) <* pOp ">"
   <|>
     Array [] <$ pOp "<>"
 
