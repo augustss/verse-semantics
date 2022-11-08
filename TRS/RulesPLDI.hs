@@ -10,7 +10,7 @@ import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe
 --import Data.Functor.Classes (Show1(liftShowList))
---import Debug.Trace
+import Debug.Trace
 
 -- Use ue in unification rules
 -- #define USE_UE 1
@@ -110,8 +110,17 @@ type ERule = Rule Expr
 
 --------------------------------------------------------------------------------
 
+before :: Rule a -> Rule a -> Rule a
+before r1 r2 env lhs =
+  case r1 env lhs of
+    [] -> r2 env lhs
+    cs -> cs
+
 rulesPLDI :: ERule
-rulesPLDI =
+rulesPLDI = rulesAlias `before` rulesPLDI'
+
+rulesPLDI' :: ERule
+rulesPLDI' =
      rulesPrimOps                      -- standard POPL rules
   <> rulesUnificationFP
   <> rulesApplication
@@ -134,8 +143,54 @@ rulesSpeculation =
 
 --------------------------------------------------------------------------------
 
+rulesAlias :: ERule
+rulesAlias _ lhs =
+  "ALIAS-SUBST" `name`
+  do DEF x e <- [lhs]
+     (ctx, y) <- aliasX x e
+     guard (x /= y)
+     -- traceM ("alias-1 " ++ show ((x, y), ctx (VAR y), underDefs (subst [(x, Var y)]) (ctx (VAR y))))
+     pure $ underDefs (subst [(x, Var y)]) (ctx (VAR y))
+
+{-
+  ++
+  "ALIAS-REFL" `name`
+  do VAR x :=: VAR x' <- [lhs]
+     guard (x == x')
+     pure (NOTFCN :@: Var x)
+-}
+
+aliasX :: Ident -> Expr -> [(Context, Ident)]
+aliasX x lhs =
+  do DEF y e <- [lhs]
+     guard (x /= y)
+     (ctx, z) <- aliasX x e
+     pure (DEF y . ctx, z)
+  ++
+  aliasX' x lhs
+
+aliasX' :: Ident -> Expr -> [(Context, Ident)]
+aliasX' x lhs =
+  do (VAR y :=: VAR z) :>: e <- [lhs]
+     guard (x == y)
+     pure ((:>: e), z)
+  ++
+  do (VAR z :=: VAR y) :>: e <- [lhs]
+     guard (x == y)
+     pure ((:>: e), z)
+  ++
+  do (e1 :>: e2) <- [lhs]
+     (ctx, z) <- aliasX' x e2
+     pure ((e1 :>:) . ctx, z)
+
+underDefs :: (Expr -> Expr) -> Expr -> Expr
+underDefs f (DEF x e) = DEF x (underDefs f e)
+underDefs f e = f e
+
+--------------------------------------------------------------------------------
+
 rulesPrimOps :: ERule
-rulesPrimOps lhs =
+rulesPrimOps _ lhs =
   "APP-ADD" `name`
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
@@ -205,6 +260,17 @@ rulesPrimOps lhs =
   "APP-CONS" `name`
   do CONS :@: VARR [v, VARR vs] <- [lhs]
      pure (ARR (v:vs))
+{-
+ ++
+  "APP-NOTFCN-HNF" `name`
+  do NOTFCN :@: v <- [lhs]
+     guard (case v of VINT{} -> True; VARR{} -> True; VOP{} -> True; _ -> False)
+     pure (Val v)
+ ++
+  "APP-NOTFCN-FCN" `name`
+  do NOTFCN :@: VLAM{} <- [lhs]
+     pure Fail
+-}
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
@@ -224,7 +290,7 @@ seqs = foldr1 (:>:)
 --------------------------------------------------------------------------------
 
 rulesApplication :: ERule
-rulesApplication lhs =
+rulesApplication _ lhs =
   "APP-BETA" `name`
   do VLAM x e :@: v <- [lhs]
      let freeV = free v
@@ -253,7 +319,7 @@ rulesApplication lhs =
 
 -- There 4 kinds of values: k, op, tuple, lambda
 rulesUnificationNoOcc :: ERule
-rulesUnificationNoOcc lhs =
+rulesUnificationNoOcc _ lhs =
 --
 -- Equal values
 -- x=x, k=k
@@ -271,6 +337,7 @@ rulesUnificationNoOcc lhs =
 #else
   do v@(SCL s1) :=: SCL s2 <- [lhs]
      guard (s1 == s2)
+     guard (not (isVar s1))
      pure v
  ++
 -- tuple=tuple
@@ -339,7 +406,7 @@ rulesUnificationNoOcc lhs =
 --------------------------------------------------------------------------------
 
 rulesChoice :: ERule
-rulesChoice lhs =
+rulesChoice _ lhs =
   "CHOOSE" `name`
   do (sx, e)         <- scopeX lhs
      (cx, e1 :|: e2) <- choiceX1 e
@@ -368,7 +435,7 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
    hole    = ident "$HOLE$"
 
 rulesGarbageCollection :: ERule
-rulesGarbageCollection lhs =
+rulesGarbageCollection _ lhs =
 #if USE_ELIM_DEF_DEAD
   "ELIM-DEF-DEAD" `name`
   do e@Def{} <- [lhs]
@@ -391,7 +458,7 @@ elimDead ee =
   let
     getXs rs (DEF x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
-    getBs bs ((VAR x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
+    getBs bs ((VAR x :=: v@Val{}) :>: e) | VAR x /= v = getBs ((x, v):bs) e
     getBs bs e = (reverse bs, e)
     -- xs are the initial defined variables
     (xs, e') = getXs [] ee
@@ -451,46 +518,55 @@ derefB lhs xx =
 #endif
 
 derefA :: Expr -> Ident -> [VContext]
-derefA lhs xx =
+derefA = derefA' False
+
+derefA' :: Bool -> Expr -> Ident -> [VContext]
+derefA' b lhs xx =
    do (Var x :@: v) <- [lhs]
       guard (x == xx)
       pure (:@: v)
    ++
-   do (VAR x :=: v@(Val HNF{})) <- [lhs]
+   do (VAR x :=: e) <- [lhs]
       guard (x == xx)
-      pure ( (:=: v) . Val)
+      guard (b || case e of Val HNF{} -> True; _ -> False)
+      pure ( (:=: e) . Val)
+   ++
+   do (e :=: VAR x) <- [lhs]
+      guard (x == xx)
+      guard (b || case e of Val HNF{} -> True; _ -> False)
+      pure ( (e :=:) . Val)
    ++
    do (v@Val{} :=: e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefA' b e xx
       pure ( (v :=:) . ctx)
    ++
    do DEF x e <- [lhs]
       guard (x /= xx)
-      ctx <- derefA e xx
+      ctx <- derefA' b e xx
       pure (Def . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA e1 xx
+      ctx <- derefA' b e1 xx
       pure ((:>: e2) . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA e2 xx
+      ctx <- derefA' b e2 xx
       pure ((e1 :>:) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA e1 xx
+      ctx <- derefA' b e1 xx
       pure ((:|: e2) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA e2 xx
+      ctx <- derefA' b e2 xx
       pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefA' True e xx
       pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefA' True e xx
       pure (All . ctx)
    -- NOTE: not in paper
    ++
@@ -503,7 +579,7 @@ derefA lhs xx =
       pure (\ a -> VOP Cons :@: VARR [v, a])
    ++
    do Split e f g <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefA' True e xx
       pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -698,11 +774,16 @@ isS Var{} = True
 isS VOP{} = True
 isS _ = False
 
+isVar :: Value -> Bool
+isVar Var{} = True
+isVar _ = False
+
 rulesDerefFP :: ERule
-rulesDerefFP lhs =
+rulesDerefFP _ lhs =
   "DEREF-S" `name`
   do xs@(VAR x :=: Val s) :>: e <- [lhs]
-     guard (VAR x /= Val s)
+     guard (not (isVar s))
+--     guard (VAR x /= Val s)
      guard (isS s)
 --     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x
@@ -722,7 +803,7 @@ rulesDerefFP lhs =
 #endif
 
 rulesFailFP :: ERule
-rulesFailFP lhs =
+rulesFailFP _ lhs =
   "FAIL-SEQL" `name`
   do Fail :>: _ <- [lhs]
      pure Fail
@@ -742,7 +823,7 @@ rulesFailFP lhs =
      pure Fail
 
 rulesOneFP :: ERule
-rulesOneFP lhs =
+rulesOneFP _ lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
@@ -758,7 +839,7 @@ rulesOneFP lhs =
      pure e
 
 rulesAllFP :: ERule
-rulesAllFP lhs =
+rulesAllFP _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (ARR [])
@@ -780,7 +861,7 @@ rulesAllFP lhs =
 -}
 
 rulesSplit :: ERule
-rulesSplit lhs =
+rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f g <- [lhs]
      pure (f :@: VARR [])
@@ -858,7 +939,7 @@ mkRess as = loop [] [] [] as
             es = [VAR x :=: Val v | (x, v) <- cs]
 
 rulesNormalization :: ERule
-rulesNormalization lhs =
+rulesNormalization _ lhs =
   "NORM-VAL" `name`
   do Val _ :>: e <- [lhs]
      pure e
@@ -869,8 +950,10 @@ rulesNormalization lhs =
  ++
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(VAR x :=: Val v) :>: e2) <- [lhs]
-     let valid | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
+     let valid | isS v     = case e1 of VAR _ :=: Val s | isS' s -> False; _ -> True
                | otherwise = case e1 of VAR _ :=: Val _         -> False; _ -> True
+         isS' Var{} = False
+         isS' x = isS x
 --     traceM $ "NORM " ++ show (x, v, e1)
      guard valid
      pure (xv :>: (e1 :>: e2))

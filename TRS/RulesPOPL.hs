@@ -143,7 +143,7 @@ rulesPOPL = rulesPrimOps
 --------------------------------------------------------------------------------
 
 rulesPrimOps :: ERule
-rulesPrimOps lhs =
+rulesPrimOps _ lhs =
   "P-ADD" `name`
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
@@ -232,7 +232,7 @@ seqs = foldl1 (:>:)
 --------------------------------------------------------------------------------
 
 rulesApplication :: ERule
-rulesApplication lhs =
+rulesApplication _ lhs =
   "APP-BETA" `name`
   do VLAM x e :@: v <- [lhs]
      let freeV = free v
@@ -256,7 +256,7 @@ rulesUnification = rulesUnificationNoOcc
                 <> rulesUnificationOcc
 
 rulesUnificationNoOcc :: ERule
-rulesUnificationNoOcc lhs =
+rulesUnificationNoOcc _ lhs =
   "ULIT" `name`
   do INT k1 :=: INT k2 <- [lhs]
      if k1 == k2
@@ -297,7 +297,7 @@ rulesUnificationNoOcc lhs =
      pure Fail
 
 rulesUnificationOcc :: ERule
-rulesUnificationOcc lhs =
+rulesUnificationOcc _ lhs =
    "UX-OCCURS" `name`
    do VAR x :=: Val v <- [lhs]
       (_, Var x') <- valueX1 v
@@ -307,7 +307,7 @@ rulesUnificationOcc lhs =
 --------------------------------------------------------------------------------
 
 rulesUnificationVariables :: ERule
-rulesUnificationVariables lhs =
+rulesUnificationVariables _ lhs =
   "SUBST" `name`
   do (ctx, VAR x :=: Val v) <- execX lhs
      let freeX = free (ctx blob)
@@ -361,7 +361,7 @@ rulesUnificationVariables lhs =
 --------------------------------------------------------------------------------
 
 rulesSequencing :: ERule
-rulesSequencing lhs =
+rulesSequencing _ lhs =
   "SEQ" `name`
   do Val v :>: e <- [lhs]
      pure e
@@ -397,7 +397,7 @@ rulesSequencing lhs =
 --------------------------------------------------------------------------------
 
 rulesFail :: ERule
-rulesFail lhs =
+rulesFail _ lhs =
   "FAIL-DEF" `name`
   do Def (Bind x Fail) <- [lhs]
      pure Fail
@@ -409,7 +409,7 @@ rulesFail lhs =
 --------------------------------------------------------------------------------
 
 rulesChoice :: ERule
-rulesChoice lhs =
+rulesChoice _ lhs =
   "FAIL-L" `name`
   do (sx, e) <- scopeX lhs
      Fail :|: e <- [e]
@@ -433,7 +433,7 @@ rulesChoice lhs =
 --------------------------------------------------------------------------------
 
 rulesOne :: ERule
-rulesOne lhs =
+rulesOne _ lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
@@ -447,7 +447,7 @@ rulesOne lhs =
      pure (Val v)
 
 rulesAll :: ERule
-rulesAll lhs =
+rulesAll _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (ARR [])
@@ -465,7 +465,7 @@ rulesAll lhs =
      pure (ARR [v])
 
 rulesSplit :: ERule
-rulesSplit lhs =
+rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f g <- [lhs]
      pure (f :@: VARR [])

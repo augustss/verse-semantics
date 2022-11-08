@@ -21,11 +21,12 @@ import Print
 rewrite :: Flags -> Core -> [Core]
 rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
  where
+  trsFlags       = T.TRSFlags { T.tfUnderLambda = fUnderLambda flg }
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
-  nf | fDfs flg  = normalFormFuelTrace
-     | otherwise = normalFormsFuelTrace
+  nf | fDfs flg  = normalFormFuelTrace trsFlags
+     | otherwise = normalFormsFuelTrace trsFlags
   checkOne [x]   = [x]
   checkOne nes   = trace (unlines $
                           "Multiple:" :
