@@ -651,7 +651,7 @@ pApply = do
 
 pOper :: P Ident
 pOper = choice $ map (\ o -> const (Ident noLoc ("in'" ++ o ++ "'")) <$> pOp o)
-  [ ">", ">=", "<", "<=", "<>", "+", "-", "*", "/" ]
+  [ ">=", "<=", "<>", "+", "-", "*", "/" ]
 
 pTuple :: P Expr
 pTuple = try (pParens (pure (Array [])))
@@ -665,10 +665,21 @@ pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
   where arr x xs = Array (x:xs)
 
 pAtom :: P Expr
-pAtom = choice [pTuple, pLiteral, Variable <$> pIdent, pMacro, pArray]
+pAtom = choice [pTuple, pLiteral, pName, pMacro, pArray]
+
+pName :: P Expr
+pName = do
+  Ident l s <- pIdent
+  let ops = [("gt", "in'>'"), ("lt", "in'<'"), ("add", "in'+'"), ("isInt", "isInt$")]
+  pure $ Variable $ Ident l $ fromMaybe s $ lookup s ops
 
 pArray :: P Expr
-pArray = Array <$> (pKeyword "array" *> pBraces (sepBy pEqu (pOp ",")))
+pArray =
+    Array <$> (pKeyword "array" *> pBraces (sepBy pEqu (pOp ",")))
+  <|>
+    pOp "<" *> (Array <$> sepBy pEqu (pOp ",")) <* pOp ">"
+  <|>
+    Array [] <$ pOp "<>"
 
 pMacro :: P Expr
 pMacro = mac <$> pMacroName <*> pBraces pSeq
