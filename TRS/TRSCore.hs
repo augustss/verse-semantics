@@ -285,7 +285,9 @@ instance Rec Expr where
             | tfUnderLambda s = [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
     hrec r s _                = []
 
+#if !NO_STRUCT_RULES
   norm = structNorm
+#endif
 
 -- structural rules
 -- every structural rule is implemented in 2 parts:
@@ -444,7 +446,8 @@ instance Arbitrary Expr where
   shrink (Val v)   = [Val v'|v'<-shrink v] ++ [Def bnd|HNF(Lam bnd)<-[v]]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
-  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+    where as = case a of _ :=: _ -> []; _ -> [a]
   shrink (a :@: b) = [Val a,Val b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
@@ -458,7 +461,7 @@ instance Arbitrary Expr where
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
   frequency
-  [ (1, Val `fmap` arbValue n xs)
+  [ (1, Val <$> arbValue n xs)
   , (1, return Fail) -- maybe not have this?
   -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   -- , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
