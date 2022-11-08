@@ -28,7 +28,7 @@ import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
-import Text.Megaparsec(sepBy1, many, eof, choice, some, optional, (<|>))
+import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 -- import Text.Megaparsec.Char(skip)
 
 import Print
@@ -600,7 +600,8 @@ alphaConvertV vs v =
 
 -- Parse Core
 pCore :: P Core
-pCore = (exprToCore defaultFlags . simpleDesugar) <$> (skip *> pSeq <* eof)
+pCore = (exprToCore flg . simpleDesugar) <$> (skip *> pSeq <* eof)
+  where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam
 -- XXX primops
@@ -661,7 +662,10 @@ pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
   where arr x xs = Array (x:xs)
 
 pAtom :: P Expr
-pAtom = choice [pTuple, pLiteral, Variable <$> pIdent, pMacro]
+pAtom = choice [pTuple, pLiteral, Variable <$> pIdent, pMacro, pArray]
+
+pArray :: P Expr
+pArray = Array <$> (pKeyword "array" *> pBraces (sepBy pEqu (pOp ",")))
 
 pMacro :: P Expr
 pMacro = mac <$> pMacroName <*> pBraces pSeq
