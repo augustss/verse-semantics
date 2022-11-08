@@ -51,7 +51,7 @@ subs flg ts
   | otherwise  = ts
 
 sub :: Flags -> T.Expr -> T.Expr
-sub flg | fFresh flg = RulesPLDI.finalSubst
+sub flg | fFinalInline flg && fFresh flg = RulesPLDI.finalSubst
         | otherwise = id
 
 rules :: Flags -> RulesPOPL.ERule
