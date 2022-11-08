@@ -64,7 +64,7 @@ readTests fn = do
 ------------
 
 assertEquivE :: HasCallStack => Bool -> TestFlags -> Loc -> Expr -> Expr -> IO Bool
-assertEquivE ok flg name e1 e2  = assertEquiv ok flg name (e1, toCore e1) (e1, toCore e2)
+assertEquivE ok flg name e1 e2  = assertEquiv ok flg name (e1, toCore e1) (e2, toCore e2)
   where toCore = exprToCore (testFlagsToFlags flg) . desugar
 
 assertEquivC :: HasCallStack => Bool -> TestFlags -> Loc -> Core -> Core -> IO Bool
