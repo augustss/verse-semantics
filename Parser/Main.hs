@@ -215,7 +215,7 @@ cEval c s =
 cParseCore :: Run CState
 cParseCore line s =
   tryIt (pure s) (updateLastExpr s . Cored) $ do
-    let prog = parseDie pCore "<interactive>" line
+    let prog = parseDie pCoreFile "<interactive>" line
     pp prog
     pure prog
 

@@ -19,7 +19,7 @@ module Core(
   alphaConvert, alphaConvertV, alphaConvertH,
   composC, composV, composH,
   composOpC, composOpV, composOpH,
-  pCore,
+  pCore, pCoreFile,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
@@ -599,8 +599,11 @@ alphaConvertV vs v =
 -----------------------------------
 
 -- Parse Core
+pCoreFile :: P Core
+pCoreFile = skip *> pCore <* eof
+
 pCore :: P Core
-pCore = (exprToCore flg . simpleDesugar) <$> (skip *> pSeq <* eof)
+pCore = (exprToCore flg . simpleDesugar) <$> pSeq
   where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam
