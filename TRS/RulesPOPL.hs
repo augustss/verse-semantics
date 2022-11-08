@@ -321,7 +321,7 @@ rulesUnificationVariables _ lhs =
   "SUBST-REC" `name`
   do VAR x :=: Val v <- [lhs]
      (ctx, VLAM y e) <- valueX v
-     guard (x `elem` free e)
+     guard (x `elem` free (VLAM y e))
      pure (VAR x :=: Val (ctx (VLAM y (Def (Bind x (lhs :>: e))))))
  ++
   "DEF-ELIML" `name`
