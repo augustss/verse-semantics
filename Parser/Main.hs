@@ -80,7 +80,7 @@ instance Pretty SomeExpr where
   pPrintPrec _ _ (Cores []) = text "No results"
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
-                                     map (pPrintPrec l 0) es
+                                     map (\ e -> pPrintPrec l 0 e $$ text "------------") es
 
 command :: Command CState
 command = Command
