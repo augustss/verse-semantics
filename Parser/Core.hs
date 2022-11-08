@@ -233,7 +233,9 @@ trivial _ = False
 lamFunc :: Bool -> Ident -> Expr -> Expr -> Expr
 lamFunc cov i e1 e2 =
   Function [(Define i AnyT, [])] $
-    if trivial e1 then
+    if e1 == Array [] then
+      e2
+    else if trivial e1 then
       Seq [e1, e2]
     else
       If3 e1 e2 (if cov then Fail else Wrong "outside domain")
