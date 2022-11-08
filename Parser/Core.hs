@@ -211,7 +211,7 @@ core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
 core (Lambda i [] (Array []) e) = val $ Function [(Define i AnyT, [])] e
 core (Lambda i rs e1 e2) = do
---  traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
+  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
   let covariant = covariantId `elem` rs || True -- XXX
   if timLam then do
