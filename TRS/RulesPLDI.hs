@@ -650,22 +650,24 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
                             ee
   where
     inline :: [(Ident, Value)] -> Value -> Value
-    inline bs v | isGnd v = v
+    inline bs v | isGnd bs v = v
                 | otherwise = inline bs (inl v)
       where
-        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
-                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
+--        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
+--                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
+        inl (Var x) = fromMaybe (Var x) $ lookup x bs
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
         inl (VLAM x e) = VLAM x (VLAM (Name "_") e :@: Var (Name "[...]")) -- XXX
         inl _ = undefined
-    isGnd :: Value -> Bool
-    isGnd VINT{} = True
-    isGnd (VARR vs) = all isGnd vs
-    isGnd VOP{} = True
-    isGnd VLAM{} = True
-    isGnd _ = False
+    isGnd :: [(Ident, a)] -> Value -> Bool
+    isGnd _ VINT{} = True
+    isGnd bs (VARR vs) = all (isGnd bs) vs
+    isGnd _ VOP{} = True
+    isGnd _ VLAM{} = True
+    isGnd bs (Var x) = isNothing (lookup x bs)
+    isGnd _ _ = False
 
 -- Make a WF value canonical, i.e., order the quantifiers
 -- and bindings in a predictable order.
