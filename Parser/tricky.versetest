@@ -1,0 +1,8 @@
+# Trivial
+testeq(CEq) { 1 } { 1 }
+testeq(CEq) { exists x . x=1 } { 1 }
+
+#testeq(SEq) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+
+# Problem 1 from Ranjit in email chain "State of play"
+testeq(CEq) { id := (\x.x); exists x y. x = id; one{ x = y; x(10) } } { 0 }

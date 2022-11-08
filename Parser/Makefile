@@ -27,6 +27,9 @@ testfast: tests
 	./tests --quiet --dfs --popl     $(TESTFILE)
 	./tests --quiet --eval           $(TESTFILE)
 
+testtricky: tests
+	./tests tricky.versetest
+
 testt: timparse
 	./timparse
 

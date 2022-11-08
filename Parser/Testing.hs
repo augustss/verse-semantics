@@ -10,7 +10,7 @@ import Expr
 import Flags
 import Parse hiding (many)
 import Core
-import Print ( prettyShow, pp )
+import Print (Pretty, prettyShow, pp)
 import Desugar(desugar)
 import Run
 
@@ -34,12 +34,18 @@ data TestFlags = TestFlags
 data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq Ident Expr Expr
+  | TestCoreEq Ident Core Core
   deriving (Show)
 
 -- Parse an evaluation equality test
 pTestEq :: P Test
 pTestEq =
-  pKeyword "testeq" *> (TestEvalEq <$> pParens pIdent <*> pBraces pExprSeq <*> pBraces pExprSeq)
+  pKeyword "testeq" *> do
+    tId <- pParens pIdent
+    if tId == Ident noLoc "CEq" then
+      TestCoreEq tId <$> pBraces pCore    <*> pBraces pCore
+     else
+      TestEvalEq tId <$> pBraces pExprSeq <*> pBraces pExprSeq
 
 -- Parse a test
 pTest :: P Test
@@ -57,26 +63,21 @@ readTests fn = do
 
 ------------
 
-assertEquiv :: HasCallStack => TestFlags -> Ident -> Expr -> Expr -> IO Bool
-assertEquiv = assertEquiv' True
+assertEquivE :: HasCallStack => Bool -> TestFlags -> Loc -> Expr -> Expr -> IO Bool
+assertEquivE ok flg name e1 e2  = assertEquiv ok flg name (e1, toCore e1) (e1, toCore e2)
+  where toCore = exprToCore (testFlagsToFlags flg) . desugar
 
-assertFail :: HasCallStack => TestFlags -> Ident -> Expr -> Expr -> IO Bool
-assertFail = assertEquiv' False
+assertEquivC :: HasCallStack => Bool -> TestFlags -> Loc -> Core -> Core -> IO Bool
+assertEquivC ok flg name e1 e2  = assertEquiv ok flg name (e1, e1) (e2, e2)
 
-assertEquiv' :: HasCallStack => Bool -> TestFlags -> Ident -> Expr -> Expr -> IO Bool
-assertEquiv' expectOK tflg name p1 p2 = do
+assertEquiv :: (HasCallStack, Pretty a) => Bool -> TestFlags -> Loc -> (a, Core) -> (a, Core) -> IO Bool
+assertEquiv expectOK tflg loc (p1, c1) (p2, c2) = do
     let noisy = not (quiet tflg)
     let flg = testFlagsToFlags tflg
-    let d1 = desugar p1
-    let d2 = desugar p2
-    let c1 = exprToCore flg d1
-    let c2 = exprToCore flg d2
     let v1 = run flg c1
     let v2 = run flg c2
 
-    let pos =
-          case name of
-            Ident loc _ -> prettyShow loc
+    let pos = prettyShow loc
 
     catch
       ( if (v1 `equivValue` v2) == expectOK
@@ -132,8 +133,12 @@ equivValue v1 v2 = v1 == v2
 runTest :: TestFlags -> Test -> IO Bool
 runTest tflg (TestEvalEq n e1 e2) =
   case n of
-    Ident _ "SEq" -> assertEquiv tflg n e1 e2
-    Ident _ "FEq" -> assertFail  tflg n e1 e2
+    Ident loc "SEq" -> assertEquivE True  tflg loc e1 e2
+    Ident loc "FEq" -> assertEquivE False tflg loc e1 e2
+    Ident _ s -> error $ "Unknown test type " ++ show s
+runTest tflg (TestCoreEq n e1 e2) =
+  case n of
+    Ident loc "CEq" -> assertEquivC True  tflg loc e1 e2
     Ident _ s -> error $ "Unknown test type " ++ show s
 
 runTests :: TestFlags -> [Test] -> IO Bool
