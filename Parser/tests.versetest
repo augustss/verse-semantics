@@ -66,6 +66,7 @@ testeq(SEq) {(x:any=>x)=(x:any=>x)}               {:false}
 testeq(SEq){array{1;2;3}}                         {1,2,3}
 testeq(SEq){array{}}                              {()}
 
+testeq(SEq){x:=(1,2); y:=(1,3); one{x=y}}         {:false}
 testeq(SEq){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 testeq(SEq){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 

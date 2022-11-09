@@ -134,8 +134,10 @@ rulesSpeculation =
 
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+
 rulesPrimOps :: ERule
-rulesPrimOps lhs =
+rulesPrimOps _ lhs =
   "APP-ADD" `name`
   do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
      pure (INT (k1+k2))
@@ -224,7 +226,7 @@ seqs = foldr1 (:>:)
 --------------------------------------------------------------------------------
 
 rulesApplication :: ERule
-rulesApplication lhs =
+rulesApplication _ lhs =
   "APP-BETA" `name`
   do VLAM x e :@: v <- [lhs]
      let freeV = free v
@@ -253,7 +255,7 @@ rulesApplication lhs =
 
 -- There 4 kinds of values: k, op, tuple, lambda
 rulesUnificationNoOcc :: ERule
-rulesUnificationNoOcc lhs =
+rulesUnificationNoOcc _ lhs =
 --
 -- Equal values
 -- x=x, k=k
@@ -339,7 +341,7 @@ rulesUnificationNoOcc lhs =
 --------------------------------------------------------------------------------
 
 rulesChoice :: ERule
-rulesChoice lhs =
+rulesChoice _ lhs =
   "CHOOSE" `name`
   do (sx, e)         <- scopeX lhs
      (cx, e1 :|: e2) <- choiceX1 e
@@ -368,7 +370,7 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
    hole    = ident "$HOLE$"
 
 rulesGarbageCollection :: ERule
-rulesGarbageCollection lhs =
+rulesGarbageCollection _ lhs =
 #if USE_ELIM_DEF_DEAD
   "ELIM-DEF-DEAD" `name`
   do e@Def{} <- [lhs]
@@ -648,22 +650,24 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
                             ee
   where
     inline :: [(Ident, Value)] -> Value -> Value
-    inline bs v | isGnd v = v
+    inline bs v | isGnd bs v = v
                 | otherwise = inline bs (inl v)
       where
-        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
-                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
+--        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
+--                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
+        inl (Var x) = fromMaybe (Var x) $ lookup x bs
         inl e@VINT{} = e
         inl e@VOP{} = e
         inl (VARR vs) = VARR (map inl vs)
         inl (VLAM x e) = VLAM x (VLAM (Name "_") e :@: Var (Name "[...]")) -- XXX
         inl _ = undefined
-    isGnd :: Value -> Bool
-    isGnd VINT{} = True
-    isGnd (VARR vs) = all isGnd vs
-    isGnd VOP{} = True
-    isGnd VLAM{} = True
-    isGnd _ = False
+    isGnd :: [(Ident, a)] -> Value -> Bool
+    isGnd _ VINT{} = True
+    isGnd bs (VARR vs) = all (isGnd bs) vs
+    isGnd _ VOP{} = True
+    isGnd _ VLAM{} = True
+    isGnd bs (Var x) = isNothing (lookup x bs)
+    isGnd _ _ = False
 
 -- Make a WF value canonical, i.e., order the quantifiers
 -- and bindings in a predictable order.
@@ -699,7 +703,7 @@ isS VOP{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
-rulesDerefFP lhs =
+rulesDerefFP _ lhs =
   "DEREF-S" `name`
   do xs@(VAR x :=: Val s) :>: e <- [lhs]
      guard (VAR x /= Val s)
@@ -722,7 +726,7 @@ rulesDerefFP lhs =
 #endif
 
 rulesFailFP :: ERule
-rulesFailFP lhs =
+rulesFailFP _ lhs =
   "FAIL-SEQL" `name`
   do Fail :>: _ <- [lhs]
      pure Fail
@@ -742,7 +746,7 @@ rulesFailFP lhs =
      pure Fail
 
 rulesOneFP :: ERule
-rulesOneFP lhs =
+rulesOneFP _ lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
@@ -758,7 +762,7 @@ rulesOneFP lhs =
      pure e
 
 rulesAllFP :: ERule
-rulesAllFP lhs =
+rulesAllFP _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (ARR [])
@@ -780,7 +784,7 @@ rulesAllFP lhs =
 -}
 
 rulesSplit :: ERule
-rulesSplit lhs =
+rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f g <- [lhs]
      pure (f :@: VARR [])
@@ -858,7 +862,7 @@ mkRess as = loop [] [] [] as
             es = [VAR x :=: Val v | (x, v) <- cs]
 
 rulesNormalization :: ERule
-rulesNormalization lhs =
+rulesNormalization _ lhs =
   "NORM-VAL" `name`
   do Val _ :>: e <- [lhs]
      pure e

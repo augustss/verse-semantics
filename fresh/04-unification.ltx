@@ -737,15 +737,16 @@ or \cref{lem:under-u} for the other cases.
 \newcommand{\oE}{\mathit{OE}}
 
 \mypara{Outer Contexts} Let $\oA$ be an \emph{outer} application contexts
-defined as:
-$$\begin{array}{rcl}
-\oA  & ::= & |hole| % \vb |lam x OE|
-           \vb |def x OA| \vb |OA = e| \vb |v == OA|
- 		   \vb |OA ; e| \vb |e ; OA| \vb |apply1N OA v| \vb |apply1N v OA|
-		   \vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
-%\oA  & ::= & |hole| \vb |v == OA| \vb |def x OA| \vb |OA ; e| \vb |e ; OA|
-%		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
-\end{array}$$
+defined as just $A$
+
+% $$\begin{array}{rcl}
+% \oA  & ::= & |hole| % \vb |lam x OE|
+%            \vb |def x OA| \vb |OA = e| \vb |v == OA|
+%  		   \vb |OA ; e| \vb |e ; OA| \vb |apply1N OA v| \vb |apply1N v OA|
+% 		   \vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
+% %\oA  & ::= & |hole| \vb |v == OA| \vb |def x OA| \vb |OA ; e| \vb |e ; OA|
+% %		 			\vb |OA choice e| \vb |e choice OA| \vb |all OA| \vb |one OA| \\
+% \end{array}$$
 
 \begin{lemma}[Shuffle] \label{lem:p-shuffle}
 If forall $e$, we have $\rstep{\rr}{OA'[e]}{OA''[e]}$:
@@ -874,9 +875,154 @@ Let us split cases on where $\rdx{1}$ is located.
 	\arrow[dotted, two heads, from=1-5, to=2-5]
 \end{tikzcd}\]
     \end{description}
-ANCHOR
 \end{description}
 \end{proof}
+
+\begin{lemma}[Deref-Under-Deref-BARRIER] \label{lem:deref-under-deref-barrier}
+Let $\rr' = $ \rulename{deref-sh}.
+If $\rstep{\rr'}{\rdx{2}}{\rdx{2}'}$ and
+   $\rdx{2} \equiv E[\rdx{1}]$ and
+   $\rstep{\rr'}{\rdx{1}}{\rdx{1}'}$
+then there exists $\rdx{2}''$ such that
+   $\rsteps{\rr'}{\rdx{2}'}{\rdx{2}''}$ and
+   $\rsteps{\rr'}{E[\rdx{1}']}{\rdx{2}''}$.
+\end{lemma}
+
+\begin{proof}
+We write $AB$ for either an $A$ or $B$ context, for the inner, assume $A_1$ wlog.
+The cases not directly handled by \cref{lem:p-shuffle} are as follows:
+\begin{description}
+\item[Case] Outer redex $\rdx{2}$ is a \emph{heap-eq} on $x$ ($x = h$)
+    \begin{description}
+    \item[Case] Inner redex $\rdx{1}$ is a \emph{heap-eq} $x = h'$. Split on occurrence of outer hole.
+        \begin{description}
+        \item[Case] \textbf{H1} Outer hole is in equation \ie $x = h; AB[\boxed{x} = h'; A_1[x]]$.
+        \item[Case] \textbf{H2} Outer hole is same as inner hole \ie $x = h; AB[x = h'; A_1[\boxed{x}]]$.
+        \end{description}
+    \item[Case] Inner redex $\rdx{1}$ is a \emph{scalar-eq} with $x$ on LHS ($x = s$).
+        Split on type of context
+        \begin{description}
+        \item[Case] $A$-context. Split on position of outer hole.
+            \begin{description}
+            \item[Case] \textbf{H3} Outer hole is in equation \ie $x = h; A[\boxed{x} = s; A_1[x]]$.
+                        \textbf{Impossible!} No copying $h$ into equations under $A$.
+            \item[Case] \textbf{H4} Outer hole is same as inner hole \ie $x = h; A[x = s; A_1[\boxed{x}]]$.
+            \end{description}
+        \item[Case] $B$-context
+            \begin{description}
+            \item[Case] \textbf{H5} Outer hole is in equation \ie $x = h; B[\boxed{x} = s; A_1[x]]$.
+            \item[Case] \textbf{H6} Outer hole is same as inner hole \ie $x = h; B[x = s; A_1[\boxed{x}]]$.
+            \end{description}
+        \end{description}
+    \item[Case] Inner redex $\rdx{1}$ is a \emph{scalar-eq} with $x$ on RHS ($y = x$).
+        Split on type of context
+        \begin{description}
+            \item[Case] \textbf{H7} $A$ context, \ie $x = h; A[y = \boxed{x}; A_1[y]]$.
+                        \textbf{Impossible!} No copying $h$ into equations under $A$.
+            \item[Case] \textbf{H8} $B$ context, \ie $x = h; B[y = \boxed{x}; A_1[y]]$. \textbf{Aarrgh. FAILS.}
+
+% x = h; B[ y = x; y = z; 10]
+%    --> x = h; B [ y = h; y = z; 10 ]         (e1)
+%    --> x = h; B [ y = x; x = z; 10 ]         (e2)
+
+        \end{description}
+    \end{description}
+
+\item[Case] Outer redex $\rdx{2}$ is a \emph{scalar-equation} on $x$ ($x = s$)
+    \begin{description}
+    \item[Case] Inner redex $\rdx{1}$ is a \emph{heap-eq} $x = h'$. Split on occurrence of outer hole.
+        \begin{description}
+        \item[Case] \textbf{S1} Outer hole is in equation \ie $x = s; AB[\boxed{x} = h'; A_1[x]]$.
+        \item[Case] \textbf{S2} Outer hole is same as inner hole \ie $x = s; AB[x = h'; A_1[\boxed{x}]]$.
+        \end{description}
+    \item[Case] Inner redex $\rdx{1}$ is a \emph{scalar-eq} with $x$ on LHS ($x = s'$).
+        Split on position of outer hole.
+        \begin{description}
+        \item[Case] \textbf{S3} Outer hole is in equation \ie $x = s; AB[\boxed{x} = s'; A_1[x]]$.
+        \item[Case] \textbf{S4} Outer hole is same as inner hole \ie $x = s; AB[x = s'; A_1[\boxed{x}]]$.
+        \end{description}
+    \item[Case] \textbf{S5} Inner redex $\rdx{1}$ is a \emph{scalar-eq} with $x$ on RHS \ie ($x = s; AB[y = \boxed{x}; A_1[y]]$).
+    \end{description}
+\end{description}
+
+Here are the diagrams showing how to join the terms in each of the above cases.
+
+\mypara{Case H1}
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PXY7IEFCW1xcYm94ZWR7eH0gPSBoJztBXzFbeF1dIl0sWzIsMCwieD12OyBBQlt2ID0gaCc7QV8xW3hdXSJdLFswLDEsIng9djsgQUJbXFxib3hlZHt4fSA9IGgnO0FfMVtoJ11dIl0sWzIsMSwieCA9IHY7IEFCW3YgPSBoJztBXzFbaCddXSJdLFs0LDAsIng9djsgQUJbdiA9IGgnO0FfMVt2XV0iXSxbNCwxLCJcXGNyZWZ7bGVtOmpvaW4tdi12fSJdLFswLDEsIlxccnVuaV8yIl0sWzAsMiwiXFxydW5pXzEiLDJdLFsyLDMsIlxccnVuaV8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiXFxydW5pXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	{x=v; AB[\boxed{x} = h';A_1[x]]} && {x=v; AB[v = h';A_1[x]]} && {x=v; AB[v = h';A_1[v]]} \\
+	{x=v; AB[\boxed{x} = h';A_1[h']]} && {x = v; AB[v = h';A_1[h']]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+
+\mypara{Case H2}
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PXY7IEFCW3ggPSBoJztBXzFbXFxib3hlZHt4fV1dIl0sWzIsMCwieD12OyBBQlt4ID0gaCc7QV8xW3ZdXSJdLFswLDEsIng9djsgQUJbeCA9IGgnO0FfMVtoJ11dIl0sWzIsMSwieCA9IHY7IEFCW3YgPSBoJztBXzFbaCddXSJdLFs0LDAsIng9djsgQUJbdiA9IGgnO0FfMVt2XV0iXSxbNCwxLCJcXGNyZWZ7bGVtOmpvaW4tdi12fSJdLFswLDEsIlxccnVuaV8yIl0sWzAsMiwiXFxydW5pXzEiLDJdLFsyLDMsIlxccnVuaV8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiXFxydW5pXzIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	{x=v; AB[x = h';A_1[\boxed{x}]]} && {x=v; AB[x = h';A_1[v]]} && {x=v; AB[v = h';A_1[v]]} \\
+	{x=v; AB[x = h';A_1[h']]} && {x = v; AB[v = h';A_1[h']]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+
+\mypara{Case H3} $x = h; A[\boxed{x} = s; A_1[x]]$ \textbf{Impossible!}
+                 Outer redex is invalid as it copies $h$ into equations
+                 under $A$ (without barrier).
+
+\mypara{Case H4} TODO HOIST
+
+\mypara{Case H5}
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PWg7IEJbXFxib3hlZHt4fSA9IHM7QV8xW3hdXSJdLFsyLDAsIng9aDsgQltoID0gcztBXzFbeF1dIl0sWzAsMSwieD1oOyBCW1xcYm94ZWR7eH0gPSBzO0FfMVtzXV0iXSxbMiwxLCJ4PWg7IEJbaCA9IHM7QV8xW3NdXSJdLFs0LDAsIng9aDsgQltoID0gcztBXzFbaF1dIl0sWzQsMSwiXFxjcmVme2xlbTpqb2luLXYtdn0iXSxbMCwxLCJcXHJ1bmlfMiJdLFswLDIsIlxccnVuaV8xIiwyXSxbMiwzLCJcXHJ1bmlfMiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDQsIlxccnVuaV8yIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	{x=h; B[\boxed{x} = s;A_1[x]]} && {x=h; B[h = s;A_1[x]]} && {x=h; B[h = s;A_1[h]]} \\
+	{x=h; B[\boxed{x} = s;A_1[s]]} && {x=h; B[h = s;A_1[s]]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+
+\mypara{Case H6}
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJ4PWg7IEJbeCA9IHM7QV8xW1xcYm94ZWR7eH1dXSJdLFsyLDAsIng9aDsgQlt4ID0gcztBXzFbaF1dIl0sWzAsMSwieD1oOyBCW3ggPSBzO0FfMVtzXV0iXSxbMiwxLCJ4PWg7IEJbaCA9IHM7QV8xW3NdXSJdLFs0LDAsIng9aDsgQltoID0gcztBXzFbaF1dIl0sWzQsMSwiXFxjcmVme2xlbTpqb2luLXYtdn0iXSxbMCwxLCJcXHJ1bmlfMiJdLFswLDIsIlxccnVuaV8xIiwyXSxbMiwzLCJcXHJ1bmlfMiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDQsIlxccnVuaV8yIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNSwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	{x=h; B[x = s;A_1[\boxed{x}]]} && {x=h; B[x = s;A_1[h]]} && {x=h; B[h = s;A_1[h]]} \\
+	{x=h; B[x = s;A_1[s]]} && {x=h; B[h = s;A_1[s]]} && {\cref{lem:join-v-v}}
+	\arrow["{\runi_2}", from=1-1, to=1-3]
+	\arrow["{\runi_1}"', from=1-1, to=2-1]
+	\arrow["{\runi_2}"', dotted, from=2-1, to=2-3]
+	\arrow["{\runi_2}", dotted, from=1-3, to=1-5]
+	\arrow[dotted, two heads, from=2-3, to=2-5]
+	\arrow[dotted, two heads, from=1-5, to=2-5]
+\end{tikzcd}\]
+
+
+\mypara{Case H7} $x = h; A[y = \boxed{x}; A_1[y]]$. \textbf{Impossible!}
+                 Outer redex is invalid as it copies $h$ into equations
+                 under $A$ (without barrier).
+
+\mypara{Case H8}
+
+
+
+\mypara{Case S1} Similar to \textbf{H1}
+\mypara{Case S2} Similar to \textbf{H2}
+\mypara{Case S3} Similar to \textbf{H5} (as outer-scalar equivalent to outer-heap-above-barrier)
+\mypara{Case S4} Similar to \textbf{H6} (as outer-scalar equivalent to outer-heap-above-barrier)
+\mypara{Case S5} Similar to \textbf{H8} (as outer-scalar equivalent to outer-heap-above-barrier)
+\end{proof}
+
+
+
 
 \begin{lemma}[Join-V-V] \label{lem:join-v-v}
 If $e \equiv {A_1[v = v'; A_2[v]]}$ and $e' \equiv {A_1[v = v'; A_2[v']}$

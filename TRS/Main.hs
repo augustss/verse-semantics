@@ -37,7 +37,7 @@ final = id
 
 prop_NormalForms p =
   --trace (show p) $
-  let trs = final $ normalFormsFuelTrace 99 rulesPLDI p in
+  let trs = final $ normalFormsFuelTrace defaultTRSFlags 99 rulesPLDI p in
     case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
         whenFail (do putStrLn "===trace:1==="

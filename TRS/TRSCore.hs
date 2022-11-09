@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-type-defaults -Wno-unused-matches -Wno-missing-signatures -Wno-missing-pattern-synonym-signatures -Wno-name-shadowing #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 module TRSCore where
 
@@ -228,54 +229,65 @@ pattern CONS    = HNF (Op Cons)
 
 --------------------------------------------------------------------------------
 
+type TRSFlags = RuleEnv Expr
+
+defaultTRSFlags :: TRSFlags
+defaultTRSFlags = TRSFlags { tfUnderLambda = True }
+
 instance Rec Expr where
-  rec r e =
-    r e ++
-    structMatch r e ++
+  data RuleEnv Expr = TRSFlags
+    { tfUnderLambda :: !Bool
+    }
+  rec r s e =
+    r s e ++
+    structMatch r s e ++
     case e of
       a :=: b ->
-           [ (n, a' :=: b)  | (n,a') <- rec r a ]
-        ++ [ (n, a  :=: b') | (n,b') <- rec r b ]
+           [ (n, a' :=: b)  | (n,a') <- rec r s a ]
+        ++ [ (n, a  :=: b') | (n,b') <- rec r s b ]
     
       a :|: b ->
-           [ (n, a' :|: b)  | (n,a') <- rec r a ]
-        ++ [ (n, a  :|: b') | (n,b') <- rec r b ]
+           [ (n, a' :|: b)  | (n,a') <- rec r s a ]
+        ++ [ (n, a  :|: b') | (n,b') <- rec r s b ]
 
       a :>: b ->
-           [ (n, a' :>: b)  | (n,a') <- rec r a ]
-        ++ [ (n, a  :>: b') | (n,b') <- rec r b ]
+           [ (n, a' :>: b)  | (n,a') <- rec r s a ]
+        ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
 
       Def (Bind x a) ->
-           [ (n, Def (Bind x a')) | (n,a') <- rec r a ]
+           [ (n, Def (Bind x a')) | (n,a') <- rec r s a ]
 
       f :@: a ->
-           [ (n,f' :@: a)  | (n,f') <- vrec r f ]
-        ++ [ (n,f  :@: a') | (n,a') <- vrec r a ]
+           [ (n,f' :@: a)  | (n,f') <- vrec r s f ]
+        ++ [ (n,f  :@: a') | (n,a') <- vrec r s a ]
   
       Val v ->
-           [ (n,Val v') | (n,v') <- vrec r v ]
+           [ (n,Val v') | (n,v') <- vrec r s v ]
   
-      One a -> [ (n, One a') | (n,a') <- rec r a ]
-      All a -> [ (n, All a') | (n,a') <- rec r a ]
+      One a -> [ (n, One a') | (n,a') <- rec r s a ]
+      All a -> [ (n, All a') | (n,a') <- rec r s a ]
       Split a f g ->
-           [ (n, Split a' f g) | (n,a') <- rec r a ]
-        ++ [ (n, Split a f' g) | (n,f') <- vrec r f ]
-        ++ [ (n, Split a f g') | (n,g') <- vrec r g ]
+           [ (n, Split a' f g) | (n,a') <- rec r s a ]
+        ++ [ (n, Split a f' g) | (n,f') <- vrec r s f ]
+        ++ [ (n, Split a f g') | (n,g') <- vrec r s g ]
       _     -> []
    where
     -- recursively rewrite expressions in values
-    vrec r (Var x) = []
-    vrec r (HNF a) = [ (n,HNF a') | (n,a') <- hrec r a ]
+    vrec r s (Var x) = []
+    vrec r s (HNF a) = [ (n,HNF a') | (n,a') <- hrec r s a ]
 
     -- recursively rewrite expressions in HNFs
-    hrec r (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
+    hrec r s (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
                               | (i,a) <- [0..] `zip` as
-                              , (n,a') <- vrec r a
+                              , (n,a') <- vrec r s a
                               ]
-    hrec r (Lam (Bind x e)) = [ (n,Lam (Bind x e')) | (n,e') <- rec r e ]
-    hrec r _                = []
+    hrec r s (Lam (Bind x e))
+            | tfUnderLambda s = [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
+    hrec r s _                = []
 
+#if !NO_STRUCT_RULES
   norm = structNorm
+#endif
 
 -- structural rules
 -- every structural rule is implemented in 2 parts:
@@ -283,23 +295,23 @@ instance Rec Expr where
 -- 2. make sure terms are "normalized" w.r.t. the rules
 
 structMatch :: Rule Expr -> Rule Expr
-structMatch r = struct
+structMatch rule = struct
  where
 #if !NO_STRUCT_RULES
-  struct (Def (Bind x e)) =
+  struct env (Def (Bind x e)) =
     [ (n,ctx xe')
     | (ctx,e') <- structDefs e
-    , (n,xe') <- r (Def (Bind x e'))
+    , (n,xe') <- rule env (Def (Bind x e'))
     ]
    where
     structDefs (Def (Bind y e)) = (Def . Bind y, e)
                                 : [ (Def . Bind y . ctx, e') | (ctx,e') <- structDefs e ]
     structDefs _                = []
  
-  struct ((VAR x1 :=: Val v1) :>: e) =
+  struct env ((VAR x1 :=: Val v1) :>: e) =
     [ (n,ctx ve')
     | (ctx,e') <- structSeqs e
-    , (n,ve') <- r ((VAR x1 :=: Val v1) :>: e')
+    , (n,ve') <- rule env ((VAR x1 :=: Val v1) :>: e')
     ]
    where
     structSeqs ((VAR x1 :=: Val v1) :>: e) =
@@ -307,22 +319,22 @@ structMatch r = struct
       : [(((VAR x1 :=: Val v1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
     structSeqs _ = []
 #endif
-  struct _ = []
+  struct _ _ = []
 
-structNorm :: Expr -> Expr
-structNorm e =
-  case normalForms (rec rules) e of
+structNorm :: RuleEnv Expr -> Expr -> Expr
+structNorm env e =
+  case normalForms env (rec rules) e of
     []       -> e
     (_,e'):_ -> e'
  where
 #if !NO_STRUCT_RULES
-  rules (Def (Bind x (Def (Bind y e)))) | x > y =
+  rules _ (Def (Bind x (Def (Bind y e)))) | x > y =
     [ ("SWAP-C", Def (Bind y (Def (Bind x e)))) ]
 
-  rules ((VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e)) | (x1,v1) > (x2,v2) =
+  rules _ ((VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e)) | (x1,v1) > (x2,v2) =
     [ ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e)) ]
 #endif
-  rules _ = []
+  rules _ _ = []
 
 --------------------------------------------------------------------------------
 
@@ -434,7 +446,8 @@ instance Arbitrary Expr where
   shrink (Val v)   = [Val v'|v'<-shrink v] ++ [Def bnd|HNF(Lam bnd)<-[v]]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
-  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+    where as = case a of _ :=: _ -> []; _ -> [a]
   shrink (a :@: b) = [Val a,Val b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
@@ -448,7 +461,7 @@ instance Arbitrary Expr where
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
   frequency
-  [ (1, Val `fmap` arbValue n xs)
+  [ (1, Val <$> arbValue n xs)
   , (1, return Fail) -- maybe not have this?
   -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   -- , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)

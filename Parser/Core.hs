@@ -19,7 +19,7 @@ module Core(
   alphaConvert, alphaConvertV, alphaConvertH,
   composC, composV, composH,
   composOpC, composOpV, composOpH,
-  pCore,
+  pCore, pCoreFile,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad.Identity
@@ -28,7 +28,7 @@ import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
-import Text.Megaparsec(sepBy1, many, eof, choice, some, optional, (<|>))
+import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 -- import Text.Megaparsec.Char(skip)
 
 import Print
@@ -211,7 +211,7 @@ core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
 core (Lambda i [] (Array []) e) = val $ Function [(Define i AnyT, [])] e
 core (Lambda i rs e1 e2) = do
---  traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
+  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
   let covariant = covariantId `elem` rs || True -- XXX
   if timLam then do
@@ -220,11 +220,7 @@ core (Lambda i rs e1 e2) = do
     e2' <- coreD e2
     pure $ CLambda i is covariant e1' e2'
   else
-    val $ Function [(Define i AnyT, [])] $
-      if trivial e1 then
-        Seq [e1, e2]
-      else
-        If3 e1 e2 (if covariant then Fail else Wrong "outside domain")
+    val $ lamFunc covariant i e1 e2
 core EmptyT = pure CFail
 core e = impossible e
 
@@ -234,6 +230,15 @@ trivial Array{} = True
 trivial (ApplyD (Variable (Ident _ "any")) _) = True
 trivial _ = False
 
+lamFunc :: Bool -> Ident -> Expr -> Expr -> Expr
+lamFunc cov i e1 e2 =
+  Function [(Define i AnyT, [])] $
+    if e1 == Array [] then
+      e2
+    else if trivial e1 then
+      Seq [e1, e2]
+    else
+      If3 e1 e2 (if cov then Fail else Wrong "outside domain")
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -362,6 +367,7 @@ value (Typedef e) = do
 -}
 value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
   where attr ae = foldr CMacro ae fs
+value (Lambda i [] e1 e2) = value $ lamFunc True i e1 e2
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
 
@@ -595,8 +601,12 @@ alphaConvertV vs v =
 -----------------------------------
 
 -- Parse Core
+pCoreFile :: P Core
+pCoreFile = skip *> pCore <* eof
+
 pCore :: P Core
-pCore = (exprToCore defaultFlags . simpleDesugar) <$> (skip *> pSeq <* eof)
+pCore = (exprToCore flg . simpleDesugar) <$> pSeq
+  where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam
 -- XXX primops
@@ -643,7 +653,7 @@ pApply = do
 
 pOper :: P Ident
 pOper = choice $ map (\ o -> const (Ident noLoc ("in'" ++ o ++ "'")) <$> pOp o)
-  [ ">", ">=", "<", "<=", "<>", "+", "-", "*", "/" ]
+  [ ">=", "<=", "<>", "+", "-", "*", "/" ]
 
 pTuple :: P Expr
 pTuple = try (pParens (pure (Array [])))
@@ -657,7 +667,27 @@ pComma = try (arr <$> pEqu <*> some (pOp "," *> pEqu))
   where arr x xs = Array (x:xs)
 
 pAtom :: P Expr
-pAtom = choice [pTuple, pLiteral, Variable <$> pIdent, pMacro]
+pAtom = choice [pTuple, pLiteral, pName, pMacro, pArray]
+
+pName :: P Expr
+pName = do
+  i@(Ident l s) <- pIdent
+  let ops = [ ("fail", Fail)
+            , ("gt", vi "in'>'")
+            , ("lt", vi "in'<'")
+            , ("add", vi "in'+'")
+            , ("isInt", vi "isInt$")
+            ]
+      vi = Variable . Ident l
+  pure $ fromMaybe (Variable i) $ lookup s ops
+
+pArray :: P Expr
+pArray =
+    Array <$> (pKeyword "array" *> pBraces (sepBy pSeq (pOp ",")))
+  <|>
+    pOp "<" *> (Array <$> sepBy pSeq (pOp ",")) <* pOp ">"
+  <|>
+    Array [] <$ pOp "<>"
 
 pMacro :: P Expr
 pMacro = mac <$> pMacroName <*> pBraces pSeq
