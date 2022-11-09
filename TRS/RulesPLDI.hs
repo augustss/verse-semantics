@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-module RulesPLDI(rulesPLDI, dsFreshFP, finalSubst, canon) where
+module RulesPLDI(rulesPLDI, rulesStructural, dsFreshFP, finalSubst, canon) where
+
+-- #define NO_STRUCT_RULES 1
 
 import TRS
 import Bind
@@ -926,3 +928,14 @@ rulesNormalization _ lhs =
   "NORM-SEQR" `name`
   do (v@Val{} :=: (e1 :>: e2)) :>: e3 <- [lhs]
      pure (e1 :>: (v :=: e2) :>: e3)
+
+------
+
+rulesStructural :: ERule
+rulesStructural _ lhs =
+  do Def (Bind x (Def (Bind y e))) <- [lhs]
+     pure ("SWAP-C", Def (Bind y (Def (Bind x e))))
+ ++
+  do (VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e) <- [lhs]
+     pure ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e))
+
