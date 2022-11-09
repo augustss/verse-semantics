@@ -7,7 +7,7 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
---import Debug.Trace (trace)
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -58,12 +58,13 @@ execX1 lhs =
      pure ((e :>:) . ctx, hole)
 
 -- X context, or exist x . X
-defX :: Expr -> [(Context, Expr)]
-defX lhs =
+defX :: Ident -> Expr -> [(Context, Expr)]
+defX xx lhs =
   do execX lhs
  ++
   do Def (Bind x dx) <- [lhs]
-     (ctx, hole) <- defX dx
+     guard (x /= xx)
+     (ctx, hole) <- defX xx dx
      return (Def . Bind x . ctx, hole)
 
 -- choice contexts
@@ -287,10 +288,12 @@ rulesUnificationNoOcc _ lhs =
  ++
   "UX5" `name`
   do Val h1@(HNF (Op _)) :=: Val h2@(HNF _) <- [lhs]
+{-
      if h1 == h2 then  -- To make it compatible with the PLDI rules
        pure (Val h1)
       else
-       pure Fail
+-}
+     pure Fail
  ++
   "UX6" `name`
   do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
@@ -326,7 +329,7 @@ rulesUnificationVariables _ lhs =
  ++
   "DEF-ELIML" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, VAR x' :=: Val v) <- defX a
+     (ctx, VAR x' :=: Val v) <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -336,13 +339,20 @@ rulesUnificationVariables _ lhs =
  ++
   "DEF-ELIMR" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, Val v :=: VAR x') <- defX a
+     (ctx, Val v :=: VAR x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
      guard (x `notElem` freeX)
      guard (x `notElem` freeV)
      pure (ctx (Val v))
+ ++
+  "DEF-ELIMV" `name`
+  do Def (Bind x a) <- [lhs]
+     (ctx, VAR y :=: VAR x') <- defX x a
+     guard (x == x')
+     guard (x /= y)
+     pure (subst [(x, Var y)] (ctx (VAR y)))
  ++
   "SWAP" `name`
   do Val (HNF hnf) :=: VAR x <- [lhs]
@@ -365,6 +375,10 @@ rulesSequencing _ lhs =
   "SEQ" `name`
   do Val v :>: e <- [lhs]
      pure e
+ ++
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
  ++
   "UNIFY-SEQL" `name`
   do (e1 :>: e2) :=: e3 <- [lhs]

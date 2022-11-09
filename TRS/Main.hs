@@ -3,6 +3,7 @@ module Main where
 
 import TRSCore
 import RulesPLDI
+import RulesPOPL
 import TRS
 import TRSGraph
 import Graph
@@ -11,6 +12,7 @@ import Test.QuickCheck
 import qualified Data.Map as M
 import Data.List
 import Data.Function
+import System.Environment
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
@@ -25,8 +27,11 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 --------------------------------------------------------------------------------
 
-main = quickCheckWith args prop_NormalForms2
-  where args = stdArgs{ maxSuccess = 10000 }
+main = do
+  args <- getArgs
+  let qcargs = stdArgs{ maxSuccess = 10000 }
+      rules = if null args then rulesPLDI else rulesPOPL
+  quickCheckWith qcargs (prop_NormalForms rules)
 
 #if NO_STRUCT_RULES
 -- After reduction, canonicalize results.
@@ -37,9 +42,9 @@ final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, canon a) :
 final = id
 #endif
 
-prop_NormalForms p =
+prop_NormalForms rules p =
   --trace (show p) $
-  let trs = final $ normalFormsFuelTrace defaultTRSFlags 99 rulesPLDI p in
+  let trs = final $ normalFormsFuelTrace defaultTRSFlags 99 rules p in
     case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
         whenFail (do putStrLn "===trace:1==="
