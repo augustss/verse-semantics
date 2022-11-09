@@ -288,10 +288,12 @@ rulesUnificationNoOcc _ lhs =
  ++
   "UX5" `name`
   do Val h1@(HNF (Op _)) :=: Val h2@(HNF _) <- [lhs]
+{-
      if h1 == h2 then  -- To make it compatible with the PLDI rules
        pure (Val h1)
       else
-       pure Fail
+-}
+     pure Fail
  ++
   "UX6" `name`
   do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
