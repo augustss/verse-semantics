@@ -58,12 +58,13 @@ execX1 lhs =
      pure ((e :>:) . ctx, hole)
 
 -- X context, or exist x . X
-defX :: Expr -> [(Context, Expr)]
-defX lhs =
+defX :: Ident -> Expr -> [(Context, Expr)]
+defX xx lhs =
   do execX lhs
  ++
   do Def (Bind x dx) <- [lhs]
-     (ctx, hole) <- defX dx
+     guard (x /= xx)
+     (ctx, hole) <- defX xx dx
      return (Def . Bind x . ctx, hole)
 
 -- choice contexts
@@ -326,7 +327,7 @@ rulesUnificationVariables _ lhs =
  ++
   "DEF-ELIML" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, VAR x' :=: Val v) <- defX a
+     (ctx, VAR x' :=: Val v) <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -336,7 +337,7 @@ rulesUnificationVariables _ lhs =
  ++
   "DEF-ELIMR" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, Val v :=: VAR x') <- defX a
+     (ctx, Val v :=: VAR x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
