@@ -10,26 +10,42 @@ testeq(CEq) { exists x . x=1 } { 1 }
 
 # Problem 1 from Ranjit in email chain "State of play"
 # XXX What is the expected result?
-testeq(CEq) { ID := (\a.a); exists x y . x = ID; one{ x = y; x(10) } }   { 0 }
+testeq(CEq) { ID := (\a.a); exists x y . x = ID; one{ x = y; x(10) } }   { exists y . one{ y = (\a.a); 10 } }
 # Test results:
-#  V0: OK, but scope bug with \x.x
+#  V0: OK
 #  V1: fails, not confluent
 
 # Problem 2 from Ranjit's email
-testeq(CEq) { ID := (\a.a); exists x y . x = ID; y = x; < y > }          { ID := (\x.x); < ID > }
+testeq(CEq) { ID := (\a.a); exists x y . x = ID; y = x; < y > }          { < \a.a > }
 # Test results:
 #  V0: OK
 #  V1: OK
 
 # Problem 3 from Ranjit's email
 # XXX What is the expected result?
-testeq(CEq) { exists a b c d x . x = <a,b>; x = <c, d>; x }              { exists c d x . x=<c,d>; x }
+testeq(CEq) { exists a b c d x . x = <a, b>; x = <c, d>; x }              { exists c d . <c,d> }
 # Test results:
 #  V0: OK (2 results, joinable with structural rules)
 #  V1: OK
+
+# Variation on problem 3
+# XXX What is the expected result?
+testeq(CEq) { exists a b c d . one { exists x . x = <a,b>; x = <c, d>; x } }              { 0 }
+# Test results:
+#  V0: OK (2 results, joinable with structural rules)  XXX expected more reduction
+#  V1: OK-ish
 
 # Yikes problem
 testeq(CEq) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }                  { fail }
 # Test results:
 #  V0: OK
 #  V1: fails, does not reduce
+
+# Problem found by QC
+testeq(CEq) { exists x . (exists y . x = y; x) | <> }                    { exists x . x | <> }
+# Test results:
+#  V0: Needs structural rules for progress
+#  V1: fails, does not reduce
+# The POPL rules can be augmented with
+#  DEF-ELIMV ex x y1 ... yn . X[y = x]  -->  ex y1 ... yn . X[y]{x<-y} x/=y x/=yi
+
