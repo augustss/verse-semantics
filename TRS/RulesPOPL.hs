@@ -7,7 +7,7 @@ import Bind
 import TRSCore
 import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
---import Debug.Trace (trace)
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- sub-categories of expressions
@@ -344,6 +344,13 @@ rulesUnificationVariables _ lhs =
      guard (x `notElem` freeX)
      guard (x `notElem` freeV)
      pure (ctx (Val v))
+ ++
+  "DEF-ELIMV" `name`
+  do Def (Bind x a) <- [lhs]
+     (ctx, VAR y :=: VAR x') <- defX x a
+     guard (x == x')
+     guard (x /= y)
+     pure (subst [(x, Var y)] (ctx (VAR y)))
  ++
   "SWAP" `name`
   do Val (HNF hnf) :=: VAR x <- [lhs]

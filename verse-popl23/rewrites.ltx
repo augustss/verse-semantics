@@ -74,6 +74,8 @@
     & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$ \\
 \rulename{def-elimr} & |def (x y_1 dots y_n) (X^[v=x])| & \movesto & |def (y_1 dots y_n) (X^[v])|
     & if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$ \\
+\rulename{def-elimv} & |def (x y_1 dots y_n) (X^[y=x])| & \movesto & |def (y_1 dots y_n) (subst (X^[v]) x y)|
+    & if $|x| \neq |y|, |x| \neq |y_i|$ \lennart{NEW} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 \rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
     & if $|X| \ne \hole,\,  x \notin \freevars{|X|}$\\
