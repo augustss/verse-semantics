@@ -367,6 +367,10 @@ rulesSequencing _ lhs =
   do Val v :>: e <- [lhs]
      pure e
  ++
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
+ ++
   "UNIFY-SEQL" `name`
   do (e1 :>: e2) :=: e3 <- [lhs]
      pure (e1 :>: (e2 :=: e3))
