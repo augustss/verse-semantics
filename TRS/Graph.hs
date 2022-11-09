@@ -4,7 +4,7 @@ import qualified Data.Map as M
 import Data.Map( Map, (!) )
 import qualified Data.Set as S
 import Data.Set( Set )
-import Data.List( nub, sort, (\\) )
+import Data.List( sort, (\\) )
 --import Test.QuickCheck hiding ( generate )
 
 -- == almost everything in this module is inspired by King & Launchbury ==
@@ -112,6 +112,27 @@ scc g = scc2 g
 
 sccs :: Ord a => Graph a -> [[a]]
 sccs = map preorder . scc
+
+--------------------------------------------------------------------------------
+-- new: turn a graph into a DAG of strongly connected components, and find the leaves
+
+-- turn a graph into a dag, replacing each scc with its representative (smallest value)
+dag :: Ord a => Graph a -> Graph a
+dag g = M.mapWithKey (\r ys -> nub ys \\ [r])
+      $ M.fromListWith (++)
+      $ [ (rep x, map rep ys)
+        | (x,ys) <- M.toList g
+        ]
+ where
+  reps = M.fromList [ (x,r) | xs <- sccs g, let r = minimum xs, x <- xs ]
+  rep x = case M.lookup x reps of
+            Nothing -> x
+            Just r  -> r
+  
+  nub  = S.toList . S.fromList
+
+leaves :: Graph a -> [a]
+leaves g = [ x | (x,[]) <- M.toList g ]
 
 --------------------------------------------------------------------------------
 -- testing correctness

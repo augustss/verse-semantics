@@ -4,6 +4,8 @@ module Main where
 import TRSCore
 import RulesPLDI
 import TRS
+import TRSGraph
+import Graph
 import Bind
 import Test.QuickCheck
 import qualified Data.Map as M
@@ -23,7 +25,7 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 
 --------------------------------------------------------------------------------
 
-main = quickCheckWith args prop_NormalForms
+main = quickCheckWith args prop_NormalForms2
   where args = stdArgs{ maxSuccess = 10000 }
 
 #if NO_STRUCT_RULES
@@ -47,6 +49,17 @@ prop_NormalForms p =
 
       [] -> whenFail (print "DOES NOT TERMINATE") True
       _  -> property True
+
+prop_NormalForms2 p =
+  --trace (show p) $
+  case [ q | Just q <- leaves (dag (trsGraphFuel defaultTRSFlags 1000 rulesPLDI p)) ] of
+    qs@(_ : _ : _) ->
+      whenFail (do sequence_
+                     [ putStrLn ("-->* (" ++ show i ++ ") " ++ show q)
+                     | (i,q) <- [1..] `zip` qs
+                     ]) False
+
+    _  -> property True
 
 --------------------------------------------------------------------
 -- Stuff to help debug rewrite rules in GHCi
