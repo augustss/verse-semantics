@@ -12,6 +12,8 @@ data Flags = Flags
   , fDfs          :: !Bool
   , fLatex        :: !Bool
   , fFinalInline  :: !Bool
+  , fAlias        :: !Bool
+  , fUnifyEq      :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   }
@@ -30,6 +32,8 @@ defaultFlags = Flags
   , fDfs          = False
   , fLatex        = False
   , fFinalInline  = True
+  , fAlias        = False
+  , fUnifyEq      = False
   , fRewriteSteps = 25000
   , fEvalSteps    = 1000
   }
@@ -41,4 +45,6 @@ showFlags f = unwords
   , if fDfs f then "one-path" else "many-paths"
   , if fSplit f then "split" else "no-split"
   , if fSimplify f then "simplify" else "no-simplify"
+  , if fAlias f then "elim-alias" else "no-elim-alias"
+  , if fUnifyEq f then "unify-equal" else "no-unify-equal"
   ]

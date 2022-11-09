@@ -112,8 +112,18 @@ type ERule = Rule Expr
 
 --------------------------------------------------------------------------------
 
+before :: Rule a -> Rule a -> Rule a
+before r1 r2 s lhs =
+  case r1 s lhs of
+    [] -> r2 s lhs
+    cs -> cs
+
 rulesPLDI :: ERule
-rulesPLDI =
+rulesPLDI s | tfAlias s = (rulesAlias `before` rulesPLDI') s
+            | otherwise = rulesPLDI' s
+
+rulesPLDI' :: ERule
+rulesPLDI' =
      rulesPrimOps                      -- standard POPL rules
   <> rulesUnificationFP
   <> rulesApplication
@@ -135,6 +145,49 @@ rulesSpeculation =
   <> rulesSplit
 
 --------------------------------------------------------------------------------
+
+rulesAlias :: ERule
+rulesAlias _ lhs =
+  "ALIAS-SUBST" `name`
+  do DEF x e <- [lhs]
+     (ctx, y) <- aliasX x e
+     guard (x /= y)
+     -- traceM ("alias-1 " ++ show ((x, y), ctx (VAR y), underDefs (subst [(x, Var y)]) (ctx (VAR y))))
+     pure $ underDefs (subst [(x, Var y)]) (ctx (VAR y))
+
+  ++
+  "ALIAS-REFL" `name`
+  do VAR x :=: VAR x' <- [lhs]
+     guard (x == x')
+     pure (NOTFCN :@: Var x)
+
+
+aliasX :: Ident -> Expr -> [(Context, Ident)]
+aliasX x lhs =
+  do DEF y e <- [lhs]
+     guard (x /= y)
+     (ctx, z) <- aliasX x e
+     pure (DEF y . ctx, z)
+  ++
+  aliasX' x lhs
+
+aliasX' :: Ident -> Expr -> [(Context, Ident)]
+aliasX' x lhs =
+  do (VAR y :=: VAR z) :>: e <- [lhs]
+     guard (x == y)
+     pure ((:>: e), z)
+  ++
+  do (VAR z :=: VAR y) :>: e <- [lhs]
+     guard (x == y)
+     pure ((:>: e), z)
+  ++
+  do (e1 :>: e2) <- [lhs]
+     (ctx, z) <- aliasX' x e2
+     pure ((e1 :>:) . ctx, z)
+
+underDefs :: (Expr -> Expr) -> Expr -> Expr
+underDefs f (DEF x e) = DEF x (underDefs f e)
+underDefs f e = f e
 
 --------------------------------------------------------------------------------
 
@@ -209,6 +262,16 @@ rulesPrimOps _ lhs =
   "APP-CONS" `name`
   do CONS :@: VARR [v, VARR vs] <- [lhs]
      pure (ARR (v:vs))
+ ++
+  "APP-NOTFCN-HNF" `name`
+  do NOTFCN :@: v <- [lhs]
+     guard (case v of VINT{} -> True; VARR{} -> True; VOP{} -> True; _ -> False)
+     pure (Val v)
+ ++
+  "APP-NOTFCN-FCN" `name`
+  do NOTFCN :@: VLAM{} <- [lhs]
+     pure Fail
+
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
@@ -454,47 +517,60 @@ derefB lhs xx =
       pure (Def . Bind x . ctx)
 #endif
 
-derefA :: Expr -> Ident -> [VContext]
-derefA lhs xx =
+derefA :: TRSFlags -> Expr -> Ident -> [VContext]
+derefA = derefA' False
+
+derefB :: TRSFlags -> Expr -> Ident -> [VContext]
+derefB s | tfUnifyEq s = derefA' True s
+         | otherwise   = derefA' False s
+
+derefA' :: Bool -> TRSFlags -> Expr -> Ident -> [VContext]
+derefA' b s lhs xx =
    do (Var x :@: v) <- [lhs]
       guard (x == xx)
       pure (:@: v)
    ++
-   do (VAR x :=: v@(Val HNF{})) <- [lhs]
+   do (VAR x :=: e) <- [lhs]
       guard (x == xx)
-      pure ( (:=: v) . Val)
+      guard (b || case e of Val HNF{} -> True; _ -> False)
+      pure ( (:=: e) . Val)
+   ++
+   do (e :=: VAR x) <- [lhs]
+      guard (x == xx)
+      guard b
+      pure ( (e :=:) . Val)
    ++
    do (v@Val{} :=: e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefA' b s e xx
       pure ( (v :=:) . ctx)
    ++
    do DEF x e <- [lhs]
       guard (x /= xx)
-      ctx <- derefA e xx
+      ctx <- derefA' b s e xx
       pure (Def . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA e1 xx
+      ctx <- derefA' b s e1 xx
       pure ((:>: e2) . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA e2 xx
+      ctx <- derefA' b s e2 xx
       pure ((e1 :>:) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA e1 xx
+      ctx <- derefA' b s e1 xx
       pure ((:|: e2) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA e2 xx
+      ctx <- derefA' b s e2 xx
       pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefB s e xx
       pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefB s e xx
       pure (All . ctx)
    -- NOTE: not in paper
    ++
@@ -507,7 +583,7 @@ derefA lhs xx =
       pure (\ a -> VOP Cons :@: VARR [v, a])
    ++
    do Split e f g <- [lhs]
-      ctx <- derefA e xx
+      ctx <- derefB s e xx
       pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -705,7 +781,7 @@ isS VOP{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
-rulesDerefFP _ lhs =
+rulesDerefFP s lhs =
   "DEREF-S" `name`
   do xs@(VAR x :=: Val s) :>: e <- [lhs]
      guard (VAR x /= Val s)
@@ -717,7 +793,7 @@ rulesDerefFP _ lhs =
   "DEREF-H" `name`
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA e x
+     ctx <- derefA s e x
      pure (xh :>: plug ctx (HNF h))
 #if USE_DEREF_K
  ++

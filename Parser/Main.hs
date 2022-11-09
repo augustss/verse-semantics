@@ -128,9 +128,10 @@ cSet _ "" s = do
 cSet True l s | Just l' <- stripPrefix "steps=" l, Just n <- readMaybe l' =
   pure $ s{ flags = (flags s){fRewriteSteps = n} }
 cSet b l s =
-  case find (isPrefixOf l . fst) flagTable of
-    Nothing -> do putStrLn "Unknown flag"; pure s
-    Just (_, (_, set)) -> pure $ s{ flags = set b (flags s) }
+  case filter (isPrefixOf l . fst) flagTable of
+    [] -> do putStrLn "Unknown flag"; pure s
+    [(_, (_, set))] -> pure $ s{ flags = set b (flags s) }
+    xs -> do putStrLn $ "Ambiguous flag: " ++ show (map fst xs); pure s
 
 flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
@@ -145,6 +146,8 @@ flagTable =
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
+  ,("alias",       (fAlias,        \ b s -> s{fAlias=b}))
+  ,("unify-equal", (fUnifyEq,      \ b s -> s{fUnifyEq=b}))
   ]
 
 cRead :: Run CState
