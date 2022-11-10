@@ -5,9 +5,16 @@ import Data.Map( Map, (!) )
 import qualified Data.Set as S
 import Data.Set( Set )
 import Data.List( sort, union, (\\) )
---import Test.QuickCheck hiding ( generate )
 
--- == almost everything in this module is inspired by King & Launchbury ==
+-- this module is heavily inspired by
+-- King & Launchbury, "Structuring Depth-First Search Algorithms in Haskell", 1994.
+-- https://www.researchgate.net/publication/2252048_Structuring_Depth-First_Search_Algorithms_in_Haskell
+
+-- changed from this paper:
+-- - use Data.Map instead of ST-monad
+-- - add Cut to Trees to detect back-arrows
+-- - mapGraph, leaves, removeLoop
+-- - dag (turn a graph into a DAG of its SCCs)
 
 --------------------------------------------------------------------------------
 -- depth-first trees
@@ -71,8 +78,8 @@ backs t = S.fromList (go S.empty t)
 type Graph a
   = Map a [a]
 
-mapGraph :: (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
-mapGraph f g =
+mapG :: (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
+mapG f g =
   M.fromListWith union
   [ (f x, S.toList (S.fromList (map f ys)))
   | (x,ys) <- M.toList g
@@ -131,88 +138,12 @@ sccs = map preorder . scc
 -- replacing each scc with its representative (smallest value)
 
 dag :: Ord a => Graph a -> Graph a
-dag g = removeLoops (mapGraph rep g) 
+dag g = removeLoops (mapG rep g) 
  where
   reps  = M.fromList [ (x,r) | xs <- sccs g, let r = minimum xs, x <- xs ]
   rep x = case M.lookup x reps of
             Nothing -> x
             Just r  -> r
-
---------------------------------------------------------------------------------
--- testing correctness
-
-{-
-newtype G = G (Graph Int) deriving ( Show )
-
-set :: (Ord a, Num a, Arbitrary a) => Gen [a]
-set = (nub . sort . map abs) `fmap` arbitrary
-
-instance Arbitrary G where
-  arbitrary =
-    do xs  <- set `suchThat` (not . null)
-       yss <- sequence [ listOf (elements xs) | x <- xs ]
-       return (G (M.fromList (xs `zip` yss)))
-
-  shrink (G g) =
-    [ G (delNode x g)
-    | (x,_) <- M.toList g
-    ] ++
-    [ G (delEdge x y g)
-    | (x,ys) <- M.toList g
-    , y <- ys
-    ]
-   where
-    delNode v g =
-      M.fromList
-      [ (x,filter (v/=) ys)
-      | (x,ys) <- M.toList g
-      , x /= v
-      ]
-
-    delEdge v w g =
-      M.insert v ((g!v) \\ [w]) g
-
--- all vertices in a component can reach each other
-prop_Scc_StronglyConnected (G g) =
-  whenFail (print cs) $
-    and [ y `S.member` r | c <- cs, x <- c, let r = reach x, y <- c ]
- where
-  cs = sccs g
-
-  reach x = go S.empty [x]
-   where
-    go seen []            = seen
-    go seen (x:xs)
-      | x `S.member` seen = go seen xs
-      | otherwise         = go (S.insert x seen) ((g!x) ++ xs)
-
--- vertices cannot forward-reach to other components
-prop_Scc_NotConnected (G g) =
-  whenFail (print cs) $
-    -- every vertex is somewhere
-    and [ or [ x `elem` c | c <- cs ]
-        | x <- vertices g
-        ] &&
-    -- cannot foward-reach
-    and [ y `S.notMember` rx
-        | (c,d) <- pairs cs
-        , x <- c
-        , let rx = reach x
-        , y <- d
-        ]
- where
-  cs = sccs g
-
-  pairs (x:xs) = [ (x,y) | y <- xs ] ++ pairs xs
-  pairs []     = []
-
-  reach x = go S.empty [x]
-   where
-    go seen []            = seen
-    go seen (x:xs)
-      | x `S.member` seen = go seen xs
-      | otherwise         = go (S.insert x seen) ((g!x) ++ xs)
--}
 
 --------------------------------------------------------------------------------
 
