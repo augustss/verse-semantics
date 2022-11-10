@@ -56,16 +56,15 @@ prop_NormalForms rules p =
       _  -> property True
 
 prop_NormalForms2 rules p =
-  --trace (show p) $
-  let trs = normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p in
-    case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
-      (_,tr1):(_,tr2):_ ->
-        whenFail (do putStrLn "===trace:1==="
-                     printTrace tr1
-                     putStrLn "===trace:2==="
-                     printTrace tr2) False
+  case normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p of
+    trs@(_:_:_) ->
+      whenFail (sequence_ [ do putStrLn ("===trace:" ++ show i ++ "===")
+                               printTrace tr
+                          | (tr,i) <- trs `zip` [1..]
+                          ]) False
 
-      _ -> property True
+    [] -> whenFail (print "DOES NOT TERMINATE") True
+    _  -> property True
  where
   rules' env t = rules env t ++ rulesStructural env t
 
