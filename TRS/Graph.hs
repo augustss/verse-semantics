@@ -95,6 +95,7 @@ transposeG g =
   [ (y,[x]) | (x,ys) <- M.toList g, y <- ys ] ++
   [ (x,[])  | x <- vertices g ]
 
+-- a loop is a self-arrow, e.g. x-->x
 removeLoops :: Ord a => Graph a -> Graph a
 removeLoops g = M.mapWithKey (\x ys -> filter (x/=) ys) g
 
@@ -122,12 +123,14 @@ preOrd g = preorderF (dff g)
 postOrd :: Ord a => Graph a -> [a]
 postOrd g = postorderF (dff g)
 
+-- two different implementations of SCC
 scc1 :: Ord a => Graph a -> Forest a
 scc1 g = reverse (dfs (transposeG g) (reverse (postOrd g)))
 
 scc2 :: Ord a => Graph a -> Forest a
 scc2 g = dfs g (reverse (postOrd (transposeG g)))
 
+-- ssc2 seems faster
 scc :: Ord a => Graph a -> Forest a
 scc g = scc2 g
 
