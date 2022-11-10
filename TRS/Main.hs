@@ -31,7 +31,7 @@ main = do
   args <- getArgs
   let qcargs = stdArgs{ maxSuccess = 10000 }
       rules = if null args then rulesPLDI else rulesPOPL
-  quickCheckWith qcargs (prop_NormalForms rules)
+  quickCheckWith qcargs (prop_NormalForms2 rules)
 
 #if NO_STRUCT_RULES
 -- After reduction, canonicalize results.
@@ -55,16 +55,19 @@ prop_NormalForms rules p =
       [] -> whenFail (print "DOES NOT TERMINATE") True
       _  -> property True
 
-prop_NormalForms2 p =
+prop_NormalForms2 rules p =
   --trace (show p) $
-  case [ q | Just q <- leaves (dag (trsGraphFuel defaultTRSFlags 1000 rulesPLDI p)) ] of
-    qs@(_ : _ : _) ->
-      whenFail (do sequence_
-                     [ putStrLn ("-->* (" ++ show i ++ ") " ++ show q)
-                     | (i,q) <- [1..] `zip` qs
-                     ]) False
+  let trs = normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p in
+    case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
+      (_,tr1):(_,tr2):_ ->
+        whenFail (do putStrLn "===trace:1==="
+                     printTrace tr1
+                     putStrLn "===trace:2==="
+                     printTrace tr2) False
 
-    _  -> property True
+      _ -> property True
+ where
+  rules' env t = rules env t ++ rulesStructural env t
 
 --------------------------------------------------------------------
 -- Stuff to help debug rewrite rules in GHCi

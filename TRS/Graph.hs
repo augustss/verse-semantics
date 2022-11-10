@@ -4,7 +4,7 @@ import qualified Data.Map as M
 import Data.Map( Map, (!) )
 import qualified Data.Set as S
 import Data.Set( Set )
-import Data.List( sort, (\\) )
+import Data.List( sort, union, (\\) )
 --import Test.QuickCheck hiding ( generate )
 
 -- == almost everything in this module is inspired by King & Launchbury ==
@@ -71,14 +71,27 @@ backs t = S.fromList (go S.empty t)
 type Graph a
   = Map a [a]
 
+mapGraph :: (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
+mapGraph f g =
+  M.fromListWith union
+  [ (f x, S.toList (S.fromList (map f ys)))
+  | (x,ys) <- M.toList g
+  ]
+
 vertices :: Graph a -> [a]
 vertices g = [ x | (x,_) <- M.toList g ]
 
 transposeG :: Ord a => Graph a -> Graph a
 transposeG g =
-  M.fromListWith (++) $
+  M.fromListWith union $
   [ (y,[x]) | (x,ys) <- M.toList g, y <- ys ] ++
   [ (x,[])  | x <- vertices g ]
+
+removeLoops :: Ord a => Graph a -> Graph a
+removeLoops g = M.mapWithKey (\x ys -> filter (x/=) ys) g
+
+leaves :: Graph a -> [a]
+leaves g = [ x | (x,[]) <- M.toList g ]
 
 --------------------------------------------------------------------------------
 -- graphs and trees
@@ -114,25 +127,16 @@ sccs :: Ord a => Graph a -> [[a]]
 sccs = map preorder . scc
 
 --------------------------------------------------------------------------------
--- new: turn a graph into a DAG of strongly connected components, and find the leaves
+-- turn a graph into a DAG of strongly connected components
+-- replacing each scc with its representative (smallest value)
 
--- turn a graph into a dag, replacing each scc with its representative (smallest value)
 dag :: Ord a => Graph a -> Graph a
-dag g = M.mapWithKey (\r ys -> nub ys \\ [r])
-      $ M.fromListWith (++)
-      $ [ (rep x, map rep ys)
-        | (x,ys) <- M.toList g
-        ]
+dag g = removeLoops (mapGraph rep g) 
  where
-  reps = M.fromList [ (x,r) | xs <- sccs g, let r = minimum xs, x <- xs ]
+  reps  = M.fromList [ (x,r) | xs <- sccs g, let r = minimum xs, x <- xs ]
   rep x = case M.lookup x reps of
             Nothing -> x
             Just r  -> r
-  
-  nub  = S.toList . S.fromList
-
-leaves :: Graph a -> [a]
-leaves g = [ x | (x,[]) <- M.toList g ]
 
 --------------------------------------------------------------------------------
 -- testing correctness
