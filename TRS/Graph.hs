@@ -4,7 +4,7 @@ import qualified Data.Map as M
 import Data.Map( Map, (!) )
 import qualified Data.Set as S
 import Data.Set( Set )
-import Data.List( sort, union, (\\) )
+import Data.List( sort, (\\) )
 
 -- this module is heavily inspired by
 -- King & Launchbury, "Structuring Depth-First Search Algorithms in Haskell", 1994.
@@ -80,8 +80,9 @@ type Graph a
 
 mapG :: (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
 mapG f g =
-  M.fromListWith union
-  [ (f x, S.toList (S.fromList (map f ys)))
+  M.map S.toList $
+  M.fromListWith S.union
+  [ (f x, S.fromList (map f ys))
   | (x,ys) <- M.toList g
   ]
 
@@ -90,7 +91,7 @@ vertices g = [ x | (x,_) <- M.toList g ]
 
 transposeG :: Ord a => Graph a -> Graph a
 transposeG g =
-  M.fromListWith union $
+  M.fromListWith (++) $
   [ (y,[x]) | (x,ys) <- M.toList g, y <- ys ] ++
   [ (x,[])  | x <- vertices g ]
 
