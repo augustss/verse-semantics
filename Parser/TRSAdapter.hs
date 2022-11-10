@@ -21,7 +21,7 @@ import Print
 rewrite :: Flags -> Core -> [Core]
 rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
  where
-  trsFlags       = T.TRSFlags { T.tfUnderLambda = fUnderLambda flg }
+  trsFlags       = T.TRSFlags { T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
@@ -147,7 +147,8 @@ allOps = [
   (T.Plus, "pre'+'"),
   (T.IsInt, "isInt$"),
   (T.MapAp, "mapAp$"),
-  (T.Cons, "cons$")
+  (T.Cons, "cons$"),
+  (T.NotFcn, "notFcn$")
   ]
 
 ----------------------------------------------

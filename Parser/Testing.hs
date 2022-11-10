@@ -23,6 +23,8 @@ data TestFlags = TestFlags
   , split     :: !Bool                -- use split
   , parse     :: !Bool                -- parse only
   , simplify  :: !Bool                -- use simplifier
+  , alias     :: !Bool                -- eliminate aliases
+  , unifyEq   :: !Bool                -- unify as equals under barrier
 --  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
@@ -154,7 +156,8 @@ runTestFile tflg fn = do
 test :: IO ()
 test = runTestFile tflg verseTest
   where tflg = TestFlags { dfs=False, popl=False, denSem=False, split=True, noInline = False
-                         , parse=False, simplify=False, eval=False, quiet=False, fileNames=[] }
+                         , parse=False, simplify=False, eval=False, quiet=False, fileNames=[]
+                         , alias=False, unifyEq=False }
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -191,6 +194,14 @@ testFlags = TestFlags
       <> help "Use simplifier"
       )
   <*> switch
+      (  long "alias"
+      <> help "Eliminate aliases"
+      )
+  <*> switch
+      (  long "unify-equals"
+      <> help "unify as equals under barrier"
+      )
+  <*> switch
       (  long "eval"
       <> help "Use fast evaluator"
       )
@@ -208,7 +219,8 @@ testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t), fFresh = not (popl t),
-                fDenSem = denSem t, fDfs = dfs t, fFinalInline = not (noInline t) }
+                fDenSem = denSem t, fDfs = dfs t, fFinalInline = not (noInline t),
+                fAlias = alias t, fUnifyEq = unifyEq t}
 main :: IO ()
 main = do
   tflg <- testArgs
@@ -220,7 +232,8 @@ main = do
 
 testArgs :: IO TestFlags
 testArgs = do
-  t <- execParser $ info (testFlags <**> helper)
+  let prf = prefs disambiguate
+  t <- customExecParser prf $ info (testFlags <**> helper)
              ( fullDesc
             <> progDesc "Test Verse rules"
             <> header "tests - testing Verse rules"

@@ -146,6 +146,7 @@ data Op
   | IsInt
   | MapAp
   | Cons
+  | NotFcn
  deriving ( Eq, Ord )
 
 instance Show Value where
@@ -173,6 +174,7 @@ instance Show Op where
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
+  show NotFcn = "notFcn"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -226,17 +228,20 @@ pattern NEQ     = HNF (Op Ne)
 pattern IsINT   = HNF (Op IsInt)
 pattern MAPAP   = HNF (Op MapAp)
 pattern CONS    = HNF (Op Cons)
+pattern NOTFCN  = HNF (Op NotFcn)
 
 --------------------------------------------------------------------------------
 
 type TRSFlags = RuleEnv Expr
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfAlias = False, tfUnifyEq = False }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool
+    , tfAlias       :: !Bool     -- get rid of alias definitions early
+    , tfUnifyEq     :: !Bool     -- treat unify under a barrier as equals
     }
   rec r s e =
     r s e ++
