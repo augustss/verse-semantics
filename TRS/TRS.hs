@@ -127,16 +127,7 @@ traceShow msg x = x
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =
   sequence_
-  [ do print t
-       unless (null n) $
-         putStrLn ("  <--" ++ n ++ "--")
-  | (n,t) <- tr
-  ]
-
-printTrace' :: (Show a) => [(String,a)] -> IO ()
-printTrace' tr =
-  sequence_
-  [ do unless (null n) $ putStrLn ("  ---" ++ n ++ "-->")
+  [ do unless (null n) $ putStrLn ("  --" ++ n ++ "-->")
        print t
   | (n,t) <- reverse tr
   ]
