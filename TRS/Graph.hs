@@ -142,9 +142,7 @@ dag :: Ord a => Graph a -> Graph a
 dag g = removeLoops (mapG rep g) 
  where
   reps  = M.fromList [ (x,r) | xs <- sccs g, let r = minimum xs, x <- xs ]
-  rep x = case M.lookup x reps of
-            Nothing -> x
-            Just r  -> r
+  rep x = M.findWithDefault x x reps
 
 --------------------------------------------------------------------------------
 
