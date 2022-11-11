@@ -3,10 +3,10 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-module TRSCore where
+module TRS.TRSCore where
 
-import TRS
-import Bind
+import TRS.TRS
+import TRS.Bind
 import Test.QuickCheck
 import Data.List( intercalate, union, elemIndex )
 import Data.Maybe

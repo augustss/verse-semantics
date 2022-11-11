@@ -1,11 +1,11 @@
-module TRSGraph where
+module TRS.TRSGraph where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
 
-import TRS
-import Traced
-import Graph
+import TRS.TRS
+import TRS.Traced
+import TRS.Graph
 
 trsGraphFuelTrace :: (Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Graph (Maybe (Traced a))
 trsGraphFuelTrace env fuel rule x = M.fromListWith (++) (go S.empty fuel [start x])

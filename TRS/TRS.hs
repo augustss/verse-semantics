@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-matches #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module TRS where
+module TRS.TRS where
 
 import qualified Data.Set as S
 import Data.List ( intercalate )

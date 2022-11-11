@@ -1,4 +1,4 @@
-module Parse(
+module Parser.Parse(
   parseDie, pFile,
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
@@ -8,7 +8,7 @@ module Parse(
 
 import Control.Monad
 import qualified Control.Monad.State.Strict as S
-import OpParser
+import Parser.OpParser
 import Data.Char ( isSpace, isPrint, isAlpha )
 import Data.Functor
 import Data.List
@@ -23,9 +23,9 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 --import Text.Read (readMaybe)
 
-import Error
-import Expr
-import Print(prettyShow)
+import Parser.Error
+import Parser.Expr
+import Parser.Print(prettyShow)
 
 -- import Debug.Trace
 

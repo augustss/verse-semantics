@@ -1,4 +1,4 @@
-module Testing(main, test) where
+module Parser.Testing(main, test) where
 
 import Control.Exception
 import Control.Monad
@@ -6,13 +6,13 @@ import GHC.Stack
 import Options.Applicative
 import System.Exit
 
-import Expr
-import Flags
-import Parse hiding (many)
-import Core
-import Print (Pretty, prettyShow, pp)
-import Desugar(desugar)
-import Run
+import Parser.Expr
+import Parser.Flags
+import Parser.Parse hiding (many)
+import Parser.Core
+import Parser.Print (Pretty, prettyShow, pp)
+import Parser.Desugar(desugar)
+import Parser.Run
 
 --------------
 

@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-module CoreSimp(simpCore) where
+module Parser.CoreSimp(simpCore) where
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe
-import Expr(Ident(..))
-import Core
-import Eval
-import Print
+import Parser.Expr(Ident(..))
+import Parser.Core
+import Parser.Eval
+import Parser.Print
 --import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.

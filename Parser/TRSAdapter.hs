@@ -1,20 +1,20 @@
-module TRSAdapter(rewrite, coreToTrs) where
+module Parser.TRSAdapter(rewrite, coreToTrs) where
 import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
 import Data.Maybe
-import qualified TRSCore as T
-import qualified Bind as T
-import qualified RulesPOPL
-import qualified RulesPLDI
-import TRS
-import Expr(Ident(..), noLoc)
-import Core
-import Error
-import Flags
+import qualified TRS.TRSCore as T
+import qualified TRS.Bind as T
+import qualified TRS.RulesPOPL as RulesPOPL
+import qualified TRS.RulesPLDI as RulesPLDI
+import TRS.TRS
+import Parser.Expr(Ident(..), noLoc)
+import Parser.Core
+import Parser.Error
+import Parser.Flags
 
 import Debug.Trace
-import Print
+import Parser.Print
 --import Parse (parseDie, pExprSeq)
 --import Desugar (desugar)
 

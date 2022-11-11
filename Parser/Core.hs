@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Core(
+module Parser.Core(
   Core(..),
   pattern CApplyVV, pattern CUnifyVE,
   pattern COne, pattern CAll, pattern CSucceeds,
@@ -31,16 +31,16 @@ import GHC.Stack(HasCallStack)
 import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 -- import Text.Megaparsec.Char(skip)
 
-import Print
-import Expr hiding (compos, composOp)
-import Desugar(primOps, getVisible, covariantId)
-import Error
+import Parser.Print
+import Parser.Expr hiding (compos, composOp)
+import Parser.Desugar(primOps, getVisible, covariantId)
+import Parser.Error
     ( unimplemented, impossible, internalError, internalErrorMsg )
-import Flags
-import SExp
-import Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
-import Desugar(simpleDesugar)
-import Misc(pattern Snoc)
+import Parser.Flags
+import Parser.SExp
+import Parser.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
+import Parser.Desugar(simpleDesugar)
+import Parser.Misc(pattern Snoc)
 --import Debug.Trace
 
 data Core

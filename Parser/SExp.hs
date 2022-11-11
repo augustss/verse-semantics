@@ -1,4 +1,4 @@
-module SExp(
+module Parser.SExp(
   SExp(..),
   pSExp,
   ) where

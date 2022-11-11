@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {- x# LANGUAGE ViewPatterns # -}
 
-module Expr(
+module Parser.Expr(
   Loc, noLoc,
   Ident(..),
   Expr(..),
@@ -23,11 +23,11 @@ import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
 import Data.Scientific(Scientific)
-import Print
+import Parser.Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
-import Error
+import Parser.Error
 
 type Loc = SourcePos
 noLoc :: Loc

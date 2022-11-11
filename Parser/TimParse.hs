@@ -1,8 +1,8 @@
-module TimParse where
+module Parser.TimParse where
 import System.Environment
 
-import Parse
-import Expr
+import Parser.Parse
+import Parser.Expr
 
 data TimTest = TimTest Ident Expr
 

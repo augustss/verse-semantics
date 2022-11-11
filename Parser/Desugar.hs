@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Desugar(desugar, simplify, primOps, getVisible, covariantId, simpleDesugar) where
+module Parser.Desugar(desugar, simplify, primOps, getVisible, covariantId, simpleDesugar) where
 --import Control.Arrow(first, second)
 import Control.Monad.State.Strict
 import Data.List
@@ -10,10 +10,10 @@ import Data.Maybe
 import Debug.Trace
 import GHC.Stack
 
-import Expr
-import Error
-import Print hiding (first, colon)
-import Misc
+import Parser.Expr
+import Parser.Error
+import Parser.Print hiding (first, colon)
+import Parser.Misc
 
 isLiteral :: Expr -> Bool
 isLiteral LitInt{} = True

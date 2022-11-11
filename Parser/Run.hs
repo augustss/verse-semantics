@@ -1,14 +1,14 @@
-module Run(
+module Parser.Run(
   run,
   Flags(..),
   defaultFlags,
   ) where
-import Core(Core)
-import CoreSimp(simpCore)
-import Eval(eval, replacePrelude, EFlags(..))
-import Flags
-import TRSAdapter(rewrite)
-import DenSem(denSem)
+import Parser.Core(Core)
+import Parser.CoreSimp(simpCore)
+import Parser.Eval(eval, replacePrelude, EFlags(..))
+import Parser.Flags
+import Parser.TRSAdapter(rewrite)
+import Parser.DenSem(denSem)
 
 run :: Flags -> Core -> Core
 run f e | fRewrite f = one $ rewrite f e'

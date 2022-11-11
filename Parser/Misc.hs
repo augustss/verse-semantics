@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Misc(
+module Parser.Misc(
   anySame, revTake, revDrop,
   pattern Snoc,
   ) where

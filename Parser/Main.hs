@@ -8,18 +8,18 @@ import Data.Maybe
 import Text.Printf
 import Text.Read(readMaybe)
 
-import Print
-import Desugar
-import Expr
-import Parse(parseDie, pFile)
-import Command
-import Core
-import CoreSimp
-import Eval
-import qualified Testing
-import TRSAdapter
-import Run
-import DenSem
+import Parser.Print
+import Parser.Desugar
+import Parser.Expr
+import Parser.Parse(parseDie, pFile)
+import Parser.Command
+import Parser.Core
+import Parser.CoreSimp
+import Parser.Eval
+import qualified Parser.Testing as Testing
+import Parser.TRSAdapter
+import Parser.Run
+import Parser.DenSem
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do

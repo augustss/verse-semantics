@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module Bind where
+module TRS.Bind where
 
 import Data.List( union, (\\) )
 

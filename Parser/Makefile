@@ -1,4 +1,4 @@
-PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative -i../TRS
+PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative -i..
 FLAGS = -O -Wall --make -DNO_STRUCT_RULES=1
 TESTSFILE=tests.versetest
 .PHONY: clean all test testfast timtests
@@ -9,10 +9,10 @@ verse: *.hs ../TRS/*.hs
 	ghc $(FLAGS) $(PKGS) -outputdir objs-verse Main.hs -o verse
 
 tests: *.hs ../TRS/*.hs
-	ghc $(FLAGS) $(PKGS) -outputdir objs-tests Testing.hs -main-is Testing -o tests
+	ghc $(FLAGS) $(PKGS) -outputdir objs-tests Testing.hs -main-is Parser.Testing -o tests
 
 timparse: *.hs
-	ghc $(FLAGS) $(PKGS)  -outputdir objs-timparse TimParse.hs -main-is TimParse -o timparse
+	ghc $(FLAGS) $(PKGS)  -outputdir objs-timparse TimParse.hs -main-is Parser.TimParse -o timparse
 
 test: tests testfast
 	./tests --quiet                  $(TESTFILE)
@@ -24,7 +24,7 @@ testfast: tests
 	./tests --quiet --dfs            $(TESTFILE)
 	./tests --quiet --dfs --split    $(TESTFILE)
 	./tests --quiet --dfs --simplify $(TESTFILE)
-	./tests --quiet --dfs --popl     $(TESTFILE)
+#	./tests --quiet --dfs --popl     $(TESTFILE)
 	./tests --quiet --eval           $(TESTFILE)
 
 testtricky: tests

@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP #-}
 module Main where
 
-import TRSCore
-import RulesPLDI
-import RulesPOPL
-import TRS
-import TRSGraph
-import Graph
-import Bind
+import TRS.TRSCore
+import TRS.RulesPLDI
+import TRS.RulesPOPL
+import TRS.TRS
+import TRS.TRSGraph
+import TRS.Graph
+import TRS.Bind
 import Test.QuickCheck
 import qualified Data.Map as M
 import Data.List

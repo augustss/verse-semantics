@@ -1,8 +1,4 @@
---
--- Copyright (c) 2005 Lennart Augustsson
--- See LICENSE for licensing details.
---
-module REPL(REPL(..), repl) where
+module Parser.REPL(REPL(..), repl) where
 import Control.Monad.Trans
 import System.Console.Haskeline
 

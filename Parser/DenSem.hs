@@ -3,15 +3,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
-module DenSem where
+module Parser.DenSem where
 import Control.Applicative((<|>))
 import Control.Monad
 import Data.List((\\), intersect)
 import qualified Data.List as L
 import Data.Maybe
-import Expr(Ident(..), noLoc)
-import Core
-import Print(Pretty(..), prettyShow, text)
+import Parser.Expr(Ident(..), noLoc)
+import Parser.Core
+import Parser.Print(Pretty(..), prettyShow, text)
 import GHC.Stack
 
 import Debug.Trace

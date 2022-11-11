@@ -1,4 +1,4 @@
-module Graph where
+module TRS.Graph where
 
 import qualified Data.Map as M
 import Data.Map( Map, (!) )

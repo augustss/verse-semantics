@@ -1,6 +1,6 @@
-module Error(module Error) where
+module Parser.Error(module Parser.Error) where
 import GHC.Stack
-import Print
+import Parser.Print
 
 unimplemented :: (HasCallStack) => String -> a
 unimplemented s = error $ "unimplemented: " ++ s

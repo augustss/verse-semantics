@@ -1,7 +1,7 @@
-module Print(
+module Parser.Print(
   module Text.PrettyPrint.HughesPJ,
   module Text.PrettyPrint.HughesPJClass,
-  module Print,
+  module Parser.Print,
   ) where
 import Text.PrettyPrint.HughesPJ hiding(first)
 import Text.PrettyPrint.HughesPJClass

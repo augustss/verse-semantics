@@ -25,42 +25,45 @@ common shared-properties
 
 common parser-properties
   import: shared-properties
+  hs-source-dirs: ..
   build-depends:  trs
-  other-modules:  Command
-                  Core
-                  CoreSimp
-                  DenSem
-                  Desugar
-                  Error
-                  Eval
-                  Expr
-                  Flags
-                  Misc
-                  OpParser
-                  Parse
-                  Print
-                  REPL
-                  Run
-                  SExp
-                  TRSAdapter
+  other-modules:  Parser.Command
+                  Parser.Core
+                  Parser.CoreSimp
+                  Parser.DenSem
+                  Parser.Desugar
+                  Parser.Error
+                  Parser.Eval
+                  Parser.Expr
+                  Parser.Flags
+                  Parser.Misc
+                  Parser.OpParser
+                  Parser.Parse
+                  Parser.Print
+                  Parser.REPL
+                  Parser.Run
+                  Parser.SExp
+                  Parser.TRSAdapter
 
 library trs
   import: shared-properties
-  hs-source-dirs: ../TRS
-  exposed-modules: Bind
-                   TRS
-                   TRSCore
-                   Show
-                   RulesPOPL
-                   RulesPLDI
+  hs-source-dirs: ..
+  exposed-modules: TRS.Bind
+                   TRS.TRS
+                   TRS.TRSCore
+                   TRS.Show
+                   TRS.RulesPOPL
+                   TRS.RulesPLDI
 
 executable verse
+  hs-source-dirs: .
   import: parser-properties
   main-is:        Main.hs
-  other-modules:  Testing
+  other-modules:  Parser.Testing
 
 test-suite tests
+  hs-source-dirs: ..
   import: parser-properties
   type: exitcode-stdio-1.0
   main-is: Testing.hs
-  ghc-options: -main-is Testing
+  ghc-options: -main-is Parser.Testing

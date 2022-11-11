@@ -1,4 +1,4 @@
-module Traced where
+module TRS.Traced where
 
 data Traced a = a :<-- [(String,a)]
 
