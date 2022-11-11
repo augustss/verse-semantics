@@ -25,7 +25,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import Parser.Error
 import Parser.Expr
-import Parser.Print(prettyShow)
+import Epic.Print(prettyShow)
 
 -- import Debug.Trace
 

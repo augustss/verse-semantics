@@ -1,6 +1,6 @@
 module Parser.Error(module Parser.Error) where
 import GHC.Stack
-import Parser.Print
+import Epic.Print
 
 unimplemented :: (HasCallStack) => String -> a
 unimplemented s = error $ "unimplemented: " ++ s

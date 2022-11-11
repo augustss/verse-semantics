@@ -11,7 +11,7 @@ import qualified Data.List as L
 import Data.Maybe
 import Parser.Expr(Ident(..), noLoc)
 import Parser.Core
-import Parser.Print(Pretty(..), prettyShow, text)
+import Epic.Print(Pretty(..), prettyShow, text)
 import GHC.Stack
 
 import Debug.Trace

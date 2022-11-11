@@ -12,7 +12,7 @@ import GHC.Stack
 
 import Parser.Expr
 import Parser.Error
-import Parser.Print hiding (first, colon)
+import Epic.Print hiding (colon)
 import Parser.Misc
 
 isLiteral :: Expr -> Bool

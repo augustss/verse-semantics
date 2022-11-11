@@ -10,7 +10,7 @@ import Parser.Expr
 import Parser.Flags
 import Parser.Parse hiding (many)
 import Parser.Core
-import Parser.Print (Pretty, prettyShow, pp)
+import Epic.Print (Pretty, prettyShow, pp)
 import Parser.Desugar(desugar)
 import Parser.Run
 

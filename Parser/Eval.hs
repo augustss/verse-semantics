@@ -16,7 +16,7 @@ import Debug.Trace
 import Parser.Expr(Ident(..), noLoc)
 import Parser.Core
 import Parser.Error
-import Parser.Print hiding (float)
+import Epic.Print hiding (float)
 import Parser.Misc
 
 pattern CUnOp :: String -> Value -> Core

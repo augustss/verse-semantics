@@ -31,7 +31,7 @@ import GHC.Stack(HasCallStack)
 import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 -- import Text.Megaparsec.Char(skip)
 
-import Parser.Print
+import Epic.Print
 import Parser.Expr hiding (compos, composOp)
 import Parser.Desugar(primOps, getVisible, covariantId)
 import Parser.Error
@@ -392,7 +392,7 @@ instance Pretty Core where
   pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
-    maybeParens (p > 0) $ fsep [text "def" <+> commaSep l 0 is <+> text "in", pPrintPrec l 0 e]
+    maybeParens (p > 0) $ fsep [text "def" <+> commaSep l is <+> text "in", pPrintPrec l 0 e]
   pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
   pPrintPrec l _ (CSplit e f g) =
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
@@ -412,7 +412,7 @@ instance Pretty HNF where
   pPrintPrec _ _ (HRat _) = undefined -- pPrintPrec l p r
   pPrintPrec _ _ (HPrim s) = text s
   pPrintPrec l _ (HArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
-  pPrintPrec l _ (HArray vs) = parens $ commaSep l 0 vs
+  pPrintPrec l _ (HArray vs) = parens $ commaSep l vs
   pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
 
 ------

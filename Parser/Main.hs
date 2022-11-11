@@ -8,7 +8,7 @@ import Data.Maybe
 import Text.Printf
 import Text.Read(readMaybe)
 
-import Parser.Print
+import Epic.Print
 import Parser.Desugar
 import Parser.Expr
 import Parser.Parse(parseDie, pFile)

@@ -7,7 +7,7 @@ import Data.Maybe
 import Parser.Expr(Ident(..))
 import Parser.Core
 import Parser.Eval
-import Parser.Print
+import Epic.Print
 --import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.

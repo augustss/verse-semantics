@@ -14,7 +14,7 @@ import Parser.Error
 import Parser.Flags
 
 import Debug.Trace
-import Parser.Print
+import Epic.Print
 --import Parse (parseDie, pExprSeq)
 --import Desugar (desugar)
 

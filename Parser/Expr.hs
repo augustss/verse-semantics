@@ -23,7 +23,7 @@ import Data.Data (Data)
 import Data.Maybe
 import Data.Ratio
 import Data.Scientific(Scientific)
-import Parser.Print
+import Epic.Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
@@ -128,7 +128,7 @@ instance Pretty Expr where
       ppA e = ppr 0 e
       ppB (Block es) = braces $ ppSeq l es
       ppB e = braces (ppr 0 e)
-      ppEs = commaSep l 1
+      ppEs = fsep . punctuate comma . map (pPrintPrec l 1)
       ppEffs rs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
@@ -154,7 +154,7 @@ instance Pretty Expr where
             where (q, ql, _) = fixity "()"
           ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
             where (q, ql, _) = fixity "()"
-          ApplyEff rs e -> text "effects" <> parens (commaSep l 0 rs) <> ppB e
+          ApplyEff rs e -> text "effects" <> parens (commaSep l rs) <> ppB e
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
