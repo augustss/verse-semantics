@@ -8,7 +8,7 @@ module Parser.Parse(
 
 import Control.Monad
 import qualified Control.Monad.State.Strict as S
-import Parser.OpParser
+import Epic.OpParser
 import Data.Char ( isSpace, isPrint, isAlpha )
 import Data.Functor
 import Data.List

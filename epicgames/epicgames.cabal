@@ -17,6 +17,7 @@ library
         Epic.Applicative
         Epic.Lens
         Epic.Print
+        Epic.OpParser
         Epic.ShowRational
         Epic.SIntMap
         Epic.SIntSet

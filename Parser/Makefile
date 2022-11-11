@@ -1,4 +1,4 @@
-PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative -i..
+PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative -i.. -i../epicgames/src
 FLAGS = -O -Wall --make -DNO_STRUCT_RULES=1
 TESTSFILE=tests.versetest
 .PHONY: clean all test testfast timtests

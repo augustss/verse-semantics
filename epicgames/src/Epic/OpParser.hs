@@ -11,7 +11,7 @@
 -- of operators.
 --
 -- @since 1.0.0
-module Parser.OpParser
+module Epic.OpParser
   ( Operator (..),
     makeExprParser,
   )
