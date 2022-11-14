@@ -321,7 +321,7 @@ The verification is about Core Verse, as described in \cref{fig:syntax}.
 
 \section{Judgements}
 The basic judgements are about what can happen when a Verse expression is evaluated.
-The outcomes we have judhements for are:
+The outcomes we have judgements for are:
 \begin{itemize}
 \item \textit{succeeds}, meaning that the evaluation of the expression will produce exactly one result.
 \item \textit{fails}, meaning that the evaluation of the expression will produce no results.
@@ -336,7 +336,7 @@ The goal of the verifier is to verify that for a program |p| we can deduce \jwel
 
 \subsection{Assumptions}
 The assumptions are of the forms \asucceeds{|a|}, \afails{|a|}, \adecides{|a|}, and \aexists{|x|}.
-The assumptions are ordered and later assumtions may depend on earlier ones.
+The assumptions are ordered and later assumptions may depend on earlier ones.
 
 Formally,
 $$
@@ -396,7 +396,7 @@ Some examples
   \inferrule
   { \jwellformed{\Gamma}{|e_1|} \quad \jwellformed{\Gamma}{|e_2|} }
   { \jwellformed{\Gamma}{|e_1 == e_2|} }
-  { \rulename{w-seq} }
+  { \rulename{w-eq} }
 
   \inferrule
   { \jwellformed{\Gamma,\aexists{x}}{|e|} }
@@ -459,7 +459,7 @@ Some examples
   \inferrule
   { \jsucceeds{\Gamma}{|e_1|} \quad \jsucceeds{\Gamma}{|e_2|} \quad ??? }
   { \jsucceeds{\Gamma}{|e_1 == e_2|} }
-  { \rulename{s-seq} }
+  { \rulename{s-eq} }
 
   \inferrule
   { \jsucceeds{\Gamma,\aexists{x}}{|e|} }
