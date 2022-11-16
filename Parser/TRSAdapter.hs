@@ -15,8 +15,6 @@ import Parser.Flags
 
 import Debug.Trace
 import Epic.Print
---import Parse (parseDie, pExprSeq)
---import Desugar (desugar)
 
 rewrite :: Flags -> Core -> [Core]
 rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
@@ -56,7 +54,7 @@ sub flg | fFinalInline flg && fFresh flg = RulesPLDI.finalSubst
 
 rules :: Flags -> RulesPOPL.ERule
 rules flg
-  | fFresh flg = RulesPLDI.rulesPLDI
+  | fFresh flg = RulesPLDI.rulesPLDI -- <> RulesPLDI.rulesStructural
   | otherwise  = RulesPOPL.rulesPOPL
 
 coreToTrs :: Core -> T.Expr

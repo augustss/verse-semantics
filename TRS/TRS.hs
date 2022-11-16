@@ -81,6 +81,8 @@ showReductionTrace sh xs = msg
     msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
     pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
 
+normalFormFuelTrace
+
 
 type Trace a = [(String, a)]
 
