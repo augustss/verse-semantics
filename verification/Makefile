@@ -12,7 +12,7 @@ PAPERTEX = $(PAPER).tex rewrites.tex
 PAPERSRC = $(PAPERTEX) ../verse.bib ../calculus.fmt
 
 rewrites.tex: ../verse-pldi23/rewrites.ltx
-	lhs2tex ../verse-pldi23/rewrites.ltx > rewrites.tex
+	lhs2TeX ../verse-pldi23/rewrites.ltx > rewrites.tex
 
 $(PAPER).tex: $(PAPER).ltx
 
