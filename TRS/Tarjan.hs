@@ -48,7 +48,7 @@ tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
         (vindex, vlowlink) = state ! v
 
 -----------------------------------------------------------------------------------
--- Grrr...
+-- Grrr... I wish these were standard functions. like takeWhile/dropWhile, but 1 step more
 
 takeUntil p []                 = []
 takeUntil p (x:xs) | p x       = [x]
