@@ -14,7 +14,7 @@ import Control.Monad( unless )
 type Rule a = RuleEnv a -> a -> [(String, a)]
 
 -- This is used to give rules names.
-infix 6 `name`   -- must bind tighter than ++
+infix 7 `name`   -- must bind tighter than ++
 name :: String -> [a] -> [(String, a)]
 name s as = [(s,a) | a <- as]
 
