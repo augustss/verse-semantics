@@ -20,15 +20,8 @@ prop_Confluence sys p =
     trs@(_:_:_) ->
       whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
-                       putStr $ unlines $ reverse $
-                         [ show t ] ++
-                         concat
-                         [ [ "  --" ++ n ++ "-->"
-                           , show t
-                           ]
-                         | (n,t) <- tr
-                         ]
-                  | (t :<-- tr,i) <- trs `zip` [1..]
+                       putStr $ unlines $ showTrace ttr
+                  | (ttr,i) <- trs `zip` [1..]
                   ]) False
     
     _ -> property True

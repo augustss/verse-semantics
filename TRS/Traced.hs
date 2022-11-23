@@ -11,6 +11,7 @@ trace (_ :<-- tr) = tr
 start :: a -> Traced a
 start x = x :<-- []
 
+-- should get deprecated because the old trace format is no good
 toList :: Traced a -> [(String,a)]
 toList (x :<-- [])         = [("",x)]
 toList (x :<-- ((n,y):tr)) = (n,x) : toList (y :<-- tr)
@@ -24,4 +25,11 @@ instance Eq a => Eq (Traced a) where
 
 instance Ord a => Ord (Traced a) where
   (x :<-- _) `compare` (y :<-- _) = x `compare` y
-  
+
+showTrace, showRevTrace :: Show a => Traced a -> [String]
+showTrace (x :<-- tr) =
+  reverse (show x : concat [ ["  --"++n++"-->", show y] | (n,y) <- tr ])
+
+showRevTrace (x :<-- tr) =
+  show x : concat [ ["  <--"++n++"--", show y] | (n,y) <- tr ]
+
