@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Tarjan where
+module TRS.Tarjan where
 
 import qualified Data.Map as M
 import Data.Map( Map, (!) )

@@ -11,6 +11,8 @@ import Test.QuickCheck
 import Data.List( intercalate, union, elemIndex )
 import Data.Maybe
 
+#define NO_STRUCT_RULES 1
+
 --------------------------------------------------------------------------------
 
 data Expr
