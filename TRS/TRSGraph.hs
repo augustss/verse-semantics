@@ -70,9 +70,9 @@ trsGraphFuelTrace' env fuel rule x = M.fromListWith (++) (go S.empty fuel [] [st
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
 
 normalFormsFuelTraceWithGraph :: (Show a, Ord a, Rec a)
-                              => RuleEnv a -> Int -> Rule a -> a -> [[(String,a)]]
+                              => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
 normalFormsFuelTraceWithGraph env fuel rule t =
-  [ toList tx
+  [ tx
   | Just tx <- leaves (dag (trsGraphFuelTrace env fuel rule t))
   ]
 

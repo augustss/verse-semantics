@@ -24,4 +24,4 @@ instance Eq a => Eq (Traced a) where
 
 instance Ord a => Ord (Traced a) where
   (x :<-- _) `compare` (y :<-- _) = x `compare` y
-
+  
