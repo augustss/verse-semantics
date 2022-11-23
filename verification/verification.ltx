@@ -467,12 +467,12 @@ Some examples
   { \rulename{s-exists} }
 
   \inferrule
-  { \jsucceeds{\Gamma}{|e_1|} }
+  { \jsucceeds{\Gamma}{|e_1|} \quad \jfails{\Gamma}{|e_2|}}
   { \jsucceeds{\Gamma}{|e_1 `choice` e_2|} }
   { \rulename{s-choice-l} }
 
   \inferrule
-  { \jsucceeds{\Gamma}{|e_2|} }
+  { \jfails{\Gamma}{|e_1|} \quad \jsucceeds{\Gamma}{|e_2|} }
   { \jsucceeds{\Gamma}{|e_1 `choice` e_2|} }
   { \rulename{s-choice-r} }
 
