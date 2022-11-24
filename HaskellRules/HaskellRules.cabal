@@ -1,0 +1,133 @@
+cabal-version:      2.4
+name:               HaskellRules
+version:            0.1.0.0
+synopsis:           Verse Rule testing
+description:        Programs for automated and interactive tests of Core Verse rewrite systems.
+copyright:          Epic Games 2022
+
+extra-source-files: CHANGELOG.md
+
+common shared-properties
+    default-language: Haskell2010
+    build-depends:    base,
+                      containers,
+                      mtl,
+                      pretty,
+--                      QuickCheck
+
+-- Various utilities.
+-- Should really have its own cabal project
+library epic
+    import:           shared-properties
+    exposed-modules:  Epic.Applicative
+--                      Epic.Lens
+                      Epic.Print
+                      Epic.OpParser
+                      Epic.ShowRational
+                      Epic.SIntMap
+                      Epic.SIntSet
+                      Epic.Uniplate
+    build-depends:
+                      parser-combinators,
+--                      lens,
+                      text,
+                      uniplate,
+    hs-source-dirs:   epic
+
+--library densem
+--    import:           shared-properties
+--    build-depends:    epic,
+--    exposed-modules:  DenSem.DenSem
+--    hs-source-dirs:   densem
+
+library trs
+    import:           shared-properties
+    exposed-modules:  TRS.Bind
+                      TRS.Graph
+                      TRS.TRS
+                      TRS.TRSGraph
+                      TRS.Traced
+    hs-source-dirs:   trs
+
+library rules
+    import:           shared-properties
+    build-depends:    trs,
+                      QuickCheck
+    exposed-modules:  Rules.RulesPLDI
+                      Rules.RulesPOPL
+		      Rules.TRSCore
+    hs-source-dirs:   rules
+
+library frontend
+    import:           shared-properties
+    build-depends:    epic,
+                      rules,
+                      trs,
+                      megaparsec,
+                      scientific,
+    exposed-modules:
+                      FrontEnd.Core
+                      FrontEnd.CoreSimp
+                      FrontEnd.Error
+                      FrontEnd.Eval
+                      FrontEnd.Expr
+                      FrontEnd.Flags
+                      FrontEnd.Desugar
+                      FrontEnd.Parse
+                      FrontEnd.Run
+                      FrontEnd.TRSAdapter
+
+    other-modules:    FrontEnd.Misc
+
+    hs-source-dirs:   .
+
+executable verse
+    import:           shared-properties
+    build-depends:    epic,
+--                      densem,
+                      frontend,
+                      haskeline,
+
+    main-is:          Main.hs
+
+    other-modules:    VerseRepl.Command
+                      VerseRepl.REPL
+
+    hs-source-dirs:   verse
+    default-language: Haskell2010
+
+executable tester
+    import:           shared-properties
+    build-depends:    epic,
+--                      densem,
+                      frontend,
+                      optparse-applicative,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   tester
+    default-language: Haskell2010
+
+executable timtest
+    import:           shared-properties
+    build-depends:    epic,
+                      frontend,
+                      optparse-applicative,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   timtest
+    default-language: Haskell2010
+
+executable qctest
+    import:           shared-properties
+    build-depends:    epic,
+    		      rules,
+                      trs,
+                      optparse-applicative,
+                      QuickCheck,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   qctest
+    default-language: Haskell2010
