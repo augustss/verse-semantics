@@ -44,6 +44,7 @@ library trs
     import:           shared-properties
     exposed-modules:  TRS.Bind
                       TRS.Graph
+		      TRS.System
                       TRS.TRS
                       TRS.TRSGraph
                       TRS.Traced
@@ -53,9 +54,9 @@ library rules
     import:           shared-properties
     build-depends:    trs,
                       QuickCheck
-    exposed-modules:  Rules.RulesPLDI
-                      Rules.RulesPOPL
-		      Rules.TRSCore
+    exposed-modules:  Rules.PLDI
+                      Rules.POPL
+                      Rules.Core
     hs-source-dirs:   rules
 
 library frontend
@@ -122,7 +123,7 @@ executable timtest
 executable qctest
     import:           shared-properties
     build-depends:    epic,
-    		      rules,
+                      rules,
                       trs,
                       optparse-applicative,
                       QuickCheck,

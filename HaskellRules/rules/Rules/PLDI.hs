@@ -1,13 +1,14 @@
-{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
+{- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.RulesPLDI(rulesPLDI, rulesStructural, dsFreshFP, finalSubst, canon) where
+module Rules.PLDI(systemPLDI, finalSubst) where
 
 -- #define NO_STRUCT_RULES 1
 
-import TRS.TRS
 import TRS.Bind
-import Rules.TRSCore
+import TRS.System
+import TRS.TRS
+import Rules.Core
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe
@@ -22,6 +23,20 @@ import Data.Maybe
 #define USE_CORRECT_WF 1
 -- Use ELIM-DEF-DEAD, a weak substitute for structural rules
 #define USE_ELIM_DEF_DEAD NO_STRUCT_RULES
+
+--------------------------------------------------------------------------------
+
+systemPLDI :: ESystem
+systemPLDI = TRSystem
+  { sname               = "PLDI"
+  , description         = "PLDI submission"
+  , preProcess          = dsFreshFP
+  , rules               = allRules
+  , rulesHaveStructural = False
+  , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  }
+
+--------------------------------------------------------------------------------
 
 implies :: Bool -> Bool -> Bool
 b1 `implies` b2 = b1 <= b2
@@ -54,13 +69,11 @@ isChoiceFreeOp _ = True
 --------------------------------------------------------------------------------
 -- contexts
 
-type Context = Expr -> Expr
-
 -- scope contexts
 
 -- choice contexts
 
-choiceX, choiceX1 :: Expr -> [(Context, Expr)]
+choiceX, choiceX1 :: Expr -> [(EContext, Expr)]
 -- CX context
 choiceX lhs = choiceX1 lhs ++ [(id,lhs)]
 -- CX context, CX /= hole
@@ -89,7 +102,7 @@ choiceX1 lhs =
 
 -- scope contexts
 -- SX context
-scopeX :: Expr -> [(Context, Expr)]
+scopeX :: Expr -> [(EContext, Expr)]
 scopeX lhs =
   do hole :|: e <- [lhs]
      pure ((:|: e), hole)
@@ -108,23 +121,21 @@ scopeX lhs =
 
 --------------------------------------------------------------------------------
 
-type ERule = Rule Expr
-
---------------------------------------------------------------------------------
-
+{-
 before :: Rule a -> Rule a -> Rule a
 before r1 r2 s lhs =
   case r1 s lhs of
     [] -> r2 s lhs
     cs -> cs
 
-rulesPLDI :: ERule
-rulesPLDI s | tfAlias s = (rulesAlias `before` rulesPLDI') s
-            | otherwise = rulesPLDI' s
+rulesAll :: ERule
+rulesAll s | tfAlias s = (rulesAlias `before` rulesPLDI') s
+           | otherwise = rulesPLDI' s
+-}
 
-rulesPLDI' :: ERule
-rulesPLDI' =
-     rulesPrimOps                      -- standard POPL rules
+allRules :: ERule
+allRules =
+     rulesPrimOps
   <> rulesUnificationFP
   <> rulesApplication
   <> rulesGarbageCollection
@@ -162,7 +173,7 @@ rulesAlias _ lhs =
      pure (NOTFCN :@: Var x)
 
 
-aliasX :: Ident -> Expr -> [(Context, Ident)]
+aliasX :: Ident -> Expr -> [(EContext, Ident)]
 aliasX x lhs =
   do DEF y e <- [lhs]
      guard (x /= y)
@@ -171,7 +182,7 @@ aliasX x lhs =
   ++
   aliasX' x lhs
 
-aliasX' :: Ident -> Expr -> [(Context, Ident)]
+aliasX' :: Ident -> Expr -> [(EContext, Ident)]
 aliasX' x lhs =
   do (VAR y :=: VAR z) :>: e <- [lhs]
      guard (x == y)

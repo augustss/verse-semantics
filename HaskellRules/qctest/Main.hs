@@ -1,13 +1,14 @@
 {-# LANGUAGE CPP #-}
 module Main where
 
-import Rules.TRSCore
-import Rules.RulesPLDI
-import Rules.RulesPOPL
+import Rules.Core
+import Rules.PLDI
+import Rules.POPL
+import TRS.Bind
+import TRS.Graph
 import TRS.TRS
 import TRS.TRSGraph
-import TRS.Graph
-import TRS.Bind
+import TRS.System
 import TRS.Traced(toList)
 import Test.QuickCheck
 import qualified Data.Map as M
@@ -31,8 +32,8 @@ ex2 = ARR [] :=: (VAR x :=: INT 3)
 main = do
   args <- getArgs
   let qcargs = stdArgs{ maxSuccess = 10000 }
-      rules = if null args then rulesPLDI else rulesPOPL
-  quickCheckWith qcargs (prop_NormalForms2 rules)
+      sys = if null args then systemPLDI else systemPOPL
+  quickCheckWith qcargs (prop_NormalForms2 sys)
 
 #if NO_STRUCT_RULES
 -- After reduction, canonicalize results.
@@ -43,9 +44,10 @@ final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, canon a) :
 final = id
 #endif
 
-prop_NormalForms rules p =
+{-
+prop_NormalForms sys p =
   --trace (show p) $
-  let trs = final $ map toList $ normalFormsFuelTrace defaultTRSFlags 99 rules p in
+  let trs = final $ map toList $ normalFormsFuelTrace defaultTRSFlags 99 (rules sys) p in
     case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
         whenFail (do putStrLn "===trace:1==="
@@ -55,8 +57,9 @@ prop_NormalForms rules p =
 
       [] -> whenFail (print "DOES NOT TERMINATE") True
       _  -> property True
+-}
 
-prop_NormalForms2 rules p =
+prop_NormalForms2 sys p =
   case map toList $ normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p of
     trs@(_:_:_) ->
       whenFail (sequence_ [ do putStrLn ("===trace:" ++ show i ++ "===")
@@ -67,7 +70,7 @@ prop_NormalForms2 rules p =
     [] -> whenFail (print "DOES NOT TERMINATE") True
     _  -> property True
  where
-  rules' env t = rules env t ++ rulesStructural env t
+  rules' env t = rules sys env t -- ++ rulesStructural env t
 
 --------------------------------------------------------------------
 -- Stuff to help debug rewrite rules in GHCi

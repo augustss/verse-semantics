@@ -4,10 +4,12 @@ import Data.Function(on)
 import Data.List(nubBy)
 import Data.Maybe
 import qualified TRS.Bind as T
-import qualified Rules.TRSCore as T
-import qualified Rules.RulesPOPL as RulesPOPL
-import qualified Rules.RulesPLDI as RulesPLDI
+import qualified Rules.Core as T
+import Rules.Core(ERule)
+import Rules.POPL
+import Rules.PLDI
 import TRS.TRS
+import TRS.System(preProcess, rules)
 import TRS.Traced(Traced, term, toList, showTrace)
 import FrontEnd.Expr(Ident(..), noLoc)
 import FrontEnd.Core
@@ -18,7 +20,7 @@ import Debug.Trace
 import Epic.Print
 
 rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (rules flg) . ds flg . coreToTrs
+rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (ruls flg) . ds flg . coreToTrs
  where
   trsFlags       = T.TRSFlags { T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
   n              = fRewriteSteps flg
@@ -43,25 +45,25 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
 
 ds :: Flags -> T.Expr -> T.Expr
 ds flg
-  | fFresh flg = RulesPLDI.dsFreshFP
+  | fFresh flg = preProcess systemPLDI
   | otherwise  = id
 
 subs :: Flags -> [Trace T.Expr] -> [Trace T.Expr]
 subs flg ts
   | fFinalInline flg && fFresh flg =
-    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = RulesPLDI.finalSubst e]
+    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = finalSubst e]
         ts'' = nubBy ((==) `on` fst) ts'
     in  map snd ts''
   | otherwise  = ts
 
 sub :: Flags -> T.Expr -> T.Expr
-sub flg | fFinalInline flg && fFresh flg = RulesPLDI.finalSubst
+sub flg | fFinalInline flg && fFresh flg = finalSubst
         | otherwise = id
 
-rules :: Flags -> RulesPOPL.ERule
-rules flg
-  | fFresh flg = RulesPLDI.rulesPLDI -- <> RulesPLDI.rulesStructural
-  | otherwise  = RulesPOPL.rulesPOPL
+ruls :: Flags -> ERule
+ruls flg
+  | fFresh flg = rules systemPLDI -- <> RulesPLDI.rulesStructural
+  | otherwise  = rules systemPOPL
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)

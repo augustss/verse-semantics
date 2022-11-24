@@ -3,13 +3,33 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.TRSCore where
+module Rules.Core(
+  Expr(..), Value(..), HNF(..), Op(..),
+  TRSFlags, RuleEnv(..), defaultTRSFlags,
+  ERule,
+  EContext,
+  ESystem,
+  pattern VAR, pattern INT, pattern ARR, pattern LAM, pattern EHNF, pattern OP,
+  pattern HVAL, pattern SCL, pattern VHNF,
+  pattern VINT, pattern VARR, pattern VLAM, pattern VOP,
+  pattern ADD, pattern SUB, pattern MUL, pattern DIV, pattern NEG,
+  pattern GRT, pattern GRE, pattern LST, pattern LSE, pattern NEQ,
+  pattern IsINT, pattern MAPAP, pattern CONS, pattern NOTFCN,
+  pattern PLUS,
+  pattern DEF,
+  subst,
+  ) where
 
-import TRS.TRS
 import TRS.Bind
+import TRS.System
+import TRS.TRS
 import Test.QuickCheck
 import Data.List( intercalate, union, elemIndex )
 import Data.Maybe
+
+type ERule = Rule Expr
+type EContext = Expr -> Expr
+type ESystem = TRSystem Expr
 
 #define NO_STRUCT_RULES 1
 

@@ -1,15 +1,42 @@
-{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
+{- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.RulesPOPL(rulesPOPL, ERule) where
+module Rules.POPL(systemPOPL, systemPOPLV) where
 
-import TRS.TRS
 import TRS.Bind
-import Rules.TRSCore
+import TRS.System
+import TRS.TRS
+import Rules.Core
 import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
+
+systemPOPL :: ESystem
+systemPOPL = TRSystem
+  { sname               = "POPL"
+  , description         = "POPL submission"
+  , preProcess          = anfArrays
+  , rules               = allRules
+  , rulesHaveStructural = False
+  , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  }
+
+systemPOPLV :: ESystem
+systemPOPLV = TRSystem
+  { sname               = "POPLE"
+  , description         = "POPL submission + DEF-ELIMV"
+  , preProcess          = anfArrays
+  , rules               = allRules <> rulesElimV
+  , rulesHaveStructural = False
+  , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  }
+
+anfArrays :: Expr -> Expr
+anfArrays = id -- XXX
+
+--------------------------------------------------------------------------------
+
 -- sub-categories of expressions
 
 isChoiceFree :: Expr -> Bool
@@ -127,10 +154,8 @@ valueX1 lhs =
 
 --------------------------------------------------------------------------------
 
-type ERule = Rule Expr
-
-rulesPOPL :: ERule
-rulesPOPL = rulesPrimOps
+allRules :: ERule
+allRules = rulesPrimOps
          <> rulesApplication
          <> rulesUnification
          <> rulesUnificationVariables
@@ -347,14 +372,6 @@ rulesUnificationVariables _ lhs =
      guard (x `notElem` freeV)
      pure (ctx (Val v))
  ++
-  "DEF-ELIMV" `name`
-  do Def (Bind x a) <- [lhs]
-     (ctx, VAR y :=: VAR x') <- defX x a
-     guard (x == x')
-     guard (x /= y)
-     guard (y `elem` free a)
-     pure (subst [(x, Var y)] (ctx (VAR y)))
- ++
   "SWAP" `name`
   do Val (HNF hnf) :=: VAR x <- [lhs]
      pure (VAR x :=: Val (HNF hnf))
@@ -368,6 +385,16 @@ rulesUnificationVariables _ lhs =
        else pure (Def (Bind x (ctx e)))
  where
   blob = Fail -- just something to plug the hole in the context so we can look at it
+
+rulesElimV :: ERule
+rulesElimV _ lhs =
+  "DEF-ELIMV" `name`
+  do Def (Bind x a) <- [lhs]
+     (ctx, VAR y :=: VAR x') <- defX x a
+     guard (x == x')
+     guard (x /= y)
+     guard (y `elem` free a)
+     pure (subst [(x, Var y)] (ctx (VAR y)))
 
 --------------------------------------------------------------------------------
 

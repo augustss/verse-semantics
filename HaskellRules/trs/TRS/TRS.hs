@@ -1,6 +1,8 @@
-{-# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-matches #-}
-{-# LANGUAGE TypeFamilies #-}
+{- x# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-matches # -}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module TRS.TRS where
 
 import TRS.Traced
@@ -13,6 +15,10 @@ import Control.Monad( unless )
 --------------------------------------------------------------------------------
 
 type Rule a = RuleEnv a -> a -> [(String, a)]
+
+
+instance Show (Rule t) where
+  show _ = "<<Rule>>"
 
 -- This is used to give rules names.
 infix 7 `name`   -- must bind tighter than ++
