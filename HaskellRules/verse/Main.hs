@@ -20,6 +20,9 @@ import FrontEnd.Eval
 import FrontEnd.TRSAdapter
 import FrontEnd.Run
 --import DenSem.DenSem
+import Rules.Systems
+import Rules.Core(ESystem)
+import TRS.System
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -44,7 +47,9 @@ data CState = CState
   , definitions :: ![Expr]
   , prelude     :: !(Maybe Expr)
   , flags       :: !Flags
+  , esystem     :: !ESystem
   }
+
 
 data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
 
@@ -91,19 +96,20 @@ command = Command
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
       , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
-      , Cmd "compile [EXPR]"       "Generate core for [last] expression"   cCompile
+--      , Cmd "compile [EXPR]"       "Generate core for [last] expression"   cCompile
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-      , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with accurate rules"           cRewrite
+      , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with selected rules"           cRewrite
 --      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
-      , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
-      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
-      , Cmd "clear"                "Clear global defs"                     cClear
-      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
-      , Cmd "display"              "Show current global defs"              cDisplay
-      , Cmd "prelude"              "Load prelude.verse"                    cPrelude
+--      , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
+--      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
+--      , Cmd "clear"                "Clear global defs"                     cClear
+--      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
+--      , Cmd "display"              "Show current global defs"              cDisplay
+--      , Cmd "prelude"              "Load prelude.verse"                    cPrelude
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
+      , Cmd "rules [NAME]"         "Select rule system"                    cRules
       , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       ]
   , c_exec = cParseLine
@@ -112,9 +118,14 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags }
+                     , prelude = Nothing, flags = defaultFlags, esystem = dummySystem }
   , c_history = Just ".versei"
   }
+
+dummySystem :: ESystem
+dummySystem = TRSystem { sname = "none", description = "no rule system selected",
+  preProcess = id, rules = noRules, rulesHaveStructural = False, confluenceRules = noRules }
+  where noRules = error "No rule system selected"
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
 updateLastExpr s e = pure s{ lastExpr = e }
@@ -142,12 +153,12 @@ flagTable =
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
 --  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
-  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
+--  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
-  ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
-  ,("alias",       (fAlias,        \ b s -> s{fAlias=b}))
-  ,("unify-equal", (fUnifyEq,      \ b s -> s{fUnifyEq=b}))
+--  ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
+--  ,("alias",       (fAlias,        \ b s -> s{fAlias=b}))
+--  ,("unify-equal", (fUnifyEq,      \ b s -> s{fUnifyEq=b}))
   ]
 
 cRead :: Run CState
@@ -222,6 +233,13 @@ cParseCore line s =
     pp prog
     pure prog
 
+cRules :: Run CState
+cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s
+cRules line s =
+  case lookupSystem line of
+    Left msg -> do putStrLn msg; pure s
+    Right e -> do putStrLn $ "Selected: " ++ description e; pure s{ esystem = e }
+
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
@@ -283,5 +301,10 @@ helpMsg = "\
 \  > :desugar\n\
 \  > :show\n\
 \  > :eval\n\
+\\n\
+\Available rule systems:\n\
+\" ++
+  concat [printf "%-10s - %s\n" (sname e) (description e) | e <- allSystems ]
+  ++ "\n\
 \Commands (can be abbreviated):\
 \"

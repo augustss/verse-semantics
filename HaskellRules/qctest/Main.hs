@@ -1,182 +1,81 @@
-{-# LANGUAGE CPP #-}
 module Main where
 
 import Rules.Core
-import Rules.PLDI
-import Rules.POPL
-import TRS.Bind
-import TRS.Graph
-import TRS.TRS
-import TRS.TRSGraph
+import Rules.POPL( systemPOPL )
+import Rules.Systems
+import TRS.TRS( step, normalFormsFuelTrace, nub )
+import TRS.TRSGraph( normalFormsFuelTraceWithGraph )
+import TRS.Tarjan
+import TRS.Traced
 import TRS.System
-import TRS.Traced(toList)
 import Test.QuickCheck
-import qualified Data.Map as M
-import Data.List
-import Data.Function
-import System.Environment
---import Debug.Trace
+import Options.Applicative
 
 --------------------------------------------------------------------------------
 
-x = ident "x"
-y = ident "y"
-z = ident "z"
-
-ex1 :: Expr
-ex1 = ARR [] :=: ((GRT :@: VARR [VINT 2, Var x]) :=: INT 3)
-ex2 = ARR [] :=: (VAR x :=: INT 3)
-
---------------------------------------------------------------------------------
-
+main :: IO ()
 main = do
-  args <- getArgs
-  let qcargs = stdArgs{ maxSuccess = 10000 }
-      sys = if null args then systemPLDI else systemPOPL
-  quickCheckWith qcargs (prop_NormalForms2 sys)
+  flags <- testArgs
+  let sys =
+        case lookupSystem (rulesys flags) of
+          Left msg -> error msg
+          Right s -> s
+      qcargs = stdArgs{ maxSuccess = numtests flags }
+  putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
+  quickCheckWith qcargs (prop_Confluence sys)
 
-#if NO_STRUCT_RULES
--- After reduction, canonicalize results.
--- This makes many (not all) things that are should be equal by the structural rules
--- actually be the same.
-final = nubBy ((==) `on` (snd . head)) . map (\ ((s, a) : sas) -> (s, canon a) : sas)
-#else
-final = id
-#endif
-
-{-
-prop_NormalForms sys p =
-  --trace (show p) $
-  let trs = final $ map toList $ normalFormsFuelTrace defaultTRSFlags 99 (rules sys) p in
-    case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
-      (_,tr1):(_,tr2):_ ->
-        whenFail (do putStrLn "===trace:1==="
-                     printTrace tr1
-                     putStrLn "===trace:2==="
-                     printTrace tr2) False
-
-      [] -> whenFail (print "DOES NOT TERMINATE") True
-      _  -> property True
--}
-
-prop_NormalForms2 sys p =
-  case map toList $ normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p of
+prop_Confluence sys p =
+  case nub . map (norm sys) . normalForms sys $ p of
     trs@(_:_:_) ->
-      whenFail (sequence_ [ do putStrLn ("===trace:" ++ show i ++ "===")
-                               printTrace tr
-                          | (tr,i) <- trs `zip` [1..]
-                          ]) False
+      whenFail (sequence_
+                  [ do putStrLn ("==trace:" ++ show i ++ "==")
+                       putStr $ unlines $ showTrace ttr
+                  | (ttr,i) <- trs `zip` [1..]
+                  ]) False
+    
+    _ -> property True
 
-    [] -> whenFail (print "DOES NOT TERMINATE") True
-    _  -> property True
+---
+  
+normalForms :: TRSystem Expr -> Expr -> [Traced Expr]
+normalForms sys
+  | rulesHaveStructural sys = normalFormsFuelTraceWithGraph defaultTRSFlags 99 (rules sys)
+  | otherwise               = normalFormsFuelTrace          defaultTRSFlags 99 (rules sys)
+
+norm :: TRSystem Expr -> Traced Expr -> Traced Expr
+norm sys = minimum . head . tarjan tstep
  where
-  rules' env t = rules sys env t -- ++ rulesStructural env t
+  tstep (t :<-- tr) =
+    [ t' :<-- ((n,t):tr)
+    | (n, t') <- step (confluenceRules sys) defaultTRSFlags t
+    ]
 
---------------------------------------------------------------------
--- Stuff to help debug rewrite rules in GHCi
---------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
-{-
-freshTrace :: Expr -> IO ()
-freshTrace e = print status >> printTrace' tr
-  where
-    (status, tr) = dfs 99 rulesPOPL e
+data TestFlags = TestFlags
+  { rulesys  :: !String
+  , numtests :: !Int
+  }
 
-freshTraces :: Expr -> IO ()
-freshTraces e = case normalFormsFuelTrace' 99 rulesFRESH e of
-  Left tr -> print NoFuel >> printTrace' tr
-  Right x0 -> print NormalForm >> mapM_ (\tr -> printTrace' tr >> putStrLn "--------") x0
+testFlags :: Parser TestFlags
+testFlags = TestFlags
+  <$> strOption
+         ( long "rules"
+        <> short 'r'
+        <> metavar "NAME"
+        <> help "Use rule system NAME" )
+  <*> option auto
+         ( long "numtests"
+        <> short 'n'
+        <> metavar "N"
+        <> value (maxSuccess stdArgs)
+        <> help "Maximum of N successful tests" )
 
-runFresh :: Expr -> [(String, Expr)]
-runFresh = normalFormsFuel 99 rulesFRESH . dsFresh
-
-dumpCtx :: (Show a, Show b) => (t -> [(Value -> a, b)]) -> t -> IO ()
-dumpCtx c e = mapM_ print [ (ctx (iVar "#") , v) | (ctx, v) <- c e]
-
-eFail :: Expr
-eFail = lam Fail
-
-def :: String -> Expr -> Expr
-def = DEF . ident
-
-lam :: Expr -> Expr
-lam = LAM (ident "_")
-
-iLAM :: String -> Expr -> Expr
-iLAM = LAM . ident
-
-iLam :: String -> Expr -> Value
-iLam x e = HNF (Lam (Bind (ident x) e))
-
-iVAR :: String -> Expr
-iVAR = VAR . ident
-
-iVar :: String -> Value
-iVar = Var . ident
-
-
-
-iDEF :: String -> Expr -> Expr
-iDEF = DEF . ident
-
-iDEFs :: [String] -> Expr -> Expr
-iDEFs = defs . map ident
-
--------------------------------------------------------------------------------------
--- examples
--------------------------------------------------------------------------------------
-
-e0 :: Expr
-e0 = iDEFs ["f", "f1", "f2"]
-        ( (iVAR "f"  :=: iLAM "x" (iLAM "y" (ADD :@: VARR [iVar "x", iVar "y"]))) :>:
-            ((iVAR "f1" :=: (iVar "f"  :@: VINT 2)) :>:
-              ((iVAR "f2" :=: (iVar "f1" :@: VINT 3)) :>:
-                iVAR "f2" )) )
-
-e0' = iDEFs ["f", "f1", "f2"]
-        ( (iVAR "f"  :=: iLAM "x" (iLAM "y" (ADD :@: VARR [iVar "x", iVar "y"]))) :>:
-          (iVAR "f1" :=: (iVar "f"  :@: VINT 2)) :>:
-          (iVAR "f2" :=: (iVar "f1" :@: VINT 3)) :>:
-          iVAR "f2" )
-
-e1 =
-  iDEFs ["a", "$r1"]
-    (
-      (INT 5 :=:
-        (iVAR "a" :=:
-          (
-            (iVAR "$r1" :>:
-              ( (iLam "x" ((IsINT :@: (iVar "x")) :>: iVAR "x")) :@: iVar "$r1" )
-            )
-          )
-        )
-      )
-    )
-
-e1''' =
-  iDEFs ["$r1", "x"]
-    (
-      (INT 5 :=: ((iVAR "$r1" :=: iVAR "x") :>: ((IsINT :@: iVar "x") :>: iVAR "x")))
-      :>:
-      (iVAR "$r1" :>: INT 5)
-    )
-
-e1_4 =
-  iDEFs ["$r1", "x"]
-    ((iVAR "x" :=: INT 5) :>: (((iVAR "$r1" :=: INT 5) :>: INT 5) :>: INT 5))
-
-
-e1' =
-  iDEFs ["x", "y"]
-    (
-      (INT 5 :=: (iVAR "x" :=: iVAR "y") )
-      :>:
-      iVAR "x"
-    )
-
-e1'' =
-  iDEFs ["x", "y"]
-    (
-      INT 5 :=: ((iVAR "x" :=: iVAR "y") :>: iVAR "x")
-    )
--}
+testArgs :: IO TestFlags
+testArgs = do
+  let prf = prefs disambiguate
+  customExecParser prf $ info (testFlags <**> helper)
+             ( fullDesc
+            <> progDesc "QuickCheck Verse rules"
+            <> header "qctest - QuickCheck testing of Verse rules"
+             )

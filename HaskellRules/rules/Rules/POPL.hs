@@ -1,6 +1,6 @@
 {- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.POPL(systemPOPL, systemPOPLV) where
+module Rules.POPL(systemPOPL, systemVPOPL) where
 
 import TRS.Bind
 import TRS.System
@@ -22,9 +22,9 @@ systemPOPL = TRSystem
   , confluenceRules     = \ _ _ -> []  -- XXX temporary
   }
 
-systemPOPLV :: ESystem
-systemPOPLV = TRSystem
-  { sname               = "POPLE"
+systemVPOPL :: ESystem
+systemVPOPL = TRSystem
+  { sname               = "VPOPL"
   , description         = "POPL submission + DEF-ELIMV"
   , preProcess          = anfArrays
   , rules               = allRules <> rulesElimV

@@ -1,12 +1,12 @@
 module Main where
 
-import TRS.TRSCore
-import TRS.Rules.POPL( systemPOPL )
+import Rules.Core
+import Rules.POPL( systemPOPL )
+import Rules.System
 import TRS.TRS( step, normalFormsFuelTrace, nub )
 import TRS.TRSGraph( normalFormsFuelTraceWithGraph )
 import TRS.Tarjan
 import TRS.Traced
-import TRS.Rules
 import Test.QuickCheck
 
 --------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ prop_Confluence sys p =
 normalForms :: System Expr -> Expr -> [Traced Expr]
 normalForms sys
   | rulesHaveStructuralRules sys = normalFormsFuelTraceWithGraph defaultTRSFlags 99 (rules sys)
-  | otherwise                    = normalFormsFuelTrace defaultTRSFlags 99 (rules sys)
+  | otherwise                    = normalFormsFuelTrace          defaultTRSFlags 99 (rules sys)
 
 norm :: System Expr -> Traced Expr -> Traced Expr
 norm sys = minimum . head . tarjan tstep
