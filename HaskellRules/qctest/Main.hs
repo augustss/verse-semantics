@@ -1,13 +1,14 @@
 {-# LANGUAGE CPP #-}
 module Main where
 
-import TRS.TRSCore
-import TRS.RulesPLDI
-import TRS.RulesPOPL
+import Rules.TRSCore
+import Rules.RulesPLDI
+import Rules.RulesPOPL
 import TRS.TRS
 import TRS.TRSGraph
 import TRS.Graph
 import TRS.Bind
+import TRS.Traced(toList)
 import Test.QuickCheck
 import qualified Data.Map as M
 import Data.List
@@ -44,7 +45,7 @@ final = id
 
 prop_NormalForms rules p =
   --trace (show p) $
-  let trs = final $ normalFormsFuelTrace defaultTRSFlags 99 rules p in
+  let trs = final $ map toList $ normalFormsFuelTrace defaultTRSFlags 99 rules p in
     case M.toList (M.fromList [ (q,tr) | tr@((_,q):_) <- trs ]) of
       (_,tr1):(_,tr2):_ ->
         whenFail (do putStrLn "===trace:1==="
@@ -56,7 +57,7 @@ prop_NormalForms rules p =
       _  -> property True
 
 prop_NormalForms2 rules p =
-  case normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p of
+  case map toList $ normalFormsFuelTraceWithGraph defaultTRSFlags 99 rules' p of
     trs@(_:_:_) ->
       whenFail (sequence_ [ do putStrLn ("===trace:" ++ show i ++ "===")
                                printTrace tr

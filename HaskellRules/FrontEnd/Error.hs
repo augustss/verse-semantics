@@ -1,4 +1,4 @@
-module Parser.Error(module Parser.Error) where
+module FrontEnd.Error(module FrontEnd.Error) where
 import GHC.Stack
 import Epic.Print
 

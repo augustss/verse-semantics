@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {- x# LANGUAGE ViewPatterns # -}
 
-module Parser.Expr(
+module FrontEnd.Expr(
   Loc, noLoc,
   Ident(..),
   Expr(..),
@@ -27,7 +27,7 @@ import Epic.Print
 import Prelude hiding ((<>))
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
-import Parser.Error
+import FrontEnd.Error
 
 type Loc = SourcePos
 noLoc :: Loc

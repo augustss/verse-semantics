@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
-module Parser.DenSem where
+module DenSem.DenSem where
 import Control.Applicative((<|>))
 import Control.Monad
 import Data.List((\\), intersect)

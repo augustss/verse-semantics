@@ -1,4 +1,4 @@
-module Parser.REPL(REPL(..), repl) where
+module VerseRepl.REPL(REPL(..), repl) where
 import Control.Monad.Trans
 import System.Console.Haskeline
 

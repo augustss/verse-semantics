@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
-module TRS.RulesPOPL(rulesPOPL, ERule) where
+module Rules.RulesPOPL(rulesPOPL, ERule) where
 
 import TRS.TRS
 import TRS.Bind
-import TRS.TRSCore
+import Rules.TRSCore
 import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
@@ -352,6 +352,7 @@ rulesUnificationVariables _ lhs =
      (ctx, VAR y :=: VAR x') <- defX x a
      guard (x == x')
      guard (x /= y)
+     guard (y `elem` free a)
      pure (subst [(x, Var y)] (ctx (VAR y)))
  ++
   "SWAP" `name`

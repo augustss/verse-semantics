@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Parser.Misc(
+module FrontEnd.Misc(
   anySame, revTake, revDrop,
   pick, pickLR,
   pattern Snoc,

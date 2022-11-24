@@ -3,7 +3,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-module TRS.TRSCore where
+module Rules.TRSCore where
 
 import TRS.TRS
 import TRS.Bind

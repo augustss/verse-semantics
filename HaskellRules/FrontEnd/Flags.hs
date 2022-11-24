@@ -1,4 +1,4 @@
-module Parser.Flags(Flags(..), defaultFlags, showFlags) where
+module FrontEnd.Flags(Flags(..), defaultFlags, showFlags) where
 
 data Flags = Flags
   { fTrace        :: !Bool

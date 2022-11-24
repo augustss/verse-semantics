@@ -1,4 +1,4 @@
-module Parser.Testing(main, test) where
+module Main(main) where
 
 import Control.Exception
 import Control.Monad
@@ -6,13 +6,13 @@ import GHC.Stack
 import Options.Applicative
 import System.Exit
 
-import Parser.Expr
-import Parser.Flags
-import Parser.Parse hiding (many)
-import Parser.Core
+import FrontEnd.Expr
+import FrontEnd.Flags
+import FrontEnd.Parse hiding (many)
+import FrontEnd.Core
 import Epic.Print (Pretty, prettyShow, pp)
-import Parser.Desugar(desugar)
-import Parser.Run
+import FrontEnd.Desugar(desugar)
+import FrontEnd.Run
 
 --------------
 
@@ -150,6 +150,7 @@ runTestFile :: TestFlags -> FilePath -> IO ()
 runTestFile tflg fn = do
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   ok <- runTests tflg =<< readTests fn
+  putStrLn $ if ok then "SUCCESS" else "FAILURE"
   unless ok $
     exitWith (ExitFailure 1)
 
@@ -165,6 +166,7 @@ ptest fn = do
   file <- readFile fn
   let e = parseDie pFile fn file
   if e == e then putStrLn $ "parsed " ++ fn else undefined
+  putStrLn "SUCCESS"
   pure ()
 
 testFlags :: Parser TestFlags

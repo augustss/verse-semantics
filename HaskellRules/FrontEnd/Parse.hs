@@ -1,4 +1,4 @@
-module Parser.Parse(
+module FrontEnd.Parse(
   parseDie, pFile,
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
@@ -23,8 +23,8 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 --import Text.Read (readMaybe)
 
-import Parser.Error
-import Parser.Expr
+import FrontEnd.Error
+import FrontEnd.Expr
 import Epic.Print(prettyShow)
 
 -- import Debug.Trace

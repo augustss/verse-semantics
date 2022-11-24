@@ -1,4 +1,7 @@
-module TRS.Traced where
+module TRS.Traced(
+  Traced(..), term, trace, start, toList,
+  showTrace, showRevTrace,
+  ) where
 
 data Traced a = a :<-- [(String,a)]
 

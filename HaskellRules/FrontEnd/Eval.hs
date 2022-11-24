@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Parser.Eval(
+module FrontEnd.Eval(
   eval,
   evalSeq,
   replacePrelude,
@@ -13,11 +13,11 @@ import Data.List
 import Data.Maybe
 import Debug.Trace
 
-import Parser.Expr(Ident(..), noLoc)
-import Parser.Core
-import Parser.Error
+import FrontEnd.Expr(Ident(..), noLoc)
+import FrontEnd.Core
+import FrontEnd.Error
 import Epic.Print hiding (float)
-import Parser.Misc
+import FrontEnd.Misc
 
 pattern CUnOp :: String -> Value -> Core
 pattern CUnOp op v <- CApplyVV (VPrim op) v@HNF{}

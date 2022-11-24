@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
-module Main(main, test) where
+module Main(main) where
 import Control.Exception
 import Control.Monad
 import Data.List
@@ -9,17 +9,17 @@ import Text.Printf
 import Text.Read(readMaybe)
 
 import Epic.Print
-import Parser.Desugar
-import Parser.Expr
-import Parser.Parse(parseDie, pFile)
-import Parser.Command
-import Parser.Core
-import Parser.CoreSimp
-import Parser.Eval
-import qualified Parser.Testing as Testing
-import Parser.TRSAdapter
-import Parser.Run
-import Parser.DenSem
+import FrontEnd.Desugar
+import FrontEnd.Expr
+import FrontEnd.Parse(parseDie, pFile)
+import VerseRepl.Command
+import FrontEnd.Core
+import FrontEnd.CoreSimp
+import FrontEnd.Eval
+--import qualified Parser.Testing as Testing
+import FrontEnd.TRSAdapter
+import FrontEnd.Run
+--import DenSem.DenSem
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -32,8 +32,8 @@ tryIt iob aiob ioa = do
 
 -------------------
 
-test :: IO ()
-test = Testing.test
+--test :: IO ()
+--test = Testing.test
 
 main :: IO ()
 main = runCommand command
@@ -95,7 +95,7 @@ command = Command
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with accurate rules"           cRewrite
-      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
+--      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
       , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
       , Cmd "clear"                "Clear global defs"                     cClear
@@ -141,7 +141,7 @@ flagTable =
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
   ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
-  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
+--  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
   ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
@@ -233,10 +233,12 @@ cRewrite c s =
   cTransform (Cores . rewrite flg . compile flg) c s
   where flg = flags s
 
+{-
 cDenSem :: Run CState
 cDenSem c s =
   cTransform (Cored . denSem . compile flgs) c s
   where flgs = (flags s){ fSplit = False, fSimplify = True, fTimLambda = True }
+-}
 
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s

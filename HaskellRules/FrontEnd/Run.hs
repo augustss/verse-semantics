@@ -1,18 +1,18 @@
-module Parser.Run(
+module FrontEnd.Run(
   run,
   Flags(..),
   defaultFlags,
   ) where
-import Parser.Core(Core)
-import Parser.CoreSimp(simpCore)
-import Parser.Eval(eval, replacePrelude, EFlags(..))
-import Parser.Flags
-import Parser.TRSAdapter(rewrite)
-import Parser.DenSem(denSem)
+import FrontEnd.Core(Core)
+import FrontEnd.CoreSimp(simpCore)
+import FrontEnd.Eval(eval, replacePrelude, EFlags(..))
+import FrontEnd.Flags
+import FrontEnd.TRSAdapter(rewrite)
+--import DenSem.DenSem(denSem)
 
 run :: Flags -> Core -> Core
 run f e | fRewrite f = one $ rewrite f e'
-        | fDenSem f = denSem e'
+        | fDenSem f = undefined -- denSem e'
         | otherwise = eval flg e'
   where flg = EFlags { underLambda = fUnderLambda f, traceEval = fTrace f, steps = fEvalSteps f }
         e' = (if fSimplify f then simpCore else id) . replacePrelude . (if fSimplify f then simpCore else id) $ e

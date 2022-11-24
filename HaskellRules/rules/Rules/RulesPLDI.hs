@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-module TRS.RulesPLDI(rulesPLDI, rulesStructural, dsFreshFP, finalSubst, canon) where
+module Rules.RulesPLDI(rulesPLDI, rulesStructural, dsFreshFP, finalSubst, canon) where
 
 -- #define NO_STRUCT_RULES 1
 
 import TRS.TRS
 import TRS.Bind
-import TRS.TRSCore
+import Rules.TRSCore
 import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe

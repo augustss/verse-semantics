@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Parser.Core(
+module FrontEnd.Core(
   Core(..),
   pattern CApplyVV, pattern CUnifyVE,
   pattern COne, pattern CAll, pattern CSucceeds,
@@ -11,7 +11,6 @@ module Parser.Core(
   HNF(..),
   compos, composOp,
   exprToCore,
-  coreToRedex,
   cSeq, cDef, cBar,
   isValue,
   fvs, fvsV, cfvs, cfvsV,
@@ -32,15 +31,12 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 -- import Text.Megaparsec.Char(skip)
 
 import Epic.Print
-import Parser.Expr hiding (compos, composOp)
-import Parser.Desugar(primOps, getVisible, covariantId)
-import Parser.Error
-    ( unimplemented, impossible, internalError, internalErrorMsg )
-import Parser.Flags
-import Parser.SExp
-import Parser.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
-import Parser.Desugar(simpleDesugar)
-import Parser.Misc(pattern Snoc)
+import FrontEnd.Expr hiding (compos, composOp)
+import FrontEnd.Desugar(primOps, getVisible, covariantId, simpleDesugar)
+import FrontEnd.Error(unimplemented, impossible, internalError, internalErrorMsg)
+import FrontEnd.Flags
+import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
+import FrontEnd.Misc(pattern Snoc)
 --import Debug.Trace
 
 data Core
@@ -414,11 +410,6 @@ instance Pretty HNF where
   pPrintPrec l _ (HArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
   pPrintPrec l _ (HArray vs) = parens $ commaSep l vs
   pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
-
-------
-
-coreToRedex :: Core -> SExp
-coreToRedex = undefined
 
 ------
 

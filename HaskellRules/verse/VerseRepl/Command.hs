@@ -1,11 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- Simple Gofer/Hugs/ghci style command interpreter.
-module Parser.Command(Command(..), Cmd(..), Run, runCommand) where
+module VerseRepl.Command(Command(..), Cmd(..), Run, runCommand) where
 import Data.Char
 import Data.List
 import Text.Printf
-import Parser.REPL
+import VerseRepl.REPL
 
 type Run s = String -> s -> IO s
 

@@ -1,17 +1,18 @@
-module Parser.TRSAdapter(rewrite, coreToTrs) where
+module FrontEnd.TRSAdapter(rewrite, coreToTrs) where
 import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
 import Data.Maybe
-import qualified TRS.TRSCore as T
 import qualified TRS.Bind as T
-import qualified TRS.RulesPOPL as RulesPOPL
-import qualified TRS.RulesPLDI as RulesPLDI
+import qualified Rules.TRSCore as T
+import qualified Rules.RulesPOPL as RulesPOPL
+import qualified Rules.RulesPLDI as RulesPLDI
 import TRS.TRS
-import Parser.Expr(Ident(..), noLoc)
-import Parser.Core
-import Parser.Error
-import Parser.Flags
+import TRS.Traced(Traced, term, toList, showTrace)
+import FrontEnd.Expr(Ident(..), noLoc)
+import FrontEnd.Core
+import FrontEnd.Error
+import FrontEnd.Flags
 
 import Debug.Trace
 import Epic.Print
@@ -24,7 +25,7 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
   tr             = fTrace flg
   latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace trsFlags
-     | otherwise = normalFormsFuelTrace trsFlags
+     | otherwise = \ x y z -> map toList $ normalFormsFuelTrace trsFlags x y z
   checkOne [x]   = [x]
   checkOne nes   = trace (unlines $
                           "Multiple:" :
@@ -34,6 +35,11 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
             | latex = trace (latexTrace xs) res
             | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res
     where res = snd (head xs)
+
+  showReductionTrace sh xs = msg
+    where
+      msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
+      pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
 
 ds :: Flags -> T.Expr -> T.Expr
 ds flg
