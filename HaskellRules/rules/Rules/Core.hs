@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-missing-pattern-synonym-signatures -Wno-missing-signatures #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -27,8 +26,6 @@ import Data.Maybe
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
-
-#define NO_STRUCT_RULES 1
 
 --------------------------------------------------------------------------------
 
@@ -264,7 +261,6 @@ instance Rec Expr where
     }
   rec r s ae =
     r s ae ++
-    structMatch r s ae ++
     case ae of
       a :=: b ->
            [ (n, a' :=: b)  | (n,a') <- rec r s a ]
@@ -308,59 +304,6 @@ instance Rec Expr where
     hrec (Lam (Bind x e))
             | tfUnderLambda s = [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
     hrec  _                = []
-
-#if !NO_STRUCT_RULES
-  norm = structNorm
-#endif
-
--- structural rules
--- every structural rule is implemented in 2 parts:
--- 1. make sure everything matches correctly
--- 2. make sure terms are "normalized" w.r.t. the rules
-
-structMatch :: Rule Expr -> Rule Expr
-structMatch _rule = struct
- where
-#if !NO_STRUCT_RULES
-  struct env (Def (Bind x e)) =
-    [ (n,ctx xe')
-    | (ctx,e') <- structDefs e
-    , (n,xe') <- rule env (Def (Bind x e'))
-    ]
-   where
-    structDefs (Def (Bind y e)) = (Def . Bind y, e)
-                                : [ (Def . Bind y . ctx, e') | (ctx,e') <- structDefs e ]
-    structDefs _                = []
- 
-  struct env ((VAR x1 :=: Val v1) :>: e) =
-    [ (n,ctx ve')
-    | (ctx,e') <- structSeqs e
-    , (n,ve') <- rule env ((VAR x1 :=: Val v1) :>: e')
-    ]
-   where
-    structSeqs ((VAR x1 :=: Val v1) :>: e) =
-        (((VAR x1 :=: Val v1) :>:), e)
-      : [(((VAR x1 :=: Val v1) :>:) . ctx, e') | (ctx,e') <- structSeqs e ]
-    structSeqs _ = []
-#endif
-  struct _ _ = []
-
-{-
-structNorm :: RuleEnv Expr -> Expr -> Expr
-structNorm env e =
-  case normalForms env (rec rules) e of
-    []       -> e
-    (_,e'):_ -> e'
- where
-#if !NO_STRUCT_RULES
-  rules _ (Def (Bind x (Def (Bind y e)))) | x > y =
-    [ ("SWAP-C", Def (Bind y (Def (Bind x e)))) ]
-
-  rules _ ((VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e)) | (x1,v1) > (x2,v2) =
-    [ ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e)) ]
-#endif
-  rules _ _ = []
--}
 
 --------------------------------------------------------------------------------
 
