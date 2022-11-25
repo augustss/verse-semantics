@@ -31,13 +31,10 @@ class Rec t where
   data RuleEnv t
   rec :: Rule t -> Rule t
 
-  norm :: (RuleEnv t) -> t -> t
-  norm _ t = t
-
 step1 :: Rec a => RuleEnv a -> Rule a -> a -> Maybe a
 step1 env rule t =
   case rec rule env t of
-    (_,t') : _ -> Just (norm env t')
+    (_,t') : _ -> Just t'
     _          -> Nothing
 
 steps :: Rec a => RuleEnv a -> Rule a -> a -> [a]
@@ -47,7 +44,7 @@ steps env rule t =
         Just t' -> steps env rule t'
 
 step :: forall a . (Ord a, Rec a) => Rule a -> Rule a
-step rule env tt = nub [ (n,norm env t) | (n,t) <- rec rule env tt ]
+step rule env tt = nub $ rec rule env tt
 
 normalForms :: (Show a, Ord a, Rec a) => RuleEnv a -> Rule a -> a -> [(String,a)]
 normalForms env rule t = normalFormsFuel env (-1) rule t

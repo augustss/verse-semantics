@@ -1,9 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.PLDI(systemPLDI) where
-
--- #define NO_STRUCT_RULES 1
 
 import TRS.Bind
 import TRS.System
@@ -20,9 +17,9 @@ import Data.Maybe
 -- Use the DEREF-K
 -- #define USE_DEREF_K 1
 -- Use the correct definition of WF
-#define USE_CORRECT_WF 1
+-- #define USE_CORRECT_WF 1
 -- Use ELIM-DEF-DEAD, a weak substitute for structural rules
-#define USE_ELIM_DEF_DEAD NO_STRUCT_RULES
+-- #define USE_ELIM_DEF_DEAD NO_STRUCT_RULES
 
 --------------------------------------------------------------------------------
 
@@ -340,17 +337,6 @@ rulesUnificationNoOcc _ lhs =
 -- Equal values
 -- x=x, k=k
   "U-SCALAR" `name`
-#if USE_UE
-  do (SCL s1 :=: SCL s2) :>: e <- [lhs]
-     guard (s1 == s2)
-     pure e
- ++
--- tuple=tuple
-  "U-TUP" `name`
-  do (ARR ss :=: ARR ss') :>: e <- [lhs]
-     guard (length ss == length ss')
-     pure (foldr (:>:) e [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
-#else
   do v@(SCL s1) :=: SCL s2 <- [lhs]
      guard (s1 == s2)
      pure v
@@ -360,7 +346,6 @@ rulesUnificationNoOcc _ lhs =
   do v@(ARR ss) :=: ARR ss' <- [lhs]
      guard (length ss == length ss')
      pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
-#endif
 {-
  ++
   "U-FAIL-OP-OP" `name`
@@ -451,12 +436,13 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
 
 rulesGarbageCollection :: ERule
 rulesGarbageCollection _ lhs =
-#if USE_ELIM_DEF_DEAD
+{-
+-- Not like the paper
   "ELIM-DEF-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
  ++
-#endif
+-}
   "ELIM-DEF" `name`
   do ee@Def{} <- [lhs]
      (xs, _, e) <- wfResE ee
@@ -517,7 +503,7 @@ simpleCst xs bs e =
 
 -}
 
-#if USE_DEREF_K
+{-
 derefB :: Expr -> Ident -> [VContext]
 derefB lhs xx =
    do VAR x <- [lhs]
@@ -532,7 +518,7 @@ derefB lhs xx =
       guard (x /= xx)
       ctx <- derefB e xx
       pure (Def . Bind x . ctx)
-#endif
+-}
 
 derefA :: TRSFlags -> Expr -> Ident -> [VContext]
 derefA = derefA' False
@@ -814,13 +800,13 @@ rulesDerefFP ss lhs =
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
      ctx <- derefA ss e x
      pure (xh :>: plug ctx (HNF h))
-#if USE_DEREF_K
+{-
  ++
   "DEREF-K" `name`
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
      ctx <- derefB e x
      pure (xh :>: plug ctx (HNF h))
-#endif
+-}
 
 rulesFailFP :: ERule
 rulesFailFP _ lhs =
@@ -921,9 +907,7 @@ wfResE = wf []
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
-#if USE_CORRECT_WF
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
-#endif
     -- WF-EQ
     wf g e@((VAR x :=: Val v) :>: e1) = do
       guard (v /= Var x)                                -- eliminate x=x before WFF
@@ -932,9 +916,7 @@ wfResE = wf []
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free v) xs))
       pure (xs, (x, v):cs, e2)
-#if USE_CORRECT_WF
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
-#endif
     -- WF-EXP
     -- This judgement makes WF non-deterministic.
     -- With USE_CORRECT_WF we explore all possibilites,
