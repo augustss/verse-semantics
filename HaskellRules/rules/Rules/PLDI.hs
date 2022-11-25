@@ -1,7 +1,7 @@
 {- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.PLDI(systemPLDI, finalSubst) where
+module Rules.PLDI(systemPLDI) where
 
 -- #define NO_STRUCT_RULES 1
 
@@ -26,11 +26,13 @@ import Data.Maybe
 
 --------------------------------------------------------------------------------
 
-systemPLDI :: ESystem
+systemPLDI :: TRSystem Expr
 systemPLDI = TRSystem
   { sname               = "PLDI"
   , description         = "PLDI submission"
+  , ruleEnv             = defaultTRSFlags
   , preProcess          = dsFreshFP
+  , postProcess         = finalSubst
   , rules               = allRules
   , rulesHaveStructural = False
   , confluenceRules     = \ _ _ -> []  -- XXX temporary

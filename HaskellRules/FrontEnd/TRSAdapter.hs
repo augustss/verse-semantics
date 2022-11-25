@@ -6,10 +6,9 @@ import Data.Maybe
 import qualified TRS.Bind as T
 import qualified Rules.Core as T
 import Rules.Core(ERule)
-import Rules.POPL
-import Rules.PLDI
+import Rules.Systems(ESystem, lookupSystem)
 import TRS.TRS
-import TRS.System(preProcess, rules)
+import TRS.System(preProcess, rules, postProcess, ruleEnv)
 import TRS.Traced(Traced, term, toList, showTrace)
 import FrontEnd.Expr(Ident(..), noLoc)
 import FrontEnd.Core
@@ -19,10 +18,12 @@ import FrontEnd.Flags
 import Debug.Trace
 import Epic.Print
 
-rewrite :: Flags -> Core -> [Core]
-rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (ruls flg) . ds flg . coreToTrs
+-- XXX use graph normal form when needed
+
+rewrite :: Flags -> ESystem -> Core -> [Core]
+rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
  where
-  trsFlags       = T.TRSFlags { T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
+  trsFlags       = (ruleEnv sys){ T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
@@ -43,27 +44,17 @@ rewrite flg = map (trsToCore . sub flg . rtrace) . checkOne . subs flg . nf n (r
       msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
       pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
 
-ds :: Flags -> T.Expr -> T.Expr
-ds flg
-  | fFresh flg = preProcess systemPLDI
-  | otherwise  = id
-
-subs :: Flags -> [Trace T.Expr] -> [Trace T.Expr]
-subs flg ts
-  | fFinalInline flg && fFresh flg =
-    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = finalSubst e]
+subs :: Flags -> ESystem -> [Trace T.Expr] -> [Trace T.Expr]
+subs flg sys ts
+  | fFinalInline flg =
+    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = postProcess sys e]
         ts'' = nubBy ((==) `on` fst) ts'
     in  map snd ts''
   | otherwise  = ts
 
-sub :: Flags -> T.Expr -> T.Expr
-sub flg | fFinalInline flg && fFresh flg = finalSubst
-        | otherwise = id
-
-ruls :: Flags -> ERule
-ruls flg
-  | fFresh flg = rules systemPLDI -- <> RulesPLDI.rulesStructural
-  | otherwise  = rules systemPOPL
+sub :: Flags -> ESystem -> T.Expr -> T.Expr
+sub flg sys | fFinalInline flg = postProcess sys
+            | otherwise = id
 
 coreToTrs :: Core -> T.Expr
 coreToTrs (CValue v) = T.Val (coreToTrsV v)

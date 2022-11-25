@@ -1,7 +1,6 @@
 module Main where
 
 import Rules.Core
-import Rules.POPL( systemPOPL )
 import Rules.Systems
 import TRS.TRS( step, normalFormsFuelTrace, nub )
 import TRS.TRSGraph( normalFormsFuelTraceWithGraph )

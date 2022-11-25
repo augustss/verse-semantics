@@ -2,6 +2,7 @@ module Main(main) where
 
 import Control.Exception
 import Control.Monad
+import Data.Maybe
 import GHC.Stack
 import Options.Applicative
 import System.Exit
@@ -13,22 +14,23 @@ import FrontEnd.Core
 import Epic.Print (Pretty, prettyShow, pp)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
+import Rules.Systems(ESystem, lookupSystem)
 
 --------------
 
 data TestFlags = TestFlags
   { dfs       :: !Bool                -- just find one normal form
-  , popl      :: !Bool                -- use old POPL rules
-  , denSem    :: !Bool                -- evaluate with denotational semantics
+--  , denSem    :: !Bool                -- evaluate with denotational semantics
   , split     :: !Bool                -- use split
   , parse     :: !Bool                -- parse only
   , simplify  :: !Bool                -- use simplifier
-  , alias     :: !Bool                -- eliminate aliases
-  , unifyEq   :: !Bool                -- unify as equals under barrier
+--  , alias     :: !Bool                -- eliminate aliases
+--  , unifyEq   :: !Bool                -- unify as equals under barrier
 --  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
   , noInline  :: !Bool                -- No final inlining
+  , system    :: !(Maybe ESystem)     -- rule system
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -76,8 +78,9 @@ assertEquiv :: (HasCallStack, Pretty a) => Bool -> TestFlags -> Loc -> (a, Core)
 assertEquiv expectOK tflg loc (p1, c1) (p2, c2) = do
     let noisy = not (quiet tflg)
     let flg = testFlagsToFlags tflg
-    let v1 = run flg c1
-    let v2 = run flg c2
+        sys = fromMaybe (error "no rule system specified") $ system tflg
+    let v1 = run flg sys c1
+    let v2 = run flg sys c2
 
     let pos = prettyShow loc
 
@@ -154,11 +157,12 @@ runTestFile tflg fn = do
   unless ok $
     exitWith (ExitFailure 1)
 
-test :: IO ()
-test = runTestFile tflg verseTest
-  where tflg = TestFlags { dfs=False, popl=False, denSem=False, split=True, noInline = False
+test :: String -> IO ()
+test n = runTestFile tflg verseTest
+  where tflg = TestFlags { dfs=False, split=True, noInline = False
                          , parse=False, simplify=False, eval=False, quiet=False, fileNames=[]
-                         , alias=False, unifyEq=False }
+                         , system = either error Just $ lookupSystem n
+                         }
 
 -- Just parse
 ptest :: FilePath -> IO ()
@@ -175,14 +179,12 @@ testFlags = TestFlags
       (  long "dfs"
       <> help "Only find one normal form"
       )
-  <*> switch
-      (  long "popl"
-      <> help "Use old POPL rules"
-      )
+{-
   <*> switch
       (  long "densem"
       <> help "Use dontational semantics"
       )
+-}
   <*> switch
       (  long "split"
       <> help "Use split"
@@ -195,6 +197,7 @@ testFlags = TestFlags
       (  long "simplify"
       <> help "Use simplifier"
       )
+{-
   <*> switch
       (  long "alias"
       <> help "Eliminate aliases"
@@ -203,6 +206,7 @@ testFlags = TestFlags
       (  long "unify-equals"
       <> help "unify as equals under barrier"
       )
+-}
   <*> switch
       (  long "eval"
       <> help "Use fast evaluator"
@@ -215,14 +219,19 @@ testFlags = TestFlags
       (  long "no-final-inline"
       <> help "Do not do final normalization"
       )
+  <*> optional (option (eitherReader lookupSystem)
+         ( long "rules"
+        <> short 'r'
+        <> metavar "NAME"
+        <> help "Use rule system NAME" ))
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
-                fRewrite = not (eval t), fFresh = not (popl t),
-                fDenSem = denSem t, fDfs = dfs t, fFinalInline = not (noInline t),
-                fAlias = alias t, fUnifyEq = unifyEq t}
+                fRewrite = not (eval t),
+                fDfs = dfs t, fFinalInline = not (noInline t)
+                }
 main :: IO ()
 main = do
   tflg <- testArgs

@@ -44,7 +44,7 @@ library trs
     import:           shared-properties
     exposed-modules:  TRS.Bind
                       TRS.Graph
-		      TRS.System
+                      TRS.System
                       TRS.Tarjan
                       TRS.TRS
                       TRS.TRSGraph
@@ -56,9 +56,10 @@ library rules
     build-depends:    trs,
                       QuickCheck
     exposed-modules:  Rules.Core
-                      Rules.PLDI
+                      Rules.Systems
+    -- The actual rules are not exposed, they are summarized in Rules.Systems
+    other-modules:    Rules.PLDI
                       Rules.POPL
-		      Rules.Systems
     hs-source-dirs:   rules
 
 library frontend
@@ -89,9 +90,10 @@ executable verse
     build-depends:    epic,
 --                      densem,
                       frontend,
-		      rules,
-		      trs,
+                      rules,
+                      trs,
                       haskeline,
+                      optparse-applicative,
 
     main-is:          Main.hs
 
@@ -106,6 +108,7 @@ executable tester
     build-depends:    epic,
 --                      densem,
                       frontend,
+                      rules,
                       optparse-applicative,
 
     main-is:          Main.hs

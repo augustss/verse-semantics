@@ -8,7 +8,6 @@ module Rules.Core(
   TRSFlags, RuleEnv(..), defaultTRSFlags,
   ERule,
   EContext,
-  ESystem,
   pattern VAR, pattern INT, pattern ARR, pattern LAM, pattern EHNF, pattern OP,
   pattern HVAL, pattern SCL, pattern VHNF,
   pattern VINT, pattern VARR, pattern VLAM, pattern VOP,
@@ -29,7 +28,6 @@ import Data.Maybe
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
-type ESystem = TRSystem Expr
 
 #define NO_STRUCT_RULES 1
 

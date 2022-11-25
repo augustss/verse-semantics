@@ -8,12 +8,12 @@ all:
 	echo Specify a target
 
 test: testfast
-	$(TESTER) --quiet       --popl     $(TESTFILE)
+	$(TESTER) --quiet --rules=popl           $(TESTFILE)
 
 testfast:
-	$(TESTER) --quiet --parse          $(TESTPARSEFILE)
-	$(TESTER) --quiet --eval           $(TESTFILE)
-	$(TESTER) --quiet --dfs --popl     $(TESTFILE)
+	$(TESTER) --quiet --parse                $(TESTPARSEFILE)
+	$(TESTER) --quiet --eval                 $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
 # PLDI rules no longer terminate with structural rules.
 #	$(TESTER) --quiet --dfs            $(TESTFILE)
 #	$(TESTER) --quiet --dfs --split    $(TESTFILE)

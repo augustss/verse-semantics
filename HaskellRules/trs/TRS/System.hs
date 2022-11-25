@@ -4,14 +4,19 @@ import Data.List
 import TRS.TRS
 
 data TRSystem t = TRSystem
-  { sname               :: String  -- short system name, should be an identfier
-  , description         :: String  -- longer system description
-  , preProcess          :: t -> t  -- prepare a term for rule application, e.g., ANF
-  , rules               :: Rule t  -- rewrite rules
-  , rulesHaveStructural :: Bool    -- are any rules structural? (slower)
-  , confluenceRules     :: Rule t  -- ???
+  { sname               :: !String       -- short system name, should be an identfier
+  , description         :: !String       -- longer system description
+  , ruleEnv             :: !(RuleEnv t)  -- environment for running rule execution
+  , preProcess          :: !(t -> t)     -- prepare a term for rule application, e.g., ANF
+  , postProcess         :: !(t -> t)     -- post processing, e.g., undo ANF
+  , rules               :: !(Rule t)     -- rewrite rules
+  , rulesHaveStructural :: !Bool         -- are any rules structural? (slower)
+  , confluenceRules     :: !(Rule t)     -- ???
   }
 --  deriving (Show)
+
+instance Show (TRSystem t) where
+  show _ = "<<TRSystem>>"
 
 -- | Case insensitive lookup of all systems matching a prefix]
 lookupTRSystem :: String -> [TRSystem t] -> [TRSystem t]

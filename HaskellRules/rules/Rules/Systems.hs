@@ -1,8 +1,10 @@
-module Rules.Systems(allSystems, lookupSystem) where
+module Rules.Systems(ESystem, allSystems, lookupSystem) where
 import TRS.System
 import Rules.Core
 import Rules.PLDI
 import Rules.POPL
+
+type ESystem = TRSystem Expr
 
 allSystems :: [ESystem]
 allSystems =

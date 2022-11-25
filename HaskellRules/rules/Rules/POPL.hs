@@ -12,24 +12,23 @@ import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
 
-systemPOPL :: ESystem
+systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
   { sname               = "POPL"
   , description         = "POPL submission"
+  , ruleEnv             = defaultTRSFlags
   , preProcess          = anfArrays
+  , postProcess         = id
   , rules               = allRules
   , rulesHaveStructural = False
   , confluenceRules     = \ _ _ -> []  -- XXX temporary
   }
 
-systemVPOPL :: ESystem
-systemVPOPL = TRSystem
+systemVPOPL :: TRSystem Expr
+systemVPOPL = systemPOPL
   { sname               = "VPOPL"
   , description         = "POPL submission + DEF-ELIMV"
-  , preProcess          = anfArrays
   , rules               = allRules <> rulesElimV
-  , rulesHaveStructural = False
-  , confluenceRules     = \ _ _ -> []  -- XXX temporary
   }
 
 anfArrays :: Expr -> Expr

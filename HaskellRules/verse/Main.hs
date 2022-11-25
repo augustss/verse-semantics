@@ -7,8 +7,9 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 import Text.Read(readMaybe)
+import Options.Applicative hiding (command)
 
-import Epic.Print
+import Epic.Print hiding ((<>))
 import FrontEnd.Desugar
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
@@ -21,7 +22,7 @@ import FrontEnd.TRSAdapter
 import FrontEnd.Run
 --import DenSem.DenSem
 import Rules.Systems
-import Rules.Core(ESystem)
+import Rules.Core(defaultTRSFlags)
 import TRS.System
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -35,11 +36,37 @@ tryIt iob aiob ioa = do
 
 -------------------
 
---test :: IO ()
---test = Testing.test
-
 main :: IO ()
-main = runCommand command
+main = do
+  flags <- mainArgs
+  let cmd =
+        case rulesys flags of
+          Nothing -> command
+          Just name -> command{ c_state = (c_state command){ esystem = either error id $ lookupSystem name } }
+  runCommand cmd
+
+data MainFlags = MainFlags
+  { rulesys  :: !(Maybe String)
+  }
+
+mainFlags :: Parser MainFlags
+mainFlags = MainFlags
+  <$> optional (strOption
+         ( long "rules"
+        <> short 'r'
+        <> metavar "NAME"
+        <> help "Use rule system NAME" ))
+
+mainArgs :: IO MainFlags
+mainArgs = do
+  let prf = prefs disambiguate
+  customExecParser prf $ info (mainFlags <**> helper)
+             ( fullDesc
+            <> progDesc "Verse interactive system"
+            <> header "verse - Parse, desugar, and evaluate Verse expressions"
+             )
+
+-------------------
 
 data CState = CState
   { lastExpr    :: !SomeExpr
@@ -124,8 +151,9 @@ command = Command
 
 dummySystem :: ESystem
 dummySystem = TRSystem { sname = "none", description = "no rule system selected",
-  preProcess = id, rules = noRules, rulesHaveStructural = False, confluenceRules = noRules }
-  where noRules = error "No rule system selected"
+  ruleEnv = defaultTRSFlags,
+  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False, confluenceRules = noRules }
+  where noRules _ _ = error "No rule system selected"
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
 updateLastExpr s e = pure s{ lastExpr = e }
@@ -217,9 +245,9 @@ cCompile :: Run CState
 cCompile c s = cTransform (Cored . compile (flags s)) c s
 
 cRun :: Run CState
-cRun c s = cTransform (Cored . run flg' . asCore flg') c s
+cRun c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
   where flg = flags s
-        flg' = if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
+        flg' = flg -- if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
 
 cEval :: Run CState
 cEval c s =
@@ -248,8 +276,9 @@ cDefEval c s = do
 
 cRewrite :: Run CState
 cRewrite c s =
-  cTransform (Cores . rewrite flg . compile flg) c s
+  cTransform (Cores . rewrite flg sys . compile flg) c s
   where flg = flags s
+        sys = esystem s
 
 {-
 cDenSem :: Run CState
