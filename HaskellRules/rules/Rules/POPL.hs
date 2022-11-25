@@ -1,4 +1,4 @@
-{- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.POPL(systemPOPL, systemVPOPL) where
 
@@ -39,7 +39,7 @@ anfArrays = id -- XXX
 -- sub-categories of expressions
 
 isChoiceFree :: Expr -> Bool
-isChoiceFree (Val v)   = True
+isChoiceFree (Val _)   = True
 isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
@@ -246,7 +246,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x e -> Def (Bind x e)) e vs
+defs vs e = foldr (\ x -> Def . Bind x) e vs
 
 unit :: Value
 unit = VARR []
@@ -295,11 +295,11 @@ rulesUnificationNoOcc _ lhs =
        else pure Fail
  ++
   "UX1" `name`
-  do INT k :=: ARR vs <- [lhs]
+  do INT _k :=: ARR _vs <- [lhs]
      pure Fail
  ++
   "UX2" `name`
-  do ARR vs :=: INT k <- [lhs]
+  do ARR _vs :=: INT _k <- [lhs]
      pure Fail
  ++
   "UX3" `name`
@@ -311,7 +311,7 @@ rulesUnificationNoOcc _ lhs =
      pure Fail
  ++
   "UX5" `name`
-  do Val h1@(HNF (Op _)) :=: Val h2@(HNF _) <- [lhs]
+  do Val (HNF (Op _)) :=: Val (HNF _) <- [lhs]
 {-
      if h1 == h2 then  -- To make it compatible with the PLDI rules
        pure (Val h1)
@@ -400,7 +400,7 @@ rulesElimV _ lhs =
 rulesSequencing :: ERule
 rulesSequencing _ lhs =
   "SEQ" `name`
-  do Val v :>: e <- [lhs]
+  do Val _v :>: e <- [lhs]
      pure e
  ++
   "SEQ-ASSOC" `name`
@@ -440,11 +440,11 @@ rulesSequencing _ lhs =
 rulesFail :: ERule
 rulesFail _ lhs =
   "FAIL-DEF" `name`
-  do Def (Bind x Fail) <- [lhs]
+  do Def (Bind _x Fail) <- [lhs]
      pure Fail
  ++
   "FAIL" `name`
-  do (cx, Fail) <- execX1 lhs
+  do (_cx, Fail) <- execX1 lhs
      pure Fail
 
 --------------------------------------------------------------------------------
@@ -452,13 +452,13 @@ rulesFail _ lhs =
 rulesChoice :: ERule
 rulesChoice _ lhs =
   "FAIL-L" `name`
-  do (sx, e) <- scopeX lhs
-     Fail :|: e <- [e]
+  do (sx, fe) <- scopeX lhs
+     Fail :|: e <- [fe]
      pure (sx e)
  ++
   "FAIL-R" `name`
-  do (sx, e) <- scopeX lhs
-     e :|: Fail <- [e]
+  do (sx, ef) <- scopeX lhs
+     e :|: Fail <- [ef]
      pure (sx e)
  ++
   "ASSOC-CHOICE" `name`
@@ -480,7 +480,7 @@ rulesOne _ lhs =
      pure Fail
  ++
   "ONE-CHOICE" `name`
-  do One (Val v :|: e) <- [lhs]
+  do One (Val v :|: _e) <- [lhs]
      pure (Val v)
  ++
   "ONE-VAL" `name`
@@ -494,11 +494,11 @@ rulesAll _ lhs =
      pure (ARR [])
  ++
   "ALL-CHOICE" `name`
-  do All es@(_ :|: _) <- [lhs]
+  do All ves@(_ :|: _) <- [lhs]
      let choiceVals (Val v) = [[v]]
          choiceVals (Val v :|: es) = [ v : vs | vs <- choiceVals es ]
          choiceVals _ = []
-     vs <- choiceVals es
+     vs <- choiceVals ves
      pure (ARR vs)
  ++
   "ALL-VAL" `name`
@@ -508,18 +508,18 @@ rulesAll _ lhs =
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
-  do Split Fail f g <- [lhs]
+  do Split Fail f _g <- [lhs]
      pure (f :@: VARR [])
  ++
   "SPLIT-CHOICE" `name`
-  do Split (Val v :|: e) f g <- [lhs]
+  do Split (Val v :|: e) _f g <- [lhs]
      let x:h:_ = identsNotIn (free lhs)
          gv = VAR h :=: (g :@: v)
          hlam = Var h :@: VLAM x e
      pure (Def (Bind h (gv :>: hlam)))
  ++
   "SPLIT-VAL" `name`
-  do Split (Val v) f g <- [lhs]
+  do Split (Val v) _f g <- [lhs]
      let x:h:_ = identsNotIn (free lhs)
          gv = VAR h :=: (g :@: v)
          hlam = Var h :@: VLAM x Fail

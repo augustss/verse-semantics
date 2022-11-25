@@ -23,13 +23,14 @@ main = do
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   quickCheckWith qcargs (prop_Confluence sys)
 
+prop_Confluence :: TRSystem Expr -> Expr -> Property
 prop_Confluence sys p =
   case nub . map (norm sys) . normalForms sys $ p of
     trs@(_:_:_) ->
       whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
                        putStr $ unlines $ showTrace ttr
-                  | (ttr,i) <- trs `zip` [1..]
+                  | (ttr,i) <- trs `zip` [1::Int ..]
                   ]) False
     
     _ -> property True

@@ -9,9 +9,9 @@ import TRS.Graph
 
 -- depth first graph building 
 trsGraphFuelTrace :: (Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Graph (Maybe (Traced a))
-trsGraphFuelTrace env fuel rule x = M.fromListWith (++) (go S.empty fuel [start x])
+trsGraphFuelTrace env afuel rule x = M.fromListWith (++) (go S.empty afuel [start x])
  where
-  go seen _ [] =
+  go _seen _ [] =
     []
 
   go seen 0 txs =
@@ -32,15 +32,15 @@ trsGraphFuelTrace env fuel rule x = M.fromListWith (++) (go S.empty fuel [start 
        ([ ty | ty <- tys, not (ty `S.member` seen) ] ++ txs)
    where
     tys = children tx
-    new = any (not . (`S.member` seen)) tys
+--    new = any (not . (`S.member` seen)) tys
 
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
 
 -- breadth-first graph building
 trsGraphFuelTrace' :: (Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Graph (Maybe (Traced a))
-trsGraphFuelTrace' env fuel rule x = M.fromListWith (++) (go S.empty fuel [] [start x])
+trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [start x])
  where
-  go seen _ [] [] =
+  go _seen _ [] [] =
     []
 
   go seen fuel q [] =
@@ -65,7 +65,7 @@ trsGraphFuelTrace' env fuel rule x = M.fromListWith (++) (go S.empty fuel [] [st
        ([ ty | ty <- tys, not (ty `S.member` seen) ] ++ q) txs
    where
     tys = children tx
-    new = any (not . (`S.member` seen)) tys
+--    new = any (not . (`S.member` seen)) tys
 
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
 

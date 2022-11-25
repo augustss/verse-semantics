@@ -157,12 +157,14 @@ runTestFile tflg fn = do
   unless ok $
     exitWith (ExitFailure 1)
 
+{-
 test :: String -> IO ()
 test n = runTestFile tflg verseTest
   where tflg = TestFlags { dfs=False, split=True, noInline = False
                          , parse=False, simplify=False, eval=False, quiet=False, fileNames=[]
                          , system = either error Just $ lookupSystem n
                          }
+-}
 
 -- Just parse
 ptest :: FilePath -> IO ()

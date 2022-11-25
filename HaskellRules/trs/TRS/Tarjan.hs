@@ -2,9 +2,8 @@
 module TRS.Tarjan where
 
 import qualified Data.Map as M
-import Data.Map( Map, (!) )
+import Data.Map( (!) )
 import qualified Data.Set as S
-import Data.Set( Set )
 
 -----------------------------------------------------------------------------------
 
@@ -18,7 +17,7 @@ tarjan :: Ord a => (a -> [a]) -> a -> [[a]]
 tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
  where
   strongc !index state onStack stack v k =
-    visit (index+1) (M.insert v (index,index) state) (S.insert v onStack) (v:stack) v (f v) k
+    visit (index+1 :: Int) (M.insert v (index,index) state) (S.insert v onStack) (v:stack) v (f v) k
   
   visit !index state onStack stack v [] k =
     if vindex == vlowlink then
@@ -35,11 +34,11 @@ tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
         strongc index state onStack stack w $
           \index' state' onStack' stack' ->
             let (vindex, vlowlink) = state' ! v
-                (windex, wlowlink) = state' ! w
+                (_windex, wlowlink) = state' ! w
              in visit index' (M.insert v (vindex, vlowlink `min` wlowlink) state')
                       onStack' stack' v ws k
 
-      Just (windex, wlowlink) ->
+      Just (windex, _wlowlink) ->
         if w `S.member` onStack then
           visit index (M.insert v (vindex, vlowlink `min` windex) state) onStack stack v ws k
         else
@@ -50,11 +49,13 @@ tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
 -----------------------------------------------------------------------------------
 -- Grrr... I wish these were standard functions. like takeWhile/dropWhile, but 1 step more
 
-takeUntil p []                 = []
+takeUntil :: (a -> Bool) -> [a] -> [a]
+takeUntil _ []                 = []
 takeUntil p (x:xs) | p x       = [x]
                    | otherwise = x : takeUntil p xs
 
-dropUntil p []                 = []
+dropUntil :: (a -> Bool) -> [a] -> [a]
+dropUntil _ []                 = []
 dropUntil p (x:xs) | p x       = xs
                    | otherwise = dropUntil p xs
 

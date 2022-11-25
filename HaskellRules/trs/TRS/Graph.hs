@@ -4,7 +4,6 @@ import qualified Data.Map as M
 import Data.Map( Map, (!) )
 import qualified Data.Set as S
 import Data.Set( Set )
-import Data.List( sort, (\\) )
 
 -- this module is heavily inspired by
 -- King & Launchbury, "Structuring Depth-First Search Algorithms in Haskell", 1994.
@@ -33,9 +32,9 @@ top (Cut x)    = x
 
 -- pruning a possibly infinite forest
 prune :: Ord a => Forest a -> Forest a
-prune ts = go S.empty ts
+prune = go S.empty
  where
-  go seen []             = []
+  go _seen []            = []
   go seen (Cut x    :ts) = Cut x : go seen ts
   go seen (Node x vs:ts)
     | x `S.member` seen  = Cut x : go seen ts
@@ -49,20 +48,20 @@ preorder :: Tree a -> [a]
 preorder t = preorderF [t]
 
 preorderF :: Forest a -> [a]
-preorderF ts = go ts []
+preorderF ats = go ats []
  where
   go []               xs = xs
-  go (Cut x     : ts) xs = go ts xs
+  go (Cut _x    : ts) xs = go ts xs
   go (Node x vs : ts) xs = x : go vs (go ts xs)
 
 postorder :: Tree a -> [a]
 postorder t = postorderF [t]
 
 postorderF :: Forest a -> [a]
-postorderF ts = go ts []
+postorderF ats = go ats []
  where
   go []               xs = xs
-  go (Cut x     : ts) xs = go ts xs
+  go (Cut _x    : ts) xs = go ts xs
   go (Node x vs : ts) xs = go vs (x : go ts xs)
 
 -- computing back-arrows

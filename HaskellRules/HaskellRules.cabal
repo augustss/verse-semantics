@@ -6,14 +6,15 @@ description:        Programs for automated and interactive tests of Core Verse r
 copyright:          Epic Games 2022
 
 extra-source-files: CHANGELOG.md
+                    README.md
 
 common shared-properties
     default-language: Haskell2010
+    ghc-options:      -Wall -O
     build-depends:    base,
                       containers,
                       mtl,
                       pretty,
---                      QuickCheck
 
 -- Various utilities.
 -- Should really have its own cabal project
@@ -116,17 +117,6 @@ executable tester
     hs-source-dirs:   tester
     default-language: Haskell2010
 
-executable timtest
-    import:           shared-properties
-    build-depends:    epic,
-                      frontend,
-                      optparse-applicative,
-
-    main-is:          Main.hs
-
-    hs-source-dirs:   timtest
-    default-language: Haskell2010
-
 executable qctest
     import:           shared-properties
     build-depends:    epic,
@@ -138,4 +128,15 @@ executable qctest
     main-is:          Main.hs
 
     hs-source-dirs:   qctest
+    default-language: Haskell2010
+
+executable timtest
+    import:           shared-properties
+    build-depends:    epic,
+                      frontend,
+                      optparse-applicative,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   timtest
     default-language: Haskell2010

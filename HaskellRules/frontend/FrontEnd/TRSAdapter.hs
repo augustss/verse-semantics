@@ -5,11 +5,10 @@ import Data.List(nubBy)
 import Data.Maybe
 import qualified TRS.Bind as T
 import qualified Rules.Core as T
-import Rules.Core(ERule)
-import Rules.Systems(ESystem, lookupSystem)
+import Rules.Systems(ESystem)
 import TRS.TRS
 import TRS.System(preProcess, rules, postProcess, ruleEnv)
-import TRS.Traced(Traced, term, toList, showTrace)
+import TRS.Traced(toList)
 import FrontEnd.Expr(Ident(..), noLoc)
 import FrontEnd.Core
 import FrontEnd.Error

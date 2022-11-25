@@ -6,7 +6,6 @@ module Epic.SIntMap (SIntMap, empty, lookup, member, insert, (!), lookupMax, del
 import Control.Arrow (first)
 import Data.Coerce
 import qualified Data.IntMap as M
-import qualified Data.IntSet as S
 import Epic.Print (Pretty (..))
 import Epic.SIntSet (SIntSet, toIntSet)
 import GHC.Stack (HasCallStack)

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-type-defaults -Wno-unused-matches -Wno-missing-signatures -Wno-missing-pattern-synonym-signatures -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-missing-pattern-synonym-signatures -Wno-missing-signatures #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -20,7 +20,6 @@ module Rules.Core(
   ) where
 
 import TRS.Bind
-import TRS.System
 import TRS.TRS
 import Test.QuickCheck
 import Data.List( intercalate, union, elemIndex )
@@ -69,59 +68,59 @@ instance Eq Expr where
   a == b = a `compare` b == EQ
 
 instance Ord Expr where
-  a `compare` b = comp [] [] a b
+  compare = comp [] []
    where
     -- so much code... this can probably simplified a lot
-    comp xs ys Wrong Wrong = EQ
-    comp xs ys Wrong _     = LT
-    comp xs ys _     Wrong = GT
+    comp _xs _ys Wrong Wrong = EQ
+    comp _xs _ys Wrong _     = LT
+    comp _xs _ys _     Wrong = GT
 
-    comp xs ys Fail Fail = EQ
-    comp xs ys Fail _    = LT
-    comp xs ys _    Fail = GT
+    comp _xs _ys Fail Fail = EQ
+    comp _xs _ys Fail _    = LT
+    comp _xs _ys _    Fail = GT
 
-    comp xs ys (Val v) (Val w) = compV xs ys v w
-    comp xs ys (Val v) _       = LT
-    comp xs ys _       (Val w) = GT
+    comp  xs  ys (Val v) (Val w) = compV xs ys v w
+    comp _xs _ys (Val _) _       = LT
+    comp _xs _ys _       (Val _) = GT
 
-    comp xs ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
-    comp xs ys (a:=:b) _       = LT
-    comp xs ys _       (c:=:d) = GT
+    comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
+    comp _xs _ys (_:=:_) _       = LT
+    comp _xs _ys _       (_:=:_) = GT
 
-    comp xs ys (a:>:b) (c:>:d) = comp xs ys a c & comp xs ys b d
-    comp xs ys (a:>:b) _       = LT
-    comp xs ys _       (c:>:d) = GT
+    comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c & comp xs ys b d
+    comp _xs _ys (_:>:_) _       = LT
+    comp _xs _ys _       (_:>:_) = GT
 
-    comp xs ys (a:|:b) (c:|:d) = comp xs ys a c & comp xs ys b d
-    comp xs ys (a:|:b) _       = LT
-    comp xs ys _       (c:|:d) = GT
+    comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c & comp xs ys b d
+    comp _xs _ys (_:|:_) _       = LT
+    comp _xs _ys _       (_:|:_) = GT
 
-    comp xs ys (a:@:b) (c:@:d) = compV xs ys a c & compV xs ys b d
-    comp xs ys (a:@:b) _       = LT
-    comp xs ys _       (c:@:d) = GT
+    comp  xs  ys (a:@:b) (c:@:d) = compV xs ys a c & compV xs ys b d
+    comp _xs _ys (_:@:_) _       = LT
+    comp _xs _ys _       (_:@:_) = GT
 
-    comp xs ys (One a) (One b) = comp xs ys a b
-    comp xs ys (One a) _       = LT
-    comp xs ys _       (One b) = GT
+    comp  xs  ys (One a) (One b) = comp xs ys a b
+    comp _xs _ys (One _) _       = LT
+    comp _xs _ys _       (One _) = GT
 
-    comp xs ys (All a) (All b) = comp xs ys a b
-    comp xs ys (All a) _       = LT
-    comp xs ys _       (All b) = GT
+    comp  xs  ys (All a) (All b) = comp xs ys a b
+    comp _xs _ys (All _) _       = LT
+    comp _xs _ys _       (All _) = GT
 
-    comp xs ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
-    comp xs ys Split {} _ = LT
-    comp xs ys _ Split {} = GT
+    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
+    comp _xs _ys Split {} _ = LT
+    comp _xs _ys _ Split {} = GT
 
-    comp xs ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp  xs  ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
 
-    compV xs ys (Var x) (Var y) =
+    compV  xs  ys (Var x) (Var y) =
       case (elemIndex x xs, elemIndex y ys) of
         (Just i, Just j)   -> i `compare` j
         (Nothing, Nothing) -> x `compare` y
         (Just _, Nothing)  -> LT
         (Nothing, Just _)  -> GT
-    compV xs ys (Var _) _       = LT
-    compV xs ys _       (Var _) = GT
+    compV _xs _ys (Var _) _       = LT
+    compV _xs _ys _       (Var _) = GT
 
     compV xs ys (HNF a) (HNF b) = compH xs ys a b
 
@@ -132,7 +131,7 @@ instance Ord Expr where
       n  = length vs
       m  = length ws
     compH xs ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
-    compH xs ys a b = a `compare` b
+    compH _xs _ys a b = a `compare` b
 
     EQ & c = c
     c  & _ = c
@@ -263,10 +262,10 @@ instance Rec Expr where
     , tfAlias       :: !Bool     -- get rid of alias definitions early
     , tfUnifyEq     :: !Bool     -- treat unify under a barrier as equals
     }
-  rec r s e =
-    r s e ++
-    structMatch r s e ++
-    case e of
+  rec r s ae =
+    r s ae ++
+    structMatch r s ae ++
+    case ae of
       a :=: b ->
            [ (n, a' :=: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :=: b') | (n,b') <- rec r s b ]
@@ -283,32 +282,32 @@ instance Rec Expr where
            [ (n, Def (Bind x a')) | (n,a') <- rec r s a ]
 
       f :@: a ->
-           [ (n,f' :@: a)  | (n,f') <- vrec r s f ]
-        ++ [ (n,f  :@: a') | (n,a') <- vrec r s a ]
+           [ (n,f' :@: a)  | (n,f') <- vrec f ]
+        ++ [ (n,f  :@: a') | (n,a') <- vrec a ]
   
       Val v ->
-           [ (n,Val v') | (n,v') <- vrec r s v ]
+           [ (n,Val v') | (n,v') <- vrec v ]
   
       One a -> [ (n, One a') | (n,a') <- rec r s a ]
       All a -> [ (n, All a') | (n,a') <- rec r s a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
-        ++ [ (n, Split a f' g) | (n,f') <- vrec r s f ]
-        ++ [ (n, Split a f g') | (n,g') <- vrec r s g ]
+        ++ [ (n, Split a f' g) | (n,f') <- vrec f ]
+        ++ [ (n, Split a f g') | (n,g') <- vrec g ]
       _     -> []
    where
     -- recursively rewrite expressions in values
-    vrec r s (Var x) = []
-    vrec r s (HNF a) = [ (n,HNF a') | (n,a') <- hrec r s a ]
+    vrec (Var _x) = []
+    vrec (HNF a) = [ (n,HNF a') | (n,a') <- hrec a ]
 
     -- recursively rewrite expressions in HNFs
-    hrec r s (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
+    hrec (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
                               | (i,a) <- [0..] `zip` as
-                              , (n,a') <- vrec r s a
+                              , (n,a') <- vrec a
                               ]
-    hrec r s (Lam (Bind x e))
+    hrec (Lam (Bind x e))
             | tfUnderLambda s = [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
-    hrec r s _                = []
+    hrec  _                = []
 
 #if !NO_STRUCT_RULES
   norm = structNorm
@@ -320,7 +319,7 @@ instance Rec Expr where
 -- 2. make sure terms are "normalized" w.r.t. the rules
 
 structMatch :: Rule Expr -> Rule Expr
-structMatch rule = struct
+structMatch _rule = struct
  where
 #if !NO_STRUCT_RULES
   struct env (Def (Bind x e)) =
@@ -346,6 +345,7 @@ structMatch rule = struct
 #endif
   struct _ _ = []
 
+{-
 structNorm :: RuleEnv Expr -> Expr -> Expr
 structNorm env e =
   case normalForms env (rec rules) e of
@@ -360,6 +360,7 @@ structNorm env e =
     [ ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e)) ]
 #endif
   rules _ _ = []
+-}
 
 --------------------------------------------------------------------------------
 
@@ -394,9 +395,9 @@ instance Term Value where
   subst sub (HNF a) = HNF (subst sub a)
 
 instance Term HNF where
-  subst sub (Arr vs) = Arr (map (subst sub) vs)
-  subst sub (Lam bnd)= Lam (substBind Var subst sub bnd)
-  subst sub a        = a
+  subst sub (Arr vs)  = Arr (map (subst sub) vs)
+  subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
+  subst _sub a        = a
 
 instance Term Expr where
   subst sub (Val v)   = Val (subst sub v)
@@ -404,12 +405,12 @@ instance Term Expr where
   subst sub (a :>: b) = subst sub a :>: subst sub b
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
-  subst sub Fail      = Fail
+  subst _sub Fail      = Fail
   subst sub (Def bnd) = Def (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
-  subst sub Wrong     = Wrong
+  subst _sub Wrong     = Wrong
 
 --------------------------------------------------------------------------------
 
@@ -431,7 +432,7 @@ arbIdents =
   do k <- choose (1,7)
      return (take k (map ident names))
  where
-  names = ["x","y","z","v","w"] ++ ["x" ++ show i | i <- [1..]]
+  names = ["x","y","z","v","w"] ++ ["x" ++ show i | i <- [1::Int ..]]
 
 arbHNF :: Int -> [Ident] -> Gen HNF
 arbHNF n xs =

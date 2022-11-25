@@ -1,4 +1,4 @@
-{- x# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures -Wno-name-shadowing -Wno-orphans -Wno-type-defaults -Wno-incomplete-uni-patterns # -}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.PLDI(systemPLDI) where
@@ -52,7 +52,7 @@ update i v (v':vs) = v' : update (i-1) v vs
 -- sub-categories of expressions
 
 isChoiceFree :: Expr -> Bool
-isChoiceFree (Val v)   = True
+isChoiceFree (Val _)   = True
 isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
@@ -159,6 +159,7 @@ rulesSpeculation =
 
 --------------------------------------------------------------------------------
 
+{-
 rulesAlias :: ERule
 rulesAlias _ lhs =
   "ALIAS-SUBST" `name`
@@ -201,6 +202,7 @@ aliasX' x lhs =
 underDefs :: (Expr -> Expr) -> Expr -> Expr
 underDefs f (DEF x e) = DEF x (underDefs f e)
 underDefs f e = f e
+-}
 
 --------------------------------------------------------------------------------
 
@@ -293,7 +295,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x e -> DEF x e) e vs
+defs vs e = foldr DEF e vs
 
 unit :: Value
 unit = VARR []
@@ -431,13 +433,13 @@ rulesChoice _ lhs =
      pure (sx (e1 :|: (e2 :|: e3)))
  ++
   "CHOOSE-R" `name`
-  do (sx, e) <- scopeX lhs
-     Fail :|: e <- [e]
+  do (sx, fe) <- scopeX lhs
+     Fail :|: e <- [fe]
      pure (sx e)
  ++
   "CHOOSE-L" `name`
-  do (sx, e) <- scopeX lhs
-     e :|: Fail <- [e]
+  do (sx, ef) <- scopeX lhs
+     e :|: Fail <- [ef]
      pure (sx e)
 
 -- Put v into ctx, alpha-converting binders in ctx
@@ -457,11 +459,12 @@ rulesGarbageCollection _ lhs =
 #endif
   "ELIM-DEF" `name`
   do ee@Def{} <- [lhs]
-     r@(xs, _, e) <- wfResE ee
+     (xs, _, e) <- wfResE ee
      guard (not (null xs))
      guard (null (intersect xs (free e)))
      pure e
 
+{-
 -- ELIM-DEF together with the structural SWAP rules
 -- is able to remove all unused bindings.
 -- Without the structural rules this doesn't happen.
@@ -502,6 +505,7 @@ simpleCst xs bs e =
         [existBind xs'' bs' e]
       else
         []
+-}
 
 {- | Application Contexts
 
@@ -692,7 +696,7 @@ derefV lhs xx =
   do VARR vs <- [lhs]
      (i, v) <- zip [0..] vs
      ctx <- derefV v xx
-     pure ((\v -> VARR (update i v vs)) . ctx)
+     pure ((\ x -> VARR (update i x vs)) . ctx)
 
 {-
   x = s; E [x] ===> x = s; E[s]
@@ -760,6 +764,7 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
     isGnd bs (Var x) = isNothing (lookup x bs)
     isGnd _ _ = False
 
+{-
 -- Make a WF value canonical, i.e., order the quantifiers
 -- and bindings in a predictable order.
 -- If the given value is not WF with the expression being a value then there are no promises.
@@ -784,6 +789,7 @@ canon ee = order . head . wfResE $ ee  -- relies of wfResE returning the most ea
           cs' = [(VAR y :=: Val v) | y <- ys, Just v <- [lookup y cs] ] -- Order binders
           r' = r -- XXX WRONG canon r  -- In case it's not a value
       in  mkRes is' cs' r'
+-}
 
 ----------------------
 
@@ -794,7 +800,7 @@ isS VOP{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
-rulesDerefFP s lhs =
+rulesDerefFP ss lhs =
   "DEREF-S" `name`
   do xs@(VAR x :=: Val s) :>: e <- [lhs]
      guard (VAR x /= Val s)
@@ -806,7 +812,7 @@ rulesDerefFP s lhs =
   "DEREF-H" `name`
   do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA s e x
+     ctx <- derefA ss e x
      pure (xh :>: plug ctx (HNF h))
 #if USE_DEREF_K
  ++
@@ -859,11 +865,11 @@ rulesAllFP _ lhs =
      pure (ARR [])
  ++
   "ALL-CHOICE" `name`
-  do All es <- [lhs]
+  do All xs <- [lhs]
      let choiceRes e | [r] <- wfRes e = [[r]]
          choiceRes (e :|: es) | [r] <- wfRes e = [ r : rs | rs <- choiceRes es ]
          choiceRes _ = []
-     rs <- choiceRes es
+     rs <- choiceRes xs
      let (is, es, vs) = mkRess rs
      pure (mkRes is es (ARR vs))
 {-
@@ -877,16 +883,16 @@ rulesAllFP _ lhs =
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
-  do Split Fail f g <- [lhs]
+  do Split Fail f _g <- [lhs]
      pure (f :@: VARR [])
  ++
   "SPLIT-CHOICE" `name`
-  do Split (e :|: ee) f g <- [lhs]
+  do Split (e :|: ee) _f g <- [lhs]
      _ <- wfRes e
      spl g e ee
  ++
   "SPLIT-VAL" `name`
-  do Split e f g <- [lhs]
+  do Split e _f g <- [lhs]
      _ <- wfRes e
      spl g e Fail
  where
@@ -933,7 +939,7 @@ wfResE = wf []
     -- This judgement makes WF non-deterministic.
     -- With USE_CORRECT_WF we explore all possibilites,
     -- without it we eagerly consume DEF and :=:.
-    wf g e =
+    wf _g e =
       pure ([], [], e)
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
@@ -950,7 +956,7 @@ mkRess as = loop [] [] [] as
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
-            es = [VAR x :=: Val v | (x, v) <- cs]
+            es = [VAR x :=: Val vv | (x, vv) <- cs]
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
@@ -963,7 +969,7 @@ rulesNormalization _ lhs =
      pure (e1 :>: (e2 :>: e3))
  ++
   "NORM-SEQ-SWAP" `name`
-  do e1 :>: (xv@(VAR x :=: Val v) :>: e2) <- [lhs]
+  do e1 :>: (xv@(VAR _x :=: Val v) :>: e2) <- [lhs]
      let valid | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
                | otherwise = case e1 of VAR _ :=: Val _         -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)
@@ -1020,6 +1026,7 @@ rulesNormalization _ lhs =
 
 ------
 
+{-
 rulesStructural :: ERule
 rulesStructural _ lhs =
   do Def (Bind x (Def (Bind y e))) <- [lhs]
@@ -1027,4 +1034,5 @@ rulesStructural _ lhs =
  ++
   do (VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e) <- [lhs]
      pure ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e))
+-}
 

@@ -13,13 +13,13 @@ newtype SIntSet k = SIntSet S.IntSet
 instance forall k. (Pretty k, Coercible k Int) => Pretty (SIntSet k) where
   pPrintPrec l p (SIntSet m) = pPrintPrec l p $ map (coerce :: Int -> k) $ S.toList m
 
-empty :: forall k v. (Coercible k Int) => SIntSet k
+empty :: forall k. (Coercible k Int) => SIntSet k
 empty = coerce (S.empty :: S.IntSet)
 
-member :: forall k v. (Coercible k Int) => k -> SIntSet k -> Bool
+member :: forall k. (Coercible k Int) => k -> SIntSet k -> Bool
 member = coerce (S.member :: Int -> S.IntSet -> Bool)
 
-insert :: forall k v. (Coercible k Int) => k -> SIntSet k -> SIntSet k
+insert :: forall k. (Coercible k Int) => k -> SIntSet k -> SIntSet k
 insert = coerce (S.insert :: Int -> S.IntSet -> S.IntSet)
 
 fromList :: forall k. (Coercible k Int) => [k] -> SIntSet k

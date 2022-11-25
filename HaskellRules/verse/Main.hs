@@ -38,9 +38,9 @@ tryIt iob aiob ioa = do
 
 main :: IO ()
 main = do
-  flags <- mainArgs
+  args <- mainArgs
   let cmd =
-        case rulesys flags of
+        case rulesys args of
           Nothing -> command
           Just name -> command{ c_state = (c_state command){ esystem = either error id $ lookupSystem name } }
   runCommand cmd
@@ -200,6 +200,7 @@ cRead afn s = do
       putStrLn "OK"
     pure prog
 
+{-
 cPrelude :: Run CState
 cPrelude fn s =
   tryIt (pure s) (\ e -> pure s{ prelude = Just e }) $ do
@@ -208,6 +209,7 @@ cPrelude fn s =
     when (prog == prog) $
       putStrLn "OK"
     pure prog
+-}
 
 cParseLine :: Run CState
 cParseLine line s =
@@ -241,14 +243,16 @@ cCoreSimplify c s = cTransform (Cored . simpCore . asCore (flags s)) c s
 cCore :: Run CState
 cCore c s = cTransform (Cored . asCore (flags s)) c s
 
+{-
 cCompile :: Run CState
 cCompile c s = cTransform (Cored . compile (flags s)) c s
-
+-}
+{-
 cRun :: Run CState
 cRun c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
   where flg = flags s
         flg' = flg -- if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
-
+-}
 cEval :: Run CState
 cEval c s =
   cTransform (Cored . eval flg . compile (flags s)) c s
@@ -268,11 +272,13 @@ cRules line s =
     Left msg -> do putStrLn msg; pure s
     Right e -> do putStrLn $ "Selected: " ++ description e; pure s{ esystem = e }
 
+{-
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
       flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
   cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
+-}
 
 cRewrite :: Run CState
 cRewrite c s =
@@ -290,15 +296,18 @@ cDenSem c s =
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
 
+{-
 cDefine :: Run CState
 cDefine =
   withLastExpr $ \ e s -> do
     let !e' = asExpr e
     pure  s{ definitions = definitions s ++ [e'] }
-
+-}
+{-
 cClear :: Run CState
 cClear _ s = pure s{ definitions = [] }
-
+-}
+{-
 cDisplay :: Run CState
 cDisplay _ s = do
   case prelude s of
@@ -307,6 +316,7 @@ cDisplay _ s = do
   putStrLn "definitions:"
   mapM_ pp $ definitions s
   pure s
+-}
 
 cShow :: Run CState
 cShow =

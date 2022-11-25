@@ -1,4 +1,3 @@
-{- x# OPTIONS_GHC -Wno-name-shadowing -Wno-unused-matches # -}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -67,14 +66,14 @@ normalFormsTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Rule a -> a -> [Trace
 normalFormsTrace env rule t = normalFormsFuelTrace env (-1) rule t
 
 normalFormsFuelTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
-normalFormsFuelTrace env n rule t = go n S.empty [start t]
+normalFormsFuelTrace env an rule at = go an S.empty [start at]
  where
-  go 0 _    (tr:_)      = []
-  go n seen []          = []
+  go 0 _    (_tr:_)      = []
+  go _n _seen []          = []
   go n seen (ttr@(t:<--tr):trs)
     | t `S.member` seen = go n seen trs
     | null ts'          = ttr : go n seen' trs
-    | otherwise         = go (n-1) seen' ([t':<--((n,t):tr) | (n,t') <- ts'] ++ trs)
+    | otherwise         = go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = step rule env t
@@ -88,7 +87,7 @@ normalFormFuelTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a
 normalFormFuelTrace env n rule t = [snd (dfs env n rule t)]
 
 dfs :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Path a
-dfs env n rule t = go n S.empty [("",t)]
+dfs env an rule at = go an S.empty [("",at)]
  where
   go 0 _    tr   = (NoFuel, tr)
   go n seen tr@((_,t):_)
@@ -102,10 +101,10 @@ dfs env n rule t = go n S.empty [("",t)]
   go _ _ _ = error "impossible"
 
 normalFormsFuelTrace' :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Either (Trace a) [[(String,a)]]
-normalFormsFuelTrace' env n rule t = go n S.empty [[("",t)]]
+normalFormsFuelTrace' env an rule at = go an S.empty [[("",at)]]
  where
   go 0 _    trs         = Left (head trs)
-  go n seen []          = Right []
+  go _n _seen []          = Right []
   go n seen (tr@((_,t):_):trs)
     | t `S.member` seen = go n seen trs
     | null ts'          = (tr :) <$> go n seen' trs
@@ -118,7 +117,7 @@ normalFormsFuelTrace' env n rule t = go n S.empty [[("",t)]]
 
 traceShow :: Show a => String -> a -> a
 --traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
-traceShow msg x = x
+traceShow _msg x = x
 
 printTrace :: (Show a) => [(String,a)] -> IO ()
 printTrace tr =
@@ -131,9 +130,9 @@ printTrace tr =
 --
 
 nub :: Ord a => [a] -> [a]
-nub xs = go S.empty xs
+nub = go S.empty
  where
-  go seen []            = []
+  go _seen []            = []
   go seen (x:xs)
     | x `S.member` seen = go seen xs
     | otherwise         = x : go (S.insert x seen) xs

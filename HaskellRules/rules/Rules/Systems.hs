@@ -13,8 +13,8 @@ allSystems =
   ]
 
 lookupSystem :: String -> Either String ESystem
-lookupSystem s =
-  case lookupTRSystem s allSystems of
+lookupSystem n =
+  case lookupTRSystem n allSystems of
     []  -> Left "No system found"
     [s] -> Right s
     ss  -> Left $ "Multiple systems found: " ++ show (map sname ss)

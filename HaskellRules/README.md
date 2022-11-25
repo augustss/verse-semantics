@@ -14,7 +14,7 @@ $ make testfast
 ```
 
 ## Contents
-Doing a complete build, `cabal build` will generate the following banaries:
+Doing a complete build, `cabal build` will generate the following binaries:
 
 * `verse` An interactive system for parsing, desugaring, and evaluation.
 * `tester` A test running taking a `.versetest` file as input.
