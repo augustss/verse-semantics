@@ -2,7 +2,7 @@
 TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/tester
 TESTFILE=versetests/tests.versetest
 TESTPARSEFILE=versetests/test1.verse
-.PHONY: all test testfast
+.PHONY: all test testfast clean
 
 all:
 	echo Specify a target
@@ -19,3 +19,7 @@ testfast:
 #	$(TESTER) --quiet --dfs --split    $(TESTFILE)
 #	$(TESTER) --quiet --dfs --simplify $(TESTFILE)
 #	$(TESTER) --quiet --dfs --popl     $(TESTFILE)
+
+clean:
+	cabal clean
+	rm -f *~

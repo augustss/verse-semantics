@@ -83,7 +83,7 @@ library frontend
 
     other-modules:    FrontEnd.Misc
 
-    hs-source-dirs:   .
+    hs-source-dirs:   frontend
 
 executable verse
     import:           shared-properties
