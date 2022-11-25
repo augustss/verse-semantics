@@ -14,11 +14,7 @@ testfast:
 	$(TESTER) --quiet --parse                $(TESTPARSEFILE)
 	$(TESTER) --quiet --eval                 $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
-# PLDI rules no longer terminate with structural rules.
-#	$(TESTER) --quiet --dfs            $(TESTFILE)
-#	$(TESTER) --quiet --dfs --split    $(TESTFILE)
-#	$(TESTER) --quiet --dfs --simplify $(TESTFILE)
-#	$(TESTER) --quiet --dfs --popl     $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=pldi     $(TESTFILE)
 
 clean:
 	cabal clean
