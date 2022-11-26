@@ -18,7 +18,7 @@ testfast:
 
 clean:
 	cabal clean
-	rm -f *~
+	rm -f *~ objs-*
 
 #######
 
