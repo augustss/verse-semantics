@@ -7,12 +7,16 @@ TESTPARSEFILE=versetests/test1.verse
 all:
 	echo Specify a target
 
+build:
+	cabal build
+
 test: testfast
 	$(TESTER) --quiet --rules=popl           $(TESTFILE)
 
 testfast:
 	$(TESTER) --quiet --parse                $(TESTPARSEFILE)
 	$(TESTER) --quiet --eval                 $(TESTFILE)
+#	$(TESTER) --quiet --eval --split         $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=pldi     $(TESTFILE)
 
