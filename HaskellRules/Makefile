@@ -18,16 +18,24 @@ testfast:
 
 clean:
 	cabal clean
-	rm -f *~ objs-*
+	rm -rf *~ objs-*
 
 #######
 
 PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative
 SRCS = -iepic -ifrontend -irules -itrs -iverse
 FLAGS = -O -Wall --make
+PROF =
+#PROF = -prof -fprof-auto
 
 verse: */*.hs */*/*.hs
-	ghc $(FLAGS) $(PKGS) $(SRCS) -outputdir objs-verse verse/Main.hs -o bin/verse
+	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-verse verse/Main.hs -o bin/verse
 
 tester: */*.hs */*/*.hs
-	ghc $(FLAGS) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
+	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
+
+v1install:
+	cabal v1-install -p megaparsec
+	cabal v1-install -p QuickCheck
+	cabal v1-install -p uniplate
+	cabal v1-install -p optparse-applicative
