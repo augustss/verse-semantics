@@ -29,13 +29,13 @@ simpSeq = evalSeq flg
 simpAny :: Core -> Core
 simpAny = f
   where
-    f (CApplyVV (Var (Ident _ "any")) v) = f $ CValue v
+    f (CApply (CVar (Ident _ "any")) v) = f v
     f e = composOp f e
 
 simpFail :: Core -> Core
 simpFail = f
   where
-    f (CDef [x] (CApplyVV (VArray []) (Var x'))) | x == x' = CFail
+    f (CDef [x] (CApply (CArray []) (CVar x'))) | x == x' = CFail
     f e = composOp f e
 
 -- When there are definitions of the form x=y,
@@ -51,10 +51,8 @@ simpAlias = fc . g
         CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' cov e1' e2'
         CLam i' (CSeq [e1', e2']) -> CLambda i' [] cov e1' e2'
         e -> error $ "simpAlias: CLambda " ++ prettyShow e
-    fc e = composOpC fc fv fh e
-    fh (HLam x (CDef h e)) | Just d <- lam x h e = fh d
-    fh e = composOpH fc fv fh e
-    fv = composOpV fc fv fh
+    fc (CLam x (CDef h e)) | Just d <- lam x h e = fc d
+    fc e = composOp fc e
 
     -- x = (y = e)  -->  x = y; y = e
     g (CUnify (CVar x) e@(CUnify (CVar y) _)) =
@@ -65,7 +63,7 @@ simpAlias = fc . g
       case runState (findB h e) Nothing of
         (e', Just (x, y)) ->
           let (x', y') = if isTempIdent x then (y, x) else (x, y)
-          in  Just $ cDef (h \\ [y']) $ subst y' (Var x') e'
+          in  Just $ cDef (h \\ [y']) $ subst y' (CVar x') e'
         _ -> Nothing
 
     lam v h e =
@@ -73,7 +71,7 @@ simpAlias = fc . g
         (e', Just (x, y)) | v == x || v == y ->
           -- Eliminate y' in favor of x'
           let (x', y') = if isTempIdent x then (y, x) else (x, y)
-          in  Just $ HLam x' $ cDef (h \\ [x, y]) $ subst y' (Var x') e'
+          in  Just $ CLam x' $ cDef (h \\ [x, y]) $ subst y' (CVar x') e'
         _ -> Nothing
 
     findB h e = do

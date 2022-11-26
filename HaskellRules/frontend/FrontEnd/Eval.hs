@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Eval(
   eval,
   evalSeq,
   replacePrelude,
   EFlags(..)
   ) where
-import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe
@@ -20,14 +20,10 @@ import Epic.Print hiding (float)
 import FrontEnd.Misc
 
 pattern CUnOp :: String -> Value -> Core
-pattern CUnOp op v <- CApplyVV (VPrim op) v@HNF{}
+pattern CUnOp op v <- CApply (CPrim op) v@HNF{}
 
 pattern CBinOp :: String -> Value -> Value -> Core
-pattern CBinOp op v1 v2 <- CApplyVV (VPrim op) (VArray [v1@HNF{}, v2@HNF{}])
-
-pattern CDecides :: Core -> Core
-pattern CDecides c <- CMacro (Ident _ "decides") c
-  where CDecides e = CMacro (Ident noLoc "decides") e
+pattern CBinOp op v1 v2 <- CApply (CPrim op) (CArray [v1@HNF{}, v2@HNF{}])
 
 pattern CUnit :: Core
 pattern CUnit = CArray []
@@ -129,8 +125,8 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CAll{} = True
     isCE CSucceeds{} = True
     isCE CDecides{} = True
-    isCE (CSplit _ (VLam _ n) (VLam _ (CLam _ g))) = isCE n && isCE g
-    isCE (CApplyVV (VPrim p) _) = isCEPrim p
+    isCE (CSplit _ (CLam _ n) (CLam _ (CLam _ g))) = isCE n && isCE g
+    isCE (CApply (CPrim p) _) = isCEPrim p
     isCE CFail = True
     isCE CWrong{} = True
     isCE _ = False
@@ -250,21 +246,24 @@ evalFail = evalTrace "evalFail" f
 evalUnify :: EvalCore
 evalUnify flg = evalTrace "evalUnify" f flg
   where
-    f (CUnify (CValue v@HNF{}) (CValue x@Var{})) = f $ CUnify (CValue x) (CValue v)
-    f (CUnify (CValue v1@HNF{}) (CValue v2@HNF{})) = unifyV v1 v2
+--    f e | trace ("f " ++ show e) False = undefined
+--    f (CUnify e1 e2) | trace ("f " ++ show (e1, e2, getHNF e1, getHNF e2)) False = undefined
+    f (CUnify v@HNF{} x@CVar{}) = f $ CUnify x v
+    f (CUnify v1@HNF{} v2@HNF{}) = unifyV v1 v2
     f e = composOpLam (underLambda flg) f e
 
-    unifyV v@(VInt i1) (VInt i2) | i1 == i2 = CValue v
+--    unifyV v1 v2 | trace ("unifyV " ++ show (v1, v2)) False = undefined
+    unifyV v@(CInt i1) (CInt i2) | i1 == i2 = CValue v
                                  | otherwise = CFail
-    unifyV VInt{} _ = CFail
-    unifyV _ VInt{} = CFail
+    unifyV CInt{} _ = CFail
+    unifyV _ CInt{} = CFail
 
-    unifyV v@(VArray vs1) (VArray vs2) | length vs1 == length vs2 =
+    unifyV v@(CArray vs1) (CArray vs2) | length vs1 == length vs2 =
       cSeq $ zipWith (\ v1 v2 -> CUnify (CValue v1) (CValue v2)) vs1 vs2 ++ [CValue v]
                                        | otherwise = CFail
-    unifyV v1@VPrim{} v2 | v1 == v2 = CValue v1  -- Compatible with PLDI rules
-    unifyV VArray{} _ = CFail
-    unifyV _ VArray{} = CFail
+    unifyV v1@CPrim{} v2 | v1 == v2 = CValue v1  -- Compatible with PLDI rules
+    unifyV CArray{} _ = CFail
+    unifyV _ CArray{} = CFail
 
     unifyV _ _ = CFail -- Compatible with PLDI rule CWrong "unifyV"
 
@@ -313,7 +312,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
           -- We need to substitute v for x in cx, and then plug the hole
           -- with x=v.
           Just $ substHole (CUnify (CVar x) (CValue v)) $ subst x v cx
---        (_, Just (x, v)) | x `elem` fvsV v, Var x /= v ->
+--        (_, Just (x, v)) | x `elem` fvs v, Var x /= v ->
 --          Just $ CWrong $ "occurs check " ++ prettyShow x
         _ -> Nothing
 
@@ -330,7 +329,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
        else
         case e of
           CUnify (CVar x) (CValue v)
-            | x `notElem` fvsV v     -- occurs check
+            | x `notElem` fvs v     -- occurs check
             , x `elem` delete x vs   -- there is another free occurrence
             -> do
               put $ Just (x, v)
@@ -350,12 +349,12 @@ evalSubst flg = evalTrace "evalSubst" f flg
 
     -- Recognize and execute the SUBST-REC rule
     substRec :: Ident -> Value -> Maybe Core
-    substRec x vv | x `notElem` fvsV vv = Nothing
-                  | Var x == vv = Nothing
+    substRec x vv | x `notElem` fvs vv = Nothing
+                  | CVar x == vv = Nothing
                   | otherwise =
       case runState (findLam vv) Nothing of
         (v', Just (y, e)) ->
-          let lam = VLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
+          let lam = CLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
           in  Just $ CUnify (CVar x) $ CValue $ substHoleV lam v'
         _ -> Just $ CWrong $ "occurs check " ++ prettyShow x
       where
@@ -366,16 +365,16 @@ evalSubst flg = evalTrace "evalSubst" f flg
             pure v
            else
             case v of
-              VLam y e | x `elem` fvs e, x /= y -> do
+              CLam y e | x `elem` fvs e, x /= y -> do
                 put $ Just (y, e)
-                pure $ Var hole
-              VArray vs -> VArray <$> mapM findLam vs
+                pure $ CVar hole
+              CArray vs -> CArray <$> mapM findLam vs
               _ -> pure v
 
     substHoleV vv = sub
       where
-        sub (Var i) | i == hole = vv
-        sub (VArray vs) = VArray $ map sub vs
+        sub (CVar i) | i == hole = vv
+        sub (CArray vs) = CArray $ map sub vs
         sub v = v
 
 -- Handle simple 'def'
@@ -395,13 +394,13 @@ evalDef flg = evalTrace "evalDef" f flg
 evalSplit :: EvalCore
 evalSplit flg = evalTrace "evalSplit" f flg
   where
-    f (CSplit CFail n _) = CApplyVV n (VArray [])
-    f e@(CSplit (CValue v) _ g) = val e g v (VLam dummy CFail)
-    f e@(CSplit (CBar (CValue v) e2) _ g) = val e g v (VLam dummy e2)
+    f (CSplit CFail n _) = CApply n (CArray [])
+    f e@(CSplit (CValue v) _ g) = val e g v (CLam dummy CFail)
+    f e@(CSplit (CBar (CValue v) e2) _ g) = val e g v (CLam dummy e2)
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
-      in  CDef [y] $ CSeq [CUnify (CVar y) (CApplyVV g v), CApplyVV (Var y) r]
+      in  CDef [y] $ CSeq [CUnify (CVar y) (CApply g v), CApply (CVar y) r]
 
 dummy :: Ident
 dummy = Ident noLoc "_"
@@ -434,15 +433,15 @@ evalOne flg = evalTrace "evalOne" f flg
 evalApp :: EvalCore
 evalApp flg = evalTrace "evalApp" f flg
   where
-    f (CApplyVV (VLam i e1) v2) = f $ subst i' v2 e1'
-      where (i', e1') | i `elem` vs = (x, subst i (Var x) e1)
+    f (CApply (CLam i e1) v2) = f $ subst i' v2 e1'
+      where (i', e1') | i `elem` vs = (x, subst i (CVar x) e1)
                       | otherwise = (i, e1)
-            vs = fvsV v2
+            vs = fvs v2
             x = head $ newVars "i" vs
-    f (CApplyVV (VArray vs) vi) = cBar $ zipWith g [0..] vs
+    f (CApply (CArray vs) vi) = cBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify (CValue vi) (CInt i), CValue v]
-    f e@(CApplyVV VPrim{} _) = composOpLam (underLambda flg) f e
-    f (CApplyVV HNF{} _) = CWrong "APP-CONST-WRONG"
+    f e@(CApply CPrim{} _) = composOpLam (underLambda flg) f e
+    f (CApply HNF{} _) = CWrong "APP-CONST-WRONG"
     f e = composOpLam (underLambda flg) f e
 
 -- Handle CSeq in odd places
@@ -494,22 +493,22 @@ evalPrimOps :: EvalCore
 evalPrimOps flg = evalTrace "evalPrimOps" f flg
   where
     -- real primitives
-    f (CUnOp  "isInt$" v) | VInt{} <- v = CUnit
+    f (CUnOp  "isInt$" v) | CInt{} <- v = CUnit
                           | otherwise   = CFail
     -- float#, string#
-    f (CUnOp  "isArr$" v) | VArray{} <- v = CUnit
+    f (CUnOp  "isArr$" v) | CArray{} <- v = CUnit
                           | otherwise   = CFail
-    f (CUnOp  "isFcn$" v) | VLam{} <- v = CUnit
+    f (CUnOp  "isFcn$" v) | CLam{} <- v = CUnit
                           | otherwise   = CFail
 
     --
-    f (CUnOp  "pre'-'" (VInt i)) = CInt $ -i
-    f (CUnOp  "pre'+'" v) | VInt i <- v = CInt i
+    f (CUnOp  "pre'-'" (CInt i)) = CInt $ -i
+    f (CUnOp  "pre'+'" v) | CInt i <- v = CInt i
                           | otherwise   = CFail
     f (CBinOp "in'+'"  v1 v2) = arith (+) v1 v2
     f (CBinOp "in'-'"  v1 v2) = arith (-) v1 v2
     f (CBinOp "in'*'"  v1 v2) = arith (*) v1 v2
-    f (CBinOp "in'/'"  (VInt i1) (VInt i2)) | i2 == 0 = CFail
+    f (CBinOp "in'/'"  (CInt i1) (CInt i2)) | i2 == 0 = CFail
                                             | otherwise = CInt $ i1 `div` i2
 {-
     f (CBinOp "intLT$"  v1 v2) = cmpU (<)  v1 v2
@@ -525,13 +524,13 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
 
     f (CBinOp "in'..'"  v1 v2) = enum v1 v2
 
-    f (CUnOp  "concat$" (VArray as)) | all isHNF as =
+    f (CUnOp  "concat$" (CArray as)) | all isHNF as =
       case () of
-        _ | Just vss <- traverse getA as -> CValue $ VArray $ concat vss
+        _ | Just vss <- traverse getA as -> CValue $ CArray $ concat vss
         _ ->  CWrong $ "concat$"
-        where getA (VArray vs) = Just vs
+        where getA (CArray vs) = Just vs
               getA _ = Nothing
-    f (CBinOp op  (VInt ni) (VArray vs)) | op `elem` ["takeL$", "dropL$", "takeR$", "dropR$"] =
+    f (CBinOp op  (CInt ni) (CArray vs)) | op `elem` ["takeL$", "dropL$", "takeR$", "dropR$"] =
       let n = fromInteger ni in
       if n >= 0 && n <= length vs then
         case op of
@@ -543,15 +542,15 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
        else
         CFail
 
-    f (CUnOp  "length" v) | VArray as <- v = CInt $ toInteger $ length as
+    f (CUnOp  "length" v) | CArray as <- v = CInt $ toInteger $ length as
                           | otherwise = CFail
 
     -- Use in 'all' desugaring.  mapAp = map ($())
-    f (CUnOp  "mapAp$" (VArray vs)) = mkArr vs
+    f (CUnOp  "mapAp$" (CArray vs)) = mkArr vs
 
     -- XXX Stricter than necessary?
-    f (CApplyVV (VPrim "cons$") v) | VArray [v1, VArray vs] <- v = CArray $ v1 : vs
-                                   | VArray [_, va] <- v, isHNF va = CFail
+    f (CApply (CPrim "cons$") v) | CArray [v1, CArray vs] <- v = CArray $ v1 : vs
+                                   | CArray [_, va] <- v, isHNF va = CFail
 --x                                 | isHNF v = CFail
 
     f e@(CUnOp "known$" _) = e  -- XXX Just leave it alone for now
@@ -559,28 +558,29 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
     f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
 
     -- Fully evaluated, and still no match
-    f (CApplyVV (VPrim op) a) | isNF a = unimplemented $ show (op, a)
+    f (CApply (CPrim op) a) | isNF a = unimplemented $ show (op, a)
     f e = composOpLam (underLambda flg) f e
 
-    arith op (VInt i1) (VInt i2) = CInt $ op i1 i2
+    arith op (CInt i1) (CInt i2) = CInt $ op i1 i2
     arith _ _ _ = CFail  -- CWrong?
     
-    cmp op (VInt i1) (VInt i2) | op i1 i2  = CInt i1
+    cmp op (CInt i1) (CInt i2) | op i1 i2  = CInt i1
                                | otherwise = CFail
     cmp _ _ _ = CFail   -- CWrong?
 {-
-    cmpU op (VInt i1) (VInt i2) | op i1 i2  = CUnit
+    cmpU op (CInt i1) (CInt i2) | op i1 i2  = CUnit
                                 | otherwise = CFail
     cmpU _ _ _ = CFail   -- CWrong?
 -}
-    enum (VInt lo) (VInt hi) = cBar [CInt i | i <- [lo .. hi ]]
+    enum (CInt lo) (CInt hi) = cBar [CInt i | i <- [lo .. hi ]]
     enum _ _ = CFail
 
 
 isNF :: Value -> Bool
-isNF (Var _) = False
-isNF (HNF (HArray vs)) = all isNF vs
+isNF (CVar _) = False
+isNF (HNF (CArray vs)) = all isNF vs
 isNF (HNF _) = True
+isNF _ = False
 
 isHNF :: Value -> Bool
 isHNF HNF{} = True
@@ -588,16 +588,15 @@ isHNF _ = False
 
 mkArr :: [Value] -> Core
 mkArr vs =
-  let xs = take (length vs) $ newVars "x" $ fvsV (VArray vs)
-      unit = VArray []
-  in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApplyVV v unit) xs vs ++ [CArray $ map Var xs]
+  let xs = take (length vs) $ newVars "x" $ fvs (CArray vs)
+  in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply v CUnit) xs vs ++ [CArray $ map CVar xs]
 
 -- A gruesome hack to test if something is an uninstantiated logical variable.
 evalKnown :: EvalCore
 evalKnown flg = evalTrace "evalKnown" f flg
   where
-    f (CApplyVV (VPrim "known$") v) | isHNF v   = CUnit
-                                    | otherwise = CFail
+    f (CApply (CPrim "known$") v) | isHNF v   = CUnit
+                                  | otherwise = CFail
     f e = composOp f e
 
 -------------------
@@ -611,7 +610,7 @@ replPrelude = evalTrace "replacePrelude" replacePrelude
 replacePrelude :: Core -> Core
 replacePrelude = f
   where
-    f (CApplyVV (Var (Ident _ i)) v) | Just p <- lookup i prelude = CApplyVV p v
+    f (CApply (CVar (Ident _ i)) v) | Just p <- lookup i prelude = CApply p v
     f (CVar (Ident _ i)) | Just p <- lookup i prelude = CValue p
     f e = composOp f e
 
@@ -619,10 +618,10 @@ replacePrelude = f
 prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                           -- x => x
-  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (VInt 0)]) -- x => int#[x]; x>=0; x
+  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (CInt 0)]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
   ,("in'->'", arrowV)
-  ,("false", VArray [])                                      -- ()
+  ,("false", CArray [])                                      -- ()
 {-
   ,("in'>'",  cmpV "intGT$")
   ,("in'>='", cmpV "intGE$")
@@ -632,26 +631,26 @@ prelude =
   ,("new", newV)
 --  ,("pre'[]'", unimplemented "pre []")
 --  ,("pre'^'", unimplemented "pre ^")
-  ,("post'^'", VLam x $ CApplyVV (VPrim "read$") vx)
-  ,("in'.='", VLam x $ CApplyVV (VPrim "write$") vx)
+  ,("post'^'", CLam x $ CApply (CPrim "read$") vx)
+  ,("in'.='", CLam x $ CApply (CPrim "write$") vx)
   ]
-  where typ is = VLam x $ cSeq $ is ++ [CVar x]
-        vx = Var x
-        app f v = CApplyVV (VPrim f) v
-        app2 f v1 v2 = CApplyVV (VPrim f) (VArray [v1, v2])
+  where typ is = CLam x $ cSeq $ is ++ [CVar x]
+        vx = CVar x
+        app f v = CApply (CPrim f) v
+        app2 f v1 v2 = CApply (CPrim f) (CArray [v1, v2])
 
         arrowV =
-          VLam st $
+          CLam st $
             CDef [s, t] $
             CSeq [
-              CUnify (CValue (VArray [Var s, Var t])) (CVar st),
+              CUnify (CValue (CArray [CVar s, CVar t])) (CVar st),
               CLam g $ CLam y $
                 CDef [sy, gsy] $
                 CSeq [
-                  app "isFcn$" (Var g),
-                  CUnify (CVar sy) (CApplyVV (Var s) (Var y)),
-                  CUnify (CVar gsy) (CApplyVV (Var g) (Var sy)),
-                  CApplyVV (Var t) (Var gsy)
+                  app "isFcn$" (CVar g),
+                  CUnify (CVar sy) (CApply (CVar s) (CVar y)),
+                  CUnify (CVar gsy) (CApply (CVar g) (CVar sy)),
+                  CApply (CVar t) (CVar gsy)
                   ]
               ]
         [st, s, t, g, y, sy, gsy, x, _xy] =
@@ -659,28 +658,25 @@ prelude =
 
 {-
         cmpV op =
-          VLam xy $
+          CLam xy $
             CDef [x, y] $
             CSeq [
-              CUnify (CValue (VArray [Var x, Var y])) (CVar xy),
-              app op (Var xy),
+              CUnify (CValue (CArray [CVar x, CVar y])) (CVar xy),
+              app op (CVar xy),
               CVar x
               ]
 -}
         newV =
-          VLam t $ CLam x $
+          CLam t $ CLam x $
             CDef [y] $
             CSeq [
-              CUnify (CVar y) (CApplyVV (Var t) (Var x)),
-              app "alloc$" (Var y)
+              CUnify (CVar y) (CApply (CVar t) (CVar x)),
+              app "alloc$" (CVar y)
               ]
 
 -- A special purpose composOp that can avoid going under lambda.
 composOpLam :: Bool -> (Core -> Core) -> Core -> Core
-composOpLam underLam f = runIdentity . composC fc fv fh
+composOpLam underLam f = composOp f'
   where
-    fc = pure . f
-    fv = composV fc fv fh
-    fh h@HLam{} | not underLam = pure h
-    fh h = composH fc fv fh h
-    
+    f' e@CLam{} | not underLam = e
+    f' e = f e

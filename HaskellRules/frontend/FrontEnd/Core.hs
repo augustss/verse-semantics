@@ -1,23 +1,20 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Core(
   Core(..),
-  pattern CApplyVV, pattern CUnifyVE,
-  pattern COne, pattern CAll, pattern CSucceeds,
-  pattern CVar, pattern VPrim, pattern VArray, pattern CArray,
-  pattern VLam, pattern CLam, pattern CInt, pattern VInt,
-  Value(..),
-  HNF(..),
+  pattern HNF, pattern CValue,
+  pattern COne, pattern CAll, pattern CSucceeds, pattern CDecides,
+  Value,
+  getValue, getHNF,
   compos, composOp,
   exprToCore,
   cSeq, cDef, cBar,
   isValue,
-  fvs, fvsV, cfvs, cfvsV,
-  subst, substV,
-  alphaConvert, alphaConvertV, alphaConvertH,
-  composC, composV, composH,
-  composOpC, composOpV, composOpH,
+  fvs, cfvs,
+  subst,
+  alphaConvert,
   pCore, pCoreFile,
   ) where
 import Prelude hiding ((<>))
@@ -33,14 +30,19 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
 import FrontEnd.Desugar(primOps, getVisible, covariantId, simpleDesugar)
-import FrontEnd.Error(unimplemented, impossible, internalError, internalErrorMsg)
+import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
 import FrontEnd.Misc(pattern Snoc)
 --import Debug.Trace
 
 data Core
-  = CValue Value
+  = CVar Ident
+  | CInt Integer
+  | CRat Rational
+  | CPrim String
+  | CArray [Value]
+  | CLam Ident Core
   | CUnify Core Core
   | CSeq [Core]
   | CApply Core Core
@@ -53,39 +55,10 @@ data Core
   | CLambda Ident [Ident] Bool Core Core
   deriving (Show, Eq)
 
+type Value = Core
+
 type Heap = [Ident]
 
-data Value = Var Ident | HNF HNF
-  deriving (Show, Eq)
-
-data HNF
-  = HInt Integer
-  | HRat Rational
-  | HPrim String
-  | HArray [Value]
-  | HLam Ident Core
-  deriving (Show, Eq)
-
-pattern CApplyVV :: Value -> Value -> Core
-pattern CApplyVV v1 v2 = CApply (CValue v1) (CValue v2)
-pattern CUnifyVE :: Value -> Core -> Core
-pattern CUnifyVE v e = CUnify (CValue v) e
-pattern CInt :: Integer -> Core
-pattern CInt x = CValue (HNF (HInt x))
-pattern VInt :: Integer -> Value
-pattern VInt i = HNF (HInt i)
-{-
-pattern CRat :: Rational -> Core
-pattern CRat x = CValue (HNF (HRat x))
--}
-pattern VArray :: [Value] -> Value
-pattern VArray vs = HNF (HArray vs)
-pattern CArray :: [Value] -> Core
-pattern CArray vs = CValue (VArray vs)
-pattern VPrim :: String -> Value
-pattern VPrim s = HNF (HPrim s)
-pattern CVar :: Ident -> Core
-pattern CVar x = CValue (Var x)
 pattern COne :: Core -> Core
 pattern COne c <- CMacro (Ident _ "one") c
   where COne e = CMacro (Ident noLoc "one") e
@@ -98,11 +71,15 @@ pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
 pattern CDecides :: Core -> Core
 pattern CDecides c <- CMacro (Ident _ "decides") c
   where CDecides e = CMacro (Ident noLoc "decides") e
-pattern VLam :: Ident -> Core -> Value
-pattern VLam i e = HNF (HLam i e)
-pattern CLam :: Ident -> Core -> Core
-pattern CLam i e = CValue (VLam i e)
 
+pattern HNF :: Core -> Core
+pattern HNF e <- (getHNF -> Just e)
+
+pattern CValue :: Core -> Value
+pattern CValue e <- (getValue -> Just e)
+  where CValue e = e
+--x          | isValue e = e
+--x          | otherwise = error "pattern CValue"
 
 cSeq :: [Core] -> Core
 cSeq [] = internalError
@@ -118,18 +95,28 @@ cBar [] = CFail
 cBar [e] = e
 cBar (e:es) = CBar e $ cBar es
 
+getHNF :: Core -> Maybe Core
+getHNF e@CInt{} = Just e
+getHNF e@CRat{} = Just e
+getHNF e@CArray{} = Just e
+getHNF e@CPrim{} = Just e
+getHNF e@CLam{} = Just e
+getHNF _ = Nothing
+
+getValue :: Core -> Maybe Core
+getValue e@CVar{} = Just e
+getValue e = getHNF e
+
 isValue :: Core -> Bool
-isValue CValue{} = True
-isValue _ = False
+isValue e = isJust (getValue e)
 
 isValue' :: Core -> Bool
 isValue' (CSeq [e]) = isValue' e
 isValue' (CSeq (e:es)) = isValue' e && isValue' (CSeq es)
-isValue' CValue{} = True
-isValue' _ = False
+isValue' e = isValue e
 
 vEmpty :: Value
-vEmpty = HNF $ HArray []
+vEmpty = CArray []
 
 type C = ReaderT Flags (State Int)
 
@@ -155,26 +142,34 @@ exprToCore :: Flags -> Expr -> Core
 exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
 
 core :: HasCallStack => Expr -> C Core
-core e@LitInt{} = val e
-core e@LitRat{} = val e
+core (LitInt i) = pure (CInt i)
+core (LitRat i _) = pure (CRat $ toRational i)
+core (Variable i@(Ident _ s)) | i `elem` primOps = pure (CPrim s)
+                              | otherwise = pure (CVar i)
+core (Array es) = CArray <$> mapM core es
+{-
+core (Typedef e) = do
+  i <- newTmp
+  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
+-}
+core (Function [(Define x AnyT, fs)] b) = CLam x . attr <$> coreD b
+  where attr ae = foldr CMacro ae fs
+--core (Lambda i [] e1 e2) = core $ lamFunc True i e1 e2
+core AnyT = pure (CPrim ":any")
 core (Wrong s) = pure $ CWrong s
-core e@Variable{} = val e
-core e@Array{} = val e
 core (Seq (Snoc es e)) = seqC <$> mapM core (Snoc (filter p es) e)
   where p (Define _ AnyT) = False
         p _ = True
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
-core (ApplyD e1 e2) = --CApplyVV <$> value e1 <*> value e2
-                      CApply <$> core e1 <*> core e2
+core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
 core (ApplyEff rs e) = coreEffs rs =<< coreD e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
-core e@Typedef{} = val e
+core e@Typedef{} = core e
 core e@Choice{} = cBar <$> mapM coreD (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
 core (Define i AnyT) = pure $ CVar i
 core (Define i e) = cUnify (CVar i) <$> core e
-core AnyT = undefined
 core Fail = pure $ CFail
 core (For2 e1 e2) = do
   useSplit <- asks fSplit
@@ -186,7 +181,7 @@ core (For2 e1 e2) = do
     ee <- coreD (seqE [e1, e2'])
     ea <- cAll ee
     xa <- newTmp
-    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApplyVV (VPrim "mapAp$") (Var xa)]
+    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
 core (If3 e1 e2 e3) = do
   c1 <- core e1
   if isValue' c1 then
@@ -198,14 +193,14 @@ core (If3 e1 e2 e3) = do
     r <- core e3'
     fn <- cOne $ CBar l r
     i <- newTmp
-    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApplyVV (Var i) vEmpty]
+    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (CVar i) vEmpty]
 --core e@Function{} = val e
 core (Do e) = coreD e
 core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
-core (Lambda i [] (Array []) e) = val $ Function [(Define i AnyT, [])] e
+core (Lambda i [] (Array []) e) = core $ Function [(Define i AnyT, [])] e
 core (Lambda i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
@@ -216,7 +211,7 @@ core (Lambda i rs e1 e2) = do
     e2' <- coreD e2
     pure $ CLambda i is covariant e1' e2'
   else
-    val $ lamFunc covariant i e1 e2
+    core $ lamFunc covariant i e1 e2
 core EmptyT = pure CFail
 core e = impossible e
 
@@ -257,15 +252,15 @@ forSplit e1 e2 = do
   let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
       gDef e = CDef [g] (cSeq [CUnify (CVar g) $
                                CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
-                                  CUnify (CVar x) (CArray $ map Var vs),
+                                  CUnify (CVar x) (CArray $ map CVar vs),
                                   CUnify (CVar a) e2',
-                                  CUnify (CVar b) (CSplit (CApplyVV (Var y) (VArray [])) (Var f) (Var g)),
-                                  CApplyVV (VPrim "cons$") (VArray [Var a, Var b])
+                                  CUnify (CVar b) (CSplit (CApply (CVar y) (CArray [])) (CVar f) (CVar g)),
+                                  CApply (CPrim "cons$") (CArray [CVar a, CVar b])
                                   ],
                                e
                               ])
 
-  pure $ fDef $ gDef $ CSplit e1' (Var f) (Var g)
+  pure $ fDef $ gDef $ CSplit e1' (CVar f) (CVar g)
 
 cOne :: Core -> C Core
 cOne e = do
@@ -275,7 +270,7 @@ cOne e = do
   u1 <- newTmp
   u2 <- newTmp
   v <- newTmp
-  pure $ CSplit e (VLam u1 CFail) (VLam v $ CLam u2 $ CVar v)
+  pure $ CSplit e (CLam u1 CFail) (CLam v $ CLam u2 $ CVar v)
 
 cAll :: Core -> C Core
 cAll e = do
@@ -294,10 +289,10 @@ cAll e = do
              CUnify (CVar g) (CLam v $ CLam r $
                                CDef [x] $
                                  CSeq [
-                                   CUnify (CVar x) (CSplit (CApplyVV (Var r) (VArray [])) (Var f) (Var g)),
-                                   CApplyVV (VPrim "cons$") (VArray [Var v, Var x])
+                                   CUnify (CVar x) (CSplit (CApply (CVar r) (CArray [])) (CVar f) (CVar g)),
+                                   CApply (CPrim "cons$") (CArray [CVar v, CVar x])
                                    ]),
-             CSplit e (Var f) (Var g)
+             CSplit e (CVar f) (CVar g)
              ]
 
 cSucceeds :: Core -> C Core
@@ -312,10 +307,10 @@ cSucceeds e = do
   x <- newTmp
   y <- newTmp
   pure $ CSplit e
-                (VLam u1 (CWrong "succeeds-fail"))
-                (VLam x $ CLam y $ CSplit (CApplyVV (Var y) (VArray []))
-                                          (VLam u2 (CVar x))
-                                          (VLam u3 $ CLam u4 $ CWrong "succeed-many")
+                (CLam u1 (CWrong "succeeds-fail"))
+                (CLam x $ CLam y $ CSplit (CApply (CVar y) (CArray []))
+                                          (CLam u2 (CVar x))
+                                          (CLam u3 $ CLam u4 $ CWrong "succeed-many")
                 )
 
 cDecides :: Core -> C Core
@@ -330,15 +325,15 @@ cDecides e = do
   x <- newTmp
   y <- newTmp
   pure $ CSplit e
-                (VLam u1 CFail)
-                (VLam x $ CLam y $ CSplit (CApplyVV (Var y) (VArray []))
-                                          (VLam u2 (CVar x))
-                                          (VLam u3 $ CLam u4 $ CWrong "succeed-many")
+                (CLam u1 CFail)
+                (CLam x $ CLam y $ CSplit (CApply (CVar y) (CArray []))
+                                          (CLam u2 (CVar x))
+                                          (CLam u3 $ CLam u4 $ CWrong "succeed-many")
                 )
 
 -- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core
-cUnify e (CValue (VPrim ":any")) = e
+cUnify e (CPrim ":any") = e
 cUnify e1 e2 = CUnify e1 e2
 
 coreD :: HasCallStack => Expr -> C Core
@@ -346,6 +341,7 @@ coreD e | null is = core e
         | otherwise = CDef is <$> core e
   where is = getVisible e
 
+{-
 val :: HasCallStack => Expr -> C Core
 val e = CValue <$> value e
 
@@ -355,7 +351,7 @@ value (LitInt i) = pure (HNF $ HInt i)
 value (LitRat i _) = pure (HNF $ HRat $ toRational i)
 value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
                                | otherwise = pure (Var i)
-value (Array es) = HNF . HArray <$> mapM value es
+value (Array es) = CArray <$> mapM value es
 {-
 value (Typedef e) = do
   i <- newTmp
@@ -366,6 +362,7 @@ value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
 value (Lambda i [] e1 e2) = value $ lamFunc True i e1 e2
 value AnyT = pure (HNF $ HPrim ":any")
 value e = internalErrorMsg $ "value: not a value\n" ++ show e
+-}
 
 --eVar :: String -> Expr
 --eVar = Variable . Ident noLoc
@@ -380,7 +377,13 @@ thunk e = do
 ------
 
 instance Pretty Core where
-  pPrintPrec l p (CValue v) = pPrintPrec l p v
+  pPrintPrec l p (CVar i) = pPrintPrec l p i
+  pPrintPrec l p (CInt i) = pPrintPrec l p i
+  pPrintPrec _ _ (CRat _) = undefined -- pPrintPrec l p r
+  pPrintPrec _ _ (CPrim s) = text s
+  pPrintPrec l _ (CArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
+  pPrintPrec l _ (CArray vs) = parens $ commaSep l vs
+  pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
   pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
@@ -399,22 +402,15 @@ instance Pretty Core where
              (if cov then text "<covariant> " else text "") <>
              text "." <+> pPrintPrec l 0 e2
 
-instance Pretty Value where
-  pPrintPrec l p (Var i) = pPrintPrec l p i
-  pPrintPrec l p (HNF v) = pPrintPrec l p v
-
-instance Pretty HNF where
-  pPrintPrec l p (HInt i) = pPrintPrec l p i
-  pPrintPrec _ _ (HRat _) = undefined -- pPrintPrec l p r
-  pPrintPrec _ _ (HPrim s) = text s
-  pPrintPrec l _ (HArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
-  pPrintPrec l _ (HArray vs) = parens $ commaSep l vs
-  pPrintPrec l p (HLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
-
 ------
 
 compos :: (Applicative f) => (Core -> f Core) -> Core -> f Core
-compos f (CValue v) = CValue <$> appV f v
+compos _ v@CVar{} = pure v
+compos _ v@CInt{} = pure v
+compos _ v@CRat{} = pure v
+compos _ v@CPrim{} = pure v
+compos f (CArray vs) = CArray <$> traverse f vs
+compos f (CLam i e) = CLam i <$> f e
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
 compos f (CSeq es) = CSeq <$> traverse f es
 compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
@@ -423,66 +419,24 @@ compos _ CFail = pure CFail
 compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
-compos f (CSplit e n g) = CSplit <$> f e <*> appV f n <*> appV f g
+compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
 compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
-
-appV :: (Applicative f) => (Core -> f Core) -> Value -> f Value
-appV _ v@Var{} = pure v
-appV f (HNF v) = HNF <$> appH f v
-
-appH :: (Applicative f) => (Core -> f Core) -> HNF -> f HNF
-appH _ v@HInt{} = pure v
-appH _ v@HRat{} = pure v
-appH _ v@HPrim{} = pure v
-appH f (HArray vs) = HArray <$> traverse (appV f) vs
-appH f (HLam i e) = HLam i <$> f e
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
-
-composC :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Core -> f Core
-composC _  fv _  (CValue v) = CValue <$> fv v
-composC fc _fv _  (CUnify e1 e2) = CUnify <$> fc e1 <*> fc e2
-composC fc _  _  (CSeq es) = CSeq <$> traverse fc es
-composC fc _  _  (CApply e1 e2) = CApply <$> fc e1 <*> fc e2
-composC fc _  _  (CBar e1 e2) = CBar <$> fc e1 <*> fc e2
-composC _  _  _  CFail = pure CFail
-composC fc _  _  (CMacro i e) = CMacro i <$> fc e
-composC fc _  _  (CDef h e) = CDef h <$> fc e
-composC _  _  _   e@CWrong{} = pure e
-composC fc fv _  (CSplit e f g) = CSplit <$> fc e <*> fv f <*> fv g
-composC fc _  _  (CLambda i is cov e1 e2) = CLambda i is cov <$> fc e1 <*> fc e2
-
-composV :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> Value -> f Value
-composV _  _  _  v@Var{} = pure v
-composV _  _  fh (HNF v) = HNF <$> fh v
-
-composH :: (Applicative f) => (Core -> f Core) -> (Value -> f Value) -> (HNF -> f HNF) -> HNF -> f HNF
-composH _  _  _  v@HInt{} = pure v
-composH _  _  _  v@HRat{} = pure v
-composH _  _  _  v@HPrim{} = pure v
-composH _  fv _  (HArray vs) = HArray <$> traverse fv vs
-composH fc _  _  (HLam i e) = HLam i <$> fc e
-
-composOpC :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> Core -> Core
-composOpC fc fv fh = runIdentity . composC (pure . fc) (pure . fv) (pure . fh)
-
-composOpV :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> Value -> Value
-composOpV fc fv fh = runIdentity . composV (pure . fc) (pure . fv) (pure . fh)
-
-composOpH :: (Core -> Core) -> (Value -> Value) -> (HNF -> HNF) -> HNF -> HNF
-composOpH fc fv fh = runIdentity . composH (pure . fc) (pure . fv) (pure . fh)
 
 -- Unique free variables
 fvs :: Core -> [Ident]
 fvs = nub . cfvs
 
-fvsV :: Value -> [Ident]
-fvsV = nub . cfvsV
-
 -- Occurrences of free variables
 cfvs :: Core -> [Ident]
-cfvs (CValue v) = cfvsV v
+cfvs (CVar v) = [v]
+cfvs CInt{} = []
+cfvs CRat{} = []
+cfvs CPrim{} = []
+cfvs (CArray vs) = concatMap cfvs vs
+cfvs (CLam i e) = filter (/= i) $ cfvs e
 cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CSeq es) = concatMap cfvs es
 cfvs (CApply e1 e2) = cfvs e1 ++ cfvs e2
@@ -490,18 +444,10 @@ cfvs (CBar e1 e2) = cfvs e1 ++ cfvs e2
 cfvs CFail = []
 cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
-cfvs (CSplit e f g) = cfvs e ++ cfvsV f ++ cfvsV g
+cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
 cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
 
-cfvsV :: Value -> [Ident]
-cfvsV (Var i) = [i]
-cfvsV (HNF h) = cfvsH h
-
-cfvsH :: HNF -> [Ident]
-cfvsH (HArray vs) = concatMap cfvsV vs
-cfvsH (HLam i e) = filter (/= i) $ cfvs e
-cfvsH _ = []
 
 ------
 
@@ -511,8 +457,16 @@ subst :: Ident -> Value -> Core -> Core
 subst x b ae | x `elem` bs = impossible "subst occur check"
              | otherwise = sub ae
   where
-    bs = fvsV b
-    sub (CValue v) = CValue $ subV v
+    bs = fvs b
+    sub v@(CVar i) | i == x = b
+                  | otherwise = v
+    sub e@CInt{} = e
+    sub e@CRat{} = e
+    sub e@CPrim{} = e
+    sub (CArray vs) = CArray $ map sub vs
+    sub a@(CLam i e) | x == i = a
+                     | i `notElem` bs = CLam i $ sub e
+                     | otherwise = sub $ alphaConvert bs a
     sub (CUnify e1 e2) = CUnify (sub e1) (sub e2)
     sub (CSeq es) = CSeq $ map sub es
     sub (CApply e1 e2) = CApply (sub e1) (sub e2)
@@ -523,31 +477,23 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | null (intersect bs h) = CDef h $ sub e
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
-    sub (CSplit e f g) = CSplit (sub e) (subV f) (subV g)
+    sub (CSplit e f g) = CSplit (sub e) (sub f) (sub g)
     sub e@(CLambda i is cov e1 e2)
       | x `elem` (i:is) = e
       | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
       | otherwise = sub $ alphaConvert bs e
-
-    subV v@(Var i) | i == x = b
-                   | otherwise = v
-    subV (HNF v) = HNF $ subH v
-
-    subH (HArray vs) = HArray $ map subV vs
-    subH a@(HLam i e) | x == i = a
-                      | i `notElem` bs = HLam i $ sub e
-                      | otherwise = subH $ alphaConvertH bs a
-    subH v = v
-
-substV :: Ident -> Value -> Value -> Value
-substV i x v = let CValue v' = subst i x (CValue v) in v'
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
 alphaConvert :: [Ident] -> Core -> Core
 alphaConvert vs = alpha []
   where
-    alpha m (CValue v) = CValue (alphaV m v)
+    alpha m (CVar i) = CVar $ fromMaybe i $ lookup i m
+    alpha _ e@CInt{} = e
+    alpha _ e@CRat{} = e
+    alpha _ e@CPrim{} = e
+    alpha m (CArray es) = CArray (map (alpha m) es)
+    alpha m (CLam i e) = CLam i' $ alpha (add (i, i') m) e where i' = fresh i
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
     alpha m (CSeq es) = CSeq (map (alpha m) es)
     alpha m (CApply e1 e2) = CApply (alpha m e1) (alpha m e2)
@@ -558,36 +504,17 @@ alphaConvert vs = alpha []
       where h' = map fresh h
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
-    alpha m (CSplit e f g) = CSplit (alpha m e) (alphaV m f) (alphaV m g)
+    alpha m (CSplit e f g) = CSplit (alpha m e) (alpha m f) (alpha m g)
     alpha m (CLambda i is cov e1 e2) = CLambda i' is' cov (alpha m' e1) (alpha m' e2)
       where i' = fresh i
             is' = map fresh is'
             m' = foldr add m (zip (i:is) (i':is'))
-
-    alphaV m (Var i) = Var $ fromMaybe i $ lookup i m
-    alphaV m (HNF h) = HNF (alphaH m h)
-
-    alphaH m (HArray es) = HArray (map (alphaV m) es)
-    alphaH m (HLam i e) = HLam i' $ alpha (add (i, i') m) e where i' = fresh i
-    alphaH _ h = h
 
     add ii@(i, i') m | i == i' = m
                      | otherwise = ii : m
 
     fresh i@(Ident l s) | i `notElem` vs = i
                         | otherwise = fresh $ Ident l (s ++ "'")
-
-alphaConvertH :: [Ident] -> HNF -> HNF
-alphaConvertH vs h =
-  case alphaConvert vs (CValue (HNF h)) of
-    CValue (HNF h') -> h'
-    _ -> impossible ()
-
-alphaConvertV :: [Ident] -> Value -> Value
-alphaConvertV vs v =
-  case alphaConvert vs (CValue v) of
-    CValue v' -> v'
-    _ -> impossible ()
 
 -----------------------------------
 

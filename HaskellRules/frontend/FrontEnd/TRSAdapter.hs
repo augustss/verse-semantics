@@ -56,12 +56,18 @@ sub flg sys | fFinalInline flg = postProcess sys
             | otherwise = id
 
 coreToTrs :: Core -> T.Expr
-coreToTrs (CValue v) = T.Val (coreToTrsV v)
+coreToTrs (CVar i) = T.Val $ T.Var $ coreToTrsI i
+coreToTrs (CInt i) = T.Val $ T.HNF $ T.Int i
+coreToTrs CRat{} = undefined
+coreToTrs (CPrim s) = T.Val $ T.HNF $ T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
+  where ops = map (\ (x,y) -> (y, x)) allOps
+coreToTrs (CArray vs) = T.Val $ T.HNF $ T.Arr $ map coreToTrsV vs
+coreToTrs (CLam x e) = T.Val $ T.HNF $ T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
 coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (CSeq []) = undefined
 coreToTrs (CSeq [e]) = coreToTrs e
 coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
-coreToTrs (CApplyVV v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
+coreToTrs (CApply v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
 coreToTrs (CBar e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
 coreToTrs CFail = T.Fail
 coreToTrs (COne e) = T.One $ coreToTrs e
@@ -73,31 +79,22 @@ coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
-coreToTrs e@CApply{} = impossible e
+--coreToTrs e@CApply{} = impossible e
 
-coreToTrsV :: Value -> T.Value
-coreToTrsV (Var i) = T.Var $ coreToTrsI i
-coreToTrsV (HNF h) = T.HNF $ coreToTrsH h
-
-coreToTrsH :: HNF -> T.HNF
-coreToTrsH (HInt i) = T.Int i
-coreToTrsH HRat{} = undefined
-coreToTrsH (HPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
-  where ops = map (\ (x,y) -> (y, x)) allOps
-coreToTrsH (HArray vs) = T.Arr $ map coreToTrsV vs
-coreToTrsH (HLam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
+coreToTrsV :: Core -> T.Value
+coreToTrsV e = case coreToTrs e of T.Val v -> v; _ -> undefined
 
 coreToTrsI :: Ident -> T.Ident
 coreToTrsI (Ident _ s) = T.Name s
 
 trsToCore :: T.Expr -> Core
-trsToCore (T.Val v) = CValue $ trsToCoreV v
+trsToCore (T.Val v) = trsToCoreV v
 trsToCore (e1 T.:=: e2) = CUnify (trsToCore e1) (trsToCore e2)
 trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
 trsToCore (e1 T.:|: e2) = CBar (trsToCore e1) (trsToCore e2)
-trsToCore (e1 T.:@: e2) = CApplyVV (trsToCoreV e1) (trsToCoreV e2)
+trsToCore (e1 T.:@: e2) = CApply (trsToCoreV e1) (trsToCoreV e2)
 trsToCore T.Fail = CFail
 trsToCore ee@T.Def{} = flat [] ee
   where flat vs (T.Def (T.Bind x e)) = flat (vs ++ [x]) e
@@ -107,15 +104,15 @@ trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
 trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCoreV f) (trsToCoreV g)
 
-trsToCoreV :: T.Value -> Value
-trsToCoreV (T.Var i) = Var (trsToCoreI i)
-trsToCoreV (T.HNF h) = HNF (trsToCoreH h)
+trsToCoreV :: T.Value -> Core
+trsToCoreV (T.Var i) = CVar (trsToCoreI i)
+trsToCoreV (T.HNF h) = trsToCoreH h
 
-trsToCoreH :: T.HNF -> HNF
-trsToCoreH (T.Int i) = HInt i
-trsToCoreH (T.Op op) = HPrim $ fromMaybe undefined $ lookup op allOps
-trsToCoreH (T.Arr vs) = HArray $ map trsToCoreV vs
-trsToCoreH (T.Lam (T.Bind x e)) = HLam (trsToCoreI x) (trsToCore e)
+trsToCoreH :: T.HNF -> Core
+trsToCoreH (T.Int i) = CInt i
+trsToCoreH (T.Op op) = CPrim $ fromMaybe undefined $ lookup op allOps
+trsToCoreH (T.Arr vs) = CArray $ map trsToCoreV vs
+trsToCoreH (T.Lam (T.Bind x e)) = CLam (trsToCoreI x) (trsToCore e)
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
