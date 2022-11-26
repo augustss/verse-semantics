@@ -19,3 +19,15 @@ testfast:
 clean:
 	cabal clean
 	rm -f *~
+
+#######
+
+PKGS = -package megaparsec -package parser-combinators -package haskeline -package QuickCheck -package optparse-applicative
+SRCS = -iepic -ifrontend -irules -itrs -iverse
+FLAGS = -O -Wall --make
+
+verse: */*.hs */*/*.hs
+	ghc $(FLAGS) $(PKGS) $(SRCS) -outputdir objs-verse verse/Main.hs -o bin/verse
+
+tester: */*.hs */*/*.hs
+	ghc $(FLAGS) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
