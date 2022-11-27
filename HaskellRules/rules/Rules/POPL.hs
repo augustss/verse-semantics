@@ -17,7 +17,7 @@ systemPOPL = TRSystem
   { sname               = "POPL"
   , description         = "POPL submission"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = anfArrays
+  , preProcess          = anf
   , postProcess         = id
   , rules               = allRules
   , rulesHaveStructural = False
@@ -31,8 +31,8 @@ systemVPOPL = systemPOPL
   , rules               = allRules <> rulesElimV
   }
 
-anfArrays :: Expr -> Expr
-anfArrays = id -- XXX
+anf :: Expr -> Expr
+anf = id -- XXX
 
 --------------------------------------------------------------------------------
 
@@ -44,13 +44,14 @@ isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
-isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
-isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
+isChoiceFree Split{}   = True
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
 -- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
+isChoiceFreeOp MapAp = False
 isChoiceFreeOp _ = True
 
 --------------------------------------------------------------------------------
@@ -147,9 +148,9 @@ valueX, valueX1 :: Value -> [(Value->Value, Value)]
 valueX lhs = valueX1 lhs ++ [(id, lhs)]
 
 valueX1 lhs =
-  do VARR vs <- [lhs]
+  do Arr vs <- [lhs]
      i <- [0..length vs-1]
-     pure (\v -> VARR (take i vs ++ [v] ++ drop (i+1) vs), vs!!i)
+     pure (\v -> Arr (take i vs ++ [v] ++ drop (i+1) vs), vs!!i)
 
 --------------------------------------------------------------------------------
 
@@ -170,86 +171,86 @@ allRules = rulesPrimOps
 rulesPrimOps :: ERule
 rulesPrimOps _ lhs =
   "P-ADD" `name`
-  do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1+k2))
+  do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1+k2))
  ++
   "P-SUB" `name`
-  do SUB :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1-k2))
+  do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1-k2))
  ++
   "P-MUL" `name`
-  do MUL :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1*k2))
+  do Op Mul :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1*k2))
  ++
   "P-DIV" `name`
-  do DIV :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Div :@: Arr [Int k1, Int k2] <- [lhs]
      if k2 /= 0
-       then pure (INT (k1 `div` k2))
+       then pure (Int (k1 `div` k2))
        else pure Fail
  ++
   "P-NEG" `name`
-  do NEG :@: VINT k <- [lhs]
-     pure (INT k)
+  do Op Neg :@: Int k <- [lhs]
+     pure (Int k)
  ++
   "P-PLUS" `name`
-  do PLUS :@: VINT k <- [lhs]
-     pure (INT k)
+  do Op Plus :@: Int k <- [lhs]
+     pure (Int k)
  ++
   "P-GRT" `name`
-  do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 > k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "P-GRE" `name`
-  do GRE :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Ge :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 >= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "P-LST" `name`
-  do LST :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Lt :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 < k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "P-LSE" `name`
-  do LSE :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Le :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 <= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "P-NEQ" `name`
-  do NEQ :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Ne :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 /= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
-  "P-IsINT" `name`
-  do IsINT :@: (HNF hnf) <- [lhs]
+  "P-IsInt" `name`
+  do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
-       Int _ -> pure (ARR [])
+       Int _ -> pure (Arr [])
        _     -> pure Fail
  ++
   "P-MAPAP" `name`
-  do MAPAP :@: VARR vs <- [lhs]
+  do Op MapAp :@: Arr vs <- [lhs]
      pure (mapAp vs)
  ++
   "P-CONS" `name`
-  do CONS :@: VARR [v, VARR vs] <- [lhs]
-     pure (ARR (v:vs))
+  do Op Cons :@: Arr [v, Arr vs] <- [lhs]
+     pure (Arr (v:vs))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-  in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
+  in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: unit)) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
 defs vs e = foldr (\ x -> Def . Bind x) e vs
 
 unit :: Value
-unit = VARR []
+unit = Arr []
 
 seqs :: [Expr] -> Expr
 seqs = foldl1 (:>:)
@@ -259,9 +260,9 @@ seqs = foldl1 (:>:)
 rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
-  do VLAM x e :@: v <- [lhs]
+  do LAM x e :@: v <- [lhs]
      let freeV = free v
-         beta y b = Def (Bind y ((VAR y :=: Val v) :>: b))
+         beta y b = DEF y ((Var y :=: Val v) :>: b)
      if x `notElem` freeV then
        pure (beta x e)
       else do
@@ -272,8 +273,8 @@ rulesApplication _ lhs =
        pure (beta x' e')
  ++
   "APP-TUP" `name`
-  do VARR vs :@: v <- [lhs]
-     pure (foldr (:|:) Fail [ (Val v :=: INT i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+  do Arr vs :@: v <- [lhs]
+     pure (foldr (:|:) Fail [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
 rulesUnification :: ERule
@@ -283,31 +284,31 @@ rulesUnification = rulesUnificationNoOcc
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc _ lhs =
   "ULIT" `name`
-  do INT k1 :=: INT k2 <- [lhs]
+  do Int k1 :=: Int k2 <- [lhs]
      if k1 == k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "UTUP" `name`
-  do ARR vs :=: ARR vs' <- [lhs]
+  do Arr vs :=: Arr vs' <- [lhs]
      if length vs == length vs'
-       then pure (foldr (:>:) (ARR vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
+       then pure (foldr (:>:) (Arr vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
   "UX1" `name`
-  do INT _k :=: ARR _vs <- [lhs]
+  do Int _k :=: Arr _vs <- [lhs]
      pure Fail
  ++
   "UX2" `name`
-  do ARR _vs :=: INT _k <- [lhs]
+  do Arr _vs :=: Int _k <- [lhs]
      pure Fail
  ++
   "UX3" `name`
-  do Val (VLAM _ _) :=: Val (HNF _) <- [lhs]
+  do Val (LAM _ _) :=: Val (HNF _) <- [lhs]
      pure Fail
  ++
   "UX4" `name`
-  do Val (HNF _) :=: Val (VLAM _ _) <- [lhs]
+  do Val (HNF _) :=: Val (LAM _ _) <- [lhs]
      pure Fail
  ++
   "UX5" `name`
@@ -326,7 +327,7 @@ rulesUnificationNoOcc _ lhs =
 rulesUnificationOcc :: ERule
 rulesUnificationOcc _ lhs =
    "UX-OCCURS" `name`
-   do VAR x :=: Val v <- [lhs]
+   do Var x :=: Val v <- [lhs]
       (_, Var x') <- valueX1 v
       guard (x == x')
       pure Fail
@@ -336,24 +337,24 @@ rulesUnificationOcc _ lhs =
 rulesUnificationVariables :: ERule
 rulesUnificationVariables _ lhs =
   "SUBST" `name`
-  do (ctx, VAR x :=: Val v) <- execX lhs
+  do (ctx, Var x :=: Val v) <- execX lhs
      let freeX = free (ctx blob)
          freeV = free v
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
-     pure (subst sub (ctx (VAR x0 :=: Val v)))
+     pure (subst sub (ctx (Var x0 :=: Val v)))
  ++
   "SUBST-REC" `name`
-  do VAR x :=: Val v <- [lhs]
-     (ctx, VLAM y e) <- valueX v
-     guard (x `elem` free (VLAM y e))
-     pure (VAR x :=: Val (ctx (VLAM y (Def (Bind x (lhs :>: e))))))
+  do Var x :=: Val v <- [lhs]
+     (ctx, LAM y e) <- valueX v
+     guard (x `elem` free (LAM y e))
+     pure (Var x :=: Val (ctx (LAM y (Def (Bind x (lhs :>: e))))))
  ++
   "DEF-ELIML" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, VAR x' :=: Val v) <- defX x a
+     (ctx, Var x' :=: Val v) <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -363,7 +364,7 @@ rulesUnificationVariables _ lhs =
  ++
   "DEF-ELIMR" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, Val v :=: VAR x') <- defX x a
+     (ctx, Val v :=: Var x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -372,8 +373,8 @@ rulesUnificationVariables _ lhs =
      pure (ctx (Val v))
  ++
   "SWAP" `name`
-  do Val (HNF hnf) :=: VAR x <- [lhs]
-     pure (VAR x :=: Val (HNF hnf))
+  do Val (HNF hnf) :=: Var x <- [lhs]
+     pure (Var x :=: Val hnf)
  ++
   "DEF-FLOAT" `name`
   do (ctx, Def (Bind x e)) <- execX1 lhs
@@ -389,11 +390,11 @@ rulesElimV :: ERule
 rulesElimV _ lhs =
   "DEF-ELIMV" `name`
   do Def (Bind x a) <- [lhs]
-     (ctx, VAR y :=: VAR x') <- defX x a
+     (ctx, Var y :=: Var x') <- defX x a
      guard (x == x')
      guard (x /= y)
      guard (y `elem` free a)
-     pure (subst [(x, Var y)] (ctx (VAR y)))
+     pure (subst [(x, Var y)] (ctx (Var y)))
 
 --------------------------------------------------------------------------------
 
@@ -418,12 +419,12 @@ rulesSequencing _ lhs =
   "UNIFY-UNIFYR" `name`
   do (e1 :=: e2) :=: e3 <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3))))
+     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
  ++
   "UNIFY-UNIFYR" `name`
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((VAR x :=: e1) :>: (VAR x :=: e2) :>: (VAR x :=: e3) :>: VAR x)))
+     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3) :>: Var x)))
   -- for FRESH
  ++ "CONJ-CST-DEFR" `name` -- e1 = (ex y. e2) --> ex y. e1 = e2
   do (e1 :=: Def (Bind y e2)) <- [lhs]
@@ -491,7 +492,7 @@ rulesAll :: ERule
 rulesAll _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
-     pure (ARR [])
+     pure (Arr [])
  ++
   "ALL-CHOICE" `name`
   do All ves@(_ :|: _) <- [lhs]
@@ -499,30 +500,30 @@ rulesAll _ lhs =
          choiceVals (Val v :|: es) = [ v : vs | vs <- choiceVals es ]
          choiceVals _ = []
      vs <- choiceVals ves
-     pure (ARR vs)
+     pure (Arr vs)
  ++
   "ALL-VAL" `name`
   do All (Val v) <- [lhs]
-     pure (ARR [v])
+     pure (Arr [v])
 
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f _g <- [lhs]
-     pure (f :@: VARR [])
+     pure (f :@: Arr [])
  ++
   "SPLIT-CHOICE" `name`
   do Split (Val v :|: e) _f g <- [lhs]
      let x:h:_ = identsNotIn (free lhs)
-         gv = VAR h :=: (g :@: v)
-         hlam = Var h :@: VLAM x e
+         gv = Var h :=: (g :@: v)
+         hlam = Var h :@: LAM x e
      pure (Def (Bind h (gv :>: hlam)))
  ++
   "SPLIT-VAL" `name`
   do Split (Val v) _f g <- [lhs]
      let x:h:_ = identsNotIn (free lhs)
-         gv = VAR h :=: (g :@: v)
-         hlam = Var h :@: VLAM x Fail
+         gv = Var h :=: (g :@: v)
+         hlam = Var h :@: LAM x Fail
      pure (Def (Bind h (gv :>: hlam)))
 
 --------------------------------------------------------------------------------

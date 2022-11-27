@@ -56,18 +56,18 @@ sub flg sys | fFinalInline flg = postProcess sys
             | otherwise = id
 
 coreToTrs :: Core -> T.Expr
-coreToTrs (CVar i) = T.Val $ T.Var $ coreToTrsI i
-coreToTrs (CInt i) = T.Val $ T.HNF $ T.Int i
+coreToTrs (CVar i) = T.Var $ coreToTrsI i
+coreToTrs (CInt i) = T.Int i
 coreToTrs CRat{} = undefined
-coreToTrs (CPrim s) = T.Val $ T.HNF $ T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
+coreToTrs (CPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
-coreToTrs (CArray vs) = T.Val $ T.HNF $ T.Arr $ map coreToTrsV vs
-coreToTrs (CLam x e) = T.Val $ T.HNF $ T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
+coreToTrs (CArray vs) = T.Arr $ map coreToTrs vs
+coreToTrs (CLam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
 coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (CSeq []) = undefined
 coreToTrs (CSeq [e]) = coreToTrs e
 coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
-coreToTrs (CApply v1 v2) = coreToTrsV v1 T.:@: coreToTrsV v2
+coreToTrs (CApply v1 v2) = coreToTrs v1 T.:@: coreToTrs v2
 coreToTrs (CBar e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
 coreToTrs CFail = T.Fail
 coreToTrs (COne e) = T.One $ coreToTrs e
@@ -88,13 +88,17 @@ coreToTrsI :: Ident -> T.Ident
 coreToTrsI (Ident _ s) = T.Name s
 
 trsToCore :: T.Expr -> Core
-trsToCore (T.Val v) = trsToCoreV v
+trsToCore (T.Var i) = CVar (trsToCoreI i)
+trsToCore (T.Int i) = CInt i
+trsToCore (T.Op op) = CPrim $ fromMaybe undefined $ lookup op allOps
+trsToCore (T.Arr vs) = CArray $ map trsToCore vs
+trsToCore (T.Lam (T.Bind x e)) = CLam (trsToCoreI x) (trsToCore e)
 trsToCore (e1 T.:=: e2) = CUnify (trsToCore e1) (trsToCore e2)
 trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
 trsToCore (e1 T.:|: e2) = CBar (trsToCore e1) (trsToCore e2)
-trsToCore (e1 T.:@: e2) = CApply (trsToCoreV e1) (trsToCoreV e2)
+trsToCore (e1 T.:@: e2) = CApply (trsToCore e1) (trsToCore e2)
 trsToCore T.Fail = CFail
 trsToCore ee@T.Def{} = flat [] ee
   where flat vs (T.Def (T.Bind x e)) = flat (vs ++ [x]) e
@@ -102,17 +106,7 @@ trsToCore ee@T.Def{} = flat [] ee
 trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
-trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCoreV f) (trsToCoreV g)
-
-trsToCoreV :: T.Value -> Core
-trsToCoreV (T.Var i) = CVar (trsToCoreI i)
-trsToCoreV (T.HNF h) = trsToCoreH h
-
-trsToCoreH :: T.HNF -> Core
-trsToCoreH (T.Int i) = CInt i
-trsToCoreH (T.Op op) = CPrim $ fromMaybe undefined $ lookup op allOps
-trsToCoreH (T.Arr vs) = CArray $ map trsToCoreV vs
-trsToCoreH (T.Lam (T.Bind x e)) = CLam (trsToCoreI x) (trsToCore e)
+trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
@@ -140,8 +134,7 @@ allOps = [
   (T.Plus, "pre'+'"),
   (T.IsInt, "isInt$"),
   (T.MapAp, "mapAp$"),
-  (T.Cons, "cons$"),
-  (T.NotFcn, "notFcn$")
+  (T.Cons, "cons$")
   ]
 
 ----------------------------------------------
@@ -156,11 +149,17 @@ showLatex :: T.Expr -> String
 showLatex ee = expr 0 ee ""
   where
     expr :: Int -> T.Expr -> ShowS
-    expr p (T.Val v) = value p v
+    expr _ (T.Var x) = ident x
+    expr _ (T.Int k) = showString (show k)
+    expr _ (T.Op o)  = showString (show o)
+    expr _ (T.Arr []) = showString "tup ()"
+    expr _ (T.Arr vs) = showString "tup (" . foldr1 (\ x s -> x . showString "," . s) (map (expr 0) vs) . showString ")"
+    expr p (T.Lam (T.Bind x e)) = showParen (p>0) $ showString "lam " . ident x . showString " (" . expr 0 e . showString ")"
+
     expr p (a T.:=: b) = showParen (p > 3) $ expr 4 a . showString " == " . expr 4 b
     expr p (a T.:>: b) = showParen (p > 1) $ expr 2 a . showString " ; "  . expr 1 b
     expr p (a T.:|: b) = showParen (p > 2) $ expr 3 a . showString " `choose` " . expr 2 b
-    expr _ (a T.:@: b) = showString "apply1 " . value 4 a . showString "(" . value 0 b . showString ")"
+    expr _ (a T.:@: b) = showString "apply1 " . expr 4 a . showString "(" . expr 0 b . showString ")"
     expr _ T.Fail      = showString "fail"
     expr p e@T.Def{}   = showString "def (" . shxs . showString ") (" . expr p a . showString ")"
       where (xs, a) = getXs e
@@ -171,15 +170,4 @@ showLatex ee = expr 0 ee ""
     expr _ (T.All a)   = showString "all (" . expr 0 a . showString ")"
     expr _ _ = undefined
 
-    value :: Int -> T.Value -> ShowS
-    value _ (T.Var x) = ident x
-    value p (T.HNF h) = hnf p h
-
     ident = showString . show
-
-    hnf :: Int -> T.HNF -> ShowS
-    hnf _ (T.Int k) = showString (show k)
-    hnf _ (T.Op o)  = showString (show o)
-    hnf _ (T.Arr []) = showString "tup ()"
-    hnf _ (T.Arr vs) = showString "tup (" . foldr1 (\ x s -> x . showString "," . s) (map (value 0) vs) . showString ")"
-    hnf p (T.Lam (T.Bind x e)) = showParen (p>0) $ showString "lam " . ident x . showString " (" . expr 0 e . showString ")"

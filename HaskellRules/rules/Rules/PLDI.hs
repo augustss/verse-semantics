@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module Rules.PLDI(systemPLDI) where
 
 import TRS.Bind
@@ -32,7 +34,7 @@ systemPLDI = TRSystem
   , postProcess         = finalSubst
   , rules               = allRules
   , rulesHaveStructural = False
-  , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  , confluenceRules     = rulesStructural
   }
 
 --------------------------------------------------------------------------------
@@ -55,8 +57,7 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (DEF _ e) = isChoiceFree e  -- NOTE: new
-isChoiceFree (HNF (Op op) :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
---isChoiceFree (Split _ (VLAM _ f) (VLAM _ (LAM _ g))) = isChoiceFree f && isChoiceFree g
+isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
 isChoiceFree (Split _ _ _) = True
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
@@ -64,6 +65,27 @@ isChoiceFree _         = False
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False -- May generate choices from the embedded functions.
 isChoiceFreeOp _ = True
+
+--------------------------------------------------------------------------------
+
+pattern SCL :: Expr -> Expr
+pattern SCL v <- (getSCL -> Just v)
+--  where SCL v = Val v
+
+getSCL :: Expr -> Maybe Expr
+getSCL v@Var{} = Just v
+getSCL v@Int{} = Just v
+getSCL v@Op{} = Just v
+getSCL _ = Nothing
+
+pattern HVAL :: Expr -> Expr
+pattern HVAL v <- (getH -> Just v)
+--  where HVAL h = h
+
+getH :: Value -> Maybe Expr
+getH v@Arr{} = Just v
+getH v@Lam{} = Just v
+getH _ = Nothing
 
 --------------------------------------------------------------------------------
 -- contexts
@@ -206,96 +228,83 @@ underDefs f e = f e
 rulesPrimOps :: ERule
 rulesPrimOps _ lhs =
   "APP-ADD" `name`
-  do ADD :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1+k2))
+  do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1+k2))
  ++
   "APP-SUB" `name`
-  do SUB :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1-k2))
+  do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1-k2))
  ++
   "APP-MUL" `name`
-  do MUL :@: VARR [VINT k1, VINT k2] <- [lhs]
-     pure (INT (k1*k2))
+  do Op Mul :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1*k2))
  ++
   "APP-DIV" `name`
-  do DIV :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Div :@: Arr [Int k1, Int k2] <- [lhs]
      if k2 /= 0
-       then pure (INT (k1 `div` k2))
+       then pure (Int (k1 `div` k2))
        else pure Fail
  ++
   "APP-NEG" `name`
-  do NEG :@: VINT k <- [lhs]
-     pure (INT k)
+  do Op Neg :@: Int k <- [lhs]
+     pure (Int k)
  ++
   "APP-PLUS" `name`
-  do PLUS :@: VINT k <- [lhs]
-     pure (INT k)
+  do Op Plus :@: Int k <- [lhs]
+     pure (Int k)
  ++
   "APP-GT" `name`
-  do GRT :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 > k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "APP-GE" `name`
-  do GRE :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Ge :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 >= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "APP-LT" `name`
-  do LST :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Lt :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 < k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "APP-LE" `name`
-  do LSE :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Le :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 <= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "APP-NE" `name`
-  do NEQ :@: VARR [VINT k1, VINT k2] <- [lhs]
+  do Op Ne :@: Arr [Int k1, Int k2] <- [lhs]
      if k1 /= k2
-       then pure (INT k1)
+       then pure (Int k1)
        else pure Fail
  ++
   "APP-ISINT" `name`
-  do IsINT :@: (HNF hnf) <- [lhs]
+  do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
-       Int _ -> pure (ARR [])
+       Int _ -> pure (Arr [])
        _     -> pure Fail
  ++
   "APP-MAPAP" `name`
-  do MAPAP :@: VARR vs <- [lhs]
+  do Op MapAp :@: Arr vs <- [lhs]
      pure (mapAp vs)
  ++
   "APP-CONS" `name`
-  do CONS :@: VARR [v, VARR vs] <- [lhs]
-     pure (ARR (v:vs))
- ++
-  "APP-NOTFCN-HNF" `name`
-  do NOTFCN :@: v <- [lhs]
-     guard (case v of VINT{} -> True; VARR{} -> True; VOP{} -> True; _ -> False)
-     pure (Val v)
- ++
-  "APP-NOTFCN-FCN" `name`
-  do NOTFCN :@: VLAM{} <- [lhs]
-     pure Fail
-
+  do Op Cons :@: Arr [v, Arr vs] <- [lhs]
+     pure (Arr (v:vs))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
-mapAp :: [Value] -> Expr
+mapAp :: [Expr] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-  in  defs xs $ seqs $ zipWith (\ x v -> VAR x :=: (v :@: unit)) xs vs ++ [ARR $ map Var xs]
+  in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: Arr [])) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
 defs vs e = foldr DEF e vs
-
-unit :: Value
-unit = VARR []
 
 seqs :: [Expr] -> Expr
 seqs = foldr1 (:>:)
@@ -305,9 +314,9 @@ seqs = foldr1 (:>:)
 rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
-  do VLAM x e :@: v <- [lhs]
+  do LAM x e :@: v <- [lhs]
      let freeV = free v
-         beta y b = DEF y ((VAR y :=: Val v) :>: b)
+         beta y b = DEF y ((Var y :=: Val v) :>: b)
      if x `notElem` freeV then
        pure (beta x e)
       else do
@@ -318,15 +327,15 @@ rulesApplication _ lhs =
        pure (beta x' e')
  ++
   "APP-TUP0" `name`
-  do VARR [] :@: _ <- [lhs]
+  do Arr [] :@: _ <- [lhs]
      pure Fail
  ++
   "APP-TUP" `name`
-  do VARR vs@(_:_) :@: v <- [lhs]
+  do Arr vs@(_:_) :@: v <- [lhs]
      let x = identNotIn (free lhs)
-         xe = VAR x
-         e = foldr1 (:|:) [ (xe :=: INT i) :>: Val vi | (i, vi) <- [0..] `zip` vs ]
-     pure (DEF x ((xe :=: Val v) :>: e))
+         xe = Var x
+         e = foldr1 (:|:) [ (xe :=: Int i) :>: vi | (i, vi) <- [0..] `zip` vs ]
+     pure (DEF x ((xe :=: v) :>: e))
 
 --------------------------------------------------------------------------------
 
@@ -343,9 +352,9 @@ rulesUnificationNoOcc _ lhs =
  ++
 -- tuple=tuple
   "U-TUP" `name`
-  do v@(ARR ss) :=: ARR ss' <- [lhs]
+  do v@(Arr ss) :=: Arr ss' <- [lhs]
      guard (length ss == length ss')
-     pure (foldr (:>:) v [ Val s :=: Val s' | (s,s') <- ss `zip` ss' ])
+     pure (foldr (:>:) v (zipWith (:=:) ss ss'))
 {-
  ++
   "U-FAIL-OP-OP" `name`
@@ -360,7 +369,7 @@ rulesUnificationNoOcc _ lhs =
 -- Unequal values
  ++
   "U-FAIL" `name`
-  do EHNF h1 :=: EHNF h2 <- [lhs]
+  do HNF h1 :=: HNF h2 <- [lhs]
      guard (case (h1, h2) of (Arr ss1, Arr ss2) -> length ss1 /= length ss2; _ -> True)
      guard (h1 /= h2)
      pure Fail
@@ -533,12 +542,12 @@ derefA' b s lhs xx =
       guard (x == xx)
       pure (:@: v)
    ++
-   do (VAR x :=: e) <- [lhs]
+   do (Var x :=: e) <- [lhs]
       guard (x == xx)
-      guard (b || case e of Val HNF{} -> True; _ -> False)
+      guard (b || case e of HNF{} -> True; _ -> False)
       pure ( (:=: e) . Val)
    ++
-   do (e :=: VAR x) <- [lhs]
+   do (e :=: Var x) <- [lhs]
       guard (x == xx)
       guard b
       pure ( (e :=:) . Val)
@@ -577,13 +586,13 @@ derefA' b s lhs xx =
       pure (All . ctx)
    -- NOTE: not in paper
    ++
-   do v@VOP{} :@: Var x <- [lhs]
+   do v@Op{} :@: Var x <- [lhs]
       guard (x == xx)
       pure (v :@:)
    ++
-   do VOP Cons :@: VARR [v, Var x] <- [lhs]
+   do Op Cons :@: Arr [v, Var x] <- [lhs]
       guard (x == xx)
-      pure (\ a -> VOP Cons :@: VARR [v, a])
+      pure (\ a -> Op Cons :@: Arr [v, a])
    ++
    do Split e f g <- [lhs]
       ctx <- derefB s e xx
@@ -674,15 +683,15 @@ derefV lhs xx =
      guard (x == xx)
      pure id
   ++
-  do VLAM v e  <- [lhs]
+  do LAM v e  <- [lhs]
      guard (v /= xx)
      ctx <- derefE e xx
-     pure (VLAM v . ctx)
+     pure (LAM v . ctx)
   ++
-  do VARR vs <- [lhs]
+  do Arr vs <- [lhs]
      (i, v) <- zip [0..] vs
      ctx <- derefV v xx
-     pure ((\ x -> VARR (update i x vs)) . ctx)
+     pure ((\ x -> Arr (update i x vs)) . ctx)
 
 {-
   x = s; E [x] ===> x = s; E[s]
@@ -715,13 +724,13 @@ dsFreshFP = ds'
     dsEqu e1 e2
       | isVal e1  = e1 :=: e2'
 --x      | isVal e2  = e2 :=: e1'
-      | otherwise = DEF x ((VAR x :=: e1' :>: VAR x) :>: (VAR x :=: e2' :>: VAR x))
+      | otherwise = DEF x ((Var x :=: e1' :>: Var x) :>: (Var x :=: e2' :>: Var x))
       where
         x   = identNotIn (free [e1', e2'])
         e1' = ds' e1
         e2' = ds' e2
 
-    dsv (VLAM x e) = VLAM x (ds' e)
+    dsv (LAM x e) = LAM x (ds' e)
     dsv v = v
 
 -- Make all substitutions that involve variable free arrays.
@@ -737,16 +746,16 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
 --        inl (Var x) | Just v@VHNF{} <- lookup x bs = v  -- Only inline arrays, scalars should not happen
 --                    | otherwise = error $ "finalSubst: not an array " ++ show (ee, x, lookup x bs)
         inl (Var x) = fromMaybe (Var x) $ lookup x bs
-        inl e@VINT{} = e
-        inl e@VOP{} = e
-        inl (VARR vs) = VARR (map inl vs)
-        inl (VLAM x e) = VLAM x (VLAM (Name "_") e :@: Var (Name "[...]")) -- XXX
+        inl e@Int{} = e
+        inl e@Op{} = e
+        inl (Arr vs) = Arr (map inl vs)
+        inl (LAM x e) = LAM x (LAM (Name "_") e :@: Var (Name "[...]")) -- XXX
         inl _ = undefined
     isGnd :: [(Ident, a)] -> Value -> Bool
-    isGnd _ VINT{} = True
-    isGnd bs (VARR vs) = all (isGnd bs) vs
-    isGnd _ VOP{} = True
-    isGnd _ VLAM{} = True
+    isGnd _ Int{} = True
+    isGnd bs (Arr vs) = all (isGnd bs) vs
+    isGnd _ Op{} = True
+    isGnd _ Lam{} = True
     isGnd bs (Var x) = isNothing (lookup x bs)
     isGnd _ _ = False
 
@@ -780,26 +789,26 @@ canon ee = order . head . wfResE $ ee  -- relies of wfResE returning the most ea
 ----------------------
 
 isS :: Value -> Bool
-isS VINT{} = True
+isS Int{} = True
 isS Var{} = True
-isS VOP{} = True
+isS Op{} = True
 isS _ = False
 
 rulesDerefFP :: ERule
 rulesDerefFP ss lhs =
   "DEREF-S" `name`
-  do xs@(VAR x :=: Val s) :>: e <- [lhs]
-     guard (VAR x /= Val s)
+  do xs@(Var x :=: Val s) :>: e <- [lhs]
+     guard (Var x /= Val s)
      guard (isS s)
 --     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x
      pure (xs :>: plug ctx s)
  ++
   "DEREF-H" `name`
-  do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
+  do xh@(Var x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
      ctx <- derefA ss e x
-     pure (xh :>: plug ctx (HNF h))
+     pure (xh :>: plug ctx h)
 {-
  ++
   "DEREF-K" `name`
@@ -848,7 +857,7 @@ rulesAllFP :: ERule
 rulesAllFP _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
-     pure (ARR [])
+     pure (Arr [])
  ++
   "ALL-CHOICE" `name`
   do All xs <- [lhs]
@@ -857,20 +866,20 @@ rulesAllFP _ lhs =
          choiceRes _ = []
      rs <- choiceRes xs
      let (is, es, vs) = mkRess rs
-     pure (mkRes is es (ARR vs))
+     pure (mkRes is es (Arr vs))
 {-
  ++
   "ALL-VAL" `name`
   do All e <- [lhs]
      (is, es, v) <- wfRes e
-     pure (mkRes is es (ARR [v]))
+     pure (mkRes is es (Arr [v]))
 -}
 
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f _g <- [lhs]
-     pure (f :@: VARR [])
+     pure (f :@: Arr [])
  ++
   "SPLIT-CHOICE" `name`
   do Split (e :|: ee) _f g <- [lhs]
@@ -884,9 +893,9 @@ rulesSplit _ lhs =
  where
    spl g e ee =
      let x:y:h:_ = identsNotIn (free lhs)
-         ve = VAR y :=: e
-         gv = VAR h :=: (g :@: Var y)
-         hlam = Var h :@: VLAM x ee
+         ve = Var y :=: e
+         gv = Var h :=: (g :@: Var y)
+         hlam = Var h :@: LAM x ee
      in  pure (DEF h (DEF y (ve :>: gv :>: hlam)))
 
 type BindV = (Ident, Value)
@@ -909,7 +918,7 @@ wfResE = wf []
       pure (x:xs, cs, e2)
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
     -- WF-EQ
-    wf g e@((VAR x :=: Val v) :>: e1) = do
+    wf g e@((Var x :=: Val v) :>: e1) = do
       guard (v /= Var x)                                -- eliminate x=x before WFF
       guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
       guard (x `elem` g)
@@ -938,7 +947,7 @@ mkRess as = loop [] [] [] as
             s = zipWith (\ i i' -> (i, Var i')) is is'
             es' = map (subst s) es
             v' = subst s v
-            es = [VAR x :=: Val vv | (x, vv) <- cs]
+            es = [Var x :=: Val vv | (x, vv) <- cs]
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
@@ -951,9 +960,9 @@ rulesNormalization _ lhs =
      pure (e1 :>: (e2 :>: e3))
  ++
   "NORM-SEQ-SWAP" `name`
-  do e1 :>: (xv@(VAR _x :=: Val v) :>: e2) <- [lhs]
-     let valid | isS v     = case e1 of VAR _ :=: Val s | isS s -> False; _ -> True
-               | otherwise = case e1 of VAR _ :=: Val _         -> False; _ -> True
+  do e1 :>: (xv@(Var _x :=: Val v) :>: e2) <- [lhs]
+     let valid | isS v     = case e1 of Var _ :=: Val s | isS s -> False; _ -> True
+               | otherwise = case e1 of Var _ :=: Val _         -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)
      guard valid
      pure (xv :>: (e1 :>: e2))
@@ -969,7 +978,7 @@ rulesNormalization _ lhs =
 -}
  ++
   "NORM-SWAP-EQ" `name`
-  do h@(Val HNF{}) :=: x@VAR{} <- [lhs]
+  do h@HNF{} :=: x@Var{} <- [lhs]
      pure (x :=: h)
  ++
   "NORM-SEQ-DEFR" `name`
@@ -1008,13 +1017,11 @@ rulesNormalization _ lhs =
 
 ------
 
-{-
 rulesStructural :: ERule
 rulesStructural _ lhs =
   do Def (Bind x (Def (Bind y e))) <- [lhs]
-     pure ("SWAP-C", Def (Bind y (Def (Bind x e))))
+     pure ("SWAP-C", DEF y (DEF x e))
  ++
-  do (VAR x1 :=: Val v1) :>: ((VAR x2 :=: Val v2) :>: e) <- [lhs]
-     pure ("SWAP-D", (VAR x2 :=: Val v2) :>: ((VAR x1 :=: Val v1) :>: e))
--}
+  do (Var x1 :=: Val v1) :>: ((Var x2 :=: Val v2) :>: e) <- [lhs]
+     pure ("SWAP-D", (Var x2 :=: Val v2) :>: ((Var x1 :=: Val v1) :>: e))
 

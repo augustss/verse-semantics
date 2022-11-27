@@ -1,12 +1,16 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-missing-pattern-synonym-signatures -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Core(
-  Expr(..), Value(..), HNF(..), Op(..),
+  Expr(..), Op(..),
+  Value,
   TRSFlags, RuleEnv(..), defaultTRSFlags,
   ERule,
   EContext,
+  pattern Val,
+  pattern HNF,
+{-
   pattern VAR, pattern INT, pattern ARR, pattern LAM, pattern EHNF, pattern OP,
   pattern HVAL, pattern SCL, pattern VHNF,
   pattern VINT, pattern VARR, pattern VLAM, pattern VOP,
@@ -14,7 +18,9 @@ module Rules.Core(
   pattern GRT, pattern GRE, pattern LST, pattern LSE, pattern NEQ,
   pattern IsINT, pattern MAPAP, pattern CONS, pattern NOTFCN,
   pattern PLUS,
+-}
   pattern DEF,
+  pattern LAM,
   subst,
   ) where
 
@@ -30,17 +36,26 @@ type EContext = Expr -> Expr
 --------------------------------------------------------------------------------
 
 data Expr
-  = Val Value                   -- ^ v
+    -- The following 5 are the old Value type
+  = Var Ident                   -- ^ x
+    -- The following 5 are the old HNF type
+  | Int Integer                 -- ^ k
+  | Op Op                       -- ^ op
+  | Arr [Expr]                  -- ^ <e1,e2,...>
+  | Lam (Bind Expr)             -- ^ \ x . e
+  --
   | Expr :=: Expr               -- ^ e1 = e2
   | Expr :>: Expr               -- ^ e1; e2
   | Expr :|: Expr               -- ^ e1 | e2
-  | Value :@: Value             -- ^ v1(v2)
+  | Expr :@: Expr               -- ^ v1(v2)
   | Def (Bind Expr)             -- ^ ex x. e
   | One Expr                    -- ^ one { e }
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
   | Wrong                       -- ^ wrong
-  | Split Expr Value Value      -- ^ split { e, v1, v2 }
+  | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
+
+type Value = Expr
 
 infixr 1 :>:
 infixr 3 :|:
@@ -48,7 +63,11 @@ infixr 2 :=:
 infixl 4 :@:
 
 instance Show Expr where
-  showsPrec p (Val v)          = showsPrec p v
+  showsPrec p (Var v)          = showsPrec p v
+  showsPrec p (Int k)          = showsPrec p k
+  showsPrec p (Op o)           = showsPrec p o
+  showsPrec _ (Arr es)         = showString $ "<" ++ intercalate ", " (map show es) ++ ">"
+  showsPrec p (Lam (Bind x e)) = showParen (p > 0) $ showString $ "\\" ++ show x ++ "." ++ show e
   showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
   showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
   showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
@@ -68,6 +87,36 @@ instance Ord Expr where
   compare = comp [] []
    where
     -- so much code... this can probably simplified a lot
+    comp  xs  ys (Var x) (Var y) =
+      case (elemIndex x xs, elemIndex y ys) of
+        (Just i, Just j)   -> i `compare` j
+        (Nothing, Nothing) -> x `compare` y
+        (Just _, Nothing)  -> LT
+        (Nothing, Just _)  -> GT
+    comp _xs _ys (Var _) _       = LT
+    comp _xs _ys _       (Var _) = GT
+
+    comp _xs _ys (Int a) (Int b) = compare a b
+    comp _xs _ys (Int _) _       = LT
+    comp _xs _ys _       (Int _) = GT
+
+    comp _xs _ys (Op a) (Op b) = compare a b
+    comp _xs _ys (Op _) _      = LT
+    comp _xs _ys _      (Op _) = GT
+
+    comp  xs  ys (Arr vs) (Arr ws)
+      | n == m    = head (dropWhile (==EQ) (zipWith (comp xs ys) vs ws) ++ [EQ])
+      | otherwise = n `compare` m
+     where
+      n  = length vs
+      m  = length ws
+    comp _xs _ys (Arr _) _       = LT
+    comp _xs _ys _       (Arr _) = GT
+
+    comp  xs  ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp _xs _ys (Lam _) _       = LT
+    comp _xs _ys _       (Lam _) = GT
+
     comp _xs _ys Wrong Wrong = EQ
     comp _xs _ys Wrong _     = LT
     comp _xs _ys _     Wrong = GT
@@ -75,10 +124,6 @@ instance Ord Expr where
     comp _xs _ys Fail Fail = EQ
     comp _xs _ys Fail _    = LT
     comp _xs _ys _    Fail = GT
-
-    comp  xs  ys (Val v) (Val w) = compV xs ys v w
-    comp _xs _ys (Val _) _       = LT
-    comp _xs _ys _       (Val _) = GT
 
     comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
     comp _xs _ys (_:=:_) _       = LT
@@ -92,7 +137,7 @@ instance Ord Expr where
     comp _xs _ys (_:|:_) _       = LT
     comp _xs _ys _       (_:|:_) = GT
 
-    comp  xs  ys (a:@:b) (c:@:d) = compV xs ys a c & compV xs ys b d
+    comp  xs  ys (a:@:b) (c:@:d) = comp xs ys a c & comp xs ys b d
     comp _xs _ys (_:@:_) _       = LT
     comp _xs _ys _       (_:@:_) = GT
 
@@ -104,48 +149,16 @@ instance Ord Expr where
     comp _xs _ys (All _) _       = LT
     comp _xs _ys _       (All _) = GT
 
-    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' & compV xs ys f f' & compV xs ys g g'
+    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' & comp xs ys f f' & comp xs ys g g'
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
 
     comp  xs  ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
 
-    compV  xs  ys (Var x) (Var y) =
-      case (elemIndex x xs, elemIndex y ys) of
-        (Just i, Just j)   -> i `compare` j
-        (Nothing, Nothing) -> x `compare` y
-        (Just _, Nothing)  -> LT
-        (Nothing, Just _)  -> GT
-    compV _xs _ys (Var _) _       = LT
-    compV _xs _ys _       (Var _) = GT
-
-    compV xs ys (HNF a) (HNF b) = compH xs ys a b
-
-    compH xs ys (Arr vs) (Arr ws)
-      | n == m    = head (dropWhile (==EQ) (zipWith (compV xs ys) vs ws) ++ [EQ])
-      | otherwise = n `compare` m
-     where
-      n  = length vs
-      m  = length ws
-    compH xs ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
-    compH _xs _ys a b = a `compare` b
-
     EQ & c = c
     c  & _ = c
 
 --------------------------------------------------------------------------------
-
-data Value
-  = Var Ident
-  | HNF HNF
- deriving ( Eq, Ord )
-
-data HNF
-  = Int Integer
-  | Op Op
-  | Arr [Value]
-  | Lam (Bind Expr)
- deriving ( Eq, Ord )
 
 data Op
   = Gt
@@ -162,18 +175,7 @@ data Op
   | IsInt
   | MapAp
   | Cons
-  | NotFcn
  deriving ( Eq, Ord )
-
-instance Show Value where
-  show (Var x) = show x
-  show (HNF a) = show a
-
-instance Show HNF where
-  show (Int k)  = show k
-  show (Op op)  = show op
-  show (Arr vs) = "<" ++ intercalate ", " (map show vs) ++ ">"
-  show (Lam (Bind x e)) = "(\\" ++ show x ++ "." ++ show e ++ ")"
 
 instance Show Op where
   show Gt    = "gt"
@@ -190,41 +192,50 @@ instance Show Op where
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
-  show NotFcn = "notFcn"
 
 --------------------------------------------------------------------------------
 -- patterns
 
 -- Expr
-pattern VAR v  = Val (Var v)
-pattern INT n  = Val (VINT n)
+{-
 pattern ARR vs = Val (VARR vs)
 pattern LAM v e= Val (VLAM v e)
 pattern EHNF h = Val (HNF h)
 pattern OP o   = Val (VOP o)
-pattern HVAL :: HNF -> Expr
-pattern HVAL v <- Val (getH -> Just v)
-  where HVAL h = Val (HNF h)
-pattern SCL :: Value -> Expr
-pattern SCL v <- Val (getS -> Just v)
-  where SCL v = Val v
 pattern VHNF :: HNF -> Value
 pattern VHNF v <- (getH -> Just v)
   where VHNF h = HNF h
 
-getH :: Value -> Maybe HNF
-getH (HNF v@Arr{}) = Just v
-getH (HNF v@Lam{}) = Just v
-getH _ = Nothing
 
-getS :: Value -> Maybe Value
-getS v@Var{} = Just v
-getS v@VINT{} = Just v
-getS v@VOP{} = Just v
-getS _ = Nothing
+-}
 
+pattern DEF :: Ident -> Expr -> Expr
 pattern DEF x e = Def (Bind x e)
 
+pattern LAM :: Ident -> Expr -> Expr
+pattern LAM x e = Lam (Bind x e)
+
+pattern Val :: Expr -> Expr
+pattern Val e <- (getVal -> Just e)
+  where Val e | Just _ <- getVal e = e
+              | otherwise = error "pattern Val"
+
+getVal :: Expr -> Maybe Expr
+getVal e@Var{} = Just e
+getVal e = getHNF e
+
+pattern HNF :: Expr -> Expr
+pattern HNF e <- (getHNF -> Just e)
+--  where HNF e = e
+
+getHNF :: Expr -> Maybe Expr
+getHNF e@Int{} = Just e
+getHNF e@Op{} = Just e
+getHNF e@Arr{} = Just e
+getHNF e@Lam{} = Just e
+getHNF _ = Nothing
+
+{-
 -- Value
 pattern VINT n  = HNF (Int n)
 pattern VARR vs = HNF (Arr vs)
@@ -244,7 +255,7 @@ pattern NEQ     = HNF (Op Ne)
 pattern IsINT   = HNF (Op IsInt)
 pattern MAPAP   = HNF (Op MapAp)
 pattern CONS    = HNF (Op Cons)
-pattern NOTFCN  = HNF (Op NotFcn)
+-}
 
 --------------------------------------------------------------------------------
 
@@ -255,7 +266,7 @@ defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfAlias = False, tfUnifyEq = 
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
-    { tfUnderLambda :: !Bool
+    { tfUnderLambda :: !Bool     -- reduce under lambda
     , tfAlias       :: !Bool     -- get rid of alias definitions early
     , tfUnifyEq     :: !Bool     -- treat unify under a barrier as equals
     }
@@ -278,37 +289,30 @@ instance Rec Expr where
            [ (n, Def (Bind x a')) | (n,a') <- rec r s a ]
 
       f :@: a ->
-           [ (n,f' :@: a)  | (n,f') <- vrec f ]
-        ++ [ (n,f  :@: a') | (n,a') <- vrec a ]
+           [ (n,f' :@: a)  | (n,f') <- rec r s f ]
+        ++ [ (n,f  :@: a') | (n,a') <- rec r s a ]
   
-      Val v ->
-           [ (n,Val v') | (n,v') <- vrec v ]
-  
+      Arr as -> [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
+                | (i,a) <- [0..] `zip` as
+                , (n,a') <- rec r s a
+                ]
+      Lam (Bind x e)
+        | tfUnderLambda s -> [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
+
       One a -> [ (n, One a') | (n,a') <- rec r s a ]
       All a -> [ (n, All a') | (n,a') <- rec r s a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
-        ++ [ (n, Split a f' g) | (n,f') <- vrec f ]
-        ++ [ (n, Split a f g') | (n,g') <- vrec g ]
+        ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
+        ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
       _     -> []
-   where
-    -- recursively rewrite expressions in values
-    vrec (Var _x) = []
-    vrec (HNF a) = [ (n,HNF a') | (n,a') <- hrec a ]
-
-    -- recursively rewrite expressions in HNFs
-    hrec (Arr as)         = [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
-                              | (i,a) <- [0..] `zip` as
-                              , (n,a') <- vrec a
-                              ]
-    hrec (Lam (Bind x e))
-            | tfUnderLambda s = [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
-    hrec  _                = []
 
 --------------------------------------------------------------------------------
 
 instance Free Expr where
-  free (Val v)   = free v
+  free (Var v)   = [v]
+  free (Arr vs)  = free vs
+  free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
   free (a :>: b) = free a `union` free b
   free (a :|: b) = free a `union` free b
@@ -319,124 +323,79 @@ instance Free Expr where
   free (Split e f g) = free e `union` free f `union` free g
   free _         = []
 
-instance Free Value where
-  free (Var x) = [x]
-  free (HNF a) = free a
-
-instance Free HNF where
-  free (Arr vs)  = free vs
-  free (Lam bnd) = free bnd
-  free _         = []
-
 --------------------------------------------------------------------------------
 
 class Term a where
-  subst :: Subst Value -> a -> a
-
-instance Term Value where
-  subst sub (Var x) = fromMaybe (Var x) (lookup x sub)
-  subst sub (HNF a) = HNF (subst sub a)
-
-instance Term HNF where
-  subst sub (Arr vs)  = Arr (map (subst sub) vs)
-  subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
-  subst _sub a        = a
+  subst :: Subst Expr -> a -> a
 
 instance Term Expr where
-  subst sub (Val v)   = Val (subst sub v)
+  subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
+  subst _sub e@Int{}  = e
+  subst _sub e@Op{}   = e
+  subst sub (Arr vs)  = Arr (map (subst sub) vs)
+  subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
   subst sub (a :=: b) = subst sub a :=: subst sub b
   subst sub (a :>: b) = subst sub a :>: subst sub b
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
-  subst _sub Fail      = Fail
+  subst _sub Fail     = Fail
   subst sub (Def bnd) = Def (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
-  subst _sub Wrong     = Wrong
+  subst _sub Wrong    = Wrong
 
 --------------------------------------------------------------------------------
 
 instance Arbitrary Op where
-  arbitrary = elements [ Add, Gt, IsInt ]
+  arbitrary = elements [ Add, Gt ]
 
----
-
-instance Arbitrary HNF where
-  arbitrary = arbIdents >>= (sized . flip arbHNF)
-
-  shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
-  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
-  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
-  shrink _         = []
-
+{-
 arbIdents :: Gen [Ident]
 arbIdents =
   do k <- choose (1,7)
      return (take k (map ident names))
  where
   names = ["x","y","z","v","w"] ++ ["x" ++ show i | i <- [1::Int ..]]
-
-arbHNF :: Int -> [Ident] -> Gen HNF
-arbHNF n xs =
-  frequency
-  [ (1, Int `fmap` arbitrary)
-  , (1, Op  `fmap` arbitrary)
-  , (n, Arr `fmap` scale (min 5) (listOf (arbValue n2 xs)))
-  , (n, Lam `fmap` arbBind n1 xs)
-  ]
- where
-  n1 = n-1
-  n2 = n `div` 2
-
----
-
-instance Arbitrary Value where
-  arbitrary = arbIdents >>= (sized . flip arbValue)
-
-  shrink (Var _) = [ HNF (Int 0), HNF (Arr []) ]
-  shrink (HNF a) = [ HNF a' | a' <- shrink a ]
-
-arbValue :: Int -> [Ident] -> Gen Value
-arbValue n xs =
-  frequency $
-  [ (1, Var `fmap` elements xs) | not (null xs) ] ++
-  [ (n', HNF `fmap` arbHNF n1 xs)
-  ]
- where
-  n' = if null xs then 1 else n
-  n1 = if n > 0 then n-1 else 0
+-}
 
 ---
 
 instance Arbitrary Expr where
   arbitrary = sized (`arbExpr` []) -- closed by default
 
-  shrink (Val v)   = [Val v'|v'<-shrink v] ++ [Def bnd|HNF(Lam bnd)<-[v]]
+  shrink (Var _)   = [ Int 0, Arr [] ]
+  shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Op _)    = []
+  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
     where as = case a of _ :=: _ -> []; _ -> [a]
-  shrink (a :@: b) = [Val a,Val b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
+  shrink (a :@: b) = [a, b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
-  shrink (All a)   = [a, One a, ARR []] ++ [All a'| a'<-shrink a]
+  shrink (All a)   = [a, One a, Arr []] ++ [All a'| a'<-shrink a]
   shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
-  shrink (Split e f g) = [e, Val f, Val g] ++ [Split e' f g | e' <- shrink e]
-                                           ++ [Split e f' g | f' <- shrink f]
-                                           ++ [Split e f g' | g' <- shrink g]
+  shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
+                                   ++ [Split e f' g | f' <- shrink f]
+                                   ++ [Split e f g' | g' <- shrink g]
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
-  frequency
-  [ (1, Val <$> arbValue n xs)
+  frequency $
+  [ (1, Var <$> elements xs) | not (null xs) ] ++
+  [ (1, Int <$> arbitrary)
+  , (1, Op  <$> arbitrary)
+  , (n, Arr <$> scale (min 5) (listOf (arbExpr n2 xs)))
+  , (n, Lam <$> arbBind n1 xs)
   , (1, return Fail) -- maybe not have this?
-  -- , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  -- , (n, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
-  , (n, (:>:) <$> arbExprU n2 xs <*> arbExpr n2 xs)
+  , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, (:@:) <$> arbValue n2 xs <*> arbValue n2 xs)
+  , (n, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, Def <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
@@ -446,16 +405,6 @@ arbExpr n xs =
   n1 = n-1
   n2 = n `div` 2
   -- n3 = n `div` 3
-
--- Either an expression or a unification
-arbExprU :: Int -> [Ident] -> Gen Expr
-arbExprU n xs =
-  frequency
-  [ (1, arbExpr n xs)
-  , (1, (\v e -> Val v :=: e) <$> arbValue n2 xs <*> arbExpr n2 xs)
-  ]
- where
-  n2 = n `div` 2
 
 arbBind :: Int -> [Ident] -> Gen (Bind Expr)
 arbBind n xs =
