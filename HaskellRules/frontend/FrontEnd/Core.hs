@@ -523,7 +523,7 @@ pCoreFile :: P Core
 pCoreFile = skip *> pCore <* eof
 
 pCore :: P Core
-pCore = (exprToCore flg . simpleDesugar) <$> pSeq
+pCore = exprToCore flg <$> pSeq
   where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam
