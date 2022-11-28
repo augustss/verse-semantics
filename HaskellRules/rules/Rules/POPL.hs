@@ -610,3 +610,4 @@ rulesStructural _ lhs =
      let y0 = identNotIn (free (ctx Fail, y, x))
          sub = [(y, Var x), (y0, Var y)]
      pure (subst sub (ctx (Var y0 :=: Var x)))
+  -- UNIFY-MOVE and SEQ are still missing
