@@ -211,10 +211,12 @@ runTestFile tflg fn = do
   let allSys = evalSystem : allSystems
   if allRules tflg then do
     mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
-   else
-    runTestFileSys tflg ts
+   else do
+    ok <- runTestFileSys tflg ts
+    unless ok $
+      exitWith (ExitFailure 1)
 
-runTestFileSys :: TestFlags -> [Test] -> IO ()
+runTestFileSys :: TestFlags -> [Test] -> IO Bool
 runTestFileSys tflg ts = do
   res <- mapM (runTest tflg) ts
   let ok = and res
@@ -222,11 +224,10 @@ runTestFileSys tflg ts = do
     putStrLn $ testSummary (sname (system tflg)) res
    else
     putStrLn $ if ok then "SUCCESS" else "FAILURE"
-  unless ok $
-    exitWith (ExitFailure 1)
+  pure ok
 
 width :: Int
-width = 5
+width = 6
 
 testSummaryHeader :: String -> [Test] -> String
 testSummaryHeader s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . testName . testInfo)
