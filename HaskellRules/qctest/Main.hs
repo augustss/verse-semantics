@@ -21,11 +21,12 @@ main = do
           Right s -> s
       qcargs = stdArgs{ maxSuccess = numtests flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
-  quickCheckWith qcargs (prop_Confluence sys)
+  quickCheckWith qcargs (prop_Confluence (wrapOne flags) sys)
 
-prop_Confluence :: TRSystem Expr -> Expr -> Property
-prop_Confluence sys p =
-  case nub . map (norm sys) . normalForms sys . preProcess sys $ p of
+prop_Confluence :: Bool -> TRSystem Expr -> Expr -> Property
+prop_Confluence wrap sys p =
+  let p' = if wrap then One p else p in
+  case nub . map (norm sys) . normalForms sys . preProcess sys $ p' of
     trs@(_:_:_) ->
       whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
@@ -55,6 +56,7 @@ norm sys = minimum . head . tarjan tstep
 data TestFlags = TestFlags
   { rulesys  :: !String
   , numtests :: !Int
+  , wrapOne  :: !Bool
   }
 
 testFlags :: Parser TestFlags
@@ -70,6 +72,10 @@ testFlags = TestFlags
         <> metavar "N"
         <> value (maxSuccess stdArgs)
         <> help "Maximum of N successful tests" )
+  <*> switch
+      (  long "wrap-one"
+      <> help "Wrap tested expression in one{}"
+      )
 
 testArgs :: IO TestFlags
 testArgs = do
