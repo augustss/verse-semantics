@@ -8,9 +8,10 @@ import Data.List
 import Data.Maybe
 import GHC.Stack
 import Options.Applicative
+import Text.Printf
 import System.Exit
 
-import Text.Megaparsec(getSourcePos, sourceLine)
+import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
 import FrontEnd.Expr
 import FrontEnd.Flags
@@ -22,7 +23,7 @@ import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
 import Rules.Core(defaultTRSFlags)
 import Rules.Equiv
-import Rules.Systems(ESystem, lookupSystem, TRSystem(..))
+import Rules.Systems(ESystem, lookupSystem, TRSystem(..), allSystems)
 
 --------------
 
@@ -37,8 +38,11 @@ data TestFlags = TestFlags
 --  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
+  , noError   :: !Bool                -- Don't show error message
   , noInline  :: !Bool                -- No final inlining
-  , system    :: !(Maybe ESystem)     -- rule system
+  , system    :: !ESystem             -- rule system
+  , summary   :: !Bool                -- produce a summary
+  , allRules  :: !Bool                -- test with all rule systems
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -48,6 +52,10 @@ data Test
   = TestEvalEq TestInfo Expr Expr
   | TestCoreEq TestInfo Core Core
   deriving (Show)
+
+testInfo :: Test -> TestInfo
+testInfo (TestEvalEq ti _ _) = ti
+testInfo (TestCoreEq ti _ _) = ti
 
 data TestInfo = TestInfo
   { testMName :: Maybe String
@@ -74,7 +82,7 @@ pTestInfo = do
   pure $ TestInfo mname loc typ excns
 
 testName :: TestInfo -> String
-testName ti = fromMaybe ("L" ++ show (sourceLine (testLocn ti))) (testMName ti)
+testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
 
 pTestType :: P TestType
 pTestType = do
@@ -140,7 +148,8 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
             pure True
         else do
-            if expectOK
+            when (not (noError tflg)) $
+             if expectOK
               then do
                 putStrLn $ pos ++ " failure:"
                 putStrLn "The expression"
@@ -162,6 +171,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
             pure False
       ) (\e -> do
+           when (not (noError tflg)) $ do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
             pp p1
@@ -171,18 +181,19 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
             print (e :: SomeException)
             putStrLn ""
             --undefined
-            pure False
+           pure False
       )
   where
     loc = testLocn ti
     noisy = not (quiet tflg)
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
-    sys = fromMaybe evalSystem $ system tflg
+    sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
 
 
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
+equivValue sys e1 e2 | sname sys == "eval" = coreToTrs e1 == coreToTrs e2  -- XXX temporary hack
 equivValue sys e1 e2 = equiv sys (coreToTrs e1) (coreToTrs e2)
 
 --------------
@@ -191,16 +202,37 @@ runTest :: TestFlags -> Test -> IO Bool
 runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
 runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
-runTests :: TestFlags -> [Test] -> IO Bool
-runTests tflg ts = and <$> mapM (runTest tflg) ts
-
 runTestFile :: TestFlags -> FilePath -> IO ()
 runTestFile tflg fn = do
+  ts <- readTests fn
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-  ok <- runTests tflg =<< readTests fn
-  putStrLn $ if ok then "SUCCESS" else "FAILURE"
+  when (summary tflg) $
+    putStrLn $ testSummaryHeader "" ts
+  let allSys = evalSystem : allSystems
+  if allRules tflg then do
+    mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
+   else
+    runTestFileSys tflg ts
+
+runTestFileSys :: TestFlags -> [Test] -> IO ()
+runTestFileSys tflg ts = do
+  res <- mapM (runTest tflg) ts
+  let ok = and res
+  if (summary tflg) then do
+    putStrLn $ testSummary (sname (system tflg)) res
+   else
+    putStrLn $ if ok then "SUCCESS" else "FAILURE"
   unless ok $
     exitWith (ExitFailure 1)
+
+width :: Int
+width = 5
+
+testSummaryHeader :: String -> [Test] -> String
+testSummaryHeader s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . testName . testInfo)
+
+testSummary :: String -> [Bool] -> String
+testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . (\ b -> if b then "OK" else "-"))
 
 {-
 test :: String -> IO ()
@@ -263,14 +295,27 @@ testFlags = TestFlags
       <> help "Be less noisy"
       )
   <*> switch
+      (  long "no-error"
+      <> help "Do not show error message on failure"
+      )
+  <*> switch
       (  long "no-final-inline"
       <> help "Do not do final normalization"
       )
-  <*> optional (option (eitherReader lookupSystem)
+  <*> option (eitherReader lookupSystem)
          ( long "rules"
         <> short 'r'
         <> metavar "NAME"
-        <> help "Use rule system NAME" ))
+        <> value evalSystem
+        <> help "Use rule system NAME" )
+  <*> switch
+      (  long "summary"
+      <> help "Produce test summary"
+      )
+  <*> switch
+      (  long "all-rules"
+      <> help "Test with all rule systems"
+      )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
