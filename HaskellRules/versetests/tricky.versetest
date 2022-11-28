@@ -1,64 +1,27 @@
 # Trivial
-testceq(SEq) { 1 } { 1 }
-testceq(SEq) { exists x . x=1 } { 1 }
+#testceq("Triv1", SEq) { 1 } { 1 }
+#testceq("Triv2", SEq) { exists x . x=1 } { 1 }
 
-testeq(SEq) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+#testeq(SEq) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 
-# Versions
-#  V0: POPL
-#  V1: 2022-11-03, nested tuples allowed in syntax (never produced), A has (v = A), U-SCALAR removes x=x
-#  V2: V1 + early alias elimination and B context under barrier
-
-# Problem 1 from Ranjit in email chain "State of play"
-# XXX What is the expected result?
-testceq(SEq) { ID := (\a.a); exists x y . x = ID; one{ x = y; x(10) } }   { exists y . one{ y = (\a.a); 10 } }
-# Test results:
-#  V0: OK
-#  V1: fails, not confluent
-#  V2: OK
-
-# Problem 2 from Ranjit's email
-testceq(SEq) { ID := (\a.a); exists x y . x = ID; y = x; < y > }          { < \a.a > }
-# Test results:
-#  V0: OK
-#  V1: OK
-#  V2: OK
-
-# Problem 3 from Ranjit's email
-# XXX What is the expected result?
-testceq(SEq) { exists a b c d x . x = <a, b>; x = <c, d>; x }              { exists c d . <c,d> }
-# Test results:
-#  V0: OK (2 results, joinable with structural rules)
-#  V1: OK
-#  V2: OK (2 results, joinable with structural rules)
-
-# Variation on problem 3
-# XXX What is the expected result?
-testceq(SEq) { exists a b c d . one { exists x . x = <a,b>; x = <c, d>; x } }
-             { exists a b c d . one { exists x . a=c; b=d;  x = <c, d>; x } }
-# Test results:
-#  V0: OK (2 results, joinable with structural rules)  XXX expected more reduction
-#  V1: OK-ish
-#  V2: OK-ish
-
-# Yikes problem
-testceq(SEq) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }                  { fail }
-# Test results:
-#  V0: OK
-#  V1: fails, does not reduce
-#  V2: OK
-
-# Problem found by QC
-testceq(SEq) { exists x . (exists y . x = y; x) | <> }                    { exists x . x | <> }
-# Test results:
-#  V0: Needs structural rules for progress
-#  V1: fails, does not reduce
-#  V2: OK
-# The POPL rules can be augmented with
-#  DEF-ELIMV ex x y1 ... yn . X[y = x]  -->  ex y1 ... yn . X[y]{x<-y} x/=y x/=yi
-
-testceq(SEq) { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
-             { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
-
-testceq(SEq) { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
-             { exists f g c d       . f(c); g(d); <c, d> }
+testceq("RJ1", SEq)  { ID := (\a.a); exists x y . x = ID; one{ x = y; x(10) } }
+                     { exists y . one{ y = (\a.a); 10 } }
+testceq("RJ2", SEq)  { ID := (\a.a); exists x y . x = ID; y = x; < y > }
+                     { < \a.a > }
+testceq("RJ3", SEq)  { exists a b c d x . x = <a, b>; x = <c, d>; x }
+                     { exists c d . <c,d> }
+testceq("RJ3a", SEq) { exists a b c d . one { exists x . x = <a,b>; x = <c, d>; x } }
+                     { exists a b c d . one { exists x . a=c; b=d;  x = <c, d>; x } }
+testceq("Yikes",SEq) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }                  { fail }
+testceq("QC1", SEq)  { exists x . (exists y . x = y; x) | <> }
+                     { exists x . x | <> }
+testceq("Ex1", SEq)  { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
+                     { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
+testceq("Ex2", SEq)  { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
+                     { exists f g c d       . f(c); g(d); <c, d> }
+testceq("Wombat",SEq){ x := (\a.a); one { exists y . x = y; < x > } }
+                     { < \a.a > }
+testceq("Koen1", SEq){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>) }
+                     { fail }
+testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
+                     { exists y . (\x.x = 0; y = 0; <>) }

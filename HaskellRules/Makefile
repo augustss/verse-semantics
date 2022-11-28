@@ -1,8 +1,11 @@
 # Temporary Makefile to run tests
-TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/tester
 TESTFILE=versetests/tests.versetest
+TRICKY=versetests/tricky.versetest
 TESTPARSEFILE=versetests/test1.verse
 .PHONY: all test testfast clean
+
+TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/tester
+TESTER=cabal run tester --
 
 all:
 	echo Specify a target
@@ -19,6 +22,9 @@ testfast:
 #	$(TESTER) --quiet --eval --split         $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=pldi     $(TESTFILE)
+
+testtricky:
+	$(TESTER) --quiet --summary --no-error --all-rules $(TRICKY)
 
 clean:
 	cabal clean
