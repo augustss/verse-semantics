@@ -103,7 +103,7 @@ $$
     \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
     \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
     \textit{Scalar Values} & s     & ::= & x \vb k \vb op \\
-    \textit{Heap Values}   & h     & ::= & |tup (v_1, dots, v_n)| \vb |lam x e| \\
+    \textit{Heap Values}   & h     & ::= & |tup (s_1, dots, s_n)| \vb |lam x e| \\
     \textit{Head Values}   & |hnf| & ::= & h \vb k \\
     \textit{Values}        & |v|   & ::= & s \vb h \\
     \textit{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
@@ -156,7 +156,7 @@ $$
 \newcommand{\figureRewriteRules}{
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Expression context}     & E  & ::= & \hole \vb |tup (v_1, dots , E , dots, v_n)| \vb |lam x E| \vb |def x E| 
+\textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| 
                                               \vb |E == e| \vb |e == E| \\
                                 &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
                                        \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
