@@ -25,7 +25,7 @@ main = do
 
 prop_Confluence :: TRSystem Expr -> Expr -> Property
 prop_Confluence sys p =
-  case nub . map (norm sys) . normalForms sys $ p of
+  case nub . map (norm sys) . normalForms sys . preProcess sys $ p of
     trs@(_:_:_) ->
       whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
