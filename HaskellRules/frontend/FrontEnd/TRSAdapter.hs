@@ -21,7 +21,7 @@ import Epic.Print
 -- XXX use graph normal form when needed
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . elimDup sys . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
+rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . elimDup sys . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
  where
   trsFlags       = (ruleEnv sys){ T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
   n              = fRewriteSteps flg
@@ -29,11 +29,13 @@ rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . elimDup sy
   latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace trsFlags
      | otherwise = \ x y z -> map toList $ normalFormsFuelTrace trsFlags x y z
+{-
   checkOne [x]   = [x]
   checkOne nes   = trace (unlines $
                           "Multiple:" :
                           map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
                          nes
+-}
   rtrace xs | not tr = res
             | latex = trace (latexTrace xs) res
             | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res

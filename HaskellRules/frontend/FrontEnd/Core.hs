@@ -29,7 +29,7 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
-import FrontEnd.Desugar(primOps, getVisible, covariantId, simpleDesugar)
+import FrontEnd.Desugar(primOps, getVisible, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)

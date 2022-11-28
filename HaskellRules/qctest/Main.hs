@@ -6,7 +6,6 @@ import TRS.TRS( step, normalFormsFuelTrace, nub )
 import TRS.TRSGraph( normalFormsFuelTraceWithGraph )
 import TRS.Tarjan
 import TRS.Traced
-import TRS.System
 import Test.QuickCheck
 import Options.Applicative
 
