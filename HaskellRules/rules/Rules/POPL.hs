@@ -601,6 +601,12 @@ rulesSplit _ lhs =
 
 rulesStructural :: ERule
 rulesStructural _ lhs =
-  "Def-SWAP" `name`
+  "DEF-SWAP" `name`
   do DEF x (DEF y e) <- [lhs]
      pure (DEF y (DEF x e))
+ <>
+  "VAR-SWAP" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))

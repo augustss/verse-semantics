@@ -57,6 +57,7 @@ library rules
     build-depends:    trs,
                       QuickCheck
     exposed-modules:  Rules.Core
+                      Rules.Equiv
                       Rules.Systems
     -- The actual rules are not exposed, they are summarized in Rules.Systems
     other-modules:    Rules.PLDI

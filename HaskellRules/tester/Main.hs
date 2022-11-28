@@ -21,6 +21,7 @@ import Epic.Print (Pretty, prettyShow, pp)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
 import Rules.Core(defaultTRSFlags)
+import Rules.Equiv
 import Rules.Systems(ESystem, lookupSystem, TRSystem(..))
 
 --------------
@@ -133,7 +134,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
     let v2 = run flg sys c2
 
     catch
-      ( if (v1 `equivValue` v2) == expectOK
+      ( if (equivValue sys v1 v2) == expectOK
         then do
             when noisy $
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
@@ -181,13 +182,8 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
 
 
 -- | Equivalence on values (or stuck expressions)
-equivValue :: Core -> Core -> Bool
-equivValue e1 e2 = coreToTrs e1 == coreToTrs e2
-
-{-
-equivValue (CWrong _) (CWrong _) = True
-equivValue v1 v2 = v1 == v2
--}
+equivValue :: ESystem -> Core -> Core -> Bool
+equivValue sys e1 e2 = equiv sys (coreToTrs e1) (coreToTrs e2)
 
 --------------
 
