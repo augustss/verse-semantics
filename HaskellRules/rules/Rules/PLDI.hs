@@ -30,12 +30,111 @@ systemPLDI = TRSystem
   { sname               = "PLDI"
   , description         = "PLDI submission"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = dsFreshFP
+  , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
+  , validExpr           = validE
   }
+
+-- Check that an expression is in the subset defined by the PLDI grammar.
+validE :: Expr -> Bool
+validE = expr
+  where
+    expr e@Val{} = value e
+    expr (Lam (Bind _ e)) = expr e
+    expr (_ :=: _) = False
+    expr (e1 :>: e2) = expru e1 && expr e2
+    expr (e1 :|: e2) = expr e1 && expr e2
+    expr (e1 :@: e2) = value e1 && value e2
+    expr (Def (Bind _ e)) = expr e
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr Fail = True
+    expr Wrong = True
+    expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr _ = undefined -- GHC bug
+    expru (v :=: e) = value v && expr e
+    expru e = expr e
+    value Var{} = True
+    value e = hnf e
+    hnf Int{} = True
+    hnf Op{}  = True
+    hnf (Arr vs) = all scalar vs
+    hnf (LAM _ e) = expr e
+    hnf _ = False
+    scalar Var{} = True
+    scalar Int{} = True
+    scalar Op{} = True
+    scalar _ = False
+
+-- Make the expression obey the PLDI grammar,
+-- i.e., valid (anf e) == True
+anf :: Expr -> Expr
+anf = expr
+  where
+    expr e@Var{} = e
+    expr e@Int{} = e
+    expr e@Op{}  = e
+    expr (Arr es) =
+      let (ds, a) = arr es
+      in  binds ds a
+    expr (Lam (Bind i e)) = Lam (Bind i (expr e))
+    expr e@(_ :=: _) =
+      case expru e of
+        -- Bare unifications not allowed as an expression
+        eu@(v :=: _) -> eu :>: v
+        eu -> eu
+    expr (e1 :>: e2) = expru e1 :>: expr e2
+    expr (e1 :|: e2) = expr e1 :|: expr e2
+    expr (e1 :@: e2) =
+      let i1:i2:_ = identsNotIn (free (e1 :@: e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (v1 :@: v2)
+    expr (Def (Bind i e)) = Def (Bind i (expr e))
+    expr (One e) = One $ expr e
+    expr (All e) = All $ expr e
+    expr e@Fail = e
+    expr e@Wrong = e
+    expr (Split e e1 e2) =
+      let i1:i2:_ = identsNotIn (free (Split e e1 e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (Split (expr e) v1 v2)
+
+    -- Expression or unification
+    expru (e1 :=: e2) =
+      case (expr e1, expr e2) of
+        (e1'@Val{}, e2') -> e1' :=: e2'
+        (e1', e2') -> DEF x $ (Var x :=: e1') :>: (Var x :=: e2') :>: Var x
+          where x = identNotIn (free (e1',  e2'))
+    expru e = expr e
+
+    value _ e@Var{} = ([], e)
+    value _ e@Int{} = ([], e)
+    value _ e@Op{}  = ([], e)
+    value _ (Lam (Bind x e)) = ([], Lam (Bind x (expr e)))
+    value _ (Arr es) = arr es
+    value i e = ([(i, expr e)], Var i)
+
+    scalar _ e@Var{} = ([], e)
+    scalar _ e@Int{} = ([], e)
+    scalar _ e@Op{}  = ([], e)
+    scalar i e = ([(i, expr e)], Var i)
+
+    arr es =
+      let is = identsNotIn $ free es
+          (dss, vs) = unzip $ zipWith scalar is es
+          ds = concat dss
+      in  (ds, Arr vs)
+
+    binds :: [(Ident, Expr)] -> Expr -> Expr
+    binds [] b = b
+    binds ((i,e):ds) b = DEF i $ (Var i :=: e) :>: binds ds b
 
 --------------------------------------------------------------------------------
 
@@ -697,42 +796,6 @@ derefV lhs xx =
   x = s; E [x] ===> x = s; E[s]
 -}
 
-isVal :: Expr -> Bool
-isVal (Val _) = True
-isVal _       = False
-
-dsFreshFP :: Expr -> Expr
-dsFreshFP = ds'
-  where
-    ds (Val v)      = Val (dsv v)
-    ds (ex :=: ex') = dsEqu ex ex'
-    ds (ex :>: ex') = ds ex :>: ds' ex'
-    ds (ex :|: ex') = ds' ex :|: ds' ex'
-    ds (vx :@: vx') = dsv vx :@: dsv vx'
-    ds (DEF x e)    = DEF x (ds' e)
-    ds (One ex)     = One (ds' ex)
-    ds (All ex)     = All (ds' ex)
-    ds (Split e f g)= Split (ds' e) (dsv f) (dsv g)
-    ds e = e
-
-    -- Make sure :=: not last
-    ds' e =
-      case ds e of
-        c@(v :=: _) -> c :>: v
-        e' -> e'
-
-    dsEqu e1 e2
-      | isVal e1  = e1 :=: e2'
---x      | isVal e2  = e2 :=: e1'
-      | otherwise = DEF x ((Var x :=: e1' :>: Var x) :>: (Var x :=: e2' :>: Var x))
-      where
-        x   = identNotIn (free [e1', e2'])
-        e1' = ds' e1
-        e2' = ds' e2
-
-    dsv (LAM x e) = LAM x (ds' e)
-    dsv v = v
-
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
 finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
@@ -758,33 +821,6 @@ finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
     isGnd _ Lam{} = True
     isGnd bs (Var x) = isNothing (lookup x bs)
     isGnd _ _ = False
-
-{-
--- Make a WF value canonical, i.e., order the quantifiers
--- and bindings in a predictable order.
--- If the given value is not WF with the expression being a value then there are no promises.
-canon :: Expr -> Expr
-canon (One e) = One (canon e)
-canon (All e) = All (canon e)
-canon (e1 :|: e2) = canon e1 :|: canon e2
-canon (e1 :>: e2) = canon e1 :>: canon e2
--- The cases above is just a vague attempt to canonicalize stuck results that are not values.
-canon ee = order . head . wfResE $ ee  -- relies of wfResE returning the most eager result first
-  where
-    order :: ([Ident], [BindV], Expr) -> Expr
-    order ([], [], r) = r
-    order (is, cs, r) =
-      let g = [(x, free e) | (x, e) <- cs ]  -- dependency graph
-          -- Do a breadth first search visiting all used variables.
-          bfs done [] = done
-          bfs done (x : xs) | x `elem` done = bfs done xs
-                            | otherwise  = bfs (x : done) (xs ++ fromMaybe [] (lookup x g))
-          ys = bfs [] (free r)                                          -- Canonical variable order
-          is' = filter (`elem` is) ys                                   -- Order existentials  
-          cs' = [(VAR y :=: Val v) | y <- ys, Just v <- [lookup y cs] ] -- Order binders
-          r' = r -- XXX WRONG canon r  -- In case it's not a value
-      in  mkRes is' cs' r'
--}
 
 ----------------------
 

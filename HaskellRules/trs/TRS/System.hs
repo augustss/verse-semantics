@@ -11,7 +11,8 @@ data TRSystem t = TRSystem
   , postProcess         :: !(t -> t)     -- post processing, e.g., undo ANF
   , rules               :: !(Rule t)     -- rewrite rules
   , rulesHaveStructural :: !Bool         -- are any rules structural? (slower)
-  , confluenceRules     :: !(Rule t)     -- ???
+  , confluenceRules     :: !(Rule t)     -- structural rules for equivalence test
+  , validExpr           :: !(t -> Bool)  -- is t valid for reduction
   }
 --  deriving (Show)
 
@@ -21,3 +22,4 @@ instance Show (TRSystem t) where
 -- | Case insensitive lookup of all systems matching a prefix]
 lookupTRSystem :: String -> [TRSystem t] -> [TRSystem t]
 lookupTRSystem n = filter (\ s -> map toLower n `isPrefixOf` map toLower (sname s))
+

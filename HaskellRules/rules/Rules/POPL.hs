@@ -17,11 +17,12 @@ systemPOPL = TRSystem
   { sname               = "POPL"
   , description         = "POPL submission"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = anf
+  , preProcess          = check valid . anf
   , postProcess         = id
   , rules               = allRules
   , rulesHaveStructural = False
   , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  , validExpr           = valid
   }
 
 systemVPOPL :: TRSystem Expr
@@ -31,8 +32,78 @@ systemVPOPL = systemPOPL
   , rules               = allRules <> rulesElimV
   }
 
+-- Check that an expression is in the subset defined by the POPL grammar.
+valid :: Expr -> Bool
+valid = expr
+  where
+    expr e@Val{} = value e
+    expr (Lam (Bind _ e)) = expr e
+    expr (e1 :=: e2) = expr e1 && expr e2
+    expr (e1 :>: e2) = expr e1 && expr e2
+    expr (e1 :|: e2) = expr e1 && expr e2
+    expr (e1 :@: e2) = value e1 && value e2
+    expr (Def (Bind _ e)) = expr e
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr Fail = True
+    expr Wrong = True
+    expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr _ = undefined -- GHC bug
+    value Var{} = True
+    value e = hnf e
+    hnf Int{} = True
+    hnf Op{}  = True
+    hnf (Arr vs) = all value vs
+    hnf (LAM _ e) = expr e
+    hnf _ = False
+
+-- Make the expression obey the POPL grammar,
+-- i.e., valid (anf e) == True
 anf :: Expr -> Expr
-anf = id -- XXX
+anf = expr
+  where
+    expr e@Var{} = e
+    expr e@Int{} = e
+    expr e@Op{}  = e
+    expr (Arr es) =
+      let (ds, a) = arr es
+      in  binds ds a
+    expr (Lam (Bind i e)) = Lam (Bind i (expr e))
+    expr (e1 :=: e2) = expr e1 :=: expr e2
+    expr (e1 :>: e2) = expr e1 :>: expr e2
+    expr (e1 :|: e2) = expr e1 :|: expr e2
+    expr (e1 :@: e2) =
+      let i1:i2:_ = identsNotIn (free (e1 :@: e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (v1 :@: v2)
+    expr (Def (Bind i e)) = Def (Bind i (expr e))
+    expr (One e) = One $ expr e
+    expr (All e) = All $ expr e
+    expr e@Fail = e
+    expr e@Wrong = e
+    expr (Split e e1 e2) =
+      let i1:i2:_ = identsNotIn (free (Split e e1 e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (Split (expr e) v1 v2)
+    value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
+    value _ e@Var{} = ([], e)
+    value _ e@Int{} = ([], e)
+    value _ e@Op{}  = ([], e)
+    value _ (Lam (Bind x e)) = ([], Lam (Bind x (expr e)))
+    value _ (Arr es) = arr es
+    value i e = ([(i, expr e)], Var i)
+    arr es =
+      let is = identsNotIn $ free es
+          (dss, vs) = unzip $ zipWith value is es
+          ds = concat dss
+      in  (ds, Arr vs)
+    binds :: [(Ident, Expr)] -> Expr -> Expr
+    binds [] b = b
+    binds ((i,e):ds) b = DEF i $ (Var i :=: e) :>: binds ds b
 
 --------------------------------------------------------------------------------
 

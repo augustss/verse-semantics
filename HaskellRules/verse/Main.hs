@@ -152,7 +152,8 @@ command = Command
 dummySystem :: ESystem
 dummySystem = TRSystem { sname = "none", description = "no rule system selected",
   ruleEnv = defaultTRSFlags,
-  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False, confluenceRules = noRules }
+  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False,
+  confluenceRules = noRules, validExpr = const undefined }
   where noRules _ _ = error "No rule system selected"
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
