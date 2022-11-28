@@ -20,7 +20,7 @@ import Epic.Print
 -- XXX use graph normal form when needed
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
+rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . elimDup . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
  where
   trsFlags       = (ruleEnv sys){ T.tfUnderLambda = fUnderLambda flg, T.tfAlias = fAlias flg, T.tfUnifyEq = fUnifyEq flg }
   n              = fRewriteSteps flg
@@ -42,6 +42,9 @@ rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . checkOne . subs flg s
     where
       msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
       pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
+
+elimDup :: [Trace T.Expr] -> [Trace T.Expr]
+elimDup = nubBy ((==) `on` (snd . head))
 
 subs :: Flags -> ESystem -> [Trace T.Expr] -> [Trace T.Expr]
 subs flg sys ts

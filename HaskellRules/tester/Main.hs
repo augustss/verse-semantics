@@ -16,6 +16,7 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
 import FrontEnd.Core
+import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow, pp)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
@@ -180,12 +181,13 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
 
 
 -- | Equivalence on values (or stuck expressions)
---
---  * Ignores message on `wrong`
---  * TODO: α-equivalence on lambdas
 equivValue :: Core -> Core -> Bool
+equivValue e1 e2 = coreToTrs e1 == coreToTrs e2
+
+{-
 equivValue (CWrong _) (CWrong _) = True
 equivValue v1 v2 = v1 == v2
+-}
 
 --------------
 
