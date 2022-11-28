@@ -21,7 +21,7 @@ systemPOPL = TRSystem
   , postProcess         = id
   , rules               = allRules
   , rulesHaveStructural = False
-  , confluenceRules     = \ _ _ -> []  -- XXX temporary
+  , confluenceRules     = rulesStructural
   , validExpr           = valid
   }
 
@@ -599,3 +599,8 @@ rulesSplit _ lhs =
 
 --------------------------------------------------------------------------------
 
+rulesStructural :: ERule
+rulesStructural _ lhs =
+  "Def-SWAP" `name`
+  do DEF x (DEF y e) <- [lhs]
+     pure (DEF y (DEF x e))
