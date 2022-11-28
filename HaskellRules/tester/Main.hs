@@ -35,7 +35,7 @@ data TestFlags = TestFlags
   , simplify  :: !Bool                -- use simplifier
 --  , alias     :: !Bool                -- eliminate aliases
 --  , unifyEq   :: !Bool                -- unify as equals under barrier
---  , underLam  :: !Bool                -- reduce under lambda
+  , underLam  :: !Bool                -- reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
   , noError   :: !Bool                -- Don't show error message
@@ -288,6 +288,10 @@ testFlags = TestFlags
       )
 -}
   <*> switch
+      (  long "under-lambda"
+      <> help "reduce under lambda"
+      )
+  <*> switch
       (  long "eval"
       <> help "Use fast evaluator"
       )
@@ -323,7 +327,8 @@ testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t),
-                fDfs = dfs t, fFinalInline = not (noInline t)
+                fDfs = dfs t, fFinalInline = not (noInline t),
+                fUnderLambda = underLam t
                 }
 main :: IO ()
 main = do
