@@ -23,7 +23,6 @@ import FrontEnd.Run
 --import DenSem.DenSem
 import Rules.Systems
 import Rules.Core(defaultTRSFlags)
-import TRS.System
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do

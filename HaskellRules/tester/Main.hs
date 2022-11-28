@@ -1,11 +1,16 @@
+{-# LANGUAGE LambdaCase #-}
 module Main(main) where
 
 import Control.Exception
 import Control.Monad
+import Data.Char
+import Data.List
 import Data.Maybe
 import GHC.Stack
 import Options.Applicative
 import System.Exit
+
+import Text.Megaparsec(getSourcePos, sourceLine)
 
 import FrontEnd.Expr
 import FrontEnd.Flags
@@ -14,7 +19,8 @@ import FrontEnd.Core
 import Epic.Print (Pretty, prettyShow, pp)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
-import Rules.Systems(ESystem, lookupSystem)
+import Rules.Core(defaultTRSFlags)
+import Rules.Systems(ESystem, lookupSystem, TRSystem(..))
 
 --------------
 
@@ -37,23 +43,63 @@ data TestFlags = TestFlags
 
 data Test
   -- Test that two expressions evaluate to the same thing
-  = TestEvalEq Ident Expr Expr
-  | TestCoreEq Ident Core Core
+  = TestEvalEq TestInfo Expr Expr
+  | TestCoreEq TestInfo Core Core
   deriving (Show)
 
--- Parse an evaluation equality test
+data TestInfo = TestInfo
+  { testMName :: Maybe String
+  , testLocn :: Loc
+  , testType :: TestType
+  , testExcn :: [(String, TestType)]
+  }
+  deriving (Show)
+
+data TestType = Skip | SEq | FEq
+  deriving (Show, Eq)
+
+pTestInfo :: P TestInfo
+pTestInfo = do
+  loc <- getSourcePos
+  let strOf (LitStr s) = s
+      strOf _ = undefined
+  mname <- fmap strOf <$> optional (pString <* pOp ",")
+  typ <- pTestType
+  let
+    pSys :: P String
+    pSys = pIdent >>= \case Ident _ s -> pure s
+  excns <- many ((,) <$> (pOp "," *> pSys) <*> (pOp "=" *> pTestType))
+  pure $ TestInfo mname loc typ excns
+
+testName :: TestInfo -> String
+testName ti = fromMaybe ("L" ++ show (sourceLine (testLocn ti))) (testMName ti)
+
+pTestType :: P TestType
+pTestType = do
+  i <- pIdent
+  case i of
+    Ident _ "SEq"  -> pure SEq
+    Ident _ "FEq"  -> pure FEq
+    Ident _ "Skip" -> pure Skip
+    _ -> fail "pTestType"
+
+-- Parse an expression evaluation equality test
 pTestEq :: P Test
 pTestEq =
   pKeyword "testeq" *> do
-    tId <- pParens pIdent
-    if tId == Ident noLoc "CEq" then
-      TestCoreEq tId <$> pBraces pCore    <*> pBraces pCore
-     else
-      TestEvalEq tId <$> pBraces pExprSeq <*> pBraces pExprSeq
+    tId <- pParens pTestInfo
+    TestEvalEq tId <$> pBraces pExprSeq <*> pBraces pExprSeq
+
+-- Parse a core expression evaluation equality test
+pTestCEq :: P Test
+pTestCEq =
+  pKeyword "testceq" *> do
+    tId <- pParens pTestInfo
+    TestCoreEq tId <$> pBraces pCore    <*> pBraces pCore
 
 -- Parse a test
 pTest :: P Test
-pTest = pTestEq
+pTest = pTestEq <|> pTestCEq
 
 -- Parse a file of tests
 pTestFile :: P [Test]
@@ -67,22 +113,23 @@ readTests fn = do
 
 ------------
 
-assertEquivE :: HasCallStack => Bool -> TestFlags -> Loc -> Expr -> Expr -> IO Bool
-assertEquivE ok flg name e1 e2  = assertEquiv ok flg name (e1, toCore e1) (e2, toCore e2)
+assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO Bool
+assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
   where toCore = exprToCore (testFlagsToFlags flg) . desugar
 
-assertEquivC :: HasCallStack => Bool -> TestFlags -> Loc -> Core -> Core -> IO Bool
-assertEquivC ok flg name e1 e2  = assertEquiv ok flg name (e1, e1) (e2, e2)
+assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO Bool
+assertEquivC ti flg e1 e2  = assertEquiv ti flg (e1, e1) (e2, e2)
 
-assertEquiv :: (HasCallStack, Pretty a) => Bool -> TestFlags -> Loc -> (a, Core) -> (a, Core) -> IO Bool
-assertEquiv expectOK tflg loc (p1, c1) (p2, c2) = do
-    let noisy = not (quiet tflg)
+assertEquiv :: (HasCallStack, Pretty a) => TestInfo -> TestFlags -> (a, Core) -> (a, Core) -> IO Bool
+assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
+    when noisy $
+      putStrLn $ pos ++ " skipped"
+    pure True
+                                      | otherwise = do
     let flg = testFlagsToFlags tflg
-        sys = fromMaybe (error "no rule system specified") $ system tflg
+        expectOK = typ == SEq
     let v1 = run flg sys c1
     let v2 = run flg sys c2
-
-    let pos = prettyShow loc
 
     catch
       ( if (v1 `equivValue` v2) == expectOK
@@ -124,6 +171,13 @@ assertEquiv expectOK tflg loc (p1, c1) (p2, c2) = do
             --undefined
             pure False
       )
+  where
+    loc = testLocn ti
+    noisy = not (quiet tflg)
+    pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
+    sys = fromMaybe evalSystem $ system tflg
+    typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
+
 
 -- | Equivalence on values (or stuck expressions)
 --
@@ -136,15 +190,8 @@ equivValue v1 v2 = v1 == v2
 --------------
 
 runTest :: TestFlags -> Test -> IO Bool
-runTest tflg (TestEvalEq n e1 e2) =
-  case n of
-    Ident loc "SEq" -> assertEquivE True  tflg loc e1 e2
-    Ident loc "FEq" -> assertEquivE False tflg loc e1 e2
-    Ident _ s -> error $ "Unknown test type " ++ show s
-runTest tflg (TestCoreEq n e1 e2) =
-  case n of
-    Ident loc "CEq" -> assertEquivC True  tflg loc e1 e2
-    Ident _ s -> error $ "Unknown test type " ++ show s
+runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
+runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
 runTests :: TestFlags -> [Test] -> IO Bool
 runTests tflg ts = and <$> mapM (runTest tflg) ts
@@ -262,3 +309,10 @@ verseTest = "tests.versetest"
 
 test1 :: FilePath
 test1     = "test1.verse"
+
+evalSystem :: ESystem
+evalSystem = TRSystem { sname = "eval", description = "no rule system selected",
+  ruleEnv = defaultTRSFlags,
+  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False,
+  confluenceRules = noRules, validExpr = const undefined }
+  where noRules _ _ = error "No rule system selected"

@@ -110,6 +110,7 @@ executable tester
 --                      densem,
                       frontend,
                       rules,
+                      megaparsec,
                       optparse-applicative,
 
     main-is:          Main.hs

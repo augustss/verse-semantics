@@ -3,6 +3,7 @@ module FrontEnd.Parse(
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
+  pString,
   P,
   testp, parseString) where
 

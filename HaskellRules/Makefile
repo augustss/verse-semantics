@@ -32,10 +32,10 @@ FLAGS = -O -Wall --make
 PROF =
 #PROF = -prof -fprof-auto
 
-verse: */*.hs */*/*.hs
+bin/verse: */*.hs */*/*.hs
 	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-verse verse/Main.hs -o bin/verse
 
-tester: */*.hs */*/*.hs
+bin/tester: */*.hs */*/*.hs
 	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
 
 v1install:

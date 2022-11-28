@@ -1,4 +1,4 @@
-module Rules.Systems(ESystem, allSystems, lookupSystem) where
+module Rules.Systems(ESystem, allSystems, lookupSystem, TRSystem(..)) where
 import TRS.System
 import Rules.Core
 import Rules.PLDI
