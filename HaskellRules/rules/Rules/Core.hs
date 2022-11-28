@@ -22,7 +22,9 @@ module Rules.Core(
   pattern DEF,
   pattern LAM,
   subst,
+  check,
   ) where
+import GHC.Stack(HasCallStack)
 
 import TRS.Bind
 import TRS.TRS
@@ -197,17 +199,6 @@ instance Show Op where
 -- patterns
 
 -- Expr
-{-
-pattern ARR vs = Val (VARR vs)
-pattern LAM v e= Val (VLAM v e)
-pattern EHNF h = Val (HNF h)
-pattern OP o   = Val (VOP o)
-pattern VHNF :: HNF -> Value
-pattern VHNF v <- (getH -> Just v)
-  where VHNF h = HNF h
-
-
--}
 
 pattern DEF :: Ident -> Expr -> Expr
 pattern DEF x e = Def (Bind x e)
@@ -234,28 +225,6 @@ getHNF e@Op{} = Just e
 getHNF e@Arr{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing
-
-{-
--- Value
-pattern VINT n  = HNF (Int n)
-pattern VARR vs = HNF (Arr vs)
-pattern VLAM v e= HNF (Lam (Bind v e))
-pattern VOP o   = HNF (Op o)
-pattern ADD     = HNF (Op Add)
-pattern SUB     = HNF (Op Sub)
-pattern MUL     = HNF (Op Mul)
-pattern DIV     = HNF (Op Div)
-pattern NEG     = HNF (Op Neg)
-pattern PLUS    = HNF (Op Plus)
-pattern GRT     = HNF (Op Gt)
-pattern GRE     = HNF (Op Ge)
-pattern LST     = HNF (Op Lt)
-pattern LSE     = HNF (Op Le)
-pattern NEQ     = HNF (Op Ne)
-pattern IsINT   = HNF (Op IsInt)
-pattern MAPAP   = HNF (Op MapAp)
-pattern CONS    = HNF (Op Cons)
--}
 
 --------------------------------------------------------------------------------
 
@@ -418,3 +387,8 @@ arbBind n xs =
   ]
 
 --------------------------------------------------------------------------------
+
+-- XXX Move somewhere better
+check :: (HasCallStack) => (Expr -> Bool) -> Expr -> Expr
+check p a | p a = a
+          | otherwise = error $ "check failed: " ++ show a
