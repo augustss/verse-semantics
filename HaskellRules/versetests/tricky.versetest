@@ -26,7 +26,8 @@ testceq("Koen1", SEq){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>
                      { fail }
 # This test loops with substitution and reduction under lambda, e.g., POPL rules
 # because x=<\y.x>
-#testceq("Koen3", SEq){ exists x . (\y.x = <y>; (exists z . z))(\y.x) }
-#                     { exists z . z }
+testceq("Koen3", SEq, POPL=Skip, POPLV=Skip)
+                     { exists x . (\y.x = <y>; (exists z . z))(\y.x) }
+                     { exists z . z }
 testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
                      { exists y . (\x.x = 0; y = 0; <>) }
