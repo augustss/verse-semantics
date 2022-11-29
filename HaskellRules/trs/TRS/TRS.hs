@@ -8,7 +8,7 @@ import TRS.Traced
 import qualified Data.Set as S
 import Data.List ( intercalate )
 import Control.Monad( unless )
---import Debug.Trace (trace)
+--import qualified Debug.Trace
 --import Data.Set( Set )
 
 --------------------------------------------------------------------------------
@@ -68,6 +68,7 @@ normalFormsFuelTrace env an rule at = go an S.empty [start at]
   go 0 _    (_tr:_)      = []
   go _n _seen []          = []
   go n seen (ttr@(t:<--tr):trs)
+--x    | Debug.Trace.trace ("go: " ++ show t) False = undefined
     | t `S.member` seen = go n seen trs
     | null ts'          = ttr : go n seen' trs
     | otherwise         = go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
