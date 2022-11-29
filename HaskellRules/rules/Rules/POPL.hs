@@ -28,8 +28,8 @@ systemPOPL = TRSystem
 systemPOPLV :: TRSystem Expr
 systemPOPLV = systemPOPL
   { sname               = "POPLV"
-  , description         = "POPL submission + DEF-ELIMV"
-  , rules               = allRules <> rulesElimV
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
+  , rules               = allRules <> rulesElimV <> rulesDefElim
   }
 
 -- Check that an expression is in the subset defined by the POPL grammar.
@@ -599,6 +599,15 @@ rulesSplit _ lhs =
 
 --------------------------------------------------------------------------------
 
+rulesDefElim :: ERule
+rulesDefElim _ lhs =
+  "DEF-ELIM" `name`
+  do DEF x e <- [lhs]
+     guard (x `notElem` free e)
+     pure e
+
+--------------------------------------------------------------------------------
+
 rulesStructural :: ERule
 rulesStructural _ lhs =
   "DEF-SWAP" `name`
@@ -620,9 +629,9 @@ rulesStructural _ lhs =
   do Val _v :>: e <- [lhs]
      pure e
 -}
-{-
+
  <>
   "UNIFY-SWAP1" `name`
   do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
      pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
--}
+
