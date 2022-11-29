@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.PLDI(systemPLDI) where
+module Rules.PLDI(systemPLDI, systemPLDIG) where
 
 import TRS.Bind
 import TRS.System
@@ -28,7 +28,20 @@ import Data.Maybe
 systemPLDI :: TRSystem Expr
 systemPLDI = TRSystem
   { sname               = "PLDI"
-  , description         = "PLDI submission"
+  , description         = "PLDI submission (ELIM-DEF without structural)"
+  , ruleEnv             = defaultTRSFlags
+  , preProcess          = check validE . anf
+  , postProcess         = finalSubst
+  , rules               = allRules <> rulesGarbageCollection
+  , rulesHaveStructural = False
+  , confluenceRules     = rulesStructural
+  , validExpr           = validE
+  }
+
+systemPLDIG :: TRSystem Expr
+systemPLDIG = TRSystem
+  { sname               = "PLDIG"
+  , description         = "PLDI submission, no ELIM-DEF"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
@@ -258,7 +271,6 @@ allRules =
      rulesPrimOps
   <> rulesUnificationFP
   <> rulesApplication
-  <> rulesGarbageCollection
   <> rulesFailFP
   <> rulesSpeculation
   <> rulesNormalization
@@ -445,15 +457,15 @@ rulesUnificationNoOcc _ lhs =
 -- Equal values
 -- x=x, k=k
   "U-SCALAR" `name`
-  do v@(SCL s1) :=: SCL s2 <- [lhs]
+  do (SCL s1 :=: SCL s2) :>: e <- [lhs]
      guard (s1 == s2)
-     pure v
+     pure e
  ++
 -- tuple=tuple
   "U-TUP" `name`
-  do v@(Arr ss) :=: Arr ss' <- [lhs]
+  do (Arr ss :=: Arr ss') :>: e <- [lhs]
      guard (length ss == length ss')
-     pure (foldr (:>:) v (zipWith (:=:) ss ss'))
+     pure (foldr (:>:) e (zipWith (:=:) ss ss'))
 {-
  ++
   "U-FAIL-OP-OP" `name`
@@ -469,6 +481,7 @@ rulesUnificationNoOcc _ lhs =
  ++
   "U-FAIL" `name`
   do HNF h1 :=: HNF h2 <- [lhs]
+     -- Arrays and up here, make sure we don't flag them as unequal when they may not be.
      guard (case (h1, h2) of (Arr ss1, Arr ss2) -> length ss1 /= length ss2; _ -> True)
      guard (h1 /= h2)
      pure Fail
@@ -631,9 +644,14 @@ derefB lhs xx =
 derefA :: TRSFlags -> Expr -> Ident -> [VContext]
 derefA = derefA' False
 
+-- Used in consuming positions.
+-- Does the same as derefA in current rules.
 derefB :: TRSFlags -> Expr -> Ident -> [VContext]
+derefB = derefA' False
+{-x
 derefB s | tfUnifyEq s = derefA' True s
          | otherwise   = derefA' False s
+-}
 
 derefA' :: Bool -> TRSFlags -> Expr -> Ident -> [VContext]
 derefA' b s lhs xx =
@@ -833,11 +851,10 @@ isS _ = False
 rulesDerefFP :: ERule
 rulesDerefFP ss lhs =
   "DEREF-S" `name`
-  do xs@(Var x :=: Val s) :>: e <- [lhs]
-     guard (Var x /= Val s)
-     guard (isS s)
+  do xs@(Var x :=: SCL s) :>: e <- [lhs]
+     guard (Var x /= s)
 --     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
-     ctx <- derefE e x
+     ctx <- derefE e x  -- handles necessary alpha-conversion
      pure (xs :>: plug ctx s)
  ++
   "DEREF-H" `name`
@@ -867,11 +884,13 @@ rulesFailFP _ lhs =
   "FAIL-UNIFY" `name`
   do _ :=: Fail <- [lhs]
      pure Fail
+{-
  ++
   -- Not needed when we have GC
   "FAIL-DEF" `name`
   do DEF _ Fail <- [lhs]
      pure Fail
+-}
 
 rulesOneFP :: ERule
 rulesOneFP _ lhs =
@@ -997,10 +1016,10 @@ rulesNormalization _ lhs =
  ++
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(Var _x :=: Val v) :>: e2) <- [lhs]
-     let valid | isS v     = case e1 of Var _ :=: Val s | isS s -> False; _ -> True
-               | otherwise = case e1 of Var _ :=: Val _         -> False; _ -> True
+     let ok | SCL{} <- v = case e1 of Var _ :=: SCL{} -> False; _ -> True
+            | otherwise  = case e1 of Var _ :=: Val _ -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)
-     guard valid
+     guard ok
      pure (xv :>: (e1 :>: e2))
 {-
  ++
