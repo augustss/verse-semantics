@@ -184,7 +184,7 @@ flagTable =
 --  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
---  ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
+  ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
 --  ,("alias",       (fAlias,        \ b s -> s{fAlias=b}))
 --  ,("unify-equal", (fUnifyEq,      \ b s -> s{fUnifyEq=b}))
   ]
