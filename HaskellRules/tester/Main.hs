@@ -194,7 +194,9 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
 equivValue sys e1 e2 | sname sys == "eval" = coreToTrs e1 == coreToTrs e2  -- XXX temporary hack
-equivValue sys e1 e2 = equiv sys (coreToTrs e1) (coreToTrs e2)
+equivValue sys e1 e2 =
+  coreToTrs e1 == coreToTrs e2 ||        -- fast test first
+  equiv sys (coreToTrs e1) (coreToTrs e2)
 
 --------------
 
@@ -204,11 +206,12 @@ runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
 runTestFile :: TestFlags -> FilePath -> IO ()
 runTestFile tflg fn = do
+  let allSys = evalSystem : allSystems
   ts <- readTests fn
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-  when (summary tflg) $
+  when (summary tflg) $ do
+    mapM_ (\ s -> printf "%-10s %s\n" (sname s) (description s)) allSys
     putStrLn $ testSummaryHeader "" ts
-  let allSys = evalSystem : allSystems
   if allRules tflg then do
     mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
    else do
@@ -360,7 +363,7 @@ test1 :: FilePath
 test1     = "test1.verse"
 
 evalSystem :: ESystem
-evalSystem = TRSystem { sname = "eval", description = "no rule system selected",
+evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
   ruleEnv = defaultTRSFlags,
   preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False,
   confluenceRules = noRules, validExpr = const undefined }
