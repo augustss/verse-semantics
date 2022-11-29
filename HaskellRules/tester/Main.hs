@@ -66,7 +66,7 @@ data TestInfo = TestInfo
   }
   deriving (Show)
 
-data TestType = Skip | SEq | FEq
+data TestType = TSkip | SEq | FEq
   deriving (Show, Eq)
 
 pTestInfo :: P TestInfo
@@ -91,7 +91,7 @@ pTestType = do
   case i of
     Ident _ "SEq"  -> pure SEq
     Ident _ "FEq"  -> pure FEq
-    Ident _ "Skip" -> pure Skip
+    Ident _ "Skip" -> pure TSkip
     _ -> fail "pTestType"
 
 -- Parse an expression evaluation equality test
@@ -124,18 +124,21 @@ readTests fn = do
 
 ------------
 
-assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO Bool
+data TestRes = Good | Bad | Excn | Skip
+  deriving (Eq, Show)
+
+assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
 assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
   where toCore = exprToCore (testFlagsToFlags flg) . desugar
 
-assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO Bool
+assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO TestRes
 assertEquivC ti flg e1 e2  = assertEquiv ti flg (e1, e1) (e2, e2)
 
-assertEquiv :: (HasCallStack, Pretty a) => TestInfo -> TestFlags -> (a, Core) -> (a, Core) -> IO Bool
-assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
+assertEquiv :: (HasCallStack, Pretty a) => TestInfo -> TestFlags -> (a, Core) -> (a, Core) -> IO TestRes
+assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     when noisy $
       putStrLn $ pos ++ " skipped"
-    pure True
+    pure Skip
                                       | otherwise = do
     let flg = testFlagsToFlags tflg
         expectOK = typ == SEq
@@ -147,7 +150,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
         then do
             when noisy $
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
-            pure True
+            pure Good
         else do
             when (not (noError tflg)) $
              if expectOK
@@ -170,7 +173,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
                 --undefined
               else do
                 putStrLn $ pos ++ " unexpected success, please update test case!"
-            pure False
+            pure Bad
       ) (\e -> do
            when (not (noError tflg)) $ do
             putStrLn $ pos ++ " failure:"
@@ -182,7 +185,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == Skip = do
             print (e :: SomeException)
             putStrLn ""
             --undefined
-           pure False
+           pure Excn
       )
   where
     loc = testLocn ti
@@ -201,7 +204,7 @@ equivValue sys e1 e2 =
 
 --------------
 
-runTest :: TestFlags -> Test -> IO Bool
+runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
 runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
@@ -224,7 +227,7 @@ runTestFileSys :: TestFlags -> [Test] -> IO Bool
 runTestFileSys tflg ts = do
   let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
   res <- mapM (runTest tflg) (filter p ts)
-  let ok = and res
+  let ok = all (==Good) res
   if (summary tflg) then do
     putStrLn $ testSummary (sname (system tflg)) res
    else
@@ -237,8 +240,12 @@ width = 6
 testSummaryHeader :: String -> [Test] -> String
 testSummaryHeader s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . testName . testInfo)
 
-testSummary :: String -> [Bool] -> String
-testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . (\ b -> if b then "OK" else "-"))
+testSummary :: String -> [TestRes] -> String
+testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . showRes)
+  where showRes Good = "OK"
+        showRes Bad  = "-"
+        showRes Excn = "excn"
+        showRes Skip = "skip"
 
 {-
 test :: String -> IO ()
