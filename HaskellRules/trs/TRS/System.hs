@@ -22,4 +22,3 @@ instance Show (TRSystem t) where
 -- | Case insensitive lookup of all systems matching a prefix]
 lookupTRSystem :: String -> [TRSystem t] -> [TRSystem t]
 lookupTRSystem n = filter (\ s -> map toLower n `isPrefixOf` map toLower (sname s))
-
