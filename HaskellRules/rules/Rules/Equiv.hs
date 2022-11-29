@@ -1,4 +1,5 @@
 module Rules.Equiv(equiv) where
+import Data.List(nub)
 import Rules.Core
 import TRS.TRS( step, normalFormsFuelTrace )
 import TRS.TRSGraph( normalFormsFuelTraceWithGraph )
@@ -18,10 +19,10 @@ normalForms sys
 
 normalForm :: TRSystem Expr -> Expr -> Expr
 normalForm sys e =
-  case normalForms sys e of
-    [] -> error "normalForms returned []"
-    [x] -> term (norm sys x)
-    _ -> error "normalForms returned many"
+  case nub $ map (norm sys) $ normalForms sys e of
+    [] -> error "normalForm: []"
+    [x] -> term x
+    xs -> error $ "normalForm: many\n" ++ show e ++ "\n" ++ show (map term xs)
 
 norm :: TRSystem Expr -> Traced Expr -> Traced Expr
 norm sys = minimum . head . tarjan tstep
