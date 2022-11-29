@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.PLDI(systemPLDI, systemPLDIG) where
+module Rules.PLDI(systemPLDI, systemPLDIG, systemPLDIS) where
 
 import TRS.Bind
 import TRS.System
@@ -13,15 +13,6 @@ import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
-
--- Use ue in unification rules
--- #define USE_UE 1
--- Use the DEREF-K
--- #define USE_DEREF_K 1
--- Use the correct definition of WF
--- #define USE_CORRECT_WF 1
--- Use ELIM-DEF-DEAD, a weak substitute for structural rules
--- #define USE_ELIM_DEF_DEAD NO_STRUCT_RULES
 
 --------------------------------------------------------------------------------
 
@@ -41,11 +32,24 @@ systemPLDI = TRSystem
 systemPLDIG :: TRSystem Expr
 systemPLDIG = TRSystem
   { sname               = "PLDIG"
-  , description         = "PLDI submission, no ELIM-DEF"
+  , description         = "PLDI submission - ELIM-DEF"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules
+  , rulesHaveStructural = False
+  , confluenceRules     = rulesStructural
+  , validExpr           = validE
+  }
+
+systemPLDIS :: TRSystem Expr
+systemPLDIS = TRSystem
+  { sname               = "PLDIS"
+  , description         = "PLDI submission + SUBST-S, SWAP-S"
+  , ruleEnv             = defaultTRSFlags
+  , preProcess          = check validE . anf
+  , postProcess         = finalSubst
+  , rules               = allRules <> rulesS <> rulesGarbageCollection
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -252,6 +256,63 @@ scopeX lhs =
   do Split hole f g <- [lhs]
      pure (\ e -> Split e f g, hole)
 
+allX :: Ident -> Expr -> [(EContext, Expr)]
+allX xx e = allX1 xx e ++ [(id, e)]
+
+allX1 :: Ident -> Expr -> [(EContext, Expr)]
+allX1 xx lhs =
+  -- No expressions in Var, Int, Op, Arr
+  do LAM x e <- [lhs]
+     guard (x /= xx)
+     (ctx, hole) <- allX xx e
+     pure (LAM x . ctx, hole)
+ ++
+  do e1 :=: e2 <- [lhs]
+     (ctx, hole) <- allX xx e1
+     pure ((:=: e2) . ctx, hole)
+ ++
+  do e1 :=: e2 <- [lhs]
+     (ctx, hole) <- allX xx e2
+     pure ((e1 :=:) . ctx, hole)
+ ++
+  do e1 :>: e2 <- [lhs]
+     (ctx, hole) <- allX xx e1
+     pure ((:>: e2) . ctx, hole)
+ ++
+  do e1 :>: e2 <- [lhs]
+     (ctx, hole) <- allX xx e2
+     pure ((e1 :>:) . ctx, hole)
+ ++
+  do e1 :|: e2 <- [lhs]
+     (ctx, hole) <- allX xx e1
+     pure ((:|: e2) . ctx, hole)
+ ++
+  do e1 :|: e2 <- [lhs]
+     (ctx, hole) <- allX xx e2
+     pure ((e1 :|:) . ctx, hole)
+ ++
+  do e1 :@: e2 <- [lhs]
+     (ctx, hole) <- allX xx e1
+     pure ((:@: e2) . ctx, hole)
+ ++
+  do e1 :@: e2 <- [lhs]
+     (ctx, hole) <- allX xx e2
+     pure ((e1 :@:) . ctx, hole)
+ ++
+  do DEF x e <- [lhs]
+     guard (x /= xx)
+     (ctx, hole) <- allX xx e
+     pure (DEF x . ctx, hole)
+ ++
+  do One e <- [lhs]
+     (ctx, hole) <- allX xx e
+     pure (One . ctx, hole)
+ ++
+  do All e <- [lhs]
+     (ctx, hole) <- allX xx e
+     pure (All . ctx, hole)
+ -- XXX Split
+
 --------------------------------------------------------------------------------
 
 {-
@@ -269,22 +330,22 @@ rulesAll s | tfAlias s = (rulesAlias `before` rulesPLDI') s
 allRules :: ERule
 allRules =
      rulesPrimOps
-  <> rulesUnificationFP
+  <> rulesUnification
   <> rulesApplication
-  <> rulesFailFP
+  <> rulesFail
   <> rulesSpeculation
   <> rulesNormalization
 
-rulesUnificationFP :: ERule
-rulesUnificationFP =
-     rulesDerefFP
+rulesUnification :: ERule
+rulesUnification =
+     rulesDeref
   <> rulesUnificationNoOcc
 
 rulesSpeculation :: ERule
 rulesSpeculation =
      rulesChoice
-  <> rulesOneFP
-  <> rulesAllFP
+  <> rulesOne
+  <> rulesAll
   <> rulesSplit
 
 --------------------------------------------------------------------------------
@@ -848,8 +909,8 @@ isS Var{} = True
 isS Op{} = True
 isS _ = False
 
-rulesDerefFP :: ERule
-rulesDerefFP ss lhs =
+rulesDeref :: ERule
+rulesDeref ss lhs =
   "DEREF-S" `name`
   do xs@(Var x :=: SCL s) :>: e <- [lhs]
      guard (Var x /= s)
@@ -870,8 +931,41 @@ rulesDerefFP ss lhs =
      pure (xh :>: plug ctx (HNF h))
 -}
 
-rulesFailFP :: ERule
-rulesFailFP _ lhs =
+isVar :: Expr -> Bool
+isVar Var{} = True
+isVar _ = False
+
+rulesS :: ERule
+rulesS _ lhs =
+  -- DEREF-S without variables.
+  "DEREF-S" `name`
+  do xs@(Var x :=: SCL s) :>: e <- [lhs]
+     guard (not (isVar s))
+--     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
+     ctx <- derefE e x  -- handles necessary alpha-conversion
+     pure (xs :>: plug ctx s)
+ ++
+  "SWAP-S" `name`
+  do DEF x ex <- [lhs]
+     (ctx1, DEF y ey) <- allX x ex
+     guard (x /= y)
+     (ctx2, Var x' :=: Var y') <- allX y ey
+     guard (x == x' && y == y')
+     pure (DEF x (ctx1 (DEF y (ctx2 (Var y :=: Var x)))))
+ ++
+  "SUBST-S" `name`
+  do DEF y ey <- [lhs]
+     (ctx1, DEF x ex) <- allX y ey
+     guard (x /= y)
+     (ctx2, (Var x' :=: Var y') :>: e) <- allX x ex
+     guard (x == x' && y == y')
+     ctx <- derefE e x
+     pure (DEF x (ctx1 (DEF y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var y))))))
+
+--------------------------------------------------------------------------------
+
+rulesFail :: ERule
+rulesFail _ lhs =
   "FAIL-SEQL" `name`
   do Fail :>: _ <- [lhs]
      pure Fail
@@ -892,8 +986,8 @@ rulesFailFP _ lhs =
      pure Fail
 -}
 
-rulesOneFP :: ERule
-rulesOneFP _ lhs =
+rulesOne :: ERule
+rulesOne _ lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
@@ -908,8 +1002,8 @@ rulesOneFP _ lhs =
      _ <- wfRes e
      pure e
 
-rulesAllFP :: ERule
-rulesAllFP _ lhs =
+rulesAll :: ERule
+rulesAll _ lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (Arr [])

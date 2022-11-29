@@ -10,7 +10,7 @@ type ESystem = TRSystem Expr
 allSystems :: [ESystem]
 allSystems =
   [ systemPOPL, systemPOPLV
-  , systemPLDI, systemPLDIG
+  , systemPLDI, systemPLDIG, systemPLDIS
   ]
 
 lookupSystem :: String -> Either String ESystem
