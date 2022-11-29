@@ -27,6 +27,7 @@ library epic
                       Epic.ShowRational
                       Epic.SIntMap
                       Epic.SIntSet
+                      Epic.String
                       Epic.Uniplate
     build-depends:
                       parser-combinators,
@@ -54,7 +55,8 @@ library trs
 
 library rules
     import:           shared-properties
-    build-depends:    trs,
+    build-depends:    epic,
+                      trs,
                       QuickCheck
     exposed-modules:  Rules.Core
                       Rules.Equiv
