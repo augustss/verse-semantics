@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.POPL(systemPOPL, systemVPOPL) where
+module Rules.POPL(systemPOPL, systemPOPLV) where
 
 import TRS.Bind
 import TRS.System
@@ -25,9 +25,9 @@ systemPOPL = TRSystem
   , validExpr           = valid
   }
 
-systemVPOPL :: TRSystem Expr
-systemVPOPL = systemPOPL
-  { sname               = "VPOPL"
+systemPOPLV :: TRSystem Expr
+systemPOPLV = systemPOPL
+  { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV"
   , rules               = allRules <> rulesElimV
   }
@@ -610,4 +610,13 @@ rulesStructural _ lhs =
      let y0 = identNotIn (free (ctx Fail, y, x))
          sub = [(y, Var x), (y0, Var y)]
      pure (subst sub (ctx (Var y0 :=: Var x)))
-  -- UNIFY-MOVE and SEQ are still missing
+{- These 2 rules makes it very slow
+ <>
+  "UNIFY-MOVE" `name`
+  do (ctx, e@(Val _v1 :=: Val v2)) <- execX lhs
+     pure (e :>: ctx v2)
+ <>
+  "SEQ" `name`
+  do Val _v :>: e <- [lhs]
+     pure e
+-}
