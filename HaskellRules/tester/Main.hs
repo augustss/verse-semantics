@@ -43,6 +43,7 @@ data TestFlags = TestFlags
   , system    :: !ESystem             -- rule system
   , summary   :: !Bool                -- produce a summary
   , allRules  :: !Bool                -- test with all rule systems
+  , onlyTest  :: !(Maybe String)      -- run only this test
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -221,7 +222,8 @@ runTestFile tflg fn = do
 
 runTestFileSys :: TestFlags -> [Test] -> IO Bool
 runTestFileSys tflg ts = do
-  res <- mapM (runTest tflg) ts
+  let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
+  res <- mapM (runTest tflg) (filter p ts)
   let ok = and res
   if (summary tflg) then do
     putStrLn $ testSummary (sname (system tflg)) res
@@ -324,6 +326,10 @@ testFlags = TestFlags
       (  long "all-rules"
       <> help "Test with all rule systems"
       )
+  <*> optional (strOption
+         ( long "only-test"
+        <> metavar "TEST"
+        <> help "Run only test named TEST" ))
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
