@@ -620,3 +620,9 @@ rulesStructural _ lhs =
   do Val _v :>: e <- [lhs]
      pure e
 -}
+{-
+ <>
+  "UNIFY-SWAP1" `name`
+  do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
+     pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
+-}
