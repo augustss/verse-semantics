@@ -231,13 +231,11 @@ getHNF _ = Nothing
 type TRSFlags = RuleEnv Expr
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfAlias = False, tfUnifyEq = False }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool     -- reduce under lambda
-    , tfAlias       :: !Bool     -- get rid of alias definitions early
-    , tfUnifyEq     :: !Bool     -- treat unify under a barrier as equals
     }
   rec r s ae =
     r s ae ++
