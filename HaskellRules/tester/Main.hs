@@ -35,7 +35,7 @@ data TestFlags = TestFlags
   , simplify  :: !Bool                -- use simplifier
 --  , alias     :: !Bool                -- eliminate aliases
 --  , unifyEq   :: !Bool                -- unify as equals under barrier
-  , underLam  :: !Bool                -- reduce under lambda
+  , noUnderLam:: !Bool                -- do not reduce under lambda
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
   , noError   :: !Bool                -- Don't show error message
@@ -124,7 +124,7 @@ readTests fn = do
 
 ------------
 
-data TestRes = Good | Bad | Excn | Skip
+data TestRes = Good | Bad | Many | None | Excn | Skip
   deriving (Eq, Show)
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
@@ -136,16 +136,20 @@ assertEquivC ti flg e1 e2  = assertEquiv ti flg (e1, e1) (e2, e2)
 
 assertEquiv :: (HasCallStack, Pretty a) => TestInfo -> TestFlags -> (a, Core) -> (a, Core) -> IO TestRes
 assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
-    when noisy $
-      putStrLn $ pos ++ " skipped"
-    pure Skip
+  when noisy $
+    putStrLn $ pos ++ " skipped"
+  pure Skip
                                       | otherwise = do
-    let flg = testFlagsToFlags tflg
-        expectOK = typ == SEq
-    let v1 = run flg sys c1
-    let v2 = run flg sys c2
+  let flg = testFlagsToFlags tflg
+      expectOK = typ == SEq
+  let vs1 = runM flg sys c1
+  let v2 = run flg sys c2
 
-    catch
+  case vs1 of
+    [] -> pure None
+    _:_:_ -> pure Many
+    [v1] ->
+     catch
       ( if (equivValue sys v1 v2) == expectOK
         then do
             when noisy $
@@ -215,6 +219,7 @@ runTestFile tflg fn = do
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   when (summary tflg) $ do
     mapM_ (\ s -> printf "%-10s %s\n" (sname s) (description s)) allSys
+    putStrLn "OK=success; nonc=non-confluent; -=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
     putStrLn $ testSummaryHeader "" ts
   if allRules tflg then do
     mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
@@ -244,6 +249,8 @@ testSummary :: String -> [TestRes] -> String
 testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . showRes)
   where showRes Good = "OK"
         showRes Bad  = "-"
+        showRes None = "t.o."
+        showRes Many = "nonc"
         showRes Excn = "excn"
         showRes Skip = "skip"
 
@@ -300,8 +307,8 @@ testFlags = TestFlags
       )
 -}
   <*> switch
-      (  long "under-lambda"
-      <> help "reduce under lambda"
+      (  long "no-under-lambda"
+      <> help "do not reduce under lambda"
       )
   <*> switch
       (  long "eval"
@@ -344,7 +351,7 @@ testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t),
                 fDfs = dfs t, fFinalInline = not (noInline t),
-                fUnderLambda = underLam t
+                fUnderLambda = not (noUnderLam t)
                 }
 main :: IO ()
 main = do
