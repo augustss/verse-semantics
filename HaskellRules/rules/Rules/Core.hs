@@ -40,7 +40,7 @@ type EContext = Expr -> Expr
 data Expr
     -- The following 5 are the old Value type
   = Var Ident                   -- ^ x
-    -- The following 5 are the old HNF type
+    -- The following 4 are the old HNF type
   | Int Integer                 -- ^ k
   | Op Op                       -- ^ op
   | Arr [Expr]                  -- ^ <e1,e2,...>
