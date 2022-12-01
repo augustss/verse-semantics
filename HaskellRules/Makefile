@@ -41,7 +41,9 @@ PROF =
 bin/verse: */*.hs */*/*.hs
 	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-verse verse/Main.hs -o bin/verse
 
+# Put a compiled `tester` in ./bin/tester
 bin/tester: */*.hs */*/*.hs
+	mkdir -p bin
 	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
 
 v1install:
