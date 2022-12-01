@@ -51,7 +51,8 @@ $alnum = [A-Za-z\_0-9]
   "=" { token Token.Equals }
   "|" { token Token.Pipe }
   ":=" { token Token.ColonEquals }
-  "=>" { token Token.EqualsGreaterThan }
+  "->" { token Token.ThinArrow }
+  "=>" { token Token.FatArrow }
   "?" { token Token.QuestionMark }
   "+" { token Token.Plus }
   "-" { token Token.Minus }

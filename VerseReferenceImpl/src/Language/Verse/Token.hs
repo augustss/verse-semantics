@@ -24,7 +24,8 @@ data Token
   | Equals
   | Pipe
   | ColonEquals
-  | EqualsGreaterThan
+  | ThinArrow
+  | FatArrow
   | QuestionMark
   | Plus
   | Minus
@@ -66,7 +67,8 @@ instance Pretty Token where
     Equals -> equals
     Pipe -> pipe
     ColonEquals -> colon <> equals
-    EqualsGreaterThan -> equals <> rangle
+    ThinArrow -> pretty '-' <> rangle
+    FatArrow -> equals <> rangle
     QuestionMark -> pretty '?'
     Plus -> pretty '+'
     Minus -> pretty '-'

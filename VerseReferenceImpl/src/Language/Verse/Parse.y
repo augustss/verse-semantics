@@ -50,7 +50,8 @@ import Language.Verse.Token qualified as Token
   '.' { L _ Token.Dot }
   '=' { L _ Token.Equals }
   '|' { L _ Token.Pipe }
-  '=>' { L _ Token.EqualsGreaterThan }
+  '->' { L _ Token.ThinArrow }
+  '=>' { L _ Token.FatArrow }
   '?' { L _ Token.QuestionMark }
   '+' { L _ Token.Plus }
   '-' { L _ Token.Minus }
