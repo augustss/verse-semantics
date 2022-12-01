@@ -1,0 +1,96 @@
+cabal-version:      2.4
+name:               verse
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+
+author: Andy Sonnenburg
+
+maintainer: andy.sonnenburg@epicgames.com
+
+library
+  exposed-modules:
+    Control.Monad.Ref
+    Control.Monad.RST
+    Control.Monad.Supply
+    Control.Monad.Trans.Fix
+    Control.Monad.Trans.Verse
+    Control.Monad.Verse
+    Control.Monad.Verse.Class
+    Data.Fix
+    Data.List.Diff
+    Data.Ref
+    Data.Unifiable
+    Debug.Traceable
+    Language.Verse
+    Language.Verse.Desugar
+    Language.Verse.Desugar.Exp
+    Language.Verse.Error
+    Language.Verse.Eval
+    Language.Verse.Ident
+    Language.Verse.Lexer
+    Language.Verse.Loc
+    Language.Verse.Name
+    Language.Verse.Parse
+    Language.Verse.Parse.Exp
+    Language.Verse.Simplify
+    Language.Verse.Simplify.Exp
+    Language.Verse.Pos
+    Language.Verse.Token
+    Language.Verse.Val
+  build-tool-depends: alex:alex, happy:happy
+  build-depends:
+    base ^>=4.16.0.0,
+    array,
+    bytestring,
+    comonad,
+    containers,
+    hashable,
+    logict,
+    mtl >= 2.3.1,
+    prettyprinter,
+    semigroupoids,
+    text,
+    transformers,
+    unordered-containers >= 0.2.6.0
+  hs-source-dirs: src
+  ghc-options: -Wall -Wno-name-shadowing
+  default-language: Haskell2010
+
+test-suite verse-test-suite
+  type: exitcode-stdio-1.0
+  main-is: TestSuite.hs
+  build-depends:
+    base ^>=4.16.0.0,
+    bytestring,
+    directory,
+    filepath,
+    HUnit,
+    prettyprinter,
+    transformers,
+    verse
+  hs-source-dirs: test
+  ghc-options: -Wall -Wno-name-shadowing
+  default-language: Haskell2010
+
+executable versei
+  main-is: Main.hs
+  build-depends:
+    base ^>=4.16.0.0,
+    bytestring,
+    prettyprinter,
+    transformers,
+    verse
+  hs-source-dirs: main
+  ghc-options: -Wall -Wno-name-shadowing
+  default-language: Haskell2010
