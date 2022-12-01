@@ -37,9 +37,11 @@ $alpha = [A-Za-z\_]
 $alnum = [A-Za-z\_0-9]
 
 :-
-  $white+ ;
   "#".* ;
   "<#"[.\n]*"#>" ;
+  " " { space }
+  \t { tab }
+  \n { newline }
   "(" { token Token.LeftParen }
   ")" { token Token.RightParen }
   "{" { token Token.LeftBrace }
@@ -88,34 +90,66 @@ newtype Lexer a = Lexer
 runLexer :: Lexer a -> ByteString -> Either Error a
 runLexer m = runExcept . evalStateT (getLexer m) . AlexInput Pos.minBound
 
+data S = S
+  { alexInput :: !AlexInput
+  , indenting :: !Bool
+  , indent :: Indent
+  , indents :: [Indent]
+  }
+
+type Indent = [White]
+
+data White = Space | Tab deriving Eq
+
 getToken :: Lexer (L Token)
 getToken = Lexer $ fix $ \ recur -> do
   s <- get
-  case alexScan s 0 of
-    AlexEOF ->
-      pure $ L (Loc s.pos s.pos) Token.EOF
-    AlexError AlexInput { pos } ->
-      Except.throwError $ LexError pos
-    AlexSkip s _ -> do
-      put s
-      recur
-    AlexToken s' n f -> do
-      put s'
-      pure . (L $ Loc s.pos s'.pos) $ f n s.input
+  case s.token of
+    Nothing -> case alexScan s 0 of
+      AlexEOF ->
+        pure $ L (Loc s.pos s.pos) Token.EOF
+      AlexError AlexInput { pos } ->
+        Except.throwError $ LexError pos
+      AlexSkip s _ -> do
+        putAlexInput s
+        recur
+      AlexToken s' n f -> do
+        putAlexInput s'
+        f s.pos s'.pos n s.input
+    Just x ->
+      putToken Nothing
+      pure x
 
-token :: Token -> Int -> ByteString -> Token
-token x _ _ = x
+type Action = Pos -> Pos -> Int -> ByteString -> Lexer (L Token)
 
-int :: Int -> ByteString -> Token
-int n xs =
-  Token.Int . ByteString.foldl' f 0 $
+space :: Action
+space _ _ _ _ = do
+  whenIndenting $ pushIndent Space
+  getToken
+
+tab :: Action
+tab _ _ _ _ = do
+  whenIndenting $ pushIndent Tab
+  getToken
+
+newline :: Action
+newline _ _ _ _ = do
+  setIndenting True
+  getToken
+
+token :: Token -> Action
+token x i j _ _ = pure $ L (Loc i j) x
+
+int :: Action
+int i j n xs =
+  L (Loc i j) . Token.Int . ByteString.foldl' f 0 $
   ByteString.take n xs
   where
     f z x = z * 10 + (toInteger $ x - ord' '0')
 
-float :: Int -> ByteString -> Token
-float n xs =
-  Token.Float . toRational . ByteString.foldl' f (0, 0, 0) $
+float :: Action
+float i j n xs =
+  L (Loc i j) . Token.Float . toRational . ByteString.foldl' f (0, 0, 0) $
   ByteString.take n xs
   where
     f (!z0, !z1, !n1) x

@@ -52,6 +52,7 @@ data Token
   | Int Integer
   | Float Rational
   | Name Name
+  | Newline
   | EOF deriving Show
 
 instance Pretty Token where
@@ -95,4 +96,5 @@ instance Pretty Token where
     Int x -> pretty x
     Float x -> pretty (fromRational x :: Double)
     Name x -> pretty x
+    Newline -> pretty "newline"
     EOF -> "end" <+> "of" <+> "file"
