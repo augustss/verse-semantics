@@ -85,8 +85,6 @@ into `tester`, `qctest` etc.
   ```
   (The "1" in `execX1` means never return an empty context.)
 
-## Contents
-
 ## Directories
 The Haskell code is split into a number of directories corresponding to
 different parts of the system.
