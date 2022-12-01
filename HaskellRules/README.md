@@ -52,6 +52,8 @@ Todo.
 The rewrite rules are expressed an embeded DSL in Haskell, compiled
 into `tester`, `qctest` etc.
 * The rules themselves are in `rules/Rules`, in files `Core.hs`, `PLDI.hs` etc.
+* `tester` uses `Rules.System.allSystems` for the rows of the table with `--summary`,
+  and to look up the name of the rules system with `--rules=<name>`.
 * In `TRSSystem`:
   * `rules :: Rules t` are used to make progress
   * `confluenceRules :: Rules t` are the structural rules used during confluence checking

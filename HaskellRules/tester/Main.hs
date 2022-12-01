@@ -142,8 +142,8 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
                                       | otherwise = do
   let flg = testFlagsToFlags tflg
       expectOK = typ == SEq
-  let vs1 = runM flg sys c1
-  let v2 = run flg sys c2
+  let vs1 = runM flg sys c1  -- May return multiple answers
+  let v2  = run flg sys c2   -- Returns just one
 
   case vs1 of
     [] -> pure None

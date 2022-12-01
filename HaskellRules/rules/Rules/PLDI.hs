@@ -12,7 +12,7 @@ import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe
 --import Data.Functor.Classes (Show1(liftShowList))
---import Debug.Trace
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -23,20 +23,21 @@ systemPLDI = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesGarbageCollection
+  , rules               = allRules <> rulesDerefS <> rulesGarbageCollection
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
   }
 
 systemPLDIG :: TRSystem Expr
+-- PLDI without garbage collection
 systemPLDIG = TRSystem
   { sname               = "PLDIG"
   , description         = "PLDI submission - ELIM-DEF"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules
+  , rules               = allRules <> rulesDerefS
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -45,7 +46,7 @@ systemPLDIG = TRSystem
 systemPLDIS :: TRSystem Expr
 systemPLDIS = TRSystem
   { sname               = "PLDIS"
-  , description         = "PLDI submission + SUBST-S, SWAP-S"
+  , description         = "PLDI submission -DEREF-S + SUBST-S, SWAP-S"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
@@ -337,8 +338,9 @@ allRules =
   <> rulesNormalization
 
 rulesUnification :: ERule
+-- Has DEREF-H but not DREF-S
 rulesUnification =
-     rulesDeref
+     rulesDerefH
   <> rulesUnificationNoOcc
 
 rulesSpeculation :: ERule
@@ -611,6 +613,8 @@ rulesChoice _ lhs =
 
 -- Put v into ctx, alpha-converting binders in ctx
 -- when necessary to avoid capture.
+--     (ctx $HOLE)  [v/$HOLE]
+-- where the [v/$HOLE] is capture avoiding substitution
 plug :: VContext -> Value -> Expr
 plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
@@ -909,20 +913,23 @@ isS Var{} = True
 isS Op{} = True
 isS _ = False
 
-rulesDeref :: ERule
-rulesDeref ss lhs =
+rulesDerefH :: ERule
+rulesDerefH ss lhs =
+  "DEREF-H" `name`
+  do xh@(Var x :=: HVAL h) :>: e <- [lhs]
+--     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
+     ctx <- derefA ss e x
+     pure (xh :>: plug ctx h)
+
+rulesDerefS :: ERule
+rulesDerefS _ss lhs =
   "DEREF-S" `name`
   do xs@(Var x :=: SCL s) :>: e <- [lhs]
      guard (Var x /= s)
 --     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x  -- handles necessary alpha-conversion
      pure (xs :>: plug ctx s)
- ++
-  "DEREF-H" `name`
-  do xh@(Var x :=: HVAL h) :>: e <- [lhs]
---     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA ss e x
-     pure (xh :>: plug ctx h)
+
 {-
  ++
   "DEREF-K" `name`
@@ -937,11 +944,11 @@ isVar _ = False
 
 rulesS :: ERule
 rulesS _ lhs =
-  -- DEREF-S without variables.
-  "DEREF-S" `name`
+  -- DEREF-K is like DEREF-S but for constants only
+  "DEREF-K" `name`
   do xs@(Var x :=: SCL s) :>: e <- [lhs]
      guard (not (isVar s))
---     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
+--     traceM $ "DEREF-K " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x  -- handles necessary alpha-conversion
      pure (xs :>: plug ctx s)
  ++
@@ -951,16 +958,18 @@ rulesS _ lhs =
      guard (x /= y)
      (ctx2, Var x' :=: Var y') <- allX y ey
      guard (x == x' && y == y')
+     traceM $ "SWAP-S " ++ show (x, y)
      pure (DEF x (ctx1 (DEF y (ctx2 (Var y :=: Var x)))))
  ++
   "SUBST-S" `name`
-  do DEF y ey <- [lhs]
-     (ctx1, DEF x ex) <- allX y ey
+  do DEF x ex <- [lhs]
+     (ctx1, DEF y ey) <- allX x ex
      guard (x /= y)
-     (ctx2, (Var x' :=: Var y') :>: e) <- allX x ex
+     (ctx2, (Var y' :=: Var x') :>: e) <- allX y ey
      guard (x == x' && y == y')
-     ctx <- derefE e x
-     pure (DEF x (ctx1 (DEF y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var y))))))
+     ctx <- derefE e y
+     traceM $ "SUBST-S " ++ show (x, y)
+     pure (DEF x (ctx1 (DEF y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var x))))))
 
 --------------------------------------------------------------------------------
 

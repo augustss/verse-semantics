@@ -21,7 +21,12 @@ import Epic.Print
 -- XXX use graph normal form when needed
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg sys = map (trsToCore . sub flg sys . rtrace) . elimDup sys . subs flg sys . nf n (rules sys) . preProcess sys . coreToTrs
+rewrite flg sys = map (trsToCore . sub flg sys . rtrace)
+                . elimDup sys
+                . subs flg sys
+                . nf n (rules sys)
+                . preProcess sys
+                . coreToTrs
  where
   trsFlags       = (ruleEnv sys){ T.tfUnderLambda = fUnderLambda flg }
   n              = fRewriteSteps flg
