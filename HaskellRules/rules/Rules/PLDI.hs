@@ -23,7 +23,7 @@ systemPLDI = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesDerefS <> rulesGarbageCollection
+  , rules               = allRules <> rulesDerefS <> rulesElimDef
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -46,11 +46,11 @@ systemPLDIG = TRSystem
 systemPLDIS :: TRSystem Expr
 systemPLDIS = TRSystem
   { sname               = "PLDIS"
-  , description         = "PLDI submission -DEREF-S + SUBST-S, SWAP-S"
+  , description         = "PLDI submission - DEREF-S + DEREF-K + SUBST-S + SWAP-S + ELIM-DEAD"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesS <> rulesGarbageCollection
+  , rules               = allRules <> rulesS <> rulesElimDef <> rulesElimDead
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -620,15 +620,15 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
    hole    = ident "$HOLE$"
 
-rulesGarbageCollection :: ERule
-rulesGarbageCollection _ lhs =
-{-
+rulesElimDead :: ERule
+rulesElimDead _ lhs =
 -- Not like the paper
-  "ELIM-DEF-DEAD" `name`
+  "ELIM-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
- ++
--}
+
+rulesElimDef :: ERule
+rulesElimDef _ lhs =
   "ELIM-DEF" `name`
   do ee@Def{} <- [lhs]
      (xs, _, e) <- wfResE ee
@@ -636,7 +636,6 @@ rulesGarbageCollection _ lhs =
      guard (null (intersect xs (free e)))
      pure e
 
-{-
 -- ELIM-DEF together with the structural SWAP rules
 -- is able to remove all unused bindings.
 -- Without the structural rules this doesn't happen.
@@ -646,7 +645,7 @@ elimDead ee =
   let
     getXs rs (DEF x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
-    getBs bs ((VAR x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
+    getBs bs ((Var x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
     getBs bs e = (reverse bs, e)
     -- xs are the initial defined variables
     (xs, e') = getXs [] ee
@@ -656,7 +655,7 @@ elimDead ee =
     simpleCst xs bs e''
 
 existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
-existBind xs bs ee = mkRes xs (map (\ (x, v) -> VAR x :=: v) bs) ee
+existBind xs bs ee = mkRes xs (map (\ (x, v) -> Var x :=: v) bs) ee
 
 -- Remove bindings of the form 'x=e' where x occurs nowhere else.
 -- Also remove unused existentials.
@@ -677,7 +676,6 @@ simpleCst xs bs e =
         [existBind xs'' bs' e]
       else
         []
--}
 
 {- | Application Contexts
 
