@@ -18,7 +18,7 @@ import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
 import FrontEnd.Core
 import FrontEnd.TRSAdapter(coreToTrs)
-import Epic.Print (Pretty, prettyShow, pp)
+import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run
 import Rules.Core(defaultTRSFlags)
@@ -39,7 +39,7 @@ data TestFlags = TestFlags
   , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
   , noError   :: !Bool                -- Don't show error message
-  , noInline  :: !Bool                -- No final inlining
+  , finalInl  :: !Bool                -- No final inlining
   , system    :: !ESystem             -- rule system
   , summary   :: !Bool                -- produce a summary
   , allRules  :: !Bool                -- test with all rule systems
@@ -161,13 +161,13 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
               then do
                 putStrLn $ pos ++ " failure:"
                 putStrLn "The expression"
-                pp p1
+                ppi p1
                 putStrLn "evaluates to"
-                pp v1
+                ppi v1
                 putStrLn "but"
-                pp p2
+                ppi p2
                 putStrLn "evaluates to"
-                pp v2
+                ppi v2
                 putStrLn ""
                 when (prettyShow v1 == prettyShow v2) $ do
                     putStrLn "The unpretty printed values are"
@@ -182,9 +182,9 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
            when (not (noError tflg)) $ do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
-            pp p1
+            ppi p1
             putStrLn "or the expression"
-            pp p2
+            ppi p2
             putStrLn "caused an exception:"
             print (e :: SomeException)
             putStrLn ""
@@ -197,6 +197,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
     sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
+    ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
 
 
 -- | Equivalence on values (or stuck expressions)
@@ -219,7 +220,7 @@ runTestFile tflg fn = do
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   when (summary tflg) $ do
     mapM_ (\ s -> printf "%-10s %s\n" (sname s) (description s)) allSys
-    putStrLn "OK=success; nonc=non-confluent; -=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
+    putStrLn "OK=success; nonc=non-confluent; BAD=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
     putStrLn $ testSummaryHeader "" ts
   if allRules tflg then do
     mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
@@ -248,7 +249,7 @@ testSummaryHeader s = (printf "%-8s" s ++) . concat . map (printf " %*s" width .
 testSummary :: String -> [TestRes] -> String
 testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . showRes)
   where showRes Good = "OK"
-        showRes Bad  = "-"
+        showRes Bad  = "BAD"
         showRes None = "t.o."
         showRes Many = "nonc"
         showRes Excn = "excn"
@@ -323,8 +324,8 @@ testFlags = TestFlags
       <> help "Do not show error message on failure"
       )
   <*> switch
-      (  long "no-final-inline"
-      <> help "Do not do final normalization"
+      (  long "final-inline"
+      <> help "Do final normalization"
       )
   <*> option (eitherReader lookupSystem)
          ( long "rules"
@@ -350,7 +351,7 @@ testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t),
-                fDfs = dfs t, fFinalInline = not (noInline t),
+                fDfs = dfs t, fFinalInline = finalInl t,
                 fUnderLambda = not (noUnderLam t)
                 }
 main :: IO ()

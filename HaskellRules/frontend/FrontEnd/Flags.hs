@@ -38,4 +38,5 @@ showFlags f = unwords
   , if fSplit f then "split" else "no-split"
   , if fSimplify f then "simplify" else "no-simplify"
   , if fUnderLambda f then "under-lambda" else "no-under-lambda"
+  , if fFinalInline f then "final-inlines" else ""
   ]

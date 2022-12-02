@@ -12,7 +12,7 @@ import Control.Monad( guard )
 import Data.List --( sort, find, union, (\\), delete, intersect )
 import Data.Maybe
 --import Data.Functor.Classes (Show1(liftShowList))
-import Debug.Trace
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -958,7 +958,7 @@ rulesS _ lhs =
      guard (x /= y)
      (ctx2, Var x' :=: Var y') <- allX y ey
      guard (x == x' && y == y')
-     traceM $ "SWAP-S " ++ show (x, y)
+--     traceM $ "SWAP-S " ++ show (x, y)
      pure (DEF x (ctx1 (DEF y (ctx2 (Var y :=: Var x)))))
  ++
   "SUBST-S" `name`
@@ -968,7 +968,7 @@ rulesS _ lhs =
      (ctx2, (Var y' :=: Var x') :>: e) <- allX y ey
      guard (x == x' && y == y')
      ctx <- derefE e y
-     traceM $ "SUBST-S " ++ show (x, y)
+--     traceM $ "SUBST-S " ++ show (x, y)
      pure (DEF x (ctx1 (DEF y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var x))))))
 
 --------------------------------------------------------------------------------
