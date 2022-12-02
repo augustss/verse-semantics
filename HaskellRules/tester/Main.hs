@@ -10,6 +10,7 @@ import GHC.Stack
 import Options.Applicative
 import Text.Printf
 import System.Exit
+import System.IO(hFlush, stdout)
 
 import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
@@ -215,45 +216,56 @@ runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
 runTestFile :: TestFlags -> FilePath -> IO ()
 runTestFile tflg fn = do
-  let allSys = evalSystem : allSystems
+  let allSys | allRules tflg = evalSystem : allSystems
+             | otherwise = [system tflg]
   ts <- readTests fn
-  putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-  when (summary tflg) $ do
-    mapM_ (\ s -> printf "%-10s %s\n" (sname s) (description s)) allSys
-    putStrLn "OK=success; nonc=non-confluent; BAD=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
-    putStrLn $ testSummaryHeader "" ts
-  if allRules tflg then do
-    mapM_ (\ sys -> runTestFileSys tflg{system=sys,eval=sname sys=="eval"} ts) allSys
+  if summary tflg then
+    runTestSummary tflg allSys ts
    else do
-    ok <- runTestFileSys tflg ts
-    unless ok $
+    putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
+    oks <- mapM (\ sys -> runTestFileSys tflg{system=sys, eval=sname sys=="eval"} ts) allSys
+    unless (and oks) $
       exitWith (ExitFailure 1)
+
+runTestSummary :: TestFlags -> [ESystem] -> [Test] -> IO ()
+runTestSummary atflg allSys tests = do
+  let tflg = atflg{ noError = True }
+  mapM_ (\ s -> printf "%-10s %s\n" (sname s) (description s)) allSys
+  putStrLn "OK=success; nonc=non-confluent; BAD=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
+  putStrLn $ testSummaryHeader allSys
+  forM_ tests $ \ test -> do
+    printf  "%-*s" widthTestName (testName (testInfo test))
+    hFlush stdout
+    forM_ allSys $ \ sys -> do
+      r <- runTest tflg{system=sys, eval=sname sys=="eval"} test
+      printf " %*s" widthSysName (showRes r)
+      hFlush stdout
+    putStrLn ""
+
+testSummaryHeader :: [ESystem] -> String
+testSummaryHeader = (printf "%-*s" widthTestName "" ++) . concat . map (printf " %*s" widthSysName . sname)
+
+showRes :: TestRes -> String
+showRes Good = "OK"
+showRes Bad  = "BAD"
+showRes None = "t.o."
+showRes Many = "nonc"
+showRes Excn = "excn"
+showRes Skip = "skip"
 
 runTestFileSys :: TestFlags -> [Test] -> IO Bool
 runTestFileSys tflg ts = do
   let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
   res <- mapM (runTest tflg) (filter p ts)
   let ok = all (==Good) res
-  if (summary tflg) then do
-    putStrLn $ testSummary (sname (system tflg)) res
-   else
-    putStrLn $ if ok then "SUCCESS" else "FAILURE"
+  putStrLn $ if ok then "SUCCESS" else "FAILURE"
   pure ok
 
-width :: Int
-width = 6
+widthTestName :: Int
+widthTestName = 10
 
-testSummaryHeader :: String -> [Test] -> String
-testSummaryHeader s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . testName . testInfo)
-
-testSummary :: String -> [TestRes] -> String
-testSummary s = (printf "%-8s" s ++) . concat . map (printf " %*s" width . showRes)
-  where showRes Good = "OK"
-        showRes Bad  = "BAD"
-        showRes None = "t.o."
-        showRes Many = "nonc"
-        showRes Excn = "excn"
-        showRes Skip = "skip"
+widthSysName :: Int
+widthSysName = 6
 
 {-
 test :: String -> IO ()
