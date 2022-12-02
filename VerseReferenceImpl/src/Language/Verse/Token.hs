@@ -16,7 +16,9 @@ data Token
   = LeftParen
   | RightParen
   | LeftBrace
+  | Indent
   | RightBrace
+  | Dedent
   | Semi
   | Colon
   | Comma
@@ -24,7 +26,8 @@ data Token
   | Equals
   | Pipe
   | ColonEquals
-  | EqualsGreaterThan
+  | ThinArrow
+  | FatArrow
   | QuestionMark
   | Plus
   | Minus
@@ -51,6 +54,7 @@ data Token
   | Int Integer
   | Float Rational
   | Name Name
+  | Newline
   | EOF deriving Show
 
 instance Pretty Token where
@@ -58,7 +62,9 @@ instance Pretty Token where
     LeftParen -> lparen
     RightParen -> rparen
     LeftBrace -> lbrace
+    Indent -> lbrace
     RightBrace -> rbrace
+    Dedent -> rbrace
     Semi -> semi
     Colon -> colon
     Comma -> comma
@@ -66,7 +72,8 @@ instance Pretty Token where
     Equals -> equals
     Pipe -> pipe
     ColonEquals -> colon <> equals
-    EqualsGreaterThan -> equals <> rangle
+    ThinArrow -> pretty '-' <> rangle
+    FatArrow -> equals <> rangle
     QuestionMark -> pretty '?'
     Plus -> pretty '+'
     Minus -> pretty '-'
@@ -93,4 +100,5 @@ instance Pretty Token where
     Int x -> pretty x
     Float x -> pretty (fromRational x :: Double)
     Name x -> pretty x
+    Newline -> "newline"
     EOF -> "end" <+> "of" <+> "file"

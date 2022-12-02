@@ -5,6 +5,7 @@ module Language.Verse.Error
   ) where
 
 import Language.Verse.Ident
+import Language.Verse.Indent
 import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Pos
@@ -14,6 +15,7 @@ import Prettyprinter
 
 data Error
   = LexError !Pos
+  | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
   | DefError !Loc !Loc !Name
   | NameError !Loc !Name
@@ -26,6 +28,11 @@ instance Pretty Error where
   pretty = \ case
     LexError x ->
       pretty x <> colon <+> "unexpected" <+> "character"
+    IndentError i x y ->
+      pretty i <> colon <+>
+      "indentation" <+> prettyIndent x <+>
+      "does" <+> "not" <+> "match" <+> "previous" <+>
+      "indentation" <+> prettyIndent y
     ParseError x y ->
       pretty x <> colon <+> "unexpected" <+> pretty y
     DefError x y z ->
@@ -47,3 +54,6 @@ instance Pretty Error where
          pretty x <> colon <+>
          "variable" <+> "not" <+> "in" <+> "scope" <> colon <+>
          pretty y
+
+prettyIndent :: Indent -> Doc ann
+prettyIndent = dquotes . hcat . fmap pretty
