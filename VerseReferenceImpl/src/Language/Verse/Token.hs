@@ -16,7 +16,9 @@ data Token
   = LeftParen
   | RightParen
   | LeftBrace
+  | Indent
   | RightBrace
+  | Dedent
   | Semi
   | Colon
   | Comma
@@ -60,7 +62,9 @@ instance Pretty Token where
     LeftParen -> lparen
     RightParen -> rparen
     LeftBrace -> lbrace
+    Indent -> lbrace
     RightBrace -> rbrace
+    Dedent -> rbrace
     Semi -> semi
     Colon -> colon
     Comma -> comma
@@ -96,5 +100,5 @@ instance Pretty Token where
     Int x -> pretty x
     Float x -> pretty (fromRational x :: Double)
     Name x -> pretty x
-    Newline -> pretty "newline"
+    Newline -> "newline"
     EOF -> "end" <+> "of" <+> "file"

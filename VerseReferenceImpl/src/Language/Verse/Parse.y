@@ -42,7 +42,9 @@ import Language.Verse.Token qualified as Token
   '(' { L _ Token.LeftParen }
   ')' { L _ Token.RightParen }
   '{' { L _ Token.LeftBrace }
+  indent { L _ Token.Indent }
   '}' { L _ Token.RightBrace }
+  dedent { L _ Token.Dedent }
   ';' { L _ Token.Semi }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEquals }
@@ -109,40 +111,44 @@ Exp3 :: { L (Exp L Name) }
   | false { Exp.False <\$ $1 }
   | true { Exp.True <\$ $1 }
   | fail { Exp.Fail <\$ $1 }
-  | one '{' Exp0 '}' { Exp.One <\$ $1 <.> duplicate $3 <. $4 }
-  | all '{' Exp0 '}' { Exp.All <\$ $1 <.> duplicate $3 <. $4 }
+  | one Block { Exp.One <\$ $1 <.> duplicate $2 }
+  | all Block { Exp.All <\$ $1 <.> duplicate $2 }
   | not Exp3 { Exp.Not <\$ $1 <.> duplicate $2 }
-  | if '{' Exp0 '}' {
-      Exp.If <\$ $1 <.> duplicate $3 <. $4
+  | if Block {
+      Exp.If <\$ $1 <.> duplicate $2
     }
-  | if '(' Exp0 ')' '{' Exp0 '}' {
-      Exp.IfThen <\$ $1 <.> duplicate $3 <.> duplicate $6 <. $7
+  | if '(' Exp0 ')' Block {
+      Exp.IfThen <\$ $1 <.> duplicate $3 <.> duplicate $5
     }
-  | if '{' Exp0 '}' then '{' Exp0 '}' {
-      Exp.IfThen <\$ $1 <.> duplicate $3 <.> duplicate $7 <. $8
+  | if Block then Block {
+      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | if '(' Exp0 ')' '{' Exp0 '}' else '{' Exp0 '}' {
-      Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $6 <.> duplicate $10 <. $11
+  | if '(' Exp0 ')' Block else Block {
+      Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $5 <.> duplicate $7
     }
-  | if '{' Exp0 '}' then '{' Exp0 '}' else '{' Exp0 '}' {
-      Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $7 <.> duplicate $11 <. $12
+  | if Block then Block else Block {
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $4 <.> duplicate $6
     }
-  | for '{' Exp0 '}' {
-      Exp.For <\$ $1 <.> duplicate $3 <. $4
+  | for Block {
+      Exp.For <\$ $1 <.> duplicate $2
     }
-  | for '(' Exp0 ')' '{' Exp0 '}' {
-      Exp.ForDo <\$ $1 <.> duplicate $3 <.> duplicate $6 <. $7
+  | for '(' Exp0 ')' Block {
+      Exp.ForDo <\$ $1 <.> duplicate $3 <.> duplicate $5
     }
-  | for '{' Exp0 '}' do '{' Exp0 '}' {
-      Exp.ForDo <\$ $1 <.> duplicate $3 <.> duplicate $7 <. $8
+  | for Block do Block {
+      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | block '{' Exp0 '}' { Exp.Block <\$ $1 <.> duplicate $3 <. $4 }
+  | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | name { Exp.Name <\$> $1 }
   | ':' Exp3 { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
   | name ':' Exp3 { Exp.InfixColon <\$> duplicate $1 <.> duplicate $3 }
   | name ':=' Exp3 { Exp.InfixColonEquals <\$> duplicate $1 <.> duplicate $3 }
+
+Block
+  : '{' Exp0 '}' { $1 .> $2 <. $3 }
+  | ':' indent Exp0 dedent { $1 .> $3 <. $4 }
 
 {
 lexer :: (L Token -> Lexer a) -> Lexer a
