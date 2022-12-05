@@ -32,7 +32,7 @@ import FrontEnd.Expr hiding (compos, composOp)
 import FrontEnd.Desugar(primOps, getVisible, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
-import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword)
+import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
 import FrontEnd.Misc(pattern Snoc)
 --import Debug.Trace
 
@@ -603,9 +603,9 @@ pArray :: P Expr
 pArray =
     Array <$> (pKeyword "array" *> pBraces (sepBy pSeq (pOp ",")))
   <|>
-    pOp "<" *> (Array <$> sepBy pSeq (pOp ",")) <* pOp ">"
-  <|>
-    Array [] <$ pOp "<>"
+    pLT *> (Array <$> sepBy pSeq (pOp ",")) <* pGT
+ where pLT = lexeme (string "<")
+       pGT = lexeme (string ">")
 
 pMacro :: P Expr
 pMacro = mac <$> pMacroName <*> pBraces pSeq
