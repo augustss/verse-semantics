@@ -13,6 +13,7 @@ import Epic.Print hiding ((<>))
 import FrontEnd.Desugar
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
+import qualified FrontEnd.Parse as P
 import VerseRepl.Command
 import FrontEnd.Core
 import FrontEnd.CoreSimp
@@ -213,8 +214,8 @@ cPrelude fn s =
 
 cParseLine :: Run CState
 cParseLine line s =
-  tryIt (pure s) (updateLastExpr s . Parsed) $ do
-    let prog = parseDie pFile "<interactive>" line
+  tryIt (pure s) (updateLastExpr s) $ do
+    let prog = parseDie ((Parsed <$> P.try pFile) <|> (Cored <$> pCoreFile)) "<interactive>" line
     pp prog
     pure prog
 
