@@ -1243,4 +1243,3 @@ rulesStructural _ lhs =
  ++
   do (Var x1 :=: Val v1) :>: ((Var x2 :=: Val v2) :>: e) <- [lhs]
      pure ("SWAP-D", (Var x2 :=: Val v2) :>: ((Var x1 :=: Val v1) :>: e))
-

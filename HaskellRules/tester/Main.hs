@@ -43,6 +43,7 @@ data TestFlags = TestFlags
   , finalInl  :: !Bool                -- No final inlining
   , system    :: !ESystem             -- rule system
   , summary   :: !Bool                -- produce a summary
+  , trace     :: !Bool                -- Show traces
   , allRules  :: !Bool                -- test with all rule systems
   , onlyTest  :: !(Maybe String)      -- run only this test
   , testExpr  :: !(Maybe String)      -- use this expression as a test
@@ -149,7 +150,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
 
   case vs1 of
     [] -> pure None
-    _:_:_ -> pure Many
+    vs@(_:_:_) -> when (fTrace flg) (failMany vs) >> pure Many
     [v1] ->
      catch
       ( if (equivValue sys v1 v2) == expectOK
@@ -200,6 +201,12 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
+
+failMany :: [Core] -> IO ()
+failMany vs = do
+  putStrLn "The expression evaluated to multiple values:"
+  mapM_ (putStrLn . ("   " ++) . prettyShow) vs
+  putStrLn ""
 
 
 -- | Equivalence on values (or stuck expressions)
@@ -350,6 +357,10 @@ testFlags = TestFlags
       <> help "Produce test summary"
       )
   <*> switch
+      (  long "trace"
+      <> help "Print rewrite traces"
+      )
+  <*> switch
       (  long "all-rules"
       <> help "Test with all rule systems"
       )
@@ -367,6 +378,7 @@ testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
                 fRewrite = not (eval t),
+                fTrace = trace t,
                 fDfs = dfs t, fFinalInline = finalInl t,
                 fUnderLambda = not (noUnderLam t)
                 }
@@ -389,7 +401,7 @@ testArgs = do
             <> progDesc "Test Verse rules"
             <> header "tests - testing Verse rules"
              )
-  let t' = 
+  let t' =
         case fileNames t of
           [] -> t{ fileNames = [if parse t then test1 else verseTest] }
           _  -> t
