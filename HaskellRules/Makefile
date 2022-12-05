@@ -8,7 +8,7 @@ TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/test
 TESTER=cabal run tester --
 
 all:
-	echo Specify a target
+	@echo Specify a target
 
 build:
 	cabal build
@@ -22,6 +22,8 @@ testfast:
 #	$(TESTER) --quiet --eval --split         $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=pldi     $(TESTFILE)
+
+trickytest: testtricky
 
 testtricky:
 	$(TESTER) --quiet --summary --no-error --all-rules $(TRICKY)
@@ -45,6 +47,9 @@ bin/verse: */*.hs */*/*.hs
 bin/tester: */*.hs */*/*.hs
 	mkdir -p bin
 	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-tester tester/Main.hs -o bin/tester
+
+bin/qctest: */*.hs */*/*.hs
+	ghc $(FLAGS) $(PROF) $(PKGS) $(SRCS) -outputdir objs-qctest qctest/Main.hs -o bin/qctest
 
 v1install:
 	cabal v1-install -p megaparsec
