@@ -92,6 +92,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
+    expr e = error $ "anf: impossible: " ++ show e
     value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
     value _ e@Var{} = ([], e)
     value _ e@Int{} = ([], e)

@@ -41,6 +41,7 @@ data Expr
   | Lam (Bind Expr)             -- ^ \ x . e
   --
   | Expr :=: Expr               -- ^ e1 = e2
+  | Ident :~: Ident             -- ^ e1 ~ e2
   | Expr :>: Expr               -- ^ e1; e2
   | Expr :|: Expr               -- ^ e1 | e2
   | Expr :@: Expr               -- ^ v1(v2)
@@ -57,6 +58,7 @@ infixr 1 :>:
 infixr 3 :|:
 infixr 2 :=:
 infixl 4 :@:
+infix  5 :~:
 
 instance Show Expr where
   showsPrec p (Var v)          = showsPrec p v
@@ -67,6 +69,7 @@ instance Show Expr where
   showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
   showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
   showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
+  showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " = " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
   showsPrec _ (Def (Bind x a)) = showString "def " . showsPrec 0 x . showString " in {" . showsPrec 0 a . showString "}"
@@ -124,6 +127,10 @@ instance Ord Expr where
     comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c & comp xs ys b d
     comp _xs _ys (_:=:_) _       = LT
     comp _xs _ys _       (_:=:_) = GT
+
+    comp  xs  ys (a:~:b) (c:~:d) = comp xs ys (Var a) (Var c) & comp xs ys (Var b) (Var d)
+    comp _xs _ys (_:~:_) _       = LT
+    comp _xs _ys _       (_:~:_) = GT
 
     comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c & comp xs ys b d
     comp _xs _ys (_:>:_) _       = LT
@@ -243,12 +250,13 @@ data DerefPos
   deriving (Eq, Ord, Show)
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = True }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool     -- reduce under lambda
     , tfDerefPos    :: !DerefPos -- where derefH is substituting
+    , tfUseTilde    :: !Bool
     }
   rec r s ae =
     r s ae ++
@@ -294,6 +302,7 @@ instance Free Expr where
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
+  free (a :~: b) = free a `union` free b
   free (a :>: b) = free a `union` free b
   free (a :|: b) = free a `union` free b
   free (a :@: b) = free a `union` free b
@@ -315,6 +324,7 @@ instance Term Expr where
   subst sub (Arr vs)  = Arr (map (subst sub) vs)
   subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
   subst sub (a :=: b) = subst sub a :=: subst sub b
+  subst sub (a :~: b) = substVar sub a :~: substVar sub b
   subst sub (a :>: b) = subst sub a :>: subst sub b
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
@@ -324,6 +334,17 @@ instance Term Expr where
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst _sub Wrong    = Wrong
+
+-- TODO(augustss):
+-- We don't normally substitute in ~, but we still need to be able to alpha convert,
+-- so we need to handle that somehow.
+-- It would probably be better to have an alpha conversion function.
+substVar :: Subst Expr -> Ident -> Ident
+substVar sub x =
+  case lookup x sub of
+    Nothing -> x
+    Just (Var y) -> y
+    Just _ -> error "substVar"
 
 --------------------------------------------------------------------------------
 
@@ -361,6 +382,7 @@ instance Arbitrary Expr where
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
+  shrink (_ :~: _) = error "impossible"
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr

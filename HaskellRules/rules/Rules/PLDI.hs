@@ -17,7 +17,7 @@ import Data.Maybe
 --------------------------------------------------------------------------------
 
 allSystemsPLDI :: [TRSystem Expr]
-allSystemsPLDI = [ systemPLDI, systemPLDIG, systemPLDIS ]
+allSystemsPLDI = [ systemPLDI, systemPLDIG, systemPLDIS, systemPLDIT ]
 
 systemPLDI :: TRSystem Expr
 systemPLDI = TRSystem
@@ -74,6 +74,20 @@ systemPLDIA = TRSystem
   }
 -}
 
+systemPLDIT :: TRSystem Expr
+systemPLDIT = TRSystem
+  { sname               = "PLDIT"
+  , description         = "PLDI submission, with ~"
+  , ruleEnv             = defaultTRSFlags
+  , preProcess          = check validE . anf
+  , postProcess         = finalSubst
+  , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde <> rulesGCTilde
+                          <> rulesElimDef <> rulesElimDead
+  , rulesHaveStructural = False
+  , confluenceRules     = rulesStructural
+  , validExpr           = validE
+  }
+
 -- Check that an expression is in the subset defined by the PLDI grammar.
 validE :: Expr -> Bool
 validE = expr
@@ -122,6 +136,7 @@ anf = expr
         -- Bare unifications not allowed as an expression
         eu@(v :=: _) -> eu :>: v
         eu -> eu
+    expr (_ :~: _) = error "anf: impossible"
     expr (e1 :>: e2) = expru e1 :>: expr e2
     expr (e1 :|: e2) = expr e1 :|: expr e2
     expr (e1 :@: e2) =
@@ -356,7 +371,7 @@ allRules =
   <> rulesNormalization
 
 rulesUnification :: ERule
--- Has DEREF-H but not DREF-S
+-- Has DEREF-H but not DEREF-S
 rulesUnification =
      rulesDerefH
   <> rulesUnificationNoOcc
@@ -752,6 +767,11 @@ derefA' b s lhs xx =
              tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       pure ( (:=: e) . Val)
    ++
+   do (Var x :=: Var y) <- [lhs]
+      guard (tfUseTilde s)
+      guard (x == xx)
+      pure (\ h -> (x :~: y) :>: (h :=: Var y))
+   ++
    do (e :=: Var x) <- [lhs]
       guard (x == xx)
       guard (tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
@@ -949,9 +969,18 @@ rulesDerefS _ss lhs =
   "DEREF-S" `name`
   do xs@(Var x :=: SCL s) :>: e <- [lhs]
      guard (Var x /= s)
---     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x  -- handles necessary alpha-conversion
+--     traceM $ "DEREF-S " ++ show (x, s, e, length (derefE e x))
      pure (xs :>: plug ctx s)
+
+-- Like DEREF-S, but for ~
+rulesDerefT :: ERule
+rulesDerefT _ss lhs =
+  "DEREF-T" `name`
+  do xs@(x :~: y) :>: e <- [lhs]
+     ctx <- derefE e x  -- handles necessary alpha-conversion
+--     traceM $ "DEREF-T " ++ show (x, s, e, length (derefE e x))
+     pure (xs :>: plug ctx (Var y))
 
 -- DEREF-K is like DEREF-S but for constants only
 rulesDerefK :: ERule
@@ -1120,6 +1149,24 @@ mkRess as = loop [] [] [] as
             es' = map (subst s) es
             v' = subst s v
             es = [Var x :=: Val vv | (x, vv) <- cs]
+
+isTilde :: Expr -> Bool
+isTilde (_ :~: _) = True
+isTilde _ = False
+
+rulesNormTilde :: ERule
+rulesNormTilde _ lhs =
+  "NORM-TILDE" `name`
+  do e1 :>: (e2@(_ :~: _) :>: e3) <- [lhs]
+     guard (not (isTilde e1))
+     pure (e2 :>: (e1 :>: e3))
+
+rulesGCTilde :: ERule
+rulesGCTilde _ lhs =
+  "GC-TILDE" `name`
+  do (x :~: _) :>: e <- [lhs]
+     guard (x `notElem` free e)
+     pure e
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =

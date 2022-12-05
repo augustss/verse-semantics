@@ -386,6 +386,8 @@ instance Pretty Core where
   pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
   pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
   pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
+  pPrintPrec l p (CApply (CVar (Ident _ "~")) (CArray [c1, c2])) =
+                  maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "~" <+> pPrintPrec l 6 c2
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
   pPrintPrec _ _ CFail = text "fail"
   pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2

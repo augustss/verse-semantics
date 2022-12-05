@@ -105,6 +105,7 @@ trsToCore (T.Op op) = CPrim $ fromMaybe undefined $ lookup op allOps
 trsToCore (T.Arr vs) = CArray $ map trsToCore vs
 trsToCore (T.Lam (T.Bind x e)) = CLam (trsToCoreI x) (trsToCore e)
 trsToCore (e1 T.:=: e2) = CUnify (trsToCore e1) (trsToCore e2)
+trsToCore (i1 T.:~: i2) = CApply (CVar (Ident noLoc "~")) (CArray [trsToCore (T.Var i1), trsToCore (T.Var i2)])
 trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
