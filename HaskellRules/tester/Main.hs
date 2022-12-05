@@ -45,6 +45,7 @@ data TestFlags = TestFlags
   , summary   :: !Bool                -- produce a summary
   , allRules  :: !Bool                -- test with all rule systems
   , onlyTest  :: !(Maybe String)      -- run only this test
+  , testExpr  :: !(Maybe String)      -- use this expression as a test
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -214,11 +215,10 @@ runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
 runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
-runTestFile :: TestFlags -> FilePath -> IO ()
-runTestFile tflg fn = do
+runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
+runTestFile tflg (fn, ts) = do
   let allSys | allRules tflg = evalSystem : allSystems
              | otherwise = [system tflg]
-  ts <- readTests fn
   if summary tflg then
     runTestSummary tflg allSys ts
    else do
@@ -357,6 +357,10 @@ testFlags = TestFlags
          ( long "only-test"
         <> metavar "TEST"
         <> help "Run only test named TEST" ))
+  <*> optional (strOption
+         ( long "expr"
+        <> metavar "EXPR"
+        <> help "Use EXPR as a test" ))
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -373,7 +377,9 @@ main = do
   if parse tflg then
     mapM_ ptest fns
    else
-    mapM_ (runTestFile tflg) fns
+    case testExpr tflg of
+      Nothing -> mapM_ (\ fn -> do ts <- readTests fn; runTestFile tflg (fn, ts)) fns
+      Just s -> runTestFile tflg (fn, parseDie pTestFile fn s)  where fn = "<command-line>"
 
 testArgs :: IO TestFlags
 testArgs = do
