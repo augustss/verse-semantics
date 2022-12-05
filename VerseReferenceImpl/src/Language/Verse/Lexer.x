@@ -36,63 +36,76 @@ import Language.Verse.Token qualified as Token
 
 $alpha = [A-Za-z\_]
 $alnum = [A-Za-z\_0-9]
-
-@newline = \r? \n
+$space = [\ \t]
+@newline = (\r \n?) | \n
 
 :-
-  <0, nested> " " { space }
-  <0, nested> \t { tab }
-  <0, nested> @newline { newline }
-  <0> "" { empty0 }
-  <nested> "" { emptyNested }
-  <indented> "#" .* ;
-  <indented> "<#" [.\n]* "#>" ;
-  <indented> [\ \t]+ ;
-  <indented> @newline { newlineIndented }
-  <indented> ":" [\ \t]* @newline { colon }
-  <indented> "=" [\ \t]* @newline { equals }
-  <indented> ":=" [\ \t]* @newline { colonEquals }
-  <indented> "=>" [\ \t]* @newline { fatArrow }
-  <nesting> "" { emptyNesting }
-  <indented> "(" { token Token.LeftParen }
-  <indented> ")" { token Token.RightParen }
-  <indented> "{" { token Token.LeftBrace }
-  <indented> "}" { token Token.RightBrace }
-  <indented> ";" { token Token.Semi }
-  <indented> ":" { token Token.Colon }
-  <indented> "," { token Token.Comma }
-  <indented> "." { token Token.Dot }
-  <indented> "=" { token Token.Equals }
-  <indented> "|" { token Token.Pipe }
-  <indented> ":=" { token Token.ColonEquals }
-  <indented> "->" { token Token.ThinArrow }
-  <indented> "=>" { token Token.FatArrow }
-  <indented> "?" { token Token.QuestionMark }
-  <indented> "+" { token Token.Plus }
-  <indented> "-" { token Token.Minus }
-  <indented> "*" { token Token.Multiply }
-  <indented> "/" { token Token.Divide }
-  <indented> "if" { token Token.If }
-  <indented> "then" { token Token.Then }
-  <indented> "else" { token Token.Else }
-  <indented> "for" { token Token.For }
-  <indented> "do" { token Token.Do }
-  <indented> "block" { token Token.Block }
-  <indented> "class" { token Token.Class }
-  <indented> "struct" { token Token.Struct }
-  <indented> "module" { token Token.Module }
-  <indented> "exists" { token Token.Exists }
-  <indented> "lambda" { token Token.Lambda }
-  <indented> "false" { token Token.False }
-  <indented> "true" { token Token.True }
-  <indented> "truth" { token Token.Truth }
-  <indented> [0-9]+ { int }
-  <indented> [0-9]+"."[0-9]+ { float }
-  <indented> "fail" { token Token.Fail }
-  <indented> "all" { token Token.All }
-  <indented> "one" { token Token.One }
-  <indented> "not" { token Token.Not }
-  <indented> $alpha $alnum* { name }
+<0, nested, maybeNesting> {
+  " " { space }
+  \t { tab }
+  @newline { newline }
+}
+
+<0> "" { empty0 }
+
+<nested> "" { emptyNested }
+
+<maybeNesting> {
+  "{" { leftBrace }
+  "" { emptyMaybeNesting }
+}
+
+<nesting> "" { emptyNesting }
+
+<indented> {
+  "#" .* ;
+  "<#" [.\n]* "#>" ;
+  [\ \t]+ ;
+  @newline { newlineIndented }
+  ":" $space* @newline { colon }
+  "=" $space* @newline { equals }
+  ":=" $space* @newline { colonEquals }
+  "=>" $space* @newline { fatArrow }
+  "(" { token Token.LeftParen }
+  ")" { token Token.RightParen }
+  "{" { token Token.LeftBrace }
+  "}" { token Token.RightBrace }
+  ";" { token Token.Semi }
+  ":" { token Token.Colon }
+  "," { token Token.Comma }
+  "." { token Token.Dot }
+  "=" { token Token.Equals }
+  "|" { token Token.Pipe }
+  ":=" { token Token.ColonEquals }
+  "->" { token Token.ThinArrow }
+  "=>" { token Token.FatArrow }
+  "?" { token Token.QuestionMark }
+  "+" { token Token.Plus }
+  "-" { token Token.Minus }
+  "*" { token Token.Multiply }
+  "/" { token Token.Divide }
+  "if" { token Token.If }
+  "then" { token Token.Then }
+  "else" { token Token.Else }
+  "for" { token Token.For }
+  "do" { token Token.Do }
+  "block" { token Token.Block }
+  "class" { token Token.Class }
+  "struct" { token Token.Struct }
+  "module" { token Token.Module }
+  "exists" { token Token.Exists }
+  "lambda" { token Token.Lambda }
+  "false" { token Token.False }
+  "true" { token Token.True }
+  "truth" { token Token.Truth }
+  [0-9]+ { int }
+  [0-9]+"."[0-9]+ { float }
+  "fail" { token Token.Fail }
+  "all" { token Token.All }
+  "one" { token Token.One }
+  "not" { token Token.Not }
+  $alpha $alnum* { name }
+}
 
 {
 newtype Lexer a = Lexer
@@ -180,6 +193,19 @@ emptyNested i j _ _ = do
   else
     throwError' $ IndentError i x y
 
+leftBrace :: Action
+leftBrace i j _ _ = do
+  popStates
+  popIndents
+  pushStates indented
+  pure $ L (Loc i j) Token.LeftBrace
+
+emptyMaybeNesting :: Action
+emptyMaybeNesting i j _ _ = do
+  popStates
+  pushStates nested
+  pure $ L (Loc i j) Token.Indent
+
 emptyNesting :: Action
 emptyNesting i j _ _ = do
   popStates
@@ -202,19 +228,25 @@ colon i j _ _ = do
 equals :: Action
 equals i j _ _ = do
   popStates
-  pushStates nesting
+  pushIndents =<< getIndent
+  putIndent []
+  pushStates maybeNesting
   pure $ L (Loc i j) Token.Equals
 
 colonEquals :: Action
 colonEquals i j _ _ = do
   popStates
-  pushStates nesting
+  pushIndents =<< getIndent
+  putIndent []
+  pushStates maybeNesting
   pure $ L (Loc i j) Token.ColonEquals
 
 fatArrow :: Action
 fatArrow i j _ _ = do
   popStates
-  pushStates nesting
+  pushIndents =<< getIndent
+  putIndent []
+  pushStates maybeNesting
   pure $ L (Loc i j) Token.FatArrow
 
 token :: Token -> Action

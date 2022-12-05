@@ -62,9 +62,9 @@ instance Pretty Token where
     LeftParen -> lparen
     RightParen -> rparen
     LeftBrace -> lbrace
-    Indent -> lbrace
+    Indent -> "indent"
     RightBrace -> rbrace
-    Dedent -> rbrace
+    Dedent -> "dedent"
     Semi -> semi
     Colon -> colon
     Comma -> comma

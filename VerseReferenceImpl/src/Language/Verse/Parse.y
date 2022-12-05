@@ -99,6 +99,7 @@ Exp3 :: { L (Exp L Name) }
   : '(' ')' { $1 \$> Exp.Tuple [] <. $2 }
   | '(' Exp0 ')' { $1 .> $2 <. $3 }
   | Exp3 '=' Exp3 { (:=:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp3 '=' BraceInd { (:=:) <\$> duplicate $1 <.> duplicate $3 }
   | Exp3 '|' Exp3 { (:|:) <\$> duplicate $1 <.> duplicate $3 }
   | Exp3 '?' { Exp.Query <\$> duplicate $1 <. $2 }
   | Exp3 '+' Exp3 { (:+:) <\$> duplicate $1 <.> duplicate $3 }
@@ -145,6 +146,13 @@ Exp3 :: { L (Exp L Name) }
   | ':' Exp3 { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
   | name ':' Exp3 { Exp.InfixColon <\$> duplicate $1 <.> duplicate $3 }
   | name ':=' Exp3 { Exp.InfixColonEquals <\$> duplicate $1 <.> duplicate $3 }
+
+BraceInd
+  : Brace { $1 }
+  | indent Exp0 dedent { $1 .> $2 <. $3 }
+
+Brace
+  : '{' Exp0 '}' { $1 .> $2 <. $3 }
 
 Block
   : '{' Exp0 '}' { $1 .> $2 <. $3 }
