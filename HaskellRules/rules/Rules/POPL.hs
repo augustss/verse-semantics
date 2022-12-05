@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.POPL(systemPOPL, systemPOPLV) where
+module Rules.POPL(allSystemsPOPL) where
 
 import TRS.Bind
 import TRS.System
@@ -11,6 +11,9 @@ import Control.Monad( guard )
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
+
+allSystemsPOPL :: [TRSystem Expr]
+allSystemsPOPL = [ systemPOPL, systemPOPLV ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem

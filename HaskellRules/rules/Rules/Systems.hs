@@ -2,16 +2,15 @@ module Rules.Systems(ESystem, allSystems, lookupSystem, TRSystem(..)) where
 import Epic.String
 import TRS.System
 import Rules.Core
-import Rules.PLDI
-import Rules.POPL
+import Rules.PLDI(allSystemsPLDI)
+import Rules.POPL(allSystemsPOPL)
 
 type ESystem = TRSystem Expr
 
 allSystems :: [ESystem]
 allSystems =
-  [ systemPOPL, systemPOPLV
-  , systemPLDI, systemPLDIG, systemPLDIS
-  ]
+     allSystemsPOPL
+  ++ allSystemsPLDI
 
 lookupSystem :: String -> Either String ESystem
 lookupSystem n =

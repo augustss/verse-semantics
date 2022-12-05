@@ -6,19 +6,13 @@ module Rules.Core(
   Expr(..), Op(..),
   Value,
   TRSFlags, RuleEnv(..), defaultTRSFlags,
+  DerefPos(..),
   ERule,
   EContext,
   pattern Val,
   pattern HNF,
-{-
-  pattern VAR, pattern INT, pattern ARR, pattern LAM, pattern EHNF, pattern OP,
-  pattern HVAL, pattern SCL, pattern VHNF,
-  pattern VINT, pattern VARR, pattern VLAM, pattern VOP,
-  pattern ADD, pattern SUB, pattern MUL, pattern DIV, pattern NEG,
-  pattern GRT, pattern GRE, pattern LST, pattern LSE, pattern NEQ,
-  pattern IsINT, pattern MAPAP, pattern CONS, pattern NOTFCN,
-  pattern PLUS,
--}
+  pattern CON,
+  isHNF,
   pattern DEF,
   pattern LAM,
   subst,
@@ -226,16 +220,35 @@ getHNF e@Arr{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
+isHNF :: Expr -> Bool
+
+isHNF = isJust . getHNF
+
+pattern CON :: Expr -> Expr
+pattern CON e <- (getCON -> Just e)
+
+getCON :: Expr -> Maybe Expr
+getCON e@Int{} = Just e
+getCON e@Op{} = Just e
+getCON _ = Nothing
+
 --------------------------------------------------------------------------------
 
 type TRSFlags = RuleEnv Expr
 
+-- Where should derefA substitute?
+data DerefPos
+  = Consumed          -- Only in consuming positions (e.g. application)
+  | ConsumedOrBarrEq  -- Consumed and in unification under barrier.
+  deriving (Eq, Ord, Show)
+
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool     -- reduce under lambda
+    , tfDerefPos    :: !DerefPos -- where derefH is substituting
     }
   rec r s ae =
     r s ae ++

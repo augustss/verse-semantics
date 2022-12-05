@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.PLDI(systemPLDI, systemPLDIG, systemPLDIS) where
+module Rules.PLDI(allSystemsPLDI) where
 
 import TRS.Bind
 import TRS.System
@@ -15,6 +15,9 @@ import Data.Maybe
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
+
+allSystemsPLDI :: [TRSystem Expr]
+allSystemsPLDI = [ systemPLDI, systemPLDIG, systemPLDIS ]
 
 systemPLDI :: TRSystem Expr
 systemPLDI = TRSystem
@@ -55,6 +58,21 @@ systemPLDIS = TRSystem
   , confluenceRules     = rulesStructural
   , validExpr           = validE
   }
+
+{-
+systemPLDIA :: TRSystem Expr
+systemPLDIA = TRSystem
+  { sname               = "PLDIA"
+  , description         = "PLDI submission - DEREF-S + DEREF-K + ELIM-ALIAS + DEREF-H' (aka Another idea (SPJ)"
+  , ruleEnv             = defaultTRSFlags{ tfDerefPos = ConsumedOrBarrEq }
+  , preProcess          = check validE . anf
+  , postProcess         = finalSubst
+  , rules               = allRules <> rulesDerefK <> rulesElimAlias -- <> rulesElimDef <> rulesElimDead
+  , rulesHaveStructural = False
+  , confluenceRules     = rulesStructural
+  , validExpr           = validE
+  }
+-}
 
 -- Check that an expression is in the subset defined by the PLDI grammar.
 validE :: Expr -> Bool
@@ -650,9 +668,9 @@ elimDead ee =
     -- xs are the initial defined variables
     (xs, e') = getXs [] ee
     -- bs are the bindings
-    (bs, e'') = getBs [] e'
+    (rbs, e'') = getBs [] e'
   in
-    simpleCst xs bs e''
+    simpleCst xs rbs e''
 
 existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs bs ee = mkRes xs (map (\ (x, v) -> Var x :=: v) bs) ee
@@ -704,19 +722,25 @@ derefB lhs xx =
       pure (Def . Bind x . ctx)
 -}
 
-derefA :: TRSFlags -> Expr -> Ident -> [VContext]
-derefA = derefA' False
+-- Where is the deref compared to the starting point?
+data DerefCtx
+  = TopLevel      -- At starting level
+  | UnderBarrier  -- A one/all has been encountered
+  deriving (Eq, Ord, Show)
+
+--derefA :: TRSFlags -> Expr -> Ident -> [VContext]
+--derefA = derefA' False
 
 -- Used in consuming positions.
 -- Does the same as derefA in current rules.
-derefB :: TRSFlags -> Expr -> Ident -> [VContext]
-derefB = derefA' False
+--derefB :: TRSFlags -> Expr -> Ident -> [VContext]
+--derefB = derefA' False
 {-x
 derefB s | tfUnifyEq s = derefA' True s
          | otherwise   = derefA' False s
 -}
 
-derefA' :: Bool -> TRSFlags -> Expr -> Ident -> [VContext]
+derefA' :: DerefCtx -> TRSFlags -> Expr -> Ident -> [VContext]
 derefA' b s lhs xx =
    do (Var x :@: v) <- [lhs]
       guard (x == xx)
@@ -724,12 +748,13 @@ derefA' b s lhs xx =
    ++
    do (Var x :=: e) <- [lhs]
       guard (x == xx)
-      guard (b || case e of HNF{} -> True; _ -> False)
+      guard (isHNF e ||   -- consuming position
+             tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       pure ( (:=: e) . Val)
    ++
    do (e :=: Var x) <- [lhs]
       guard (x == xx)
-      guard b
+      guard (tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       pure ( (e :=:) . Val)
    ++
    do (v@Val{} :=: e) <- [lhs]
@@ -758,11 +783,11 @@ derefA' b s lhs xx =
       pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      ctx <- derefB s e xx
+      ctx <- derefA' UnderBarrier s e xx
       pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      ctx <- derefB s e xx
+      ctx <- derefA' UnderBarrier s e xx
       pure (All . ctx)
    -- NOTE: not in paper
    ++
@@ -775,7 +800,7 @@ derefA' b s lhs xx =
       pure (\ a -> Op Cons :@: Arr [v, a])
    ++
    do Split e f g <- [lhs]
-      ctx <- derefB s e xx
+      ctx <- derefA' UnderBarrier s e xx
       pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -916,7 +941,7 @@ rulesDerefH ss lhs =
   "DEREF-H" `name`
   do xh@(Var x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA ss e x
+     ctx <- derefA' TopLevel ss e x
      pure (xh :>: plug ctx h)
 
 rulesDerefS :: ERule
@@ -928,27 +953,18 @@ rulesDerefS _ss lhs =
      ctx <- derefE e x  -- handles necessary alpha-conversion
      pure (xs :>: plug ctx s)
 
-{-
- ++
+-- DEREF-K is like DEREF-S but for constants only
+rulesDerefK :: ERule
+rulesDerefK _ss lhs =
   "DEREF-K" `name`
-  do xh@(VAR x :=: HVAL h) :>: e <- [lhs]
-     ctx <- derefB e x
-     pure (xh :>: plug ctx (HNF h))
--}
-
-isVar :: Expr -> Bool
-isVar Var{} = True
-isVar _ = False
-
-rulesS :: ERule
-rulesS _ lhs =
-  -- DEREF-K is like DEREF-S but for constants only
-  "DEREF-K" `name`
-  do xs@(Var x :=: SCL s) :>: e <- [lhs]
-     guard (not (isVar s))
+  do xs@(Var x :=: CON s) :>: e <- [lhs]
 --     traceM $ "DEREF-K " ++ show (x, s, e, length (derefE e x))
      ctx <- derefE e x  -- handles necessary alpha-conversion
      pure (xs :>: plug ctx s)
+
+rulesS :: ERule
+rulesS ss lhs =
+  rulesDerefK ss lhs
  ++
   "SWAP-S" `name`
   do DEF x ex <- [lhs]
