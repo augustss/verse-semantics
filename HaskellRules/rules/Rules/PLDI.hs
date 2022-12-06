@@ -1180,6 +1180,7 @@ rulesNormalization _ lhs =
  ++
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(Var _x :=: Val v) :>: e2) <- [lhs]
+     guard (not (isTilde e1))
      let ok | SCL{} <- v = case e1 of Var _ :=: SCL{} -> False; _ -> True
             | otherwise  = case e1 of Var _ :=: Val _ -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)
