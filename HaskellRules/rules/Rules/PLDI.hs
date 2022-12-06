@@ -770,7 +770,12 @@ derefA' b s lhs xx =
    do (Var x :=: Var y) <- [lhs]
       guard (tfUseTilde s)
       guard (x == xx)
-      pure (\ h -> (x :~: y) :>: (h :=: Var y))
+      -- We do not want to introduce x~x since that will
+      -- lead to infinite reduction sequences.
+      if x == y then
+        pure (\ h ->               (h :=: Var y))
+       else
+        pure (\ h -> (x :~: y) :>: (h :=: Var y))
    ++
    do (e :=: Var x) <- [lhs]
       guard (x == xx)
