@@ -78,11 +78,13 @@ systemPLDIT :: TRSystem Expr
 systemPLDIT = TRSystem
   { sname               = "PLDIT"
   , description         = "PLDI submission, with ~"
-  , ruleEnv             = defaultTRSFlags
+  , ruleEnv             = defaultTRSFlags{ tfDerefPos = ConsumedOrBarrEq }
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
-                          <> rulesElimDef <> rulesElimDead <> rulesDerefHLast
+                          <> rulesElimDef
+                          <> rulesElimDead
+                         -- <> rulesDerefHLast
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -764,6 +766,7 @@ derefA b s lhs xx =
    do (Var x :=: Var y) <- [lhs]
       guard (tfUseTilde s)
       guard (x == xx)
+      guard (tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       -- We do not want to introduce x~x since that will
       -- lead to infinite reduction sequences.
       if x == y then
