@@ -151,8 +151,10 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
   case vs1 of
     [] -> pure None
     vs@(_:_:_) -> do
-      when (not (noError tflg)) $
-        failMany vs
+      when (not (noError tflg)) $ do
+        putStrLn $ pos ++ " the expression evaluated to multiple values:"
+        mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
+        putStrLn ""
       pure Many
     [v1] ->
      catch
@@ -204,12 +206,6 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
-
-failMany :: [Core] -> IO ()
-failMany vs = do
-  putStrLn "The expression evaluated to multiple values:"
-  mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
-  putStrLn ""
 
 
 -- | Equivalence on values (or stuck expressions)
