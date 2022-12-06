@@ -50,6 +50,8 @@ $space = [\ \t]
 
 <nested> "" { emptyNested }
 
+<dedenting> "" { emptyDedenting }
+
 <maybeNesting> {
   "{" { leftBrace }
   "" { emptyMaybeNesting }
@@ -167,10 +169,7 @@ tab = action $ do
   getToken
 
 newline :: Action
-newline = action newline'
-
-newline' :: Lexer (L Token)
-newline' = do
+newline = action $ do
   putIndent []
   getToken
 
@@ -186,12 +185,18 @@ emptyNested i j _ _ = do
   if x `isPrefixOf` y then do
     popIndents
     popStates
+    pushStates dedenting
     pure $ L (Loc i j) Token.Dedent
   else if y `isPrefixOf` x then do
     pushStates indented
     getToken
   else
     throwError' $ IndentError i x y
+
+emptyDedenting :: Action
+emptyDedenting i j _ _ = do
+  popStates
+  pure $ L (Loc i j) Token.Newline
 
 leftBrace :: Action
 leftBrace i j _ _ = do
@@ -215,9 +220,10 @@ emptyNesting i j _ _ = do
   pure $ L (Loc i j) Token.Indent
 
 newlineIndented :: Action
-newlineIndented = action $ do
+newlineIndented i j _ _ = do
   popStates
-  newline'
+  putIndent []
+  pure $ L (Loc i j) Token.Newline
 
 colon :: Action
 colon i j _ _ = do
@@ -250,29 +256,18 @@ fatArrow i j _ _ = do
   pure $ L (Loc i j) Token.FatArrow
 
 token :: Token -> Action
-token x i j _ _ = do
-  popStates
+token x i j _ _ =
   pure $ L (Loc i j) x
 
 int :: Action
-int i j n xs = do
-  popStates
-  int' i j n xs
-
-int' :: Action
-int' i j n xs =
+int i j n xs =
   pure . L (Loc i j) . Token.Int .
   ByteString.foldl' f 0 $ ByteString.take n xs
   where
     f z x = z * 10 + (toInteger $ x - ord' '0')
 
 float :: Action
-float i j n xs = do
-  popStates
-  float' i j n xs
-
-float' :: Action
-float' i j n xs =
+float i j n xs =
   pure . L (Loc i j) . Token.Float . toRational .
   ByteString.foldl' f (0, 0, 0) $ ByteString.take n xs
   where
@@ -286,8 +281,7 @@ ord' :: Char -> Word8
 ord' = fromIntegral . ord
 
 name :: Action
-name i j n xs = do
-  popStates
+name i j n xs =
   pure . L (Loc i j) . Token.Name . Text.decodeUtf8 $ ByteString.take n xs
 
 throwError :: Loc -> Token -> Lexer a
