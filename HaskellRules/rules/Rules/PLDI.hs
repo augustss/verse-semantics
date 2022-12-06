@@ -82,7 +82,7 @@ systemPLDIT = TRSystem
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
-                          <> rulesElimDef <> rulesElimDead
+                          <> rulesElimDef <> rulesElimDead <> rulesDerefHLast
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -678,35 +678,41 @@ elimDead ee =
   let
     getXs rs (DEF x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
+    getTs bs ((x :~: y) :>: e) = getTs ((x,y):bs) e
+    getTs bs e = (reverse bs, e)
     getBs bs ((Var x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
     getBs bs e = (reverse bs, e)
     -- xs are the initial defined variables
     (xs, e') = getXs [] ee
+    -- ts are the ~ bindings
+    (ts, e'') = getTs [] e'
     -- bs are the bindings
-    (rbs, e'') = getBs [] e'
+    (cs, e''') = getBs [] e''
   in
-    simpleCst xs rbs e''
+    simpleCst xs ts cs e'''
 
-existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
-existBind xs bs ee = mkRes xs (map (\ (x, v) -> Var x :=: v) bs) ee
+existBind :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> Expr
+existBind xs ts bs ee = mkRes xs (map (\ (x,y) -> x :~: y) ts ++ map (\ (x, v) -> Var x :=: v) bs) ee
 
--- Remove bindings of the form 'x=e' where x occurs nowhere else.
--- Also remove unused existentials.
-simpleCst :: [Ident] -> [(Ident, Expr)] -> Expr -> [Expr]
-simpleCst xs bs e =
+-- Remove bindings of the form 'x=e' where x occurs nowhere else,
+-- remove 'x~y' where x occurs nowhere else,
+-- and remove unused existentials.
+simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
+simpleCst xs ts bs e =
   let evs = free e
-      ts = filter isTriv xs
+      trs = filter isTriv xs
       isTriv x | x `elem` evs = False
                | otherwise =
         case partition ((== x) . fst) bs of
-          ([_], obs) -> x `notElem` (free (map snd obs) ++ map fst obs) -- single binding, no other occurrences
+          (l, obs) | length l <= 1 -> x `notElem` (free (map snd obs) ++ map fst obs ++ map snd ts) -- 0/1 bindings, no other occurrences
           _ -> False
-      xs' = filter  (`notElem` ts) xs
-      bs' = filter ((`notElem` ts) . fst) bs
-      avs = free (bs', e)
+      xs' = filter  (`notElem` trs) xs
+      ts' = filter ((`notElem` trs) . fst) ts
+      bs' = filter ((`notElem` trs) . fst) bs
+      avs = free (ts', bs', e)
       xs'' = filter (`elem` avs) xs'
   in  if xs'' /= xs then
-        [existBind xs'' bs' e]
+        [existBind xs'' ts' bs' e]
       else
         []
 
@@ -957,6 +963,23 @@ rulesDerefH ss lhs =
      ctx <- derefA TopLevel ss e x
      pure (xh :>: plug ctx h)
 
+-- x=h; ...; x  --> x=h; ...; h
+rulesDerefHLast :: ERule
+rulesDerefHLast _ lhs =
+  "DEREF-H-LAST" `name`
+  do xh@(Var x :=: HVAL h) :>: e <- [lhs]
+     ctx <- derefL e x
+     pure (xh :>: plug ctx h)
+ where
+   derefL e xx =
+     do Var x <- [e]
+        guard (x == xx)
+        pure id
+    ++
+     do e1 :>: e2 <- [e]
+        ctx <- derefL e2 xx
+        pure ((e1 :>:) . ctx)
+
 rulesDerefS :: ERule
 rulesDerefS _ss lhs =
   "DEREF-S" `name`
@@ -1039,13 +1062,11 @@ rulesOne _ lhs =
  ++
   "ONE-CHOICE" `name`
   do One (e :|: _) <- [lhs]
-     _ <- wfRes e
-     pure e
+     wfResV e
  ++
   "ONE-VAL" `name`
   do One e <- [lhs]
-     _ <- wfRes e
-     pure e
+     wfResV e
 
 rulesAll :: ERule
 rulesAll _ lhs =
@@ -1077,13 +1098,13 @@ rulesSplit _ lhs =
  ++
   "SPLIT-CHOICE" `name`
   do Split (e :|: ee) _f g <- [lhs]
-     _ <- wfRes e
-     spl g e ee
+     e' <- wfResV e
+     spl g e' ee
  ++
   "SPLIT-VAL" `name`
   do Split e _f g <- [lhs]
-     _ <- wfRes e
-     spl g e Fail
+     e' <- wfResV e
+     spl g e' Fail
  where
    spl g e ee =
      let x:y:h:_ = identsNotIn (free lhs)
@@ -1094,9 +1115,14 @@ rulesSplit _ lhs =
 
 type BindV = (Ident, Value)
 
+wfResV :: Expr -> [Expr]
+wfResV e = do
+  (is, es, Val v) <- wfResE e
+  pure $ mkRes is (map (\ (x, y) -> Var x :=: y) es) v
+
 wfRes :: Expr -> [([Ident], [BindV], Value)]
 wfRes e = do
-  --traceM ("wfRes " ++ show (e, wfResE e))
+--  traceM ("wfRes " ++ show (e, wfResE e))
   (is, es, Val v) <- wfResE e
   pure (is, es, v)
 
