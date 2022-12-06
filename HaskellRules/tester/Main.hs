@@ -150,7 +150,10 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
 
   case vs1 of
     [] -> pure None
-    vs@(_:_:_) -> when (fTrace flg) (failMany vs) >> pure Many
+    vs@(_:_:_) -> do
+      when (not (noError tflg)) $
+        failMany vs
+      pure Many
     [v1] ->
      catch
       ( if (equivValue sys v1 v2) == expectOK
@@ -205,7 +208,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
 failMany :: [Core] -> IO ()
 failMany vs = do
   putStrLn "The expression evaluated to multiple values:"
-  mapM_ (putStrLn . ("   " ++) . prettyShow) vs
+  mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
   putStrLn ""
 
 
