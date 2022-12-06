@@ -94,7 +94,7 @@ asDesugared e = asExpr e
 asCore :: Flags -> SomeExpr -> Core
 asCore _ (Cored e) = e
 asCore _ (Cores [e]) = e
-asCore _ Cores{} = error "Multiple Core values"
+asCore _ Cores{} = error "Not a singleton Core value"
 asCore s e = exprToCore s $ asDesugared e
 
 instance Show SomeExpr where
