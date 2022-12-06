@@ -10,7 +10,7 @@ import Data.List( union )
 --------------------------------------------------------------------------------
 
 data Type
-  = Base Value -- a function with at most one result
+  = Base Expr -- a function with at most one result
   | Type :-> Type
  deriving ( Eq, Ord, Show )
 
@@ -23,7 +23,7 @@ Val v `asVal` h = h v
 e     `asVal` h = Def (Bind x ((Var x :=: e) :>: h (Var x)))
  where
   h_ = h (Var (ident ""))
-  x  = identNotIn (free h_)
+  x  = identNotIn (free (h_,e))
 
 wrap :: Expr -> Expr -> Expr -> Type -> Expr
 wrap _unr bad e (Base t) =
@@ -51,21 +51,35 @@ typeCheck e t =
   do putStrLn ("Expr: " ++ show e)
      putStrLn ("Type: " ++ show t)
      putStrLn ("Wrap: " ++ show et)
-     putStrLn ("Norm: " ++ show et')
+     putStrLn ("Norm: " ++ show (simp et))
      if BAD `elem` map Var (free et')
        then putStrLn "*** TYPE CHECK FAILED"
        else putStrLn "+++ TYPE CHECK SUCCEEDED"
  where
-  et       = hasType e t
-  (_,et'):_ = normalForms defaultTRSFlags typeRules et
+  et = hasType e t
+
+simp :: Expr -> Expr
+simp e = caseSplit e'
+ where
+  (_,e'):_ = normalForms defaultTRSFlags typeRules et
+
+  caseSplit (Lam (Bind x e)) = Lam (Bind x (caseSplit e))
+  caseSplit 
+
+  block (Lam (Bind x
 
 int :: Value
 int = LAM x ((Op IsInt :@: (Var x)) :>: Var x)
- where
-  x = ident "x"
+
+x = ident "x"
 
 typeRules :: Rule Expr
-typeRules = rules (head allSystems) <> rulesUNR
+typeRules = rules (head allSystems) <> rulesUNR <> rulesExtra
+
+rulesExtra :: Rule Expr
+rulesExtra _ lhs =
+  "isInt-isInt" `name`
+    do 
 
 rulesUNR :: Rule Expr
 rulesUNR _ lhs =
@@ -92,5 +106,6 @@ rulesUNR _ lhs =
 main :: IO ()
 main =
   do typeCheck (Int 0) (Base int)
+     typeCheck (LAM x (Var x)) (Base int :-> Base int)
 
 
