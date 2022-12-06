@@ -81,7 +81,7 @@ systemPLDIT = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde <> rulesGCTilde
+  , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
                           <> rulesElimDef <> rulesElimDead
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
@@ -1123,6 +1123,10 @@ wfResE = wf []
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
      ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
+    -- WF-ALIAS
+    wf g ((x :~: _) :>: e) = do
+      guard (x `notElem` free e)                        -- eliminate x first
+      wf g e                                            -- and just throw away the alias
     -- WF-EQ
     wf g e@((Var x :=: Val v) :>: e1) = do
       guard (v /= Var x)                                -- eliminate x=x before WFF
@@ -1166,12 +1170,15 @@ rulesNormTilde _ lhs =
      guard (not (isTilde e1))
      pure (e2 :>: (e1 :>: e3))
 
+{-
+This is wrong, e.g.:  (x~y; 0); x
 rulesGCTilde :: ERule
 rulesGCTilde _ lhs =
   "GC-TILDE" `name`
   do (x :~: _) :>: e <- [lhs]
      guard (x `notElem` free e)
      pure e
+-}
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
