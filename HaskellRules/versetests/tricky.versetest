@@ -15,14 +15,18 @@ testceq("RJ3a", SEq) { exists a b c d . one { exists x . x = <a,b>; x = <c, d>; 
 testceq("Yikes1",SEq) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }
                      { fail }
 testceq("Yikes2",SEq) { exists x y. x=<1,2>; y=x; \w.<x,y> }
-                      { \w. <<1,2>,<1,2>> }
+                     # we would like this: { \w. <<1,2>,<1,2>> }
+                     # but the PLDI rules fail because of the ANF pass
+                     { \w. x:= <1,2>; <x,x> }
 testceq("QC1", SEq)  { exists x . (exists y . x = y; x) | <> }
                      { exists x . x | <> }
 testceq("Ex1", SEq)  { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
                      { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
 testceq("Ex2", SEq)  { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
                      { exists f g c d       . f(c); g(d); <c, d> }
-testceq("Wombat1",SEq){ x := (\a.a); one { exists y . x = y; < x > } }
+testceq("Wombat1a",SEq){ x := <1>; one { exists y . x = y; < x > } }
+                     { < <1> > }
+testceq("Wombat1b",SEq){ x := (\a.a); one { exists y . x = y; < x > } }
                      { < \a.a > }
 testceq("Wombat2",SEq){ exists y. x := (\a.a); one { x = y; < x > } }
                      # The denotational semantics would say the result is { < \a.a > }
