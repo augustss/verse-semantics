@@ -743,20 +743,8 @@ data DerefCtx
   | UnderBarrier  -- A one/all has been encountered
   deriving (Eq, Ord, Show)
 
---derefA :: TRSFlags -> Expr -> Ident -> [VContext]
---derefA = derefA' False
-
--- Used in consuming positions.
--- Does the same as derefA in current rules.
---derefB :: TRSFlags -> Expr -> Ident -> [VContext]
---derefB = derefA' False
-{-x
-derefB s | tfUnifyEq s = derefA' True s
-         | otherwise   = derefA' False s
--}
-
-derefA' :: DerefCtx -> TRSFlags -> Expr -> Ident -> [VContext]
-derefA' b s lhs xx =
+derefA :: DerefCtx -> TRSFlags -> Expr -> Ident -> [VContext]
+derefA b s lhs xx =
    do (Var x :@: v) <- [lhs]
       guard (x == xx)
       pure (:@: v)
@@ -783,36 +771,36 @@ derefA' b s lhs xx =
       pure ( (e :=:) . Val)
    ++
    do (v@Val{} :=: e) <- [lhs]
-      ctx <- derefA' b s e xx
+      ctx <- derefA b s e xx
       pure ( (v :=:) . ctx)
    ++
    do DEF x e <- [lhs]
       guard (x /= xx)
-      ctx <- derefA' b s e xx
+      ctx <- derefA b s e xx
       pure (Def . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA' b s e1 xx
+      ctx <- derefA b s e1 xx
       pure ((:>: e2) . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA' b s e2 xx
+      ctx <- derefA b s e2 xx
       pure ((e1 :>:) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA' b s e1 xx
+      ctx <- derefA b s e1 xx
       pure ((:|: e2) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA' b s e2 xx
+      ctx <- derefA b s e2 xx
       pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure (All . ctx)
    -- NOTE: not in paper
    ++
@@ -825,7 +813,7 @@ derefA' b s lhs xx =
       pure (\ a -> Op Cons :@: Arr [v, a])
    ++
    do Split e f g <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -966,7 +954,7 @@ rulesDerefH ss lhs =
   "DEREF-H" `name`
   do xh@(Var x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA' TopLevel ss e x
+     ctx <- derefA TopLevel ss e x
      pure (xh :>: plug ctx h)
 
 rulesDerefS :: ERule
