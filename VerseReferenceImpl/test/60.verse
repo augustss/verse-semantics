@@ -1,6 +1,5 @@
 exists X .
 block:
-  Y := 1;
+  Y := 1
   Y = X
-;
 X

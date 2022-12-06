@@ -3,9 +3,9 @@ exists B .
 B = all {
   exists C .
   exists D .
-  C = D;
-  A = C;
-  D = false;
-};
-A = true;
+  C = D
+  A = C
+  D = false
+}
+A = true
 (A, B)
