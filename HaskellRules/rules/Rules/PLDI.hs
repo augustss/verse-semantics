@@ -764,9 +764,8 @@ derefA b s lhs xx =
       pure ( (:=: e) . Val)
    ++
    do (Var x :=: Var y) <- [lhs]
-      guard (tfUseTilde s)
+      guard (tfUseTilde s && tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       guard (x == xx)
-      guard (tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       -- We do not want to introduce x~x since that will
       -- lead to infinite reduction sequences.
       if x == y then
