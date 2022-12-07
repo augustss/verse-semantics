@@ -67,6 +67,7 @@ library rules
     -- The actual rules are not exposed, they are summarized in Rules.Systems
     other-modules:    Rules.PLDI
                       Rules.POPL
+                      Rules.KoenNaive
     hs-source-dirs:   rules
 
 library frontend
@@ -133,19 +134,6 @@ executable qctest
     main-is:          Main.hs
 
     hs-source-dirs:   qctest
-    default-language: Haskell2010
-
-executable unr-bad
-    import:           shared-properties
-    build-depends:    epic,
-                      rules,
-                      trs,
-                      optparse-applicative,
-                      QuickCheck,
-
-    main-is:          Main.hs
-
-    hs-source-dirs:   unr-bad
     default-language: Haskell2010
 
 executable timtest
