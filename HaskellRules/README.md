@@ -103,3 +103,22 @@ different parts of the system.
 
 * `versetests/` Verse code for the various tests.
   * `tricky.versetest`: some tricky examples
+
+## Ranjit Notes
+
+To run a single test with a `--trace` 
+
+```
+cabal run -- tester -r PLDIT --only-test Koen5 --trace versetests/tricky.versetest
+```
+
+To get a summary for all the rules
+
+```
+cabal run -- tester -r PLDIT --summary versetests/tricky.versetest
+```
+
+
+
+
+
