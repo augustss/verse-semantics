@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module FrontEnd.Misc(
+module Epic.List(
   anySame, revTake, revDrop,
   pick, pickLR,
   pattern Snoc,
@@ -25,6 +25,7 @@ revDrop n = reverse . drop n . reverse
 pick :: [a] -> [(a, [a])]
 pick as = [(a, xs ++ ys) | (xs, a, ys) <- pickLR as]
 
+-- Split the list in all possible way.
 pickLR :: [a] -> [([a], a, [a])]
 pickLR as = zip3 (inits as) as (tail (tails as))
 

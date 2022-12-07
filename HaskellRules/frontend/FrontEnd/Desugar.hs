@@ -13,7 +13,7 @@ import GHC.Stack
 import FrontEnd.Expr
 import FrontEnd.Error
 import Epic.Print hiding (colon)
-import FrontEnd.Misc
+import Epic.List
 
 isLiteral :: Expr -> Bool
 isLiteral LitInt{} = True

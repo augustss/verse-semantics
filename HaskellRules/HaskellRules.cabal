@@ -22,6 +22,7 @@ library epic
     import:           shared-properties
     exposed-modules:  Epic.Applicative
 --                      Epic.Lens
+                      Epic.List
                       Epic.Print
                       Epic.OpParser
                       Epic.ShowRational
@@ -84,8 +85,6 @@ library frontend
                       FrontEnd.Parse
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
-
-    other-modules:    FrontEnd.Misc
 
     hs-source-dirs:   frontend
 

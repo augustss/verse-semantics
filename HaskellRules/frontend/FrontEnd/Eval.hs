@@ -17,7 +17,7 @@ import FrontEnd.Expr(Ident(..), noLoc)
 import FrontEnd.Core
 import FrontEnd.Error
 import Epic.Print hiding (float)
-import FrontEnd.Misc
+import Epic.List
 
 pattern CUnOp :: String -> Value -> Core
 pattern CUnOp op v <- CApply (CPrim op) v@HNF{}
