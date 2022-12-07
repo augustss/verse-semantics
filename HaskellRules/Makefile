@@ -17,11 +17,11 @@ test: testfast
 	$(TESTER) --quiet --rules=popl           $(TESTFILE)
 
 testfast:
-	$(TESTER) --quiet --parse                $(TESTPARSEFILE)
-	$(TESTER) --quiet --eval                 $(TESTFILE)
-#	$(TESTER) --quiet --eval --split         $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=popl     $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=pldi     $(TESTFILE)
+	$(TESTER) --quiet --parse                               $(TESTPARSEFILE)
+	$(TESTER) --quiet       --eval       --no-under-lambda  $(TESTFILE)
+#	$(TESTER) --quiet --eval --split                        $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=POPL                    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=PLDI --final-inline     $(TESTFILE)
 
 trickytest: testtricky
 

@@ -42,10 +42,11 @@ import Language.Verse.Token qualified as Token
   '(' { L _ Token.LeftParen }
   ')' { L _ Token.RightParen }
   '{' { L _ Token.LeftBrace }
-  indent { L _ Token.Indent }
+  ind { L _ Token.Indent }
   '}' { L _ Token.RightBrace }
-  dedent { L _ Token.Dedent }
+  ded { L _ Token.Dedent }
   ';' { L _ Token.Semi }
+  newline { L _ Token.Newline }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEquals }
   ',' { L _ Token.Comma }
@@ -80,12 +81,16 @@ import Language.Verse.Token qualified as Token
 
 %%
 
-Exp0
-  : Exp1 { $1 }
-  | exists name '.' Exp0 { Exp.Exists <\$ $1 <.> duplicate $2 <.> duplicate $4 }
-  | lambda name '.' Exp0 { Exp.Lambda <\$ $1 <.> duplicate $2 <.> duplicate $4 }
-  | Exp1 ';' { $1 <. $2 }
-  | Exp1 ';' Exp0 { (:*>:) <\$> duplicate $1 <.> duplicate $3 }
+List
+  : Scan Exp1 { $2 }
+  | Scan exists name '.' List { Exp.Exists <\$> duplicate $3 <.> duplicate $5 }
+  | Scan lambda name '.' List { Exp.Lambda <\$> duplicate $3 <.> duplicate $5 }
+  | Scan Exp1 Separator { $2 <. $3 }
+  | Scan Exp1 Separator List { (:*>:) <\$> duplicate $2 <.> duplicate $4 }
+
+Separator
+  : ';' { $1 }
+  | newline { $1 }
 
 Exp1 :: { L (Exp L Name) }
   : Exp2 { Exp.Tuple . reverse <\$> $1 }
@@ -97,18 +102,18 @@ Exp2 :: { L [L (Exp L Name)] }
 
 Exp3 :: { L (Exp L Name) }
   : '(' ')' { $1 \$> Exp.Tuple [] <. $2 }
-  | '(' Exp0 ')' { $1 .> $2 <. $3 }
+  | '(' List ')' { $1 .> $2 <. $3 }
   | Exp3 '=' Exp3 { (:=:) <\$> duplicate $1 <.> duplicate $3 }
   | Exp3 '=' BraceInd { (:=:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '|' Exp3 { (:|:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp3 '|' Scan Exp3 { (:|:) <\$> duplicate $1 <.> duplicate $4 }
   | Exp3 '?' { Exp.Query <\$> duplicate $1 <. $2 }
-  | Exp3 '+' Exp3 { (:+:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '-' Exp3 { (:-:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '*' Exp3 { (:*:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '/' Exp3 { (:/:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp3 '+' Scan Exp3 { (:+:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp3 '-' Scan Exp3 { (:-:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp3 '*' Scan Exp3 { (:*:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp3 '/' Scan Exp3 { (:/:) <\$> duplicate $1 <.> duplicate $4 }
   | Exp3 '(' ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3) }
-  | Exp3 '(' Exp0 ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
-  | truth '{' Exp0 '}' { Exp.Truth <\$ $1 <.> duplicate $3 <. $4 }
+  | Exp3 '(' List ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
+  | truth '{' List '}' { Exp.Truth <\$ $1 <.> duplicate $3 <. $4 }
   | false { Exp.False <\$ $1 }
   | true { Exp.True <\$ $1 }
   | fail { Exp.Fail <\$ $1 }
@@ -118,13 +123,13 @@ Exp3 :: { L (Exp L Name) }
   | if Block {
       Exp.If <\$ $1 <.> duplicate $2
     }
-  | if '(' Exp0 ')' Block {
+  | if '(' List ')' Block {
       Exp.IfThen <\$ $1 <.> duplicate $3 <.> duplicate $5
     }
   | if Block then Block {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | if '(' Exp0 ')' Block else Block {
+  | if '(' List ')' Block else Block {
       Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $5 <.> duplicate $7
     }
   | if Block then Block else Block {
@@ -133,7 +138,7 @@ Exp3 :: { L (Exp L Name) }
   | for Block {
       Exp.For <\$ $1 <.> duplicate $2
     }
-  | for '(' Exp0 ')' Block {
+  | for '(' List ')' Block {
       Exp.ForDo <\$ $1 <.> duplicate $3 <.> duplicate $5
     }
   | for Block do Block {
@@ -149,14 +154,18 @@ Exp3 :: { L (Exp L Name) }
 
 BraceInd
   : Brace { $1 }
-  | indent Exp0 dedent { $1 .> $2 <. $3 }
+  | ind List ded { $1 .> $2 <. $3 }
 
 Brace
-  : '{' Exp0 '}' { $1 .> $2 <. $3 }
+  : Scan '{' List '}' { $2 .> $3 <. $4 }
 
 Block
-  : '{' Exp0 '}' { $1 .> $2 <. $3 }
-  | ':' indent Exp0 dedent { $1 .> $3 <. $4 }
+  : Brace { $1 }
+  | ':' ind List ded { $1 .> $3 <. $4 }
+
+Scan
+  : { () }
+  | newline { () }
 
 {
 lexer :: (L Token -> Lexer a) -> Lexer a

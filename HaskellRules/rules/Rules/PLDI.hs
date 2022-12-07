@@ -78,11 +78,11 @@ systemPLDIT :: TRSystem Expr
 systemPLDIT = TRSystem
   { sname               = "PLDIT"
   , description         = "PLDI submission, with ~"
-  , ruleEnv             = defaultTRSFlags
+  , ruleEnv             = defaultTRSFlags{ tfUseTilde = True }
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde <> rulesGCTilde
-                          <> rulesElimDef <> rulesElimDead
+  , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
+                          <> rulesElimDef <> rulesElimDead <> rulesDerefHLast
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -678,35 +678,41 @@ elimDead ee =
   let
     getXs rs (DEF x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
+    getTs bs ((x :~: y) :>: e) = getTs ((x,y):bs) e
+    getTs bs e = (reverse bs, e)
     getBs bs ((Var x :=: v@Val{}) :>: e) = getBs ((x, v):bs) e
     getBs bs e = (reverse bs, e)
     -- xs are the initial defined variables
     (xs, e') = getXs [] ee
+    -- ts are the ~ bindings
+    (ts, e'') = getTs [] e'
     -- bs are the bindings
-    (rbs, e'') = getBs [] e'
+    (cs, e''') = getBs [] e''
   in
-    simpleCst xs rbs e''
+    simpleCst xs ts cs e'''
 
-existBind :: [Ident] -> [(Ident, Expr)] -> Expr -> Expr
-existBind xs bs ee = mkRes xs (map (\ (x, v) -> Var x :=: v) bs) ee
+existBind :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> Expr
+existBind xs ts bs ee = mkRes xs (map (\ (x,y) -> x :~: y) ts ++ map (\ (x, v) -> Var x :=: v) bs) ee
 
--- Remove bindings of the form 'x=e' where x occurs nowhere else.
--- Also remove unused existentials.
-simpleCst :: [Ident] -> [(Ident, Expr)] -> Expr -> [Expr]
-simpleCst xs bs e =
+-- Remove bindings of the form 'x=e' where x occurs nowhere else,
+-- remove 'x~y' where x occurs nowhere else,
+-- and remove unused existentials.
+simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
+simpleCst xs ts bs e =
   let evs = free e
-      ts = filter isTriv xs
+      trs = filter isTriv xs
       isTriv x | x `elem` evs = False
                | otherwise =
         case partition ((== x) . fst) bs of
-          ([_], obs) -> x `notElem` (free (map snd obs) ++ map fst obs) -- single binding, no other occurrences
+          (l, obs) | length l <= 1 -> x `notElem` (free (map snd obs) ++ map fst obs ++ map snd ts) -- 0/1 bindings, no other occurrences
           _ -> False
-      xs' = filter  (`notElem` ts) xs
-      bs' = filter ((`notElem` ts) . fst) bs
-      avs = free (bs', e)
+      xs' = filter  (`notElem` trs) xs
+      ts' = filter ((`notElem` trs) . fst) ts
+      bs' = filter ((`notElem` trs) . fst) bs
+      avs = free (ts', bs', e)
       xs'' = filter (`elem` avs) xs'
   in  if xs'' /= xs then
-        [existBind xs'' bs' e]
+        [existBind xs'' ts' bs' e]
       else
         []
 
@@ -743,20 +749,8 @@ data DerefCtx
   | UnderBarrier  -- A one/all has been encountered
   deriving (Eq, Ord, Show)
 
---derefA :: TRSFlags -> Expr -> Ident -> [VContext]
---derefA = derefA' False
-
--- Used in consuming positions.
--- Does the same as derefA in current rules.
---derefB :: TRSFlags -> Expr -> Ident -> [VContext]
---derefB = derefA' False
-{-x
-derefB s | tfUnifyEq s = derefA' True s
-         | otherwise   = derefA' False s
--}
-
-derefA' :: DerefCtx -> TRSFlags -> Expr -> Ident -> [VContext]
-derefA' b s lhs xx =
+derefA :: DerefCtx -> TRSFlags -> Expr -> Ident -> [VContext]
+derefA b s lhs xx =
    do (Var x :@: v) <- [lhs]
       guard (x == xx)
       pure (:@: v)
@@ -770,7 +764,12 @@ derefA' b s lhs xx =
    do (Var x :=: Var y) <- [lhs]
       guard (tfUseTilde s)
       guard (x == xx)
-      pure (\ h -> (x :~: y) :>: (h :=: Var y))
+      -- We do not want to introduce x~x since that will
+      -- lead to infinite reduction sequences.
+      if x == y then
+        pure (\ h ->               (h :=: Var y))
+       else
+        pure (\ h -> (x :~: y) :>: (h :=: Var y))
    ++
    do (e :=: Var x) <- [lhs]
       guard (x == xx)
@@ -778,36 +777,36 @@ derefA' b s lhs xx =
       pure ( (e :=:) . Val)
    ++
    do (v@Val{} :=: e) <- [lhs]
-      ctx <- derefA' b s e xx
+      ctx <- derefA b s e xx
       pure ( (v :=:) . ctx)
    ++
    do DEF x e <- [lhs]
       guard (x /= xx)
-      ctx <- derefA' b s e xx
+      ctx <- derefA b s e xx
       pure (Def . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA' b s e1 xx
+      ctx <- derefA b s e1 xx
       pure ((:>: e2) . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
-      ctx <- derefA' b s e2 xx
+      ctx <- derefA b s e2 xx
       pure ((e1 :>:) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA' b s e1 xx
+      ctx <- derefA b s e1 xx
       pure ((:|: e2) . ctx)
    ++
    do (e1 :|: e2) <- [lhs]
-      ctx <- derefA' b s e2 xx
+      ctx <- derefA b s e2 xx
       pure ((e1 :|:) . ctx)
    ++
    do (One e) <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure (One . ctx)
    ++
    do (All e) <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure (All . ctx)
    -- NOTE: not in paper
    ++
@@ -820,7 +819,7 @@ derefA' b s lhs xx =
       pure (\ a -> Op Cons :@: Arr [v, a])
    ++
    do Split e f g <- [lhs]
-      ctx <- derefA' UnderBarrier s e xx
+      ctx <- derefA UnderBarrier s e xx
       pure ((\ e' -> Split e' f g) . ctx)
 
 {- | Expression Contexts `E` ----------------------------------------------
@@ -961,8 +960,25 @@ rulesDerefH ss lhs =
   "DEREF-H" `name`
   do xh@(Var x :=: HVAL h) :>: e <- [lhs]
 --     traceM $ "DEREF-H " ++ show (x, h, e, length (derefA e x))
-     ctx <- derefA' TopLevel ss e x
+     ctx <- derefA TopLevel ss e x
      pure (xh :>: plug ctx h)
+
+-- x=h; ...; x  --> x=h; ...; h
+rulesDerefHLast :: ERule
+rulesDerefHLast _ lhs =
+  "DEREF-H-LAST" `name`
+  do xh@(Var x :=: HVAL h) :>: e <- [lhs]
+     ctx <- derefL e x
+     pure (xh :>: plug ctx h)
+ where
+   derefL e xx =
+     do Var x <- [e]
+        guard (x == xx)
+        pure id
+    ++
+     do e1 :>: e2 <- [e]
+        ctx <- derefL e2 xx
+        pure ((e1 :>:) . ctx)
 
 rulesDerefS :: ERule
 rulesDerefS _ss lhs =
@@ -1046,13 +1062,11 @@ rulesOne _ lhs =
  ++
   "ONE-CHOICE" `name`
   do One (e :|: _) <- [lhs]
-     _ <- wfRes e
-     pure e
+     wfResV e
  ++
   "ONE-VAL" `name`
   do One e <- [lhs]
-     _ <- wfRes e
-     pure e
+     wfResV e
 
 rulesAll :: ERule
 rulesAll _ lhs =
@@ -1084,13 +1098,13 @@ rulesSplit _ lhs =
  ++
   "SPLIT-CHOICE" `name`
   do Split (e :|: ee) _f g <- [lhs]
-     _ <- wfRes e
-     spl g e ee
+     e' <- wfResV e
+     spl g e' ee
  ++
   "SPLIT-VAL" `name`
   do Split e _f g <- [lhs]
-     _ <- wfRes e
-     spl g e Fail
+     e' <- wfResV e
+     spl g e' Fail
  where
    spl g e ee =
      let x:y:h:_ = identsNotIn (free lhs)
@@ -1101,9 +1115,14 @@ rulesSplit _ lhs =
 
 type BindV = (Ident, Value)
 
+wfResV :: Expr -> [Expr]
+wfResV e = do
+  (is, es, Val v) <- wfResE e
+  pure $ mkRes is (map (\ (x, y) -> Var x :=: y) es) v
+
 wfRes :: Expr -> [([Ident], [BindV], Value)]
 wfRes e = do
-  --traceM ("wfRes " ++ show (e, wfResE e))
+--  traceM ("wfRes " ++ show (e, wfResE e))
   (is, es, Val v) <- wfResE e
   pure (is, es, v)
 
@@ -1117,7 +1136,12 @@ wfResE = wf []
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
-     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
+    -- WF-ALIAS
+    wf g ((x :~: _) :>: e) = do
+      guard (x `notElem` free e)                        -- eliminate x first
+      wf g e                                            -- and just throw away the alias
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
     -- WF-EQ
     wf g e@((Var x :=: Val v) :>: e1) = do
       guard (v /= Var x)                                -- eliminate x=x before WFF
@@ -1126,11 +1150,8 @@ wfResE = wf []
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free v) xs))
       pure (xs, (x, v):cs, e2)
-     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
     -- WF-EXP
-    -- This judgement makes WF non-deterministic.
-    -- With USE_CORRECT_WF we explore all possibilites,
-    -- without it we eagerly consume DEF and :=:.
     wf _g e =
       pure ([], [], e)
 
@@ -1161,12 +1182,15 @@ rulesNormTilde _ lhs =
      guard (not (isTilde e1))
      pure (e2 :>: (e1 :>: e3))
 
+{-
+This is wrong, e.g.:  (x~y; 0); x
 rulesGCTilde :: ERule
 rulesGCTilde _ lhs =
   "GC-TILDE" `name`
   do (x :~: _) :>: e <- [lhs]
      guard (x `notElem` free e)
      pure e
+-}
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
@@ -1180,6 +1204,7 @@ rulesNormalization _ lhs =
  ++
   "NORM-SEQ-SWAP" `name`
   do e1 :>: (xv@(Var _x :=: Val v) :>: e2) <- [lhs]
+     guard (not (isTilde e1))
      let ok | SCL{} <- v = case e1 of Var _ :=: SCL{} -> False; _ -> True
             | otherwise  = case e1 of Var _ :=: Val _ -> False; _ -> True
 --     traceM $ "NORM " ++ show (x, v, e1)

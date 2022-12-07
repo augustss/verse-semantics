@@ -150,7 +150,12 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
 
   case vs1 of
     [] -> pure None
-    vs@(_:_:_) -> when (fTrace flg) (failMany vs) >> pure Many
+    vs@(_:_:_) -> do
+      when (not (noError tflg)) $ do
+        putStrLn $ pos ++ " the expression evaluated to multiple values:"
+        mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
+        putStrLn ""
+      pure Many
     [v1] ->
      catch
       ( if (equivValue sys v1 v2) == expectOK
@@ -201,12 +206,6 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
-
-failMany :: [Core] -> IO ()
-failMany vs = do
-  putStrLn "The expression evaluated to multiple values:"
-  mapM_ (putStrLn . ("   " ++) . prettyShow) vs
-  putStrLn ""
 
 
 -- | Equivalence on values (or stuck expressions)
@@ -264,7 +263,7 @@ runTestFileSys :: TestFlags -> [Test] -> IO Bool
 runTestFileSys tflg ts = do
   let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
   res <- mapM (runTest tflg) (filter p ts)
-  let ok = all (==Good) res
+  let ok = all (`elem` [Good, Skip]) res
   putStrLn $ sname (system tflg) ++ " " ++ if ok then "SUCCESS" else "FAILURE"
   pure ok
 

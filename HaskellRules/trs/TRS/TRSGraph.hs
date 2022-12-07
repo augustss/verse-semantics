@@ -1,4 +1,4 @@
-module TRS.TRSGraph where
+module TRS.TRSGraph(normalFormsFuelTraceWithGraph) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -36,6 +36,7 @@ trsGraphFuelTrace env afuel rule x = M.fromListWith (++) (go S.empty afuel [star
 
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
 
+{-
 -- breadth-first graph building
 trsGraphFuelTrace' :: (Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Graph (Maybe (Traced a))
 trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [start x])
@@ -68,6 +69,7 @@ trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [
 --    new = any (not . (`S.member` seen)) tys
 
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
+-}
 
 normalFormsFuelTraceWithGraph :: (Show a, Ord a, Rec a)
                               => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
