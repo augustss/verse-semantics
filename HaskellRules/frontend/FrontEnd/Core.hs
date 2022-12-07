@@ -33,7 +33,7 @@ import FrontEnd.Desugar(primOps, getVisible, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
-import FrontEnd.Misc(pattern Snoc)
+import Epic.List(pattern Snoc)
 --import Debug.Trace
 
 data Core

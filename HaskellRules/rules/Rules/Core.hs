@@ -13,15 +13,7 @@ module Rules.Core(
   pattern HNF, getHNF,
   pattern CON,
   isHNF,
-{-
-  pattern VAR, pattern INT, pattern ARR, pattern LAM, pattern EHNF, pattern OP,
-  pattern HVAL, pattern SCL, pattern VHNF,
-  pattern VINT, pattern VARR, pattern VLAM, pattern VOP,
-  pattern ADD, pattern SUB, pattern MUL, pattern DIV, pattern NEG,
-  pattern GRT, pattern GRE, pattern LST, pattern LSE, pattern NEQ,
-  pattern IsINT, pattern MAPAP, pattern CONS, pattern NOTFCN,
-  pattern PLUS,
--}
+  isVal,
   pattern DEF,
   pattern LAM,
   subst,
@@ -228,6 +220,9 @@ getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
 getVal e = getHNF e
 
+isVal :: Expr -> Bool
+isVal = isJust . getVal
+
 pattern HNF :: Expr -> Expr
 pattern HNF e <- (getHNF -> Just e)
 --  where HNF e = e
@@ -240,7 +235,6 @@ getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
 isHNF :: Expr -> Bool
-
 isHNF = isJust . getHNF
 
 pattern CON :: Expr -> Expr
@@ -262,13 +256,14 @@ data DerefPos
   deriving (Eq, Ord, Show)
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False, tfUseWFEqVar = False }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool     -- reduce under lambda
     , tfDerefPos    :: !DerefPos -- where derefH is substituting
-    , tfUseTilde    :: !Bool
+    , tfUseTilde    :: !Bool     -- use x~y expressions
+    , tfUseWFEqVar  :: !Bool     -- Use WF-Eq with flipped arguments, i.e., y=x
     }
   rec r s ae =
     r s ae ++

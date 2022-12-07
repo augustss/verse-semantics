@@ -14,6 +14,7 @@ module TRS.TRS(
   nub,
   ) where
 
+import Epic.List( nub )
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
@@ -123,15 +124,5 @@ printTrace tr =
   | (n,t) <- reverse tr
   ]
 -}
-
---
-
-nub :: Ord a => [a] -> [a]
-nub = go S.empty
- where
-  go _seen []            = []
-  go seen (x:xs)
-    | x `S.member` seen = go seen xs
-    | otherwise         = x : go (S.insert x seen) xs
 
 --------------------------------------------------------------------------------

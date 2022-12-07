@@ -4,6 +4,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Rules.PLDI(allSystemsPLDI) where
 
+import Epic.List(anySame)
 import TRS.Bind
 import TRS.System
 import TRS.TRS
@@ -78,11 +79,14 @@ systemPLDIT :: TRSystem Expr
 systemPLDIT = TRSystem
   { sname               = "PLDIT"
   , description         = "PLDI submission, with ~"
-  , ruleEnv             = defaultTRSFlags{ tfUseTilde = True }
+  , ruleEnv             = defaultTRSFlags{ tfUseTilde = True, tfDerefPos = ConsumedOrBarrEq, tfUseWFEqVar = True }
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
-                          <> rulesElimDef <> rulesElimDead <> rulesDerefHLast
+                         -- <> rulesElimDef
+                          <> rulesElimDead
+                          <> rulesElimAlias
+                          <> rulesDerefHLast
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -653,21 +657,22 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
    hole    = ident "$HOLE$"
 
+-- This eliminates some defs, but not as many as is possible with the structural rules.
+rulesElimDef :: ERule
+rulesElimDef ss lhs =
+  "ELIM-DEF" `name`
+  do ee@Def{} <- [lhs]
+     (xs, _, e) <- wfResE ss ee
+     guard (not (null xs))
+     guard (null (intersect xs (free e)))
+     pure e
+
 rulesElimDead :: ERule
 rulesElimDead _ lhs =
 -- Not like the paper
   "ELIM-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
-
-rulesElimDef :: ERule
-rulesElimDef _ lhs =
-  "ELIM-DEF" `name`
-  do ee@Def{} <- [lhs]
-     (xs, _, e) <- wfResE ee
-     guard (not (null xs))
-     guard (null (intersect xs (free e)))
-     pure e
 
 -- ELIM-DEF together with the structural SWAP rules
 -- is able to remove all unused bindings.
@@ -691,30 +696,50 @@ elimDead ee =
   in
     simpleCst xs ts cs e'''
 
+-- 
+-- xs are the existentially bound identifiers
+-- ts are the alias definitions, x~y
+-- bs are the definitions, x=e
+-- e is the final expression.
+-- The objective is to remove as many of the xs and corresponding bindings as possible.
+-- First, split the bindings into those that are local (i.e., LHS is in xs) and non-local.
+-- For the local bindings, only allow x=v, and no duplications (correspnds to WF).
+-- Using e and the non-local binds as roots, compute which of the local bindings that are reachable.
+-- Then
+--  remove all unreachable local bindings
+--  remove xs that are no longer used
+--  remove x~y if x or y were removed
+simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
+simpleCst xs ts bs expr = do
+  let (lbs, nlbs) = partition ((`elem` xs) . fst) bs
+  guard (not (anySame (map fst lbs)))
+  guard (all (isVal . snd) lbs)
+  let roots = free (nlbs, expr)
+      graph = [(x, free e) | (x, e) <- lbs ]
+      reachable = xs `intersect` search graph roots
+      removed = xs \\ reachable
+      ts' = [ t | t@(x, y) <- ts, x `notElem` removed, y `notElem` removed ]
+      lbs' = [ b | b@(x, _) <- bs, x `elem` reachable ]
+  guard (reachable /= xs)
+  pure $ existBind reachable ts' (lbs' ++ nlbs) expr
+      
+search :: (Eq a) => [(a, [a])] -> [a] -> [a]
+search g = loop []
+  where loop seen [] = seen
+        loop seen (x:xs) | x `elem` seen = loop seen xs
+                         | otherwise = let ys = fromMaybe [] $ lookup x g
+                                       in  loop (x:seen) (ys ++ xs)
+
 existBind :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs ts bs ee = mkRes xs (map (\ (x,y) -> x :~: y) ts ++ map (\ (x, v) -> Var x :=: v) bs) ee
 
--- Remove bindings of the form 'x=e' where x occurs nowhere else,
--- remove 'x~y' where x occurs nowhere else,
--- and remove unused existentials.
-simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
-simpleCst xs ts bs e =
-  let evs = free e
-      trs = filter isTriv xs
-      isTriv x | x `elem` evs = False
-               | otherwise =
-        case partition ((== x) . fst) bs of
-          (l, obs) | length l <= 1 -> x `notElem` (free (map snd obs) ++ map fst obs ++ map snd ts) -- 0/1 bindings, no other occurrences
-          _ -> False
-      xs' = filter  (`notElem` trs) xs
-      ts' = filter ((`notElem` trs) . fst) ts
-      bs' = filter ((`notElem` trs) . fst) bs
-      avs = free (ts', bs', e)
-      xs'' = filter (`elem` avs) xs'
-  in  if xs'' /= xs then
-        [existBind xs'' ts' bs' e]
-      else
-        []
+-- XXX WRONG: Only eliminates first ~
+rulesElimAlias :: ERule
+rulesElimAlias _ lhs =
+  "ELIM-ALIAS" `name`
+  do (sx, (x :~: _) :>: e) <- scopeX lhs
+     guard (x `notElem` free e)
+     pure (sx e)
 
 {- | Application Contexts
 
@@ -762,7 +787,7 @@ derefA b s lhs xx =
       pure ( (:=: e) . Val)
    ++
    do (Var x :=: Var y) <- [lhs]
-      guard (tfUseTilde s)
+      guard (tfUseTilde s && tfDerefPos s == ConsumedOrBarrEq && b == UnderBarrier)
       guard (x == xx)
       -- We do not want to introduce x~x since that will
       -- lead to infinite reduction sequences.
@@ -923,7 +948,7 @@ derefV lhs xx =
 
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
-finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
+finalSubst ee | [(_, cs, vv)] <- wfRes defaultTRSFlags ee = Val $ inline cs vv
               | otherwise = --(if ee /= Fail then trace ("finalSubst: not WF\n" ++ show ee) else id)
                             ee
   where
@@ -1055,29 +1080,29 @@ rulesFail _ lhs =
 -}
 
 rulesOne :: ERule
-rulesOne _ lhs =
+rulesOne ss lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
  ++
   "ONE-CHOICE" `name`
   do One (e :|: _) <- [lhs]
-     wfResV e
+     wfResV ss e
  ++
   "ONE-VAL" `name`
   do One e <- [lhs]
-     wfResV e
+     wfResV ss e
 
 rulesAll :: ERule
-rulesAll _ lhs =
+rulesAll ss lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (Arr [])
  ++
   "ALL-CHOICE" `name`
   do All xs <- [lhs]
-     let choiceRes e | [r] <- wfRes e = [[r]]
-         choiceRes (e :|: es) | [r] <- wfRes e = [ r : rs | rs <- choiceRes es ]
+     let choiceRes e | [r] <- wfRes ss e = [[r]]
+         choiceRes (e :|: es) | [r] <- wfRes ss e = [ r : rs | rs <- choiceRes es ]
          choiceRes _ = []
      rs <- choiceRes xs
      let (is, es, vs) = mkRess rs
@@ -1086,24 +1111,24 @@ rulesAll _ lhs =
  ++
   "ALL-VAL" `name`
   do All e <- [lhs]
-     (is, es, v) <- wfRes e
+     (is, es, v) <- wfRes ss e
      pure (mkRes is es (Arr [v]))
 -}
 
 rulesSplit :: ERule
-rulesSplit _ lhs =
+rulesSplit ss lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f _g <- [lhs]
      pure (f :@: Arr [])
  ++
   "SPLIT-CHOICE" `name`
   do Split (e :|: ee) _f g <- [lhs]
-     e' <- wfResV e
+     e' <- wfResV ss e
      spl g e' ee
  ++
   "SPLIT-VAL" `name`
   do Split e _f g <- [lhs]
-     e' <- wfResV e
+     e' <- wfResV ss e
      spl g e' Fail
  where
    spl g e ee =
@@ -1115,21 +1140,21 @@ rulesSplit _ lhs =
 
 type BindV = (Ident, Value)
 
-wfResV :: Expr -> [Expr]
-wfResV e = do
-  (is, es, Val v) <- wfResE e
+wfResV :: TRSFlags -> Expr -> [Expr]
+wfResV ss e = do
+  (is, es, Val v) <- wfResE ss e
   pure $ mkRes is (map (\ (x, y) -> Var x :=: y) es) v
 
-wfRes :: Expr -> [([Ident], [BindV], Value)]
-wfRes e = do
+wfRes :: TRSFlags -> Expr -> [([Ident], [BindV], Value)]
+wfRes ss e = do
 --  traceM ("wfRes " ++ show (e, wfResE e))
-  (is, es, Val v) <- wfResE e
+  (is, es, Val v) <- wfResE ss e
   pure (is, es, v)
 
 -- Returns a non-empty list WF decompositions of the expression.
 -- The most eager (i.e., most binders and bindings) is first in the list.
-wfResE :: Expr -> [([Ident], [BindV], Expr)]
-wfResE = wf []
+wfResE :: TRSFlags -> Expr -> [([Ident], [BindV], Expr)]
+wfResE ss = wf []
   where
     -- WF-DEF
     wf g e@(DEF x e1) = do
@@ -1142,11 +1167,29 @@ wfResE = wf []
       guard (x `notElem` free e)                        -- eliminate x first
       wf g e                                            -- and just throw away the alias
      ++ pure ([], [], e)  -- it's always possible to use WF-EXP
-    -- WF-EQ
-    wf g e@((Var x :=: Val v) :>: e1) = do
-      guard (v /= Var x)                                -- eliminate x=x before WFF
-      guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
+    -- WF-EQ-VAR
+    wf g ((Var x :=: Var y) :>: e1) = do
+      guard (x /= y)                                    -- eliminate x=x before WFF
+      (++)
+        (do
+           guard (x `elem` g)
+           guard (x `notElem` free e1)                     -- subst scalars before WFF
+           (xs, cs, e2) <- wf (delete x g) e1
+           guard (null (intersect [y] xs))
+           pure (xs, (x, Var y):cs, e2)
+        )
+        (do -- Same thing, but with x and y swapped
+           guard (tfUseWFEqVar ss)
+           guard (y `elem` g)
+           guard (y `notElem` free e1)                     -- subst scalars before WFF
+           (xs, cs, e2) <- wf (delete y g) e1
+           guard (null (intersect [x] xs))
+           pure (xs, (y, Var x):cs, e2)
+        )
+    -- WF-EQ, RHS not a variable
+    wf g e@((Var x :=: HNF v) :>: e1) = do
       guard (x `elem` g)
+      guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free v) xs))
       pure (xs, (x, v):cs, e2)
