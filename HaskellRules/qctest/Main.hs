@@ -1,8 +1,9 @@
 module Main where
 
+import Epic.List( nub )
 import Rules.Core
 import Rules.Systems
-import TRS.TRS( step, normalFormsFuelTrace, nub )
+import TRS.TRS( step, normalFormsFuelTrace )
 import TRS.TRSGraph( normalFormsFuelTraceWithGraph )
 import TRS.Tarjan
 import TRS.Traced

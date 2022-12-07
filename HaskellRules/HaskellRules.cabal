@@ -45,6 +45,7 @@ library epic
 
 library trs
     import:           shared-properties
+    build-depends:    epic
     exposed-modules:  TRS.Bind
                       TRS.Graph
                       TRS.System

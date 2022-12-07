@@ -8,6 +8,7 @@ import TRS.Traced
 import qualified Data.Set as S
 import Data.List ( intercalate )
 import Control.Monad( unless )
+import Epic.List ( nub )
 --import qualified Debug.Trace
 --import Data.Set( Set )
 
@@ -124,15 +125,5 @@ printTrace tr =
        print t
   | (n,t) <- reverse tr
   ]
-
---
-
-nub :: Ord a => [a] -> [a]
-nub = go S.empty
- where
-  go _seen []            = []
-  go seen (x:xs)
-    | x `S.member` seen = go seen xs
-    | otherwise         = x : go (S.insert x seen) xs
 
 --------------------------------------------------------------------------------
