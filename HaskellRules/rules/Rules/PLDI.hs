@@ -4,6 +4,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Rules.PLDI(allSystemsPLDI) where
 
+import Epic.List(anySame)
 import TRS.Bind
 import TRS.System
 import TRS.TRS
@@ -655,13 +656,7 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
   where
    hole    = ident "$HOLE$"
 
-rulesElimDead :: ERule
-rulesElimDead _ lhs =
--- Not like the paper
-  "ELIM-DEAD" `name`
-  do e@Def{} <- [lhs]
-     elimDead e
-
+-- This eliminates some defs, but not as many as is possible with the structural rules.
 rulesElimDef :: ERule
 rulesElimDef ss lhs =
   "ELIM-DEF" `name`
@@ -670,6 +665,13 @@ rulesElimDef ss lhs =
      guard (not (null xs))
      guard (null (intersect xs (free e)))
      pure e
+
+rulesElimDead :: ERule
+rulesElimDead _ lhs =
+-- Not like the paper
+  "ELIM-DEAD" `name`
+  do e@Def{} <- [lhs]
+     elimDead e
 
 -- ELIM-DEF together with the structural SWAP rules
 -- is able to remove all unused bindings.
@@ -693,30 +695,43 @@ elimDead ee =
   in
     simpleCst xs ts cs e'''
 
+-- 
+-- xs are the existentially bound identifiers
+-- ts are the alias definitions, x~y
+-- bs are the definitions, x=e
+-- e is the final expression.
+-- The objective is to remove as many of the xs and corresponding bindings as possible.
+-- First, split the bindings into those that are local (i.e., LHS is in xs) and non-local.
+-- For the local bindings, only allow x=v, and no duplications (correspnds to WF).
+-- Using e and the non-local binds as roots, compute which of the local bindings that are reachable.
+-- Then
+--  remove all unreachable local bindings
+--  remove xs that are no longer used
+--  remove x~y if x or y were removed
+simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
+simpleCst xs ts bs expr = do
+  let (lbs, nlbs) = partition ((`elem` xs) . fst) bs
+  guard (not (anySame (map fst lbs)))
+  guard (all (isVal . snd) lbs)
+  let roots = free (nlbs, expr)
+      graph = [(x, free e) | (x, e) <- lbs ]
+      reachable = xs `intersect` search graph roots
+      removed = xs \\ reachable
+      ts' = [ t | t@(x, y) <- ts, x `notElem` removed, y `notElem` removed ]
+      lbs' = [ b | b@(x, _) <- bs, x `elem` reachable ]
+  guard (reachable /= xs)
+  pure $ existBind reachable ts' (lbs' ++ nlbs) expr
+      
+search :: (Eq a) => [(a, [a])] -> [a] -> [a]
+search g = loop []
+  where loop seen [] = seen
+        loop seen (x:xs) | x `elem` seen = loop seen xs
+                         | otherwise = let ys = fromMaybe [] $ lookup x g
+                                       in  loop (x:seen) (ys ++ xs)
+
 existBind :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs ts bs ee = mkRes xs (map (\ (x,y) -> x :~: y) ts ++ map (\ (x, v) -> Var x :=: v) bs) ee
 
--- Remove bindings of the form 'x=e' where x occurs nowhere else,
--- remove 'x~y' where x occurs nowhere else,
--- and remove unused existentials.
-simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
-simpleCst xs ts bs e =
-  let evs = free e
-      trs = filter isTriv xs
-      isTriv x | x `elem` evs = False
-               | otherwise =
-        case partition ((== x) . fst) bs of
-          (l, obs) | length l <= 1 -> x `notElem` (free (map snd obs) ++ map fst obs ++ map snd ts) -- 0/1 bindings, no other occurrences
-          _ -> False
-      xs' = filter  (`notElem` trs) xs
-      ts' = filter ((`notElem` trs) . fst) ts
-      bs' = filter ((`notElem` trs) . fst) bs
-      avs = free (ts', bs', e)
-      xs'' = filter (`elem` avs) xs'
-  in  if xs'' /= xs then
-        [existBind xs'' ts' bs' e]
-      else
-        []
 
 {- | Application Contexts
 
