@@ -3,7 +3,8 @@
 module Main where
 
 import TRS.Bind
-import TRS.TRS
+import TRS.NormalForm(normalForms)
+import TRS.TRS(name)
 import Rules.Core
 import Rules.Systems
 import Data.List( union )
@@ -58,17 +59,18 @@ typeCheck e t =
        else putStrLn "+++ TYPE CHECK SUCCEEDED"
  where
   et       = hasType e t
-  (_,et'):_ = normalForms defaultTRSFlags typeRules et
+  (_,et'):_ = normalForms typeTRSystem et
+
+typeTRSystem :: TRSystem Expr
+typeTRSystem = sys{ rules = rules sys <> rulesUNR }
+  where sys = head allSystems
 
 int :: Value
 int = LAM x ((Op IsInt :@: (Var x)) :>: Var x)
  where
   x = ident "x"
 
-typeRules :: Rule Expr
-typeRules = rules (head allSystems) <> rulesUNR
-
-rulesUNR :: Rule Expr
+rulesUNR :: ERule
 rulesUNR _ lhs =
   "UNR-seq-L" `name`
     do UNR :>: _ <- [lhs]

@@ -46,6 +46,7 @@ library trs
     import:           shared-properties
     exposed-modules:  TRS.Bind
                       TRS.Graph
+                      TRS.NormalForm
                       TRS.System
                       TRS.Tarjan
                       TRS.TRS

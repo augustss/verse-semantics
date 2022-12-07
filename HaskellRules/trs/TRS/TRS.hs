@@ -2,12 +2,21 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-module TRS.TRS where
+module TRS.TRS(
+  Rule,
+  name,
+  Rec(..),
+  step,
+  normalFormsFuelTracePlain,
+  normalFormFuelTracePlain,
+  Trace,
+  -- XXX
+  nub,
+  ) where
 
 import TRS.Traced
 import qualified Data.Set as S
-import Data.List ( intercalate )
-import Control.Monad( unless )
+--import Control.Monad( unless )
 --import qualified Debug.Trace
 --import Data.Set( Set )
 
@@ -31,6 +40,7 @@ class Rec t where
   data RuleEnv t
   rec :: Rule t -> Rule t
 
+{-
 step1 :: Rec a => RuleEnv a -> Rule a -> a -> Maybe a
 step1 env rule t =
   case rec rule env t of
@@ -42,28 +52,14 @@ steps env rule t =
   t : case step1 env rule t of
         Nothing -> []
         Just t' -> steps env rule t'
+-}
 
 step :: forall a . (Ord a, Rec a) => Rule a -> Rule a
 step rule env tt = nub $ rec rule env tt
 
-normalForms :: (Show a, Ord a, Rec a) => RuleEnv a -> Rule a -> a -> [(String,a)]
-normalForms env rule t = normalFormsFuel env (-1) rule t
-
-normalFormsFuel :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [(String,a)]
-normalFormsFuel env n rule t =
-  [ (sequ (map fst tr), x)
-  | (x :<-- tr) <- normalFormsFuelTrace env n rule t
-  ]
- where
-  sequ [] = "refl"
-  sequ as = intercalate ";" as
-
 -- traces are produced in reverse order, i.e. final result first
-normalFormsTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Rule a -> a -> [Traced a]
-normalFormsTrace env rule t = normalFormsFuelTrace env (-1) rule t
-
-normalFormsFuelTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
-normalFormsFuelTrace env an rule at = go an S.empty [start at]
+normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
+normalFormsFuelTracePlain env an rule at = go an S.empty [start at]
  where
   go 0 _    (_tr:_)      = []
   go _n _seen []          = []
@@ -81,8 +77,8 @@ type Path a = (Result, Trace a)
 data Result = NoFuel | Stuck | NormalForm deriving (Show)
 
 -- Like normalFormsFuelTrace, but only does a depth first search
-normalFormFuelTrace :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [[(String,a)]]
-normalFormFuelTrace env n rule t = [snd (dfs env n rule t)]
+normalFormFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [[(String,a)]]
+normalFormFuelTracePlain env n rule t = [snd (dfs env n rule t)]
 
 dfs :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Path a
 dfs env an rule at = go an S.empty [("",at)]
@@ -98,6 +94,7 @@ dfs env an rule at = go an S.empty [("",at)]
       ts''  = filter ((`S.notMember` seen) . snd) ts'
   go _ _ _ = error "impossible"
 
+{-
 normalFormsFuelTrace' :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Either (Trace a) [[(String,a)]]
 normalFormsFuelTrace' env an rule at = go an S.empty [[("",at)]]
  where
@@ -111,8 +108,9 @@ normalFormsFuelTrace' env an rule at = go an S.empty [[("",at)]]
     seen' = S.insert t seen
     ts'   = step rule env t
   go _ _ _ = error "impossible"
+-}
 
-
+{-
 traceShow :: Show a => String -> a -> a
 --traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
 traceShow _msg x = x
@@ -124,6 +122,7 @@ printTrace tr =
        print t
   | (n,t) <- reverse tr
   ]
+-}
 
 --
 

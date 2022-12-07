@@ -7,8 +7,9 @@ import qualified TRS.Bind as T
 import qualified Rules.Core as T
 import Rules.Equiv(equiv)
 import Rules.Systems(ESystem)
-import TRS.TRS
-import TRS.System(preProcess, rules, postProcess, ruleEnv)
+import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace)
+import TRS.System(preProcess, postProcess, ruleEnv)
+import TRS.TRS(Trace)
 import TRS.Traced(toList)
 import FrontEnd.Expr(Ident(..), noLoc)
 import FrontEnd.Core
@@ -21,19 +22,19 @@ import Epic.Print
 -- XXX use graph normal form when needed
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg sys = map (trsToCore . sub flg sys . rtrace)
+rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
                 . elimDup sys
                 . subs flg sys
-                . nf n (rules sys)
+                . nf
                 . preProcess sys
                 . coreToTrs
  where
-  trsFlags       = (ruleEnv sys){ T.tfUnderLambda = fUnderLambda flg }
+  sys            = asys{ruleEnv = (ruleEnv asys){ T.tfUnderLambda = fUnderLambda flg } }
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
-  nf | fDfs flg  = normalFormFuelTrace trsFlags
-     | otherwise = \ x y z -> map toList $ normalFormsFuelTrace trsFlags x y z
+  nf | fDfs flg  =              normalFormFuelTrace  sys n
+     | otherwise = map toList . normalFormsFuelTrace sys n
 {-
   checkOne [x]   = [x]
   checkOne nes   = trace (unlines $
