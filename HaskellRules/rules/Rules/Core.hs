@@ -25,13 +25,16 @@ module Rules.Core(
   pattern DEF,
   pattern LAM,
   subst,
+  alphaRename,
+  invariant,
+  collect,
   check,
   ) where
 import GHC.Stack(HasCallStack)
 
 import TRS.Bind
 import TRS.TRS
-import Test.QuickCheck
+import Test.QuickCheck hiding ( collect )
 import Data.List( intercalate, union, elemIndex )
 import Data.Maybe
 
@@ -326,6 +329,14 @@ instance Free Expr where
 class Term a where
   subst :: Subst Expr -> a -> a
 
+-- rename the binder so that it is not the same as the first argument
+alphaRename :: [Ident] -> Bind Expr -> Bind Expr
+alphaRename xs bnd@(Bind x e)
+  | x `notElem` xs = bnd
+  | otherwise      = Bind y (subst [(x,Var y)] e)
+ where
+  y = identNotIn (x : (xs ++ free e))
+
 instance Term Expr where
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
@@ -408,8 +419,8 @@ arbExpr n xs =
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, Def <$> arbBind n1 xs)
-  , (n, One <$> arbExpr n1 xs)
-  , (n, All <$> arbExpr n1 xs)
+  -- , (n, One <$> arbExpr n1 xs)
+  -- , (n, All <$> arbExpr n1 xs)
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
@@ -427,6 +438,27 @@ arbBind n xs =
   [ (4, do let x:_ = filter (`notElem` xs) (map Name ["x","y","z","v","w"] ++ map Prim [1..])
            Bind x <$> arbExpr n (x:xs))
   ]
+
+--------------------------------------------------------------------------------
+
+invariant :: (Expr -> Bool) -> Expr -> Bool
+invariant here = collect here (&&)
+
+collect :: (Expr->a) -> (a->a->a) -> Expr -> a
+collect here (\/) = col
+ where
+  col e = rec (here e) e
+  
+  rec a (Arr es)         = foldr (\/) a (map col es)
+  rec a (Lam (Bind _ e)) = a \/ col e
+  rec a (Def (Bind _ e)) = a \/ col e
+  rec a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
+  rec a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
+  rec a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
+  rec a (One e)          = a \/ col e
+  rec a (All e)          = a \/ col e
+  rec a (Split x y z)    = a \/ (col x \/ (col y \/ col z))  
+  rec a _                = a
 
 --------------------------------------------------------------------------------
 
