@@ -83,9 +83,10 @@ systemPLDIT = TRSystem
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
-                          <> rulesElimDef
+                         -- <> rulesElimDef
                           <> rulesElimDead
-                         -- <> rulesDerefHLast
+                          <> rulesElimAlias
+                          <> rulesDerefHLast
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
