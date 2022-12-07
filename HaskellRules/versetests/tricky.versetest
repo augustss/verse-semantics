@@ -42,3 +42,5 @@ testceq("Koen3", SEq, POPL=Skip, POPLV=Skip)
                      { exists z . z }
 testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
                      { exists y . (\x.x = 0; y = 0; <>) }
+testceq("Koen5a", SEq){ exists y . (\x.x = (exists z . <0>); x = y; <>) }
+                     { exists y . (\x.x = <0>; y = <0>; <>) }
