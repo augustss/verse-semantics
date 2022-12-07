@@ -78,7 +78,7 @@ systemPLDIT :: TRSystem Expr
 systemPLDIT = TRSystem
   { sname               = "PLDIT"
   , description         = "PLDI submission, with ~"
-  , ruleEnv             = defaultTRSFlags
+  , ruleEnv             = defaultTRSFlags{ tfUseTilde = True }
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
