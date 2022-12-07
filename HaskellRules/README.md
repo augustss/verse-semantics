@@ -117,8 +117,3 @@ To get a summary for all the rules
 ```
 cabal run -- tester -r PLDIT --summary versetests/tricky.versetest
 ```
-
-
-
-
-
