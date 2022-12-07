@@ -1136,11 +1136,12 @@ wfResE = wf []
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
-     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
     -- WF-ALIAS
     wf g ((x :~: _) :>: e) = do
       guard (x `notElem` free e)                        -- eliminate x first
       wf g e                                            -- and just throw away the alias
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
     -- WF-EQ
     wf g e@((Var x :=: Val v) :>: e1) = do
       guard (v /= Var x)                                -- eliminate x=x before WFF
@@ -1149,11 +1150,8 @@ wfResE = wf []
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free v) xs))
       pure (xs, (x, v):cs, e2)
-     ++ pure ([], [], e)  -- including this is the right thing, but exceedingly slow
+     ++ pure ([], [], e)  -- it's always possible to use WF-EXP
     -- WF-EXP
-    -- This judgement makes WF non-deterministic.
-    -- With USE_CORRECT_WF we explore all possibilites,
-    -- without it we eagerly consume DEF and :=:.
     wf _g e =
       pure ([], [], e)
 
