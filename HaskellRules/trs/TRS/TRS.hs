@@ -14,6 +14,7 @@ module TRS.TRS(
   nub,
   ) where
 
+import Epic.List( nub )
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
