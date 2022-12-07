@@ -250,13 +250,14 @@ data DerefPos
   deriving (Eq, Ord, Show)
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False, tfUseWFEqVar = False }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
     { tfUnderLambda :: !Bool     -- reduce under lambda
     , tfDerefPos    :: !DerefPos -- where derefH is substituting
-    , tfUseTilde    :: !Bool
+    , tfUseTilde    :: !Bool     -- use x~y expressions
+    , tfUseWFEqVar  :: !Bool     -- Use WF-Eq with flipped arguments, i.e., y=x
     }
   rec r s ae =
     r s ae ++

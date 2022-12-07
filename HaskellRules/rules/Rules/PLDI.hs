@@ -661,10 +661,10 @@ rulesElimDead _ lhs =
      elimDead e
 
 rulesElimDef :: ERule
-rulesElimDef _ lhs =
+rulesElimDef ss lhs =
   "ELIM-DEF" `name`
   do ee@Def{} <- [lhs]
-     (xs, _, e) <- wfResE ee
+     (xs, _, e) <- wfResE ss ee
      guard (not (null xs))
      guard (null (intersect xs (free e)))
      pure e
@@ -923,7 +923,7 @@ derefV lhs xx =
 
 -- Make all substitutions that involve variable free arrays.
 finalSubst :: Expr -> Expr
-finalSubst ee | [(_, cs, vv)] <- wfRes ee = Val $ inline cs vv
+finalSubst ee | [(_, cs, vv)] <- wfRes defaultTRSFlags ee = Val $ inline cs vv
               | otherwise = --(if ee /= Fail then trace ("finalSubst: not WF\n" ++ show ee) else id)
                             ee
   where
@@ -1055,29 +1055,29 @@ rulesFail _ lhs =
 -}
 
 rulesOne :: ERule
-rulesOne _ lhs =
+rulesOne ss lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
  ++
   "ONE-CHOICE" `name`
   do One (e :|: _) <- [lhs]
-     wfResV e
+     wfResV ss e
  ++
   "ONE-VAL" `name`
   do One e <- [lhs]
-     wfResV e
+     wfResV ss e
 
 rulesAll :: ERule
-rulesAll _ lhs =
+rulesAll ss lhs =
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (Arr [])
  ++
   "ALL-CHOICE" `name`
   do All xs <- [lhs]
-     let choiceRes e | [r] <- wfRes e = [[r]]
-         choiceRes (e :|: es) | [r] <- wfRes e = [ r : rs | rs <- choiceRes es ]
+     let choiceRes e | [r] <- wfRes ss e = [[r]]
+         choiceRes (e :|: es) | [r] <- wfRes ss e = [ r : rs | rs <- choiceRes es ]
          choiceRes _ = []
      rs <- choiceRes xs
      let (is, es, vs) = mkRess rs
@@ -1086,24 +1086,24 @@ rulesAll _ lhs =
  ++
   "ALL-VAL" `name`
   do All e <- [lhs]
-     (is, es, v) <- wfRes e
+     (is, es, v) <- wfRes ss e
      pure (mkRes is es (Arr [v]))
 -}
 
 rulesSplit :: ERule
-rulesSplit _ lhs =
+rulesSplit ss lhs =
   "SPLIT-FAIL" `name`
   do Split Fail f _g <- [lhs]
      pure (f :@: Arr [])
  ++
   "SPLIT-CHOICE" `name`
   do Split (e :|: ee) _f g <- [lhs]
-     e' <- wfResV e
+     e' <- wfResV ss e
      spl g e' ee
  ++
   "SPLIT-VAL" `name`
   do Split e _f g <- [lhs]
-     e' <- wfResV e
+     e' <- wfResV ss e
      spl g e' Fail
  where
    spl g e ee =
@@ -1115,21 +1115,21 @@ rulesSplit _ lhs =
 
 type BindV = (Ident, Value)
 
-wfResV :: Expr -> [Expr]
-wfResV e = do
-  (is, es, Val v) <- wfResE e
+wfResV :: TRSFlags -> Expr -> [Expr]
+wfResV ss e = do
+  (is, es, Val v) <- wfResE ss e
   pure $ mkRes is (map (\ (x, y) -> Var x :=: y) es) v
 
-wfRes :: Expr -> [([Ident], [BindV], Value)]
-wfRes e = do
+wfRes :: TRSFlags -> Expr -> [([Ident], [BindV], Value)]
+wfRes ss e = do
 --  traceM ("wfRes " ++ show (e, wfResE e))
-  (is, es, Val v) <- wfResE e
+  (is, es, Val v) <- wfResE ss e
   pure (is, es, v)
 
 -- Returns a non-empty list WF decompositions of the expression.
 -- The most eager (i.e., most binders and bindings) is first in the list.
-wfResE :: Expr -> [([Ident], [BindV], Expr)]
-wfResE = wf []
+wfResE :: TRSFlags -> Expr -> [([Ident], [BindV], Expr)]
+wfResE ss = wf []
   where
     -- WF-DEF
     wf g e@(DEF x e1) = do
@@ -1142,11 +1142,29 @@ wfResE = wf []
       guard (x `notElem` free e)                        -- eliminate x first
       wf g e                                            -- and just throw away the alias
      ++ pure ([], [], e)  -- it's always possible to use WF-EXP
-    -- WF-EQ
-    wf g e@((Var x :=: Val v) :>: e1) = do
-      guard (v /= Var x)                                -- eliminate x=x before WFF
-      guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
+    -- WF-EQ-VAR
+    wf g ((Var x :=: Var y) :>: e1) = do
+      guard (x /= y)                                    -- eliminate x=x before WFF
+      (++)
+        (do
+           guard (x `elem` g)
+           guard (x `notElem` free e1)                     -- subst scalars before WFF
+           (xs, cs, e2) <- wf (delete x g) e1
+           guard (null (intersect [y] xs))
+           pure (xs, (x, Var y):cs, e2)
+        )
+        (do -- Same thing, but with x and y swapped
+           guard (tfUseWFEqVar ss)
+           guard (y `elem` g)
+           guard (y `notElem` free e1)                     -- subst scalars before WFF
+           (xs, cs, e2) <- wf (delete y g) e1
+           guard (null (intersect [x] xs))
+           pure (xs, (y, Var x):cs, e2)
+        )
+    -- WF-EQ, RHS not a variable
+    wf g e@((Var x :=: HNF v) :>: e1) = do
       guard (x `elem` g)
+      guard (isS v `implies` (x `notElem` free e1))     -- subst scalars before WFF
       (xs, cs, e2) <- wf (delete x g) e1
       guard (null (intersect (free v) xs))
       pure (xs, (x, v):cs, e2)
