@@ -732,6 +732,13 @@ search g = loop []
 existBind :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> Expr
 existBind xs ts bs ee = mkRes xs (map (\ (x,y) -> x :~: y) ts ++ map (\ (x, v) -> Var x :=: v) bs) ee
 
+-- XXX WRONG: Only eliminates first ~
+rulesElimAlias :: ERule
+rulesElimAlias _ lhs =
+  "ELIM-ALIAS" `name`
+  do (sx, (x :~: _) :>: e) <- scopeX lhs
+     guard (x `notElem` free e)
+     pure (sx e)
 
 {- | Application Contexts
 
