@@ -13,6 +13,7 @@ module Rules.Core(
   pattern HNF,
   pattern CON,
   isHNF,
+  isVal,
   pattern DEF,
   pattern LAM,
   subst,
@@ -216,6 +217,9 @@ getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
 getVal e = getHNF e
 
+isVal :: Expr -> Bool
+isVal = isJust . getVal
+
 pattern HNF :: Expr -> Expr
 pattern HNF e <- (getHNF -> Just e)
 --  where HNF e = e
@@ -228,7 +232,6 @@ getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
 isHNF :: Expr -> Bool
-
 isHNF = isJust . getHNF
 
 pattern CON :: Expr -> Expr
