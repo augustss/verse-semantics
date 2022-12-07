@@ -124,14 +124,4 @@ printTrace tr =
   ]
 -}
 
---
-
-nub :: Ord a => [a] -> [a]
-nub = go S.empty
- where
-  go _seen []            = []
-  go seen (x:xs)
-    | x `S.member` seen = go seen xs
-    | otherwise         = x : go (S.insert x seen) xs
-
 --------------------------------------------------------------------------------
