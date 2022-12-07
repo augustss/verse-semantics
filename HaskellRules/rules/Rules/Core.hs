@@ -250,7 +250,7 @@ data DerefPos
   deriving (Eq, Ord, Show)
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = True }
+defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
