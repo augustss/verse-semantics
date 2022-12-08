@@ -1,6 +1,6 @@
 # Trivial
-#testceq("Triv1", SEq) { 1 } { 1 }
-#testceq("Triv2", SEq) { exists x . x=1 } { 1 }
+testceq("Triv1", SEq) { 1 } { 1 }
+testceq("Triv2", SEq) { exists x . x=1 } { 1 }
 
 #testeq(SEq) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 
