@@ -442,18 +442,18 @@ invariant here = collect here (&&)
 collect :: (Expr->a) -> (a->a->a) -> Expr -> a
 collect here (\/) = col
  where
-  col e = rec (here e) e
+  col e = recr (here e) e
   
-  rec a (Arr es)         = foldr (\/) a (map col es)
-  rec a (Lam (Bind _ e)) = a \/ col e
-  rec a (Def (Bind _ e)) = a \/ col e
-  rec a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
-  rec a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
-  rec a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
-  rec a (One e)          = a \/ col e
-  rec a (All e)          = a \/ col e
-  rec a (Split x y z)    = a \/ (col x \/ (col y \/ col z))  
-  rec a _                = a
+  recr a (Arr es)         = foldr (\/) a (map col es)
+  recr a (Lam (Bind _ e)) = a \/ col e
+  recr a (Def (Bind _ e)) = a \/ col e
+  recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
+  recr a (One e)          = a \/ col e
+  recr a (All e)          = a \/ col e
+  recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
+  recr a _                = a
 
 --------------------------------------------------------------------------------
 
