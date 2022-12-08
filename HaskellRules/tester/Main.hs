@@ -148,17 +148,20 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
   let vs1 = runM flg sys c1  -- May return multiple answers
   let v2  = run flg sys c2   -- Returns just one
 
-  case vs1 of
-    [] -> pure None
-    vs@(_:_:_) -> do
-      when (not (noError tflg)) $ do
-        putStrLn $ pos ++ " the expression evaluated to multiple values:"
-        mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
-        putStrLn ""
-      pure Many
-    [v1] ->
-     catch
-      ( if (equivValue sys v1 v2) == expectOK
+  catch (
+    case vs1 of
+      [] -> do
+        when (not (noError tflg)) $ do
+          putStrLn $ pos ++ " max rewrite steps exceeded"
+        pure None
+      vs@(_:_:_) -> do
+        when (not (noError tflg)) $ do
+          putStrLn $ pos ++ " the expression evaluated to multiple values:"
+          mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
+          putStrLn ""
+        pure Many
+      [v1] ->
+       if (equivValue sys v1 v2) == expectOK
         then do
             when noisy $
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
