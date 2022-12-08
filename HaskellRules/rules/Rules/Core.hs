@@ -414,8 +414,8 @@ arbExpr n xs =
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, Def <$> arbBind n1 xs)
-  -- , (n, One <$> arbExpr n1 xs)
-  -- , (n, All <$> arbExpr n1 xs)
+  , (n, One <$> arbExpr n1 xs)
+  , (n, All <$> arbExpr n1 xs)
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
