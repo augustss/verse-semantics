@@ -27,7 +27,7 @@ systemPLDI = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesDerefS <> rulesElimDef
+  , rules               = allRules <> rulesDerefS <> rulesElimExi
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -54,7 +54,7 @@ systemPLDIS = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = check validE . anf
   , postProcess         = finalSubst
-  , rules               = allRules <> rulesS <> rulesElimDef <> rulesElimDead
+  , rules               = allRules <> rulesS <> rulesElimExi <> rulesElimDead
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = validE
@@ -102,7 +102,7 @@ validE = expr
     expr (e1 :>: e2) = expru e1 && expr e2
     expr (e1 :|: e2) = expr e1 && expr e2
     expr (e1 :@: e2) = value e1 && value e2
-    expr (Def (Bind _ e)) = expr e
+    expr (Exi (Bind _ e)) = expr e
     expr (One e) = expr e
     expr (All e) = expr e
     expr Fail = True
@@ -149,7 +149,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (v1 :@: v2)
-    expr (Def (Bind i e)) = Def (Bind i (expr e))
+    expr (Exi (Bind i e)) = Exi (Bind i (expr e))
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
     expr e@Fail = e
@@ -165,7 +165,7 @@ anf = expr
     expru (e1 :=: e2) =
       case (expr e1, expr e2) of
         (e1'@Val{}, e2') -> e1' :=: e2'
-        (e1', e2') -> DEF x $ (Var x :=: e1') :>: (Var x :=: e2') :>: Var x
+        (e1', e2') -> EXI x $ (Var x :=: e1') :>: (Var x :=: e2') :>: Var x
           where x = identNotIn (free (e1',  e2'))
     expru e = expr e
 
@@ -189,7 +189,7 @@ anf = expr
 
     binds :: [(Ident, Expr)] -> Expr -> Expr
     binds [] b = b
-    binds ((i,e):ds) b = DEF i $ (Var i :=: e) :>: binds ds b
+    binds ((i,e):ds) b = EXI i $ (Var i :=: e) :>: binds ds b
 
 --------------------------------------------------------------------------------
 
@@ -210,7 +210,7 @@ isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
-isChoiceFree (DEF _ e) = isChoiceFree e  -- NOTE: new
+isChoiceFree (EXI _ e) = isChoiceFree e  -- NOTE: new
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
 isChoiceFree (Split _ _ _) = True
 isChoiceFree Wrong     = True
@@ -271,9 +271,9 @@ choiceX1 lhs =
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)
  ++
-  do DEF x cx <- [lhs]
+  do EXI x cx <- [lhs]
      (ctx, hole) <- choiceX cx
-     pure (Def . Bind x . ctx, hole) -- hopefully this is sound!
+     pure (Exi . Bind x . ctx, hole) -- hopefully this is sound!
 
 -- scope contexts
 -- SX context
@@ -337,10 +337,10 @@ allX1 xx lhs =
      (ctx, hole) <- allX xx e2
      pure ((e1 :@:) . ctx, hole)
  ++
-  do DEF x e <- [lhs]
+  do EXI x e <- [lhs]
      guard (x /= xx)
      (ctx, hole) <- allX xx e
-     pure (DEF x . ctx, hole)
+     pure (EXI x . ctx, hole)
  ++
   do One e <- [lhs]
      (ctx, hole) <- allX xx e
@@ -393,7 +393,7 @@ rulesSpeculation =
 rulesAlias :: ERule
 rulesAlias _ lhs =
   "ALIAS-SUBST" `name`
-  do DEF x e <- [lhs]
+  do EXI x e <- [lhs]
      (ctx, y) <- aliasX x e
      guard (x /= y)
      -- traceM ("alias-1 " ++ show ((x, y), ctx (VAR y), underDefs (subst [(x, Var y)]) (ctx (VAR y))))
@@ -408,10 +408,10 @@ rulesAlias _ lhs =
 
 aliasX :: Ident -> Expr -> [(EContext, Ident)]
 aliasX x lhs =
-  do DEF y e <- [lhs]
+  do EXI y e <- [lhs]
      guard (x /= y)
      (ctx, z) <- aliasX x e
-     pure (DEF y . ctx, z)
+     pure (EXI y . ctx, z)
   ++
   aliasX' x lhs
 
@@ -515,7 +515,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: Arr [])) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr DEF e vs
+defs vs e = foldr EXI e vs
 
 seqs :: [Expr] -> Expr
 seqs = foldr1 (:>:)
@@ -527,7 +527,7 @@ rulesApplication _ lhs =
   "APP-BETA" `name`
   do LAM x e :@: v <- [lhs]
      let freeV = free v
-         beta y b = DEF y ((Var y :=: Val v) :>: b)
+         beta y b = EXI y ((Var y :=: Val v) :>: b)
      if x `notElem` freeV then
        pure (beta x e)
       else do
@@ -546,7 +546,7 @@ rulesApplication _ lhs =
      let x = identNotIn (free lhs)
          xe = Var x
          e = foldr1 (:|:) [ (xe :=: Int i) :>: vi | (i, vi) <- [0..] `zip` vs ]
-     pure (DEF x ((xe :=: v) :>: e))
+     pure (EXI x ((xe :=: v) :>: e))
 
 --------------------------------------------------------------------------------
 
@@ -658,10 +658,10 @@ plug ctx v = subst [(hole,v)] (ctx (Var hole))
    hole    = ident "$HOLE$"
 
 -- This eliminates some defs, but not as many as is possible with the structural rules.
-rulesElimDef :: ERule
-rulesElimDef ss lhs =
-  "ELIM-DEF" `name`
-  do ee@Def{} <- [lhs]
+rulesElimExi :: ERule
+rulesElimExi ss lhs =
+  "ELIM-EXI" `name`
+  do ee@Exi{} <- [lhs]
      (xs, _, e) <- wfResE ss ee
      guard (not (null xs))
      guard (null (intersect xs (free e)))
@@ -671,22 +671,22 @@ rulesElimDead :: ERule
 rulesElimDead _ lhs =
 -- Not like the paper
   "ELIM-DEAD" `name`
-  do e@Def{} <- [lhs]
+  do e@Exi{} <- [lhs]
      elimDead e
  <>
   "ELIM-DEAD-U" `name`
-  do DEF x e <- [lhs]
+  do EXI x e <- [lhs]
      guard (x `notElem` free e)
      pure e
 
--- ELIM-DEF together with the structural SWAP rules
+-- ELIM-EXI together with the structural SWAP rules
 -- is able to remove all unused bindings.
 -- Without the structural rules this doesn't happen.
 -- So we deal with them separately.
 elimDead :: Expr -> [Expr]
 elimDead ee =
   let
-    getXs rs (DEF x e) = getXs (x:rs) e
+    getXs rs (EXI x e) = getXs (x:rs) e
     getXs rs e = (reverse rs, e)
     getTs bs ((x :~: y) :>: e) = getTs ((x,y):bs) e
     getTs bs e = (reverse bs, e)
@@ -768,10 +768,10 @@ derefB lhs xx =
       ctx <- derefB e2 xx
       pure ((e1 :>:) . ctx)
    ++
-   do DEF x e <- [lhs]
+   do EXI x e <- [lhs]
       guard (x /= xx)
       ctx <- derefB e xx
-      pure (Def . Bind x . ctx)
+      pure (Exi . Bind x . ctx)
 -}
 
 -- Where is the deref compared to the starting point?
@@ -811,10 +811,10 @@ derefA b s lhs xx =
       ctx <- derefA b s e xx
       pure ( (v :=:) . ctx)
    ++
-   do DEF x e <- [lhs]
+   do EXI x e <- [lhs]
       guard (x /= xx)
       ctx <- derefA b s e xx
-      pure (Def . Bind x . ctx)
+      pure (Exi . Bind x . ctx)
    ++
    do (e1 :>: e2) <- [lhs]
       ctx <- derefA b s e1 xx
@@ -867,10 +867,10 @@ derefE lhs xx =
       ctx <- derefV v xx
       pure (Val . ctx)
    ++
-   do DEF x e <- [lhs]
+   do EXI x e <- [lhs]
       guard (x /= xx)
       ctx       <- derefE e xx
-      pure (Def . Bind x . ctx)
+      pure (Exi . Bind x . ctx)
    ++
    do (v :=: e) <- [lhs]
       ctx    <- derefE v xx
@@ -1043,23 +1043,23 @@ rulesS ss lhs =
   rulesDerefK ss lhs
  ++
   "SWAP-S" `name`
-  do DEF x ex <- [lhs]
-     (ctx1, DEF y ey) <- allX x ex
+  do EXI x ex <- [lhs]
+     (ctx1, EXI y ey) <- allX x ex
      guard (x /= y)
      (ctx2, Var x' :=: Var y') <- allX y ey
      guard (x == x' && y == y')
 --     traceM $ "SWAP-S " ++ show (x, y)
-     pure (DEF x (ctx1 (DEF y (ctx2 (Var y :=: Var x)))))
+     pure (EXI x (ctx1 (EXI y (ctx2 (Var y :=: Var x)))))
  ++
   "SUBST-S" `name`
-  do DEF x ex <- [lhs]
-     (ctx1, DEF y ey) <- allX x ex
+  do EXI x ex <- [lhs]
+     (ctx1, EXI y ey) <- allX x ex
      guard (x /= y)
      (ctx2, (Var y' :=: Var x') :>: e) <- allX y ey
      guard (x == x' && y == y')
      ctx <- derefE e y
 --     traceM $ "SUBST-S " ++ show (x, y)
-     pure (DEF x (ctx1 (DEF y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var x))))))
+     pure (EXI x (ctx1 (EXI y (ctx2 ((Var y :=: Var x) :>: plug ctx (Var x))))))
 
 --------------------------------------------------------------------------------
 
@@ -1080,8 +1080,8 @@ rulesFail _ lhs =
 {-
  ++
   -- Not needed when we have GC
-  "FAIL-DEF" `name`
-  do DEF _ Fail <- [lhs]
+  "FAIL-EXI" `name`
+  do EXI _ Fail <- [lhs]
      pure Fail
 -}
 
@@ -1142,7 +1142,7 @@ rulesSplit ss lhs =
          ve = Var y :=: e
          gv = Var h :=: (g :@: Var y)
          hlam = Var h :@: LAM x ee
-     in  pure (DEF h (DEF y (ve :>: gv :>: hlam)))
+     in  pure (EXI h (EXI y (ve :>: gv :>: hlam)))
 
 type BindV = (Ident, Value)
 
@@ -1162,8 +1162,8 @@ wfRes ss e = do
 wfResE :: TRSFlags -> Expr -> [([Ident], [BindV], Expr)]
 wfResE ss = wf []
   where
-    -- WF-DEF
-    wf g e@(DEF x e1) = do
+    -- WF-EXI
+    wf g e@(EXI x e1) = do
       (xs, cs, e2) <- wf (x:g) e1
       guard (x `notElem` xs)
       pure (x:xs, cs, e2)
@@ -1205,7 +1205,7 @@ wfResE ss = wf []
       pure ([], [], e)
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
-mkRes is es r = foldr (\ i e -> DEF i e) r' is
+mkRes is es r = foldr (\ i e -> EXI i e) r' is
   where r' = foldr (:>:) r es
 
 mkRess :: [([Ident], [BindV], Value)] -> ([Ident], [Expr], [Value])
@@ -1266,8 +1266,8 @@ rulesNormalization _ lhs =
      pure (e :>: (c :>: VAR x))
  ++
   "NORM-DEF-EQ" `name`
-  do DEF y c@(VAR x :=: Val{}) <- [lhs]
-     pure (DEF y (c :>: VAR x))
+  do EXI y c@(VAR x :=: Val{}) <- [lhs]
+     pure (EXI y (c :>: VAR x))
 -}
  ++
   "NORM-SWAP-EQ" `name`
@@ -1275,34 +1275,34 @@ rulesNormalization _ lhs =
      pure (x :=: h)
  ++
   "NORM-SEQ-DEFR" `name`
-  do DEF x e1 :>: e2 <- [lhs]
+  do EXI x e1 :>: e2 <- [lhs]
      let (nx, ne1) =
            if x `notElem` free e2 then
              (x, e1)
            else
              let x' = identNotIn (free [e1, e2])
              in  (x', subst [(x, Var x')] e1)
-     pure (DEF nx (ne1 :>: e2))
+     pure (EXI nx (ne1 :>: e2))
  ++
   "NORM-SEQ-DEFL" `name`
-  do e1 :>: DEF x e2 <- [lhs]
+  do e1 :>: EXI x e2 <- [lhs]
      let (nx, ne2) =
            if x `notElem` free e1 then
              (x, e2)
            else
              let x' = identNotIn (free [e1, e2])
              in  (x', subst [(x, Var x')] e2)
-     pure (DEF nx (e1 :>: ne2))
+     pure (EXI nx (e1 :>: ne2))
  ++
-  "NORM-DEFR" `name`
-  do (v1 :=: DEF x e2) :>: e3 <- [lhs]
+  "NORM-EXIR" `name`
+  do (v1 :=: EXI x e2) :>: e3 <- [lhs]
      let (nx, ne2) =
            if x `notElem` free (v1, e3) then
              (x, e2)
            else
              let x' = identNotIn (free [v1, e2, e3])
              in  (x', subst [(x, Var x')] e2)
-     pure (DEF nx ((v1 :=: ne2) :>: e3))
+     pure (EXI nx ((v1 :=: ne2) :>: e3))
  ++
   "NORM-SEQR" `name`
   do (v@Val{} :=: (e1 :>: e2)) :>: e3 <- [lhs]
@@ -1312,8 +1312,8 @@ rulesNormalization _ lhs =
 
 rulesStructural :: ERule
 rulesStructural _ lhs =
-  do Def (Bind x (Def (Bind y e))) <- [lhs]
-     pure ("SWAP-C", DEF y (DEF x e))
+  do Exi (Bind x (Exi (Bind y e))) <- [lhs]
+     pure ("SWAP-C", EXI y (EXI x e))
  ++
   do (Var x1 :=: Val v1) :>: ((Var x2 :=: Val v2) :>: e) <- [lhs]
      pure ("SWAP-D", (Var x2 :=: Val v2) :>: ((Var x1 :=: Val v1) :>: e))
