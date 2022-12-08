@@ -1,11 +1,12 @@
 module Main where
-
+import Data.Maybe
 import Epic.List( nub )
 import Rules.Core
+import Rules.Equiv(norm)
 import Rules.Systems
-import TRS.TRS( step )
+--import TRS.TRS( step )
 import TRS.NormalForm( normalFormsFuelTrace )
-import TRS.Tarjan
+--import TRS.Tarjan
 import TRS.Traced
 import Test.QuickCheck
 import Options.Applicative
@@ -27,24 +28,16 @@ prop_Confluence :: TestFlags -> TRSystem Expr -> Expr -> Property
 prop_Confluence flags sys p =
   let p' = if wrapOne flags then One p else p in
   case nub . map (norm sys) . normalFormsFuelTrace sys (maxSteps flags) . preProcess sys $ p' of
+    trs | any isNothing trs ->  -- normalization timed out.  Pretend test succeeded
+      discard
     trs@(_:_:_) ->
       whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
                        putStr $ unlines $ showTrace ttr
-                  | (ttr,i) <- trs `zip` [1::Int ..]
+                  | (Just ttr,i) <- trs `zip` [1::Int ..]
                   ]) False
     
     _ -> property True
-
----
-  
-norm :: TRSystem Expr -> Traced Expr -> Traced Expr
-norm sys = minimum . head . tarjan tstep
- where
-  tstep (t :<-- tr) =
-    [ t' :<-- ((n,t):tr)
-    | (n, t') <- step (confluenceRules sys) defaultTRSFlags t
-    ]
 
 --------------------------------------------------------------------------------
 

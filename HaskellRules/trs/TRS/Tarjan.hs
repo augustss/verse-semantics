@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module TRS.Tarjan where
 
 import qualified Data.Map as M
@@ -15,36 +16,42 @@ import Epic.List(takeUntil, dropUntil)
 -- reimplemented from
 -- https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
 
-tarjan :: Ord a => (a -> [a]) -> a -> [[a]]
-tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
+type Fuel = Int
+type Kont a = Fuel -> Int -> M.Map a (Int,Int) -> S.Set a -> [a] -> Maybe [[a]]
+
+tarjan :: forall a . Ord a => Fuel -> (a -> [a]) -> a -> Maybe [[a]]
+tarjan afuel nexts x = strongc afuel 0 M.empty S.empty [] x (\ _ _ _ _ _ -> Just [])
  where
-  strongc !index state onStack stack v k =
-    visit (index+1 :: Int) (M.insert v (index,index) state) (S.insert v onStack) (v:stack) v (f v) k
+  strongc :: Fuel -> Int -> M.Map a (Int,Int) -> S.Set a -> [a] -> a -> Kont a -> Maybe [[a]]
+  strongc 0 _ _ _ _ _ _ = Nothing
+  strongc fuel !index state onStack stack v k =
+    visit (fuel-1) (index+1) (M.insert v (index,index) state) (S.insert v onStack) (v:stack) v (nexts v) k
   
-  visit !index state onStack stack v [] k =
+  visit :: Fuel -> Int -> M.Map a (Int,Int) -> S.Set a -> [a] -> a -> [a] -> Kont a -> Maybe [[a]]
+  visit !fuel !index state onStack stack v [] k =
     if vindex == vlowlink then
       let xs = takeUntil (v==) stack in
-        xs : k index state (foldr S.delete onStack xs) (dropUntil (v==) stack)
+        (xs :) <$> k fuel index state (foldr S.delete onStack xs) (dropUntil (v==) stack)
     else
-      k index state onStack stack
+      k fuel index state onStack stack
    where
     (vindex, vlowlink) = state!v
 
-  visit index state onStack stack v (w:ws) k =
+  visit fuel index state onStack stack v (w:ws) k =
     case M.lookup w state of
       Nothing ->
-        strongc index state onStack stack w $
-          \index' state' onStack' stack' ->
+        strongc fuel index state onStack stack w $
+          \ fuel' index' state' onStack' stack' ->
             let (vindex, vlowlink) = state' ! v
                 (_windex, wlowlink) = state' ! w
-             in visit index' (M.insert v (vindex, vlowlink `min` wlowlink) state')
+             in visit fuel' index' (M.insert v (vindex, vlowlink `min` wlowlink) state')
                       onStack' stack' v ws k
 
       Just (windex, _wlowlink) ->
         if w `S.member` onStack then
-          visit index (M.insert v (vindex, vlowlink `min` windex) state) onStack stack v ws k
+          visit fuel index (M.insert v (vindex, vlowlink `min` windex) state) onStack stack v ws k
         else
-          visit index state onStack stack v ws k
+          visit fuel index state onStack stack v ws k
        where
         (vindex, vlowlink) = state ! v
 

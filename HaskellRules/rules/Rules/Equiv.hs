@@ -1,4 +1,5 @@
-module Rules.Equiv(equiv) where
+module Rules.Equiv(equiv, norm) where
+import Data.Maybe
 import Rules.Core
 import TRS.TRS( step )
 import TRS.Tarjan
@@ -11,10 +12,11 @@ equiv :: TRSystem Expr -> Expr -> Expr -> Bool
 equiv sys e1 e2 = normalForm sys e1 == normalForm sys e2
 
 normalForm :: TRSystem Expr -> Expr -> Expr
-normalForm sys e = term $ norm sys $ start e
+normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out: " ++ show e) $ norm sys $ start e
 
-norm :: TRSystem Expr -> Traced Expr -> Traced Expr
-norm sys = minimum . head . tarjan tstep
+-- Normalize an expression.  Return Nothing if the normalization times out.
+norm :: TRSystem Expr -> Traced Expr -> Maybe (Traced Expr)
+norm sys tre = minimum . head <$> tarjan (tfNormSteps (ruleEnv sys)) tstep tre
  where
   tstep (t :<-- tr) =
     [ t' :<-- ((n,t):tr)

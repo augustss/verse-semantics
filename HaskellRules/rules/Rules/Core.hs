@@ -76,7 +76,7 @@ instance Show Expr where
   showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
-  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString "." . showsPrec 0 a
+  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString ". " . showsPrec 0 a
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
@@ -256,7 +256,8 @@ data DerefPos
   deriving (Eq, Ord, Show)
 
 defaultTRSFlags :: TRSFlags
-defaultTRSFlags = TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False, tfUseWFEqVar = False }
+defaultTRSFlags =
+  TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False, tfUseWFEqVar = False, tfNormSteps = 10000 }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
@@ -264,6 +265,7 @@ instance Rec Expr where
     , tfDerefPos    :: !DerefPos -- where derefH is substituting
     , tfUseTilde    :: !Bool     -- use x~y expressions
     , tfUseWFEqVar  :: !Bool     -- Use WF-Eq with flipped arguments, i.e., y=x
+    , tfNormSteps   :: !Int      -- Maximum normalization steps
     }
   rec r s ae =
     r s ae ++
