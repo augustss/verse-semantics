@@ -673,6 +673,11 @@ rulesElimDead _ lhs =
   "ELIM-DEAD" `name`
   do e@Def{} <- [lhs]
      elimDead e
+ <>
+  "ELIM-DEAD-U" `name`
+  do DEF x e <- [lhs]
+     guard (x `notElem` free e)
+     pure e
 
 -- ELIM-DEF together with the structural SWAP rules
 -- is able to remove all unused bindings.
@@ -712,6 +717,7 @@ elimDead ee =
 simpleCst :: [Ident] -> [(Ident, Ident)] -> [(Ident, Expr)] -> Expr -> [Expr]
 simpleCst xs ts bs expr = do
   let (lbs, nlbs) = partition ((`elem` xs) . fst) bs
+  guard (not (anySame xs))
   guard (not (anySame (map fst lbs)))
   guard (all (isVal . snd) lbs)
   let roots = free (nlbs, expr)
