@@ -47,6 +47,7 @@ data TestFlags = TestFlags
   , allRules  :: !Bool                -- test with all rule systems
   , onlyTest  :: !(Maybe String)      -- run only this test
   , testExpr  :: !(Maybe String)      -- use this expression as a test
+  , maxSteps  :: !Int                 -- max number of rewrite steps
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -374,6 +375,12 @@ testFlags = TestFlags
          ( long "expr"
         <> metavar "EXPR"
         <> help "Use EXPR as a test" ))
+  <*> option auto
+         ( long "max-steps"
+        <> short 'm'
+        <> metavar "NUM"
+        <> value 100
+        <> help "Maximum number of rewrite steps" )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -382,7 +389,8 @@ testFlagsToFlags t =
                 fRewrite = not (eval t),
                 fTrace = trace t,
                 fDfs = dfs t, fFinalInline = finalInl t,
-                fUnderLambda = not (noUnderLam t)
+                fUnderLambda = not (noUnderLam t),
+                fRewriteSteps = maxSteps t
                 }
 main :: IO ()
 main = do
