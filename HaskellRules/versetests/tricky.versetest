@@ -47,3 +47,5 @@ testceq("Koen5a", SEq){ exists y . (\x.x = (exists z . <0>); x = y; <>) }
 # Do we expect confluence of | that is not under a one/all?
 testceq("QC2", SEq)  { (<> | <>) = (<> = <>) }
                      { <> | <> }
+testceq("QC3", SEq)  { <0(add) = <>> }
+                     { <0(add) = <>> }
