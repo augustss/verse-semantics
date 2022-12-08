@@ -5,6 +5,7 @@ module Epic.List(
   pick, pickLR,
   pattern Snoc,
   nub,
+  takeUntil, dropUntil,
   ) where
 import qualified Data.Set as S
 import Data.List(inits, tails)
@@ -50,4 +51,16 @@ nub = go S.empty
   go seen (x:xs)
     | x `S.member` seen = go seen xs
     | otherwise         = x : go (S.insert x seen) xs
+
+---------
+
+takeUntil :: (a -> Bool) -> [a] -> [a]
+takeUntil _ []                 = []
+takeUntil p (x:xs) | p x       = [x]
+                   | otherwise = x : takeUntil p xs
+
+dropUntil :: (a -> Bool) -> [a] -> [a]
+dropUntil _ []                 = []
+dropUntil p (x:xs) | p x       = xs
+                   | otherwise = dropUntil p xs
 
