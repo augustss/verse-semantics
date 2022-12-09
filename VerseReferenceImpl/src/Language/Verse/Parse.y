@@ -100,6 +100,7 @@ import Language.Verse.Token qualified as Token
   int { (int -> Just $$) }
   float { (float -> Just $$) }
   name { (name -> Just $$) }
+  isInt { L _ Token.IsInt }
 
 %%
 
@@ -156,6 +157,7 @@ Exp :: { L (Exp L Name) }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | name { Exp.Name <\$> $1 }
+  | isInt '(' Exp ')' { Exp.IsInt <\$ $1 <.> duplicate $3 }
 
 If
   : if Block {

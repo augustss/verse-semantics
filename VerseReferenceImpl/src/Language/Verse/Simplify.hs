@@ -121,6 +121,8 @@ simplify' e = for e $ \ case
     x' <- freshIdent
     let e2' = Exists (x' <$ e) <$> duplicate (Name x' <$ e)
     pure $ Invoke e1' e2'
+  Desugar.IsInt e ->
+    IsInt <$> simplify' e
 
 newIdent :: MonadSupply Word m => a -> m (Ident a)
 newIdent x = Ident <$> supply <*> pure (Just x)

@@ -179,6 +179,10 @@ eval' e = case extract e of
   Exp.Name x -> lookupName x >>= \ case
     Nothing -> throwError $ IdentError (loc e) x
     Just var -> pure var
+  Exp.IsInt e -> do
+    var <- eval' e
+    isInt var
+    
 
 liftOrd :: (MonadError Error m, MonadVerse m) =>
            Loc ->
@@ -272,6 +276,18 @@ div' loc var_x var_y = do
       (Val.Rational x, Val.Rational y) ->
         newVar $ Val.Rational $ x / y
       _ -> throwDomainError loc
+  pure var
+
+isInt :: (MonadError Error m, MonadVerse m) =>
+         Var m Val -> m (Var m Val)
+isInt var_x = do
+  var <- freshVar
+  whenBound var_x $ \ val_x -> 
+    unify var =<< case val_x of
+      Val.Int _ ->
+        pure var_x
+      _ ->
+        empty
   pure var
 
 lookupName :: Monad m => Ident Name -> EvalT m (Maybe (Var m Val))

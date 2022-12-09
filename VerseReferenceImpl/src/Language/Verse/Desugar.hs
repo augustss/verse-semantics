@@ -114,6 +114,8 @@ desugar' e = for e $ \ case
     tellName x
     e <- desugar' e
     pure $ (Name <$> x) :=: e
+  Parse.IsInt e ->
+    IsInt <$> desugar' e
 
 tellName :: L Name -> Desugar ()
 tellName x = do
