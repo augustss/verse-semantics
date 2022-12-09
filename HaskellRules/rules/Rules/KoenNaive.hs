@@ -19,12 +19,12 @@ systemKoen = TRSystem
   { sname               = "Koen"
   , description         = "Koen's very naive rules"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = check validE . expr
-  , postProcess         = id
+  , preProcess          = const (check validE . expr)
+  , postProcess         = const id
   , rules               = allRules
   , rulesHaveStructural = True
   , confluenceRules     = \_ _ -> []
-  , validExpr           = validE
+  , validExpr           = const validE
   }
 
 -- Turn an expression into the subset of the Koen grammar

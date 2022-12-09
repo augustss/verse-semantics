@@ -25,39 +25,27 @@ systemPLDI = TRSystem
   { sname               = "PLDI"
   , description         = "PLDI submission (ELIM-DEF without structural)"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = check validE . anf
-  , postProcess         = finalSubst
+  , preProcess          = const (check validE . anf)
+  , postProcess         = const finalSubst
   , rules               = allRules <> rulesDerefS <> rulesElimExi
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
-  , validExpr           = validE
+  , validExpr           = const validE
   }
 
 systemPLDIG :: TRSystem Expr
 -- PLDI without garbage collection
-systemPLDIG = TRSystem
+systemPLDIG = systemPLDI
   { sname               = "PLDIG"
   , description         = "PLDI submission - ELIM-DEF"
-  , ruleEnv             = defaultTRSFlags
-  , preProcess          = check validE . anf
-  , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS
-  , rulesHaveStructural = False
-  , confluenceRules     = rulesStructural
-  , validExpr           = validE
   }
 
 systemPLDIS :: TRSystem Expr
-systemPLDIS = TRSystem
+systemPLDIS = systemPLDI
   { sname               = "PLDIS"
   , description         = "PLDI submission - DEREF-S + DEREF-K + SUBST-S + SWAP-S + ELIM-DEAD"
-  , ruleEnv             = defaultTRSFlags
-  , preProcess          = check validE . anf
-  , postProcess         = finalSubst
   , rules               = allRules <> rulesS <> rulesElimExi <> rulesElimDead
-  , rulesHaveStructural = False
-  , confluenceRules     = rulesStructural
-  , validExpr           = validE
   }
 
 {-
@@ -76,20 +64,15 @@ systemPLDIA = TRSystem
 -}
 
 systemPLDIT :: TRSystem Expr
-systemPLDIT = TRSystem
+systemPLDIT = systemPLDI
   { sname               = "PLDIT"
   , description         = "PLDI submission, with ~"
   , ruleEnv             = defaultTRSFlags{ tfUseTilde = True, tfDerefPos = ConsumedOrBarrEq, tfUseWFEqVar = True }
-  , preProcess          = check validE . anf
-  , postProcess         = finalSubst
   , rules               = allRules <> rulesDerefS <> rulesDerefT <> rulesNormTilde
                          -- <> rulesElimDef
                           <> rulesElimDead
                           <> rulesElimAlias
                           <> rulesDerefHLast
-  , rulesHaveStructural = False
-  , confluenceRules     = rulesStructural
-  , validExpr           = validE
   }
 
 -- Check that an expression is in the subset defined by the PLDI grammar.

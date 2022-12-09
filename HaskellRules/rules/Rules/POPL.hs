@@ -20,12 +20,12 @@ systemPOPL = TRSystem
   { sname               = "POPL"
   , description         = "POPL submission"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = check valid . anf
-  , postProcess         = id
+  , preProcess          = const (check valid . anf)
+  , postProcess         = const id
   , rules               = allRules
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
-  , validExpr           = valid
+  , validExpr           = const valid
   }
 
 systemPOPLV :: TRSystem Expr
