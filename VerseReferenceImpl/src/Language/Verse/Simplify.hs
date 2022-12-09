@@ -55,6 +55,14 @@ simplify' e = for e $ \ case
     (:*>:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:=:) e1 e2 ->
     (:=:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:<:) e1 e2 ->
+    (:<:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:<=:) e1 e2 ->
+    (:<=:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:>:) e1 e2 ->
+    (:>:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:>=:) e1 e2 ->
+    (:>=:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:|:) e1 e2 ->
     (:|:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:+:) e1 e2 ->

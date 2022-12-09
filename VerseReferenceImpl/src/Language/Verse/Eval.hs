@@ -28,7 +28,18 @@ import Data.Traversable (for)
 
 import Language.Verse.Error
 import Language.Verse.Ident
-import Language.Verse.Simplify.Exp (Exp ((:*>:), (:=:), (:|:), (:+:), (:-:), (:*:), (:/:)))
+import Language.Verse.Simplify.Exp (Exp ( (:*>:)
+                                        , (:=:)
+                                        , (:<:)
+                                        , (:<=:)
+                                        , (:>:)
+                                        , (:>=:)
+                                        , (:|:)
+                                        , (:+:)
+                                        , (:-:)
+                                        , (:*:)
+                                        , (:/:)
+                                        ))
 import Language.Verse.Simplify.Exp qualified as Exp
 import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
@@ -62,6 +73,22 @@ eval' e = case extract e of
     var2 <- eval' e2
     unify var1 var2
     pure var1
+  e1 :<: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    liftOrd (loc e) (<) var1 var2
+  e1 :<=: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    liftOrd (loc e) (<=) var1 var2
+  e1 :>: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    liftOrd (loc e) (>) var1 var2
+  e1 :>=: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    liftOrd (loc e) (>=) var1 var2
   e1 :|: e2 ->
     eval' e1 <|> eval' e2
   e1 :+: e2 -> do
@@ -153,6 +180,39 @@ eval' e = case extract e of
     Nothing -> throwError $ IdentError (loc e) x
     Just var -> pure var
 
+liftOrd :: (MonadError Error m, MonadVerse m) =>
+           Loc ->
+           (forall a . Ord a => a -> a -> Bool) ->
+           Var m Val -> Var m Val -> m (Var m Val)
+liftOrd loc f var_x var_y = do
+  var <- freshVar
+  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+    unify var =<< case (val_x, val_y) of
+      (Val.Int x, Val.Int y) ->
+        newBool var_x $ f x y
+      (Val.Int x, Val.Float y) ->
+        newBool var_x $ f (fromInteger x) y
+      (Val.Int x, Val.Rational y) ->
+        newBool var_x $ f (fromInteger x) y
+      (Val.Float x, Val.Int y) ->
+        newBool var_x $ f x (fromInteger y)
+      (Val.Float x, Val.Float y) ->
+        newBool var_x $ f x y
+      (Val.Float x, Val.Rational y) ->
+        newBool var_x $ f (toRational x) y
+      (Val.Rational x, Val.Int y) ->
+        newBool var_x $ f x (fromInteger y)
+      (Val.Rational x, Val.Float y) ->
+        newBool var_x $ f x (toRational y)
+      (Val.Rational x, Val.Rational y) ->
+        newBool var_x $ f x y
+      _ -> throwDomainError loc
+  pure var
+  where
+    newBool var = \ case
+      False -> empty
+      True -> pure var
+
 liftNum :: (MonadError Error m, MonadVerse m) =>
            Loc ->
            (forall a . Num a => a -> a -> a) ->
@@ -190,7 +250,7 @@ div' loc var_x var_y = do
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     unify var =<< case (val_x, val_y) of
       (Val.Int _, Val.Int 0) ->
-        throwDivideByZeroError loc
+        empty
       (Val.Int x, Val.Int y) ->
         newVar $ Val.Rational $ x % y
       (Val.Int x, Val.Float y) ->
@@ -208,7 +268,7 @@ div' loc var_x var_y = do
       (Val.Rational x, Val.Float y) ->
         newVar $ Val.Float $ fromRational $ x / toRational y
       (Val.Rational _, Val.Rational 0) ->
-        throwDivideByZeroError loc
+        empty
       (Val.Rational x, Val.Rational y) ->
         newVar $ Val.Rational $ x / y
       _ -> throwDomainError loc
@@ -222,9 +282,6 @@ localName x = local . HashMap.insert x
 
 localNames :: Monad m => Env m -> EvalT m a -> EvalT m a
 localNames = local . (<>)
-
-throwDivideByZeroError :: MonadError Error m => Loc -> m a
-throwDivideByZeroError = throwError . DivideByZeroError
 
 throwDomainError :: MonadError Error m => Loc -> m a
 throwDomainError = throwError . DomainError

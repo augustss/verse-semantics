@@ -21,7 +21,6 @@ data Error
   | NameError !Loc !Name
   | IdentError !Loc !(Ident Name)
   | DomainError !Loc
-  | DivideByZeroError !Loc
   | UnboundError deriving Show
 
 instance Pretty Error where
@@ -45,8 +44,6 @@ instance Pretty Error where
       varNotInScope x y
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "value"
-    DivideByZeroError x ->
-      pretty x <> colon <+> "divide" <+> "by" <+> "zero"
     UnboundError ->
       "unbound" <+> "variable"
     where

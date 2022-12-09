@@ -23,9 +23,14 @@ data Token
   | Colon
   | Comma
   | Dot
-  | Equals
+  | Equal
+  | NotEqual
+  | Less
+  | LessEqual
+  | Greater
+  | GreaterEqual
   | Pipe
-  | ColonEquals
+  | ColonEqual
   | ThinArrow
   | FatArrow
   | QuestionMark
@@ -69,9 +74,14 @@ instance Pretty Token where
     Colon -> colon
     Comma -> comma
     Dot -> dot
-    Equals -> equals
+    Equal -> equals
+    NotEqual -> "<>"
+    Less -> pretty '<'
+    LessEqual -> "<="
+    Greater -> pretty '>'
+    GreaterEqual -> ">="
     Pipe -> pipe
-    ColonEquals -> colon <> equals
+    ColonEqual -> colon <> equals
     ThinArrow -> pretty '-' <> rangle
     FatArrow -> equals <> rangle
     QuestionMark -> pretty '?'

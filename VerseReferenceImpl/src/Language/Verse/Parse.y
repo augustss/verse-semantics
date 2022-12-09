@@ -11,7 +11,19 @@ import Control.Comonad
 import Data.Functor
 import Data.Functor.Apply
 
-import Language.Verse.Parse.Exp (Exp ((:*>:), (:=:), (:|:), (:+:), (:-:), (:*:), (:/:)))
+import Language.Verse.Parse.Exp (Exp ( (:*>:)
+                                     , (:=:)
+                                     , (:<>:)
+                                     , (:<:)
+                                     , (:<=:)
+                                     , (:>:)
+                                     , (:>=:)
+                                     , (:|:)
+                                     , (:+:)
+                                     , (:-:)
+                                     , (:*:)
+                                     , (:/:)
+                                     ))
 import Language.Verse.Parse.Exp qualified as Exp
 import Language.Verse.Lexer (Lexer)
 import Language.Verse.Lexer qualified as Lexer
@@ -29,13 +41,18 @@ import Language.Verse.Token qualified as Token
 %lexer { lexer } { L _ Token.EOF }
 %error { uncurryL Lexer.throwError }
 
+%nonassoc IF
+%left ';' newline
+%left ','
 %left '=' ':='
+%nonassoc '<>'
+%nonassoc '<' '<=' '>' '>='
+%nonassoc not
+%left '|'
 %left '+' '-'
 %left '*' '/'
-%right '|'
-%right not
-%left '?'
-%right ':'
+%nonassoc '?'
+%nonassoc ':'
 %left '('
 
 %token
@@ -48,10 +65,15 @@ import Language.Verse.Token qualified as Token
   ';' { L _ Token.Semi }
   newline { L _ Token.Newline }
   ':' { L _ Token.Colon }
-  ':=' { L _ Token.ColonEquals }
+  ':=' { L _ Token.ColonEqual }
   ',' { L _ Token.Comma }
   '.' { L _ Token.Dot }
-  '=' { L _ Token.Equals }
+  '=' { L _ Token.Equal }
+  '<>' { L _ Token.NotEqual }
+  '<' { L _ Token.Less }
+  '<=' { L _ Token.LessEqual }
+  '>' { L _ Token.Greater }
+  '>=' { L _ Token.GreaterEqual }
   '|' { L _ Token.Pipe }
   '->' { L _ Token.ThinArrow }
   '=>' { L _ Token.FatArrow }
@@ -82,75 +104,95 @@ import Language.Verse.Token qualified as Token
 %%
 
 List
-  : Scan Exp1 { $2 }
-  | Scan exists name '.' List { Exp.Exists <\$> duplicate $3 <.> duplicate $5 }
+  : Scan exists name '.' List { Exp.Exists <\$> duplicate $3 <.> duplicate $5 }
   | Scan lambda name '.' List { Exp.Lambda <\$> duplicate $3 <.> duplicate $5 }
-  | Scan Exp1 Separator { $2 <. $3 }
-  | Scan Exp1 Separator List { (:*>:) <\$> duplicate $2 <.> duplicate $4 }
+  | Scan MaybeCommas { $2 }
+  | Scan MaybeCommas Separator { $2 <. $3 }
+  | Scan MaybeCommas Separator List { (:*>:) <\$> duplicate $2 <.> duplicate $4 }
 
 Separator
   : ';' { $1 }
   | newline { $1 }
 
-Exp1 :: { L (Exp L Name) }
-  : Exp2 { Exp.Tuple . reverse <\$> $1 }
-  | Exp3 { $1 }
+MaybeCommas :: { L (Exp L Name) }
+  : Commas { Exp.Tuple . reverse <\$> $1 }
+  | Exp { $1 }
 
-Exp2 :: { L [L (Exp L Name)] }
-  : Exp3 ',' Exp3 { (\ x y -> [x, y]) <\$> duplicate $3 <.> duplicate $1 }
-  | Exp2 ',' Exp3 { (:) <\$> duplicate $3 <.> $1 }
+Commas :: { L [L (Exp L Name)] }
+  : Exp ',' Exp { (\ x y -> [x, y]) <\$> duplicate $3 <.> duplicate $1 }
+  | Commas ',' Exp { (:) <\$> duplicate $3 <.> $1 }
 
-Exp3 :: { L (Exp L Name) }
+Exp :: { L (Exp L Name) }
   : '(' ')' { $1 \$> Exp.Tuple [] <. $2 }
   | '(' List ')' { $1 .> $2 <. $3 }
-  | Exp3 '=' Exp3 { (:=:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '=' BraceInd { (:=:) <\$> duplicate $1 <.> duplicate $3 }
-  | Exp3 '|' Scan Exp3 { (:|:) <\$> duplicate $1 <.> duplicate $4 }
-  | Exp3 '?' { Exp.Query <\$> duplicate $1 <. $2 }
-  | Exp3 '+' Scan Exp3 { (:+:) <\$> duplicate $1 <.> duplicate $4 }
-  | Exp3 '-' Scan Exp3 { (:-:) <\$> duplicate $1 <.> duplicate $4 }
-  | Exp3 '*' Scan Exp3 { (:*:) <\$> duplicate $1 <.> duplicate $4 }
-  | Exp3 '/' Scan Exp3 { (:/:) <\$> duplicate $1 <.> duplicate $4 }
-  | Exp3 '(' ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3) }
-  | Exp3 '(' List ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
+  | Exp '=' Exp { (:=:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '=' BraceInd { (:=:) <\$> duplicate $1 <.> duplicate $3 }
+  | name ':' Exp { Exp.InfixColon <\$> duplicate $1 <.> duplicate $3 }
+  | name ':=' Exp { Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '<>' Exp { (:<>:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '<' Exp { (:<:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '<=' Exp { (:<=:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '>' Exp { (:>:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '>=' Exp { (:>=:) <\$> duplicate $1 <.> duplicate $3 }
+  | Exp '|' Scan Exp { (:|:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp '+' Scan Exp { (:+:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp '-' Scan Exp { (:-:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp '*' Scan Exp { (:*:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp '/' Scan Exp { (:/:) <\$> duplicate $1 <.> duplicate $4 }
+  | Exp '?' { Exp.Query <\$> duplicate $1 <. $2 }
+  | ':' Exp { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
+  | Exp '(' ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3) }
+  | Exp '(' List ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
   | truth '{' List '}' { Exp.Truth <\$ $1 <.> duplicate $3 <. $4 }
   | false { Exp.False <\$ $1 }
   | true { Exp.True <\$ $1 }
   | fail { Exp.Fail <\$ $1 }
   | one Block { Exp.One <\$ $1 <.> duplicate $2 }
   | all Block { Exp.All <\$ $1 <.> duplicate $2 }
-  | not Exp3 { Exp.Not <\$ $1 <.> duplicate $2 }
-  | if Block {
-      Exp.If <\$ $1 <.> duplicate $2
-    }
-  | if '(' List ')' Block {
-      Exp.IfThen <\$ $1 <.> duplicate $3 <.> duplicate $5
-    }
-  | if Block then Block {
-      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $4
-    }
-  | if '(' List ')' Block else Block {
-      Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $5 <.> duplicate $7
-    }
-  | if Block then Block else Block {
-      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $4 <.> duplicate $6
-    }
-  | for Block {
-      Exp.For <\$ $1 <.> duplicate $2
-    }
-  | for '(' List ')' Block {
-      Exp.ForDo <\$ $1 <.> duplicate $3 <.> duplicate $5
-    }
-  | for Block do Block {
-      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
-    }
+  | not Exp { Exp.Not <\$ $1 <.> duplicate $2 }
+  | If { $1 }
+  | For { $1 }
   | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | name { Exp.Name <\$> $1 }
-  | ':' Exp3 { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
-  | name ':' Exp3 { Exp.InfixColon <\$> duplicate $1 <.> duplicate $3 }
-  | name ':=' Exp3 { Exp.InfixColonEquals <\$> duplicate $1 <.> duplicate $3 }
+
+If
+  : if Block {
+      Exp.If <\$ $1 <.> duplicate $2
+    }
+  | if Paren Block {
+      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
+  | if Block Then {
+      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
+  | if Paren Block Else {
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
+    }
+  | if Block Then Else {
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
+    }
+
+Then
+  : then Block { $1 .> $2 }
+
+Else
+  : else Block { $1 .> $2 }
+
+For
+  : for Block {
+      Exp.For <\$ $1 <.> duplicate $2
+    }
+  | for Paren Block {
+      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
+  | for Block do Block {
+      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+
+Paren
+  : '(' List ')' { $1 .> $2 <. $3 }
 
 BraceInd
   : Brace { $1 }
