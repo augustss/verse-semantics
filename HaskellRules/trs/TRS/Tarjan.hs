@@ -5,6 +5,8 @@ import qualified Data.Map as M
 import Data.Map( (!) )
 import qualified Data.Set as S
 
+import Epic.List(takeUntil, dropUntil)
+
 -----------------------------------------------------------------------------------
 
 -- Tarjans SCC algorithm, it's lazy in the graph, so you can use it just find the
@@ -46,20 +48,6 @@ tarjan f x = strongc 0 M.empty S.empty [] x (\_ _ _ _ -> [])
        where
         (vindex, vlowlink) = state ! v
 
------------------------------------------------------------------------------------
--- Grrr... I wish these were standard functions. like takeWhile/dropWhile, but 1 step more
-
-takeUntil :: (a -> Bool) -> [a] -> [a]
-takeUntil _ []                 = []
-takeUntil p (x:xs) | p x       = [x]
-                   | otherwise = x : takeUntil p xs
-
-dropUntil :: (a -> Bool) -> [a] -> [a]
-dropUntil _ []                 = []
-dropUntil p (x:xs) | p x       = xs
-                   | otherwise = dropUntil p xs
-
------------------------------------------------------------------------------------
 
 {-
 main = print $ head $ tarjan f 1

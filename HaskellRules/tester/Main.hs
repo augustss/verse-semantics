@@ -47,6 +47,7 @@ data TestFlags = TestFlags
   , allRules  :: !Bool                -- test with all rule systems
   , onlyTest  :: !(Maybe String)      -- run only this test
   , testExpr  :: !(Maybe String)      -- use this expression as a test
+  , maxSteps  :: !Int                 -- max number of rewrite steps
   , fileNames :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -148,17 +149,20 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
   let vs1 = runM flg sys c1  -- May return multiple answers
   let v2  = run flg sys c2   -- Returns just one
 
-  case vs1 of
-    [] -> pure None
-    vs@(_:_:_) -> do
-      when (not (noError tflg)) $ do
-        putStrLn $ pos ++ " the expression evaluated to multiple values:"
-        mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
-        putStrLn ""
-      pure Many
-    [v1] ->
-     catch
-      ( if (equivValue sys v1 v2) == expectOK
+  catch (
+    case vs1 of
+      [] -> do
+        when (not (noError tflg)) $ do
+          putStrLn $ pos ++ " max rewrite steps exceeded"
+        pure None
+      vs@(_:_:_) -> do
+        when (not (noError tflg)) $ do
+          putStrLn $ pos ++ " the expression evaluated to multiple values:"
+          mapM_ (putStrLn . (++ "-----") . unlines . map ("   " ++) . lines . prettyShow) vs
+          putStrLn ""
+        pure Many
+      [v1] ->
+       if (equivValue sys v1 v2) == expectOK
         then do
             when noisy $
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
@@ -371,6 +375,12 @@ testFlags = TestFlags
          ( long "expr"
         <> metavar "EXPR"
         <> help "Use EXPR as a test" ))
+  <*> option auto
+         ( long "max-steps"
+        <> short 'm'
+        <> metavar "NUM"
+        <> value 100
+        <> help "Maximum number of rewrite steps" )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -379,7 +389,8 @@ testFlagsToFlags t =
                 fRewrite = not (eval t),
                 fTrace = trace t,
                 fDfs = dfs t, fFinalInline = finalInl t,
-                fUnderLambda = not (noUnderLam t)
+                fUnderLambda = not (noUnderLam t),
+                fRewriteSteps = maxSteps t
                 }
 main :: IO ()
 main = do

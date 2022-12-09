@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-matches -Wno-name-shadowing #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.KoenNaive(allSystemsKoen) where
@@ -29,7 +30,7 @@ systemKoen = TRSystem
 -- Turn an expression into the subset of the Koen grammar
 expr :: Expr -> Expr
 expr (e1 :|: e2)      = expr e1 :|: expr e2
-expr (Def (Bind x e)) = Def (Bind x (expr e))
+expr (Exi (Bind x e)) = Exi (Bind x (expr e))
 expr (One e)          = One (expr e)
 expr (All e)          = All (expr e)
 expr (Split a b c)    = Split (expr a) (expr b) (expr c)
@@ -39,7 +40,7 @@ defseq :: Expr -> Expr
 defseq (Var x)          = Var x
 defseq (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
 defseq (e1 :>: e2)      = letExpr (expr e1) (\_ -> defseq e2)
-defseq (Def (Bind x e)) = Def (Bind x (defseq e))
+defseq (Exi (Bind x e)) = Exi (Bind x (defseq e))
 defseq (Arr es)         = letExprs (map expr es) (\xs -> letExpr (Arr xs) id)
 defseq (fe :@: e)       = letExprs [expr fe,expr e] (\[f,x] -> letExpr (f :@: x) id)
 defseq (Lam (Bind x e)) = letExpr (Lam (Bind x (expr e))) id
@@ -48,7 +49,7 @@ defseq e                = letExpr e id
 letExpr :: Expr -> (Expr -> Expr) -> Expr
 letExpr e@(Var _)     f = f e
 letExpr (Var x :=: e) f = (Var x :=: e) :>: f (Var x)
-letExpr e             f = Def (Bind x ((Var x :=: e) :>: f (Var x)))
+letExpr e             f = Exi (Bind x ((Var x :=: e) :>: f (Var x)))
  where
   fx0 = f (Var (ident ""))
   x   = identNotIn (free fx0)
@@ -65,7 +66,7 @@ validE = ok
  where
   ok (Arr xs)         = all isVar xs
   ok (Lam (Bind _ e)) = ok e
-  ok (Def (Bind _ e)) = ok e
+  ok (Exi (Bind _ e)) = ok e
   ok (_ :=: _)        = False
   ok (e1 :>: e2)      = eq e1 && sequ e2
   ok (f :@: x)        = isVar f && isVar x
@@ -78,7 +79,7 @@ validE = ok
   eq _         = False
   
   sequ (e1 :>: e2)      = eq e1 && sequ e2
-  sequ (Def (Bind _ e)) = sequ e
+  sequ (Exi (Bind _ e)) = sequ e
   sequ (Var _)          = True
   sequ _                = False
   
@@ -116,8 +117,8 @@ rulesStructural _ lhs =
      pure ((Var x :=: Var y) :>: (Var y :=: e) :>: r)
  ++
   "STRUCT-VAR-VAR-SWAP" `name`
-  do Def (Bind x (Def (Bind y e))) <- [lhs]
-     pure (Def (Bind y (Def (Bind x e))))
+  do Exi (Bind x (Exi (Bind y e))) <- [lhs]
+     pure (Exi (Bind y (Exi (Bind x e))))
 
 --------------------------------------------------------------------------------
 
@@ -201,14 +202,14 @@ rulesEquality _ lhs =
      pure ((y :=: e) :>: (x :=: r1) :>: r2)
  ++
   "EQ-EXISTS" `name`
-  do (Var x :=: Def bnd) :>: r <- [lhs]
+  do (Var x :=: Exi bnd) :>: r <- [lhs]
      let Bind y e = alphaRename (x:free r) bnd
-     pure (Def (Bind y ((Var x :=: e) :>: r)))
+     pure (Exi (Bind y ((Var x :=: e) :>: r)))
  ++
   "SEQ-EXISTS" `name`
-  do x_eq_e1 :>: Def bnd <- [lhs]
+  do x_eq_e1 :>: Exi bnd <- [lhs]
      let Bind y e2 = alphaRename (free x_eq_e1) bnd
-     pure (Def (Bind y (x_eq_e1 :>: e2)))
+     pure (Exi (Bind y (x_eq_e1 :>: e2)))
  ++
   "EQ-FAIL" `name`
   do (_ :=: Fail) :>: r <- [lhs]
@@ -218,10 +219,10 @@ rulesEquality _ lhs =
   do x_eq_e1 :>: e2 <- [lhs]
      guard (isRelevant e2)
      let y = identNotIn (free e2)
-     pure (x_eq_e1 :>: Def (Bind y ((Var y :=: e2) :>: Var y)))
+     pure (x_eq_e1 :>: Exi (Bind y ((Var y :=: e2) :>: Var y)))
  where
   isRelevant (Var _)   = False
-  isRelevant (Def _)   = False
+  isRelevant (Exi _)   = False
   isRelevant (_ :=: _) = False
   isRelevant _         = True
 
@@ -242,8 +243,8 @@ rulesChoice _ lhs =
      pure e
  ++
   "EXISTS-CHOICE" `name`
-  do Def (Bind x (e1 :|: e2)) <- [lhs]
-     pure (Def (Bind x e1) :|: Def (Bind x e2))
+  do Exi (Bind x (e1 :|: e2)) <- [lhs]
+     pure (Exi (Bind x e1) :|: Exi (Bind x e2))
  ++
   "CHOICE-MOVE" `name`
   do (Var x :=: e) :>: (Var y :=: (e1 :|: e2)) :>: e3 <- [lhs]
@@ -275,7 +276,7 @@ choiceContext lhs =
      defns (:|: e2) e1 ++ defns (e1 :|:) e2
  where
   defns ctx e = (ctx, e) : case e of
-                             Def (Bind x e) -> defns (ctx . Def . Bind x) e
+                             Exi (Bind x e) -> defns (ctx . Exi . Bind x) e
                              _              -> []
 
 --------------------------------------------------------------------------------
@@ -286,14 +287,14 @@ rulesApplication _ lhs =
   do (f :=: Lam bnd) :>: (y :=: (f' :@: v)) :>: r <- [lhs]
      guard (f == f')
      let Bind x e = alphaRename (free (y, (f, (v, r)))) bnd
-     pure ((f :=: Lam bnd) :>: Def (Bind x ((Var x :=: v) :>: (y :=: e) :>: r)))
+     pure ((f :=: Lam bnd) :>: Exi (Bind x ((Var x :=: v) :>: (y :=: e) :>: r)))
  ++
   "APP-ARRAY" `name`
   do (a :=: Arr xs) :>: (y :=: (a' :@: v)) :>: r <- [lhs]
      guard (a == a')
      let i = identNotIn (free (a, (xs, (y, (v, r)))))
      pure ( (a :=: Arr xs)
-        :>: Def (Bind i ( (Var i :=: v)
+        :>: Exi (Bind i ( (Var i :=: v)
                       :>: (y :=: foldr
                                  (\(x,j) e -> ((Var i :=: Int j) :>: x) :|: e)
                                  Fail
@@ -307,12 +308,12 @@ rulesApplication _ lhs =
 rulesGarbageCollect :: ERule
 rulesGarbageCollect _ lhs =
   "VAR-UNUSED" `name`
-  do Def (Bind x e) <- [lhs]
+  do Exi (Bind x e) <- [lhs]
      guard (x `notElem` free e)
      pure e
  ++
   "VAR-DEF-UNUSED" `name`
-  do Def (Bind x ((Var x' :=: Val v) :>: r)) <- [lhs]
+  do Exi (Bind x ((Var x' :=: Val v) :>: r)) <- [lhs]
      guard (x == x' && x `notElem` free v)
      let (ys,r') = takeXEqs x r
      guard (x `notElem` free r')

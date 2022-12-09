@@ -45,7 +45,7 @@ valid = expr
     expr (e1 :>: e2) = expr e1 && expr e2
     expr (e1 :|: e2) = expr e1 && expr e2
     expr (e1 :@: e2) = value e1 && value e2
-    expr (Def (Bind _ e)) = expr e
+    expr (Exi (Bind _ e)) = expr e
     expr (One e) = expr e
     expr (All e) = expr e
     expr Fail = True
@@ -81,7 +81,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (v1 :@: v2)
-    expr (Def (Bind i e)) = Def (Bind i (expr e))
+    expr (Exi (Bind i e)) = Exi (Bind i (expr e))
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
     expr e@Fail = e
@@ -107,7 +107,7 @@ anf = expr
       in  (ds, Arr vs)
     binds :: [(Ident, Expr)] -> Expr -> Expr
     binds [] b = b
-    binds ((i,e):ds) b = DEF i $ (Var i :=: e) :>: binds ds b
+    binds ((i,e):ds) b = EXI i $ (Var i :=: e) :>: binds ds b
 
 --------------------------------------------------------------------------------
 
@@ -164,10 +164,10 @@ defX :: Ident -> Expr -> [(Context, Expr)]
 defX xx lhs =
   do execX lhs
  ++
-  do Def (Bind x dx) <- [lhs]
+  do Exi (Bind x dx) <- [lhs]
      guard (x /= xx)
      (ctx, hole) <- defX xx dx
-     return (Def . Bind x . ctx, hole)
+     return (Exi . Bind x . ctx, hole)
 
 -- choice contexts
 
@@ -194,9 +194,9 @@ choiceX1 lhs =
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)
  ++
-  do Def (Bind x cx) <- [lhs]
+  do Exi (Bind x cx) <- [lhs]
      (ctx, hole) <- choiceX cx
-     pure (Def . Bind x . ctx, hole) -- hopefully this is sound!
+     pure (Exi . Bind x . ctx, hole) -- hopefully this is sound!
 
 -- scope contexts
 -- SX context
@@ -322,7 +322,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: unit)) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x -> Def . Bind x) e vs
+defs vs e = foldr (\ x -> Exi . Bind x) e vs
 
 unit :: Value
 unit = Arr []
@@ -337,7 +337,7 @@ rulesApplication _ lhs =
   "APP-BETA" `name`
   do LAM x e :@: v <- [lhs]
      let freeV = free v
-         beta y b = DEF y ((Var y :=: Val v) :>: b)
+         beta y b = EXI y ((Var y :=: Val v) :>: b)
      if x `notElem` freeV then
        pure (beta x e)
       else do
@@ -425,10 +425,10 @@ rulesUnificationVariables _ lhs =
   do Var x :=: Val v <- [lhs]
      (ctx, LAM y e) <- valueX v
      guard (x `elem` free (LAM y e))
-     pure (Var x :=: Val (ctx (LAM y (Def (Bind x (lhs :>: e))))))
+     pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
  ++
   "DEF-ELIML" `name`
-  do Def (Bind x a) <- [lhs]
+  do Exi (Bind x a) <- [lhs]
      (ctx, Var x' :=: Val v) <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
@@ -437,8 +437,8 @@ rulesUnificationVariables _ lhs =
      guard (x `notElem` freeV)
      pure (ctx (Val v))
  ++
-  "DEF-ELIMR" `name`
-  do Def (Bind x a) <- [lhs]
+  "EXI-ELIMR" `name`
+  do Exi (Bind x a) <- [lhs]
      (ctx, Val v :=: Var x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
@@ -452,19 +452,19 @@ rulesUnificationVariables _ lhs =
      pure (Var x :=: Val hnf)
  ++
   "DEF-FLOAT" `name`
-  do (ctx, Def (Bind x e)) <- execX1 lhs
+  do (ctx, Exi (Bind x e)) <- execX1 lhs
      let freeX = free (ctx blob)
          x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
-       then pure (Def (Bind x' (ctx (subst [(x,Var x')] e))))
-       else pure (Def (Bind x (ctx e)))
+       then pure (Exi (Bind x' (ctx (subst [(x,Var x')] e))))
+       else pure (Exi (Bind x (ctx e)))
  where
   blob = Fail -- just something to plug the hole in the context so we can look at it
 
 rulesElimV :: ERule
 rulesElimV _ lhs =
   "DEF-ELIMV" `name`
-  do Def (Bind x a) <- [lhs]
+  do Exi (Bind x a) <- [lhs]
      (ctx, Var y :=: Var x') <- defX x a
      guard (x == x')
      guard (x /= y)
@@ -494,19 +494,19 @@ rulesSequencing _ lhs =
   "UNIFY-UNIFYR" `name`
   do (e1 :=: e2) :=: e3 <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
+     pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
  ++
   "UNIFY-UNIFYR" `name`
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
-     pure (Def (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3) :>: Var x)))
+     pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3) :>: Var x)))
   -- for FRESH
  ++ "CONJ-CST-DEFR" `name` -- e1 = (ex y. e2) --> ex y. e1 = e2
-  do (e1 :=: Def (Bind y e2)) <- [lhs]
+  do (e1 :=: Exi (Bind y e2)) <- [lhs]
      let y' = identNotIn (free e2 ++ free e2)
      if y `elem` free e1
-       then pure (Def (Bind y' (e1 :=: subst [(y,Var y')] e2)))
-       else pure (Def (Bind y (e1 :=: e2)))
+       then pure (Exi (Bind y' (e1 :=: subst [(y,Var y')] e2)))
+       else pure (Exi (Bind y (e1 :=: e2)))
 -- ++ "CONJ-SEQ-ASSOC" `name`
 --  do (e1 :>: e2) :>: e3 <- [lhs]
 --     pure (e1 :>: (e2 :>: e3))
@@ -516,7 +516,7 @@ rulesSequencing _ lhs =
 rulesFail :: ERule
 rulesFail _ lhs =
   "FAIL-DEF" `name`
-  do Def (Bind _x Fail) <- [lhs]
+  do Exi (Bind _x Fail) <- [lhs]
      pure Fail
  ++
   "FAIL" `name`
@@ -592,21 +592,21 @@ rulesSplit _ lhs =
      let x:h:_ = identsNotIn (free lhs)
          gv = Var h :=: (g :@: v)
          hlam = Var h :@: LAM x e
-     pure (Def (Bind h (gv :>: hlam)))
+     pure (Exi (Bind h (gv :>: hlam)))
  ++
   "SPLIT-VAL" `name`
   do Split (Val v) _f g <- [lhs]
      let x:h:_ = identsNotIn (free lhs)
          gv = Var h :=: (g :@: v)
          hlam = Var h :@: LAM x Fail
-     pure (Def (Bind h (gv :>: hlam)))
+     pure (Exi (Bind h (gv :>: hlam)))
 
 --------------------------------------------------------------------------------
 
 rulesDefElim :: ERule
 rulesDefElim _ lhs =
   "DEF-ELIM" `name`
-  do DEF x e <- [lhs]
+  do EXI x e <- [lhs]
      guard (x `notElem` free e)
      pure e
 
@@ -614,9 +614,9 @@ rulesDefElim _ lhs =
 
 rulesStructural :: ERule
 rulesStructural _ lhs =
-  "DEF-SWAP" `name`
-  do DEF x (DEF y e) <- [lhs]
-     pure (DEF y (DEF x e))
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     pure (EXI y (EXI x e))
  <>
   "VAR-SWAP" `name`
   do (ctx, Var x :=: Var y) <- execX lhs

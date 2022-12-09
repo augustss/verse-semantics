@@ -39,4 +39,5 @@ showFlags f = unwords
   , if fSimplify f then "simplify" else "no-simplify"
   , if fUnderLambda f then "under-lambda" else "no-under-lambda"
   , if fFinalInline f then "final-inlines" else ""
+  , "max-steps=" ++ show (fRewriteSteps f)
   ]

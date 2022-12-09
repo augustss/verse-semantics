@@ -14,7 +14,7 @@ module Rules.Core(
   pattern CON,
   isHNF,
   isVal,
-  pattern DEF,
+  pattern EXI,
   pattern LAM,
   subst,
   alphaRename,
@@ -49,7 +49,7 @@ data Expr
   | Expr :>: Expr               -- ^ e1; e2
   | Expr :|: Expr               -- ^ e1 | e2
   | Expr :@: Expr               -- ^ v1(v2)
-  | Def (Bind Expr)             -- ^ ex x. e
+  | Exi (Bind Expr)             -- ^ ex x. e
   | One Expr                    -- ^ one { e }
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
@@ -69,14 +69,14 @@ instance Show Expr where
   showsPrec p (Int k)          = showsPrec p k
   showsPrec p (Op o)           = showsPrec p o
   showsPrec _ (Arr es)         = showString $ "<" ++ intercalate ", " (map show es) ++ ">"
-  showsPrec p (Lam (Bind x e)) = showParen (p > 0) $ showString $ "\\" ++ show x ++ "." ++ show e
+  showsPrec p (Lam (Bind x e)) = showParen (p > 0) $ showString "\\" . showsPrec 0 x . showString "." . showsPrec 0 e
   showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
   showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
   showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
   showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
-  showsPrec _ (Def (Bind x a)) = showString "def " . showsPrec 0 x . showString " in {" . showsPrec 0 a . showString "}"
+  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString "." . showsPrec 0 a
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
@@ -160,7 +160,7 @@ instance Ord Expr where
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
 
-    comp  xs  ys (Def (Bind x a)) (Def (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
     EQ & c = c
     c  & _ = c
@@ -205,8 +205,8 @@ instance Show Op where
 
 -- Expr
 
-pattern DEF :: Ident -> Expr -> Expr
-pattern DEF x e = Def (Bind x e)
+pattern EXI :: Ident -> Expr -> Expr
+pattern EXI x e = Exi (Bind x e)
 
 pattern LAM :: Ident -> Expr -> Expr
 pattern LAM x e = Lam (Bind x e)
@@ -280,8 +280,8 @@ instance Rec Expr where
            [ (n, a' :>: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
 
-      Def (Bind x a) ->
-           [ (n, Def (Bind x a')) | (n,a') <- rec r s a ]
+      Exi (Bind x a) ->
+           [ (n, Exi (Bind x a')) | (n,a') <- rec r s a ]
 
       f :@: a ->
            [ (n,f' :@: a)  | (n,f') <- rec r s f ]
@@ -313,7 +313,7 @@ instance Free Expr where
   free (a :>: b) = free a `union` free b
   free (a :|: b) = free a `union` free b
   free (a :@: b) = free a `union` free b
-  free (Def bnd) = free bnd
+  free (Exi bnd) = free bnd
   free (One a)   = free a
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
@@ -344,7 +344,7 @@ instance Term Expr where
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst _sub Fail     = Fail
-  subst sub (Def bnd) = Def (substBind Var subst sub bnd)
+  subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
@@ -393,7 +393,7 @@ instance Arbitrary Expr where
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
   shrink (All a)   = [a, One a, Arr []] ++ [All a'| a'<-shrink a]
-  shrink (Def (Bind x a)) = [a |x `notElem` free a] ++ [Def (Bind x a') | a' <- shrink a]
+  shrink (Exi (Bind x a)) = [a |x `notElem` free a] ++ [Exi (Bind x a') | a' <- shrink a]
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
@@ -413,9 +413,9 @@ arbExpr n xs =
   , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
   , (n, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, Def <$> arbBind n1 xs)
-  -- , (n, One <$> arbExpr n1 xs)
-  -- , (n, All <$> arbExpr n1 xs)
+  , (n, Exi <$> arbBind n1 xs)
+  , (n, One <$> arbExpr n1 xs)
+  , (n, All <$> arbExpr n1 xs)
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
@@ -442,18 +442,18 @@ invariant here = collect here (&&)
 collect :: (Expr->a) -> (a->a->a) -> Expr -> a
 collect here (\/) = col
  where
-  col e = rec (here e) e
+  col e = recr (here e) e
   
-  rec a (Arr es)         = foldr (\/) a (map col es)
-  rec a (Lam (Bind _ e)) = a \/ col e
-  rec a (Def (Bind _ e)) = a \/ col e
-  rec a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
-  rec a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
-  rec a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
-  rec a (One e)          = a \/ col e
-  rec a (All e)          = a \/ col e
-  rec a (Split x y z)    = a \/ (col x \/ (col y \/ col z))  
-  rec a _                = a
+  recr a (Arr es)         = foldr (\/) a (map col es)
+  recr a (Lam (Bind _ e)) = a \/ col e
+  recr a (Exi (Bind _ e)) = a \/ col e
+  recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
+  recr a (One e)          = a \/ col e
+  recr a (All e)          = a \/ col e
+  recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
+  recr a _                = a
 
 --------------------------------------------------------------------------------
 

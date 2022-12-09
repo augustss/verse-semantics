@@ -393,7 +393,7 @@ instance Pretty Core where
   pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
   pPrintPrec l p (CDef is e) =
-    maybeParens (p > 0) $ fsep [text "def" <+> commaSep l is <+> text "in", pPrintPrec l 0 e]
+    maybeParens (p > 0) $ fsep [text "ex" <+> hsep (map (pPrintPrec l 0) is) <> text ".", pPrintPrec l 0 e]
   pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
   pPrintPrec l _ (CSplit e f g) =
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
