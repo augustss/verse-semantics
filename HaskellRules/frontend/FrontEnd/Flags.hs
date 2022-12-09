@@ -18,7 +18,7 @@ data Flags = Flags
 defaultFlags :: Flags
 defaultFlags = Flags
   { fTrace        = False
-  , fSplit        = True
+  , fSplit        = False
   , fSimplify     = False
   , fUnderLambda  = True
   , fTimLambda    = False
