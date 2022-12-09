@@ -11,7 +11,6 @@ import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace)
 import TRS.System(preProcess, postProcess, ruleEnv)
 import TRS.TRS(Trace)
 import TRS.Traced(toList)
-import FrontEnd.Expr(noLoc)
 import FrontEnd.Core
 import FrontEnd.Error
 import FrontEnd.Flags

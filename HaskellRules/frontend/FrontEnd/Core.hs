@@ -16,7 +16,7 @@ module FrontEnd.Core(
   subst,
   alphaConvert,
   pCore, pCoreFile,
-  Ident(..),
+  Ident(..), noLoc,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad
