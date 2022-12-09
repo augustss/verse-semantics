@@ -3,8 +3,8 @@ Cons := (lambda X . exists Y . exists Z . (Y, Z) = X; all{Y | :Z})
 MapAp := (lambda F . if (G := F(0)) {Cons(G(), MapAp(Tail(F)))} else {false})
 F := (lambda X . 1|2)
 Gs := all:
-  F();
+  F()
   X := 3|4
-  F();
+  F()
   lambda Y . X
 MapAp(Gs)
