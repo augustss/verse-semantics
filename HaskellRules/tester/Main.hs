@@ -21,10 +21,9 @@ import FrontEnd.Core
 import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
-import FrontEnd.Run
-import Rules.Core(defaultTRSFlags)
+import FrontEnd.Run(run, runM, everySystem, evalSystem, findSystem)
 import Rules.Equiv
-import Rules.Systems(ESystem, lookupSystem, TRSystem(..), allSystems)
+import Rules.Systems(ESystem, TRSystem(..))
 
 --------------
 
@@ -37,7 +36,6 @@ data TestFlags = TestFlags
 --  , alias     :: !Bool                -- eliminate aliases
 --  , unifyEq   :: !Bool                -- unify as equals under barrier
   , noUnderLam:: !Bool                -- do not reduce under lambda
-  , eval      :: !Bool                -- Use fast evaluator
   , quiet     :: !Bool                -- Less noisy
   , noError   :: !Bool                -- Don't show error message
   , finalInl  :: !Bool                -- No final inlining
@@ -144,10 +142,9 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     putStrLn $ pos ++ " skipped"
   pure Skip
                                       | otherwise = do
-  let flg = testFlagsToFlags tflg
-      expectOK = typ == SEq
-  let vs1 = runM flg sys c1  -- May return multiple answers
-  let v2  = run flg sys c2   -- Returns just one
+  let expectOK = typ == SEq
+  let vs1 = xrunM c1  -- May return multiple answers
+  let v2  = xrun c2   -- Returns just one
 
   catch (
     case vs1 of
@@ -210,7 +207,10 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     sys = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
-
+    flg = testFlagsToFlags tflg
+      
+    xrun = run flg sys
+    xrunM = runM flg sys
 
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
@@ -227,13 +227,13 @@ runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
 
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts) = do
-  let allSys | allRules tflg = evalSystem : allSystems
+  let allSys | allRules tflg = everySystem
              | otherwise = [system tflg]
   if summary tflg then
     runTestSummary tflg allSys ts
    else do
     putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-    oks <- mapM (\ sys -> runTestFileSys tflg{system=sys, eval=sname sys=="eval"} ts) allSys
+    oks <- mapM (\ sys -> runTestFileSys tflg{system=sys} ts) allSys
     unless (and oks) $
       exitWith (ExitFailure 1)
 
@@ -247,7 +247,7 @@ runTestSummary atflg allSys tests = do
     printf  "%-*s" widthTestName (testName (testInfo test))
     hFlush stdout
     forM_ allSys $ \ sys -> do
-      r <- runTest tflg{system=sys, eval=sname sys=="eval"} test
+      r <- runTest tflg{system=sys} test
       printf " %*s" widthSysName (showRes r)
       hFlush stdout
     putStrLn ""
@@ -333,10 +333,12 @@ testFlags = TestFlags
       (  long "no-under-lambda"
       <> help "do not reduce under lambda"
       )
+{-
   <*> switch
       (  long "eval"
       <> help "Use fast evaluator"
       )
+-}
   <*> switch
       (  long "quiet"
       <> help "Be less noisy"
@@ -349,7 +351,7 @@ testFlags = TestFlags
       (  long "final-inline"
       <> help "Do final normalization"
       )
-  <*> option (eitherReader lookupSystem)
+  <*> option (eitherReader findSystem)
          ( long "rules"
         <> short 'r'
         <> metavar "NAME"
@@ -367,6 +369,12 @@ testFlags = TestFlags
       (  long "all-rules"
       <> help "Test with all rule systems"
       )
+{-
+  <*> switch
+      (  long "refimpl"
+      <> help "Use reference implementation"
+      )
+-}
   <*> optional (strOption
          ( long "only-test"
         <> metavar "TEST"
@@ -386,7 +394,6 @@ testFlags = TestFlags
 testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   defaultFlags{ fSplit = split t, fSimplify = simplify t,
-                fRewrite = not (eval t),
                 fTrace = trace t,
                 fDfs = dfs t, fFinalInline = finalInl t,
                 fUnderLambda = not (noUnderLam t),
@@ -422,10 +429,3 @@ verseTest = "tests.versetest"
 
 test1 :: FilePath
 test1     = "test1.verse"
-
-evalSystem :: ESystem
-evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
-  ruleEnv = defaultTRSFlags,
-  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False,
-  confluenceRules = noRules, validExpr = const undefined }
-  where noRules _ _ = error "No rule system selected"

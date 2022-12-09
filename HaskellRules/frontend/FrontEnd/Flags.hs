@@ -5,7 +5,6 @@ data Flags = Flags
   , fSplit        :: !Bool
   , fSimplify     :: !Bool
   , fUnderLambda  :: !Bool
-  , fRewrite      :: !Bool
   , fTimLambda    :: !Bool
 --  , fDenSem       :: !Bool
   , fDfs          :: !Bool
@@ -22,7 +21,6 @@ defaultFlags = Flags
   , fSplit        = True
   , fSimplify     = False
   , fUnderLambda  = True
-  , fRewrite      = False
   , fTimLambda    = False
 --  , fDenSem       = False
   , fDfs          = False

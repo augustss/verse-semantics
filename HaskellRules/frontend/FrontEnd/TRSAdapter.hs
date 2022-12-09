@@ -1,4 +1,4 @@
-module FrontEnd.TRSAdapter(rewrite, coreToTrs) where
+module FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore) where
 import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
@@ -11,7 +11,7 @@ import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace)
 import TRS.System(preProcess, postProcess, ruleEnv)
 import TRS.TRS(Trace)
 import TRS.Traced(toList)
-import FrontEnd.Expr(Ident(..), noLoc)
+import FrontEnd.Expr(noLoc)
 import FrontEnd.Core
 import FrontEnd.Error
 import FrontEnd.Flags
@@ -26,10 +26,11 @@ rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
                 . elimDup sys
                 . subs flg sys
                 . nf
-                . preProcess sys
+                . preProcess sys (ruleEnv sys)
                 . coreToTrs
  where
-  sys            = asys{ruleEnv = (ruleEnv asys){ T.tfUnderLambda = fUnderLambda flg } }
+  sys            = asys{ruleEnv = (ruleEnv asys){ T.tfUnderLambda = fUnderLambda flg
+                                                , T.tfTrace = fTrace flg, T.tfRewriteSteps = n } }
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
@@ -58,13 +59,13 @@ elimDup sys = nubBy (equiv sys `on` (snd . head))
 subs :: Flags -> ESystem -> [Trace T.Expr] -> [Trace T.Expr]
 subs flg sys ts
   | fFinalInline flg =
-    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = postProcess sys e]
+    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = postProcess sys (ruleEnv sys) e]
         ts'' = nubBy ((==) `on` fst) ts'
     in  map snd ts''
   | otherwise  = ts
 
 sub :: Flags -> ESystem -> T.Expr -> T.Expr
-sub flg sys | fFinalInline flg = postProcess sys
+sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
             | otherwise = id
 
 coreToTrs :: Core -> T.Expr

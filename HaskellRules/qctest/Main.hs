@@ -27,7 +27,7 @@ main = do
 prop_Confluence :: TestFlags -> TRSystem Expr -> Expr -> Property
 prop_Confluence flags sys p =
   let p' = if wrapOne flags then One p else p in
-  case nub . map (norm sys) . normalFormsFuelTrace sys (maxSteps flags) . preProcess sys $ p' of
+  case nub . map (norm sys) . normalFormsFuelTrace sys (maxSteps flags) . preProcess sys (ruleEnv sys) $ p' of
     trs | any isNothing trs ->  -- normalization timed out.  Pretend test succeeded
       discard
     trs@(_:_:_) ->

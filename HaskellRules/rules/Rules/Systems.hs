@@ -1,4 +1,5 @@
-module Rules.Systems(ESystem, allSystems, lookupSystem, TRSystem(..)) where
+module Rules.Systems(ESystem, allSystems, lookupSystemEx, lookupSystem,
+                     TRSystem(..), defaultTRSFlags) where
 import Epic.String
 import TRS.System
 import Rules.Core
@@ -15,8 +16,11 @@ allSystems =
   ++ allSystemsKoen
 
 lookupSystem :: String -> Either String ESystem
-lookupSystem n =
-  case lookupTRSystem n allSystems of
+lookupSystem = lookupSystemEx allSystems
+
+lookupSystemEx :: [ESystem] -> String -> Either String ESystem
+lookupSystemEx sys n =
+  case lookupTRSystem n sys of
     []  -> Left "No system found"
     [s] -> Right s
     ss  ->

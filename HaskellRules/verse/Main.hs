@@ -17,13 +17,13 @@ import qualified FrontEnd.Parse as P
 import VerseRepl.Command
 import FrontEnd.Core
 import FrontEnd.CoreSimp
-import FrontEnd.Eval
+import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
-import FrontEnd.TRSAdapter
-import FrontEnd.Run
+--import FrontEnd.TRSAdapter
+import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
 --import DenSem.DenSem
-import Rules.Systems
-import Rules.Core(defaultTRSFlags)
+import Rules.Systems(ESystem, TRSystem(..))
+--import Rules.Core(defaultTRSFlags)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -42,7 +42,7 @@ main = do
   let cmd =
         case rulesys args of
           Nothing -> command
-          Just name -> command{ c_state = (c_state command){ esystem = either error id $ lookupSystem name } }
+          Just name -> command{ c_state = (c_state command){ esystem = either error id $ findSystem name } }
   runCommand cmd
 
 data MainFlags = MainFlags
@@ -126,7 +126,6 @@ command = Command
 --      , Cmd "compile [EXPR]"       "Generate core for [last] expression"   cCompile
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-      , Cmd "rewrite [EXPR]"       "Rewrite [last] expression with selected rules"           cRewrite
 --      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
 --      , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
@@ -137,7 +136,7 @@ command = Command
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
-      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
+--      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -145,16 +144,9 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags{fSplit=False} , esystem = dummySystem }
+                     , prelude = Nothing, flags = defaultFlags{fSplit=False} , esystem = evalSystem }
   , c_history = Just ".versei"
   }
-
-dummySystem :: ESystem
-dummySystem = TRSystem { sname = "none", description = "no rule system selected",
-  ruleEnv = defaultTRSFlags,
-  preProcess = id, postProcess = id, rules = noRules, rulesHaveStructural = False,
-  confluenceRules = noRules, validExpr = const undefined }
-  where noRules _ _ = error "No rule system selected"
 
 updateLastExpr :: CState -> SomeExpr -> IO CState
 updateLastExpr s e = pure s{ lastExpr = e }
@@ -175,8 +167,7 @@ cSet b l s =
 
 flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
-  [("rewrite",     (fRewrite,      \ b s -> s{fRewrite=b}))
-  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
+  [("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
   ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
@@ -248,28 +239,31 @@ cCore c s = cTransform (Cored . asCore (flags s)) c s
 cCompile :: Run CState
 cCompile c s = cTransform (Cored . compile (flags s)) c s
 -}
-{-
-cRun :: Run CState
-cRun c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
+
+cEval :: Run CState
+cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
   where flg = flags s
         flg' = flg -- if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
--}
+
+{-
 cEval :: Run CState
 cEval c s =
   cTransform (Cored . eval flg . compile (flags s)) c s
   where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
-
+-}
+{-
 cParseCore :: Run CState
 cParseCore line s =
   tryIt (pure s) (updateLastExpr s . Cored) $ do
     let prog = parseDie pCoreFile "<interactive>" line
     pp prog
     pure prog
+-}
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s
 cRules line s =
-  case lookupSystem line of
+  case findSystem line of
     Left msg -> do putStrLn msg; pure s
     Right e -> do putStrLn $ "Selected: " ++ description e; pure s{ esystem = e }
 
@@ -281,22 +275,16 @@ cDefEval c s = do
   cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
 -}
 
-cRewrite :: Run CState
-cRewrite c s =
-  cTransform (Cores . rewrite flg sys . compile flg) c s
-  where flg = flags s
-        sys = esystem s
-
 {-
 cDenSem :: Run CState
 cDenSem c s =
   cTransform (Cored . denSem . compile flgs) c s
   where flgs = (flags s){ fSplit = False, fSimplify = True, fTimLambda = True }
 -}
-
+{-
 compile :: Flags -> SomeExpr -> Core
 compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
-
+-}
 {-
 cDefine :: Run CState
 cDefine =
@@ -344,7 +332,7 @@ helpMsg = "\
 \\n\
 \Available rule systems:\n\
 \" ++
-  concat [printf "%-10s - %s\n" (sname e) (description e) | e <- allSystems ]
+  concat [printf "%-10s - %s\n" (sname e) (description e) | e <- everySystem ]
   ++ "\n\
 \Commands (can be abbreviated):\
 \"
