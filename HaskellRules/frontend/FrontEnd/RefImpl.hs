@@ -1,6 +1,4 @@
 module FrontEnd.RefImpl(evalRI) where
-evalRI e = undefined
-{-
 import Data.Ratio
 import Control.Monad ((<=<))
 import qualified Data.Text as T
@@ -82,4 +80,3 @@ valsToCore avs = foldr1 C.CBar (cores avs)
     core (V.Truth _) = undefined
     core (V.Lambda _i _env _e) = undefined
     core (V.Tuple vs) = C.CArray $ cores vs
--}
