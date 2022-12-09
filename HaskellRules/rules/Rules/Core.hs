@@ -257,7 +257,8 @@ data DerefPos
 
 defaultTRSFlags :: TRSFlags
 defaultTRSFlags =
-  TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False, tfUseWFEqVar = False, tfNormSteps = 10000 }
+  TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False
+           , tfUseWFEqVar = False, tfNormSteps = 10000, tfTrace = False, tfRewriteSteps = 10000 }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
@@ -265,7 +266,9 @@ instance Rec Expr where
     , tfDerefPos    :: !DerefPos -- where derefH is substituting
     , tfUseTilde    :: !Bool     -- use x~y expressions
     , tfUseWFEqVar  :: !Bool     -- Use WF-Eq with flipped arguments, i.e., y=x
+    , tfRewriteSteps:: !Int      -- Maximum rewrite steps
     , tfNormSteps   :: !Int      -- Maximum normalization steps
+    , tfTrace       :: !Bool     -- trace evaluation
     }
   rec r s ae =
     r s ae ++
