@@ -13,7 +13,7 @@ import Data.List
 import Data.Maybe
 import Debug.Trace
 
-import FrontEnd.Expr(Ident(..), noLoc)
+import FrontEnd.Expr(noLoc)
 import FrontEnd.Core
 import FrontEnd.Error
 import Epic.Print hiding (float)

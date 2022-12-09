@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId, simpleDesugar) where
 --import Control.Arrow(first, second)
+import Control.Monad
 import Control.Monad.State.Strict
 import Data.List
 --import qualified Data.Map as M
