@@ -82,25 +82,25 @@ import Language.Verse.Token qualified as Token
   '-' { L _ Token.Minus }
   '*' { L _ Token.Multiply }
   '/' { L _ Token.Divide }
-  exists { L _ Token.Exists }
-  lambda { L _ Token.Lambda }
-  truth { L _ Token.Truth }
-  false { L _ Token.False }
-  true { L _ Token.True }
-  fail { L _ Token.Fail }
   all { L _ Token.All }
-  one { L _ Token.One }
-  not { L _ Token.Not }
-  if { L _ Token.If }
-  then { L _ Token.Then }
-  else { L _ Token.Else }
-  for { L _ Token.For }
-  do { L _ Token.Do }
   block { L _ Token.Block }
+  do { L _ Token.Do }
+  else { L _ Token.Else }
+  exists { L _ Token.Exists }
+  fail { L _ Token.Fail }
+  false { L _ Token.False }
+  for { L _ Token.For }
+  if { L _ Token.If }
+  isInt { L _ Token.IsInt }
+  lambda { L _ Token.Lambda }
+  not { L _ Token.Not }
+  one { L _ Token.One }
+  then { L _ Token.Then }
+  true { L _ Token.True }
+  truth { L _ Token.Truth }
   int { (int -> Just $$) }
   float { (float -> Just $$) }
   name { (name -> Just $$) }
-  isInt { L _ Token.IsInt }
 
 %%
 
@@ -166,10 +166,16 @@ If
   | if Paren Block {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
+  | if Paren Then {
+      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
   | if Block Then {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Paren Block Else {
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
+    }
+  | if Paren Then Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
   | if Block Then Else {

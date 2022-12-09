@@ -35,6 +35,8 @@ desugar' e = for e $ \ case
     (:*>:) <$> desugar' e1 <*> desugar' e2
   (Parse.:=:) e1 e2 ->
     (:=:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:<>:) e1 e2 -> do
+    Not . (<$ e) <$> ((:=:) <$> desugar' e1 <*> desugar' e2)
   (Parse.:<:) e1 e2 ->
     (:<:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<=:) e1 e2 ->

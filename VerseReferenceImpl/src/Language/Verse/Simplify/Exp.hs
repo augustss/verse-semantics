@@ -9,7 +9,6 @@ import Data.HashSet (HashSet)
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
-  | f (Exp f a) :<>: f (Exp f a)
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
   | f (Exp f a) :>: f (Exp f a)
