@@ -189,31 +189,29 @@ liftOrd loc f var_x var_y = do
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     unify var =<< case (val_x, val_y) of
       (Val.Int x, Val.Int y) ->
-        newBool $ f x y
+        newBool var_x $ f x y
       (Val.Int x, Val.Float y) ->
-        newBool $ f (fromInteger x) y
+        newBool var_x $ f (fromInteger x) y
       (Val.Int x, Val.Rational y) ->
-        newBool $ f (fromInteger x) y
+        newBool var_x $ f (fromInteger x) y
       (Val.Float x, Val.Int y) ->
-        newBool $ f x (fromInteger y)
+        newBool var_x $ f x (fromInteger y)
       (Val.Float x, Val.Float y) ->
-        newBool $ f x y
+        newBool var_x $ f x y
       (Val.Float x, Val.Rational y) ->
-        newBool $ f (toRational x) y
+        newBool var_x $ f (toRational x) y
       (Val.Rational x, Val.Int y) ->
-        newBool $ f x (fromInteger y)
+        newBool var_x $ f x (fromInteger y)
       (Val.Rational x, Val.Float y) ->
-        newBool $ f x (toRational y)
+        newBool var_x $ f x (toRational y)
       (Val.Rational x, Val.Rational y) ->
-        newBool $ f x y
+        newBool var_x $ f x y
       _ -> throwDomainError loc
   pure var
   where
-    newBool = \ case
-      False -> newFalse
-      True -> newVar . Val.Truth =<< newFalse
-    newFalse =
-      newVar $ Val.Tuple []
+    newBool var = \ case
+      False -> empty
+      True -> pure var
 
 liftNum :: (MonadError Error m, MonadVerse m) =>
            Loc ->
