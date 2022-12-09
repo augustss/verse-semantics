@@ -4,7 +4,6 @@ module FrontEnd.CoreSimp(simpCore) where
 import Control.Monad.State.Strict
 import Data.List
 import Data.Maybe
-import FrontEnd.Expr(Ident(..))
 import FrontEnd.Core
 import FrontEnd.Eval
 import Epic.Print
