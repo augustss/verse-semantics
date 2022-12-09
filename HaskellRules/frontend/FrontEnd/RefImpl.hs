@@ -1,7 +1,10 @@
 module FrontEnd.RefImpl(evalRI) where
 import Data.Ratio
 import Control.Monad ((<=<))
+import Control.Monad.ST(runST)
+import Control.Monad.Trans.Except ( runExceptT )
 import qualified Data.Text as T
+import qualified Data.HashMap.Strict as H
 
 import Data.Fix
 
@@ -13,12 +16,13 @@ import qualified Language.Verse.Val as V
 import Language.Verse.Loc as Loc(L(..), minBound)
 import Language.Verse.Parse.Exp(Exp(..))
 import Language.Verse.Name(Name)
-import Control.Monad.ST(runST)
-import Control.Monad.Trans.Except ( runExceptT )
+import Language.Verse.Ident(Ident, name)
+import qualified Language.Verse.Simplify.Exp as S
 
 import qualified FrontEnd.Core as C
 
 type ExpL = L (Exp L Name)
+type SExpL = L (S.Exp L (Ident Name))
 
 evalRI :: C.Core -> C.Core
 evalRI = valsToCore . evalExp . coreToExp
@@ -31,6 +35,9 @@ nl = L Loc.minBound
 
 identToName :: C.Ident -> Name
 identToName (C.Ident _ s) = T.pack s
+
+nameToIdent :: Ident Name -> C.Ident
+nameToIdent n = C.Ident C.noLoc (maybe "?" T.unpack (name n))
 
 coreToExp :: C.Core -> ExpL
 coreToExp = nl . expl
@@ -53,7 +60,12 @@ coreToExp = nl . expl
     expl (C.CApply (C.CPrim "in'*'") (C.CArray [e1, e2])) = coreToExp e1 :*: coreToExp e2
     expl (C.CApply (C.CPrim "in'/'") (C.CArray [e1, e2])) = coreToExp e1 :/: coreToExp e2
     expl (C.CApply (C.CPrim "pre'+'") e) = expl e -- XXX
-    expl (C.CApply (C.CPrim "in'<>'") (C.CArray [e1, e2])) = Not (nl (coreToExp e1 :=: coreToExp e2))
+--    expl (C.CApply (C.CPrim "in'<>'") (C.CArray [e1, e2])) = Not (nl (coreToExp e1 :=: coreToExp e2))
+    expl (C.CApply (C.CPrim "in'<'") (C.CArray [e1, e2]))  = coreToExp e1 :<: coreToExp e2
+    expl (C.CApply (C.CPrim "in'<='") (C.CArray [e1, e2])) = coreToExp e1 :<=: coreToExp e2
+    expl (C.CApply (C.CPrim "in'>'") (C.CArray [e1, e2]))  = coreToExp e1 :>: coreToExp e2
+    expl (C.CApply (C.CPrim "in'>='") (C.CArray [e1, e2])) = coreToExp e1 :>=: coreToExp e2
+    expl (C.CApply (C.CPrim "isInt$") e) = expl e -- XXX
     expl (C.CApply e1 e2) = Invoke (coreToExp e1) (coreToExp e2)
     expl (C.CBar e1 e2) = coreToExp e1 :|: coreToExp e2
     expl (C.CFail) = Fail
@@ -78,5 +90,12 @@ valsToCore avs = foldr1 C.CBar (cores avs)
     core (V.Rational r) | denominator r == 1 = C.CInt (numerator r)
                         | otherwise = C.CRat r
     core (V.Truth _) = undefined
-    core (V.Lambda _i _env _e) = undefined
+    core (V.Lambda i env e) | H.null env = C.CLam (nameToIdent i) (expToCore e)
+                            | otherwise = undefined
     core (V.Tuple vs) = C.CArray $ cores vs
+
+expToCore :: SExpL -> C.Core
+expToCore (L _ ee) = core ee
+  where
+    core (S.Name i) = C.CVar (nameToIdent i)
+    core e = error $ "expToCore: " ++ show e

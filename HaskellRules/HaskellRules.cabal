@@ -80,6 +80,7 @@ library frontend
                       scientific,
                       text,
                       transformers,
+                      unordered-containers,
     exposed-modules:
                       FrontEnd.Core
                       FrontEnd.CoreSimp
