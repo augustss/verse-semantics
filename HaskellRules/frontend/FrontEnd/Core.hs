@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -23,6 +24,7 @@ import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Control.Monad.Reader
+import Data.Data(Data)
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
@@ -55,7 +57,7 @@ data Core
   | CWrong String
   | CSplit Core Value Value
   | CLambda Ident [Ident] Bool Core Core
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data)
 
 type Value = Core
 
