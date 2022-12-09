@@ -16,8 +16,10 @@ module FrontEnd.Core(
   subst,
   alphaConvert,
   pCore, pCoreFile,
+  Ident(..),
   ) where
 import Prelude hiding ((<>))
+import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Control.Monad.Reader
