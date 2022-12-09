@@ -171,6 +171,12 @@ core e@Choice{} = cBar <$> mapM coreD (flat e)
 core (Define i AnyT) = pure $ CVar i
 core (Define i e) = cUnify (CVar i) <$> core e
 core Fail = pure $ CFail
+core (For2 e1@(Define i e) e2@(Variable i')) | i == i' = do
+  useSplit <- asks fSplit
+  if useSplit then
+    forSplit e1 e2
+   else
+    cAll =<< coreD e
 core (For2 e1 e2) = do
   useSplit <- asks fSplit
   if useSplit then
