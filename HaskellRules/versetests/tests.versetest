@@ -27,9 +27,10 @@ testeq(SEq) {3>2}                                 {3}
 testeq(SEq) {3>=4}                                {:false}
 testeq(SEq) {3>=3}                                {3}
 testeq(SEq) {3>=2}                                {3}
-testeq(SEq) {3<>4}                                {3}
-testeq(SEq) {3<>3}                                {:false}
-testeq(SEq) {3<>2}                                {3}
+# No <> yet
+testeq(SEq,refimpl=Skip) {3<>4}                                {3}
+testeq(SEq,refimpl=Skip) {3<>3}                                {:false}
+testeq(SEq,refimpl=Skip) {3<>2}                                {3}
 testeq(SEq) {3=4}                                 {:false}
 testeq(SEq) {3=3}                                 {3}
 testeq(SEq) {3=2}                                 {:false}
@@ -38,28 +39,29 @@ testeq(SEq) {3=2}                                 {:false}
 # Values to consider: K, op, tuple, lambda
 # K
 testeq(SEq) {1=2}                                 {:false}
-testeq(SEq) {1=prefix'-'}                         {:false}
+# no prefix'op'
+testeq(SEq,refimpl=Skip) {1=prefix'-'}                         {:false}
 testeq(SEq) {1=(1,2)}                             {:false}
 testeq(SEq) {1=(x:any=>x)}                        {:false}
 # op
-testeq(SEq) {prefix'-'=1}                         {:false}
-testeq(SEq) {prefix'-'=prefix'+'}                 {:false}
-testeq(SEq) {prefix'-'=(1,2,3)}                   {:false}
-testeq(SEq) {prefix'-'=(x:any=>x)}                {:false}
+testeq(SEq,refimpl=Skip) {prefix'-'=1}                         {:false}
+testeq(SEq,refimpl=Skip) {prefix'-'=prefix'+'}                 {:false}
+testeq(SEq,refimpl=Skip) {prefix'-'=(1,2,3)}                   {:false}
+testeq(SEq,refimpl=Skip) {prefix'-'=(x:any=>x)}                {:false}
 # tuple
 testeq(SEq) {(1,2)=1}                             {:false}
-testeq(SEq) {(1,2)=prefix'-'}                     {:false}
+testeq(SEq,refimpl=Skip) {(1,2)=prefix'-'}                     {:false}
 testeq(SEq) {(1,2)=(1,2,3)}                       {:false}
 testeq(SEq) {(1,2)=(x:any=>x)}                    {:false}
 # lambda
 testeq(SEq) {(x:any=>x)=1}                        {:false}
-testeq(SEq) {(x:any=>x)=prefix'-'}                {:false}
+testeq(SEq,refimpl=Skip) {(x:any=>x)=prefix'-'}                {:false}
 testeq(SEq) {(x:any=>x)=(1,2,3)}                  {:false}
 testeq(SEq) {(x:any=>x)=(x:any=>1)}               {:false}
 # Unification with equal values
 testeq(SEq) {1=1}                                 {1}
 # Not with POPL
-testeq(SEq,popl=FEq)
+testeq(SEq,popl=FEq,refimpl=Skip)
             {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq(SEq) {(1,2)=(1,2)}                         {(1,2)}
 testeq(SEq) {(x:any=>x)=(x:any=>x)}               {:false}
@@ -111,8 +113,8 @@ testeq(SEq) {ap0(f(x:int):=2)<covariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
 #testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
-testeq(SEq) {x? : int}                            { x : ?int }
-testeq(SEq) {x[] : int}                           { x : []int }
+testeq(SEq,refimpl=Skip) {x? : int}                            { x : ?int }
+testeq(SEq,refimpl=Skip) {x[] : int}                           { x : []int }
 testeq(SEq) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 # DESUGAR HOW?
 #testeq(SEq) {p^[](:int):int}                      {0}
@@ -143,7 +145,6 @@ testeq(SEq) {
   fac[3] }                                                                     {6}
 
 testeq(SEq) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
-testeq(SEq) {f() := 1|2; for(f[]; x:=3|4){x}}     {(3,4,3,4)}
 testeq(SEq) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq(SEq) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq(SEq) {for(x:=1|2|3){x>1}}                  {:false}
