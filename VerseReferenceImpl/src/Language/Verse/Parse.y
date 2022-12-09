@@ -157,7 +157,7 @@ Exp :: { L (Exp L Name) }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | name { Exp.Name <\$> $1 }
-  | isInt '(' Exp ')' { Exp.IsInt <\$ $1 <.> duplicate $3 }
+  | isInt '(' List ')' { Exp.IsInt <\$ $1 <.> duplicate $3 }
 
 If
   : if Block {

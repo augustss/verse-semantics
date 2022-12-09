@@ -111,6 +111,7 @@ $space = [\ \t]
   "all" { token Token.All }
   "one" { token Token.One }
   "not" { token Token.Not }
+  "isInt" { token Token.IsInt }
   $alpha $alnum* { name }
 }
 
