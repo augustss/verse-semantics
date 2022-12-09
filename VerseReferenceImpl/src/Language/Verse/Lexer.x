@@ -65,8 +65,8 @@ $space = [\ \t]
   [\ \t]+ ;
   @newline { newlineIndented }
   ":" $space* @newline { colon }
-  "=" $space* @newline { equals }
-  ":=" $space* @newline { colonEquals }
+  "=" $space* @newline { equal }
+  ":=" $space* @newline { colonEqual }
   "=>" $space* @newline { fatArrow }
   "(" { token Token.LeftParen }
   ")" { token Token.RightParen }
@@ -76,9 +76,14 @@ $space = [\ \t]
   ":" { token Token.Colon }
   "," { token Token.Comma }
   "." { token Token.Dot }
-  "=" { token Token.Equals }
+  "=" { token Token.Equal }
+  "<>" { token Token.NotEqual }
+  "<" { token Token.Less }
+  "<=" { token Token.LessEqual }
+  ">" { token Token.Greater }
+  ">=" { token Token.GreaterEqual }
   "|" { token Token.Pipe }
-  ":=" { token Token.ColonEquals }
+  ":=" { token Token.ColonEqual }
   "->" { token Token.ThinArrow }
   "=>" { token Token.FatArrow }
   "?" { token Token.QuestionMark }
@@ -231,21 +236,21 @@ colon i j _ _ = do
   pushStates nesting
   pure $ L (Loc i j) Token.Colon
 
-equals :: Action
-equals i j _ _ = do
+equal :: Action
+equal i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []
   pushStates maybeNesting
-  pure $ L (Loc i j) Token.Equals
+  pure $ L (Loc i j) Token.Equal
 
-colonEquals :: Action
-colonEquals i j _ _ = do
+colonEqual :: Action
+colonEqual i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []
   pushStates maybeNesting
-  pure $ L (Loc i j) Token.ColonEquals
+  pure $ L (Loc i j) Token.ColonEqual
 
 fatArrow :: Action
 fatArrow i j _ _ = do

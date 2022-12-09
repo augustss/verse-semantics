@@ -35,6 +35,14 @@ desugar' e = for e $ \ case
     (:*>:) <$> desugar' e1 <*> desugar' e2
   (Parse.:=:) e1 e2 ->
     (:=:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:<:) e1 e2 ->
+    (:<:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:<=:) e1 e2 ->
+    (:<=:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:>:) e1 e2 ->
+    (:>:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:>=:) e1 e2 ->
+    (:>=:) <$> desugar' e1 <*> desugar' e2
   (Parse.:|:) e1 e2 ->
     (:|:) <$> desugar' e1 <*> desugar' e2
   (Parse.:+:) e1 e2 ->
@@ -102,7 +110,7 @@ desugar' e = for e $ \ case
     tellName x
     e <- desugar' e
     pure $ (Name <$> x) :=: (Colon <$> duplicate e)
-  Parse.InfixColonEquals x e -> do
+  Parse.InfixColonEqual x e -> do
     tellName x
     e <- desugar' e
     pure $ (Name <$> x) :=: e

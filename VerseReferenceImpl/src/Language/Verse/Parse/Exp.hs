@@ -7,6 +7,11 @@ module Language.Verse.Parse.Exp
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
+  | f (Exp f a) :<>: f (Exp f a)
+  | f (Exp f a) :<: f (Exp f a)
+  | f (Exp f a) :<=: f (Exp f a)
+  | f (Exp f a) :>: f (Exp f a)
+  | f (Exp f a) :>=: f (Exp f a)
   | f (Exp f a) :|: f (Exp f a)
   | f (Exp f a) :+: f (Exp f a)
   | f (Exp f a) :-: f (Exp f a)
@@ -35,6 +40,6 @@ data Exp f a
   | Name a
   | PrefixColon (f (Exp f a))
   | InfixColon (f a) (f (Exp f a))
-  | InfixColonEquals (f a) (f (Exp f a))
+  | InfixColonEqual (f a) (f (Exp f a))
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)
