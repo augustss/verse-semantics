@@ -41,7 +41,6 @@ import Language.Verse.Token qualified as Token
 %lexer { lexer } { L _ Token.EOF }
 %error { uncurryL Lexer.throwError }
 
-%nonassoc IF
 %left ';' newline
 %left ','
 %left '=' ':='
@@ -144,7 +143,7 @@ Exp :: { L (Exp L Name) }
   | ':' Exp { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
   | Exp '(' ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3) }
   | Exp '(' List ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
-  | truth '{' List '}' { Exp.Truth <\$ $1 <.> duplicate $3 <. $4 }
+  | truth Block { Exp.Truth <\$ $1 <.> duplicate $2 }
   | false { Exp.False <\$ $1 }
   | true { Exp.True <\$ $1 }
   | fail { Exp.Fail <\$ $1 }
