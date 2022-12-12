@@ -45,7 +45,7 @@ import Language.Verse.Token qualified as Token
 %left ','
 %left '=' ':='
 %nonassoc '<>'
-%nonassoc '<' '<=' '>' '>='
+%right '<' '<=' '>' '>='
 %nonassoc not
 %left '|'
 %left '+' '-'
