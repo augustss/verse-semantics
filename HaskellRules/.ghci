@@ -5,3 +5,6 @@
 :set -package haskeline
 :set -package QuickCheck
 :set -package uniplate
+:set -package mtl
+:set -package scientific
+:set -package unordered-containers
