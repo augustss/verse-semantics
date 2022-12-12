@@ -21,7 +21,7 @@ data Error
   | NameError !Loc !Name
   | IdentError !Loc !(Ident Name)
   | DomainError !Loc
-  | UnboundError deriving Show
+  | StuckError !Loc deriving Show
 
 instance Pretty Error where
   pretty = \ case
@@ -44,8 +44,8 @@ instance Pretty Error where
       varNotInScope x y
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "value"
-    UnboundError ->
-      "unbound" <+> "variable"
+    StuckError x ->
+      pretty x <> colon <+> "stuck"
     where
       varNotInScope x y =
          pretty x <> colon <+>

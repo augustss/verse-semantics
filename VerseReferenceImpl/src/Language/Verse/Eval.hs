@@ -55,11 +55,9 @@ eval :: ( MonadError Error m
         , MonadRef m
         , EqRef (Ref m)
         ) => L (Exp L (Ident Name)) -> m [Fix Val]
-eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze >>= f
-  where
-    f = \ case
-      Nothing -> throwError UnboundError
-      Just x -> pure x
+eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze >>= \ case
+  Nothing -> throwError $ StuckError $ loc e
+  Just x -> pure x
 
 eval' :: ( MonadError Error m
          , MonadVerse m
@@ -182,7 +180,6 @@ eval' e = case extract e of
   Exp.IsInt e -> do
     var <- eval' e
     isInt var
-    
 
 liftOrd :: (MonadError Error m, MonadVerse m) =>
            Loc ->
@@ -282,12 +279,9 @@ isInt :: (MonadError Error m, MonadVerse m) =>
          Var m Val -> m (Var m Val)
 isInt var_x = do
   var <- freshVar
-  whenBound var_x $ \ val_x -> 
-    unify var =<< case val_x of
-      Val.Int _ ->
-        pure var_x
-      _ ->
-        empty
+  whenBound var_x $ \ case
+    Val.Int _ -> unify var var_x
+    _ -> empty
   pure var
 
 lookupName :: Monad m => Ident Name -> EvalT m (Maybe (Var m Val))

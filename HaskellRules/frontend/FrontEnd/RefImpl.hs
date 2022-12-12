@@ -53,13 +53,13 @@ coreToExp' :: C.Core -> ExpL
 coreToExp' = nl . expl
   where
     seqe :: [Exp L Name] -> Exp L Name
-    seqe [] = undefined
+    seqe [] = Tuple []
     seqe [e] = e
     seqe (e:es) = nl e :*>: nl (seqe es)
 
     expl (C.CVar n) = Name (identToName n)
     expl (C.CInt i) = Int i
---    expl (C.CRat _) = undefined
+    expl (C.CRat r) = nl (Int $ numerator r) :/: nl (Int $ denominator r)
 --    expl (C.CPrim _) = undefined
     expl (C.CArray es) = Tuple $ map coreToExp' es
     expl (C.CLam i e) = Lambda (nl (identToName i)) (coreToExp' e)
@@ -70,7 +70,7 @@ coreToExp' = nl . expl
     expl (C.CApply (C.CPrim "in'*'") (C.CArray [e1, e2])) = coreToExp' e1 :*: coreToExp' e2
     expl (C.CApply (C.CPrim "in'/'") (C.CArray [e1, e2])) = coreToExp' e1 :/: coreToExp' e2
     expl (C.CApply (C.CPrim "pre'+'") e) = expl e -- XXX
---    expl (C.CApply (C.CPrim "in'<>'") (C.CArray [e1, e2])) = Not (nl (coreToExp' e1 :=: coreToExp' e2))
+    expl (C.CApply (C.CPrim "in'<>'") (C.CArray [e1, e2])) = coreToExp' e1 :<>: coreToExp' e2
     expl (C.CApply (C.CPrim "in'<'") (C.CArray [e1, e2]))  = coreToExp' e1 :<: coreToExp' e2
     expl (C.CApply (C.CPrim "in'<='") (C.CArray [e1, e2])) = coreToExp' e1 :<=: coreToExp' e2
     expl (C.CApply (C.CPrim "in'>'") (C.CArray [e1, e2]))  = coreToExp' e1 :>: coreToExp' e2

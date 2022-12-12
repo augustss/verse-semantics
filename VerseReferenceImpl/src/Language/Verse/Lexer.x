@@ -91,27 +91,27 @@ $space = [\ \t]
   "-" { token Token.Minus }
   "*" { token Token.Multiply }
   "/" { token Token.Divide }
-  "if" { token Token.If }
-  "then" { token Token.Then }
-  "else" { token Token.Else }
-  "for" { token Token.For }
-  "do" { token Token.Do }
+  "all" { token Token.All }
   "block" { token Token.Block }
   "class" { token Token.Class }
-  "struct" { token Token.Struct }
-  "module" { token Token.Module }
+  "do" { token Token.Do }
+  "else" { token Token.Else }
   "exists" { token Token.Exists }
-  "lambda" { token Token.Lambda }
+  "fail" { token Token.Fail }
   "false" { token Token.False }
+  "for" { token Token.For }
+  "if" { token Token.If }
+  "isInt" { token Token.IsInt }
+  "lambda" { token Token.Lambda }
+  "module" { token Token.Module }
+  "not" { token Token.Not }
+  "one" { token Token.One }
+  "struct" { token Token.Struct }
+  "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
-  "fail" { token Token.Fail }
-  "all" { token Token.All }
-  "one" { token Token.One }
-  "not" { token Token.Not }
-  "isInt" { token Token.IsInt }
   $alpha $alnum* { name }
 }
 
