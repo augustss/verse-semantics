@@ -4,6 +4,7 @@ module TRS.Traced(
   ) where
 
 data Traced a = a :<-- [(String,a)]
+  deriving (Show)
 
 term :: Traced a -> a
 term (x :<-- _) = x

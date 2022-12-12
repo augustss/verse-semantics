@@ -7,11 +7,9 @@ module TRS.TRS(
   name,
   Rec(..),
   step,
+  NormResult(..),
   normalFormsFuelTracePlain,
   normalFormFuelTracePlain,
-  Trace,
-  -- XXX
-  nub,
   ) where
 
 import Epic.List( nub )
@@ -30,7 +28,7 @@ instance Show (Rule t) where
   show _ = "<<Rule>>"
 
 -- This is used to give rules names.
-infix 7 `name`   -- must bind tighter than ++
+infix 7 `name`   -- must bind tighter than <>
 name :: String -> [a] -> [(String, a)]
 name s as = [(s,a) | a <- as]
 
@@ -39,90 +37,50 @@ name s as = [(s,a) | a <- as]
 class Rec t where
   -- RuleEnv can contain some environment (like flags) needed during reduction
   data RuleEnv t
+  -- Convert a rule that matches at the top level to a rule that matches everywhere
   rec :: Rule t -> Rule t
-
-{-
-step1 :: Rec a => RuleEnv a -> Rule a -> a -> Maybe a
-step1 env rule t =
-  case rec rule env t of
-    (_,t') : _ -> Just t'
-    _          -> Nothing
-
-steps :: Rec a => RuleEnv a -> Rule a -> a -> [a]
-steps env rule t =
-  t : case step1 env rule t of
-        Nothing -> []
-        Just t' -> steps env rule t'
--}
 
 step :: forall a . (Ord a, Rec a) => Rule a -> Rule a
 step rule env tt = nub $ rec rule env tt
 
--- traces are produced in reverse order, i.e. final result first
-normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
+data NormResult a = NormResult
+  { nrDone :: [Traced a]   -- All terms that have no children
+  , nrLeft :: [Traced a]   -- Unexplored terms due to timeout
+  }
+  deriving (Show)
+
+-- Traces are produced in reverse order, i.e. final result first
+normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> NormResult a
 normalFormsFuelTracePlain env an rule at = go an S.empty [start at]
  where
-  go 0 _    (_tr:_)      = []
-  go _n _seen []          = []
-  go n seen (ttr@(t:<--tr):trs)
---x    | Debug.Trace.trace ("go: " ++ show t) False = undefined
+  go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
+  go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
+  go  n  seen (ttr@(t:<--tr):trs)
+--    | (s,_):_ <- tr, Debug.Trace.trace ("go: " ++ show (s, t)) False = undefined
     | t `S.member` seen = go n seen trs
-    | null ts'          = ttr : go n seen' trs
+    | null ts'          = addDone ttr $ go n seen' trs
     | otherwise         = go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = step rule env t
 
-type Trace a = [(String, a)]
-type Path a = (Result, Trace a)
-data Result = NoFuel | Stuck | NormalForm deriving (Show)
+addDone :: Traced a -> NormResult a -> NormResult a
+addDone a nr = nr{ nrDone = a : nrDone nr }
 
 -- Like normalFormsFuelTrace, but only does a depth first search
-normalFormFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> [[(String,a)]]
-normalFormFuelTracePlain env n rule t = [snd (dfs env n rule t)]
+normalFormFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> NormResult a
+normalFormFuelTracePlain env n rule t = dfs env n rule t
 
-dfs :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Path a
-dfs env an rule at = go an S.empty [("",at)]
+dfs :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> NormResult a
+dfs env an rule at = go an S.empty (start at)
  where
-  go 0 _    tr   = (NoFuel, tr)
-  go n seen tr@((_,t):_)
-    | null ts'   = (NormalForm, tr)
-    | null ts''  = (Stuck, tr)
-    | otherwise  = go (n-1) seen' (head ts'' : tr)
+  go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
+  go n seen ttr@(t :<-- tr)
+    | null ts'   = NormResult { nrDone = [ttr], nrLeft = [] }
+    | null ts''  = error "normalFormFuelTracePlain.dfs : no children"  -- a loop.  Maybe because of structural rules.
+    | otherwise  = go (n-1) seen' (t' :<-- ((s, t) : tr))
     where
       seen' = S.insert t seen
       ts'   = step rule env t
       ts''  = filter ((`S.notMember` seen) . snd) ts'
-  go _ _ _ = error "impossible"
-
-{-
-normalFormsFuelTrace' :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Either (Trace a) [[(String,a)]]
-normalFormsFuelTrace' env an rule at = go an S.empty [[("",at)]]
- where
-  go 0 _    trs         = Left (head trs)
-  go _n _seen []          = Right []
-  go n seen (tr@((_,t):_):trs)
-    | t `S.member` seen = go n seen trs
-    | null ts'          = (tr :) <$> go n seen' trs
-    | otherwise         = go (n-1) seen' (map (:tr) ts' ++ trs)
-   where
-    seen' = S.insert t seen
-    ts'   = step rule env t
-  go _ _ _ = error "impossible"
--}
-
-{-
-traceShow :: Show a => String -> a -> a
---traceShow msg x = trace ("\nTRACE: " ++ msg ++ " : " ++ show x) x
-traceShow _msg x = x
-
-printTrace :: (Show a) => [(String,a)] -> IO ()
-printTrace tr =
-  sequence_
-  [ do unless (null n) $ putStrLn ("  --" ++ n ++ "-->")
-       print t
-  | (n,t) <- reverse tr
-  ]
--}
-
---------------------------------------------------------------------------------
+      (s, t') = head ts''

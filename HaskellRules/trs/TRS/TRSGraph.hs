@@ -72,9 +72,10 @@ trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [
 -}
 
 normalFormsFuelTraceWithGraph :: (Show a, Ord a, Rec a)
-                              => RuleEnv a -> Int -> Rule a -> a -> [Traced a]
-normalFormsFuelTraceWithGraph env fuel rule t =
-  [ tx
-  | Just tx <- leaves (dag (trsGraphFuelTrace env fuel rule t))
-  ]
+                              => RuleEnv a -> Int -> Rule a -> a -> NormResult a
+normalFormsFuelTraceWithGraph env fuel rule t = NormResult
+  { nrDone = [ tx | Just tx <- lvs ]
+  , nrLeft = [ start t | Nothing <- lvs ]
+  }
+  where lvs = leaves (dag (trsGraphFuelTrace env fuel rule t))
 

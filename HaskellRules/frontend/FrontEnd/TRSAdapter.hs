@@ -7,9 +7,8 @@ import qualified TRS.Bind as T
 import qualified Rules.Core as T
 import Rules.Equiv(equiv)
 import Rules.Systems(ESystem)
-import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace)
+import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
 import TRS.System(preProcess, postProcess, ruleEnv)
-import TRS.TRS(Trace)
 import TRS.Traced(toList)
 import FrontEnd.Core
 import FrontEnd.Error
@@ -24,6 +23,8 @@ rewrite :: Flags -> ESystem -> Core -> [Core]
 rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
                 . elimDup sys
                 . subs flg sys
+                . map toList
+                . nrToList
                 . nf
                 . preProcess sys (ruleEnv sys)
                 . coreToTrs
@@ -33,15 +34,10 @@ rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
   n              = fRewriteSteps flg
   tr             = fTrace flg
   latex          = fLatex flg
-  nf | fDfs flg  =              normalFormFuelTrace  sys n
-     | otherwise = map toList . normalFormsFuelTrace sys n
-{-
-  checkOne [x]   = [x]
-  checkOne nes   = trace (unlines $
-                          "Multiple:" :
-                          map (\(s,e) -> s ++ ": " ++ prettyShow (trsToCore e) ++ "\n+++++") (map head nes))
-                         nes
--}
+  nf | fDfs flg  = normalFormFuelTrace  sys n
+     | otherwise = normalFormsFuelTrace sys n
+  nrToList NormResult{ nrDone = xs, nrLeft = [] } = xs
+  nrToList _ = []  -- Just flag timeout as an empty list
   rtrace xs | not tr = res
             | latex = trace (latexTrace xs) res
             | otherwise = trace (showReductionTrace (prettyShow . trsToCore) xs) res
@@ -51,6 +47,8 @@ rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
     where
       msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
       pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
+
+type Trace a = [(String, a)]
 
 elimDup :: ESystem -> [Trace T.Expr] -> [Trace T.Expr]
 elimDup sys = nubBy (equiv sys `on` (snd . head))
