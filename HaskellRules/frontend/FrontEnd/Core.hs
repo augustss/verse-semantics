@@ -546,7 +546,7 @@ pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
     exists is e = foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
-    pQuant = pKeyword "exists" <|> pKeyword "ex" <|> pKeyword "E"
+    pQuant = pKeyword "exists" <|> pKeyword "exi" <|> pKeyword "ex" <|> pKeyword "E"
       -- <|> void (pOp "∃")
 
 pLam :: P Expr
