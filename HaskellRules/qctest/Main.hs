@@ -39,7 +39,8 @@ prop_Confluence flags sys p =
                        putStr $ unlines $ showTrace ttr
                   | (Just ttr,i) <- trs `zip` [1::Int ..]
                   ]) False
-        _ | null left -> property True  -- no time-outs
+        _ | null left || ignoreFuelStop flags ->
+            property True  -- no time-outs
           | otherwise ->
 --            Debug.Trace.trace ("TO " ++ show p')
             discard                     -- reduction timed out
@@ -47,10 +48,11 @@ prop_Confluence flags sys p =
 --------------------------------------------------------------------------------
 
 data TestFlags = TestFlags
-  { rulesys  :: !String
-  , numtests :: !Int
-  , wrapOne  :: !Bool
-  , maxSteps :: !Int
+  { rulesys        :: !String
+  , numtests       :: !Int
+  , wrapOne        :: !Bool
+  , maxSteps       :: !Int
+  , ignoreFuelStop :: !Bool
   }
 
 testFlags :: Parser TestFlags
@@ -61,21 +63,24 @@ testFlags = TestFlags
         <> metavar "NAME"
         <> help "Use rule system NAME" )
   <*> option auto
-         ( long "numtests"
+         ( long "max-success"
         <> short 'n'
         <> metavar "NUM"
         <> value (maxSuccess stdArgs)
         <> help "Maximum of NUM successful tests" )
   <*> switch
-      (  long "wrap-one"
-      <> help "Wrap tested expression in one{}"
-      )
+         ( long "wrap-one"
+        <> help "Wrap tested expression in one{}" )
   <*> option auto
          ( long "max-steps"
         <> short 'm'
         <> metavar "NUM"
-        <> value 100
+        <> value 1000
         <> help "Maximum number of rewrite steps" )
+  <*> switch
+         ( long "ignore-fuel-stop"
+        <> short 'i'
+        <> help "Do not discard out-of-fuel tests" )
 
 testArgs :: IO TestFlags
 testArgs = do

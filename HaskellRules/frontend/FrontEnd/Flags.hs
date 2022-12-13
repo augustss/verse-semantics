@@ -12,6 +12,7 @@ data Flags = Flags
   , fFinalInline  :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
+  , fNoFuelStop   :: !Bool
   }
   deriving (Show)
 
@@ -28,6 +29,7 @@ defaultFlags = Flags
   , fFinalInline  = True
   , fRewriteSteps = 25000
   , fEvalSteps    = 1000
+  , fNoFuelStop   = False
   }
 
 showFlags :: Flags -> String

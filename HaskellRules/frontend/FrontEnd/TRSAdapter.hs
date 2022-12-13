@@ -36,7 +36,7 @@ rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
   latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace  sys n
      | otherwise = normalFormsFuelTrace sys n
-  nrToList NormResult{ nrDone = xs, nrLeft = [] } = xs
+  nrToList NormResult{ nrDone = xs, nrLeft = left } | null left || fNoFuelStop flg = xs
   nrToList _ = []  -- Just flag timeout as an empty list
   rtrace xs | not tr = res
             | latex = trace (latexTrace xs) res

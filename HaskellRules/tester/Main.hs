@@ -28,25 +28,26 @@ import Rules.Systems(ESystem, TRSystem(..))
 --------------
 
 data TestFlags = TestFlags
-  { dfs       :: !Bool                -- just find one normal form
---  , denSem    :: !Bool                -- evaluate with denotational semantics
-  , split     :: !Bool                -- use split
-  , parse     :: !Bool                -- parse only
-  , simplify  :: !Bool                -- use simplifier
---  , alias     :: !Bool                -- eliminate aliases
---  , unifyEq   :: !Bool                -- unify as equals under barrier
-  , noUnderLam:: !Bool                -- do not reduce under lambda
-  , quiet     :: !Bool                -- Less noisy
-  , noError   :: !Bool                -- Don't show error message
-  , finalInl  :: !Bool                -- No final inlining
-  , system    :: !ESystem             -- rule system
-  , summary   :: !Bool                -- produce a summary
-  , trace     :: !Bool                -- Show traces
-  , allRules  :: !Bool                -- test with all rule systems
-  , onlyTest  :: !(Maybe String)      -- run only this test
-  , testExpr  :: !(Maybe String)      -- use this expression as a test
-  , maxSteps  :: !Int                 -- max number of rewrite steps
-  , fileNames :: ![FilePath]          -- input files
+  { dfs            :: !Bool                -- just find one normal form
+--  , denSem         :: !Bool                -- evaluate with denotational semantics
+  , split          :: !Bool                -- use split
+  , parse          :: !Bool                -- parse only
+  , simplify       :: !Bool                -- use simplifier
+--  , alias          :: !Bool                -- eliminate aliases
+--  , unifyEq        :: !Bool                -- unify as equals under barrier
+  , noUnderLam     :: !Bool                -- do not reduce under lambda
+  , quiet          :: !Bool                -- Less noisy
+  , noError        :: !Bool                -- Don't show error message
+  , finalInl       :: !Bool                -- No final inlining
+  , system         :: !ESystem             -- rule system
+  , summary        :: !Bool                -- produce a summary
+  , trace          :: !Bool                -- Show traces
+  , allRules       :: !Bool                -- test with all rule systems
+  , onlyTest       :: !(Maybe String)      -- run only this test
+  , testExpr       :: !(Maybe String)      -- use this expression as a test
+  , maxSteps       :: !Int                 -- max number of rewrite steps
+  , ignoreFuelStop :: !Bool                -- ignore running out of fuel
+  , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
 
@@ -143,8 +144,8 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
   pure Skip
                                       | otherwise = do
   let expectOK = typ == SEq
-  let vs1 = xrunM c1  -- May return multiple answers
-  let v2  = xrun c2   -- Returns just one
+  let vs1 = runM flg sys c1  -- May return multiple answers
+  let v2  = run flg sys c2   -- Returns just one
 
   catch (
     case vs1 of
@@ -209,9 +210,6 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
     flg = testFlagsToFlags tflg
       
-    xrun = run flg sys
-    xrunM = runM flg sys
-
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
 equivValue sys e1 e2 | sname sys == "eval" = coreToTrs e1 == coreToTrs e2  -- XXX temporary hack
@@ -389,6 +387,9 @@ testFlags = TestFlags
         <> metavar "NUM"
         <> value 100
         <> help "Maximum number of rewrite steps" )
+  <*> switch
+         ( long "ignore-fuel-stop"
+        <> help "Ignore running out of fuel" )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -397,7 +398,8 @@ testFlagsToFlags t =
                 fTrace = trace t,
                 fDfs = dfs t, fFinalInline = finalInl t,
                 fUnderLambda = not (noUnderLam t),
-                fRewriteSteps = maxSteps t
+                fRewriteSteps = maxSteps t,
+                fNoFuelStop = ignoreFuelStop t
                 }
 main :: IO ()
 main = do
