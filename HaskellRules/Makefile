@@ -6,6 +6,7 @@ TESTPARSEFILE=versetests/test1.verse
 
 TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/tester
 TESTER=cabal run tester --
+QCTEST=cabal run qctest --
 
 all:
 	@echo Specify a target
@@ -27,6 +28,10 @@ trickytest: testtricky
 
 testtricky:
 	$(TESTER) --quiet --summary --no-error --all-rules $(TRICKY)
+
+testqcconf:
+	$(QCTEST) --rules=POPLV --ignore-fuel-stop
+	$(QCTEST) --rules=POPLV --max-success=30
 
 clean:
 	cabal clean
