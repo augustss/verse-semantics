@@ -30,9 +30,11 @@ desugar :: Expr -> Expr
 desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< addDeref <=< dsD <=< dropParens)
   where eval = flip evalState 1
 
+{-
 simpleDesugar :: Expr -> Expr
 simpleDesugar = eval . (unifyAnfS <=< anfS)
   where eval = flip evalState 1
+-}
 
 type D = State Int
 
