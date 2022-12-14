@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId, simpleDesugar) where
+module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId) where
 --import Control.Arrow(first, second)
 import Control.Monad
 import Control.Monad.State.Strict
@@ -628,6 +628,7 @@ anfS = anf
       (es2, e2') <- value e2
       pure $ seqE $ es1 ++ es2 ++ [con e1' e2']
 
+{-
 unifyAnfS :: Expr -> D Expr
 unifyAnfS = anf
   where
@@ -645,6 +646,7 @@ unifyAnfS = anf
     isVal Array{} = True
     isVal Function{} = True
     isVal _ = False
+-}
 
 ------------
 
