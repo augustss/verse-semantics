@@ -385,7 +385,7 @@ testFlags = TestFlags
          ( long "max-steps"
         <> short 'm'
         <> metavar "NUM"
-        <> value 100
+        <> value 1000
         <> help "Maximum number of rewrite steps" )
   <*> switch
          ( long "ignore-fuel-stop"
