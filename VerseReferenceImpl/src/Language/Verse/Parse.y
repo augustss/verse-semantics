@@ -43,6 +43,8 @@ import Language.Verse.Token qualified as Token
 
 %left ';' newline
 %left ','
+%left IF IF_THEN
+%left then else
 %left '=' ':='
 %nonassoc '<>'
 %right '<' '<=' '>' '>='
@@ -64,6 +66,7 @@ import Language.Verse.Token qualified as Token
   ';' { L _ Token.Semi }
   newline { L _ Token.Newline }
   ':' { L _ Token.Colon }
+  colonEOL { L _ Token.ColonEOL }
   ':=' { L _ Token.ColonEqual }
   ',' { L _ Token.Comma }
   '.' { L _ Token.Dot }
@@ -159,16 +162,16 @@ Exp :: { L (Exp L Name) }
   | isInt '(' List ')' { Exp.IsInt <\$ $1 <.> duplicate $3 }
 
 If
-  : if Block {
+  : if Block %prec IF {
       Exp.If <\$ $1 <.> duplicate $2
     }
-  | if Paren Block {
+  | if Paren Block %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
-  | if Paren Then {
+  | if Paren Then %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
-  | if Block Then {
+  | if Block Then %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Paren Block Else {
@@ -183,9 +186,11 @@ If
 
 Then
   : then Block { $1 .> $2 }
+  | then Exp { $1 .> $2 }
 
 Else
   : else Block { $1 .> $2 }
+  | else Exp { $1 .> $2 }
 
 For
   : for Block {
@@ -210,7 +215,7 @@ Brace
 
 Block
   : Brace { $1 }
-  | ':' ind List ded { $1 .> $3 <. $4 }
+  | colonEOL ind List ded { $1 .> $3 <. $4 }
 
 Scan
   : { () }

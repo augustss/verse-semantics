@@ -21,6 +21,7 @@ data Token
   | Dedent
   | Semi
   | Colon
+  | ColonEOL
   | Comma
   | Dot
   | Equal
@@ -73,6 +74,7 @@ instance Pretty Token where
     Dedent -> "dedent"
     Semi -> semi
     Colon -> colon
+    ColonEOL -> colon
     Comma -> comma
     Dot -> dot
     Equal -> equals

@@ -235,7 +235,7 @@ colon :: Action
 colon i j _ _ = do
   popStates
   pushStates nesting
-  pure $ L (Loc i j) Token.Colon
+  pure $ L (Loc i j) Token.ColonEOL
 
 equal :: Action
 equal i j _ _ = do
