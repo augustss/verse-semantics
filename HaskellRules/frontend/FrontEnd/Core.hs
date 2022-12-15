@@ -197,8 +197,8 @@ core (Lambda i rs e1 e2) = do
   timLam <- asks fTimLambda
   let covariant = covariantId `elem` rs || True -- XXX
   if timLam then do
-    let is = getVisible e1
-    e1' <- core e1
+    let Exists is e1a = e1
+    e1' <- core e1a
     e2' <- core e2
     pure $ CLambda i is covariant e1' e2'
   else
@@ -234,7 +234,7 @@ coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
 
 forSplit :: Expr -> Expr -> C Core
-forSplit e1 e2 = do
+forSplit (Exists vs e1) e2 = do
   f <- newTmp
   g <- newTmp
   u <- newTmp
@@ -242,8 +242,7 @@ forSplit e1 e2 = do
   y <- newTmp
   a <- newTmp
   b <- newTmp
-  let vs = getVisible e1
-  e1' <- core (Seq [e1, Array $ map Variable vs])
+  e1' <- core (Exists vs $ Seq [e1, Array $ map Variable vs])
   e2' <- core e2
   let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
       gDef e = CDef [g] (cSeq [CUnify (CVar g) $
@@ -257,6 +256,7 @@ forSplit e1 e2 = do
                               ])
 
   pure $ fDef $ gDef $ CSplit e1' (CVar f) (CVar g)
+forSplit e1 e2 = impossible (e1,e2)
 
 cOne :: Core -> C Core
 cOne e = do
