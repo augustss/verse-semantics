@@ -125,11 +125,18 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CAll{} = True
     isCE CSucceeds{} = True
     isCE CDecides{} = True
-    isCE (CSplit _ (CLam _ n) (CLam _ (CLam _ g))) = isCE n && isCE g
+    isCE (CSplit _ (CLam _ n) g) = isCE n && isCELam g
     isCE (CApply (CPrim p) _) = isCEPrim p
     isCE CFail = True
     isCE CWrong{} = True
+    isCE (CDef _ e) = isCE e
     isCE _ = False
+    -- The g of CSplit is recursive, so it might get a CDef in front of the lambda.
+    --isCELam e | trace ("isCELam " ++ prettyShow e) False = undefined
+    isCELam (CLam _ (CLam _ e)) = isCE e
+    isCELam (CLam _ (CDef [_] (CSeq [_, CLam _ e]))) = isCE e
+    isCELam (CVar _) = True -- happens for recursive functions
+    isCELam _ = False
 
     isCEPrim _ = True
 
