@@ -120,7 +120,7 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
-isChoiceFree Split{}   = True
+isChoiceFree Split{}   = True  -- XXX is it?
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
 -- KC: what about @?
