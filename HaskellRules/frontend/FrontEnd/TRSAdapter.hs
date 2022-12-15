@@ -1,4 +1,4 @@
-module FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore) where
+module FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore, asTRS) where
 import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
@@ -16,6 +16,9 @@ import FrontEnd.Flags
 
 import Debug.Trace
 import Epic.Print
+
+asTRS :: (T.Expr -> T.Expr) -> Core -> Core
+asTRS f = trsToCore . f . coreToTrs
 
 -- XXX use graph normal form when needed
 

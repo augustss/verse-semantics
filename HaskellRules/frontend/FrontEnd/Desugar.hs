@@ -27,7 +27,7 @@ doTrace = False
 -------
 
 desugar :: Expr -> Expr
-desugar = eval . (anfS <=< dsDo <=< scopeCheck <=< addDeref <=< dsD <=< dropParens)
+desugar = eval . (addScope <=< dsDo <=< addDeref <=< dsD <=< dropParens)
   where eval = flip evalState 1
 
 {-
@@ -37,6 +37,18 @@ simpleDesugar = eval . (unifyAnfS <=< anfS)
 -}
 
 type D = State Int
+
+newInt :: D Int
+newInt = do
+  n <- get
+  put $! n+1
+  pure n
+
+-- Used prefixes "a", "d", "f", "i", "r", "w", "x", "y", "z"
+newIdent :: Loc -> String -> D Ident
+newIdent l s = do
+  n <- newInt
+  pure $ Ident l $ "$" ++ s ++ show n
 
 type SExpr = Expr   -- Simple Expr: only has some of the constructors
 
@@ -211,8 +223,8 @@ dsD = expr
             s' = p ++ "'" ++ s ++ "'"
 
     -- Handle function(e){b}
-    --function e b | trace ("function " ++ show (e, b)) False = undefined
-    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) [i] b | i == covariantId =
+    --function e r b | trace ("function " ++ show (e, r, b)) False = undefined
+    function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) _ b =
       Lambda y [] (Array []) <$> expr b
       --primFcn y <$> expr b
     function e rs b = do
@@ -293,7 +305,7 @@ dsM expr y =
         pure $ -- Function [(tAny noLoc vy, rs)] $ seqE [ex, ez, er]
                Lambda vy rs (seqE [ex, ez, er]) (Variable r)
       unknown <-
-        Unify y <$> dsD expr
+        unify y <$> dsD expr
       if useKnown then
         pure $ If3 (applyPrimD "known$" y) known unknown
        else
@@ -325,17 +337,6 @@ applyPrim s e = ApplyS (Variable (Ident noLoc s)) e
 
 applyPrimD :: String -> SExpr -> SExpr
 applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
-
-newInt :: D Int
-newInt = do
-  n <- get
-  put $! n+1
-  pure n
-
-newIdent :: Loc -> String -> D Ident
-newIdent l s = do
-  n <- newInt
-  pure $ Ident l $ "$" ++ s ++ show n
 
 inVarM :: Expr -> D (Expr, Maybe Expr)
 inVarM e@Variable{} = pure (e, Nothing)
@@ -472,7 +473,7 @@ dsPArr l lhss ea = do
       let asId (Variable i) = pure i
           asId _ = newIdent l "d"
       xs <- mapM asId ls
-      let eun = Unify (Array (map (tAny l) xs)) e
+      let eun = unify (Array (map (tAny l) xs)) e
       elss <- zipWithM (\ lhs x -> if lhs == Variable x then pure [] else (:[]) <$> dsP l lhs (Variable x)) ls xs
       pure $ Seq $ concat elss ++ [eun]
 
@@ -582,6 +583,7 @@ dsDo = f
     f e = compos f e
 
 --------------------
+{-
 -- Make all Array take value arguments, as well as ApplyS/ApplyD
 anfS :: Expr -> D Expr
 anfS = anf
@@ -619,7 +621,7 @@ anfS = anf
       (es1, e1') <- value e1
       (es2, e2') <- value e2
       pure $ seqE $ es1 ++ es2 ++ [con e1' e2']
-
+-}
 {-
 unifyAnfS :: Expr -> D Expr
 unifyAnfS = anf
@@ -725,14 +727,18 @@ getFreeD e = getFree e \\ getVisible e
 
 --------------
 
+{-
 data ScopeErr
   = ErrMultiple [Ident]
   | ErrUndefined Ident
   | ErrShadow Ident
 --  deriving (Show)
+-}
 
-scopeCheck :: Expr -> D Expr
-scopeCheck e = do
+addScope :: Expr -> D Expr
+addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
+ where prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else prelude
+{-
   let errs = scopeErrs (S.fromList $ prel ++ primOps) (Do e)
       -- HACK: Recognize when we have loaded prelude.verse
       prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else prelude
@@ -751,6 +757,7 @@ scopeCheck e = do
     iis -> trace ("scopeCheck: warning shadowing " ++ show iis) $
            -- XXX Here we should patch up the shadowing problem
            pure e
+-}
 
 knownEffects :: [Ident]
 knownEffects = map (Ident noLoc) [
@@ -762,52 +769,77 @@ isLambdaEffect i = elem i [
   covariantId
   ]
 
-scopeErrs :: S.Set Ident -> Expr -> [ScopeErr]
-scopeErrs s = expr
+errUndefined :: [Ident] -> D ()
+errUndefined =
+  mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i))
+
+errShadow :: [Ident] -> D ()
+errShadow =
+  mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning shadowing " ++ prettyShow (l, i))
+
+errMultiple :: [[Ident]] -> D ()
+errMultiple =
+  mapM_ (\ is -> error $ "scopeCheck: Multiply defined " ++ prettyShow (head is) ++
+                         prettyShow [ l | Ident l _ <- is ])
+
+scope :: S.Set Ident -> Expr -> D Expr
+scope s = expr
   where
-    expr LitInt{} = []
-    expr LitRat{} = []
-    expr (Variable i) | i `S.member` s = []
-                      | otherwise = [ErrUndefined i]
-    expr (Array es) = concatMap expr es
-    expr (Seq es) = concatMap expr es
-    expr (ApplyS e1 e2) = expr e1 ++ expr e2
-    expr (ApplyD e1 e2) = expr e1 ++ expr e2
-    expr (ApplyEff is e) =
-      [ErrUndefined i | i <- is \\ knownEffects ] ++
+    expr e@LitInt{} = pure e
+    expr e@LitRat{} = pure e
+    expr e@(Variable i) | i `S.member` s = pure e
+                        | otherwise = do errUndefined [i]; pure e
+    expr (Array es) = Array <$> mapM expr es
+    expr (Seq es) = Seq <$> mapM expr es
+    expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
+    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+    expr (ApplyEff is e) = do
+      errUndefined (is \\ knownEffects)
       expr e
-    expr (If3 e1 e2 e3) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2) ++ expr (Do e3)
-      where (errs, s') = defs e1
-    expr (For2 e1 e2) = errs ++ scopeErrs s' e1 ++ scopeErrs s' (Do e2)
-      where (errs, s') = defs e1
-    expr (Let e1 e2) = errs ++ scopeErrs s' e1  ++ scopeErrs s' (Do e2)
-      where (errs, s') = defs e1
-    expr (Do e) = errs ++ scopeErrs s' e
-      where (errs, s') = defs e
-    expr (Function [] e2) = scopeErrs s (Do e2)
-    expr (Function ((a,_):ars) e2) = errs ++ scopeErrs s' (Function ars e2)
-      where (errs, s') = defs a
-    expr (Unify e1 e2) = expr e1 ++ expr e2
-    expr (Where e1 e2) = expr e1 ++ expr e2
-    expr (Define _ e) = expr e
-    expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
-    expr (Range e1) = expr e1
+    expr (If3 e1 e2 e3) = do
+      (e1', s') <- defs s e1
+      If3 e1' <$> scope s' e2 <*> expr e3
+    expr (For2 e1 e2) = do
+      (e1', s') <- defs s e1
+      For2 e1' <$> scope s' e2
+    expr (Let e1 e2) = do
+      (e1', s') <- defs s e1
+      Let e1' <$> scope s' e2
+    expr (Do e) = exprD e
+    expr (Function [] e2) = Function [] <$> exprD e2
+    expr (Function ((a,r):ars) e2) = do
+      (a', s') <- defs s a
+      f' <- scope s' (Function ars e2)
+      case f' of
+        Function ars' e2' -> pure (Function ((a',r):ars') e2')
+        _ -> undefined
+    expr (Unify e1 e2) = unify <$> expr e1 <*> expr e2
+    expr (Where e1 e2) = Where <$> expr e1 <*> expr e2
+    expr (Define i e) = unify (Variable i) <$> expr e
+    expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
+    expr (Range e1) = Range <$> expr e1
 --    expr (Typedef e1) = expr (Do e1)
-    expr (Macro1 _ [] e1) = expr (Do e1)
+    expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
-    expr (Lambda i _ e1 e2) = errs ++ scopeErrs s'' e1 ++ scopeErrs s'' (Do e2)
-      where (errs, s') = defs e1
-            s'' = S.insert i s'
-    expr AnyT = []
+    expr (Lambda i r e1 e2) = do
+      (e1', s') <- defs (S.insert i s) e1
+      Lambda i r e1' <$> scope s' (Do e2)
+    expr e@AnyT = pure e
+    expr e@EmptyT = pure e
     expr e = impossible e
 
-    defs :: Expr -> ([ScopeErr], S.Set Ident)
-    defs e =
+    exprD e = fst <$> defs s e
+
+    defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
+    defs as e = do
       let is = getVisible e
-          errM = map ErrMultiple $ filter ((> 1) . length) $ group $ sort is
-          errS = [ ErrShadow i | i <- is, i `S.member` s ]
-          s' = foldr S.insert s is
-      in  (errM ++ errS, s')
+          errM = filter ((> 1) . length) $ group $ sort is
+          errS = [ i | i <- is, i `S.member` s ]
+          s' = foldr S.insert as is
+      e' <- scope s' e
+      errMultiple errM
+      errShadow errS
+      pure (Exists is e', s')
 
 addDeref :: Expr -> D Expr
 addDeref = pure . exprD S.empty
@@ -830,7 +862,7 @@ addDeref = pure . exprD S.empty
     expr s (Do e) = Do (exprD s e)
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
-    expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
+    expr s (Unify e1 e2) = unify (expr s e1) (expr s e2)
     expr s (Where e1 e2) = Where (expr s e1) (expr s e2)
     expr s (Define i e) = Define i (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)

@@ -100,6 +100,7 @@ data Expr
   | AnyT                      -- :any
   | EmptyT                    -- :false
   | Wrong String              -- wrong
+  | Exists [Ident] Expr       -- exists xs . e
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -209,6 +210,7 @@ instance Pretty Expr where
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
           EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
+          Exists is e -> maybeParens (p > 0) $ text "exists" <+> hsep (map (ppr 0) is) <+> text "." <+> ppr 0 e
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -316,6 +318,7 @@ compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
 compos _ AnyT = pure AnyT
 compos _ EmptyT = pure EmptyT
 compos _ e@Wrong{} = pure e
+compos f (Exists is e) = Exists is <$> f e
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)

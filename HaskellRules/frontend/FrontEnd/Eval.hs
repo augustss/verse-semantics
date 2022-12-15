@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Eval(
   eval,
@@ -62,7 +63,7 @@ evalTrace s f flg e | not (traceEval flg) = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop (steps trc) $ evalTrace "eval" (const ea) trc (CWrong"")
+eval trc ea = loop (steps trc) $ evalTrace "eval" (const $ anf ea) trc (CWrong"")
   where
     -- HACK: Recognizer when we have loaded the prelude.verse file
     hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False
@@ -432,15 +433,15 @@ evalOne flg = evalTrace "evalOne" f flg
 evalApp :: EvalCore
 evalApp flg = evalTrace "evalApp" f flg
   where
-    f (CApply (CLam i e1) v2) = f $ subst i' v2 e1'
+    f (CApply (CLam i e1) (CValue v2)) = f $ subst i' v2 e1'
       where (i', e1') | i `elem` vs = (x, subst i (CVar x) e1)
                       | otherwise = (i, e1)
             vs = fvs v2
             x = head $ newVars "i" vs
-    f (CApply (CArray vs) vi) = cBar $ zipWith g [0..] vs
+    f (CApply (CArray vs) (CValue vi)) = cBar $ zipWith g [0..] vs
       where g i v = CSeq [CUnify (CValue vi) (CInt i), CValue v]
     f e@(CApply CPrim{} _) = composOpLam (underLambda flg) f e
-    f (CApply HNF{} _) = CWrong "APP-CONST-WRONG"
+    f (CApply HNF{} CValue{}) = CWrong "APP-CONST-WRONG"
     f e = composOpLam (underLambda flg) f e
 
 -- Handle CSeq in odd places
@@ -679,3 +680,31 @@ composOpLam underLam f = composOp f'
   where
     f' e@CLam{} | not underLam = e
     f' e = f e
+
+anf :: Core -> Core
+anf = flip evalState (1::Int) . expr
+  where
+    expr e@CArray{} = val e
+    expr (CApply e1 e2) = do
+      (es1, v1) <- value e1
+      (es2, v2) <- value e2
+      defs (es1 ++ es2) (CApply v1 v2)
+    expr e = compos expr e
+    val e = do
+      (es, v) <- value e
+      defs es v
+    value (CArray es) = do
+      (ess, vs) <- unzip <$> mapM value es
+      pure (concat ess, CArray vs)
+    value e@CLam{} = ([],) <$> expr e
+    value (CValue v) = pure ([], v)
+    value e = do
+      e' <- expr e
+      i <- newIdent "b"
+      pure ([(i, e')], CVar i)
+    newIdent s = do
+      i <- get
+      put $! i+1
+      pure $ Ident noLoc $ s ++ show i
+    defs ies r =
+      pure $ cDef (map fst ies) $ cSeq $ [ CUnify (CVar i) e | (i, e) <- ies ] ++ [r]

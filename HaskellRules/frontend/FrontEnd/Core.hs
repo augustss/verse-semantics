@@ -29,7 +29,6 @@ import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
--- import Text.Megaparsec.Char(skip)
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
@@ -37,7 +36,6 @@ import FrontEnd.Desugar(primOps, getVisible, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
-import Epic.List(pattern Snoc)
 --import Debug.Trace
 
 data Core
@@ -143,7 +141,7 @@ newTmp = do
 
 exprToCore :: Flags -> Expr -> Core
 --exprToCore _ e | trace ("exprToCore: " ++ prettyShow e) False = undefined
-exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
+exprToCore flg e = flip evalState 1 . flip runReaderT flg . core $ e
 
 core :: HasCallStack => Expr -> C Core
 core (LitInt i) = pure (CInt i)
@@ -151,44 +149,31 @@ core (LitRat i _) = pure (CRat $ toRational i)
 core (Variable i@(Ident _ s)) | i `elem` primOps = pure (CPrim s)
                               | otherwise = pure (CVar i)
 core (Array es) = CArray <$> mapM core es
-{-
-core (Typedef e) = do
-  i <- newTmp
-  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
--}
-core (Function [(Define x AnyT, fs)] b) = CLam x . attr <$> coreD b
-  where attr ae = foldr CMacro ae fs
---core (Lambda i [] e1 e2) = core $ lamFunc True i e1 e2
 core AnyT = pure (CPrim ":any")
 core (Wrong s) = pure $ CWrong s
-core (Seq (Snoc es e)) = seqC <$> mapM core (Snoc (filter p es) e)
-  where p (Define _ AnyT) = False
-        p _ = True
+core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
-core (ApplyEff rs e) = coreEffs rs =<< coreD e
+core (ApplyEff rs e) = coreEffs rs =<< core e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = core e
-core e@Choice{} = cBar <$> mapM coreD (flat e)
+core e@Choice{} = cBar <$> mapM core (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
-core (Define i AnyT) = pure $ CVar i
-core (Define i e) = cUnify (CVar i) <$> core e
 core Fail = pure $ CFail
-core (For2 e1@(Define i e) e2@(Variable i')) | i == i' = do
+core (For2 e1@(Exists (i:is) (Unify (Variable i') e)) e2@(Variable i'')) | i == i' && i == i'' = do
   useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
    else
-    cAll =<< coreD e
+    cAll =<< core (Exists is e)
 core (For2 e1 e2) = do
   useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
    else do
-    e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
-    ee <- coreD (seqE [e1, e2'])
+    ee <- coreBind e1 e2
     ea <- cAll ee
     xa <- newTmp
     pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
@@ -197,20 +182,16 @@ core (If3 e1 e2 e3) = do
   if isValue' c1 then
     core e2
    else do
-    e2' <- thunk e2
     e3' <- thunk e3
-    l <- coreD (seqE [e1, e2'])
+    l <- coreBind e1 e2
     r <- core e3'
     fn <- cOne $ CBar l r
     i <- newTmp
     pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (CVar i) vEmpty]
---core e@Function{} = val e
-core (Do e) = coreD e
-core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
-core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
-core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
-core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
-core (Lambda i [] (Array []) e) = core $ Function [(Define i AnyT, [])] e
+core (Macro1 (Ident _ "all") [] e) = cAll =<< core e
+core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
+core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
+core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
 core (Lambda i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
@@ -218,28 +199,33 @@ core (Lambda i rs e1 e2) = do
   if timLam then do
     let is = getVisible e1
     e1' <- core e1
-    e2' <- coreD e2
+    e2' <- core e2
     pure $ CLambda i is covariant e1' e2'
   else
-    core $ lamFunc covariant i e1 e2
+    lamFunc covariant i e1 e2
 core EmptyT = pure CFail
+core (Exists is e) = cDef is <$> core e
 core e = impossible e
 
--- Is the expression non-failing and contains no binders
-trivial :: Expr -> Bool
-trivial Array{} = True
-trivial (ApplyD (Variable (Ident _ "any")) _) = True
-trivial _ = False
+coreBind :: Expr -> Expr -> C Core
+coreBind (Exists is e1) e2 = do
+  e2' <- thunk e2
+  core (Exists is (seqE [e1, e2']))
+coreBind e _ = error $ "coreBind: " ++ prettyShow e
 
-lamFunc :: Bool -> Ident -> Expr -> Expr -> Expr
-lamFunc cov i e1 e2 =
-  Function [(Define i AnyT, [])] $
-    if e1 == Array [] then
+lambda :: Ident -> [Ident] -> Expr -> C Core
+lambda x fs b = CLam x . attr <$> core b
+  where attr ae = foldr CMacro ae fs
+
+lamFunc :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
+--lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
+lamFunc cov i (Exists is e1) e2 =
+  lambda i [] $
+    if null is && e1 == Array [] then
       e2
-    else if trivial e1 then
-      Seq [e1, e2]
     else
-      If3 e1 e2 (if cov then Fail else Wrong "outside domain")
+      If3 (Exists is e1) e2 (if cov then Fail else Wrong "outside domain")
+lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -257,8 +243,8 @@ forSplit e1 e2 = do
   a <- newTmp
   b <- newTmp
   let vs = getVisible e1
-  e1' <- coreD (Seq [e1, Array $ map Variable vs])
-  e2' <- coreD e2
+  e1' <- core (Seq [e1, Array $ map Variable vs])
+  e2' <- core e2
   let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
       gDef e = CDef [g] (cSeq [CUnify (CVar g) $
                                CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
@@ -346,43 +332,12 @@ cUnify :: Core -> Core -> Core
 cUnify e (CPrim ":any") = e
 cUnify e1 e2 = CUnify e1 e2
 
-coreD :: HasCallStack => Expr -> C Core
-coreD e | null is = core e
-        | otherwise = CDef is <$> core e
-  where is = getVisible e
-
-{-
-val :: HasCallStack => Expr -> C Core
-val e = CValue <$> value e
-
-value :: HasCallStack => Expr -> C Value
---value e | trace ("value:\n" ++ prettyShow e) False = undefined
-value (LitInt i) = pure (HNF $ HInt i)
-value (LitRat i _) = pure (HNF $ HRat $ toRational i)
-value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
-                               | otherwise = pure (Var i)
-value (Array es) = CArray <$> mapM value es
-{-
-value (Typedef e) = do
-  i <- newTmp
-  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
--}
-value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
-  where attr ae = foldr CMacro ae fs
-value (Lambda i [] e1 e2) = value $ lamFunc True i e1 e2
-value AnyT = pure (HNF $ HPrim ":any")
-value e = internalErrorMsg $ "value: not a value\n" ++ show e
--}
-
---eVar :: String -> Expr
---eVar = Variable . Ident noLoc
-
 thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
   pure $ -- Function [(Define i AnyT, [])] e
-         Lambda i [] (Array []) e
+         Lambda i [] (Exists [] $ Array []) e
 
 ------
 
