@@ -844,7 +844,8 @@ The choice operator, |choice|, serves as both |cons| and |append| for choices.
       |applyN filter (p, xsl)| & := & |all (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
       |applyN find (p, xsl)| & := & |one (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
       |applyN every (p, xsl)| & := & |applyN map (p,xsl)| \\
-      |applyN fromTo (lo,hi)| & := & |all (if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi)))|
+      |applyN fromTo (lo,hi)| & := & |all (if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi)))| \\
+      |applyN zip (xsl,ysl)| & := & |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
     \end{array}
   \end{array}
   $$
