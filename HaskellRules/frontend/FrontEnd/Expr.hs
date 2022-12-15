@@ -92,7 +92,6 @@ data Expr
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
-  | Define2 Ident Ident Expr  -- i~x := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
@@ -203,7 +202,6 @@ instance Pretty Expr where
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          Define2 i j e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Ident noLoc "~>") (Variable j)) (Ident noLoc ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
           Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
@@ -310,7 +308,6 @@ compos f (Macro1 m as b) = Macro1 m as <$> f b
 compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Return e) = Return <$> f e
 compos f (Define i e) = Define i <$> f e
-compos f (Define2 i j e) = Define2 i j <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Where e1 e2) = Where <$> f e1 <*> f e2

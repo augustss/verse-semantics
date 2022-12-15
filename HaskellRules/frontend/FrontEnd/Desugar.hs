@@ -191,7 +191,6 @@ dsD = expr
 
     -- Make it idempotent
     expr (Define i e) = Define i <$> expr e
-    expr (Define2 i j e) = Define2 i j <$> expr e
     expr (Choice e1 e2) = Choice <$> expr e1 <*> expr e2
     expr (Unify e1 e2) = unify <$> expr e1 <*> expr e2
     expr (Where e1 e2) = Where <$> expr e1 <*> expr e2
@@ -278,9 +277,6 @@ dsM expr y =
 --    Typedef{} -> dflt
     Macro1{} -> dflt
     Define i e -> Define i <$> dsM e y
-    Define2 j i e -> do
-      e' <- dsM e y
-      pure $ Seq [Define j y, Define i e']
     Choice e1 e2 -> Choice <$> dsM e1 y <*> dsM e2 y
     Range e -> pure $ ApplyD e y
     AnyT -> dflt
@@ -459,7 +455,8 @@ dsP l (InfixOp i (Ident _ "->") x) e = do
       Variable x' -> pure (x', [])
       _ -> do x' <- newIdent l "x"; dx <- dsP l x (Variable x'); pure (x', [dx])
   e' <- dsD e
-  pure $ seqE $ di ++ dx ++ [Define2 i' x' e']
+  e'' <- dsM e' (Variable i')
+  pure $ seqE $ di ++ dx ++ [tAny noLoc i', Define x' e'']
 
 -- What else is allowed?  LitInt and LitRat would be easy.
 dsP l x y = syntaxError l $ "Illegal LHS of ':=' " ++ prettyShow x ++ ", RHS=" ++ prettyShow y
@@ -582,11 +579,6 @@ dsDo = f
       e' <- f e
       pure $ ApplyD e' (tAny noLoc r)
 
-    f (Define2 i x e) = do
-      e' <- dsM e (Variable i)
-      e'' <- f e'
-      pure $ Seq [tAny noLoc i, Define x e'']
-
     f e = compos f e
 
 --------------------
@@ -669,7 +661,6 @@ getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible Macro1 {} = []
 getVisible (Define i e) = i : getVisible e
-getVisible (Define2 i j e) = i : j : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible AnyT = []
@@ -696,7 +687,6 @@ getVar (Where e1 e2) = getVar e1 ++ getVar e2
 --getVar (Typedef _) = []
 getVar Macro1 {} = []
 getVar (Define _ e) = getVar e
-getVar (Define2 _ _ e) = getVar e
 getVar Choice{} = []
 getVar (Set _ _ e) = getVar e
 getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
@@ -800,7 +790,6 @@ scopeErrs s = expr
     expr (Unify e1 e2) = expr e1 ++ expr e2
     expr (Where e1 e2) = expr e1 ++ expr e2
     expr (Define _ e) = expr e
-    expr (Define2 _ _ e) = expr e
     expr (Choice e1 e2) = expr (Do e1) ++ expr (Do e2)
     expr (Range e1) = expr e1
 --    expr (Typedef e1) = expr (Do e1)
@@ -844,7 +833,6 @@ addDeref = pure . exprD S.empty
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
     expr s (Where e1 e2) = Where (expr s e1) (expr s e2)
     expr s (Define i e) = Define i (expr s e)
-    expr s (Define2 i j e) = Define2 i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
       where op = Ident l ("in'" ++ sop ++ "'")
