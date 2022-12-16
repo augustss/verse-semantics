@@ -49,7 +49,7 @@ library
     Language.Verse.Pos
     Language.Verse.Token
     Language.Verse.Val
-  build-tool-depends: alex:alex, happy:happy
+  build-tool-depends:
   build-depends:
     base >= 4.16.0.0,
     array,

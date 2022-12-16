@@ -51,6 +51,7 @@ data Token
   | Exists
   | Lambda
   | Truth
+  | Array
   | False
   | True
   | Fail
@@ -104,6 +105,7 @@ instance Pretty Token where
     Exists -> "exists"
     Lambda -> "lambda"
     Truth -> "truth"
+    Array -> "array"
     False -> "false"
     True -> "true"
     Fail -> "fail"

@@ -43,7 +43,21 @@ $space = [\ \t]
 <0, nested, maybeNesting> {
   " " { space }
   \t { tab }
+}
+
+<0, nested, maybeNesting, blockComment> {
   @newline { newline }
+}
+
+<0, nested, maybeNesting, indented> {
+  "#" .* ;
+  "<#" { leftBlockComment }
+}
+
+<blockComment> {
+  \t { tabBlockComment }
+  "#>" { rightBlockComment }
+  . { textBlockComment }
 }
 
 <0> "" { empty0 }
@@ -66,8 +80,6 @@ $space = [\ \t]
 <nesting> "" { emptyNesting }
 
 <indented> {
-  "#" .* ;
-  "<#" [.\n]* "#>" ;
   [\ \t]+ ;
   @newline { newlineIndented }
   ":" $space* @newline { colonEOL }
@@ -116,6 +128,7 @@ $space = [\ \t]
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
+  "array" { token Token.Array }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
   $alpha $alnum* { name }
@@ -183,6 +196,30 @@ tab = action $ do
 newline :: Action
 newline = action $ do
   putIndent []
+  getToken
+
+leftBlockComment :: Action
+leftBlockComment = action $ do
+  pushStates blockComment
+  pushIndent Space
+  pushIndent Space
+  getToken
+
+tabBlockComment :: Action
+tabBlockComment = action $ do
+  pushIndent Tab
+  getToken
+
+textBlockComment :: Action
+textBlockComment = action $ do
+  pushIndent Space
+  getToken
+
+rightBlockComment :: Action
+rightBlockComment = action $ do
+  pushIndent Space
+  pushIndent Space
+  popStates
   getToken
 
 empty0 :: Action
