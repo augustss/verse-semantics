@@ -122,8 +122,8 @@ MaybeCommas :: { L (Exp L Name) }
   | Exp { $1 }
 
 Commas :: { L [L (Exp L Name)] }
-  : Exp ',' Exp { (\ x y -> [x, y]) <\$> duplicate $3 <.> duplicate $1 }
-  | Commas ',' Exp { (:) <\$> duplicate $3 <.> $1 }
+  : Exp ',' Scan Exp { (\ x y -> [x, y]) <\$> duplicate $4 <.> duplicate $1 }
+  | Commas ',' Scan Exp { (:) <\$> duplicate $4 <.> $1 }
 
 Exp :: { L (Exp L Name) }
   : '(' ')' { $1 \$> Exp.Tuple [] <. $2 }
