@@ -1,8 +1,9 @@
 const path = require('path');
 const webpack = require('webpack');
+const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
-    mode: 'production',
+    mode: 'development',
     externals: {
         'wasmer_wasi_js_bg.wasm': true
     },
@@ -13,6 +14,13 @@ module.exports = {
     plugins: [
         new webpack.ProvidePlugin({
             Buffer: ['buffer', 'Buffer']
+        }),
+        new CopyPlugin({
+            patterns: [
+                {
+                    from: 'static'
+                }
+            ]
         })
     ],
     resolve: {
@@ -24,14 +32,9 @@ module.exports = {
         client: {
             overlay: false
         },
-        static: [
-            {
-                directory: path.join(__dirname, 'static'),
-            },
-            {
-                directory: path.join(__dirname, 'dist'),
-            }
-        ],
+        static: {
+            directory: path.join(__dirname, "dist")
+        },
         headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",

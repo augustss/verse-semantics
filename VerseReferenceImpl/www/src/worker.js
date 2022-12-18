@@ -2,14 +2,22 @@ import { init, WASI } from '@wasmer/wasi';
 
 await init();
 
-const module = await WebAssembly.compileStreaming(fetch('./verse.wasm'));
+const compile = () => WebAssembly.compileStreaming(fetch('./verse.wasm'))
+
+let module = await compile();
 
 self.onmessage = async ({ data: { stdinString } }) => {
     const wasi = new WASI({
         env: {},
         args: []
     });
-    const instance = wasi.instantiate(module, {});
+    let instance;
+    try {
+        wasi.instantiate(module, {});
+    } catch (e) {
+        module = await compile();
+        wasi.instantiate(module, {});
+    }
     const stdin = wasi.fs.open('in', {
         create: true,
         write: true,

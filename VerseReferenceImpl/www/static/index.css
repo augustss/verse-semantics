@@ -22,7 +22,7 @@ h1, p {
     padding: 0px;
     height: 600px;
     display: grid;
-    grid-template-columns: 50% 50%;
+    grid-template-columns: 33% 33% 33%;
     grid-template-rows: 100%;
     grid-gap: 1.5rem;
 }
@@ -36,8 +36,6 @@ h1, p {
     box-sizing: border-box;
     border-radius: 10px;
     background: var(--panel-background);
-    /* color: #93a1a1; */
-    /* color: #cacaca; */
     color: #efefef;
     font-size: 14px;
     overflow: auto;
@@ -48,6 +46,6 @@ h1, p {
     outline: none;
 }
 
-#out {
+#out, #err {
     white-space: pre-wrap
 }
