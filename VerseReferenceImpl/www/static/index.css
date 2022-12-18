@@ -1,6 +1,4 @@
 body {
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    font-size: 16px;
     background-color: #eee8d5;
     max-width: 1200px;
     margin: 0px auto;
@@ -13,7 +11,8 @@ body {
     --panel-background: #002b36;
 }
 
-h1, p {
+h1 {
+    font-family: 'Alex Brush', cursive;
     padding: 0px 10px;
 }
 
@@ -22,7 +21,7 @@ h1, p {
     padding: 0px;
     height: 600px;
     display: grid;
-    grid-template-columns: 33% 33% 33%;
+    grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: 100%;
     grid-gap: 1.5rem;
 }
