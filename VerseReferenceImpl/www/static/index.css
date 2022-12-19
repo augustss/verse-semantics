@@ -40,6 +40,20 @@ h1 {
     overflow: auto;
 }
 
+.panel::-webkit-scrollbar {
+    width: 12px;               /* width of the entire scrollbar */
+}
+
+.panel::-webkit-scrollbar-track {
+    border-radius: 10px;
+}
+
+.panel::-webkit-scrollbar-thumb {
+  background-color: #93a1a1;    /* color of the scroll thumb */
+  border-radius: 10px;       /* roundness of the scroll thumb */
+  border: 3px solid #002b36;  /* creates padding around scroll thumb */
+}
+
 #in {
     resize: none;
     outline: none;

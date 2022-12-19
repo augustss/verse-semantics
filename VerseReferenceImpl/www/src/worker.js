@@ -18,13 +18,7 @@ const readFile = (fs, path) => {
 
 let module = await compileStreaming();
 
-const instantiate = (module, wasi) => {
-    try {
-        return wasi.instantiate(module, {});
-    } catch (e) {
-        return instantiate(module, wasi);
-    }
-};
+const instantiate = (module, wasi) => wasi.instantiate(module, {});
 
 self.onmessage = async ({ data: { stdinString } }) => {
     const wasi = new WASI({
