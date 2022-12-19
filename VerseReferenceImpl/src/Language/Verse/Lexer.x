@@ -272,7 +272,6 @@ leftBraceMaybeNesting i j _ _ = do
 emptyMaybeNesting :: Action
 emptyMaybeNesting i j _ _ = do
   popStates
-  pushStates maybeNewline
   pushStates nested
   pure $ L (Loc i j) Token.Indent
 
@@ -281,7 +280,6 @@ emptyNesting i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []
-  pushStates maybeNewline
   pushStates nested
   pure $ L (Loc i j) Token.Indent
 
