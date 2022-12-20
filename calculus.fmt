@@ -200,6 +200,7 @@
 %format x_n
 
 %format h_1
+%format h_2
 %format h_n
 %format h_i
 
@@ -281,6 +282,9 @@
 %format ce_3
 %format ce_n
 %format ce_m
+%format sf_1 = "se_1"
+%format sf_2 = "se_2"
+%format sf = "se"
 
 %format p_0
 %format p_1
