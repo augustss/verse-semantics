@@ -2255,7 +2255,7 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
                                               \\
       \text{Results}            & w   & ::= & |v| \vb |v `choice` e| \\
       \text{Non-store primops}  & sp  & ::= & \text{any, except } |alloc|, |read|, |write| \\
-      \text{Non-store expression} & oe  & ::= & \text{like |e|, that is not |w|, and also with no |storeKW| in it} \\
+      \text{Non-store expression} & oe  & ::= & \text{like |e|, that is not |w|, and also not a |storeKW|} \\
     \end{array} \\
 \\
 
@@ -2270,11 +2270,12 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
   \end{array} \\
     \\
 
-  \textit{Store copy/delete} \\
+  \textit{Store duplication} \\
   \begin{array}{lrcll}
     \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
     \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \\
-    \rulename{st-fail}     & |store h fail| & \movesto & |fail| \\
+%% FAIL rules handles this
+%%    \rulename{st-fail}     & |store h fail| & \movesto & |fail| \\
   \end{array} \\
 
     \\
