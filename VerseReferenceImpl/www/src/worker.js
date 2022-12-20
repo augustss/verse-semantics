@@ -39,9 +39,8 @@ const start = (stdinString) => {
         truncate: true
     });
     stdin.writeString(stdinString);
-    let exitCode;
     try {
-        exitCode = wasi.start(instance);
+        return wasi.start(instance);
     } catch (e) {
         wasi = new WASI({
             env: {},
