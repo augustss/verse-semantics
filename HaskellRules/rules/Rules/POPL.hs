@@ -349,7 +349,10 @@ rulesApplication _ lhs =
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
-     pure (foldr (:|:) Fail [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+     if null vs then
+       pure Fail
+      else
+       pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
 rulesUnification :: ERule
