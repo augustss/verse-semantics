@@ -4,8 +4,6 @@ await init();
 
 const compileStreaming = () => WebAssembly.compileStreaming(fetch('./verse.wasm'));
 
-const instantiate = (module, wasi) => wasi.instantiate(module, {});
-
 const moveFile = (fs, path) => {
     let file;
     try {
@@ -22,35 +20,42 @@ const moveFile = (fs, path) => {
 
 const module = await compileStreaming();
 
-const wasi = new WASI({
+let wasi = new WASI({
     env: {},
     args: []
 });
 
-const instance = instantiate(module, wasi);
+let instance = wasi.instantiate(module, {});
 
-const memory = instance.exports.memory;
+let memory = instance.exports.memory;
 
 const initialBuffer = new ArrayBuffer(memory.buffer.byteLength);
 new Uint8Array(initialBuffer).set(new Uint8Array(memory.buffer));
 
-const withMemory = f => {
+const start = (stdinString) => {
+    const stdin = wasi.fs.open('/in', {
+        create: true,
+        write: true,
+        truncate: true
+    });
+    stdin.writeString(stdinString);
+    let exitCode;
     try {
-        f();
-    } finally {
-        new Uint8Array(memory.buffer).set(new Uint8Array(initialBuffer));
+        exitCode = wasi.start(instance);
+    } catch (e) {
+        wasi = new WASI({
+            env: {},
+            args: []
+        });
+        instance = wasi.instantiate(module, {});
+        memory = instance.exports.memory;
+        return start(stdinString);
     }
-}
+};
 
 self.onmessage = ({ data: { stdinString } }) => {
-    withMemory(() => {
-        const stdin = wasi.fs.open('/in', {
-            create: true,
-            write: true,
-            truncate: true
-        });
-        stdin.writeString(stdinString);
-        const exitCode = wasi.start(instance);
+    try {
+        const exitCode = start(stdinString);
         const stdoutString = moveFile(wasi.fs, '/out');
         const stderrString = moveFile(wasi.fs, '/err');
         self.postMessage({
@@ -58,5 +63,7 @@ self.onmessage = ({ data: { stdinString } }) => {
             stdoutString,
             stderrString
         });
-    });
+    } finally {
+        new Uint8Array(memory.buffer).set(new Uint8Array(initialBuffer));
+    }
 };

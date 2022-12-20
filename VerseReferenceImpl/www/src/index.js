@@ -9,25 +9,18 @@ window.addEventListener('DOMContentLoaded', event => {
     if (stdinString) {
         stdin.textContent = stdinString;
     }
-    const stderrString = localStorage.getItem('stderr');
-    if (stderrString) {
-        out.textContent = stderrString;
-    } else {
-        const stdoutString = localStorage.getItem('stdout');
-        if (stdoutString) {
-            out.textContent = stdoutString;
-        }
+    const outString = localStorage.getItem('out');
+    if (outString) {
+        out.textContent = outString;
     }
 });
 
 worker.onmessage = ({ data: { exitCode, stdoutString, stderrString } }) => {
     localStorage.setItem('stdout', stdoutString);
     localStorage.setItem('stderr', stderrString);
-    if (stderrString) {
-        out.textContent = stderrString;
-    } else if (stdoutString) {
-        out.textContent = stdoutString;
-    }
+    const outString = stderrString? stderrString : stdoutString;
+    localStorage.setItem('out', outString);
+    out.textContent = outString;
 };
 
 stdin.addEventListener('input', event => {
