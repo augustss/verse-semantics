@@ -4,7 +4,9 @@ await init();
 
 const compileStreaming = () => WebAssembly.compileStreaming(fetch('./verse.wasm'));
 
-const readFile = (fs, path) => {
+const instantiate = (module, wasi) => wasi.instantiate(module, {});
+
+const moveFile = (fs, path) => {
     let file;
     try {
         file = fs.open(path, {
@@ -13,31 +15,48 @@ const readFile = (fs, path) => {
     } catch (e) {
         return '';
     }
-    return file.readString();
+    const result = file.readString();
+    fs.removeFile(path);
+    return result;
 };
 
-let module = await compileStreaming();
+const module = await compileStreaming();
 
-const instantiate = (module, wasi) => wasi.instantiate(module, {});
+const wasi = new WASI({
+    env: {},
+    args: []
+});
 
-self.onmessage = async ({ data: { stdinString } }) => {
-    const wasi = new WASI({
-        env: {},
-        args: []
-    });
-    const instance = instantiate(module, wasi);
-    const stdin = wasi.fs.open('in', {
-        create: true,
-        write: true,
-        truncate: true
-    });
-    stdin.writeString(stdinString);
-    const exitCode = wasi.start(instance);
-    const stdoutString = readFile(wasi.fs, 'out');
-    const stderrString = readFile(wasi.fs, 'err');
-    self.postMessage({
-        exitCode,
-        stdoutString,
-        stderrString
+const instance = instantiate(module, wasi);
+
+const memory = instance.exports.memory;
+
+const initialBuffer = new ArrayBuffer(memory.buffer.byteLength);
+new Uint8Array(initialBuffer).set(new Uint8Array(memory.buffer));
+
+const withMemory = f => {
+    try {
+        f();
+    } finally {
+        new Uint8Array(memory.buffer).set(new Uint8Array(initialBuffer));
+    }
+}
+
+self.onmessage = ({ data: { stdinString } }) => {
+    withMemory(() => {
+        const stdin = wasi.fs.open('/in', {
+            create: true,
+            write: true,
+            truncate: true
+        });
+        stdin.writeString(stdinString);
+        const exitCode = wasi.start(instance);
+        const stdoutString = moveFile(wasi.fs, '/out');
+        const stderrString = moveFile(wasi.fs, '/err');
+        self.postMessage({
+            exitCode,
+            stdoutString,
+            stderrString
+        });
     });
 };

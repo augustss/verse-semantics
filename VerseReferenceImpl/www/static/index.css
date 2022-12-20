@@ -3,15 +3,10 @@ body {
     max-width: 1200px;
     margin: 0px auto;
     padding: 5px;
-    color: #073642;
-    --keyword-color: #93a1a1;
-    --name-color: LightGreen;
-    --type-color: LightBlue;
-    --no-value-color: Gray;
-    --panel-background: #002b36;
 }
 
 h1 {
+    color: #073642;
     font-family: 'Alex Brush', cursive;
     padding: 0px 10px;
 }
@@ -19,10 +14,10 @@ h1 {
 #content {
     width: 100%;
     padding: 0px;
-    height: 600px;
+    height: 800px;
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 100%;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
     grid-gap: 1.5rem;
 }
 
@@ -34,14 +29,14 @@ h1 {
     height: 100%;
     box-sizing: border-box;
     border-radius: 10px;
-    background: var(--panel-background);
+    background: #002b36;
     color: #efefef;
     font-size: 14px;
     overflow: auto;
 }
 
 .panel::-webkit-scrollbar {
-    width: 12px;               /* width of the entire scrollbar */
+    width: 12px;
 }
 
 .panel::-webkit-scrollbar-track {
@@ -49,9 +44,9 @@ h1 {
 }
 
 .panel::-webkit-scrollbar-thumb {
-  background-color: #93a1a1;    /* color of the scroll thumb */
-  border-radius: 10px;       /* roundness of the scroll thumb */
-  border: 3px solid #002b36;  /* creates padding around scroll thumb */
+  background-color: #efefef;
+  border-radius: 10px;
+  border: 3px solid #002b36;
 }
 
 #in {
