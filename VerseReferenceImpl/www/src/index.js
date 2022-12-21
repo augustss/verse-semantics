@@ -1,8 +1,8 @@
 const worker = new Worker(new URL('./worker.js', import.meta.url));
 
-const stdin = document.querySelector('#in');
+const stdin = document.getElementById('in');
 
-const out = document.querySelector('#out');
+const out = document.getElementById('out');
 
 window.addEventListener('DOMContentLoaded', event => {
     const stdinString = localStorage.getItem('stdin');

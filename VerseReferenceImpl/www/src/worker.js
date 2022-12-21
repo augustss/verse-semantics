@@ -4,7 +4,7 @@ await init();
 
 const compileStreaming = () => WebAssembly.compileStreaming(fetch('./verse.wasm'));
 
-const moveFile = (fs, path) => {
+const moveFileToString = (fs, path) => {
     let file;
     try {
         file = fs.open(path, {
@@ -13,56 +13,63 @@ const moveFile = (fs, path) => {
     } catch (e) {
         return '';
     }
-    const result = file.readString();
-    fs.removeFile(path);
-    return result;
+    try {
+        return file.readString();
+    } finally {
+        fs.removeFile(path);
+    }
 };
 
-const module = await compileStreaming();
-
-let wasi = new WASI({
-    env: {},
-    args: []
-});
-
-let instance = wasi.instantiate(module, {});
-
-let memory = instance.exports.memory;
-
-const initialBuffer = new ArrayBuffer(memory.buffer.byteLength);
-new Uint8Array(initialBuffer).set(new Uint8Array(memory.buffer));
-
-const start = (stdinString) => {
-    const stdin = wasi.fs.open('/in', {
+const writeFile = (fs, path, string) => {
+    const file = fs.open(path, {
         create: true,
         write: true,
         truncate: true
     });
-    stdin.writeString(stdinString);
+    file.writeString(string);
+};
+
+const module = await compileStreaming();
+
+let wasi;
+let instance;
+let memory;
+
+const instantiate = () => {
+    wasi  = new WASI({
+        env: {},
+        args: []
+    });
+    instance = wasi.instantiate(module, {});
+    memory = instance.exports.memory;
+};
+
+instantiate();
+
+const initialArray = new Uint8Array(new ArrayBuffer(memory.buffer.byteLength));
+initialArray.set(new Uint8Array(memory.buffer));
+
+const start = (stdinString) => {
+    writeFile(wasi.fs, '/in', stdinString);
     try {
         return wasi.start(instance);
     } catch (e) {
-        wasi = new WASI({
-            env: {},
-            args: []
-        });
-        instance = wasi.instantiate(module, {});
-        memory = instance.exports.memory;
-        return start(stdinString);
+        instantiate();
+        writeFile(wasi.fs, '/in', stdinString);
+        return wasi.start(instance);
+    } finally {
+        const array = new Uint8Array(memory.buffer);
+        array.set(initialArray);
     }
 };
 
 self.onmessage = ({ data: { stdinString } }) => {
-    try {
-        const exitCode = start(stdinString);
-        const stdoutString = moveFile(wasi.fs, '/out');
-        const stderrString = moveFile(wasi.fs, '/err');
-        self.postMessage({
-            exitCode,
-            stdoutString,
-            stderrString
-        });
-    } finally {
-        new Uint8Array(memory.buffer).set(new Uint8Array(initialBuffer));
-    }
+    const exitCode = start(stdinString);
+    const stdoutString = moveFileToString(wasi.fs, '/out');
+    const stderrString = moveFileToString(wasi.fs, '/err');
+    self.postMessage({
+        exitCode,
+        stdoutString,
+        stderrString
+    });
 };
