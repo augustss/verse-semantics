@@ -38,6 +38,9 @@ testqcconf:
 	$(QCTEST) --rules=POPLV --ignore-fuel-stop
 	$(QCTEST) --rules=POPLV --max-success=30
 
+teststore:
+	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
+
 clean:
 	cabal clean
 	rm -rf *~ objs-*

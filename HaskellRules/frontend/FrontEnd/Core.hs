@@ -13,11 +13,12 @@ module FrontEnd.Core(
   exprToCore,
   cSeq, cDef, cBar,
   isValue,
-  fvs, cfvs,
+  fvs, cfvs, fvsS,
   subst,
   alphaConvert,
   pCore, pCoreFile,
   Ident(..), noLoc,
+  storeAlloc, storeRead, storeWrite, storeEmpty, storePrint,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad
@@ -25,6 +26,7 @@ import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Data.Data(Data)
+import qualified Data.IntMap as IM
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
@@ -32,7 +34,7 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
-import FrontEnd.Desugar(primOps, getVisible, covariantId)
+import FrontEnd.Desugar(primOps, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
@@ -43,6 +45,7 @@ data Core
   | CInt Integer
   | CRat Rational
   | CPrim String
+  | CPtr Ptr
   | CArray [Value]
   | CLam Ident Core
   | CUnify Core Core
@@ -55,11 +58,17 @@ data Core
   | CWrong String
   | CSplit Core Value Value
   | CLambda Ident [Ident] Bool Core Core
+  -- Store primitives
+  | CStore Store Core
   deriving (Show, Eq, Data)
 
 type Value = Core
 
 type Heap = [Ident]
+
+data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
+  deriving (Show, Eq, Data)
+type Ptr = Int
 
 pattern COne :: Core -> Core
 pattern COne c <- CMacro (Ident _ "one") c
@@ -102,6 +111,7 @@ getHNF e@CInt{} = Just e
 getHNF e@CRat{} = Just e
 getHNF e@CArray{} = Just e
 getHNF e@CPrim{} = Just e
+getHNF e@CPtr{} = Just e
 getHNF e@CLam{} = Just e
 getHNF _ = Nothing
 
@@ -341,11 +351,41 @@ thunk e = do
 
 ------
 
+storeAlloc :: Value -> Store -> (Store, Ptr)
+storeAlloc v s@Store{refMap = m} =
+  let p = maybe 0 (succ . fst) $ IM.lookupMax m
+  in  (s{refMap = IM.insert p v m}, p)
+
+storeRead :: Ptr -> Store -> Value
+storeRead p Store{refMap = m } =
+  fromMaybe (error $ "Ptr not in store: " ++ show p) $ IM.lookup p m
+
+storeWrite :: Ptr -> Value -> Store -> Store
+storeWrite p v s@Store{ refMap = m } = s{ refMap = IM.insert p v m }
+
+storeEmpty :: Store
+storeEmpty = Store { refMap = IM.empty, outputs = [] }
+
+storePrint :: Core -> Store -> Store
+storePrint h s = s{ outputs = outputs s ++ [h] }
+
+storeMap :: (Value -> Value) -> Store -> Store
+storeMap f s = s{ refMap = IM.map f (refMap s) }
+
+storeMapA :: (Applicative a) => (Value -> a Value) -> Store -> a Store
+storeMapA f s = Store <$> sequenceA (IM.map f (refMap s)) <*> pure (outputs s)
+
+storeValues :: Store -> [Value]
+storeValues s = map snd $ IM.toList $ refMap s
+
+------
+
 instance Pretty Core where
   pPrintPrec l p (CVar i) = pPrintPrec l p i
   pPrintPrec l p (CInt i) = pPrintPrec l p i
   pPrintPrec _ _ (CRat _) = undefined -- pPrintPrec l p r
   pPrintPrec _ _ (CPrim s) = text s
+  pPrintPrec _ _ (CPtr p) = text ("R#" ++ show p)
   pPrintPrec l _ (CArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
   pPrintPrec l _ (CArray vs) = parens $ commaSep l vs
   pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
@@ -368,6 +408,11 @@ instance Pretty Core where
     parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
              (if cov then text "<covariant> " else text "") <>
              text "." <+> pPrintPrec l 0 e2
+  pPrintPrec l p (CStore s e) =
+    maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+
+instance Pretty Store where
+  pPrintPrec l _ (Store m _) = commaSep l (IM.toList m) -- XXX
 
 ------
 
@@ -376,6 +421,7 @@ compos _ v@CVar{} = pure v
 compos _ v@CInt{} = pure v
 compos _ v@CRat{} = pure v
 compos _ v@CPrim{} = pure v
+compos _ v@CPtr{} = pure v
 compos f (CArray vs) = CArray <$> traverse f vs
 compos f (CLam i e) = CLam i <$> f e
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
@@ -388,6 +434,7 @@ compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
 compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
+compos f (CStore s e) = CStore <$> storeMapA f s <*> f e
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
@@ -396,12 +443,16 @@ composOp f = runIdentity . compos (pure . f)
 fvs :: Core -> [Ident]
 fvs = nub . cfvs
 
+fvsS :: Store -> [Ident]
+fvsS = nub . cfvsS
+
 -- Occurrences of free variables
 cfvs :: Core -> [Ident]
 cfvs (CVar v) = [v]
 cfvs CInt{} = []
 cfvs CRat{} = []
 cfvs CPrim{} = []
+cfvs CPtr{} = []
 cfvs (CArray vs) = concatMap cfvs vs
 cfvs (CLam i e) = filter (/= i) $ cfvs e
 cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
@@ -414,7 +465,10 @@ cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
 cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
+cfvs (CStore s e) = cfvsS s ++ cfvs e
 
+cfvsS :: Store -> [Ident]
+cfvsS = concatMap cfvs . storeValues
 
 ------
 
@@ -430,6 +484,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     sub e@CInt{} = e
     sub e@CRat{} = e
     sub e@CPrim{} = e
+    sub e@CPtr{} = e
     sub (CArray vs) = CArray $ map sub vs
     sub a@(CLam i e) | x == i = a
                      | i `notElem` bs = CLam i $ sub e
@@ -449,6 +504,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
       | x `elem` (i:is) = e
       | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
       | otherwise = sub $ alphaConvert bs e
+    sub (CStore s e) = CStore (storeMap sub s) (sub e)
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
@@ -459,6 +515,7 @@ alphaConvert vs = alpha []
     alpha _ e@CInt{} = e
     alpha _ e@CRat{} = e
     alpha _ e@CPrim{} = e
+    alpha _ e@CPtr{} = e
     alpha m (CArray es) = CArray (map (alpha m) es)
     alpha m (CLam i e) = CLam i' $ alpha (add (i, i') m) e where i' = fresh i
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
@@ -476,6 +533,7 @@ alphaConvert vs = alpha []
       where i' = fresh i
             is' = map fresh is'
             m' = foldr add m (zip (i:is) (i':is'))
+    alpha m (CStore s e) = CStore (storeMap (alpha m) s) (alpha m e)
 
     add ii@(i, i') m | i == i' = m
                      | otherwise = ii : m

@@ -8,11 +8,13 @@ import qualified Rules.Core as T
 import Rules.Equiv(equiv)
 import Rules.Systems(ESystem)
 import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
-import TRS.System(preProcess, postProcess, ruleEnv)
+import TRS.System(preProcess, postProcess, ruleEnv, sname)
 import TRS.Traced(toList)
 import FrontEnd.Core
 import FrontEnd.Error
+import FrontEnd.Eval
 import FrontEnd.Flags
+import GHC.Stack
 
 import Debug.Trace
 import Epic.Print
@@ -22,8 +24,13 @@ asTRS f = trsToCore . f . coreToTrs
 
 -- XXX use graph normal form when needed
 
+evaluate :: T.RuleEnv T.Expr -> Core -> [Core]
+evaluate tflg e = [eval flg e]
+  where flg = EFlags { underLambda = T.tfUnderLambda tflg, traceEval = T.tfTrace tflg, steps = T.tfRewriteSteps tflg }
+
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg asys = map (trsToCore . sub flg sys . rtrace)
+rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
+                 | otherwise = map (trsToCore . sub flg sys . rtrace)
                 . elimDup sys
                 . subs flg sys
                 . map toList
@@ -68,7 +75,7 @@ sub :: Flags -> ESystem -> T.Expr -> T.Expr
 sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
             | otherwise = id
 
-coreToTrs :: Core -> T.Expr
+coreToTrs :: HasCallStack => Core -> T.Expr
 coreToTrs (CVar i) = T.Var $ coreToTrsI i
 coreToTrs (CInt i) = T.Int i
 coreToTrs CRat{} = undefined
@@ -92,7 +99,7 @@ coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
---coreToTrs e@CApply{} = impossible e
+coreToTrs _ = undefined
 
 coreToTrsV :: Core -> T.Value
 coreToTrsV e = case coreToTrs e of T.Val v -> v; _ -> undefined

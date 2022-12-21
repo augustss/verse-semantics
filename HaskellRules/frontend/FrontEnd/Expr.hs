@@ -240,8 +240,10 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn ".="      3
       , inl "="       3 -- XXX is this right
       , inl ">>"      3 -- XXX is this right
-      , inr "||"      4
-      , inr "&&"      5
+--      , inr "||"      4
+      , inr "or"      4
+--      , inr "&&"      5
+      , inr "and"     5
       , inr ":"       6     
       , inr "<>"      6     
       , inr "<="      6     
@@ -264,7 +266,8 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "pre^"   11
       , inn "pre?"   11
       , inn "pre:"   11
-      , inn "pre!"   11
+--      , inn "pre!"   11
+      , inn "prenot" 11
       , inn "pre[]"  11
       , inn "macro"  12
       , inl "()"     13

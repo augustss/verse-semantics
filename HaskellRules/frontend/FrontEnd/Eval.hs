@@ -18,6 +18,7 @@ import FrontEnd.Core
 import FrontEnd.Error
 import Epic.Print hiding (float)
 import Epic.List
+import Epic.Uniplate(universe)
 
 pattern CUnOp :: String -> Value -> Core
 pattern CUnOp op v <- CApply (CPrim op) v@HNF{}
@@ -63,8 +64,13 @@ evalTrace s f flg e | not (traceEval flg) = e'
 
 -- Reduce until we reach HNF
 eval :: EvalCore
-eval trc ea = loop (steps trc) $ evalTrace "eval" (const $ anf ea) trc (CWrong"")
+eval trc ea = unStore $ loop (steps trc) $ evalTrace "eval" (const ea'') trc (CWrong"")
   where
+    ea' = anf ea
+    ea'' = if noStoreIn ea && hasStoreOp ea then CStore storeEmpty ea' else ea'
+    unStore (CStore _ e) | not (hasStoreOp e) = e
+    unStore e = e
+
     -- HACK: Recognizer when we have loaded the prelude.verse file
     hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False
 
@@ -92,6 +98,7 @@ isX _ = False
 evalSteps :: Bool -> EvalCore
 evalSteps hasPRELUDE t =
   evalWrong t .
+  evalRef t . (if False then checkStoreConsistency t else id) . evalStore t .
   evalDefFloat t . evalAll t . evalChoice t . evalSplit t .
   evalFail t . evalUnify t . evalUnused t . evalSubst t . evalDef t .
   evalOne t . evalApp t . evalSeq t . evalBar t . evalSucceeds t . evalPrimOps t .
@@ -109,6 +116,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
     t e = choice e
 
     -- Find more anchor points
+--    f e | trace ("+++ evalChoice " ++ prettyShow e) False = undefined
     f (COne e) = COne $ choice e
     f (CAll e) = CAll $ choice e
     f (CSucceeds e) = CSucceeds $ choice e
@@ -126,7 +134,7 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE CSucceeds{} = True
     isCE CDecides{} = True
     isCE (CSplit _ (CLam _ n) g) = isCE n && isCELam g
-    isCE (CApply (CPrim p) _) = isCEPrim p
+    isCE (CApply (CPrim p) (CValue _)) = not (isStorePrim p)
     isCE CFail = True
     isCE CWrong{} = True
     isCE (CDef _ e) = isCE e
@@ -138,14 +146,17 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCELam (CVar _) = True -- happens for recursive functions
     isCELam _ = False
 
-    isCEPrim _ = True
-
+    choice (CStore s e) = CStore s (choice e)
     choice (CBar e1 e2) = CBar (choice e1) (choice e2)
 --    choice e | trace ("\nchoice ***\n" ++ prettyShow e++"\n---") False = undefined
-    choice e =
+    choice e | noStoreIn e =
+--      trace ("*** choice " ++ prettyShow (e, snd (runState (findC e) Nothing))) $
       case runState (findC e) Nothing of
         (_, Nothing) -> f e  -- no choice found, look deeper down
-        (e', Just es) -> cBar $ map e' es
+        (e', Just es) ->
+--          trace ("%%% dup " ++ prettyShow (map e' es)) $
+          cBar $ map e' es
+    choice e = f e
     -- Find the leftmost choice.
     -- Return a function representing the CX context.
     findC :: Core -> State (Maybe [Core]) (Core -> Core)
@@ -246,6 +257,7 @@ evalFail = evalTrace "evalFail" f
     hasFail (CUnify e1 e2) = hasFail e1 || hasFail e2
     hasFail (CSeq es) = any hasFail es
     hasFail (CDef _ e) = hasFail e
+    hasFail (CStore _ e) = hasFail e
     hasFail _ = False
 
 -- Handle unification
@@ -268,9 +280,15 @@ evalUnify flg = evalTrace "evalUnify" f flg
     unifyV v@(CArray vs1) (CArray vs2) | length vs1 == length vs2 =
       cSeq $ zipWith (\ v1 v2 -> CUnify (CValue v1) (CValue v2)) vs1 vs2 ++ [CValue v]
                                        | otherwise = CFail
-    unifyV v1@CPrim{} v2 | v1 == v2 = CValue v1  -- Compatible with PLDI rules
     unifyV CArray{} _ = CFail
     unifyV _ CArray{} = CFail
+
+    unifyV v1@CPrim{} v2 | v1 == v2 = CValue v1  -- Compatible with PLDI rules
+
+    unifyV v@(CPtr i1) (CPtr i2) | i1 == i2 = CValue v
+                                 | otherwise = CFail
+    unifyV CPtr{} _ = CFail
+    unifyV _ CPtr{} = CFail
 
     unifyV _ _ = CFail -- Compatible with PLDI rule CWrong "unifyV"
 
@@ -561,8 +579,16 @@ evalPrimOps flg = evalTrace "evalPrimOps" f flg
 --x                                 | isHNF v = CFail
 
     f e@(CUnOp "known$" _) = e  -- XXX Just leave it alone for now
-    f e@(CUnOp "new$" _) = e  -- XXX Just leave it alone for now
     f e@(CUnOp "pre'[]'" _) = e  -- XXX Just leave it alone for now
+
+    f e@(CUnOp "alloc$" _) = e  -- Just leave it alone
+    f e@(CUnOp "read$" _)  = e  -- Just leave it alone
+    f e@(CUnOp "write$" _) = e  -- Just leave it alone
+    f e@(CUnOp "print$" _) = e  -- Just leave it alone
+    f e@(CBinOp "in'+='" _ _)  = e
+    f e@(CBinOp "in'-='" _ _)  = e
+    f e@(CBinOp "in'*='" _ _)  = e
+    f e@(CBinOp "in'/='" _ _)  = e
 
     -- Fully evaluated, and still no match
     f (CApply (CPrim op) a) | isNF a = unimplemented $ show (op, a)
@@ -715,3 +741,143 @@ anf = flip evalState (1::Int) . expr
       pure $ Ident noLoc $ s ++ show i
     defs ies r =
       pure $ cDef (map fst ies) $ cSeq $ [ CUnify (CVar i) e | (i, e) <- ies ] ++ [r]
+
+--------------------
+
+
+-- Handles
+--  REF-NEW REF-READ REF-WRITE
+evalRef :: EvalCore
+evalRef flg = evalTrace "evalRef" f flg
+  where
+    f (CStore s e) = CStore s' (f e') where (s', e') = st s e
+    f e = composOp f e
+
+    -- Reference ops
+    st s (CApply (CPrim "alloc$") (HNF v)) = (s', CPtr p)  -- XXX HNF or CValue?
+      where (s', p) = storeAlloc v s
+    st s (CApply (CPrim "read$") (CPtr p)) = (s, CValue $ storeRead p s)
+    st s (CApply (CPrim "write$") (CArray [CPtr p, HNF v])) = (s', CArray [])  -- XXX HNF or CValue?
+      where s' = storeWrite p v s
+    st s (CApply (CPrim "in'+='") (CArray [CPtr p, CInt j])) = asgOp s p (+) j
+    st s (CApply (CPrim "in'-='") (CArray [CPtr p, CInt j])) = asgOp s p (-) j
+    st s (CApply (CPrim "in'*='") (CArray [CPtr p, CInt j])) = asgOp s p (*) j
+    st s (CApply (CPrim "in'/='") (CArray [CPtr p, CInt j])) | j == 0 = (s, CFail)
+                                                             | otherwise = asgOp s p div j
+    -- HACK
+    st s (CApply (CPrim "print$") (HNF h)) =
+       trace ("print$: " ++ prettyShow h) $
+       (storePrint h s, CArray [])
+
+    -- Recurse
+    st s (CUnify e1 e2) =
+      let (s', e1') = st s e1
+          (s'', e2') = st s' e2
+      in  if isSE e1' then
+            (s'', CUnify e1' e2')
+          else
+            (s', CUnify e1' e2)
+    st s (CDef h e) = (s', CDef h e') where (s', e') = st s e
+    st as (CSeq aes) = loop as [] aes
+      where loop s rs [] = (s, CSeq $ reverse rs)
+            loop s rs (e:es) =
+              let (s', e') = st s e
+              in  if isSE e' then loop s' (e':rs) es else (s', CSeq $ reverse rs ++ e' : es)
+    st s e = (s, e)
+
+    asgOp s p op j =
+      case storeRead p s of
+        CInt i ->
+          let v = CInt (i `op` j)
+              s' = storeWrite p v s
+          in  (s', CValue v)
+        e -> error $ "asgOP " ++ show e
+
+isSE :: Core -> Bool
+isSE (CValue _) = True
+isSE (CUnify e1 e2) = isSE e1 && isSE e2
+isSE (CSeq es) = all isSE es
+isSE (CDef _ e) = isSE e
+isSE (CApply (CPrim p) (CValue _)) = not (isStorePrim p)
+isSE _ = False
+
+evalStore :: EvalCore
+evalStore flg = evalTrace "evalStore" f flg
+  where
+    f (CStore s e) = CStore s' (f e') where (s', e') = st s e
+    f e = composOp f e
+
+    -- Duplicate store
+    st s (CSplit e n g) | not (isDone e) = (s, CSplit (CStore s e) n g)
+    st s (CBar e1 e2) | not (isDone e1) = (s, CBar (CStore s e1) e2)
+    st _ COne{} = error "evalStore: found one{}"
+    st _ CAll{} = error "evalStore: found all{}"
+    st _ CSucceeds{} = error "evalStore: found succeeds{}"
+
+    -- Commit store
+    st _ (CSplit (CStore s e) n g) | isRes e = (s, CSplit e n g)
+    st _ (CBar (CStore s e1) e2) | isRes e1 = (s, CBar e1 e2)
+
+    -- Recurse
+    st s (CUnify e1 e2) =
+      let (s', e1') = st s e1
+          (s'', e2') = st s' e2
+      in  if isSE e1' then
+            (s'', CUnify e1' e2')
+          else
+            (s', CUnify e1' e2)
+    st s (CDef h e) = (s', CDef h e') where (s', e') = st s e
+    st as (CSeq aes) = loop as [] aes
+      where loop s rs [] = (s, CSeq $ reverse rs)
+            loop s rs (e:es) =
+              let (s', e') = st s e
+              in  if isSE e' then loop s' (e':rs) es else (s', CSeq $ reverse rs ++ e' : es)
+    st s e = (s, e)
+
+    isRes (CValue _) = True
+    isRes (CBar (CValue _) _) = True
+    isRes _ = False
+
+    isDone CFail = True
+    isDone CStore{} = True
+    isDone e = isRes e
+
+isStorePrim :: String -> Bool
+isStorePrim p = p `elem`
+  [
+   "alloc$", "read$", "write$"
+  ,"in'+='" ,"in'-='" ,"in'*='" ,"in'/='"
+  ,"print$"
+  ,"in'..'"  -- XXX not really
+  ,"mapAp"   -- XXX unknown
+  ]
+
+isStore :: Core -> Bool
+isStore CStore{}  = True
+isStore _ = False
+
+noStoreIn :: Core -> Bool
+noStoreIn = not . any isStore . universe
+
+hasStoreOp :: Core -> Bool
+hasStoreOp e = not $ null [ () | CApply (CPrim p) _ <- universe e, isStorePrim p ]
+
+checkStoreConsistency :: EvalCore
+checkStoreConsistency _ _ee = undefined
+{-
+  case execState (count ee) (0::Int,0::Int,0::Int) of
+    c@(cStore, cSplitE, cBarE) | (cStore == 1 || cStore == 0 && cSplitE > 0) &&
+                                 (cSplitE == 0 && cBarE == 0 || cSplitE > 0) -> ee
+                               | otherwise -> error $ "checkStoreConsistency " ++ show c ++ "\n" ++ prettyShow ee
+  where
+    count (CStore s e) = do
+      modify (\ (t,p,b) -> (t+1,p,b))
+      CStore s <$> count e
+    count (CSplitE s e f g) = do
+      modify (\ (t,p,b) -> (t,p+1,b))
+      CSplitE s <$> count e <*> count f <*> count g
+    count (CBarE s e1 e2) = do
+      modify (\ (t,p,b) -> (t,p,b+1))
+      CBarE s <$> count e1 <*> count e2
+    count e = compos count e
+-}
