@@ -120,7 +120,7 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
-isChoiceFree Split{}   = True
+isChoiceFree Split{}   = True  -- XXX is it?
 isChoiceFree Wrong     = True
 isChoiceFree _         = False
 -- KC: what about @?
@@ -349,7 +349,10 @@ rulesApplication _ lhs =
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
-     pure (foldr (:|:) Fail [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+     if null vs then
+       pure Fail
+      else
+       pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
 rulesUnification :: ERule

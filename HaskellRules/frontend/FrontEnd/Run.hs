@@ -38,11 +38,11 @@ runM f s e = rewrite f s e'
 evalSystem :: ESystem
 evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
   ruleEnv = defaultTRSFlags,
-  preProcess = eval', postProcess = const id, rules = noRules, rulesHaveStructural = False,
+  preProcess = evaluate, postProcess = const id, rules = noRules, rulesHaveStructural = False,
   confluenceRules = noRules, validExpr = \ _ _ -> True }
   where
     noRules _ _ = []
-    eval' tflg = coreToTrs . eval flg . trsToCore
+    evaluate tflg = coreToTrs . eval flg . trsToCore
       where flg = EFlags { underLambda = tfUnderLambda tflg, traceEval = tfTrace tflg, steps = tfRewriteSteps tflg }
 
 refiSystem :: ESystem

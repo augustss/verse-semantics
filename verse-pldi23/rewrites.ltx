@@ -119,7 +119,7 @@ $$
     \begin{array}[t]{l}
           \text{Infix operators ``|choice|'', ``;'', ``|=|'', and ``>'' are all right-associative.} \\
           \text{``|=|'' binds more tightly than ``;''.} \\
-          \text{Function application |(v_1 v_2)| is left-associatve, as usual.} \\
+          \text{Function application |(v_1 v_2)| is left-associative, as usual.} \\
           \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
           \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
     \end{array} \\
@@ -137,7 +137,7 @@ $$
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
 
       |if e_1 then e_2 else e_3| & \text{means}
-      & |def v (v == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v)| & \text{|v,x| fresh} \\
+      & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
       |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
      \end{array} \\

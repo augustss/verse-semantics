@@ -13,11 +13,12 @@ module FrontEnd.Core(
   exprToCore,
   cSeq, cDef, cBar,
   isValue,
-  fvs, cfvs,
+  fvs, cfvs, fvsS,
   subst,
   alphaConvert,
   pCore, pCoreFile,
   Ident(..), noLoc,
+  storeAlloc, storeRead, storeWrite, storeEmpty, storePrint,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad
@@ -25,19 +26,18 @@ import Control.Monad.Identity
 import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Data.Data(Data)
+import qualified Data.IntMap as IM
 import Data.List
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
--- import Text.Megaparsec.Char(skip)
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
-import FrontEnd.Desugar(primOps, getVisible, covariantId)
+import FrontEnd.Desugar(primOps, covariantId)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
-import Epic.List(pattern Snoc)
 --import Debug.Trace
 
 data Core
@@ -45,6 +45,7 @@ data Core
   | CInt Integer
   | CRat Rational
   | CPrim String
+  | CPtr Ptr
   | CArray [Value]
   | CLam Ident Core
   | CUnify Core Core
@@ -57,11 +58,17 @@ data Core
   | CWrong String
   | CSplit Core Value Value
   | CLambda Ident [Ident] Bool Core Core
+  -- Store primitives
+  | CStore Store Core
   deriving (Show, Eq, Data)
 
 type Value = Core
 
 type Heap = [Ident]
+
+data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
+  deriving (Show, Eq, Data)
+type Ptr = Int
 
 pattern COne :: Core -> Core
 pattern COne c <- CMacro (Ident _ "one") c
@@ -104,6 +111,7 @@ getHNF e@CInt{} = Just e
 getHNF e@CRat{} = Just e
 getHNF e@CArray{} = Just e
 getHNF e@CPrim{} = Just e
+getHNF e@CPtr{} = Just e
 getHNF e@CLam{} = Just e
 getHNF _ = Nothing
 
@@ -143,7 +151,7 @@ newTmp = do
 
 exprToCore :: Flags -> Expr -> Core
 --exprToCore _ e | trace ("exprToCore: " ++ prettyShow e) False = undefined
-exprToCore flg e = flip evalState 1 . flip runReaderT flg . coreD $ e
+exprToCore flg e = flip evalState 1 . flip runReaderT flg . core $ e
 
 core :: HasCallStack => Expr -> C Core
 core (LitInt i) = pure (CInt i)
@@ -151,44 +159,31 @@ core (LitRat i _) = pure (CRat $ toRational i)
 core (Variable i@(Ident _ s)) | i `elem` primOps = pure (CPrim s)
                               | otherwise = pure (CVar i)
 core (Array es) = CArray <$> mapM core es
-{-
-core (Typedef e) = do
-  i <- newTmp
-  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
--}
-core (Function [(Define x AnyT, fs)] b) = CLam x . attr <$> coreD b
-  where attr ae = foldr CMacro ae fs
---core (Lambda i [] e1 e2) = core $ lamFunc True i e1 e2
 core AnyT = pure (CPrim ":any")
 core (Wrong s) = pure $ CWrong s
-core (Seq (Snoc es e)) = seqC <$> mapM core (Snoc (filter p es) e)
-  where p (Define _ AnyT) = False
-        p _ = True
+core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
-core (ApplyEff rs e) = coreEffs rs =<< coreD e
+core (ApplyEff rs e) = coreEffs rs =<< core e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = core e
-core e@Choice{} = cBar <$> mapM coreD (flat e)
+core e@Choice{} = cBar <$> mapM core (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
-core (Define i AnyT) = pure $ CVar i
-core (Define i e) = cUnify (CVar i) <$> core e
 core Fail = pure $ CFail
-core (For2 e1@(Define i e) e2@(Variable i')) | i == i' = do
+core (For2 e1@(Exists (i:is) (Unify (Variable i') e)) e2@(Variable i'')) | i == i' && i == i'' = do
   useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
    else
-    cAll =<< coreD e
+    cAll =<< core (Exists is e)
 core (For2 e1 e2) = do
   useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
    else do
-    e2' <- thunk e2
 --  traceM $ show (e2, e2', seqE [e1, e2'])
-    ee <- coreD (seqE [e1, e2'])
+    ee <- coreBind e1 e2
     ea <- cAll ee
     xa <- newTmp
     pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
@@ -197,49 +192,50 @@ core (If3 e1 e2 e3) = do
   if isValue' c1 then
     core e2
    else do
-    e2' <- thunk e2
     e3' <- thunk e3
-    l <- coreD (seqE [e1, e2'])
+    l <- coreBind e1 e2
     r <- core e3'
     fn <- cOne $ CBar l r
     i <- newTmp
     pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (CVar i) vEmpty]
---core e@Function{} = val e
-core (Do e) = coreD e
-core (Macro1 (Ident _ "all") [] e) = cAll =<< coreD e
-core (Macro1 (Ident _ "one") [] e) = cOne =<< coreD e
-core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< coreD e
-core (Macro1 (Ident _ "decides") [] e) = cDecides =<< coreD e
-core (Lambda i [] (Array []) e) = core $ Function [(Define i AnyT, [])] e
+core (Macro1 (Ident _ "all") [] e) = cAll =<< core e
+core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
+core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
+core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
 core (Lambda i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
   let covariant = covariantId `elem` rs || True -- XXX
   if timLam then do
-    let is = getVisible e1
-    e1' <- core e1
-    e2' <- coreD e2
+    let Exists is e1a = e1
+    e1' <- core e1a
+    e2' <- core e2
     pure $ CLambda i is covariant e1' e2'
   else
-    core $ lamFunc covariant i e1 e2
+    lamFunc covariant i e1 e2
 core EmptyT = pure CFail
+core (Exists is e) = cDef is <$> core e
 core e = impossible e
 
--- Is the expression non-failing and contains no binders
-trivial :: Expr -> Bool
-trivial Array{} = True
-trivial (ApplyD (Variable (Ident _ "any")) _) = True
-trivial _ = False
+coreBind :: Expr -> Expr -> C Core
+coreBind (Exists is e1) e2 = do
+  e2' <- thunk e2
+  core (Exists is (seqE [e1, e2']))
+coreBind e _ = error $ "coreBind: " ++ prettyShow e
 
-lamFunc :: Bool -> Ident -> Expr -> Expr -> Expr
-lamFunc cov i e1 e2 =
-  Function [(Define i AnyT, [])] $
-    if e1 == Array [] then
+lambda :: Ident -> [Ident] -> Expr -> C Core
+lambda x fs b = CLam x . attr <$> core b
+  where attr ae = foldr CMacro ae fs
+
+lamFunc :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
+--lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
+lamFunc cov i (Exists is e1) e2 =
+  lambda i [] $
+    if null is && e1 == Array [] then
       e2
-    else if trivial e1 then
-      Seq [e1, e2]
     else
-      If3 e1 e2 (if cov then Fail else Wrong "outside domain")
+      If3 (Exists is e1) e2 (if cov then Fail else Wrong "outside domain")
+lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -248,7 +244,7 @@ coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
 
 forSplit :: Expr -> Expr -> C Core
-forSplit e1 e2 = do
+forSplit (Exists vs e1) e2 = do
   f <- newTmp
   g <- newTmp
   u <- newTmp
@@ -256,9 +252,8 @@ forSplit e1 e2 = do
   y <- newTmp
   a <- newTmp
   b <- newTmp
-  let vs = getVisible e1
-  e1' <- coreD (Seq [e1, Array $ map Variable vs])
-  e2' <- coreD e2
+  e1' <- core (Exists vs $ Seq [e1, Array $ map Variable vs])
+  e2' <- core e2
   let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
       gDef e = CDef [g] (cSeq [CUnify (CVar g) $
                                CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
@@ -271,6 +266,7 @@ forSplit e1 e2 = do
                               ])
 
   pure $ fDef $ gDef $ CSplit e1' (CVar f) (CVar g)
+forSplit e1 e2 = impossible (e1,e2)
 
 cOne :: Core -> C Core
 cOne e = do
@@ -346,43 +342,41 @@ cUnify :: Core -> Core -> Core
 cUnify e (CPrim ":any") = e
 cUnify e1 e2 = CUnify e1 e2
 
-coreD :: HasCallStack => Expr -> C Core
-coreD e | null is = core e
-        | otherwise = CDef is <$> core e
-  where is = getVisible e
-
-{-
-val :: HasCallStack => Expr -> C Core
-val e = CValue <$> value e
-
-value :: HasCallStack => Expr -> C Value
---value e | trace ("value:\n" ++ prettyShow e) False = undefined
-value (LitInt i) = pure (HNF $ HInt i)
-value (LitRat i _) = pure (HNF $ HRat $ toRational i)
-value (Variable i@(Ident _ s)) | i `elem` primOps = pure (HNF $ HPrim s)
-                               | otherwise = pure (Var i)
-value (Array es) = CArray <$> mapM value es
-{-
-value (Typedef e) = do
-  i <- newTmp
-  HNF . HLam i <$> coreD (Seq [Unify (Variable i) e, Variable i])
--}
-value (Function [(Define x AnyT, fs)] b) = HNF . HLam x . attr <$> coreD b
-  where attr ae = foldr CMacro ae fs
-value (Lambda i [] e1 e2) = value $ lamFunc True i e1 e2
-value AnyT = pure (HNF $ HPrim ":any")
-value e = internalErrorMsg $ "value: not a value\n" ++ show e
--}
-
---eVar :: String -> Expr
---eVar = Variable . Ident noLoc
-
 thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
   pure $ -- Function [(Define i AnyT, [])] e
-         Lambda i [] (Array []) e
+         Lambda i [] (Exists [] $ Array []) e
+
+------
+
+storeAlloc :: Value -> Store -> (Store, Ptr)
+storeAlloc v s@Store{refMap = m} =
+  let p = maybe 0 (succ . fst) $ IM.lookupMax m
+  in  (s{refMap = IM.insert p v m}, p)
+
+storeRead :: Ptr -> Store -> Value
+storeRead p Store{refMap = m } =
+  fromMaybe (error $ "Ptr not in store: " ++ show p) $ IM.lookup p m
+
+storeWrite :: Ptr -> Value -> Store -> Store
+storeWrite p v s@Store{ refMap = m } = s{ refMap = IM.insert p v m }
+
+storeEmpty :: Store
+storeEmpty = Store { refMap = IM.empty, outputs = [] }
+
+storePrint :: Core -> Store -> Store
+storePrint h s = s{ outputs = outputs s ++ [h] }
+
+storeMap :: (Value -> Value) -> Store -> Store
+storeMap f s = s{ refMap = IM.map f (refMap s) }
+
+storeMapA :: (Applicative a) => (Value -> a Value) -> Store -> a Store
+storeMapA f s = Store <$> sequenceA (IM.map f (refMap s)) <*> pure (outputs s)
+
+storeValues :: Store -> [Value]
+storeValues s = map snd $ IM.toList $ refMap s
 
 ------
 
@@ -391,6 +385,7 @@ instance Pretty Core where
   pPrintPrec l p (CInt i) = pPrintPrec l p i
   pPrintPrec _ _ (CRat _) = undefined -- pPrintPrec l p r
   pPrintPrec _ _ (CPrim s) = text s
+  pPrintPrec _ _ (CPtr p) = text ("R#" ++ show p)
   pPrintPrec l _ (CArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
   pPrintPrec l _ (CArray vs) = parens $ commaSep l vs
   pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
@@ -413,6 +408,11 @@ instance Pretty Core where
     parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
              (if cov then text "<covariant> " else text "") <>
              text "." <+> pPrintPrec l 0 e2
+  pPrintPrec l p (CStore s e) =
+    maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+
+instance Pretty Store where
+  pPrintPrec l _ (Store m _) = commaSep l (IM.toList m) -- XXX
 
 ------
 
@@ -421,6 +421,7 @@ compos _ v@CVar{} = pure v
 compos _ v@CInt{} = pure v
 compos _ v@CRat{} = pure v
 compos _ v@CPrim{} = pure v
+compos _ v@CPtr{} = pure v
 compos f (CArray vs) = CArray <$> traverse f vs
 compos f (CLam i e) = CLam i <$> f e
 compos f (CUnify e1 e2) = CUnify <$> f e1 <*> f e2
@@ -433,6 +434,7 @@ compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
 compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
+compos f (CStore s e) = CStore <$> storeMapA f s <*> f e
 
 composOp :: (Core -> Core) -> Core -> Core
 composOp f = runIdentity . compos (pure . f)
@@ -441,12 +443,16 @@ composOp f = runIdentity . compos (pure . f)
 fvs :: Core -> [Ident]
 fvs = nub . cfvs
 
+fvsS :: Store -> [Ident]
+fvsS = nub . cfvsS
+
 -- Occurrences of free variables
 cfvs :: Core -> [Ident]
 cfvs (CVar v) = [v]
 cfvs CInt{} = []
 cfvs CRat{} = []
 cfvs CPrim{} = []
+cfvs CPtr{} = []
 cfvs (CArray vs) = concatMap cfvs vs
 cfvs (CLam i e) = filter (/= i) $ cfvs e
 cfvs (CUnify e1 e2) = cfvs e1 ++ cfvs e2
@@ -459,7 +465,10 @@ cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
 cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
+cfvs (CStore s e) = cfvsS s ++ cfvs e
 
+cfvsS :: Store -> [Ident]
+cfvsS = concatMap cfvs . storeValues
 
 ------
 
@@ -475,6 +484,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     sub e@CInt{} = e
     sub e@CRat{} = e
     sub e@CPrim{} = e
+    sub e@CPtr{} = e
     sub (CArray vs) = CArray $ map sub vs
     sub a@(CLam i e) | x == i = a
                      | i `notElem` bs = CLam i $ sub e
@@ -494,6 +504,7 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
       | x `elem` (i:is) = e
       | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
       | otherwise = sub $ alphaConvert bs e
+    sub (CStore s e) = CStore (storeMap sub s) (sub e)
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
@@ -504,6 +515,7 @@ alphaConvert vs = alpha []
     alpha _ e@CInt{} = e
     alpha _ e@CRat{} = e
     alpha _ e@CPrim{} = e
+    alpha _ e@CPtr{} = e
     alpha m (CArray es) = CArray (map (alpha m) es)
     alpha m (CLam i e) = CLam i' $ alpha (add (i, i') m) e where i' = fresh i
     alpha m (CUnify e1 e2) = CUnify (alpha m e1) (alpha m e2)
@@ -521,6 +533,7 @@ alphaConvert vs = alpha []
       where i' = fresh i
             is' = map fresh is'
             m' = foldr add m (zip (i:is) (i':is'))
+    alpha m (CStore s e) = CStore (storeMap (alpha m) s) (alpha m e)
 
     add ii@(i, i') m | i == i' = m
                      | otherwise = ii : m

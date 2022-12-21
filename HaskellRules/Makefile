@@ -14,15 +14,20 @@ all:
 build:
 	cabal build
 
-test: testfast
-	$(TESTER) --quiet --rules=popl           $(TESTFILE)
+test: testfast testslow
+
+testslow:
+	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
+
+testignore:
+	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000 --ignore-fuel-stop   $(TESTFILE)
 
 testfast:
 	$(TESTER) --quiet --parse                                                $(TESTPARSEFILE)
 	$(TESTER) --quiet       --rules=eval --no-under-lambda                   $(TESTFILE)
 #	$(TESTER) --quiet --eval --split                                         $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=POPL                --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=PLDI --final-inline --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
 
 trickytest: testtricky
 
@@ -32,6 +37,9 @@ testtricky:
 testqcconf:
 	$(QCTEST) --rules=POPLV --ignore-fuel-stop
 	$(QCTEST) --rules=POPLV --max-success=30
+
+teststore:
+	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
 
 clean:
 	cabal clean

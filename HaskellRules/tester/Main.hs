@@ -212,7 +212,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
       
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
-equivValue sys e1 e2 | sname sys == "eval" = coreToTrs e1 == coreToTrs e2  -- XXX temporary hack
+equivValue sys e1 e2 | sname sys == "eval" = e1 == e2  -- XXX temporary hack
 equivValue sys e1 e2 =
   coreToTrs e1 == coreToTrs e2 ||        -- fast test first
   equiv sys (coreToTrs e1) (coreToTrs e2)
@@ -385,7 +385,7 @@ testFlags = TestFlags
          ( long "max-steps"
         <> short 'm'
         <> metavar "NUM"
-        <> value 100
+        <> value 1000
         <> help "Maximum number of rewrite steps" )
   <*> switch
          ( long "ignore-fuel-stop"

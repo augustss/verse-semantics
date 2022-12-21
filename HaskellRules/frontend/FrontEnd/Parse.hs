@@ -165,7 +165,8 @@ pLiteral :: P Expr
 pLiteral = choice
   [ LitInt <$> pDecimal
   , LitChar <$> pChar
-  , (LitRat <$> L.scientific <*> many letterChar) <* skip
+  -- Handle 1..2 incorrectly
+--  , (LitRat <$> L.scientific <*> many letterChar) <* skip
   , pString
   ]
 

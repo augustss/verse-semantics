@@ -827,15 +827,16 @@ To keep the examples readable, we allow ourselves a bit of syntactic sugar, summ
   $$
   \begin{array}{l}
     \begin{array}{l@@{\;}l}
-      |apply1 head xs| & :=  |apply1 xs 0| \\
-      |apply1 tail xs| & :=  |all (def i (i > 0; apply1 xs i))| \\
-      |applyN cons (x,xs)| & :=  |all (x `choice` def i (apply1 xs i))| \\
-      |applyN append (xs, ys)| & :=  |all ((def i (apply1 xs i)) `choice` (def i (apply1 ys i)))| \\
-      |applyN flatMap (f,xs)| & := |all (def i (apply1 f (apply1 xs i)))| \\
-      |applyN map (f, xs)| & :=  |if x := apply1 head xs then applyN cons (apply1 f x, applyN map (f,apply1 tail xs)) else emptytup| \\
-      |applyN filter (p, xs)| & :=  |all (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN find (p, xs)| & :=  |one (def i (x := apply1 xs i; one (apply1 p x); x)))| \\
-      |applyN every (p, xs)| & :=  |applyN map (p,xs)| \\
+      |apply1 head xsl| & :=  |apply1 xsl 0| \\
+      |apply1 tail xsl| & :=  |all (def i (i > 0; apply1 xsl i))| \\
+      |applyN cons (x,xsl)| & :=  |all (x `choice` def i (apply1 xsl i))| \\
+      |applyN append (xsl, ysl)| & :=  |all ((def i (apply1 xsl i)) `choice` (def i (apply1 ysl i)))| \\
+      |applyN flatMap (f,xsl)| & := |all (def i (apply1 f (apply1 xsl i)))| \\
+      |applyN map (f, xsl)| & :=  |if x := apply1 head xsl then applyN cons (apply1 f x, applyN map (f,apply1 tail xsl)) else emptytup| \\
+      |applyN filter (p, xsl)| & :=  |all (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
+      |applyN find (p, xsl)| & :=  |one (def i (x := apply1 xsl i; one (apply1 p x); x)))| \\
+      |applyN every (p, xsl)| & :=  |applyN map (p,xsl)| \\
+      |applyN zip (xsl,ysl)| & := |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
     \end{array}
   \end{array}
   $$
@@ -2231,6 +2232,115 @@ It may help to keep the termination argument simpler by proving confluence of th
 Finally, to get to the precise statement of \cref{thm:confluence}, we have to show that the extra rules and |cutr n| can be moved to the end of a sequence, and commute them past |stepA| and |stepB|. If two single steps do not commute to two likewise \emph{single} steps, this proof might have to allude to the decreasing measure used in the termination proof above, if it can be constructed so that $\movestoX$ does not increase that measure, or use more complicated decreasing diagrams techniques. For this it may help to first prove that incomplete applications of \rulename{subst}, where the context $X$ is not as large as possible, do not occur in the joining sequences.
 
 \fi % confluence appendix
+
+\section{Updateable references} \label{sec:store}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{References}         & r \\
+      \text{Expressions}        & e   & ::= & \cdots \vb |store h e| \\
+      \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
+      \text{Head values}        & hnf & ::= & \cdots \vb r \\
+      \text{Execution contexts} & X   & ::= & \cdots \vb |store s X| \\
+      \text{Choice contexts}    & CX  & ::= & \cdots \vb |store s CX| \\
+      \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
+      \text{Heap context}       & H   & ::= & \hole|,s| \vb |cell r v, H| \\
+      \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \vb |def x S| \\
+      \text{Store-op free exprs}&|sf| & ::= & |v| \vb |sf_1 = sf_2| \vb |sf_1; sf_2| \vb |def x sf|
+                                              \vb |apply1 sp v|
+                                              %%% need sv \vb |split sf sv_1 sv_2|
+                                              \\
+      \text{Results}            & w   & ::= & |v| \vb |v `choice` e| \\
+      \text{Non-store primops}  & sp  & ::= & \text{any, except } |alloc|, |read|, |write| \\
+      \text{Non-store expression} & oe  & ::= & \text{like |e|, that is not |w|, and also not a |storeKW| nor |fail|} \\
+    \end{array} \\
+\\
+
+  \textbf{Axiom extensions} \\
+  \textit{Reference ops} \\
+  \begin{array}{lrcll}
+    \rulename{ref-alloc} & |store h (S^[apply1 alloc v])| & \movesto & |store (cell r v, h) (S^[r])| & \text{|r| fresh} \\
+    \rulename{ref-read} & |store (H^[cell r v]) (S^[apply1 read r])| & \movesto & |store (H^[cell r v]) (S^[v])| \\
+    \rulename{ref-write} &
+        | store (H^[cell r v_1]) (S^[applyN write (r,v_2)])|
+        & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
+  \end{array} \\
+    \\
+
+  \textit{Store duplication} \\
+  \begin{array}{lrcll}
+    \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
+    \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \\
+%% FAIL rules handles this
+%%    \rulename{st-fail}     & |store h fail| & \movesto & |fail| \\
+  \end{array} \\
+
+    \\
+  \textit{Store commit} \\
+  \begin{array}{lrcll}
+     \rulename{st-split} & |store h_1 (S^[split (store h_2 w) f g])| & \movesto &
+         |store h_2 (S^[split w f g])| \\
+     \rulename{st-choice} & |store h_1 (S^[(store h_2 w) `choice` e]| & \movesto & |store h_2 (S^[w `choice` e])| \\
+  \end{array} \\
+
+  %% \textit{Store propagation} \\
+  %% \begin{array}{lrcll}
+  %%   % SEQ
+  %%   \rulename{st-seq-l} & |store s (e_1; e_2)|  & \movesto & |store s e_1; e_2| & e_1;e_2 \not\in se \\
+  %%   \rulename{st-seq-r} & |store s se; e|  & \movesto & |se; store s e| \\
+  %%   \rulename{st-seq-o} & |se_1; store s se_2|  & \movesto & |store s (se_1; se_2)| \\
+  %%   % UNIFY
+  %%   \rulename{st-unify-l} & |store s (e_1 = e_2)|  & \movesto & |store s e_1 = e_2| & e_1=e_2 \not\in se \\
+  %%   \rulename{st-unify-r} & |store s se = e|  & \movesto & |se = store s e| \\
+  %%   \rulename{st-unify-o} & |se_1 = store s se_2|  & \movesto & |store s (se_1 = se_2)| \\
+  %%   % DEF
+  %%   \rulename{st-def-in} & |store s (def x e)| & \movesto & |def x (store s e)| & e \not\in se, x \not\in \freevars{s}  \\
+  %%   \rulename{st-def-out} & |def x (store s se)| & \movesto & |store s (def x se)| & x \not\in \freevars{s} \\
+  %% \end{array} \\
+%%   \textit{Store copy/delete} \\
+%%   \begin{array}{lrcll}
+%%     % FAIL
+%% %    \rulename{st-fail-def} & |def x (store s fail)| & \movesto & |fail|  \\
+%%     \rulename{st-fail}     & |store s fail| & \movesto & |fail| \\
+%%     % SPLIT
+%%     \rulename{st-split} & |store s (split e f g)| & \movesto & |splitE s (store s e) f g| & e \not\in r \\
+%%     \rulename{st-split-fail} & |splitE s fail f g| & \movesto &
+%%     %%% |store s (split fail f g)| \\
+%%         |store s (apply0 f)| \\
+%%     \rulename{st-split-res} & |splitE s_1 (store s_2 r) f g| & \movesto &
+%%         |store s_2 (split r f g)| \\
+%% %    \rulename{st-split-val} & |splitE s_1 (store s_2 v) f g| & \movesto &
+%% %        |store s_2 (split v f g)| \\
+%% %    \rulename{st-split-alt} & |splitE s_1 (store s_2 (v `choice` e)) f g| & \movesto &
+%% %      |store s_2 (split (v `choice` e) f g)| \\
+
+%%     % CHOICE
+%%     \rulename{st-choice} & |store s (e_1 `choice` e_2)| & \movesto & |choiceE s (store s e_1) e_2|  & e_1 \not\in r \\
+%%     \rulename{st-choice-fail} & |choiceE s fail e| & \movesto & |store s e| \\
+%%     \rulename{st-choice-res} & |choiceE s_2 (store s_1 r) e| & \movesto & |store s_1 (r `choice` e)| \\
+%% %    \rulename{st-choice-val} & |choiceE s_2 (store s_1 v) e| & \movesto & |store s_1 (v `choice` e)| \\
+%% %    \rulename{st-choice-alt} & |choiceE s_2 (store s_1 (v `choice` e_1)) e_2| & \movesto & |store s_1 (v `choice` (e_1 `choice` e_2))| \\
+    
+%%   \end{array} \\
+    \\
+    \textit{Unification} \\
+    \begin{array}{lrcll}
+      \text{Extension with the obvious axioms making equal references unify,
+        and anything else fail.}
+    \end{array} \\
+  \\
+  \textit{Top level} \\
+  \begin{array}{lrcll}
+    \text{Start top level reduction of |e| with |store emp e|.}
+  \end{array} \\
+
+  \end{array}
+   $$
+  \caption{The Verse calculus: store axioms} \label{fig:store-axioms}
+\end{figure}
 
 \end{document}
 
