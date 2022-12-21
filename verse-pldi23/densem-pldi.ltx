@@ -370,7 +370,7 @@ $$
 \end{figure}
 
 There is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
-enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatention)
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatentation)
 of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
 the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
 And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
@@ -390,7 +390,7 @@ a \emph{set of labelled values}, each of type $\LblValue$.
 \item A labelled value (of type $\LblValue$)
 is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
 \item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
-\item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
+\item The union (or concatentation) operation $\munion$, defined in \cref{fig:labelled-sem},
 adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
 and a $\lblright$ tag to those coming from the right.
 So the labels specify where in the tree the value comes from.

@@ -21,6 +21,7 @@ data Token
   | Dedent
   | Semi
   | Colon
+  | ColonEOL
   | Comma
   | Dot
   | Equal
@@ -50,6 +51,7 @@ data Token
   | Exists
   | Lambda
   | Truth
+  | Array
   | False
   | True
   | Fail
@@ -73,6 +75,7 @@ instance Pretty Token where
     Dedent -> "dedent"
     Semi -> semi
     Colon -> colon
+    ColonEOL -> colon
     Comma -> comma
     Dot -> dot
     Equal -> equals
@@ -102,6 +105,7 @@ instance Pretty Token where
     Exists -> "exists"
     Lambda -> "lambda"
     Truth -> "truth"
+    Array -> "array"
     False -> "false"
     True -> "true"
     Fail -> "fail"

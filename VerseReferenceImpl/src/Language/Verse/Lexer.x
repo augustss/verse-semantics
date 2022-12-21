@@ -43,31 +43,49 @@ $space = [\ \t]
 <0, nested, maybeNesting> {
   " " { space }
   \t { tab }
+}
+
+<0, nested, maybeNesting, blockComment> {
   @newline { newline }
+}
+
+<0, nested, maybeNesting, indented> {
+  "#" .* ;
+  "<#" { leftBlockComment }
+}
+
+<blockComment> {
+  \t { tabBlockComment }
+  "#>" { rightBlockComment }
+  . { textBlockComment }
 }
 
 <0> "" { empty0 }
 
 <nested> "" { emptyNested }
 
-<dedenting> "" { emptyDedenting }
+<maybeNewline> {
+  "{" { leftBraceMaybeNewline }
+  "do" { doMaybeNewline }
+  "then" { thenMaybeNewline }
+  "else" { elseMaybeNewline }
+  "" { emptyMaybeNewline }
+}
 
 <maybeNesting> {
-  "{" { leftBrace }
+  "{" { leftBraceMaybeNesting }
   "" { emptyMaybeNesting }
 }
 
 <nesting> "" { emptyNesting }
 
 <indented> {
-  "#" .* ;
-  "<#" [.\n]* "#>" ;
   [\ \t]+ ;
   @newline { newlineIndented }
-  ":" $space* @newline { colon }
-  "=" $space* @newline { equal }
-  ":=" $space* @newline { colonEqual }
-  "=>" $space* @newline { fatArrow }
+  ":" $space* @newline { colonEOL }
+  "=" $space* @newline { equalEOL }
+  ":=" $space* @newline { colonEqualEOL }
+  "=>" $space* @newline { fatArrowEOL }
   "(" { token Token.LeftParen }
   ")" { token Token.RightParen }
   "{" { token Token.LeftBrace }
@@ -110,6 +128,7 @@ $space = [\ \t]
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
+  "array" { token Token.Array }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
   $alpha $alnum* { name }
@@ -179,9 +198,33 @@ newline = action $ do
   putIndent []
   getToken
 
+leftBlockComment :: Action
+leftBlockComment = action $ do
+  pushStates blockComment
+  pushIndent Space
+  pushIndent Space
+  getToken
+
+tabBlockComment :: Action
+tabBlockComment = action $ do
+  pushIndent Tab
+  getToken
+
+textBlockComment :: Action
+textBlockComment = action $ do
+  pushIndent Space
+  getToken
+
+rightBlockComment :: Action
+rightBlockComment = action $ do
+  pushIndent Space
+  pushIndent Space
+  popStates
+  getToken
+
 empty0 :: Action
 empty0 = action $ do
-  pushStates indented
+  pushStates maybeNewline
   getToken
 
 emptyNested :: Action
@@ -191,21 +234,36 @@ emptyNested i j _ _ = do
   if x `isPrefixOf` y then do
     popIndents
     popStates
-    pushStates dedenting
     pure $ L (Loc i j) Token.Dedent
   else if y `isPrefixOf` x then do
-    pushStates indented
+    pushStates maybeNewline
     getToken
   else
     throwError' $ IndentError i x y
 
-emptyDedenting :: Action
-emptyDedenting i j _ _ = do
+maybeNewlineAction :: Token -> Action
+maybeNewlineAction x i j _ _ = do
   popStates
-  pure $ L (Loc i j) Token.Newline
+  pushStates indented
+  pure $ L (Loc i j) x
 
-leftBrace :: Action
-leftBrace i j _ _ = do
+leftBraceMaybeNewline :: Action
+leftBraceMaybeNewline = maybeNewlineAction Token.LeftBrace
+
+doMaybeNewline :: Action
+doMaybeNewline = maybeNewlineAction Token.Do
+
+thenMaybeNewline :: Action
+thenMaybeNewline = maybeNewlineAction Token.Then
+
+elseMaybeNewline :: Action
+elseMaybeNewline = maybeNewlineAction Token.Else
+
+emptyMaybeNewline :: Action
+emptyMaybeNewline = maybeNewlineAction Token.Newline
+
+leftBraceMaybeNesting :: Action
+leftBraceMaybeNesting i j _ _ = do
   popStates
   popIndents
   pushStates indented
@@ -226,35 +284,35 @@ emptyNesting i j _ _ = do
   pure $ L (Loc i j) Token.Indent
 
 newlineIndented :: Action
-newlineIndented i j _ _ = do
+newlineIndented = action $ do
   popStates
   putIndent []
-  pure $ L (Loc i j) Token.Newline
+  getToken
 
-colon :: Action
-colon i j _ _ = do
+colonEOL :: Action
+colonEOL i j _ _ = do
   popStates
   pushStates nesting
-  pure $ L (Loc i j) Token.Colon
+  pure $ L (Loc i j) Token.ColonEOL
 
-equal :: Action
-equal i j _ _ = do
+equalEOL :: Action
+equalEOL i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []
   pushStates maybeNesting
   pure $ L (Loc i j) Token.Equal
 
-colonEqual :: Action
-colonEqual i j _ _ = do
+colonEqualEOL :: Action
+colonEqualEOL i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []
   pushStates maybeNesting
   pure $ L (Loc i j) Token.ColonEqual
 
-fatArrow :: Action
-fatArrow i j _ _ = do
+fatArrowEOL :: Action
+fatArrowEOL i j _ _ = do
   popStates
   pushIndents =<< getIndent
   putIndent []

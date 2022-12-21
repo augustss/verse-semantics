@@ -12,6 +12,10 @@ PAPERSRC = $(PAPERTEX) ../verse.bib
 rewrites.tex:   rewrites.ltx   ../calculus.fmt
 verse-conf.tex: verse-conf.ltx densem-pldi.ltx ../calculus.fmt
 
+talk-figures-pldi.pdf: talk-figures-pldi.tex rewrites.tex
+	$(LATEX) talk-figures-pldi
+	$(LATEX) talk-figures-pldi
+
 verse-conf.pdf: $(PAPERSRC)
 	$(LATEX) verse-conf
 	bibtex verse-conf

@@ -29,6 +29,11 @@ systemKoen = TRSystem
 
 -- Turn an expression into the subset of the Koen grammar
 expr :: Expr -> Expr
+expr e@(Var _)        = e
+expr e@(Int _)        = e
+expr e@(Op _)         = e
+expr e@(Arr es) | all isVar es = e
+expr (Lam (Bind x e)) = Lam (Bind x (expr e))
 expr (e1 :|: e2)      = expr e1 :|: expr e2
 expr (Exi (Bind x e)) = Exi (Bind x (expr e))
 expr (One e)          = One (expr e)
@@ -41,10 +46,10 @@ defseq (Var x)          = Var x
 defseq (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
 defseq (e1 :>: e2)      = letExpr (expr e1) (\_ -> defseq e2)
 defseq (Exi (Bind x e)) = Exi (Bind x (defseq e))
+defseq Fail             = Fail
 defseq (Arr es)         = letExprs (map expr es) (\xs -> letExpr (Arr xs) id)
 defseq (fe :@: e)       = letExprs [expr fe,expr e] (\[f,x] -> letExpr (f :@: x) id)
-defseq (Lam (Bind x e)) = letExpr (Lam (Bind x (expr e))) id
-defseq e                = letExpr e id
+defseq e                = letExpr (expr e) id
 
 letExpr :: Expr -> (Expr -> Expr) -> Expr
 letExpr e@(Var _)     f = f e
@@ -57,8 +62,6 @@ letExpr e             f = Exi (Bind x ((Var x :=: e) :>: f (Var x)))
 letExprs :: [Expr] -> ([Expr] -> Expr) -> Expr
 letExprs []     f = f []
 letExprs (e:es) f = letExpr e (\x -> letExprs es (\xs -> f (x:xs)))
-
-data OK = EQ | Yes | No deriving ( Eq, Ord, Show )
 
 -- Check that an expression is in the subset defined by the grammar.
 validE :: Expr -> Bool
@@ -81,10 +84,12 @@ validE = ok
   sequ (e1 :>: e2)      = eq e1 && sequ e2
   sequ (Exi (Bind _ e)) = sequ e
   sequ (Var _)          = True
+  sequ Fail             = True
   sequ _                = False
-  
-  isVar (Var _) = True
-  isVar _       = False
+
+isVar :: Expr -> Bool
+isVar (Var _) = True
+isVar _       = False
 
 --------------------------------------------------------------------------------
 
@@ -98,6 +103,28 @@ allRules =
   <> rulesGarbageCollect
   <> rulesOne
   <> rulesAll
+
+--------------------------------------------------------------------------------
+
+{-
+type Know = [([Ident], [Expr])]
+
+(+=) :: Know -> (Ident, Expr) -> Know
+[]             += (x,v) = [([x],[v])]
+((xs,vs):know) += (x,v)
+  | x `elem` xs          = (xs,v:vs) : know
+  | otherwise            = (xs,vs) : (know += (x,v))
+
+(+~) :: Know -> (Ident, Ident) -> Know
+[]             +~ (x,y) = [([x,y],[])]
+((xs,vs):know) +~ (x,y)
+  | x `elem` xs          = ([y] `union` xs,vs) : know
+  | y `elem` xs          = ([x] `union` xs,vs) : know
+  | otherwise            = (xs,vs) : (know +~ (x,v))
+
+matchCtx :: Expr -> [(Expr -> Expr, Expr)]
+matchCtx = undefined
+-}
 
 --------------------------------------------------------------------------------
 
@@ -321,6 +348,10 @@ rulesGarbageCollect _ lhs =
  where
   takeXEqs x ((Var x' :=: Var y) :>: r) | x == x' = (y:ys,r') where (ys,r') = takeXEqs x r
   takeXEqs x r                                    = ([],r)
+
+--------------------------------------------------------------------------------
+
+
 
 --------------------------------------------------------------------------------
 

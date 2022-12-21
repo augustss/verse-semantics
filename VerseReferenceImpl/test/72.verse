@@ -1,10 +1,5 @@
 Tail := lambda (X). all{exists I . I > 0; X(I)}
 Cons := lambda (X) {exists Y . exists Z . (Y, Z) = X; all. Y | :Z}
 MapAp := lambda (F). if (G := F(0)). Cons(G(), MapAp(Tail(F)))
-F := lambda (X). 1|2
-MapAp(all:
-  F()
-  X := 3|4
-  F()
-  lambda (Y). X
-)
+F := lambda (X) {exists Y . Y = one{lambda (Z). 1|2}; Y()}
+MapAp(all{F(); X := 3|4; lambda (Y). X})

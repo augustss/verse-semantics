@@ -41,8 +41,11 @@ import Language.Verse.Token qualified as Token
 %lexer { lexer } { L _ Token.EOF }
 %error { uncurryL Lexer.throwError }
 
+%nonassoc '.'
 %left ';' newline
 %left ','
+%left IF IF_THEN FOR
+%left then else do
 %left '=' ':='
 %nonassoc '<>'
 %right '<' '<=' '>' '>='
@@ -64,6 +67,7 @@ import Language.Verse.Token qualified as Token
   ';' { L _ Token.Semi }
   newline { L _ Token.Newline }
   ':' { L _ Token.Colon }
+  colonEOL { L _ Token.ColonEOL }
   ':=' { L _ Token.ColonEqual }
   ',' { L _ Token.Comma }
   '.' { L _ Token.Dot }
@@ -105,7 +109,6 @@ import Language.Verse.Token qualified as Token
 
 List
   : Scan exists name '.' List { Exp.Exists <\$> duplicate $3 <.> duplicate $5 }
-  | Scan lambda name '.' List { Exp.Lambda <\$> duplicate $3 <.> duplicate $5 }
   | Scan MaybeCommas { $2 }
   | Scan MaybeCommas Separator { $2 <. $3 }
   | Scan MaybeCommas Separator List { (:*>:) <\$> duplicate $2 <.> duplicate $4 }
@@ -119,8 +122,8 @@ MaybeCommas :: { L (Exp L Name) }
   | Exp { $1 }
 
 Commas :: { L [L (Exp L Name)] }
-  : Exp ',' Exp { (\ x y -> [x, y]) <\$> duplicate $3 <.> duplicate $1 }
-  | Commas ',' Exp { (:) <\$> duplicate $3 <.> $1 }
+  : Exp ',' Scan Exp { (\ x y -> [x, y]) <\$> duplicate $4 <.> duplicate $1 }
+  | Commas ',' Scan Exp { (:) <\$> duplicate $4 <.> $1 }
 
 Exp :: { L (Exp L Name) }
   : '(' ')' { $1 \$> Exp.Tuple [] <. $2 }
@@ -157,18 +160,19 @@ Exp :: { L (Exp L Name) }
   | float { Exp.Float <\$> $1 }
   | name { Exp.Name <\$> $1 }
   | isInt '(' List ')' { Exp.IsInt <\$ $1 <.> duplicate $3 }
+  | Lambda { $1 }
 
 If
-  : if Block {
+  : if Block %prec IF {
       Exp.If <\$ $1 <.> duplicate $2
     }
-  | if Paren Block {
+  | if Paren Block %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
-  | if Paren Then {
+  | if Paren Then %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
-  | if Block Then {
+  | if Block Then %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Paren Block Else {
@@ -183,12 +187,14 @@ If
 
 Then
   : then Block { $1 .> $2 }
+  | then Exp { $1 .> $2 }
 
 Else
   : else Block { $1 .> $2 }
+  | else Exp { $1 .> $2 }
 
 For
-  : for Block {
+  : for Block %prec FOR {
       Exp.For <\$ $1 <.> duplicate $2
     }
   | for Paren Block {
@@ -197,6 +203,9 @@ For
   | for Block do Block {
       Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
+
+Lambda
+  : lambda '(' name ')' Block { Exp.Lambda <\$ $1 <.> duplicate $3 <.> duplicate $5 }
 
 Paren
   : '(' List ')' { $1 .> $2 <. $3 }
@@ -210,7 +219,8 @@ Brace
 
 Block
   : Brace { $1 }
-  | ':' ind List ded { $1 .> $3 <. $4 }
+  | '.' Exp { $1 .> $2 }
+  | colonEOL ind List ded { $1 .> $3 <. $4 }
 
 Scan
   : { () }
