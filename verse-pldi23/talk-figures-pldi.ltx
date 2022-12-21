@@ -1,0 +1,368 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[acmsmall,review,dvipsnames]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\let\Bbbk\relax % polycode defines that again?
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
+
+\RequirePackage[utf8]{inputenc}
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{POPL} % CONF = POPL or ICFP or OOPSLA
+\acmArticle{1}
+\acmYear{2022}
+\acmMonth{1}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+
+%% -------------- Copyright information ------------------
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
+\usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
+
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
+\newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
+\newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\newcommand{\joachim}[1]{}
+\newcommand{\koen}[1]{}
+\newcommand{\olin}[1]{}
+\newcommand{\ranjit}[1]{}
+\fi
+% ---------------- End of comments -----------------
+
+
+\begin{document}
+
+%% Title information
+% \title{The essence of functional logic programming}
+\title{The Verse Calculus: a Core Calculus for Functional Logic Programming}
+
+                                        %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+% \titlenote{with title note}             %% \titlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+% \subtitle{Subtitle}                     %% \subtitle is optional
+% \subtitlenote{with subtitle note}       %% \subtitlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Lennart Augustsson}
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{lennart.augustsson@@epicgames.com}          %% \email is recommended
+
+\author{Joachim Breitner}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{0000-0003-3753-6821}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{Germany}                    %% \country is recommended
+}
+\email{joachim.breitner@@epicgames.com}          %% \email is recommended
+
+\author{Koen Claessen}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{koen.claessen@@epicgames.com}          %% \email is recommended
+
+\author{Simon Peyton Jones}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{United Kingdom}                    %% \country is recommended
+}
+\email{simonpj@@epicgames.com}          %% \email is recommended
+
+\author{Olin Shivers}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{olin.shivers@@epicgames.com}          %% \email is recommended
+
+\author{Tim Sweeney}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{tim.sweeney@@epicgames.com}          %% \email is recommended
+
+
+
+\maketitle
+
+\input{rewrites}
+
+\section{Syntax}
+
+\begin{figure}[t]
+$$
+\begin{array}{l}
+  \textbf{Abstract syntax} \\
+    \begin{array}{lrcl}
+    \textit{Integers}      & k \\
+    \textit{Variables}     & \multicolumn{3}{l}{x,y,z,f,g} \\
+    \textit{Primops}       & \op   & ::= & |gt| \vb |add| \\
+    \textit{Values}        & |v|   & ::= & x \vb k \vb op \vb |tup (s_1, dots, s_n)| \vb |lam x e| \\
+    \textit{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
+                                             \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+                           & eu     & ::= & |e| \vb |v == e| \\
+\end{array}
+    \\
+    \textbf{Desugaring} \\
+    \begin{array}{rcll}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
+      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
+      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
+      |apply1 e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1 f a)|  & |f,a|\ \text{fresh} \\
+      |tup (e_1, dots, e_n)| & \text{means} &
+          |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
+      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
+%      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
+
+      |if e_1 then e_2 else e_3| & \text{means}
+      & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
+      |for e| & \text{means}  & |all e| \\
+      |for^(e_1) do e_2| & \text{means} & |def y (y == all (e_1; thunk e_2); applyN map (lam z (apply0 z), y))| \\
+%       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+      |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
+     \end{array} \\
+\end{array}
+$$
+\caption{\textbf{The Verse Calculus: Syntax}}
+\label{fig:syntax}
+\end{figure}
+
+
+\begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E| 
+                                              \vb |E == e| \vb |e == E| \\
+                                &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
+                                       \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
+\textit{Application context}    & A  & ::= & |apply1N hole v| \vb |apply1N op hole| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
+                                &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
+\textit{Scope context}          & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
+\textit{Choice context}         & CX & ::= & \hole \vb |v == CX| \vb |CX; e| \vb |ce ; CX|  \vb |def x CX| \\
+\textit{Choice-free expr}      & ce & ::= & |v| \vb |v == ce| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
+                                             %%% NOTE: the following is not in the POPL submission,
+                                             %%% but needed to make progress in (1,2)[x:int]
+                                             \vb |apply1 op v|
+                                             \vb |def x ce| \\
+\textit{Bound variables} & \multicolumn{3}{l}{
+  \boundvars{E} =
+  \begin{array}[t]{l}
+      \text{The variables that are bound by |E| at the hole} \\
+      \text{e.g. $\boundvars{|(def x (x=3)) `choice` (def y (hole = 4)))|} = \{y\}$}
+  \end{array}
+   }
+\end{array}$$
+
+% \begin{longtable}[l]{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
+% \rulegroupname{Unification:~\runi}
+% \rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
+% \rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}$ \\
+% \rulename{u-scalar} & |s == s; e |                                    & \movesto & e \\
+% \rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1' ,dots, v_n'); e| & \movesto & \multicolumn{2}{l} {|v_1==v1';dots;v_n==v_n'; e|} \\
+% \rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
+% \end{longtable}
+% \vspace{-4mm}
+\begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
+% \rulegroupname{Application:~\rapp}
+% \rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
+% \rulename{app-tup0} & |apply1N (tup ()) v| & \movesto & |fail| \\
+% \rulename{app-tup}  & |apply1N (tup (v_0 dots v_n)) v| & \movesto
+% 	& |def x (x == v; (x = 0; v_0 choice dots choice x = n; v_n)| & if $|x| \not \in \freevars{|v|}, n \geq 0$ \\
+% \rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+% \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+% \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
+% \end{longtable}
+% \vspace{-4mm}
+% \begin{longtable}[l]{@@{\quad} l @@{\;}  r >{$}c<{$} l l}
+% \rulegroupname{Speculation:~\rspc}
+\rulename{choose}     & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| & if $|CX| \ne \hole$ \\
+% \rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+% \rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
+% \rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
+\\
+\\
+\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
+\rulename{one-choice} & |one (v_1 `choice` e_2)| & \movesto & |v_1| & \\
+\rulename{one-value}  & |one v|              & \movesto & |v| &  \\
+\\
+\\
+\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (v_1 choice dots choice v_n)| & \movesto &
+   |tup (v_1, dots, v_n)| & \\
+
+%% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
+\end{longtable}
+\caption{\textbf{The Verse Calculus: Rewrite Rules}}
+   \label{fig:rewrite-rules} \label{fig:choice-rules} \label{fig:contexts}
+\end{figure}
+
+\end{document}
+
+
