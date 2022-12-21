@@ -8,3 +8,11 @@
 :set -package mtl
 :set -package scientific
 :set -package unordered-containers
+--
+:set -i../VerseReferenceImpl/src
+:set -package logict
+:set -package prettyprinter
+:set -package comonad
+:set -package hashable
+:set -package semigroupoids
+:set -package optparse-applicative
