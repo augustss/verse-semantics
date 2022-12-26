@@ -98,17 +98,17 @@ executable versei
   ghc-options: -Wall -Wno-name-shadowing
   default-language: Haskell2010
 
-executable verse.wasm
-  main-is: Main.hs
-  build-depends:
-    base >= 4.16.0.0,
-    bytestring,
-    prettyprinter,
-    transformers,
-    verse
-  hs-source-dirs: wasm
-  ghc-options: -Wall
-  default-language: Haskell2010
+--executable verse.wasm
+  --main-is: Main.hs
+  --build-depends:
+    --base >= 4.16.0.0,
+    --bytestring,
+    --prettyprinter,
+    --transformers,
+    --verse
+  --hs-source-dirs: wasm
+  --ghc-options: -Wall
+  --default-language: Haskell2010
 
 executable verselex
   main-is: Main.hs

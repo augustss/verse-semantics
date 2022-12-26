@@ -2342,6 +2342,45 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
   \caption{The Verse calculus: store axioms} \label{fig:store-axioms}
 \end{figure}
 
+To add updateable references we extend the system with syntax and rules from figure~\ref{fig:store-axioms}.
+The |store h e| indicates that |e| should be reduced using the heap |h|.
+A heap is simply a mapping from references to values (one mapping being |cell r v|).
+A reference is some opaque type that supports equality (unification) and creation of a new reference.
+
+There are three new primitive operations, |alloc|, |read|, and |write|.
+Their interaction with the store can be seen from the axioms.
+The |apply1 alloc v| operation creates a new reference and adds a binding with |v| to the store.
+The |apply1 read r| operation retrieves the value for reference |r| from the store,
+and |applyN write (r, v)| updates the reference |r| with |v| in the store.
+All of these operations use the context |S| which ensures that there are no store operations
+to the left of the hole, i.e., a store operation in the hole is the next one that should execute.
+
+The interesting rules involve choice and |splitKW| because store operations are transactional in the sense
+that when an expressions fails, none of its store operations will happen.
+
+When reducing |split e f g| in an |S| hole, rule \rulename{st-split-dup}, the store is duplicated.
+Any store operations inside the |splitKW| will happen in this local copy of the store.
+Note the two occurrences of |h| in the right hand side of \rulename{st-split-dup}.
+If the reduction of |e| results in |fail| then rule \rulename{fail} is used,
+and the store from the failing computation is simply thrown away.
+If the reduction of |e| results in a value (with or without more alternatives) then rule
+\rulename{st-split} is used.  This rule replaces the outer store with the inner store,
+since we know the inner computation has succeeded.
+
+Similarely, the reduction of |e_1 `choice` e_2| will duplicate the store into the first branch, \rulename{st-choice-dup}.
+And again, similarely, \rulename{st-choice} commits the new store and throws away the old.
+
+The use of |oe| in the rules is to ensure that the rules cannot get stuck in a loop.
+Using |e| instead of |oe| would mean that failing or committing would make the expression match the duplication rule again.
+It also prevents the duplication rule from repeatedly duplicating the |storeKW|.
+
+To support limited store operations ({\eg}, |read|,
+but not |write|) we can equip the store with a set of currently allowed operations.
+We also need some extra expressions that modify this set.
+
+\subsection{Examples}
+\lennart{Not yet}
+
 \end{document}
 
 % LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
