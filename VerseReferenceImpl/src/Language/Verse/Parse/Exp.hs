@@ -29,7 +29,8 @@ data Exp f a
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
   | Exists (f a) (f (Exp f a))
-  | Invoke (f (Exp f a)) (f (Exp f a))
+  | ParenInvoke (f (Exp f a)) (f (Exp f a))
+  | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Lambda (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))

@@ -19,6 +19,8 @@ data Token
   | Indent
   | RightBrace
   | Dedent
+  | LeftBracket
+  | RightBracket
   | Semi
   | Colon
   | ColonEOL
@@ -73,6 +75,8 @@ instance Pretty Token where
     Indent -> "indent"
     RightBrace -> rbrace
     Dedent -> "dedent"
+    LeftBracket -> lbracket
+    RightBracket -> rbracket
     Semi -> semi
     Colon -> colon
     ColonEOL -> colon

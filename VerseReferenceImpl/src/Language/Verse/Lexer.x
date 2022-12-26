@@ -56,6 +56,7 @@ $space = [\ \t]
 
 <blockComment> {
   \t { tabBlockComment }
+  "<#>" { indBlockComment }
   "#>" { rightBlockComment }
   . { textBlockComment }
 }
@@ -90,6 +91,8 @@ $space = [\ \t]
   ")" { token Token.RightParen }
   "{" { token Token.LeftBrace }
   "}" { token Token.RightBrace }
+  "[" { token Token.LeftBracket }
+  "]" { token Token.RightBracket }
   ";" { token Token.Semi }
   ":" { token Token.Colon }
   "," { token Token.Comma }
@@ -208,6 +211,13 @@ leftBlockComment = action $ do
 tabBlockComment :: Action
 tabBlockComment = action $ do
   pushIndent Tab
+  getToken
+
+indBlockComment :: Action
+indBlockComment = action $ do
+  pushIndent Space
+  pushIndent Space
+  pushIndent Space
   getToken
 
 textBlockComment :: Action

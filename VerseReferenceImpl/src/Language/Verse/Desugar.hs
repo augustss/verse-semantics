@@ -88,7 +88,9 @@ desugar' e = for e $ \ case
     extract <$> exists (desugar' e)
   Parse.Exists x e ->
     Exists x <$> exists (desugar' e)
-  Parse.Invoke e1 e2 ->
+  Parse.ParenInvoke e1 e2 ->
+    Invoke <$> desugar' e1 <*> desugar' e2
+  Parse.BracketInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.Lambda x e ->
     Lambda x <$> exists (desugar' e)

@@ -55,7 +55,7 @@ import Language.Verse.Token qualified as Token
 %left '*' '/'
 %nonassoc '?'
 %nonassoc ':'
-%left '('
+%left '(' '['
 
 %token
   '(' { L _ Token.LeftParen }
@@ -64,6 +64,8 @@ import Language.Verse.Token qualified as Token
   ind { L _ Token.Indent }
   '}' { L _ Token.RightBrace }
   ded { L _ Token.Dedent }
+  '[' { L _ Token.LeftBracket }
+  ']' { L _ Token.RightBracket }
   ';' { L _ Token.Semi }
   newline { L _ Token.Newline }
   ':' { L _ Token.Colon }
@@ -144,8 +146,18 @@ Exp :: { L (Exp L Name) }
   | Exp '/' Scan Exp { (:/:) <\$> duplicate $1 <.> duplicate $4 }
   | Exp '?' { Exp.Query <\$> duplicate $1 <. $2 }
   | ':' Exp { Exp.PrefixColon <\$ $1 <.> duplicate $2 }
-  | Exp '(' ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3) }
-  | Exp '(' List ')' { Exp.Invoke <\$> duplicate $1 <.> duplicate $3 <. $4 }
+  | Exp '(' ')' {
+      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3)
+    }
+  | Exp '(' List ')' {
+      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $3 <. $4
+    }
+  | Exp '[' ']' {
+      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.Tuple [] <. $3)
+    }
+  | Exp '[' List ']' {
+      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate $3 <. $4
+    }
   | truth Block { Exp.Truth <\$ $1 <.> duplicate $2 }
   | false { Exp.False <\$ $1 }
   | true { Exp.True <\$ $1 }
