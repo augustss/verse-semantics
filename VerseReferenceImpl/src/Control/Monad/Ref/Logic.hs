@@ -16,10 +16,11 @@ import Control.Monad.Error.Class
 import Control.Monad.Logic
 import Control.Monad.Logic.Class
 import Control.Monad.Ref
-import Control.Monad.State.Strict
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer.CPS
 
 newtype RefLogicT m a = RefLogicT
-  { unRefLogicT :: LogicT (StateT (m ()) m) a
+  { unRefLogicT :: LogicT (WriterT (Ap m) m) a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -29,28 +30,48 @@ newtype RefLogicT m a = RefLogicT
 deriving instance MonadError e m => MonadError e (RefLogicT m)
 
 runRefLogicT :: Monad m => RefLogicT m a -> m [a]
-runRefLogicT = flip evalStateT (pure ()) . observeAllT . unRefLogicT
+runRefLogicT = evalWriterT . observeAllT . unRefLogicT
+
+evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
+evalWriterT = fmap fst . runWriterT
+
+data Ap f
+  = Ap (f ())
+  | Zero
+
+runAp :: Applicative f => Ap f -> f ()
+runAp = \ case
+  Ap x -> x
+  Zero -> pure ()
+
+instance Applicative f => Semigroup (Ap f) where
+  (<>) = curry $ \ case
+    (Zero, _) -> Zero
+    (_, Zero) -> Zero
+    (Ap x, Ap y) -> Ap $ y *> x
+
+instance Applicative f => Monoid (Ap f) where
+  mempty = Ap $ pure ()
 
 instance MonadTrans RefLogicT where
   lift = RefLogicT . lift . lift
 
 instance Monad m => Alternative (RefLogicT m) where
   empty = RefLogicT $ LogicT $ \ _ fk ->
-    put (pure ()) *> fk
+    tell Zero *> fk
   x <|> y = RefLogicT $ LogicT $ \ sk fk ->
     unLogicT (unRefLogicT x) sk $ unLogicT (unRefLogicT y) sk fk
 
 instance Monad m => MonadLogic (RefLogicT m) where
   msplit m = RefLogicT $ LogicT $ \ sk fk -> do
-    (x, fk') <- runStateT' (msplit' m)
-    sk x $ lift fk' *> fk
-    where
-      runStateT' =
-        lift . flip runStateT (pure ())
-      msplit' m =
-        unLogicT (unRefLogicT m) sk' $ pure Nothing
-        where
-          sk' x fk = pure $ Just (x, RefLogicT (lift fk) >>= reflect)
+    (x, fk') <- lift . runWriterT . fmap (fmap (fmap RefLogicT)) . msplit' $ unRefLogicT m
+    sk x $ lift (runAp fk') *> fk
+
+msplit' :: Monad m => LogicT m a -> m (Maybe (a, LogicT m a))
+msplit' m =
+  unLogicT m sk' $ pure Nothing
+  where
+    sk' x fk = pure $ Just (x, lift fk >>= reflect)
 
 instance MonadRef m => MonadRef (RefLogicT m) where
   type Ref (RefLogicT m) = Ref m
@@ -61,5 +82,5 @@ instance MonadRef m => MonadRef (RefLogicT m) where
     writeRef ref x
     sk () $ do
       writeRef ref y
-      modify (writeRef ref x *>)
+      tell . Ap $ writeRef ref x
       fk

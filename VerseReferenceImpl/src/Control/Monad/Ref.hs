@@ -6,6 +6,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Ref
   ( MonadRef (..)
+  , modifyRef
   ) where
 
 import Control.Monad.Logic
@@ -14,6 +15,7 @@ import Control.Monad.ST
 import Control.Monad.State.Lazy qualified as Lazy
 import Control.Monad.State.Strict qualified as Strict
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.Writer.CPS qualified as CPS
 
 import Data.IORef
 import Data.Kind
@@ -38,25 +40,22 @@ class Monad m => MonadRef m where
 
   writeRef :: Ref m a -> a -> m ()
   default writeRef :: (m ~ t n, MonadRefTrans t n) => Ref m a -> a -> m ()
-  writeRef x = lift . writeRef x
+  writeRef ref = lift . writeRef ref
 
-  modifyRef :: Ref m a -> (a -> a) -> m ()
-  default modifyRef :: (m ~ t n, MonadRefTrans t n) => Ref m a -> (a -> a) -> m ()
-  modifyRef x = lift . modifyRef x
+modifyRef :: MonadRef m => Ref m a -> (a -> a) -> m ()
+modifyRef ref f = writeRef ref . f =<< readRef ref
 
 instance MonadRef IO where
   type Ref IO = IORef
   newRef = newIORef
   readRef = readIORef
   writeRef = writeIORef
-  modifyRef = modifyIORef
 
 instance MonadRef (ST s) where
   type Ref (ST s) = STRef s
   newRef = newSTRef
   readRef = readSTRef
   writeRef = writeSTRef
-  modifyRef = modifySTRef
 
 instance MonadRef m => MonadRef (ExceptT e m)
 
@@ -67,3 +66,5 @@ instance MonadRef m => MonadRef (ReaderT r m)
 instance MonadRef m => MonadRef (Lazy.StateT s m)
 
 instance MonadRef m => MonadRef (Strict.StateT s m)
+
+instance MonadRef m => MonadRef (CPS.WriterT w m)
