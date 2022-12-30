@@ -44,18 +44,20 @@ instance MonadSupply s m => MonadSupply s (CPS.WriterT w m)
 
 newtype SupplyT s m a = SupplyT
   { getSupplyT :: Strict.StateT s m a
-  } deriving (Functor, Applicative, Monad)
+  } deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadFail
+             , MonadTrans
+             , MonadIO
+             , MonadRef
+             )
 
 type Supply s = SupplyT s Identity
 
 deriving instance MonadError e m => MonadError e (SupplyT s m)
 
 deriving instance MonadFix m => MonadFix (SupplyT s m)
-
-instance MonadTrans (SupplyT s) where
-  lift = SupplyT . lift
-
-instance MonadRef m => MonadRef (SupplyT s m)
 
 instance (Enum s, Monad m) => MonadSupply s (SupplyT s m) where
   supply = SupplyT $ do

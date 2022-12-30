@@ -10,6 +10,7 @@ module Control.Monad.RST
 
 import Control.Applicative
 import Control.Monad.Error.Class
+import Control.Monad.IO.Class
 import Control.Monad.Logic.Class
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
@@ -35,12 +36,15 @@ instance Monad m => Applicative (RST r s m) where
     f r s >>= \ (f, s) -> x r s <&> \ (x, s) -> (f x, s)
 
 instance (Alternative m, Monad m) => Alternative (RST r s m) where
-  empty = RST $ \ _ _ -> empty
+  empty = lift empty
   x <|> y = RST $ \ r s -> runRST x r s <|> runRST y r s
 
 instance Monad m => Monad (RST r s m) where
   x >>= f = RST $ \ r s ->
     runRST x r s >>= \ (x, s) -> runRST (f x) r s
+
+instance MonadFail m => MonadFail (RST r s m) where
+  fail = lift . fail
 
 instance MonadError e m => MonadError e (RST r s m) where
   throwError = lift . throwError
@@ -65,7 +69,10 @@ instance Monad m => MonadState s (RST r s m) where
   state f = RST $ \ _ s -> pure $ f s
 
 instance MonadTrans (RST r s) where
-  lift x = RST $ \ _ s -> (, s) <$> x
+  lift m = RST $ \ _ s -> (, s) <$> m
+
+instance MonadIO m => MonadIO (RST r s m) where
+  liftIO m = RST $ \ _ s -> (, s) <$> liftIO m
 
 instance MonadRef m => MonadRef (RST r s m)
 

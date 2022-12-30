@@ -16,49 +16,57 @@ import Control.Monad.Error.Class
 import Control.Monad.Logic
 import Control.Monad.Logic.Class
 import Control.Monad.Ref
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Writer.CPS
+import Control.Monad.State.Strict
+import Control.Monad.Supply
 
 newtype RefLogicT m a = RefLogicT
-  { unRefLogicT :: LogicT (WriterT (Ap m) m) a
+  { unRefLogicT :: LogicT (StateT (Ap m) m) a
   } deriving ( Functor
              , Applicative
              , Monad
-             , MonadFail
+             , MonadIO
              )
 
 deriving instance MonadError e m => MonadError e (RefLogicT m)
 
+deriving instance MonadSupply s m => MonadSupply s (RefLogicT m)
+
 runRefLogicT :: Monad m => RefLogicT m a -> m [a]
 runRefLogicT = evalWriterT . observeAllT . unRefLogicT
 
-evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
-evalWriterT = fmap fst . runWriterT
+data Ap f = Ap !Bool (f ())
 
-data Ap f
-  = Ap (f ())
-  | Zero
+emptyAp :: Applicative f => Ap f
+emptyAp = Ap True $ pure ()
 
-runAp :: Applicative f => Ap f -> f ()
-runAp = \ case
-  Ap x -> x
-  Zero -> pure ()
+runAp :: Ap f -> f ()
+runAp (Ap _ x) = x
 
-instance Applicative f => Semigroup (Ap f) where
-  (<>) = curry $ \ case
-    (Zero, _) -> Zero
-    (_, Zero) -> Zero
-    (Ap x, Ap y) -> Ap $ y *> x
+runWriterT :: Applicative f => StateT (Ap f) m a -> m (a, Ap f)
+runWriterT = flip runStateT emptyAp
 
-instance Applicative f => Monoid (Ap f) where
-  mempty = Ap $ pure ()
+evalWriterT :: (Applicative f, Monad m) => StateT (Ap f) m a -> m a
+evalWriterT = flip evalStateT emptyAp
+
+tellAp :: (Applicative f, Applicative m) => f () -> StateT (Ap f) m ()
+tellAp s = StateT $ \ case
+  (Ap True s') -> pure ((), Ap True $ s *> s')
+  s -> pure ((), s)
+
+tellEmpty :: Applicative m => StateT (Ap f) m ()
+tellEmpty = StateT $ \ case
+  Ap True s -> pure ((), Ap False s)
+  s -> pure ((), s)
 
 instance MonadTrans RefLogicT where
   lift = RefLogicT . lift . lift
 
+instance Monad m => MonadFail (RefLogicT m) where
+  fail _ = empty
+
 instance Monad m => Alternative (RefLogicT m) where
   empty = RefLogicT $ LogicT $ \ _ fk ->
-    tell Zero *> fk
+    tellEmpty *> fk
   x <|> y = RefLogicT $ LogicT $ \ sk fk ->
     unLogicT (unRefLogicT x) sk $ unLogicT (unRefLogicT y) sk fk
 
@@ -68,8 +76,7 @@ instance Monad m => MonadLogic (RefLogicT m) where
     sk x $ lift (runAp fk') *> fk
 
 msplit' :: Monad m => LogicT m a -> m (Maybe (a, LogicT m a))
-msplit' m =
-  unLogicT m sk' $ pure Nothing
+msplit' m = unLogicT m sk' $ pure Nothing
   where
     sk' x fk = pure $ Just (x, lift fk >>= reflect)
 
@@ -82,5 +89,5 @@ instance MonadRef m => MonadRef (RefLogicT m) where
     writeRef ref x
     sk () $ do
       writeRef ref y
-      tell . Ap $ writeRef ref x
+      tellAp $ writeRef ref x
       fk
