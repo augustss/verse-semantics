@@ -68,8 +68,8 @@ testFlags = TestFlags
          ( long "max-success"
         <> short 'n'
         <> metavar "NUM"
-        <> value (maxSuccess stdArgs)
-        <> help "Maximum of NUM successful tests" )
+        <> value nDef
+        <> help ("Maximum of NUM successful tests (default " ++ show nDef ++ ")") )
   <*> switch
          ( long "wrap-one"
         <> help "Wrap tested expression in one{}" )
@@ -77,12 +77,14 @@ testFlags = TestFlags
          ( long "max-steps"
         <> short 'm'
         <> metavar "NUM"
-        <> value 1000
-        <> help "Maximum number of rewrite steps" )
+        <> value mDef
+        <> help ("Maximum number of rewrite steps (default " ++ show mDef ++ ")") )
   <*> switch
          ( long "ignore-fuel-stop"
         <> short 'i'
         <> help "Do not discard out-of-fuel tests" )
+ where nDef = maxSuccess stdArgs
+       mDef = 1000
 
 testArgs :: IO TestFlags
 testArgs = do
