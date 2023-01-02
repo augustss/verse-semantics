@@ -30,7 +30,7 @@ evaluate tflg e = [eval flg e]
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
 rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
-                 | otherwise = map (trsToCore . sub flg sys . rtrace)
+                 | otherwise = force . map (trsToCore . sub flg sys . rtrace)
                 . elimDup sys
                 . subs flg sys
                 . map toList
@@ -57,6 +57,9 @@ rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
     where
       msg = "***** Reduction trace\n" ++ (unlines $ map pr $ reverse xs) ++ "*****\n"
       pr (s, a) = s ++ ":\n" ++ sh a ++ "\n----------\n"
+
+  -- Force evaluation to get traces
+  force xs = if xs==xs then xs else undefined
 
 type Trace a = [(String, a)]
 
