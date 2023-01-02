@@ -644,6 +644,10 @@ rulesStructural _ lhs =
   "UNIFY-SWAP1" `name`
   do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
      pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
+ <>
+  "UNIFY-SWAP2" `name`
+  do (e1 :=: e2) :>: (e3 :=: e4) <- [lhs]
+     pure $ (e3 :=: e4) :>: (e1 :=: e2)
 
  -- NEW RULE
  -- Needed for \x.(<> = x); <>
