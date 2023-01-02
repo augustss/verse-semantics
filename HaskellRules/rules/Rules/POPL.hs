@@ -503,13 +503,16 @@ rulesSequencing _ lhs =
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
      pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3) :>: Var x)))
+{-
   -- for FRESH
+  -- XXX is this needed
  ++ "CONJ-CST-DEFR" `name` -- e1 = (ex y. e2) --> ex y. e1 = e2
   do (e1 :=: Exi (Bind y e2)) <- [lhs]
-     let y' = identNotIn (free e2 ++ free e2)
+     let y' = identNotIn (free e1 ++ free e2)
      if y `elem` free e1
        then pure (Exi (Bind y' (e1 :=: subst [(y,Var y')] e2)))
        else pure (Exi (Bind y (e1 :=: e2)))
+-}
 -- ++ "CONJ-SEQ-ASSOC" `name`
 --  do (e1 :>: e2) :>: e3 <- [lhs]
 --     pure (e1 :>: (e2 :>: e3))
