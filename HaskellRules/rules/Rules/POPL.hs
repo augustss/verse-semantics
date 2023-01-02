@@ -642,3 +642,11 @@ rulesStructural _ lhs =
   do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
      pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
 
+ -- NEW RULE
+ -- Needed for \x.(<> = x); <>
+ --  Maybe better: x=v --> x=v; v
+ <>
+  "UNIFY-RES" `name`
+  do (e1 :=: Val e2) :>: e3 <- [lhs]
+     guard (e2 == e3)
+     pure (e1 :=: e2)
