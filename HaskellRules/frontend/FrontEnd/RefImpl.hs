@@ -77,7 +77,7 @@ coreToExp' = nl . expl
     expl (C.CApply (C.CPrim "in'>='") (C.CArray [e1, e2])) = coreToExp' e1 :>=: coreToExp' e2
     expl (C.CApply (C.CPrim "isInt$") e) = IsInt (coreToExp e)
     expl (C.CApply (C.CPrim "mapAp$") e) = expl (C.CApply (C.CVar (C.Ident C.noLoc "mapAp")) e)
-    expl (C.CApply e1 e2) = Invoke (coreToExp' e1) (coreToExp' e2)
+    expl (C.CApply e1 e2) = BracketInvoke (coreToExp' e1) (coreToExp' e2)
     expl (C.CBar e1 e2) = coreToExp' e1 :|: coreToExp' e2
     expl (C.CFail) = Fail
     expl (C.COne e) = One $ coreToExp' e
