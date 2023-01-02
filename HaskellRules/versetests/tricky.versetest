@@ -49,3 +49,5 @@ testceq("QC2", SEq)  { (<> | <>) = (<> = <>) }
                      { <> | <> }
 testceq("QC3", SEq)  { <0(add) = <>> }
                      { <0(add) = <>> }
+testceq("QC4", SEq)  { add(<>) = (ex x. all {x} = all {x}) }
+                     { ex x . <x> = add(<>); x=x; <x> }
