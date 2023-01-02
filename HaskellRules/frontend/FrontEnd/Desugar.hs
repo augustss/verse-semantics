@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId) where
+module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId, dsScope) where
 --import Control.Arrow(first, second)
 import Control.Monad
 import Control.Monad.State.Strict
@@ -669,6 +669,7 @@ getVisible AnyT = []
 getVisible EmptyT = []
 getVisible Function{} = []
 getVisible Lambda{} = []
+getVisible Exists{} = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -734,6 +735,9 @@ data ScopeErr
   | ErrShadow Ident
 --  deriving (Show)
 -}
+
+dsScope :: Expr -> Expr
+dsScope e = evalState (addScope e) 1
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -826,6 +830,7 @@ scope s = expr
       Lambda i r e1' <$> scope s' (Do e2)
     expr e@AnyT = pure e
     expr e@EmptyT = pure e
+    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert s is) e
     expr e = impossible e
 
     exprD e = fst <$> defs s e
