@@ -494,7 +494,7 @@ rulesSequencing _ lhs =
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (Val v :=: e2))
  ++
-  "UNIFY-UNIFYR" `name`
+  "UNIFY-UNIFYL" `name`
   do (e1 :=: e2) :=: e3 <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
      pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
