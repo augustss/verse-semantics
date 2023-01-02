@@ -13,7 +13,7 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -33,6 +33,13 @@ systemPOPLV = systemPOPL
   { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
   , rules               = allRules <> rulesElimV <> rulesDefElim
+  }
+
+systemPOPLF :: TRSystem Expr
+systemPOPLF = systemPOPL
+  { sname               = "POPLF"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL"
+  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesBadFail
   }
 
 -- Check that an expression is in the subset defined by the POPL grammar.
@@ -615,6 +622,39 @@ rulesDefElim _ lhs =
   do EXI x e <- [lhs]
      guard (x `notElem` free e)
      pure e
+
+
+--------------------------------------------------------------------------------
+
+-- Make bad uses of primitives go to FAIL
+rulesBadFail :: ERule
+rulesBadFail _ lhs =
+  "OP-FAIL" `name`
+  do Op op :@: HNF e <- [lhs]
+     guard (arrSize e /= Just (opNumArgs op))
+     pure Fail
+ <>
+  "AP-FAIL" `name`
+  do HNF f :@: _ <- [lhs]
+     guard (not (validFcn f))
+     pure Fail
+
+arrSize :: Expr -> Maybe Int
+arrSize (Arr es) = Just (length es)
+arrSize _ = Nothing
+
+opNumArgs :: Op -> Int
+opNumArgs Neg = 1
+opNumArgs Plus = 1
+opNumArgs IsInt = 1
+opNumArgs MapAp = 1
+opNumArgs _ = 2
+
+validFcn :: Expr -> Bool
+validFcn Op{} = True
+validFcn Arr{} = True
+validFcn Lam{} = True
+validFcn _ = False
 
 --------------------------------------------------------------------------------
 
