@@ -31,6 +31,8 @@ prop_Confluence flags sys p =
     NormResult { nrDone = done, nrLeft = left } ->
       -- First, check if all the stuck terms actually have the same normal form
       case nub $ map (norm sys) done of
+        [] ->                           -- no "stuck" results
+          discard
         trs | any isNothing trs ->      -- normalization timed out
           discard
         trs@(_:_:_) ->                  -- multiple normal form
