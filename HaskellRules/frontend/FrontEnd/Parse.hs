@@ -166,7 +166,7 @@ pLiteral = choice
   [ LitInt <$> pDecimal
   , LitChar <$> pChar
   -- Handle 1..2 incorrectly
---  , (LitRat <$> L.scientific <*> many letterChar) <* skip
+  , (LitRat <$> L.scientific <*> many letterChar) <* skip
   , pString
   ]
 
@@ -175,7 +175,7 @@ pDecimal = choice
   [ try (char '0' *> char' 'x' *> L.hexadecimal)
   , try (char '0' *> char' 'o' *> L.octal)
   , try (char '0' *> char' 'b' *> L.binary)
-  , try (L.decimal <* notFollowedBy (char '.'))
+  , try (L.decimal <* notFollowedBy (char '.' <* notFollowedBy (char '.')))
   ] <* skip
 
 pChar :: P Char
