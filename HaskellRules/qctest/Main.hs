@@ -20,7 +20,7 @@ main = do
         case lookupSystem (rulesys flags) of
           Left msg -> error msg
           Right s -> s
-      qcargs = stdArgs{ maxSuccess = numtests flags }
+      qcargs = stdArgs{ maxSuccess = numtests flags, replay = read <$> replayStr flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   quickCheckWith qcargs (prop_Confluence flags sys)
 
@@ -54,6 +54,7 @@ data TestFlags = TestFlags
   , numtests       :: !Int
   , wrapOne        :: !Bool
   , maxSteps       :: !Int
+  , replayStr      :: !(Maybe String)
   , ignoreFuelStop :: !Bool
   }
 
@@ -79,6 +80,10 @@ testFlags = TestFlags
         <> metavar "NUM"
         <> value mDef
         <> help ("Maximum number of rewrite steps (default " ++ show mDef ++ ")") )
+  <*> optional (option str
+         ( long "replay"
+        <> metavar "REPLAY"
+        <> help "Random replay setting") )
   <*> switch
          ( long "ignore-fuel-stop"
         <> short 'i'
