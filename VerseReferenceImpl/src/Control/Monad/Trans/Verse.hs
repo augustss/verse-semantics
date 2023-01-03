@@ -140,7 +140,14 @@ all' m f = split m $ \ case
   Nothing -> f []
   Just (var, m) -> freshen var >>= \ var ->  all' m $ \ vars -> f $ var : vars
 
-for' m f g = undefined
+for' :: ( MonadFix m
+        , MonadRef m
+        , MonadSupply Label m
+        , Traversable f
+        ) => VerseT m a -> (a -> VerseT m (Var m f)) -> ([Var m f] -> VerseT m ()) -> VerseT m ()
+for' m f g = split m $ \ case
+  Nothing -> g []
+  Just (x, m) -> f x >>= freshen >>= \ var -> for' m f $ \ vars -> g $ var : vars
 
 unify :: ( MonadRef m
          , EqRef (Ref m)
