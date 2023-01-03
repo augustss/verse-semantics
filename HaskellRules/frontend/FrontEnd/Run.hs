@@ -6,6 +6,8 @@ module FrontEnd.Run(
   findSystem,
   everySystem,
   ) where
+import Data.List
+import Epic.Print
 import FrontEnd.Core(Core)
 import FrontEnd.CoreSimp(simpCore)
 import FrontEnd.Eval(eval, replacePrelude, EFlags(..))
@@ -21,7 +23,7 @@ run :: Flags -> ESystem -> Core -> Core
 run f s = one . runM f s
  where  one [r] = r
         one [] = error "run: rewrite ran out of fuel"
-        one _ = error "run: multiple results from rewrite"
+        one rs = error $ "run: multiple results from rewrite:\n" ++ intercalate "\n-----------------\n" (map prettyShow rs)
 
 runM :: Flags -> ESystem -> Core -> [Core]
 runM f s e = rewrite f s e'
