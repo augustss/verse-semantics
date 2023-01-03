@@ -128,7 +128,7 @@ instance Ord Expr where
     comp _xs _ys Fail _    = LT
     comp _xs _ys _    Fail = GT
 
-    comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c  comp xs ys b d
+    comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c <> comp xs ys b d
     comp _xs _ys (_:=:_) _       = LT
     comp _xs _ys _       (_:=:_) = GT
 
