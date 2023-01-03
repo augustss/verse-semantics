@@ -12,7 +12,8 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsKoen :: [TRSystem Expr]
-allSystemsKoen = [ systemKoen ]
+allSystemsKoen = take 0 -- XXX
+  [ systemKoen ]
 
 systemKoen :: TRSystem Expr
 systemKoen = TRSystem
