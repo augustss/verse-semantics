@@ -232,7 +232,10 @@ valueX lhs = valueX1 lhs ++ [(id, lhs)]
 valueX1 lhs =
   do Arr vs <- [lhs]
      i <- [0..length vs-1]
-     pure (\v -> Arr (take i vs ++ [v] ++ drop (i+1) vs), vs!!i)
+     let ctx1 = \ v -> Arr (take i vs ++ [v] ++ drop (i+1) vs)
+         v1 = vs!!i
+     (ctx2, v2) <- valueX v1
+     pure (ctx1 . ctx2, v2)
 
 --------------------------------------------------------------------------------
 
