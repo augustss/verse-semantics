@@ -34,7 +34,7 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
-import FrontEnd.Desugar(primOps, covariantId)
+import FrontEnd.Desugar(primOps, covariantId, dsScope)
 import FrontEnd.Error(unimplemented, impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
@@ -548,7 +548,7 @@ pCoreFile :: P Core
 pCoreFile = skip *> pCore <* eof
 
 pCore :: P Core
-pCore = exprToCore flg <$> pSeq
+pCore = exprToCore flg . dsScope <$> pSeq
   where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam
@@ -558,7 +558,7 @@ pExists :: P Expr
 pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
-    exists is e = foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
+    exists is e = Exists is e -- foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
     pQuant = pKeyword "exists" <|> pKeyword "exi" <|> pKeyword "ex" <|> pKeyword "E"
       -- <|> void (pOp "∃")
 

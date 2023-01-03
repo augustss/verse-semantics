@@ -13,7 +13,7 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -33,6 +33,13 @@ systemPOPLV = systemPOPL
   { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
   , rules               = allRules <> rulesElimV <> rulesDefElim
+  }
+
+systemPOPLF :: TRSystem Expr
+systemPOPLF = systemPOPL
+  { sname               = "POPLF"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL"
+  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesBadFail
   }
 
 -- Check that an expression is in the subset defined by the POPL grammar.
@@ -494,7 +501,7 @@ rulesSequencing _ lhs =
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (Val v :=: e2))
  ++
-  "UNIFY-UNIFYR" `name`
+  "UNIFY-UNIFYL" `name`
   do (e1 :=: e2) :=: e3 <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
      pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3))))
@@ -503,13 +510,16 @@ rulesSequencing _ lhs =
   do e1 :=: (e2 :=: e3) <- [lhs]
      let x = identNotIn (free [e1,e2,e3])
      pure (Exi (Bind x ((Var x :=: e1) :>: (Var x :=: e2) :>: (Var x :=: e3) :>: Var x)))
+{-
   -- for FRESH
+  -- XXX is this needed
  ++ "CONJ-CST-DEFR" `name` -- e1 = (ex y. e2) --> ex y. e1 = e2
   do (e1 :=: Exi (Bind y e2)) <- [lhs]
-     let y' = identNotIn (free e2 ++ free e2)
+     let y' = identNotIn (free e1 ++ free e2)
      if y `elem` free e1
        then pure (Exi (Bind y' (e1 :=: subst [(y,Var y')] e2)))
        else pure (Exi (Bind y (e1 :=: e2)))
+-}
 -- ++ "CONJ-SEQ-ASSOC" `name`
 --  do (e1 :>: e2) :>: e3 <- [lhs]
 --     pure (e1 :>: (e2 :>: e3))
@@ -613,6 +623,39 @@ rulesDefElim _ lhs =
      guard (x `notElem` free e)
      pure e
 
+
+--------------------------------------------------------------------------------
+
+-- Make bad uses of primitives go to FAIL
+rulesBadFail :: ERule
+rulesBadFail _ lhs =
+  "OP-FAIL" `name`
+  do Op op :@: HNF e <- [lhs]
+     guard (arrSize e /= Just (opNumArgs op))
+     pure Fail
+ <>
+  "AP-FAIL" `name`
+  do HNF f :@: _ <- [lhs]
+     guard (not (validFcn f))
+     pure Fail
+
+arrSize :: Expr -> Maybe Int
+arrSize (Arr es) = Just (length es)
+arrSize _ = Nothing
+
+opNumArgs :: Op -> Int
+opNumArgs Neg = 1
+opNumArgs Plus = 1
+opNumArgs IsInt = 1
+opNumArgs MapAp = 1
+opNumArgs _ = 2
+
+validFcn :: Expr -> Bool
+validFcn Op{} = True
+validFcn Arr{} = True
+validFcn Lam{} = True
+validFcn _ = False
+
 --------------------------------------------------------------------------------
 
 rulesStructural :: ERule
@@ -641,4 +684,21 @@ rulesStructural _ lhs =
   "UNIFY-SWAP1" `name`
   do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
      pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
+ <>
+  "UNIFY-SWAP2" `name`
+  do (e1 :=: e2) :>: (e3 :=: e4) <- [lhs]
+     pure $ (e3 :=: e4) :>: (e1 :=: e2)
 
+ -- NEW RULE
+ -- Needed for \x.(<> = x); <>
+ --  Maybe better: x=v --> x=v; v
+ <>
+  "UNIFY-RES" `name`
+  do (e1 :=: Val e2) :>: e3 <- [lhs]
+     guard (e2 == e3)
+     pure (e1 :=: e2)
+ -- NEW RULE
+ <>
+  "UNIFY-SWAP" `name`
+  do (e1 :=: e2) <- [lhs]
+     pure (e2 :=: e1)

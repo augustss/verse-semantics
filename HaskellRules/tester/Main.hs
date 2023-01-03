@@ -22,6 +22,7 @@ import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
 import FrontEnd.Run(run, runM, everySystem, evalSystem, findSystem)
+import Rules.Core(RuleEnv(..))
 import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
 
@@ -46,6 +47,7 @@ data TestFlags = TestFlags
   , onlyTest       :: !(Maybe String)      -- run only this test
   , testExpr       :: !(Maybe String)      -- use this expression as a test
   , maxSteps       :: !Int                 -- max number of rewrite steps
+  , maxNormSteps   :: !Int                 -- max number of normalization steps
   , ignoreFuelStop :: !Bool                -- ignore running out of fuel
   , fileNames      :: ![FilePath]          -- input files
   }
@@ -205,11 +207,11 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     loc = testLocn ti
     noisy = not (quiet tflg)
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
-    sys = system tflg
+    sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
     flg = testFlagsToFlags tflg
-      
+
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
 equivValue sys e1 e2 | sname sys == "eval" = e1 == e2  -- XXX temporary hack
@@ -387,6 +389,11 @@ testFlags = TestFlags
         <> metavar "NUM"
         <> value 1000
         <> help "Maximum number of rewrite steps" )
+  <*> option auto
+         ( long "max-norm-steps"
+        <> metavar "NUM"
+        <> value 10000
+        <> help "Maximum number of normalization steps" )
   <*> switch
          ( long "ignore-fuel-stop"
         <> help "Ignore running out of fuel" )
