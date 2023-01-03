@@ -651,8 +651,8 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 We remarked in \Cref{sec:unify} that we can desugar the pattern matching of a high-level
 language into unification. But what about pattern matching with multiple equations, such as this definition in Haskell:
 \begin{code}
-  append []      ys = ys
-  append (x:xs)  ys = x : append xs ys
+  append []      ysl = ysl
+  append (x:xsl)  ysl = x : append xsl ysl
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly\footnote{
@@ -660,15 +660,15 @@ We use the empty tuple |emptytup| to represent the empty list and pairs to repre
 and we allow ourselves to write |lamhdr (tup(x,y)) body| rather than |lam p (def (x ^^ y) (p = tup (x,y); body)|
   }:
 $$
-|append =lam (tup (xs,ys))
-  ((xs = emptytup; ys) space choice space
-   (def (x ^^ xrest) (xs = tup (x,xrest); tup (x, applyN append (xrest, ys)))))|
+|append =lam (tup (xsl,ysl))
+  ((xsl = emptytup; ysl) space choice space
+   (def (x ^^ xrest) (xsl = tup (x,xrest); tup (x, applyN append (xrest, ysl)))))|
 $$
-If |xs| is |emptytup|, the left-hand choice succeeds, returning |ys|; and the right-hand choice
+If |xsl| is |emptytup|, the left-hand choice succeeds, returning |ysl|; and the right-hand choice
 fails (by attempting to unify |emptytup| with |tup(x,xrest)|).
-If |xs| is of the form |tup (x,xrest)|,
+If |xsl| is of the form |tup (x,xrest)|,
 the right-hand choice succeeds, and we make a recursive call to |append|.
-Finally if |xs| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
+Finally if |xsl| is built with head-normal forms other than the empty tuple and pairs, both choices fail, and |append| returns no
 results at all.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
@@ -860,16 +860,16 @@ To obtain the first element of a tuple, we can simply use array indexing. This f
 \item |tail|.
 To get the tail of a tuple, we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
 This way, the expression fails at the first value and only the other values are collected by |allKW|.
-It returns the empty tuple if |xs| is empty or not even a tuple.
+It returns the empty tuple if |xsl| is empty or not even a tuple.
 
 \item |cons| and |append|.
-We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|
-or all the elements of |xs|, and similarly we can define |append|.
+We can implement |applyN cons (x,xsl)| by collecting with |allKW| the choices we get from choosing |x|
+or all the elements of |xsl|, and similarly we can define |append|.
 
 \item |flatMap|.
 For the function |map|, which applies a function to each element of a tuple and collects the results,
 two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
-|flatMap| flattens the choices from iterating through |xs| with
+|flatMap| flattens the choices from iterating through |xsl| with
 the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
 
 \item |map|.
@@ -889,8 +889,8 @@ If we use |oneKW| instead of |allKW|, we get the function that checks if |p| hol
 and returns the first matching element, or fails if |p| does not hold for any element.
 
 \item |every|.
-To test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
-If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
+To test if a predicate |p| holds for every element of a tuple |xsl|, we can simply use |applyN map (p,xsl)|!
+If |p| fails for any value, the whole call to |applyN map (p,xsl)| fails.
 \end{itemize}
 
 \subsection{Choice comprehensions} \label{sec:for}
