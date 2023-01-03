@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -42,11 +43,13 @@ class (Alternative m, Monad m) => MonadVerse m where
 
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
-  once :: m a -> (a -> m ()) -> m ()
+  split :: m a -> (Maybe (a, m a) -> m ()) -> m ()
 
-  lnot :: m a -> m ()
+  once' :: m a -> (a -> m ()) -> m ()
 
-  ifte :: m a -> (a -> m ()) -> m () -> m ()
+  lnot' :: m a -> m ()
+
+  ifte' :: m a -> (a -> m ()) -> m () -> m ()
 
   all' :: Traversable f => m (Var m f) -> ([Var m f] -> m ()) -> m ()
 
@@ -75,9 +78,10 @@ instance ( MonadFix m
   freshVar = Verse.freshVar
   newVar = Verse.newVar
   whenBound = Verse.whenBound
-  once = Verse.once
-  lnot = Verse.lnot
-  ifte = Verse.ifte
+  split = Verse.split
+  once' = Verse.once'
+  lnot' = Verse.lnot'
+  ifte' = Verse.ifte'
   all' = Verse.all'
   for' = Verse.for'
   unify = Verse.unify
@@ -85,12 +89,14 @@ instance ( MonadFix m
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
-    whenBound x $ \ x -> runReaderT (f x) r
-  once m f = ReaderT $ \ r ->
-    once (runReaderT m r) $ \ x -> runReaderT (f x) r
-  lnot m = ReaderT $ lnot . runReaderT m
-  ifte p t e = ReaderT $ \ r ->
-    ifte (runReaderT p r) (flip runReaderT r . t) (runReaderT e r)
+    whenBound x $ flip runReaderT r . f
+  split m f = ReaderT $ \ r ->
+    split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)
+  once' m f = ReaderT $ \ r ->
+    once' (runReaderT m r) $ flip runReaderT r . f
+  lnot' m = ReaderT $ lnot' . runReaderT m
+  ifte' p t e = ReaderT $ \ r ->
+    ifte' (runReaderT p r) (flip runReaderT r . t) (runReaderT e r)
   all' m f = ReaderT $ \ r ->
     all' (runReaderT m r) $ flip runReaderT r . f
   for' m f g = ReaderT $ \ r ->

@@ -109,14 +109,14 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    once (eval' e) $ \ var_e -> unify var var_e
+    once' (eval' e) $ \ var_e -> unify var var_e
     pure var
   Exp.All e -> do
     var <- freshVar
     all' (eval' e) $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
-    lnot $ eval' e
+    lnot' $ eval' e
     newVar $ Val.Tuple []
   Exp.Query e -> do
     var <- freshVar
@@ -124,7 +124,7 @@ eval' e = case extract e of
     pure var
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    ifte
+    ifte'
       (do
           xs <- for (HashSet.toMap xs) $ const freshVar
           _ <- localNames xs $ eval' p
