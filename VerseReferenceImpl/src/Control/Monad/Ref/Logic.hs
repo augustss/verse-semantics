@@ -19,6 +19,8 @@ import Control.Monad.Ref
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 
+import Data.Coerce
+
 newtype RefLogicT m a = RefLogicT
   { unRefLogicT :: LogicT (StateT (Ap m) m) a
   } deriving ( Functor
@@ -34,28 +36,29 @@ deriving instance MonadSupply s m => MonadSupply s (RefLogicT m)
 runRefLogicT :: Monad m => RefLogicT m a -> m [a]
 runRefLogicT = evalWriterT . observeAllT . unRefLogicT
 
-data Ap f = Ap !Bool (f ())
+data Ap m = Ap !Word (StateT (Ap m) m ())
 
-emptyAp :: Applicative f => Ap f
-emptyAp = Ap True $ pure ()
+emptyAp :: Monad m => Ap m
+emptyAp = Ap 0 $ pure ()
 
-runAp :: Ap f -> f ()
-runAp (Ap _ x) = x
-
-runWriterT :: Applicative f => StateT (Ap f) m a -> m (a, Ap f)
+runWriterT :: Monad m => StateT (Ap m) m a -> m (a, Ap m)
 runWriterT = flip runStateT emptyAp
 
-evalWriterT :: (Applicative f, Monad m) => StateT (Ap f) m a -> m a
+evalWriterT :: Monad m => StateT (Ap m) m a -> m a
 evalWriterT = flip evalStateT emptyAp
 
-tellAp :: (Applicative f, Applicative m) => f () -> StateT (Ap f) m ()
+tellAp :: Monad m => StateT (Ap m) m () -> StateT (Ap m) m ()
 tellAp s = StateT $ \ case
-  (Ap True s') -> pure ((), Ap True $ s *> s')
+  (Ap 0 s') -> pure ((), Ap 0 $ s *> s')
   s -> pure ((), s)
 
-tellEmpty :: Applicative m => StateT (Ap f) m ()
-tellEmpty = StateT $ \ case
-  Ap True s -> pure ((), Ap False s)
+tellLeft :: Applicative m => StateT (Ap m) m ()
+tellLeft = StateT $ \ (Ap i s) ->
+  pure ((), Ap (i + 1) s)
+
+tellRight :: Applicative m => StateT (Ap m) m ()
+tellRight = StateT $ \ case
+  Ap i s | i /= 0 -> pure ((), Ap (i - 1) s)
   s -> pure ((), s)
 
 instance MonadTrans RefLogicT where
@@ -65,15 +68,18 @@ instance Monad m => MonadFail (RefLogicT m) where
   fail _ = empty
 
 instance Monad m => Alternative (RefLogicT m) where
-  empty = RefLogicT $ LogicT $ \ _ fk ->
-    tellEmpty *> fk
-  x <|> y = RefLogicT $ LogicT $ \ sk fk ->
-    unLogicT (unRefLogicT x) sk $ unLogicT (unRefLogicT y) sk fk
+  empty = RefLogicT $ LogicT $ \ _ fk -> fk
+  x <|> y = RefLogicT $ LogicT $ \ sk fk -> do
+    tellLeft
+    unLogicT (unRefLogicT x) sk $ do
+      tellRight
+      unLogicT (unRefLogicT y) sk fk
 
 instance Monad m => MonadLogic (RefLogicT m) where
   msplit m = RefLogicT $ LogicT $ \ sk fk -> do
-    (x, fk') <- lift . runWriterT . fmap (fmap (fmap RefLogicT)) . msplit' $ unRefLogicT m
-    sk x $ lift (runAp fk') *> fk
+    (x, Ap _ fk') <- lift . runWriterT . fmap (fmap (fmap coerce)) . msplit' $ coerce m
+    tellAp fk'
+    sk x $ fk' *> fk
 
 msplit' :: Monad m => LogicT m a -> m (Maybe (a, LogicT m a))
 msplit' m = unLogicT m sk' $ pure Nothing
@@ -86,8 +92,9 @@ instance MonadRef m => MonadRef (RefLogicT m) where
   readRef = lift . readRef
   writeRef ref x = RefLogicT $ LogicT $ \ sk fk -> do
     y <- readRef ref
-    writeRef ref x
-    sk () $ do
-      writeRef ref y
-      tellAp $ writeRef ref x
-      fk
+    loop x y
+    sk () $ loop y x *> fk
+    where
+      loop x y = do
+        writeRef ref x
+        tellAp $ loop y x

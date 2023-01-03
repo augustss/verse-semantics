@@ -4,8 +4,9 @@ module Control.Monad.Verse
   , VerseT
   , Verse.Label
   , runVerseT
+  , freshen
   ) where
 
-import Control.Monad.Trans.Verse (VerseT, runVerseT)
+import Control.Monad.Trans.Verse (VerseT, runVerseT, freshen)
 import Control.Monad.Trans.Verse qualified as Verse
 import Control.Monad.Verse.Class
