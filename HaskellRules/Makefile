@@ -32,7 +32,7 @@ testfast:
 trickytest: testtricky
 
 testtricky:
-	$(TESTER) --quiet --summary --no-error --all-rules --max-norm-steps=100000 --max-steps=2000 $(TRICKY)
+	$(TESTER) --quiet --summary --no-error --all-rules --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
 
 testqcconf:
 	$(QCTEST) --rules=POPLV --ignore-fuel-stop
