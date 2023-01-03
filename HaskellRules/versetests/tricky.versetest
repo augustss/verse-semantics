@@ -51,7 +51,7 @@ testceq("QC3", SEq)  { <0(add) = <>> }
                      { <0(add) = <>> }
 testceq("QC4", SEq)  { add(<>) = (ex x. all {x} = all {x}) }
                      { ex x . <x> = add(<>); x=x; <x> }
-testceq("QC4a", SEq) { \a. add(a) = (ex x. all {x} = all {x}) }
+testceq("QC4a", SEq) { \a. add(a) = (ex x. <x> = <x>) }
                      { \a. ex x . <x> = add(a); x=x; <x> }
 testceq("QC5", SEq)  { \x.(<<x>> = x)(<>) }
                      { \x.fail }
