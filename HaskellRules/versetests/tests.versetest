@@ -61,7 +61,7 @@ testeq(SEq) {(x:any=>x)=(x:any=>1)}               {:false}
 # Unification with equal values
 testeq(SEq) {1=1}                                 {1}
 # Not with POPL
-testeq(SEq,popl=FEq,refimpl=Skip)
+testeq(SEq,popl*=FEq,refimpl=Skip)
             {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq(SEq) {(1,2)=(1,2)}                         {(1,2)}
 testeq(SEq) {(x:any=>x)=(x:any=>x)}               {:false}
