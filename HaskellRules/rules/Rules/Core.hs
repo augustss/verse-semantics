@@ -156,14 +156,12 @@ instance Ord Expr where
     comp _xs _ys (All _) _       = LT
     comp _xs _ys _       (All _) = GT
 
-    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' & comp xs ys f f' & comp xs ys g g'
+    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
 
     comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
-    EQ & c = c
-    c  & _ = c
 
 --------------------------------------------------------------------------------
 
