@@ -383,6 +383,17 @@ rulesUnificationNoOcc _ lhs =
        then pure (foldr (:>:) (Arr vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
+  "ULAM" `name`
+  do Lam{} :=: Lam{} <- [lhs]
+     pure Fail
+ ++
+  "UFAIL" `name`
+  do HNF e1 :=: HNF e2 <- [lhs]
+     guard (case (e1,e2) of (Int{},Int{}) -> False; (Arr{},Arr{}) -> False; _ -> True)
+     guard (e1 /= e2)
+     pure Fail
+{-
+ ++
   "UX1" `name`
   do Int _k :=: Arr _vs <- [lhs]
      pure Fail
@@ -411,6 +422,7 @@ rulesUnificationNoOcc _ lhs =
   "UX6" `name`
   do Val (HNF _) :=: Val (HNF (Op _)) <- [lhs]
      pure Fail
+-}
 
 rulesUnificationOcc :: ERule
 rulesUnificationOcc _ lhs =
