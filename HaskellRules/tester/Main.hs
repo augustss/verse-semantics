@@ -67,7 +67,7 @@ data TestInfo = TestInfo
   { testMName :: Maybe String
   , testLocn :: Loc
   , testType :: TestType
-  , testExcn :: [(String, TestType)]
+  , testExcn :: [((String, Bool), TestType)]  -- The bool indicates the the string is just a prefix
   }
   deriving (Show)
 
@@ -84,7 +84,9 @@ pTestInfo = do
   let
     pSys :: P String
     pSys = pIdent >>= \case Ident _ s -> pure s
-  excns <- many ((,) <$> (pOp "," *> pSys) <*> (pOp "=" *> pTestType))
+    pSysWild :: P (String, Bool)
+    pSysWild = (,) <$> pSys <*> (isJust <$> optional (lexeme (string "*")))
+  excns <- many ((,) <$> (pOp "," *> pSysWild) <*> (pOp "=" *> pTestType))
   pure $ TestInfo mname loc typ excns
 
 testName :: TestInfo -> String
@@ -208,9 +210,11 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     noisy = not (quiet tflg)
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
     sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-    typ = maybe (testType ti) snd $ find (\ (s,_) -> map toLower s == map toLower (sname sys)) (testExcn ti)
+    typ = maybe (testType ti) snd $ find (\ (s,_) -> match s (sname sys)) (testExcn ti)
     ppi x = putStrLn . unlines . map ("   " ++) . lines . prettyShow $ x
     flg = testFlagsToFlags tflg
+    match (n, w) m = map toLower n `tst` map toLower m
+      where tst = if w then isPrefixOf else (==)
 
 -- | Equivalence on values (or stuck expressions)
 equivValue :: ESystem -> Core -> Core -> Bool
