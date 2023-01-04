@@ -47,7 +47,7 @@ import Language.Verse.Token qualified as Token
 %left ','
 %left IF IF_THEN FOR
 %left then else do
-%left '=' ':='
+%right '=' ':=' '=>'
 %nonassoc '<>'
 %right '<' '<=' '>' '>='
 %nonassoc not
@@ -61,52 +61,52 @@ import Language.Verse.Token qualified as Token
 %token
   '(' { L _ Token.LeftParen }
   ')' { L _ Token.RightParen }
-  '{' { L _ Token.LeftBrace }
-  ind { L _ Token.Indent }
-  '}' { L _ Token.RightBrace }
-  ded { L _ Token.Dedent }
-  '[' { L _ Token.LeftBracket }
-  ']' { L _ Token.RightBracket }
-  ';' { L _ Token.Semi }
-  newline { L _ Token.Newline }
-  ':' { L _ Token.Colon }
-  colonEOL { L _ Token.ColonEOL }
-  ':=' { L _ Token.ColonEqual }
+  '*' { L _ Token.Multiply }
+  '+' { L _ Token.Plus }
   ',' { L _ Token.Comma }
+  '-' { L _ Token.Minus }
+  '->' { L _ Token.ThinArrow }
   '.' { L _ Token.Dot }
-  '=' { L _ Token.Equal }
-  '<>' { L _ Token.NotEqual }
+  '/' { L _ Token.Divide }
+  ':' { L _ Token.Colon }
+  ':=' { L _ Token.ColonEqual }
+  ';' { L _ Token.Semi }
   '<' { L _ Token.Less }
   '<=' { L _ Token.LessEqual }
+  '<>' { L _ Token.NotEqual }
+  '=' { L _ Token.Equal }
+  '=>' { L _ Token.FatArrow }
   '>' { L _ Token.Greater }
   '>=' { L _ Token.GreaterEqual }
-  '|' { L _ Token.Pipe }
-  '->' { L _ Token.ThinArrow }
-  '=>' { L _ Token.FatArrow }
   '?' { L _ Token.QuestionMark }
-  '+' { L _ Token.Plus }
-  '-' { L _ Token.Minus }
-  '*' { L _ Token.Multiply }
-  '/' { L _ Token.Divide }
+  '[' { L _ Token.LeftBracket }
+  ']' { L _ Token.RightBracket }
+  '{' { L _ Token.LeftBrace }
+  '|' { L _ Token.Pipe }
+  '}' { L _ Token.RightBrace }
   all { L _ Token.All }
   block { L _ Token.Block }
+  colonEOL { L _ Token.ColonEOL }
+  ded { L _ Token.Dedent }
   do { L _ Token.Do }
   else { L _ Token.Else }
   exists { L _ Token.Exists }
   fail { L _ Token.Fail }
   false { L _ Token.False }
+  float { (float -> Just $$) }
   for { L _ Token.For }
+  function { L _ Token.Function }
   if { L _ Token.If }
+  ind { L _ Token.Indent }
+  int { (int -> Just $$) }
   isInt { L _ Token.IsInt }
-  lambda { L _ Token.Lambda }
+  name { (name -> Just $$) }
+  newline { L _ Token.Newline }
   not { L _ Token.Not }
   one { L _ Token.One }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
-  int { (int -> Just $$) }
-  float { (float -> Just $$) }
-  name { (name -> Just $$) }
 
 %%
 
@@ -138,11 +138,9 @@ Commas :: { L [L (Exp L Name)] }
   | Commas ',' Scan Exp { (:) <\$> duplicate $4 <.> $1 }
 
 Exp :: { L (Exp L Name) }
-  : '(' List ')' {
-      Exp.List $2 <\$ $1 <. $3
-    }
-  | Exp '=' Exp {
-      (:=:) <\$> duplicate $1 <.> duplicate $3
+  : Paren { $1 }
+  | Exp '=' Scan Exp {
+      (:=:) <\$> duplicate $1 <.> duplicate $4
     }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
@@ -153,20 +151,29 @@ Exp :: { L (Exp L Name) }
   | name ':=' Exp {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp '<>' Exp {
-      (:<>:) <\$> duplicate $1 <.> duplicate $3
+  | name ':=' BraceInd {
+      Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp '<' Exp {
-      (:<:) <\$> duplicate $1 <.> duplicate $3
+  | Exp '=>' Exp {
+      Exp.Function <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp '<=' Exp {
-      (:<=:) <\$> duplicate $1 <.> duplicate $3
+  | Exp '=>' BraceInd {
+      Exp.Function <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp '>' Exp {
-      (:>:) <\$> duplicate $1 <.> duplicate $3
+  | Exp '<>' Scan Exp {
+      (:<>:) <\$> duplicate $1 <.> duplicate $4
     }
-  | Exp '>=' Exp {
-      (:>=:) <\$> duplicate $1 <.> duplicate $3
+  | Exp '<' Scan Exp {
+      (:<:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp '<=' Scan Exp {
+      (:<=:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp '>' Scan Exp {
+      (:>:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp '>=' Scan Exp {
+      (:>=:) <\$> duplicate $1 <.> duplicate $4
     }
   | Exp '|' Scan Exp {
       (:|:) <\$> duplicate $1 <.> duplicate $4
@@ -223,9 +230,9 @@ Exp :: { L (Exp L Name) }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
-  | Lambda { $1 }
-  | isInt '(' List ')' {
-      Exp.IsInt <\$ $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
+  | Function { $1 }
+  | isInt Paren {
+      Exp.IsInt <\$ $1 <.> duplicate $2
     }
 
 If
@@ -275,9 +282,9 @@ Exists
       Exp.Exists <\$ $1 <.> duplicate $2
     }
 
-Lambda
-  : lambda '(' name ')' Block {
-      Exp.Lambda <\$ $1 <.> duplicate $3 <.> duplicate $5
+Function
+  : function Paren Block {
+      Exp.Function <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
 
 Paren

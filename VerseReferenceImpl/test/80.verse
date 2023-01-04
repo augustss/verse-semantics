@@ -1,7 +1,6 @@
-any := lambda (X):
-  X
+any := function (exists X). X
 
-Tail := lambda (Xs):
+Tail := function (exists Xs):
   all:
     I:any
     I > 0

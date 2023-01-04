@@ -51,7 +51,7 @@ data Token
   | Struct
   | Module
   | Exists
-  | Lambda
+  | Function
   | Truth
   | Array
   | False
@@ -107,7 +107,7 @@ instance Pretty Token where
     Struct -> "struct"
     Module -> "module"
     Exists -> "exists"
-    Lambda -> "lambda"
+    Function -> "function"
     Truth -> "truth"
     Array -> "array"
     False -> "false"

@@ -158,14 +158,17 @@ eval' e = case extract e of
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
         empty
         (zip xs [0 ..])
-      Val.Lambda x xs e ->
-        unify var =<< local (const $ HashMap.insert x var2 xs) (eval' e)
+      Val.Function env xs e_domain e_range -> do
+        xs <- for (HashSet.toMap xs) $ const freshVar
+        var_domain <- localNames xs $ eval' e_domain
+        unify var2 var_domain
+        unify var =<< local (const $ HashMap.union xs env) (eval' e_range)
       _ ->
         throwError $ DomainError $ loc e
     pure var
-  Exp.Lambda x xs e -> do
+  Exp.Function ys xs e1 e2 -> do
     env <- ask
-    newVar $ Val.Lambda (extract x) (HashMap.intersection env $ HashSet.toMap xs) e
+    newVar $ Val.Function (HashMap.intersection env $ HashSet.toMap ys) xs e1 e2
   Exp.Tuple exps ->
     newVar =<< Val.Tuple <$> traverse eval' exps
   Exp.Truth e ->

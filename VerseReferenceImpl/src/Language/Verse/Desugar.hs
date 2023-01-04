@@ -94,12 +94,13 @@ desugar' e = for e $ \ case
   Parse.Exists x -> do
     tellName x
     pure . Name $ extract x
+  Parse.Function e1 e2 -> do
+    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
-  Parse.Lambda x e ->
-    Lambda x <$> exists (desugar' e)
   Parse.Tuple es ->
     Tuple <$> for es desugar'
   Parse.Truth e ->
