@@ -1,16 +1,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Epic.SIntMap (SIntMap, empty, lookup, member, insert, (!), lookupMax, delete, toList, fromList, map, restrictKeys) where
-
+module Epic.SIntMap (SIntMap, empty, lookup, member, insert, (!), lookupMax, delete
+                    , toList, fromList, map, restrictKeys, keys, elems, null) where
+import Prelude hiding (lookup, map, null)
+import qualified Prelude
 import Control.Arrow (first)
 import Data.Coerce
 import qualified Data.IntMap as M
 import Epic.Print (Pretty (..))
 import Epic.SIntSet (SIntSet, toIntSet)
 import GHC.Stack (HasCallStack)
-import Prelude hiding (lookup, map)
-import qualified Prelude
 
 newtype SIntMap k v = SIntMap (M.IntMap v)
   deriving (Eq, Ord, Show)
@@ -45,8 +45,17 @@ fromList = coerce (M.fromList :: [(Int, v)] -> M.IntMap v)
 toList :: forall k v. (Coercible k Int) => SIntMap k v -> [(k, v)]
 toList = coerce (M.toList :: M.IntMap v -> [(Int, v)])
 
-map :: forall k v. (Coercible k Int) => (v -> v) -> SIntMap k v -> SIntMap k v
-map = coerce (M.map :: (v -> v) -> M.IntMap v -> M.IntMap v)
+map :: forall k v v'. (Coercible k Int) => (v -> v') -> SIntMap k v -> SIntMap k v'
+map = coerce (M.map :: (v -> v') -> M.IntMap v -> M.IntMap v')
 
 restrictKeys :: forall k v. (Coercible k Int) => SIntMap k v -> SIntSet k -> SIntMap k v
 restrictKeys (SIntMap m) s = SIntMap $ M.restrictKeys m (toIntSet s)
+
+keys :: forall k v . (Coercible k Int) => SIntMap k v -> [k]
+keys (SIntMap m) = coerce (M.keys m)
+
+elems :: forall k v . SIntMap k v -> [v]
+elems (SIntMap m) = M.elems m
+
+null :: forall k v . SIntMap k v -> Bool
+null (SIntMap m) = M.null m
