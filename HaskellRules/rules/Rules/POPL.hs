@@ -32,14 +32,14 @@ systemPOPLV :: TRSystem Expr
 systemPOPLV = systemPOPL
   { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
-  , rules               = allRules <> rulesElimV <> rulesDefElim
+  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
   }
 
 systemPOPLF :: TRSystem Expr
 systemPOPLF = systemPOPL
   { sname               = "POPLF"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL"
-  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesBadFail
+  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
   }
 
 -- Check that an expression is in the subset defined by the POPL grammar.
@@ -538,6 +538,14 @@ rulesSequencing _ lhs =
 -- ++ "CONJ-SEQ-ASSOC" `name`
 --  do (e1 :>: e2) :>: e3 <- [lhs]
 --     pure (e1 :>: (e2 :>: e3))
+
+rulesSequencingExtra :: ERule
+rulesSequencingExtra _ lhs =
+  "UNIFY-SEQR-E" `name`
+  do e1 :=: (e2 :>: e3) <- [lhs]
+     guard (not (isVal e1))
+     let x = identNotIn (free [e1,e2,e3])
+     pure (EXI x ((Var x :=: e1) :>: e2 :>: (Var x :=: e3)))
 
 --------------------------------------------------------------------------------
 
