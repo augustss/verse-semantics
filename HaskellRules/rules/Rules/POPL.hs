@@ -665,9 +665,6 @@ opArgTC op =
     Plus -> int                   -- Must be Int
     IsInt -> any_                 -- Any type is allowed
     MapAp -> arr lam              -- Used internally: takes an array of thunks
-    Alloc -> any_                 -- Any type can be allocated
-    Read -> ref                   -- Must be Ref
-    Write -> pair (hnf ref) any_  -- Must be Ref, anything
     Cons -> pair any_ (arr any_)  -- Must be anything, array
     _ -> pair (hnf int) (hnf int) -- Must be Int, Int
   where int Int{} = True          
@@ -677,8 +674,6 @@ opArgTC op =
         arr _ _ = False
         lam Lam{} = True
         lam _ = False
-        ref Ref{} = True
-        ref _ = False
         hnf p (HNF e) = p e  -- Check the predicate for HNF
         hnf _ _ = True       -- Assume OK if it's not HNF
         pair t1 t2 (Arr [e1, e2]) = t1 e1 && t2 e2
