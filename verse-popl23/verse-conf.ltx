@@ -2244,10 +2244,10 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
       \text{Expressions}        & e   & ::= & \cdots \vb |store h e| \\
       \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
       \text{Head values}        & hnf & ::= & \cdots \vb r \\
-      \text{Execution contexts} & X   & ::= & \cdots \vb |store s X| \\
-      \text{Choice contexts}    & CX  & ::= & \cdots \vb |store s CX| \\
+      \text{Execution contexts} & X   & ::= & \cdots \vb |store h X| \\
+      \text{Choice contexts}    & CX  & ::= & \cdots \vb |store h CX| \\
       \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
-      \text{Heap context}       & H   & ::= & \hole|,s| \vb |cell r v, H| \\
+      \text{Heap context}       & H   & ::= & \hole|,h| \vb |cell r v, H| \\
       \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \vb |def x S| \\
       \text{Store-op free exprs}&|sf| & ::= & |v| \vb |sf_1 = sf_2| \vb |sf_1; sf_2| \vb |def x sf|
                                               \vb |apply1 sp v|
