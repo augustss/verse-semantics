@@ -1,4 +1,4 @@
 one {
-  exists X .
+  exists X
   X = true|X
 }

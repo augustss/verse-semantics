@@ -1,7 +1,7 @@
-exists X .
-exists Y .
+exists X
+exists Y
 Y = all {
-  exists I .
+  exists I
   X(I)
 };
 X = ();

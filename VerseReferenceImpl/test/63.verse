@@ -1,5 +1,5 @@
 X := 1
-exists Y .
+exists Y
 if:
   X = 2
 then:

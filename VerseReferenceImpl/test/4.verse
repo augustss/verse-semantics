@@ -1,8 +1,8 @@
-exists X .
-exists Y .
+exists X
+exists Y
 X = false|true;
 Y = (X, X);
-exists Z .
+exists Z
 Y = (Z, Z);
 Z = true;
 X

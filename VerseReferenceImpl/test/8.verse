@@ -1,4 +1,4 @@
-exists X .
+exists X
 all {
   X = false;
   false|true

@@ -1,8 +1,8 @@
-exists X .
-exists Y .
-exists Z .
+exists X
+exists Y
+exists Z
 Z = all {
-  exists T .
+  exists T
   T = 4;
   T = X;
   T = Y

@@ -1,7 +1,7 @@
-exists X .
-exists Y .
+exists X
+exists Y
 Y = all {
-  exists Z .
+  exists Z
   ((Z = 3)|(Z = 2)|(Z = 1));
   ((Z = X)|(Z = X)|(Z = X))
 };

@@ -8,6 +8,7 @@ import Control.Monad.Trans.Except
 
 import Data.ByteString qualified as ByteString
 import Data.Functor
+import Data.List
 
 import Language.Verse
 
@@ -25,7 +26,7 @@ main = runTestTTAndExit =<< getTest
 getTest :: IO Test
 getTest = do
   filePaths <- listDirectory "test"
-  let verseFiles = filter ((== ".verse") . takeExtension) filePaths
+  let verseFiles = sort $ filter ((== ".verse") . takeExtension) filePaths
   pure . TestList $ verseFiles <&> \ verseFile -> TestCase $ do
     ByteString.readFile ("test" </> verseFile) >>= runExceptT . eval >>= \ case
       Left e -> do

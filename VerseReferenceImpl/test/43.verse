@@ -1,6 +1,6 @@
-exists X .
-exists Y .
-exists Z .
+exists X
+exists Y
+exists Z
 Y = all {
   (X = 1)|(Z = 5)|(X = 3)
 };

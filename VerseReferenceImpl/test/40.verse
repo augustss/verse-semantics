@@ -1,7 +1,7 @@
-exists X .
-exists Y .
+exists X
+exists Y
 Y = all {
-  exists Z .
+  exists Z
   Z = X
   Z = 1|2|3|4
 }
