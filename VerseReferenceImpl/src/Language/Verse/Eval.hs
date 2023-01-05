@@ -10,7 +10,7 @@ module Language.Verse.Eval
 
 import Control.Applicative
 import Control.Comonad
-import Control.Monad (join)
+import Control.Monad (guard, join)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Fix
 import Control.Monad.Reader
@@ -189,33 +189,28 @@ liftOrd :: (MonadError Error m, MonadVerse m) =>
            (forall a . Ord a => a -> a -> Bool) ->
            Var m Val -> Var m Val -> m (Var m Val)
 liftOrd loc f var_x var_y = do
-  var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    unify var =<< case (val_x, val_y) of
+    case (val_x, val_y) of
       (Val.Int x, Val.Int y) ->
-        newBool var_x $ f x y
+        guard $ f x y
       (Val.Int x, Val.Float y) ->
-        newBool var_x $ f (fromInteger x) y
+        guard $ f (fromInteger x) y
       (Val.Int x, Val.Rational y) ->
-        newBool var_x $ f (fromInteger x) y
+        guard $ f (fromInteger x) y
       (Val.Float x, Val.Int y) ->
-        newBool var_x $ f x (fromInteger y)
+        guard $ f x (fromInteger y)
       (Val.Float x, Val.Float y) ->
-        newBool var_x $ f x y
+        guard $ f x y
       (Val.Float x, Val.Rational y) ->
-        newBool var_x $ f (toRational x) y
+        guard $ f (toRational x) y
       (Val.Rational x, Val.Int y) ->
-        newBool var_x $ f x (fromInteger y)
+        guard $ f x (fromInteger y)
       (Val.Rational x, Val.Float y) ->
-        newBool var_x $ f x (toRational y)
+        guard $ f x (toRational y)
       (Val.Rational x, Val.Rational y) ->
-        newBool var_x $ f x y
+        guard $ f x y
       _ -> throwDomainError loc
-  pure var
-  where
-    newBool var = \ case
-      False -> empty
-      True -> pure var
+  pure var_x
 
 liftNum :: (MonadError Error m, MonadVerse m) =>
            Loc ->
