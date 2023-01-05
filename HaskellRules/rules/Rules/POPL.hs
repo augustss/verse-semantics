@@ -383,13 +383,22 @@ rulesUnificationNoOcc _ lhs =
        then pure (foldr (:>:) (Arr vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
-  "ULAM" `name`
+  "UX-LAM" `name`
   do Lam{} :=: Lam{} <- [lhs]
      pure Fail
  ++
-  "UFAIL" `name`
+  "UX-OP" `name`
+  do Op{} :=: Op{} <- [lhs]
+     pure Fail
+ ++
+  "UX" `name`
   do HNF e1 :=: HNF e2 <- [lhs]
-     guard (case (e1,e2) of (Int{},Int{}) -> False; (Arr{},Arr{}) -> False; _ -> True)
+     -- Avoid the cases handled above, and fail for any unequal hnfs
+     guard (case (e1,e2) of (Int{},Int{}) -> False
+                            (Arr{},Arr{}) -> False
+                            (Lam{},Lam{}) -> False
+                            (Op{}, Op{})  -> False
+                            _             -> True)
      guard (e1 /= e2)
      pure Fail
 {-
