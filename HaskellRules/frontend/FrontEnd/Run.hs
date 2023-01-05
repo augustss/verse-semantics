@@ -12,7 +12,7 @@ import FrontEnd.Core(Core)
 import FrontEnd.CoreSimp(simpCore)
 import FrontEnd.Eval(eval, replacePrelude, EFlags(..))
 import FrontEnd.Flags
-import FrontEnd.RefImpl(evalRI)
+--import FrontEnd.RefImpl(evalRI)
 import FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore)
 import Rules.Systems(TRSystem(..), ESystem, lookupSystemEx, allSystems)
 import Rules.Core(RuleEnv(..), defaultTRSFlags)
@@ -47,6 +47,7 @@ evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL
     evaluate tflg = coreToTrs . eval flg . trsToCore
       where flg = EFlags { underLambda = tfUnderLambda tflg, traceEval = tfTrace tflg, steps = tfRewriteSteps tflg }
 
+{-
 refiSystem :: ESystem
 refiSystem = TRSystem { sname = "refimpl", description = "Andy's reference implementation",
   ruleEnv = defaultTRSFlags,
@@ -55,9 +56,10 @@ refiSystem = TRSystem { sname = "refimpl", description = "Andy's reference imple
   where
     noRules _ _ = []
     eval' _ = coreToTrs . evalRI . trsToCore
+-}
 
 everySystem :: [ESystem]
-everySystem = allSystems ++ [evalSystem, refiSystem]
+everySystem = allSystems ++ [evalSystem] -- , refiSystem]
 
 findSystem :: String -> Either String ESystem
 findSystem = lookupSystemEx everySystem
