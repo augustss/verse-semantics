@@ -160,9 +160,10 @@ eval' e = case extract e of
         (zip xs [0 ..])
       Val.Function env xs e_domain e_range -> do
         xs <- for (HashSet.toMap xs) $ const freshVar
-        var_domain <- localNames xs $ eval' e_domain
-        unify var2 var_domain
-        unify var =<< local (const $ HashMap.union xs env) (eval' e_range)
+        local (const $ HashMap.union xs env) $ do
+          var_domain <- eval' e_domain
+          unify var2 var_domain
+          unify var =<< eval' e_range
       _ ->
         throwError $ DomainError $ loc e
     pure var
