@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module TRS.Bind where
-
+import Data.Data(Data)
 import Data.List( union, (\\) )
 
 --------------------------------------------------------------------------------
@@ -8,7 +9,7 @@ import Data.List( union, (\\) )
 data Ident
   = Name String
   | Prim Int
- deriving ( Eq, Ord )
+ deriving ( Eq, Ord, Data )
 
 instance Show Ident where
   show (Name x) = x
@@ -51,7 +52,7 @@ instance Free Ident where
 --------------------------------------------------------------------------------
 
 data Bind t = Bind Ident t
- deriving ( Eq, Ord, Show )
+ deriving ( Eq, Ord, Show, Data )
 
 instance Free t => Free (Bind t) where
   free (Bind x t) = free t \\ [x]
