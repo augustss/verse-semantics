@@ -1,5 +1,5 @@
-exists X .
-exists Y .
+exists X
+exists Y
 all{X = true} = ();
 Y = false|true;
 X = false|true;

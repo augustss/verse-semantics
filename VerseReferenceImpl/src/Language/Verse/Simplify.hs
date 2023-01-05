@@ -17,6 +17,7 @@ import Control.Monad.Except
 import Control.Monad.Trans.Writer.CPS (runWriterT)
 import Control.Monad.Writer.CPS
 
+import Data.Foldable (foldlM)
 import Data.HashMap.Strict (HashMap, traverseWithKey)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
@@ -93,15 +94,13 @@ simplify' e = for e $ \ case
     localNames xs (simplify' e1) <*>
     localNames xs (simplify' e2)
   Desugar.Exists x e -> do
-    x' <- for x newIdent
-    e' <- localName (extract x) (extract x') $ simplify' e
-    pure $ Exists x' e'
+    (x', e') <- localName (extract x) $ simplify' e
+    pure $ Exists (x' <$ x) e'
+  Desugar.Function xs e1 e2 -> do
+    (xs', (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
+    pure $ Function ys xs' e1 e2
   Desugar.Invoke e1 e2 ->
     Invoke <$> simplify' e1 <*> simplify' e2
-  Desugar.Lambda x e -> do
-    x' <- for x newIdent
-    (e, xs) <- localLambda (extract x) (extract x') $ simplify' e
-    pure $ Lambda x' xs e
   Desugar.Tuple exps ->
     Tuple <$> for exps simplify'
   Desugar.Truth e ->
@@ -130,13 +129,22 @@ newIdent x = Ident <$> supply <*> pure (Just x)
 freshIdent :: MonadSupply Word m => m (Ident a)
 freshIdent = flip Ident Nothing <$> supply
 
-localLambda :: Name -> Ident Name -> Simplify a -> Simplify (a, HashSet (Ident Name))
-localLambda x x' m = do
-  level <- (+ 1) <$> askLevel
-  let f r = R { level, env = HashMap.insert x (x', level) r.env }
-  (y, xs) <- lift . fmap (fmap Diff.toList) . runWriterT $ local f m
-  tell $ Diff.fromList $ filter ((< level) . snd) xs
-  pure (y, HashSet.fromList $ fst <$> xs)
+localFunction :: HashSet Name ->
+                 Simplify a ->
+                 Simplify (HashSet (Ident Name), a, HashSet (Ident Name))
+localFunction xs m = do
+  level' <- (+ 1) <$> askLevel
+  env <- askEnv
+  (xs', env') <- foldlM
+    (\ (xs', env') x -> do
+        x' <- newIdent x
+        pure (HashSet.insert x' xs', HashMap.insert x (x', level') env'))
+    (mempty, env)
+    (HashSet.toList xs)
+  (x, ys) <- lift . fmap (fmap Diff.toList) . runWriterT $
+    local (const R { level = level', env = env' }) m
+  tell $ Diff.fromList $ filter ((< level') . snd) ys
+  pure (xs', x, HashSet.fromList $ fst <$> ys)
 
 tellName :: Ident Name -> Level -> Simplify ()
 tellName x level_x = do
@@ -149,10 +157,11 @@ lookupName x = asks $ HashMap.lookup x . env
 localNames :: Env -> Simplify a -> Simplify a
 localNames = localEnv . (<>)
 
-localName :: Name -> Ident Name -> Simplify a -> Simplify a
-localName x y m = do
+localName :: Name -> Simplify a -> Simplify (Ident Name, a)
+localName x m = do
+  x' <- newIdent x
   level <- askLevel
-  localEnv (HashMap.insert x (y, level)) $ m
+  (x', ) <$> localEnv (HashMap.insert x (x', level)) m
 
 localEnv :: (Env -> Env) -> Simplify a -> Simplify a
 localEnv f = local (\ R {..} -> R { env = f env, .. })
@@ -167,6 +176,9 @@ fromEnv = HashSet.fromList . fmap fst . HashMap.elems
 
 askLevel :: Simplify Level
 askLevel = asks level
+
+askEnv :: Simplify Env
+askEnv = asks env
 
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT

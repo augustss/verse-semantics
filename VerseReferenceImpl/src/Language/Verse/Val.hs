@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Val
   ( Val (..)
   ) where
@@ -15,6 +16,7 @@ import Data.Function
 import Data.Functor
 import Data.Foldable
 import Data.HashMap.Strict (HashMap)
+import Data.HashSet (HashSet)
 import Data.Maybe
 import Data.Ratio
 import Data.Traversable
@@ -24,7 +26,7 @@ import Data.Unifiable
 import Language.Verse.Ident
 import Language.Verse.Loc
 import Language.Verse.Name
-import Language.Verse.Simplify.Exp (Exp)
+import Language.Verse.Simplify.Exp qualified as Simplify
 
 import Prelude (Double, Integer)
 import Prettyprinter
@@ -36,8 +38,14 @@ data Val a
   | Float !Double
   | Rational !Rational
   | Truth a
-  | Lambda !(Ident Name) !(HashMap (Ident Name) a) !(L (Exp L (Ident Name)))
+  | Function !(IdentMap Name a) !(IdentSet Name) !Exp !Exp
   | Tuple [a] deriving (Show, Functor, Foldable, Traversable)
+
+type IdentSet a = HashSet (Ident a)
+
+type IdentMap a v = HashMap (Ident a) v
+
+type Exp = L (Simplify.Exp L (Ident Name))
 
 instance Unifiable Val where
   zipMatch  = curry $ \ case
@@ -54,6 +62,6 @@ instance Pretty a => Pretty (Val a) where
     Float x -> pretty x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x -> "truth" <> lbrace <> pretty x <> rbrace
-    Lambda x _ _ -> "lambda" <+> pretty x <+> dot <+> "..."
+    Function _ _ _ _ -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs

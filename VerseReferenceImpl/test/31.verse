@@ -1,3 +1,3 @@
-exists logic .
-logic = lambda (X). (X = false) | (X = true);
+exists logic
+logic = function (exists X). (X = false) | (X = true);
 :logic

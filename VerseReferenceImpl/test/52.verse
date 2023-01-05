@@ -1,3 +1,3 @@
-exists X .
+exists X
 X?;
 X = true

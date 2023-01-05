@@ -1,3 +1,3 @@
-exists X .
+exists X
 all{X = true} = ();
 X = true

@@ -8,6 +8,8 @@ import Control.Comonad
 import Control.Monad.Except
 import Control.Monad.State.Strict
 
+import Data.Foldable (foldlM)
+import Data.Functor
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap, foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
@@ -31,8 +33,6 @@ desugar e = runExcept $ do
 
 desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Name))
 desugar' e = for e $ \ case
-  (Parse.:*>:) e1 e2 ->
-    (:*>:) <$> desugar' e1 <*> desugar' e2
   (Parse.:=:) e1 e2 ->
     (:=:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<>:) e1 e2 -> do
@@ -55,6 +55,11 @@ desugar' e = for e $ \ case
     (:*:) <$> desugar' e1 <*> desugar' e2
   (Parse.:/:) e1 e2 ->
     (:/:) <$> desugar' e1 <*> desugar' e2
+  Parse.List [] ->
+    pure $ Tuple []
+  Parse.List (e:es) -> extract <$> do
+    e <- desugar' e
+    foldlM (\ z x -> desugar' x <&> \ x -> (:*>:) <$> duplicate z <.> duplicate x) e es
   Parse.Fail ->
     pure Fail
   Parse.One e -> do
@@ -86,16 +91,18 @@ desugar' e = for e $ \ case
     ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
-  Parse.Exists x e ->
-    Exists x <$> exists (desugar' e)
+  Parse.Exists x -> do
+    tellName x
+    pure . Name $ extract x
+  Parse.Function e1 e2 -> do
+    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
-  Parse.Lambda x e ->
-    Lambda x <$> exists (desugar' e)
-  Parse.Tuple exps ->
-    Tuple <$> for exps desugar'
+  Parse.Tuple es ->
+    Tuple <$> for es desugar'
   Parse.Truth e ->
     Truth <$> exists (desugar' e)
   Parse.True ->

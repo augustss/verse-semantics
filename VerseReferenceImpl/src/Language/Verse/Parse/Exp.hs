@@ -5,8 +5,7 @@ module Language.Verse.Parse.Exp
   ) where
 
 data Exp f a
-  = f (Exp f a) :*>: f (Exp f a)
-  | f (Exp f a) :=: f (Exp f a)
+  = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :<>: f (Exp f a)
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
@@ -17,6 +16,7 @@ data Exp f a
   | f (Exp f a) :-: f (Exp f a)
   | f (Exp f a) :*: f (Exp f a)
   | f (Exp f a) :/: f (Exp f a)
+  | List [f (Exp f a)]
   | Fail
   | One (f (Exp f a))
   | All (f (Exp f a))
@@ -28,10 +28,10 @@ data Exp f a
   | For (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
-  | Exists (f a) (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
-  | Lambda (f a) (f (Exp f a))
+  | Exists (f a)
+  | Function (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | True
