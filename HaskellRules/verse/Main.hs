@@ -144,7 +144,8 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags{fSplit=False} , esystem = evalSystem }
+                     , prelude = Nothing, flags = defaultFlags{fSplit=False, fNoFuelStop=True}
+                     , esystem = evalSystem }
   , c_history = Just ".versei"
   }
 
