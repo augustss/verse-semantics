@@ -5,6 +5,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Core(
   Core(..),
+  Store(..),
   pattern HNF, pattern CValue,
   pattern COne, pattern CAll, pattern CSucceeds, pattern CDecides,
   Value,
@@ -619,6 +620,7 @@ pName = do
             , ("gt", vi "in'>'")
             , ("lt", vi "in'<'")
             , ("add", vi "in'+'")
+            , ("addto", vi "in'+='")
             , ("isInt", vi "isInt$")
             ]
       vi = Variable . Ident l
