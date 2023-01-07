@@ -314,7 +314,7 @@ rulesPrimOps _ lhs =
   "P-IsInt" `name`
   do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
-       Int _ -> pure (Arr [])
+       Int _ -> pure hnf -- (Arr [])
        _     -> pure Fail
  ++
   "P-MAPAP" `name`
