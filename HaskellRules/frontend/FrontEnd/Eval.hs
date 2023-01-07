@@ -643,7 +643,7 @@ replPrelude = evalTrace "replacePrelude" replacePrelude
 replacePrelude :: Core -> Core
 replacePrelude = f
   where
-    f (CApply (CVar (Ident _ i)) v) | Just p <- lookup i prelude = CApply p v
+    f (CApply (CVar (Ident _ i)) v) | Just p <- lookup i prelude = f (CApply p v)
     f (CVar (Ident _ i)) | Just p <- lookup i prelude = CValue p
     f e = composOp f e
 
@@ -652,7 +652,8 @@ prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                           -- x => x
   ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (CInt 0)]) -- x => int#[x]; x>=0; x
-  ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
+--  ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
+  ,("int", CPrim "isInt$")
   ,("in'->'", arrowV)
   ,("false", CArray [])                                      -- ()
 {-
@@ -664,8 +665,8 @@ prelude =
   ,("new", newV)
 --  ,("pre'[]'", unimplemented "pre []")
 --  ,("pre'^'", unimplemented "pre ^")
-  ,("post'^'", CLam x $ CApply (CPrim "read$") vx)
-  ,("in'.='", CLam x $ CApply (CPrim "write$") vx)
+  ,("post'^'", CPrim "read$")
+  ,("in'.='", CPrim "write$")
   ]
   where typ is = CLam x $ cSeq $ is ++ [CVar x]
         vx = CVar x
