@@ -273,10 +273,11 @@ cOne e = do
  useSplit <- asks fSplit
  if not useSplit then pure $ COne e
  else do
-  u1 <- newTmp
-  u2 <- newTmp
   v <- newTmp
-  pure $ CSplit e (CLam u1 CFail) (CLam v $ CLam u2 $ CVar v)
+  pure $ CSplit e (CLam underscore CFail) (CLam v $ CLam underscore $ CVar v)
+
+underscore :: Ident
+underscore = Ident noLoc "_"
 
 cAll :: Core -> C Core
 cAll e = do
@@ -285,13 +286,12 @@ cAll e = do
  else do
   f <- newTmp
   g <- newTmp
-  u <- newTmp
   v <- newTmp
   r <- newTmp
   x <- newTmp
   pure $ CDef [f, g] $
            CSeq [
-             CUnify (CVar f) (CLam u $ CArray []),
+             CUnify (CVar f) (CLam underscore $ CArray []),
              CUnify (CVar g) (CLam v $ CLam r $
                                CDef [x] $
                                  CSeq [
