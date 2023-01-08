@@ -33,11 +33,11 @@ rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
                  | otherwise = force . map (trsToCore . sub flg sys . rtrace)
                 . map toList
                 . nrToList
---                . nrTrace sys
+                . nrTrace sys
                 . subsNR flg sys
                 . elimDupNR sys
                 . nf
---                . start
+                . start
                 . preProcess sys (ruleEnv sys)
                 . coreToTrs
  where
@@ -67,12 +67,16 @@ sub :: Flags -> ESystem -> T.Expr -> T.Expr
 sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
             | otherwise = id
 
-{-
+moreTrace :: Bool
+moreTrace = False
+
 start :: T.Expr -> T.Expr
-start e = trace ("start:\n" ++ show e) e
+start e | moreTrace = trace ("start:\n" ++ show e) e
+        | otherwise = e
 
 nrTrace :: ESystem -> NormResult T.Expr -> NormResult T.Expr
-nrTrace sys nr = trace (normDump sys nr) nr
+nrTrace sys nr | moreTrace = trace (normDump sys nr) nr
+               | otherwise = nr
 
 normDump :: ESystem -> NormResult T.Expr -> String
 normDump sys nr =
@@ -85,10 +89,9 @@ normDump sys nr =
 dumpOne :: ESystem -> T.Expr -> String
 dumpOne sys e = show e ++ "\n   " ++ red ++ "\n====="
   where red =
-          case normalFormsFuelTrace sys 25000 e of
+          case normalFormsFuelTrace sys 20000 e of
             NormResult { nrLeft = [] } -> "reduces"
             NormResult { nrDone = done, nrLeft = left } -> "no " ++ show (length done, length left)
--}
 
 type Trace a = [(String, a)]
 
