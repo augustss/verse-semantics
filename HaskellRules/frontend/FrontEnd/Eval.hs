@@ -518,12 +518,12 @@ evalPrimOps :: EvalCore
 evalPrimOps flg = evalTrace "evalPrimOps" f flg
   where
     -- real primitives
-    f (CUnOp  "isInt$" v) | CInt{} <- v = CUnit
+    f (CUnOp  "isInt$" v) | CInt{} <- v = v -- CUnit
                           | otherwise   = CFail
     -- float#, string#
-    f (CUnOp  "isArr$" v) | CArray{} <- v = CUnit
+    f (CUnOp  "isArr$" v) | CArray{} <- v = v -- CUnit
                           | otherwise   = CFail
-    f (CUnOp  "isFcn$" v) | CLam{} <- v = CUnit
+    f (CUnOp  "isFcn$" v) | CLam{} <- v = v -- CUnit
                           | otherwise   = CFail
 
     --
@@ -652,8 +652,8 @@ prelude :: [(String, Value)]
 prelude =
   [("any", typ [])                                           -- x => x
   ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (CInt 0)]) -- x => int#[x]; x>=0; x
---  ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
-  ,("int", CPrim "isInt$")
+  ,("int", typ [app "isInt$" vx])                            -- x => int#[x]; x
+--  ,("int", CPrim "isInt$")
   ,("in'->'", arrowV)
   ,("false", CArray [])                                      -- ()
 {-
