@@ -3,6 +3,8 @@ import Data.Char(toLower)
 import Data.Function(on)
 import Data.List(nubBy)
 import Data.Maybe
+import qualified Data.IntMap as IM
+import qualified Epic.SIntMap as SIM
 import qualified TRS.Bind as T
 import qualified Rules.Core as T
 import Rules.Equiv(normalForm)
@@ -139,7 +141,9 @@ coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
-coreToTrs _ = undefined
+coreToTrs (CStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
+coreToTrs (CPtr p) = T.Ref (T.Ptr p)
+--coreToTrs _ = undefined
 
 coreToTrsV :: Core -> T.Value
 coreToTrsV e = case coreToTrs e of T.Val v -> v; _ -> undefined
@@ -168,6 +172,9 @@ trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
 trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
+trsToCore (T.Store h e) = CStore s (trsToCore e)
+  where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
+trsToCore (T.Ref (T.Ptr i)) = CPtr i
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
@@ -175,27 +182,24 @@ trsToCoreI (T.Prim i) = Ident noLoc $ "$" ++ show i
 
 allOps :: [(T.Op, String)]
 allOps = [
-{-
-  (T.Gt, "intGT$"),
-  (T.Le, "intGE$"),
-  (T.Lt, "intLT$"),
-  (T.Le, "intLE$"),
-  (T.Ne, "intNE$"),
--}
-  (T.Gt, "in'>'"),
-  (T.Ge, "in'>='"),
-  (T.Lt, "in'<'"),
-  (T.Le, "in'<='"),
-  (T.Ne, "in'<>'"),
-  (T.Add, "in'+'"),
-  (T.Sub, "in'-'"),
-  (T.Mul, "in'*'"),
-  (T.Div, "in'/'"),
-  (T.Neg, "pre'-'"),
-  (T.Plus, "pre'+'"),
+  (T.Gt,    "in'>'"),
+  (T.Ge,    "in'>='"),
+  (T.Lt,    "in'<'"),
+  (T.Le,    "in'<='"),
+  (T.Ne,    "in'<>'"),
+  (T.Add,   "in'+'"),
+  (T.Sub,   "in'-'"),
+  (T.Mul,   "in'*'"),
+  (T.Div,   "in'/'"),
+  (T.Neg,   "pre'-'"),
+  (T.Plus,  "pre'+'"),
   (T.IsInt, "isInt$"),
   (T.MapAp, "mapAp$"),
-  (T.Cons, "cons$")
+  (T.Cons,  "cons$"),
+  (T.Alloc, "alloc$"),
+  (T.Read,  "read$"),
+  (T.Write, "write$"),
+  (T.AddTo, "in'+='")
   ]
 
 ----------------------------------------------

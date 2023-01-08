@@ -1,19 +1,22 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.POPL(allSystemsPOPL) where
+import Control.Monad( guard )
+import Data.Maybe
 
+import qualified Epic.SIntMap as IM
+import Epic.Uniplate(universe)
 import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
---import Debug.Trace
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLS ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -22,7 +25,7 @@ systemPOPL = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = allRules
+  , rules               = allRules <> rulesChoiceSX
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
@@ -32,15 +35,26 @@ systemPOPLV :: TRSystem Expr
 systemPOPLV = systemPOPL
   { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
-  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
+  , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
   }
 
 systemPOPLF :: TRSystem Expr
 systemPOPLF = systemPOPL
   { sname               = "POPLF"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL"
-  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+  , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
   }
+
+systemPOPLS :: TRSystem Expr
+systemPOPLS = s
+  { sname               = "POPLS"
+  , description         = "POPLF + store"
+  , rules               = allRules <> rulesChoiceNoSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail <> rulesStore
+  , preProcess          = \ e -> foo . addStore . preProcess s e
+  , postProcess         = const dropStore
+  }
+  where s = systemPOPLF
+        foo e = e -- trace ("foo: " ++ show e) e
 
 -- Check that an expression is in the subset defined by the POPL grammar.
 valid :: Expr -> Bool
@@ -58,6 +72,7 @@ valid = expr
     expr Fail = True
     expr Wrong = True
     expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr (Store h e) = all value (IM.elems h) && expr e
     expr _ = undefined -- GHC bug
     value Var{} = True
     value e = hnf e
@@ -99,11 +114,13 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
+    expr (Store h e) | IM.null h = Store h $ expr e
     expr e = error $ "anf: impossible: " ++ show e
     value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
     value _ e@Var{} = ([], e)
     value _ e@Int{} = ([], e)
     value _ e@Op{}  = ([], e)
+    value _ e@Ref{} = ([], e)
     value _ (Lam (Bind x e)) = ([], Lam (Bind x (expr e)))
     value _ (Arr es) = arr es
     value i e = ([(i, expr e)], Var i)
@@ -126,15 +143,30 @@ isChoiceFree (a :=: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
-isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
+isChoiceFree (Op op :@: _) = isChoiceFreeOp op && not (isStoreOp op) -- NOTE: not in POPL submission
 isChoiceFree Split{}   = True  -- XXX is it?
 isChoiceFree Wrong     = True
+isChoiceFree (EXI _ e) = isChoiceFree e
 isChoiceFree _         = False
 -- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
 isChoiceFreeOp _ = True
+
+isStoreFree :: Expr -> Bool
+isStoreFree (Val _)   = True
+isStoreFree (a :=: b) = isStoreFree a && isStoreFree b
+isStoreFree (a :>: b) = isStoreFree a && isStoreFree b
+isStoreFree (Op op :@: _) = not (isStoreOp op)
+isStoreFree _         = False
+
+isStoreOp :: Op -> Bool
+isStoreOp Alloc = True -- Don't mess with memory ops
+isStoreOp Read = True -- Don't mess with memory ops
+isStoreOp Write = True -- Don't mess with memory ops
+isStoreOp AddTo = True
+isStoreOp _ = False
 
 --------------------------------------------------------------------------------
 -- contexts
@@ -165,6 +197,10 @@ execX1 lhs =
   do e :>: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
+ ++
+  do Store h e <- [lhs]
+     (ctx, hole) <- execX e
+     pure (Store h . ctx, hole)
 
 -- X context, or exist x . X
 defX :: Ident -> Expr -> [(Context, Expr)]
@@ -204,6 +240,12 @@ choiceX1 lhs =
   do Exi (Bind x cx) <- [lhs]
      (ctx, hole) <- choiceX cx
      pure (Exi . Bind x . ctx, hole) -- hopefully this is sound!
+{-
+ ++
+  do Store h e <- [lhs]
+     (ctx, hole) <- choiceX e
+     pure (Store h . ctx, hole)
+-}
 
 -- scope contexts
 -- SX context
@@ -223,6 +265,12 @@ scopeX lhs =
  ++
   do Split hole f g <- [lhs]
      pure (\ e -> Split e f g, hole)
+{-
+ ++
+  do Store h e <- [lhs]
+     (ctx, hole) <- scopeX e
+     pure (Store h . ctx, hole)
+-}
 
 -- value contexts
 -- V context
@@ -236,6 +284,39 @@ valueX1 lhs =
          v1 = vs!!i
      (ctx2, v2) <- valueX v1
      pure (ctx1 . ctx2, v2)
+
+storeX, storeX1 :: Expr -> [(Context, Expr)]
+-- S context
+storeX lhs = storeX1 lhs ++ [(id,lhs)]
+-- S context, S /= hole
+storeX1 lhs =
+  do sx :=: e <- [lhs]
+     (ctx, hole) <- storeX sx
+     pure ((:=: e) . ctx, hole)
+ ++
+  do se :=: sx <- [lhs]
+     guard (isStoreFree se)
+     (ctx, hole) <- storeX sx
+     pure ((se :=:) . ctx, hole)
+ ++
+  do sx :>: e <- [lhs]
+     (ctx, hole) <- storeX sx
+     pure ((:>: e) . ctx, hole)
+ ++
+  do se :>: sx <- [lhs]
+     guard (isStoreFree se)
+     (ctx, hole) <- storeX sx
+     pure ((se :>:) . ctx, hole)
+{-
+ ++
+  do Exi (Bind x sx) <- [lhs]
+     (ctx, hole) <- storeX sx
+     pure (Exi . Bind x . ctx, hole)
+-}
+
+isResult :: Expr -> Bool
+isResult (v :|: _) = isVal v
+isResult v = isVal v
 
 --------------------------------------------------------------------------------
 
@@ -348,7 +429,9 @@ rulesApplication _ lhs =
   do LAM x e :@: v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
-     if x `notElem` freeV then
+     if x == Name "_" then
+       pure e
+      else if x `notElem` freeV then
        pure (beta x e)
       else do
        -- The x has to be renamed to avoid capture
@@ -377,6 +460,12 @@ rulesUnificationNoOcc _ lhs =
        then pure (Int k1)
        else pure Fail
  ++
+  "UREF" `name`
+  do Ref k1 :=: Ref k2 <- [lhs]
+     if k1 == k2
+       then pure (Ref k1)
+       else pure Fail
+ ++
   "UTUP" `name`
   do Arr vs :=: Arr vs' <- [lhs]
      if length vs == length vs'
@@ -395,6 +484,7 @@ rulesUnificationNoOcc _ lhs =
   do HNF e1 :=: HNF e2 <- [lhs]
      -- Avoid the cases handled above, and fail for any unequal hnfs
      guard (case (e1,e2) of (Int{},Int{}) -> False
+                            (Ref{},Ref{}) -> False
                             (Arr{},Arr{}) -> False
                             (Lam{},Lam{}) -> False
                             (Op{}, Op{})  -> False
@@ -572,6 +662,13 @@ rulesFail _ lhs =
 
 rulesChoice :: ERule
 rulesChoice _ lhs =
+  "CHOOSE" `name`
+  do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX1 e
+     pure (sx (cx e1 :|: cx e2))
+
+rulesChoiceSX :: ERule
+rulesChoiceSX _ lhs =
   "FAIL-L" `name`
   do (sx, fe) <- scopeX lhs
      Fail :|: e <- [fe]
@@ -586,11 +683,20 @@ rulesChoice _ lhs =
   do (sx, e) <- scopeX lhs
      (e1 :|: e2) :|: e3 <- [e]
      pure (sx (e1 :|: (e2 :|: e3)))
+
+rulesChoiceNoSX :: ERule
+rulesChoiceNoSX _ lhs =
+  "FAIL-L" `name`
+  do Fail :|: e <- [lhs]
+     pure e
  ++
-  "CHOOSE" `name`
-  do (sx, e)         <- scopeX lhs
-     (cx, e1 :|: e2) <- choiceX1 e
-     pure (sx (cx e1 :|: cx e2))
+  "FAIL-R" `name`
+  do e :|: Fail <- [lhs]
+     pure e
+ ++
+  "ASSOC-CHOICE" `name`
+  do (e1 :|: e2) :|: e3 <- [lhs]
+     pure (e1 :|: (e2 :|: e3))
 
 --------------------------------------------------------------------------------
 
@@ -682,7 +788,11 @@ opArgTC op =
     Plus -> int                   -- Must be Int
     IsInt -> any_                 -- Any type is allowed
     MapAp -> arr lam              -- Used internally: takes an array of thunks
+    Alloc -> any_                 -- Any type can be allocated
+    Read -> ref                   -- Must be Ref
+    Write -> pair (hnf ref) any_  -- Must be Ref, anything
     Cons -> pair any_ (arr any_)  -- Must be anything, array
+    AddTo -> pair (hnf ref) (hnf int)
     _ -> pair (hnf int) (hnf int) -- Must be Int, Int
   where int Int{} = True          
         int _ = False
@@ -691,6 +801,8 @@ opArgTC op =
         arr _ _ = False
         lam Lam{} = True
         lam _ = False
+        ref Ref{} = True
+        ref _ = False
         hnf p (HNF e) = p e  -- Check the predicate for HNF
         hnf _ _ = True       -- Assume OK if it's not HNF
         pair t1 t2 (Arr [e1, e2]) = t1 e1 && t2 e2
@@ -748,3 +860,97 @@ rulesStructural _ lhs =
   "UNIFY-SWAP" `name`
   do (e1 :=: e2) <- [lhs]
      pure (e2 :=: e1)
+
+------------------
+
+storeEmpty :: Heap
+storeEmpty = IM.empty
+
+storeAlloc :: Heap -> Value -> (Heap, Ptr)
+storeAlloc h v =
+  let p | IM.null h = Ptr 0
+        | otherwise = fst $ IM.findMax h
+      h' = IM.insert p v h
+  in  (h', p)
+
+storeRead :: Heap -> Ptr -> Value
+storeRead h p = fromMaybe (error $ "storeRead: " ++ show p) $ IM.lookup p h
+
+storeWrite :: Heap -> Ptr -> Value -> Heap
+storeWrite h p v = IM.insert p v h
+
+addStore :: Expr -> Expr
+addStore e = Store storeEmpty e
+
+dropStore :: Expr -> Expr
+dropStore (Store _ e) | hasNoStoreOps e = e
+dropStore e = e
+
+hasNoStoreOps :: Expr -> Bool
+hasNoStoreOps e = null [ () | Op o <- universe e, isStoreOp o ]
+
+isNonStore :: Expr -> Bool
+isNonStore Store{} = False
+isNonStore Fail = False
+isNonStore (EXI _ e) = isNonStore e
+isNonStore e = not (isResult e)
+
+rulesStore :: ERule
+rulesStore _ lhs =
+  "REF-ALLOC" `name`
+  do Store h e <- [lhs]
+     (ctx, Op Alloc :@: Val v) <- storeX e
+     let (h', p) = storeAlloc h v
+     pure (Store h' (ctx (Ref p)))
+ ++
+  "REF-READ" `name`
+  do Store h e <- [lhs]
+     (ctx, Op Read :@: Ref p) <- storeX e
+     let v = storeRead h p
+     pure (Store h (ctx v))
+ ++
+  "REF-WRITE" `name`
+  do Store h e <- [lhs]
+     (ctx, Op Write :@: Arr [Ref p, Val v]) <- storeX e
+     let h' = storeWrite h p v
+     pure (Store h' (ctx (Arr [])))
+ ++
+  "ST-SPLIT-DUP" `name`
+  do Store h e <- [lhs]
+     (ctx, Split oe f g) <- storeX e
+     guard (isNonStore oe)
+     pure (Store h (ctx (Split (Store h oe) f g)))
+ ++
+  "ST-CHOICE-DUP" `name`
+  do Store h ee <- [lhs]
+     (ctx, oe :|: e) <- storeX ee
+     guard (isChoiceFree oe)
+     guard (isNonStore oe)
+     --traceM $ "ST-CHOICE-DUP " ++ show oe
+     pure (Store h (ctx (Store h oe :|: e)))
+ ++
+  "ST-SPLIT" `name`
+  do Store _ e <- [lhs]
+     (ctx, Split (Store h w) f g) <- storeX e
+     guard (isResult w)
+     pure (Store h (ctx (Split w f g)))
+ ++
+  "ST-CHOICE" `name`
+  do Store _ ee <- [lhs]
+     (ctx, Store h w :|: e) <- storeX ee
+     guard (isResult w)
+     pure (Store h (ctx (w :|: e)))
+{-
+ ++
+  "ST-FAIL" `name`
+  do Store _ Fail <- [lhs]
+     pure Fail
+-}
+ ++
+  "REF-ADDTO" `name`
+  do Store h e <- [lhs]
+     (ctx, Op AddTo :@: Arr [Ref p, Int i]) <- storeX e
+     Int j <- [storeRead h p]
+     let h' = storeWrite h p v
+         v = Int (j + i)
+     pure (Store h' (ctx v))

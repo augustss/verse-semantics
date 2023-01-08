@@ -1,9 +1,11 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Core(
   Expr(..), Op(..),
+  Heap, Ptr(..),
   Value,
   TRSFlags, RuleEnv(..), defaultTRSFlags,
   DerefPos(..),
@@ -22,13 +24,15 @@ module Rules.Core(
   collect,
   check,
   ) where
+import qualified Epic.SIntMap as IM
+import Data.Data(Data)
+import Data.List( intercalate, union, elemIndex )
+import Data.Maybe
 import GHC.Stack(HasCallStack)
 
 import TRS.Bind
 import TRS.TRS
 import Test.QuickCheck hiding ( collect )
-import Data.List( intercalate, union, elemIndex )
-import Data.Maybe
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
@@ -55,8 +59,16 @@ data Expr
   | Fail                        -- ^ fail
   | Wrong                       -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
+  -- only used for updatable references
+  | Store Heap Expr
+  | Ref Ptr
+  deriving (Data)
 
 type Value = Expr
+
+type Heap = IM.SIntMap Ptr Value
+newtype Ptr = Ptr Int deriving (Eq, Ord, Data)
+instance Show Ptr where show (Ptr i) = "r" ++ show i
 
 infixr 1 :>:
 infixr 3 :|:
@@ -80,8 +92,11 @@ instance Show Expr where
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
-  showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
+  showsPrec _ (Split e v1 v2)  = showString "split{" . showsPrec 0 e . showString ", " .
                                  showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
+  showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
+                                 showsPrec 0 e . showString "}"
+  showsPrec p (Ref r)          = showsPrec p r
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -160,8 +175,16 @@ instance Ord Expr where
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
 
-    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp  xs  ys (Store h e) (Store h' e') =
+      compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
+    comp _xs _ys Store {} _ = LT
+    comp _xs _ys _ Store {} = GT
 
+    comp _xs _ys (Ref p) (Ref q) = compare p q
+    comp _xs _ys Ref {} _        = LT
+    comp _xs _ys _ Ref {}        = GT
+
+    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
 --------------------------------------------------------------------------------
 
@@ -180,7 +203,11 @@ data Op
   | IsInt
   | MapAp
   | Cons
- deriving ( Eq, Ord )
+  | Alloc
+  | Read
+  | Write
+  | AddTo
+ deriving ( Eq, Ord, Data )
 
 instance Show Op where
   show Gt    = "gt"
@@ -197,6 +224,10 @@ instance Show Op where
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
+  show Alloc = "alloc"
+  show Read  = "read"
+  show Write = "write"
+  show AddTo = "addto"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -229,6 +260,7 @@ getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
 getHNF e@Op{} = Just e
 getHNF e@Arr{} = Just e
+getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
@@ -241,6 +273,7 @@ pattern CON e <- (getCON -> Just e)
 getCON :: Expr -> Maybe Expr
 getCON e@Int{} = Just e
 getCON e@Op{} = Just e
+getCON e@Ref{} = Just e
 getCON _ = Nothing
 
 --------------------------------------------------------------------------------
@@ -303,12 +336,16 @@ instance Rec Expr where
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
         ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
+      -- No reductions in the store, it's supposed to be a Value
+      Store h e -> [ (n, Store h e') | (n,e') <- rec r s e ]
       _     -> []
 
 --------------------------------------------------------------------------------
 
 instance Free Expr where
   free (Var v)   = [v]
+  free Int{}     = []
+  free Op{}      = []
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
@@ -320,7 +357,11 @@ instance Free Expr where
   free (One a)   = free a
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
-  free _         = []
+  free Fail      = []
+  free Wrong     = []
+  free (Store h e) = free (IM.elems h) `union` free e
+  free Ref{}     = []
+
 
 --------------------------------------------------------------------------------
 
@@ -350,8 +391,10 @@ instance Term Expr where
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
-  subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst _sub Wrong    = Wrong
+  subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
+  subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
+  subst _sub e@Ref{}  = e
 
 -- TODO(augustss):
 -- We don't normally substitute in ~, but we still need to be able to alpha convert,
@@ -401,6 +444,8 @@ instance Arbitrary Expr where
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
+  shrink (Store _ _) = undefined
+  shrink (Ref _)   = []
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
@@ -456,6 +501,7 @@ collect here (\/) = col
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
+  recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
 
 --------------------------------------------------------------------------------

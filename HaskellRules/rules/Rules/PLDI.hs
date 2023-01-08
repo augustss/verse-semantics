@@ -143,6 +143,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
+    expr _ = undefined
 
     -- Expression or unification
     expru (e1 :=: e2) =
