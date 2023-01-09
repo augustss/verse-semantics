@@ -8,11 +8,11 @@ module Language.Verse.Val
   ( Val (..)
   ) where
 
+import Control.Applicative
 import Control.Monad.Trans.Maybe
 import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
-import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
 import Data.Ratio
@@ -76,10 +76,11 @@ findList x ys = uncons ys >>= \ case
     tell [(ys, ys')]
     pure ys
 
-uncons :: MonadVar m => Var m Val -> m (Maybe (Var m Val, Var m Val))
-uncons xs = readVar xs <&> \ case
-  Just (Cons x xs) -> Just (x, xs)
-  _ -> Nothing
+uncons :: (Alternative m, MonadVar m) => Var m Val -> m (Maybe (Var m Val, Var m Val))
+uncons xs = readVar xs >>= \ case
+  Just (Cons x xs) -> pure $ Just (x, xs)
+  Just _ -> empty
+  _ -> pure Nothing
 
 instance Pretty a => Pretty (Val a) where
   pretty = \ case
