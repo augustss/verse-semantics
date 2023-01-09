@@ -2,25 +2,20 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Val
   ( Val (..)
   ) where
 
-import Control.Applicative
+import Control.Monad.Trans.Maybe
+import Control.Monad.Var
+import Control.Monad.Writer.CPS
 
-import Data.Eq
-import Data.Function
 import Data.Functor
-import Data.Foldable
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
-import Data.Maybe
 import Data.Ratio
-import Data.Traversable
-import Data.Tuple
 import Data.Unifiable
 
 import Language.Verse.Ident
@@ -28,10 +23,7 @@ import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Simplify.Exp qualified as Simplify
 
-import Prelude (Double, Integer)
 import Prettyprinter
-
-import Text.Show
 
 data Val a
   = Int !Integer
@@ -39,6 +31,7 @@ data Val a
   | Rational !Rational
   | Truth a
   | Function !(IdentMap Name a) !(IdentSet Name) !Exp !Exp
+  | Cons a a
   | Tuple [a] deriving (Show, Functor, Foldable, Traversable)
 
 type IdentSet a = HashSet (Ident a)
@@ -48,13 +41,45 @@ type IdentMap a v = HashMap (Ident a) v
 type Exp = L (Simplify.Exp L (Ident Name))
 
 instance Unifiable Val where
-  zipMatch  = curry $ \ case
-    (Truth x, Truth y) -> Just $ Truth (x, y)
-    (Int x, Int y) | x == y -> Just $ Int x
-    (Rational x, Rational y) | x == y -> Just $ Rational x
-    (Float x, Float y) | x == y -> Just $ Float x
-    (Tuple xs, Tuple ys) -> Tuple <$> zipMatch xs ys
-    _ -> Nothing
+  zipMatchM = curry $ \ case
+    (Truth x, Truth y) -> pure $ Just [(x, y)]
+    (Int x, Int y) | x == y -> pure $ Just []
+    (Rational x, Rational y) | x == y -> pure $ Just []
+    (Float x, Float y) | x == y -> pure $ Just []
+    (Tuple xs, Tuple ys) -> pure $ zipMatch xs ys
+    (Cons x xs, Cons y ys) -> runMaybeT . execWriterT $ zipCons x xs y ys
+    _ -> pure Nothing
+
+type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
+
+zipCons :: MonadVar m =>
+           Var m Val -> Var m Val ->
+           Var m Val -> Var m Val ->
+           ZipMatchT Val m ()
+zipCons x xs y ys = zipList xs =<< findCons x y ys
+
+zipList :: MonadVar m => Var m Val -> Var m Val -> ZipMatchT Val m ()
+zipList xs ys = uncons xs >>= \ case
+  Just (x, xs) -> zipList xs =<< findList x ys
+  Nothing -> tell [(xs, ys)]
+
+findCons :: MonadVar m => Var m Val -> Var m Val -> Var m Val -> ZipMatchT Val m (Var m Val)
+findCons x y ys = eqVar x y >>= \ case
+  False -> newVar . Cons y =<< findList x ys
+  True -> pure ys
+
+findList :: MonadVar m => Var m Val -> Var m Val -> ZipMatchT Val m (Var m Val)
+findList x ys = uncons ys >>= \ case
+  Just (y, ys) -> findCons x y ys
+  Nothing -> do
+    ys' <- newVar . Cons x =<< freshVar
+    tell [(ys, ys')]
+    pure ys
+
+uncons :: MonadVar m => Var m Val -> m (Maybe (Var m Val, Var m Val))
+uncons xs = readVar xs <&> \ case
+  Just (Cons x xs) -> Just (x, xs)
+  _ -> Nothing
 
 instance Pretty a => Pretty (Val a) where
   pretty = \ case
@@ -63,5 +88,6 @@ instance Pretty a => Pretty (Val a) where
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x -> "truth" <> lbrace <> pretty x <> rbrace
     Function _ _ _ _ -> "function"
+    Cons _ _ -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
