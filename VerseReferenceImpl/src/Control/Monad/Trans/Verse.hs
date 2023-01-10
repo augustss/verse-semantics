@@ -13,10 +13,7 @@
 module Control.Monad.Trans.Verse
   ( VerseT
   , runVerseT
-  , Var
-  , freshVar
   , Label
-  , newVar
   , whenBound
   , split
   , once'
@@ -41,9 +38,12 @@ import Control.Monad.RST
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
+import Control.Monad.Var (MonadVar)
+import Control.Monad.Var qualified as Var
 
 import Data.Fix
 import Data.Foldable (for_)
+import Data.Functor
 import Data.IntMap.Lazy (IntMap)
 import Data.IntMap.Lazy qualified as IntMap
 import Data.Ref
@@ -76,6 +76,26 @@ instance Monad m => MonadLogic (VerseT m) where
     local (\ r -> r { level = r.level + 1 }) .
     getVerseT
 
+instance ( MonadRef m
+         , MonadSupply Label m
+         , EqRef (Ref m)
+         ) => MonadVar (VerseT m) where
+  type Var (VerseT m) = Var m
+
+  freshVar =
+    fmap Var . newRef . Repr 1 =<<
+    Unbound <$> newRef (const $ pure ()) <*> askLevel
+
+  newVar = lift . newVar'
+
+  readVar var = findVar var <&> \ case
+    (_, _, Bound x _) -> Just x
+    _ -> Nothing
+
+  eqVar var_x var_y =
+    (\ (var_x, _, _) (var_y, _, _) -> eqRef var_x var_y) <$>
+    findVar var_x <*>
+    findVar var_y
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m = do
@@ -89,14 +109,6 @@ data VarState m f
 type Label = Int
 
 newtype Var m f = Var { getVar :: Set m (VarState m f) }
-
-freshVar :: MonadRef m => VerseT m (Var m f)
-freshVar =
-  fmap Var . newRef . Repr 1 =<<
-  Unbound <$> newRef (const $ pure ()) <*> askLevel
-
-newVar :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> VerseT m (Var m f)
-newVar = lift . newVar'
 
 newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
 newVar' x = fmap Var . newRef . Repr 1 =<< Bound x <$> supply
@@ -150,6 +162,7 @@ for' m f g = split m $ \ case
   Just (x, m) -> f x >>= freshen >>= \ var -> for' m f $ \ vars -> g $ var : vars
 
 unify :: ( MonadRef m
+         , MonadSupply Label m
          , EqRef (Ref m)
          , Unifiable f
          ) => Var m f -> Var m f -> VerseT m ()
@@ -159,13 +172,26 @@ unify var_x var_y = do
   when (not $ eqRef set_x set_y) $ case (repr_x, repr_y) of
     (Unbound f_x level_x, Unbound f_y level_y) -> do
       level <- askLevel
-      if level_x == level && level_y == level then do
-        f <- newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
-        union' (\ _ _ -> Unbound f level_x) set_x set_y
-      else
-        whenBound var_x $ \ val_x ->
+      case (level_x == level, level_y == level) of
+        (True, True) -> do
+          f <- newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
+          union' (\ _ _ -> Unbound f level_x) set_x set_y
+        (True, False) -> do
+          writeRef set_x $ Link set_y
+          p <- newRef False
+          writeRef p True
+          f_y' <- readRef f_y
+          lift $ modifyRef f_x $ flip (liftA2 (*>)) (whenM (readRef p) . f_y')
+        (False, True) -> do
+          writeRef set_y $ Link set_x
+          p <- newRef False
+          writeRef p True
+          f_x' <- readRef f_x
+          lift $ modifyRef f_y $ flip (liftA2 (*>)) (whenM (readRef p) . f_x')
+        (False, False) ->
+          whenBound var_x $ \ val_x ->
           whenBound var_y $ \ val_y ->
-            unify' val_x val_y
+          unify' val_x val_y
     (Unbound f_x level_x, Bound val_y _) -> do
       level <- askLevel
       if level_x == level then do
@@ -186,10 +212,11 @@ unify var_x var_y = do
       unify' val_x val_y
 
 unify' :: ( MonadRef m
+          , MonadSupply Label m
           , EqRef (Ref m)
           , Unifiable f
           ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
-unify' val_x val_y = case zipMatch val_x val_y of
+unify' val_x val_y = zipMatchM val_x val_y >>= \ case
   Nothing -> empty
   Just val_z -> for_ val_z $ uncurry $ unify
 
@@ -276,8 +303,7 @@ splitPromise (Promise ref_x) f = readRef ref_x >>= \ case
   Pending xs -> do
     f' <- toListener f
     lift . writeRef ref_x . Pending $ f' : xs
-  Resolved x ->
-    f x
+  Resolved x -> f x
   where
     toListener f = do
       r <- ask'

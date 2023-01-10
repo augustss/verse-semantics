@@ -18,29 +18,15 @@ import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Trans.Verse (VerseT)
 import Control.Monad.Trans.Verse qualified as Verse
+import Control.Monad.Var
 
 import Data.Fix
-import Data.Kind
 import Data.Ref
 import Data.Unifiable
 
-type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
-  VarDefault (t n) = Var n
-
 type MonadVerseTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVerse n)
 
-class (Alternative m, Monad m) => MonadVerse m where
-  type Var m :: (Type -> Type) -> Type
-  type Var m = VarDefault m
-
-  freshVar :: m (Var m f)
-  default freshVar :: (m ~ t n, MonadVerseTrans t n) => m (Var m f)
-  freshVar = lift freshVar
-
-  newVar :: f (Var m f) -> m (Var m f)
-  default newVar :: (m ~ t n, MonadVerseTrans t n) => f (Var m f) -> m (Var m f)
-  newVar = lift . newVar
-
+class (Alternative m, MonadVar m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
   split :: m a -> (Maybe (a, m a) -> m ()) -> m ()
@@ -74,9 +60,6 @@ instance ( MonadFix m
          , MonadSupply Verse.Label m
          , EqRef (Ref m)
          ) => MonadVerse (VerseT m) where
-  type Var (VerseT m) = Verse.Var m
-  freshVar = Verse.freshVar
-  newVar = Verse.newVar
   whenBound = Verse.whenBound
   split = Verse.split
   once' = Verse.once'

@@ -27,6 +27,7 @@ library
     Control.Monad.Supply
     Control.Monad.Trans.Fix
     Control.Monad.Trans.Verse
+    Control.Monad.Var
     Control.Monad.Verse
     Control.Monad.Verse.Class
     Data.Fix
@@ -98,17 +99,17 @@ executable versei
   ghc-options: -Wall -Wno-name-shadowing
   default-language: Haskell2010
 
---executable verse.wasm
-  --main-is: Main.hs
-  --build-depends:
-    --base >= 4.16.0.0,
-    --bytestring,
-    --prettyprinter,
-    --transformers,
-    --verse
-  --hs-source-dirs: wasm
-  --ghc-options: -Wall
-  --default-language: Haskell2010
+executable verse.wasm
+  main-is: Main.hs
+  build-depends:
+    base >= 4.16.0.0,
+    bytestring,
+    prettyprinter,
+    transformers,
+    verse
+  hs-source-dirs: wasm
+  ghc-options: -Wall
+  default-language: Haskell2010
 
 executable verselex
   main-is: Main.hs

@@ -33,7 +33,7 @@ getTest = do
         let errFile = replaceExtension verseFile "err"
         expected <- (readFile $ "test" </> errFile) `catchIOError` \ e ->
           if isDoesNotExistError e then pure "" else ioError e
-        let actual = show $ pretty e
+        let actual = show $ pretty e <> line
         assertEqual errFile expected actual
       Right xs -> do
         let outFile = replaceExtension verseFile "out"

@@ -16,6 +16,7 @@ import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.Supply
+import Control.Monad.Var
 import Control.Monad.Verse
 
 import Data.Fix
@@ -158,18 +159,24 @@ eval' e = case extract e of
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
         empty
         (zip xs [0 ..])
-      Val.Function env xs e_domain e_range -> do
-        xs <- for (HashSet.toMap xs) $ const freshVar
-        local (const $ HashMap.union xs env) $ do
-          var_domain <- eval' e_domain
-          unify var2 var_domain
-          unify var =<< eval' e_range
-      _ ->
-        throwError $ DomainError $ loc e
+      Val.Cons var_x var_xs -> fix (\ recur var_x var_xs -> whenBound var_x $ \ case
+        Val.Function env xs e_d e_r ->
+          ifte'
+          (do
+              xs <- for (HashSet.toMap xs) $ const freshVar
+              var_d <- localNames xs $ eval' e_d
+              unify var2 var_d
+              pure xs)
+          (\ xs -> unify var =<< local (const $ HashMap.union xs env) (eval' e_r)) $
+          whenBound var_xs $ \ case
+            Val.Cons var_x var_xs -> recur var_x var_xs
+            _ -> throwDomainError $ loc e
+        _ -> throwDomainError $ loc e) var_x var_xs
+      _ -> throwDomainError $ loc e
     pure var
   Exp.Function ys xs e1 e2 -> do
-    env <- ask
-    newVar $ Val.Function (HashMap.intersection env $ HashSet.toMap ys) xs e1 e2
+    env <- flip HashMap.intersection (HashSet.toMap ys) <$> ask
+    newVar =<< Val.Cons <$> newVar (Val.Function env xs e1 e2) <*> freshVar
   Exp.Tuple exps ->
     newVar =<< Val.Tuple <$> traverse eval' exps
   Exp.Truth e ->

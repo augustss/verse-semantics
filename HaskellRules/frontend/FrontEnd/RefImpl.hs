@@ -53,16 +53,14 @@ coreToExp' :: C.Core -> ExpL
 coreToExp' = nl . expl
   where
     seqe :: [Exp L Name] -> Exp L Name
-    seqe [] = Tuple []
-    seqe [e] = e
-    seqe (e:es) = nl e :*>: nl (seqe es)
+    seqe = List . fmap nl
 
     expl (C.CVar n) = Name (identToName n)
     expl (C.CInt i) = Int i
     expl (C.CRat r) = nl (Int $ numerator r) :/: nl (Int $ denominator r)
 --    expl (C.CPrim _) = undefined
     expl (C.CArray es) = Tuple $ map coreToExp' es
-    expl (C.CLam i e) = Lambda (nl (identToName i)) (coreToExp' e)
+    expl (C.CLam i e) = Function (nl . Exists . nl $ identToName i) (coreToExp' e)
     expl (C.CUnify e1 e2) = coreToExp' e1 :=: coreToExp' e2
     expl (C.CSeq es) = seqe (map expl es)
     expl (C.CApply (C.CPrim "in'+'") (C.CArray [e1, e2])) = coreToExp' e1 :+: coreToExp' e2
@@ -85,7 +83,10 @@ coreToExp' = nl . expl
     expl (C.CSucceeds e) = expl e  -- XXX temporarily
     expl (C.CMacro i e) = error $ "expl: " ++ show (i, e)
     expl (C.CDef [] e) = expl e
-    expl (C.CDef (i:is) e) = Exists (nl $ identToName i) (coreToExp' (C.CDef is e))
+    expl (C.CDef (i:is) e) = List
+      [ nl . Exists . nl $ identToName i
+      , coreToExp' (C.CDef is e)
+      ]
 --    expl (C.CWrong _) = undefined
 --    expl (C.CSplit _ _ _) = undefined
 --    expl (C.CLambda _ _ _ _ _) = undefined
@@ -101,8 +102,8 @@ valsToCore avs = foldr1 C.CBar (cores avs)
     core (V.Rational r) | denominator r == 1 = C.CInt (numerator r)
                         | otherwise = C.CRat r
     core (V.Truth _) = undefined
-    core (V.Lambda i env e) | H.null env = C.CLam (nameToIdent i) (expToCore e)
-                            | otherwise = undefined
+    core (V.Function env xs e1 e2)
+      | otherwise = undefined
     core (V.Tuple vs) = C.CArray $ cores vs
 
 expToCore :: SExpL -> C.Core

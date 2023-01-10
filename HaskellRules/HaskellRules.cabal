@@ -75,7 +75,7 @@ library frontend
     build-depends:    epic,
                       rules,
                       trs,
---                      verse,
+                      verse,
                       megaparsec,
                       scientific,
                       text,
@@ -90,7 +90,7 @@ library frontend
                       FrontEnd.Flags
                       FrontEnd.Desugar
                       FrontEnd.Parse
---                      FrontEnd.RefImpl
+                      FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
 
