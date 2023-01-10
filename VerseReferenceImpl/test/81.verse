@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 exists X
 :X
 Y := 1|2

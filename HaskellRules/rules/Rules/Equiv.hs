@@ -1,5 +1,6 @@
-module Rules.Equiv(equiv, norm) where
+module Rules.Equiv(equiv, norm, normalForm) where
 import Data.Maybe
+import GHC.Stack
 import Rules.Core
 import TRS.TRS( step )
 import TRS.Tarjan
@@ -8,11 +9,12 @@ import TRS.System
 
 -- Test if two expressions are equivalent.
 -- Reduce both and normalize.
-equiv :: TRSystem Expr -> Expr -> Expr -> Bool
+equiv :: (HasCallStack) => TRSystem Expr -> Expr -> Expr -> Bool
 equiv sys e1 e2 = normalForm sys e1 == normalForm sys e2
 
-normalForm :: TRSystem Expr -> Expr -> Expr
-normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out: " ++ show e) $ norm sys $ start e
+normalForm :: (HasCallStack) => TRSystem Expr -> Expr -> Expr
+normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out (steps=" ++ show (tfNormSteps (ruleEnv sys)) ++ "): " ++ show e) $
+                          norm sys $ start e
 
 -- Normalize an expression.  Return Nothing if the normalization times out.
 norm :: TRSystem Expr -> Traced Expr -> Maybe (Traced Expr)

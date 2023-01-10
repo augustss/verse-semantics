@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 exists A
 exists B
 B = all {

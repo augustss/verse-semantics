@@ -5,11 +5,11 @@ import Data.List(nubBy)
 import Data.Maybe
 import qualified TRS.Bind as T
 import qualified Rules.Core as T
-import Rules.Equiv(equiv)
+import Rules.Equiv(normalForm)
 import Rules.Systems(ESystem)
 import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
 import TRS.System(preProcess, postProcess, ruleEnv, sname)
-import TRS.Traced(toList)
+import TRS.Traced(Traced, term, toList)
 import FrontEnd.Core
 import FrontEnd.Error
 import FrontEnd.Eval
@@ -31,11 +31,13 @@ evaluate tflg e = [eval flg e]
 rewrite :: Flags -> ESystem -> Core -> [Core]
 rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
                  | otherwise = force . map (trsToCore . sub flg sys . rtrace)
-                . elimDup sys
-                . subs flg sys
                 . map toList
                 . nrToList
+--                . nrTrace sys
+                . subsNR flg sys
+                . elimDupNR sys
                 . nf
+--                . start
                 . preProcess sys (ruleEnv sys)
                 . coreToTrs
  where
@@ -46,7 +48,7 @@ rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
   latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace  sys n
      | otherwise = normalFormsFuelTrace sys n
-  nrToList NormResult{ nrDone = xs, nrLeft = left } | null left || fNoFuelStop flg = xs
+  nrToList NormResult{ nrDone = xs, nrLeft = left } | null left || fNoFuelStop flg = xs ++ left
   nrToList _ = []  -- Just flag timeout as an empty list
   rtrace xs | not tr = res
             | latex = trace (latexTrace xs) res
@@ -61,22 +63,54 @@ rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
   -- Force evaluation to get traces
   force xs = if xs==xs then xs else undefined
 
-type Trace a = [(String, a)]
-
-elimDup :: ESystem -> [Trace T.Expr] -> [Trace T.Expr]
-elimDup sys = nubBy (equiv sys `on` (snd . head))
-
-subs :: Flags -> ESystem -> [Trace T.Expr] -> [Trace T.Expr]
-subs flg sys ts
-  | fFinalInline flg =
-    let ts' = [(e', t) | t@((_, e):_) <- ts, let e' = postProcess sys (ruleEnv sys) e]
-        ts'' = nubBy ((==) `on` fst) ts'
-    in  map snd ts''
-  | otherwise  = ts
-
 sub :: Flags -> ESystem -> T.Expr -> T.Expr
 sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
             | otherwise = id
+
+{-
+start :: T.Expr -> T.Expr
+start e = trace ("start:\n" ++ show e) e
+
+nrTrace :: ESystem -> NormResult T.Expr -> NormResult T.Expr
+nrTrace sys nr = trace (normDump sys nr) nr
+
+normDump :: ESystem -> NormResult T.Expr -> String
+normDump sys nr =
+  unlines $
+  ("done=" ++ show (length (nrDone nr)) ++ ", left=" ++ show (length (nrLeft nr))) :
+  map ((++ "\n=====") . show . term) (nrDone nr) ++
+  ["\n*****"] ++
+  map (dumpOne sys . term) (nrLeft nr)
+
+dumpOne :: ESystem -> T.Expr -> String
+dumpOne sys e = show e ++ "\n   " ++ red ++ "\n====="
+  where red =
+          case normalFormsFuelTrace sys 25000 e of
+            NormResult { nrLeft = [] } -> "reduces"
+            NormResult { nrDone = done, nrLeft = left } -> "no " ++ show (length done, length left)
+-}
+
+type Trace a = [(String, a)]
+
+-- Eliminate duplicates in the 'done' results by using
+-- an (expensive) equivalence check.
+elimDupNR :: ESystem -> NormResult T.Expr -> NormResult T.Expr
+elimDupNR sys nr = nr{ nrDone = elimDupT sys (nrDone nr) }
+
+elimDupT :: ESystem -> [Traced T.Expr] -> [Traced T.Expr]
+elimDupT sys = nubTraced (normalForm sys)
+
+nubTraced :: (T.Expr -> T.Expr) -> [Traced T.Expr] -> [Traced T.Expr]
+nubTraced f = map snd . nubBy ((==) `on` fst) . map (\ t -> (f (term t), t))
+
+-- Eliminate duplicates in the 'done' results by possibly using
+-- a final normalization step.
+subsNR :: Flags -> ESystem -> NormResult T.Expr -> NormResult T.Expr
+subsNR flg sys nr | not (fFinalInline flg) = nr
+                  | otherwise = nr{ nrDone = subsT sys (nrDone nr) }
+
+subsT :: ESystem -> [Traced T.Expr] -> [Traced T.Expr]
+subsT sys = nubTraced (postProcess sys (ruleEnv sys))
 
 coreToTrs :: HasCallStack => Core -> T.Expr
 coreToTrs (CVar i) = T.Var $ coreToTrsI i
