@@ -172,13 +172,26 @@ unify var_x var_y = do
   when (not $ eqRef set_x set_y) $ case (repr_x, repr_y) of
     (Unbound f_x level_x, Unbound f_y level_y) -> do
       level <- askLevel
-      if level_x == level && level_y == level then do
-        f <- newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
-        union' (\ _ _ -> Unbound f level_x) set_x set_y
-      else
-        whenBound var_x $ \ val_x ->
+      case (level_x == level, level_y == level) of
+        (True, True) -> do
+          f <- newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
+          union' (\ _ _ -> Unbound f level_x) set_x set_y
+        (True, False) -> do
+          writeRef set_x $ Link set_y
+          p <- newRef False
+          writeRef p True
+          f_y' <- readRef f_y
+          lift $ modifyRef f_x $ flip (liftA2 (*>)) (whenM (readRef p) . f_y')
+        (False, True) -> do
+          writeRef set_y $ Link set_x
+          p <- newRef False
+          writeRef p True
+          f_x' <- readRef f_x
+          lift $ modifyRef f_y $ flip (liftA2 (*>)) (whenM (readRef p) . f_x')
+        (False, False) ->
+          whenBound var_x $ \ val_x ->
           whenBound var_y $ \ val_y ->
-            unify' val_x val_y
+          unify' val_x val_y
     (Unbound f_x level_x, Bound val_y _) -> do
       level <- askLevel
       if level_x == level then do
