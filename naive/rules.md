@@ -1,4 +1,4 @@
-## Ranjit's NAIVE modifications
+# Ranjit's NAIVE modifications
 
 Key idea "distinguish" between *flexible* and *rigid* variable occurrences
 
@@ -31,6 +31,55 @@ The `x=v` constraints are one of
 - **alias**   	`x = y` where `y` is flexible
 - **test**    	`x = a` where `a` is rigid
 
+## Syntax
+
+```
+(HNF)		hnf := k | <x1,...,xn> | \x.e
+
+(value)		v   := hnf | x
+
+(expr)		e   := v | exists x. e | x = e; e | x(e) | e||e | one {e} | all {e}  | G; e
+
+(constrs)	C 	:= D; A; T
+(defin) 	D 	:= {x <- h; ...} 	where x is flexible and h is HNF value
+(alias)		A 	:= {x == y; ...}	where x, y are flexible
+(test)		T 	:= {x <- a; ...}	where x is flexible and a is rigid
+
+(context) 	E	:= * | exists x. E | x = E; e | x = e ; E | E || e | e || E | one {E} | all {E} | G; E
+```
+
+## Flows-To Judgment
+
+graph = set of directed edges E \subset (X \cup HNF) \times X
+
+_Flows-to_ judgment: `G |- x <- h` says an hnf value `h` **flows-to** a variable `x` in a graph `G`  if
+
+x <- v in G
+------------[refl]
+G |- x <- v
+
+x <- y in G 	G |- y <- v
+---------------------------[trans]
+G |- x <- y
+
+## Context Graph
+
+```
+g(E) = graph(E, 0)
+where
+  graph(*, G) 		    = G
+  graph(C; e, G)		= G \cup D \cup T			(NOTE: no alias!)
+  graph(exists x. E, G) = graph(E, G)
+  graph(x=E, G) 		= graph(E, G)
+  graph(x = e ; E)      = graph(E, G)
+  graph(E || e) 	    = graph(E, G)
+  graph(e || E)         = graph(E, G)
+  graph(one {E})        = graph(E, G)
+  graph(all {E})        = graph(E, G)
+```
+
+We say `E |- x <- h` if `g(E) |- x <- h`
+
 ## Unification: Aliases
 
 *Aliases* are boring (?). Lets just replace with some common variable so
@@ -44,61 +93,36 @@ The `x=v` constraints are one of
 Assuming we've gotten rid of `aliases` with `(uni-alias)`
 I'd like to crunch unifications down to the following:
 
-- def-def :   `x = h1; x = h2`  -->  ???
-- def-test:   `x = h1; x = a`   -->  ???
-- test-test:  `x = a1; x = a2`  -->  ???
-
-
+```
 (UNI-FLEX)
-E[x=h1; x=h2; e]  	--> E[cs; x=h; e]   	if unify(h1, h2) = (cs, h)
-                  	--> E[fail]         	if unify(h1, h2) = fail
+E[x <- h1; x <- h2; e]  --> E[cs; x=h; e]   	if unify(h1, h2) = (cs, h)
+                  		--> E[fail]         	if unify(h1, h2) = fail
 
 (UNI-FLEX-TEST)
-E[x = h; x = a; e]	--> E[cs; x = h''; e]   if E |- a is h' and unify(h, h') = (cs, h'')
-E[x = h; x = a; e]	--> E[fail; e]      	if E |- a is h' and unify(h, h') = fail
+E[x <- h; x <- a; e]	--> E[cs; x <- h''; e]  if E |- a <- h' and unify(h, h') = (cs, h'')
+E[x <- h; x <- a; e]	--> E[fail; e]      	if E |- a <- h' and unify(h, h') = fail
 
 (UNI-TEST)
-E[x = a1; x = a2; e]  --> E[cs; x = h; e]   if E |- ai is hi and unify(h1, h2) = (cs, h)
-E[x = a1; x = a2; e]  --> E[fail; e]    	if E |- ai is hi and unify(h1, h2) = fail
-
-
-E[x = a1; x = a2; e]  --> E[x = LAM; e] 	if E |- a1 is LAM   	E |- a2 is LAM
-                  	--> E[x = k; e]   	if E |- a1 is k     	E |- a2 is k
-                  	--> E[c..;x = <w>; e] if E |- a1 is <u1..uk>  E |- a2 is <v1..vk>   <u1..uk> ~ <v1..vk> ==> c.. / <w1..wk>
-                  	--> E[fail]       	if E |- a1 is h1    	E |- a2 is h2     	(and not above)
-
+E[x <- a1; x <- a2; e]  --> E[cs; x <- h; e]   	if E |- ai <- hi and unify(h1, h2) = (cs, h)
+E[x <- a1; x <- a2; e]  --> E[fail; e]    		if E |- ai <- hi and unify(h1, h2) = fail
+```
 
 ### Unification: Def-Def
 
 ```
-unify(h1, h2) = (constraints, h) | fail
+unify :: (HNF, HNF) -> (constraints, HNF) OR Fail
 
-<> ~ <> => 0, <>
+unify(k, 		 k) 		= {}, k
 
-<y,ys> ~ <z, zs> =>
+unify(<y1...yk>, <z1...zk>) = ci...ck; x = <w1...wk>
+  where
+    ci, wi = yi=zi, yi  IF yi, zi flex
+    ci, wi = yi=zi, yi  IF yi flex, zi rigid
+    ci, wi = yi=zi, zi  IF zi flex, yi rigid
+    ci, wi = (exists ti. ti = yi; ti = zi), ti  IF yi, zi rigid
 
-(UNI-FLEX)	x = <y1...yk> ; x = <z1...zk>   --> ci...ck; x = <w1...wk>
-
-where
-
-  ci, wi = yi=zi, yi  IF yi, zi flex
-
-  ci, wi = yi=zi, yi  IF yi flex, zi rigid
-
-  ci, wi = yi=zi, zi  IF zi flex, yi rigid
-
-  ci, wi = (exists ti. ti = yi; ti = zi), ti  IF yi, zi rigid
+unify(_		  , _) 			= fail
 ```
-
-Why not
-
-```
-(UNI-RIGID) 	E[x = a] --> E[x = h]   	if x is flex, a is rigid, E |- a is h
-```
-
-and the ACTUAL work is done by
-
-(UNI-FLEX)
 
 ## Examples
 
