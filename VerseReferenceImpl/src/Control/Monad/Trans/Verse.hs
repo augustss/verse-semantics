@@ -303,8 +303,7 @@ splitPromise (Promise ref_x) f = readRef ref_x >>= \ case
   Pending xs -> do
     f' <- toListener f
     lift . writeRef ref_x . Pending $ f' : xs
-  Resolved x ->
-    f x
+  Resolved x -> f x
   where
     toListener f = do
       r <- ask'
