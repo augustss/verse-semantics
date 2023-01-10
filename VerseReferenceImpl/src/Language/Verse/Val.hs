@@ -72,9 +72,10 @@ findList :: MonadVar m => Var m Val -> Var m Val -> ZipMatchT Val m (Var m Val)
 findList x ys = uncons ys >>= \ case
   Just (y, ys) -> findCons x y ys
   Nothing -> do
-    ys' <- newVar . Cons x =<< freshVar
+    zs <- freshVar
+    ys' <- newVar $ Cons x zs
     tell [(ys, ys')]
-    pure ys
+    pure zs
 
 uncons :: (Alternative m, MonadVar m) => Var m Val -> m (Maybe (Var m Val, Var m Val))
 uncons xs = readVar xs >>= \ case
