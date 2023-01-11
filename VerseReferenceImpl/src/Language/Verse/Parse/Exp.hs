@@ -32,6 +32,7 @@ data Exp f a
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Function (f (Exp f a)) (f (Exp f a))
+  | Overload (f a) (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | True

@@ -56,6 +56,7 @@ import Language.Verse.Token qualified as Token
 %left '*' '/'
 %nonassoc '?'
 %nonassoc ':'
+%nonassoc name
 %left '(' '['
 
 %token
@@ -153,6 +154,15 @@ Exp :: { L (Exp L Name) }
     }
   | name ':=' BraceInd {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
+    }
+  | name Paren {
+      Exp.ParenInvoke <\$> duplicate (Exp.Name <\$> $1) <.> duplicate $2
+    }
+  | name Paren ':=' Exp {
+      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | name Paren ':=' BraceInd {
+      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
     }
   | Exp '=>' Exp {
       Exp.Function <\$> duplicate $1 <.> duplicate $3

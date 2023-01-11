@@ -97,6 +97,12 @@ desugar' e = for e $ \ case
   Parse.Function e1 e2 -> do
     (e1, xs) <- lift $ runDesugar' $ desugar' e1
     Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+  Parse.Overload x e1 e2 -> do
+    tellName' x
+    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    e2 <- exists $ desugar' e2
+    let e = Function (HashMap.keysSet xs) <$> duplicate e1 <.> duplicate e2
+    pure $ (Name <$> x) :=: e
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
@@ -129,11 +135,16 @@ desugar' e = for e $ \ case
     IsInt <$> desugar' e
 
 tellName :: L Name -> Desugar ()
-tellName x = do
-  s <- get
-  case HashMap.lookup (extract x) s of
-    Nothing -> put $ HashMap.insert (extract x) (loc x) s
-    Just y -> throwError $ DefError y (loc x) (extract x)
+tellName x =
+  put =<< HashMap.alterF
+  (\ case
+      Nothing -> pure . Just $ loc x
+      Just y -> throwError $ DefError y (loc x) (extract x))
+  (extract x) =<< get
+
+tellName' :: L Name -> Desugar ()
+tellName' x =
+  modify $ HashMap.insertWith (flip const) (extract x) (loc x)
 
 exists :: Desugar (L (Exp L Name)) -> Desugar (L (Exp L Name))
 exists m = lift $ do
