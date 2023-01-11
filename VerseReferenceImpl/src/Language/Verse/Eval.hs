@@ -175,12 +175,12 @@ eval' e = case extract e of
       _ -> throwDomainError $ loc e
     pure var
   Exp.Function ys xs e1 e2 -> do
-    env <- flip HashMap.intersection (HashSet.toMap ys) <$> ask
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
     newVar =<< Val.Cons <$> newVar (Val.Function env xs e1 e2) <*> freshVar
   Exp.Tuple exps ->
-    newVar =<< Val.Tuple <$> traverse eval' exps
+    newVar . Val.Tuple =<< traverse eval' exps
   Exp.Truth e ->
-    newVar =<< Val.Truth <$> eval' e
+    newVar . Val.Truth =<< eval' e
   Exp.Int x ->
     newVar $ Val.Int x
   Exp.Float x ->

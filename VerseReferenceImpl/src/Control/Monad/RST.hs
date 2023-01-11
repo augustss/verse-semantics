@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Control.Monad.RST
@@ -28,7 +27,7 @@ evalRST x r = fmap fst . runRST x r
 
 instance Functor m => Functor (RST r s m) where
   fmap f m = RST $ \ r s ->
-    fmap (\ (a, s) -> (f a, s)) $ runRST m r s
+    (\ (a, s) -> (f a, s)) <$> runRST m r s
 
 instance Monad m => Applicative (RST r s m) where
   pure a = RST $ \ _ s ->

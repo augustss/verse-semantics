@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -28,7 +27,7 @@ module Control.Monad.Trans.Verse
 
 import Control.Applicative
 import Control.Category ((>>>))
-import Control.Monad ((>=>), when)
+import Control.Monad ((>=>), unless, when)
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
@@ -65,7 +64,7 @@ deriving instance MonadError e m => MonadError e (VerseT m)
 
 deriving instance MonadSupply s m => MonadSupply s (VerseT m)
 
-instance MonadTrans (VerseT) where
+instance MonadTrans VerseT where
   lift = VerseT . lift . lift
 
 instance Monad m => MonadLogic (VerseT m) where
@@ -111,7 +110,7 @@ type Label = Int
 newtype Var m f = Var { getVar :: Set m (VarState m f) }
 
 newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
-newVar' x = fmap Var . newRef . Repr 1 =<< Bound x <$> supply
+newVar' x = fmap Var . newRef . Repr 1 . Bound x =<< supply
 
 whenBound :: MonadRef m => Var m f -> (f (Var m f) -> VerseT m ()) -> VerseT m ()
 whenBound var_x f = do
@@ -167,27 +166,23 @@ unify :: ( MonadRef m
          , Unifiable f
          ) => Var m f -> Var m f -> VerseT m ()
 unify var_x var_y = do
-  (set_x, _, repr_x) <- findVar var_x
-  (set_y, _, repr_y) <- findVar var_y
-  when (not $ eqRef set_x set_y) $ case (repr_x, repr_y) of
+  x@(set_x, _, repr_x) <- findVar var_x
+  y@(set_y, _, repr_y) <- findVar var_y
+  unless (eqRef set_x set_y) $ case (repr_x, repr_y) of
     (Unbound f_x level_x, Unbound f_y level_y) -> do
       level <- askLevel
       case (level_x == level, level_y == level) of
         (True, True) -> do
           f <- newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
-          union' (\ _ _ -> Unbound f level_x) set_x set_y
+          union' (\ _ _ -> Unbound f level_x) x y
         (True, False) -> do
-          writeRef set_x $ Link set_y
-          p <- newRef False
-          writeRef p True
-          f_y' <- readRef f_y
-          lift $ modifyRef f_x $ flip (liftA2 (*>)) (whenM (readRef p) . f_y')
+          link set_y set_x
+          f_y' <- toListener =<< readRef f_y
+          lift $ modifyRef f_x $ flip (liftA2 (*>)) f_y'
         (False, True) -> do
-          writeRef set_y $ Link set_x
-          p <- newRef False
-          writeRef p True
-          f_x' <- readRef f_x
-          lift $ modifyRef f_y $ flip (liftA2 (*>)) (whenM (readRef p) . f_x')
+          link set_x set_y
+          f_x' <- toListener =<< readRef f_x
+          lift $ modifyRef f_y $ flip (liftA2 (*>)) f_x'
         (False, False) ->
           whenBound var_x $ \ val_x ->
           whenBound var_y $ \ val_y ->
@@ -195,7 +190,7 @@ unify var_x var_y = do
     (Unbound f_x level_x, Bound val_y _) -> do
       level <- askLevel
       if level_x == level then do
-        union set_y set_x
+        union y x
         ($ val_y) =<< readRef f_x
       else
         whenBound var_x $ \ val_x ->
@@ -203,13 +198,18 @@ unify var_x var_y = do
     (Bound val_x _, Unbound f_y level_y) -> do
       level <- askLevel
       if level_y == level then do
-        union set_x set_y
+        union x y
         ($ val_x) =<< readRef f_y
       else
         whenBound var_y $ \ val_y ->
           unify' val_x val_y
     (Bound val_x _, Bound val_y _) ->
       unify' val_x val_y
+  where
+    toListener f = do
+      p <- newRef False
+      writeRef p True
+      pure $ whenM (readRef p) . f
 
 unify' :: ( MonadRef m
           , MonadSupply Label m
@@ -218,7 +218,7 @@ unify' :: ( MonadRef m
           ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
 unify' val_x val_y = zipMatchM val_x val_y >>= \ case
   Nothing -> empty
-  Just val_z -> for_ val_z $ uncurry $ unify
+  Just val_z -> for_ val_z $ uncurry unify
 
 freshen :: ( MonadFix m
            , MonadRef m
@@ -313,7 +313,7 @@ splitPromise (Promise ref_x) f = readRef ref_x >>= \ case
       writeRef p True
       pure $ Listener p (resolve promise r . f)
 
-findVar :: MonadRef m => Var m f -> VerseT m (Set m (VarState m f), Word, VarState m f)
+findVar :: MonadRef m => Var m f -> VerseT m (Found m (VarState m f))
 findVar = find . getVar
 
 type Set m a = Ref m (SetState m a)
@@ -322,17 +322,17 @@ data SetState m a
   = Repr !Word a
   | Link !(Set m a)
 
+type Found m a = (Set m a, Word, a)
+
 union :: ( MonadRef m
          , EqRef (Ref m)
-         ) => Set m a -> Set m a -> VerseT m ()
+         ) => Found m a -> Found m a -> VerseT m ()
 union = union' const
 
 union' :: ( MonadRef m
           , EqRef (Ref m)
-          ) => (a -> a -> a) -> Set m a -> Set m a -> VerseT m ()
-union' f set_x set_y = do
-  (set_x, size_x, repr_x) <- find set_x
-  (set_y, size_y, repr_y) <- find set_y
+          ) => (a -> a -> a) -> Found m a -> Found m a -> VerseT m ()
+union' f (set_x, size_x, repr_x) (set_y, size_y, repr_y) = do
   if size_y > size_x then do
     writeRef set_x $ Link set_y
     writeRef set_y $ Repr (size_x + size_y) (f repr_x repr_y)
@@ -340,10 +340,13 @@ union' f set_x set_y = do
     writeRef set_x $ Repr (size_x + size_y) (f repr_x repr_y)
     writeRef set_y $ Link set_x
 
-find :: MonadRef m => Set m a -> VerseT m (Set m a, Word, a)
+link :: MonadRef m => Set m a -> Set m a -> VerseT m ()
+link set_x set_y = writeRef set_y $ Link set_x
+
+find :: MonadRef m => Set m a -> VerseT m (Found m a)
 find = lift . find'
 
-find' :: MonadRef m => Set m a -> m (Set m a, Word, a)
+find' :: MonadRef m => Set m a -> m (Found m a)
 find' set = readRef set >>= \ case
   Repr size repr -> pure (set, size, repr)
   Link set -> find' set

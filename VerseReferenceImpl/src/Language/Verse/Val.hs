@@ -1,6 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
@@ -89,7 +87,7 @@ instance Pretty a => Pretty (Val a) where
     Float x -> pretty x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x -> "truth" <> lbrace <> pretty x <> rbrace
-    Function _ _ _ _ -> "function"
-    Cons _ _ -> "function"
+    Function {} -> "function"
+    Cons {} -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
