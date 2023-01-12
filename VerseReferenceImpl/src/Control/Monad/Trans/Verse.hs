@@ -238,7 +238,7 @@ freshen' var = lift (find' $ getVar var) >>= \ case
       modify $ IntMap.insert i var
       lift . newVar' =<< for val freshen'
     Just val -> pure val
-  _ -> pure var
+  (set, _, Unbound {}) -> pure $ Var set
 
 freeze :: ( MonadFix m
           , MonadRef m
@@ -375,20 +375,20 @@ freshPromise = Promise <$> newRef (Pending [])
 resolve :: MonadRef m => Promise m -> R -> VerseT m () -> VerseT m ()
 resolve (Promise ref) r m = readRef ref >>= \ case
   Pending xs -> hasListeners xs >>= \ case
-    False -> split' r m $ \ case
-      Nothing -> writeRef ref (Resolved False) *> apListeners xs False
-      Just ((), _) -> writeRef ref (Resolved True) *> apListeners xs True
-    True -> msplit' (local' (const r) m) >>= \ case
+    False -> msplit' (local' (const r) m) >>= \ case
       Nothing -> empty
       Just ((), _) -> writeRef ref (Resolved True)
+    True -> split' r m $ \ case
+      Nothing -> writeRef ref (Resolved False) *> apListeners xs False
+      Just ((), _) -> writeRef ref (Resolved True) *> apListeners xs True
   Resolved _ -> error "resolve"
 
 hasListeners :: MonadRef m => [Listener m] -> VerseT m Bool
 hasListeners = \ case
-  [] -> pure True
+  [] -> pure False
   Listener ref _:xs -> readRef ref >>= \ case
     False -> hasListeners xs
-    True -> pure False
+    True -> pure True
 
 apListeners :: MonadRef m => [Listener m] -> Bool -> VerseT m ()
 apListeners xs x = case xs of
