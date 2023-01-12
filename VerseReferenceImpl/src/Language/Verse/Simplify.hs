@@ -55,6 +55,8 @@ simplify' e = for e $ \ case
     (:*>:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:=:) e1 e2 ->
     (:=:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:.:) e x ->
+    (:.: x) <$> simplify' e
   (Desugar.:<:) e1 e2 ->
     (:<:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:<=:) e1 e2 ->
@@ -83,6 +85,10 @@ simplify' e = for e $ \ case
     Not <$> simplify' e
   Desugar.Query e ->
     Query <$> simplify' e
+  Desugar.Module xs e -> do
+    x <- supply
+    xs <- newEnv xs
+    Module x (fromEnv xs) <$> localNames xs (simplify' e)
   Desugar.IfThenElse xs p t e -> newEnv xs >>= \ xs ->
     IfThenElse (fromEnv xs) <$>
     localNames xs (simplify' p) <*>

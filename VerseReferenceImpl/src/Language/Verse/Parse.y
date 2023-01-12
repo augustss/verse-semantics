@@ -14,6 +14,7 @@ import Data.Functor.Apply
 
 import Language.Verse.Parse.Exp (Exp ( (:=:)
                                      , (:<>:)
+                                     , (:.:)
                                      , (:<:)
                                      , (:<=:)
                                      , (:>:)
@@ -42,9 +43,9 @@ import Language.Verse.Token qualified as Token
 %lexer { lexer } { L _ Token.EOF }
 %error { uncurryL Lexer.throwError }
 
-%nonassoc '.'
 %left ';' newline
 %left ','
+%nonassoc DOT_SPACE
 %left IF IF_THEN FOR
 %left then else do
 %right '=' ':=' '=>'
@@ -54,6 +55,7 @@ import Language.Verse.Token qualified as Token
 %left '|'
 %left '+' '-'
 %left '*' '/'
+%left '.'
 %nonassoc '?'
 %nonassoc ':'
 %nonassoc name
@@ -101,6 +103,7 @@ import Language.Verse.Token qualified as Token
   ind { L _ Token.Indent }
   int { (int -> Just $$) }
   isInt { L _ Token.IsInt }
+  module { L _ Token.Module }
   name { (name -> Just $$) }
   newline { L _ Token.Newline }
   not { L _ Token.Not }
@@ -146,6 +149,9 @@ Exp :: { L (Exp L Name) }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
+  | name {
+      Exp.Name <\$> $1
+    }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
     }
@@ -172,6 +178,9 @@ Exp :: { L (Exp L Name) }
     }
   | Exp '<>' Scan Exp {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp '.' name {
+      (:.:) <\$> duplicate $1 <.> $3
     }
   | Exp '<' Scan Exp {
       (:<:) <\$> duplicate $1 <.> duplicate $4
@@ -236,7 +245,7 @@ Exp :: { L (Exp L Name) }
   | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
-  | name { Exp.Name <\$> $1 }
+  | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
@@ -309,7 +318,7 @@ Brace
 
 Block
   : Brace { $1 }
-  | '.' Exp { $1 .> $2 }
+  | '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | colonEOL ind List ded { Exp.List $3 <\$ $1 <. $4 }
 
 Scan

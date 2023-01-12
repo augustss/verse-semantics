@@ -4,6 +4,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Val
   ( Val (..)
+  , Label
   ) where
 
 import Control.Applicative
@@ -12,6 +13,7 @@ import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
 import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
 import Data.Ratio
 import Data.Unifiable
@@ -28,9 +30,12 @@ data Val a
   | Float !Double
   | Rational !Rational
   | Truth a
+  | Tuple [a]
+  | Module !Label !(HashMap Name a)
   | Function !(IdentMap Name a) !(IdentSet Name) !Exp !Exp
-  | Cons a a
-  | Tuple [a] deriving (Show, Functor, Foldable, Traversable)
+  | Cons a a deriving (Show, Functor, Foldable, Traversable)
+
+type Label = Word
 
 type IdentSet a = HashSet (Ident a)
 
@@ -45,6 +50,7 @@ instance Unifiable Val where
     (Rational x, Rational y) | x == y -> pure $ Just []
     (Float x, Float y) | x == y -> pure $ Just []
     (Tuple xs, Tuple ys) -> pure $ zipMatch xs ys
+    (Module x _, Module y _) | x == y -> pure $ Just []
     (Cons x xs, Cons y ys) -> runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
 
@@ -83,11 +89,29 @@ uncons xs = readVar xs >>= \ case
 
 instance Pretty a => Pretty (Val a) where
   pretty = \ case
-    Int x -> pretty x
-    Float x -> pretty x
-    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x -> "truth" <> lbrace <> pretty x <> rbrace
-    Function {} -> "function"
-    Cons {} -> "function"
-    Tuple [] -> "false"
-    Tuple xs -> tupled $ pretty <$> xs
+    Int x ->
+      pretty x
+    Float x ->
+      pretty x
+    Rational x ->
+      pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x ->
+      "truth" <> braces (pretty x)
+    Function {} ->
+      "function"
+    Cons {} ->
+      "function"
+    Tuple [] ->
+      "false"
+    Tuple xs ->
+      tupled $ pretty <$> xs
+    Module _ xs ->
+      "module" <>
+      braced ((\ (k, v) -> pretty k <+> ":=" <+> pretty v) <$> HashMap.toList xs)
+    where
+      braced =
+        group .
+        encloseSep
+        (flatAlt "{ " "{")
+        (flatAlt " }" "}")
+        ", "

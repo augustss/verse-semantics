@@ -37,6 +37,8 @@ desugar' e = for e $ \ case
     (:=:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<>:) e1 e2 -> do
     Not . (<$ e) <$> ((:=:) <$> desugar' e1 <*> desugar' e2)
+  (Parse.:.:) e x ->
+    (:.: x) <$> desugar' e
   (Parse.:<:) e1 e2 ->
     (:<:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<=:) e1 e2 ->
@@ -70,6 +72,9 @@ desugar' e = for e $ \ case
     Not <$> desugar' e
   Parse.Query e ->
     Query <$> desugar' e
+  Parse.Module e -> do
+    (e, xs) <- lift $ runDesugar' $ desugar' e
+    pure $ Module (HashMap.keysSet xs) e
   Parse.If p -> do
     (p, xs) <- lift $ runDesugar' $ desugar' p
     pure $ IfThenElse (HashMap.keysSet xs) p (Tuple [] <$ p) (Tuple [] <$ p)

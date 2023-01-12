@@ -20,6 +20,7 @@ import Control.Monad.Var
 import Control.Monad.Verse
 
 import Data.Fix
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
@@ -31,6 +32,7 @@ import Language.Verse.Error
 import Language.Verse.Ident
 import Language.Verse.Simplify.Exp (Exp ( (:*>:)
                                         , (:=:)
+                                        , (:.:)
                                         , (:<:)
                                         , (:<=:)
                                         , (:>:)
@@ -72,6 +74,13 @@ eval' e = case extract e of
     var2 <- eval' e2
     unify var1 var2
     pure var1
+  e :.: x -> do
+    var_e <- eval' e
+    var <- freshVar
+    whenBound var_e $ \ case
+      Val.Module _ xs | Just var_x <- HashMap.lookup x xs -> unify var var_x
+      _ -> throwNameError (loc e) x
+    pure var
   e1 :<: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -123,6 +132,10 @@ eval' e = case extract e of
     var <- freshVar
     join $ unify <$> newVar (Val.Truth var) <*> eval' e
     pure var
+  Exp.Module x xs e -> do
+    xs <- for (HashSet.toMap xs) $ const freshVar
+    _ <- localNames xs $ eval' e
+    newVar . Val.Module x $ toNames xs
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
     ifte'
@@ -301,3 +314,16 @@ localNames = local . (<>)
 
 throwDomainError :: MonadError Error m => Loc -> m a
 throwDomainError = throwError . DomainError
+
+throwNameError :: MonadError Error m => Loc -> Name -> m a
+throwNameError x = throwError . NameError x
+
+toNames :: Hashable a => HashMap (Ident a) v -> HashMap a v
+toNames =
+  HashMap.fromList .
+  HashMap.foldrWithKey
+  (\ k x z ->
+     case name k of
+       Nothing -> z
+       Just k -> (k, x) : z)
+  []

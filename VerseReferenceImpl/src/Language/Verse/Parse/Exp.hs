@@ -4,9 +4,12 @@ module Language.Verse.Parse.Exp
   ( Exp (..)
   ) where
 
+import Language.Verse.Name
+
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :<>: f (Exp f a)
+  | f (Exp f a) :.: !Name
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
   | f (Exp f a) :>: f (Exp f a)
@@ -22,6 +25,7 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Query (f (Exp f a))
+  | Module (f (Exp f a))
   | If (f (Exp f a))
   | IfThen (f (Exp f a)) (f (Exp f a))
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
