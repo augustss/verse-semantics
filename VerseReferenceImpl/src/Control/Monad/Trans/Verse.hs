@@ -91,11 +91,6 @@ instance ( MonadRef m
     (_, _, Bound x _) -> Just x
     _ -> Nothing
 
-  eqVar var_x var_y =
-    (\ (var_x, _, _) (var_y, _, _) -> eqRef var_x var_y) <$>
-    findVar var_x <*>
-    findVar var_y
-
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m = do
   let level = minBound

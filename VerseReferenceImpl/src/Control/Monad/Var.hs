@@ -36,10 +36,6 @@ class Monad m => MonadVar m where
   default readVar :: (m ~ t n, MonadVarTrans t n) => Var m f -> m (Maybe (f (Var m f)))
   readVar = lift . readVar
 
-  eqVar :: Var m f -> Var m f -> m Bool
-  default eqVar :: (m ~ t n, MonadVarTrans t n) => Var m f -> Var m f -> m Bool
-  eqVar x y = lift $ eqVar x y
-
 instance MonadVar m => MonadVar (MaybeT m)
 
 instance MonadVar m => MonadVar (ReaderT r m)

@@ -4,6 +4,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Val
   ( Val (..)
+  , Function (..)
   , Label
   ) where
 
@@ -32,8 +33,17 @@ data Val a
   | Truth a
   | Tuple [a]
   | Module !Label !(HashMap Name a)
-  | Function !(IdentMap Name a) !(IdentSet Name) !Exp !Exp
-  | Cons a a deriving (Show, Functor, Foldable, Traversable)
+  | Functions !(Function a) a deriving (Show, Functor, Foldable, Traversable)
+
+data Function a = Function
+  !Label
+  !(IdentMap Name a)
+  !(IdentSet Name)
+  !Exp
+  !Exp deriving (Show, Functor, Foldable, Traversable)
+
+instance Eq (Function a) where
+  Function x _ _ _ _ == Function y _ _ _ _ = x == y
 
 type Label = Word
 
@@ -51,14 +61,14 @@ instance Unifiable Val where
     (Float x, Float y) | x == y -> pure $ Just []
     (Tuple xs, Tuple ys) -> pure $ zipMatch xs ys
     (Module x _, Module y _) | x == y -> pure $ Just []
-    (Cons x xs, Cons y ys) -> runMaybeT . execWriterT $ zipCons x xs y ys
+    (Functions x xs, Functions y ys ) -> runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
 
 type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
 
 zipCons :: MonadVar m =>
-           Var m Val -> Var m Val ->
-           Var m Val -> Var m Val ->
+           Function (Var m Val) -> Var m Val ->
+           Function (Var m Val) -> Var m Val ->
            ZipMatchT Val m ()
 zipCons x xs y ys = zipList xs =<< findCons x y ys
 
@@ -67,23 +77,31 @@ zipList xs ys = uncons xs >>= \ case
   Just (x, xs) -> zipList xs =<< findList x ys
   Nothing -> tell [(xs, ys)]
 
-findCons :: MonadVar m => Var m Val -> Var m Val -> Var m Val -> ZipMatchT Val m (Var m Val)
-findCons x y ys = eqVar x y >>= \ case
-  False -> newVar . Cons y =<< findList x ys
-  True -> pure ys
+findCons :: MonadVar m =>
+            Function (Var m Val) ->
+            Function (Var m Val) -> Var m Val ->
+            ZipMatchT Val m (Var m Val)
+findCons x y ys =
+  if x == y then pure ys
+  else newVar . Functions y =<< findList x ys
 
-findList :: MonadVar m => Var m Val -> Var m Val -> ZipMatchT Val m (Var m Val)
+findList :: MonadVar m =>
+            Function (Var m Val) ->
+            Var m Val ->
+            ZipMatchT Val m (Var m Val)
 findList x ys = uncons ys >>= \ case
   Just (y, ys) -> findCons x y ys
   Nothing -> do
     zs <- freshVar
-    ys' <- newVar $ Cons x zs
+    ys' <- newVar $ Functions x zs
     tell [(ys, ys')]
     pure zs
 
-uncons :: (Alternative m, MonadVar m) => Var m Val -> m (Maybe (Var m Val, Var m Val))
+uncons :: ( Alternative m
+          , MonadVar m
+          ) => Var m Val -> m (Maybe (Function (Var m Val), Var m Val))
 uncons xs = readVar xs >>= \ case
-  Just (Cons x xs) -> pure $ Just (x, xs)
+  Just (Functions x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
 
@@ -97,9 +115,7 @@ instance Pretty a => Pretty (Val a) where
       pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x ->
       "truth" <> braces (pretty x)
-    Function {} ->
-      "function"
-    Cons {} ->
+    Functions {} ->
       "function"
     Tuple [] ->
       "false"

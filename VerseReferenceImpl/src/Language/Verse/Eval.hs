@@ -132,10 +132,10 @@ eval' e = case extract e of
     var <- freshVar
     join $ unify <$> newVar (Val.Truth var) <*> eval' e
     pure var
-  Exp.Module x xs e -> do
+  Exp.Module i xs e -> do
     xs <- for (HashSet.toMap xs) $ const freshVar
     _ <- localNames xs $ eval' e
-    newVar . Val.Module x $ toNames xs
+    newVar . Val.Module i $ toNames xs
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
     ifte'
@@ -172,8 +172,8 @@ eval' e = case extract e of
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
         empty
         (zip xs [0 ..])
-      Val.Cons var_x var_xs -> fix (\ recur var_x var_xs -> whenBound var_x $ \ case
-        Val.Function env xs e_d e_r ->
+      Val.Functions x var_xs -> fix (\ recur x var_xs ->
+        let Val.Function _ env xs e_d e_r = x in
           ifte'
           (do
               xs <- for (HashSet.toMap xs) $ const freshVar
@@ -182,14 +182,13 @@ eval' e = case extract e of
               pure xs)
           (\ xs -> unify var =<< local (const $ HashMap.union xs env) (eval' e_r)) $
           whenBound var_xs $ \ case
-            Val.Cons var_x var_xs -> recur var_x var_xs
-            _ -> throwDomainError $ loc e
-        _ -> throwDomainError $ loc e) var_x var_xs
+            Val.Functions x var_xs -> recur x var_xs
+            _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
-  Exp.Function ys xs e1 e2 -> do
+  Exp.Function i ys xs e1 e2 -> do
     env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
-    newVar =<< Val.Cons <$> newVar (Val.Function env xs e1 e2) <*> freshVar
+    newVar =<< Val.Functions (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Tuple exps ->
     newVar . Val.Tuple =<< traverse eval' exps
   Exp.Truth e ->

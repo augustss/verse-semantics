@@ -30,7 +30,7 @@ data Exp f a
   | IfThenElse !(HashSet a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))
-  | Function !(HashSet a) !(HashSet a) (f (Exp f a)) (f (Exp f a))
+  | Function !Label !(HashSet a) !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Invoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))

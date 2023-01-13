@@ -86,24 +86,27 @@ simplify' e = for e $ \ case
   Desugar.Query e ->
     Query <$> simplify' e
   Desugar.Module xs e -> do
-    x <- supply
+    i <- supply
     xs <- newEnv xs
-    Module x (fromEnv xs) <$> localNames xs (simplify' e)
-  Desugar.IfThenElse xs p t e -> newEnv xs >>= \ xs ->
+    Module i (fromEnv xs) <$> localNames xs (simplify' e)
+  Desugar.IfThenElse xs p t e -> do
+    xs <- newEnv xs
     IfThenElse (fromEnv xs) <$>
-    localNames xs (simplify' p) <*>
-    localNames xs (simplify' t) <*>
-    simplify' e
-  Desugar.ForDo xs e1 e2 -> newEnv xs >>= \ xs ->
+      localNames xs (simplify' p) <*>
+      localNames xs (simplify' t) <*>
+      simplify' e
+  Desugar.ForDo xs e1 e2 -> do
+    xs <- newEnv xs
     ForDo (fromEnv xs) <$>
-    localNames xs (simplify' e1) <*>
-    localNames xs (simplify' e2)
+      localNames xs (simplify' e1) <*>
+      localNames xs (simplify' e2)
   Desugar.Exists x e -> do
     (x', e') <- localName (extract x) $ simplify' e
     pure $ Exists (x' <$ x) e'
   Desugar.Function xs e1 e2 -> do
-    (xs', (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
-    pure $ Function ys xs' e1 e2
+    i <- supply
+    (xs, (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
+    pure $ Function i ys xs e1 e2
   Desugar.Invoke e1 e2 ->
     Invoke <$> simplify' e1 <*> simplify' e2
   Desugar.Tuple exps ->
@@ -117,9 +120,9 @@ simplify' e = for e $ \ case
   Desugar.Name x -> lookupName x >>= \ case
     Nothing ->
       throwError $ NameError (loc e) x
-    Just (x', level_x) -> do
-      tellName x' level_x
-      pure $ Name x'
+    Just (x, level_x) -> do
+      tellName x level_x
+      pure $ Name x
   Desugar.Colon e -> do
     e1' <- simplify' e
     x' <- freshIdent
