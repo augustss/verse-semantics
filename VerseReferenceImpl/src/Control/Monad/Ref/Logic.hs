@@ -78,9 +78,9 @@ instance MonadRef m => MonadRef (RefLogicT m) where
   readRef = lift . readRef
   writeRef ref x = RefLogicT $ LogicT $ \ sk fk -> do
     y <- readRef ref
-    loop x y
-    sk () $ loop y x *> fk
+    write x y
+    sk () $ write y x *> fk
     where
-      loop x y = do
+      write x y = do
         writeRef ref x
-        tellAp $ loop y x
+        tellAp $ writeRef ref y

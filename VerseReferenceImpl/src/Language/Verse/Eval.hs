@@ -20,6 +20,7 @@ import Control.Monad.Var
 import Control.Monad.Verse
 
 import Data.Fix
+import Data.Foldable
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -78,8 +79,13 @@ eval' e = case extract e of
     var_e <- eval' e
     var <- freshVar
     whenBound var_e $ \ case
-      Val.Module _ xs | Just var_x <- HashMap.lookup x xs -> unify var var_x
-      _ -> throwNameError (loc e) x
+      Val.Module _ xs
+        | Just var_x <- HashMap.lookup x xs -> unify var var_x
+        | otherwise -> throwNameError (loc e) x
+      Val.StructInst _ xs
+        | Just var_x <- HashMap.lookup x xs -> unify var var_x
+        | otherwise -> throwNameError (loc e) x
+      _ -> throwDomainError $ loc e
     pure var
   e1 :<: e2 -> do
     var1 <- eval' e1
@@ -136,6 +142,23 @@ eval' e = case extract e of
     xs <- for (HashSet.toMap xs) $ const freshVar
     _ <- localNames xs $ eval' e
     newVar . Val.Module i $ toNames xs
+  Exp.Struct i ys xs e -> do
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar $ Val.Struct i env xs e
+  Exp.Inst e1 xs e2 -> do
+    var1 <- eval' e1
+    xs <- for (HashSet.toMap xs) $ const freshVar
+    _ <- localNames xs $ eval' e2
+    var <- freshVar
+    whenBound var1 $ \ case
+      Val.Struct i env ys e -> do
+        ys <- for (HashSet.toMap ys) $ const freshVar
+        _ <- local (const $ HashMap.union ys env) (eval' e)
+        let ys' = toNames ys
+        for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ uncurry unify
+        unify var =<< newVar (Val.StructInst i ys')
+      _ -> throwDomainError $ loc e
+    pure var
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
     ifte'
@@ -162,6 +185,9 @@ eval' e = case extract e of
   Exp.Exists x e -> do
     var <- freshVar
     localName (extract x) var $ eval' e
+  Exp.Function i ys xs e1 e2 -> do
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -172,7 +198,12 @@ eval' e = case extract e of
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
         empty
         (zip xs [0 ..])
-      Val.Functions x var_xs -> fix (\ recur x var_xs ->
+      Val.Struct i env xs e -> do
+        xs <- for (HashSet.toMap xs) $ const freshVar
+        _ <- local (const $ HashMap.union xs env) (eval' e)
+        unify var2 =<< newVar (Val.StructInst i $ toNames xs)
+        unify var var2
+      Val.Overload x var_xs -> fix (\ recur x var_xs ->
         let Val.Function _ env xs e_d e_r = x in
           ifte'
           (do
@@ -182,13 +213,10 @@ eval' e = case extract e of
               pure xs)
           (\ xs -> unify var =<< local (const $ HashMap.union xs env) (eval' e_r)) $
           whenBound var_xs $ \ case
-            Val.Functions x var_xs -> recur x var_xs
+            Val.Overload x var_xs -> recur x var_xs
             _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
-  Exp.Function i ys xs e1 e2 -> do
-    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
-    newVar =<< Val.Functions (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Tuple exps ->
     newVar . Val.Tuple =<< traverse eval' exps
   Exp.Truth e ->

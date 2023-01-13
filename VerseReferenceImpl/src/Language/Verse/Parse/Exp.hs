@@ -26,6 +26,8 @@ data Exp f a
   | Not (f (Exp f a))
   | Query (f (Exp f a))
   | Module (f (Exp f a))
+  | Struct (f (Exp f a))
+  | Inst (f (Exp f a)) (f (Exp f a))
   | If (f (Exp f a))
   | IfThen (f (Exp f a)) (f (Exp f a))
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))

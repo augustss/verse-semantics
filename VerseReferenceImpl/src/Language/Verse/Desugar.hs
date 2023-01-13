@@ -23,12 +23,12 @@ import Language.Verse.Parse.Exp qualified as Parse
 
 type Desugar = StateT (HashMap Name Loc) (Except Error)
 
-runDesugar' :: Desugar a -> Except Error (a, HashMap Name Loc)
-runDesugar' = flip runStateT mempty
+runDesugar :: Desugar a -> Except Error (a, HashMap Name Loc)
+runDesugar = flip runStateT mempty
 
 desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L Name))
 desugar e = runExcept $ do
-  (e, xs) <- runDesugar' $ desugar' e
+  (e, xs) <- runDesugar $ desugar' e
   pure $ exists' xs e
 
 desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Name))
@@ -73,26 +73,33 @@ desugar' e = for e $ \ case
   Parse.Query e ->
     Query <$> desugar' e
   Parse.Module e -> do
-    (e, xs) <- lift $ runDesugar' $ desugar' e
+    (e, xs) <- lift $ runDesugar $ desugar' e
     pure $ Module (HashMap.keysSet xs) e
+  Parse.Struct e -> do
+    (e, xs) <- lift $ runDesugar $ desugar' e
+    pure $ Struct (HashMap.keysSet xs) e
+  Parse.Inst e1 e2 -> do
+    e1 <- desugar' e1
+    (e2, xs) <- lift $ runDesugar $ desugar' e2
+    pure $ Inst e1 (HashMap.keysSet xs) e2
   Parse.If p -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     pure $ IfThenElse (HashMap.keysSet xs) p (Tuple [] <$ p) (Tuple [] <$ p)
   Parse.IfThen p t -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     IfThenElse (HashMap.keysSet xs) p <$>
       exists (desugar' t) <*>
       pure (Tuple [] <$ p <. t)
   Parse.IfThenElse p t e -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     IfThenElse (HashMap.keysSet xs) p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
   Parse.For e -> do
-    (e, xs) <- lift $ runDesugar' $ desugar' e
+    (e, xs) <- lift $ runDesugar $ desugar' e
     pure $ ForDo (HashMap.keysSet xs) e (Tuple [] <$ e)
   Parse.ForDo e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
     ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
@@ -100,11 +107,11 @@ desugar' e = for e $ \ case
     tellName x
     pure . Name $ extract x
   Parse.Function e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
     Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.Overload x e1 e2 -> do
     tellName' x
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
     e2 <- exists $ desugar' e2
     let e = Function (HashMap.keysSet xs) <$> duplicate e1 <.> duplicate e2
     pure $ (Name <$> x) :=: e
@@ -153,7 +160,7 @@ tellName' x =
 
 exists :: Desugar (L (Exp L Name)) -> Desugar (L (Exp L Name))
 exists m = lift $ do
-  (e, xs) <- runDesugar' m
+  (e, xs) <- runDesugar m
   pure $ exists' xs e
 
 exists' :: HashMap Name Loc -> L (Exp L Name) -> L (Exp L Name)

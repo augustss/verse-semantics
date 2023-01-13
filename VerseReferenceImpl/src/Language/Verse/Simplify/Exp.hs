@@ -27,6 +27,8 @@ data Exp f a
   | Not (f (Exp f a))
   | Query (f (Exp f a))
   | Module !Label !(HashSet a) (f (Exp f a))
+  | Struct !Label !(HashSet a) !(HashSet a) (f (Exp f a))
+  | Inst (f (Exp f a)) !(HashSet a) (f (Exp f a))
   | IfThenElse !(HashSet a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))

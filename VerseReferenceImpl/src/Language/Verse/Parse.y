@@ -58,6 +58,7 @@ import Language.Verse.Token qualified as Token
 %left '.'
 %nonassoc '?'
 %nonassoc ':'
+%nonassoc '{' colonEOL
 %nonassoc name
 %left '(' '['
 
@@ -108,6 +109,7 @@ import Language.Verse.Token qualified as Token
   newline { L _ Token.Newline }
   not { L _ Token.Not }
   one { L _ Token.One }
+  struct { L _ Token.Struct }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
@@ -246,12 +248,22 @@ Exp :: { L (Exp L Name) }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
+  | struct Block { Exp.Struct <\$ $1 <.> duplicate $2 }
+  | Inst { $1 }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
   | isInt Paren {
       Exp.IsInt <\$ $1 <.> duplicate $2
+    }
+
+Inst
+  : Exp '{' List '}' {
+      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
+    }
+  | Exp colonEOL ind List ded {
+      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $4 <\$ $2 <. $5)
     }
 
 If

@@ -13,6 +13,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
+import Data.Foldable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
@@ -33,7 +34,9 @@ data Val a
   | Truth a
   | Tuple [a]
   | Module !Label !(HashMap Name a)
-  | Functions !(Function a) a deriving (Show, Functor, Foldable, Traversable)
+  | Struct !Label !(IdentMap Name a) !(IdentSet Name) !Exp
+  | StructInst !Label !(HashMap Name a)
+  | Overload !(Function a) a deriving (Show, Functor, Foldable, Traversable)
 
 data Function a = Function
   !Label
@@ -55,13 +58,20 @@ type Exp = L (Simplify.Exp L (Ident Name))
 
 instance Unifiable Val where
   zipMatchM = curry $ \ case
-    (Truth x, Truth y) -> pure $ Just [(x, y)]
-    (Int x, Int y) | x == y -> pure $ Just []
-    (Rational x, Rational y) | x == y -> pure $ Just []
-    (Float x, Float y) | x == y -> pure $ Just []
-    (Tuple xs, Tuple ys) -> pure $ zipMatch xs ys
-    (Module x _, Module y _) | x == y -> pure $ Just []
-    (Functions x xs, Functions y ys ) -> runMaybeT . execWriterT $ zipCons x xs y ys
+    (Truth x, Truth y) ->
+      pure $ Just [(x, y)]
+    (Int x, Int y) | x == y ->
+      pure $ Just []
+    (Rational x, Rational y) | x == y ->
+      pure $ Just []
+    (Float x, Float y) | x == y ->
+      pure $ Just []
+    (Tuple xs, Tuple ys) ->
+      pure $ zipMatch xs ys
+    (StructInst x xs, StructInst y ys) | x == y ->
+      pure . Just . toList $ HashMap.intersectionWith (,) xs ys
+    (Overload x xs, Overload y ys ) ->
+      runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
 
 type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
@@ -83,7 +93,7 @@ findCons :: MonadVar m =>
             ZipMatchT Val m (Var m Val)
 findCons x y ys =
   if x == y then pure ys
-  else newVar . Functions y =<< findList x ys
+  else newVar . Overload y =<< findList x ys
 
 findList :: MonadVar m =>
             Function (Var m Val) ->
@@ -93,7 +103,7 @@ findList x ys = uncons ys >>= \ case
   Just (y, ys) -> findCons x y ys
   Nothing -> do
     zs <- freshVar
-    ys' <- newVar $ Functions x zs
+    ys' <- newVar $ Overload x zs
     tell [(ys, ys')]
     pure zs
 
@@ -101,30 +111,26 @@ uncons :: ( Alternative m
           , MonadVar m
           ) => Var m Val -> m (Maybe (Function (Var m Val), Var m Val))
 uncons xs = readVar xs >>= \ case
-  Just (Functions x xs) -> pure $ Just (x, xs)
+  Just (Overload x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
 
 instance Pretty a => Pretty (Val a) where
   pretty = \ case
-    Int x ->
-      pretty x
-    Float x ->
-      pretty x
-    Rational x ->
-      pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x ->
-      "truth" <> braces (pretty x)
-    Functions {} ->
-      "function"
-    Tuple [] ->
-      "false"
-    Tuple xs ->
-      tupled $ pretty <$> xs
-    Module _ xs ->
-      "module" <>
-      braced ((\ (k, v) -> pretty k <+> ":=" <+> pretty v) <$> HashMap.toList xs)
+    Int x -> pretty x
+    Float x -> pretty x
+    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x -> "truth" <> braces (pretty x)
+    Overload {} -> "function"
+    Tuple [] -> "false"
+    Tuple xs -> tupled $ pretty <$> xs
+    Module _ xs -> "module" <> braced (names xs)
+    Struct i _ _ _ -> "struct#" <> pretty i
+    StructInst i xs -> "struct#" <> pretty i <> braced (names xs)
     where
+      names xs =
+        (\ (k, v) -> pretty k <+> ":=" <+> pretty v) <$>
+        HashMap.toList xs
       braced =
         group .
         encloseSep

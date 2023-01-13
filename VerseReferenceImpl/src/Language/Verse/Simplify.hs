@@ -89,6 +89,14 @@ simplify' e = for e $ \ case
     i <- supply
     xs <- newEnv xs
     Module i (fromEnv xs) <$> localNames xs (simplify' e)
+  Desugar.Struct xs e -> do
+    i <- supply
+    (xs, e, ys) <- localFunction xs $ simplify' e
+    pure $ Struct i ys xs e
+  Desugar.Inst e1 xs e2 -> do
+    e1 <- simplify' e1
+    xs <- newEnv xs
+    Inst e1 (fromEnv xs) <$> localNames xs (simplify' e2)
   Desugar.IfThenElse xs p t e -> do
     xs <- newEnv xs
     IfThenElse (fromEnv xs) <$>
