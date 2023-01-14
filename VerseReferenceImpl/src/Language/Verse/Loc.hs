@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Loc
   ( Loc (..)
   , minBound
@@ -10,7 +11,7 @@ module Language.Verse.Loc
   , uncurryL
   ) where
 
-import Control.Comonad
+import Control.Comonad.Env
 
 import Data.Bool
 import Data.Eq
@@ -48,6 +49,9 @@ instance Apply L where
 instance Comonad L where
   extract (L _ x) = x
   duplicate x@(L y _) = L y x
+
+instance ComonadEnv Loc L where
+  ask = loc
 
 loc :: L a -> Loc
 loc (L x _) = x

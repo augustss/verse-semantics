@@ -153,7 +153,7 @@ eval' e = case extract e of
     whenBound var1 $ \ case
       Val.Struct i env ys e -> do
         ys <- for (HashSet.toMap ys) $ const freshVar
-        _ <- local (const $ HashMap.union ys env) (eval' e)
+        _ <- local (const $ ys <> env) (eval' e)
         let ys' = toNames ys
         for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ uncurry unify
         unify var =<< newVar (Val.StructInst i ys')
@@ -200,7 +200,7 @@ eval' e = case extract e of
         (zip xs [0 ..])
       Val.Struct i env xs e -> do
         xs <- for (HashSet.toMap xs) $ const freshVar
-        _ <- local (const $ HashMap.union xs env) (eval' e)
+        _ <- local (const $ xs <> env) (eval' e)
         unify var2 =<< newVar (Val.StructInst i $ toNames xs)
         unify var var2
       Val.Overload x var_xs -> fix (\ recur x var_xs ->
@@ -208,10 +208,11 @@ eval' e = case extract e of
           ifte'
           (do
               xs <- for (HashSet.toMap xs) $ const freshVar
-              var_d <- localNames xs $ eval' e_d
+              let env' = xs <> env
+              var_d <- local (const env') $ eval' e_d
               unify var2 var_d
-              pure xs)
-          (\ xs -> unify var =<< local (const $ HashMap.union xs env) (eval' e_r)) $
+              pure env')
+          (\ env' -> unify var =<< local (const env') (eval' e_r)) $
           whenBound var_xs $ \ case
             Val.Overload x var_xs -> recur x var_xs
             _ -> throwDomainError $ loc e) x var_xs
