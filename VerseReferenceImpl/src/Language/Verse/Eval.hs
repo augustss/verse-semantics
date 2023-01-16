@@ -17,7 +17,7 @@ import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Var
-import Control.Monad.Verse
+import Control.Monad.Verse (MonadVerse (..), runVerseT)
 
 import Data.Fix
 import Data.Foldable
@@ -31,6 +31,7 @@ import Data.Traversable (for)
 
 import Language.Verse.Error
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Simplify.Exp (Exp ( (:*>:)
                                         , (:=:)
                                         , (:.:)
@@ -64,6 +65,7 @@ eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze >>= \ c
   Just x -> pure x
 
 eval' :: ( MonadError Error m
+         , MonadSupply Label m
          , MonadVerse m
          , EqRef (Ref m)
          ) => L (Exp L (Ident Name)) -> EvalT m (Var m Val)
@@ -185,7 +187,8 @@ eval' e = case extract e of
   Exp.Exists x e -> do
     var <- freshVar
     localName (extract x) var $ eval' e
-  Exp.Function i ys xs e1 e2 -> do
+  Exp.Function ys xs e1 e2 -> do
+    i <- supply
     env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
     newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Invoke e1 e2 -> do

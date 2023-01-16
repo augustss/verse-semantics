@@ -42,6 +42,7 @@ library
     Language.Verse.Eval
     Language.Verse.Ident
     Language.Verse.Indent
+    Language.Verse.Label
     Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Name

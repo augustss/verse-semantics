@@ -6,9 +6,11 @@ module Language.Verse.Ident
 
 import Data.Hashable
 
+import Language.Verse.Label
+
 import Prettyprinter
 
-data Ident a = Ident !Word !(Maybe a) deriving Show
+data Ident a = Ident !Label !(Maybe a) deriving Show
 
 name :: Ident a -> Maybe a
 name (Ident _ x) = x

@@ -5,7 +5,6 @@
 module Language.Verse.Val
   ( Val (..)
   , Function (..)
-  , Label
   ) where
 
 import Control.Applicative
@@ -21,6 +20,7 @@ import Data.Ratio
 import Data.Unifiable
 
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Simplify.Exp qualified as Simplify
@@ -47,8 +47,6 @@ data Function a = Function
 
 instance Eq (Function a) where
   Function x _ _ _ _ == Function y _ _ _ _ = x == y
-
-type Label = Word
 
 type IdentSet a = HashSet (Ident a)
 
@@ -120,16 +118,16 @@ instance Pretty a => Pretty (Val a) where
     Int x -> pretty x
     Float x -> pretty x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x -> "truth" <> braces (pretty x)
+    Truth x -> "truth" <> align (braces (pretty x))
     Overload {} -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
-    Module _ xs -> "module" <> braced (names xs)
+    Module _ xs -> "module" <> align (braced (names xs))
     Struct i _ _ _ -> "struct#" <> pretty i
-    StructInst i xs -> "struct#" <> pretty i <> braced (names xs)
+    StructInst i xs -> "struct#" <> pretty i <> align (braced (names xs))
     where
       names xs =
-        (\ (k, v) -> pretty k <+> ":=" <+> pretty v) <$>
+        (\ (k, v) -> pretty k <+> ":=" <+> align (pretty v)) <$>
         HashMap.toList xs
       braced =
         group .

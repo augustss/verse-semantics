@@ -95,9 +95,8 @@ desugar' e = for e $ \ case
     IfThenElse (HashMap.keysSet xs) p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
-  Parse.For e -> do
-    (e, xs) <- lift $ runDesugar $ desugar' e
-    pure $ ForDo (HashMap.keysSet xs) e (Tuple [] <$ e)
+  Parse.For e ->
+    All <$> exists (desugar' e)
   Parse.ForDo e1 e2 -> do
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)

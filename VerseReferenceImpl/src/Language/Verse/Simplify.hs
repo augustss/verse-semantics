@@ -26,12 +26,13 @@ import Data.Traversable (for)
 
 import Language.Verse.Error
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Loc (L, loc)
 import Language.Verse.Name
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Simplify.Exp
 
-type Simplify = WriterT W (ReaderT R (SupplyT Word (Except Error)))
+type Simplify = WriterT W (ReaderT R (SupplyT Label (Except Error)))
 
 type W = Diff.List (Ident Name, Level)
 
@@ -112,9 +113,8 @@ simplify' e = for e $ \ case
     (x', e') <- localName (extract x) $ simplify' e
     pure $ Exists (x' <$ x) e'
   Desugar.Function xs e1 e2 -> do
-    i <- supply
     (xs, (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
-    pure $ Function i ys xs e1 e2
+    pure $ Function ys xs e1 e2
   Desugar.Invoke e1 e2 ->
     Invoke <$> simplify' e1 <*> simplify' e2
   Desugar.Tuple exps ->
@@ -139,10 +139,10 @@ simplify' e = for e $ \ case
   Desugar.IsInt e ->
     IsInt <$> simplify' e
 
-newIdent :: MonadSupply Word m => a -> m (Ident a)
+newIdent :: MonadSupply Label m => a -> m (Ident a)
 newIdent x = Ident <$> supply <*> pure (Just x)
 
-freshIdent :: MonadSupply Word m => m (Ident a)
+freshIdent :: MonadSupply Label m => m (Ident a)
 freshIdent = flip Ident Nothing <$> supply
 
 localFunction :: HashSet Name ->
