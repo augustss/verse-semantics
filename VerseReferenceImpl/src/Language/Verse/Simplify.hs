@@ -94,6 +94,11 @@ simplify' e = for e $ \ case
     i <- supply
     (xs, e, ys) <- localFunction xs $ simplify' e
     pure $ Struct i ys xs e
+  Desugar.Class e1 xs e2 -> do
+    i <- supply
+    e1 <- for e1 simplify'
+    (xs, e2, ys) <- localFunction xs $ simplify' e2
+    pure $ Class i e1 ys xs e2
   Desugar.Inst e1 xs e2 -> do
     e1 <- simplify' e1
     xs <- newEnv xs

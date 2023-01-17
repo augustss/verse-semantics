@@ -4,11 +4,13 @@ module Main
   ( main
   ) where
 
+import Control.Monad (join)
 import Control.Monad.Trans.Except
 
 import Data.ByteString qualified as ByteString
 import Data.Functor
 import Data.List
+import Data.Traversable
 
 import Language.Verse
 
@@ -25,7 +27,7 @@ main = runTestTTAndExit =<< getTest
 
 getTest :: IO Test
 getTest = do
-  filePaths <- listDirectory "test"
+  filePaths <- listDirectory' "test"
   let verseFiles = sort $ filter ((== ".verse") . takeExtension) filePaths
   pure . TestList $ verseFiles <&> \ verseFile -> TestCase $ do
     ByteString.readFile ("test" </> verseFile) >>= runExceptT . eval >>= \ case
@@ -41,3 +43,8 @@ getTest = do
           if isDoesNotExistError e then pure "" else ioError e
         let actual = show $ foldr (\ x z -> pretty x <> line <> z) mempty xs
         assertEqual outFile expected actual
+
+listDirectory' :: FilePath -> IO [FilePath]
+listDirectory' x = do
+  xs <- listDirectory x `catchIOError` const (pure [])
+  join <$> (for xs $ \ y -> (y:) <$> fmap (y </>) <$> listDirectory' (x </> y))

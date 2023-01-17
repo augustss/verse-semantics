@@ -81,12 +81,22 @@ eval' e = case extract e of
     var_e <- eval' e
     var <- freshVar
     whenBound var_e $ \ case
-      Val.Module _ xs
-        | Just var_x <- HashMap.lookup x xs -> unify var var_x
-        | otherwise -> throwNameError (loc e) x
-      Val.StructInst _ xs
-        | Just var_x <- HashMap.lookup x xs -> unify var var_x
-        | otherwise -> throwNameError (loc e) x
+      Val.Module _ xs ->
+        case HashMap.lookup x xs of
+          Just var_x -> unify var var_x
+          Nothing -> throwNameError (loc e) x
+      Val.StructInst _ xs ->
+        case HashMap.lookup x xs of
+          Just var_x -> unify var var_x
+          Nothing -> throwNameError (loc e) x
+      Val.ClassInst _ var_super xs -> fix (\ recur var_super xs ->
+        case HashMap.lookup x xs of
+          Just var_x -> unify var var_x
+          Nothing -> case var_super of
+            Just var_super -> whenBound var_super $ \ case
+              Val.ClassInst _ var_super xs -> recur var_super xs
+              _ -> throwDomainError $ loc e
+            Nothing -> throwNameError (loc e) x) var_super xs
       _ -> throwDomainError $ loc e
     pure var
   e1 :<: e2 -> do
@@ -147,6 +157,10 @@ eval' e = case extract e of
   Exp.Struct i ys xs e -> do
     env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
     newVar $ Val.Struct i env xs e
+  Exp.Class i e1 ys xs e2 -> do
+    var1 <- for e1 eval'
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar $ Val.Class i var1 env xs e2
   Exp.Inst e1 xs e2 -> do
     var1 <- eval' e1
     xs <- for (HashSet.toMap xs) $ const freshVar
@@ -155,10 +169,22 @@ eval' e = case extract e of
     whenBound var1 $ \ case
       Val.Struct i env ys e -> do
         ys <- for (HashSet.toMap ys) $ const freshVar
-        _ <- local (const $ ys <> env) (eval' e)
+        _ <- local (const $ ys <> env) $ eval' e
         let ys' = toNames ys
         for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ uncurry unify
         unify var =<< newVar (Val.StructInst i ys')
+      Val.Class i var_super env ys e' -> fix (\ recur i var_super env ys e' var -> do
+        var_super <- for var_super $ \ var_class -> do
+          var_inst <- freshVar
+          whenBound var_class $ \ case
+            Val.Class i var_super env ys e' -> recur i var_super env ys e' var_inst
+            _ -> throwDomainError $ loc e
+          pure var_inst
+        ys <- for (HashSet.toMap ys) $ const freshVar
+        _ <- local (const $ ys <> env) $ eval' e'
+        let ys' = toNames ys
+        for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ uncurry unify
+        unify var =<< newVar (Val.ClassInst i var_super ys')) i var_super env ys e' var
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do

@@ -36,6 +36,8 @@ data Val a
   | Module !Label !(HashMap Name a)
   | Struct !Label !(IdentMap Name a) !(IdentSet Name) !Exp
   | StructInst !Label !(HashMap Name a)
+  | Class !Label (Maybe a) !(IdentMap Name a) !(IdentSet Name) !Exp
+  | ClassInst !Label (Maybe a) !(HashMap Name a)
   | Overload !(Function a) a deriving (Show, Functor, Foldable, Traversable)
 
 data Function a = Function
