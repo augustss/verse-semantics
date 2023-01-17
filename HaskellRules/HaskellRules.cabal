@@ -75,7 +75,7 @@ library frontend
     build-depends:    epic,
                       rules,
                       trs,
-                      verse,
+--                      verse,
                       megaparsec,
                       scientific,
                       text,
