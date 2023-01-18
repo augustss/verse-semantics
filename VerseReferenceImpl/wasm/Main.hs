@@ -19,6 +19,11 @@ import System.IO
 main :: IO ()
 main = ByteString.readFile "in" >>= runExceptT . eval >>= \ case
   Left e -> withFile "err" WriteMode $ \ err ->
-    hPutDoc err $ pretty e <> line
+    renderIO err . layoutSmart layoutOptions . (<> line) $ pretty e
   Right xs -> withFile "out" WriteMode $ \ out ->
-    for_ xs $ hPutDoc out . (<> line) . pretty
+    for_ xs $ renderIO out . layoutSmart layoutOptions . (<> line) . pretty
+
+layoutOptions :: LayoutOptions
+layoutOptions = defaultLayoutOptions
+  { layoutPageWidth = AvailablePerLine 60 1.0
+  }

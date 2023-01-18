@@ -21,6 +21,7 @@ maintainer: andy.sonnenburg@epicgames.com
 library
   exposed-modules:
     Control.Monad.Ref
+    Control.Monad.Ref.Backtrack
     Control.Monad.Ref.Logic
     Control.Monad.RST
     Control.Monad.Stuck

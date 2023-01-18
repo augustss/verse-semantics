@@ -120,16 +120,18 @@ instance Pretty a => Pretty (Val a) where
     Int x -> pretty x
     Float x -> pretty x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x -> "truth" <> align (braces (pretty x))
+    Truth x -> "truth" <> braces (pretty x)
     Overload {} -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
-    Module _ xs -> "module" <> align (braced (names xs))
-    Struct i _ _ _ -> "struct#" <> pretty i
-    StructInst i xs -> "struct#" <> pretty i <> align (braced (names xs))
+    Module i xs -> "module#" <> prettyLabel i <> align (braced (names xs))
+    Struct i _ _ _ -> "struct#" <> prettyLabel i
+    StructInst i xs -> "struct#" <> prettyLabel i <> align (braced (names xs))
+    Class i _ _ _ _ -> "class#" <> prettyLabel i
+    ClassInst i _ xs -> "class#" <> prettyLabel i <> align (braced (names xs))
     where
       names xs =
-        (\ (k, v) -> pretty k <+> ":=" <+> align (pretty v)) <$>
+        (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)) <$>
         HashMap.toList xs
       braced =
         group .
