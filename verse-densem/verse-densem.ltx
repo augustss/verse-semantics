@@ -774,6 +774,9 @@ $$
 
 The labelled semantics from the previous section can be simplified. Here, we show two isomorphic presentations. We ignore |\wrong| and |\bot| for now.
 
+\newcommand{\sseq}{\mathit{seq}}
+\newcommand{\powersett}{\powerset^{\geq{}1}}
+
 \begin{figure}
 $$
 \begin{array}{l}
@@ -799,17 +802,20 @@ $$
 % \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
 % & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
-& \mone([]) & = & [] \\
-& \mone(\varnothing{}:s) & = & \mone(s) \\
-& \mone(u:s) & = & [u] & \text{if $u$ is a singleton set} \\
-& \mone(u:s) & = & \wrong & \text{if $u$ has more than one element}\\[1mm]
-\text{All}  & \mall & : & \mtype \rightarrow \mtype \\
- & \mall(s) & = & \wrong & \text{if any $u \in s$ has more than one element} \\
- & \mall(s) & = & \stuple [ u \, \vert \, u \in s, u \not= \varnothing ] & \text{if all $u \in s$ have at most one element}  \\[1mm]
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
-     & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
-  \end{array}
+& \mone(s) & = & \shead{(\sseq{(s)})} \\[1mm]
+\text{All}  & \mone & : & \mtype \rightarrow \mtype \\
+& \mone(s) & = & \stuple{(\sseq{(s)})} \\[1mm]
+\text{Head}  & \shead & : & [\powersett{W}] \rightarrow \mtype \\
+& \shead([])  & = & [] \\
+& \shead(u:s) & = & [u] & \text{if $u$ is a singleton set} \\
+& \shead(u:s) & = & \wrong & \text{if $u$ has more than one element}\\[1mm]
+\text{To tuple} & \stuple & : & [\powersett{W}] \rightarrow \mtype \\
+     & \stuple([\{w_1\}, \cdots, \{w_n\}]) & = & [\tuple{w_1,\cdots,w_n}] \\
+     & \stuple(ws) & = & \wrong & \text{if any $r \in ws$ has more than one element} \\
+     & \stuple(ws) & = & \bot & \text{if |ws| is infinite} \\[1mm]
+\text{Seq} & \sseq & : & \mtype \rightarrow [\powersett{W}] \\
+     & \sseq(s) & = & [ r \, \vert \, r \in s, r \not= \varnothing ] \\
+\end{array}
 \end{array}
 $$
 \caption{Sequence-of-set semantics for $\mtype$}
