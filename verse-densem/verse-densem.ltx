@@ -430,7 +430,7 @@ $
 
   \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{v}{\rho}) \\
+  \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{|v|}{\rho}) \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
   \semapp{E}{|e_1 choice e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} \; \munion     \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \mintersect \; \semapp{E}{|e_2|}{\rho} \\
@@ -457,10 +457,11 @@ $
   \semapp{O}{|add|} & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
       \,\text{\bf then}\, \munit(k_1+k_2)
       \,\text{\bf else}\, \wrong \\
-  \semapp{O}{|gt|}  & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)| \wedge k_1 > k_2)
-      \,\text{\bf then}\, \munit(k_1)
-      \,\text{\bf else}\, \mempty \\
-
+  \semapp{O}{|gt|}  & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+      \,\text{\bf then (if}\, (k_1 > k_2)
+                       \,\text{\bf then}\, \munit(k_1)
+                       \,\text{\bf else}\, \mempty \,)
+      \,\text{\bf else}\, \wrong \\
   \semapp{O}{|int|}  & = &  \lambda w.\, \text{\bf if}\, (w = k)
       \,\text{\bf then}\, \munit(k)
       \,\text{\bf else}\, \mempty
@@ -468,9 +469,10 @@ $
   
 \begin{array}{rcll}
 apply & : & (\Value \times \Value) \rightarrow \mtype \\
-apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
+apply( k, w) & = & \wrong & \\
 apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
   & = &  \mempty & \text{otherwise} \\
+apply( \tuple{v_0, \ldots, v_n}, w) & = & \wrong & w \not\in \mathbb{Z} \\
 apply( f, w ) & = & f(w) & f \in \Value \rightarrow \mtype \\
 \end{array}
 \end{array}
@@ -549,7 +551,7 @@ we use the same $k$ for both.  Same for $op$, where the semantic equivalent is t
 
 The equations for $\semfun{E}$ are more interesting.
 \begin{itemize}
-\item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton sequence of results.
+\item Values $\semapp{E}{|v|}{\rho}$: compute the single value for |v|, and return a singleton set of results.
 The auxiliary function $\munit$ is defined at the bottom of \cref{fig:den-sem1}.
 \item Choice $\semapp{E}{|e_1 choice e_2|}{\rho}$: take the union (written $\munion$) of the values
   returned by |e_1| and |e_2| respectively.  For bags this union operator is just bag union (\Cref{fig:set-sem}).
@@ -605,7 +607,7 @@ $\semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})}$, and take the union
 
 Of course we can't possibly implement it like this, but it makes a great specification.
 For example |def x (x=3)| tries all possible values for |x|, but only one of them succeeds, namely |3|, so
-the semantics is a singleton sequence $[3]$.
+the semantics is a singleton set $[3]$.
 
 \subsection{The denotational semantics is un-implementable}
 
@@ -700,8 +702,9 @@ $$
 \text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
              & \shead [] & = & empty \\
              & \shead (w \scons s) & = & \munits{w} \\[1mm]
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
+\text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
      & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+     & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
   \end{array} \\
 \\
 \begin{array}{rrcll}
@@ -764,6 +767,55 @@ containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
 $$
 \semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
 $$
+
+
+% -------------------------------------
+\section{An simpler order-sensitive denotational semantics} \label{sec:simple-order-sensitive}
+
+The labelled semantics from the previous section can be simplified. Here, we show two isomorphic presentations. We ignore |\wrong| and |\bot| for now.
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\mtype & = & \mlift{(\wrong + [\powerset{W}])} \\
+\end{array} \\
+\\
+\text{\bf Operations} \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+    & \mempty & = & [] \\[1mm]
+\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
+     & \munits{w} & = & [\setform{ w }] \\[1mm]
+\text{Union (Exists)}        & \cup & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \cup s_2 & = & \mathit{zipWith} \, (\cup) \, s_1 \, s_2 \\[1mm]
+\text{Union (Choice)}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \munion s_2 & = & s_1 \bowtie s_2 \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+ &  s_1 \mintersect s_2 & = & [ u_1 \cap u_2 \, \vert ±, u_1 \in s_1, u_2 \in s_2 ] \\[1mm]
+\text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+&  s_1 \msemi s_2 & = & [ u_2 \, \vert \, u_1 \in s_1, u_2 \in s_2 ] \\[1mm]
+% \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
+% & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
+\text{One}  & \mone & : & \mtype \rightarrow \mtype \\
+& \mone([]) & = & [] \\
+& \mone(\varnothing{}:s) & = & \mone(s) \\
+& \mone(u:s) & = & [u] & \text{if $u$ is a singleton set} \\
+& \mone(u:s) & = & \wrong & \text{if $u$ has more than one element}\\[1mm]
+\text{All}  & \mall & : & \mtype \rightarrow \mtype \\
+ & \mall(s) & = & \wrong & \text{if any $u \in s$ has more than one element} \\
+ & \mall(s) & = & \stuple [ u \, \vert \, u \in s, u \not= \varnothing ] & \text{if all $u \in s$ have at most one element}  \\[1mm]
+\text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
+     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+     & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
+  \end{array}
+\end{array}
+$$
+\caption{Sequence-of-set semantics for $\mtype$}
+\label{fig:sequence-of-set-sem}
+\end{figure}
+
 
 
 
