@@ -775,7 +775,7 @@ $$
 The labelled semantics from the previous section can be simplified. Here, we show two isomorphic presentations. We ignore |\wrong| and |\bot| for now.
 
 \newcommand{\sseq}{\mathit{seq}}
-\newcommand{\powersett}{\powerset^{\geq{}1}}
+\newcommand{\powersett}{\powerset}
 
 \begin{figure}
 $$
@@ -796,15 +796,15 @@ $$
 \text{Union (Choice)}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
  &  s_1 \munion s_2 & = & s_1 \bowtie s_2 \\[1mm]
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \mintersect s_2 & = & [ u_1 \cap u_2 \, \vert ±, u_1 \in s_1, u_2 \in s_2 ] \\[1mm]
+ &  s_1 \mintersect s_2 & = & [ u_1 \cap u_2 \, \vert \, u_1 \in s_1, u_2 \in s_2 ] \\[1mm]
 \text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
 &  s_1 \msemi s_2 & = & [ u_2 \, \vert \, u_1 \in s_1, u_2 \in s_2 ] \\[1mm]
 % \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
 % & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
 & \mone(s) & = & \shead{(\sseq{(s)})} \\[1mm]
-\text{All}  & \mone & : & \mtype \rightarrow \mtype \\
-& \mone(s) & = & \stuple{(\sseq{(s)})} \\[1mm]
+\text{All}  & \mall & : & \mtype \rightarrow \mtype \\
+& \mall(s) & = & \stuple{(\sseq{(s)})} \\[1mm]
 \text{Head}  & \shead & : & [\powersett{W}] \rightarrow \mtype \\
 & \shead([])  & = & [] \\
 & \shead(u:s) & = & [u] & \text{if $u$ is a singleton set} \\
