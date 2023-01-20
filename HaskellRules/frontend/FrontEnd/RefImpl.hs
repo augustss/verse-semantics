@@ -1,4 +1,9 @@
+{-# LANGUAGE CPP #-}
 module FrontEnd.RefImpl(evalRI) where
+#if 1
+evalRI :: a -> b
+evalRI _ = error "no refimpl in this version"
+#else
 --import Debug.Trace
 --import Epic.Print
 import Data.Ratio
@@ -133,3 +138,4 @@ addPrelude c | "mapAp$" `elem` primops = ins preludeCore
   where primops = [ s | C.CPrim s <- universe c]
         ins (C.CDef i e) = C.CDef i (ins e)
         ins e = C.CSeq [e, c]
+#endif

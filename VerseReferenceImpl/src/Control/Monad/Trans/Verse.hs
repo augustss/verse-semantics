@@ -27,11 +27,13 @@ module Control.Monad.Trans.Verse
 
 import Control.Applicative
 import Control.Category ((>>>))
-import Control.Monad ((>=>), unless, when)
+import Control.Monad ((>=>), join, unless, when)
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.Ref.Backtrack (backtrack)
+import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Ref.Logic
 import Control.Monad.RST
 import Control.Monad.State.Strict
@@ -50,7 +52,7 @@ import Data.Traversable (for)
 import Data.Unifiable
 
 newtype VerseT m a = VerseT
-  { getVerseT :: RST R (S m) (RefLogicT m) a
+  { unVerseT :: RST R (S m) (RefLogicT m) a
   } deriving ( Functor
              , Applicative
              , Alternative
@@ -58,6 +60,7 @@ newtype VerseT m a = VerseT
              , MonadFail
              , MonadIO
              , MonadRef
+             , Backtrack.MonadRef
              )
 
 deriving instance MonadError e m => MonadError e (VerseT m)
@@ -73,7 +76,7 @@ instance Monad m => MonadLogic (VerseT m) where
     fmap (fmap (fmap VerseT)) .
     msplit .
     local (\ r -> r { level = r.level + 1 }) .
-    getVerseT
+    unVerseT
 
 instance ( MonadRef m
          , MonadSupply Label m
@@ -92,9 +95,12 @@ instance ( MonadRef m
     _ -> Nothing
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
-runVerseT m = do
-  let level = minBound
-  runRefLogicT (evalRST (getVerseT m) R { level } [])
+runVerseT m = runRefLogicT $ do
+  world <- newWorld'
+  evalRST (unVerseT m) R { level } S { promises, world }
+  where
+    level = minBound
+    promises = []
 
 data VarState m f
   = Unbound !(Ref m (f (Var m f) -> VerseT m ())) !Level
@@ -346,13 +352,36 @@ find' set = readRef set >>= \ case
   Repr size repr -> pure (set, size, repr)
   Link set -> find' set
 
+type WorldSet m = Ref m (WorldState m)
+
+data WorldState m
+  = UnboundWorld !(Ref m (VerseT m ()))
+  | BoundWorld
+
+freshWorld :: MonadRef m => VerseT m (WorldSet m)
+freshWorld = Backtrack.newRef . UnboundWorld =<< newRef (pure ())
+
+newWorld' :: MonadRef m => RefLogicT m (WorldSet m)
+newWorld' = Backtrack.newRef BoundWorld
+
+bindWorld :: MonadRef m => WorldSet m -> VerseT m ()
+bindWorld set = Backtrack.readRef set >>= \ case
+  UnboundWorld m -> Backtrack.writeRef set BoundWorld *> join (readRef m)
+  BoundWorld -> error "bindWorld"
+
+whenWorldBound :: MonadRef m => WorldSet m -> VerseT m () -> VerseT m ()
+whenWorldBound = undefined
+
 newtype R = R
   { level :: Level
   }
 
 type Level = Word
 
-type S m = Promises m
+data S m = S
+  { promises :: Promises m
+  , world :: WorldSet m
+  }
 
 type Promises m = [Promise m]
 
@@ -402,19 +431,19 @@ asks' :: Monad m => (R -> a) -> VerseT m a
 asks' = VerseT . asks
 
 local' :: Monad m => (R -> R) -> VerseT m a -> VerseT m a
-local' f = VerseT . local f . getVerseT
+local' f = VerseT . local f . unVerseT
 
 getPromises :: VerseT m (Promises m)
-getPromises = VerseT get
+getPromises = VerseT $ gets promises
 
 putPromises :: Promises m -> VerseT m ()
-putPromises = VerseT . put
+putPromises promises = VerseT . modify $ \ s -> s { promises }
 
 modifyPromises :: (Promises m -> Promises m) -> VerseT m ()
-modifyPromises = VerseT . modify
+modifyPromises f = VerseT . modify $ \ s -> s { promises = f s.promises }
 
 msplit' :: Monad m => VerseT m a -> VerseT m (Maybe (a, VerseT m a))
-msplit' = VerseT . fmap (fmap (fmap VerseT)) . msplit . getVerseT
+msplit' = VerseT . fmap (fmap (fmap VerseT)) . msplit . unVerseT
 
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM p m = p >>= flip when m

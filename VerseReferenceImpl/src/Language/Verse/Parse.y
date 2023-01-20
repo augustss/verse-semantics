@@ -90,6 +90,7 @@ import Language.Verse.Token qualified as Token
   '}' { L _ Token.RightBrace }
   all { L _ Token.All }
   block { L _ Token.Block }
+  class { L _ Token.Class }
   colonEOL { L _ Token.ColonEOL }
   ded { L _ Token.Dedent }
   do { L _ Token.Do }
@@ -245,10 +246,13 @@ Exp :: { L (Exp L Name) }
       Exp.Not <\$ $1 <.> duplicate $2
     }
   | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
-  | int { Exp.Int <\$> $1 }
-  | float { Exp.Float <\$> $1 }
   | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
   | struct Block { Exp.Struct <\$ $1 <.> duplicate $2 }
+  | class Block { Exp.Class Nothing <\$ $1 <.> duplicate $2 }
+  | class '(' ')' Block { Exp.Class Nothing <\$ $1 <.> duplicate $4 }
+  | class '(' Exp ')' Block { Exp.Class . Just <\$ $1 <.> duplicate $3 <.> duplicate $5 }
+  | int { Exp.Int <\$> $1 }
+  | float { Exp.Float <\$> $1 }
   | Inst { $1 }
   | If { $1 }
   | For { $1 }

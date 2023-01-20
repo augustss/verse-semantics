@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Control.Monad.RST
@@ -14,6 +15,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Logic.Class
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
+import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.State.Class
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
@@ -75,5 +77,7 @@ instance MonadIO m => MonadIO (RST r s m) where
   liftIO m = RST $ \ _ s -> (, s) <$> liftIO m
 
 instance MonadRef m => MonadRef (RST r s m)
+
+instance Backtrack.MonadRef m => Backtrack.MonadRef (RST r s m)
 
 instance MonadSupply s m => MonadSupply s (RST r s' m)
