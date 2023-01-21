@@ -113,6 +113,7 @@ $space = [\ \t]
   "*" { token Token.Multiply }
   "/" { token Token.Divide }
   "all" { token Token.All }
+  "array" { token Token.Array }
   "block" { token Token.Block }
   "class" { token Token.Class }
   "do" { token Token.Do }
@@ -127,11 +128,12 @@ $space = [\ \t]
   "module" { token Token.Module }
   "not" { token Token.Not }
   "one" { token Token.One }
+  "set" { token Token.Set }
   "struct" { token Token.Struct }
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
-  "array" { token Token.Array }
+  "var" { token Token.Var }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
   $alpha $alnum* { name }

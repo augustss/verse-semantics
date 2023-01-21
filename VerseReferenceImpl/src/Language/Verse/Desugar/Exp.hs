@@ -28,7 +28,6 @@ data Exp f a
   | Query (f (Exp f a))
   | Module !(HashSet a) (f (Exp f a))
   | Struct !(HashSet a) (f (Exp f a))
-  | Class (Maybe (f (Exp f a))) !(HashSet a) (f (Exp f a))
   | Inst (f (Exp f a)) !(HashSet a) (f (Exp f a))
   | IfThenElse !(HashSet a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashSet a) (f (Exp f a)) (f (Exp f a))
@@ -42,5 +41,7 @@ data Exp f a
   | Name a
   | Colon (f (Exp f a))
   | IsInt (f (Exp f a))
+
+data Named = Var | Pure deriving Show
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)

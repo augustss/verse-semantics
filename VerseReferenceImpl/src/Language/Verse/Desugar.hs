@@ -78,10 +78,6 @@ desugar' e = for e $ \ case
   Parse.Struct e -> do
     (e, xs) <- lift $ runDesugar $ desugar' e
     pure $ Struct (HashMap.keysSet xs) e
-  Parse.Class e1 e2 -> do
-    e1 <- for e1 desugar'
-    (e2, xs) <- lift $ runDesugar $ desugar' e2
-    pure $ Class e1 (HashMap.keysSet xs) e2
   Parse.Inst e1 e2 -> do
     e1 <- desugar' e1
     (e2, xs) <- lift $ runDesugar $ desugar' e2

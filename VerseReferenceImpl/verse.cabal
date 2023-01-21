@@ -22,6 +22,7 @@ library
   exposed-modules:
     Control.Monad.Ref
     Control.Monad.Ref.Backtrack
+    Control.Monad.Ref.Lenient
     Control.Monad.Ref.Logic
     Control.Monad.RST
     Control.Monad.Stuck

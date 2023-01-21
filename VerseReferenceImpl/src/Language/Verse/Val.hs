@@ -1,10 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Val
   ( Val (..)
+  , hoistVal
   , Function (..)
+  , hoistFunction
   ) where
 
 import Control.Applicative
@@ -13,6 +17,7 @@ import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
 import Data.Foldable
+import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
@@ -27,27 +32,25 @@ import Language.Verse.Simplify.Exp qualified as Simplify
 
 import Prettyprinter
 
-data Val a
+data Val f a
   = Int !Integer
   | Float !Double
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module !Label !(HashMap Name a)
-  | Struct !Label !(IdentMap Name a) !(IdentSet Name) !Exp
-  | StructInst !Label !(HashMap Name a)
-  | Class !Label (Maybe a) !(IdentMap Name a) !(IdentSet Name) !Exp
-  | ClassInst !Label (Maybe a) !(HashMap Name a)
-  | Overload !(Function a) a deriving (Show, Functor, Foldable, Traversable)
+  | Module !Label !(HashMap Name (f a))
+  | Struct !Label !(IdentMap Name (f a)) !(IdentSet Name) !Exp
+  | StructInst !Label !(HashMap Name (f a))
+  | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
 
-data Function a = Function
+data Function f a = Function
   !Label
-  !(IdentMap Name a)
+  !(IdentMap Name (f a))
   !(IdentSet Name)
   !Exp
   !Exp deriving (Show, Functor, Foldable, Traversable)
 
-instance Eq (Function a) where
+instance Eq (Function f a) where
   Function x _ _ _ _ == Function y _ _ _ _ = x == y
 
 type IdentSet a = HashSet (Ident a)
@@ -56,7 +59,7 @@ type IdentMap a v = HashMap (Ident a) v
 
 type Exp = L (Simplify.Exp L (Ident Name))
 
-instance Unifiable Val where
+instance Zippable f => Unifiable (Val f) where
   zipMatchM = curry $ \ case
     (Truth x, Truth y) ->
       pure $ Just [(x, y)]
@@ -69,36 +72,38 @@ instance Unifiable Val where
     (Tuple xs, Tuple ys) ->
       pure $ zipMatch xs ys
     (StructInst x xs, StructInst y ys) | x == y ->
-      pure . Just . toList $ HashMap.intersectionWith (,) xs ys
-    (Overload x xs, Overload y ys ) ->
+      runMaybeT . execWriterT $
+      for_ (HashMap.intersectionWith (,) xs ys) $
+      maybe empty tell . uncurry zipMatch
+    (Overload x xs, Overload y ys) ->
       runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
 
 type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
 
 zipCons :: MonadVar m =>
-           Function (Var m Val) -> Var m Val ->
-           Function (Var m Val) -> Var m Val ->
-           ZipMatchT Val m ()
+           Function f (Var m (Val f)) -> Var m (Val f) ->
+           Function f (Var m (Val f)) -> Var m (Val f) ->
+           ZipMatchT (Val f) m ()
 zipCons x xs y ys = zipList xs =<< findCons x y ys
 
-zipList :: MonadVar m => Var m Val -> Var m Val -> ZipMatchT Val m ()
+zipList :: MonadVar m => Var m (Val f) -> Var m (Val f) -> ZipMatchT (Val f) m ()
 zipList xs ys = uncons xs >>= \ case
   Just (x, xs) -> zipList xs =<< findList x ys
   Nothing -> tell [(xs, ys)]
 
 findCons :: MonadVar m =>
-            Function (Var m Val) ->
-            Function (Var m Val) -> Var m Val ->
-            ZipMatchT Val m (Var m Val)
+            Function f (Var m (Val f)) ->
+            Function f (Var m (Val f)) -> Var m (Val f) ->
+            ZipMatchT (Val f) m (Var m (Val f))
 findCons x y ys =
   if x == y then pure ys
   else newVar . Overload y =<< findList x ys
 
 findList :: MonadVar m =>
-            Function (Var m Val) ->
-            Var m Val ->
-            ZipMatchT Val m (Var m Val)
+            Function f (Var m (Val f)) ->
+            Var m (Val f) ->
+            ZipMatchT (Val f) m (Var m (Val f))
 findList x ys = uncons ys >>= \ case
   Just (y, ys) -> findCons x y ys
   Nothing -> do
@@ -109,33 +114,67 @@ findList x ys = uncons ys >>= \ case
 
 uncons :: ( Alternative m
           , MonadVar m
-          ) => Var m Val -> m (Maybe (Function (Var m Val), Var m Val))
+          ) => Var m (Val f) -> m (Maybe (Function f (Var m (Val f)), Var m (Val f)))
 uncons xs = readVar xs >>= \ case
   Just (Overload x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
 
-instance Pretty a => Pretty (Val a) where
+instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
   pretty = \ case
-    Int x -> pretty x
-    Float x -> pretty x
-    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x -> "truth" <> braces (pretty x)
-    Overload {} -> "function"
-    Tuple [] -> "false"
-    Tuple xs -> tupled $ pretty <$> xs
-    Module i xs -> "module#" <> prettyLabel i <> align (braced (names xs))
-    Struct i _ _ _ -> "struct#" <> prettyLabel i
-    StructInst i xs -> "struct#" <> prettyLabel i <> align (braced (names xs))
-    Class i _ _ _ _ -> "class#" <> prettyLabel i
-    ClassInst i _ xs -> "class#" <> prettyLabel i <> align (braced (names xs))
+    Int x ->
+      pretty x
+    Float x ->
+      pretty x
+    Rational x ->
+      pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x ->
+      align $ "truth" <> group (braces $ pretty x)
+    Overload {} ->
+      "function"
+    Tuple [] ->
+      "false"
+    Tuple xs ->
+      align . tupled $ pretty <$> xs
+    Module i xs ->
+      align $ "module#" <> prettyLabel i <> group (braced $ names xs)
+    Struct i _ _ _ ->
+      "struct#" <> prettyLabel i
+    StructInst i xs ->
+      align $ "struct#" <> prettyLabel i <> group (braced $ names xs)
     where
       names xs =
         (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)) <$>
         HashMap.toList xs
+      tupled =
+        group .
+        encloseSep
+        (flatAlt "( " lparen)
+        (flatAlt (hardline <> rparen) rparen)
+        ", "
+      braces x =
+        flatAlt (hardline <> "{ ") lbrace <> x <> flatAlt (hardline <> rbrace) rbrace
       braced =
         group .
         encloseSep
-        (flatAlt "{ " "{")
-        (flatAlt " }" "}")
+        (flatAlt (hardline <> "{ ") lbrace)
+        (flatAlt (hardline <> rbrace) rbrace)
         ", "
+
+hoistVal :: (forall c . f c -> g c) ->
+            Val f a -> Val g a
+hoistVal f = \ case
+  Int x -> pure $ Int x
+  Float x -> pure $ Float x
+  Rational x -> pure $ Rational x
+  Truth x -> pure $ Truth x
+  Tuple xs -> pure $ Tuple xs
+  Module i xs -> Module i <$> traverse f xs
+  Struct i ys xs e -> traverse f ys <&> \ ys -> Struct i ys xs e
+  StructInst i xs -> StructInst i <$> traverse f xs
+  Overload x xs -> Overload <$> hoistFunction f x <*> pure xs
+
+hoistFunction :: (forall c . f c -> g c) ->
+                 Function f a -> Function g a
+hoistFunction f (Function i ys xs e1 e2) =
+  traverse f ys <&> \ ys -> Function i ys xs e1 e2
