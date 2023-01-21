@@ -32,6 +32,8 @@ data Exp f a
   | IfThenElse !(HashSet a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))
+  | Var (f a) (f (Exp f a))
+  | Set (f a) (f (Exp f a))
   | Function !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Invoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
@@ -41,7 +43,5 @@ data Exp f a
   | Name a
   | Colon (f (Exp f a))
   | IsInt (f (Exp f a))
-
-data Named = Var | Pure deriving Show
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)

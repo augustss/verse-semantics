@@ -17,7 +17,6 @@ import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
 import Data.Foldable
-import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
@@ -164,17 +163,16 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
 hoistVal :: (forall c . f c -> g c) ->
             Val f a -> Val g a
 hoistVal f = \ case
-  Int x -> pure $ Int x
-  Float x -> pure $ Float x
-  Rational x -> pure $ Rational x
-  Truth x -> pure $ Truth x
-  Tuple xs -> pure $ Tuple xs
-  Module i xs -> Module i <$> traverse f xs
-  Struct i ys xs e -> traverse f ys <&> \ ys -> Struct i ys xs e
-  StructInst i xs -> StructInst i <$> traverse f xs
-  Overload x xs -> Overload <$> hoistFunction f x <*> pure xs
+  Int x -> Int x
+  Float x -> Float x
+  Rational x -> Rational x
+  Truth x -> Truth x
+  Tuple xs -> Tuple xs
+  Module i xs -> Module i (f <$> xs)
+  Struct i ys xs e -> Struct i (f <$> ys) xs e
+  StructInst i xs -> StructInst i (f <$> xs)
+  Overload x xs -> Overload (hoistFunction f x) xs
 
 hoistFunction :: (forall c . f c -> g c) ->
                  Function f a -> Function g a
-hoistFunction f (Function i ys xs e1 e2) =
-  traverse f ys <&> \ ys -> Function i ys xs e1 e2
+hoistFunction f (Function i ys xs e1 e2) = Function i (f <$> ys) xs e1 e2

@@ -112,6 +112,14 @@ simplify' e = for e $ \ case
   Desugar.Exists x e -> do
     (x', e') <- localName (extract x) $ simplify' e
     pure $ Exists (x' <$ x) e'
+  Desugar.Var x e -> do
+    (x', e') <- localName (extract x) $ simplify' e
+    pure $ Var (x' <$ x) e'
+  Desugar.Set x e -> lookupName (extract x) >>= \ case
+    Nothing -> throwError $ NameError (loc x) (extract x)
+    Just (x', level_x) -> do
+      tellName x' level_x
+      Set (x' <$ x) <$> simplify' e
   Desugar.Function xs e1 e2 -> do
     (xs, (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
     pure $ Function ys xs e1 e2
@@ -126,8 +134,7 @@ simplify' e = for e $ \ case
   Desugar.Float x ->
     pure $ Float x
   Desugar.Name x -> lookupName x >>= \ case
-    Nothing ->
-      throwError $ NameError (loc e) x
+    Nothing -> throwError $ NameError (loc e) x
     Just (x, level_x) -> do
       tellName x level_x
       pure $ Name x

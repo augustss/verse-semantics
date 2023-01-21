@@ -241,6 +241,16 @@ eval' e = case extract e of
   Exp.Exists x e -> do
     var <- freshVar
     localName (extract x) (Val var) $ eval' e
+  Exp.Var x e -> do
+    ref <- Lenient.newRef =<< freshVar
+    localName (extract x) (Ref ref) $ eval' e
+  Exp.Set x e -> lookupName' (extract x) >>= \ case
+    Nothing -> throwIdentError (loc x) (extract x)
+    Just (Val _) -> throwDomainError $ loc e
+    Just (Ref ref) -> do
+      var <- eval' e
+      Lenient.writeRef ref var
+      pure var
   Exp.Function ys xs e1 e2 -> do
     i <- supply
     env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
@@ -284,7 +294,7 @@ eval' e = case extract e of
   Exp.Float x ->
     newVar $ Val.Float x
   Exp.Name x -> lookupName x >>= \ case
-    Nothing -> throwError $ IdentError (loc e) x
+    Nothing -> throwIdentError (loc e) x
     Just var -> pure var
   Exp.IsInt e ->
     lift . isInt =<< eval' e
@@ -397,13 +407,18 @@ isInt var_x = do
 lookupName :: ( MonadVerse m
               , EqRef (Lenient.Ref m)
               ) => Ident Name -> EvalT m (Maybe (MutVar m))
-lookupName x = asks (HashMap.lookup x) >>= \ case
+lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
     var <- freshVar
     Lenient.readRef ref $ unify var
     pure $ Just var
   Just (Val x) -> pure $ Just x
+
+lookupName' :: ( MonadVerse m
+               , EqRef (Lenient.Ref m)
+               ) => Ident Name -> EvalT m (Maybe (Named m))
+lookupName' = asks . HashMap.lookup
 
 localName :: Monad m => Ident Name -> Named m -> EvalT m a -> EvalT m a
 localName x = local . HashMap.insert x
@@ -413,6 +428,9 @@ localNames = local . (<>)
 
 throwDomainError :: MonadError Error m => Loc -> m a
 throwDomainError = throwError . DomainError
+
+throwIdentError :: MonadError Error m => Loc -> Ident Name -> m a
+throwIdentError x = throwError . IdentError x
 
 throwNameError :: MonadError Error m => Loc -> Name -> m a
 throwNameError x = throwError . NameError x
