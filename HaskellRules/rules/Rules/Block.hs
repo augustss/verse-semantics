@@ -104,6 +104,9 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
     value e@Op{}  = pure e
     value (Arr es) = Arr <$> mapM value es
     value (LAM x e) = LAM x <$> blockV [x] e
+    -- Handle some constructors specially to avoid (harmless) nonsense bindings
+    value (e1 :>: e2) = addExpr e1 *> value e2
+    value (EXI i e) = do s <- addExist i; value (subst s e)
     value e = Var <$> addExpr e
 
     block = blockV []
@@ -136,7 +139,7 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
         pure []
 
     addExpr :: Expr -> A Ident
-    addExpr e | trace ("addExpr " ++ show e) False = undefined
+--    addExpr e | trace ("addExpr " ++ show e) False = undefined
     addExpr (Var x :=: e) = do
       e' <- expr e
       addEqn (Var x, e')
