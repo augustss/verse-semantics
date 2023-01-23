@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -39,20 +40,38 @@ class (Alternative m, MonadVar m, Lenient.MonadRef m) => MonadVerse m where
   freeze = freezeBy id
 
   freezeBy :: Traversable g => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
+  default freezeBy :: ( m ~ t n
+                      , MonadVerseTrans t n
+                      , Traversable g
+                      ) => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
+  freezeBy f = lift . freezeBy f
+
+  freshen :: Traversable f => Var m f -> m (Var m f)
+  default freshen :: ( m ~ t n
+                     , MonadVerseTrans t n
+                     , Traversable f
+                     ) => Var m f -> m (Var m f)
+  freshen = lift . freshen
 
   split :: m a -> (Maybe (a, m a) -> m ()) -> m ()
 
   once' :: m a -> (a -> m ()) -> m ()
+  once' m f = ifte' m f empty
 
   lnot' :: m a -> m ()
+  lnot' m = ifte' m (const empty) (pure ())
 
   ifte' :: m a -> (a -> m ()) -> m () -> m ()
+  ifte' m f n = split m $ \ case
+    Just (x, _) -> f x
+    Nothing -> n
 
-  all' :: Traversable f => m (Var m f) -> ([Var m f] -> m ()) -> m ()
+  for' :: m a -> (a -> m b) -> ([b] -> m ()) -> m ()
+  for' m f g = split m $ \ case
+    Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
+    Nothing -> g []
 
-  for' :: Traversable f => m a -> (a -> m (Var m f)) -> ([Var m f] -> m ()) -> m ()
-
-type MonadVerseTrans t n = ( Var (t n) ~ Var n, MonadTrans t, MonadVerse n)
+type MonadVerseTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVerse n)
 
 instance ( MonadFix m
          , MonadRef m
@@ -60,26 +79,13 @@ instance ( MonadFix m
          , EqRef (Ref m)
          ) => MonadVerse (VerseT m) where
   whenBound = Verse.whenBound
-  split = Verse.split
-  once' = Verse.once'
-  lnot' = Verse.lnot'
-  ifte' = Verse.ifte'
-  all' = Verse.all'
-  for' = Verse.for'
   unify = Verse.unify
   freezeBy = Verse.freezeBy
+  freshen = Verse.freshen
+  split = Verse.split
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
     whenBound x $ flip runReaderT r . f
   split m f = ReaderT $ \ r ->
     split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)
-  once' m f = ReaderT $ \ r ->
-    once' (runReaderT m r) $ flip runReaderT r . f
-  lnot' m = ReaderT $ lnot' . runReaderT m
-  ifte' p t e = ReaderT $ \ r ->
-    ifte' (runReaderT p r) (flip runReaderT r . t) (runReaderT e r)
-  all' m f = ReaderT $ \ r ->
-    all' (runReaderT m r) $ flip runReaderT r . f
-  for' m f g = ReaderT $ \ r ->
-    for' (runReaderT m r) (flip runReaderT r . f) (flip runReaderT r . g)

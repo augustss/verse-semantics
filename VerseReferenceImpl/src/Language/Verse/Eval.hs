@@ -175,7 +175,7 @@ eval' e = case extract e of
     pure var
   Exp.All e -> do
     var <- freshVar
-    all' (eval' e) $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
+    for' (eval' e) freshen $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
     lnot' $ eval' e
@@ -234,7 +234,7 @@ eval' e = case extract e of
           _ <- localNames xs $ eval' e1
           pure xs)
       (\ xs ->
-         localNames xs $ eval' e2)
+         freshen =<< localNames xs (eval' e2))
       (\ vars ->
          unify var =<< newVar (Val.Tuple vars))
     pure var
@@ -249,7 +249,7 @@ eval' e = case extract e of
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      Lenient.writeRef ref var
+      Lenient.writeRef ref =<< freshen var
       pure var
   Exp.Function ys xs e1 e2 -> do
     i <- supply

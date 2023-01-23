@@ -104,5 +104,4 @@ instance MonadRef m => Backtrack.MonadRef (RefLogicT m) where
       write x y = do
         writeRef ref x
         tellAp $ get >>= \ (S p _) -> when p (writeRef ref y)
-  backtrack =
-    RefLogicT . lift . modify $ \ (S _ s) -> S True s
+  backtrack = RefLogicT . lift . modify $ \ (S _ s) -> S True s

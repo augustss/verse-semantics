@@ -16,11 +16,6 @@ module Control.Monad.Trans.Verse
   , Label
   , whenBound
   , split
-  , once'
-  , lnot'
-  , ifte'
-  , all'
-  , for'
   , unify
   , freshen
   , freezeBy
@@ -69,14 +64,6 @@ deriving instance MonadSupply s m => MonadSupply s (VerseT m)
 
 instance MonadTrans VerseT where
   lift = VerseT . lift . lift
-
-instance Monad m => MonadLogic (VerseT m) where
-  msplit =
-    VerseT .
-    fmap (fmap (fmap VerseT)) .
-    msplit .
-    local (\ r -> r { level = r.level + 1 }) .
-    unVerseT
 
 instance ( MonadRef m
          , MonadSupply Label m
@@ -151,36 +138,6 @@ whenBound var_x f = do
       p <- newRef' False
       writeRef' p True
       pure $ \ val_x -> whenM (readRef' p) $ resolvePromise promise r $ f val_x
-
-once' :: MonadRef m => VerseT m a -> (a -> VerseT m ()) -> VerseT m ()
-once' m f = ifte' m f empty
-
-lnot' :: MonadRef m => VerseT m a -> VerseT m ()
-lnot' m = ifte' m (const empty) (pure ())
-
-ifte' :: MonadRef m
-      => VerseT m a -> (a -> VerseT m ()) -> VerseT m () -> VerseT m ()
-ifte' m f n = split m $ \ case
-  Nothing -> n
-  Just (x, _) -> f x
-
-all' :: ( MonadFix m
-        , MonadRef m
-        , MonadSupply Label m
-        , Traversable f
-        ) => VerseT m (Var m f) -> ([Var m f] -> VerseT m ()) -> VerseT m ()
-all' m f = split m $ \ case
-  Nothing -> f []
-  Just (var, m) -> freshen var >>= \ var ->  all' m $ \ vars -> f $ var : vars
-
-for' :: ( MonadFix m
-        , MonadRef m
-        , MonadSupply Label m
-        , Traversable f
-        ) => VerseT m a -> (a -> VerseT m (Var m f)) -> ([Var m f] -> VerseT m ()) -> VerseT m ()
-for' m f g = split m $ \ case
-  Nothing -> g []
-  Just (x, m) -> f x >>= freshen >>= \ var -> for' m f $ \ vars -> g $ var : vars
 
 unify :: ( MonadRef m
          , MonadSupply Label m
