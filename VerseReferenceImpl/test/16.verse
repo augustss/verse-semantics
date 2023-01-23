@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 exists If
 exists F
 If = function (exists P). function (exists X). function (exists Y):

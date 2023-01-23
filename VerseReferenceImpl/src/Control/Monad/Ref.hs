@@ -10,21 +10,17 @@ module Control.Monad.Ref
   ) where
 
 import Control.Monad.Logic
-import Control.Monad.Reader
 import Control.Monad.ST
-import Control.Monad.State.Lazy qualified as Lazy
-import Control.Monad.State.Strict qualified as Strict
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Lazy qualified as Lazy
+import Control.Monad.Trans.State.Strict qualified as Strict
 import Control.Monad.Trans.Writer.CPS qualified as CPS
 
 import Data.IORef
 import Data.Kind
 import Data.STRef
-
-type family RefDefault (m :: Type -> Type) :: Type -> Type where
-  RefDefault (t n) = Ref n
-
-type MonadRefTrans t n = (Ref (t n) ~ Ref n, MonadTrans t, MonadRef n)
 
 class Monad m => MonadRef m where
   type Ref m :: Type -> Type
@@ -41,6 +37,11 @@ class Monad m => MonadRef m where
   writeRef :: Ref m a -> a -> m ()
   default writeRef :: (m ~ t n, MonadRefTrans t n) => Ref m a -> a -> m ()
   writeRef ref = lift . writeRef ref
+
+type family RefDefault (m :: Type -> Type) :: Type -> Type where
+  RefDefault (t n) = Ref n
+
+type MonadRefTrans t n = (Ref (t n) ~ Ref n, MonadTrans t, MonadRef n)
 
 modifyRef :: MonadRef m => Ref m a -> (a -> a) -> m ()
 modifyRef ref f = writeRef ref . f =<< readRef ref

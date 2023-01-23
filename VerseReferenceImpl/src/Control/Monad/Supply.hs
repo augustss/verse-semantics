@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Control.Monad.Supply
@@ -43,7 +43,7 @@ instance MonadSupply s m => MonadSupply s (Strict.StateT s' m)
 instance MonadSupply s m => MonadSupply s (CPS.WriterT w m)
 
 newtype SupplyT s m a = SupplyT
-  { getSupplyT :: Strict.StateT s m a
+  { unSupplyT :: Strict.StateT s m a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -66,7 +66,7 @@ instance (Enum s, Monad m) => MonadSupply s (SupplyT s m) where
     pure x
 
 runSupplyT :: (Bounded s, Monad m) => SupplyT s m a -> m a
-runSupplyT = flip Strict.evalStateT minBound . getSupplyT
+runSupplyT = flip Strict.evalStateT minBound . unSupplyT
 
 runSupply :: Bounded s => Supply s a -> a
 runSupply = runIdentity . runSupplyT

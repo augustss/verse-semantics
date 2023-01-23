@@ -3,33 +3,44 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Eval
-  ( eval
+  ( Pure (..)
+  , eval
   ) where
 
 import Control.Applicative
 import Control.Comonad
-import Control.Monad (guard, join)
+import Control.Monad
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.Ref.Lenient qualified as Lenient
 import Control.Monad.Supply
-import Control.Monad.Verse
+import Control.Monad.Var
+import Control.Monad.Verse (MonadVerse (..), runVerseT)
 
 import Data.Fix
+import Data.Foldable
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
 import Data.Ratio
 import Data.Ref
-import Data.Traversable (for)
+import Data.Traversable
+import Data.Unifiable
 
 import Language.Verse.Error
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Simplify.Exp (Exp ( (:*>:)
                                         , (:=:)
+                                        , (:.:)
                                         , (:<:)
                                         , (:<=:)
                                         , (:>:)
@@ -43,26 +54,61 @@ import Language.Verse.Simplify.Exp (Exp ( (:*>:)
 import Language.Verse.Simplify.Exp qualified as Exp
 import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
-import Language.Verse.Val (Val)
+import Language.Verse.Val (Val, hoistVal)
 import Language.Verse.Val qualified as Val
 
-type Env m = HashMap (Ident Name) (Var m Val)
+import Prettyprinter
 
 type EvalT m = ReaderT (Env m) m
+
+type Env m = HashMap (Ident Name) (Named m)
+
+type Named m = Mut m (MutVar m)
+
+type MutVar m = Var m (MutVal m)
+
+type MutVal m = Val (Mut m)
+
+data Mut m a
+  = Ref (Lenient.Ref m (MutVar m))
+  | Val a deriving (Functor, Foldable, Traversable)
+
+instance EqRef (Lenient.Ref m) => Unifiable (Mut m)
+
+instance EqRef (Lenient.Ref m) => Zippable (Mut m) where
+  zipMatch = curry $ \ case
+    (Ref x, Ref y) | eqRef x y -> Just []
+    (Val x, Val y) -> Just [(x, y)]
+    _ -> Nothing
+
+data Pure a
+  = Read
+  | Pure a deriving (Show, Functor, Foldable, Traversable)
+
+instance Pretty a => Pretty (Pure a) where
+  pretty = \ case
+    Read -> pretty '^'
+    Pure x -> pretty x
+
+freeze' :: MonadVerse m => MutVar m -> m (Maybe (Fix (Val Pure)))
+freeze' = freezeBy $ hoistVal $ \ case
+  Ref _ -> Read
+  Val x -> Pure x
 
 eval :: ( MonadError Error m
         , MonadFix m
         , MonadRef m
         , EqRef (Ref m)
-        ) => L (Exp L (Ident Name)) -> m [Fix Val]
-eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze >>= \ case
+        ) => L (Exp L (Ident Name)) -> m [Fix (Val Pure)]
+eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze' >>= \ case
   Nothing -> throwError $ StuckError $ loc e
   Just x -> pure x
 
 eval' :: ( MonadError Error m
+         , MonadSupply Label m
          , MonadVerse m
-         , EqRef (Ref m)
-         ) => L (Exp L (Ident Name)) -> EvalT m (Var m Val)
+         , EqRef (Lenient.Ref m)
+         ) => L (Exp L (Ident Name)) -> EvalT m (MutVar m)
 eval' e = case extract e of
   e1 :*>: e2 -> do
     eval' e1 *> eval' e2
@@ -71,40 +117,56 @@ eval' e = case extract e of
     var2 <- eval' e2
     unify var1 var2
     pure var1
+  e :.: x -> do
+    var_e <- eval' e
+    var <- freshVar
+    whenBound var_e $ \ case
+      Val.Module _ xs ->
+        case HashMap.lookup x xs of
+          Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
+          Just (Val var_x) -> unify var var_x
+          Nothing -> throwNameError (loc e) x
+      Val.StructInst _ xs ->
+        case HashMap.lookup x xs of
+          Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
+          Just (Val var_x) -> unify var var_x
+          Nothing -> throwNameError (loc e) x
+      _ -> throwDomainError $ loc e
+    pure var
   e1 :<: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftOrd (loc e) (<) var1 var2
+    lift $ liftOrd (loc e) (<) var1 var2
   e1 :<=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftOrd (loc e) (<=) var1 var2
+    lift $ liftOrd (loc e) (<=) var1 var2
   e1 :>: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftOrd (loc e) (>) var1 var2
+    lift $ liftOrd (loc e) (>) var1 var2
   e1 :>=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftOrd (loc e) (>=) var1 var2
+    lift $ liftOrd (loc e) (>=) var1 var2
   e1 :|: e2 ->
     eval' e1 <|> eval' e2
   e1 :+: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftNum (loc e) (+) var1 var2
+    lift $ liftNum (loc e) (+) var1 var2
   e1 :-: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftNum (loc e) (-) var1 var2
+    lift $ liftNum (loc e) (-) var1 var2
   e1 :*: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    liftNum (loc e) (*) var1 var2
+    lift $ liftNum (loc e) (*) var1 var2
   e1 :/: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    div' (loc e) var1 var2
+    lift $ div' (loc e) var1 var2
   Exp.Fail ->
     empty
   Exp.One e -> do
@@ -113,7 +175,7 @@ eval' e = case extract e of
     pure var
   Exp.All e -> do
     var <- freshVar
-    all' (eval' e) $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
+    for' (eval' e) freshen $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
     lnot' $ eval' e
@@ -122,11 +184,42 @@ eval' e = case extract e of
     var <- freshVar
     join $ unify <$> newVar (Val.Truth var) <*> eval' e
     pure var
+  Exp.Module i xs e -> do
+    xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+    _ <- localNames xs $ eval' e
+    newVar . Val.Module i $ toNames xs
+  Exp.Struct i ys xs e -> do
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar $ Val.Struct i env xs e
+  Exp.Inst e1 xs e2 -> do
+    var1 <- eval' e1
+    xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+    _ <- localNames xs $ eval' e2
+    var <- freshVar
+    whenBound var1 $ \ case
+      Val.Struct i env ys e -> do
+        ys <- for (HashSet.toMap ys) . const $ Val <$> freshVar
+        _ <- local (const $ ys <> env) $ eval' e
+        let ys' = toNames ys
+        for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ \ case
+          (Val var_x, Val var_y) ->
+            unify var_x var_y
+          (Ref ref_x, Val var_y) ->
+            Lenient.readRef ref_x $ unify var_y
+          (Val var_x, Ref ref_y) ->
+            Lenient.readRef ref_y $ unify var_x
+          (Ref ref_x, Ref ref_y) ->
+            Lenient.readRef ref_x $ \ var_x ->
+            Lenient.readRef ref_y $ \ var_y ->
+            unify var_x var_y
+        unify var =<< newVar (Val.StructInst i ys')
+      _ -> throwDomainError $ loc e
+    pure var
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
     ifte'
       (do
-          xs <- for (HashSet.toMap xs) $ const freshVar
+          xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
           _ <- localNames xs $ eval' p
           pure xs)
       (\ xs ->
@@ -137,17 +230,31 @@ eval' e = case extract e of
     var <- freshVar
     for'
       (do
-          xs <- for (HashSet.toMap xs) $ const freshVar
+          xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
           _ <- localNames xs $ eval' e1
           pure xs)
       (\ xs ->
-         localNames xs $ eval' e2)
+         freshen =<< localNames xs (eval' e2))
       (\ vars ->
          unify var =<< newVar (Val.Tuple vars))
     pure var
   Exp.Exists x e -> do
     var <- freshVar
-    localName (extract x) var $ eval' e
+    localName (extract x) (Val var) $ eval' e
+  Exp.Var x e -> do
+    ref <- Lenient.newRef =<< freshVar
+    localName (extract x) (Ref ref) $ eval' e
+  Exp.Set x e -> lookupName' (extract x) >>= \ case
+    Nothing -> throwIdentError (loc x) (extract x)
+    Just (Val _) -> throwDomainError $ loc e
+    Just (Ref ref) -> do
+      var <- eval' e
+      Lenient.writeRef ref =<< freshen var
+      pure var
+  Exp.Function ys xs e1 e2 -> do
+    i <- supply
+    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -158,36 +265,46 @@ eval' e = case extract e of
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
         empty
         (zip xs [0 ..])
-      Val.Function env xs e_domain e_range -> do
-        xs <- for (HashSet.toMap xs) $ const freshVar
-        var_domain <- localNames xs $ eval' e_domain
-        unify var2 var_domain
-        unify var =<< local (const $ HashMap.union xs env) (eval' e_range)
-      _ ->
-        throwError $ DomainError $ loc e
+      Val.Struct i env xs e -> do
+        xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+        _ <- local (const $ xs <> env) (eval' e)
+        unify var2 =<< newVar (Val.StructInst i $ toNames xs)
+        unify var var2
+      Val.Overload x var_xs -> fix (\ recur x var_xs ->
+        let Val.Function _ env xs e_d e_r = x in
+          ifte'
+          (do
+              xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+              let env' = xs <> env
+              var_d <- local (const env') $ eval' e_d
+              unify var2 var_d
+              pure env')
+          (\ env' -> unify var =<< local (const env') (eval' e_r)) $
+          whenBound var_xs $ \ case
+            Val.Overload x var_xs -> recur x var_xs
+            _ -> throwDomainError $ loc e) x var_xs
+      _ -> throwDomainError $ loc e
     pure var
-  Exp.Function ys xs e1 e2 -> do
-    env <- ask
-    newVar $ Val.Function (HashMap.intersection env $ HashSet.toMap ys) xs e1 e2
   Exp.Tuple exps ->
-    newVar =<< Val.Tuple <$> traverse eval' exps
+    newVar . Val.Tuple =<< traverse eval' exps
   Exp.Truth e ->
-    newVar =<< Val.Truth <$> eval' e
+    newVar . Val.Truth =<< eval' e
   Exp.Int x ->
     newVar $ Val.Int x
   Exp.Float x ->
     newVar $ Val.Float x
   Exp.Name x -> lookupName x >>= \ case
-    Nothing -> throwError $ IdentError (loc e) x
+    Nothing -> throwIdentError (loc e) x
     Just var -> pure var
-  Exp.IsInt e -> do
-    var <- eval' e
-    isInt var
+  Exp.IsInt e ->
+    lift . isInt =<< eval' e
 
 liftOrd :: (MonadError Error m, MonadVerse m) =>
            Loc ->
            (forall a . Ord a => a -> a -> Bool) ->
-           Var m Val -> Var m Val -> m (Var m Val)
+           MutVar m ->
+           MutVar m ->
+           m (MutVar m)
 liftOrd loc f var_x var_y = do
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     case (val_x, val_y) of
@@ -212,10 +329,12 @@ liftOrd loc f var_x var_y = do
       _ -> throwDomainError loc
   pure var_x
 
-liftNum :: (MonadError Error m, MonadVerse m) =>
+liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
            Loc ->
            (forall a . Num a => a -> a -> a) ->
-           Var m Val -> Var m Val -> m (Var m Val)
+           MutVar m ->
+           MutVar m ->
+           m (MutVar m)
 liftNum loc f var_x var_y = do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
@@ -241,9 +360,11 @@ liftNum loc f var_x var_y = do
       _ -> throwDomainError loc
   pure var
 
-div' :: ( MonadError Error m
-        , MonadVerse m
-        ) => Loc -> Var m Val -> Var m Val -> m (Var m Val)
+div' :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
+        Loc ->
+        MutVar m ->
+        MutVar m ->
+        m (MutVar m)
 div' loc var_x var_y = do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
@@ -273,8 +394,9 @@ div' loc var_x var_y = do
       _ -> throwDomainError loc
   pure var
 
-isInt :: (MonadError Error m, MonadVerse m) =>
-         Var m Val -> m (Var m Val)
+isInt :: ( MonadError Error m
+         , MonadVerse m
+         , EqRef (Lenient.Ref m)) => MutVar m -> m (MutVar m)
 isInt var_x = do
   var <- freshVar
   whenBound var_x $ \ case
@@ -282,10 +404,23 @@ isInt var_x = do
     _ -> empty
   pure var
 
-lookupName :: Monad m => Ident Name -> EvalT m (Maybe (Var m Val))
-lookupName = asks . HashMap.lookup
+lookupName :: ( MonadVerse m
+              , EqRef (Lenient.Ref m)
+              ) => Ident Name -> EvalT m (Maybe (MutVar m))
+lookupName = lookupName' >=> \ case
+  Nothing -> pure Nothing
+  Just (Ref ref) -> do
+    var <- freshVar
+    Lenient.readRef ref $ unify var
+    pure $ Just var
+  Just (Val x) -> pure $ Just x
 
-localName :: Monad m => Ident Name -> Var m Val -> EvalT m a -> EvalT m a
+lookupName' :: ( MonadVerse m
+               , EqRef (Lenient.Ref m)
+               ) => Ident Name -> EvalT m (Maybe (Named m))
+lookupName' = asks . HashMap.lookup
+
+localName :: Monad m => Ident Name -> Named m -> EvalT m a -> EvalT m a
 localName x = local . HashMap.insert x
 
 localNames :: Monad m => Env m -> EvalT m a -> EvalT m a
@@ -293,3 +428,19 @@ localNames = local . (<>)
 
 throwDomainError :: MonadError Error m => Loc -> m a
 throwDomainError = throwError . DomainError
+
+throwIdentError :: MonadError Error m => Loc -> Ident Name -> m a
+throwIdentError x = throwError . IdentError x
+
+throwNameError :: MonadError Error m => Loc -> Name -> m a
+throwNameError x = throwError . NameError x
+
+toNames :: Hashable a => HashMap (Ident a) v -> HashMap a v
+toNames =
+  HashMap.fromList .
+  HashMap.foldrWithKey
+  (\ k x z ->
+     case name k of
+       Nothing -> z
+       Just k -> (k, x) : z)
+  []

@@ -6,9 +6,12 @@ module Language.Verse.Desugar.Exp
 
 import Data.HashSet (HashSet)
 
+import Language.Verse.Name
+
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
+  | f (Exp f a) :.: !Name
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
   | f (Exp f a) :>: f (Exp f a)
@@ -23,9 +26,14 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Query (f (Exp f a))
+  | Module !(HashSet a) (f (Exp f a))
+  | Struct !(HashSet a) (f (Exp f a))
+  | Inst (f (Exp f a)) !(HashSet a) (f (Exp f a))
   | IfThenElse !(HashSet a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))
+  | Var (f a) (f (Exp f a))
+  | Set (f a) (f (Exp f a))
   | Function !(HashSet a) (f (Exp f a)) (f (Exp f a))
   | Invoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]

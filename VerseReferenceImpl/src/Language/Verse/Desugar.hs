@@ -21,14 +21,14 @@ import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Parse.Exp qualified as Parse
 
-type Desugar = StateT (HashMap Name Loc) (Except Error)
+type Desugar = StateT (HashMap Name (Loc, Bool)) (Except Error)
 
-runDesugar' :: Desugar a -> Except Error (a, HashMap Name Loc)
-runDesugar' = flip runStateT mempty
+runDesugar :: Desugar a -> Except Error (a, HashMap Name (Loc, Bool))
+runDesugar = flip runStateT mempty
 
 desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L Name))
 desugar e = runExcept $ do
-  (e, xs) <- runDesugar' $ desugar' e
+  (e, xs) <- runDesugar $ desugar' e
   pure $ exists' xs e
 
 desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Name))
@@ -37,6 +37,8 @@ desugar' e = for e $ \ case
     (:=:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<>:) e1 e2 -> do
     Not . (<$ e) <$> ((:=:) <$> desugar' e1 <*> desugar' e2)
+  (Parse.:.:) e x ->
+    (:.: x) <$> desugar' e
   (Parse.:<:) e1 e2 ->
     (:<:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<=:) e1 e2 ->
@@ -70,33 +72,53 @@ desugar' e = for e $ \ case
     Not <$> desugar' e
   Parse.Query e ->
     Query <$> desugar' e
+  Parse.Module e -> do
+    (e, xs) <- lift $ runDesugar $ desugar' e
+    pure $ Module (HashMap.keysSet xs) e
+  Parse.Struct e -> do
+    (e, xs) <- lift $ runDesugar $ desugar' e
+    pure $ Struct (HashMap.keysSet xs) e
+  Parse.Inst e1 e2 -> do
+    e1 <- desugar' e1
+    (e2, xs) <- lift $ runDesugar $ desugar' e2
+    pure $ Inst e1 (HashMap.keysSet xs) e2
   Parse.If p -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     pure $ IfThenElse (HashMap.keysSet xs) p (Tuple [] <$ p) (Tuple [] <$ p)
   Parse.IfThen p t -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     IfThenElse (HashMap.keysSet xs) p <$>
       exists (desugar' t) <*>
       pure (Tuple [] <$ p <. t)
   Parse.IfThenElse p t e -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
+    (p, xs) <- lift $ runDesugar $ desugar' p
     IfThenElse (HashMap.keysSet xs) p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
-  Parse.For e -> do
-    (e, xs) <- lift $ runDesugar' $ desugar' e
-    pure $ ForDo (HashMap.keysSet xs) e (Tuple [] <$ e)
+  Parse.For e ->
+    All <$> exists (desugar' e)
   Parse.ForDo e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
     ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
   Parse.Exists x -> do
-    tellName x
+    tellName x False
     pure . Name $ extract x
+  Parse.Var x -> do
+    tellName x True
+    pure . Name $ extract x
+  Parse.Set x e ->
+    Set x <$> desugar' e
   Parse.Function e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
     Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+  Parse.Overload x e1 e2 -> do
+    tellName' x False
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
+    e2 <- exists $ desugar' e2
+    let e = Function (HashMap.keysSet xs) <$> duplicate e1 <.> duplicate e2
+    pure $ (Name <$> x) :=: e
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
@@ -118,27 +140,38 @@ desugar' e = for e $ \ case
   Parse.PrefixColon e ->
     Colon <$> desugar' e
   Parse.InfixColon x e -> do
-    tellName x
+    tellName x False
     e <- desugar' e
     pure $ (Name <$> x) :=: (Colon <$> duplicate e)
   Parse.InfixColonEqual x e -> do
-    tellName x
+    tellName x False
     e <- desugar' e
     pure $ (Name <$> x) :=: e
   Parse.IsInt e ->
     IsInt <$> desugar' e
 
-tellName :: L Name -> Desugar ()
-tellName x = do
-  s <- get
-  case HashMap.lookup (extract x) s of
-    Nothing -> put $ HashMap.insert (extract x) (loc x) s
-    Just y -> throwError $ DefError y (loc x) (extract x)
+tellName :: L Name -> Bool -> Desugar ()
+tellName x var =
+  put =<<
+  HashMap.alterF
+  (\ case
+      Nothing -> pure $ Just (loc x, var)
+      Just (y, _) -> throwError $ DefError y (loc x) (extract x))
+  (extract x) =<<
+  get
+
+tellName' :: L Name -> Bool -> Desugar ()
+tellName' x var =
+  modify $ HashMap.insertWith (flip const) (extract x) (loc x, var)
 
 exists :: Desugar (L (Exp L Name)) -> Desugar (L (Exp L Name))
 exists m = lift $ do
-  (e, xs) <- runDesugar' m
+  (e, xs) <- runDesugar m
   pure $ exists' xs e
 
-exists' :: HashMap Name Loc -> L (Exp L Name) -> L (Exp L Name)
-exists' xs e = foldlWithKey' (\ z x y -> L y $ Exists (L y x) z) e xs
+exists' :: HashMap Name (Loc, Bool) -> L (Exp L Name) -> L (Exp L Name)
+exists' xs e = foldlWithKey' f e xs
+  where
+    f z x (loc, var) = L loc $ (if var then Var x' else Exists x') z
+      where
+        x' = L loc x

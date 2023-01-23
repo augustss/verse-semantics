@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 any := function (exists X). X
 
 Tail := function (exists Xs):

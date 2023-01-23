@@ -14,6 +14,7 @@ import Data.Functor.Apply
 
 import Language.Verse.Parse.Exp (Exp ( (:=:)
                                      , (:<>:)
+                                     , (:.:)
                                      , (:<:)
                                      , (:<=:)
                                      , (:>:)
@@ -42,9 +43,9 @@ import Language.Verse.Token qualified as Token
 %lexer { lexer } { L _ Token.EOF }
 %error { uncurryL Lexer.throwError }
 
-%nonassoc '.'
 %left ';' newline
 %left ','
+%nonassoc DOT_SPACE
 %left IF IF_THEN FOR
 %left then else do
 %right '=' ':=' '=>'
@@ -54,8 +55,11 @@ import Language.Verse.Token qualified as Token
 %left '|'
 %left '+' '-'
 %left '*' '/'
+%left '.'
 %nonassoc '?'
 %nonassoc ':'
+%nonassoc '{' colonEOL
+%nonassoc name
 %left '(' '['
 
 %token
@@ -86,6 +90,7 @@ import Language.Verse.Token qualified as Token
   '}' { L _ Token.RightBrace }
   all { L _ Token.All }
   block { L _ Token.Block }
+  class { L _ Token.Class }
   colonEOL { L _ Token.ColonEOL }
   ded { L _ Token.Dedent }
   do { L _ Token.Do }
@@ -100,13 +105,17 @@ import Language.Verse.Token qualified as Token
   ind { L _ Token.Indent }
   int { (int -> Just $$) }
   isInt { L _ Token.IsInt }
+  module { L _ Token.Module }
   name { (name -> Just $$) }
   newline { L _ Token.Newline }
   not { L _ Token.Not }
   one { L _ Token.One }
+  set { L _ Token.Set }
+  struct { L _ Token.Struct }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
+  var { L _ Token.Var }
 
 %%
 
@@ -145,14 +154,32 @@ Exp :: { L (Exp L Name) }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
+  | set name '=' Exp {
+      Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | name {
+      Exp.Name <\$> $1
+    }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
+    }
+  | var name {
+      Exp.Var <\$ $1 <.> duplicate $2
     }
   | name ':=' Exp {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
     }
   | name ':=' BraceInd {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
+    }
+  | name Paren {
+      Exp.ParenInvoke <\$> duplicate (Exp.Name <\$> $1) <.> duplicate $2
+    }
+  | name Paren ':=' Exp {
+      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | name Paren ':=' BraceInd {
+      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
     }
   | Exp '=>' Exp {
       Exp.Function <\$> duplicate $1 <.> duplicate $3
@@ -162,6 +189,9 @@ Exp :: { L (Exp L Name) }
     }
   | Exp '<>' Scan Exp {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp '.' name {
+      (:.:) <\$> duplicate $1 <.> $3
     }
   | Exp '<' Scan Exp {
       (:<:) <\$> duplicate $1 <.> duplicate $4
@@ -224,15 +254,25 @@ Exp :: { L (Exp L Name) }
       Exp.Not <\$ $1 <.> duplicate $2
     }
   | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
+  | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
+  | struct Block { Exp.Struct <\$ $1 <.> duplicate $2 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
-  | name { Exp.Name <\$> $1 }
+  | Inst { $1 }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
   | isInt Paren {
       Exp.IsInt <\$ $1 <.> duplicate $2
+    }
+
+Inst
+  : Exp '{' List '}' {
+      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
+    }
+  | Exp colonEOL ind List ded {
+      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $4 <\$ $2 <. $5)
     }
 
 If
@@ -299,7 +339,7 @@ Brace
 
 Block
   : Brace { $1 }
-  | '.' Exp { $1 .> $2 }
+  | '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | colonEOL ind List ded { Exp.List $3 <\$ $1 <. $4 }
 
 Scan

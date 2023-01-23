@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImportQualifiedPost #-}
@@ -27,12 +26,13 @@ import Data.Traversable (for)
 
 import Language.Verse.Error
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Loc (L, loc)
 import Language.Verse.Name
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Simplify.Exp
 
-type Simplify = WriterT W (ReaderT R (SupplyT Word (Except Error)))
+type Simplify = WriterT W (ReaderT R (SupplyT Label (Except Error)))
 
 type W = Diff.List (Ident Name, Level)
 
@@ -56,6 +56,8 @@ simplify' e = for e $ \ case
     (:*>:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:=:) e1 e2 ->
     (:=:) <$> simplify' e1 <*> simplify' e2
+  (Desugar.:.:) e x ->
+    (:.: x) <$> simplify' e
   (Desugar.:<:) e1 e2 ->
     (:<:) <$> simplify' e1 <*> simplify' e2
   (Desugar.:<=:) e1 e2 ->
@@ -84,21 +86,43 @@ simplify' e = for e $ \ case
     Not <$> simplify' e
   Desugar.Query e ->
     Query <$> simplify' e
-  Desugar.IfThenElse xs p t e -> newEnv xs >>= \ xs ->
+  Desugar.Module xs e -> do
+    i <- supply
+    xs <- newEnv xs
+    Module i (fromEnv xs) <$> localNames xs (simplify' e)
+  Desugar.Struct xs e -> do
+    i <- supply
+    (xs, e, ys) <- localFunction xs $ simplify' e
+    pure $ Struct i ys xs e
+  Desugar.Inst e1 xs e2 -> do
+    e1 <- simplify' e1
+    xs <- newEnv xs
+    Inst e1 (fromEnv xs) <$> localNames xs (simplify' e2)
+  Desugar.IfThenElse xs p t e -> do
+    xs <- newEnv xs
     IfThenElse (fromEnv xs) <$>
-    localNames xs (simplify' p) <*>
-    localNames xs (simplify' t) <*>
-    simplify' e
-  Desugar.ForDo xs e1 e2 -> newEnv xs >>= \ xs ->
+      localNames xs (simplify' p) <*>
+      localNames xs (simplify' t) <*>
+      simplify' e
+  Desugar.ForDo xs e1 e2 -> do
+    xs <- newEnv xs
     ForDo (fromEnv xs) <$>
-    localNames xs (simplify' e1) <*>
-    localNames xs (simplify' e2)
+      localNames xs (simplify' e1) <*>
+      localNames xs (simplify' e2)
   Desugar.Exists x e -> do
     (x', e') <- localName (extract x) $ simplify' e
     pure $ Exists (x' <$ x) e'
+  Desugar.Var x e -> do
+    (x', e') <- localName (extract x) $ simplify' e
+    pure $ Var (x' <$ x) e'
+  Desugar.Set x e -> lookupName (extract x) >>= \ case
+    Nothing -> throwError $ NameError (loc x) (extract x)
+    Just (x', level_x) -> do
+      tellName x' level_x
+      Set (x' <$ x) <$> simplify' e
   Desugar.Function xs e1 e2 -> do
-    (xs', (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
-    pure $ Function ys xs' e1 e2
+    (xs, (e1, e2), ys) <- localFunction xs $ (,) <$> simplify' e1 <*> simplify' e2
+    pure $ Function ys xs e1 e2
   Desugar.Invoke e1 e2 ->
     Invoke <$> simplify' e1 <*> simplify' e2
   Desugar.Tuple exps ->
@@ -110,11 +134,10 @@ simplify' e = for e $ \ case
   Desugar.Float x ->
     pure $ Float x
   Desugar.Name x -> lookupName x >>= \ case
-    Nothing ->
-      throwError $ NameError (loc e) x
-    Just (x', level_x) -> do
-      tellName x' level_x
-      pure $ Name x'
+    Nothing -> throwError $ NameError (loc e) x
+    Just (x, level_x) -> do
+      tellName x level_x
+      pure $ Name x
   Desugar.Colon e -> do
     e1' <- simplify' e
     x' <- freshIdent
@@ -123,10 +146,10 @@ simplify' e = for e $ \ case
   Desugar.IsInt e ->
     IsInt <$> simplify' e
 
-newIdent :: MonadSupply Word m => a -> m (Ident a)
+newIdent :: MonadSupply Label m => a -> m (Ident a)
 newIdent x = Ident <$> supply <*> pure (Just x)
 
-freshIdent :: MonadSupply Word m => m (Ident a)
+freshIdent :: MonadSupply Label m => m (Ident a)
 freshIdent = flip Ident Nothing <$> supply
 
 localFunction :: HashSet Name ->

@@ -90,7 +90,7 @@ library frontend
                       FrontEnd.Flags
                       FrontEnd.Desugar
                       FrontEnd.Parse
---                      FrontEnd.RefImpl
+                      FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
 
