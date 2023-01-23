@@ -16,10 +16,12 @@ module Rules.Core(
   isVal,
   pattern EXI,
   pattern LAM,
+  pattern Block, Eqn,
   subst,
   alphaRename,
   invariant,
   collect,
+  allVars,
   check,
   ) where
 import GHC.Stack(HasCallStack)
@@ -29,6 +31,7 @@ import TRS.TRS
 import Test.QuickCheck hiding ( collect )
 import Data.List( intercalate, union, elemIndex )
 import Data.Maybe
+import Epic.List(nub)
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
@@ -55,6 +58,7 @@ data Expr
   | Fail                        -- ^ fail
   | Wrong                       -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
+  | BlockC Expr                 -- ^ same as e, but maintaining invariants
 
 type Value = Expr
 
@@ -82,6 +86,7 @@ instance Show Expr where
   showsPrec _ Wrong            = showString "wrong"
   showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
                                  showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
+  showsPrec _ (BlockC e)       = showString "block {" . showsPrec 0 e . showString "}"
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -159,6 +164,10 @@ instance Ord Expr where
     comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
+
+    comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
+    comp _xs _ys BlockC{} _ = LT
+    comp _xs _ys _ BlockC{} = GT
 
     comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
@@ -243,6 +252,25 @@ getCON e@Int{} = Just e
 getCON e@Op{} = Just e
 getCON _ = Nothing
 
+type Eqn = (Value, Expr)
+
+pattern Block :: [Ident] -> [(Value, Expr)] -> Value -> Expr
+pattern Block xs bs v <- (BlockC (getBlock -> Just (xs, bs, v)))
+  where Block xs bs v = BlockC (foldr EXI (foldr eqn v bs) xs)
+          where eqn (a, b) r = (a :=: b) :>: r
+
+getBlock :: Expr -> Maybe ([Ident], [Eqn], Value)
+getBlock = blk
+  where
+    blk (EXI i e) = (\ (xs, qs, v) -> (i:xs, qs, v)) <$> blk e
+    blk e = blk' e
+    blk' ((Val a :=: e) :>: b) = (\ (xs, qs, v) -> (xs, (a, e) : qs, v)) <$> blk' b
+--    blk' (Val v) = Just ([], [], v)
+--    blk' _ = Nothing
+    blk' (_ :>: _) = Nothing
+    blk' (_ :=: _) = Nothing
+    blk' e = Just ([], [], e)
+
 --------------------------------------------------------------------------------
 
 type TRSFlags = RuleEnv Expr
@@ -303,6 +331,8 @@ instance Rec Expr where
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
         ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
+      BlockC a ->
+           [ (n, BlockC a') | (n, a') <- rec r s a ]
       _     -> []
 
 --------------------------------------------------------------------------------
@@ -320,6 +350,7 @@ instance Free Expr where
   free (One a)   = free a
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
+  free (BlockC e) = free e
   free _         = []
 
 --------------------------------------------------------------------------------
@@ -336,6 +367,7 @@ alphaRename xs bnd@(Bind x e)
   y = identNotIn (x : (xs ++ free e))
 
 instance Term Expr where
+  subst [] e = e
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
   subst _sub e@Op{}   = e
@@ -351,7 +383,17 @@ instance Term Expr where
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
+  subst sub (BlockC e) = BlockC (subst sub e)
   subst _sub Wrong    = Wrong
+
+instance (Term a, Term b) => Term (a, b) where
+  subst sub (a, b) = (subst sub a, subst sub b)
+
+instance (Term a, Term b, Term c) => Term (a, b, c) where
+  subst sub (a, b, c) = (subst sub a, subst sub b, subst sub c)
+
+instance (Term a) => Term [a] where
+  subst sub xs = map (subst sub) xs
 
 -- TODO(augustss):
 -- We don't normally substitute in ~, but we still need to be able to alpha convert,
@@ -401,6 +443,8 @@ instance Arbitrary Expr where
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
+  -- XXX this is probably wrong
+  shrink BlockC{}  = error "impossible"
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
@@ -419,6 +463,7 @@ arbExpr n xs =
   , (n, Exi <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
+  -- Don't generate Block, the anf-ing will do that.
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
@@ -457,6 +502,24 @@ collect here (\/) = col
   recr a (All e)          = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a _                = a
+
+--------------------------------------------------------------------------------
+
+allVars :: Expr -> [Ident]
+allVars = nub . expr
+  where
+    expr (Var i) = [i]
+    expr (Arr es) = concatMap expr es
+    expr (LAM i e) = i : expr e
+    expr (EXI i e) = i : expr e
+    expr (e1 :=: e2) = expr e1 ++ expr e2
+    expr (e1 :@: e2) = expr e1 ++ expr e2
+    expr (e1 :>: e2) = expr e1 ++ expr e2
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
+    expr (BlockC e) = expr e
+    expr _ = []
 
 --------------------------------------------------------------------------------
 

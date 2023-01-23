@@ -13,7 +13,7 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLR ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -22,7 +22,7 @@ systemPOPL = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = allRules
+  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
@@ -32,14 +32,23 @@ systemPOPLV :: TRSystem Expr
 systemPOPLV = systemPOPL
   { sname               = "POPLV"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
-  , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
+  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
   }
 
 systemPOPLF :: TRSystem Expr
 systemPOPLF = systemPOPL
   { sname               = "POPLF"
   , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL"
+  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+  }
+
+systemPOPLR :: TRSystem Expr
+systemPOPLR = systemPOPL
+  { sname               = "POPLR"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM - SUBST-REC"
   , rules               = allRules <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+--                          <> rulesOcc
+--                          <> rulesMoreFail
   }
 
 -- Check that an expression is in the subset defined by the POPL grammar.
@@ -242,7 +251,7 @@ valueX1 lhs =
 allRules :: ERule
 allRules = rulesPrimOps
          <> rulesApplication
-         <> rulesUnification
+         <> rulesUnificationNoOcc
          <> rulesUnificationVariables
          <> rulesSequencing
          <> rulesChoice
@@ -365,9 +374,9 @@ rulesApplication _ lhs =
        pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
 
 --------------------------------------------------------------------------------
-rulesUnification :: ERule
-rulesUnification = rulesUnificationNoOcc
-                <> rulesUnificationOcc
+--rulesUnification :: ERule
+--rulesUnification = rulesUnificationNoOcc
+--                <> rulesUnificationOcc
 
 rulesUnificationNoOcc :: ERule
 rulesUnificationNoOcc _ lhs =
@@ -441,6 +450,15 @@ rulesUnificationOcc _ lhs =
       guard (x == x')
       pure Fail
 
+-- Ban all recursion
+_rulesOcc :: ERule
+_rulesOcc _ lhs =
+   "UX-OCCURS" `name`
+   do Var x :=: Val v <- [lhs]
+      guard (Var x /= v)
+      guard (x `elem` free v)
+      pure Fail
+
 --------------------------------------------------------------------------------
 
 rulesUnificationVariables :: ERule
@@ -454,12 +472,6 @@ rulesUnificationVariables _ lhs =
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      pure (subst sub (ctx (Var x0 :=: Val v)))
- ++
-  "SUBST-REC" `name`
-  do Var x :=: Val v <- [lhs]
-     (ctx, LAM y e) <- valueX v
-     guard (x `elem` free (LAM y e))
-     pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
  ++
   "DEF-ELIML" `name`
   do Exi (Bind x a) <- [lhs]
@@ -494,6 +506,14 @@ rulesUnificationVariables _ lhs =
        else pure (Exi (Bind x (ctx e)))
  where
   blob = Fail -- just something to plug the hole in the context so we can look at it
+
+rulesSubstRec :: ERule
+rulesSubstRec _ lhs =
+  "SUBST-REC" `name`
+  do Var x :=: Val v <- [lhs]
+     (ctx, LAM y e) <- valueX v
+     guard (x `elem` free (LAM y e))
+     pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
 
 rulesElimV :: ERule
 rulesElimV _ lhs =
@@ -566,6 +586,12 @@ rulesFail _ lhs =
  ++
   "FAIL" `name`
   do (_cx, Fail) <- execX1 lhs
+     pure Fail
+
+_rulesMoreFail :: ERule
+_rulesMoreFail _ lhs =
+  "FAIL-LAM" `name`
+  do Lam (Bind _x Fail) <- [lhs]
      pure Fail
 
 --------------------------------------------------------------------------------

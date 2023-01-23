@@ -30,6 +30,12 @@ testfast:
 	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
 
+testnorec:
+	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
+
+testnorecqc:
+	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
+
 trickytest: testtricky
 
 testtricky:

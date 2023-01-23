@@ -53,6 +53,7 @@ data NormResult a = NormResult
 normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> NormResult a
 normalFormsFuelTracePlain env an rule at = go an S.empty [start at]
  where
+--  go  n  _ trs | Debug.Trace.trace ("go " ++ show (n, length trs)) False = undefined
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)

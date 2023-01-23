@@ -165,6 +165,7 @@ trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
 trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
+trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
