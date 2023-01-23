@@ -35,9 +35,15 @@ systemBlock = TRSystem
 {-
 v ::= x | hnf
 hnf ::= k | <v,...> | \x.b | op
-b ::= (exist x)*; (v=e)*; e        -- Maybe the last e should be v
+b ::= fail | exist x*; (v=e)*; v
 e ::= v | v(v) | fail | (b || b) | one{b} | all{b} | split{b,v,v}
 -}
+
+pattern BFail :: Expr
+pattern BFail = BlockC Fail
+
+pattern BVal :: Value -> Expr
+pattern BVal v = BlockC (Val v)
 
 -- Check that an expression is in the subset defined by the Block grammar.
 valid :: Expr -> Bool
@@ -65,6 +71,7 @@ valid = block
     block' (EXI _ b) = block' b
     block' b = block'' b
     block'' ((v :=: e) :>: b) = value v && expr e && block'' b
+    block'' Fail = True  -- Block [] [] Fail is ok
     block'' b = value b
 --    block'' b = expr b
 
@@ -152,18 +159,59 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
       pure y
       
 --------------------------------------------------------------------------------
+
+-- sub-categories of expressions
+
+isChoiceFree :: Expr -> Bool
+isChoiceFree (Val _)   = True
+isChoiceFree (One _)   = True
+isChoiceFree (All _)   = True
+isChoiceFree (Op op :@: _) = isChoiceFreeOp op
+--isChoiceFree Split{}   = True  -- XXX is it?
+isChoiceFree _         = False
+
+isChoiceFreeOp :: Op -> Bool
+isChoiceFreeOp MapAp = False
+isChoiceFreeOp _ = True
+
+--------------------------------------------------------------------------------
 -- contexts
 
 type Context = Expr -> Expr
+
+-- scope contexts
+-- SX context
+scopeX :: Expr -> [(Context, Expr)]
+scopeX lhs =
+  do hole :|: e <- [lhs]
+     pure ((:|: e), hole)
+ ++
+  do e :|: hole <- [lhs]
+     pure ((e :|:), hole)
+ ++
+  do One hole <- [lhs]
+     pure (One, hole)
+ ++
+  do All hole <- [lhs]
+     pure (All, hole)
+ ++
+  do Split hole f g <- [lhs]
+     pure (\ e -> Split e f g, hole)
 
 --------------------------------------------------------------------------------
 
 allRules :: ERule
 allRules =  rulesPrimOps
          <> rulesApplication
+         <> rulesUnification
          <> rulesSubst
          <> rulesDefElim
-         <> rulesUnification
+         <> rulesBlock
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+--         <> rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -260,24 +308,26 @@ rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
   do Block oxs obs oe <- [lhs]
-     (lbs, (Var ox, LAM x (Block xs qs e) :@: v), rbs) <- pickLR obs
+     (lbs, (Var ox, LAM x (Block xs bs e) :@: v), rbs) <- pickLR obs
+     let (xs'@(x' : _), qs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
+         b = Block xs' ((Var x',v) : qs') e'
+     pure $ Block oxs (lbs ++ [(Var ox, b)] ++ rbs) oe
+{-
      let fb = (x:xs, (Var x, Var tmpVar):qs, e)
          (nxs, nbs, ne) = alphaBlk (oxs ++ free v) fb
          nbs' = subst [(tmpVar, v)] nbs
      --traceM ("mergeBlock " ++ show (oxs, (lbs, rbs), ox, ((nxs, nbs', ne), v), oe))
      pure $ Block (oxs ++ nxs) (lbs ++ nbs' ++ [(Var ox, ne)] ++ rbs) oe
+-}
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
      if null vs then
        pure Fail
       else
-       pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+       pure (foldr1 (:|:) [ Block [] [(Val v, Int i)] (Val vi) | (i,vi) <- [0..] `zip` vs ])
 
 type Blk = ([Ident], [Eqn], Expr)
-
-tmpVar :: Ident
-tmpVar = Name "$$$"
 
 alphaBlk :: [Ident] -> Blk -> Blk
 alphaBlk vs b@(xs, bs, e) =
@@ -286,6 +336,14 @@ alphaBlk vs b@(xs, bs, e) =
       sub = [ (x, Var x') | (x, x') <- zip xs xs', x /= x' ]
   in  --trace ("alphaBlk " ++ show sub) $
       (xs', subst sub bs, subst sub e)
+
+rulesBlock :: ERule
+rulesBlock _ lhs =
+  "BLOCK" `name`
+  do Block oxs obs oe <- [lhs]
+     (lbs, (Var ox, Block xs bs e), rbs) <- pickLR obs
+     let (nxs, nbs, ne) = alphaBlk oxs (xs, bs, e)
+     pure $ Block (oxs ++ nxs) (lbs ++ nbs ++ [(Var ox, ne)] ++ rbs) oe
 
 --------------------------------------------------------------------------------
 
@@ -340,14 +398,14 @@ rulesUnification _ lhs =
      ((Int k1, Int k2), bs') <- pick bs
      if k1 == k2
        then pure (Block xs bs' e)
-       else pure Fail
+       else pure BFail
  ++
   "UTUP" `name`
   do Block xs bs e <- [lhs]
      (lbs, (Arr vs, Arr vs'), rbs) <- pickLR bs
      if length vs == length vs'
        then pure (Block xs (lbs ++ [ (v, v') | (v,v') <- vs `zip` vs' ] ++ rbs) e)
-       else pure Fail
+       else pure BFail
  ++
   "UX-LAM" `name`
   do Block _ bs _ <- [lhs]
@@ -370,6 +428,70 @@ rulesUnification _ lhs =
                             _             -> True)
      guard (e1 /= e2)
      pure Fail
+
+--------------------------------------------------------------------------------
+
+rulesFail :: ERule
+rulesFail _ lhs =
+  "FAIL" `name`
+  do Block _ bs _ <- [lhs]
+     ((_, Fail), _) <- pick bs
+     pure BFail
+
+rulesOne :: ERule
+rulesOne _ lhs =
+  "ONE-FAIL" `name`
+  do One BFail <- [lhs]
+     pure Fail
+ ++
+  "ONE-CHOICE" `name`
+  do One (BVal v :|: _e) <- [lhs]
+     pure (Val v)
+ ++
+  "ONE-VAL" `name`
+  do One (BVal v) <- [lhs]
+     pure (Val v)
+
+rulesAll :: ERule
+rulesAll _ lhs =
+  "ALL-FAIL" `name`
+  do All BFail <- [lhs]
+     pure (Arr [])
+ ++
+  "ALL-CHOICE" `name`
+  do All ves@(_ :|: _) <- [lhs]
+     let choiceVals (BVal v) = [[v]]
+         choiceVals (BVal v :|: es) = [ v : vs | vs <- choiceVals es ]
+         choiceVals _ = []
+     vs <- choiceVals ves
+     pure (Arr vs)
+ ++
+  "ALL-VAL" `name`
+  do All (BVal v) <- [lhs]
+     pure (Arr [v])
+
+rulesChoice :: ERule
+rulesChoice _ lhs =
+  "FAIL-L" `name`
+  do (sx, fe) <- scopeX lhs
+     BFail :|: e <- [fe]
+     pure (sx e)
+ ++
+  "FAIL-R" `name`
+  do (sx, ef) <- scopeX lhs
+     e :|: BFail <- [ef]
+     pure (sx e)
+ ++
+  "ASSOC-CHOICE" `name`
+  do (sx, e) <- scopeX lhs
+     (e1 :|: e2) :|: e3 <- [e]
+     pure (sx (e1 :|: (e2 :|: e3)))
+ ++
+  "CHOOSE" `name`
+  do (sx, Block xs bs v) <- scopeX lhs
+     (lbs, (x, b1 :|: b2), rbs) <- pickLR bs
+     guard (all (isChoiceFree . snd) lbs)
+     pure (sx (Block xs (lbs ++ [(x,b1)] ++ rbs) v :|: Block xs (lbs ++ [(x,b2)] ++ rbs) v))
 
 --------------------------------------------------------------------------------
 
