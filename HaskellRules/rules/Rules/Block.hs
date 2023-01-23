@@ -257,18 +257,12 @@ rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
   do Block oxs obs oe <- [lhs]
-     (lbs, (Var ox, LAM x b@BlockC{} :@: v), rbs) <- pickLR obs
-     let freeV = free v
-     let Block xs qs e =
-           if x `notElem` freeV then
-             b
-           else
-             -- The x has to be renamed to avoid capture
-             let freeE = free b
-                 x' = identNotIn (freeV ++ freeE)
-             in  subst [(x, Var x')] b
-     let fb = (x:xs, (Var x, v):qs, e)
-     pure $ mergeBlock oxs (lbs, rbs) ox fb oe
+     (lbs, (Var ox, LAM x (Block xs qs e) :@: v), rbs) <- pickLR obs
+     let fb = (x:xs, (Var x, Var tmpVar):qs, e)
+         (nxs, nbs, ne) = alphaBlk (oxs ++ free v) fb
+         nbs' = subst [(tmpVar, v)] nbs
+     --traceM ("mergeBlock " ++ show (oxs, (lbs, rbs), ox, ((nxs, nbs', ne), v), oe))
+     pure $ Block (oxs ++ nxs) (lbs ++ nbs' ++ [(Var ox, ne)] ++ rbs) oe
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
@@ -279,17 +273,16 @@ rulesApplication _ lhs =
 
 type Blk = ([Ident], [Eqn], Expr)
 
-mergeBlock :: [Ident] -> ([Eqn], [Eqn]) -> Ident -> Blk -> Expr -> Expr
-mergeBlock oxs (lbs, rbs) ox b oe =
-  let (nxs, nbs, ne) = alphaBlk oxs b
-  in  Block (oxs ++ nxs) (lbs ++ nbs ++ [(Var ox, ne)] ++ rbs) oe
+tmpVar :: Ident
+tmpVar = Name "$$$"
 
 alphaBlk :: [Ident] -> Blk -> Blk
 alphaBlk vs b@(xs, bs, e) =
   let is = identsNotIn (vs ++ free b)
       xs' = zipWith (\ x i -> if x `elem` vs then i else x) xs is
       sub = [ (x, Var x') | (x, x') <- zip xs xs', x /= x' ]
-  in  (xs', subst sub bs, subst sub e)
+  in  --trace ("alphaBlk " ++ show sub) $
+      (xs', subst sub bs, subst sub e)
 
 --------------------------------------------------------------------------------
 
