@@ -71,6 +71,7 @@ import Language.Verse.Token qualified as Token
   '-' { L _ Token.Minus }
   '->' { L _ Token.ThinArrow }
   '.' { L _ Token.Dot }
+  '..' { L _ Token.DotDot }
   '/' { L _ Token.Divide }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEqual }

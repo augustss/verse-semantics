@@ -97,6 +97,7 @@ $space = [\ \t]
   ":" { token Token.Colon }
   "," { token Token.Comma }
   "." { token Token.Dot }
+  ".." { token Token.DotDot }
   "=" { token Token.Equal }
   "<>" { token Token.NotEqual }
   "<" { token Token.Less }
