@@ -56,6 +56,8 @@ data Token
   | Array
   | False
   | True
+  | Var
+  | Set
   | Fail
   | All
   | One

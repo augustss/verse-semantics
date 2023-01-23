@@ -16,6 +16,7 @@ import Data.Ref
 
 import Language.Verse.Desugar
 import Language.Verse.Error
+import Language.Verse.Eval (Pure (..))
 import Language.Verse.Eval qualified as Eval
 import Language.Verse.Lexer
 import Language.Verse.Parse
@@ -26,5 +27,5 @@ eval :: ( MonadError Error m
         , MonadFix m
         , MonadRef m
         , EqRef (Ref m)
-        ) => ByteString -> m [Fix Val]
+        ) => ByteString -> m [Fix (Val Pure)]
 eval = Eval.eval <=< liftEither . (simplify <=< desugar <=< runLexer parse)
