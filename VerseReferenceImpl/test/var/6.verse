@@ -1,3 +1,3 @@
 var X = 0
-set X = (1|2) + X|X
+set X = X + (1|2)
 X
