@@ -114,6 +114,8 @@ instance Pretty Token where
     Array -> "array"
     False -> "false"
     True -> "true"
+    Var -> "var"
+    Set -> "set"
     Fail -> "fail"
     All -> "all"
     One -> "one"

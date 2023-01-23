@@ -244,7 +244,10 @@ split :: MonadRef m
       => VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
 split m f = do
   r <- ask'
-  split' r { level = r.level + 1 } m f
+  world <- getWorld
+  world' <- freshWorld
+  split' r { level = r.level + 1 } m $ \ x -> f x *> resolveWorld world'
+  putWorld world'
 
 split' :: MonadRef m
        => R -> VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
@@ -442,6 +445,14 @@ getWorld = VerseT $ gets world
 
 putWorld :: World m -> VerseT m ()
 putWorld world = VerseT . modify $ \ s -> s { world }
+
+localWorld :: (World m -> World m) -> VerseT m a -> VerseT m a
+localWorld f m = do
+  world <- getWorld
+  putWorld $ f world
+  x <- m
+  putWorld world
+  pure x
 
 newRef' :: MonadRef m => a -> VerseT m (Ref m a)
 newRef' = VerseT . lift . newRef
