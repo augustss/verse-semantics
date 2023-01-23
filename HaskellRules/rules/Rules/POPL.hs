@@ -249,7 +249,7 @@ valueX1 lhs =
 --------------------------------------------------------------------------------
 
 allRules :: ERule
-allRules = rulesPrimOps
+allRules =  rulesPrimOps
          <> rulesApplication
          <> rulesUnificationNoOcc
          <> rulesUnificationVariables
