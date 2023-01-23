@@ -35,8 +35,8 @@ systemBlock = TRSystem
 {-
 v ::= x | hnf
 hnf ::= k | <v,...> | \x.b | op
-b ::= fail | exist x*; (v=e)*; v
-e ::= v | v(v) | fail | (b || b) | one{b} | all{b} | split{b,v,v}
+b ::= fail | (b || b) | exist x*; (v=e)*; v
+e ::= v | v(v) | b | one{b} | all{b} | split{b,v,v}
 -}
 
 pattern BFail :: Expr
