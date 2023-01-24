@@ -10,9 +10,8 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Control.Monad( guard )
 --import Data.Functor.Classes (Show1(liftShowList))
-import Debug.Trace
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -298,8 +297,8 @@ unit :: Value
 unit = Arr []
 
 -- Make bad uses of primitives go to FAIL
-rulesBadFail :: ERule
-rulesBadFail _ lhs =
+_rulesBadFail :: ERule
+_rulesBadFail _ lhs =
   "OP-FAIL" `name`
   do Op op :@: HNF e <- [lhs]
      guard (not (opArgTC op e))
@@ -544,4 +543,7 @@ rulesChoice _ lhs =
 --------------------------------------------------------------------------------
 
 rulesStructural :: ERule
-rulesStructural _ _ = []
+rulesStructural _ lhs =
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     pure (EXI y (EXI x e))
