@@ -35,8 +35,6 @@ import GHC.Stack(HasCallStack)
 import TRS.Bind
 import TRS.TRS
 import Test.QuickCheck hiding ( collect )
-import Data.List( intercalate, union, elemIndex )
-import Data.Maybe
 import Epic.List(nub)
 
 type ERule = Rule Expr
@@ -69,7 +67,6 @@ data Expr
   | Store Heap Expr
   | Ref Ptr
   deriving (Data)
->>>>>>> main
 
 type Value = Expr
 

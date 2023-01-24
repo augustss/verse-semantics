@@ -16,7 +16,7 @@ import Rules.Core
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLS ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLS ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -57,8 +57,10 @@ systemPOPLR = systemPOPL
   , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
 --                          <> rulesOcc
 --                          <> rulesMoreFail
+  }
+
 systemPOPLS :: TRSystem Expr
-systemPOPLS = s
+systemPOPLS = systemPOPL
   { sname               = "POPLS"
   , description         = "POPLF + store"
   , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceNoSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail <> rulesStore
