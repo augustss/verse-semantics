@@ -134,6 +134,7 @@ coreToTrs (CDef (i:is) e) = T.Exi $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e
 coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
 coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
+coreToTrs (CMacro (Ident _ "block") e) = coreToTrs e
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
 coreToTrs _ = undefined
@@ -166,6 +167,7 @@ trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
 trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
 trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
+--trsToCore (T.BlockC e) = trsToCore e
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
