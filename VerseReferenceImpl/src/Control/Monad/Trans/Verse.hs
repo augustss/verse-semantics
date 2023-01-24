@@ -89,18 +89,18 @@ instance MonadRef m => Lenient.MonadRef (VerseT m) where
   readRef ref f = do
     world <- getWorld
     world' <- freshWorld
-    putWorld world'
     whenRealWorld world $ do
       f =<< VerseT (lift $ Backtrack.readRef ref)
       resolveWorld world'
+    putWorld world'
 
   writeRef ref x = do
     world <- getWorld
     world' <- freshWorld
-    putWorld world'
     whenRealWorld world $ do
       VerseT . lift $ Backtrack.writeRef ref x
       resolveWorld world'
+    putWorld world'
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m = runRefLogicT $ do
@@ -244,7 +244,12 @@ split :: MonadRef m
       => VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
 split m f = do
   r <- ask'
-  split' r { level = r.level + 1 } m f
+  world <- getWorld
+  world' <- freshWorld
+  split' r { level = r.level + 1 } m $ \ x -> do
+    localWorld (const world) $ f x
+    resolveWorld world'
+  putWorld world'
 
 split' :: MonadRef m
        => R -> VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
@@ -323,17 +328,16 @@ data WorldState m
 
 freshWorld :: MonadRef m => VerseT m (World m)
 freshWorld =
-  VerseT . lift $
-  fmap World . Backtrack.newRef . PendingWorld =<<
+  fmap World . newRef' . PendingWorld =<<
   lift (newRef $ pure ())
 
 newWorld' :: MonadRef m => RefLogicT m (World m)
-newWorld' = fmap World $ Backtrack.newRef RealWorld
+newWorld' = World <$> newRef RealWorld
 
 resolveWorld :: MonadRef m => World m -> VerseT m ()
-resolveWorld (World ref) = VerseT (lift $ Backtrack.readRef ref) >>= \ case
+resolveWorld (World ref) = readRef' ref >>= \ case
   PendingWorld m -> do
-    VerseT . lift $ Backtrack.writeRef ref RealWorld
+    writeRef' ref RealWorld
     join . lift $ readRef m
   RealWorld -> error "resolveWorld"
 
@@ -442,6 +446,14 @@ getWorld = VerseT $ gets world
 
 putWorld :: World m -> VerseT m ()
 putWorld world = VerseT . modify $ \ s -> s { world }
+
+localWorld :: (World m -> World m) -> VerseT m a -> VerseT m a
+localWorld f m = do
+  world <- getWorld
+  putWorld $ f world
+  x <- m
+  putWorld world
+  pure x
 
 newRef' :: MonadRef m => a -> VerseT m (Ref m a)
 newRef' = VerseT . lift . newRef

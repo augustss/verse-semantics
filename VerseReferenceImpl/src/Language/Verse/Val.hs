@@ -125,6 +125,8 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
       pretty x
     Float x ->
       pretty x
+    Rational x | denominator x == 1 ->
+      pretty $ numerator x
     Rational x ->
       pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x ->
