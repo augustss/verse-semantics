@@ -387,16 +387,17 @@ instance Arbitrary Expr where
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
-  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
+  shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
-  shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
-    where as = case a of _ :=: _ -> []; _ -> [a]
-  shrink (a :@: b) = [a, b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
+  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
-  shrink (All a)   = [a, One a, Arr []] ++ [All a'| a'<-shrink a]
-  shrink (Exi (Bind x a)) = [a |x `notElem` free a] ++ [Exi (Bind x a') | a' <- shrink a]
+  shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
+  shrink (Exi (Bind x a)) = [a |x `notElem` ys]
+                         ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
+                         ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
@@ -409,7 +410,8 @@ arbExpr n xs =
   [ (1, Var <$> elements xs) | not (null xs) ] ++
   [ (1, Int <$> arbitrary)
   , (1, Op  <$> arbitrary)
-  , (n, Arr <$> scale (min 5) (listOf (arbExpr n2 xs)))
+  , (n, Arr <$> do k <- choose (0,5)
+                   sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
   , (n, Lam <$> arbBind n1 xs)
   , (1, return Fail) -- maybe not have this?
   , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
