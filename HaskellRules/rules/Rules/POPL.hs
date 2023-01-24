@@ -11,7 +11,7 @@ import TRS.System
 import TRS.TRS
 import Rules.Core
 --import Data.Functor.Classes (Show1(liftShowList))
-import Debug.Trace
+--import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -31,13 +31,18 @@ systemPOPL = TRSystem
   , validExpr           = const valid
   }
 
+-- Fixes some problems from  versetests/tricky.versetest.
+--  QC1   by DEF-ELIMV
+--  Koen5 by DEF-ELIM
+--  QC4   by UNIFY-SEQR-E
 systemPOPLV :: TRSystem Expr
 systemPOPLV = systemPOPL
   { sname               = "POPLV"
-  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + UNIFY-SEQR-E"
   , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
   }
 
+-- Like POPLV, but all bad uses of application and ops reduce to Fail rather than getting stuck.
 systemPOPLF :: TRSystem Expr
 systemPOPLF = systemPOPL
   { sname               = "POPLF"
