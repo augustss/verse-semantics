@@ -24,10 +24,11 @@ main = do
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   quickCheckWith qcargs (prop_Confluence flags sys)
 
-prop_Confluence :: TestFlags -> TRSystem Expr -> Expr -> Property
-prop_Confluence flags sys p =
+prop_Confluence :: TestFlags -> TRSystem Expr -> Property
+prop_Confluence flags sys =
+  forAllShrink arbExpr shrinkExpr $ \p ->
   let p' = if wrapOne flags then One p else p in
-  case normalFormsFuelTrace sys (maxSteps flags) $ preProcess sys (ruleEnv sys) p' of
+  case normalFormsFuelTrace sys (maxSteps flags) p' of
     NormResult { nrDone = done, nrLeft = left } ->
       -- First, check if all the stuck terms actually have the same normal form
       case nub $ map (norm sys) done of
@@ -46,6 +47,13 @@ prop_Confluence flags sys p =
           | otherwise ->
 --            Debug.Trace.trace ("TO " ++ show p')
             discard                     -- reduction timed out
+ where
+  arbExpr =
+    do p <- arbitrary
+       return (preProcess sys (ruleEnv sys) p)
+
+  shrinkExpr p =
+    [ p' | p' <- shrink p, validExpr sys (ruleEnv sys) p' ]
 
 --------------------------------------------------------------------------------
 

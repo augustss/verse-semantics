@@ -1,9 +1,11 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Core(
   Expr(..), Op(..),
+  Heap, Ptr(..),
   Value,
   TRSFlags, RuleEnv(..), defaultTRSFlags,
   DerefPos(..),
@@ -24,6 +26,10 @@ module Rules.Core(
   allVars,
   check,
   ) where
+import qualified Epic.SIntMap as IM
+import Data.Data(Data)
+import Data.List( intercalate, union, elemIndex )
+import Data.Maybe
 import GHC.Stack(HasCallStack)
 
 import TRS.Bind
@@ -59,8 +65,17 @@ data Expr
   | Wrong                       -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
+  -- only used for updatable references
+  | Store Heap Expr
+  | Ref Ptr
+  deriving (Data)
+>>>>>>> main
 
 type Value = Expr
+
+type Heap = IM.SIntMap Ptr Value
+newtype Ptr = Ptr Int deriving (Eq, Ord, Data)
+instance Show Ptr where show (Ptr i) = "r" ++ show i
 
 infixr 1 :>:
 infixr 3 :|:
@@ -80,13 +95,16 @@ instance Show Expr where
   showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
-  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString ". " . showsPrec 0 a
+  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "∃" . showsPrec 0 x . showString ". " . showsPrec 0 a
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
-  showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
+  showsPrec _ (Split e v1 v2)  = showString "split{" . showsPrec 0 e . showString ", " .
                                  showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
   showsPrec _ (BlockC e)       = showString "block {" . showsPrec 0 e . showString "}"
+  showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
+                                 showsPrec 0 e . showString "}"
+  showsPrec p (Ref r)          = showsPrec p r
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -169,8 +187,16 @@ instance Ord Expr where
     comp _xs _ys BlockC{} _ = LT
     comp _xs _ys _ BlockC{} = GT
 
-    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp  xs  ys (Store h e) (Store h' e') =
+      compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
+    comp _xs _ys Store {} _ = LT
+    comp _xs _ys _ Store {} = GT
 
+    comp _xs _ys (Ref p) (Ref q) = compare p q
+    comp _xs _ys Ref {} _        = LT
+    comp _xs _ys _ Ref {}        = GT
+
+    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
 --------------------------------------------------------------------------------
 
@@ -189,7 +215,11 @@ data Op
   | IsInt
   | MapAp
   | Cons
- deriving ( Eq, Ord )
+  | Alloc
+  | Read
+  | Write
+  | AddTo
+ deriving ( Eq, Ord, Data )
 
 instance Show Op where
   show Gt    = "gt"
@@ -206,6 +236,10 @@ instance Show Op where
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
+  show Alloc = "alloc"
+  show Read  = "read"
+  show Write = "write"
+  show AddTo = "addto"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -238,6 +272,7 @@ getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
 getHNF e@Op{} = Just e
 getHNF e@Arr{} = Just e
+getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
@@ -250,6 +285,7 @@ pattern CON e <- (getCON -> Just e)
 getCON :: Expr -> Maybe Expr
 getCON e@Int{} = Just e
 getCON e@Op{} = Just e
+getCON e@Ref{} = Just e
 getCON _ = Nothing
 
 type Eqn = (Value, Expr)
@@ -333,12 +369,16 @@ instance Rec Expr where
         ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
       BlockC a ->
            [ (n, BlockC a') | (n, a') <- rec r s a ]
+      -- No reductions in the store, it's supposed to be a Value
+      Store h e -> [ (n, Store h e') | (n,e') <- rec r s e ]
       _     -> []
 
 --------------------------------------------------------------------------------
 
 instance Free Expr where
   free (Var v)   = [v]
+  free Int{}     = []
+  free Op{}      = []
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
@@ -351,7 +391,10 @@ instance Free Expr where
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
-  free _         = []
+  free Fail      = []
+  free Wrong     = []
+  free (Store h e) = free (IM.elems h) `union` free e
+  free Ref{}     = []
 
 --------------------------------------------------------------------------------
 
@@ -379,12 +422,14 @@ instance Term Expr where
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst _sub Fail     = Fail
+  subst _sub Wrong    = Wrong
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst sub (BlockC e) = BlockC (subst sub e)
-  subst _sub Wrong    = Wrong
+  subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
+  subst _sub e@Ref{}  = e
 
 instance (Term a, Term b) => Term (a, b) where
   subst sub (a, b) = (subst sub a, subst sub b)
@@ -429,22 +474,24 @@ instance Arbitrary Expr where
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
-  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
+  shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
-  shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
-    where as = case a of _ :=: _ -> []; _ -> [a]
-  shrink (a :@: b) = [a, b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
+  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
-  shrink (All a)   = [a, One a, Arr []] ++ [All a'| a'<-shrink a]
-  shrink (Exi (Bind x a)) = [a |x `notElem` free a] ++ [Exi (Bind x a') | a' <- shrink a]
+  shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
+  shrink (Exi (Bind x a)) = [a |x `notElem` ys]
+                         ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
+                         ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
-  -- XXX this is probably wrong
   shrink BlockC{}  = error "impossible"
+  shrink (Store _ _) = undefined
+  shrink (Ref _)   = []
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
@@ -453,7 +500,8 @@ arbExpr n xs =
   [ (1, Var <$> elements xs) | not (null xs) ] ++
   [ (1, Int <$> arbitrary)
   , (1, Op  <$> arbitrary)
-  , (n, Arr <$> scale (min 5) (listOf (arbExpr n2 xs)))
+  , (n, Arr <$> do k <- choose (0,5)
+                   sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
   , (n, Lam <$> arbBind n1 xs)
   , (1, return Fail) -- maybe not have this?
   , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
@@ -501,6 +549,7 @@ collect here (\/) = col
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
+  recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
 
 --------------------------------------------------------------------------------

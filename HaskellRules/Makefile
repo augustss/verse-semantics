@@ -53,6 +53,9 @@ testqcconf:
 teststore:
 	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
 
+teststorepopl:
+	$(TESTER) --rules=popls --split --final-inline --max-steps=200000 --no-under-lambda versetests/storetests.versetest
+
 clean:
 	cabal clean
 	rm -rf *~ objs-*
