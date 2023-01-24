@@ -350,13 +350,6 @@ rulesApplication _ lhs =
      let (xs'@(x' : _), qs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
          b = Block xs' ((Var x', v) : qs') e'
      pure $ Block oxs (lbs ++ [(ox, b)] ++ rbs) oe
-{-
-     let fb = (x:xs, (Var x, Var tmpVar):qs, e)
-         (nxs, nbs, ne) = alphaBlk (oxs ++ free v) fb
-         nbs' = subst [(tmpVar, v)] nbs
-     --traceM ("mergeBlock " ++ show (oxs, (lbs, rbs), ox, ((nxs, nbs', ne), v), oe))
-     pure $ Block (oxs ++ nxs) (lbs ++ nbs' ++ [(Var ox, ne)] ++ rbs) oe
--}
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
@@ -377,7 +370,7 @@ alphaBlk vs b@(xs, bs, e) =
 
 rulesBlock :: ERule
 rulesBlock _ lhs =
-  "BLOCK" `name`
+  "MERGE-BLK" `name`
   do Block oxs obs oe <- [lhs]
      (lbs, (ox, Block xs bs e), rbs) <- pickLR obs
      let (nxs, nbs, ne) = alphaBlk (oxs ++ free (lbs, ox, rbs)) (xs, bs, e)
@@ -426,6 +419,14 @@ rulesDefElim _ lhs =
      (x, xs') <- pick xs
      guard (x `notElem` free (bs, e))
      pure (Block xs' bs e)
+ ++
+  "DEF-ELIMV" `name`
+  do Block xs bs e <- [lhs]
+     ((Var y, Var x), bs') <- pick bs
+     guard (x `elem` xs)
+     guard (x /= y)
+     let sub = [(x, Var y)]
+     pure $ Block (delete x xs) (subst sub bs') (subst sub e)
 
 --------------------------------------------------------------------------------
 
@@ -448,13 +449,13 @@ rulesUnification _ lhs =
   "UX-LAM" `name`
   do Block _ bs _ <- [lhs]
      ((Lam{}, Lam{}), _) <- pick bs
-     pure Fail
+     pure BFail
  ++
 {-
   "UX-OP" `name`
   do Block _ bs _ <- [lhs]
      ((Op{}, Op{}), _) <- pick bs
-     pure Fail
+     pure BFail
  ++
 -}
   "UX-OP" `name`
@@ -474,7 +475,7 @@ rulesUnification _ lhs =
                             (Op{}, Op{})  -> False
                             _             -> True)
      guard (e1 /= e2)
-     pure Fail
+     pure BFail
 
 --------------------------------------------------------------------------------
 
@@ -547,3 +548,7 @@ rulesStructural _ lhs =
   "EXI-SWAP" `name`
   do EXI x (EXI y e) <- [lhs]
      pure (EXI y (EXI x e))
+ <>
+  "UNIFY-SWAP" `name`
+  do u1@(_ :=: _) :>: (u2@(_ :=: _) :>: r) <- [lhs]
+     pure $ u2 :>: (u1 :>: r)
