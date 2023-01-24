@@ -297,6 +297,50 @@ mapAp vs =
 unit :: Value
 unit = Arr []
 
+-- Make bad uses of primitives go to FAIL
+rulesBadFail :: ERule
+rulesBadFail _ lhs =
+  "OP-FAIL" `name`
+  do Op op :@: HNF e <- [lhs]
+     guard (not (opArgTC op e))
+     pure Fail
+ <>
+  "AP-FAIL" `name`
+  do HNF f :@: _ <- [lhs]
+     guard (not (validFcn f))
+     pure Fail
+
+-- Check that an Op has a legal argument.
+-- The argument is assumed to be in HNF.
+-- If the argument is an array, the elements are not in HNF
+-- so they need extra tests.
+opArgTC :: Op -> Value -> Bool
+opArgTC op =
+  case op of
+    Neg -> int                    -- Must be Int
+    Plus -> int                   -- Must be Int
+    IsInt -> any_                 -- Any type is allowed
+    MapAp -> arr lam              -- Used internally: takes an array of thunks
+    Cons -> pair any_ (arr any_)  -- Must be anything, array
+    _ -> pair (hnf int) (hnf int) -- Must be Int, Int
+  where int Int{} = True          
+        int _ = False
+        any_ _ = True
+        arr p (Arr vs) = all p vs
+        arr _ _ = False
+        lam Lam{} = True
+        lam _ = False
+        hnf p (HNF e) = p e  -- Check the predicate for HNF
+        hnf _ _ = True       -- Assume OK if it's not HNF
+        pair t1 t2 (Arr [e1, e2]) = t1 e1 && t2 e2
+        pair _ _ _ = False
+
+validFcn :: Expr -> Bool
+validFcn Op{} = True
+validFcn Arr{} = True
+validFcn Lam{} = True
+validFcn _ = False
+
 --------------------------------------------------------------------------------
 
 rulesApplication :: ERule
