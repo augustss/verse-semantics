@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 X1 := # test
   1
 
