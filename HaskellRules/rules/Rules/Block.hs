@@ -82,7 +82,8 @@ type A a = State (([Ident], [Eqn]), [Ident]) a
 anf :: Expr -> Expr
 anf ee = foo $ evalState (block ee) (undefined, allVars ee)
   where
-    foo xx = trace (show ee) $ trace (show xx) xx
+    foo xx = --trace (show ee) $ trace (show xx)
+             xx
     expr :: Expr -> A Expr
     expr e@Var{} = pure e
     expr e@Int{} = pure e
@@ -291,16 +292,10 @@ rulesPrimOps _ lhs =
 mapAp :: [Value] -> Expr
 mapAp vs =
   let xs = take (length vs) $ identsNotIn $ free vs
-  in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: unit)) xs vs ++ [Arr $ map Var xs]
-
-defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x -> Exi . Bind x) e vs
+  in  Block xs (zipWith (\ x v -> (Var x, v :@: unit)) xs vs) (Arr $ map Var xs)
 
 unit :: Value
 unit = Arr []
-
-seqs :: [Expr] -> Expr
-seqs = foldl1 (:>:)
 
 --------------------------------------------------------------------------------
 
@@ -308,10 +303,10 @@ rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
   do Block oxs obs oe <- [lhs]
-     (lbs, (Var ox, LAM x (Block xs bs e) :@: v), rbs) <- pickLR obs
+     (lbs, (ox, LAM x (Block xs bs e) :@: v), rbs) <- pickLR obs
      let (xs'@(x' : _), qs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
-         b = Block xs' ((Var x',v) : qs') e'
-     pure $ Block oxs (lbs ++ [(Var ox, b)] ++ rbs) oe
+         b = Block xs' ((Var x', v) : qs') e'
+     pure $ Block oxs (lbs ++ [(ox, b)] ++ rbs) oe
 {-
      let fb = (x:xs, (Var x, Var tmpVar):qs, e)
          (nxs, nbs, ne) = alphaBlk (oxs ++ free v) fb
@@ -341,9 +336,9 @@ rulesBlock :: ERule
 rulesBlock _ lhs =
   "BLOCK" `name`
   do Block oxs obs oe <- [lhs]
-     (lbs, (Var ox, Block xs bs e), rbs) <- pickLR obs
+     (lbs, (ox, Block xs bs e), rbs) <- pickLR obs
      let (nxs, nbs, ne) = alphaBlk oxs (xs, bs, e)
-     pure $ Block (oxs ++ nxs) (lbs ++ nbs ++ [(Var ox, ne)] ++ rbs) oe
+     pure $ Block (oxs ++ nxs) (lbs ++ nbs ++ [(ox, ne)] ++ rbs) oe
 
 --------------------------------------------------------------------------------
 
@@ -412,10 +407,19 @@ rulesUnification _ lhs =
      ((Lam{}, Lam{}), _) <- pick bs
      pure Fail
  ++
+{-
   "UX-OP" `name`
   do Block _ bs _ <- [lhs]
      ((Op{}, Op{}), _) <- pick bs
      pure Fail
+ ++
+-}
+  "UX-OP" `name`
+  do Block xs bs e <- [lhs]
+     ((Op o1, Op o2), bs') <- pick bs
+     if o1 == o2
+       then pure (Block xs bs' e)
+       else pure BFail
  ++
   "UX" `name`
   do Block _ bs _ <- [lhs]
