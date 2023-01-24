@@ -18,6 +18,8 @@ import qualified Data.Set as S
 --import Control.Monad( unless )
 --import qualified Debug.Trace
 --import Data.Set( Set )
+import System.IO.Unsafe
+import Text.Printf
 
 --------------------------------------------------------------------------------
 
@@ -57,12 +59,25 @@ normalFormsFuelTracePlain env an rule at = go an S.empty [start at]
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)
 --    | (s,_):_ <- tr, Debug.Trace.trace ("go: " ++ show (s, t)) False = undefined
-    | t `S.member` seen = go n seen trs
-    | null ts'          = addDone ttr $ go n seen' trs
-    | otherwise         = go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
+    | t `S.member` seen = stepper "SEEN" ttr $ go n seen trs
+    | null ts'          = stepper "DONE" ttr $ addDone ttr $ go n seen' trs
+    | otherwise         =
+      stepper "STEP" ttr $
+      go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = step rule env t
+
+singleStep :: Bool
+singleStep = False
+
+stepper :: (Show a) => String -> Traced a -> b -> b
+stepper msg (t:<--tr) x | singleStep = unsafePerformIO $ do
+  let s = case tr of ((ss,_):_) -> ss; _ -> "REFL"
+  printf "%s %10s %s\n" msg s (show t)
+  _ <- getLine
+  pure x
+              | otherwise = x
 
 addDone :: Traced a -> NormResult a -> NormResult a
 addDone a nr = nr{ nrDone = a : nrDone nr }
@@ -76,9 +91,11 @@ dfs env an rule at = go an S.empty (start at)
  where
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
-    | null ts'   = NormResult { nrDone = [ttr], nrLeft = [] }
+    | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
     | null ts''  = error "normalFormFuelTracePlain.dfs : no children"  -- a loop.  Maybe because of structural rules.
-    | otherwise  = go (n-1) seen' (t' :<-- ((s, t) : tr))
+    | otherwise  =
+      stepper "STEP" ttr $
+      go (n-1) seen' (t' :<-- ((s, t) : tr))
     where
       seen' = S.insert t seen
       ts'   = step rule env t
