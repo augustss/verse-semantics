@@ -7,7 +7,6 @@ module Language.Verse.Ident
 import Data.Functor.Classes
 import Data.Hashable
 import Data.Hashable.Lifted
-import Data.String
 
 import Language.Verse.Label
 
@@ -16,9 +15,6 @@ import Prettyprinter
 data Ident a
   = Pure a
   | Label !Label deriving (Show, Eq, Ord)
-
-instance IsString a => IsString (Ident a) where
-  fromString = Pure . fromString
 
 instance Eq1 Ident where
   liftEq f = curry $ \ case
