@@ -53,17 +53,19 @@ data NormResult a = NormResult
 normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> NormResult a
 normalFormsFuelTracePlain env an rule at = go an S.empty [start at]
  where
---  go  n  _ trs | Debug.Trace.trace ("go " ++ show (n, length trs)) False = undefined
+--  go  n  _ trs | Debug.Trace.trace ("go: " ++ show (n, length trs)) False = undefined
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)
---    | (s,_):_ <- tr, Debug.Trace.trace ("go: " ++ show (s, t)) False = undefined
+--    | Debug.Trace.trace ("go: " ++ show (rn tr, t)) False = undefined
     | t `S.member` seen = go n seen trs
     | null ts'          = addDone ttr $ go n seen' trs
     | otherwise         = go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = step rule env t
+--    rn [] = "refl"
+--    rn ((s,_):_) = s
 
 addDone :: Traced a -> NormResult a -> NormResult a
 addDone a nr = nr{ nrDone = a : nrDone nr }
