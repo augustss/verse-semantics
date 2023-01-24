@@ -71,6 +71,7 @@ import Language.Verse.Token qualified as Token
   '-' { L _ Token.Minus }
   '->' { L _ Token.ThinArrow }
   '.' { L _ Token.Dot }
+  '..' { L _ Token.DotDot }
   '/' { L _ Token.Divide }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEqual }
@@ -110,10 +111,12 @@ import Language.Verse.Token qualified as Token
   newline { L _ Token.Newline }
   not { L _ Token.Not }
   one { L _ Token.One }
+  set { L _ Token.Set }
   struct { L _ Token.Struct }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
+  var { L _ Token.Var }
 
 %%
 
@@ -152,11 +155,17 @@ Exp :: { L (Exp L Name) }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
+  | set name '=' Exp {
+      Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
   | name {
       Exp.Name <\$> $1
     }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
+    }
+  | var name {
+      Exp.Var <\$ $1 <.> duplicate $2
     }
   | name ':=' Exp {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
@@ -248,9 +257,6 @@ Exp :: { L (Exp L Name) }
   | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
   | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
   | struct Block { Exp.Struct <\$ $1 <.> duplicate $2 }
-  | class Block { Exp.Class Nothing <\$ $1 <.> duplicate $2 }
-  | class '(' ')' Block { Exp.Class Nothing <\$ $1 <.> duplicate $4 }
-  | class '(' Exp ')' Block { Exp.Class . Just <\$ $1 <.> duplicate $3 <.> duplicate $5 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | Inst { $1 }

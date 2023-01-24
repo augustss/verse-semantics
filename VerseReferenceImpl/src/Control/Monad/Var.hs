@@ -15,11 +15,6 @@ import Control.Monad.Trans.Writer.CPS qualified as CPS
 
 import Data.Kind
 
-type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
-  VarDefault (t n) = Var n
-
-type MonadVarTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVar n)
-
 class Monad m => MonadVar m where
   type Var m :: (Type -> Type) -> Type
   type Var m = VarDefault m
@@ -35,6 +30,11 @@ class Monad m => MonadVar m where
   readVar :: Var m f -> m (Maybe (f (Var m f)))
   default readVar :: (m ~ t n, MonadVarTrans t n) => Var m f -> m (Maybe (f (Var m f)))
   readVar = lift . readVar
+
+type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
+  VarDefault (t n) = Var n
+
+type MonadVarTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVar n)
 
 instance MonadVar m => MonadVar (MaybeT m)
 

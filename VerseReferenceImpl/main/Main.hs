@@ -7,7 +7,7 @@ module Main
 import Control.Monad.Trans.Except
 
 import Data.ByteString qualified as ByteString
-import Data.Foldable (for_)
+import Data.Foldable
 
 import Language.Verse
 
