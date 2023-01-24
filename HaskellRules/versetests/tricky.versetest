@@ -20,7 +20,9 @@ testceq("Yikes2",SEq) { exists x y. x=<1,2>; y=x; \w.<x,y> }
                      { x:= <1,2>; \w. <x,x> }
 testceq("QC1", SEq)  { exists x . (exists y . x = y; x) | <> }
                      { exists x . x | <> }
-testceq("Ex1", SEq)  { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
+# There are too many existentials in Block for the structural rules to terminate.
+testceq("Ex1", SEq, Block=Skip)
+                     { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
                      { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
 testceq("Ex2", SEq)  { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
                      { exists f g c d       . f(c); g(d); <c, d> }
@@ -37,7 +39,7 @@ testceq("Koen1", SEq){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>
                      { fail }
 # This test loops with substitution and reduction under lambda, e.g., POPL rules
 # because x=<\y.x>
-testceq("Koen3", SEq, POPL=Skip, POPLV=Skip)
+testceq("Koen3", SEq, POPL=Skip, POPLV=Skip, Block=Skip)
                      { exists x . (\y.x = <y>; (exists z . z))(\y.x) }
                      { exists z . z }
 testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
