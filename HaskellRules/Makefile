@@ -33,6 +33,9 @@ testfast:
 testnorec:
 	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
 
+testblock:
+	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=25000    $(TESTFILE)
+
 testnorecqc:
 	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
 
