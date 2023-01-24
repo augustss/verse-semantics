@@ -327,12 +327,10 @@ data WorldState m
   | RealWorld
 
 freshWorld :: MonadRef m => VerseT m (World m)
-freshWorld =
-  fmap World . newRef' . PendingWorld =<<
-  lift (newRef $ pure ())
+freshWorld = lift $ fmap World . newRef . PendingWorld =<< newRef (pure ())
 
 newWorld' :: MonadRef m => RefLogicT m (World m)
-newWorld' = World <$> newRef RealWorld
+newWorld' = lift $ World <$> newRef RealWorld
 
 resolveWorld :: MonadRef m => World m -> VerseT m ()
 resolveWorld (World ref) = readRef' ref >>= \ case

@@ -36,22 +36,24 @@ import Data.Traversable
 import Data.Unifiable
 
 import Language.Verse.Error
-import Language.Verse.Ident
+import Language.Verse.Ident (Ident)
+import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Simplify.Exp (Exp ( (:*>:)
-                                        , (:=:)
-                                        , (:.:)
-                                        , (:<:)
-                                        , (:<=:)
-                                        , (:>:)
-                                        , (:>=:)
-                                        , (:|:)
-                                        , (:+:)
-                                        , (:-:)
-                                        , (:*:)
-                                        , (:/:)
-                                        ))
-import Language.Verse.Simplify.Exp qualified as Exp
+import Language.Verse.Desugar.Exp (Exp ( (:*>:)
+                                       , (:=:)
+                                       , (:.:)
+                                       , (:..:)
+                                       , (:<:)
+                                       , (:<=:)
+                                       , (:>:)
+                                       , (:>=:)
+                                       , (:|:)
+                                       , (:+:)
+                                       , (:-:)
+                                       , (:*:)
+                                       , (:/:)
+                                       ))
+import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Val (Val, hoistVal)
@@ -133,6 +135,17 @@ eval' e = case extract e of
           Nothing -> throwNameError (loc e) x
       _ -> throwDomainError $ loc e
     pure var
+  e1 :..: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    var <- freshVar
+    whenBound var1 $ \ case
+      Val.Int val1 -> whenBound var2 $ \ case
+        Val.Int val2 ->
+          unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+        _ -> throwDomainError $ loc e2
+      _ -> throwDomainError $ loc e1
+    pure var
   e1 :<: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -188,8 +201,8 @@ eval' e = case extract e of
     xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
     _ <- localNames xs $ eval' e
     newVar . Val.Module i $ toNames xs
-  Exp.Struct i ys xs e -> do
-    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+  Exp.Struct i xs e -> do
+    env <- ask
     newVar $ Val.Struct i env xs e
   Exp.Inst e1 xs e2 -> do
     var1 <- eval' e1
@@ -251,9 +264,9 @@ eval' e = case extract e of
       var <- eval' e
       Lenient.writeRef ref =<< freshen var
       pure var
-  Exp.Function ys xs e1 e2 -> do
+  Exp.Function xs e1 e2 -> do
     i <- supply
-    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    env <- ask
     newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
@@ -439,8 +452,7 @@ toNames :: Hashable a => HashMap (Ident a) v -> HashMap a v
 toNames =
   HashMap.fromList .
   HashMap.foldrWithKey
-  (\ k x z ->
-     case name k of
-       Nothing -> z
-       Just k -> (k, x) : z)
+  (\ case
+      Ident.Pure x -> \ y z -> (x, y) : z
+      Ident.Label _ -> \ _ z -> z)
   []

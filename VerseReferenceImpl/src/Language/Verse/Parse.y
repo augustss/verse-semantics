@@ -15,6 +15,7 @@ import Data.Functor.Apply
 import Language.Verse.Parse.Exp (Exp ( (:=:)
                                      , (:<>:)
                                      , (:.:)
+                                     , (:..:)
                                      , (:<:)
                                      , (:<=:)
                                      , (:>:)
@@ -53,6 +54,7 @@ import Language.Verse.Token qualified as Token
 %right '<' '<=' '>' '>='
 %nonassoc not
 %left '|'
+%left '..'
 %left '+' '-'
 %left '*' '/'
 %left '.'
@@ -194,6 +196,9 @@ Exp :: { L (Exp L Name) }
   | Exp '.' name {
       (:.:) <\$> duplicate $1 <.> $3
     }
+  | Exp '..' Exp {
+      (:..:) <\$> duplicate $1 <.> duplicate $3
+    }
   | Exp '<' Scan Exp {
       (:<:) <\$> duplicate $1 <.> duplicate $4
     }
@@ -209,8 +214,14 @@ Exp :: { L (Exp L Name) }
   | Exp '|' Scan Exp {
       (:|:) <\$> duplicate $1 <.> duplicate $4
     }
+  | '+' Scan Exp {
+      Exp.PrefixPlus <$ $1 <.> duplicate $3
+    }
   | Exp '+' Scan Exp {
       (:+:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | '-' Scan Exp {
+      Exp.PrefixMinus <$ $1 <.> duplicate $3
     }
   | Exp '-' Scan Exp {
       (:-:) <\$> duplicate $1 <.> duplicate $4
