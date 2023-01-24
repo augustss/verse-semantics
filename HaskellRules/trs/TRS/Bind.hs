@@ -3,6 +3,7 @@
 module TRS.Bind where
 import Data.Data(Data)
 import Data.List( union, (\\) )
+import Data.Char( isDigit )
 
 --------------------------------------------------------------------------------
 
@@ -22,8 +23,12 @@ prim :: Int -> Ident
 prim = Prim
 
 identsNotIn :: [Ident] -> [Ident]
+identsNotIn zs = [ Name ("v" ++ show (m+i)) | i <- [1..] ]
+ where m = maximum (0 : [ read s :: Integer | Name ('v':s) <- zs, not (null s), all isDigit s ])
+{-
 identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
  where m = maximum (0 : [ n | Prim n <- zs ])
+-}
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
