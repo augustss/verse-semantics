@@ -36,6 +36,11 @@ deriving instance MonadError e m => MonadError e (RefLogicT m)
 
 deriving instance MonadSupply s m => MonadSupply s (RefLogicT m)
 
+instance MonadState s m => MonadState s (RefLogicT m) where
+  get = lift get
+  put = lift . put
+  state = lift . state
+
 runRefLogicT :: Monad m => RefLogicT m a -> m [a]
 runRefLogicT = evalWriterT . observeAllT . unRefLogicT
 

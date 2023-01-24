@@ -49,7 +49,7 @@ import Data.Traversable (for)
 import Data.Unifiable
 
 newtype VerseT m a = VerseT
-  { unVerseT :: RST R (S m) (RefLogicT m) a
+  { unVerseT :: RST R (S m) (RefLogicT (StateT (World m) m)) a
   } deriving ( Functor
              , Applicative
              , Alternative
@@ -63,7 +63,7 @@ deriving instance MonadError e m => MonadError e (VerseT m)
 deriving instance MonadSupply s m => MonadSupply s (VerseT m)
 
 instance MonadTrans VerseT where
-  lift = VerseT . lift . lift
+  lift = VerseT . lift . lift . lift
 
 instance ( MonadRef m
          , MonadSupply Label m
@@ -103,9 +103,8 @@ instance MonadRef m => Lenient.MonadRef (VerseT m) where
     putWorld world'
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
-runVerseT m = runRefLogicT $ do
-  world <- newWorld'
-  evalRST (unVerseT m) R { level } S { promises, world }
+runVerseT m =
+  evalStateT (runRefLogicT (evalRST (unVerseT m) R { level } S { promises })) =<< newWorld'
   where
     level = minBound
     promises = []
@@ -329,8 +328,8 @@ data WorldState m
 freshWorld :: MonadRef m => VerseT m (World m)
 freshWorld = lift $ fmap World . newRef . PendingWorld =<< newRef (pure ())
 
-newWorld' :: MonadRef m => RefLogicT m (World m)
-newWorld' = lift $ World <$> newRef RealWorld
+newWorld' :: MonadRef m => m (World m)
+newWorld' = World <$> newRef RealWorld
 
 resolveWorld :: MonadRef m => World m -> VerseT m ()
 resolveWorld (World ref) = readRef' ref >>= \ case
@@ -360,9 +359,8 @@ newtype R = R
 
 type Level = Word
 
-data S m = S
+newtype S m = S
   { promises :: Promises m
-  , world :: World m
   }
 
 type Promises m = [Promise m]
@@ -439,13 +437,13 @@ putPromises promises = VerseT . modify $ \ s -> s { promises }
 modifyPromises :: (Promises m -> Promises m) -> VerseT m ()
 modifyPromises f = VerseT . modify $ \ s -> s { promises = f s.promises }
 
-getWorld :: VerseT m (World m)
-getWorld = VerseT $ gets world
+getWorld :: Monad m => VerseT m (World m)
+getWorld = VerseT . lift $ get
 
-putWorld :: World m -> VerseT m ()
-putWorld world = VerseT . modify $ \ s -> s { world }
+putWorld :: Monad m => World m -> VerseT m ()
+putWorld = VerseT . lift . put
 
-localWorld :: (World m -> World m) -> VerseT m a -> VerseT m a
+localWorld :: Monad m => (World m -> World m) -> VerseT m a -> VerseT m a
 localWorld f m = do
   world <- getWorld
   putWorld $ f world
