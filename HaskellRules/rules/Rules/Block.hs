@@ -337,7 +337,7 @@ rulesBlock _ lhs =
   "BLOCK" `name`
   do Block oxs obs oe <- [lhs]
      (lbs, (ox, Block xs bs e), rbs) <- pickLR obs
-     let (nxs, nbs, ne) = alphaBlk oxs (xs, bs, e)
+     let (nxs, nbs, ne) = alphaBlk (oxs ++ free (lbs, ox, rbs)) (xs, bs, e)
      pure $ Block (oxs ++ nxs) (lbs ++ nbs ++ [(ox, ne)] ++ rbs) oe
 
 --------------------------------------------------------------------------------
