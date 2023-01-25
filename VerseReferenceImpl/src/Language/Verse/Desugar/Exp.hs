@@ -35,7 +35,7 @@ data Exp f a
   | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))
   | Var (f a) (f (Exp f a))
-  | Set (f (Exp f a)) (f (Exp f a))
+  | Set (f a) (f (Exp f a))
   | Function !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
   | Invoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]

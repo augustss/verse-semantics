@@ -117,8 +117,8 @@ desugar' e = for e $ \ case
   Parse.Var x -> do
     tellName x True
     pure . Name . Pure $ extract x
-  Parse.Set e1 e2 ->
-    Set <$> desugar' e1 <*> desugar' e2
+  Parse.Set x e ->
+    Set (Pure <$> x) <$> desugar' e
   Parse.Function e1 e2 -> do
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     Function (snd <$> xs) e1 <$> exists (desugar' e2)
