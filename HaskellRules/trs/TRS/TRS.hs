@@ -46,6 +46,12 @@ class Rec t where
 step :: forall a . (Ord a, Rec a) => Rule a -> Rule a
 step rule env tt = nub $ rec rule env tt
 
+stepS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
+stepS sys tt =
+  case step (rules sys) (ruleEnv sys) tt of
+    [] -> nub $ rec (rules2 sys) (ruleEnv sys) tt
+    xs -> xs
+
 data NormResult a = NormResult
   { nrDone :: [Traced a]   -- All terms that have no children
   , nrLeft :: [Traced a]   -- Unexplored terms due to timeout
@@ -56,8 +62,6 @@ data NormResult a = NormResult
 normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => TRSystem a -> Int -> a -> NormResult a
 normalFormsFuelTracePlain sys an at = go an S.empty [start at]
  where
-  env = ruleEnv sys
-  rule = rules sys
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)
@@ -69,7 +73,7 @@ normalFormsFuelTracePlain sys an at = go an S.empty [start at]
       go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
-    ts'   = step rule env t
+    ts'   = stepS sys t
 --    rn [] = "refl"
 --    rn ((s,_):_) = s
 
@@ -91,8 +95,6 @@ addDone a nr = nr{ nrDone = a : nrDone nr }
 normalFormFuelTracePlain :: (Show a, Ord a, Rec a) => TRSystem a -> Int -> a -> NormResult a
 normalFormFuelTracePlain sys an at = go an S.empty (start at)
  where
-  env = ruleEnv sys
-  rule = rules sys
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
     | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
@@ -102,7 +104,7 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
       go (n-1) seen' (t' :<-- ((s, t) : tr))
     where
       seen' = S.insert t seen
-      ts'   = step rule env t
+      ts'   = stepS sys t
       ts''  = filter ((`S.notMember` seen) . snd) ts'
       (s, t') = head ts''
 
@@ -115,6 +117,7 @@ data TRSystem t = TRSystem
   , preProcess          :: !(RuleEnv t -> t -> t)     -- prepare a term for rule application, e.g., ANF
   , postProcess         :: !(RuleEnv t -> t -> t)     -- post processing, e.g., undo ANF
   , rules               :: !(Rule t)                  -- rewrite rules
+  , rules2              :: !(Rule t)                  -- hack
   , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
   , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
   , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction

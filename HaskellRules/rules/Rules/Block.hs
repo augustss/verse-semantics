@@ -26,6 +26,7 @@ systemBlock = TRSystem
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
   , rules               = allRules
+  , rules2              = rulesOcc
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
@@ -345,11 +346,9 @@ validFcn _ = False
 rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
-  do Block oxs obs oe <- [lhs]
-     (lbs, (ox, LAM x (Block xs bs e) :@: v), rbs) <- pickLR obs
-     let (xs'@(x' : _), qs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
-         b = Block xs' ((Var x', v) : qs') e'
-     pure $ Block oxs (lbs ++ [(ox, b)] ++ rbs) oe
+  do LAM x (Block xs bs e) :@: v <- [lhs]
+     let (xs'@(x' : _), bs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
+     pure $ Block xs' ((Var x', v) : bs') e'
  ++
   "APP-TUP" `name`
   do Arr vs :@: v <- [lhs]
@@ -600,5 +599,23 @@ rulesStructural _ lhs =
      pure (EXI y (EXI x e))
  <>
   "UNIFY-SWAP" `name`
-  do u1@(_ :=: Val _) :>: (u2@(_ :=: Val _) :>: r) <- [lhs]
+  do u1@(_ :=: e1) :>: (u2@(_ :=: e2) :>: r) <- [lhs]
+     guard (isChoiceFree e1 || isChoiceFree e2)
      pure $ u2 :>: (u1 :>: r)
+ <>
+  "VAR-SWAP" `name`
+  do Block xs bs v <- [lhs]
+     (lbs, (Var x, Var y), rbs) <- pickLR bs
+     let (lbs', rbs', v') = subst [(y, Var x), (x, Var y)] (lbs, rbs, v)
+     pure $ Block xs (lbs' ++ [(Var y, Var x)] ++ rbs') v'
+{-
+  do Var x :=: Var y <- [lhs]
+     guard (x /= y)
+     pure $ Var y :=: Var x
+-}
+{-
+  do (ctx, Var x :=: Var y) <- execX lhs
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
+-}

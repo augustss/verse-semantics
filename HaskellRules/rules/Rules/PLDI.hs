@@ -28,6 +28,7 @@ systemPLDI = TRSystem
   , preProcess          = const (check validE . anf)
   , postProcess         = const finalSubst
   , rules               = allRules <> rulesDerefS <> rulesElimExi
+  , rules2              = \ _ _ -> []
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const validE

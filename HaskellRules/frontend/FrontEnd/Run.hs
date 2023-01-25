@@ -40,7 +40,7 @@ runM f s e = rewrite f s e'
 evalSystem :: ESystem
 evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
   ruleEnv = defaultTRSFlags,
-  preProcess = evaluate, postProcess = const id, rules = noRules, rulesHaveStructural = False,
+  preProcess = evaluate, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
   confluenceRules = noRules, validExpr = \ _ _ -> True }
   where
     noRules _ _ = []

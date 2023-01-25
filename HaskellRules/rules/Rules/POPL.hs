@@ -26,6 +26,7 @@ systemPOPL = TRSystem
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
   , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceSX
+  , rules2              = \ _ _ -> []
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
@@ -872,10 +873,12 @@ rulesStructural _ lhs =
  <>
   "UNIFY-SWAP1" `name`
   do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
+     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
      pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
  <>
   "UNIFY-SWAP2" `name`
   do (e1 :=: e2) :>: (e3 :=: e4) <- [lhs]
+     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
      pure $ (e3 :=: e4) :>: (e1 :=: e2)
 
  -- NEW RULE
@@ -890,6 +893,7 @@ rulesStructural _ lhs =
  <>
   "UNIFY-SWAP" `name`
   do (e1 :=: e2) <- [lhs]
+     guard (isChoiceFree e1 || isChoiceFree e2)
      pure (e2 :=: e1)
 
 ------------------
