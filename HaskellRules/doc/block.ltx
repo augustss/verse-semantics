@@ -140,7 +140,7 @@ This working document contains our most active rule-sets
 
 \maketitle
 
-\section{POPL rules with adjustments}
+\section{POPL rules with ``simpler'' syntax}
 % ----------------------------------------------------
 \begin{figure}
   $$
@@ -149,10 +149,12 @@ This working document contains our most active rule-sets
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
-    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+    \text{Programs}    & p & ::= & |one c| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Blocks}      & b & ::= & \{ |def xs q| \} \\
+    \text{Block body}  & q & ::= & |v == e; q| \vb |v| \\
+    \text{Choice}      & c & ::= & |fail| \vb |c_1 choice c_2| \vb b \\
+    \text{Expressions} & e & ::= & |v| \vb |apply1N v_1 v_2| \vb |c|
+                       \vb  |one c| \vb |all c| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -178,33 +180,29 @@ This working document contains our most active rule-sets
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+      |{ v }| & \text{means} & |{def () v}| \\
+%%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
-\caption{POPL syntax} \label{fig:popl-syntax}
+\caption{POPL-block syntax} \label{fig:popl-block-syntax}
 \end{figure}
 
 % ----------------------------------------------------
 \begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
-    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \text{Block equation contexts} & Q & ::= & |hole; q| \vb |v = e; Q| \\
+    \text{Block equation contexts} & QC & ::= & |hole; q| \vb |v = ce; QC| \\
+    \text{Variable list context} & V & ::= & |hole xs| \vb |x V|  \\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-    \vb |one hole| \vb |all hole| \\
-\iffullverse
-    && \vb & |succeeds hole| \vb |decides hole| \\
-\fi
-    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
-    \vb |one e| \vb |all e|
-    %%% NOTE: the following is not in the POPL submission,
-    %%% but needed to make progress in (1,2)[x:int]
-    \vb |apply1 op v|
+       \vb |one hole| \vb |all hole| \\
+
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one e| \vb |all e|
+                                            \vb |apply1 op v|
   \end{array}
    $$
   \caption{The syntax of contexts}
@@ -213,21 +211,21 @@ This working document contains our most active rule-sets
 
 % ----------------------------------------------------
 \begin{figure}
-$\begin{array}{l}
-\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
 % The quad indents the lines
 % The \hspace{-..} removes redundant space between rule name column and LHS column
 % that arises because the longest rule name and the longer LHS are not on the same line
 % The \; reduces the spacing around the arrow
+% The >{$} turns on math mode for the arrow column
 
 \rulegroupname{Primitive operations}
 
 \rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
-    \begin{cases}
+    $\begin{cases}
       |k_1| & \text{if $k_1 > k_2$} \\
       |fail| & \text{otherwise}
-      \end{cases} \\
+      \end{cases}$ \\
 
 \iffullverse
     \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
@@ -239,95 +237,86 @@ $\begin{array}{l}
 
 \rulegroupname{Application}
 
-\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
-          & \text{if $x \not\in \freevars{|v|}$} \\
-\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-beta} & |apply1 (lam x ({def xs q})) v| & \movesto & |{def (x xs) (x=v; q)}|
+          & if $x \not\in \freevars{|v|}$ \\
+\rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|{v = 0; v_0} choice dots choice {v = n; v_n}|} \\
+
+\rulegroupname{Block}
+
+\rulename{merge} & |def xs Q^[x == {def ys (q; v)}]| & \movesto & |def (xs ys) Q^[q; x == v]| &
+          if |xs # ys|\\
 
 \\[-2mm]
 \rulegroupname{Unification}
 
 \rulename{ulit} & |k_1 == k_2| & \movesto
-    & \largerhs{\begin{cases}
+    & \largerhs{$\begin{cases}
         |k_1| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
-      \end{cases}} \\
-\rulename{utup} & |tup (v_1,dots,v_m) == tup (v1',dots,v_n')|
-    & \movesto & \largerhs{\begin{cases}
+      \end{cases}$} \\
+\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
+    % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
+    & \movesto & \largerhs{$\begin{cases}
         \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
             & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{cases}
-   }\\
-\rulename{ux-tup1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
-\rulename{ux-tup2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
-\rulename{ux-lam1} & |(lam x e) == hnf| & \movesto & |fail|\\
-\rulename{ux-lam2} & |hnf == (lam x e)| & \movesto & |fail|\\
-\rulename{ux-op1} & |op == hnf| & \movesto & |fail|\\
-\rulename{ux-op2} & |hnf == op| & \movesto & |fail|\\
-\end{array}
-\\
-\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;\;}c@@{\;\;} l l}
+    $}\\
+\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
+\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
+\rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
+\rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
+\rulename{ux5} & |op == hnf| & \movesto & |fail|\\
+\rulename{ux6} & |hnf == op| & \movesto & |fail|\\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & if $|V| \ne |hole|$ \\
 
 \\[-2mm]
 \rulegroupname{Unification variables}
 
-\rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
-    & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
-\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
-%    &&&& if $|x| \in \freevars{|lam y e|}$ \\
-\rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
-    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
-\rulename{def-elimr} & |def (x ys) (X^[v=x])| & \movesto & |def ys (X^[v])|
-    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
-\rulename{def-elimv} & |def (x ys) (X^[z=x])| & \movesto & |def ys (subst (X^[z]) x z)|
-    & \text{if $|z| \neq |x,ys|, |x| \neq |ys|, $ \lennart{NEW}} \\
+\rulename{subst} & |Q^[x==v]| & \movesto & |(subst Q x v)^[x==v]|
+    & if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$ \\
+
+\rulename{def-eliml} & |def (V^[x]) (Q^[x==v])| & \movesto & |def (V^[]) (Q^[])|
+    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
+
+\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
+    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
+
+\rulename{def-elimv} & |def (V^[x]) (Q^[y=x])| & \movesto & |def (V^[]) (subst (Q^[]) x y)|
+    & if $|x| \neq |y|$ \\
+
+\rulename{def-elim} & |def (V^[x]) q; v| & \movesto & |def (V^[]) q v|
+    & if $|x| \notin \freevars{|q|}\cup \freevars{|v|}$ \\
+
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 
 \\[-2mm]
-\rulegroupname{Existentials}
-\rulename{def-elim} & |def x e| & \movesto & |e| 
-    & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
-    & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulegroupname{Fail propagation}
 
-\\[-2mm]
-\rulegroupname{Sequencing}
+\rulename{fail} & |{def xs (Q^[x=fail])}| & \movesto & |fail|  \\
 
-\rulename{seq} & |v ; e| & \movesto & |e| \\
-\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
-\rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
-\rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{unify-seqr-e} & |e == (e_1 ; e_2)| & \movesto & |def x (x == e_1; e_2; x == e_3)|
-  & \text{if |e| is not a value}\\
-\rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
-\rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
-\end{array}
-\end{array}$
-\caption{The Verse calculus: rewrite rules (1)}
-\label{fig:general-axioms} \label{fig:rules1}
+\end{longtable}
+
+  \caption{The Verse calculus: rewrite rules (1)}
+    \label{fig:general-axioms} \label{fig:rules1}
 \end{figure}
 
 % ===================================================================
 \begin{figure}
   $$
   \begin{array}{l}
-   \textit{Fail propagation} \\
-    \begin{array}[t]{lr@@{\;}c@@{\;}ll}
-      \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
-       \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$}
-    \end{array} \\
-    \\[-2mm]
     \textit{One and all} \\
     \begin{array}[t]{lr@@{\;}c@@{\;}l}
     \rulename{one-fail} & |one fail| & \movesto & |fail| \\
-    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
-    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \rulename{one-choice} & |one ({v} `choice` e)| & \movesto & |v| \\
+    \rulename{one-value} & |one {v}| & \movesto & |v| \\
     \end{array} \hspace{5mm}
     \begin{array}[t]{lr@@{\;}c@@{\;}l}
-    \rulename{all-fail} & |all fail| & \movesto & |tup ()| \\
+    \rulename{all-fail} & |all fail| & \movesto & |emptytup| \\
     \rulename{all-choice} &
-      |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
-    \rulename{all-value} & |all v| & \movesto & |tup v| \\
+      |all ({v_1} choice dots choice {v_n})| & \movesto & |tup (v_1, dots, v_n)| \\
+    \rulename{all-value} & |all {v}| & \movesto & |tup v| \\
     \end{array} \\
 
     \\[-2mm]
@@ -337,7 +326,9 @@ $\begin{array}{l}
     \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
     \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
     \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \rulename{choice} & |SX^[{ def xs (QC^[x == c_1 `choice` c2]) }]| & \movesto &
+                        |SX^[{def xs (QC^[x == c_1])} `choice` {def xs (QC^[x == c_2])}]| \\
+%%    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
     \end{array} \\
 
 \iffullverse

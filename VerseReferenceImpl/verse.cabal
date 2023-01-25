@@ -36,7 +36,6 @@ library
     Data.List.Diff
     Data.Ref
     Data.Unifiable
-    Debug.Traceable
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp

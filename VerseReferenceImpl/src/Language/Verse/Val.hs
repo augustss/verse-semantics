@@ -19,7 +19,6 @@ import Control.Monad.Writer.CPS
 import Data.Foldable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
-import Data.HashSet (HashSet)
 import Data.Ratio
 import Data.Unifiable
 
@@ -38,21 +37,19 @@ data Val f a
   | Truth a
   | Tuple [a]
   | Module !Label !(HashMap Name (f a))
-  | Struct !Label !(IdentMap Name (f a)) !(IdentSet Name) !Exp
+  | Struct !Label !(IdentMap Name (f a)) !(IdentMap Name Bool) !Exp
   | StructInst !Label !(HashMap Name (f a))
   | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
 
 data Function f a = Function
   !Label
   !(IdentMap Name (f a))
-  !(IdentSet Name)
+  !(IdentMap Name Bool)
   !Exp
   !Exp deriving (Show, Functor, Foldable, Traversable)
 
 instance Eq (Function f a) where
   Function x _ _ _ _ == Function y _ _ _ _ = x == y
-
-type IdentSet a = HashSet (Ident a)
 
 type IdentMap a v = HashMap (Ident a) v
 
