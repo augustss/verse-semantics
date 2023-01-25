@@ -82,33 +82,33 @@ desugar' e = for e $ \ case
   Parse.Module e -> do
     i <- supply
     (e, xs) <- lift $ runDesugar $ desugar' e
-    pure $ Module i (HashMap.keysSet xs) e
+    pure $ Module i (snd <$> xs) e
   Parse.Struct e -> do
     i <- supply
     (e, xs) <- lift $ runDesugar $ desugar' e
-    pure $ Struct i (HashMap.keysSet xs) e
+    pure $ Struct i (snd <$> xs) e
   Parse.Inst e1 e2 -> do
     e1 <- desugar' e1
     (e2, xs) <- lift $ runDesugar $ desugar' e2
-    pure $ Inst e1 (HashMap.keysSet xs) e2
+    pure $ Inst e1 (snd <$> xs) e2
   Parse.If p -> do
     (p, xs) <- lift $ runDesugar $ desugar' p
-    pure $ IfThenElse (HashMap.keysSet xs) p (Tuple [] <$ p) (Tuple [] <$ p)
+    pure $ IfThenElse (snd <$> xs) p (Tuple [] <$ p) (Tuple [] <$ p)
   Parse.IfThen p t -> do
     (p, xs) <- lift $ runDesugar $ desugar' p
-    IfThenElse (HashMap.keysSet xs) p <$>
+    IfThenElse (snd <$> xs) p <$>
       exists (desugar' t) <*>
       pure (Tuple [] <$ p <. t)
   Parse.IfThenElse p t e -> do
     (p, xs) <- lift $ runDesugar $ desugar' p
-    IfThenElse (HashMap.keysSet xs) p <$>
+    IfThenElse (snd <$> xs) p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
   Parse.For e ->
     All <$> exists (desugar' e)
   Parse.ForDo e1 e2 -> do
     (e1, xs) <- lift $ runDesugar $ desugar' e1
-    ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+    ForDo (snd <$> xs) e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
   Parse.Exists x -> do
@@ -117,16 +117,16 @@ desugar' e = for e $ \ case
   Parse.Var x -> do
     tellName x True
     pure . Name . Pure $ extract x
-  Parse.Set x e ->
-    Set (Pure <$> x) <$> desugar' e
+  Parse.Set e1 e2 ->
+    Set <$> desugar' e1 <*> desugar' e2
   Parse.Function e1 e2 -> do
     (e1, xs) <- lift $ runDesugar $ desugar' e1
-    Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+    Function (snd <$> xs) e1 <$> exists (desugar' e2)
   Parse.Overload x e1 e2 -> do
     tellName' x False
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     e2 <- exists $ desugar' e2
-    let e = Function (HashMap.keysSet xs) <$> duplicate e1 <.> duplicate e2
+    let e = Function (snd <$> xs) <$> duplicate e1 <.> duplicate e2
     pure $ (Name . Pure <$> x) :=: e
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
@@ -193,6 +193,7 @@ exists m = lift $ do
 exists' :: Env -> L (Exp L (Ident Name)) -> L (Exp L (Ident Name))
 exists' xs e = foldlWithKey' f e xs
   where
-    f z x (loc, var) = (if var then Var else Exists) <$> duplicate x' <.> duplicate z
-      where
-        x' = L loc x
+    f z x (loc, var) =
+      (if var then Var else Exists) <$>
+      duplicate (L loc x) <.>
+      duplicate z
