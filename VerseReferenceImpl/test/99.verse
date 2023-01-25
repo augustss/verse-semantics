@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 any(exists X) := X
 
 F(:any > 0) := 1

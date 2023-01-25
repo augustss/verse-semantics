@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 X := all:
   Y := A|B
   Y

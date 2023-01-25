@@ -8,9 +8,12 @@ import TRS.Traced
 import TRS.Graph
 
 -- depth first graph building 
-trsGraphFuelTrace :: (Ord a, Rec a) => RuleEnv a -> Int -> Rule a -> a -> Graph (Maybe (Traced a))
-trsGraphFuelTrace env afuel rule x = M.fromListWith (++) (go S.empty afuel [start x])
+trsGraphFuelTrace :: (Ord a, Rec a) => TRSystem a -> Int -> a -> Graph (Maybe (Traced a))
+trsGraphFuelTrace sys afuel x = M.fromListWith (++) (go S.empty afuel [start x])
  where
+  env = ruleEnv sys
+  rule = rules sys
+
   go _seen _ [] =
     []
 
@@ -72,10 +75,10 @@ trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [
 -}
 
 normalFormsFuelTraceWithGraph :: (Show a, Ord a, Rec a)
-                              => RuleEnv a -> Int -> Rule a -> a -> NormResult a
-normalFormsFuelTraceWithGraph env fuel rule t = NormResult
+                              => TRSystem a -> Int -> a -> NormResult a
+normalFormsFuelTraceWithGraph sys fuel t = NormResult
   { nrDone = [ tx | Just tx <- lvs ]
   , nrLeft = [ start t | Nothing <- lvs ]
   }
-  where lvs = leaves (dag (trsGraphFuelTrace env fuel rule t))
+  where lvs = leaves (dag (trsGraphFuelTrace sys fuel t))
 

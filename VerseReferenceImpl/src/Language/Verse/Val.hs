@@ -23,11 +23,11 @@ import Data.HashSet (HashSet)
 import Data.Ratio
 import Data.Unifiable
 
+import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
-import Language.Verse.Simplify.Exp qualified as Simplify
 
 import Prettyprinter
 
@@ -56,7 +56,7 @@ type IdentSet a = HashSet (Ident a)
 
 type IdentMap a v = HashMap (Ident a) v
 
-type Exp = L (Simplify.Exp L (Ident Name))
+type Exp = L (Desugar.Exp L (Ident Name))
 
 instance Zippable f => Unifiable (Val f) where
   zipMatchM = curry $ \ case

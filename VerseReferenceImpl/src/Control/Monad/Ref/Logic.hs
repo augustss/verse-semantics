@@ -98,10 +98,10 @@ instance MonadRef m => Backtrack.MonadRef (RefLogicT m) where
   readRef = lift . readRef
   writeRef ref x = RefLogicT $ LogicT $ \ sk fk -> do
     y <- readRef ref
-    write x y
+    writeRef ref x
     sk () $ get >>= \ (S p _) -> when p (write y x) >> fk
     where
       write x y = do
         writeRef ref x
-        tellAp $ get >>= \ (S p _) -> when p (writeRef ref y)
+        tellAp $ writeRef ref y
   backtrack = RefLogicT . lift . modify $ \ (S _ s) -> S True s
