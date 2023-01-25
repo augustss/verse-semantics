@@ -140,7 +140,7 @@ This working document contains our most active rule-sets
 
 \maketitle
 
-\section{POPL rules with adjustments}
+\section{POPL rules with ``simpler'' syntax}
 % ----------------------------------------------------
 \begin{figure}
   $$
@@ -149,10 +149,12 @@ This working document contains our most active rule-sets
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
-    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+    \text{Programs}    & p & ::= & |one c| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Blocks}      & b & ::= & \{ |def xs q| \} \\
+    \text{Block body}  & q & ::= & |v == e; q| \vb |v| \\
+    \text{Choice}      & c & ::= & |fail| \vb |c_1 choice c_2| \vb b \\
+    \text{Expressions} & e & ::= & |v| \vb |apply1N v_1 v_2| \vb |c|
+                       \vb  |one c| \vb |all c| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -178,33 +180,27 @@ This working document contains our most active rule-sets
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| \\
+%%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
-\caption{POPL syntax} \label{fig:popl-syntax}
+\caption{POPL-block syntax} \label{fig:popl-block-syntax}
 \end{figure}
 
 % ----------------------------------------------------
 \begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
-    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
-    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \text{Block contexts} & Q & |hole; q| \vb |v = e; Q| \\
+    \text{Variable context} & V & |hole xs| \vb |x V|  
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-    \vb |one hole| \vb |all hole| \\
-\iffullverse
-    && \vb & |succeeds hole| \vb |decides hole| \\
-\fi
-    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
-    \vb |one e| \vb |all e|
-    %%% NOTE: the following is not in the POPL submission,
-    %%% but needed to make progress in (1,2)[x:int]
-    \vb |apply1 op v|
+       \vb |one hole| \vb |all hole| \\
+
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one e| \vb |all e|
+                                            \vb |apply1 op v|
   \end{array}
    $$
   \caption{The syntax of contexts}
