@@ -543,6 +543,56 @@ rulesChoice _ lhs =
 
 --------------------------------------------------------------------------------
 
+rulesOcc :: ERule
+rulesOcc _ lhs =
+   "UX-OCCURS" `name`
+   do Var x :=: Val v <- [lhs]
+      guard (Var x /= v)
+      guard (x `elem` free v)
+      pure (Var x :=: Fail)
+
+-- Ban recursion.
+-- Doesn't really work
+_rulesOcc :: ERule
+_rulesOcc _ lhs =
+   "UX-OCCURS" `name`
+   do Var x :=: Val v <- [lhs]
+      guard (Var x /= v)
+      guard (x `elem` free v)
+      pure (Var x :=: addFailV x v)
+
+addFailV :: Ident -> Value -> Expr
+addFailV x e@(Var x') | x == x' = Fail
+                      | otherwise = e
+addFailV x f@(LAM y e) | x /= y = LAM y $ addFailE x e
+                       | otherwise = f
+addFailV x (Arr vs) | any (== Fail) vs' = Fail
+                    | otherwise = Arr vs'
+                    where vs' = map (addFailV x) vs
+addFailV _ e@(Int _) = e
+addFailV _ e@(Op _) = e
+addFailV _ e = error $ "impossible: " ++ show e
+
+addFailE :: Ident -> Expr -> Expr
+addFailE x (Val v) = addFailV x v
+addFailE x (v1 :@: v2) | v1' == Fail || v2' == Fail = Fail
+                       | otherwise = v1' :@: v2'
+                       where v1' = addFailV x v1; v2' = addFailV x v2
+addFailE x (e1 :>: e2) = addFailE x e1 :>: addFailE x e2
+addFailE x (v :=: e) | v' == Fail = Fail
+                     | otherwise = v' :=: addFailE x e
+                     where v' = addFailV x v
+addFailE x (e1 :|: e2) = addFailE x e1 :|: addFailE x e2
+addFailE _ Fail = Fail
+addFailE x (BlockC e) = BlockC (addFailE x e)
+addFailE x (EXI y e) | x == y = EXI y e
+                     | otherwise = EXI x (addFailE x e)
+addFailE x (One e) = One (addFailE x e)
+addFailE x (All e) = All (addFailE x e)
+addFailE _ e = error $ "impossible: " ++ show e
+
+--------------------------------------------------------------------------------
+
 rulesStructural :: ERule
 rulesStructural _ lhs =
   "EXI-SWAP" `name`
@@ -550,5 +600,5 @@ rulesStructural _ lhs =
      pure (EXI y (EXI x e))
  <>
   "UNIFY-SWAP" `name`
-  do u1@(_ :=: _) :>: (u2@(_ :=: _) :>: r) <- [lhs]
+  do u1@(_ :=: Val _) :>: (u2@(_ :=: Val _) :>: r) <- [lhs]
      pure $ u2 :>: (u1 :>: r)
