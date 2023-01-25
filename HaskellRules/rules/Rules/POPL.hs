@@ -578,7 +578,7 @@ rulesUnificationVariables _ lhs =
      guard (x `notElem` freeV)
      pure (ctx (Val v))
  ++
-  "EXI-ELIMR" `name`
+  "DEF-ELIMR" `name`
   do Exi (Bind x a) <- [lhs]
      (ctx, Val v :=: Var x') <- defX x a
      guard (x == x')
@@ -825,7 +825,7 @@ opArgTC op =
     Cons -> pair any_ (arr any_)  -- Must be anything, array
     AddTo -> pair (hnf ref) (hnf int)
     _ -> pair (hnf int) (hnf int) -- Must be Int, Int
-  where int Int{} = True          
+  where int Int{} = True
         int _ = False
         any_ _ = True
         arr p (Arr vs) = all p vs
