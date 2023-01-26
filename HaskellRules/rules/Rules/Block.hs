@@ -346,8 +346,11 @@ validFcn _ = False
 rulesApplication :: ERule
 rulesApplication _ lhs =
   "APP-BETA" `name`
-  do LAM x (Block xs bs e) :@: v <- [lhs]
-     let (xs'@(x' : _), bs', e') = alphaBlk (free v) (x:xs, bs, e)  -- Avoid capturing in v
+  do LAM x b@(Block xs bs e) :@: v <- [lhs]
+     -- If x is shadowed in the block, use a fresh variable
+     let y = if x `elem` xs then identNotIn (allVars b) else x
+     -- Avoid capturing in v
+     let (xs'@(x' : _), bs', e') = alphaBlk (free v) (y:xs, bs, e)
      pure $ Block xs' ((Var x', v) : bs') e'
  ++
   "APP-TUP" `name`
