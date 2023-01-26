@@ -134,7 +134,7 @@
 %% Note: \begin{abstract}...\end{abstract} environment must come
 %% before \maketitle command
 \begin{abstract}
-This working document contains our most active rule-sets
+This working document contains our most active rule-sets.
 \end{abstract}
 
 
@@ -180,7 +180,7 @@ This working document contains our most active rule-sets
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |{ v }| & \text{means} & |{def () v}| \\
+      |{ q }| & \text{means} & |{def () q}| \\
 %%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
@@ -191,6 +191,15 @@ This working document contains our most active rule-sets
 \caption{POPL-block syntax} \label{fig:popl-block-syntax}
 \end{figure}
 
+\subsection{Contexts}
+\begin{itemize}
+\item |Q|, context for a single equation in a block.
+\item |QC|, context for a single equation in a block, but with all equations on the left being choice free.
+\item |V|, context for a single variable quantified variables in a block.
+\item |SX|, context where choices can be made.
+\end{itemize}
+
+
 % ----------------------------------------------------
 \begin{figure}
   $$
@@ -198,7 +207,7 @@ This working document contains our most active rule-sets
     \text{Block equation contexts} & Q & ::= & |hole; q| \vb |v = e; Q| \\
     \text{Block equation contexts} & QC & ::= & |hole; q| \vb |v = ce; QC| \\
     \text{Variable list context} & V & ::= & |hole xs| \vb |x V|  \\
-    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \text{Scope contexts} & SX & ::= & |hole choice c| \vb |c choice hole |
        \vb |one hole| \vb |all hole| \\
 
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one e| \vb |all e|
@@ -238,10 +247,11 @@ This working document contains our most active rule-sets
 \rulegroupname{Application}
 
 \rulename{app-beta} & |apply1 (lam x ({def xs q})) v| & \movesto & |{def (x xs) (x=v; q)}|
-          & if $x \not\in \freevars{|v|}$ \\
+          & if $x \not\in \freevars{|v|} \cup \{\overline{x}\}$ \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|{v = 0; v_0} choice dots choice {v = n; v_n}|} \\
 
+\\[-2mm]
 \rulegroupname{Block}
 
 \rulename{merge} & |def xs Q^[x == {def ys (q; v)}]| & \movesto & |def (xs ys) Q^[q; x == v]| &
@@ -250,15 +260,15 @@ This working document contains our most active rule-sets
 \\[-2mm]
 \rulegroupname{Unification}
 
-\rulename{ulit} & |k_1 == k_2| & \movesto
+\rulename{ulit} & |Q^[k_1 == k_2]| & \movesto
     & \largerhs{$\begin{cases}
-        |k_1| & \text{if $k_1=k_2$} \\
+        |Q^[]| & \text{if $k_1=k_2$} \\
         |fail| & \text{otherwise}
       \end{cases}$} \\
-\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
+\rulename{utup} & {|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n')]|}
     % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
     & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
+        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m']|} \\
             & \text{if $m=n$} \\
         |fail| & \text{otherwise}
       \end{cases}
@@ -368,6 +378,7 @@ This working document contains our most active rule-sets
 %\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
 %\end{itemize}
 
+\section{Dummy}
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
 
