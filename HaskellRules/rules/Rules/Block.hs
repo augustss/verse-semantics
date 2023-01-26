@@ -405,6 +405,7 @@ rulesDefElim _ lhs =
      guard (x `notElem` free (bs', e, v))
      pure (Block (delete x xs) bs' e)
  ++
+{-
   "DEF-ELIMR" `name`
   do Block xs bs e <- [lhs]
      ((Val v, Var x), bs') <- pick bs
@@ -412,6 +413,7 @@ rulesDefElim _ lhs =
      guard (x `notElem` free (bs', e, v))
      pure (Block (delete x xs) bs' e)
  ++
+-}
   "SWAP" `name`
   do Val (HNF hnf) :=: Var x <- [lhs]
      pure (Var x :=: Val hnf)

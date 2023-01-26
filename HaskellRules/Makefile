@@ -36,7 +36,7 @@ testnorec:
 
 testblock:
 	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=1000     $(TESTFILE)
-	$(TESTER) --quiet       --rules=Block                  --max-steps=10000    $(TESTFILE)
+	$(TESTER) --quiet       --rules=Block                  --max-steps=25000    $(TESTFILE)
 
 testblockqc:
 	$(QCTEST) --rules=Block --ignore-fuel-stop --max-success=100000

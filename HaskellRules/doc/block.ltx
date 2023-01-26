@@ -280,8 +280,8 @@ This working document contains our most active rule-sets
 \rulename{def-eliml} & |def (V^[x]) (Q^[x==v])| & \movesto & |def (V^[]) (Q^[])|
     & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
-\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
-    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
+%\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
+%    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
 \rulename{def-elimv} & |def (V^[x]) (Q^[y=x])| & \movesto & |def (V^[]) (subst (Q^[]) x y)|
     & if $|x| \neq |y|$ \\
