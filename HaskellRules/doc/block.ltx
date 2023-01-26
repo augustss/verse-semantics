@@ -160,7 +160,7 @@ This working document contains our most active rule-sets
     && \vb & |succeeds e| \vb |decides e| \\
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x b| \\
     \text{Primops} & op  & ::= & |gt| \vb |add|
 \iffullverse
     \vb |isInt|
@@ -347,9 +347,26 @@ This working document contains our most active rule-sets
     \label{fig:rules2}  \label{fig:choice}
 \end{figure}
 
-\begin{itemize}
-\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
-\end{itemize}
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Structural rules} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{exist-swap} & |def (dots x y dots) q| & \movesto & |def (dots y x dots) q| \\
+    \rulename{eqn-swap} & |def xs (dots x_1 == ce_1; x_2 == ce_2; dots)| & \movesto & |def xs (dots x_2 == ce_2; x_1 == ce_1; dots)| \\
+    \rulename{var-swap} & |def xs (Q^[x == y]| & \movesto & |def xs (Q^{y/x,x/y}^[y == x])| \\
+    \end{array} \\
+
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (3)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+
+%\begin{itemize}
+%\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
+%\end{itemize}
 
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
