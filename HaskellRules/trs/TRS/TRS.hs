@@ -49,6 +49,8 @@ step rule env tt = nub $ rec rule env tt
 stepS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
 stepS sys tt =
   case step (rules sys) (ruleEnv sys) tt of
+    -- HACK: see comment on TRSystem
+    -- If rules did nothing, then try rules2.
     [] -> nub $ rec (rules2 sys) (ruleEnv sys) tt
     xs -> xs
 
@@ -109,6 +111,10 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
       (s, t') = head ts''
 
 --------------------------------------------------------------------------------------------------------
+
+-- The rules2 field has rules that are used when none of the rules
+-- field apply anymore.
+-- This is a hack and not really a normal TRS.
 
 data TRSystem t = TRSystem
   { sname               :: !String                    -- short system name, should be an identfier
