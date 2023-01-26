@@ -47,6 +47,9 @@ instance (Free a, Free b) => Free (a,b) where
 instance (Free a, Free b, Free c) => Free (a,b,c) where
   free (a,b,c) = free a `union` free b `union` free c
 
+instance (Free a, Free b, Free c, Free d) => Free (a,b,c,d) where
+  free (a,b,c,d) = free a `union` free b `union` free c `union` free d
+
 instance Free a => Free [a] where
   free = foldr union [] . map free
 
