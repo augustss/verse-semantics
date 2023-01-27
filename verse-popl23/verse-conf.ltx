@@ -2245,10 +2245,10 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
       \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
       \text{Head values}        & hnf & ::= & \cdots \vb r \\
       \text{Execution contexts} & X   & ::= & \cdots \vb |store h X| \\
-      \text{Choice contexts}    & CX  & ::= & \cdots \vb |store h CX| \\
+      \text{Scope contexts}     & SX  & ::= & \cdots \vb |store h SX| \\
       \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
       \text{Heap context}       & H   & ::= & \hole|,h| \vb |cell r v, H| \\
-      \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \vb |def x S| \\
+      \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \\
       \text{Store-op free exprs}&|sf| & ::= & |v| \vb |sf_1 = sf_2| \vb |sf_1; sf_2| \vb |def x sf|
                                               \vb |apply1 sp v|
                                               %%% need sv \vb |split sf sv_1 sv_2|
@@ -2273,7 +2273,8 @@ Finally, to get to the precise statement of \cref{thm:confluence}, we have to sh
   \textit{Store duplication} \\
   \begin{array}{lrcll}
     \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
-    \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \\
+    \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \quad
+    |oe| \in |ce| \\
 %% FAIL rules handles this
 %%    \rulename{st-fail}     & |store h fail| & \movesto & |fail| \\
   \end{array} \\
@@ -2368,11 +2369,19 @@ If the reduction of |e| results in a value (with or without more alternatives) t
 since we know the inner computation has succeeded.
 
 Similarely, the reduction of |e_1 `choice` e_2| will duplicate the store into the first branch, \rulename{st-choice-dup}.
+Here |e_1| must not contain any store operation nor any choices.
 And again, similarely, \rulename{st-choice} commits the new store and throws away the old.
 
 The use of |oe| in the rules is to ensure that the rules cannot get stuck in a loop.
 Using |e| instead of |oe| would mean that failing or committing would make the expression match the duplication rule again.
 It also prevents the duplication rule from repeatedly duplicating the |storeKW|.
+
+Note that |storeKW| is part of the |X| context, which means that the |storeKW| can float inside
+existentials.
+This is necessary for the store rules to fire since the |S| context does not allow
+going under existentials.
+If |S| contained |storeKW| then an |alloc| or |write| could update the store with
+a variable that is not in scope.
 
 To support limited store operations ({\eg}, |read|,
 but not |write|) we can equip the store with a set of currently allowed operations.

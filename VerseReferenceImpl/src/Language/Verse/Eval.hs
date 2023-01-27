@@ -29,29 +29,30 @@ import Data.Foldable
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
-import Data.HashSet qualified as HashSet
 import Data.Ratio
 import Data.Ref
 import Data.Traversable
 import Data.Unifiable
 
 import Language.Verse.Error
-import Language.Verse.Ident
+import Language.Verse.Ident (Ident)
+import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Simplify.Exp (Exp ( (:*>:)
-                                        , (:=:)
-                                        , (:.:)
-                                        , (:<:)
-                                        , (:<=:)
-                                        , (:>:)
-                                        , (:>=:)
-                                        , (:|:)
-                                        , (:+:)
-                                        , (:-:)
-                                        , (:*:)
-                                        , (:/:)
-                                        ))
-import Language.Verse.Simplify.Exp qualified as Exp
+import Language.Verse.Desugar.Exp (Exp ( (:*>:)
+                                       , (:=:)
+                                       , (:.:)
+                                       , (:..:)
+                                       , (:<:)
+                                       , (:<=:)
+                                       , (:>:)
+                                       , (:>=:)
+                                       , (:|:)
+                                       , (:+:)
+                                       , (:-:)
+                                       , (:*:)
+                                       , (:/:)
+                                       ))
+import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Val (Val, hoistVal)
@@ -133,40 +134,51 @@ eval' e = case extract e of
           Nothing -> throwNameError (loc e) x
       _ -> throwDomainError $ loc e
     pure var
+  e1 :..: e2 -> do
+    var1 <- eval' e1
+    var2 <- eval' e2
+    var <- freshVar
+    whenBound var1 $ \ case
+      Val.Int val1 -> whenBound var2 $ \ case
+        Val.Int val2 ->
+          unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+        _ -> throwDomainError $ loc e2
+      _ -> throwDomainError $ loc e1
+    pure var
   e1 :<: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftOrd (loc e) (<) var1 var2
+    liftOrd (loc e) (<) var1 var2
   e1 :<=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftOrd (loc e) (<=) var1 var2
+    liftOrd (loc e) (<=) var1 var2
   e1 :>: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftOrd (loc e) (>) var1 var2
+    liftOrd (loc e) (>) var1 var2
   e1 :>=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftOrd (loc e) (>=) var1 var2
+    liftOrd (loc e) (>=) var1 var2
   e1 :|: e2 ->
     eval' e1 <|> eval' e2
   e1 :+: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftNum (loc e) (+) var1 var2
+    liftNum (loc e) (+) var1 var2
   e1 :-: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftNum (loc e) (-) var1 var2
+    liftNum (loc e) (-) var1 var2
   e1 :*: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ liftNum (loc e) (*) var1 var2
+    liftNum (loc e) (*) var1 var2
   e1 :/: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ div' (loc e) var1 var2
+    div' (loc e) var1 var2
   Exp.Fail ->
     empty
   Exp.One e -> do
@@ -185,23 +197,23 @@ eval' e = case extract e of
     join $ unify <$> newVar (Val.Truth var) <*> eval' e
     pure var
   Exp.Module i xs e -> do
-    xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+    xs <- for xs freshNamed
     _ <- localNames xs $ eval' e
-    newVar . Val.Module i $ toNames xs
-  Exp.Struct i ys xs e -> do
-    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    newVar . Val.Module i $ fromIdents xs
+  Exp.Struct i xs e -> do
+    env <- ask
     newVar $ Val.Struct i env xs e
   Exp.Inst e1 xs e2 -> do
     var1 <- eval' e1
-    xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+    xs <- for xs freshNamed
     _ <- localNames xs $ eval' e2
     var <- freshVar
     whenBound var1 $ \ case
       Val.Struct i env ys e -> do
-        ys <- for (HashSet.toMap ys) . const $ Val <$> freshVar
+        ys <- for ys freshNamed
         _ <- local (const $ ys <> env) $ eval' e
-        let ys' = toNames ys
-        for_ (HashMap.intersectionWith (,) (toNames xs) ys') $ \ case
+        let ys' = fromIdents ys
+        for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $ \ case
           (Val var_x, Val var_y) ->
             unify var_x var_y
           (Ref ref_x, Val var_y) ->
@@ -219,7 +231,7 @@ eval' e = case extract e of
     var <- freshVar
     ifte'
       (do
-          xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+          xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
           pure xs)
       (\ xs ->
@@ -230,7 +242,7 @@ eval' e = case extract e of
     var <- freshVar
     for'
       (do
-          xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+          xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
           pure xs)
       (\ xs ->
@@ -251,9 +263,9 @@ eval' e = case extract e of
       var <- eval' e
       Lenient.writeRef ref =<< freshen var
       pure var
-  Exp.Function ys xs e1 e2 -> do
+  Exp.Function xs e1 e2 -> do
     i <- supply
-    env <- asks $ flip HashMap.intersection (HashSet.toMap ys)
+    env <- ask
     newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
@@ -266,15 +278,15 @@ eval' e = case extract e of
         empty
         (zip xs [0 ..])
       Val.Struct i env xs e -> do
-        xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+        xs <- for xs freshNamed
         _ <- local (const $ xs <> env) (eval' e)
-        unify var2 =<< newVar (Val.StructInst i $ toNames xs)
+        unify var2 =<< newVar (Val.StructInst i $ fromIdents xs)
         unify var var2
       Val.Overload x var_xs -> fix (\ recur x var_xs ->
         let Val.Function _ env xs e_d e_r = x in
           ifte'
           (do
-              xs <- for (HashSet.toMap xs) . const $ Val <$> freshVar
+              xs <- for xs freshNamed
               let env' = xs <> env
               var_d <- local (const env') $ eval' e_d
               unify var2 var_d
@@ -302,9 +314,7 @@ eval' e = case extract e of
 liftOrd :: (MonadError Error m, MonadVerse m) =>
            Loc ->
            (forall a . Ord a => a -> a -> Bool) ->
-           MutVar m ->
-           MutVar m ->
-           m (MutVar m)
+           MutVar m -> MutVar m -> EvalT m (MutVar m)
 liftOrd loc f var_x var_y = do
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     case (val_x, val_y) of
@@ -332,9 +342,7 @@ liftOrd loc f var_x var_y = do
 liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
            Loc ->
            (forall a . Num a => a -> a -> a) ->
-           MutVar m ->
-           MutVar m ->
-           m (MutVar m)
+           MutVar m -> MutVar m -> EvalT m (MutVar m)
 liftNum loc f var_x var_y = do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
@@ -362,9 +370,7 @@ liftNum loc f var_x var_y = do
 
 div' :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
         Loc ->
-        MutVar m ->
-        MutVar m ->
-        m (MutVar m)
+        MutVar m -> MutVar m -> EvalT m (MutVar m)
 div' loc var_x var_y = do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
@@ -435,12 +441,19 @@ throwIdentError x = throwError . IdentError x
 throwNameError :: MonadError Error m => Loc -> Name -> m a
 throwNameError x = throwError . NameError x
 
-toNames :: Hashable a => HashMap (Ident a) v -> HashMap a v
-toNames =
+fromIdents :: Hashable a => HashMap (Ident a) v -> HashMap a v
+fromIdents =
   HashMap.fromList .
   HashMap.foldrWithKey
-  (\ k x z ->
-     case name k of
-       Nothing -> z
-       Just k -> (k, x) : z)
+  (\ case
+      Ident.Pure x -> \ y z -> (x, y) : z
+      Ident.Label _ -> \ _ z -> z)
   []
+
+freshNamed :: MonadVerse m => Bool -> EvalT m (Named m)
+freshNamed = \ case
+  False -> Val <$> freshVar
+  True -> Ref <$> freshRef
+
+freshRef :: MonadVerse m => EvalT m (Lenient.Ref m (Var m f))
+freshRef = Lenient.newRef =<< freshVar

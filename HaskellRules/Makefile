@@ -23,12 +23,26 @@ testignore:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000 --ignore-fuel-stop   $(TESTFILE)
 
 testfast:
-	$(TESTER) --quiet --parse                                                $(TESTPARSEFILE)
-	$(TESTER) --quiet       --rules=eval --no-under-lambda                   $(TESTFILE)
-#	$(TESTER) --quiet --eval --split                                         $(TESTFILE)
+	$(TESTER) --quiet --parse                                                   $(TESTPARSEFILE)
+	$(TESTER) --quiet       --rules=eval --no-under-lambda                      $(TESTFILE)
+#	$(TESTER) --quiet --eval --split                                            $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=25000    $(TESTFILE)
+
+testnorec:
+	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
+
+testblock:
+	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=1000     $(TESTFILE)
+	$(TESTER) --quiet       --rules=Block                  --max-steps=25000    $(TESTFILE)
+
+testblockqc:
+	$(QCTEST) --rules=Block --ignore-fuel-stop --max-success=100000
+
+testnorecqc:
+	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
 
 trickytest: testtricky
 
@@ -41,6 +55,9 @@ testqcconf:
 
 teststore:
 	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
+
+teststorepopl:
+	$(TESTER) --rules=popls --split --final-inline --max-steps=200000 --no-under-lambda versetests/storetests.versetest
 
 clean:
 	cabal clean

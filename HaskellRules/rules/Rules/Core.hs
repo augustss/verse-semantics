@@ -1,9 +1,11 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Core(
   Expr(..), Op(..),
+  Heap, Ptr(..),
   Value,
   TRSFlags, RuleEnv(..), defaultTRSFlags,
   DerefPos(..),
@@ -16,19 +18,24 @@ module Rules.Core(
   isVal,
   pattern EXI,
   pattern LAM,
+  pattern Block, Eqn,
   subst,
   alphaRename,
   invariant,
   collect,
+  allVars,
   check,
   ) where
+import qualified Epic.SIntMap as IM
+import Data.Data(Data)
+import Data.List( intercalate, union, elemIndex )
+import Data.Maybe
 import GHC.Stack(HasCallStack)
 
 import TRS.Bind
 import TRS.TRS
 import Test.QuickCheck hiding ( collect )
-import Data.List( intercalate, union, elemIndex )
-import Data.Maybe
+import Epic.List(nub)
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
@@ -55,8 +62,17 @@ data Expr
   | Fail                        -- ^ fail
   | Wrong                       -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
+  | BlockC Expr                 -- ^ same as e, but maintaining invariants
+  -- only used for updatable references
+  | Store Heap Expr
+  | Ref Ptr
+  deriving (Data)
 
 type Value = Expr
+
+type Heap = IM.SIntMap Ptr Value
+newtype Ptr = Ptr Int deriving (Eq, Ord, Data)
+instance Show Ptr where show (Ptr i) = "r" ++ show i
 
 infixr 1 :>:
 infixr 3 :|:
@@ -80,8 +96,12 @@ instance Show Expr where
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
-  showsPrec _ (Split e v1 v2)  = showString "split {" . showsPrec 0 e . showString ", " .
+  showsPrec _ (Split e v1 v2)  = showString "split{" . showsPrec 0 e . showString ", " .
                                  showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
+  showsPrec _ (BlockC e)       = showString "block {" . showsPrec 0 e . showString "}"
+  showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
+                                 showsPrec 0 e . showString "}"
+  showsPrec p (Ref r)          = showsPrec p r
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -160,8 +180,20 @@ instance Ord Expr where
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
 
-    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
+    comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
+    comp _xs _ys BlockC{} _ = LT
+    comp _xs _ys _ BlockC{} = GT
 
+    comp  xs  ys (Store h e) (Store h' e') =
+      compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
+    comp _xs _ys Store {} _ = LT
+    comp _xs _ys _ Store {} = GT
+
+    comp _xs _ys (Ref p) (Ref q) = compare p q
+    comp _xs _ys Ref {} _        = LT
+    comp _xs _ys _ Ref {}        = GT
+
+    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
 
 --------------------------------------------------------------------------------
 
@@ -180,7 +212,11 @@ data Op
   | IsInt
   | MapAp
   | Cons
- deriving ( Eq, Ord )
+  | Alloc
+  | Read
+  | Write
+  | AddTo
+ deriving ( Eq, Ord, Data )
 
 instance Show Op where
   show Gt    = "gt"
@@ -197,6 +233,10 @@ instance Show Op where
   show IsInt = "isInt"
   show MapAp = "mapAp"
   show Cons  = "cons"
+  show Alloc = "alloc"
+  show Read  = "read"
+  show Write = "write"
+  show AddTo = "addto"
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -229,6 +269,7 @@ getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
 getHNF e@Op{} = Just e
 getHNF e@Arr{} = Just e
+getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing
 
@@ -241,7 +282,27 @@ pattern CON e <- (getCON -> Just e)
 getCON :: Expr -> Maybe Expr
 getCON e@Int{} = Just e
 getCON e@Op{} = Just e
+getCON e@Ref{} = Just e
 getCON _ = Nothing
+
+type Eqn = (Value, Expr)
+
+pattern Block :: [Ident] -> [(Value, Expr)] -> Value -> Expr
+pattern Block xs bs v <- (BlockC (getBlock -> Just (xs, bs, v)))
+  where Block xs bs v = BlockC (foldr EXI (foldr eqn v bs) xs)
+          where eqn (a, b) r = (a :=: b) :>: r
+
+getBlock :: Expr -> Maybe ([Ident], [Eqn], Value)
+getBlock = blk
+  where
+    blk (EXI i e) = (\ (xs, qs, v) -> (i:xs, qs, v)) <$> blk e
+    blk e = blk' e
+    blk' ((Val a :=: e) :>: b) = (\ (xs, qs, v) -> (xs, (a, e) : qs, v)) <$> blk' b
+--    blk' (Val v) = Just ([], [], v)
+--    blk' _ = Nothing
+    blk' (_ :>: _) = Nothing
+    blk' (_ :=: _) = Nothing
+    blk' e = Just ([], [], e)
 
 --------------------------------------------------------------------------------
 
@@ -303,12 +364,18 @@ instance Rec Expr where
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
         ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
+      BlockC a ->
+           [ (n, BlockC a') | (n, a') <- rec r s a ]
+      -- No reductions in the store, it's supposed to be a Value
+      Store h e -> [ (n, Store h e') | (n,e') <- rec r s e ]
       _     -> []
 
 --------------------------------------------------------------------------------
 
 instance Free Expr where
   free (Var v)   = [v]
+  free Int{}     = []
+  free Op{}      = []
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
@@ -320,7 +387,11 @@ instance Free Expr where
   free (One a)   = free a
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
-  free _         = []
+  free (BlockC e) = free e
+  free Fail      = []
+  free Wrong     = []
+  free (Store h e) = free (IM.elems h) `union` free e
+  free Ref{}     = []
 
 --------------------------------------------------------------------------------
 
@@ -336,6 +407,7 @@ alphaRename xs bnd@(Bind x e)
   y = identNotIn (x : (xs ++ free e))
 
 instance Term Expr where
+  subst [] e = e
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
   subst _sub e@Op{}   = e
@@ -347,11 +419,23 @@ instance Term Expr where
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst _sub Fail     = Fail
+  subst _sub Wrong    = Wrong
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
-  subst _sub Wrong    = Wrong
+  subst sub (BlockC e) = BlockC (subst sub e)
+  subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
+  subst _sub e@Ref{}  = e
+
+instance (Term a, Term b) => Term (a, b) where
+  subst sub (a, b) = (subst sub a, subst sub b)
+
+instance (Term a, Term b, Term c) => Term (a, b, c) where
+  subst sub (a, b, c) = (subst sub a, subst sub b, subst sub c)
+
+instance (Term a) => Term [a] where
+  subst sub xs = map (subst sub) xs
 
 -- TODO(augustss):
 -- We don't normally substitute in ~, but we still need to be able to alpha convert,
@@ -387,20 +471,24 @@ instance Arbitrary Expr where
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
-  shrink (Lam bnd) = [ Arr [] ] ++ [ Lam (Bind x e') | let Bind x e = bnd, e' <- shrink e ]
+  shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
-  shrink (a :>: b) = as ++ [b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
-    where as = case a of _ :=: _ -> []; _ -> [a]
-  shrink (a :@: b) = [a, b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
+  shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
-  shrink (All a)   = [a, One a, Arr []] ++ [All a'| a'<-shrink a]
-  shrink (Exi (Bind x a)) = [a |x `notElem` free a] ++ [Exi (Bind x a') | a' <- shrink a]
+  shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
+  shrink (Exi (Bind x a)) = [a |x `notElem` ys]
+                         ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
+                         ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
+  shrink (BlockC e)  = BlockC <$> shrink e
+  shrink (Store _ _) = undefined
+  shrink (Ref _)   = []
   shrink Wrong     = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
@@ -409,7 +497,8 @@ arbExpr n xs =
   [ (1, Var <$> elements xs) | not (null xs) ] ++
   [ (1, Int <$> arbitrary)
   , (1, Op  <$> arbitrary)
-  , (n, Arr <$> scale (min 5) (listOf (arbExpr n2 xs)))
+  , (n, Arr <$> do k <- choose (0,5)
+                   sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
   , (n, Lam <$> arbBind n1 xs)
   , (1, return Fail) -- maybe not have this?
   , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
@@ -419,6 +508,7 @@ arbExpr n xs =
   , (n, Exi <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
+  -- Don't generate Block, the anf-ing will do that.
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
@@ -456,7 +546,26 @@ collect here (\/) = col
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
+  recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
+
+--------------------------------------------------------------------------------
+
+allVars :: Expr -> [Ident]
+allVars = nub . expr
+  where
+    expr (Var i) = [i]
+    expr (Arr es) = concatMap expr es
+    expr (LAM i e) = i : expr e
+    expr (EXI i e) = i : expr e
+    expr (e1 :=: e2) = expr e1 ++ expr e2
+    expr (e1 :@: e2) = expr e1 ++ expr e2
+    expr (e1 :>: e2) = expr e1 ++ expr e2
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
+    expr (BlockC e) = expr e
+    expr _ = []
 
 --------------------------------------------------------------------------------
 

@@ -26,6 +26,7 @@ data Token
   | ColonEOL
   | Comma
   | Dot
+  | DotDot
   | Equal
   | NotEqual
   | Less
@@ -84,6 +85,7 @@ instance Pretty Token where
     ColonEOL -> colon
     Comma -> comma
     Dot -> dot
+    DotDot -> ".."
     Equal -> equals
     NotEqual -> "<>"
     Less -> pretty '<'

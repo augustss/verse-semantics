@@ -29,7 +29,7 @@ getTest :: IO Test
 getTest = do
   filePaths <- listDirectory' "test"
   let verseFiles = sort $ filter ((== ".verse") . takeExtension) filePaths
-  pure . TestList $ verseFiles <&> \ verseFile -> TestCase $ do
+  pure . TestList $ verseFiles <&> \ verseFile -> TestLabel verseFile . TestCase $ do
     ByteString.readFile ("test" </> verseFile) >>= runExceptT . eval >>= \ case
       Left e -> do
         let errFile = replaceExtension verseFile "err"

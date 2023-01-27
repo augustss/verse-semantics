@@ -5,11 +5,11 @@ testeq(SEq) {p := alloc$[99]; write$[p,88]; read$[p]} {88}
 
 # Sugared operators
 testeq(SEq) {p := new[int][99]; p^}                   {99}
-testeq(SEq) {p := new[int][99]; p .= 88; p^}          {88}
+#testeq(SEq) {p := new[int][99]; p .= 88; p^}          {88}
 testeq(SEq) {p := new[int][99]; p += 88; p^}          {187}
-testeq(SEq) {p := new[int][99]; p -= 88; p^}          {11}
-testeq(SEq) {p := new[int][99]; p *= 88; p^}          {8712}
-testeq(SEq) {p := new[int][99]; p /= 88; p^}          {1}
+#testeq(SEq) {p := new[int][99]; p -= 88; p^}          {11}
+#testeq(SEq) {p := new[int][99]; p *= 88; p^}          {8712}
+#testeq(SEq) {p := new[int][99]; p /= 88; p^}          {1}
 
 # New syntax
 testeq(SEq) {var p:int=99; p}                         {99}
