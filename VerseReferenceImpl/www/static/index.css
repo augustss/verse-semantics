@@ -54,6 +54,6 @@ h1 {
     outline: none;
 }
 
-#out, #err {
+#out {
     white-space: pre-wrap
 }

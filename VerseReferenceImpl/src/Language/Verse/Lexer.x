@@ -43,6 +43,9 @@ $space = [\ \t]
 <0, nested, maybeNesting, indCmt> {
   " " { space }
   \t { tab }
+}
+
+<0, nested, maybeNesting> {
   "<#>" { indCmt0 }
 }
 
@@ -64,6 +67,7 @@ $space = [\ \t]
 }
 
 <indCmt> {
+  "<#>" { indCmtIndCmt }
   "" { emptyIndCmt }
 }
 
@@ -287,8 +291,23 @@ emptyNested i j _ _ = do
   else
     throwError' $ IndentError i x y
 
+indCmtIndCmt :: Action
+indCmtIndCmt i _ _ _ = do
+  x <- getIndent
+  y <- peekIndents
+  if x `isPrefixOf` y then do
+    popIndents
+    pushIndents x
+    pushStates indentedIndCmt
+    getToken
+  else if y `isPrefixOf` x then do
+    pushStates indentedIndCmt
+    getToken
+  else
+    throwError' $ IndentError i x y
+
 emptyIndCmt :: Action
-emptyIndCmt i j _ _ = do
+emptyIndCmt i _ _ _ = do
   x <- getIndent
   y <- peekIndents
   if x `isPrefixOf` y then do
