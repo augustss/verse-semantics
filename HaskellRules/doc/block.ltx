@@ -275,7 +275,8 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \rulegroupname{Block}
 
 \rulename{merge} & |def xs Q^[x == {def ys (q; v)}]| & \movesto & |def (xs ys) Q^[q; x == v]| &
-          if |xs # ys|\\
+        if |xs # ys|\\
+\multicolumn{4}{l}{\lennart{The notation |q| above isn't quite right.}}\\
 
 \\[-2mm]
 \rulegroupname{Unification}
