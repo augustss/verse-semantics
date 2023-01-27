@@ -43,11 +43,15 @@ $space = [\ \t]
 <0, nested, maybeNesting, indCmt> {
   " " { space }
   \t { tab }
+  "<#>" { indCmt0 }
 }
 
 <0, nested, maybeNesting, indCmt, indented, colon, equal, colonEqual, fatArrow> {
   "#" .* ;
-  "<#>" { indCmt0 }
+}
+
+<indented, colon, equal, colonEqual, fatArrow> {
+  "<#>" { indCmtIndented }
 }
 
 <0, nested, maybeNesting, blockCmt, indCmt> {
@@ -102,7 +106,7 @@ $space = [\ \t]
 
 <maybeNesting> {
   "{" { leftBraceMaybeNesting }
-  "" { emptyMaybeNesting }
+  "" { emptyNesting }
 }
 
 <nesting> "" { emptyNesting }
@@ -249,12 +253,39 @@ newline = action $ do
   putIndent []
   getToken
 
-indCmt0 :: Action
-indCmt0 = action $ do
+empty0 :: Action
+empty0 = action $ do
+  pushStates maybeNewline
+  getToken
+
+indCmt' :: Lexer (L Token)
+indCmt' = do
   pushIndents =<< getIndent
   pushStates indCmt
   pushStates indentedIndCmt
   getToken
+
+indCmt0 :: Action
+indCmt0 = action indCmt'
+
+indCmtIndented :: Action
+indCmtIndented = action $ do
+  popStates
+  indCmt'
+
+emptyNested :: Action
+emptyNested i j _ _ = do
+  x <- getIndent
+  y <- peekIndents
+  if x `isPrefixOf` y then do
+    popIndents
+    popStates
+    pure $ L (Loc i j) Token.Dedent
+  else if y `isPrefixOf` x then do
+    pushStates maybeNewline
+    getToken
+  else
+    throwError' $ IndentError i x y
 
 emptyIndCmt :: Action
 emptyIndCmt i j _ _ = do
@@ -263,7 +294,7 @@ emptyIndCmt i j _ _ = do
   if x `isPrefixOf` y then do
     popIndents
     popStates
-    pure $ L (Loc i j) Token.Newline
+    getToken
   else if y `isPrefixOf` x then do
     pushStates indentedIndCmt
     getToken
@@ -300,25 +331,6 @@ rightBlockCmt = action $ do
   pushIndent Space
   popStates
   getToken
-
-empty0 :: Action
-empty0 = action $ do
-  pushStates maybeNewline
-  getToken
-
-emptyNested :: Action
-emptyNested i j _ _ = do
-  x <- getIndent
-  y <- peekIndents
-  if x `isPrefixOf` y then do
-    popIndents
-    popStates
-    pure $ L (Loc i j) Token.Dedent
-  else if y `isPrefixOf` x then do
-    pushStates maybeNewline
-    getToken
-  else
-    throwError' $ IndentError i x y
 
 leftBlockCmtIndented :: Action
 leftBlockCmtIndented = action $ do
@@ -358,17 +370,9 @@ leftBraceMaybeNesting i j _ _ = do
   pushStates indented
   pure $ L (Loc i j) Token.LeftBrace
 
-emptyMaybeNesting :: Action
-emptyMaybeNesting i j _ _ = do
-  popStates
-  pushStates nested
-  pure $ L (Loc i j) Token.Indent
-
 emptyNesting :: Action
 emptyNesting i j _ _ = do
   popStates
-  pushIndents =<< getIndent
-  putIndent []
   pushStates nested
   pure $ L (Loc i j) Token.Indent
 
@@ -377,6 +381,15 @@ newlineIndented = action $ do
   popStates
   putIndent []
   getToken
+
+newlineToken :: Token -> Action
+newlineToken x i j _ _ = do
+  popStates
+  popStates
+  pushIndents =<< getIndent
+  putIndent []
+  pushStates nesting
+  pure $ L (Loc i j) x
 
 emptyToken :: Token -> Action
 emptyToken x i j _ _ = do
@@ -389,11 +402,7 @@ colonIndented = action $ do
   getToken
 
 newlineColon :: Action
-newlineColon i j _ _ = do
-  popStates
-  popStates
-  pushStates nesting
-  pure $ L (Loc i j) Token.ColonEOL
+newlineColon = newlineToken Token.ColonEOL
 
 emptyColon :: Action
 emptyColon = emptyToken Token.Colon
@@ -404,13 +413,7 @@ equalIndented = action $ do
   getToken
 
 newlineEqual :: Action
-newlineEqual i j _ _ = do
-  popStates
-  popStates
-  pushIndents =<< getIndent
-  putIndent []
-  pushStates maybeNesting
-  pure $ L (Loc i j) Token.Equal
+newlineEqual = newlineToken Token.Equal
 
 emptyEqual :: Action
 emptyEqual = emptyToken Token.Equal
@@ -421,13 +424,7 @@ colonEqualIndented = action $ do
   getToken
 
 newlineColonEqual :: Action
-newlineColonEqual i j _ _ = do
-  popStates
-  popStates
-  pushIndents =<< getIndent
-  putIndent []
-  pushStates maybeNesting
-  pure $ L (Loc i j) Token.ColonEqual
+newlineColonEqual = newlineToken Token.ColonEqual
 
 emptyColonEqual :: Action
 emptyColonEqual = emptyToken Token.ColonEqual
@@ -438,13 +435,7 @@ fatArrowIndented = action $ do
   getToken
 
 newlineFatArrow :: Action
-newlineFatArrow i j _ _ = do
-  popStates
-  popStates
-  pushIndents =<< getIndent
-  putIndent []
-  pushStates maybeNesting
-  pure $ L (Loc i j) Token.FatArrow
+newlineFatArrow = newlineToken Token.FatArrow
 
 emptyFatArrow :: Action
 emptyFatArrow = emptyToken Token.FatArrow
