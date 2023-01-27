@@ -61,6 +61,10 @@
 %format es_1
 %format es_2
 %format hnf = "\mathit{hnf}"
+%format q_1
+%format q_2
+%format qc_1
+%format qc_2
 
 %% xs etc stole syntax used in examples.
 %format xsl = " xs "

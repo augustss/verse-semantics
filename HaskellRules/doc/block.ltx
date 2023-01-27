@@ -150,8 +150,8 @@ This working document contains our most active rule-sets.
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs}    & p & ::= & |one c| \quad \text{where} \; \freevars{c} = \emptyset \\
-    \text{Block body}  & q & ::= & |v == e; q| \vb |v| \\
-    \text{Blocks}      & b & ::= & \{ |def (x_1 dots x_n) q| \} \quad n \ge 0 \\
+    \text{Blocks}      & b & ::= & \{ |def (x_1 dots x_n) (q; v)| \} \quad n \ge 0 \\
+    \text{Equations}   & q & ::= & |v == e; q| \vb |emp| \\
     \text{Choice}      & c & ::= & |fail| \vb |c_1 choice c_2| \vb b \\
     \text{Expressions} & e & ::= & |v| \vb |apply1N v_1 v_2| \vb |c|
                        \vb  |one c| \vb |all c| \\
@@ -181,7 +181,8 @@ This working document contains our most active rule-sets.
       |xs| & \text{means} & |x_1 dots x_n| \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |{ q }| & \text{means} & |{def () q}| \\
+      |{ q; v }| & \text{means} & |{def () (q; v)}| \\
+      |{ v }| & \text{means} & |{def () (; v)}| \\
 %%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
@@ -199,12 +200,13 @@ The reason to distinguish them is to limit what expressions can occur where.
 \item |b|, a block with some local variables, |xs|, followed by a block body, |q|.
   The local variables can be regarded as a set; the quantification order is irrelevant.
   The variables should be distinct.
-\item |q|, a block body is a number of equations of
-  the form |v == e|, and finally a value, |v|.
+\item |q|, a sequence of equations of
+  the form |v == e|.
   The equations is a sequence because order matters when there are effects.
+  The '|;|' is used both to prepend and append an equation to a sequence.
 \item |c|, choices are the expressions that may occur in |oneKW| and |allKW|.
 \item |e|, expressions can only occur in equations, |v == e|.
-  \item |v|, values (as usual).  Note that lambda expressions, |lam x b|, has a block body.
+\item |v|, values (as usual).  Note that lambda expressions, |lam x b|, has a block body.
 \end{itemize}
 It is quite easy to take an arbitrary expression and transform it to this subset.
 \lennart{Add figure with translation}.
@@ -213,9 +215,11 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 
 \subsection{Contexts}
 \begin{itemize}
-\item |Q|, context for a single equation in a block.
-\item |QC|, context for a single equation in a block, but with all equations on the left being choice free.
-\item |V|, context for a single variable quantified variables in a block.
+\item |Q|, context for a sequence of equations in a block.
+  Note that the hole can contain a single equation, no equations, or many equations.
+\item |QC|, context for a sequence of equations in a block, but with all equations on the left being choice free.
+\item |V|, context for a sequence of variables quantified variables in a block.
+  Note that the hole can contain a single variable, no variables, or many variables.
 \item |SX|, context where choices can be made.
 \end{itemize}
 
@@ -224,14 +228,14 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
-    \text{Block equation contexts} & Q & ::= & |hole; q| \vb |v = e; Q| \\
-    \text{Block equation contexts} & QC & ::= & |hole; q| \vb |v = ce; QC| \\
-    \text{Variable list context} & V & ::= & |hole xs| \vb |x V|  \\
+    \text{Equation contexts} & Q & ::= & \overline{|v == e;|} \;|hole;|\; \overline{|v == e;|} \\
+    \text{Equation contexts} & QC & ::= & \overline{|v == ce;|} \;|hole;|\; \overline{|v == e;|} \\
+    \text{Variable list contexts} & V & ::= & |xs hole xs| \\
     \text{Scope contexts} & SX & ::= & |hole choice c| \vb |c choice hole |
        \vb |one hole| \vb |all hole| \\
 
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one c| \vb |all c|
-                                            \vb |apply1 op v|
+                                            \vb |apply1 op v| \\
   \end{array}
    $$
   \caption{The syntax of contexts}
@@ -266,7 +270,7 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 
 \rulegroupname{Application}
 
-\rulename{app-beta} & |apply1 (lam x ({def xs q})) v| & \movesto & |{def (x xs) (x=v; q)}|
+\rulename{app-beta} & |apply1 (lam x ({def xs (q; v_1)})) v_2| & \movesto & |{def (x xs) (x=v_2; q; v_1)}|
           & if $x \not\in \freevars{|v|} \cup \{\overline{x}\}$ \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|{v = 0; v_0} choice dots choice {v = n; v_n}|} \\
@@ -274,9 +278,8 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \\[-2mm]
 \rulegroupname{Block}
 
-\rulename{merge} & |def xs Q^[x == {def ys (q; v)}]| & \movesto & |def (xs ys) Q^[q; x == v]| &
+\rulename{merge} & |def xs Q^[v_1 == {def ys (q; v_2)}]; v_3| & \movesto & |def (xs ys) Q^[q; v_1 == v_2]; v_3| &
         if |xs # ys|\\
-\multicolumn{4}{l}{\lennart{The notation |q| above isn't quite right.}}\\
 
 \\[-2mm]
 \rulegroupname{Unification}
@@ -304,16 +307,16 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \rulename{subst} & |Q^[x==v]| & \movesto & |(subst Q x v)^[x==v]|
     & if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$ \\
 
-\rulename{def-eliml} & |def (V^[x]) (Q^[x==v])| & \movesto & |def (V^[]) (Q^[])|
+\rulename{def-eliml} & |def (V^[x]) (Q^[x==v_1]; v_2)| & \movesto & |def (V^[]) (Q^[]; v_2)|
     & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
 %\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
 %    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
-\rulename{def-elimv} & |def (V^[x]) (Q^[y=x])| & \movesto & |def (V^[]) (subst (Q^[]) x y)|
+\rulename{def-elimv} & |def (V^[x]) (Q^[y=x]; v)| & \movesto & |def (V^[]) (subst (Q^[]; v) x y)|
     & if $|x| \neq |y|$ \\
 
-\rulename{def-elim} & |def (V^[x]) q| & \movesto & |def (V^[]) q|
+\rulename{def-elim} & |def (V^[x]) (q; v)| & \movesto & |def (V^[]) (q; v)|
     & if $|x| \notin \freevars{|q|}$ \\
 
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
@@ -321,7 +324,7 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \\[-2mm]
 \rulegroupname{Fail propagation}
 
-\rulename{fail} & |{def xs (Q^[x=fail])}| & \movesto & |fail|  \\
+\rulename{fail} & |{def xs (Q^[v_1=fail]; v_2)}| & \movesto & |fail|  \\
 
 \end{longtable}
 
@@ -352,9 +355,9 @@ It is quite easy to take an arbitrary expression and transform it to this subset
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
     \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
-    \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-    \rulename{choice} & |SX^[{ def xs (QC^[x == (c_1 `choice` c_2)]) }]| & \movesto &
-                        |SX^[{def xs (QC^[x == c_1])} `choice` {def xs (QC^[x == c_2])}]| \\
+    \rulename{assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & {\hspace{-1mm}|SX^[{ def xs (QC^[x == (c_1 `choice` c_2)]; v) }]|} & \movesto &
+                        |SX^[{def xs (QC^[x == c_1]; v)} `choice` {def xs (QC^[x == c_2]; v)}]| \\
 %%    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
     \end{array} \\
 
@@ -381,8 +384,8 @@ It is quite easy to take an arbitrary expression and transform it to this subset
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exist-swap} & |def (dots x y dots) q| & \movesto & |def (dots y x dots) q| \\
-    \rulename{eqn-swap} & |def xs (dots x_1 == e_1; x_2 == e_2; dots)| & \movesto & |def xs (dots x_2 == e_2; x_1 == e_1; dots)| & \text{if |e_1| or |e_2| is a |ce|} \\
-    \rulename{var-swap} & |def xs (Q^[x == y]| & \movesto & |def xs ((Q^[x == y])^{y/x,x/y})| \\
+    \rulename{eqn-swap} & |def xs (dots v_1 == e_1; v_2 == e_2; dots)| & \movesto & |def xs (dots v_2 == e_2; v_1 == e_1; dots)| & \text{if |e_1| or |e_2| is a |ce|} \\
+    \rulename{var-swap} & |def xs (Q^[x == y]; v)| & \movesto & |def xs ((Q^[x == y];v)^{y/x,x/y})| \\
     \end{array} \\
 
    \end{array}
