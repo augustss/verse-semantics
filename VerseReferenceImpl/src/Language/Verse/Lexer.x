@@ -40,49 +40,66 @@ $space = [\ \t]
 @newline = (\r \n?) | \n
 
 :-
-<0, nested, maybeNesting> {
+<0, nested, maybeNesting, indCmt> {
   " " { space }
   \t { tab }
-}
-
-<0, nested, maybeNesting, blockComment> {
-  @newline { newline }
-}
-
-<0, nested, maybeNesting> {
   "#" .* ;
 }
 
-<0, nested, maybeNesting, blockComment> {
-  "<#" { leftBlockComment }
+<0, nested, maybeNesting> {
+  "<#>" { indCmt0 }
 }
 
-<blockComment> {
-  \t { tabBlockComment }
-  "<#>" { indBlockComment }
-  "#>" { rightBlockComment }
-  . { textBlockComment }
+<0, nested, maybeNesting, blockCmt, indCmt> {
+  @newline { newline }
+  "<#" { leftBlockCmt }
+}
+
+<indented, indentedIndCmt> {
+  @newline { newlineIndented }
+}
+
+<indCmt> {
+  "" { emptyIndCmt }
+}
+
+<indentedIndCmt> {
+  . ;
+}
+
+<blockCmt> {
+  \t { tabBlockCmt }
+  "<#>" { indBlockCmt }
+  "#>" { rightBlockCmt }
+  . { textBlockCmt }
 }
 
 <indented, colon, equal, colonEqual, fatArrow> {
   "#" .* ;
+  "<#>" { indCmt0 }
 }
 
-<indented, colon, equal, colonEqual, fatArrow, indentedBlockComment> {
-  "<#" { leftBlockCommentIndented }
-}
-
-<indentedBlockComment> {
-  \t ;
+<indentedBlockCmt, indCmt, indentedIndCmt> {
   "<#>" ;
-  "#>" { rightIndentedBlockComment }
+}
+
+<indented, colon, equal, colonEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
+  "<#" { leftBlockCmtIndented }
+}
+
+<indentedBlockCmt> {
+  "#>" { rightIndentedBlockCmt }
   . ;
   @newline ;
 }
 
-<0> "" { empty0 }
+<0> {
+  "" { empty0 }
+}
 
-<nested> "" { emptyNested }
+<nested> {
+  "" { emptyNested }
+}
 
 <maybeNewline> {
   "{" { leftBraceMaybeNewline }
@@ -124,7 +141,6 @@ $space = [\ \t]
 }
 
 <indented> {
-  @newline { newlineIndented }
   ":" { colonIndented }
   "=" { equalIndented }
   ":=" { colonEqualIndented }
@@ -242,32 +258,53 @@ newline = action $ do
   putIndent []
   getToken
 
-leftBlockComment :: Action
-leftBlockComment = action $ do
-  pushStates blockComment
+indCmt0 :: Action
+indCmt0 = action $ do
+  pushIndents =<< getIndent
+  pushStates indCmt
+  pushStates indentedIndCmt
+  getToken
+
+emptyIndCmt :: Action
+emptyIndCmt i j _ _ = do
+  x <- getIndent
+  y <- peekIndents
+  if x `isPrefixOf` y then do
+    popIndents
+    popStates
+    pure $ L (Loc i j) Token.Newline
+  else if y `isPrefixOf` x then do
+    pushStates indentedIndCmt
+    getToken
+  else
+    throwError' $ IndentError i x y
+
+leftBlockCmt :: Action
+leftBlockCmt = action $ do
+  pushStates blockCmt
   pushIndent Space
   pushIndent Space
   getToken
 
-tabBlockComment :: Action
-tabBlockComment = action $ do
+tabBlockCmt :: Action
+tabBlockCmt = action $ do
   pushIndent Tab
   getToken
 
-indBlockComment :: Action
-indBlockComment = action $ do
+indBlockCmt :: Action
+indBlockCmt = action $ do
   pushIndent Space
   pushIndent Space
   pushIndent Space
   getToken
 
-textBlockComment :: Action
-textBlockComment = action $ do
+textBlockCmt :: Action
+textBlockCmt = action $ do
   pushIndent Space
   getToken
 
-rightBlockComment :: Action
-rightBlockComment = action $ do
+rightBlockCmt :: Action
+rightBlockCmt = action $ do
   pushIndent Space
   pushIndent Space
   popStates
@@ -292,13 +329,13 @@ emptyNested i j _ _ = do
   else
     throwError' $ IndentError i x y
 
-leftBlockCommentIndented :: Action
-leftBlockCommentIndented = action $ do
-  pushStates indentedBlockComment
+leftBlockCmtIndented :: Action
+leftBlockCmtIndented = action $ do
+  pushStates indentedBlockCmt
   getToken
 
-rightIndentedBlockComment :: Action
-rightIndentedBlockComment = action $ do
+rightIndentedBlockCmt :: Action
+rightIndentedBlockCmt = action $ do
   popStates
   getToken
 
