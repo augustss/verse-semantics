@@ -356,7 +356,7 @@ Block
 
 Scan
   : { () }
-  | newline { () }
+  | Scan newline { () }
 
 {
 lexer :: (L Token -> Lexer a) -> Lexer a
