@@ -200,12 +200,13 @@ The reason to distinguish them is to limit what expressions can occur where.
 \item |b|, a block with some local variables, |xs|, followed by a block body, |q|.
   The local variables can be regarded as a set; the quantification order is irrelevant.
   The variables should be distinct.
-\item |q|, a block body is a number of equations of
-  the form |v == e|, and finally a value, |v|.
+\item |q|, a sequence of equations of
+  the form |v == e|.
   The equations is a sequence because order matters when there are effects.
+  The '|;|' is used both to prepend and append an equation to a sequence.
 \item |c|, choices are the expressions that may occur in |oneKW| and |allKW|.
 \item |e|, expressions can only occur in equations, |v == e|.
-  \item |v|, values (as usual).  Note that lambda expressions, |lam x b|, has a block body.
+\item |v|, values (as usual).  Note that lambda expressions, |lam x b|, has a block body.
 \end{itemize}
 It is quite easy to take an arbitrary expression and transform it to this subset.
 \lennart{Add figure with translation}.
@@ -227,8 +228,8 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
-    \text{Equation contexts} & Q & ::= & \overline{|v == e;|} \;|hole|\; \overline{|v == e;|} \\
-    \text{Equation contexts} & QC & ::= & \overline{|v == ce;|} \;|hole|\; \overline{|v == e;|} \\
+    \text{Equation contexts} & Q & ::= & \overline{|v == e;|} \;|hole;|\; \overline{|v == e;|} \\
+    \text{Equation contexts} & QC & ::= & \overline{|v == ce;|} \;|hole;|\; \overline{|v == e;|} \\
     \text{Variable list contexts} & V & ::= & |xs hole xs| \\
     \text{Scope contexts} & SX & ::= & |hole choice c| \vb |c choice hole |
        \vb |one hole| \vb |all hole| \\
@@ -383,7 +384,7 @@ It is quite easy to take an arbitrary expression and transform it to this subset
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exist-swap} & |def (dots x y dots) q| & \movesto & |def (dots y x dots) q| \\
-    \rulename{eqn-swap} & |def xs (dots x_1 == e_1; x_2 == e_2; dots)| & \movesto & |def xs (dots x_2 == e_2; x_1 == e_1; dots)| & \text{if |e_1| or |e_2| is a |ce|} \\
+    \rulename{eqn-swap} & |def xs (dots x_1 == v_1; x_2 == v_2; dots)| & \movesto & |def xs (dots x_2 == v_2; x_1 == v_1; dots)| \\
     \rulename{var-swap} & |def xs (Q^[x == y]; v)| & \movesto & |def xs ((Q^[x == y];v)^{y/x,x/y})| \\
     \end{array} \\
 
