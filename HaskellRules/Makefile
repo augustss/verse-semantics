@@ -39,7 +39,7 @@ testblock:
 	$(TESTER) --quiet       --rules=Block                  --max-steps=25000    $(TESTFILE)
 
 testblockqc:
-	$(QCTEST) --rules=Block --ignore-fuel-stop --max-success=100000
+	$(QCTEST) --rules=Block --ignore-fuel-stop --max-success=1000000
 
 testnorecqc:
 	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
