@@ -446,7 +446,7 @@ instClass' :: MonadEval m =>
               EvalT m ()
 instClass' loc i env var_super ys e_body xs f =
   instSuper loc var_super xs $ \ var_super ys_super -> do
-    ys <- for ys freshNamed <&> (<> ys_super)
+    ys <-  (ys_super <>) <$> for ys freshNamed
     _ <- local (const $ ys <> env) $ eval' e_body
     let ys' = fromIdents ys
     for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
