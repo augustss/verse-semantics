@@ -194,6 +194,10 @@ This working document contains our most active rule-sets
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
     \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E|
+                                              \vb |E == e| \vb |e == E| \\
+                                &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
+                                       \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
     \vb |one hole| \vb |all hole| \\
 \iffullverse
@@ -274,7 +278,7 @@ $\begin{array}{l}
 \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
     & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
 \rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
-%    &&&& if $|x| \in \freevars{|lam y e|}$ \\
+    &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
 \rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
     & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
 \rulename{def-elimr} & |def (x ys) (X^[v=x])| & \movesto & |def ys (X^[v])|
@@ -297,7 +301,7 @@ $\begin{array}{l}
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
 \rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
 \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{unify-seqr-e} & |e == (e_1 ; e_2)| & \movesto & |def x (x == e_1; e_2; x == e_3)|
+\rulename{unify-seqr-e} & |e == (e_1 ; e_2)| & \movesto & |def x (x == e; e_1; x == e_2)|
   & \text{if |e| is not a value}\\
 \rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
 \rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
@@ -305,6 +309,22 @@ $\begin{array}{l}
 \end{array}$
 \caption{The Verse calculus: rewrite rules (1)}
 \label{fig:general-axioms} \label{fig:rules1}
+\end{figure}
+
+% -----------     Variations    -----------------------------------------
+
+\begin{figure}
+$\begin{array}{l}
+\begin{array}{@@{\quad} l  r c l l}
+\multicolumn{4}{l}{\text{Remove \rulename{subst} and \rulename{subst-rec} and add}} \\[1mm]
+\rulename{deref} & |x==v; E^[x]| & \movesto & |x==v; E^[v]|
+    & \text{if $|x|,\freevars{|v|} \notin \boundvars{|E|}$, $|x| \notin \freevars{v}$} \\
+\rulename{seq-swap1} & |e_1 ; x = v|    & \movesto & |x == v; e_1|     & \text{if |e_1| not of form |x' == v'|}\\
+\rulename{seq-swap2} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & \text{if |e_1| not of form |x' == v'|}\\
+
+\end{array}
+\end{array}$
+\caption{Variations (Ranjit) }
 \end{figure}
 
 % ===================================================================
@@ -362,6 +382,12 @@ $\begin{array}{l}
 
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
+
+\subsection{Ranjit variations}
+
+Instead of using substitution, move |x=v| bindings outwards, and substitute to the right only.
+
+What about |(x; def y (x=3; blah))|? I think we need to move that |x=3| outwards don't we?
 
 \bibliography{../../verse}
 
