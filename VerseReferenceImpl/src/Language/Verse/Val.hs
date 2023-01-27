@@ -37,21 +37,21 @@ data Val f a
   | Truth a
   | Tuple [a]
   | Module !Label !(HashMap Name (f a))
-  | Struct !Label !(IdentMap Name (f a)) !(IdentMap Name Bool) !Exp
+  | Struct !Label !(IdentMap Name (f a)) !(IdentMap Name Bool) Exp
   | StructInst !Label !(HashMap Name (f a))
+  | Class !Label !(IdentMap Name (f a)) (Maybe a) !(IdentMap Name Bool) Exp
+  | ClassInst !Label (Maybe a) !(HashMap Name (f a))
   | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
 
 data Function f a = Function
   !Label
   !(IdentMap Name (f a))
   !(IdentMap Name Bool)
-  !Exp
-  !Exp deriving (Show, Functor, Foldable, Traversable)
+  Exp
+  Exp deriving (Show, Functor, Foldable, Traversable)
 
 instance Eq (Function f a) where
   Function x _ _ _ _ == Function y _ _ _ _ = x == y
-
-type IdentMap a v = HashMap (Ident a) v
 
 type Exp = L (Desugar.Exp L (Ident Name))
 
@@ -67,10 +67,13 @@ instance Zippable f => Unifiable (Val f) where
       pure $ Just []
     (Tuple xs, Tuple ys) ->
       pure $ zipMatch xs ys
-    (StructInst x xs, StructInst y ys) | x == y ->
-      runMaybeT . execWriterT $
+    (StructInst i xs, StructInst j ys) | i == j -> runMaybeT . execWriterT $
       for_ (HashMap.intersectionWith (,) xs ys) $
-      maybe empty tell . uncurry zipMatch
+        maybe empty tell . uncurry zipMatch
+    (ClassInst i x xs, ClassInst j y ys) | i == j -> runMaybeT . execWriterT $ do
+      maybe empty tell $ zipMatch x y
+      for_ (HashMap.intersectionWith (,) xs ys) $
+        maybe empty tell . uncurry zipMatch
     (Overload x xs, Overload y ys) ->
       runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
@@ -139,7 +142,23 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
     Struct i _ _ _ ->
       "struct#" <> prettyLabel i
     StructInst i xs ->
-      align $ "struct#" <> prettyLabel i <> group (braced $ names xs)
+      align $
+      "struct#" <>
+      prettyLabel i <>
+      group (braced $ names xs)
+    Class i _ _ _ _ ->
+      "class#" <> prettyLabel i
+    ClassInst i Nothing xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      group (braced $ names xs)
+    ClassInst i (Just x) xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      parens (pretty x) <>
+      group (braced $ names xs)
     where
       names xs =
         (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)) <$>
@@ -151,7 +170,9 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
         (flatAlt (hardline <> rparen) rparen)
         ", "
       braces x =
-        flatAlt (hardline <> "{ ") lbrace <> x <> flatAlt (hardline <> rbrace) rbrace
+        flatAlt (hardline <> "{ ") lbrace <>
+        x <>
+        flatAlt (hardline <> rbrace) rbrace
       braced =
         group .
         encloseSep
@@ -159,8 +180,7 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-hoistVal :: (forall c . f c -> g c) ->
-            Val f a -> Val g a
+hoistVal :: (forall c . f c -> g c) -> Val f a -> Val g a
 hoistVal f = \ case
   Int x -> Int x
   Float x -> Float x
@@ -170,8 +190,9 @@ hoistVal f = \ case
   Module i xs -> Module i (f <$> xs)
   Struct i ys xs e -> Struct i (f <$> ys) xs e
   StructInst i xs -> StructInst i (f <$> xs)
+  Class i ys e1 xs e2 -> Class i (f <$> ys) e1 xs e2
+  ClassInst i x xs -> ClassInst i x (f <$> xs)
   Overload x xs -> Overload (hoistFunction f x) xs
 
-hoistFunction :: (forall c . f c -> g c) ->
-                 Function f a -> Function g a
+hoistFunction :: (forall c . f c -> g c) -> Function f a -> Function g a
 hoistFunction f (Function i ys xs e1 e2) = Function i (f <$> ys) xs e1 e2

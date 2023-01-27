@@ -133,7 +133,7 @@ ReversedList :: { [L (Exp L Name)] }
   : MaybeCommas { [$1] }
   | ReversedList Separator MaybeCommas { $3 : $1 }
 
-MaybeSeparator
+MaybeSeparator :: { () }
   : { () }
   | Separator { () }
 
@@ -265,9 +265,21 @@ Exp :: { L (Exp L Name) }
   | not Exp {
       Exp.Not <\$ $1 <.> duplicate $2
     }
-  | block Block { Exp.Block <\$ $1 <.> duplicate $2 }
-  | module Block { Exp.Module <\$ $1 <.> duplicate $2 }
-  | struct Block { Exp.Struct <\$ $1 <.> duplicate $2 }
+  | block Block {
+      Exp.Block <\$ $1 <.> duplicate $2
+    }
+  | module Block {
+      Exp.Module <\$ $1 <.> duplicate $2
+    }
+  | struct Block {
+      Exp.Struct <\$ $1 <.> duplicate $2
+    }
+  | class Block {
+      Exp.Class Nothing <\$ $1 <.> duplicate $2
+    }
+  | class Paren Block {
+      Exp.Class <\$ $1 <.> (Just <\$> duplicate $2) <.> duplicate $3
+    }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | Inst { $1 }
@@ -279,7 +291,7 @@ Exp :: { L (Exp L Name) }
       Exp.IsInt <\$ $1 <.> duplicate $2
     }
 
-Inst
+Inst :: { L (Exp L Name) }
   : Exp '{' List '}' {
       Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
     }
@@ -287,7 +299,7 @@ Inst
       Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $4 <\$ $2 <. $5)
     }
 
-If
+If :: { L (Exp L Name) }
   : if Block %prec IF {
       Exp.If <\$ $1 <.> duplicate $2
     }
@@ -310,15 +322,15 @@ If
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
 
-Then
+Then :: { L (Exp L Name) }
   : then Block { $1 .> $2 }
   | then Exp { $1 .> $2 }
 
-Else
+Else :: { L (Exp L Name) }
   : else Block { $1 .> $2 }
   | else Exp { $1 .> $2 }
 
-For
+For :: { L (Exp L Name) }
   : for Block %prec FOR {
       Exp.For <\$ $1 <.> duplicate $2
     }
@@ -329,32 +341,32 @@ For
       Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
 
-Exists
+Exists :: { L (Exp L Name) }
   : exists name {
       Exp.Exists <\$ $1 <.> duplicate $2
     }
 
-Function
+Function :: { L (Exp L Name) }
   : function Paren Block {
       Exp.Function <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
 
-Paren
+Paren :: { L (Exp L Name) }
   : '(' List ')' { Exp.List $2 <\$ $1 <. $3 }
 
-BraceInd
+BraceInd :: { L (Exp L Name) }
   : Brace { $1 }
   | ind List ded { Exp.List $2 <\$ $1 <. $3 }
 
-Brace
+Brace :: { L (Exp L Name) }
   : Scan '{' List '}' { Exp.List $3 <\$ $2 <. $4 }
 
-Block
+Block :: { L (Exp L Name) }
   : Brace { $1 }
   | '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | colonEOL ind List ded { Exp.List $3 <\$ $1 <. $4 }
 
-Scan
+Scan :: { () }
   : { () }
   | Scan newline { () }
 
