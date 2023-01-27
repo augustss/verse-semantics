@@ -384,7 +384,7 @@ It is quite easy to take an arbitrary expression and transform it to this subset
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exist-swap} & |def (dots x y dots) q| & \movesto & |def (dots y x dots) q| \\
-    \rulename{eqn-swap} & |def xs (dots x_1 == v_1; x_2 == v_2; dots)| & \movesto & |def xs (dots x_2 == v_2; x_1 == v_1; dots)| \\
+    \rulename{eqn-swap} & |def xs (dots v_1 == e_1; v_2 == e_2; dots)| & \movesto & |def xs (dots v_2 == e_2; v_1 == e_1; dots)| & \text{if |e_1| or |e_2| is a |ce|} \\
     \rulename{var-swap} & |def xs (Q^[x == y]; v)| & \movesto & |def xs ((Q^[x == y];v)^{y/x,x/y})| \\
     \end{array} \\
 
