@@ -134,7 +134,7 @@
 %% Note: \begin{abstract}...\end{abstract} environment must come
 %% before \maketitle command
 \begin{abstract}
-This working document contains our most active rule-sets
+This working document contains our most active rule-sets.
 \end{abstract}
 
 
@@ -160,7 +160,7 @@ This working document contains our most active rule-sets
     && \vb & |succeeds e| \vb |decides e| \\
 \fi
     \text{Values} & v & ::= & x  \vb \hnf \\
-    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
+    \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x b| \\
     \text{Primops} & op  & ::= & |gt| \vb |add|
 \iffullverse
     \vb |isInt|
@@ -180,7 +180,7 @@ This working document contains our most active rule-sets
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | \\
-      |{ v }| & \text{means} & |{def () v}| \\
+      |{ q }| & \text{means} & |{def () q}| \\
 %%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
@@ -191,6 +191,15 @@ This working document contains our most active rule-sets
 \caption{POPL-block syntax} \label{fig:popl-block-syntax}
 \end{figure}
 
+\subsection{Contexts}
+\begin{itemize}
+\item |Q|, context for a single equation in a block.
+\item |QC|, context for a single equation in a block, but with all equations on the left being choice free.
+\item |V|, context for a single variable quantified variables in a block.
+\item |SX|, context where choices can be made.
+\end{itemize}
+
+
 % ----------------------------------------------------
 \begin{figure}
   $$
@@ -198,7 +207,7 @@ This working document contains our most active rule-sets
     \text{Block equation contexts} & Q & ::= & |hole; q| \vb |v = e; Q| \\
     \text{Block equation contexts} & QC & ::= & |hole; q| \vb |v = ce; QC| \\
     \text{Variable list context} & V & ::= & |hole xs| \vb |x V|  \\
-    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \text{Scope contexts} & SX & ::= & |hole choice c| \vb |c choice hole |
        \vb |one hole| \vb |all hole| \\
 
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one e| \vb |all e|
@@ -238,10 +247,11 @@ This working document contains our most active rule-sets
 \rulegroupname{Application}
 
 \rulename{app-beta} & |apply1 (lam x ({def xs q})) v| & \movesto & |{def (x xs) (x=v; q)}|
-          & if $x \not\in \freevars{|v|}$ \\
+          & if $x \not\in \freevars{|v|} \cup \{\overline{x}\}$ \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|{v = 0; v_0} choice dots choice {v = n; v_n}|} \\
 
+\\[-2mm]
 \rulegroupname{Block}
 
 \rulename{merge} & |def xs Q^[x == {def ys (q; v)}]| & \movesto & |def (xs ys) Q^[q; x == v]| &
@@ -250,29 +260,25 @@ This working document contains our most active rule-sets
 \\[-2mm]
 \rulegroupname{Unification}
 
-\rulename{ulit} & |k_1 == k_2| & \movesto
+\rulename{ulit} & |Q^[k_1 == k_2]| & \movesto
     & \largerhs{$\begin{cases}
-        |k_1| & \text{if $k_1=k_2$} \\
-        |fail| & \text{otherwise}
+        |Q^[]| & \text{if $k_1=k_2$} \\
+        |Q^[x==fail]| & \text{otherwise, |x| fresh}
       \end{cases}$} \\
-\rulename{utup} & \llap{|tup (v_1,dots,v_m) == tup (v1',dots,v_n')|}
+\rulename{utup} & {|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n')]|}
     % the \llap allows the LHS to reach into the first columns; ok due to the short rule name
     & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
+        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m']|} \\
             & \text{if $m=n$} \\
-        |fail| & \text{otherwise}
+        |Q^[x==fail]| & \text{otherwise, |x| fresh}
       \end{cases}
     $}\\
-\rulename{ux1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
-\rulename{ux2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
-\rulename{ux3} & |(lam x e) == hnf| & \movesto & |fail|\\
-\rulename{ux4} & |hnf == (lam x e)| & \movesto & |fail|\\
-\rulename{ux5} & |op == hnf| & \movesto & |fail|\\
-\rulename{ux6} & |hnf == op| & \movesto & |fail|\\
-\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & if $|V| \ne |hole|$ \\
+\rulename{ux} & |v_1 == v_2 | & \movesto & |x == fail| & if not matched above, |x| fresh \\
+%%\rulename{ux-occurs} & |x=V^[x]| & \movesto & |x == fail| & if $|V| \ne |hole|$, |x| fresh \\
+\rulename{ux-occurs} & |x == v| & \movesto & {\text{???recursion???}} & \text{if $x \in \freevars{v}$}\\
 
 \\[-2mm]
-\rulegroupname{Unification variables}
+\rulegroupname{Variables}
 
 \rulename{subst} & |Q^[x==v]| & \movesto & |(subst Q x v)^[x==v]|
     & if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$ \\
@@ -280,8 +286,8 @@ This working document contains our most active rule-sets
 \rulename{def-eliml} & |def (V^[x]) (Q^[x==v])| & \movesto & |def (V^[]) (Q^[])|
     & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
-\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
-    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
+%\rulename{def-elimr} & |def (V^[x]) (Q^[v==x])| & \movesto & |def (V^[]) (Q^[])|
+%    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
 \rulename{def-elimv} & |def (V^[x]) (Q^[y=x])| & \movesto & |def (V^[]) (subst (Q^[]) x y)|
     & if $|x| \neq |y|$ \\
@@ -326,7 +332,7 @@ This working document contains our most active rule-sets
     \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
     \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
     \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-    \rulename{choice} & |SX^[{ def xs (QC^[x == c_1 `choice` c2]) }]| & \movesto &
+    \rulename{choice} & |SX^[{ def xs (QC^[x == (c_1 `choice` c_2)]) }]| & \movesto &
                         |SX^[{def xs (QC^[x == c_1])} `choice` {def xs (QC^[x == c_2])}]| \\
 %%    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
     \end{array} \\
@@ -347,10 +353,28 @@ This working document contains our most active rule-sets
     \label{fig:rules2}  \label{fig:choice}
 \end{figure}
 
-\begin{itemize}
-\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
-\end{itemize}
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Structural rules} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{exist-swap} & |def (dots x y dots) q| & \movesto & |def (dots y x dots) q| \\
+    \rulename{eqn-swap} & |def xs (dots x_1 == e_1; x_2 == e_2; dots)| & \movesto & |def xs (dots x_2 == e_2; x_1 == e_1; dots)| & \text{if |e_1| or |e_2| is a |ce|} \\
+    \rulename{var-swap} & |def xs (Q^[x == y]| & \movesto & |def xs ((Q^[x == y])^{y/x,x/y})| \\
+    \end{array} \\
 
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (3)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+
+%\begin{itemize}
+%\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
+%\end{itemize}
+
+\section{Dummy}
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
 

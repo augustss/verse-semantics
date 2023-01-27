@@ -68,6 +68,7 @@ library rules
     other-modules:    Rules.PLDI
                       Rules.POPL
                       Rules.KoenNaive
+                      Rules.Block
     hs-source-dirs:   rules
 
 library frontend

@@ -6,6 +6,7 @@ import Rules.Core
 import Rules.PLDI(allSystemsPLDI)
 import Rules.POPL(allSystemsPOPL)
 import Rules.KoenNaive(allSystemsKoen)
+import Rules.Block(allSystemsBlock)
 
 type ESystem = TRSystem Expr
 
@@ -14,6 +15,7 @@ allSystems =
      allSystemsPOPL
   ++ allSystemsPLDI
   ++ allSystemsKoen
+  ++ allSystemsBlock
 
 lookupSystem :: String -> Either String ESystem
 lookupSystem = lookupSystemEx allSystems

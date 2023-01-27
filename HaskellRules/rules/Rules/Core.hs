@@ -18,10 +18,12 @@ module Rules.Core(
   isVal,
   pattern EXI,
   pattern LAM,
+  pattern Block, Eqn,
   subst,
   alphaRename,
   invariant,
   collect,
+  allVars,
   check,
   ) where
 import qualified Epic.SIntMap as IM
@@ -33,6 +35,7 @@ import GHC.Stack(HasCallStack)
 import TRS.Bind
 import TRS.TRS
 import Test.QuickCheck hiding ( collect )
+import Epic.List(nub)
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
@@ -59,6 +62,7 @@ data Expr
   | Fail                        -- ^ fail
   | Wrong                       -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
+  | BlockC Expr                 -- ^ same as e, but maintaining invariants
   -- only used for updatable references
   | Store Heap Expr
   | Ref Ptr
@@ -88,12 +92,13 @@ instance Show Expr where
   showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
-  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "∃" . showsPrec 0 x . showString ". " . showsPrec 0 a
+  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString ". " . showsPrec 0 a
   showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
   showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
   showsPrec _ Wrong            = showString "wrong"
   showsPrec _ (Split e v1 v2)  = showString "split{" . showsPrec 0 e . showString ", " .
                                  showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
+  showsPrec _ (BlockC e)       = showString "block {" . showsPrec 0 e . showString "}"
   showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
                                  showsPrec 0 e . showString "}"
   showsPrec p (Ref r)          = showsPrec p r
@@ -174,6 +179,10 @@ instance Ord Expr where
     comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
     comp _xs _ys Split {} _ = LT
     comp _xs _ys _ Split {} = GT
+
+    comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
+    comp _xs _ys BlockC{} _ = LT
+    comp _xs _ys _ BlockC{} = GT
 
     comp  xs  ys (Store h e) (Store h' e') =
       compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
@@ -276,6 +285,25 @@ getCON e@Op{} = Just e
 getCON e@Ref{} = Just e
 getCON _ = Nothing
 
+type Eqn = (Value, Expr)
+
+pattern Block :: [Ident] -> [(Value, Expr)] -> Value -> Expr
+pattern Block xs bs v <- (BlockC (getBlock -> Just (xs, bs, v)))
+  where Block xs bs v = BlockC (foldr EXI (foldr eqn v bs) xs)
+          where eqn (a, b) r = (a :=: b) :>: r
+
+getBlock :: Expr -> Maybe ([Ident], [Eqn], Value)
+getBlock = blk
+  where
+    blk (EXI i e) = (\ (xs, qs, v) -> (i:xs, qs, v)) <$> blk e
+    blk e = blk' e
+    blk' ((Val a :=: e) :>: b) = (\ (xs, qs, v) -> (xs, (a, e) : qs, v)) <$> blk' b
+--    blk' (Val v) = Just ([], [], v)
+--    blk' _ = Nothing
+    blk' (_ :>: _) = Nothing
+    blk' (_ :=: _) = Nothing
+    blk' e = Just ([], [], e)
+
 --------------------------------------------------------------------------------
 
 type TRSFlags = RuleEnv Expr
@@ -336,6 +364,8 @@ instance Rec Expr where
            [ (n, Split a' f g) | (n,a') <- rec r s a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
         ++ [ (n, Split a f g') | (n,g') <- rec r s g ]
+      BlockC a ->
+           [ (n, BlockC a') | (n, a') <- rec r s a ]
       -- No reductions in the store, it's supposed to be a Value
       Store h e -> [ (n, Store h e') | (n,e') <- rec r s e ]
       _     -> []
@@ -357,11 +387,11 @@ instance Free Expr where
   free (One a)   = free a
   free (All a)   = free a
   free (Split e f g) = free e `union` free f `union` free g
+  free (BlockC e) = free e
   free Fail      = []
   free Wrong     = []
   free (Store h e) = free (IM.elems h) `union` free e
   free Ref{}     = []
-
 
 --------------------------------------------------------------------------------
 
@@ -377,6 +407,7 @@ alphaRename xs bnd@(Bind x e)
   y = identNotIn (x : (xs ++ free e))
 
 instance Term Expr where
+  subst [] e = e
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
   subst _sub e@Op{}   = e
@@ -388,13 +419,23 @@ instance Term Expr where
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst _sub Fail     = Fail
+  subst _sub Wrong    = Wrong
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
-  subst _sub Wrong    = Wrong
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
+  subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
   subst _sub e@Ref{}  = e
+
+instance (Term a, Term b) => Term (a, b) where
+  subst sub (a, b) = (subst sub a, subst sub b)
+
+instance (Term a, Term b, Term c) => Term (a, b, c) where
+  subst sub (a, b, c) = (subst sub a, subst sub b, subst sub c)
+
+instance (Term a) => Term [a] where
+  subst sub xs = map (subst sub) xs
 
 -- TODO(augustss):
 -- We don't normally substitute in ~, but we still need to be able to alpha convert,
@@ -445,6 +486,7 @@ instance Arbitrary Expr where
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
+  shrink (BlockC e)  = BlockC <$> shrink e
   shrink (Store _ _) = undefined
   shrink (Ref _)   = []
   shrink Wrong     = []
@@ -466,6 +508,7 @@ arbExpr n xs =
   , (n, Exi <$> arbBind n1 xs)
   , (n, One <$> arbExpr n1 xs)
   , (n, All <$> arbExpr n1 xs)
+  -- Don't generate Block, the anf-ing will do that.
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
@@ -505,6 +548,24 @@ collect here (\/) = col
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
+
+--------------------------------------------------------------------------------
+
+allVars :: Expr -> [Ident]
+allVars = nub . expr
+  where
+    expr (Var i) = [i]
+    expr (Arr es) = concatMap expr es
+    expr (LAM i e) = i : expr e
+    expr (EXI i e) = i : expr e
+    expr (e1 :=: e2) = expr e1 ++ expr e2
+    expr (e1 :@: e2) = expr e1 ++ expr e2
+    expr (e1 :>: e2) = expr e1 ++ expr e2
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
+    expr (BlockC e) = expr e
+    expr _ = []
 
 --------------------------------------------------------------------------------
 

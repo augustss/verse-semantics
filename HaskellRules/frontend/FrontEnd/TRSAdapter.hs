@@ -139,6 +139,7 @@ coreToTrs (CDef (i:is) e) = T.Exi $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e
 coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
 coreToTrs CWrong{} = T.Wrong
 coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
+coreToTrs (CMacro (Ident _ "block") e) = coreToTrs e
 coreToTrs e@CMacro{} = impossible e
 coreToTrs e@CLambda{} = impossible e
 coreToTrs (CStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
@@ -172,6 +173,8 @@ trsToCore (T.One e) = COne $ trsToCore e
 trsToCore (T.All e) = CAll $ trsToCore e
 trsToCore T.Wrong = CWrong "unknown"
 trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
+trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
+--trsToCore (T.BlockC e) = trsToCore e
 trsToCore (T.Store h e) = CStore s (trsToCore e)
   where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
 trsToCore (T.Ref (T.Ptr i)) = CPtr i
