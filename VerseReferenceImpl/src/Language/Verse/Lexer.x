@@ -43,10 +43,10 @@ $space = [\ \t]
 <0, nested, maybeNesting, indCmt> {
   " " { space }
   \t { tab }
-  "#" .* ;
 }
 
-<0, nested, maybeNesting> {
+<0, nested, maybeNesting, indCmt, indented, colon, equal, colonEqual, fatArrow> {
+  "#" .* ;
   "<#>" { indCmt0 }
 }
 
@@ -63,7 +63,8 @@ $space = [\ \t]
   "" { emptyIndCmt }
 }
 
-<indentedIndCmt> {
+<indentedBlockCmt, indentedIndCmt> {
+  "<#>" ;
   . ;
 }
 
@@ -74,22 +75,12 @@ $space = [\ \t]
   . { textBlockCmt }
 }
 
-<indented, colon, equal, colonEqual, fatArrow> {
-  "#" .* ;
-  "<#>" { indCmt0 }
-}
-
-<indentedBlockCmt, indCmt, indentedIndCmt> {
-  "<#>" ;
-}
-
 <indented, colon, equal, colonEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
   "<#" { leftBlockCmtIndented }
 }
 
 <indentedBlockCmt> {
   "#>" { rightIndentedBlockCmt }
-  . ;
   @newline ;
 }
 
