@@ -1,2 +1,4 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-1 # a
+X := () => <# a #>
+  1
+X()
