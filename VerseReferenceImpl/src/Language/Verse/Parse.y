@@ -162,18 +162,6 @@ Exp :: { L (Exp L Name) }
   | name {
       Exp.Name <\$> $1
     }
-  | name ':' Exp {
-      Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
-    }
-  | name ':' ind List ded {
-      Exp.Inst <\$> duplicate (Exp.Name <\$> $1) <.> duplicate ($2 \$> Exp.List $4 <. $5)
-    }
-  | Exp '{' List '}' {
-      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
-    }
-  | Exp ':' ind List ded {
-      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
-    }
   | var name {
       Exp.Var <\$ $1 <.> duplicate $2
     }
@@ -191,6 +179,18 @@ Exp :: { L (Exp L Name) }
     }
   | name Paren ':=' BraceInd {
       Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | name ':' Exp {
+      Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
+    }
+  | name ':' ind List ded {
+      Exp.Inst <\$> duplicate (Exp.Name <\$> $1) <.> duplicate ($2 \$> Exp.List $4 <. $5)
+    }
+  | Exp '{' List '}' {
+      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
+    }
+  | Exp ':' ind List ded {
+      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }
   | Exp '=>' Exp {
       Exp.Function <\$> duplicate $1 <.> duplicate $3
