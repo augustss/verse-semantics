@@ -23,7 +23,6 @@ data Token
   | RightBracket
   | Semi
   | Colon
-  | ColonEOL
   | Comma
   | Dot
   | DotDot
@@ -82,7 +81,6 @@ instance Pretty Token where
     RightBracket -> rbracket
     Semi -> semi
     Colon -> colon
-    ColonEOL -> colon
     Comma -> comma
     Dot -> dot
     DotDot -> ".."

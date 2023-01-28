@@ -27,7 +27,6 @@ import Control.Monad.Verse (MonadVerse (..), runVerseT)
 
 import Data.Fix
 import Data.Foldable
-import Data.Functor
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap

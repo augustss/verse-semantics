@@ -59,9 +59,9 @@ import Language.Verse.Token qualified as Token
 %left '*' '/'
 %left '.'
 %nonassoc '?'
-%nonassoc ':'
-%nonassoc '{' colonEOL
+%nonassoc '{'
 %nonassoc name
+%nonassoc ':'
 %left '(' '['
 
 %token
@@ -94,7 +94,6 @@ import Language.Verse.Token qualified as Token
   all { L _ Token.All }
   block { L _ Token.Block }
   class { L _ Token.Class }
-  colonEOL { L _ Token.ColonEOL }
   ded { L _ Token.Dedent }
   do { L _ Token.Do }
   else { L _ Token.Else }
@@ -165,6 +164,15 @@ Exp :: { L (Exp L Name) }
     }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
+    }
+  | name ':' ind List ded {
+      Exp.Inst <\$> duplicate (Exp.Name <\$> $1) <.> duplicate ($2 \$> Exp.List $4 <. $5)
+    }
+  | Exp '{' List '}' {
+      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
+    }
+  | Exp ':' ind List ded {
+      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }
   | var name {
       Exp.Var <\$ $1 <.> duplicate $2
@@ -239,10 +247,10 @@ Exp :: { L (Exp L Name) }
       Exp.PrefixColon <\$ $1 <.> duplicate $2
     }
   | Exp '(' List ')' {
-      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
+      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
   | Exp '[' List ']' {
-      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
+      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2
@@ -282,21 +290,12 @@ Exp :: { L (Exp L Name) }
     }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
-  | Inst { $1 }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
   | isInt Paren {
       Exp.IsInt <\$ $1 <.> duplicate $2
-    }
-
-Inst :: { L (Exp L Name) }
-  : Exp '{' List '}' {
-      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $3 <\$ $2 <. $4)
-    }
-  | Exp colonEOL ind List ded {
-      Exp.Inst <\$> duplicate $1 <.> duplicate (Exp.List $4 <\$ $2 <. $5)
     }
 
 If :: { L (Exp L Name) }
@@ -364,7 +363,7 @@ Brace :: { L (Exp L Name) }
 Block :: { L (Exp L Name) }
   : Brace { $1 }
   | '.' Exp %prec DOT_SPACE { $1 .> $2 }
-  | colonEOL ind List ded { Exp.List $3 <\$ $1 <. $4 }
+  | ':' ind List ded { $1 \$> Exp.List $3 <. $4 }
 
 Scan :: { () }
   : { () }

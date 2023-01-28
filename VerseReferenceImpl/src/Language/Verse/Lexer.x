@@ -401,13 +401,13 @@ newlineIndented = action $ do
   putIndent []
   getToken
 
-newlineToken :: Token -> Action
-newlineToken x i j _ _ = do
+newlineToken :: Int -> Token -> Action
+newlineToken s x i j _ _ = do
   popStates
   popStates
   pushIndents =<< getIndent
   putIndent []
-  pushStates nesting
+  pushStates s
   pure $ L (Loc i j) x
 
 emptyToken :: Token -> Action
@@ -421,7 +421,7 @@ colonIndented = action $ do
   getToken
 
 newlineColon :: Action
-newlineColon = newlineToken Token.ColonEOL
+newlineColon = newlineToken nesting Token.Colon
 
 emptyColon :: Action
 emptyColon = emptyToken Token.Colon
@@ -432,7 +432,7 @@ equalIndented = action $ do
   getToken
 
 newlineEqual :: Action
-newlineEqual = newlineToken Token.Equal
+newlineEqual = newlineToken maybeNesting Token.Equal
 
 emptyEqual :: Action
 emptyEqual = emptyToken Token.Equal
@@ -443,7 +443,7 @@ colonEqualIndented = action $ do
   getToken
 
 newlineColonEqual :: Action
-newlineColonEqual = newlineToken Token.ColonEqual
+newlineColonEqual = newlineToken maybeNesting Token.ColonEqual
 
 emptyColonEqual :: Action
 emptyColonEqual = emptyToken Token.ColonEqual
@@ -454,7 +454,7 @@ fatArrowIndented = action $ do
   getToken
 
 newlineFatArrow :: Action
-newlineFatArrow = newlineToken Token.FatArrow
+newlineFatArrow = newlineToken maybeNesting Token.FatArrow
 
 emptyFatArrow :: Action
 emptyFatArrow = emptyToken Token.FatArrow
