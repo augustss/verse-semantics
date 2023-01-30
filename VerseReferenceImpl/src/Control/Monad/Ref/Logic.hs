@@ -15,7 +15,6 @@ module Control.Monad.Ref.Logic
   ) where
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Control.Monad.Logic
@@ -28,10 +27,6 @@ import Control.Monad.Supply
 import Control.Monad.Trans.Class
 
 import Data.Coerce
-
--- import Debug.Trace
-
-trace = flip const
 
 newtype RefLogicT m a = RefLogicT
   { unRefLogicT :: LogicT (StateT m) a
@@ -86,11 +81,14 @@ instance Monad m => Alternative (RefLogicT m) where
 
 instance Monad m => MonadLogic (RefLogicT m) where
   msplit m = RefLogicT $ LogicT $ \ sk fk -> do
-    (x, s) <- lift (runStateT . fmap (fmap (fmap coerce)) . msplit' $ coerce m)
+    (x, s) <- lift (runStateT . fmap coerceSplit . msplit' $ coerce m)
     s.forward
     sk x $ s.backward *> fk
 
-msplit' :: Monad m => LogicT (StateT m) a -> StateT m (Maybe (a, LogicT (StateT m) a))
+coerceSplit :: Maybe (a, LogicT (StateT m) a) -> Maybe (a, RefLogicT m a)
+coerceSplit = coerce
+
+msplit' :: Monad m => LogicT m a -> m (Maybe (a, LogicT m a))
 msplit' m = unLogicT m sk' $ pure Nothing
   where
     sk' x fk = pure $ Just (x, lift fk >>= reflect)
