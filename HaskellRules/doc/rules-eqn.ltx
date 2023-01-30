@@ -266,7 +266,8 @@ $\begin{array}{l}
         |fail| & \text{otherwise}
       \end{cases}
    }\\
-\rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{ulit} nor \rulename{utup} match} \\
+\rulename{ux-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{ulit} nor \rulename{utup} match} \\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \end{array}
 \\
 \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;\;}c@@{\;\;} l l}
@@ -371,6 +372,7 @@ $\begin{array}{l}
     \label{fig:rules-structural}  \label{fig:structural}
 \end{figure}
 
+\section{Dummy}
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
 
