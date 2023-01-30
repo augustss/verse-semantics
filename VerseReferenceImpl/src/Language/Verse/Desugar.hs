@@ -6,8 +6,11 @@ module Language.Verse.Desugar
 
 import Control.Comonad
 import Control.Monad.Except
-import Control.Monad.State.Strict
+import Control.Monad.Reader.Class
+import Control.Monad.RST
+import Control.Monad.State.Class
 import Control.Monad.Supply
+import Control.Monad.Trans.Class
 
 import Data.Foldable
 import Data.Functor.Apply
@@ -23,12 +26,12 @@ import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Parse.Exp qualified as Parse
 
-type Desugar = StateT Env (SupplyT Label (Except Error))
+type Desugar = RST Bool Env (SupplyT Label (Except Error))
 
 type Env = HashMap (Ident Name) (Loc, Bool)
 
 runDesugar :: Desugar a -> SupplyT Label (Except Error) (a, Env)
-runDesugar = flip runStateT mempty
+runDesugar m = runRST m False mempty
 
 desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L (Ident Name)))
 desugar e = runExcept . runSupplyT $ do
@@ -37,8 +40,12 @@ desugar e = runExcept . runSupplyT $ do
 
 desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L (Ident Name)))
 desugar' e = for e $ \ case
-  (Parse.:=:) e1 e2 ->
-    (:=:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:=:) e1 e2 -> ask >>= \ case
+    False -> (:=:) <$> desugar' e1 <*> desugar' e2
+    True -> do
+      (x, e1) <- (,) <$> getIdent e1 <*> desugar' e1
+      e2 <- local (const False) $ desugar' e2
+      pure $ Default x e1 e2
   (Parse.:<>:) e1 e2 -> do
     Not . (<$ e) <$> ((:=:) <$> desugar' e1 <*> desugar' e2)
   (Parse.:.:) e x ->
@@ -85,12 +92,12 @@ desugar' e = for e $ \ case
     pure $ Module i (snd <$> xs) e
   Parse.Struct e -> do
     i <- supply
-    (e, xs) <- lift $ runDesugar $ desugar' e
+    (e, xs) <- lift $ runDesugar $ local (const True) $ desugar' e
     pure $ Struct i (snd <$> xs) e
   Parse.Class e1 e2 -> do
     i <- supply
     e1 <- traverse desugar' e1
-    (e2, xs) <- lift $ runDesugar $ desugar' e2
+    (e2, xs) <- lift $ runDesugar $ local (const True) $ desugar' e2
     pure $ Class i e1 (snd <$> xs) e2
   Parse.Inst e1 e2 -> do
     e1 <- desugar' e1
@@ -152,23 +159,37 @@ desugar' e = for e $ \ case
   Parse.Name x ->
     pure . Name $ Pure x
   Parse.PrefixColon e -> do
-    extract <$> desugarColon e
+    e <- desugar' e
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    ask >>= \ case
+      False -> pure $ Invoke e e_i
+      True -> pure $ (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
     tellName x False
-    e <- desugarColon e
-    pure $ (Name . Pure <$> x) :=: e
+    let e1 = Name . Pure <$> x
+    e <- desugar' e
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    let e2 = Invoke <$> duplicate e <.> duplicate e_i
+    ask >>= \ case
+      False -> pure $ e1 :=: e2
+      True -> pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.InfixColonEqual x e -> do
     tellName x False
-    e <- desugar' e
-    pure $ (Name . Pure <$> x) :=: e
+    ask >>= \ case
+      False -> do
+        e <- desugar' e
+        pure $ (Name . Pure <$> x) :=: e
+      True -> do
+        e <- local (const False) $ desugar' e
+        pure $ Default (Pure <$> x) (Name . Pure <$> x) e
   Parse.IsInt e ->
     IsInt <$> desugar' e
 
-desugarColon :: L (Parse.Exp L Name) -> Desugar (L (Exp L (Ident Name)))
-desugarColon e = do
-  e1 <- desugar' e
-  e2 <- (e $>) . Name <$> freshIdent (loc e) False
-  pure $ Invoke <$> duplicate e1 <.> duplicate e2
+getIdent :: L (Parse.Exp L Name) -> Desugar (L (Ident Name))
+getIdent e = case extract e of
+  Parse.Exists x -> pure $ Pure <$> x
+  Parse.InfixColon x _ -> pure $ Pure <$> x
+  _ -> throwError $ AnonError $ loc e
 
 freshIdent :: Loc -> Bool -> Desugar (Ident Name)
 freshIdent loc var = do
