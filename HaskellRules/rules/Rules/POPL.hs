@@ -1068,6 +1068,7 @@ rulesStructural _ lhs =
   do (e1 :=: Val e2) :>: e3 <- [lhs]
      guard (e2 == e3)
      pure (e1 :=: e2)
+-}
  -- NEW RULE
  <>
   "UNIFY-SWAP" `name`
