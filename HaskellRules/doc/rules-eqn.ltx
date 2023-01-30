@@ -206,7 +206,7 @@ This means that some of the original POPL can be removed or simplified.
 \iffullverse
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
-    \text{Choice contexts} & CX & ::= & \hole \vb \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
     \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
     \vb |one e| \vb |all e|
     %%% NOTE: the following is not in the POPL submission,
@@ -281,7 +281,7 @@ $\begin{array}{l}
 %% \rulename{subst-rec} & |x == V^[lam y e]| & \movesto & \largerhs{|x == V^[lam y (def x (x = V^[lam y e]; e))]|} \\
 %%    &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
 \rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
-    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
+    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \notin |{ys}|$} \\
 \rulename{def-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
@@ -362,8 +362,8 @@ $\begin{array}{l}
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exist-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
-    \rulename{eu-swap} & |def xs (dots eu_1; eu_2; dots)| & \movesto & |def xs (dots eu_2; eu_1; dots)| & \text{if |eu_1| or |eu_2| is choice free} \\
-    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
+    \rulename{val-swap} & |e_1; x==v; e_2| & \movesto & |x==v; e_1; e_2| \\
+    \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
 %%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
     \end{array} \\
 
