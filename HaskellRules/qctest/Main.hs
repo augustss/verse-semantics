@@ -28,7 +28,11 @@ main = do
   quickCheckWith qcargs (prop_Confluence flags sys)
 
 prop_Confluence :: TestFlags -> TRSystem Expr -> Property
-prop_Confluence flags sys =
+prop_Confluence flags | koen flags = prop_Confluence2 flags
+                      | otherwise  = prop_Confluence1 flags
+
+prop_Confluence1 :: TestFlags -> TRSystem Expr -> Property
+prop_Confluence1 flags sys =
   forAllShrink arbExpr shrinkExpr $ \p ->
   let p' = if wrapOne flags then One p else p in
   case normalFormsFuelTrace sys (maxSteps flags) p' of
@@ -102,6 +106,7 @@ data TestFlags = TestFlags
   , maxSteps       :: !Int
   , replayStr      :: !(Maybe String)
   , ignoreFuelStop :: !Bool
+  , koen           :: !Bool
   }
 
 testFlags :: Parser TestFlags
@@ -134,6 +139,9 @@ testFlags = TestFlags
          ( long "ignore-fuel-stop"
         <> short 'i'
         <> help "Do not discard out-of-fuel tests" )
+  <*> switch
+         ( long "koen"
+        <> help "Use Koen's prop_Confluence2" )
  where nDef = maxSuccess stdArgs
        mDef = 1000
 
