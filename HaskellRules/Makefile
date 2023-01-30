@@ -28,8 +28,9 @@ testfast:
 #	$(TESTER) --quiet --eval --split                                            $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=POPLL                  --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
 
 testnorec:
 	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
@@ -46,6 +47,11 @@ testpoplaqc:
 
 testpoplxqc:
 	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
+
+testpopll:
+	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)
+	$(TESTER)               --rules=POPLL --max-steps=25000 --max-norm-steps=100000 $(TRICKY)
+	$(TESTER) --quiet       --rules=POPLL --max-steps=25000                         $(TESTFILE)
 
 testpopllqc:
 	$(QCTEST) --rules=POPLL --ignore-fuel-stop --max-success=1000000
