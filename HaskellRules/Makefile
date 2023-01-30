@@ -86,4 +86,8 @@ v1install:
 	cabal v1-install -p megaparsec
 	cabal v1-install -p QuickCheck
 	cabal v1-install -p uniplate
+	cabal v1-install -p logict
+	cabal v1-install -p prettyprinter
+	cabal v1-install -p comonad
+	cabal v1-install -p semigroupoids
 	cabal v1-install -p optparse-applicative
