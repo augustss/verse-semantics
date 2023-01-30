@@ -141,6 +141,9 @@ This working document contains our most active rule-sets
 \maketitle
 
 \section{POPL rules with adjustments}
+These are the POPL rules, but using the PLDI grammar.
+This means that some of the original POPL can be removed or simplified.
+
 % ----------------------------------------------------
 \begin{figure}
   $$
@@ -150,9 +153,13 @@ This working document contains our most active rule-sets
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
     \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
-       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
-    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+    \text{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
+                                         \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \\
+                         &       & \vb & |one e| \vb |all e| \\
+                         & eu     & ::= & |e| \vb |v == e| \\
+%    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
+%       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e| 
+%    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
 % SPJ Omitting for now
 \iffullverse
     && \vb & |succeeds e| \vb |decides e| \\
@@ -192,19 +199,15 @@ This working document contains our most active rule-sets
 \begin{figure}
   $$
     \begin{array}{lr@@{\;}c@@{\;}l}
-    \text{Execution contexts} & X & ::= & \hole \vb |X == e| \vb |e == X| \vb |X ; e| \vb |e; X| \\
+    \text{Execution contexts} & X & ::= & \hole \vb |v == X| \vb |X ; e| \vb |e; X| \\
     \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
-    \textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E|
-                                              \vb |E == e| \vb |e == E| \\
-                                &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
-                                       \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
     \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
     \vb |one hole| \vb |all hole| \\
 \iffullverse
     && \vb & |succeeds hole| \vb |decides hole| \\
 \fi
-    \text{Choice contexts} & CX & ::= & \hole \vb |CX == e| \vb |ce == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ce_1 == ce_2| \vb |ce_1 ; ce_2|
+    \text{Choice contexts} & CX & ::= & \hole \vb \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
     \vb |one e| \vb |all e|
     %%% NOTE: the following is not in the POPL submission,
     %%% but needed to make progress in (1,2)[x:int]
@@ -243,8 +246,9 @@ $\begin{array}{l}
 
 \rulegroupname{Application}
 
-\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x=v; e)|
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
           & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
 
 \\[-2mm]
@@ -262,12 +266,8 @@ $\begin{array}{l}
         |fail| & \text{otherwise}
       \end{cases}
    }\\
-\rulename{ux-tup1} & |k == tup (v_1,dots,v_n) | & \movesto & |fail| \\
-\rulename{ux-tup2} & |tup (v_1,dots,v_n) == k | & \movesto & |fail| \\
-\rulename{ux-lam1} & |(lam x e) == hnf| & \movesto & |fail|\\
-\rulename{ux-lam2} & |hnf == (lam x e)| & \movesto & |fail|\\
-\rulename{ux-op1} & |op == hnf| & \movesto & |fail|\\
-\rulename{ux-op2} & |hnf == op| & \movesto & |fail|\\
+\rulename{ux-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{ulit} nor \rulename{utup} match} \\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \end{array}
 \\
 \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;\;}c@@{\;\;} l l}
@@ -277,14 +277,12 @@ $\begin{array}{l}
 
 \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
     & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
-\rulename{subst-rec} & |x = V^[lam y e]| & \movesto & \largerhs{|x = V^[lam y (def x (x = V^[lam y e]; e))]|} \\
+\rulename{subst-rec} & |x == V^[lam y e]| & \movesto & \largerhs{|x == V^[lam y (def x (x = V^[lam y e]; e))]|} \\
     &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
 \rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
     & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
-\rulename{def-elimr} & |def (x ys) (X^[v=x])| & \movesto & |def ys (X^[v])|
-    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
-\rulename{def-elimv} & |def (x ys) (X^[z=x])| & \movesto & |def ys (subst (X^[z]) x z)|
-    & \text{if $|z| \neq |x,ys|, |x| \neq |ys|, $ \lennart{NEW}} \\
+\rulename{def-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
+    & \text{if $|z| \neq |x,ys|, |x| \neq |ys|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 
 \\[-2mm]
@@ -299,32 +297,12 @@ $\begin{array}{l}
 
 \rulename{seq} & |v ; e| & \movesto & |e| \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
-\rulename{unify-seql} & |(e_1; e_2) == e_3| & \movesto & |e_1 ; (e_2 == e_3)| \\
 \rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
-\rulename{unify-seqr-e} & |e == (e_1 ; e_2)| & \movesto & |def x (x == e; e_1; x == e_2)|
-  & \text{if |e| is not a value}\\
-\rulename{unify-unifyl} & |(e_1 == e_2) == e_3| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
-\rulename{unify-unifyr} & |e_1 == (e_2 == e_3)| & \movesto & |def x (x=e_1; x=e_2; x=e_3)| & \text{|x| fresh}\\
+\rulename{unify-unifyr} & |v == (e_1 == e_2)| & \movesto & |v==e_1; v==e_2| \\
 \end{array}
 \end{array}$
 \caption{The Verse calculus: rewrite rules (1)}
 \label{fig:general-axioms} \label{fig:rules1}
-\end{figure}
-
-% -----------     Variations    -----------------------------------------
-
-\begin{figure}
-$\begin{array}{l}
-\begin{array}{@@{\quad} l  r c l l}
-\multicolumn{4}{l}{\text{Remove \rulename{subst} and \rulename{subst-rec} and add}} \\[1mm]
-\rulename{deref} & |x==v; E^[x]| & \movesto & |x==v; E^[v]|
-    & \text{if $|x|,\freevars{|v|} \notin \boundvars{|E|}$, $|x| \notin \freevars{v}$} \\
-\rulename{seq-swap1} & |e_1 ; x = v|    & \movesto & |x == v; e_1|     & \text{if |e_1| not of form |x' == v'|}\\
-\rulename{seq-swap2} & |e_1 ; (x = v; e_2)|    & \movesto & |x == v; (e_1; e_2)|     & \text{if |e_1| not of form |x' == v'|}\\
-
-\end{array}
-\end{array}$
-\caption{Variations (Ranjit) }
 \end{figure}
 
 % ===================================================================
@@ -376,18 +354,27 @@ $\begin{array}{l}
     \label{fig:rules2}  \label{fig:choice}
 \end{figure}
 
-\begin{itemize}
-\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
-\end{itemize}
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Structural rules} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{exist-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
+    \rulename{eu-swap} & |def xs (dots eu_1; eu_2; dots)| & \movesto & |def xs (dots eu_2; eu_1; dots)| & \text{if |eu_1| or |eu_2| is choice free} \\
+    \rulename{var-swap} & |X^[x=y]| & \movestoX & |subst X y x^[y=x]| \\
+%%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+    \end{array} \\
 
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (3)}
+    \label{fig:rules-structural}  \label{fig:structural}
+\end{figure}
+
+\section{Dummy}
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
-
-\subsection{Ranjit variations}
-
-Instead of using substitution, move |x=v| bindings outwards, and substitute to the right only.
-
-What about |(x; def y (x=3; blah))|? I think we need to move that |x=3| outwards don't we?
 
 \bibliography{../../verse}
 

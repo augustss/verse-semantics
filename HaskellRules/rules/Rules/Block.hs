@@ -2,7 +2,7 @@
 {- # LANGUAGE FlexibleInstances # -}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.Block(allSystemsBlock) where
+module Rules.Block(allSystemsBlock, anf, valid) where
 import Control.Monad.State.Strict
 import Data.List(delete)
 import Epic.List(pick, pickLR)
@@ -16,21 +16,27 @@ import Rules.Core
 --------------------------------------------------------------------------------
 
 allSystemsBlock :: [TRSystem Expr]
-allSystemsBlock = [ systemBlock ]
+allSystemsBlock = [ systemBlock, systemBlockA, systemBlockR ]
 
 systemBlock :: TRSystem Expr
 systemBlock = TRSystem
   { sname               = "Block"
-  , description         = "Block"
+  , description         = "Block; recursion gets stuck"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
   , rules               = allRules
-  , rules2              = rulesOcc
+  , rules2              = \ _ _ -> []
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
   }
+
+systemBlockA :: TRSystem Expr
+systemBlockA = systemBlock { sname = "BlockA", rules2 = rulesOcc, description = "Block; rec->fail after" }
+
+systemBlockR :: TRSystem Expr
+systemBlockR = systemBlock { sname = "BlockR", rules = rules systemBlock <> rulesRec, description = "Block; +SUBST-REC" }
 
 {-
 v ::= x | hnf
@@ -198,6 +204,19 @@ scopeX lhs =
  ++
   do Split hole f g <- [lhs]
      pure (\ e -> Split e f g, hole)
+
+-- value contexts
+-- V context
+valueX, valueX1 :: Value -> [(Value->Value, Value)]
+valueX lhs = valueX1 lhs ++ [(id, lhs)]
+
+valueX1 lhs =
+  do Arr vs <- [lhs]
+     i <- [0..length vs-1]
+     let ctx1 = \ v -> Arr (take i vs ++ [v] ++ drop (i+1) vs)
+         v1 = vs!!i
+     (ctx2, v2) <- valueX v1
+     pure (ctx1 . ctx2, v2)
 
 --------------------------------------------------------------------------------
 
@@ -547,6 +566,21 @@ rulesChoice _ lhs =
 
 --------------------------------------------------------------------------------
 
+-- Make array recursion an error, uinfold once for lambda
+rulesRec :: ERule
+rulesRec _ lhs =
+  "UX-OCCURS" `name`
+  do Var x :=: Val v <- [lhs]
+     (_, Var x') <- valueX1 v
+     guard (x == x')
+     pure Fail
+ <>
+  "SUBST-REC" `name`
+  do Var x :=: Val v <- [lhs]
+     (ctx, lam@(LAM y (Block xs bs r))) <- valueX v
+     guard (x `elem` free lam)
+     pure (Var x :=: Val (ctx (LAM y (Block (x:xs) ((Var x, Val v) : bs) r))))
+
 rulesOcc :: ERule
 rulesOcc _ lhs =
    "UX-OCCURS" `name`
@@ -605,7 +639,8 @@ rulesStructural _ lhs =
  <>
   "UNIFY-SWAP" `name`
   do u1@(_ :=: e1) :>: (u2@(_ :=: e2) :>: r) <- [lhs]
-     guard (isChoiceFree e1 || isChoiceFree e2)
+     --guard (isChoiceFree e1 || isChoiceFree e2)
+     guard (isVal e1 && isVal e2)
      pure $ u2 :>: (u1 :>: r)
  <>
   "VAR-SWAP" `name`

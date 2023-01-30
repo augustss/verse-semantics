@@ -10,7 +10,6 @@ import Control.Monad.State.Strict
 import Control.Monad.Supply
 
 import Data.Foldable
-import Data.Functor
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap, foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
@@ -68,7 +67,8 @@ desugar' e = for e $ \ case
     pure $ Tuple []
   Parse.List (e:es) -> extract <$> do
     e <- desugar' e
-    foldlM (\ z x -> desugar' x <&> \ x -> (:*>:) <$> duplicate z <.> duplicate x) e es
+    es <- traverse desugar' es
+    pure $ foldl' (\ z x -> (:*>:) <$> duplicate z <.> duplicate x) e es
   Parse.Fail ->
     pure Fail
   Parse.One e -> do
@@ -87,6 +87,11 @@ desugar' e = for e $ \ case
     i <- supply
     (e, xs) <- lift $ runDesugar $ desugar' e
     pure $ Struct i (snd <$> xs) e
+  Parse.Class e1 e2 -> do
+    i <- supply
+    e1 <- traverse desugar' e1
+    (e2, xs) <- lift $ runDesugar $ desugar' e2
+    pure $ Class i e1 (snd <$> xs) e2
   Parse.Inst e1 e2 -> do
     e1 <- desugar' e1
     (e2, xs) <- lift $ runDesugar $ desugar' e2
@@ -133,7 +138,7 @@ desugar' e = for e $ \ case
   Parse.BracketInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.Tuple es ->
-    Tuple <$> for es desugar'
+    Tuple <$> traverse desugar' es
   Parse.Truth e ->
     Truth <$> exists (desugar' e)
   Parse.True ->

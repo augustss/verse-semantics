@@ -1,2 +1,6 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-1 # a
+block:
+  X := block:
+    2<#>
+  1
+  X

@@ -30,6 +30,7 @@ data Exp f a
   | Query (f (Exp f a))
   | Module !Label !(HashMap a Bool) (f (Exp f a))
   | Struct !Label !(HashMap a Bool) (f (Exp f a))
+  | Class !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
   | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
   | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
