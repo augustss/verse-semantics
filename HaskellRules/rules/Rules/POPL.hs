@@ -136,7 +136,7 @@ systemPOPLL = systemPOPLV
          <> rulesApplication
          <> rulesUnificationNoOcc
          <> rulesUnificationVariablesNoR
-         <> rulesSequencing
+         <> rulesSequencingV
          <> rulesChoice
          <> rulesOne
          <> rulesAll
@@ -855,6 +855,25 @@ rulesSequencingExtra _ lhs =
      let x = identNotIn (free [e1,e2,e3])
      pure (EXI x ((Var x :=: e1) :>: e2 :>: (Var x :=: e3)))
 
+-- Assuming LHS is a value
+rulesSequencingV :: ERule
+rulesSequencingV _ lhs =
+  "SEQ" `name`
+  do Val _v :>: e <- [lhs]
+     pure e
+ ++
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
+ ++
+  "UNIFY-SEQR" `name`
+  do Val v :=: (e1 :>: e2) <- [lhs]
+     pure (e1 :>: (Val v :=: e2))
+ ++
+  "UNIFY-UNIFYR" `name`
+  do Val v :=: (e1 :=: e2) <- [lhs]
+     pure ((Val v :=: e1) :>: (Val v :=: e2))
+
 --------------------------------------------------------------------------------
 
 rulesFail :: ERule
@@ -1069,12 +1088,14 @@ rulesStructural _ lhs =
      guard (e2 == e3)
      pure (e1 :=: e2)
 -}
+{-
  -- NEW RULE
  <>
   "UNIFY-SWAP" `name`
   do (e1 :=: e2) <- [lhs]
      guard (isChoiceFree e1 || isChoiceFree e2)
      pure (e2 :=: e1)
+-}
 
 ------------------
 
