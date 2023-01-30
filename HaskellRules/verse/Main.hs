@@ -19,7 +19,7 @@ import FrontEnd.Core
 import FrontEnd.CoreSimp
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
---import FrontEnd.TRSAdapter
+import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
@@ -133,6 +133,7 @@ command = Command
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
 --      , Cmd "display"              "Show current global defs"              cDisplay
 --      , Cmd "prelude"              "Load prelude.verse"                    cPrelude
+      , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
@@ -232,6 +233,11 @@ cSimplify = cTransform (Desugared . simplify . asExpr)
 
 cCoreSimplify :: Run CState
 cCoreSimplify c s = cTransform (Cored . simpCore . asCore (flags s)) c s
+
+cPreprocess :: Run CState
+cPreprocess c s = cTransform (Cored . pre . asCore (flags s)) c s
+  where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
+        sys = esystem s
 
 cCore :: Run CState
 cCore c s = cTransform (Cored . asCore (flags s)) c s
