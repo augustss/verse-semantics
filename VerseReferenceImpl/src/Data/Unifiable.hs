@@ -24,3 +24,11 @@ instance Zippable [] where
     (x:xs, y:ys) -> ((x, y):) <$> zipMatch xs ys
     ([], []) -> Just []
     _ -> Nothing
+
+instance Unifiable Maybe
+
+instance Zippable Maybe where
+  zipMatch = curry $ \ case
+    (Nothing, Nothing) -> Just []
+    (Just x, Just y) -> Just [(x, y)]
+    _ -> Nothing

@@ -2,11 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Ident
   ( Ident (..)
+  , IdentMap
   ) where
 
 import Data.Functor.Classes
 import Data.Hashable
 import Data.Hashable.Lifted
+import Data.HashMap.Strict (HashMap)
 
 import Language.Verse.Label
 
@@ -15,6 +17,8 @@ import Prettyprinter
 data Ident a
   = Pure a
   | Label !Label deriving (Show, Eq, Ord)
+
+type IdentMap a v = HashMap (Ident a) v
 
 instance Eq1 Ident where
   liftEq f = curry $ \ case
