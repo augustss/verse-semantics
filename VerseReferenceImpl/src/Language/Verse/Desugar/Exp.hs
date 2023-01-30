@@ -44,6 +44,7 @@ data Exp f a
   | Int Integer
   | Float Double
   | Name a
+  | Default (f a) (f (Exp f a)) (f (Exp f a))
   | IsInt (f (Exp f a))
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)
