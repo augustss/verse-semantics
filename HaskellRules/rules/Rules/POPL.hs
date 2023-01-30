@@ -734,7 +734,22 @@ _rulesOcc _ lhs =
 --------------------------------------------------------------------------------
 
 rulesUnificationVariables :: ERule
-rulesUnificationVariables _ lhs =
+rulesUnificationVariables env lhs =
+  rulesUnificationVariablesNoR env lhs
+ ++
+  "DEF-ELIMR" `name`
+  do Exi (Bind x a) <- [lhs]
+     (ctx, Val v :=: Var x') <- defX x a
+     guard (x == x')
+     let freeX = free (ctx Fail)
+         freeV = free v
+     guard (x `notElem` freeX)
+     guard (x `notElem` freeV)
+     pure (ctx (Val v))
+  
+
+rulesUnificationVariablesNoR :: ERule
+rulesUnificationVariablesNoR _ lhs =
   "SUBST" `name`
   do (ctx, Var x :=: Val v) <- execX lhs
      let freeX = free (ctx blob)
@@ -748,16 +763,6 @@ rulesUnificationVariables _ lhs =
   "DEF-ELIML" `name`
   do Exi (Bind x a) <- [lhs]
      (ctx, Var x' :=: Val v) <- defX x a
-     guard (x == x')
-     let freeX = free (ctx blob)
-         freeV = free v
-     guard (x `notElem` freeX)
-     guard (x `notElem` freeV)
-     pure (ctx (Val v))
- ++
-  "DEF-ELIMR" `name`
-  do Exi (Bind x a) <- [lhs]
-     (ctx, Val v :=: Var x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
