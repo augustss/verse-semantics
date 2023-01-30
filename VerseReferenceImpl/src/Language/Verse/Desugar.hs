@@ -152,23 +152,22 @@ desugar' e = for e $ \ case
   Parse.Name x ->
     pure . Name $ Pure x
   Parse.PrefixColon e -> do
-    extract <$> desugarColon e
+    e <- desugar' e
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    pure $ Invoke e e_i
   Parse.InfixColon x e -> do
     tellName x False
-    e <- desugarColon e
-    pure $ (Name . Pure <$> x) :=: e
+    let e1 = Name . Pure <$> x
+    e <- desugar' e
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    let e2 = Invoke <$> duplicate e <.> duplicate e_i
+    pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.InfixColonEqual x e -> do
     tellName x False
     e <- desugar' e
     pure $ (Name . Pure <$> x) :=: e
   Parse.IsInt e ->
     IsInt <$> desugar' e
-
-desugarColon :: L (Parse.Exp L Name) -> Desugar (L (Exp L (Ident Name)))
-desugarColon e = do
-  e1 <- desugar' e
-  e2 <- (e $>) . Name <$> freshIdent (loc e) False
-  pure $ Invoke <$> duplicate e1 <.> duplicate e2
 
 freshIdent :: Loc -> Bool -> Desugar (Ident Name)
 freshIdent loc var = do
