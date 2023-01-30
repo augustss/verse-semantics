@@ -5,6 +5,7 @@
 module TRS.TRS(
   Rule,
   name,
+  (-=),
   Rec(..),
   step,
   NormResult(..),
@@ -34,6 +35,11 @@ instance Show (Rule t) where
 infix 7 `name`   -- must bind tighter than <>
 name :: String -> [a] -> [(String, a)]
 name s as = [(s,a) | a <- as]
+
+-- Remove a named rule.
+infixl 8 -=
+(-=) :: Rule a -> String -> Rule a
+rule -= nm = \ env a -> filter ((/= nm) . fst) (rule env a)
 
 --------------------------------------------------------------------------------
 
