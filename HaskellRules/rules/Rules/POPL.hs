@@ -1053,17 +1053,13 @@ rulesStructural _ lhs =
      pure e
 -}
 
+ -- NEW RULE
  <>
-  "UNIFY-SWAP1" `name`
-  do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
-     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
-     pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
- <>
-  "UNIFY-SWAP2" `name`
-  do (e1 :=: e2) :>: (e3 :=: e4) <- [lhs]
-     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
-     pure $ (e3 :=: e4) :>: (e1 :=: e2)
-
+  "EXP-SWAP" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+     guard (isChoiceFree e1 || isChoiceFree e2)
+     pure $ e2 :>: (e1 :>: e3)
+{-
  -- NEW RULE
  -- Needed for \x.(<> = x); <>
  --  Maybe better: x=v --> x=v; v
