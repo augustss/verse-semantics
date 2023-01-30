@@ -281,7 +281,7 @@ $\begin{array}{l}
 \rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
     & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \neq |y_i|$} \\
 \rulename{def-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
-    & \text{if $|z| \neq |x,ys|, |x| \neq |ys| $ \\
+    & \text{if $|z| \neq |x,ys|, |x| \neq |ys|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 
 \\[-2mm]
