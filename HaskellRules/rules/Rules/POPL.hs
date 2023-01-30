@@ -10,13 +10,15 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+import qualified Rules.Block
+import qualified Rules.PLDI
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLS ]
+allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLS, systemPOPLA, systemPOPLX, systemPOPLL ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -58,6 +60,93 @@ systemPOPLR = systemPOPL
   , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
 --                          <> rulesOcc
 --                          <> rulesMoreFail
+  }
+
+systemPOPLA :: TRSystem Expr
+systemPOPLA = systemPOPLV
+  { sname = "POPLA"
+  , preProcess = const (check Rules.Block.valid . nb . Rules.Block.anf)
+  , validExpr = Rules.Block.valid
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR + Block.anf"
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
+  }
+  where
+    nb e@Var{} = e
+    nb e@Int{} = e
+    nb e@Op{} = e
+    nb (Arr es) = Arr (map nb es)
+    nb (LAM x e) = LAM x (nb e)
+    nb (e1 :=: e2) = nb e1 :=: nb e2
+    nb (e1 :>: e2) = nb e1 :>: nb e2
+    nb (e1 :|: e2) = nb e1 :|: nb e2
+    nb (e1 :@: e2) = nb e1 :@: nb e2
+    nb (EXI x e) = EXI x (nb e)
+    nb (One e) = One (nb e)
+    nb (All e) = All (nb e)
+    nb e@Fail = e
+    nb e@Wrong = e
+    nb (Split e1 e2 e3) = Split (nb e1) (nb e2) (nb e3)
+    nb (BlockC e) = nb e
+    nb _ = undefined
+
+systemPOPLX :: TRSystem Expr
+systemPOPLX = systemPOPLV
+  { sname = "POPLX"
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR + v=e desugar + sequences end in v"
+  , preProcess = const (check validV . anfV)
+  , validExpr = const validV
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
+  }
+
+systemPOPLL :: TRSystem Expr
+systemPOPLL = systemPOPLV
+  { sname = "POPLL"
+  , preProcess = const (check Rules.PLDI.validE . Rules.PLDI.anf)
+  , valid = Rules.PLDI.validE
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR - SUBST-REC + PLDI.anf"
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
   }
 
 systemPOPLS :: TRSystem Expr
@@ -131,6 +220,93 @@ anf = expr
       in  binds ds (Split (expr e) v1 v2)
     expr (Store h e) | IM.null h = Store h $ expr e
     expr e = error $ "anf: impossible: " ++ show e
+    value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
+    value _ e@Var{} = ([], e)
+    value _ e@Int{} = ([], e)
+    value _ e@Op{}  = ([], e)
+    value _ e@Ref{} = ([], e)
+    value _ (Lam (Bind x e)) = ([], Lam (Bind x (expr e)))
+    value _ (Arr es) = arr es
+    value i e = ([(i, expr e)], Var i)
+    arr es =
+      let is = identsNotIn $ free es
+          (dss, vs) = unzip $ zipWith value is es
+          ds = concat dss
+      in  (ds, Arr vs)
+    binds :: [(Ident, Expr)] -> Expr -> Expr
+    binds [] b = b
+    binds ((i,e):ds) b = EXI i $ (Var i :=: e) :>: binds ds b
+
+-- Check that an expression is in the subset defined by the POPL grammar.
+validV :: Expr -> Bool
+validV = expr
+  where
+    expr e@Val{} = value e
+    expr (Lam (Bind _ e)) = expr e
+    expr (e1 :=: e2) = value e1 && expr e2
+    expr (e1 :>: e2) = expr e1 && expr e2
+    expr (e1 :|: e2) = expr e1 && expr e2
+    expr (e1 :@: e2) = value e1 && value e2
+    expr (Exi (Bind _ e)) = expr e
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr Fail = True
+    expr Wrong = True
+    expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr (Store h e) = all value (IM.elems h) && expr e
+    expr _ = undefined -- GHC bug
+    value Var{} = True
+    value e = hnf e
+    hnf Int{} = True
+    hnf Op{}  = True
+    hnf (Arr vs) = all value vs
+    hnf (LAM _ e) = expr e
+    hnf _ = False
+
+-- Make the expression obey the POPL grammar,
+-- i.e., valid (anf e) == True
+anfV :: Expr -> Expr
+anfV = expr
+  where
+    expr e@Var{} = e
+    expr e@Int{} = e
+    expr e@Op{}  = e
+    expr (Arr es) =
+      let (ds, a) = arr es
+      in  binds ds a
+    expr (Lam (Bind i e)) = Lam (Bind i (exprR e))
+    expr (e1 :=: e2) =
+      let i1 = identNotIn (free (e1, e2))
+          (ds1, v1) = value i1 e1
+      in  binds ds1 (v1 :=: expr e2)
+    expr (e1 :>: e2) = expr e1 :>: exprR e2
+    expr (e1 :|: e2) = exprR e1 :|: exprR e2
+    expr (e1 :@: e2) =
+      let i1:i2:_ = identsNotIn (free (e1 :@: e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (v1 :@: v2)
+    expr (Exi (Bind i e)) = Exi (Bind i (exprR e))
+    expr (One e) = One $ exprR e
+    expr (All e) = All $ exprR e
+    expr e@Fail = e
+    expr e@Wrong = e
+    expr (Split e e1 e2) =
+      let i1:i2:_ = identsNotIn (free (Split e e1 e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (Split (exprR e) v1 v2)
+    expr (Store h e) | IM.null h = Store h $ expr e
+    expr e = error $ "anf: impossible: " ++ show e
+    exprR = valR . expr
+    valR e@(_ :>: _) = e
+    valR e | isVal e = e
+           | otherwise =
+             let i = identNotIn (free e)
+                 (ds, v) = value i e
+             in  binds ds v
     value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
     value _ e@Var{} = ([], e)
     value _ e@Int{} = ([], e)
