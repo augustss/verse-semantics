@@ -3,11 +3,12 @@
 COMMON=../../calculus.fmt ../../verse.bib
 
 # Top-level target
-all: rules.pdf block.pdf
+all: rules.pdf block.pdf rules-eqn.pdf
 
 LATEX=pdflatex -halt-on-error
 
 rules.tex: $(COMMON) rules.ltx
+rules-eqn.tex: $(COMMON) rules-eqn.ltx
 block.tex: $(COMMON) block.ltx
 
 .ltx.tex:

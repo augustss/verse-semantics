@@ -254,6 +254,8 @@
 %format e_i
 
 %format eu = "eu"
+%format eu_1 = "eu_1"
+%format eu_2 = "eu_2"
 
 %format h_1
 %format h_2
