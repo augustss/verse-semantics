@@ -21,6 +21,7 @@ import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.Ref.Lenient qualified as Lenient
 import Control.Monad.Supply
+import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Var
 import Control.Monad.Verse (MonadVerse (..), runVerseT)
 
@@ -60,7 +61,7 @@ import Language.Verse.Val qualified as Val
 
 import Prettyprinter
 
-type EvalT m = ReaderT (Env m) m
+type EvalT m = WriterT (Defaults m) (ReaderT (Env m) m)
 
 type MonadEval m =
   ( MonadError Error m
@@ -68,6 +69,8 @@ type MonadEval m =
   , MonadVerse m
   , EqRef (Lenient.Ref m)
   )
+
+type Defaults m = HashMap (Ident Name) (Env m, L (Exp L (Ident Name)))
 
 type Env m = HashMap (Ident Name) (Named m)
 
@@ -103,8 +106,11 @@ freeze' = freezeBy $ hoistVal $ \ case
   Ref _ -> Read
   Val x -> Pure x
 
-runEvalT :: EvalT m a -> m a
-runEvalT = flip runReaderT mempty
+runEvalT :: Functor m => EvalT m a -> m a
+runEvalT = flip runReaderT mempty . evalWriterT
+
+evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
+evalWriterT = fmap fst . runWriterT
 
 eval :: ( MonadError Error m
         , MonadFix m
@@ -122,12 +128,12 @@ eval' e = case extract e of
   e1 :=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    unify var1 var2
+    lift $ unify var1 var2
     pure var1
   e :.: x -> do
     var_e <- eval' e
     var <- freshVar
-    whenBound var_e $ \ case
+    lift $ whenBound var_e $ \ case
       Val.Module _ xs ->
         case HashMap.lookup x xs of
           Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
@@ -149,7 +155,7 @@ eval' e = case extract e of
     var1 <- eval' e1
     var2 <- eval' e2
     var <- freshVar
-    whenBound var1 $ \ case
+    lift $ whenBound var1 $ \ case
       Val.Int val1 -> whenBound var2 $ \ case
         Val.Int val2 ->
           unify var =<<
@@ -270,14 +276,14 @@ eval' e = case extract e of
     var <- freshVar
     localName (extract x) (Val var) $ eval' e
   Exp.Var x e -> do
-    ref <- Lenient.newRef =<< freshVar
+    ref <- lift $ Lenient.newRef =<< freshVar
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupName' (extract x) >>= \ case
     Nothing -> throwIdentError (loc x) (extract x)
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      Lenient.writeRef ref =<< freshen var
+      lift $ Lenient.writeRef ref =<< freshen var
       pure var
   Exp.Function xs e1 e2 -> do
     i <- supply
@@ -319,14 +325,19 @@ eval' e = case extract e of
   Exp.Name x -> lookupName x >>= \ case
     Nothing -> throwIdentError (loc e) x
     Just var -> pure var
+  Exp.Default x e1 e2 -> do
+    var1 <- eval' e1
+    env <- ask
+    tell $ HashMap.singleton (extract x) (env, e2)
+    pure var1
   Exp.IsInt e ->
-    lift . isInt =<< eval' e
+    isInt =<< eval' e
 
 liftOrd :: (MonadError Error m, MonadVerse m) =>
            Loc ->
            (forall a . Ord a => a -> a -> Bool) ->
            MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftOrd loc f var_x var_y = do
+liftOrd loc f var_x var_y = lift $ do
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     case (val_x, val_y) of
       (Val.Int x, Val.Int y) ->
@@ -354,7 +365,7 @@ liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
            Loc ->
            (forall a . Num a => a -> a -> a) ->
            MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftNum loc f var_x var_y = do
+liftNum loc f var_x var_y = lift $ do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     unify var =<< case (val_x, val_y) of
@@ -382,7 +393,7 @@ liftNum loc f var_x var_y = do
 div' :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
         Loc ->
         MutVar m -> MutVar m -> EvalT m (MutVar m)
-div' loc var_x var_y = do
+div' loc var_x var_y = lift $ do
   var <- freshVar
   whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
     unify var =<< case (val_x, val_y) of
@@ -414,10 +425,10 @@ div' loc var_x var_y = do
 isInt :: ( MonadError Error m
          , MonadVerse m
          , EqRef (Lenient.Ref m)
-         ) => MutVar m -> m (MutVar m)
+         ) => MutVar m -> EvalT m (MutVar m)
 isInt var_x = do
   var <- freshVar
-  whenBound var_x $ \ case
+  lift $ whenBound var_x $ \ case
     Val.Int _ -> unify var var_x
     _ -> empty
   pure var
@@ -425,27 +436,27 @@ isInt var_x = do
 instSuper :: MonadEval m =>
              Loc ->
              Maybe (MutVar m) -> Env m ->
-             (Maybe (MutVar m) -> Env m -> EvalT m ()) ->
+             (Maybe (MutVar m) -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instSuper loc var_super xs f = case var_super of
-  Nothing -> f Nothing mempty
+  Nothing -> f Nothing mempty mempty
   Just var_super -> instClass loc var_super xs $ f . Just
 
 instClass :: MonadEval m =>
              Loc ->
              MutVar m -> Env m ->
-             (MutVar m -> Env m -> EvalT m ()) ->
+             (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
-instClass loc var_class xs f = whenBound var_class $ \ case
+instClass loc var_class xs f = whenBound var_class $ evalWriterT' . \ case
   Val.Class i env var_super ys e_body ->
-    instSuper loc var_super xs $ \ var_super ys_super -> do
+    instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
       ys <-  (ys_super <>) <$> for ys freshNamed
-      _ <- local (const $ ys <> env) $ eval' e_body
+      defs <- local (const $ ys <> env) $ execWriterT' $ eval' e_body
       let ys' = fromIdents ys
       for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
         uncurry unifyNamed
       var <- newVar (Val.ClassInst i var_super ys')
-      f var ys
+      f var (defs <> defs_super) ys
   _ -> throwDomainError loc
 
 lookupName :: ( MonadVerse m
@@ -455,7 +466,7 @@ lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
     var <- freshVar
-    Lenient.readRef ref $ unify var
+    lift $ Lenient.readRef ref $ unify var
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
@@ -491,7 +502,7 @@ fromIdents =
 unifyNamed :: ( MonadVerse m
               , EqRef (Lenient.Ref m)
               ) => Named m -> Named m -> EvalT m ()
-unifyNamed = curry $ \ case
+unifyNamed = curry $ lift . \ case
   (Val var_x, Val var_y) ->
     unify var_x var_y
   (Ref ref_x, Val var_y) ->
@@ -509,4 +520,4 @@ freshNamed = \ case
   True -> Ref <$> freshRef
 
 freshRef :: MonadVerse m => EvalT m (Lenient.Ref m (Var m f))
-freshRef = Lenient.newRef =<< freshVar
+freshRef = lift . Lenient.newRef =<< freshVar

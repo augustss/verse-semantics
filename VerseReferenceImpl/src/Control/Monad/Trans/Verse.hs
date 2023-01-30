@@ -23,7 +23,7 @@ module Control.Monad.Trans.Verse
 
 import Control.Applicative
 import Control.Category ((>>>))
-import Control.Monad ((>=>), join, unless, when)
+import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
@@ -56,6 +56,7 @@ newtype VerseT m a = VerseT
              , Monad
              , MonadFail
              , MonadIO
+             , MonadPlus
              )
 
 deriving instance MonadError e m => MonadError e (VerseT m)
