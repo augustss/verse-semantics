@@ -66,7 +66,7 @@ systemPOPLA :: TRSystem Expr
 systemPOPLA = systemPOPLV
   { sname = "POPLA"
   , preProcess = const (check Rules.Block.valid . nb . Rules.Block.anf)
-  , validExpr = Rules.Block.valid
+  , validExpr = const Rules.Block.valid
   , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR + Block.anf"
   , rules = rulesPrimOps
          <> rulesApplication
@@ -130,7 +130,7 @@ systemPOPLL :: TRSystem Expr
 systemPOPLL = systemPOPLV
   { sname = "POPLL"
   , preProcess = const (check Rules.PLDI.validE . Rules.PLDI.anf)
-  , valid = Rules.PLDI.validE
+  , validExpr = const Rules.PLDI.validE
   , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR - SUBST-REC + PLDI.anf"
   , rules = rulesPrimOps
          <> rulesApplication
