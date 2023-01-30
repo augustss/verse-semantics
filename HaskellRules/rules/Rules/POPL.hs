@@ -799,7 +799,9 @@ rulesElimV _ lhs =
      (ctx, Var y :=: Var x') <- defX x a
      guard (x == x')
      guard (x /= y)
-     guard (y `elem` free a)
+     guard (y `elem` free a)  -- This is necessary to ensure y is bound outside x.
+                              -- It would be better to just substitute inside the y
+                              -- binding.
      pure (subst [(x, Var y)] (ctx (Var y)))
 
 --------------------------------------------------------------------------------
