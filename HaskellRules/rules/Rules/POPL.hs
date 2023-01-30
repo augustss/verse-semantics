@@ -18,7 +18,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLH ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -78,6 +78,14 @@ systemPOPLLD = s
   { sname = "POPLLD"
   , description = description s ++ ", (D) FLOAT/SUBST-ONE"
   , rules = (rules s -= "SUBST") <> rulesSubstOne
+  }
+  where s = systemPOPLLC
+
+systemPOPLLH :: TRSystem Expr
+systemPOPLLH = s
+  { sname = "POPLLH"
+  , description = description s ++ " - UX-OCCURS"
+  , rules = rules s -= "UX-OCCURS"
   }
   where s = systemPOPLLC
 
