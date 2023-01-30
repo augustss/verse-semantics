@@ -1,19 +1,21 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Epic.SIntMap (SIntMap, empty, lookup, member, insert, (!), lookupMax, delete
-                    , toList, fromList, map, restrictKeys, keys, elems, null) where
+                    , toList, fromList, map, restrictKeys, keys, elems, null, findMax) where
 import Prelude hiding (lookup, map, null)
 import qualified Prelude
 import Control.Arrow (first)
 import Data.Coerce
+import Data.Data(Data)
 import qualified Data.IntMap as M
 import Epic.Print (Pretty (..))
 import Epic.SIntSet (SIntSet, toIntSet)
 import GHC.Stack (HasCallStack)
 
 newtype SIntMap k v = SIntMap (M.IntMap v)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance forall k v. (Pretty k, Pretty v, Coercible k Int) => Pretty (SIntMap k v) where
   pPrintPrec l p (SIntMap m) = pPrintPrec l p $ Prelude.map (first (coerce :: Int -> k)) $ M.toList m
@@ -59,3 +61,6 @@ elems (SIntMap m) = M.elems m
 
 null :: forall k v . SIntMap k v -> Bool
 null (SIntMap m) = M.null m
+
+findMax :: forall k v . (Coercible k Int) => SIntMap k v -> (k, v)
+findMax (SIntMap m) = coerce (M.findMax m)

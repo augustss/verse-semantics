@@ -1,67 +1,198 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Val
   ( Val (..)
+  , hoistVal
+  , Function (..)
+  , hoistFunction
   ) where
 
 import Control.Applicative
+import Control.Monad.Trans.Maybe
+import Control.Monad.Var
+import Control.Monad.Writer.CPS
 
-import Data.Eq
-import Data.Function
-import Data.Functor
 import Data.Foldable
 import Data.HashMap.Strict (HashMap)
-import Data.HashSet (HashSet)
-import Data.Maybe
+import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
-import Data.Traversable
-import Data.Tuple
 import Data.Unifiable
 
+import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
-import Language.Verse.Simplify.Exp qualified as Simplify
 
-import Prelude (Double, Integer)
 import Prettyprinter
 
-import Text.Show
-
-data Val a
+data Val f a
   = Int !Integer
   | Float !Double
   | Rational !Rational
   | Truth a
-  | Function !(IdentMap Name a) !(IdentSet Name) !Exp !Exp
-  | Tuple [a] deriving (Show, Functor, Foldable, Traversable)
+  | Tuple [a]
+  | Module !Label !(HashMap Name (f a))
+  | Struct !Label !(IdentMap Name (f a)) !(IdentMap Name Bool) Exp
+  | StructInst !Label !(HashMap Name (f a))
+  | Class !Label !(IdentMap Name (f a)) (Maybe a) !(IdentMap Name Bool) Exp
+  | ClassInst !Label (Maybe a) !(HashMap Name (f a))
+  | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
 
-type IdentSet a = HashSet (Ident a)
+data Function f a = Function
+  !Label
+  !(IdentMap Name (f a))
+  !(IdentMap Name Bool)
+  Exp
+  Exp deriving (Show, Functor, Foldable, Traversable)
 
-type IdentMap a v = HashMap (Ident a) v
+instance Eq (Function f a) where
+  Function x _ _ _ _ == Function y _ _ _ _ = x == y
 
-type Exp = L (Simplify.Exp L (Ident Name))
+type Exp = L (Desugar.Exp L (Ident Name))
 
-instance Unifiable Val where
-  zipMatch  = curry $ \ case
-    (Truth x, Truth y) -> Just $ Truth (x, y)
-    (Int x, Int y) | x == y -> Just $ Int x
-    (Rational x, Rational y) | x == y -> Just $ Rational x
-    (Float x, Float y) | x == y -> Just $ Float x
-    (Tuple xs, Tuple ys) -> Tuple <$> zipMatch xs ys
-    _ -> Nothing
+instance Zippable f => Unifiable (Val f) where
+  zipMatchM = curry $ \ case
+    (Truth x, Truth y) ->
+      pure $ Just [(x, y)]
+    (Int x, Int y) | x == y ->
+      pure $ Just []
+    (Rational x, Rational y) | x == y ->
+      pure $ Just []
+    (Float x, Float y) | x == y ->
+      pure $ Just []
+    (Tuple xs, Tuple ys) ->
+      pure $ zipMatch xs ys
+    (StructInst i xs, StructInst j ys) | i == j -> runMaybeT . execWriterT $
+      for_ (HashMap.intersectionWith (,) xs ys) $
+        maybe empty tell . uncurry zipMatch
+    (ClassInst i x xs, ClassInst j y ys) | i == j -> runMaybeT . execWriterT $ do
+      maybe empty tell $ zipMatch x y
+      for_ (HashMap.intersectionWith (,) xs ys) $
+        maybe empty tell . uncurry zipMatch
+    (Overload x xs, Overload y ys) ->
+      runMaybeT . execWriterT $ zipCons x xs y ys
+    _ -> pure Nothing
 
-instance Pretty a => Pretty (Val a) where
+type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
+
+zipCons :: MonadVar m =>
+           Function f (Var m (Val f)) -> Var m (Val f) ->
+           Function f (Var m (Val f)) -> Var m (Val f) ->
+           ZipMatchT (Val f) m ()
+zipCons x xs y ys = zipList xs =<< findCons x y ys
+
+zipList :: MonadVar m => Var m (Val f) -> Var m (Val f) -> ZipMatchT (Val f) m ()
+zipList xs ys = uncons xs >>= \ case
+  Just (x, xs) -> zipList xs =<< findList x ys
+  Nothing -> tell [(xs, ys)]
+
+findCons :: MonadVar m =>
+            Function f (Var m (Val f)) ->
+            Function f (Var m (Val f)) -> Var m (Val f) ->
+            ZipMatchT (Val f) m (Var m (Val f))
+findCons x y ys =
+  if x == y then pure ys
+  else newVar . Overload y =<< findList x ys
+
+findList :: MonadVar m =>
+            Function f (Var m (Val f)) ->
+            Var m (Val f) ->
+            ZipMatchT (Val f) m (Var m (Val f))
+findList x ys = uncons ys >>= \ case
+  Just (y, ys) -> findCons x y ys
+  Nothing -> do
+    zs <- freshVar
+    ys' <- newVar $ Overload x zs
+    tell [(ys, ys')]
+    pure zs
+
+uncons :: ( Alternative m
+          , MonadVar m
+          ) => Var m (Val f) -> m (Maybe (Function f (Var m (Val f)), Var m (Val f)))
+uncons xs = readVar xs >>= \ case
+  Just (Overload x xs) -> pure $ Just (x, xs)
+  Just _ -> empty
+  _ -> pure Nothing
+
+instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
   pretty = \ case
-    Int x -> pretty x
-    Float x -> pretty x
-    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x -> "truth" <> lbrace <> pretty x <> rbrace
-    Function _ _ _ _ -> "function"
-    Tuple [] -> "false"
-    Tuple xs -> tupled $ pretty <$> xs
+    Int x ->
+      pretty x
+    Float x ->
+      pretty x
+    Rational x | denominator x == 1 ->
+      pretty $ numerator x
+    Rational x ->
+      pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x ->
+      align $ "truth" <> group (braces $ pretty x)
+    Overload {} ->
+      "function"
+    Tuple [] ->
+      "false"
+    Tuple xs ->
+      align . tupled $ pretty <$> xs
+    Module i xs ->
+      align $ "module#" <> prettyLabel i <> group (braced $ names xs)
+    Struct i _ _ _ ->
+      "struct#" <> prettyLabel i
+    StructInst i xs ->
+      align $
+      "struct#" <>
+      prettyLabel i <>
+      group (braced $ names xs)
+    Class i _ _ _ _ ->
+      "class#" <> prettyLabel i
+    ClassInst i Nothing xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      group (braced $ names xs)
+    ClassInst i (Just x) xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      parens (pretty x) <>
+      group (braced $ names xs)
+    where
+      names xs =
+        (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)) <$>
+        HashMap.toList xs
+      tupled =
+        group .
+        encloseSep
+        (flatAlt "( " lparen)
+        (flatAlt (hardline <> rparen) rparen)
+        ", "
+      braces x =
+        flatAlt (hardline <> "{ ") lbrace <>
+        x <>
+        flatAlt (hardline <> rbrace) rbrace
+      braced =
+        group .
+        encloseSep
+        (flatAlt (hardline <> "{ ") lbrace)
+        (flatAlt (hardline <> rbrace) rbrace)
+        ", "
+
+hoistVal :: (forall c . f c -> g c) -> Val f a -> Val g a
+hoistVal f = \ case
+  Int x -> Int x
+  Float x -> Float x
+  Rational x -> Rational x
+  Truth x -> Truth x
+  Tuple xs -> Tuple xs
+  Module i xs -> Module i (f <$> xs)
+  Struct i ys xs e -> Struct i (f <$> ys) xs e
+  StructInst i xs -> StructInst i (f <$> xs)
+  Class i ys e1 xs e2 -> Class i (f <$> ys) e1 xs e2
+  ClassInst i x xs -> ClassInst i x (f <$> xs)
+  Overload x xs -> Overload (hoistFunction f x) xs
+
+hoistFunction :: (forall c . f c -> g c) -> Function f a -> Function g a
+hoistFunction f (Function i ys xs e1 e2) = Function i (f <$> ys) xs e1 e2

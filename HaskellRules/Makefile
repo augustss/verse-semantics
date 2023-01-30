@@ -23,12 +23,41 @@ testignore:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000 --ignore-fuel-stop   $(TESTFILE)
 
 testfast:
-	$(TESTER) --quiet --parse                                                $(TESTPARSEFILE)
-	$(TESTER) --quiet       --rules=eval --no-under-lambda                   $(TESTFILE)
-#	$(TESTER) --quiet --eval --split                                         $(TESTFILE)
+	$(TESTER) --quiet --parse                                                   $(TESTPARSEFILE)
+	$(TESTER) --quiet       --rules=eval --no-under-lambda                      $(TESTFILE)
+#	$(TESTER) --quiet --eval --split                                            $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=POPLL                  --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
+
+testnorec:
+	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
+
+testblock:
+	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=1000     $(TESTFILE)
+	$(TESTER) --quiet       --rules=Block                  --max-steps=25000    $(TESTFILE)
+
+testblockqc:
+	$(QCTEST) --rules=BlockA --ignore-fuel-stop --max-success=1000000
+
+testpoplaqc:
+	$(QCTEST) --rules=POPLA --ignore-fuel-stop --max-success=1000000
+
+testpoplxqc:
+	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
+
+testpopll:
+	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)
+	$(TESTER)               --rules=POPLL --max-steps=25000 --max-norm-steps=100000 $(TRICKY)
+	$(TESTER) --quiet       --rules=POPLL --max-steps=25000                         $(TESTFILE)
+
+testpopllqc:
+	$(QCTEST) --rules=POPLL --ignore-fuel-stop --max-success=1000000
+
+testnorecqc:
+	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
 
 trickytest: testtricky
 
@@ -41,6 +70,9 @@ testqcconf:
 
 teststore:
 	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
+
+teststorepopl:
+	$(TESTER) --rules=popls --split --final-inline --max-steps=200000 --no-under-lambda versetests/storetests.versetest
 
 clean:
 	cabal clean
@@ -69,4 +101,8 @@ v1install:
 	cabal v1-install -p megaparsec
 	cabal v1-install -p QuickCheck
 	cabal v1-install -p uniplate
+	cabal v1-install -p logict
+	cabal v1-install -p prettyprinter
+	cabal v1-install -p comonad
+	cabal v1-install -p semigroupoids
 	cabal v1-install -p optparse-applicative

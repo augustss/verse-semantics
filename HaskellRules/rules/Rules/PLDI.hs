@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.PLDI(allSystemsPLDI) where
+module Rules.PLDI(allSystemsPLDI, anf, validE) where
 
 import Epic.List(anySame)
 import TRS.Bind
@@ -28,6 +28,7 @@ systemPLDI = TRSystem
   , preProcess          = const (check validE . anf)
   , postProcess         = const finalSubst
   , rules               = allRules <> rulesDerefS <> rulesElimExi
+  , rules2              = \ _ _ -> []
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const validE
@@ -143,6 +144,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
+    expr _ = undefined
 
     -- Expression or unification
     expru (e1 :=: e2) =

@@ -6,37 +6,52 @@ module Language.Verse.Desugar
 
 import Control.Comonad
 import Control.Monad.Except
-import Control.Monad.State.Strict
+import Control.Monad.Reader.Class
+import Control.Monad.RST
+import Control.Monad.State.Class
+import Control.Monad.Supply
+import Control.Monad.Trans.Class
 
-import Data.Foldable (foldlM)
-import Data.Functor
+import Data.Foldable
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap, foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
-import Data.Traversable (for)
+import Data.Traversable
 
 import Language.Verse.Desugar.Exp
 import Language.Verse.Error
+import Language.Verse.Ident
+import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
 import Language.Verse.Parse.Exp qualified as Parse
 
-type Desugar = StateT (HashMap Name Loc) (Except Error)
+type Desugar = RST Bool Env (SupplyT Label (Except Error))
 
-runDesugar' :: Desugar a -> Except Error (a, HashMap Name Loc)
-runDesugar' = flip runStateT mempty
+type Env = HashMap (Ident Name) (Loc, Bool)
 
-desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L Name))
-desugar e = runExcept $ do
-  (e, xs) <- runDesugar' $ desugar' e
+runDesugar :: Desugar a -> SupplyT Label (Except Error) (a, Env)
+runDesugar m = runRST m False mempty
+
+desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L (Ident Name)))
+desugar e = runExcept . runSupplyT $ do
+  (e, xs) <- runDesugar $ desugar' e
   pure $ exists' xs e
 
-desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Name))
+desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L (Ident Name)))
 desugar' e = for e $ \ case
-  (Parse.:=:) e1 e2 ->
-    (:=:) <$> desugar' e1 <*> desugar' e2
+  (Parse.:=:) e1 e2 -> ask >>= \ case
+    False -> (:=:) <$> desugar' e1 <*> desugar' e2
+    True -> do
+      (x, e1) <- (,) <$> getIdent e1 <*> desugar' e1
+      e2 <- local (const False) $ desugar' e2
+      pure $ Default x e1 e2
   (Parse.:<>:) e1 e2 -> do
     Not . (<$ e) <$> ((:=:) <$> desugar' e1 <*> desugar' e2)
+  (Parse.:.:) e x ->
+    (:.: x) <$> desugar' e
+  (Parse.:..:) e1 e2 ->
+    (:..:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<:) e1 e2 ->
     (:<:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<=:) e1 e2 ->
@@ -59,7 +74,8 @@ desugar' e = for e $ \ case
     pure $ Tuple []
   Parse.List (e:es) -> extract <$> do
     e <- desugar' e
-    foldlM (\ z x -> desugar' x <&> \ x -> (:*>:) <$> duplicate z <.> duplicate x) e es
+    es <- traverse desugar' es
+    pure $ foldl' (\ z x -> (:*>:) <$> duplicate z <.> duplicate x) e es
   Parse.Fail ->
     pure Fail
   Parse.One e -> do
@@ -70,39 +86,66 @@ desugar' e = for e $ \ case
     Not <$> desugar' e
   Parse.Query e ->
     Query <$> desugar' e
+  Parse.Module e -> do
+    i <- supply
+    (e, xs) <- lift $ runDesugar $ desugar' e
+    pure $ Module i (snd <$> xs) e
+  Parse.Struct e -> do
+    i <- supply
+    (e, xs) <- lift $ runDesugar $ local (const True) $ desugar' e
+    pure $ Struct i (snd <$> xs) e
+  Parse.Class e1 e2 -> do
+    i <- supply
+    e1 <- traverse desugar' e1
+    (e2, xs) <- lift $ runDesugar $ local (const True) $ desugar' e2
+    pure $ Class i e1 (snd <$> xs) e2
+  Parse.Inst e1 e2 -> do
+    e1 <- desugar' e1
+    (e2, xs) <- lift $ runDesugar $ desugar' e2
+    pure $ Inst e1 (snd <$> xs) e2
   Parse.If p -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
-    pure $ IfThenElse (HashMap.keysSet xs) p (Tuple [] <$ p) (Tuple [] <$ p)
+    (p, xs) <- lift $ runDesugar $ desugar' p
+    pure $ IfThenElse (snd <$> xs) p (Tuple [] <$ p) (Tuple [] <$ p)
   Parse.IfThen p t -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
-    IfThenElse (HashMap.keysSet xs) p <$>
+    (p, xs) <- lift $ runDesugar $ desugar' p
+    IfThenElse (snd <$> xs) p <$>
       exists (desugar' t) <*>
       pure (Tuple [] <$ p <. t)
   Parse.IfThenElse p t e -> do
-    (p, xs) <- lift $ runDesugar' $ desugar' p
-    IfThenElse (HashMap.keysSet xs) p <$>
+    (p, xs) <- lift $ runDesugar $ desugar' p
+    IfThenElse (snd <$> xs) p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
-  Parse.For e -> do
-    (e, xs) <- lift $ runDesugar' $ desugar' e
-    pure $ ForDo (HashMap.keysSet xs) e (Tuple [] <$ e)
+  Parse.For e ->
+    All <$> exists (desugar' e)
   Parse.ForDo e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
-    ForDo (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
+    ForDo (snd <$> xs) e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
   Parse.Exists x -> do
-    tellName x
-    pure . Name $ extract x
+    tellName x False
+    pure . Name . Pure $ extract x
+  Parse.Var x -> do
+    tellName x True
+    pure . Name . Pure $ extract x
+  Parse.Set x e ->
+    Set (Pure <$> x) <$> desugar' e
   Parse.Function e1 e2 -> do
-    (e1, xs) <- lift $ runDesugar' $ desugar' e1
-    Function (HashMap.keysSet xs) e1 <$> exists (desugar' e2)
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
+    Function (snd <$> xs) e1 <$> exists (desugar' e2)
+  Parse.Overload x e1 e2 -> do
+    tellName' x False
+    (e1, xs) <- lift $ runDesugar $ desugar' e1
+    e2 <- exists $ desugar' e2
+    let e = Function (snd <$> xs) <$> duplicate e1 <.> duplicate e2
+    pure $ (Name . Pure <$> x) :=: e
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.Tuple es ->
-    Tuple <$> for es desugar'
+    Tuple <$> traverse desugar' es
   Parse.Truth e ->
     Truth <$> exists (desugar' e)
   Parse.True ->
@@ -114,31 +157,69 @@ desugar' e = for e $ \ case
   Parse.Float x ->
     pure $ Float x
   Parse.Name x ->
-    pure $ Name x
-  Parse.PrefixColon e ->
-    Colon <$> desugar' e
+    pure . Name $ Pure x
+  Parse.PrefixColon e -> do
+    e <- desugar' e
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    ask >>= \ case
+      False -> pure $ Invoke e e_i
+      True -> pure $ (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
-    tellName x
+    tellName x False
+    let e1 = Name . Pure <$> x
     e <- desugar' e
-    pure $ (Name <$> x) :=: (Colon <$> duplicate e)
+    e_i <- (e $>) . Name <$> freshIdent (loc e) False
+    let e2 = Invoke <$> duplicate e <.> duplicate e_i
+    ask >>= \ case
+      False -> pure $ e1 :=: e2
+      True -> pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.InfixColonEqual x e -> do
-    tellName x
-    e <- desugar' e
-    pure $ (Name <$> x) :=: e
+    tellName x False
+    ask >>= \ case
+      False -> do
+        e <- desugar' e
+        pure $ (Name . Pure <$> x) :=: e
+      True -> do
+        e <- local (const False) $ desugar' e
+        pure $ Default (Pure <$> x) (Name . Pure <$> x) e
   Parse.IsInt e ->
     IsInt <$> desugar' e
 
-tellName :: L Name -> Desugar ()
-tellName x = do
-  s <- get
-  case HashMap.lookup (extract x) s of
-    Nothing -> put $ HashMap.insert (extract x) (loc x) s
-    Just y -> throwError $ DefError y (loc x) (extract x)
+getIdent :: L (Parse.Exp L Name) -> Desugar (L (Ident Name))
+getIdent e = case extract e of
+  Parse.Exists x -> pure $ Pure <$> x
+  Parse.InfixColon x _ -> pure $ Pure <$> x
+  _ -> throwError $ AnonError $ loc e
 
-exists :: Desugar (L (Exp L Name)) -> Desugar (L (Exp L Name))
+freshIdent :: Loc -> Bool -> Desugar (Ident Name)
+freshIdent loc var = do
+  x <- Label <$> supply
+  modify $ HashMap.insert x (loc, var)
+  pure x
+
+tellName :: L Name -> Bool -> Desugar ()
+tellName x var =
+  put =<<
+  HashMap.alterF
+  (\ case
+      Nothing -> pure $ Just (loc x, var)
+      Just (y, _) -> throwError $ DefError y (loc x) (extract x))
+  (Pure $ extract x) =<<
+  get
+
+tellName' :: L Name -> Bool -> Desugar ()
+tellName' x var =
+  modify $ HashMap.insertWith (flip const) (Pure $ extract x) (loc x, var)
+
+exists :: Desugar (L (Exp L (Ident Name))) -> Desugar (L (Exp L (Ident Name)))
 exists m = lift $ do
-  (e, xs) <- runDesugar' m
+  (e, xs) <- runDesugar m
   pure $ exists' xs e
 
-exists' :: HashMap Name Loc -> L (Exp L Name) -> L (Exp L Name)
-exists' xs e = foldlWithKey' (\ z x y -> L y $ Exists (L y x) z) e xs
+exists' :: Env -> L (Exp L (Ident Name)) -> L (Exp L (Ident Name))
+exists' xs e = foldlWithKey' f e xs
+  where
+    f z x (loc, var) =
+      (if var then Var else Exists) <$>
+      duplicate (L loc x) <.>
+      duplicate z

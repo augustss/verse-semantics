@@ -12,31 +12,10 @@ import TRS.TRSGraph(normalFormsFuelTraceWithGraph)
 
 normalFormsFuelTrace :: (Show a, Ord a, Rec a)
                      => TRSystem a -> Int -> a -> NormResult a
-normalFormsFuelTrace sys n | rulesHaveStructural sys = normalFormsFuelTraceWithGraph env n rls
-                           | otherwise               = normalFormsFuelTracePlain     env n rls
-  where env = ruleEnv sys
-        rls = rules sys
+normalFormsFuelTrace sys | rulesHaveStructural sys = normalFormsFuelTraceWithGraph sys
+                         | otherwise               = normalFormsFuelTracePlain     sys
 
-{-
-normalForms :: (Show a, Ord a, Rec a) => TRSystem a -> a -> NormResult a
-normalForms sys t = normalFormsFuel sys (-1) t
-
-normalFormsFuel :: (Show a, Ord a, Rec a) => TRSystem a -> Int -> a -> NormResult a
-normalFormsFuel sys n t =
-  [ (sequ (map fst tr), x)
-  | (x :<-- tr) <- normalFormsFuelTrace sys n t
-  ]
- where
-  sequ [] = "refl"
-  sequ as = intercalate ";" as
-
-normalFormsTrace :: (Show a, Ord a, Rec a) => TRSystem a -> a -> [Traced a]
-normalFormsTrace sys t = normalFormsFuelTrace sys (-1) t
--}
 normalFormFuelTrace :: (Show a, Ord a, Rec a)
                      => TRSystem a -> Int -> a -> NormResult a
-normalFormFuelTrace sys n | rulesHaveStructural sys = error "normalFormFuelTraceWithGraph not implemented"
-                          | otherwise               = normalFormFuelTracePlain env n rls
-  where env = ruleEnv sys
-        rls = rules sys
-
+normalFormFuelTrace sys | rulesHaveStructural sys = error "normalFormFuelTraceWithGraph not implemented"
+                        | otherwise               = normalFormFuelTracePlain sys

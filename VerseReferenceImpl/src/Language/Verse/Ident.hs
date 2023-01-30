@@ -1,29 +1,47 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Ident
   ( Ident (..)
-  , name
+  , IdentMap
   ) where
 
+import Data.Functor.Classes
 import Data.Hashable
+import Data.Hashable.Lifted
+import Data.HashMap.Strict (HashMap)
+
+import Language.Verse.Label
 
 import Prettyprinter
 
-data Ident a = Ident !Word !(Maybe a) deriving Show
+data Ident a
+  = Pure a
+  | Label !Label deriving (Show, Eq, Ord)
 
-name :: Ident a -> Maybe a
-name (Ident _ x) = x
+type IdentMap a v = HashMap (Ident a) v
 
-instance Eq (Ident a) where
-  Ident x _ == Ident y _ = x == y
+instance Eq1 Ident where
+  liftEq f = curry $ \ case
+    (Pure x, Pure y) -> f x y
+    (Label x, Label y) -> x == y
+    _ -> False
 
-instance Ord (Ident a) where
-  compare (Ident x _) (Ident y _) = compare x y
+instance Hashable a => Hashable (Ident a) where
+  hash = \ case
+    Pure x -> 0 `hashWithSalt` x
+    Label x -> distinguisher `hashWithSalt` x
+  hashWithSalt = hashWithSalt1
 
-instance Hashable (Ident a) where
-  hashWithSalt x (Ident y _) = hashWithSalt x y
-  hash (Ident x _) = hash x
+instance Hashable1 Ident where
+  liftHashWithSalt f s = \ case
+    Pure x -> s `hashWithSalt` distinguisher `f` x
+    Label x -> s `hashWithSalt` distinguisher `hashWithSalt` x
 
 instance Pretty a => Pretty (Ident a) where
-  pretty (Ident i x) = case x of
-    Nothing -> "t" <> pretty i
-    Just x -> pretty x
+  pretty = \ case
+    Pure x -> pretty x
+    Label x -> "t" <> prettyLabel x
+
+distinguisher :: Int
+distinguisher = fromIntegral $ (maxBound :: Word) `quot` 3
+{-# INLINE distinguisher #-}

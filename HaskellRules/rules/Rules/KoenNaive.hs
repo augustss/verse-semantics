@@ -12,7 +12,7 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsKoen :: [TRSystem Expr]
-allSystemsKoen = take 0 -- XXX
+allSystemsKoen = -- take 0 -- XXX
   [ systemKoen ]
 
 systemKoen :: TRSystem Expr
@@ -23,6 +23,7 @@ systemKoen = TRSystem
   , preProcess          = const (check validE . expr)
   , postProcess         = const id
   , rules               = allRules
+  , rules2              = \ _ _ -> []
   , rulesHaveStructural = True
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE

@@ -24,7 +24,7 @@ h1 {
 .panel {
     padding: 1rem;
     box-sizing: border-box;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: "Fira Code";
     width: 100%;
     height: 100%;
     box-sizing: border-box;
@@ -54,6 +54,6 @@ h1 {
     outline: none;
 }
 
-#out, #err {
+#out {
     white-space: pre-wrap
 }
