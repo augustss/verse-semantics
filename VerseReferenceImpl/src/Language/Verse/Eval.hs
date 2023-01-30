@@ -35,7 +35,7 @@ import Data.Traversable
 import Data.Unifiable
 
 import Language.Verse.Error
-import Language.Verse.Ident (Ident, IdentMap)
+import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
 import Language.Verse.Desugar.Exp (Exp ( (:*>:)
@@ -103,18 +103,21 @@ freeze' = freezeBy $ hoistVal $ \ case
   Ref _ -> Read
   Val x -> Pure x
 
+runEvalT :: EvalT m a -> m a
+runEvalT = flip runReaderT mempty
+
 eval :: ( MonadError Error m
         , MonadFix m
         , MonadRef m
         , EqRef (Ref m)
         ) => L (Exp L (Ident Name)) -> m [Fix (Val Pure)]
-eval e = runSupplyT $ runVerseT $ runReaderT (eval' e) mempty >>= freeze' >>= \ case
+eval e = runSupplyT $ runVerseT $ runEvalT (eval' e) >>= freeze' >>= \ case
   Nothing -> throwError $ StuckError $ loc e
   Just x -> pure x
 
 eval' :: MonadEval m => L (Exp L (Ident Name)) -> EvalT m (MutVar m)
 eval' e = case extract e of
-  e1 :*>: e2 -> do
+  e1 :*>: e2 ->
     eval' e1 *> eval' e2
   e1 :=: e2 -> do
     var1 <- eval' e1
@@ -220,18 +223,24 @@ eval' e = case extract e of
     var1 <- eval' e1
     xs <- for xs freshNamed
     _ <- localNames xs $ eval' e2
+    let xs' = fromIdents xs
     var <- freshVar
     whenBound var1 $ \ case
       Val.Struct i env ys e -> do
         ys <- for ys freshNamed
         _ <- local (const $ ys <> env) $ eval' e
         let ys' = fromIdents ys
-        for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
+        for_ (HashMap.intersectionWith (,) ys' xs') $
           uncurry unifyNamed
         unify var =<< newVar (Val.StructInst i ys')
       Val.Class i env var_super ys e_body ->
-        instClass' (loc e) i env var_super ys e_body xs $ \ var_inst _ ->
-          unify var var_inst
+        instSuper (loc e) var_super xs $ \ var_super ys_super -> do
+          ys <-  (ys_super <>) <$> for ys freshNamed
+          _ <- local (const $ ys <> env) $ eval' e_body
+          let ys' = fromIdents ys
+          for_ (HashMap.intersectionWith (,) ys' xs') $
+            uncurry unifyNamed
+          unify var =<< newVar (Val.ClassInst i var_super ys')
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do
@@ -429,28 +438,15 @@ instClass :: MonadEval m =>
              EvalT m ()
 instClass loc var_class xs f = whenBound var_class $ \ case
   Val.Class i env var_super ys e_body ->
-    instClass' loc i env var_super ys e_body xs f
+    instSuper loc var_super xs $ \ var_super ys_super -> do
+      ys <-  (ys_super <>) <$> for ys freshNamed
+      _ <- local (const $ ys <> env) $ eval' e_body
+      let ys' = fromIdents ys
+      for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
+        uncurry unifyNamed
+      var <- newVar (Val.ClassInst i var_super ys')
+      f var ys
   _ -> throwDomainError loc
-
-instClass' :: MonadEval m =>
-              Loc ->
-              Label ->
-              Env m ->
-              Maybe (MutVar m) ->
-              IdentMap Name Bool ->
-              L (Exp L (Ident Name)) ->
-              Env m ->
-              (MutVar m -> Env m -> EvalT m ()) ->
-              EvalT m ()
-instClass' loc i env var_super ys e_body xs f =
-  instSuper loc var_super xs $ \ var_super ys_super -> do
-    ys <-  (ys_super <>) <$> for ys freshNamed
-    _ <- local (const $ ys <> env) $ eval' e_body
-    let ys' = fromIdents ys
-    for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
-      uncurry unifyNamed
-    var <- newVar (Val.ClassInst i var_super ys')
-    f var ys
 
 lookupName :: ( MonadVerse m
               , EqRef (Lenient.Ref m)
