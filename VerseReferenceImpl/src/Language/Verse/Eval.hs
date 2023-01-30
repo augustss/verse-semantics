@@ -5,7 +5,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Eval
@@ -274,7 +273,7 @@ eval' e = case extract e of
   Exp.Function xs e1 e2 -> do
     i <- supply
     env <- ask
-    newVar =<< Val.Overload (Val.Function i env xs e1 e2) <$> freshVar
+    newVar . Val.Overload (Val.Function i env xs e1 e2) =<< freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2

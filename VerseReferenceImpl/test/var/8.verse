@@ -1,11 +1,9 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 exists X
-exists Z
 var Y = 0
-R := all:
+Z := all:
   set Y = Y + 1
-  (X = 2)|(Z = 2)
+  X = 2|2|2
   Y
-X = 1|2|3
-Z = 1|2|3
-R
+X = 1|2|3|2
+Z
