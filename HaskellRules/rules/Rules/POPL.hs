@@ -140,7 +140,7 @@ systemPOPLL = systemPOPLV
          <> rulesChoice
          <> rulesOne
          <> rulesAll
-         <> rulesFail
+         <> (rulesFail -= "FAIL-DEF")
          <> rulesSplit
          <> rulesSubstRec
          <> rulesUnificationOcc
@@ -871,8 +871,8 @@ rulesSequencingV _ lhs =
      pure (e1 :>: (Val v :=: e2))
  ++
   "UNIFY-UNIFYR" `name`
-  do Val v :=: (e1 :=: e2) <- [lhs]
-     pure ((Val v :=: e1) :>: (Val v :=: e2))
+  do Val v1 :=: (Val v2 :=: e) <- [lhs]
+     pure ((Val v1 :=: Val v2) :>: (Val v1 :=: e))
 
 --------------------------------------------------------------------------------
 
@@ -1074,7 +1074,7 @@ rulesStructural _ lhs =
 
  -- NEW RULE
  <>
-  "EXP-SWAP" `name`
+  "EU-SWAP" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      guard (isChoiceFree e1 || isChoiceFree e2)
      pure $ e2 :>: (e1 :>: e3)
