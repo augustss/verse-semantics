@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.PLDI(allSystemsPLDI) where
+module Rules.PLDI(allSystemsPLDI, anf, validE) where
 
 import Epic.List(anySame)
 import TRS.Bind
