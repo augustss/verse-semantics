@@ -256,18 +256,18 @@ $\begin{array}{l}
 \\[-2mm]
 \rulegroupname{Unification}
 
-\rulename{ulit} & |k_1 == k_2| & \movesto
-    & \largerhs{\begin{cases}
-        |k_1| & \text{if $k_1=k_2$} \\
-        |fail| & \text{otherwise}
-      \end{cases}} \\
-\rulename{utup} & |tup (v_1,dots,v_m) == tup (v1',dots,v_n')|
-    & \movesto & \largerhs{\begin{cases}
-        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
-            & \text{if $m=n$} \\
-        |fail| & \text{otherwise}
-      \end{cases}
-   }\\
+\rulename{ulit} & |k_1 == k_2| & \movesto &
+%%      \largerhs{\begin{cases}
+          |k_1| & \text{if $k_1=k_2$} \\
+%%        |fail| & \text{otherwise}
+%%      \end{cases}} \\
+        
+\rulename{utup} & |tup (v_1,dots,v_m) == tup (v1',dots,v_m')| & \movesto &
+%%        \largerhs{\begin{cases}
+        \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|}  \\
+%%        |fail| & \text{otherwise}
+%%      \end{cases}
+%%   }\\
 \rulename{ux-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{ulit} nor \rulename{utup} match} \\
 \rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \end{array}
