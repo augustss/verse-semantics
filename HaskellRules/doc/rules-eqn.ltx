@@ -256,8 +256,8 @@ $\begin{array}{l}
 \\[-2mm]
 \rulegroupname{Unification}
 
-\rulename{ulit} & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
-\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n'); e| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n';e|} \\
+\rulename{ulit} & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
+\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
 %% \rulename{ulit} & |k_1 == k_2| & \movesto
 %%     & \largerhs{\begin{cases}
 %%         |k_1| & \text{if $k_1=k_2$} \\
