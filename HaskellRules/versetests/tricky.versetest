@@ -21,7 +21,7 @@ testceq("Yikes2",SEq) { exists x y. x=<1,2>; y=x; \w.<x,y> }
 testceq("QC1", SEq)  { exists x . (exists y . x = y; x) | <> }
                      { exists x . x | <> }
 # There are too many existentials in Block for the structural rules to terminate.
-testceq("Ex1", SEq, Block=Skip)
+testceq("Ex1", SEq, Block=Skip, POPLL=Skip)
                      { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
                      { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
 testceq("Ex2", SEq)  { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
@@ -39,7 +39,7 @@ testceq("Koen1", SEq){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>
                      { fail }
 # This test loops with substitution and reduction under lambda, e.g., POPL rules
 # because x=<\y.x>
-testceq("Koen3", SEq, POPL=Skip, POPLV=Skip, Block=Skip)
+testceq("Koen3", SEq, POPL=Skip, POPLV=Skip, Block=Skip, POPLL=Skip)
                      { exists x . (\y.x = <y>; (exists z . z))(\y.x) }
                      { exists z . z }
 testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
@@ -58,8 +58,8 @@ testceq("QC4a", SEq) { \a. add(a) = (ex x. <x> = <x>) }
                      { \a. ex x . <x> = add(a); x=x; <x> }
 testceq("QC5", SEq)  { \x.(<<x>> = x)(<>) }
                      { \x.fail }
-testceq("Rec1", SEq) { ex x. (\y.x(fail)) = x }
+testceq("Rec1", SEq, POPLL=Skip) { ex x. (\y.x(fail)) = x }
                      { \y.fail }
 # Result depends on how recursion is treated.
-testceq("Rec2", SEq) { <> = one { ex a. <> = one {ex b. b = one {\y.a}; b = a; b} } }
+testceq("Rec2", SEq, POPLL=Skip) { <> = one { ex a. <> = one {ex b. b = one {\y.a}; b = a; b} } }
                      { fail }

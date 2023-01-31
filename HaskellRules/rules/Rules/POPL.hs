@@ -10,13 +10,15 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+import qualified Rules.Block
+import qualified Rules.PLDI
 --import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLS ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLH ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -32,33 +34,60 @@ systemPOPL = TRSystem
   , validExpr           = const valid
   }
 
--- Fixes some problems from  versetests/tricky.versetest.
---  QC1   by DEF-ELIMV
---  Koen5 by DEF-ELIM
---  QC4   by UNIFY-SEQR-E
-systemPOPLV :: TRSystem Expr
-systemPOPLV = systemPOPL
-  { sname               = "POPLV"
-  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + UNIFY-SEQR-E"
-  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
+systemPOPLL :: TRSystem Expr
+systemPOPLL = systemPOPLV
+  { sname = "POPLL"
+  , preProcess = const (check Rules.PLDI.validE . Rules.PLDI.anf)
+  , validExpr = const Rules.PLDI.validE
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR - SUBST-REC + PLDI.anf"
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencingV
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> (rulesFail -= "FAIL-DEF")
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
   }
 
--- Like POPLV, but all bad uses of application and ops reduce to Fail rather than getting stuck.
-systemPOPLF :: TRSystem Expr
-systemPOPLF = systemPOPL
-  { sname               = "POPLF"
-  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL + UNIFY-SEQR-E + BAD-FAIL"
-  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+systemPOPLLA :: TRSystem Expr
+systemPOPLLA = s
+  { sname = "POPLLA"
+  , description = description s ++ ", (A) use SWAP-ELIMV"
+  , rules = (rules s -= "DEF-ELIMV") <> rulesSwapV
   }
+  where s = systemPOPLL
 
-systemPOPLR :: TRSystem Expr
-systemPOPLR = systemPOPL
-  { sname               = "POPLR"
-  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM - SUBST-REC"
-  , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
---                          <> rulesOcc
---                          <> rulesMoreFail
+systemPOPLLC :: TRSystem Expr
+systemPOPLLC = s
+  { sname = "POPLLC"
+  , description = description s ++ ", (C) change EU-SWAP"
+  , confluenceRules = (confluenceRules s -= "EU-SWAP") <> rulesValSwap
   }
+  where s = systemPOPLLA
+
+systemPOPLLD :: TRSystem Expr
+systemPOPLLD = s
+  { sname = "POPLLD"
+  , description = description s ++ ", (D) FLOAT/SUBST-ONE"
+  , rules = (rules s -= "SUBST") <> rulesSubstOne
+  }
+  where s = systemPOPLLC
+
+systemPOPLLH :: TRSystem Expr
+systemPOPLLH = s
+  { sname = "POPLLH"
+  , description = description s ++ " - UX-OCCURS"
+  , rules = rules s -= "UX-OCCURS"
+  }
+  where s = systemPOPLLC
 
 systemPOPLS :: TRSystem Expr
 systemPOPLS = systemPOPL
@@ -131,6 +160,93 @@ anf = expr
       in  binds ds (Split (expr e) v1 v2)
     expr (Store h e) | IM.null h = Store h $ expr e
     expr e = error $ "anf: impossible: " ++ show e
+    value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
+    value _ e@Var{} = ([], e)
+    value _ e@Int{} = ([], e)
+    value _ e@Op{}  = ([], e)
+    value _ e@Ref{} = ([], e)
+    value _ (Lam (Bind x e)) = ([], Lam (Bind x (expr e)))
+    value _ (Arr es) = arr es
+    value i e = ([(i, expr e)], Var i)
+    arr es =
+      let is = identsNotIn $ free es
+          (dss, vs) = unzip $ zipWith value is es
+          ds = concat dss
+      in  (ds, Arr vs)
+    binds :: [(Ident, Expr)] -> Expr -> Expr
+    binds [] b = b
+    binds ((i,e):ds) b = EXI i $ (Var i :=: e) :>: binds ds b
+
+-- Check that an expression is in the subset defined by the POPL grammar.
+validV :: Expr -> Bool
+validV = expr
+  where
+    expr e@Val{} = value e
+    expr (Lam (Bind _ e)) = expr e
+    expr (e1 :=: e2) = value e1 && expr e2
+    expr (e1 :>: e2) = expr e1 && expr e2
+    expr (e1 :|: e2) = expr e1 && expr e2
+    expr (e1 :@: e2) = value e1 && value e2
+    expr (Exi (Bind _ e)) = expr e
+    expr (One e) = expr e
+    expr (All e) = expr e
+    expr Fail = True
+    expr Wrong = True
+    expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr (Store h e) = all value (IM.elems h) && expr e
+    expr _ = undefined -- GHC bug
+    value Var{} = True
+    value e = hnf e
+    hnf Int{} = True
+    hnf Op{}  = True
+    hnf (Arr vs) = all value vs
+    hnf (LAM _ e) = expr e
+    hnf _ = False
+
+-- Make the expression obey the POPL grammar,
+-- i.e., valid (anf e) == True
+anfV :: Expr -> Expr
+anfV = expr
+  where
+    expr e@Var{} = e
+    expr e@Int{} = e
+    expr e@Op{}  = e
+    expr (Arr es) =
+      let (ds, a) = arr es
+      in  binds ds a
+    expr (Lam (Bind i e)) = Lam (Bind i (exprR e))
+    expr (e1 :=: e2) =
+      let i1 = identNotIn (free (e1, e2))
+          (ds1, v1) = value i1 e1
+      in  binds ds1 (v1 :=: expr e2)
+    expr (e1 :>: e2) = expr e1 :>: exprR e2
+    expr (e1 :|: e2) = exprR e1 :|: exprR e2
+    expr (e1 :@: e2) =
+      let i1:i2:_ = identsNotIn (free (e1 :@: e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (v1 :@: v2)
+    expr (Exi (Bind i e)) = Exi (Bind i (exprR e))
+    expr (One e) = One $ exprR e
+    expr (All e) = All $ exprR e
+    expr e@Fail = e
+    expr e@Wrong = e
+    expr (Split e e1 e2) =
+      let i1:i2:_ = identsNotIn (free (Split e e1 e2))
+          (ds1, v1) = value i1 e1
+          (ds2, v2) = value i2 e2
+          ds = ds1 ++ ds2
+      in  binds ds (Split (exprR e) v1 v2)
+    expr (Store h e) | IM.null h = Store h $ expr e
+    expr e = error $ "anf: impossible: " ++ show e
+    exprR = valR . expr
+    valR e@(_ :>: _) = e
+    valR e | isVal e = e
+           | otherwise =
+             let i = identNotIn (free e)
+                 (ds, v) = value i e
+             in  binds ds v
     value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
     value _ e@Var{} = ([], e)
     value _ e@Int{} = ([], e)
@@ -226,6 +342,12 @@ defX xx lhs =
      guard (x /= xx)
      (ctx, hole) <- defX xx dx
      return (Exi . Bind x . ctx, hole)
+
+-- Get initially quantified variables from a defX context
+defVars :: Context -> [Ident]
+defVars ctx = loop (ctx Fail)
+  where loop (EXI x e) = x : loop e
+        loop _ = []
 
 -- choice contexts
 
@@ -332,6 +454,82 @@ storeX1 lhs =
 isResult :: Expr -> Bool
 isResult (v :|: _) = isVal v
 isResult v = isVal v
+
+-- Context for everything
+varX :: Ident -> Expr -> [Context]
+-- X context
+varX xx lhs =
+  do Var x <- [lhs]
+     guard (x == xx)
+     pure id
+ ++
+  do Arr vs <- [lhs]
+     i <- [0..length vs-1]
+     let ctx1 = \ v -> Arr (take i vs ++ [v] ++ drop (i+1) vs)
+         v1 = vs!!i
+     ctx2 <- varX xx v1
+     pure (ctx1 . ctx2)
+ ++
+  do LAM x e <- [lhs]
+     guard (x /= xx)
+     ctx <- varX xx e
+     pure (LAM x . ctx)
+ ++
+  do x :=: e <- [lhs]
+     ctx <- varX xx x
+     pure ((:=: e) . ctx)
+ ++
+  do e :=: x <- [lhs]
+     ctx <- varX xx x
+     pure ((e :=:) . ctx)
+ ++
+  do x :>: e <- [lhs]
+     ctx <- varX xx x
+     pure ((:>: e) . ctx)
+ ++
+  do e :>: x <- [lhs]
+     ctx <- varX xx x
+     pure ((e :>:) . ctx)
+ ++
+  do x :|: e <- [lhs]
+     ctx <- varX xx x
+     pure ((:|: e) . ctx)
+ ++
+  do e :|: x <- [lhs]
+     ctx <- varX xx x
+     pure ((e :|:) . ctx)
+ ++
+  do x :@: e <- [lhs]
+     ctx <- varX xx x
+     pure ((:@: e) . ctx)
+ ++
+  do e :@: x <- [lhs]
+     ctx <- varX xx x
+     pure ((e :@:) . ctx)
+ ++
+  do One x <- [lhs]
+     ctx <- varX xx x
+     pure (One . ctx)
+ ++
+  do All x <- [lhs]
+     ctx <- varX xx x
+     pure (All . ctx)
+ ++
+  do Split x e2 e3 <- [lhs]
+     ctx <- varX xx x
+     pure ((\ e -> Split e e2 e3) . ctx)
+ ++
+  do Split e1 x e3 <- [lhs]
+     ctx <- varX xx x
+     pure ((\ e -> Split e1 e e3) . ctx)
+ ++
+  do Split e1 e2 x <- [lhs]
+     ctx <- varX xx x
+     pure ((\ e -> Split e1 e2 e) . ctx)
+ ++
+  do Store h e <- [lhs] -- XXX also the heap!!!
+     ctx <- varX xx e
+     pure (Store h . ctx)
 
 --------------------------------------------------------------------------------
 
@@ -558,7 +756,22 @@ _rulesOcc _ lhs =
 --------------------------------------------------------------------------------
 
 rulesUnificationVariables :: ERule
-rulesUnificationVariables _ lhs =
+rulesUnificationVariables env lhs =
+  rulesUnificationVariablesNoR env lhs
+ ++
+  "DEF-ELIMR" `name`
+  do Exi (Bind x a) <- [lhs]
+     (ctx, Val v :=: Var x') <- defX x a
+     guard (x == x')
+     let freeX = free (ctx Fail)
+         freeV = free v
+     guard (x `notElem` freeX)
+     guard (x `notElem` freeV)
+     pure (ctx (Val v))
+  
+
+rulesUnificationVariablesNoR :: ERule
+rulesUnificationVariablesNoR _ lhs =
   "SUBST" `name`
   do (ctx, Var x :=: Val v) <- execX lhs
      let freeX = free (ctx blob)
@@ -572,16 +785,6 @@ rulesUnificationVariables _ lhs =
   "DEF-ELIML" `name`
   do Exi (Bind x a) <- [lhs]
      (ctx, Var x' :=: Val v) <- defX x a
-     guard (x == x')
-     let freeX = free (ctx blob)
-         freeV = free v
-     guard (x `notElem` freeX)
-     guard (x `notElem` freeV)
-     pure (ctx (Val v))
- ++
-  "DEF-ELIMR" `name`
-  do Exi (Bind x a) <- [lhs]
-     (ctx, Val v :=: Var x') <- defX x a
      guard (x == x')
      let freeX = free (ctx blob)
          freeV = free v
@@ -614,12 +817,22 @@ rulesSubstRec _ lhs =
 rulesElimV :: ERule
 rulesElimV _ lhs =
   "DEF-ELIMV" `name`
-  do Exi (Bind x a) <- [lhs]
-     (ctx, Var y :=: Var x') <- defX x a
+  do EXI x a <- [lhs]
+     (ctx, Var z :=: Var x') <- defX x a
      guard (x == x')
-     guard (x /= y)
-     guard (y `elem` free a)
-     pure (subst [(x, Var y)] (ctx (Var y)))
+     guard (x /= z)
+     guard (z `notElem` defVars ctx)
+     pure (subst [(x, Var z)] (ctx (Var z)))
+
+rulesSwapV :: ERule
+rulesSwapV _ lhs =
+  "SWAP-V" `name`
+  do EXI x a <- [lhs]
+     (ctx, Var z :=: Var x') <- defX x a
+     guard (x == x')
+     guard (x /= z)
+     guard (z `notElem` defVars ctx)
+     pure (EXI x (ctx (Var x :=: Var z)))
 
 --------------------------------------------------------------------------------
 
@@ -671,6 +884,25 @@ rulesSequencingExtra _ lhs =
      guard (not (isVal e1))
      let x = identNotIn (free [e1,e2,e3])
      pure (EXI x ((Var x :=: e1) :>: e2 :>: (Var x :=: e3)))
+
+-- Assuming LHS is a value
+rulesSequencingV :: ERule
+rulesSequencingV _ lhs =
+  "SEQ" `name`
+  do Val _v :>: e <- [lhs]
+     pure e
+ ++
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
+ ++
+  "UNIFY-SEQR" `name`
+  do Val v :=: (e1 :>: e2) <- [lhs]
+     pure (e1 :>: (Val v :=: e2))
+ ++
+  "UNIFY-UNIFYR" `name`
+  do Val v1 :=: (Val v2 :=: e) <- [lhs]
+     pure ((Val v1 :=: Val v2) :>: (Val v1 :=: e))
 
 --------------------------------------------------------------------------------
 
@@ -870,17 +1102,13 @@ rulesStructural _ lhs =
      pure e
 -}
 
+ -- NEW RULE
  <>
-  "UNIFY-SWAP1" `name`
-  do (e1 :=: e2) :>: ((e3 :=: e4) :>: e5) <- [lhs]
-     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
-     pure $ (e3 :=: e4) :>: ((e1 :=: e2) :>: e5)
- <>
-  "UNIFY-SWAP2" `name`
-  do (e1 :=: e2) :>: (e3 :=: e4) <- [lhs]
-     guard (isChoiceFree e1 && isChoiceFree e2 || isChoiceFree e3 && isChoiceFree e4)
-     pure $ (e3 :=: e4) :>: (e1 :=: e2)
-
+  "EU-SWAP" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+     guard (isChoiceFree e1 || isChoiceFree e2)
+     pure $ e2 :>: (e1 :>: e3)
+{-
  -- NEW RULE
  -- Needed for \x.(<> = x); <>
  --  Maybe better: x=v --> x=v; v
@@ -889,12 +1117,33 @@ rulesStructural _ lhs =
   do (e1 :=: Val e2) :>: e3 <- [lhs]
      guard (e2 == e3)
      pure (e1 :=: e2)
+-}
+{-
  -- NEW RULE
  <>
   "UNIFY-SWAP" `name`
   do (e1 :=: e2) <- [lhs]
      guard (isChoiceFree e1 || isChoiceFree e2)
      pure (e2 :=: e1)
+-}
+
+rulesValSwap :: ERule
+rulesValSwap _ lhs = 
+  "VAL-SWAP" `name`
+  do e1 :>: (e2@(_ :=: Val _) :>: e3) <- [lhs]
+     pure $ e2 :>: (e1 :>: e3)
+
+rulesSubstOne :: ERule
+rulesSubstOne _ lhs =
+  "FLOAT" `name`
+  do (ctx, q@(Var x :=: Val _) :>: e) <- execX lhs
+     guard (x `elem` free (ctx Fail))
+     pure (q :>: ctx e)
+ <>
+  "SUBST-ONE" `name`
+  do q@(Var x :=: Val v) :>: e <- [lhs]
+     ctx <- varX x e
+     pure (q :>: ctx v)
 
 ------------------
 
@@ -989,3 +1238,103 @@ rulesStore _ lhs =
      let h' = storeWrite h p v
          v = Int (j + i)
      pure (Store h' (ctx v))
+
+-----------------------------------------------------------------------------------
+-- Old experiments below this line.
+-- No need to read these.
+
+_allSystemsPOPL :: [TRSystem Expr]
+_allSystemsPOPL = [ systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLA, systemPOPLX ]
+
+-- Fixes some problems from  versetests/tricky.versetest.
+--  QC1   by DEF-ELIMV
+--  Koen5 by DEF-ELIM
+--  QC4   by UNIFY-SEQR-E
+systemPOPLV :: TRSystem Expr
+systemPOPLV = systemPOPL
+  { sname               = "POPLV"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + UNIFY-SEQR-E"
+  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra
+  }
+
+-- Like POPLV, but all bad uses of application and ops reduce to Fail rather than getting stuck.
+systemPOPLF :: TRSystem Expr
+systemPOPLF = systemPOPL
+  { sname               = "POPLF"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM + BAD-FAIL + UNIFY-SEQR-E + BAD-FAIL"
+  , rules               = allRules <> rulesSubstRec <> rulesUnificationOcc <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+  }
+
+systemPOPLR :: TRSystem Expr
+systemPOPLR = systemPOPL
+  { sname               = "POPLR"
+  , description         = "POPL submission + DEF-ELIMV + DEF-ELIM - SUBST-REC"
+  , rules               = allRules <> rulesChoiceSX <> rulesElimV <> rulesDefElim <> rulesSequencingExtra <> rulesBadFail
+--                          <> rulesOcc
+--                          <> rulesMoreFail
+  }
+
+systemPOPLA :: TRSystem Expr
+systemPOPLA = systemPOPLV
+  { sname = "POPLA"
+  , preProcess = const (check Rules.Block.valid . nb . Rules.Block.anf)
+  , validExpr = const Rules.Block.valid
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR + Block.anf"
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
+  }
+  where
+    nb e@Var{} = e
+    nb e@Int{} = e
+    nb e@Op{} = e
+    nb (Arr es) = Arr (map nb es)
+    nb (LAM x e) = LAM x (nb e)
+    nb (e1 :=: e2) = nb e1 :=: nb e2
+    nb (e1 :>: e2) = nb e1 :>: nb e2
+    nb (e1 :|: e2) = nb e1 :|: nb e2
+    nb (e1 :@: e2) = nb e1 :@: nb e2
+    nb (EXI x e) = EXI x (nb e)
+    nb (One e) = One (nb e)
+    nb (All e) = All (nb e)
+    nb e@Fail = e
+    nb e@Wrong = e
+    nb (Split e1 e2 e3) = Split (nb e1) (nb e2) (nb e3)
+    nb (BlockC e) = nb e
+    nb _ = undefined
+
+systemPOPLX :: TRSystem Expr
+systemPOPLX = systemPOPLV
+  { sname = "POPLX"
+  , description = "POPL submission + DEF-ELIMV + DEF-ELIM - DEF-ELIMR + v=e desugar + sequences end in v"
+  , preProcess = const (check validV . anfV)
+  , validExpr = const validV
+  , rules = rulesPrimOps
+         <> rulesApplication
+         <> rulesUnificationNoOcc
+         <> rulesUnificationVariablesNoR
+         <> rulesSequencing
+         <> rulesChoice
+         <> rulesOne
+         <> rulesAll
+         <> rulesFail
+         <> rulesSplit
+         <> rulesSubstRec
+         <> rulesUnificationOcc
+         <> rulesChoiceSX
+         <> rulesElimV
+         <> rulesDefElim
+  }
+
