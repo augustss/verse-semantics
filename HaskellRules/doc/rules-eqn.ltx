@@ -375,6 +375,98 @@ $\begin{array}{l}
     \label{fig:rules-structural}  \label{fig:structural}
 \end{figure}
 
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+    \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
+    \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
+   \end{array} \\
+    
+  \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+   \end{array}
+   $$
+  \caption{CURRENT choice-related contexts and rules}
+\end{figure}
+
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Scope contexts} & SX & ::= & |one hole| \vb |all hole| \vb SX[ |hole choice e| ] \vb SX[ |e choice hole| ]\\
+    \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
+    \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
+   \end{array} \\
+    
+  \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |fail choice e| & \movesto & |e| \\
+    \rulename{fail-r} & |e choice fail| & \movesto & |e| \\
+    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+   \end{array}
+   $$
+  \caption{PROPOSED SIMPLIFIED choice-related contexts and rules}
+\end{figure}
+
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Scope contexts} & SX & ::= & |one hole| \vb |all hole| \vb SX[ |hole choice e| ] \vb SX[ |e choice hole| ]\\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
+    \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
+   \end{array} \\
+    
+  \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |fail choice e| & \movesto & |e| \\
+    \rulename{fail-r} & |e choice fail| & \movesto & |e| \\
+    \rulename{assoc-choice} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+    \rulename{choose-exi} & |def x (e_1 choice e_2)| & \movesto & |(def x e_1) choice (def x e_2)| \\
+    \\[-2mm]
+    \rulename{choose-seql} & |SX^[(e_1 choice e_2) ; e]| & \movesto & |SX^[(e_1 ; e) choice (e_2 ; e)]| \\
+    \rulename{choose-seqr} & |SX^[ce; (e_1 choice e_2)]| & \movesto & |SX^[(ce ; e_1) choice (ce ; e_2)]| \\
+    \rulename{choose-uni} & |SX^[v = (e_1 choice e_2) ; e]| & \movesto & |SX^[(v = e_1 ; e) choice (v = e_2 ; e)]|
+    \end{array} \\
+   \end{array}
+   $$
+  \caption{PROPOSED SIMPLIFIED (2) choice-related contexts and rules}
+\end{figure}
+
+% ===================================================================
+
+
+
 \section{Dummy}
 Dummy citation to avoid bibtex error:
 \cite{hanus:curry-report}.
