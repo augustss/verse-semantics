@@ -1,12 +1,14 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 any(exists X) := X
 
+one_(X:any) := X = 1
+
+two(X:any) := X = 2
+
 x := class:
-  X:any
+  X:one_
 
 y := class(x):
-  F() := X
+  X:two
 
-Y := y{X := 1}
-
-Y.X, Y.F()
+Y := y{}

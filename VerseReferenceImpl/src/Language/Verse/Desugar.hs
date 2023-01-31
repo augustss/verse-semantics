@@ -13,6 +13,7 @@ import Control.Monad.Supply
 import Control.Monad.Trans.Class
 
 import Data.Foldable
+import Data.Functor
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap, foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
@@ -136,10 +137,13 @@ desugar' e = for e $ \ case
     Function (snd <$> xs) e1 <$> exists (desugar' e2)
   Parse.Overload x e1 e2 -> do
     tellName' x False
+    let x' = Pure <$> x
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     e2 <- exists $ desugar' e2
     let e = Function (snd <$> xs) <$> duplicate e1 <.> duplicate e2
-    pure $ (Name . Pure <$> x) :=: e
+    ask <&> \ case
+      False -> (Name <$> x') :=: e
+      True -> Default x' (Name <$> x') e
   Parse.ParenInvoke e1 e2 ->
     Invoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
@@ -161,27 +165,24 @@ desugar' e = for e $ \ case
   Parse.PrefixColon e -> do
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
-    ask >>= \ case
-      False -> pure $ Invoke e e_i
-      True -> pure $ (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
+    ask <&> \ case
+      False -> Invoke e e_i
+      True -> (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
     tellName x False
     let e1 = Name . Pure <$> x
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
     let e2 = Invoke <$> duplicate e <.> duplicate e_i
-    ask >>= \ case
-      False -> pure $ e1 :=: e2
-      True -> pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
+    ask <&> \ case
+      False -> e1 :=: e2
+      True -> ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.InfixColonEqual x e -> do
     tellName x False
+    let x' = Pure <$> x
     ask >>= \ case
-      False -> do
-        e <- desugar' e
-        pure $ (Name . Pure <$> x) :=: e
-      True -> do
-        e <- local (const False) $ desugar' e
-        pure $ Default (Pure <$> x) (Name . Pure <$> x) e
+      False -> desugar' e <&> ((Name <$> x') :=:)
+      True -> local (const False) (desugar' e) <&> Default x' (Name <$> x')
   Parse.IsInt e ->
     IsInt <$> desugar' e
 
