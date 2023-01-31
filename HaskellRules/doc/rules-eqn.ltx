@@ -286,8 +286,8 @@ $\begin{array}{l}
 %%    &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
 \rulename{exi-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
     & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \notin |{ys}|$} \\
-\rulename{exi-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
-    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
+%%\rulename{exi-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
+%%    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 \rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
 
@@ -310,6 +310,15 @@ $\begin{array}{l}
 \caption{The Verse calculus: rewrite rules (1)}
 \label{fig:general-axioms} \label{fig:rules1}
 \end{figure}
+
+\subsection{Variable ordering}
+For the \rulename{var-swap} rule we need a stable order of variables.
+At a subexpression, a variable, |x|, is considered ``less than'' a variable, |y|, if
+\begin{itemize}
+\item Both variables bound: the variable with closest binder is considered less.
+\item Both variables unbound: use alphabetic comparison of variable names.
+\item Otherwise, the bound variables is considered less.
+\end{itemize}
 
 % ===================================================================
 \begin{figure}
@@ -368,7 +377,7 @@ $\begin{array}{l}
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exi-swap} & |def (x y) e| & \movesto & |def (y x) e| \\
     \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
-    \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+%%    \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
 %%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
     \end{array} \\
 
