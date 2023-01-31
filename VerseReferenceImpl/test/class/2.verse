@@ -10,4 +10,4 @@ y := class(x):
 
 Y := y{}
 
-Y.F()
+Y.X, Y.F()

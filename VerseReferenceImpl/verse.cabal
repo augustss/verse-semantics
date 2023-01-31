@@ -27,14 +27,12 @@ library
     Control.Monad.RST
     Control.Monad.Stuck
     Control.Monad.Supply
-    Control.Monad.Trans.Fix
     Control.Monad.Trans.Verse
     Control.Monad.Unify
     Control.Monad.Var
     Control.Monad.Verse
     Control.Monad.Verse.Class
     Data.Fix
-    Data.List.Diff
     Data.Ref
     Data.Unifiable
     Language.Verse
