@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.POPL(allSystemsPOPL) where
 import Control.Monad( guard )
+import Data.List
 import Data.Maybe
 
 import qualified Epic.SIntMap as IM
@@ -18,7 +19,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -72,6 +73,23 @@ systemPOPLLC = s
   , confluenceRules = (confluenceRules s -= "EU-SWAP") <> rulesValSwap
   }
   where s = systemPOPLLA
+
+systemPOPLLU :: TRSystem Expr
+systemPOPLLU = s
+  { sname = "POPLLU"
+  , description = description s ++ ", - UNIFY-UNIFYR"
+  , rules = rules s -= "UNIFY-UNIFYR"
+  }
+  where s = systemPOPLLC
+
+systemPOPLLQ :: TRSystem Expr
+systemPOPLLQ = s
+  { sname = "POPLLQ"
+  , description = description s ++ ", ordered VAR-SWAP"
+  , rules = (rules s -= "DEF-ELIMV") <> rulesVarSwapOrd
+  , confluenceRules = confluenceRules s -= "VAR-SWAP"
+  }
+  where s = systemPOPLLU
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
@@ -826,6 +844,23 @@ rulesSwapV _ lhs =
      guard (z `notElem` defVars ctx)
      pure (EXI x (ctx (Var x :=: Var z)))
 
+rulesVarSwapOrd :: ERule
+rulesVarSwapOrd env lhs =
+  "VAR-SWAP-ORD" `name`
+  do Var x :=: Var y <- [lhs]
+     guard (lessThan env y x)
+     pure (Var y :=: Var x)
+
+-- Order variables by binding depth, innermost is smaller.
+-- Use name comparison for unbound variables.
+lessThan :: TRSFlags -> Ident -> Ident -> Bool
+lessThan env x y =
+  case (elemIndex x (boundVars env), elemIndex y (boundVars env)) of
+    (Nothing, Nothing) -> x < y   -- Both unbound, use names
+    (Just _,  Nothing) -> True    -- Bound is smaller than unbound
+    (Nothing, Just _ ) -> False
+    (Just i,  Just j ) -> i < j   -- Use binding depth
+
 --------------------------------------------------------------------------------
 
 rulesSequencing :: ERule
@@ -1134,6 +1169,7 @@ rulesSubstOne _ lhs =
  <>
   "SUBST-ONE" `name`
   do q@(Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
      ctx <- varX x e
      pure (q :>: ctx v)
 
@@ -1236,7 +1272,7 @@ rulesStore _ lhs =
 -- No need to read these.
 
 _allSystemsPOPL :: [TRSystem Expr]
-_allSystemsPOPL = [ systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLA, systemPOPLX ]
+_allSystemsPOPL = [ systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLA, systemPOPLX, systemPOPLLH ]
 
 -- Fixes some problems from  versetests/tricky.versetest.
 --  QC1   by DEF-ELIMV
@@ -1329,4 +1365,41 @@ systemPOPLX = systemPOPLV
          <> rulesElimV
          <> rulesDefElim
   }
+
+-- Without UX-OCCURS we get this:
+{-
+\x.x = (ex v1. v1 = x; <v1>); <>
+==trace:1==
+\x.x = (ex v1. v1 = x; <v1>); <>
+  --DEF-FLOAT-->
+\x.ex v1. x = (v1 = x; <v1>); <>
+  --SUBST-->
+\x.ex v1. x = (v1 = x; <x>); <>
+  --DEF-ELIML-->
+\x.x = (x; <x>); <>
+  --UNIFY-SEQR-->
+\x.(x; x = <x>); <>
+  --SEQ-ASSOC-->
+\x.x; x = <x>; <>
+  --SEQ-->
+\x.x = <x>; <>
+==trace:2==
+\x.x = (ex v1. v1 = x; <v1>); <>
+  --DEF-FLOAT-->
+\x.ex v1. x = (v1 = x; <v1>); <>
+  --UNIFY-SEQR-->
+\x.ex v1. (v1 = x; x = <v1>); <>
+  --SUBST-->
+\x.ex v1. (v1 = <v1>; x = <v1>); <>
+  --SEQ-ASSOC-->
+\x.ex v1. v1 = <v1>; x = <v1>; <>
+-}
+
+systemPOPLLH :: TRSystem Expr
+systemPOPLLH = s
+  { sname = "POPLLH"
+  , description = description s ++ " - UX-OCCURS"
+  , rules = rules s -= "UX-OCCURS"
+  }
+  where s = systemPOPLLC
 

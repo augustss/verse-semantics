@@ -2,11 +2,12 @@
 any(exists X) := X
 
 x := class:
-  X:any
+  F() := 1
 
 y := class(x):
-  F() := X
+  F() := 2
 
-Y := y{X := 1}
+Y := y:
+  F() := 3
 
-Y.X, Y.F()
+Y.F()

@@ -1,12 +1,12 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 any(exists X) := X
 
+Plus1(X:any) := X + 1
+
 x := class:
-  X:any
+  X:Plus1 = 1
 
-y := class(x):
-  F() := X
+X := x:
+  X := 2
 
-Y := y{X := 1}
-
-Y.X, Y.F()
+X.X

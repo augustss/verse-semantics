@@ -317,7 +317,8 @@ data DerefPos
 defaultTRSFlags :: TRSFlags
 defaultTRSFlags =
   TRSFlags { tfUnderLambda = True, tfDerefPos = Consumed, tfUseTilde = False
-           , tfUseWFEqVar = False, tfNormSteps = 10000, tfTrace = False, tfRewriteSteps = 10000 }
+           , tfUseWFEqVar = False, tfNormSteps = 10000, tfTrace = False, tfRewriteSteps = 10000
+           , boundVars = [] }
 
 instance Rec Expr where
   data RuleEnv Expr = TRSFlags
@@ -328,6 +329,7 @@ instance Rec Expr where
     , tfRewriteSteps:: !Int      -- Maximum rewrite steps
     , tfNormSteps   :: !Int      -- Maximum normalization steps
     , tfTrace       :: !Bool     -- trace evaluation
+    , boundVars     :: ![Ident]  -- temporary during reduction
     }
   rec r s ae =
     r s ae ++
@@ -345,7 +347,7 @@ instance Rec Expr where
         ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
 
       Exi (Bind x a) ->
-           [ (n, Exi (Bind x a')) | (n,a') <- rec r s a ]
+           [ (n, Exi (Bind x a')) | (n,a') <- rec r (addBound x s) a ]
 
       f :@: a ->
            [ (n,f' :@: a)  | (n,f') <- rec r s f ]
@@ -356,7 +358,7 @@ instance Rec Expr where
                 , (n,a') <- rec r s a
                 ]
       Lam (Bind x e)
-        | tfUnderLambda s -> [ (n,Lam (Bind x e')) | (n,e') <- rec r s e ]
+        | tfUnderLambda s -> [ (n,Lam (Bind x e')) | (n,e') <- rec r (addBound x s) e ]
 
       One a -> [ (n, One a') | (n,a') <- rec r s a ]
       All a -> [ (n, All a') | (n,a') <- rec r s a ]
@@ -369,6 +371,7 @@ instance Rec Expr where
       -- No reductions in the store, it's supposed to be a Value
       Store h e -> [ (n, Store h e') | (n,e') <- rec r s e ]
       _     -> []
+     where addBound x tf = tf{ boundVars = x : boundVars tf }
 
 --------------------------------------------------------------------------------
 
@@ -465,7 +468,7 @@ arbIdents =
 ---
 
 instance Arbitrary Expr where
-  arbitrary = sized (`arbExpr` []) -- closed by default
+  arbitrary = sized (`arbExpr` map Name ["a","b","c"]) -- closed by default
 
   shrink (Var _)   = [ Int 0, Arr [] ]
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
