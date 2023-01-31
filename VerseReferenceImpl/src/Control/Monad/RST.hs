@@ -10,6 +10,7 @@ module Control.Monad.RST
   ) where
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Control.Monad.Logic.Class
@@ -40,6 +41,10 @@ instance Monad m => Applicative (RST r s m) where
 instance (Alternative m, Monad m) => Alternative (RST r s m) where
   empty = lift empty
   x <|> y = RST $ \ r s -> runRST x r s <|> runRST y r s
+
+instance (Alternative m, Monad m) => MonadPlus (RST r s m) where
+  mzero = empty
+  mplus = (<|>)
 
 instance Monad m => Monad (RST r s m) where
   x >>= f = RST $ \ r s ->
