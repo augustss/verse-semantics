@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.POPL(allSystemsPOPL) where
 import Control.Monad( guard )
+import Data.List
 import Data.Maybe
 
 import qualified Epic.SIntMap as IM
@@ -18,7 +19,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -80,6 +81,15 @@ systemPOPLLU = s
   , rules = rules s -= "UNIFY-UNIFYR"
   }
   where s = systemPOPLLC
+
+systemPOPLLQ :: TRSystem Expr
+systemPOPLLQ = s
+  { sname = "POPLLQ"
+  , description = description s ++ ", ordered VAR-SWAP"
+  , rules = (rules s -= "DEF-ELIMV") <> rulesVarSwapOrd
+  , confluenceRules = confluenceRules s -= "VAR-SWAP"
+  }
+  where s = systemPOPLLU
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
@@ -833,6 +843,23 @@ rulesSwapV _ lhs =
      guard (x /= z)
      guard (z `notElem` defVars ctx)
      pure (EXI x (ctx (Var x :=: Var z)))
+
+rulesVarSwapOrd :: ERule
+rulesVarSwapOrd env lhs =
+  "VAR-SWAP-ORD" `name`
+  do Var x :=: Var y <- [lhs]
+     guard (lessThan env y x)
+     pure (Var y :=: Var x)
+
+-- Order variables by binding depth, innermost is smaller.
+-- Use name comparison for unbound variables.
+lessThan :: TRSFlags -> Ident -> Ident -> Bool
+lessThan env x y =
+  case (elemIndex x (boundVars env), elemIndex y (boundVars env)) of
+    (Nothing, Nothing) -> x < y   -- Both unbound, use names
+    (Just _,  Nothing) -> True    -- Bound is smaller than unbound
+    (Nothing, Just _ ) -> False
+    (Just i,  Just j ) -> i < j   -- Use binding depth
 
 --------------------------------------------------------------------------------
 
