@@ -6,7 +6,10 @@ PAPERTEX=confluence.tex
 PAPERSRC=$(PAPERTEX) rewrites.tex 01-language.tex 03-preliminaries.tex 04-confluence.tex ../verse.bib
 
 # Top-level target
-pdf: $(PAPERSRC)
+rules: rules-eqn.tex rewrites.tex
+	latexmk -pdf rules-eqn.tex
+
+conf: $(PAPERSRC)
 	latexmk -pdf $(PAPERTEX)
 
 %.tex:   %.ltx   ../calculus.fmt
