@@ -200,7 +200,7 @@ This working document contains our most active rule-sets.
       |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | \\
       |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | \\
       |{ q v }| & \text{means} & |{def () (q v)}| \\
-      |{ v }| & \text{means} & |{def () (v)}| \\
+      |{ v }| & \text{means} & |{def () (v)}| \qquad \text{(this is the special case of |{ q v }| when |q| is empty)} \\
 %%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
      \end{array} \\
   \\[-2mm]
@@ -214,14 +214,15 @@ This working document contains our most active rule-sets.
 \end{figure}
 
 \subsection{Syntax}
-The syntactical categories |b|, |q|, |np|, |c|, |e|, and |v| are all expressions.
+The syntactical categories |b|, |np|, |c|, |e|, and |v| are all expressions.
 The reason to distinguish them is to limit what kinds of expressions can occur where.
 \begin{itemize}
 \item |b|, a block with some local variables |xs|, followed by a sequence |q| of equations and a result |v|.
   The local variables can be regarded as a set; the quantification order is irrelevant.
   The variables should be distinct.
-\item |q|, a sequence of equations, each of the form |v == e;|.
-  The equations are in a sequence, not a set, because order matters when there are effects.
+
+  Each equation is of the form |v == e;|.
+  The equations are in a sequence, not a set, because order matters when the expressions |e| contain choices.
   Every equation ends with a semicolon '|;|'. Equations can appear only within blocks.
 \item |np|, a ``nonplural'' expression that will either produce a single value or fail.
 The body of a lambda expression must be a nonplural expression (either a block or |fail|).
@@ -305,20 +306,28 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 \\[-2mm]
 \rulegroupname{Unification}
 
-\rulename{ulit} & |context Q (k == k';)| & \movesto
+\rulename{unify} & |longdef xs (context Q (hnf == hnf';)) v| & \movesto
     & \largerhs{$\begin{cases}
-        |context Q ()| & \text{if $k=k'$} \\
+        |longdef xs (context Q ()) v| & \text{if |hnf| is |k|, |hnf'| is |k'|, $k=k'$} \\
+        \multicolumn{2}{@@{}l}{|longdef xs (context Q (v1==v1';commadots;v_m=v_m';)) v|} \\
+        \multicolumn{2}{@@{}l}{~~\text{if |hnf| is |tup (v1,commadots,v_m)|, |hnf'| is |tup (v1',commadots,v_n')|, $|m|=|n|$}} \\
         |context Q (x==fail;)| & \text{otherwise; |x| fresh}
       \end{cases}$} \\[12pt]
-\rulename{utup} & {\hskip-3em|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n');]|}
-    % the \hskip-3em allows the LHS to reach into the first columns; ok due to the short rule name 
-    & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m';]|\qquad\text{if $m=n$}} \\
-        |Q^[x==fail;]| & \text{otherwise; |x| fresh}
-      \end{cases}
-    $}\\[12pt]
-\rulename{ux} & |context Q (v == v';)| & \movesto & \largerhs{|context Q (x == fail;)|\quad if unmatched by \textsc{ulit}/\textsc{utup}; |x| fresh} \\
-%%\rulename{ux-occurs} & |x=V^[x]| & \movesto & |x == fail| & if $|V| \ne |hole|$; |x| fresh \\
+%% \rulename{ulit} & |context Q (k == k';)| & \movesto
+%%     & \largerhs{$\begin{cases}
+%%         |context Q ()| & \text{if $k=k'$} \\
+%%         |context Q (x==fail;)| & \text{otherwise; |x| fresh}
+%%       \end{cases}$} \\[12pt]_
+%% \rulename{utup} & {\hskip-3em|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n');]|}
+%%     %% the \hskip-3em allows the LHS to reach into the first columns; ok due to the short rule name 
+%%     & \movesto & \largerhs{$\begin{cases}
+%%         \multicolumn{2}{@@{}l}{|longdef xs (context Q (v_1==v1';dots;v_m=v_m';)) v|\qquad\text{if $m=n$}} \\
+%%         |Q^[x==fail;]| & \text{otherwise; |x| fresh}
+%%       \end{cases}
+%%     $}\\[12pt]
+%% \rulename{ux} & |context Q (hnf == hnf';)| & \movesto & \largerhs{|context Q (x == fail;)|\quad if unmatched by \textsc{ulit}/\textsc{utup}; |x| fresh} \\
+
+%% \rulename{ux-occurs} & |x=V^[x]| & \movesto & |x == fail| & if $|V| \ne |hole|$; |x| fresh \\
 \rulename{ux-occurs} & |x == v| & \movesto & {\text{???recursion???}} & \text{if $x \in \freevars{v}$}\\
 
 \\[-2mm]
