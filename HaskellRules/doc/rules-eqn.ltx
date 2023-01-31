@@ -289,6 +289,7 @@ $\begin{array}{l}
 \rulename{exi-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+\rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
 
 \\[-2mm]
 \rulegroupname{Existentials}
