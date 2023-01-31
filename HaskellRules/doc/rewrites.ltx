@@ -160,7 +160,7 @@
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
-      \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
+%       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
       \vb |one hole| \vb |all hole| \\
@@ -216,11 +216,11 @@
 \rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
   % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
+\multicolumn{2}{l}  \rulename{u-tup} \; |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} don't match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |U^[x==v]| & \movesto & |(subst U x v)^[x==v]|
-    & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]|
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
   \rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
 
@@ -229,9 +229,9 @@
 \rulegroupname{Elimination:~\rgc}
 \rulename{def-elim} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-eliml} & |def (x ys) (U^[x==v])| & \movesto & |def ys (U^[v])|
+\rulename{def-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
   & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-\rulename{def-elimv} & |def (x ys) (U^[z==x])| & \movesto & |def ys (subst (U^[z]) x z)|
+\rulename{def-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
     \\[-2mm]
