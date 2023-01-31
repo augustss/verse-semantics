@@ -282,15 +282,13 @@ $$\begin{array}{l}
       \begin{array}{lr@@{\;}c@@{\;}ll}
       \rulename{exi-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
       \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
-      \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
-      % \rulename{val-swap} & |def xs (dots eu_1; eu_2; dots)| & \movesto & |def xs (dots eu_2; eu_1; dots)| & \text{if |eu_1| or |eu_2| is choice free} \\
-      % \rulename{var-swap} & |X^[x==y]| & \movestoX & |subst X y x^[y==x]| \\
-  %%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+      % \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+      % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
       \end{array} \\
 
      \end{array}
      $$
-    \caption{The Verse calculus: rewrite rules (3)}
+    \caption{The Verse calculus: Structural Rules}
       \label{fig:rules-structural}  \label{fig:structural}
   \end{figure}
 
