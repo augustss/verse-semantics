@@ -36,6 +36,7 @@ import Control.Monad.RST
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
+import Control.Monad.Unify
 import Control.Monad.Var (MonadVar, freshVar)
 import Control.Monad.Var qualified as Var
 
@@ -66,22 +67,6 @@ deriving instance MonadSupply s m => MonadSupply s (VerseT m)
 instance MonadTrans VerseT where
   lift = VerseT . lift . lift
 
-instance ( MonadRef m
-         , MonadSupply Label m
-         , EqRef (Ref m)
-         ) => MonadVar (VerseT m) where
-  type Var (VerseT m) = Var m
-
-  freshVar =
-    fmap Var . newRef' . Repr 1 =<<
-    Unbound <$> newRef' (const $ pure ()) <*> askLevel
-
-  newVar = lift . newVar'
-
-  readVar var = findVar var <&> \ case
-    (_, _, Bound x _) -> Just x
-    _ -> Nothing
-
 instance MonadRef m => Lenient.MonadRef (VerseT m) where
   type Ref (VerseT m) = Ref m
 
@@ -102,6 +87,81 @@ instance MonadRef m => Lenient.MonadRef (VerseT m) where
       VerseT . lift $ Backtrack.writeRef ref x
       resolveWorld world'
     putWorld world'
+
+instance ( MonadRef m
+         , MonadSupply Label m
+         , EqRef (Ref m)
+         ) => MonadVar (VerseT m) where
+  type Var (VerseT m) = Var m
+
+  freshVar =
+    fmap Var . newRef' . Repr 1 =<<
+    Unbound <$> newRef' (const $ pure ()) <*> askLevel
+
+  newVar = lift . newVar'
+
+  readVar var = findVar var <&> \ case
+    (_, _, Bound x _) -> Just x
+    _ -> Nothing
+
+instance ( MonadRef m
+         , MonadSupply Label m
+         , EqRef (Ref m)
+         ) => MonadUnify (VerseT m) where
+  unify var_x var_y = do
+    x@(set_x, _, repr_x) <- findVar var_x
+    y@(set_y, _, repr_y) <- findVar var_y
+    unless (eqRef set_x set_y) $ case (repr_x, repr_y) of
+      (Unbound f_x level_x, Unbound f_y level_y) -> do
+        level <- askLevel
+        case (level_x == level, level_y == level) of
+          (True, True) -> do
+            f <- newRef' =<< liftA2 (*>) <$> readRef' f_x <*> readRef' f_y
+            union' (\ _ _ -> Unbound f level_x) x y
+          (True, False) -> do
+            link set_y set_x
+            f_y' <- toListener =<< readRef' f_y
+            lift $ modifyRef f_x $ flip (liftA2 (*>)) f_y'
+          (False, True) -> do
+            link set_x set_y
+            f_x' <- toListener =<< readRef' f_x
+            lift $ modifyRef f_y $ flip (liftA2 (*>)) f_x'
+          (False, False) ->
+            whenBound var_x $ \ val_x ->
+            whenBound var_y $ \ val_y ->
+            unify' val_x val_y
+      (Unbound f_x level_x, Bound val_y _) -> do
+        level <- askLevel
+        if level_x == level then do
+          union y x
+          ($ val_y) =<< readRef' f_x
+        else
+          whenBound var_x $ \ val_x ->
+            unify' val_x val_y
+      (Bound val_x _, Unbound f_y level_y) -> do
+        level <- askLevel
+        if level_y == level then do
+          union x y
+          ($ val_x) =<< readRef' f_y
+        else
+          whenBound var_y $ \ val_y ->
+            unify' val_x val_y
+      (Bound val_x _, Bound val_y _) ->
+        unify' val_x val_y
+    where
+      toListener f = do
+        p <- newRef' False
+        writeRef' p True
+        pure $ whenM (readRef' p) . f
+
+unify' :: ( MonadRef m
+          , MonadSupply Label m
+          , EqRef (Ref m)
+          , Unifiable f
+          ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
+unify' val_x val_y = zipMatchM val_x val_y >>= \ case
+  Nothing -> empty
+  Just val_z -> for_ val_z $ uncurry unify
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m = runRefLogicT $ do
@@ -139,66 +199,6 @@ whenBound var_x f = do
       p <- newRef' False
       writeRef' p True
       pure $ \ val_x -> whenM (readRef' p) $ resolvePromise promise r $ f val_x
-
-unify :: ( MonadRef m
-         , MonadSupply Label m
-         , EqRef (Ref m)
-         , Unifiable f
-         ) => Var m f -> Var m f -> VerseT m ()
-unify var_x var_y = do
-  x@(set_x, _, repr_x) <- findVar var_x
-  y@(set_y, _, repr_y) <- findVar var_y
-  unless (eqRef set_x set_y) $ case (repr_x, repr_y) of
-    (Unbound f_x level_x, Unbound f_y level_y) -> do
-      level <- askLevel
-      case (level_x == level, level_y == level) of
-        (True, True) -> do
-          f <- newRef' =<< liftA2 (*>) <$> readRef' f_x <*> readRef' f_y
-          union' (\ _ _ -> Unbound f level_x) x y
-        (True, False) -> do
-          link set_y set_x
-          f_y' <- toListener =<< readRef' f_y
-          lift $ modifyRef f_x $ flip (liftA2 (*>)) f_y'
-        (False, True) -> do
-          link set_x set_y
-          f_x' <- toListener =<< readRef' f_x
-          lift $ modifyRef f_y $ flip (liftA2 (*>)) f_x'
-        (False, False) ->
-          whenBound var_x $ \ val_x ->
-          whenBound var_y $ \ val_y ->
-          unify' val_x val_y
-    (Unbound f_x level_x, Bound val_y _) -> do
-      level <- askLevel
-      if level_x == level then do
-        union y x
-        ($ val_y) =<< readRef' f_x
-      else
-        whenBound var_x $ \ val_x ->
-          unify' val_x val_y
-    (Bound val_x _, Unbound f_y level_y) -> do
-      level <- askLevel
-      if level_y == level then do
-        union x y
-        ($ val_x) =<< readRef' f_y
-      else
-        whenBound var_y $ \ val_y ->
-          unify' val_x val_y
-    (Bound val_x _, Bound val_y _) ->
-      unify' val_x val_y
-  where
-    toListener f = do
-      p <- newRef' False
-      writeRef' p True
-      pure $ whenM (readRef' p) . f
-
-unify' :: ( MonadRef m
-          , MonadSupply Label m
-          , EqRef (Ref m)
-          , Unifiable f
-          ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
-unify' val_x val_y = zipMatchM val_x val_y >>= \ case
-  Nothing -> empty
-  Just val_z -> for_ val_z $ uncurry unify
 
 freshen :: ( MonadFix m
            , MonadRef m

@@ -22,6 +22,7 @@ import Control.Monad.Ref
 import Control.Monad.Ref.Lenient qualified as Lenient
 import Control.Monad.Supply
 import Control.Monad.Trans.Writer.CPS
+import Control.Monad.Unify
 import Control.Monad.Var
 import Control.Monad.Verse (MonadVerse (..), runVerseT)
 
@@ -128,7 +129,7 @@ eval' e = case extract e of
   e1 :=: e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
-    lift $ unify var1 var2
+    unify var1 var2
     pure var1
   e :.: x -> do
     var_e <- eval' e
@@ -215,7 +216,7 @@ eval' e = case extract e of
   Exp.Query e -> do
     var_e <- eval' e
     var <- freshVar
-    lift $ unify var_e =<< newVar (Val.Truth var)
+    unify var_e =<< newVar (Val.Truth var)
     pure var
   Exp.Module i xs e -> do
     xs <- for xs freshNamed
@@ -234,7 +235,7 @@ eval' e = case extract e of
     _ <- localNames xs $ eval' e2
     let xs' = fromIdents xs
     var <- freshVar
-    lift $ whenBound var1 $ evalWriterT . \ case
+    whenBound' var1 $ \ case
       Val.Struct i env ys e -> do
         ys <- for ys freshNamed
         defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
@@ -244,10 +245,10 @@ eval' e = case extract e of
         let defs' = fromIdents defs
         for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
           unifyNamed y . Val =<< local (const env) (eval' e)
-        lift $ unify var =<< newVar (Val.StructInst i ys')
+        unify var =<< newVar (Val.StructInst i ys')
       Val.Class i env var_super ys e_body ->
         instSuper (loc e) var_super xs $ \ var_super defs_super ys_super -> do
-          ys <-  (ys_super <>) <$> for ys freshNamed
+          ys <-  (ys_super <>) <$> for (ys \\ ys_super) freshNamed
           defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e_body
           let ys' = fromIdents ys
           for_ (HashMap.intersectionWith (,) ys' xs') $
@@ -255,18 +256,18 @@ eval' e = case extract e of
           let defs' = fromIdents $ defs <> defs_super
           for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
             unifyNamed y . Val =<< local (const env) (eval' e)
-          lift $ unify var =<< newVar (Val.ClassInst i var_super ys')
+          unify var =<< newVar (Val.ClassInst i var_super ys')
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    lift $ ifte'
-      (evalWriterT $ do
+    ifte''
+      (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
           pure xs)
-      (\ xs -> unify var =<< evalWriterT (localNames xs $ eval' t))
-      (unify var =<< evalWriterT (eval' e))
+      (\ xs -> unify var =<< localNames xs (eval' t))
+      (unify var =<< eval' e)
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
@@ -312,7 +313,7 @@ eval' e = case extract e of
               xs <- for xs freshNamed
               let env' = xs <> env
               var_arg <- local (const env') $ eval' e_arg
-              lift $ unify var2 var_arg
+              unify var2 var_arg
               pure env')
           (\ env' -> unify var =<< evalWriterT (local (const env') $ eval' e_body)) $
           whenBound var_xs $ \ case
@@ -453,7 +454,7 @@ instClass :: MonadEval m =>
              MutVar m -> Env m ->
              (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
-instClass loc var_class xs f = lift . whenBound var_class $ evalWriterT . \ case
+instClass loc var_class xs f = whenBound' var_class $ \ case
   Val.Class i env var_super ys e_body ->
     instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
       ys <-  (ys_super <>) <$> for ys freshNamed
@@ -527,6 +528,16 @@ freshNamed = \ case
 
 freshRef :: MonadVerse m => EvalT m (Lenient.Ref m (Var m f))
 freshRef = lift . Lenient.newRef =<< freshVar
+
+whenBound' :: ( Monoid w
+              , MonadVerse m
+              ) => Var m f -> (f (Var m f) -> WriterT w m ()) -> WriterT w m ()
+whenBound' x f = lift . whenBound x $ evalWriterT . f
+
+ifte'' :: ( Monoid w
+          , MonadVerse m
+          ) => WriterT w m a -> (a -> WriterT w m ()) -> WriterT w m () -> WriterT w m ()
+ifte'' p t e = lift $ ifte' (evalWriterT p) (evalWriterT . t) (evalWriterT e)
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference

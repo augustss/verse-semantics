@@ -21,21 +21,14 @@ import Control.Monad.Ref.Lenient qualified as Lenient
 import Control.Monad.Supply
 import Control.Monad.Trans.Verse (VerseT)
 import Control.Monad.Trans.Verse qualified as Verse
+import Control.Monad.Unify
 import Control.Monad.Var
 
 import Data.Fix
 import Data.Ref
-import Data.Unifiable
 
-class (MonadPlus m, MonadVar m, Lenient.MonadRef m) => MonadVerse m where
+class (MonadPlus m, MonadUnify m, Lenient.MonadRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
-
-  unify :: Unifiable f => Var m f -> Var m f -> m ()
-  default unify :: ( m ~ t n
-                   , MonadVerseTrans t n
-                   , Unifiable f
-                   ) => Var m f -> Var m f -> m ()
-  unify x y = lift $ unify x y
 
   freeze :: Traversable f => Var m f -> m (Maybe (Fix f))
   freeze = freezeBy id
@@ -80,7 +73,6 @@ instance ( MonadFix m
          , EqRef (Ref m)
          ) => MonadVerse (VerseT m) where
   whenBound = Verse.whenBound
-  unify = Verse.unify
   freezeBy = Verse.freezeBy
   freshen = Verse.freshen
   split = Verse.split

@@ -29,6 +29,7 @@ library
     Control.Monad.Supply
     Control.Monad.Trans.Fix
     Control.Monad.Trans.Verse
+    Control.Monad.Unify
     Control.Monad.Var
     Control.Monad.Verse
     Control.Monad.Verse.Class
