@@ -282,17 +282,17 @@ $\begin{array}{l}
 %% not in use
 %% \rulename{subst-rec} & |x == V^[lam y e]| & \movesto & \largerhs{|x == V^[lam y (def x (x = V^[lam y e]; e))]|} \\
 %%    &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
-\rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
+\rulename{exi-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
     & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \notin |{ys}|$} \\
-\rulename{def-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
+\rulename{exi-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
 
 \\[-2mm]
 \rulegroupname{Existentials}
-\rulename{def-elim} & |def x e| & \movesto & |e| 
+\rulename{exi-elim} & |def x e| & \movesto & |e| 
     & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
+\rulename{exi-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
     & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
 
 \\[-2mm]
