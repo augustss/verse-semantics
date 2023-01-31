@@ -1,0 +1,428 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[acmsmall,review,dvipsnames,nocopyrightspace]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\acmConference{Some Conference}{somedate}{somewhere}
+
+\let\Bbbk\relax % polycode defines that again?
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../../calculus.fmt
+
+%format ctrdots = "\cdots"
+%format lowdots = "\ldots"
+%format commadots = "\;\ldots"
+%format k_3
+%format applyNP (a) (b) = a "\," b
+%format lam x (e) = "\lambda" x "." e
+%format context (x) (e) = x "[\mskip1.5mu" e "\unskip\mskip1.5mu]"
+%format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
+%format doublesubstNP (e) x (v) y (w) = "\doublesubst{" e "}{" x "}{" v "}{" y "}{" w "}"
+%format longdef (x) (y) (z) = "\exists" x ".\," y "\," z
+%format nullspace = "\hbox{}"
+
+\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
+
+\RequirePackage[utf8]{inputenc}
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
+\usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+\newcommand{\subst}[3]{#1[#3/#2]}
+\newcommand{\doublesubst}[5]{#1[#3/#2,#5/#4]}
+
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
+\newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
+\newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
+\newcommand{\guy}[1]{{\color{purple} [{GLS}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\newcommand{\joachim}[1]{}
+\newcommand{\koen}[1]{}
+\newcommand{\olin}[1]{}
+\newcommand{\ranjit}[1]{}
+\newcommand{\gls}[1]{}
+\fi
+% ---------------- End of comments -----------------
+
+
+\begin{document}
+
+%% Title information
+% \title{The essence of functional logic programming}
+\title{The Verse Calculus: rule sets (blocks with lambda-fail)}
+
+%% Author with single affiliation.
+\author{MaxVerse team}
+
+
+%% ---------------- Abstract ---------------------
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+This working document contains our most active rule-sets.
+\end{abstract}
+
+
+\maketitle
+
+\section{POPL rules with ``simpler'' syntax}
+% ----------------------------------------------------
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}c@@{\;}l@@{\qquad}l}
+    \text{Integers} & |k| \\
+    \text{Variables} & |x|\rlap{|,y,z,f,g|} \\
+    \text{Programs}    & |p| & ::= & |one c| & \text{where} \; \freevars{|c|} = \emptyset \\
+    \text{Blocks}      & |b| & ::= & \{ |def (x_1 lowdots x_n) (q v)| \} & |n| \ge |0| \\
+    \text{Equations}   & |q| & ::= & |v_1 = e_1; commadots v_n = e_n;| & |n| \ge |0| \\
+    \text{Nonplural}  & |np| & ::= & |b| \vb |fail| \\
+    \text{Choice}      & |c| & ::= & |np| \vb |c_1 choice c_2|  \\
+    \text{Expressions} & |e| & ::= & |v| \vb |apply1N v_1 v_2| \vb |c| \vb  |one c| \vb |all c| \\
+% SPJ Omitting for now
+\iffullverse
+    && \vb & |succeeds e| \vb |decides e| \\
+\fi
+    \text{Values} & |v| & ::= & |x|  \vb |hnf| \\
+    \text{Head values} & |hnf| & ::= & |k| \vb op \vb |lam x np| \vb |arr (v_1, commadots, v_n)|  & |n| \ge |0| \\
+    \text{Primops} & op  & ::= & |gt| \vb |add|
+\iffullverse
+    \vb |isInt|
+\fi
+    \end{array} \\
+    \\[-3mm]
+%%    \text{\emph{Concrete syntax}:} \;\;
+%%    \begin{array}[t]{l}
+%%          \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
+%%          \text{``|=|'' binds more tightly than ``;''.} \\
+%%          \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
+%%          \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
+%%    \end{array} \\ \\[-3mm]
+    \textbf{Shorthand} \\
+    \begin{array}{rcl@@{\qquad}l}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, commadots, v_n)| & \text{means} & |arr (v_1,commadots, v_n)| \quad n \geq 2 \\
+      |xs| & \text{means} & |x_1 lowdots x_n| & |n|\ge |0| \\
+      |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | \\
+      |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | \\
+      |{ q v }| & \text{means} & |{def () (q v)}| \\
+      |{ v }| & \text{means} & |{def () (v)}| \\
+%%      |def (x_1 ^^ x_2 dots x_n) q| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n q))| \\
+     \end{array} \\
+  \\[-2mm]
+  \text{``$\freevars{e}$'' means the set of free variables of |e|; in \versecalc{}, $\lambda$ and |defKW| are the only binders.} \\
+  % \text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+    \text{The choice operator `\,|choice|\,' is right-associative. Parentheses may be used to specify} \\
+    \text{explicitly how operands of `\,|choice|\,' should be associated.}
+  \end{array}
+  $$
+\caption{POPL-block syntax} \label{fig:popl-block-syntax}
+\end{figure}
+
+\subsection{Syntax}
+The syntactical categories |b|, |q|, |np|, |c|, |e|, and |v| are all expressions.
+The reason to distinguish them is to limit what kinds of expressions can occur where.
+\begin{itemize}
+\item |b|, a block with some local variables |xs|, followed by a sequence |q| of equations and a result |v|.
+  The local variables can be regarded as a set; the quantification order is irrelevant.
+  The variables should be distinct.
+\item |q|, a sequence of equations, each of the form |v == e;|.
+  The equations are in a sequence, not a set, because order matters when there are effects.
+  Every equation ends with a semicolon '|;|'. Equations can appear only within blocks.
+\item |np|, a ``nonplural'' expression that will either produce a single value or fail.
+The body of a lambda expression must be a nonplural expression (either a block or |fail|).
+\item |c|, an expression that may produce any nonnegative number of results. Choices are the expressions that may occur in |oneKW| and |allKW|, or as operands of the choice operator.
+\item |e|, a general expression. Expressions can only appear as the right-hand sides of equations.
+\item |v|, values (as usual). The result expression of a block must be a value. Both subexpressions of an application |apply1N v_1 v_2| must be values.
+\end{itemize}
+It is quite easy to take an arbitrary expression and transform it to this subset.
+\lennart{Add figure with translation}.
+
+\lennart{The curly braces around a block could be omitted in the syntax.  I'm not sure which is clearer.}
+\guy{Using curly braces around blocks is a great idea. They avoid much of the need for operator precedence, and completely avoid the need for parentheses around lambda expressions.}
+
+\subsection{Contexts}
+\begin{itemize}
+\item |Q|, context for a sequence of equations in a block.
+  Note that the hole can contain a single equation, no equations, or many equations.
+\item |QC| is like Q, but all equations to the left of the hole must be free.
+\item |V|, context for a sequence of quantified variables in a block.
+  Note that the hole can contain a single variable, no variables, or many variables.
+\item |SX|, context where choices can be made.
+\end{itemize}
+
+
+% ----------------------------------------------------
+\begin{figure}
+  $$
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Equation contexts} & Q & ::= & |q| \;|hole|\; |q'| \\
+    \text{Equation contexts} & QC & ::= & |v_1 == ce_1; commadots v_n == ce_n;| \;|hole|\; |q'| \qquad\qquad |n| \ge |0| \\
+    \text{Variable list contexts} & V & ::= & |xs| \;|hole|\; |ys| \\
+    \text{Scope contexts} & SX & ::= & |hole choice c| \vb |c choice hole | \vb |one hole| \vb |all hole| \\[4pt]
+
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |one c| \vb |all c| \vb |apply1 op v| \\
+  \end{array}
+   $$
+  \caption{The syntax of contexts}
+    \label{fig:contexts}
+\end{figure}
+
+% ----------------------------------------------------
+\begin{figure}
+\begin{longtable}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}>{$}c<{$}@@{\;} l l}
+% The quad indents the lines
+% The \hspace{-..} removes redundant space between rule name column and LHS column
+% that arises because the longest rule name and the longer LHS are not on the same line
+% The \; reduces the spacing around the arrow
+% The >{$} turns on math mode for the arrow column
+
+\rulegroupname{Primitive operations}
+
+\rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where |k_3 == k_1+k_2|} \\[3pt]
+\rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
+    $\begin{cases}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{cases}$ \\
+
+\iffullverse
+    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
+    $\left\{\begin{array}{@@{}ll}
+      |()| & \text{if |hnf| is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array}\right.$
+\fi
+
+\rulegroupname{Application}
+
+\rulename{app-beta} & |applyNP (lam x ({def ys (q v)})) (v')| & \movesto & |{def (x ys) (x=v'; q v)}|
+          & if $x \not\in \freevars{|v'|} \cup \{|ys|\}$ \\
+\rulename{app-beta-fail} & |applyNP (lam x (fail)) (v)| & \movesto & |fail| \\
+\rulename{app-tup} & |applyNP (tup (v_0,commadots v_n)) (v)| & \movesto & \largerhs{|{v = 0; v_0} choice ctrdots choice {v = n; v_n}|\qquad if $|n| \ge |0|$} \\
+\rulename{app-tup-0} & |apply1N emptytup v| & \movesto & |fail| \\
+
+\\[-2mm]
+\rulegroupname{Block}
+
+\rulename{merge} & |def xs (context Q (v_1 == {def ys (q v_2)};)) v_3| & \movesto & |def (xs ys) (context Q (q nullspace v_1 == v_2;)) v_3| &
+        \text{if $\{|xs|\} \cap \{|ys|\} = \emptyset$}\\
+
+\\[-2mm]
+\rulegroupname{Unification}
+
+\rulename{ulit} & |context Q (k == k';)| & \movesto
+    & \largerhs{$\begin{cases}
+        |context Q ()| & \text{if $k=k'$} \\
+        |context Q (x==fail;)| & \text{otherwise; |x| fresh}
+      \end{cases}$} \\[12pt]
+\rulename{utup} & {\hskip-3em|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n')]|}
+    % the \hskip-3em allows the LHS to reach into the first columns; ok due to the short rule name 
+    & \movesto & \largerhs{$\begin{cases}
+        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m']|\qquad\text{if $m=n$}} \\
+        |Q^[x==fail]| & \text{otherwise; |x| fresh}
+      \end{cases}
+    $}\\[12pt]
+\rulename{ux} & |context Q (v == v';)| & \movesto & \largerhs{|context Q (x == fail;)|\quad if unmatched by \textsc{ulit}/\textsc{utup}; |x| fresh} \\
+%%\rulename{ux-occurs} & |x=V^[x]| & \movesto & |x == fail| & if $|V| \ne |hole|$; |x| fresh \\
+\rulename{ux-occurs} & |x == v| & \movesto & {\text{???recursion???}} & \text{if $x \in \freevars{v}$}\\
+
+\\[-2mm]
+\rulegroupname{Variables}
+
+\rulename{subst} & |longdef xs (context Q (y==v;)) v'| & \movesto & \largerhs{|longdef xs (context (subst Q y v) (y==v;)) (subst v' y v)|} \\
+    & & & \largerhs{\qquad\qquad\qquad if $|y| \in \freevars{|Q|} \cup \freevars{|v'|}$, $|y| \notin \freevars{|v|}$} \\
+
+\rulename{def-eliml} & |def (V^[x]) (context Q (x==v;) v')| & \movesto & |def (V^[]) (context Q () v')|
+    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v'|}$ \\
+
+%\rulename{def-elimr} & |def (V^[x]) (context Q (v==x;))| & \movesto & |def (V^[]) (context Q ())|
+%    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
+
+  \rulename{def-elimv} & |def (V^[x]) (context Q (y=x); v)| & \movesto &
+                                 |longdef (V^[]) (context (substNP Q x y) ()) (subst v x y)| & if $|x| \neq |y|$ \\
+
+\rulename{def-elim} & |def (V^[x]) (q; v)| & \movesto & |def (V^[]) (q; v)|
+    & if $|x| \notin \freevars{|q|}$ \\
+
+\rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+
+\\[-2mm]
+\rulegroupname{Fail propagation}
+
+\rulename{fail} & |{def xs (context Q (v_1=fail;) v_2)}| & \movesto & |fail|  \\
+
+\end{longtable}
+
+  \caption{The Verse calculus: rewrite rules (1)}
+    \label{fig:general-axioms} \label{fig:rules1}
+\end{figure}
+
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{One and all} \\
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{one-choice} & |one ({v} choice c)| & \movesto & |v| \\
+    \rulename{one-value} & |one {v}| & \movesto & |v| \\
+    \end{array} \hspace{5mm}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{all-fail} & |all fail| & \movesto & |emptytup| \\
+    \rulename{all-choice} &
+      |all ({v_1} choice ctrdots choice {v_n})| & \movesto & |tup (v_1, commadots, v_n)| \\
+    \rulename{all-value} & |all {v}| & \movesto & |tup v| \\
+    \end{array} \\
+
+    \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & {\hspace{-1mm}|SX^[{ def xs (context QC (x == c_1 choice c_2;)) v}]|} & \movesto &
+                        |SX^[{def xs (context QC (x == c_1;)) v} choice {def xs (context QC (x == c_2;)) v}]| \\
+%%    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+
+\iffullverse
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+\fi
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (2)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Structural rules} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{exist-swap} & |{def (context V (x y)) q v}| & \movesto & |{def (context V (y x)) q v}| \\
+      \rulename{eqn-swap} & |{def xs (context Q (v_1 == e_1; v_2 == e_2;)) v}| & \movesto &
+                                          |{def xs (context Q (v_2 == e_2; v_1 == e_1;)) v}| & \text{if |e_1| or |e_2| is a |ce|} \\
+      \rulename{var-swap} & |{def xs (context Q (y == z;)) v}| & \movesto & \largerhs{|{longdef xs (doublesubstNP (context Q (y == z;)) y z z y) (doublesubstNP v y z z y)}|} \\
+    \end{array} \\
+
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (3)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+
+%\begin{itemize}
+%\item \rulename{unify-seqr} is redundant; we can just do \rulename{unify-seqr-e} and then \rulename{subst}, can't we?
+%\end{itemize}
+
+\section{Dummy}
+Dummy citation to avoid bibtex error:
+\cite{hanus:curry-report}.
+
+\bibliography{../../verse}
+
+\end{document}
