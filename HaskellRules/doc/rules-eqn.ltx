@@ -301,8 +301,8 @@ $\begin{array}{l}
 \rulegroupname{Sequencing}
 
 \rulename{seq} & |v ; e| & \movesto & |e| \\
-\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
-\rulename{unify-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_2| \\
+\rulename{seq-assoc} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
+\rulename{unify-seqr} & |v == (eu ; e)| & \movesto & |eu ; v == e| \\
 %% \rulename{unify-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1==v_2; v_1==e| \\
 \end{array}
 \end{array}$
@@ -366,7 +366,7 @@ $\begin{array}{l}
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
     \rulename{exi-swap} & |def (x y) e| & \movesto & |def (y x) e| \\
-    \rulename{val-swap} & |e_1; x==v; e_2| & \movesto & |x==v; e_1; e_2| \\
+    \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
     \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
 %%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
     \end{array} \\
