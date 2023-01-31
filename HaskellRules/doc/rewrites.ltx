@@ -102,8 +102,8 @@
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
       \text{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
-                                           \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \\
-                           &       & \vb & |one e| \vb |all e| \\
+                                           \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
+                             \vb |one e| \vb |all e| \\
                            & eu     & ::= & |e| \vb |v == e| \\
   %    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
   %       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
@@ -216,7 +216,7 @@
 \rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
   % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-\multicolumn{2}{l}  \rulename{u-tup} \; |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
+\multicolumn{2}{l}{\; \rulename{u-tup} \quad |tup (v_1,dots,v_n) == tup (v1',dots,v_n')|} & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} don't match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]|
