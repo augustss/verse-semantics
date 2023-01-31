@@ -227,17 +227,17 @@
     \\[-2mm]
 
 \rulegroupname{Elimination:~\rgc}
-\rulename{def-elim} & |def x e| & \movesto & |e|
+\rulename{exi-elim} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
+\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
   & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-\rulename{def-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
+\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
     \\[-2mm]
 
 \rulegroupname{Normalization:~\rcon}
-\rulename{norm-def} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
 \rulename{norm-val} & |v ; e| & \movesto & |e| \\
 \rulename{norm-seq} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
 \rulename{norm-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
