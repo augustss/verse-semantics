@@ -90,8 +90,8 @@
 \newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
 
 
-% --------------------------------------------------------
 
+%  -------------------------- Syntax -----------------------
 \newcommand{\figureSyntax}{
 \begin{figure}[t]
     $$
@@ -154,11 +154,13 @@
 \end{figure}
 }
 
+%  -------------------------- Contexts -----------------------
 \newcommand{\figureContexts}{
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Execution contexts} & X & ::= & \hole \vb |v == X| \vb |X ; e| \vb |e; X| \\
+      \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
+      \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
       \vb |one hole| \vb |all hole| \\
@@ -177,9 +179,10 @@
       \label{fig:contexts}
 \end{figure}
 }
-% --------------------------------------------------------
 
-% ICFP rewrite rules
+
+% ------------------ ICFP rewrite rules -------------------
+
 \newcommand{\figureRewriteRulesICFP}{
   \begin{figure}
     $\begin{array}{l}
@@ -216,7 +219,7 @@
   \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} don't match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
+  \rulename{subst} & |U^[x==v]| & \movesto & |(subst U x v)^[x==v]|
     & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
   \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
   \rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
@@ -226,9 +229,9 @@
 \rulegroupname{Elimination:~\rgc}
 \rulename{def-elim} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
+\rulename{def-eliml} & |def (x ys) (U^[x==v])| & \movesto & |def ys (U^[v])|
   & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-\rulename{def-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
+\rulename{def-elimv} & |def (x ys) (U^[z==x])| & \movesto & |def ys (subst (U^[z]) x z)|
     & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
     \\[-2mm]
