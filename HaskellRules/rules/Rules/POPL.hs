@@ -18,7 +18,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLH ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -78,14 +78,6 @@ systemPOPLLD = s
   { sname = "POPLLD"
   , description = description s ++ ", (D) FLOAT/SUBST-ONE"
   , rules = (rules s -= "SUBST") <> rulesSubstOne
-  }
-  where s = systemPOPLLC
-
-systemPOPLLH :: TRSystem Expr
-systemPOPLLH = s
-  { sname = "POPLLH"
-  , description = description s ++ " - UX-OCCURS"
-  , rules = rules s -= "UX-OCCURS"
   }
   where s = systemPOPLLC
 
@@ -1244,7 +1236,7 @@ rulesStore _ lhs =
 -- No need to read these.
 
 _allSystemsPOPL :: [TRSystem Expr]
-_allSystemsPOPL = [ systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLA, systemPOPLX ]
+_allSystemsPOPL = [ systemPOPLV, systemPOPLF, systemPOPLR, systemPOPLA, systemPOPLX, systemPOPLLH ]
 
 -- Fixes some problems from  versetests/tricky.versetest.
 --  QC1   by DEF-ELIMV
@@ -1337,4 +1329,41 @@ systemPOPLX = systemPOPLV
          <> rulesElimV
          <> rulesDefElim
   }
+
+-- Without UX-OCCURS we get this:
+{-
+\x.x = (ex v1. v1 = x; <v1>); <>
+==trace:1==
+\x.x = (ex v1. v1 = x; <v1>); <>
+  --DEF-FLOAT-->
+\x.ex v1. x = (v1 = x; <v1>); <>
+  --SUBST-->
+\x.ex v1. x = (v1 = x; <x>); <>
+  --DEF-ELIML-->
+\x.x = (x; <x>); <>
+  --UNIFY-SEQR-->
+\x.(x; x = <x>); <>
+  --SEQ-ASSOC-->
+\x.x; x = <x>; <>
+  --SEQ-->
+\x.x = <x>; <>
+==trace:2==
+\x.x = (ex v1. v1 = x; <v1>); <>
+  --DEF-FLOAT-->
+\x.ex v1. x = (v1 = x; <v1>); <>
+  --UNIFY-SEQR-->
+\x.ex v1. (v1 = x; x = <v1>); <>
+  --SUBST-->
+\x.ex v1. (v1 = <v1>; x = <v1>); <>
+  --SEQ-ASSOC-->
+\x.ex v1. v1 = <v1>; x = <v1>; <>
+-}
+
+systemPOPLLH :: TRSystem Expr
+systemPOPLLH = s
+  { sname = "POPLLH"
+  , description = description s ++ " - UX-OCCURS"
+  , rules = rules s -= "UX-OCCURS"
+  }
+  where s = systemPOPLLC
 
