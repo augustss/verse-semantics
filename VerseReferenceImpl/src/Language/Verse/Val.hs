@@ -22,11 +22,14 @@ import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Unifiable
 
+import Language.Verse.Class (Class)
 import Language.Verse.Desugar.Exp qualified as Desugar
+import Language.Verse.Function (Function)
 import Language.Verse.Ident
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
+import Language.Verse.Struct (Struct)
 
 import Prettyprinter
 
@@ -43,15 +46,10 @@ data Val f a
   | ClassInst !Label (Maybe a) !(HashMap Name (f a))
   | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
 
-data Function f a = Function
-  !Label
-  !(IdentMap Name (f a))
-  !(IdentMap Name Bool)
-  Exp
-  Exp deriving (Show, Functor, Foldable, Traversable)
-
-instance Eq (Function f a) where
-  Function x _ _ _ _ == Function y _ _ _ _ = x == y
+data Overload f a
+  = Function !(Function f a)
+  | Struct !(Struct f a)
+  | Class !(Class f a) deriving (Show, Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L (Ident Name))
 
