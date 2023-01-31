@@ -365,7 +365,7 @@ $\begin{array}{l}
   \begin{array}{l}
     \textit{Structural rules} \\
     \begin{array}{lr@@{\;}c@@{\;}ll}
-    \rulename{exist-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
+    \rulename{exi-swap} & |def (x y) e| & \movesto & |def (y x) e| \\
     \rulename{val-swap} & |e_1; x==v; e_2| & \movesto & |x==v; e_1; e_2| \\
     \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
 %%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
