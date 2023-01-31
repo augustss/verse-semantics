@@ -1134,6 +1134,7 @@ rulesSubstOne _ lhs =
  <>
   "SUBST-ONE" `name`
   do q@(Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
      ctx <- varX x e
      pure (q :>: ctx v)
 
