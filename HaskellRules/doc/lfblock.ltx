@@ -310,11 +310,11 @@ It is quite easy to take an arbitrary expression and transform it to this subset
         |context Q ()| & \text{if $k=k'$} \\
         |context Q (x==fail;)| & \text{otherwise; |x| fresh}
       \end{cases}$} \\[12pt]
-\rulename{utup} & {\hskip-3em|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n')]|}
+\rulename{utup} & {\hskip-3em|Q^[tup (v_1,dots,v_m) == tup (v1',dots,v_n');]|}
     % the \hskip-3em allows the LHS to reach into the first columns; ok due to the short rule name 
     & \movesto & \largerhs{$\begin{cases}
-        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m']|\qquad\text{if $m=n$}} \\
-        |Q^[x==fail]| & \text{otherwise; |x| fresh}
+        \multicolumn{2}{@@{}l}{|Q^[v_1==v1';dots;v_m=v_m';]|\qquad\text{if $m=n$}} \\
+        |Q^[x==fail;]| & \text{otherwise; |x| fresh}
       \end{cases}
     $}\\[12pt]
 \rulename{ux} & |context Q (v == v';)| & \movesto & \largerhs{|context Q (x == fail;)|\quad if unmatched by \textsc{ulit}/\textsc{utup}; |x| fresh} \\
@@ -333,7 +333,7 @@ It is quite easy to take an arbitrary expression and transform it to this subset
 %\rulename{def-elimr} & |def (V^[x]) (context Q (v==x;))| & \movesto & |def (V^[]) (context Q ())|
 %    & if $|x| \notin \freevars{|Q|}\cup \freevars{|v|}$ \\
 
-  \rulename{def-elimv} & |def (V^[x]) (context Q (y=x); v)| & \movesto &
+  \rulename{def-elimv} & |def (V^[x]) (context Q (y=x;) v)| & \movesto &
                                  |longdef (V^[]) (context (substNP Q x y) ()) (subst v x y)| & if $|x| \neq |y|$ \\
 
 \rulename{def-elim} & |def (V^[x]) (q; v)| & \movesto & |def (V^[]) (q; v)|
