@@ -73,6 +73,14 @@ systemPOPLLC = s
   }
   where s = systemPOPLLA
 
+systemPOPLLU :: TRSystem Expr
+systemPOPLLU = s
+  { sname = "POPLLU"
+  , description = description s ++ ", - UNIFY-UNIFYR"
+  , rules = rules s -= "UNIFY-UNIFYR"
+  }
+  where s = systemPOPLLC
+
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
   { sname = "POPLLD"
