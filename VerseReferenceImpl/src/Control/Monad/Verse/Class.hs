@@ -13,6 +13,7 @@ module Control.Monad.Verse.Class
   ) where
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
@@ -26,7 +27,7 @@ import Data.Fix
 import Data.Ref
 import Data.Unifiable
 
-class (Alternative m, MonadVar m, Lenient.MonadRef m) => MonadVerse m where
+class (MonadPlus m, MonadVar m, Lenient.MonadRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
   unify :: Unifiable f => Var m f -> Var m f -> m ()

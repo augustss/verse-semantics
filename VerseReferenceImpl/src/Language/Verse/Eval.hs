@@ -201,18 +201,21 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    once' (eval' e) $ \ var_e -> unify var var_e
+    lift $ once' (evalWriterT $ eval' e) $ \ var_e ->
+      unify var var_e
     pure var
   Exp.All e -> do
     var <- freshVar
-    for' (eval' e) freshen $ \ vars_e -> unify var =<< newVar (Val.Tuple vars_e)
+    lift $ for' (evalWriterT $ eval' e) freshen $ \ vars_e ->
+      unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
-    lnot' $ eval' e
+    lift . lnot' . evalWriterT $ eval' e
     newVar $ Val.Tuple []
   Exp.Query e -> do
+    var_e <- eval' e
     var <- freshVar
-    join $ unify <$> newVar (Val.Truth var) <*> eval' e
+    lift $ unify var_e =<< newVar (Val.Truth var)
     pure var
   Exp.Module i xs e -> do
     xs <- for xs freshNamed
@@ -231,46 +234,49 @@ eval' e = case extract e of
     _ <- localNames xs $ eval' e2
     let xs' = fromIdents xs
     var <- freshVar
-    whenBound var1 $ \ case
+    lift $ whenBound var1 $ evalWriterT . \ case
       Val.Struct i env ys e -> do
         ys <- for ys freshNamed
-        _ <- local (const $ ys <> env) $ eval' e
+        defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
         let ys' = fromIdents ys
         for_ (HashMap.intersectionWith (,) ys' xs') $
           uncurry unifyNamed
-        unify var =<< newVar (Val.StructInst i ys')
+        let defs' = fromIdents defs
+        for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
+          unifyNamed y . Val =<< local (const env) (eval' e)
+        lift $ unify var =<< newVar (Val.StructInst i ys')
       Val.Class i env var_super ys e_body ->
-        instSuper (loc e) var_super xs $ \ var_super ys_super -> do
+        instSuper (loc e) var_super xs $ \ var_super defs_super ys_super -> do
           ys <-  (ys_super <>) <$> for ys freshNamed
-          _ <- local (const $ ys <> env) $ eval' e_body
+          defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e_body
           let ys' = fromIdents ys
           for_ (HashMap.intersectionWith (,) ys' xs') $
             uncurry unifyNamed
-          unify var =<< newVar (Val.ClassInst i var_super ys')
+          let defs' = fromIdents $ defs <> defs_super
+          for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
+            unifyNamed y . Val =<< local (const env) (eval' e)
+          lift $ unify var =<< newVar (Val.ClassInst i var_super ys')
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    ifte'
-      (do
+    lift $ ifte'
+      (evalWriterT $ do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
           pure xs)
-      (\ xs ->
-         unify var =<< localNames xs (eval' t))
-      (unify var =<< eval' e)
+      (\ xs -> unify var =<< evalWriterT (localNames xs $ eval' t))
+      (unify var =<< evalWriterT (eval' e))
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
-    for'
-      (do
+    lift $ for'
+      (evalWriterT $ do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
           pure xs)
-      (\ xs ->
-         freshen =<< localNames xs (eval' e2))
-      (\ vars ->
-         unify var =<< newVar (Val.Tuple vars))
+      (\ xs -> freshen =<< evalWriterT (localNames xs $ eval' e2))
+      (\ vars -> unify var =<< newVar (Val.Tuple vars))
     pure var
   Exp.Exists x e -> do
     var <- freshVar
@@ -293,7 +299,7 @@ eval' e = case extract e of
     var1 <- eval' e1
     var2 <- eval' e2
     var <- freshVar
-    whenBound var1 $ \ case
+    lift $ whenBound var1 $ \ case
       Val.Tuple xs ->
         foldr
         (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
@@ -302,13 +308,13 @@ eval' e = case extract e of
       Val.Overload x var_xs -> fix (\ recur x var_xs ->
         let Val.Function _ env xs e_arg e_body = x in
           ifte'
-          (do
+          (evalWriterT $ do
               xs <- for xs freshNamed
               let env' = xs <> env
-              var_d <- local (const env') $ eval' e_arg
-              unify var2 var_d
+              var_arg <- local (const env') $ eval' e_arg
+              lift $ unify var2 var_arg
               pure env')
-          (\ env' -> unify var =<< local (const env') (eval' e_body)) $
+          (\ env' -> unify var =<< evalWriterT (local (const env') $ eval' e_body)) $
           whenBound var_xs $ \ case
             Val.Overload x var_xs -> recur x var_xs
             _ -> throwDomainError $ loc e) x var_xs
@@ -447,11 +453,11 @@ instClass :: MonadEval m =>
              MutVar m -> Env m ->
              (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
-instClass loc var_class xs f = whenBound var_class $ evalWriterT' . \ case
+instClass loc var_class xs f = lift . whenBound var_class $ evalWriterT . \ case
   Val.Class i env var_super ys e_body ->
     instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
       ys <-  (ys_super <>) <$> for ys freshNamed
-      defs <- local (const $ ys <> env) $ execWriterT' $ eval' e_body
+      defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e_body
       let ys' = fromIdents ys
       for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
         uncurry unifyNamed
@@ -478,7 +484,7 @@ lookupName' = asks . HashMap.lookup
 localName :: Monad m => Ident Name -> Named m -> EvalT m a -> EvalT m a
 localName x = local . HashMap.insert x
 
-localNames :: Monad m => Env m -> EvalT m a -> EvalT m a
+localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
 localNames = local . (<>)
 
 throwDomainError :: MonadError Error m => Loc -> m a
@@ -521,3 +527,6 @@ freshNamed = \ case
 
 freshRef :: MonadVerse m => EvalT m (Lenient.Ref m (Var m f))
 freshRef = lift . Lenient.newRef =<< freshVar
+
+(\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
+(\\) = HashMap.difference
