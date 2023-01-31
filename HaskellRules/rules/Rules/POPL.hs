@@ -18,7 +18,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
