@@ -71,7 +71,7 @@ type MonadEval m =
   , EqRef (Lenient.Ref m)
   )
 
-type Defaults m = HashMap (Ident Name) (Env m, L (Exp L (Ident Name)))
+type Defaults m = HashMap (Ident Name) (MutVar m, Env m, L (Exp L (Ident Name)))
 
 type Env m = HashMap (Ident Name) (Named m)
 
@@ -243,19 +243,19 @@ eval' e = case extract e of
         for_ (HashMap.intersectionWith (,) ys' xs') $
           uncurry unifyNamed
         let defs' = fromIdents defs
-        for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
-          unifyNamed y . Val =<< local (const env) (eval' e)
+        for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
+          unify var =<< local (const env) (eval' e)
         unify var =<< newVar (Val.StructInst i ys')
       Val.Class i env var_super ys e_body ->
-        instSuper (loc e) var_super xs $ \ var_super defs_super ys_super -> do
+        instSuper (loc e) var_super xs' $ \ var_super defs_super ys_super -> do
           ys <-  (ys_super <>) <$> for (ys \\ ys_super) freshNamed
           defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e_body
           let ys' = fromIdents ys
           for_ (HashMap.intersectionWith (,) ys' xs') $
             uncurry unifyNamed
           let defs' = fromIdents $ defs <> defs_super
-          for_ (HashMap.intersectionWith (,) (ys' \\ xs') defs') $ \ (y, (env, e)) ->
-            unifyNamed y . Val =<< local (const env) (eval' e)
+          for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
+            unify var =<< local (const env) (eval' e)
           unify var =<< newVar (Val.ClassInst i var_super ys')
       _ -> throwDomainError $ loc e
     pure var
@@ -335,7 +335,7 @@ eval' e = case extract e of
   Exp.Default x e1 e2 -> do
     var1 <- eval' e1
     env <- ask
-    tell $ HashMap.singleton (extract x) (env, e2)
+    tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
   Exp.IsInt e ->
     isInt =<< eval' e
@@ -442,7 +442,7 @@ isInt var_x = do
 
 instSuper :: MonadEval m =>
              Loc ->
-             Maybe (MutVar m) -> Env m ->
+             Maybe (MutVar m) -> HashMap Name (Named m) ->
              (Maybe (MutVar m) -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instSuper loc var_super xs f = case var_super of
@@ -451,7 +451,7 @@ instSuper loc var_super xs f = case var_super of
 
 instClass :: MonadEval m =>
              Loc ->
-             MutVar m -> Env m ->
+             MutVar m -> HashMap Name (Named m) ->
              (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instClass loc var_class xs f = whenBound' var_class $ \ case
@@ -460,7 +460,7 @@ instClass loc var_class xs f = whenBound' var_class $ \ case
       ys <-  (ys_super <>) <$> for ys freshNamed
       defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e_body
       let ys' = fromIdents ys
-      for_ (HashMap.intersectionWith (,) (fromIdents xs) ys') $
+      for_ (HashMap.intersectionWith (,) ys' xs) $
         uncurry unifyNamed
       var <- newVar (Val.ClassInst i var_super ys')
       f var (defs <> defs_super) ys
