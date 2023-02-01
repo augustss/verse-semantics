@@ -16,7 +16,7 @@
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
-%include ../../calculus.fmt
+%include ../calculus.fmt
 
 \newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
 \newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
@@ -123,27 +123,187 @@ This means that some of the original POPL can be removed or simplified.
 \figureSyntax
 
 % ----------------------------------------------------
-\figureContexts
+\begin{figure}
+  $$
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \text{Execution contexts} & X & ::= & \hole \vb |v == X| \vb |X ; e| \vb |e; X| \\
+    \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+    \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
+    \vb |one hole| \vb |all hole| \\
+\iffullverse
+    && \vb & |succeeds hole| \vb |decides hole| \\
+\fi
+    \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+    \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
+    \vb |one e| \vb |all e|
+    %%% NOTE: the following is not in the POPL submission,
+    %%% but needed to make progress in (1,2)[x:int]
+    \vb |apply1 op v|
+  \end{array}
+   $$
+  \caption{The syntax of contexts}
+    \label{fig:contexts}
+\end{figure}
 
 % ----------------------------------------------------
-\figureStructuralRules
+\begin{figure}
+$\begin{array}{l}
+\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+% The quad indents the lines
+% The \hspace{-..} removes redundant space between rule name column and LHS column
+% that arises because the longest rule name and the longer LHS are not on the same line
+% The \; reduces the spacing around the arrow
 
-% ----------------------------------------------------
-\figureRewriteRulesICFP
+\rulegroupname{Primitive operations}
 
+\rulename{p-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{p-gt} & |applyN gt (k_1,k_2)| & \movesto &
+    \begin{cases}
+      |k_1| & \text{if $k_1 > k_2$} \\
+      |fail| & \text{otherwise}
+      \end{cases} \\
 
-\subsection{Variable ordering}
-For the \rulename{var-swap} rule we need a stable order of variables.
-At a subexpression, a variable, |x|, is considered ``less than'' a variable, |y|, if
-\begin{itemize}
-\item Both variables bound: the variable with closest binder is considered less.
-\item Both variables unbound: use alphabetic comparison of variable names.
-\item Otherwise, the bound variables is considered less.
-\end{itemize}
+\iffullverse
+    \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
+    $\left\{\begin{array}{@@{}ll}
+      |()| & \text{if |hnf| is an integer} \\
+      |fail| & \text{otherwise}
+      \end{array}\right.$
+\fi
+
+\rulegroupname{Application}
+
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+          & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+
+\\[-2mm]
+\rulegroupname{Unification}
+
+\rulename{ulit} & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
+\rulename{utup} & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
+%% \rulename{ulit} & |k_1 == k_2| & \movesto
+%%     & \largerhs{\begin{cases}
+%%         |k_1| & \text{if $k_1=k_2$} \\
+%%         |fail| & \text{otherwise}
+%%       \end{cases}} \\
+%% \rulename{utup} & |tup (v_1,dots,v_m) == tup (v1',dots,v_n')|
+%%     & \movesto & \largerhs{\begin{cases}
+%%         \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_m=v_m'; tup (v_1,dots,v_m)|} \\
+%%             & \text{if $m=n$} \\
+%%         |fail| & \text{otherwise}
+%%       \end{cases}
+%%    }\\
+\rulename{ux-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{ulit} nor \rulename{utup} match} \\
+\rulename{ux-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+\end{array}
+\\
+\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;\;}c@@{\;\;} l l}
+
+\\[-2mm]
+\rulegroupname{Unification variables}
+
+\rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
+    & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
+%% not in use
+%% \rulename{subst-rec} & |x == V^[lam y e]| & \movesto & \largerhs{|x == V^[lam y (def x (x = V^[lam y e]; e))]|} \\
+%%    &&&& \text{if $|x| \in \freevars{|lam y e|}$} \\
+\rulename{exi-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
+    & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|}, |x| \notin |{ys}|$} \\
+\rulename{exi-elimv} & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
+    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
+\rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
+\rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
+
+\\[-2mm]
+\rulegroupname{Existentials}
+\rulename{exi-elim} & |def x e| & \movesto & |e|
+    & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-float} & |X^[def x e]| & \movesto & |def x (X^[e])|
+    & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+
+\\[-2mm]
+\rulegroupname{Sequencing}
+
+\rulename{seq} & |v ; e| & \movesto & |e| \\
+\rulename{seq-assoc} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
+\rulename{unify-seqr} & |v == (eu ; e)| & \movesto & |eu ; v == e| \\
+%% \rulename{unify-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1==v_2; v_1==e| \\
+\end{array}
+\end{array}$
+\caption{The Verse calculus: rewrite rules (1)}
+\label{fig:general-axioms} \label{fig:rules1}
+\end{figure}
 
 % ===================================================================
-\section{Proposed Rules for Choice}
+\begin{figure}
+  $$
+  \begin{array}{l}
+   \textit{Fail propagation} \\
+    \begin{array}[t]{lr@@{\;}c@@{\;}ll}
+%%      \rulename{fail-def} & |def x fail| & \movesto & |fail|  \\
+       \rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$}
+    \end{array} \\
+    \\[-2mm]
+    \textit{One and all} \\
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{one-fail} & |one fail| & \movesto & |fail| \\
+    \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+    \rulename{one-value} & |one v| & \movesto & |v| \\
+    \end{array} \hspace{5mm}
+    \begin{array}[t]{lr@@{\;}c@@{\;}l}
+    \rulename{all-fail} & |all fail| & \movesto & |tup ()| \\
+    \rulename{all-choice} &
+      |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
+    \rulename{all-value} & |all v| & \movesto & |tup v| \\
+    \end{array} \\
 
+    \\[-2mm]
+
+    \textit{Choice} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{fail-l} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
+    \rulename{fail-r} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+    \rulename{assoc-choice} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
+    \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole
+    \end{array} \\
+
+\iffullverse
+    \\[-2mm]
+
+    \textit{Effects} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+    \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+    \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+    \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+\fi
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (2)}
+    \label{fig:rules2}  \label{fig:choice}
+\end{figure}
+
+% ===================================================================
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textit{Structural rules} \\
+    \begin{array}{lr@@{\;}c@@{\;}ll}
+    \rulename{exi-swap} & |def (x y) e| & \movesto & |def (y x) e| \\
+    \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
+    \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+%%    \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+    \end{array} \\
+
+   \end{array}
+   $$
+  \caption{The Verse calculus: rewrite rules (3)}
+    \label{fig:rules-structural}  \label{fig:structural}
+\end{figure}
+
+% ===================================================================
 \begin{figure}
   $$
   \begin{array}{l}

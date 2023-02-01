@@ -106,7 +106,7 @@ different parts of the system.
 
 ## Ranjit Notes
 
-To run a single test with a `--trace` 
+To run a single test with a `--trace`
 
 ```
 cabal run -- tester -r PLDIT --only-test Koen5 --trace versetests/tricky.versetest

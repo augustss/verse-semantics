@@ -8,7 +8,8 @@ all: rules.pdf block.pdf rules-eqn.pdf lfblock.pdf
 LATEX=pdflatex -halt-on-error
 
 rules.tex: $(COMMON) rules.ltx
-rules-eqn.tex: $(COMMON) rules-eqn.ltx
+rules-eqn.tex: $(COMMON) rewrites.tex rules-eqn.ltx
+rewrites.tex: $(COMMON) rewrites.ltx
 block.tex: $(COMMON) block.ltx
 lfblock.tex: $(COMMON) lfblock.ltx
 

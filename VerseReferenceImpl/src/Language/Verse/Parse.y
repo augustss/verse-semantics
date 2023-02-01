@@ -183,6 +183,9 @@ Exp :: { L (Exp L Name) }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
     }
+  | name '->' name ':' Exp {
+      Exp.ArrowInfixColon <\$> duplicate $1 <.> duplicate $3 <.> duplicate $5
+    }
   | name ':' ind List ded {
       Exp.Inst <\$> duplicate (Exp.Name <\$> $1) <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }

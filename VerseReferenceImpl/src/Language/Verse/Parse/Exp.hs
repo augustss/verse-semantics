@@ -54,6 +54,7 @@ data Exp f a
   | Name a
   | PrefixColon (f (Exp f a))
   | InfixColon (f a) (f (Exp f a))
+  | ArrowInfixColon (f a) (f a) (f (Exp f a))
   | InfixColonEqual (f a) (f (Exp f a))
   | IsInt (f (Exp f a))  -- LA: temporary: test if it's an integer
 
