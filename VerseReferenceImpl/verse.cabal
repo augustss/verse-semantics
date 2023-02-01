@@ -36,12 +36,10 @@ library
     Data.Ref
     Data.Unifiable
     Language.Verse
-    Language.Verse.Class
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
     Language.Verse.Error
     Language.Verse.Eval
-    Language.Verse.Function
     Language.Verse.Ident
     Language.Verse.Indent
     Language.Verse.Label
@@ -51,7 +49,6 @@ library
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos
-    Language.Verse.Struct
     Language.Verse.Token
     Language.Verse.Val
   build-tool-depends:
