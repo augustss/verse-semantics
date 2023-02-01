@@ -15,6 +15,8 @@ X := cons(logic):
   Head := true
   Tail := false
 
+cons(logic)[X]
+
 not cons(cons(any))[X]
 
 X.Head, X.Tail

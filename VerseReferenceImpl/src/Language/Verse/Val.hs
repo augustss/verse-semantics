@@ -6,9 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Val
   ( Val (..)
-  , hoistVal
-  , Function (..)
-  , hoistFunction
+  , hoist
+  , Overload (..)
+  , hoistOverload
   ) where
 
 import Control.Applicative
@@ -37,23 +37,37 @@ data Val f a
   | Truth a
   | Tuple [a]
   | Module !Label !(HashMap Name (f a))
-  | Struct !Label !(IdentMap Name (f a)) !(IdentMap Name Bool) Exp
   | StructInst !Label !(HashMap Name (f a))
-  | Class !Label !(IdentMap Name (f a)) (Maybe a) !(IdentMap Name Bool) Exp
   | ClassInst !Label (Maybe a) !(HashMap Name (f a))
-  | Overload !(Function f a) a deriving (Show, Functor, Foldable, Traversable)
+  | Overloads !(Overload f a) a deriving (Show, Functor, Foldable, Traversable)
 
-data Function f a = Function
-  !Label
-  !(IdentMap Name (f a))
-  !(IdentMap Name Bool)
-  Exp
-  Exp deriving (Show, Functor, Foldable, Traversable)
-
-instance Eq (Function f a) where
-  Function x _ _ _ _ == Function y _ _ _ _ = x == y
+data Overload f a
+  = Function
+    !Label
+    !(IdentMap Name (f a))
+    !(IdentMap Name Bool)
+    Exp
+    Exp
+  | Struct
+    !Label
+    !(IdentMap Name (f a))
+    !(IdentMap Name Bool)
+    Exp
+  | Class
+    !Label
+    !(IdentMap Name (f a))
+    (Maybe a)
+    !(IdentMap Name Bool)
+    Exp deriving (Show, Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L (Ident Name))
+
+instance Eq (Overload f a) where
+  (==) = curry $ \ case
+    (Function x _ _ _ _, Function y _ _ _ _) -> x == y
+    (Struct x _ _ _, Struct y _ _ _) -> x == y
+    (Class x _ _ _ _, Class y _ _ _ _) -> x == y
+    _ -> False
 
 instance Zippable f => Unifiable (Val f) where
   zipMatchM = curry $ \ case
@@ -74,15 +88,15 @@ instance Zippable f => Unifiable (Val f) where
       maybe empty tell $ zipMatch x y
       for_ (HashMap.intersectionWith (,) xs ys) $
         maybe empty tell . uncurry zipMatch
-    (Overload x xs, Overload y ys) ->
+    (Overloads x xs, Overloads y ys) ->
       runMaybeT . execWriterT $ zipCons x xs y ys
     _ -> pure Nothing
 
 type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
 
 zipCons :: MonadVar m =>
-           Function f (Var m (Val f)) -> Var m (Val f) ->
-           Function f (Var m (Val f)) -> Var m (Val f) ->
+           Overload f (Var m (Val f)) -> Var m (Val f) ->
+           Overload f (Var m (Val f)) -> Var m (Val f) ->
            ZipMatchT (Val f) m ()
 zipCons x xs y ys = zipList xs =<< findCons x y ys
 
@@ -92,30 +106,30 @@ zipList xs ys = uncons xs >>= \ case
   Nothing -> tell [(xs, ys)]
 
 findCons :: MonadVar m =>
-            Function f (Var m (Val f)) ->
-            Function f (Var m (Val f)) -> Var m (Val f) ->
+            Overload f (Var m (Val f)) ->
+            Overload f (Var m (Val f)) -> Var m (Val f) ->
             ZipMatchT (Val f) m (Var m (Val f))
 findCons x y ys =
   if x == y then pure ys
-  else newVar . Overload y =<< findList x ys
+  else newVar . Overloads y =<< findList x ys
 
 findList :: MonadVar m =>
-            Function f (Var m (Val f)) ->
+            Overload f (Var m (Val f)) ->
             Var m (Val f) ->
             ZipMatchT (Val f) m (Var m (Val f))
 findList x ys = uncons ys >>= \ case
   Just (y, ys) -> findCons x y ys
   Nothing -> do
     zs <- freshVar
-    ys' <- newVar $ Overload x zs
+    ys' <- newVar $ Overloads x zs
     tell [(ys, ys')]
     pure zs
 
 uncons :: ( Alternative m
           , MonadVar m
-          ) => Var m (Val f) -> m (Maybe (Function f (Var m (Val f)), Var m (Val f)))
+          ) => Var m (Val f) -> m (Maybe (Overload f (Var m (Val f)), Var m (Val f)))
 uncons xs = readVar xs >>= \ case
-  Just (Overload x xs) -> pure $ Just (x, xs)
+  Just (Overloads x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
 
@@ -131,7 +145,7 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
       pretty (numerator x) <> pretty '/' <> pretty (denominator x)
     Truth x ->
       align $ "truth" <> group (braces $ pretty x)
-    Overload {} ->
+    Overloads {} ->
       "function"
     Tuple [] ->
       "false"
@@ -139,15 +153,11 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
       align . tupled $ pretty <$> xs
     Module i xs ->
       align $ "module#" <> prettyLabel i <> group (braced $ names xs)
-    Struct i _ _ _ ->
-      "struct#" <> prettyLabel i
     StructInst i xs ->
       align $
       "struct#" <>
       prettyLabel i <>
       group (braced $ names xs)
-    Class i _ _ _ _ ->
-      "class#" <> prettyLabel i
     ClassInst i Nothing xs ->
       align $
       "class#" <>
@@ -180,19 +190,26 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-hoistVal :: (forall c . f c -> g c) -> Val f a -> Val g a
-hoistVal f = \ case
+instance Pretty (Overload f a) where
+  pretty = \ case
+    Function x _ _ _ _ -> "function#" <> prettyLabel x
+    Struct x _ _ _ -> "struct#" <> prettyLabel x
+    Class x _ _ _ _ -> "class#" <> prettyLabel x
+
+hoist :: (forall b . f b -> g b) -> Val f a -> Val g a
+hoist f = \ case
   Int x -> Int x
   Float x -> Float x
   Rational x -> Rational x
   Truth x -> Truth x
   Tuple xs -> Tuple xs
   Module i xs -> Module i (f <$> xs)
-  Struct i ys xs e -> Struct i (f <$> ys) xs e
   StructInst i xs -> StructInst i (f <$> xs)
-  Class i ys e1 xs e2 -> Class i (f <$> ys) e1 xs e2
   ClassInst i x xs -> ClassInst i x (f <$> xs)
-  Overload x xs -> Overload (hoistFunction f x) xs
+  Overloads x xs -> Overloads (hoistOverload f x) xs
 
-hoistFunction :: (forall c . f c -> g c) -> Function f a -> Function g a
-hoistFunction f (Function i ys xs e1 e2) = Function i (f <$> ys) xs e1 e2
+hoistOverload :: (forall b . f b -> g b) -> Overload f a -> Overload g a
+hoistOverload f = \ case
+  Function i env xs e1 e2 -> Function i (f <$> env) xs e1 e2
+  Struct i env xs e -> Struct i (f <$> env) xs e
+  Class i env x xs e -> Class i (f <$> env) x xs e
