@@ -246,8 +246,8 @@
 \rulegroupname{Normalization:~\rcon}
 \rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
 \rulename{norm-val} & |v ; e| & \movesto & |e| \\
-\rulename{norm-seq} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
-\rulename{norm-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
+\rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
+\rulename{norm-seqr} & |v == (eu ; e)| & \movesto & |eu ; v == e| \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]

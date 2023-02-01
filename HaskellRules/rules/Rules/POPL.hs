@@ -13,7 +13,6 @@ import TRS.TRS
 import Rules.Core
 import qualified Rules.Block
 import qualified Rules.PLDI
---import Data.Functor.Classes (Show1(liftShowList))
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
@@ -99,23 +98,6 @@ systemPOPLLT = s
   }
   where s = systemPOPLLU
 
-systemICFP_SX :: TRSystem Expr
-systemICFP_SX = s
-  { sname = "ICFPSX"
-  , description = "ICFP rules, old SX"
-  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
-  }
-  where s = systemPOPLLQ
-
-systemICFP :: TRSystem Expr
-systemICFP = s
-  { sname = "ICFP"
-  , description = "ICFP, from doc/rewrites.ltx"
-  , rules = (rules s -= "CHOOSE" -= "FAIL-L" -= "FAIL-R" -= "ASSOC-CHOICE")
-            <> rulesChoiceN <> rulesChoiceNoSX
-  }
-  where s = systemICFP_SX
-
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
   { sname = "POPLLD"
@@ -135,6 +117,22 @@ systemPOPLS = systemPOPL
   where s = systemPOPLF
         foo e = e -- trace ("foo: " ++ show e) e
 
+systemICFP_SX :: TRSystem Expr
+systemICFP_SX = s
+  { sname = "ICFPSX"
+  , description = "ICFP rules, old SX"
+  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
+  }
+  where s = systemPOPLLQ
+
+systemICFP :: TRSystem Expr
+systemICFP = s
+  { sname = "ICFPx"
+  , description = "ICFP, from doc/rewrites.ltx"
+  , rules = (rules s -= "CHOOSE" -= "FAIL-L" -= "FAIL-R" -= "ASSOC-CHOICE")
+            <> rulesChoiceN <> rulesChoiceNoSX
+  }
+  where s = systemICFP_SX
 -- Check that an expression is in the subset defined by the POPL grammar.
 valid :: Expr -> Bool
 valid = expr
@@ -368,7 +366,7 @@ execX1 lhs =
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
 
--- X context, or exist x . X
+-- X context, or exist x . defX
 defX :: Ident -> Expr -> [(Context, Expr)]
 defX xx lhs =
   do execX lhs

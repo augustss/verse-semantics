@@ -3,6 +3,7 @@ module Rules.Systems(ESystem, allSystems, lookupSystemEx, lookupSystem,
 import Epic.String
 import TRS.System
 import Rules.Core
+import Rules.ICFP(allSystemsICFP)
 import Rules.PLDI(allSystemsPLDI)
 import Rules.POPL(allSystemsPOPL)
 import Rules.KoenNaive(allSystemsKoen)
@@ -12,7 +13,8 @@ type ESystem = TRSystem Expr
 
 allSystems :: [ESystem]
 allSystems =
-     allSystemsPOPL
+     allSystemsICFP
+  ++ allSystemsPOPL
   ++ allSystemsPLDI
   ++ allSystemsKoen
   ++ allSystemsBlock
