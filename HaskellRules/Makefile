@@ -14,13 +14,12 @@ all:
 build:
 	cabal build
 
-test: testfast testslow
+testicfp:
+	$(TESTER) --quiet --dfs --rules=ICFP                    --max-steps=25000       $(TESTFILE)
+	$(TESTER) --quiet       --rules=ICFP --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 
 testslow:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
-
-testignore:
-	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000 --ignore-fuel-stop   $(TESTFILE)
 
 testfast:
 	$(TESTER) --quiet --parse                                                   $(TESTPARSEFILE)
