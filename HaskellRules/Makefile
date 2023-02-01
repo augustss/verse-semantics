@@ -17,6 +17,7 @@ build:
 testicfp:
 	$(TESTER) --quiet --dfs --rules=ICFP                    --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet       --rules=ICFP --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
+	$(QCTEST)               --rules=ICFP --ignore-fuel-stop --max-success=1000
 
 testslow:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
@@ -46,6 +47,9 @@ testpoplaqc:
 
 testpoplxqc:
 	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
+
+testicfpqc:
+	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000
 
 testpopll:
 	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)

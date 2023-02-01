@@ -103,8 +103,9 @@ systemICFP :: TRSystem Expr
 systemICFP = s
   { sname = "ICFP"
   , description = "ICFP rules, from doc/rewrites.ltx"
+  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
   }
-  where s = systemPOPLLT
+  where s = systemPOPLLQ
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
