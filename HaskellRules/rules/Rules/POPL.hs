@@ -532,6 +532,11 @@ varX xx lhs =
      ctx <- varX xx x
      pure ((e :@:) . ctx)
  ++
+  do EXI x e <- [lhs]
+     guard (x /= xx)
+     ctx <- varX xx e
+     pure (EXI x . ctx)
+ ++
   do One x <- [lhs]
      ctx <- varX xx x
      pure (One . ctx)
