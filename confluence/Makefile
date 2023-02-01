@@ -1,15 +1,13 @@
 .SUFFIXES: .pdf .ps .ltx $(.SUFFIXES)
 .PHONY: all clean realclean
 
+REWRITES=../HaskellRules/doc/rewrites.tex
 LATEX=pdflatex -halt-on-error
 PAPERTEX=confluence.tex
-PAPERSRC=$(PAPERTEX) rewrites.tex 01-language.tex 03-preliminaries.tex 04-confluence.tex ../verse.bib
+PAPERSRC=$(PAPERTEX) $(REWRITES) 01-language.tex 03-preliminaries.tex 04-confluence.tex ../verse.bib
 
 # Top-level target
-rules: rules-eqn.tex rewrites.tex
-	latexmk -pdf rules-eqn.tex
-
-conf: $(PAPERSRC)
+pdf: $(PAPERSRC)
 	latexmk -pdf $(PAPERTEX)
 
 %.tex:   %.ltx   ../calculus.fmt
