@@ -19,7 +19,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ, systemPOPLLT, systemICFP ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -90,6 +90,21 @@ systemPOPLLQ = s
   , confluenceRules = confluenceRules s -= "VAR-SWAP"
   }
   where s = systemPOPLLU
+
+systemPOPLLT :: TRSystem Expr
+systemPOPLLT = s
+  { sname = "POPLLT"
+  , description = description s ++ ", new APP-TUP"
+  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
+  }
+  where s = systemPOPLLU
+
+systemICFP :: TRSystem Expr
+systemICFP = s
+  { sname = "ICFP"
+  , description = "ICFP rules, from doc/rewrites.ltx"
+  }
+  where s = systemPOPLLT
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
@@ -652,6 +667,7 @@ rulesApplication _ lhs =
   do LAM x e :@: v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
+     -- A small shortcut for dummy variables.
      if x == Name "_" then
        pure e
       else if x `notElem` freeV then
@@ -669,6 +685,17 @@ rulesApplication _ lhs =
        pure Fail
       else
        pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+
+rulesAppTupV :: ERule
+rulesAppTupV _ lhs =
+  "APP-TUPV" `name`
+  do Arr vs :@: v <- [lhs]
+     if null vs then
+       pure Fail
+      else do
+       let x = identNotIn (free (vs, v))
+           vx = Var x
+       pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])))
 
 --------------------------------------------------------------------------------
 --rulesUnification :: ERule
