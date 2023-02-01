@@ -284,7 +284,7 @@ $$\begin{array}{l}
     \begin{array}{l}
       \textit{Structural rules} \\
       \begin{array}{lr@@{\;}c@@{\;}ll}
-      \rulename{exi-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
+      \rulename{exi-swap} & |def (x y) e| & \movesto & |def (y x) e| \\
       \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
       % \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
       % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
