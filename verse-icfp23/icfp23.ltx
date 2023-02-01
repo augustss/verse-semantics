@@ -446,6 +446,7 @@ Rules may be applied anywhere they match, again just like the lambda calculus. T
 \section{The Verse calculus, informally} \label{sec:informal}
 
 \figureSyntax
+\figureContexts
 
 We begin by presenting the Verse calculus, \versecalc, informally.  We will give its
 rewrite rules precisely in \cref{sec:rewrite-rules}.
@@ -973,6 +974,7 @@ has the following properties:
 \end{itemize}
 
 \figureRewriteRules
+\figureStructuralRules
 
 
 \subsection{Functions and function application} \label{sec:beta}
@@ -1147,8 +1149,6 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % the simpler \rulename{global-subst}: to establish confluence.
 
 \subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
-
-\figureNormalizationRules
 
 The syntax of \cref{fig:syntax} allows |(def x e)|, |(v == e)|, and |(e_1;e_2)|
 to occur anywhere

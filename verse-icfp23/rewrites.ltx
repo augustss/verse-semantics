@@ -1,7 +1,7 @@
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
-%include ../../calculus.fmt
+%include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Typesetting rewrite rules
@@ -162,12 +162,13 @@
       \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
 %       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
-      \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-      \vb |one hole| \vb |all hole| \\
+      \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
+      \text{Scope contexts} & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+      
   \iffullverse
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
-      \text{Choice contexts} & CX & ::= & \hole \vb \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+      \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
       \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
       \vb |one e| \vb |all e|
       %%% NOTE: the following is not in the POPL submission,
@@ -184,7 +185,7 @@
 
 % ------------------ ICFP rewrite rules -------------------
 
-\newcommand{\figureRewriteRulesICFP}{
+\newcommand{\figureRewriteRules}{
   \begin{figure}
     $\begin{array}{l}
     \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
@@ -253,9 +254,9 @@
 
 \rulegroupname{Speculation:~\rspc}
 \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
-\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-\rulename{choose-r} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
-\rulename{choose-l} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
+\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
 \rulename{one-value}  & |one v| & \movesto & |v| \\

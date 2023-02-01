@@ -99,13 +99,22 @@ systemPOPLLT = s
   }
   where s = systemPOPLLU
 
-systemICFP :: TRSystem Expr
-systemICFP = s
-  { sname = "ICFP"
-  , description = "ICFP rules, from doc/rewrites.ltx"
+systemICFP_SX :: TRSystem Expr
+systemICFP_SX = s
+  { sname = "ICFPSX"
+  , description = "ICFP rules, old SX"
   , rules = (rules s -= "APP-TUP") <> rulesAppTupV
   }
   where s = systemPOPLLQ
+
+systemICFP :: TRSystem Expr
+systemICFP = s
+  { sname = "ICFP"
+  , description = "ICFP, from doc/rewrites.ltx"
+  , rules = (rules s -= "CHOOSE" -= "FAIL-L" -= "FAIL-R" -= "ASSOC-CHOICE")
+            <> rulesChoiceN <> rulesChoiceNoSX
+  }
+  where s = systemICFP_SX
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
@@ -434,6 +443,23 @@ scopeX lhs =
      (ctx, hole) <- scopeX e
      pure (Store h . ctx, hole)
 -}
+
+-- new scope contexts
+-- new SX context
+scopeNX :: Expr -> [(Context, Expr)]
+scopeNX lhs =
+  do One hole <- [lhs]
+     choices One hole
+ ++
+  do All hole <- [lhs]
+     choices All hole
+ where
+  choices ctx e =
+    (ctx,e) : case e of
+                e1 :|: e2 -> choices (ctx . (e1 :|:)) e2
+                          ++ choices (ctx . (:|: e2)) e1
+                _         -> []
+
 
 -- value contexts
 -- V context
@@ -988,6 +1014,14 @@ rulesChoice :: ERule
 rulesChoice _ lhs =
   "CHOOSE" `name`
   do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX1 e
+     pure (sx (cx e1 :|: cx e2))
+
+-- Choice with new scope context
+rulesChoiceN :: ERule
+rulesChoiceN _ lhs =
+  "CHOOSE" `name`
+  do (sx, e)         <- scopeNX lhs
      (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
 
