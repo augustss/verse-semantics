@@ -165,18 +165,22 @@ desugar' e = for e $ \ case
   Parse.PrefixColon e -> do
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
-    ask <&> \ case
-      False -> Invoke e e_i
-      True -> (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
+    pure $ Invoke e e_i
   Parse.InfixColon x e -> do
     tellName x False
     let e1 = Name . Pure <$> x
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
     let e2 = Invoke <$> duplicate e <.> duplicate e_i
-    ask <&> \ case
-      False -> e1 :=: e2
-      True -> ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
+    pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
+  Parse.ArrowInfixColon x y e -> do
+    tellName x False
+    let e3 = Name . Pure <$> x
+    tellName y False
+    let e1 = Name . Pure <$> y
+    e <- desugar' e
+    let e2 = Invoke <$> duplicate e <.> duplicate e3
+    pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e3
   Parse.InfixColonEqual x e -> do
     tellName x False
     let x' = Pure <$> x

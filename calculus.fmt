@@ -177,6 +177,7 @@
 %format write = "\textbf{write}"
 %format any = "\textbf{any}"
 %format dots = "\cdots"
+%format tdots = "\!\!\!\cdots\!\!\!"
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"

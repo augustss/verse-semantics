@@ -1,7 +1,7 @@
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
-%include ../../calculus.fmt
+%include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Typesetting rewrite rules
@@ -90,8 +90,8 @@
 \newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
 
 
-% --------------------------------------------------------
 
+%  -------------------------- Syntax -----------------------
 \newcommand{\figureSyntax}{
 \begin{figure}[t]
     $$
@@ -102,8 +102,8 @@
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
       \text{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
-                                           \vb |e_1 choice e_2| \vb |apply1N v_1 v_2| \\
-                           &       & \vb & |one e| \vb |all e| \\
+                                           \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
+                             \vb |one e| \vb |all e| \\
                            & eu     & ::= & |e| \vb |v == e| \\
   %    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
   %       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
@@ -154,33 +154,38 @@
 \end{figure}
 }
 
+%  -------------------------- Contexts -----------------------
 \newcommand{\figureContexts}{
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Execution contexts} & X & ::= & \hole \vb |v == X| \vb |X ; e| \vb |e; X| \\
+      \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
+%       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
-      \text{Scope contexts} & SX & ::= & |hole choice e| \vb |e choice hole |
-      \vb |one hole| \vb |all hole| \\
+      \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
+      \text{Scope contexts} & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+      
   \iffullverse
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
-      \text{Choice contexts} & CX & ::= & \hole \vb \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+      \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
       \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
       \vb |one e| \vb |all e|
       %%% NOTE: the following is not in the POPL submission,
       %%% but needed to make progress in (1,2)[x:int]
-      \vb |apply1 op v|
+      \vb |apply1 op v| \\
+      & \multicolumn{3}{l}{\lennart{\text{Should we modify |ce| so it's a subset of |e|?  Currently |eu| ruins that.}}}
     \end{array}
      $$
     \caption{The syntax of contexts}
       \label{fig:contexts}
 \end{figure}
 }
-% --------------------------------------------------------
 
-% ICFP rewrite rules
-\newcommand{\figureRewriteRulesICFP}{
+
+% ------------------ ICFP rewrite rules -------------------
+
+\newcommand{\figureRewriteRules}{
   \begin{figure}
     $\begin{array}{l}
     \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
@@ -203,8 +208,8 @@
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
               & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
-\rulename{app-tup}     & |apply1 (tup (v_0,dots,v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
-	    \rulename{app-tup-new} & |apply1 (tup (v_0,dots,v_n)) v| & \movesto & \largerhs{|def x (x == v; (x == 0; v_0) choice dots choice (x == n; v_n))|} \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
+         \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
 \rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
@@ -214,28 +219,32 @@
 \rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
   % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} don't match} \\
+  \rulename{u-tup} & \hspace{-7mm} |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & |v_1==v1';dots;v_n=v_n'; emptytup| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |X^[x==v]| & \movesto & |(subst X x v)^[x==v]|
-    & \text{if $|x| \in \freevars{|X|}$, $|x| \notin \freevars{v}$} \\
-  \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
-  \rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+  \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
+  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| ``less than'' |y| } \\
 
     \\[-2mm]
 
 \rulegroupname{Elimination:~\rgc}
-\rulename{def-elim} & |def x e| & \movesto & |e|
+\rulename{exi-elim} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-eliml} & |def (x ys) (X^[x==v])| & \movesto & |def ys (X^[v])|
-  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-	    \rulename{def-elimv} (CUT?) & |def (x ys) (X^[z==x])| & \movesto & |def ys (subst (X^[z]) x z)|
-    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
+% This uses \overline
+%\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
+%  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
+% without \overline
+\rulename{def-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
+  & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
+%\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
+%    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
     \\[-2mm]
 
 \rulegroupname{Normalization:~\rcon}
-\rulename{norm-def} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
 \rulename{norm-val} & |v ; e| & \movesto & |e| \\
 \rulename{norm-seq} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
 \rulename{norm-seqr} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; (v == e_2)| \\
@@ -245,9 +254,9 @@
 
 \rulegroupname{Speculation:~\rspc}
 \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
-\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-\rulename{choose-r} & |SX^[fail choice e]| & \movesto & |SX^[e]| \\
-\rulename{choose-l} & |SX^[e choice fail]| & \movesto & |SX^[e]| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
+\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
 \rulename{one-value}  & |one v| & \movesto & |v| \\
@@ -281,7 +290,7 @@ $$\begin{array}{l}
     \begin{array}{l}
       \textit{Structural rules} \\
       \begin{array}{lr@@{\;}c@@{\;}ll}
-      \rulename{exi-swap} & |def (dots x y dots) e| & \movesto & |def (dots y x dots) e| \\
+      \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
       \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
       % \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
       % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\

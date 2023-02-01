@@ -19,7 +19,7 @@ import qualified Rules.PLDI
 --------------------------------------------------------------------------------
 
 allSystemsPOPL :: [TRSystem Expr]
-allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ ]
+allSystemsPOPL = [ systemPOPL, systemPOPLS, systemPOPLL, systemPOPLLA, systemPOPLLC, systemPOPLLD, systemPOPLLU, systemPOPLLQ, systemPOPLLT, systemICFP ]
 
 systemPOPL :: TRSystem Expr
 systemPOPL = TRSystem
@@ -90,6 +90,31 @@ systemPOPLLQ = s
   , confluenceRules = confluenceRules s -= "VAR-SWAP"
   }
   where s = systemPOPLLU
+
+systemPOPLLT :: TRSystem Expr
+systemPOPLLT = s
+  { sname = "POPLLT"
+  , description = description s ++ ", new APP-TUP"
+  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
+  }
+  where s = systemPOPLLU
+
+systemICFP_SX :: TRSystem Expr
+systemICFP_SX = s
+  { sname = "ICFPSX"
+  , description = "ICFP rules, old SX"
+  , rules = (rules s -= "APP-TUP") <> rulesAppTupV
+  }
+  where s = systemPOPLLQ
+
+systemICFP :: TRSystem Expr
+systemICFP = s
+  { sname = "ICFP"
+  , description = "ICFP, from doc/rewrites.ltx"
+  , rules = (rules s -= "CHOOSE" -= "FAIL-L" -= "FAIL-R" -= "ASSOC-CHOICE")
+            <> rulesChoiceN <> rulesChoiceNoSX
+  }
+  where s = systemICFP_SX
 
 systemPOPLLD :: TRSystem Expr
 systemPOPLLD = s
@@ -419,6 +444,23 @@ scopeX lhs =
      pure (Store h . ctx, hole)
 -}
 
+-- new scope contexts
+-- new SX context
+scopeNX :: Expr -> [(Context, Expr)]
+scopeNX lhs =
+  do One hole <- [lhs]
+     choices One hole
+ ++
+  do All hole <- [lhs]
+     choices All hole
+ where
+  choices ctx e =
+    (ctx,e) : case e of
+                e1 :|: e2 -> choices (ctx . (e1 :|:)) e2
+                          ++ choices (ctx . (:|: e2)) e1
+                _         -> []
+
+
 -- value contexts
 -- V context
 valueX, valueX1 :: Value -> [(Value->Value, Value)]
@@ -516,6 +558,11 @@ varX xx lhs =
   do e :@: x <- [lhs]
      ctx <- varX xx x
      pure ((e :@:) . ctx)
+ ++
+  do EXI x e <- [lhs]
+     guard (x /= xx)
+     ctx <- varX xx e
+     pure (EXI x . ctx)
  ++
   do One x <- [lhs]
      ctx <- varX xx x
@@ -652,6 +699,7 @@ rulesApplication _ lhs =
   do LAM x e :@: v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
+     -- A small shortcut for dummy variables.
      if x == Name "_" then
        pure e
       else if x `notElem` freeV then
@@ -669,6 +717,17 @@ rulesApplication _ lhs =
        pure Fail
       else
        pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+
+rulesAppTupV :: ERule
+rulesAppTupV _ lhs =
+  "APP-TUPV" `name`
+  do Arr vs :@: v <- [lhs]
+     if null vs then
+       pure Fail
+      else do
+       let x = identNotIn (free (vs, v))
+           vx = Var x
+       pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])))
 
 --------------------------------------------------------------------------------
 --rulesUnification :: ERule
@@ -955,6 +1014,14 @@ rulesChoice :: ERule
 rulesChoice _ lhs =
   "CHOOSE" `name`
   do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX1 e
+     pure (sx (cx e1 :|: cx e2))
+
+-- Choice with new scope context
+rulesChoiceN :: ERule
+rulesChoiceN _ lhs =
+  "CHOOSE" `name`
+  do (sx, e)         <- scopeNX lhs
      (cx, e1 :|: e2) <- choiceX1 e
      pure (sx (cx e1 :|: cx e2))
 
