@@ -11,8 +11,6 @@ import TRS.Traced
 import Test.QuickCheck as QC
 import Options.Applicative
 
-import TRS.Bind
-
 --------------------------------------------------------------------------------
 
 main :: IO ()
