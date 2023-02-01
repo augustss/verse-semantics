@@ -206,7 +206,8 @@
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
               & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
-\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto & \largerhs{|(v = 0; v_0) choice dots choice (v = n; v_n)|} \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
+         \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
 \rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
@@ -216,13 +217,13 @@
 \rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
   % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-\multicolumn{2}{l}{\; \rulename{u-tup} \quad |tup (v_1,dots,v_n) == tup (v1',dots,v_n')|} & \movesto & \largerhs{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} don't match} \\
+  \rulename{u-tup} & \hspace{-7mm} |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & |v_1==v1';dots;v_n=v_n'; emptytup| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]|
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
-  \rulename{swap} & |hnf==x|    & \movesto & |x==hnf| \\
-  \rulename{var-swap} & |x==y|    & \movesto & |y==x| & \text{ if |y| ``less than'' |x| } \\
+  \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
+  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| ``less than'' |y| } \\
 
     \\[-2mm]
 
@@ -231,8 +232,8 @@
   & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
   & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
-    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
+%\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
+%    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
     \\[-2mm]
 

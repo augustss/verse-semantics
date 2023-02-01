@@ -126,19 +126,19 @@ This means that some of the original POPL can be removed or simplified.
 \figureContexts
 
 % ----------------------------------------------------
-\figureStructuralRules
+\figureRewriteRulesICFP
 
 % ----------------------------------------------------
-\figureRewriteRulesICFP
+\figureStructuralRules
 
 
 \subsection{Variable ordering}
-For the \rulename{var-swap} rule we need a stable order of variables.
-At a subexpression, a variable, |x|, is considered ``less than'' a variable, |y|, if
+For the \rulename{var-swap} rule we need a stable (under $\alpha$-conversion) order of variables.
+At a subexpression, one variable is considered ``less than'' another variable if
 \begin{itemize}
-\item Both variables bound: the variable with closest binder is considered less.
-\item Both variables unbound: use alphabetic comparison of variable names.
-\item Otherwise, the bound variables is considered less.
+\item Both variables bound: the variable with closest binder is considered lesser.
+\item Both variables unbound: use alphabetic comparison of the variable names.
+\item Otherwise, the bound variable is considered lesser.
 \end{itemize}
 
 % ===================================================================
