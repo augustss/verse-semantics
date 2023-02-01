@@ -172,7 +172,8 @@
       \vb |one e| \vb |all e|
       %%% NOTE: the following is not in the POPL submission,
       %%% but needed to make progress in (1,2)[x:int]
-      \vb |apply1 op v|
+      \vb |apply1 op v| \\
+      & \multicolumn{3}{l}{\lennart{\text{Should we modify |ce| so it's a subset of |e|?  Currently |eu| ruins that.}}}
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -230,8 +231,12 @@
 \rulegroupname{Elimination:~\rgc}
 \rulename{exi-elim} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
-  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
+% This uses \overline
+%\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
+%  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
+% without \overline
+\rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
+  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{y_i}|$} \\
 %\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
 %    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
 
