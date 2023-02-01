@@ -26,7 +26,7 @@ clean:
 	-rm -f $(NAME).tex rewrites.tex
 	-rm -f $(NAME).aux $(NAME).log $(NAME).out \
                $(NAME).pdf $(NAME).bbl $(NAME).blg \
-               $(NAME).ptb
+               $(NAME).ptb comment.cut
 
 # Total reset -- delete intermediates *and* final derives
 realclean: clean
