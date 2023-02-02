@@ -236,7 +236,7 @@
 %\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
 %  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
 % without \overline
-\rulename{def-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
+\rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
   & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
 %\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
 %    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
