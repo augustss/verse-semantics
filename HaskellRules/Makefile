@@ -50,7 +50,7 @@ testpoplxqc:
 	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
 
 testicfpqc:
-	$(QCTEST) --rules=ICFPR --ignore-fuel-stop --max-success=1000000
+	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
 
 testpopll:
 	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)
