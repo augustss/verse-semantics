@@ -5,6 +5,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Eval
@@ -13,9 +14,10 @@ module Language.Verse.Eval
   ) where
 
 import Control.Applicative
+import Control.Category ((>>>))
 import Control.Comonad
 import Control.Monad
-import Control.Monad.Except (MonadError (..))
+import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
@@ -33,6 +35,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Ref
+import Data.Tagged
 import Data.Traversable
 import Data.Unifiable
 
@@ -97,8 +100,8 @@ freeze' = freezeBy $ Val.hoist $ \ case
   Ref _ -> Read
   Val x -> Pure x
 
-runEvalT :: Functor m => EvalT m a -> m a
-runEvalT = flip runReaderT mempty . evalWriterT
+runEvalT :: MonadVar m => EvalT m a -> m a
+runEvalT m = runReaderT (evalWriterT m) =<< newEnv
 
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
@@ -322,10 +325,11 @@ eval' e = case extract e of
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
 
-invokeIntrinsic :: Intrinsic ->
-                   MutVar m ->
-                   (Maybe (MutVar m) -> EvalT m ()) ->
-                   EvalT m ()
+invokeIntrinsic :: (MonadVerse m, Zippable f) =>
+                   Intrinsic ->
+                   Var m (Val f) ->
+                   (Maybe (Var m (Val f)) -> m ()) ->
+                   m ()
 invokeIntrinsic = \ case
   Intrinsic.Less -> liftOrd (<)
   Intrinsic.LessEqual -> liftOrd (<=)
@@ -336,105 +340,121 @@ invokeIntrinsic = \ case
   Intrinsic.Multiply -> liftNum (*)
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
-  Intrinsic.Float -> float
 
-liftOrd :: (MonadError Error m, MonadVerse m) =>
+liftOrd :: (MonadVerse m, Zippable f) =>
            (forall a . Ord a => a -> a -> Bool) ->
-           MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftOrd loc f var_x var_y = lift $ do
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    case (val_x, val_y) of
-      (Val.Int x, Val.Int y) ->
-        guard $ f x y
-      (Val.Int x, Val.Float y) ->
-        guard $ f (fromInteger x) y
-      (Val.Int x, Val.Rational y) ->
-        guard $ f (fromInteger x) y
-      (Val.Float x, Val.Int y) ->
-        guard $ f x (fromInteger y)
-      (Val.Float x, Val.Float y) ->
-        guard $ f x y
-      (Val.Float x, Val.Rational y) ->
-        guard $ f (toRational x) y
-      (Val.Rational x, Val.Int y) ->
-        guard $ f x (fromInteger y)
-      (Val.Rational x, Val.Float y) ->
-        guard $ f x (toRational y)
-      (Val.Rational x, Val.Rational y) ->
-        guard $ f x y
-  pure var_x
+           Var m (Val f) ->
+           (Maybe (Var m (Val f)) -> m ()) ->
+           m ()
+liftOrd f var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var_p <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var_p =<< case (val_x, val_y) of
+          (Val.Int x, Val.Int y) -> newVar . Tagged $ f x y
+          (Val.Int x, Val.Float y) -> newVar . Tagged $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) -> newVar . Tagged $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) -> newVar . Tagged $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) -> newVar . Tagged $ f x y
+          (Val.Float x, Val.Rational y) -> newVar . Tagged $ f (toRational x) y
+          (Val.Rational x, Val.Int y) -> newVar . Tagged $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) -> newVar . Tagged $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) -> newVar . Tagged $ f x y
+          _ -> empty
+      pure (var_x, var_p))
+  (\ (var_x, var_p) -> whenBound var_p $ \ val_p -> do
+      guard $ getTagged val_p
+      k $ Just var_x)
+  (k Nothing)
 
-liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
-           Loc ->
+liftNum :: (MonadVerse m, Zippable f) =>
            (forall a . Num a => a -> a -> a) ->
-           MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftNum loc f var_x var_y = lift $ do
-  var <- freshVar
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    unify var =<< case (val_x, val_y) of
-      (Val.Int x, Val.Int y) ->
-        newVar . Val.Int $ f x y
-      (Val.Int x, Val.Float y) ->
-        newVar . Val.Float $ f (fromInteger x) y
-      (Val.Int x, Val.Rational y) ->
-        newVar . Val.Rational $ f (fromInteger x) y
-      (Val.Float x, Val.Int y) ->
-        newVar . Val.Float $ f x (fromInteger y)
-      (Val.Float x, Val.Float y) ->
-        newVar . Val.Float $ f x y
-      (Val.Float x, Val.Rational y) ->
-        newVar . Val.Float $ fromRational $ f (toRational x) y
-      (Val.Rational x, Val.Int y) ->
-        newVar . Val.Rational $ f x (fromInteger y)
-      (Val.Rational x, Val.Float y) ->
-        newVar . Val.Float $ fromRational $ f x (toRational y)
-      (Val.Rational x, Val.Rational y) ->
-        newVar . Val.Rational $ f x y
-      _ -> throwDomainError loc
-  pure var
+           Var m (Val f) ->
+           (Maybe (Var m (Val f)) -> m ()) ->
+           m ()
+liftNum f var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var' <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var' =<< case (val_x, val_y) of
+          (Val.Int x, Val.Int y) ->
+            newVar . Val.Int $ f x y
+          (Val.Int x, Val.Float y) ->
+            newVar . Val.Float $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) ->
+            newVar . Val.Rational $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) ->
+            newVar . Val.Float $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) ->
+            newVar . Val.Float $ f x y
+          (Val.Float x, Val.Rational y) ->
+            newVar . Val.Float $ fromRational $ f (toRational x) y
+          (Val.Rational x, Val.Int y) ->
+            newVar . Val.Rational $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) ->
+            newVar . Val.Float $ fromRational $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) ->
+            newVar . Val.Rational $ f x y
+          _ -> empty
+      pure var')
+  (k . Just)
+  (k Nothing)
 
-div' :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
-        Loc ->
-        MutVar m -> MutVar m -> EvalT m (MutVar m)
-div' loc var_x var_y = lift $ do
-  var <- freshVar
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    unify var =<< case (val_x, val_y) of
-      (Val.Int _, Val.Int 0) ->
-        empty
-      (Val.Int x, Val.Int y) ->
-        newVar $ Val.Rational $ x % y
-      (Val.Int x, Val.Float y) ->
-        newVar $ Val.Float $ fromInteger x / y
-      (Val.Int x, Val.Rational y) ->
-        newVar $ Val.Rational $ fromInteger x / y
-      (Val.Float x, Val.Int y) ->
-        newVar $ Val.Float $ x / fromInteger y
-      (Val.Float x, Val.Float y) ->
-        newVar $ Val.Float $ x / y
-      (Val.Float x, Val.Rational y) ->
-        newVar $ Val.Float $ fromRational $ toRational x / y
-      (Val.Rational x, Val.Int y) ->
-        newVar $ Val.Rational $ x / fromInteger y
-      (Val.Rational x, Val.Float y) ->
-        newVar $ Val.Float $ fromRational $ x / toRational y
-      (Val.Rational _, Val.Rational 0) ->
-        empty
-      (Val.Rational x, Val.Rational y) ->
-        newVar $ Val.Rational $ x / y
-      _ -> throwDomainError loc
-  pure var
+div' :: (MonadVerse m, Zippable f) =>
+        Var m (Val f) ->
+        (Maybe (Var m (Val f)) -> m ()) ->
+        m ()
+div' var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var' <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var' =<< case (val_x, val_y) of
+          (Val.Int _, Val.Int 0) -> do
+            newVar $ Tagged Nothing
+          (Val.Int x, Val.Int y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Rational $ x % y
+          (Val.Int x, Val.Float y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Float $ fromInteger x / y
+          (Val.Int x, Val.Rational y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Rational $ fromInteger x / y
+          (Val.Float x, Val.Int y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Float $ x / fromInteger y
+          (Val.Float x, Val.Float y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Float $ x / y
+          (Val.Float x, Val.Rational y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Float $ fromRational $ toRational x / y
+          (Val.Rational x, Val.Int y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Rational $ x / fromInteger y
+          (Val.Rational x, Val.Float y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Float $ fromRational $ x / toRational y
+          (Val.Rational _, Val.Rational 0) ->
+            newVar $ Tagged Nothing
+          (Val.Rational x, Val.Rational y) ->
+            newVar . Tagged . Just <=< newVar $ Val.Rational $ x / y
+          _ -> empty
+      pure var')
+  (\ var -> whenBound var $ getTagged >>> \ case
+      Nothing -> empty
+      Just var -> k $ Just var)
+  (k Nothing)
 
-isInt :: ( MonadError Error m
-         , MonadVerse m
-         , EqRef (Lenient.Ref m)
-         ) => MutVar m -> EvalT m (MutVar m)
-isInt var_x = do
-  var <- freshVar
-  lift $ whenBound var_x $ \ case
-    Val.Int _ -> unify var var_x
-    _ -> empty
-  pure var
+int :: MonadVerse m => Var m (Val f) -> (Maybe (Var m (Val f)) -> m ()) -> m ()
+int var k = whenBound var $ \ case
+  Val.Int _ -> k $ Just var
+  Val.Rational x | denominator x == 1 -> k $ Just var
+  _ -> empty
 
 instSuper :: MonadEval m =>
              Loc ->
@@ -488,6 +508,23 @@ instClass' loc var_class f = whenBound' var_class $ \ case
         f var ys
     _ -> instClass' loc var_xs f
   _ -> throwDomainError loc
+
+newEnv :: MonadVar m => m (Env m)
+newEnv = execWriterT $ do
+  tell' "operator'<'" Intrinsic.Less
+  tell' "operator'<='" Intrinsic.LessEqual
+  tell' "operator'>'" Intrinsic.Greater
+  tell' "operator'>='" Intrinsic.GreaterEqual
+  tell' "operator'+'" Intrinsic.Plus
+  tell' "operator'-'" Intrinsic.Minus
+  tell' "operator'*'" Intrinsic.Multiply
+  tell' "operator'/'" Intrinsic.Divide
+  tell' "int" Intrinsic.Int
+  where
+    tell' x y =
+      tell . HashMap.singleton x . Val =<<
+      newVar . Val.Overloads (Overload.Intrinsic y) =<<
+      freshVar
 
 lookupName :: ( MonadVerse m
               , EqRef (Lenient.Ref m)
@@ -557,9 +594,11 @@ whenBound' :: ( Monoid w
               ) => Var m f -> (f (Var m f) -> WriterT w m ()) -> WriterT w m ()
 whenBound' x f = lift . whenBound x $ evalWriterT . f
 
-ifte'' :: ( Monoid w
-          , MonadVerse m
-          ) => WriterT w m a -> (a -> WriterT w m ()) -> WriterT w m () -> WriterT w m ()
+ifte'' :: (Monoid w, MonadVerse m) =>
+          WriterT w m a ->
+          (a -> WriterT w m ()) ->
+          WriterT w m () ->
+          WriterT w m ()
 ifte'' p t e = lift $ ifte' (evalWriterT p) (evalWriterT . t) (evalWriterT e)
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a

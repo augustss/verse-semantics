@@ -34,6 +34,7 @@ library
     Control.Monad.Verse.Class
     Data.Fix
     Data.Ref
+    Data.Tagged
     Data.Unifiable
     Language.Verse
     Language.Verse.Desugar
