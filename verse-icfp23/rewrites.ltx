@@ -163,18 +163,16 @@
 %       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
-      \text{Scope contexts} & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+                            & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
       
   \iffullverse
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
       \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
-      \vb |one e| \vb |all e|
-      %%% NOTE: the following is not in the POPL submission,
-      %%% but needed to make progress in (1,2)[x:int]
-      \vb |apply1 op v| \\
-      & \multicolumn{3}{l}{\lennart{\text{Should we modify |ce| so it's a subset of |e|?  Currently |eu| ruins that.}}}
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceu ; ce|
+                                     \vb |one e| \vb |all e|
+                                     \vb |apply1 op v| \\
+                               & ceu & ::= & |ce| \vb |v == ce| \\
     \end{array}
      $$
     \caption{The syntax of contexts}
