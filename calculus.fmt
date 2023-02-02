@@ -176,12 +176,15 @@
 %format read = "\textbf{read}"
 %format write = "\textbf{write}"
 %format any = "\textbf{any}"
-%format dots = "\cdots"
+%format dots = "\ldots"
 %format tdots = "\!\!\!\cdots\!\!\!"
 %format emp = "\epsilon"
 %format plus = "\oplus"
 %format hole = "\hole"
+
+%% Unification
 %format == = "="
+
 % format := = "\mapsto"
 %format ; = ";\,"
 %format csp = ",\,"  %% Comma with space
