@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP) where
+module Rules.ICFP(allSystemsICFP, isRecursive) where
 import Control.Monad( guard )
 import Data.List
 
@@ -10,6 +10,9 @@ import TRS.System
 import TRS.TRS
 import Rules.Core
 --import Debug.Trace
+
+isRecursive :: Expr -> Bool
+isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 --------------------------------------------------------------------------------
 
