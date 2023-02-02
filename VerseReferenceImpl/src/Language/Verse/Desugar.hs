@@ -165,7 +165,9 @@ desugar' e = for e $ \ case
   Parse.PrefixColon e -> do
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
-    pure $ Invoke e e_i
+    ask <&> \ case
+      False -> Invoke e e_i
+      True -> (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
     tellName x False
     let e1 = Name . Pure <$> x

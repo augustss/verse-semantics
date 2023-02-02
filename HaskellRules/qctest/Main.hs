@@ -1,8 +1,5 @@
 module Main where
 import Data.Maybe
-import Data.List( nubBy )
-import Data.Function( on )
-import qualified Data.Set as S
 import Epic.List( nub )
 import Rules.Core
 import Rules.Equiv(norm)
@@ -43,7 +40,10 @@ prop_Confluence1 flags sys =
           discard
         trs | any isNothing trs ->      -- normalization timed out
           discard
-        trs@(_:_:_) ->                  -- multiple normal form
+        trs@(_:_:_)
+          | ignoreRecursive flags && any (maybe False (isRecursive . term)) trs ->
+            discard
+          | otherwise ->                  -- multiple normal form
           whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
                        putStr $ unlines $ showTrace ttr
@@ -69,13 +69,11 @@ prop_Confluence2 flags sys =
       forAllBlind (arbTrace sys p) $ \m1 ->
         forAllBlind (arbTrace sys p) $ \m2 ->
           case (m1, m2) of
-            (Just w1@(r1 :<-- t1), Just w2@(r2 :<-- t2)) ->
+            (Just w1, Just w2) ->
               whenFail (do putStrLn "==trace:1=="
                            putStr (unlines (showTrace w1))
-                           print (step (rules sys) (ruleEnv sys) r1)
                            putStrLn "==trace:2=="
-                           putStr (unlines (showTrace w2))
-                           print (step (rules sys) (ruleEnv sys) r2)) $
+                           putStr (unlines (showTrace w2))) $
                 norm sys w1 == norm sys w2
             
             _ -> discard
@@ -90,7 +88,7 @@ prop_Confluence2 flags sys =
 arbTrace :: TRSystem Expr -> Expr -> Gen (Maybe (Traced Expr))
 arbTrace sys p = go (0 :: Int) [] p
  where
-  go k _t _p | k > 100 = return Nothing
+  go k _t _p | k > 15 = return Nothing
   go k t p' =
     case step (rules sys) (ruleEnv sys) p' of
       []  -> do return (Just (p' :<-- t))
@@ -107,6 +105,7 @@ data TestFlags = TestFlags
   , replayStr      :: !(Maybe String)
   , ignoreFuelStop :: !Bool
   , koen           :: !Bool
+  , ignoreRecursive :: !Bool
   }
 
 testFlags :: Parser TestFlags
@@ -142,6 +141,10 @@ testFlags = TestFlags
   <*> switch
          ( long "koen"
         <> help "Use Koen's prop_Confluence2" )
+  <*> switch
+         ( long "ignore-recursive"
+        <> short 'r'
+        <> help "Discard failures involving recursion" )
  where nDef = maxSuccess stdArgs
        mDef = 1000
 

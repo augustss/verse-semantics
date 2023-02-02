@@ -65,7 +65,8 @@ library rules
                       Rules.Equiv
                       Rules.Systems
     -- The actual rules are not exposed, they are summarized in Rules.Systems
-    other-modules:    Rules.PLDI
+    other-modules:    Rules.ICFP
+                      Rules.PLDI
                       Rules.POPL
                       Rules.KoenNaive
                       Rules.Block

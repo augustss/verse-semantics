@@ -497,27 +497,28 @@ instance Arbitrary Expr where
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
   frequency $
-  [ (1, Var <$> elements xs) | not (null xs) ] ++
+  [ (length xs, Var <$> elements xs) ] ++
   [ (1, Int <$> arbitrary)
   , (1, Op  <$> arbitrary)
-  , (n, Arr <$> do k <- choose (0,5)
-                   sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
-  , (n, Lam <$> arbBind n1 xs)
-  , (1, return Fail) -- maybe not have this?
-  , (n, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (n, Exi <$> arbBind n1 xs)
-  , (n, One <$> arbExpr n1 xs)
-  , (n, All <$> arbExpr n1 xs)
+  , (1, return Fail)
+  , (rv, Arr <$> do k <- choose (0,5)
+                    sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
+  , (ri, Lam <$> arbBind n1 xs)
+  , (ri, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (ri, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (ri, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (rv, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+  , (ri, Exi <$> arbBind n1 xs)
+  , (rv, One <$> arbExpr n1 xs)
+  , (rv, All <$> arbExpr n1 xs)
   -- Don't generate Block, the anf-ing will do that.
   -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
   ]
  where
   n1 = n-1
   n2 = n `div` 2
-  -- n3 = n `div` 3
+  ri = 6 `min` n
+  rv = 2 `min` n
 
 arbBind :: Int -> [Ident] -> Gen (Bind Expr)
 arbBind n xs =
