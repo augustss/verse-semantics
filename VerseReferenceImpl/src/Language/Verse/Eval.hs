@@ -39,24 +39,14 @@ import Data.Unifiable
 import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
+import Language.Verse.Intrinsic (Intrinsic)
+import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
-import Language.Verse.Desugar.Exp (Exp ( (:*>:)
-                                       , (:=:)
-                                       , (:.:)
-                                       , (:..:)
-                                       , (:<:)
-                                       , (:<=:)
-                                       , (:>:)
-                                       , (:>=:)
-                                       , (:|:)
-                                       , (:+:)
-                                       , (:-:)
-                                       , (:*:)
-                                       , (:/:)
-                                       ))
+import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:..:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
-import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
+import Language.Verse.Name
+import Language.Verse.Overload qualified as Overload
 import Language.Verse.Val (Val)
 import Language.Verse.Val qualified as Val
 
@@ -164,40 +154,8 @@ eval' e = case extract e of
         _ -> throwDomainError $ loc e2
       _ -> throwDomainError $ loc e1
     pure var
-  e1 :<: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (<) var1 var2
-  e1 :<=: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (<=) var1 var2
-  e1 :>: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (>) var1 var2
-  e1 :>=: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (>=) var1 var2
   e1 :|: e2 ->
     eval' e1 <|> eval' e2
-  e1 :+: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (+) var1 var2
-  e1 :-: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (-) var1 var2
-  e1 :*: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (*) var1 var2
-  e1 :/: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    div' (loc e) var1 var2
   Exp.Fail ->
     empty
   Exp.One e -> do
@@ -224,11 +182,11 @@ eval' e = case extract e of
     newVar . Val.Module i $ fromIdents xs
   Exp.Struct i xs e -> do
     env <- ask
-    newVar . Val.Overloads (Val.Struct i env xs e) =<< freshVar
+    newVar . Val.Overloads (Overload.Struct i env xs e) =<< freshVar
   Exp.Class i e_super xs e -> do
     env <- ask
     var_super <- for e_super eval'
-    newVar . Val.Overloads (Val.Class i env var_super xs e) =<< freshVar
+    newVar . Val.Overloads (Overload.Class i env var_super xs e) =<< freshVar
   Exp.Inst e1 xs e2 -> do
     var1 <- eval' e1
     xs <- for xs freshNamed
@@ -237,11 +195,7 @@ eval' e = case extract e of
     var <- freshVar
     whenBound' var1 $ \ case
       Val.Overloads x var_xs -> fix (\ recur x var_xs -> case x of
-        Val.Function {} ->
-          whenBound' var_xs $ \ case
-            Val.Overloads x var_xs -> recur x var_xs
-            _ -> throwDomainError $ loc e
-        Val.Struct i env ys e -> do
+        Overload.Struct i env ys e -> do
           ys <- for ys freshNamed
           defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
           let ys' = fromIdents ys
@@ -251,7 +205,7 @@ eval' e = case extract e of
           for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
             unify var =<< local (const env) (eval' e)
           unify var =<< newVar (Val.StructInst i ys')
-        Val.Class i env var_super ys e ->
+        Overload.Class i env var_super ys e ->
           instSuper (loc e) var_super xs' $ \ var_super defs_super ys_super -> do
             ys <- (ys_super <>) <$> for (ys \\ ys_super) freshNamed
             defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
@@ -261,7 +215,10 @@ eval' e = case extract e of
             let defs' = fromIdents $ defs <> defs_super
             for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
               unify var =<< local (const env) (eval' e)
-            unify var =<< newVar (Val.ClassInst i var_super ys')) x var_xs
+            unify var =<< newVar (Val.ClassInst i var_super ys')
+        _ -> whenBound' var_xs $ \ case
+          Val.Overloads x var_xs -> recur x var_xs
+          _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do
@@ -300,7 +257,7 @@ eval' e = case extract e of
   Exp.Function xs e1 e2 -> do
     i <- supply
     env <- ask
-    newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
+    newVar . Val.Overloads (Overload.Function i env xs e1 e2) =<< freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -312,7 +269,7 @@ eval' e = case extract e of
         empty
         (zip xs [0 ..])
       Val.Overloads x var_xs -> fix (\ recur x var_xs -> case x of
-        Val.Function _ env xs e_arg e ->
+        Overload.Function _ env xs e_arg e ->
           ifte'
           (evalWriterT $ do
               xs <- for xs freshNamed
@@ -323,12 +280,12 @@ eval' e = case extract e of
           whenBound var_xs $ \ case
             Val.Overloads x var_xs -> recur x var_xs
             _ -> throwDomainError $ loc e
-        Val.Struct i env xs e -> evalWriterT $ do
+        Overload.Struct i env xs e -> evalWriterT $ do
           unify var var2
           xs <- for xs freshNamed
           _ <- local (const $ xs <> env) . lift . evalWriterT $ eval' e
           unify var2 =<< newVar (Val.StructInst i $ fromIdents xs)
-        Val.Class i env var_super xs e -> do
+        Overload.Class i env var_super xs e -> do
           unify var var2
           fix (\ recur var2 -> do
             whenBound var2 $ \ case
@@ -340,6 +297,11 @@ eval' e = case extract e of
                     unify var2 =<< newVar (Val.ClassInst i var_super $ fromIdents xs)
                 | Just var2 <- var_super' -> recur var2
               _ -> empty) var2
+        Overload.Intrinsic x -> invokeIntrinsic x var2 $ \ case
+          Just var' -> unify var var'
+          Nothing -> whenBound var_xs $ \ case
+            Val.Overloads x var_xs -> recur x var_xs
+            _ -> throwDomainError $ loc e
           ) x var_xs
       _ -> throwDomainError $ loc e
     pure var
@@ -359,11 +321,24 @@ eval' e = case extract e of
     env <- ask
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
-  Exp.IsInt e ->
-    isInt =<< eval' e
+
+invokeIntrinsic :: Intrinsic ->
+                   MutVar m ->
+                   (Maybe (MutVar m) -> EvalT m ()) ->
+                   EvalT m ()
+invokeIntrinsic = \ case
+  Intrinsic.Less -> liftOrd (<)
+  Intrinsic.LessEqual -> liftOrd (<=)
+  Intrinsic.Greater -> liftOrd (>)
+  Intrinsic.GreaterEqual -> liftOrd (>=)
+  Intrinsic.Plus -> liftNum (+)
+  Intrinsic.Minus -> liftNum (-)
+  Intrinsic.Multiply -> liftNum (*)
+  Intrinsic.Divide -> div'
+  Intrinsic.Int -> int
+  Intrinsic.Float -> float
 
 liftOrd :: (MonadError Error m, MonadVerse m) =>
-           Loc ->
            (forall a . Ord a => a -> a -> Bool) ->
            MutVar m -> MutVar m -> EvalT m (MutVar m)
 liftOrd loc f var_x var_y = lift $ do
@@ -387,7 +362,6 @@ liftOrd loc f var_x var_y = lift $ do
         guard $ f x (toRational y)
       (Val.Rational x, Val.Rational y) ->
         guard $ f x y
-      _ -> throwDomainError loc
   pure var_x
 
 liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
@@ -487,7 +461,7 @@ instClass :: MonadEval m =>
              EvalT m ()
 instClass loc var_class xs f = whenBound' var_class $ \ case
   Val.Overloads x var_xs -> case x of
-    Val.Class i env var_super ys e ->
+    Overload.Class i env var_super ys e ->
       instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
         ys <- (ys_super <>) <$> for ys freshNamed
         defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
@@ -506,7 +480,7 @@ instClass' :: MonadEval m =>
               EvalT m ()
 instClass' loc var_class f = whenBound' var_class $ \ case
   Val.Overloads x var_xs -> case x of
-    Val.Class i env var_super ys e ->
+    Overload.Class i env var_super ys e ->
       instSuper' loc var_super $ \ var_super ys_super -> do
         ys <- (ys_super <>) <$> for ys freshNamed
         _ <- local (const $ ys <> env) . lift . evalWriterT $ eval' e

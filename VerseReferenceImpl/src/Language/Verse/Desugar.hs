@@ -189,8 +189,6 @@ desugar' e = for e $ \ case
     ask >>= \ case
       False -> desugar' e <&> ((Name <$> x') :=:)
       True -> local (const False) (desugar' e) <&> Default x' (Name <$> x')
-  Parse.IsInt e ->
-    IsInt <$> desugar' e
 
 getIdent :: L (Parse.Exp L Name) -> Desugar (L (Ident Name))
 getIdent e = case extract e of

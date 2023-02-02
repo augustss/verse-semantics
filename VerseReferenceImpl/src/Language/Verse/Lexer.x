@@ -178,7 +178,6 @@ $space = [\ \t]
   "false" { token Token.False }
   "for" { token Token.For }
   "if" { token Token.If }
-  "isInt" { token Token.IsInt }
   "module" { token Token.Module }
   "not" { token Token.Not }
   "one" { token Token.One }

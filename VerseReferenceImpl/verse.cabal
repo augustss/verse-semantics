@@ -42,10 +42,12 @@ library
     Language.Verse.Eval
     Language.Verse.Ident
     Language.Verse.Indent
+    Language.Verse.Intrinsic
     Language.Verse.Label
     Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Name
+    Language.Verse.Overload
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos

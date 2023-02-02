@@ -14,15 +14,7 @@ data Exp f a
   | f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :.: !Name
   | f (Exp f a) :..: f (Exp f a)
-  | f (Exp f a) :<: f (Exp f a)
-  | f (Exp f a) :<=: f (Exp f a)
-  | f (Exp f a) :>: f (Exp f a)
-  | f (Exp f a) :>=: f (Exp f a)
   | f (Exp f a) :|: f (Exp f a)
-  | f (Exp f a) :+: f (Exp f a)
-  | f (Exp f a) :-: f (Exp f a)
-  | f (Exp f a) :*: f (Exp f a)
-  | f (Exp f a) :/: f (Exp f a)
   | Fail
   | One (f (Exp f a))
   | All (f (Exp f a))
@@ -45,6 +37,5 @@ data Exp f a
   | Float Double
   | Name a
   | Default (f a) (f (Exp f a)) (f (Exp f a))
-  | IsInt (f (Exp f a))
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)

@@ -62,7 +62,6 @@ data Token
   | All
   | One
   | Not
-  | IsInt
   | Int Integer
   | Float Rational
   | Name Name
@@ -120,7 +119,6 @@ instance Pretty Token where
     All -> "all"
     One -> "one"
     Not -> "not"
-    IsInt -> "isInt"
     Int x -> pretty x
     Float x -> pretty (fromRational x :: Double)
     Name x -> pretty x
