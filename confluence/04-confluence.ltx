@@ -56,6 +56,27 @@ Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 
 \section{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
+\begin{lemma}[Disjoint] \label{lem:disjoint}
+Let $e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots$
+be an expression with two \emph{disjoint} reducts
+$\rdx{1}$ and $\rdx{2}$.
+%
+If $\rstep{}{e}{\ldots \rdx{1}' \ldots \rdx{2} \ldots \equiv e_1}$ and
+   $\rstep{}{e}{\ldots \rdx{1} \ldots \rdx{2}' \ldots \equiv e_2}$
+then there exists $e'$ such that
+		$\rstep{}{e_1}{e'}$ and
+		$\rstep{}{e_2}{e'}$.
+\end{lemma}
+
+\begin{proof}
+Trivial.
+\end{proof}
+
+In the rest of the proof, the above \cref{lem:disjoint} lemma
+allows us to focus our attention on the cases where one reduct
+\emph{occurs under} the other and vice versa.
+
+
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
@@ -94,8 +115,41 @@ then there exists $\rdx{\rapp}''$ such that
 \end{description}
 \end{proof}
 
-\ranjit{CURSOR:HEREHEREHEREHEREHERE}
+\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+%
+Let $\rr' \equiv \rr - \rulename{subst}$.
+%
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rstep{}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\rapp}{E[\rdx{}']}{\rdx{\runi}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzEsMSwiXFxyZHh7XFxydW5pfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDMsIlxccnInIl0sWzMsMiwiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMiwiXFxyciciLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\rdx{\runi} \equiv E[\rdx{}]} & {E[\rdx{}']} \\
+	{\rdx{\runi}'} & {\rdx{\runi}''}
+	\arrow["\runi"', from=1-1, to=2-1]
+	\arrow["{\rr'}", from=1-1, to=1-2]
+	\arrow["\runi", dotted, from=1-2, to=2-2]
+	\arrow["{\rr'}"', dotted, from=2-1, to=2-2]
+\end{tikzcd}\]
+\end{lemma}
 
+\begin{proof}
+Split cases on the rule used in $\runi$.
+\begin{description}
+\item[Case:] \rulename{subst} Here, $\rdx{\runi} \equiv X[x=v]
+\item[Case:] \rulename{swap}
+\item[Case:] \rulename{var-swap}
+\item[Case:] \rulename{u-lit}
+\item[Case:] \rulename{u-tup}
+\item[Case:] \rulename{u-fail}
+\item[Case:] \rulename{u-occurs}
+\end{description}
+\end{proof}
+
+\ranjit{CURSOR:HEREHEREHEREHEREHERE}
 
 % \begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
 % \begin{itemize}
