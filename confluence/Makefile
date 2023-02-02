@@ -13,6 +13,9 @@ pdf: $(PAPERSRC)
 %.tex:   %.ltx   ../calculus.fmt
 	lhs2TeX $< > $@
 
+../verse-icfp23/rewrites.tex: ../verse-icfp23/rewrites.ltx
+	(cd ../verse-icfp23; make rewrites.tex)
+
 # Fake targets
 ##############
 clean:
