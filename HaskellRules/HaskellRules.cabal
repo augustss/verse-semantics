@@ -18,7 +18,7 @@ common shared-properties
 
 -- Various utilities.
 -- Should really have its own cabal project
-library epic
+library all
     import:           shared-properties
     exposed-modules:  Epic.Applicative
 --                      Epic.Lens
@@ -30,23 +30,7 @@ library epic
                       Epic.SIntSet
                       Epic.String
                       Epic.Uniplate
-    build-depends:
-                      parser-combinators,
---                      lens,
-                      text,
-                      uniplate,
-    hs-source-dirs:   epic
-
---library densem
---    import:           shared-properties
---    build-depends:    epic,
---    exposed-modules:  DenSem.DenSem
---    hs-source-dirs:   densem
-
-library trs
-    import:           shared-properties
-    build-depends:    epic
-    exposed-modules:  TRS.Bind
+                      TRS.Bind
                       TRS.Graph
                       TRS.NormalForm
                       TRS.System
@@ -54,36 +38,9 @@ library trs
                       TRS.TRS
                       TRS.TRSGraph
                       TRS.Traced
-    hs-source-dirs:   trs
-
-library rules
-    import:           shared-properties
-    build-depends:    epic,
-                      trs,
-                      QuickCheck
-    exposed-modules:  Rules.Core
+                      Rules.Core
                       Rules.Equiv
                       Rules.Systems
-    -- The actual rules are not exposed, they are summarized in Rules.Systems
-    other-modules:    Rules.ICFP
-                      Rules.PLDI
-                      Rules.POPL
-                      Rules.KoenNaive
-                      Rules.Block
-    hs-source-dirs:   rules
-
-library frontend
-    import:           shared-properties
-    build-depends:    epic,
-                      rules,
-                      trs,
---                      verse,
-                      megaparsec,
-                      scientific,
-                      text,
-                      transformers,
-                      unordered-containers,
-    exposed-modules:
                       FrontEnd.Core
                       FrontEnd.CoreSimp
                       FrontEnd.Error
@@ -95,16 +52,28 @@ library frontend
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
-
-    hs-source-dirs:   frontend
+                      --DenSem.DenSem
+    other-modules:    Rules.ICFP
+                      Rules.PLDI
+                      Rules.POPL
+                      Rules.KoenNaive
+                      Rules.Block
+    build-depends:
+                      parser-combinators,
+--                      lens,
+                      text,
+                      uniplate,
+                      QuickCheck,
+                      megaparsec,
+                      scientific,
+                      text,
+                      transformers,
+                      unordered-containers,
+    hs-source-dirs:   .
 
 executable verse
     import:           shared-properties
-    build-depends:    epic,
---                      densem,
-                      frontend,
-                      rules,
-                      trs,
+    build-depends:    all,
                       haskeline,
                       optparse-applicative,
 
@@ -118,10 +87,7 @@ executable verse
 
 executable tester
     import:           shared-properties
-    build-depends:    epic,
---                      densem,
-                      frontend,
-                      rules,
+    build-depends:    all,
                       megaparsec,
                       optparse-applicative,
 
@@ -132,9 +98,7 @@ executable tester
 
 executable qctest
     import:           shared-properties
-    build-depends:    epic,
-                      rules,
-                      trs,
+    build-depends:    all,
                       optparse-applicative,
                       QuickCheck,
 
@@ -145,8 +109,7 @@ executable qctest
 
 executable timtest
     import:           shared-properties
-    build-depends:    epic,
-                      frontend,
+    build-depends:    all,
                       optparse-applicative,
 
     main-is:          Main.hs
