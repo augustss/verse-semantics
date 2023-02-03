@@ -1136,11 +1136,13 @@ when its condition mentions |x| which is not yet defined?  But in fact, rule \ru
 us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
 $$
 \begin{array}{l@@{\;}l}
-                                & |def x (x = if (x=0; x>1) then 33 else 55)| \\
-\movestoR{deref-s}              & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
-\movestoR{u-fail,fail-seql}     & |def x (x = if fail then 33 else 55)|\\
-\movestoC{\text{simplify |if|}} & |def x (x = 55)| \\
-\movestoR{elim-def}            & |55|
+                                & |def x (x = if (x=0; x>1) then 33 else 55; x)| \\
+\movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55; x)| \\
+\movestoR{u-fail,fail}          & |def x (x = if fail then 33 else 55; x)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
+\movestoR{subst}                & |def x (x = 55; 55)| \\
+\movestoR{exi-eliml}            & |55| \\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
