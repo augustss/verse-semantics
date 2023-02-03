@@ -103,12 +103,12 @@ instance ( MonadFix m
             union' (\ _ _ -> Unbound f level_x) x y
           (True, False) -> do
             link set_y set_x
-            f_y' <- toListener =<< readRef' f_y
-            lift $ modifyRef f_x $ flip (liftA2 (*>)) f_y'
-          (False, True) -> do
-            link set_x set_y
             f_x' <- toListener =<< readRef' f_x
             lift $ modifyRef f_y $ flip (liftA2 (*>)) f_x'
+          (False, True) -> do
+            link set_x set_y
+            f_y' <- toListener =<< readRef' f_y
+            lift $ modifyRef f_x $ flip (liftA2 (*>)) f_y'
           (False, False) ->
             whenBound var_x $ \ val_x ->
             whenBound var_y $ \ val_y ->
