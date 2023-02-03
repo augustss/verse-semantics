@@ -170,6 +170,9 @@ scopeX lhs =
  ++
   do All hole <- [lhs]
      choices All hole
+ ++
+  do Split hole f g <- [lhs]
+     choices (\ e -> Split e f g) hole
  where
   choices ctx e =
     (ctx,e) : case e of
@@ -206,7 +209,7 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op && not (isStoreOp op)
---isChoiceFree Split{}   = True  -- XXX is it?
+isChoiceFree Split{}   = True  -- XXX This isn't true!!
 isChoiceFree Wrong     = True
 isChoiceFree (EXI _ e) = isChoiceFree e
 isChoiceFree _         = False
@@ -253,6 +256,8 @@ allRules =  rulesApplication
          <> rulesNormalization
          <> rulesSpeculation
          <> rulesFail
+         -- SPLIT rules only trigger in case of a SPLIT
+         <> rulesSplit
 
 --------------------------------------------------------------------------------
 
@@ -543,6 +548,28 @@ rulesFail _ lhs =
   "FAIL" `name`
   do (_cx, Fail) <- execX1 lhs
      pure Fail
+
+--------------------------------------------------------------------------------
+
+rulesSplit :: ERule
+rulesSplit _ lhs =
+  "SPLIT-FAIL" `name`
+  do Split Fail f _g <- [lhs]
+     pure (f :@: unit)
+ ++
+  "SPLIT-CHOICE" `name`
+  do Split (Val v :|: e) _f g <- [lhs]
+     let x:h:_ = identsNotIn (free lhs)
+         gv = Var h :=: (g :@: v)
+         hlam = Var h :@: LAM x e
+     pure (EXI h (gv :>: hlam))
+ ++
+  "SPLIT-VALUE" `name`
+  do Split (Val v) _f g <- [lhs]
+     let x:h:_ = identsNotIn (free lhs)
+         gv = Var h :=: (g :@: v)
+         hlam = Var h :@: LAM x Fail
+     pure (EXI h (gv :>: hlam))
 
 --------------------------------------------------------------------------------
 
