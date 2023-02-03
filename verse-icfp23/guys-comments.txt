@@ -204,23 +204,30 @@ DONE
 
 line 296: I suggest using the word "produces" rather than "returns"; the word "return" is usually used in conjunction with procedures, but "one{e}" is a special construct.
 
+CHECK: I used "yield"; but said that it "returns" e2 or e3, because you can only yield a sequence of values.
+Saying "yeilds whatever e2 yields" seems clumsy.
 
 
 line 300: This sentence is flat-out wrong— as indicated at the start of the next sentence—so I recommend warning the reader by starting this sentence with "It would seem that" and replace the semicolon with ", but" to indicate that this warning applies to the entire sentence.
 
+CHECK: I redrafted.
+
 
 line 302: Set "then" and "else" in boldface. Also, I can't resist commenting that this wrapping of the "then" and "else" parts in thunks seems vaguely familiar. :-)  See https://dspace.mit.edu/handle/1721.1/6913, page 54 (page 64 of the PDF file).
 
+DONE: I acced a citation.
 
 line 304: You need to say here that "x" is fresh. Alternatively, you could use the lambda desugaring rule (see footnote 4) with an empty tuple to avoid the need for a fresh variable here (the desugaring rule will choose the fresh variable for you):
 
     (one{(e_1; \lambda<>.e_2) | \lambda<>.e_3}<>
 
+DONE
 
 lines 305–306: The explanation in this sentence is a bit muddled; in particular, the referent of "that lambda" is clear as mud. Here is a suggested rewrite:
 
 The argument of **one** reduces to either (\lambda x.e_2) | (\lambda x.e_3) or \lambda x.e_3 depending on whether e_1 succeeds or fails, respectively; one then picks the first value (\lambda x.e_2 if e_1 succeeded, \lambda x.e_3 if e_1 failed) and applies it to <>. 
 
+DONE
 
 line 315: "Indexing out of range is fail." What happens if the index is not an integer? I am guessing that it is fail if the index is an op or a lambda expression or a tuple; it gets stuck if it is a variable that has not yet been unified with a value; it (eventually) reduces to the integer case if the index is a variable that has been unified with an integer; it (eventually) reduces to fail if the index is a variable that has been unified with an op or a lambda expression or a tuple. (Now I look ahead to the definition of rewrite rule APP-TUP on line 462, and I _think_ my prose description is consistent with that, possibly with a few more occurrences of "eventually".)
 
