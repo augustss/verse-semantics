@@ -69,7 +69,7 @@ library all
                       text,
                       transformers,
                       unordered-containers,
-    hs-source-dirs:   epic trs rules frontend
+    hs-source-dirs:   .
 
 executable verse
     import:           shared-properties
