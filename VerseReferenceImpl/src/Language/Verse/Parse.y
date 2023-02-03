@@ -106,7 +106,6 @@ import Language.Verse.Token qualified as Token
   if { L _ Token.If }
   ind { L _ Token.Indent }
   int { (int -> Just $$) }
-  isInt { L _ Token.IsInt }
   module { L _ Token.Module }
   name { (name -> Just $$) }
   newline { L _ Token.Newline }
@@ -297,9 +296,6 @@ Exp :: { L (Exp L Name) }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
-  | isInt Paren {
-      Exp.IsInt <\$ $1 <.> duplicate $2
-    }
 
 If :: { L (Exp L Name) }
   : if Block %prec IF {

@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Desugar
   ( desugar
@@ -54,23 +55,27 @@ desugar' e = for e $ \ case
   (Parse.:..:) e1 e2 ->
     (:..:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<:) e1 e2 ->
-    (:<:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'<'" e1 e2
   (Parse.:<=:) e1 e2 ->
-    (:<=:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'<='" e1 e2
   (Parse.:>:) e1 e2 ->
-    (:>:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'>'" e1 e2
   (Parse.:>=:) e1 e2 ->
-    (:>=:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'>='" e1 e2
   (Parse.:|:) e1 e2 ->
     (:|:) <$> desugar' e1 <*> desugar' e2
   (Parse.:+:) e1 e2 ->
-    (:+:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'+'" e1 e2
+  Parse.PrefixPlus e ->
+    desugarOperator1 "prefix'+'" e
   (Parse.:-:) e1 e2 ->
-    (:-:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'-'" e1 e2
+  Parse.PrefixMinus e ->
+    desugarOperator1 "prefix'-'" e
   (Parse.:*:) e1 e2 ->
-    (:*:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'*'" e1 e2
   (Parse.:/:) e1 e2 ->
-    (:/:) <$> desugar' e1 <*> desugar' e2
+    desugarOperator2 "operator'/'" e1 e2
   Parse.List [] ->
     pure $ Tuple []
   Parse.List (e:es) -> extract <$> do
@@ -189,8 +194,21 @@ desugar' e = for e $ \ case
     ask >>= \ case
       False -> desugar' e <&> ((Name <$> x') :=:)
       True -> local (const False) (desugar' e) <&> Default x' (Name <$> x')
-  Parse.IsInt e ->
-    IsInt <$> desugar' e
+
+desugarOperator1 :: Name ->
+                    L (Parse.Exp L Name) ->
+                    Desugar (Exp L (Ident Name))
+desugarOperator1 x e =
+  desugar' e <&> \ e ->
+  Invoke (Name (Pure x) <$ e) e
+
+desugarOperator2 :: Name ->
+                    L (Parse.Exp L Name) ->
+                    L (Parse.Exp L Name) ->
+                    Desugar (Exp L (Ident Name))
+desugarOperator2 x e1 e2 =
+  (,) <$> desugar' e1 <*> desugar' e2 <&> \ (e1, e2) ->
+  Invoke (Name (Pure x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
 
 getIdent :: L (Parse.Exp L Name) -> Desugar (L (Ident Name))
 getIdent e = case extract e of

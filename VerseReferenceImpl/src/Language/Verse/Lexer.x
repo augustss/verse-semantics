@@ -38,6 +38,7 @@ $alpha = [A-Za-z\_]
 $alnum = [A-Za-z\_0-9]
 $space = [\ \t]
 @newline = (\r \n?) | \n
+@operator = ([\x20-\x7E] # [\# \\ \{ \} \" \'])*
 
 :-
 <0, nested, maybeNesting, indCmt> {
@@ -178,7 +179,6 @@ $space = [\ \t]
   "false" { token Token.False }
   "for" { token Token.For }
   "if" { token Token.If }
-  "isInt" { token Token.IsInt }
   "module" { token Token.Module }
   "not" { token Token.Not }
   "one" { token Token.One }
@@ -190,7 +190,7 @@ $space = [\ \t]
   "var" { token Token.Var }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
-  $alpha $alnum* { name }
+  $alpha $alnum* ("'" @operator "'")? { name }
 }
 
 {

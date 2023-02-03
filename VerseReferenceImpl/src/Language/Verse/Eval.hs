@@ -5,6 +5,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Eval
@@ -13,9 +14,10 @@ module Language.Verse.Eval
   ) where
 
 import Control.Applicative
+import Control.Category ((>>>))
 import Control.Comonad
 import Control.Monad
-import Control.Monad.Except (MonadError (..))
+import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
@@ -39,24 +41,14 @@ import Data.Unifiable
 import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
+import Language.Verse.Intrinsic (Intrinsic)
+import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
-import Language.Verse.Desugar.Exp (Exp ( (:*>:)
-                                       , (:=:)
-                                       , (:.:)
-                                       , (:..:)
-                                       , (:<:)
-                                       , (:<=:)
-                                       , (:>:)
-                                       , (:>=:)
-                                       , (:|:)
-                                       , (:+:)
-                                       , (:-:)
-                                       , (:*:)
-                                       , (:/:)
-                                       ))
+import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:..:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
-import Language.Verse.Name
 import Language.Verse.Loc (Loc, L, loc)
+import Language.Verse.Name
+import Language.Verse.Overload qualified as Overload
 import Language.Verse.Val (Val)
 import Language.Verse.Val qualified as Val
 
@@ -107,8 +99,8 @@ freeze' = freezeBy $ Val.hoist $ \ case
   Ref _ -> Read
   Val x -> Pure x
 
-runEvalT :: Functor m => EvalT m a -> m a
-runEvalT = flip runReaderT mempty . evalWriterT
+runEvalT :: MonadVar m => EvalT m a -> m a
+runEvalT m = runReaderT (evalWriterT m) =<< newEnv
 
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
@@ -164,40 +156,8 @@ eval' e = case extract e of
         _ -> throwDomainError $ loc e2
       _ -> throwDomainError $ loc e1
     pure var
-  e1 :<: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (<) var1 var2
-  e1 :<=: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (<=) var1 var2
-  e1 :>: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (>) var1 var2
-  e1 :>=: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftOrd (loc e) (>=) var1 var2
   e1 :|: e2 ->
     eval' e1 <|> eval' e2
-  e1 :+: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (+) var1 var2
-  e1 :-: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (-) var1 var2
-  e1 :*: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    liftNum (loc e) (*) var1 var2
-  e1 :/: e2 -> do
-    var1 <- eval' e1
-    var2 <- eval' e2
-    div' (loc e) var1 var2
   Exp.Fail ->
     empty
   Exp.One e -> do
@@ -224,11 +184,11 @@ eval' e = case extract e of
     newVar . Val.Module i $ fromIdents xs
   Exp.Struct i xs e -> do
     env <- ask
-    newVar . Val.Overloads (Val.Struct i env xs e) =<< freshVar
+    newVar . Val.Overloads (Overload.Struct i env xs e) =<< freshVar
   Exp.Class i e_super xs e -> do
     env <- ask
     var_super <- for e_super eval'
-    newVar . Val.Overloads (Val.Class i env var_super xs e) =<< freshVar
+    newVar . Val.Overloads (Overload.Class i env var_super xs e) =<< freshVar
   Exp.Inst e1 xs e2 -> do
     var1 <- eval' e1
     xs <- for xs freshNamed
@@ -237,11 +197,7 @@ eval' e = case extract e of
     var <- freshVar
     whenBound' var1 $ \ case
       Val.Overloads x var_xs -> fix (\ recur x var_xs -> case x of
-        Val.Function {} ->
-          whenBound' var_xs $ \ case
-            Val.Overloads x var_xs -> recur x var_xs
-            _ -> throwDomainError $ loc e
-        Val.Struct i env ys e -> do
+        Overload.Struct i env ys e -> do
           ys <- for ys freshNamed
           defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
           let ys' = fromIdents ys
@@ -251,7 +207,7 @@ eval' e = case extract e of
           for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
             unify var =<< local (const env) (eval' e)
           unify var =<< newVar (Val.StructInst i ys')
-        Val.Class i env var_super ys e ->
+        Overload.Class i env var_super ys e ->
           instSuper (loc e) var_super xs' $ \ var_super defs_super ys_super -> do
             ys <- (ys_super <>) <$> for (ys \\ ys_super) freshNamed
             defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
@@ -261,7 +217,10 @@ eval' e = case extract e of
             let defs' = fromIdents $ defs <> defs_super
             for_ (HashMap.intersection defs' $ ys' \\ xs') $ \ (var, env, e) ->
               unify var =<< local (const env) (eval' e)
-            unify var =<< newVar (Val.ClassInst i var_super ys')) x var_xs
+            unify var =<< newVar (Val.ClassInst i var_super ys')
+        _ -> whenBound' var_xs $ \ case
+          Val.Overloads x var_xs -> recur x var_xs
+          _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
   Exp.IfThenElse xs p t e -> do
@@ -300,7 +259,7 @@ eval' e = case extract e of
   Exp.Function xs e1 e2 -> do
     i <- supply
     env <- ask
-    newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
+    newVar . Val.Overloads (Overload.Function i env xs e1 e2) =<< freshVar
   Exp.Invoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -312,7 +271,7 @@ eval' e = case extract e of
         empty
         (zip xs [0 ..])
       Val.Overloads x var_xs -> fix (\ recur x var_xs -> case x of
-        Val.Function _ env xs e_arg e ->
+        Overload.Function _ env xs e_arg e ->
           ifte'
           (evalWriterT $ do
               xs <- for xs freshNamed
@@ -323,12 +282,12 @@ eval' e = case extract e of
           whenBound var_xs $ \ case
             Val.Overloads x var_xs -> recur x var_xs
             _ -> throwDomainError $ loc e
-        Val.Struct i env xs e -> evalWriterT $ do
+        Overload.Struct i env xs e -> evalWriterT $ do
           unify var var2
           xs <- for xs freshNamed
           _ <- local (const $ xs <> env) . lift . evalWriterT $ eval' e
           unify var2 =<< newVar (Val.StructInst i $ fromIdents xs)
-        Val.Class i env var_super xs e -> do
+        Overload.Class i env var_super xs e -> do
           unify var var2
           fix (\ recur var2 -> do
             whenBound var2 $ \ case
@@ -340,7 +299,11 @@ eval' e = case extract e of
                     unify var2 =<< newVar (Val.ClassInst i var_super $ fromIdents xs)
                 | Just var2 <- var_super' -> recur var2
               _ -> empty) var2
-          ) x var_xs
+        Overload.Intrinsic x -> invokeIntrinsic x var2 $ \ case
+          Just var' -> unify var var'
+          Nothing -> whenBound var_xs $ \ case
+            Val.Overloads x var_xs -> recur x var_xs
+            _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
   Exp.Tuple exps ->
@@ -359,108 +322,172 @@ eval' e = case extract e of
     env <- ask
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
-  Exp.IsInt e ->
-    isInt =<< eval' e
 
-liftOrd :: (MonadError Error m, MonadVerse m) =>
-           Loc ->
+invokeIntrinsic :: (MonadVerse m, Zippable f) =>
+                   Intrinsic ->
+                   Var m (Val f) ->
+                   (Maybe (Var m (Val f)) -> m ()) ->
+                   m ()
+invokeIntrinsic = \ case
+  Intrinsic.Less -> liftOrd (<)
+  Intrinsic.LessEqual -> liftOrd (<=)
+  Intrinsic.Greater -> liftOrd (>)
+  Intrinsic.GreaterEqual -> liftOrd (>=)
+  Intrinsic.Plus -> liftNum (+)
+  Intrinsic.PrefixPlus -> prefixPlus
+  Intrinsic.Minus -> liftNum (-)
+  Intrinsic.PrefixMinus -> prefixMinus
+  Intrinsic.Multiply -> liftNum (*)
+  Intrinsic.Divide -> div'
+  Intrinsic.Int -> int
+
+liftOrd :: (MonadVerse m, Zippable f) =>
            (forall a . Ord a => a -> a -> Bool) ->
-           MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftOrd loc f var_x var_y = lift $ do
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    case (val_x, val_y) of
-      (Val.Int x, Val.Int y) ->
-        guard $ f x y
-      (Val.Int x, Val.Float y) ->
-        guard $ f (fromInteger x) y
-      (Val.Int x, Val.Rational y) ->
-        guard $ f (fromInteger x) y
-      (Val.Float x, Val.Int y) ->
-        guard $ f x (fromInteger y)
-      (Val.Float x, Val.Float y) ->
-        guard $ f x y
-      (Val.Float x, Val.Rational y) ->
-        guard $ f (toRational x) y
-      (Val.Rational x, Val.Int y) ->
-        guard $ f x (fromInteger y)
-      (Val.Rational x, Val.Float y) ->
-        guard $ f x (toRational y)
-      (Val.Rational x, Val.Rational y) ->
-        guard $ f x y
-      _ -> throwDomainError loc
-  pure var_x
+           Var m (Val f) ->
+           (Maybe (Var m (Val f)) -> m ()) ->
+           m ()
+liftOrd f var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var_p <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var_p =<< case (val_x, val_y) of
+          (Val.Int x, Val.Int y) -> newVar . Const $ f x y
+          (Val.Int x, Val.Float y) -> newVar . Const $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) -> newVar . Const $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) -> newVar . Const $ f x y
+          (Val.Float x, Val.Rational y) -> newVar . Const $ f (toRational x) y
+          (Val.Rational x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) -> newVar . Const $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) -> newVar . Const $ f x y
+          _ -> empty
+      pure (var_x, var_p))
+  (\ (var_x, var_p) -> whenBound var_p $ \ val_p -> do
+      guard $ getConst val_p
+      k $ Just var_x)
+  (k Nothing)
 
-liftNum :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
-           Loc ->
+liftNum :: (MonadVerse m, Zippable f) =>
            (forall a . Num a => a -> a -> a) ->
-           MutVar m -> MutVar m -> EvalT m (MutVar m)
-liftNum loc f var_x var_y = lift $ do
-  var <- freshVar
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    unify var =<< case (val_x, val_y) of
-      (Val.Int x, Val.Int y) ->
-        newVar . Val.Int $ f x y
-      (Val.Int x, Val.Float y) ->
-        newVar . Val.Float $ f (fromInteger x) y
-      (Val.Int x, Val.Rational y) ->
-        newVar . Val.Rational $ f (fromInteger x) y
-      (Val.Float x, Val.Int y) ->
-        newVar . Val.Float $ f x (fromInteger y)
-      (Val.Float x, Val.Float y) ->
-        newVar . Val.Float $ f x y
-      (Val.Float x, Val.Rational y) ->
-        newVar . Val.Float $ fromRational $ f (toRational x) y
-      (Val.Rational x, Val.Int y) ->
-        newVar . Val.Rational $ f x (fromInteger y)
-      (Val.Rational x, Val.Float y) ->
-        newVar . Val.Float $ fromRational $ f x (toRational y)
-      (Val.Rational x, Val.Rational y) ->
-        newVar . Val.Rational $ f x y
-      _ -> throwDomainError loc
-  pure var
+           Var m (Val f) ->
+           (Maybe (Var m (Val f)) -> m ()) ->
+           m ()
+liftNum f var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var' <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var' =<< case (val_x, val_y) of
+          (Val.Int x, Val.Int y) ->
+            newVar . Val.Int $ f x y
+          (Val.Int x, Val.Float y) ->
+            newVar . Val.Float $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) ->
+            newVar . Val.Rational $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) ->
+            newVar . Val.Float $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) ->
+            newVar . Val.Float $ f x y
+          (Val.Float x, Val.Rational y) ->
+            newVar . Val.Float $ fromRational $ f (toRational x) y
+          (Val.Rational x, Val.Int y) ->
+            newVar . Val.Rational $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) ->
+            newVar . Val.Float $ fromRational $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) ->
+            newVar . Val.Rational $ f x y
+          _ -> empty
+      pure var')
+  (k . Just)
+  (k Nothing)
 
-div' :: (MonadError Error m, MonadVerse m, EqRef (Lenient.Ref m)) =>
-        Loc ->
-        MutVar m -> MutVar m -> EvalT m (MutVar m)
-div' loc var_x var_y = lift $ do
-  var <- freshVar
-  whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
-    unify var =<< case (val_x, val_y) of
-      (Val.Int _, Val.Int 0) ->
-        empty
-      (Val.Int x, Val.Int y) ->
-        newVar $ Val.Rational $ x % y
-      (Val.Int x, Val.Float y) ->
-        newVar $ Val.Float $ fromInteger x / y
-      (Val.Int x, Val.Rational y) ->
-        newVar $ Val.Rational $ fromInteger x / y
-      (Val.Float x, Val.Int y) ->
-        newVar $ Val.Float $ x / fromInteger y
-      (Val.Float x, Val.Float y) ->
-        newVar $ Val.Float $ x / y
-      (Val.Float x, Val.Rational y) ->
-        newVar $ Val.Float $ fromRational $ toRational x / y
-      (Val.Rational x, Val.Int y) ->
-        newVar $ Val.Rational $ x / fromInteger y
-      (Val.Rational x, Val.Float y) ->
-        newVar $ Val.Float $ fromRational $ x / toRational y
-      (Val.Rational _, Val.Rational 0) ->
-        empty
-      (Val.Rational x, Val.Rational y) ->
-        newVar $ Val.Rational $ x / y
-      _ -> throwDomainError loc
-  pure var
+prefixPlus :: MonadVerse m =>
+              Var m (Val f) ->
+              (Maybe (Var m (Val f)) -> m ()) ->
+              m ()
+prefixPlus var k =
+  ifte'
+  (do
+      whenBound var $ \ case
+        Val.Int _ -> pure ()
+        Val.Float _ -> pure ()
+        Val.Rational _ -> pure ()
+        _ -> empty
+      pure var)
+  (k . Just)
+  (k Nothing)
 
-isInt :: ( MonadError Error m
-         , MonadVerse m
-         , EqRef (Lenient.Ref m)
-         ) => MutVar m -> EvalT m (MutVar m)
-isInt var_x = do
-  var <- freshVar
-  lift $ whenBound var_x $ \ case
-    Val.Int _ -> unify var var_x
-    _ -> empty
-  pure var
+prefixMinus :: (MonadVerse m, Zippable f) =>
+               Var m (Val f) ->
+               (Maybe (Var m (Val f)) -> m ()) ->
+               m ()
+prefixMinus var k =
+  ifte'
+  (do
+      var' <- freshVar
+      whenBound var $ \ val -> unify var' =<< case val of
+        Val.Int x -> newVar . Val.Int $ negate x
+        Val.Float x -> newVar . Val.Float $ negate x
+        Val.Rational x -> newVar . Val.Rational $ negate x
+        _ -> empty
+      pure var')
+  (k . Just)
+  (k Nothing)
+
+div' :: (MonadVerse m, Zippable f) =>
+        Var m (Val f) ->
+        (Maybe (Var m (Val f)) -> m ()) ->
+        m ()
+div' var k =
+  ifte'
+  (do
+      var_x <- freshVar
+      var_y <- freshVar
+      unify var =<< newVar (Val.Tuple [var_x, var_y])
+      var' <- freshVar
+      whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
+        unify var' =<< case (val_x, val_y) of
+          (Val.Int _, Val.Int 0) -> do
+            newVar $ Const Nothing
+          (Val.Int x, Val.Int y) ->
+            newVar . Const . Just <=< newVar $ Val.Rational $ x % y
+          (Val.Int x, Val.Float y) ->
+            newVar . Const . Just <=< newVar $ Val.Float $ fromInteger x / y
+          (Val.Int x, Val.Rational y) ->
+            newVar . Const . Just <=< newVar $ Val.Rational $ fromInteger x / y
+          (Val.Float x, Val.Int y) ->
+            newVar . Const . Just <=< newVar $ Val.Float $ x / fromInteger y
+          (Val.Float x, Val.Float y) ->
+            newVar . Const . Just <=< newVar $ Val.Float $ x / y
+          (Val.Float x, Val.Rational y) ->
+            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ toRational x / y
+          (Val.Rational x, Val.Int y) ->
+            newVar . Const . Just <=< newVar $ Val.Rational $ x / fromInteger y
+          (Val.Rational x, Val.Float y) ->
+            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ x / toRational y
+          (Val.Rational _, Val.Rational 0) ->
+            newVar $ Const Nothing
+          (Val.Rational x, Val.Rational y) ->
+            newVar . Const . Just <=< newVar $ Val.Rational $ x / y
+          _ -> empty
+      pure var')
+  (\ var -> whenBound var $ getConst >>> \ case
+      Nothing -> empty
+      Just var -> k $ Just var)
+  (k Nothing)
+
+int :: MonadVerse m => Var m (Val f) -> (Maybe (Var m (Val f)) -> m ()) -> m ()
+int var k = whenBound var $ \ case
+  Val.Int _ -> k $ Just var
+  Val.Rational x | denominator x == 1 -> k $ Just var
+  _ -> empty
 
 instSuper :: MonadEval m =>
              Loc ->
@@ -487,7 +514,7 @@ instClass :: MonadEval m =>
              EvalT m ()
 instClass loc var_class xs f = whenBound' var_class $ \ case
   Val.Overloads x var_xs -> case x of
-    Val.Class i env var_super ys e ->
+    Overload.Class i env var_super ys e ->
       instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
         ys <- (ys_super <>) <$> for ys freshNamed
         defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
@@ -506,7 +533,7 @@ instClass' :: MonadEval m =>
               EvalT m ()
 instClass' loc var_class f = whenBound' var_class $ \ case
   Val.Overloads x var_xs -> case x of
-    Val.Class i env var_super ys e ->
+    Overload.Class i env var_super ys e ->
       instSuper' loc var_super $ \ var_super ys_super -> do
         ys <- (ys_super <>) <$> for ys freshNamed
         _ <- local (const $ ys <> env) . lift . evalWriterT $ eval' e
@@ -514,6 +541,25 @@ instClass' loc var_class f = whenBound' var_class $ \ case
         f var ys
     _ -> instClass' loc var_xs f
   _ -> throwDomainError loc
+
+newEnv :: MonadVar m => m (Env m)
+newEnv = execWriterT $ do
+  tell' "operator'<'" Intrinsic.Less
+  tell' "operator'<='" Intrinsic.LessEqual
+  tell' "operator'>'" Intrinsic.Greater
+  tell' "operator'>='" Intrinsic.GreaterEqual
+  tell' "operator'+'" Intrinsic.Plus
+  tell' "prefix'+'" Intrinsic.PrefixPlus
+  tell' "operator'-'" Intrinsic.Minus
+  tell' "prefix'-'" Intrinsic.PrefixMinus
+  tell' "operator'*'" Intrinsic.Multiply
+  tell' "operator'/'" Intrinsic.Divide
+  tell' "int" Intrinsic.Int
+  where
+    tell' x y =
+      tell . HashMap.singleton x . Val =<<
+      newVar . Val.Overloads (Overload.Intrinsic y) =<<
+      freshVar
 
 lookupName :: ( MonadVerse m
               , EqRef (Lenient.Ref m)
@@ -583,9 +629,11 @@ whenBound' :: ( Monoid w
               ) => Var m f -> (f (Var m f) -> WriterT w m ()) -> WriterT w m ()
 whenBound' x f = lift . whenBound x $ evalWriterT . f
 
-ifte'' :: ( Monoid w
-          , MonadVerse m
-          ) => WriterT w m a -> (a -> WriterT w m ()) -> WriterT w m () -> WriterT w m ()
+ifte'' :: (Monoid w, MonadVerse m) =>
+          WriterT w m a ->
+          (a -> WriterT w m ()) ->
+          WriterT w m () ->
+          WriterT w m ()
 ifte'' p t e = lift $ ifte' (evalWriterT p) (evalWriterT . t) (evalWriterT e)
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
