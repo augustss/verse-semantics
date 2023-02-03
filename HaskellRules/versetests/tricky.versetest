@@ -59,6 +59,8 @@ testceq("QC4a", SEq) { \a. add(a) = (ex x. <x> = <x>) }
 # QC5 takes a surprising numbers of steps (>100000) with the ICFP rules.
 testceq("QC5", SEq)  { \x.(<<x>> = x)(<>) }
                      { \x.fail }
+testceq("QC6", SEq)  { ex a. ex y. ex c. (c = y; <>) | <>; a = c; c }
+                     { ex y. ex c. (c = y; <>) | <>; c }
 testceq("Rec1", SEq, POPLL=Skip,ICFP=Skip) { ex x. (\y.x(fail)) = x }
                      { \y.fail }
 # Result depends on how recursion is treated.
