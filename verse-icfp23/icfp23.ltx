@@ -430,12 +430,17 @@ thus\footnote{The rule names come from \cref{fig:rules}, to be discussed in \cre
   are given here just for reference.}:
 $$
 \begin{array}{ll}
-                         & |def (x ^^ y ^^ z) (x = tup(y,3); x = tup(2,z); y)| \\
-\movestoR{deref-h}       & |def (x ^^ y ^^ z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-\movestoR{u-tup}          & |def (x ^^ y ^^ z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
-\movestoRn{deref-s}{2}  & |def (x ^^ y ^^ z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-\movestoR{norm-seq-assoc,norm-swap-eq}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
-\movestoR{norm-val,elim-def}     & |                                                     2|
+                         & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
+\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
+\movestoR{exi-eliml}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3; emptytup); y)| \\
+\movestoR{exi-eliml}     & |def y ((2==y; emptytup); y)| \\
+\movestoR{norm-seq}      & |def y (2==y; emptytup; y)| \\
+\movestoR{hnf-swap}      & |def y (y==2; emptytup; y)| \\
+\movestoR{subst}         & |def y (y==2; emptytup; 2)| \\
+\movestoR{exi-eliml}     & |emptytup; 2| \\
+\movestoR{norm-val}      & |2| \\
+\text{\lennart{ICFP conversion done}}
 \end{array}
 $$
 %
