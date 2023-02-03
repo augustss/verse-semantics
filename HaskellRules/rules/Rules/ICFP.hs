@@ -17,7 +17,8 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPR, systemICFPV ]
+allSystemsICFP = [ systemICFP, systemICFPR,
+                   systemICFPA, systemICFPC, systemICFPD ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -41,11 +42,28 @@ systemICFPR = s
   }
   where s = systemICFP
 
-systemICFPV :: TRSystem Expr
-systemICFPV = s
-  { sname = "ICFPV"
-  , description = description s ++ " - EXI-SWAP + EXI-VAR-SWAP"
+systemICFPA :: TRSystem Expr
+systemICFPA = s
+  { sname = "ICFPA"
+  , description = description s ++ ", plan A: - EXI-SWAP + EXI-VAR-SWAP"
   , confluenceRules = (confluenceRules s -= "EXI-SWAP") <> rulesExiVarSwap
+  }
+  where s = systemICFP
+
+systemICFPC :: TRSystem Expr
+systemICFPC = s
+  { sname = "ICFPC"
+  , description = description s ++ ", plan C: + EXI-SWAP-ND"
+  , confluenceRules = confluenceRules s <> rulesVarSwapND
+  }
+  where s = systemICFP
+
+systemICFPD :: TRSystem Expr
+systemICFPD = s
+  { sname = "ICFPD"
+  , description = description s ++ ", plan D: - VAR-SWAP + EXI-ELIMV + VAR-SWAP-SUBST"
+  , rules = (rules s -= "VAR-SWAP") <> rulesExiElimV
+  , confluenceRules = confluenceRules s <> rulesVarSwapSubst
   }
   where s = systemICFP
 
@@ -597,3 +615,33 @@ rulesExiVarSwap _ lhs =
   do EXI x (EXI y e) <- [lhs]
      let e' = substExp (Var y :=: Var x) (Var x :=: Var y) e
      pure (EXI y (EXI x e'))
+
+rulesVarSwapND :: ERule
+rulesVarSwapND _ lhs =
+  "VAR-SWAP-ND" `name`
+  do x@Var{} :=: y@Var{} <- [lhs]
+     pure (y :=: x)
+
+rulesExiElimV :: ERule
+rulesExiElimV _ lhs =
+  "EXI-ELIMV" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var z :=: Var x') :>: e) <- defX x a
+     guard (x == x')
+     guard (x /= z)
+     guard (z `notElem` defVars ctx)
+     pure (subst [(x, Var z)] (ctx e))
+
+-- Get initially quantified variables from a defX context
+defVars :: Context -> [Ident]
+defVars ctx = loop (ctx Fail)
+  where loop (EXI x e) = x : loop e
+        loop _ = []
+
+rulesVarSwapSubst :: ERule
+rulesVarSwapSubst _ lhs =
+  "VAR-SWAP-SUBST" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
