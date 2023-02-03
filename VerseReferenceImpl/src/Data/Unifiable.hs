@@ -7,7 +7,7 @@ module Data.Unifiable
 
 import Control.Monad.Var
 
-import Data.Tagged
+import Data.Functor.Const
 
 class Traversable f => Unifiable f where
   zipMatchM :: MonadVar m =>
@@ -39,7 +39,7 @@ instance Zippable Maybe where
     (Just x, Just y) -> Just [(x, y)]
     _ -> Nothing
 
-instance Unifiable (Tagged a)
+instance Unifiable (Const a)
 
-instance Zippable (Tagged a) where
+instance Zippable (Const a) where
   zipMatch _ _ = Nothing

@@ -35,7 +35,6 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Ref
-import Data.Tagged
 import Data.Traversable
 import Data.Unifiable
 
@@ -304,8 +303,7 @@ eval' e = case extract e of
           Just var' -> unify var var'
           Nothing -> whenBound var_xs $ \ case
             Val.Overloads x var_xs -> recur x var_xs
-            _ -> throwDomainError $ loc e
-          ) x var_xs
+            _ -> throwDomainError $ loc e) x var_xs
       _ -> throwDomainError $ loc e
     pure var
   Exp.Tuple exps ->
@@ -355,19 +353,19 @@ liftOrd f var k =
       var_p <- freshVar
       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
         unify var_p =<< case (val_x, val_y) of
-          (Val.Int x, Val.Int y) -> newVar . Tagged $ f x y
-          (Val.Int x, Val.Float y) -> newVar . Tagged $ f (fromInteger x) y
-          (Val.Int x, Val.Rational y) -> newVar . Tagged $ f (fromInteger x) y
-          (Val.Float x, Val.Int y) -> newVar . Tagged $ f x (fromInteger y)
-          (Val.Float x, Val.Float y) -> newVar . Tagged $ f x y
-          (Val.Float x, Val.Rational y) -> newVar . Tagged $ f (toRational x) y
-          (Val.Rational x, Val.Int y) -> newVar . Tagged $ f x (fromInteger y)
-          (Val.Rational x, Val.Float y) -> newVar . Tagged $ f x (toRational y)
-          (Val.Rational x, Val.Rational y) -> newVar . Tagged $ f x y
+          (Val.Int x, Val.Int y) -> newVar . Const $ f x y
+          (Val.Int x, Val.Float y) -> newVar . Const $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) -> newVar . Const $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) -> newVar . Const $ f x y
+          (Val.Float x, Val.Rational y) -> newVar . Const $ f (toRational x) y
+          (Val.Rational x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) -> newVar . Const $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) -> newVar . Const $ f x y
           _ -> empty
       pure (var_x, var_p))
   (\ (var_x, var_p) -> whenBound var_p $ \ val_p -> do
-      guard $ getTagged val_p
+      guard $ getConst val_p
       k $ Just var_x)
   (k Nothing)
 
@@ -422,30 +420,30 @@ div' var k =
       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
         unify var' =<< case (val_x, val_y) of
           (Val.Int _, Val.Int 0) -> do
-            newVar $ Tagged Nothing
+            newVar $ Const Nothing
           (Val.Int x, Val.Int y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Rational $ x % y
+            newVar . Const . Just <=< newVar $ Val.Rational $ x % y
           (Val.Int x, Val.Float y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Float $ fromInteger x / y
+            newVar . Const . Just <=< newVar $ Val.Float $ fromInteger x / y
           (Val.Int x, Val.Rational y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Rational $ fromInteger x / y
+            newVar . Const . Just <=< newVar $ Val.Rational $ fromInteger x / y
           (Val.Float x, Val.Int y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Float $ x / fromInteger y
+            newVar . Const . Just <=< newVar $ Val.Float $ x / fromInteger y
           (Val.Float x, Val.Float y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Float $ x / y
+            newVar . Const . Just <=< newVar $ Val.Float $ x / y
           (Val.Float x, Val.Rational y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Float $ fromRational $ toRational x / y
+            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ toRational x / y
           (Val.Rational x, Val.Int y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Rational $ x / fromInteger y
+            newVar . Const . Just <=< newVar $ Val.Rational $ x / fromInteger y
           (Val.Rational x, Val.Float y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Float $ fromRational $ x / toRational y
+            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ x / toRational y
           (Val.Rational _, Val.Rational 0) ->
-            newVar $ Tagged Nothing
+            newVar $ Const Nothing
           (Val.Rational x, Val.Rational y) ->
-            newVar . Tagged . Just <=< newVar $ Val.Rational $ x / y
+            newVar . Const . Just <=< newVar $ Val.Rational $ x / y
           _ -> empty
       pure var')
-  (\ var -> whenBound var $ getTagged >>> \ case
+  (\ var -> whenBound var $ getConst >>> \ case
       Nothing -> empty
       Just var -> k $ Just var)
   (k Nothing)

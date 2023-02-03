@@ -195,12 +195,17 @@ desugar' e = for e $ \ case
       False -> desugar' e <&> ((Name <$> x') :=:)
       True -> local (const False) (desugar' e) <&> Default x' (Name <$> x')
 
-desugarOperator1 :: Name -> L (Parse.Exp L Name) -> Desugar (Exp L (Ident Name))
+desugarOperator1 :: Name ->
+                    L (Parse.Exp L Name) ->
+                    Desugar (Exp L (Ident Name))
 desugarOperator1 x e =
   desugar' e <&> \ e ->
   Invoke (Name (Pure x) <$ e) e
 
-desugarOperator2 :: Name -> L (Parse.Exp L Name) -> L (Parse.Exp L Name) -> Desugar (Exp L (Ident Name))
+desugarOperator2 :: Name ->
+                    L (Parse.Exp L Name) ->
+                    L (Parse.Exp L Name) ->
+                    Desugar (Exp L (Ident Name))
 desugarOperator2 x e1 e2 =
   (,) <$> desugar' e1 <*> desugar' e2 <&> \ (e1, e2) ->
   Invoke (Name (Pure x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
