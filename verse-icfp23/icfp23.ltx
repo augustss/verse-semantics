@@ -537,7 +537,7 @@ constrain the \emph{output} of a function (here |2 == apply1 first x|), and ther
 affect its \emph{input} (here |tup(y,5)|).
 
 Although ``|;|\!'' is called ``sequencing'', the order of that sequence
-is immaterial for equations that do not contain choices (see \Cref{sec:choice-rules} for the latter caveat).
+is immaterial for equations that do not contain choices (see \Cref{sec:choice} for the latter caveat).
 For example
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
@@ -582,8 +582,15 @@ We duplicate the context surrounding the choice, and ``float the choice outwards
 The same thing happens when there are multiple choices.  For examplle
 $$
 |def (x y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
+\quad
+\text{yields the sequence |tup (7,31), tup(7,5), tup(22,31), tup(22,5)|}
 $$
-produces the sequence of values |tup (7,31), tup(7,5), tup(22,31), tup(22,5)|.
+Notice that the order of the two equations now \emph{is} significant:
+$$
+|(def (x y) y == (31 choice 5); (x == (7 choice 22); tup (x,y)))|
+\quad
+\text{yields the sequence |tup (7,31), tup(22,31), tup(7,5), tup(22,5)|}
+$$
 Readers familiar with list comprehensions in Haskell and other
 languages will recognise this nested-loop pattern, but here it
 emerges naturally from choice as a deeply-built-in primitive,
