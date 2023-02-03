@@ -1,9 +1,9 @@
 module Rules.Systems(ESystem, allSystems, lookupSystemEx, lookupSystem,
-                     TRSystem(..), defaultTRSFlags) where
+                     TRSystem(..), defaultTRSFlags, isRecursive) where
 import Epic.String
 import TRS.System
 import Rules.Core
-import Rules.ICFP(allSystemsICFP)
+import Rules.ICFP(allSystemsICFP, isRecursive)
 import Rules.PLDI(allSystemsPLDI)
 import Rules.POPL(allSystemsPOPL)
 import Rules.KoenNaive(allSystemsKoen)

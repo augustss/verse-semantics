@@ -40,7 +40,10 @@ prop_Confluence1 flags sys =
           discard
         trs | any isNothing trs ->      -- normalization timed out
           discard
-        trs@(_:_:_) ->                  -- multiple normal form
+        trs@(_:_:_)
+          | ignoreRecursive flags && any (maybe False (isRecursive . term)) trs ->
+            discard
+          | otherwise ->                  -- multiple normal form
           whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
                        putStr $ unlines $ showTrace ttr
@@ -102,6 +105,7 @@ data TestFlags = TestFlags
   , replayStr      :: !(Maybe String)
   , ignoreFuelStop :: !Bool
   , koen           :: !Bool
+  , ignoreRecursive :: !Bool
   }
 
 testFlags :: Parser TestFlags
@@ -137,6 +141,10 @@ testFlags = TestFlags
   <*> switch
          ( long "koen"
         <> help "Use Koen's prop_Confluence2" )
+  <*> switch
+         ( long "ignore-recursive"
+        <> short 'r'
+        <> help "Discard failures involving recursion" )
  where nDef = maxSuccess stdArgs
        mDef = 1000
 

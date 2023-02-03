@@ -1,0 +1,553 @@
+Remark: For ease of keyboarding, I will write mathematical expressions in a sort of pseudo-LaTeX. Specifically: (1) I will use less-than "<" and greater-than ">" for angle brackets (rather than writing "\langle" and "\rangle"); (2) I will use "|" to stand for both the choice operator and the BNF alternation symbol; (3) I will write simply the letter "v" despite the fact that I suspect you are using "\mathit{v}" to get that nice pointy-bottomed "v"; (4) I will write simply "eu" or "hnf" for those BNF nonterminals when I know perfectly well that one should write "\mathit{eu}" and "\mathit{hnf}"; (5) I will write "{" and "}" instead of "\{" and "\}"; (6) sometimes I use double asterisks to indicate **boldface**, but not always.
+
+
+Big-picture notes I wrote on the front page:
+
+There is an asymmetry between the "one" and "all" constructs, in that "all" returns a tuple of all the values, but "one" returns just one value rather than a tuple of the one value. I wonder whether this is somehow related to an asymmetry between the syntax for a choice (expressed using an infix operator "|") and the syntax for a tuple (expressed with angle brackets around a list of comma-separated items). The tuple syntax makes it easy to distinguish between a value and a singleton tuple of that value, whereas the choice syntax has no way to express "a choice of one item" as distinct from the item itself. All this is of course a perennial problem in programming language design. From Simon's talk I gather that in Verse one uses parentheses (around a list of comma-separated items) rather than angle brackets to express tuples, and therefore, given that parentheses are already committed to their usual use of being able to surround any expression without changing the meaning, in Verse there is no natural way to express a singleton tuple using the parenthesis syntax. Some languages use "(e,)", which I dislike. Simon's talk (slide 21) indicates that there is a more verbose alternate syntax ("for { v }" in verse, or "all { v }" in VC) for creating a singleton tuple, and that strikes me as a reasonable design decision. (I am reminded of all the contortions required in APL to distinguish scalar values from single-element arrays of various ranks when necessary, and to gloss over those distinctions when convenient. The rules are not obvious.) And all this in turn is related to the property that one can nest tuples but one cannot nest choices; choice construction is associative but tuple construction is not. These are all perfectly sensible design choices, but perhaps worth communicating to the reader even more clearly and explicitly in a longer document.
+
+This idea of explaining logic programming using a term-rewriting system seems like an excellent research goal that would be a distinct improvement over prior literature on logic programming.
+
+Section 2.5: This explanation of the if-then-else of prior logic languages in terms of a much simpler construct "oine" that combines "cut" with local propagation is very nice, and appears to be a major research contribution of this paper.
+
+---------------------------------------
+
+DONE: line 89: The example would be much easier to understand if the initial expression (way back on the previous page at line 27!) were copied here, right before line 89.
+
+
+MOOT: line 101: Because scalar values are presented in line 104 in the order "x | k | op", I suggest that the line "Integers k" be transposed to after the line "Variables x,y,z,f,g".
+
+
+line 102: Of the five (meta-)variables (BNF nonterminals) "x", "y", "z", "f", "g" listed, only "x", "y", and "f" are used in Figure 1. Moreover, Figure 1 also uses "a" in line 123. If the intent is to list only (meta-)variables used in Figure 1, then the list should be "x, y, f, a". This list appears also to cover (meta-)variables used in Figures 3, 4, and 5. It is not necessary to list variables in the text such as "z" as used in line 170 or "b" as used in line 180, because those are actual variables, that is, _instances_ of the BNF nonterminals.
+I note that "f" and "a" appear to be used only in line 123, so one could choose to use "x" for "f" and "y" for "a", which would allow line 102 to be further condensed to "Variables x, y". This is a stylistic choice.
+
+DONE
+* I replaced 'a' by 'x' in Fig 1.
+* I left the list as x,y,z,f,g, so that we can use f,g in the text if we want
+
+
+
+line 105: I believe the definition of Heap Values should not be
+    h ::= <s_1, \cdots, s_n> | \lambda x.e
+but rather
+    h ::= <v_1, \cdots, v_n> | \lambda x.e
+because line 140 says that "tuples have only value components", not "tuples have only scalar value components". Nevertheless, I was still in some doubt because I didn't see any examples of nested tuples in the paper. What finally settled it in my mind was that line 369 shows code that produces a tuple of lambda expressions (as part of the desugaring of "for"). Also, come to think of it, "\ldots" is the preferred form of ellipsis between commas.
+MOOT: values have changed
+
+line 106: It might be useful to alert the reader that the BNF nonterminal "hnf" is used nowhere in Figure 1, but becomes important in Section 3. To this end it might also help to move it to just before line 112.
+MOOT: hnf is now used
+
+
+line 109: I note that no English descriptor has been provided for the BNF nonterminal "eu", which seems odd since it plays a pretty important role in Figure 4.
+Reading between the lines in Section 2.1, I get the impression that "eu" means something like "Expression or Unification Opportunity", which is a mouthful. The second alternative "v = e" for "eu" is not a binding; maybe it's just an "equation" (of limited form)?
+
+CHECK: I have added a note in Fig 1; see if you like it.
+
+line 112: It might be useful to alert the reader that the BNF nonterminal "c" is used nowhere in Figure 1, but becomes important in Section 3. To this end it might also help to put a small bit of vertical spacing before that line to separate it from the other BNF definitions.
+
+MOOT
+
+line 114: The description of operator precedence is welcome but incomplete. For example, I assume that "=" is intended to bind less tightly than "|" or "+".
+
+CHECK: I think we intend that every example should be parenthesised
+       so that the answers here do not matter.
+
+What is the precedence of the various operators relative to the keywords "else" and "do"?
+
+CHECK: I propose that we don't cover this, since it's about the source language. I have added a sentence in
+Section 2 to say this.
+
+line 115: "left-associatve" => "left-associative"; also, this line refers to function application as "(v_1 v_2)", but in line 108 function application is presumably defined as "v_1 v_2". Nowhere in the BNF is "(e)" defined to be valid syntax for an expression. Maybe you need either more BNF or some English text to the effect that parentheses may be used freely around any expression for readability and to override default operator precedence.
+
+DONE: added a line to Fig 1.
+
+
+line 117: I believe that "as far to the right as possible" can be explained precisely and concisely for your grammar as "that is, up to the next unmatched right encloser ")" or ">" or "}" or unenclosed comma ",", or to the end of the entire expression if none of these are present."
+
+CHECK: yes, but it takes more space.
+
+line 122: I believe "\ldots" would be the preferred form of ellipsis (in two places).
+
+DONE
+
+Also, here and in all uses of this syntactic sugar for \exists, I recommend that you use a _thick_ space "\;" between the variables, not just a thin space "\,", to make sure that the reader can easily distinguish a sequence of sinel-letter variables from a single variable whose name contains more than one letter—especially when the two kinds of variable are mixed in a single expression, as for example in line 180 and line 235.
+
+UNSURE: I'm not sure this is a good idea.  Leaving it for now.
+
+line 123: Are the parentheses required in the form "e_1(e_2)" for this desugaring to be applied? (For example, may the desugaring be applied to an expression such as "(x := (\lambda y.y+y); x) 3" or "(if e then add else gt)<3,4>"?) In the desugared result, should it be "f(a)" or "f a", in light of the fact that function application as defined at line 108 does not require parentheses? Should this desugaring be subject to the condition that either e_1 or e_2 is not a value?
+
+I would recommend using the form "f a" within the Figure. In the text, you already comment that as a matter of style you frequently choose to write function applications as "f(e)" rather than "f e", but I would suggest keeping that usage out of the basic definitions.
+
+DONE: ...at least in the desugaring block.  A tension is that Source Verse uses f(e)
+
+line 124: Should the desugaring of "<e_1, ..., e_n>" be subject to the condition that at least one of e_1, ..., e_n is not a value? Also, I believe "\ldots" would be the preferred form of ellipsis here (in all four places).
+
+CHECK: not really.  Desugaring is fine even if they are values.
+
+line 125: Should the desugaring of "e_1 = e_2" be subject to the condition that either e_1 is not a value or "e_1 = e_2" occurs other than to the left of a semicolon (see lines 165–166)?
+
+CHECK: same comment here
+
+line 127: "means the free variable" => "means the free variables"
+
+I assume fvs could be rigorously defined in some fashion such as:
+
+  fvs(x) = { x }
+  fvs(k) = \emptyset
+  fvs(op) = \emptyset
+  fvs(<v_1,...,v_n>) = fvs(v_1) \cup \cdots \cup fvs(v_n)
+  fvs(\lambda x.e) = fvs(e) \setdiff { x }
+  fvs(eu; e) = fvs(eu) \cup fvs(e)
+  fvs(\exists x.e) = fvs(e) \setdiff { x }
+  fvs(fail) = \emptyset
+  fvs(e_1 | e_2) = fvs(e_1) \cup fvs(e_2)
+  fvs(v_1 v_2) = fvs(v_1) \cup fvs(v_2)
+  fvs(one{e}) = fvs(e)
+  fvs(all{e}) = fvs(e)
+
+If so, it would be nice to present such a definition for completeness.
+
+CHECK: agreed. But we are short of space, and it really is standard.
+
+
+line 131: Big-picture comments on Figure 1: I assume that this figure has, as usual, been tightly compressed to conserve vertical space because of conference paper page limits. Given those constraints, I found this figure remarkably readable and felt that I had little trouble decoding its intent. Nevertheless, because this figure is the first encounter with, and the major presentation of, the VC syntax, I suggest that it could be made even more readable and accessible if you choose to publish a version in another venue, such as a journal, or arXiv.org. The detailed per-line notes above have some suggestions. I also recommend that the BNF productions for "Heap Values h" and "Expressions e" and "eu" be listed vertically, with comments, in this style:
+
+Heap Values      h ::= <v_1, ..., v_n>          tuple
+                    | \lambda x.e               lambda expression
+
+Expressions      e ::= v                        value
+                    | eu; e                     sequence
+                    | \exists x.e               scope declaration
+                    | fail                      failure (produces no value)
+                    | e_1 | e_2                 choice
+                    | v_1 v_2                   function application
+                    | one{e}                    first value of e
+                    | all{e}                    tuple with all values of e
+
+               eu ::= e                         expression
+                    | v = e                     unification
+
+Probably some of these suggested comments are poor, but you can improve them.
+
+CHECK: not done yet; space saving
+
+line 168: "A program executes by solving its equations" => "A VC program executes by solving its equations, using the process of unification"
+
+DONE
+
+line 189: I found this example difficult to follow at first because a desugaring step has been skipped: "first(y) is not a value, and it appears to the left of "=", so it is necessary first to apply the desugaring rule from lin e 125 to get
+
+    \exists x y. x = <y, 5>; (\exists z. z = first(x); z = 2; z); y
+
+for some fresh z. Only then can you evaluate "first(x)" to get "y", producing
+
+    \exists x y. x = <y, 5>; (\exists z. z = y; z = 2; z); y
+
+then unify "y" with "z" and "z" with "2" so that you know that "y" is 2.
+
+This is a lot of distracting detail that you probably want to avoid in this early example. The solution is to rewrite the example from
+
+    \exists x y. x = <y, 5>; first(x) = 2; y
+
+to
+
+    \exists x y. x = <y, 5>; 2 = first(x); y
+
+which of course may seem slightly awkward to the reader, but that's the corner into which your choice of syntactic restrictions has painted you. Another choice might be:
+
+    \exists x y t. x = <y, 5>; t = first(x); t = 2; y
+
+DONE
+
+line 192: "the order of that sequence is immaterial for equations" I thin you really do need to qualify this blanket statement to something like "the order of that sequence is immaterial for equations that do not contain any choices (which are discussed in Section 2.2)".
+
+DONE: but I referred on to 3.5 because 2.2 doesn't cover the choice-free stuff.
+
+line 194: "the equation x = 3 + y is stuck" Presumably because evaluation of "3 + y" is stuck; this might be worth saying. More generally, evaluation of a function application of an "op" gets stuck if any element of the argument tuple is a variable?
+
+DONE
+
+line 203: The wording "a VC expression evaluates to a choice of zero, one, or many values" is not quite consistent with the way the rest of the paper talks about choices: there is no such thing as "a choice of values"—if I understand correctly, a "choice" is an expression with two operand expressions. Like any other expression, it produces a (possibly empty) sequence of values; specifically, choice expression evaluates to a sequence of values that consists of all the values produced by the first expression followed by all the values produced by the second expression (I hesitate to use the term "append" because the sequence of values produced by the first expression might be infinite). Consider simplifying the wording to just "a VC expression evaluates to zero, one, or many values".
+
+DONE: I adopted your simpler wording.
+
+line 205: "all the values yielded by e_1 and all the values yielded by e_2" => "all the values yielded by e_1 followed by all the values yielded by e_2"
+
+DONE
+
+line 206: "Duplicates are not eliminated and, as we shall see in Section 2.7, order is maintained." => "Order is maintained and duplicates are not eliminated (more on this in Sections 2.6 and 2.7)."
+
+DONE
+
+line 208: This might be a good place to explain that if e_1 produces zero values, or if e_2 produces zero values for every value produced by e_1, then "e_1; e_2" produces zero values. This fact will become relevant at line 298.
+line 219: This explanation, ending with "float the choice outwards:, is very nice.
+line 220: This would be a good place to insert a sentence along the lines of:
+Similarly, in VC a variable is never bound to zero values; an attempt to do so fails.
+    \exists x. x = fail; <3, x>   ->   \exists x. fail; <3, x>   ->   \exists x. fail   ->   fail
+
+CHECK: see hte new text of Section 2.2. It's a bit longer but it makes several new points, as Guy suggests.
+
+line 226: In the expression "x * 2", the operator "*" is not defined. (Sure, I can tell what you mean, and Verse undoubtedly has such an operator; still, for the purposes of VC, it has not (yet) been defined in the paper.) Either add "*" to the list of alternatives for "op" in Figure 1, or choose a different example here in line 226. (This same problem with "*" occurs at other points later in the paper.)
+
+UNSURE: then we'd need to add rewrite rules too.  I don't think anyone will stumble here.
+
+line 234: Although the paper has already stated the "long scope" rule for lambda expressions, the fact that the whitespace to either side of the "|" is noticeably larger than the space after the "." of the lambda expression misleads the reader into thinking the lambda scopes only up to the "|", not beyond it. I am uncertain as to why so much space is used around "|" here, as compared to lines 226, 235, and 239. If you feel the large amount of whitespace is justified, then I suggest using redundant parentheses around the entire body of the lambda expression, and I recommend using "\bigl(" and "\bigr)", not just "(" and ")".
+
+CHECK: I removed the extra space.  I didn't do the bigr thing becuase that involves fiddling with lhs2text.  Quite do-able though if you think it's important.
+
+line 292: Given that this desugaring of "\lambda<x,y>. e" is also used late in the paper (line 706), I would recommend that this desugaring rule be placed in Figure 1 alongside the others:
+    \lambda<x_1, ..., x_n>. e   means   \lambda y. \exists x_1 ... x_n. y = <x_1, ..., x_n>; e        y fresh
+Then that can be removed from footnote 4, and the rest of footnote 4 can be run into the text (I have replaced "pairs" with "2-tuples" for clarity):
+"Fortunately, choice allows us to express this idea directly (we use the empty tuple to represent the empty list and 2-tuples to represent cons cells):"
+
+DONE
+
+
+line 296: I suggest using the word "produces" rather than "returns"; the word "return" is usually used in conjunction with procedures, but "one{e}" is a special construct.
+
+
+
+line 300: This sentence is flat-out wrong— as indicated at the start of the next sentence—so I recommend warning the reader by starting this sentence with "It would seem that" and replace the semicolon with ", but" to indicate that this warning applies to the entire sentence.
+
+
+line 302: Set "then" and "else" in boldface. Also, I can't resist commenting that this wrapping of the "then" and "else" parts in thunks seems vaguely familiar. :-)  See https://dspace.mit.edu/handle/1721.1/6913, page 54 (page 64 of the PDF file).
+
+
+line 304: You need to say here that "x" is fresh. Alternatively, you could use the lambda desugaring rule (see footnote 4) with an empty tuple to avoid the need for a fresh variable here (the desugaring rule will choose the fresh variable for you):
+
+    (one{(e_1; \lambda<>.e_2) | \lambda<>.e_3}<>
+
+
+lines 305–306: The explanation in this sentence is a bit muddled; in particular, the referent of "that lambda" is clear as mud. Here is a suggested rewrite:
+
+The argument of **one** reduces to either (\lambda x.e_2) | (\lambda x.e_3) or \lambda x.e_3 depending on whether e_1 succeeds or fails, respectively; one then picks the first value (\lambda x.e_2 if e_1 succeeded, \lambda x.e_3 if e_1 failed) and applies it to <>. 
+
+
+line 315: "Indexing out of range is fail." What happens if the index is not an integer? I am guessing that it is fail if the index is an op or a lambda expression or a tuple; it gets stuck if it is a variable that has not yet been unified with a value; it (eventually) reduces to the integer case if the index is a variable that has been unified with an integer; it (eventually) reduces to fail if the index is a variable that has been unified with an op or a lambda expression or a tuple. (Now I look ahead to the definition of rewrite rule APP-TUP on line 462, and I _think_ my prose description is consistent with that, possibly with a few more occurrences of "eventually".)
+
+
+line 319: Given that there has been no mention of singleton choices, there is some doubt in my mind whether the notation "(v_1 | \cdots | v_n)" is intended to include the form "v_1". Moreover, it certainly does not include the form "( )", which is not defined in the syntax. Therefore I would say that (a) the words "as a consequence," should be struck (the empty case does need to be described separately), and for clarity I would recommend describing the case of a single value separately: "If e produces a single value v (rather than a choice or no values), then all{e} reduces to the singleton tuple <v>."
+
+
+line 322: This is a really nice theoretical treatment of indexing. The practical consequences for compilation may be very interesting.
+
+
+line 328: At the end of this paragraph I suggest adding "In either case, left-to-right order is preserved."
+
+
+line 330: "But all really requires the evaluation of all choices before proceeding" Just how far do the choices need to be evaluated? To values? To values or stuck computations? Or merely reduced to expressions that contain no choices?
+
+
+line 340: This treatment of filters in **for** is of course very nice, similar to what can be done in Icon but without use of side effects. As Simon said in the talk, it's list comprehensions everywhere!
+
+
+line 344: You need to warn the reader quite explicitly in the caption for Figure 2 that these functions do NOT use the list representation introduced in footnote 4 for the append example on line 250! A good start would be to caption the figure "Functions on tuples, analogous to list or array functions in some other languages" in line 359.
+
+
+lines 346–347: These two lines are not merely "Notation"; they are additional "Desugaring" rules, and arguably belong in Figure 1 with the other desugaring rules; failing that, try changing the word "Notation" to "Desugaring" in line 345.
+
+
+line 354: Prior languages that support binding (not just assigning) a variable in the predicate part of an "if", with the scope of the variable including the "then" part of the construct but not the "else" part, are Fortress and Swift.
+
+
+line 357: To complement "every", one might consider adding
+
+    some<p, xs> = one{\exists i.p(xs(i))}
+
+if I have that right.
+
+
+line 358: A striking feature of Figure 2 is that it contains no examples of reduction functions such as reduce, foldl, foldr, or mapreduce.
+
+
+line 362: I wrote this note in the margin during my first pass: "It's beginning to smell like Icon." :-)
+
+
+line 366: "using the map function defined in Fig. 2" Figure 2 is not really discussed until Section 2.8, so this is something of a forward reference. Please consider swapping Sections 2.7 and 2.8.
+
+
+line 370: "for a fresh variable v"  The variable "x" also needs to be fresh (or you could use <>, as discussed in my comment on line 304).
+
+
+line 372: Unless you are absolutely desperate to save space in order to obey conference paper page limits, I recommend avoiding abbreviations such as "e.g." and "i.e." and "cf."; instead use "for example" and "that is" and "see". This will make your paper much more accessible to readers who are not native speakers of Latin.
+
+
+line 372: After the keyword "do", I think the braces surrounding "x | x + 1" should be replaced with parentheses.
+
+
+line 373: "At this point it is crucial to use" => "It is crucial that the definition of **for** uses"
+
+
+lines 382–383: "The choice operator, |, serves as both cons and append for choices." => "The choice operator, |, serves as both cons and append for choices. VC has no corresponding built-in operators for tuples, so they are defined in Fig. 2."
+
+
+line 391: In fact, can we not write simply "fcn<x, 1, y, 2> = x + y", given the desugaring rule on line 347?
+
+
+Comments on Section 3 of Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, and Sweeney,
+"The Verse Calculus: a Core Calculus for Functional Logic Programming", draft dated January 2003.
+
+
+BIG-PICTURE COMMENTS
+
+The text of Section 3 does not say explicitly whether the expectation is that a VC program should be fully desugared before applying the rewrite rules, and the indirect evidence is contradictory: on the one hand, some of the examples (line 548, line 662, line 689) apply rewrite rules to VC expressions that have not been desugared; on the other hand, if the intention is to desugar "on the fly" or not at all, then the discussion of confluence in Section 4 should include the rewriting rules for desugaring as part of the overall set of rules expected to be confluent, and the proof of confluence should take those rules into account.
+
+The organization of the figures and the organization of the text are mismatched big-time. Avoid chiasmus! Please organize Figures 3, 4, and 5 so that the sets of rules (both rewrite rules and Gentzen rules) appear in the order that they are discussed in the text. (The current order in the Figures is Contexts, Unification, Application, Speculation, Normalization, Fail Propagation, Garbage Collection, Structural rules, and Well-formedness; the current order in the text is Application, Unification, the first two Contexts, Normalization, Garbage Collection, Fail Propagation, Speculation, and the other two contexts—and the Structural Rules are not mentioned at all in the text.)
+
+The same issue occurs with the discussion of each set of rules. For example, the rules for Application appear in Figure 3 in the order APP-BETA, APP-TUP0, APP-TUP, APP-ADD, APP-GT, and APP-GT-FAIL, but they are discussed in the text (in Section 3.1) in the order APP-ADD, APP-GT, APP-GT-FAIL, APP-BETA, and APP-TUP, and rule APP-TUP0 is not mentioned in the text.
+
+With so many sets of rules and so many rules in each set, it is really important to proceed in one chosen order, mentioning every set of rules and every rule, so that the reader can more easily follow the textual description and have confidence that every item has been addressed. (You will note that, when I write up my detailed comments, even though every comment is labeled with a line number, I also take care to present the comments in ascending order of line number.)
+
+[Now that I have seen the "POPL version" of the paper, I can see that these figures were reorganized. They may yet be reorganized again. The basic principle remains: all else being equal, the order of presentation of figures and within each figure should match the order of discussion in the text.]
+
+
+DETAILED COMMENTS
+
+
+line 428: Should "All the variables on the right-hand side" be "All the free variables on the right-hand side"?
+
+
+line 436: When I read Figure 2 in Section 2, I was slightly surprised by the choice of "gt" rather than "lt" as the one primitive comparison operation, because I anticipated (from experience with Icon) that VC would be defined so as to allow chaining of comparison operators, and using "lt" would allow chaining in the customary "ascending" order "0 < x < 10"; but because "gt" is primitive, the example here in line 436 is the more unusual "10 > x > 0". This is not a huge deal in the grand scheme of things, but it does prompt me to ask if there is some other deep reason why "gt" was chosen.
+
+
+line 442: I suggest grouping the context definitions with the rewrite rules that use them. (If we are lucky, scope contexts and choice contexts will go away, and that means just putting evaluation contexts and application contexts closer to the Application rewrite rules. The definition of "Choice-free expr" could be moved to Figure 2 or put next to the Speculation rewrite rules.)
+
+
+line 443: The two occurrences of \cdots should be \ldots. Also, I believe that "s_1" and "s_n" should be "v_1" and "v_n" (see my earlier comment about line 105).
+
+Also, consider using the form
+
+  < v_1, ..., v_{i-1}, \Box, v_{i+1}, ..., v_n >
+
+
+lines 450–451: Provide a full formal definition of "bvs", perhaps in a separate figure, similar to my suggestion for "fvs".
+
+
+line 454: Technically, lines 450–451 provide a definition only of "bvs(E)", leaving "bvs(A)" undefined in rule DEREF-H. I think a single definition of "bvs" can be crafted that will accept both E and A contexts.
+
+In addition, the second use of "\not\in" is an abuse of notation; better to write "fvs(h) \cap bvs(A) = \emptyset".
+
+
+line 455: As we discussed by Zoom (Jan 11 or 13), U-SCALAR should be "k = k; e --> e", not "s = s; e --> e". (Apparently it is important that "x = x" not disappear, if it ever appears in the first place; and "add = add" should be treated in the same way as "\lambda x.x = \lambda x.x", that is, it should fail. If "x = x; e" should simply not be rewritten, then the restriction on rule U-FAIL needs to be rewritten.)
+
+
+line 456: The three occurrences of \cdots should be \ldots.
+
+
+line 458: For rule U-FAIL, it may be difficult for the reader to figure out the details of the condition "if neither U-SCALAR nor U-TUP match"; part of the problem is that the LHS "hnf_1 = hnf_2" of rule U-FAIL does not match the form "eu; e" of the LHS of U-SCALAR and U-TUP. A simple patch would be to present the rule U-FAIL as
+
+U-FAIL   hnf_1 = hnf_2; e   -->   fail     if neither U-SCALAR nor U-TUP match
+
+A more verbose but crystal clear solution would be to present seven rules instead:
+
+U-SCALAR-TUP-FAIL   k = <v_1, ..., v_n>; e   -->   fail
+
+U-TUP-SCALAR-FAIL   <v_1, ..., v_n> = k; e   -->   fail
+
+U-SCALAR-LAMBDA-FAIL   k = \lambda x. e_1; e_2   -->   fail
+
+U-LAMBDA-SCALAR-FAIL   \lambda x. e_1 = k; e_2   -->   fail
+
+U-TUP-LAMBDA-FAIL   <v_1, ..., v_n> = \lambda x. e_1; e_2   -->   fail
+
+U-LAMBDA-TUP-FAIL   \lambda x. e_1 = <v_1, ..., v_n>; e_2   -->   fail
+
+U-LAMBDA-LAMBDA-FAIL   \lambda x_1. e_1 = \lambda x_2. e_2; e_3   -->   fail
+
+
+line 462: In APP-TUP, it is not sufficient that x\not\in fvs(v); it is important that x also not be a free variable in v_0, ..., v_n. Also, this is not really a condition onn the application of the rule, because it is a restriction on a manufactured variable rather than on the form of the LHS. So the comment on the right should really be "x fresh\qquad if n\geq 0".
+
+
+line 463: Rule APP-ADD is incorrect. It is not intended to replace an expression of the form "add<k_1, k_2>" with the expression "k_1 + k_2": that would just be a "resugaring", the inverse of the desugaring rule in Figure 2 at line 120.
+
+Rather, I am sure that the intent of the rule is to "escape from expression-land", do some work in "mathematics-land", and then project back into expressions-land. The addition needs to be a mathematical (or at least computational) addition. The correct way to present the rule is:
+
+APP-ADD   add<k_1, k_2>   -->   k_3       where k_3 = k_1 + k_2
+
+(Compare this to the rule for APP-GT, where the actual comparison of k_1 and k_2 is similarly done over on the right, in mathematics-land.)
+
+Also, I strongly suspect that in VC (but maybe not in Verse) there should be various additional rules to express cases where "add" fails: when the tuple is of length other than 2, or the tuple has elements that are not variables or integers, or the argument is not a tuple at all.
+
+
+line 465: I strongly suspect that in VC (but maybe not in Verse) there should be various additional rules to express cases where "gt" fails: when the tuple is of length other than 2, or the tuple has elements that are not variables or integers, or the argument is not a tuple at all.
+
+
+lines 474, 475, 477: I was very confused by the notation after the squiggly arrow. It is eventually explained briefly on line 575, with reference to Figure 5. It seems to me a really bad idea to overload the vertical bar "|" in this way; it's bad enough that it is used in BNF and a slightly shorter and bolder one is used as the choice operator. I strongly recommend that you choose a different separator for use in the syntax of the judgment defined in Figure 5. An obvious possibility is the double vertical bar obtained in LaTeX by using "\|".
+
+
+line 477: On the RHS of rule ALL-CHOICE, the "v" in the tuple should be a pointy-bottomed "v".
+
+
+line 480: Consider breaking Figure 3 into three figures (one each for Unification rewrite rules, Application rewrite rules, and Speculation rewrite rules).
+
+
+line 486: "just use $\alpha$-conversion" => "$\alpha$-conversion may be used", and before the period add "throughout $\lambda x.e". Also, in the argument to "fvs", the "v" should be a pointy-bottomed "v". Also, it is not sufficient that "x' \not\in fvs(v)"; we also need "x' \not\in fvs(e)", lest a free variable in "e" be captured. So make that "x' \not\in fvs(v, e)". But now the form "fvs(e_1, e_2)" needs to be defined (it is also used in the rule NORM-DEFR at line 598). So if you provide a complete formal definition of "fvs", add to that definition "fvs(e_1, e_2) = fvs(e_1) \cup fvs(e_2)".
+
+While we are add it: I suggest that alpha-conversion be added explicitly as a rewrite rule. After all, beta-conversion is not taken for granted (Figure 3 has APP-BETA), so why take alpha-conversion for granted when it is so easy to define?
+
+ALPHA-LAMBDA   \lambda x.e   -->   \lambda x'.e[x'/x]   if x' \not\in fvs(e)
+
+ALPHA-EXISTS   \exists x.e   -->   \exists x'.e[x'/x]   if x' \not\in fvs(e)
+
+and add to the text "We use the notation "e[x'/x]" to represent the expression obtained by performing standard capture-free substitution of x' for x within e."
+
+
+line 487: Rule APP-TUP0 should be mentioned in the text.
+
+
+line 499: I see " -- " being used where "---" should be used in the LaTeX source. However, even better would be to repunctuate as "any other value, including itself (see Section 4.2)."
+
+
+lines 511–512: "a \emph{scalar value}; that is, a variable or integer literal" Make that semicolon a comma, and add "or operator" after "integer literal".
+
+
+line 513: "only syntactically allow literals" => "syntactically allow only literals"
+
+
+line 516: after "when the RHS" add "of the equation"
+
+
+line 519: "elegantly" I agree!
+
+
+line 526: "Both rules substitute only to the right of a binding." Explain why.
+
+
+line 527: "by moving" => "by first moving"
+
+
+line 547: This sentence uses the word "equality" rather than "equation" (and see also "heap equalities" in line 570); this raises a big-picture question about terminology. It is generally a good rule in technical writing that when you invest a word with a specific technical meaning, then you should stick to using that word, and only that word, for that technical meaning, and only that meaning, unless there is a very good reason to do otherwise. So one should avoid unnecessary "synonyms" on the one hand and overloading of technical terms on the other.
+
+In this paper, I find that not only are the terms "equality" and "equation" used to refer to the same thing, but also the word "unification" (see line 569)—indeed, the BNF nonterminal "eu" seems to hint at the word "unification"—and the word "binding" (see "heap bindings" in line 572).
+
+I recommend that the term "unification" be reserved to refer to the actual process, or an instance of the process, of unifying two terms. This is an process or action that may be spurred by the processing of an equation. I recommend that the syntax form "x = e" always be referred to as an "equation", not an "equality" or "unification".
+
+
+line 569: "upward and to the left" With respect to what? I think these words may apply to the conceptual expression _tree_, but not to the syntactic forms generated by the BNF, which are linear. Possibly adding with words "within the expression tree" would help the reader. But given that ";" is right-associative, "upward within the expression tree" may be sufficient.
+
+
+line 570: Confusing terminology: from the example, it appears that the term "heap equality" refers to equations of the form "x = h" but "heap bindings" refers to equations of the more general form "h = v". Indeed, it appears that the contained word "heap" has two very different intended meanings: a "heap equality" appears to be an equation whose RHS is a "heap value" (see lines 105 and 140), that is, a value (lambda or tuple) that is typically allocated within "heap storage" that may be managed by a garbage collector or other storage management algorithm; whereas a "heap binding" appears to be an equation that appears within a set of equations that is regarded as a (possibly partial or local) "heap", and this sense of "heap" is actually not defined until line 576. 
+
+
+line 576: "judgement" This word is used only here and in line 578. This is not a big deal, but this spelling struck me as (please pardon my use of the term) "Brit", so I looked it up. Apparently, nowadays "judgment" is strongly preferred in the US; in the UK/Canada/Australia/New Zealand/South Africa, "judgement" is preferred in non-legal contexts but "judgment" is mandatory in legal contexts. I saw one claim that the Times, The Guardian, and The Telegraph have recently moved to using "judgment" in all contexts (this claim by a copyeditor who has worked for all three).  See https://www.theguardian.com/guardian-observer-style-guide-j and https://www.telegraph.co.uk/style-book/j/ (the style guide for the Times is behind a paywall).
+
+On line 630 we have "normalization" and on line 632 we have "normalisation".
+
+This is always a hazard when authors have different backgrounds. I suggest that you all make a global decision as to whether you collectively intend to follow UK spelling or USA spelling for all Verse-connected publications. Then make a little "house style" guide for yourselves, starting with these two words.
+
+
+line 577: "the expression wrapped in that heap" What do you mean by "_the_ expression"? Two points:
+
+(a) Unless you specify that "e" is not of the form "exists x.e_1" or "x = e_1; e_2", the choice of embedded expression is not unique. Note that the rules in Figure 5 do not enforce such a constraint on "e".
+
+(b) The operation of the rules in Figure 5 may implicitly require alpha-conversion.
+
+
+line 589: As I read this figure, I wondered whether a rewrite rule "exists x. exists x. e --> exists x. e" is needed, but later I realized that this is a special case of the garbage collection rule ELIM-DEF.
+
+
+line 592: I note that the parentheses on the LHS of the rewrite rule NORM-SEQ-ASSOC are required, but the parentheses on the RHS are redundant and therefore optional. I suppose those redundant parentheses are there to satisfy a likely reader expectation about how rewriting rules for associativity typically look. But this alerted me to the issue, and as I read and reread the paper, I could not divine any other specific principle that governs when you choose to insert such optional parentheses and when you choose to omit them. In NORM-SEQ-DEFL, the parentheses on the LHS are redundant.
+
+
+line 598: In the restriction at the right of rule NORM-DEFR, "fvs(v, e_2)" is not defined because the two-argument form of "fvs" has not yet been defined or discussed, only the one-argument form.
+
+
+line 506: In the restriction at the right of rule ELIM-DEF, I regarde "\bar{x} \not\in fvs(e_2)" as an abuse of notation; let me recommend "{ \bar{x} } \cap fvs(e_2) = \emptyset".
+
+
+line 618: In rule WF-EQ, in the premise "v \neq x" and also the premise to it right, the "v" should be a pointy-bottomed "v".
+
+
+line 619: In rule WF-EQ, the fifth premise mentions an otherwise unmentioned variable "h"; surely this is a typo.
+
+
+line 641: "with be" => "will be"
+
+Also I think this note is not quite correct: I think the general result of a non-stuck reduction may involve choices, and therefore will be one of (a) fail; (b) a "final expression" e (c) a sequence of choices e_1 | e_2 | ... | e_n, n >= 2, where each e_k is a "final expression"; where a "final expression" is one that the squiggly arrow takes to a value with a set of equations for heap values.
+
+
+line 648: "to ensure that each arm of the choice consists of a value wrapped in a heap" This is true only for the "all" construct. For the "one" construct, the rules ensure that the _first_ arm of the choice consists of a value wrapped in a heap.
+
+
+line 655: "(syntax in Fig. 1)" The syntax is actually in Fig. 3.
+
+
+line 670: In the code, I think a set of parentheses is missing: it should be "((x = 1; 77) | (x = 1; 99))".
+
+
+line 674: "the branches might contain choices" Then it would be more effective just to begin with an example for which that is true. So, back on line 662, begin with the expression "exists x. (if (x > 0) then (55 | 66) else 44); x = 1; (77 | 99)" (that is, simply replace "55" with "(55 | 66)").
+
+
+line 675: "innermost enclosing scope construct" The paper has not defined the term "scope construct".
+
+
+line 681: "rules ASSOC-CHOICE, FAIL-L, and FAIL-R" But Fig. 3 actually uses different names for these rules.
+
+
+line 684: Footnote 7 promises to "return" to a point in Section 3.3, but that section precedes Section 3.5, which contains the footnote.
+
+
+lines 687, 690, 693: A better name for rule FAIL-L-NO-SX would be "CHOOSE-R-NO-SX".
+
+
+line 690: Add a little vertical space between line 690 and line 691, to separate the two reduction sequences.
+
+
+line 700 "Consider a function call f(e)." Make that "Consider a function call f(e), where f is a variable and e is an expression that is not a value."
+
+
+line 722: "when the RHS is a value" => "when the RHS of an equation is a value”
+
+
+Comments on Sections 4, 5, and 6 of Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, and Sweeney,
+"The Verse Calculus: a Core Calculus for Functional Logic Programming", draft dated January 2003.
+
+
+SECTION 4 COMMENTS
+
+
+line 759: "(a steps to b)" => "(e steps to e')"; also "(a reduces to b)" => "(e reduces to e')"
+
+
+lines 762: "rules" => "sequences of rule applications" (in two places)
+
+
+line 764: add comma before "ultimately"
+
+
+line 780: I think "\mathcal{R}" should be "\mathcal{S}"
+
+
+line 790: "final equality" => "third equality" (to prevent confusion, because the third equations is not "final" within the entire expression)
+
+
+line 812: "appliction" => "application"
+
+
+line 817: "exists x,y." => "exists x y." (and again on line 818)
+
+Also, should "\rightarrow^*" instead be a double-headed rightarrow (for consistency with notation used in the confluence proof)?
+
+
+line 832: I had a visceral negative reaction to the use of "\leftarrow*" in this way, especially since this notation has not been explained. Better to use two lines to show the two reductions, as for example on lines 689 and 690.
+
+
+line 837: "we get (lambda y. y)"  But don't we actually get "0" (eventually)? Also, this whole paragraph would be easier to follow if _all_ the reduction steps were shown.
+
+
+line 838: "But if we first apply DEREF-H, twice, we get" => "But if we thought we could first apply DEREF-H, twice, we would get"
+
+
+SECTION 5 COMMENTS
+
+
+line 921: "A key rewrite rule" What is the source of this rewrite rule?
+
+
+SECTION 6 COMMENTS
+
+
+[none]
+
+
+[end]
+
