@@ -104,7 +104,8 @@
       \text{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
                                            \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
                              \vb |one e| \vb |all e| \\
-                           & eu     & ::= & |e| \vb |v == e| \\
+                             & eu     & ::= & |e| \vb |v == e| \quad \quad
+                                       \text{``$eu$'' is pronounced ``expression or unification''} \\
   %    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
   %       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
   %    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
@@ -122,11 +123,13 @@
       \\[-3mm]
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
-            \text{``|choice|'', ``;'', and ``|=|'' are right-associative.} \\
-            \text{``|=|'' binds more tightly than ``;''.} \\
-            \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible.} \\
-            \hspace{2mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|.}
-      \end{array} \\ \\[-3mm]
+            \text{``|choice|'', ``;'', and ``|=|'' are right-associative} \\
+            \text{``|=|'' binds more tightly than ``;''} \\
+            \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
+            \hspace{4mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|} \\
+      \end{array} \\
+      \text{Parentheses may be used freely to aid readability and override default precedence}
+  \\
       \textbf{Desugaring} \\
     \begin{array}{rcll}
 %%      |emptytup| & \text{means} & |arr ()|\\
@@ -134,7 +137,7 @@
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
-      |apply1 e_1 e_2| & \text{means} & |def (f a) (f == e_1 ; a == e_2; apply1 f a)|  & |f,a|\ \text{fresh} \\
+      |e_1 e_2| & \text{means} & |def (f x) (f == e_1 ; x == e_2; f x)|  & |f,x|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
@@ -144,7 +147,8 @@
       & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
       |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-     \end{array} \\
+      |lamhdr (tup(x,y)) e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
+    \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
@@ -163,18 +167,16 @@
 %       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
-      \text{Scope contexts} & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+                            & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
       
   \iffullverse
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
       \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v == ce| \vb |ce_1 ; ce_2|
-      \vb |one e| \vb |all e|
-      %%% NOTE: the following is not in the POPL submission,
-      %%% but needed to make progress in (1,2)[x:int]
-      \vb |apply1 op v| \\
-      & \multicolumn{3}{l}{\lennart{\text{Should we modify |ce| so it's a subset of |e|?  Currently |eu| ruins that.}}}
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceu ; ce|
+                                     \vb |one e| \vb |all e|
+                                     \vb |apply1 op v| \\
+                               & ceu & ::= & |ce| \vb |v == ce| \\
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -236,7 +238,7 @@
 %\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
 %  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
 % without \overline
-\rulename{def-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
+\rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
   & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
 %\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
 %    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\

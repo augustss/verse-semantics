@@ -18,7 +18,7 @@ testicfp:
 	$(TESTER) --quiet --dfs --rules=ICFP                    --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=ICFPR                   --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet       --rules=ICFP --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
-	$(QCTEST)               --rules=ICFP --ignore-fuel-stop --max-success=1000
+	$(QCTEST)               --rules=ICFP --ignore-fuel-stop --max-success=1000 --ignore-recursive
 
 testslow:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
@@ -50,7 +50,7 @@ testpoplxqc:
 	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
 
 testicfpqc:
-	$(QCTEST) --rules=ICFPR --ignore-fuel-stop --max-success=1000000
+	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
 
 testpopll:
 	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)

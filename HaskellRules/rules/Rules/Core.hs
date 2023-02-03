@@ -25,6 +25,7 @@ module Rules.Core(
   collect,
   allVars,
   check,
+  substExp,
   ) where
 import qualified Epic.SIntMap as IM
 import Data.Data(Data)
@@ -577,3 +578,37 @@ allVars = nub . expr
 check :: (HasCallStack) => (Expr -> Bool) -> Expr -> Expr
 check p a | p a = a
           | otherwise = error $ "check failed: " ++ show a
+
+--------------------------------------------------------------------------------
+
+-- Substiture one expressions for another.
+-- XXX Does not avoid accidental capture in the 'to' expression.
+substExp :: Expr -> Expr -> Expr -> Expr
+substExp from to = sub
+  where
+    fvs = free from
+    tvs = free to
+    sub e | e == from = to
+    sub e@Var{}   = e
+    sub e@Int{}   = e
+    sub e@Op{}    = e
+    sub (Arr vs)  = Arr (map sub vs)
+    sub (LAM x e) | x `elem` fvs = LAM x e
+                  | x `elem` tvs = error "unimplemented"
+                  | otherwise = LAM x (sub e)
+    sub (a :=: b) = sub a :=: sub b
+    sub (a :>: b) = sub a :>: sub b
+    sub (a :|: b) = sub a :|: sub b
+    sub (a :@: b) = sub a :@: sub b
+    sub Fail      = Fail
+    sub Wrong     = Wrong
+    sub (EXI x e) | x `elem` fvs = EXI x e
+                  | x `elem` tvs = error "unimplemented"
+                  | otherwise = EXI x (sub e)
+    sub (One a)   = One (sub a)
+    sub (All a)   = All (sub a)
+    sub (Split e f g) = Split (sub e) (sub f) (sub g)
+    sub (BlockC e) = BlockC (sub e)
+    sub (Store h e) = Store (IM.map sub h) (sub e)
+    sub e@Ref{}   = e
+    sub _         = undefined
