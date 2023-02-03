@@ -312,7 +312,6 @@ isChoiceFree Split{}   = True  -- XXX is it?
 isChoiceFree Wrong     = True
 isChoiceFree (EXI _ e) = isChoiceFree e
 isChoiceFree _         = False
--- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False

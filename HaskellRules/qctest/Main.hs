@@ -10,6 +10,7 @@ import TRS.NormalForm( normalFormsFuelTrace, NormResult(..) )
 import TRS.Traced
 import Test.QuickCheck as QC
 import Options.Applicative
+import qualified Data.Set as S
 
 --------------------------------------------------------------------------------
 
@@ -60,14 +61,17 @@ prop_Confluence1 flags sys =
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
-    [ p' | p' <- shrink p, validExpr sys (ruleEnv sys) p' ]
+    [ p'
+    | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
+    , validExpr sys (ruleEnv sys) p'
+    ]
 
 prop_Confluence2 :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence2 flags sys =
   forAllShrink arbExpr shrinkExpr $ \p0 ->
     let p = if wrapOne flags then One p0 else p0 in
-      forAllBlind (arbTrace sys p) $ \m1 ->
-        forAllBlind (arbTrace sys p) $ \m2 ->
+      forAllBlind (arbTrace flags sys p) $ \m1 ->
+        forAllBlind (arbTrace flags sys p) $ \m2 ->
           case (m1, m2) of
             (Just w1, Just w2) ->
               whenFail (do putStrLn "==trace:1=="
@@ -83,17 +87,67 @@ prop_Confluence2 flags sys =
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
-    [ p' | p' <- shrink p, validExpr sys (ruleEnv sys) p' ]
+    [ p'
+    | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
+    , validExpr sys (ruleEnv sys) p'
+    ]
 
-arbTrace :: TRSystem Expr -> Expr -> Gen (Maybe (Traced Expr))
-arbTrace sys p = go (0 :: Int) [] p
+arbTrace :: TestFlags -> TRSystem Expr -> Expr -> Gen (Maybe (Traced Expr))
+arbTrace flags sys p = go (5 :: Int) (15 :: Int) [] p
  where
-  go k _t _p | k > 15 = return Nothing
-  go k t p' =
+  go k0 k1 _t p' | k1 <= 0 || (ignoreRecursive flags && isRecursive p') =
+    do return Nothing
+
+  go k0 k1 t p' | k0 > 0 =
+    frequency
+    [ (1, go 0 k1 t p')
+    , (4, case step (confluenceRules sys) (ruleEnv sys) p' of
+            []  -> do go 0 k1 t p'
+            nqs -> do (n,q) <- elements nqs
+                      go (k0-1) k1 ((n,p'):t) q)
+    ]
+  
+  go k0 k1 t p' =
     case step (rules sys) (ruleEnv sys) p' of
       []  -> do return (Just (p' :<-- t))
       nqs -> do (n,q) <- elements nqs
-                go (k+1) ((n,p'):t) q
+                go k0 (k1-1) ((n,p'):t) q
+
+prop_Terminates :: TestFlags -> TRSystem Expr -> Property
+prop_Terminates flags sys =
+  forAllShrinkBlind arbExpr shrinkExpr $ \p ->
+  let p' = if wrapOne flags then One p else p in
+  case diverges (999::Int) S.empty [(299::Int,S.empty,p' :<-- [])] of
+    Nothing ->
+      property True
+    
+    Just trp ->
+      whenFail (putStr (unlines (showTrace trp))) $
+        False
+ where
+  arbExpr =
+    do p <- arbitrary
+       return (preProcess sys (ruleEnv sys) p)
+
+  shrinkExpr p =
+    [ p' | p' <- shrink p, validExpr sys (ruleEnv sys) p' ]
+
+  diverges n _ ps | n <= 0 || null ps =
+    Nothing
+
+  diverges n seen ((fuel,pars,trp@(p :<-- tr)):ps)
+    | fuel <= 0 || p `S.member` pars =
+      Just trp
+    
+    | isRecursive p || p `S.member` seen =
+      diverges n seen ps
+
+    | otherwise =
+      diverges (n-1) (S.insert p seen) $
+        [ (fuel-1, S.insert p pars, q :<-- ((rule,p):tr))
+        | (rule,q) <- step (rules sys) (ruleEnv sys) p
+        ]
+       ++ ps  
 
 --------------------------------------------------------------------------------
 

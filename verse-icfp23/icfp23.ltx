@@ -430,12 +430,17 @@ thus\footnote{The rule names come from \cref{fig:rules}, to be discussed in \cre
   are given here just for reference.}:
 $$
 \begin{array}{ll}
-                         & |def (x ^^ y ^^ z) (x = tup(y,3); x = tup(2,z); y)| \\
-\movestoR{deref-h}       & |def (x ^^ y ^^ z) (x = tup(y,3); tup(y,3) = tup(2,z); y)| \\
-\movestoR{u-tup}          & |def (x ^^ y ^^ z) (x = tup(y,3); (y = 2; 3 = z; tup(y,3)); y)| \\
-\movestoRn{deref-s}{2}  & |def (x ^^ y ^^ z) (x = tup(2,3); (y = 2; 3 = z; tup(2,3)); 2)| \\
-\movestoR{norm-seq-assoc,norm-swap-eq}  & |def (x ^^ y ^^ z) (x = tup(2,3); y = 2; z = 3; tup(2,3); 2)| \\
-\movestoR{norm-val,elim-def}     & |                                                     2|
+                         & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
+\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
+\movestoR{exi-eliml}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3; emptytup); y)| \\
+\movestoR{exi-eliml}     & |def y ((2==y; emptytup); y)| \\
+\movestoR{norm-seq}      & |def y (2==y; emptytup; y)| \\
+\movestoR{hnf-swap}      & |def y (y==2; emptytup; y)| \\
+\movestoR{subst}         & |def y (y==2; emptytup; 2)| \\
+\movestoR{exi-eliml}     & |emptytup; 2| \\
+\movestoR{norm-val}      & |2| \\
+\text{\lennart{ICFP conversion done}}
 \end{array}
 $$
 %
@@ -1131,11 +1136,13 @@ when its condition mentions |x| which is not yet defined?  But in fact, rule \ru
 us to substitute \emph{locally} in any X-context surrounding the equality |(x=0)| thus:
 $$
 \begin{array}{l@@{\;}l}
-                                & |def x (x = if (x=0; x>1) then 33 else 55)| \\
-\movestoR{deref-s}              & |def x (x = if (x=0; 0>1) then 33 else 55)| \\
-\movestoR{u-fail,fail-seql}     & |def x (x = if fail then 33 else 55)|\\
-\movestoC{\text{simplify |if|}} & |def x (x = 55)| \\
-\movestoR{elim-def}            & |55|
+                                & |def x (x = if (x=0; x>1) then 33 else 55; x)| \\
+\movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55; x)| \\
+\movestoR{u-fail,fail}          & |def x (x = if fail then 33 else 55; x)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
+\movestoR{subst}                & |def x (x = 55; 55)| \\
+\movestoR{exi-eliml}            & |55| \\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1293,10 +1300,10 @@ without this restriction we lose confluence.  To see this, consider\footnote{Rem
 $$
 \begin{array}{l@@{\;}l}
                                  & |def x ((if (x>0) then 55 else 44); x=1; (77 choice 99))|\\
- \movestoR{norm-seq-swap2}       & |def x (x=1; (if (x>0)  then 55 else 44); (77 choice 99))|\\
- \movestoR{deref-s}                & |def x (x=1; (if (1>0)  then 55 else 44); (77 choice 99))|\\
- \movestoC{\text{simplify |if|}} & |def x (x=1; 55; (77 choice 99))|\\
- \movestoR{seq, elim-def}       & |77 choice 99|\\
+ \movestoR{subst}                & |def x ((if (1>0) then 55 else 44); x=1; (77 choice 99))|\\
+ \movestoC{\text{simplify |if|}} & |def x (55; x=1; (77 choice 99))|\\
+ \movestoR{norm-val, exi-eliml}  & |77 choice 99|\\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
@@ -1900,44 +1907,35 @@ Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching o
 At \circlednum{5} and \circlednum{6} the actual numbers are inline.
 After removing some garbage we reach the result at \circlednum{7}.
 \begin{figure}
-\begin{scriptsize}
+\begin{footnotesize}
 % no space needed around math environments in a figure
 \setlength{\abovedisplayskip}{0pt}%
 \setlength{\belowdisplayskip}{0pt}%
 $$
 \begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-  &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+                &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+                & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
 
 
-  & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
-\circlednum{1}  & \movestoR{deref-h,elim-def} & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t) (t == tup (2,3) ; t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
-\circlednum{2}  & \movestoR{app-beta}         & |def (p ^^ t) (t == tup (2,3) ; t == def (xy) ((xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr}    & |def (p ^^ t) (t == tup (2,3) ; def (xy) (t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl}    & |def (p ^^ t ^^ xy) (t == tup (2,3) ; t == (xy == p ; def (x ^^ y) (tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seqr,norm-seq-assoc}   & |def (p ^^ t ^^ xy) (t == tup (2,3) ; xy == p ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-seq-swap}    & |def (p ^^ t ^^ xy) (xy == p ; t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == xy ; tup (y,x))) ; p)| \\
-\circlednum{3}  & \movestoR{deref-s,elim-def} & |def (p ^^ t) (t == tup (2,3) ; t == def (x ^^ y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t) (t == tup (2,3) ; def (x) (t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x) (t == tup (2,3) ; t == def (y) ((tup (x,y) == p ; tup (y,x))) ; p)| \\
-  & \movestoR{norm-defr,norm-seq-defr} & |def (p ^^ t ^^ x) (t == tup (2,3) ; def (y) (t == (tup (x,y) == p ; tup (y,x)) ; p))| \\
-  & \movestoR{norm-seq-defl} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; t == (tup (x,y) == p ; tup (y,x)) ; p)| \\
-  & \movestoR{norm-seqr} & |def (p ^^ t ^^ x ^^ y) (t == tup (2,3) ; (tup (x,y) == p ; t == tup (y,x)) ; p)| \\
-  & \movestoR{deref-h,elim-def} & |def (p ^^ x ^^ y) ((tup (x,y) == p ; tup (2,3) == tup (y,x)) ; p)| \\
-  & \movestoR{norm-seq-assoc,norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; tup (2,3) == tup (y,x) ; p)| \\
-\circlednum{4}  & \movestoR{u-tup,norm-seq-assoc} & |def (p ^^ x ^^ y) (p == tup (x,y) ; 2 == y ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x ^^ y) (p == tup (x,y) ; y == 2 ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x ^^ y) (y == 2 ; p == tup (x,y) ; (3 == x ; tup (2,3)) ; p)| \\
-\circlednum{5}  & \movestoR{deref-s,elim-def} & |def (p ^^ x) (p == tup (x,2) ; (3 == x ; tup (2,3)) ; p)| \\
-  & \movestoR{norm-seq-assoc} & |def (p ^^ x) (p == tup (x,2) ; 3 == x ; tup (2,3) ; p)| \\
-  & \movestoR{norm-swap-eq} & |def (p ^^ x) (p == tup (x,2) ; x == 3 ; tup (2,3) ; p)| \\
-  & \movestoR{norm-seq-swap} & |def (p ^^ x) (x == 3 ; p == tup (x,2) ; tup (2,3) ; p)| \\
-\circlednum{6}  & \movestoR{deref-s,elim-def} & |def (p) (p == tup (3,2) ; tup (2,3) ; p)| \\
-\circlednum{7}  & \movestoR{norm-val} & |def (p) (p == tup (3,2) ; p)| \\
-  & \movestoR{post-reduction-inline} & |tup (3,2)| \\
+\circlednum{1}  & \movestoR{subst,exi-eliml}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+                & \movestoR{subst,exi-eliml}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+                & \movestoR{norm-exi}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+                & \movestoR{subst,exi-eliml}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
+                & \movestoR{norm-exi,norm-exi} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+                & \movestoR{norm-seqr,norm-seq}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
+                & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
+                & \movestoR{subst,exi-eliml}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
+                & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; emptytup; tup(x,y))| \\
+                & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; emptytup; tup(x,y))| \\
+                & \movestoR{subst,exi-eliml}   & |def x (3==x; emptytup; tup(x,2))| \\
+                & \movestoR{hnf-swap}          & |def x (x==3; emptytup; tup(x,2))| \\
+                & \movestoR{subst,exi-eliml}   & |emptytup; tup(3,2)| \\
+                & \movestoR{norm-val}          & |tup(3,2)| \\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
-\end{scriptsize}
+\end{footnotesize}
 \caption{Sample reduction sequence} \label{fig:sample-reductions}
 \end{figure}
 
