@@ -269,6 +269,8 @@
 %format b_1
 %format b_2
 
+%format u_1
+%format u_n
 %format v_0
 %format v_1
 %format v1'
