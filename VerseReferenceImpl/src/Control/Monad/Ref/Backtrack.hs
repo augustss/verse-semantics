@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Ref.Backtrack
   ( MonadRef (..)
@@ -9,6 +10,8 @@ module Control.Monad.Ref.Backtrack
   ) where
 
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Writer.CPS qualified as CPS
 
 import Data.Kind
 
@@ -39,3 +42,7 @@ type MonadRefTrans t n = (Ref (t n) ~ Ref n, MonadTrans t, MonadRef n)
 
 modifyRef :: MonadRef m => Ref m a -> (a -> a) -> m ()
 modifyRef ref f = writeRef ref . f =<< readRef ref
+
+instance MonadRef m => MonadRef (ReaderT r m)
+
+instance MonadRef m => MonadRef (CPS.WriterT w m)

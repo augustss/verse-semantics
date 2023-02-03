@@ -1,3 +1,4 @@
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -13,6 +14,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Writer.CPS qualified as CPS
 
+import Data.Fix
 import Data.Kind
 
 class Monad m => MonadVar m where
@@ -30,6 +32,23 @@ class Monad m => MonadVar m where
   readVar :: Var m f -> m (Maybe (f (Var m f)))
   default readVar :: (m ~ t n, MonadVarTrans t n) => Var m f -> m (Maybe (f (Var m f)))
   readVar = lift . readVar
+
+  freeze :: Traversable f => Var m f -> m (Maybe (Fix f))
+  freeze = freezeBy id
+
+  freezeBy :: Traversable g => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
+  default freezeBy :: ( m ~ t n
+                      , MonadVarTrans t n
+                      , Traversable g
+                      ) => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
+  freezeBy f = lift . freezeBy f
+
+  freshen :: Traversable f => Var m f -> m (Var m f)
+  default freshen :: ( m ~ t n
+                     , MonadVarTrans t n
+                     , Traversable f
+                     ) => Var m f -> m (Var m f)
+  freshen = lift . freshen
 
 type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
   VarDefault (t n) = Var n

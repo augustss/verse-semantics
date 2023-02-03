@@ -21,12 +21,13 @@ import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
-import Control.Monad.Ref.Lenient qualified as Lenient
+import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Supply
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Unify
 import Control.Monad.Var
-import Control.Monad.Verse (MonadVerse (..), runVerseT)
+import Control.Monad.Verse (runVerseT)
+import Control.Monad.Verse.Class
 
 import Data.Fix
 import Data.Foldable
@@ -60,7 +61,8 @@ type MonadEval m =
   ( MonadError Error m
   , MonadSupply Label m
   , MonadVerse m
-  , EqRef (Lenient.Ref m)
+  , Unifiable (World m)
+  , EqRef (Backtrack.Ref m)
   )
 
 type Defaults m = HashMap (Ident Name) (MutVar m, Env m, L (Exp L (Ident Name)))
@@ -74,12 +76,12 @@ type MutVar m = Var m (MutVal m)
 type MutVal m = Val (Mut m)
 
 data Mut m a
-  = Ref (Lenient.Ref m (MutVar m))
+  = Ref (Backtrack.Ref m (MutVar m))
   | Val a deriving (Functor, Foldable, Traversable)
 
-instance EqRef (Lenient.Ref m) => Unifiable (Mut m)
+instance EqRef (Backtrack.Ref m) => Unifiable (Mut m)
 
-instance EqRef (Lenient.Ref m) => Zippable (Mut m) where
+instance EqRef (Backtrack.Ref m) => Zippable (Mut m) where
   zipMatch = curry $ \ case
     (Ref x, Ref y) | eqRef x y -> Just []
     (Val x, Val y) -> Just [(x, y)]
@@ -91,13 +93,15 @@ data Pure a
 
 instance Pretty a => Pretty (Pure a) where
   pretty = \ case
-    Read -> pretty '^'
+    Read -> "ref"
     Pure x -> pretty x
 
-freeze' :: MonadVerse m => MutVar m -> m (Maybe (Fix (Val Pure)))
+freeze' :: ( Backtrack.MonadRef m
+           , MonadVar m
+           ) => MutVar m -> m (Maybe (Fix (Val Pure)))
 freeze' = freezeBy $ Val.hoist $ \ case
   Ref _ -> Read
-  Val x -> Pure x
+  Val var -> Pure var
 
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = runReaderT (evalWriterT m) =<< newEnv
@@ -129,17 +133,17 @@ eval' e = case extract e of
     lift $ whenBound var_e $ \ case
       Val.Module _ xs ->
         case HashMap.lookup x xs of
-          Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
+          Just (Ref ref_x) -> readRef' ref_x $ unify var
           Just (Val var_x) -> unify var var_x
           Nothing -> throwNameError (loc e) x
       Val.StructInst _ xs ->
         case HashMap.lookup x xs of
-          Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
+          Just (Ref ref_x) -> readRef' ref_x $ unify var
           Just (Val var_x) -> unify var var_x
           Nothing -> throwNameError (loc e) x
       Val.ClassInst _ _ xs ->
         case HashMap.lookup x xs of
-          Just (Ref ref_x) -> Lenient.readRef ref_x $ unify var
+          Just (Ref ref_x) -> readRef' ref_x $ unify var
           Just (Val var_x) -> unify var var_x
           Nothing -> throwNameError (loc e) x
       _ -> throwDomainError $ loc e
@@ -247,14 +251,14 @@ eval' e = case extract e of
     var <- freshVar
     localName (extract x) (Val var) $ eval' e
   Exp.Var x e -> do
-    ref <- lift $ Lenient.newRef =<< freshVar
+    ref <- lift $ newRef' =<< freshVar
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupName' (extract x) >>= \ case
     Nothing -> throwIdentError (loc x) (extract x)
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      lift $ Lenient.writeRef ref =<< freshen var
+      lift $ writeRef' ref =<< freshen var
       pure var
   Exp.Function xs e1 e2 -> do
     i <- supply
@@ -562,19 +566,18 @@ newEnv = execWriterT $ do
       freshVar
 
 lookupName :: ( MonadVerse m
-              , EqRef (Lenient.Ref m)
+              , Unifiable (World m)
+              , EqRef (Backtrack.Ref m)
               ) => Ident Name -> EvalT m (Maybe (MutVar m))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
     var <- freshVar
-    lift $ Lenient.readRef ref $ unify var
+    lift $ readRef' ref $ unify var
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
-lookupName' :: ( MonadVerse m
-               , EqRef (Lenient.Ref m)
-               ) => Ident Name -> EvalT m (Maybe (Named m))
+lookupName' :: Monad m => Ident Name -> EvalT m (Maybe (Named m))
 lookupName' = asks . HashMap.lookup
 
 localName :: Monad m => Ident Name -> Named m -> EvalT m a -> EvalT m a
@@ -602,27 +605,32 @@ fromIdents =
   []
 
 unifyNamed :: ( MonadVerse m
-              , EqRef (Lenient.Ref m)
+              , Unifiable (World m)
+              , EqRef (Backtrack.Ref m)
               ) => Named m -> Named m -> EvalT m ()
 unifyNamed = curry $ lift . \ case
   (Val var_x, Val var_y) ->
     unify var_x var_y
   (Ref ref_x, Val var_y) ->
-    Lenient.readRef ref_x $ unify var_y
+    readRef' ref_x $ unify var_y
   (Val var_x, Ref ref_y) ->
-    Lenient.readRef ref_y $ unify var_x
+    readRef' ref_y $ unify var_x
   (Ref ref_x, Ref ref_y) ->
-    Lenient.readRef ref_x $ \ var_x ->
-    Lenient.readRef ref_y $ \ var_y ->
+    readRef' ref_x $ \ var_x ->
+    readRef' ref_y $ \ var_y ->
     unify var_x var_y
 
-freshNamed :: MonadVerse m => Bool -> EvalT m (Named m)
+freshNamed :: ( Backtrack.MonadRef m
+              , MonadVar m
+              ) => Bool -> EvalT m (Named m)
 freshNamed = \ case
   False -> Val <$> freshVar
   True -> Ref <$> freshRef
 
-freshRef :: MonadVerse m => EvalT m (Lenient.Ref m (Var m f))
-freshRef = lift . Lenient.newRef =<< freshVar
+freshRef :: ( Backtrack.MonadRef m
+            , MonadVar m
+            ) => m (Backtrack.Ref m (Var m f))
+freshRef = newRef' =<< freshVar
 
 whenBound' :: ( Monoid w
               , MonadVerse m
@@ -635,6 +643,37 @@ ifte'' :: (Monoid w, MonadVerse m) =>
           WriterT w m () ->
           WriterT w m ()
 ifte'' p t e = lift $ ifte' (evalWriterT p) (evalWriterT . t) (evalWriterT e)
+
+newRef' :: Backtrack.MonadRef m => a -> m (Backtrack.Ref m a)
+newRef' = Backtrack.newRef
+
+readRef' :: ( Backtrack.MonadRef m
+            , MonadVerse m
+            , Unifiable (World m)
+            ) => Backtrack.Ref m a -> (a -> m ()) -> m ()
+readRef' ref f = do
+  world <- getWorld
+  world' <- freshVar
+  whenBound world $ \ _ -> do
+    world'' <- getWorld
+    putWorld world
+    f =<< Backtrack.readRef ref
+    unify world' =<< getWorld
+    putWorld world''
+
+writeRef' :: ( Backtrack.MonadRef m
+             , MonadVerse m
+             , Unifiable (World m)
+             ) => Backtrack.Ref m a -> a -> m ()
+writeRef' ref x = do
+  world <- getWorld
+  world' <- freshVar
+  whenBound world $ \ _ -> do
+    world'' <- getWorld
+    putWorld world
+    Backtrack.writeRef ref x
+    unify world' =<< getWorld
+    putWorld world''
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference

@@ -7,6 +7,7 @@
 module Language.Verse.Val
   ( Val (..)
   , hoist
+  , hoistA
   ) where
 
 import Control.Applicative
@@ -15,6 +16,8 @@ import Control.Monad.Var
 import Control.Monad.Writer.CPS
 
 import Data.Foldable
+import Data.Functor
+import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
@@ -160,13 +163,16 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
         ", "
 
 hoist :: (forall b . f b -> g b) -> Val f a -> Val g a
-hoist f = \ case
-  Int x -> Int x
-  Float x -> Float x
-  Rational x -> Rational x
-  Truth x -> Truth x
-  Tuple xs -> Tuple xs
-  Module i xs -> Module i (f <$> xs)
-  StructInst i xs -> StructInst i (f <$> xs)
-  ClassInst i x xs -> ClassInst i x (f <$> xs)
-  Overloads x xs -> Overloads (Overload.hoist f x) xs
+hoist f = runIdentity . hoistA (Identity . f)
+
+hoistA :: Applicative m => (forall b . f b -> m (g b)) -> Val f a -> m (Val g a)
+hoistA f = \ case
+  Int x -> pure $ Int x
+  Float x -> pure $ Float x
+  Rational x -> pure $ Rational x
+  Truth x -> pure $ Truth x
+  Tuple xs -> pure $ Tuple xs
+  Module i xs -> Module i <$> traverse f xs
+  StructInst i xs -> StructInst i <$> traverse f xs
+  ClassInst i x xs -> ClassInst i x <$> traverse f xs
+  Overloads x xs -> Overload.hoistA f x <&> \ x -> Overloads x xs

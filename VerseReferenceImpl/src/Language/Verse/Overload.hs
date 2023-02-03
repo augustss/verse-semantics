@@ -6,7 +6,11 @@
 module Language.Verse.Overload
   ( Overload (..)
   , hoist
+  , hoistA
   ) where
+
+import Data.Functor
+import Data.Functor.Identity
 
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
@@ -41,8 +45,11 @@ instance Pretty (Overload f a) where
     Intrinsic x -> pretty x
 
 hoist :: (forall b . f b -> g b) -> Overload f a -> Overload g a
-hoist f = \ case
-  Function i env xs e1 e2 -> Function i (f <$> env) xs e1 e2
-  Struct i env xs e -> Struct i (f <$> env) xs e
-  Class i env x xs e -> Class i (f <$> env) x xs e
-  Intrinsic x -> Intrinsic x
+hoist f = runIdentity . hoistA (Identity . f)
+
+hoistA :: Applicative m => (forall b . f b -> m (g b)) -> Overload f a -> m (Overload g a)
+hoistA f = \ case
+  Function i env xs e1 e2 -> traverse f env <&> \ env -> Function i env xs e1 e2
+  Struct i env xs e -> traverse f env <&> \ env -> Struct i env xs e
+  Class i env x xs e -> traverse f env <&> \ env -> Class i env x xs e
+  Intrinsic x -> pure $ Intrinsic x

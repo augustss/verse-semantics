@@ -14,38 +14,29 @@ module Control.Monad.Verse.Class
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Fix
 import Control.Monad.Reader
-import Control.Monad.Ref
-import Control.Monad.Ref.Lenient qualified as Lenient
-import Control.Monad.Supply
-import Control.Monad.Trans.Verse (VerseT)
-import Control.Monad.Trans.Verse qualified as Verse
+import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Unify
 import Control.Monad.Var
 
-import Data.Fix
-import Data.Ref
+import Data.Kind
 
-class (MonadPlus m, MonadUnify m, Lenient.MonadRef m) => MonadVerse m where
+class ( MonadPlus m
+      , MonadUnify m
+      , Backtrack.MonadRef m
+      ) => MonadVerse m where
+  type World m :: Type -> Type
+  type World m = WorldDefault m
+
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
-  freeze :: Traversable f => Var m f -> m (Maybe (Fix f))
-  freeze = freezeBy id
+  getWorld :: m (Var m (World m))
+  default getWorld :: (m ~ t n, MonadVerseTrans t n) => m (Var m (World m))
+  getWorld = lift getWorld
 
-  freezeBy :: Traversable g => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
-  default freezeBy :: ( m ~ t n
-                      , MonadVerseTrans t n
-                      , Traversable g
-                      ) => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
-  freezeBy f = lift . freezeBy f
-
-  freshen :: Traversable f => Var m f -> m (Var m f)
-  default freshen :: ( m ~ t n
-                     , MonadVerseTrans t n
-                     , Traversable f
-                     ) => Var m f -> m (Var m f)
-  freshen = lift . freshen
+  putWorld :: Var m (World m) -> m ()
+  default putWorld :: (m ~ t n, MonadVerseTrans t n) => Var m (World m) -> m ()
+  putWorld = lift . putWorld
 
   split :: m a -> (Maybe (a, m a) -> m ()) -> m ()
 
@@ -65,17 +56,15 @@ class (MonadPlus m, MonadUnify m, Lenient.MonadRef m) => MonadVerse m where
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
 
-type MonadVerseTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVerse n)
+type family WorldDefault (m :: Type -> Type) :: Type -> Type where
+  WorldDefault (t n) = World n
 
-instance ( MonadFix m
-         , MonadRef m
-         , MonadSupply Verse.Label m
-         , EqRef (Ref m)
-         ) => MonadVerse (VerseT m) where
-  whenBound = Verse.whenBound
-  freezeBy = Verse.freezeBy
-  freshen = Verse.freshen
-  split = Verse.split
+type MonadVerseTrans t n =
+  ( Var (t n) ~ Var n
+  , World (t n) ~ World n
+  , MonadTrans t
+  , MonadVerse n
+  )
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
