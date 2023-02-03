@@ -50,7 +50,7 @@ rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
   latex          = fLatex flg
   nf | fDfs flg  = normalFormFuelTrace  sys n
      | otherwise = normalFormsFuelTrace sys n
-  nrToList NormResult{ nrDone = xs, nrLeft = left } | null left || fNoFuelStop flg = xs ++ left
+  nrToList NormResult{ nrDone = xs, nrLeft = left } | null left || fNoFuelStop flg = xs -- ++ left
   nrToList _ = []  -- Just flag timeout as an empty list
   rtrace xs | not tr = res
             | latex = trace (latexTrace xs) res
