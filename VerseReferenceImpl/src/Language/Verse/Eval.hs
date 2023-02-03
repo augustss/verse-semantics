@@ -334,7 +334,9 @@ invokeIntrinsic = \ case
   Intrinsic.Greater -> liftOrd (>)
   Intrinsic.GreaterEqual -> liftOrd (>=)
   Intrinsic.Plus -> liftNum (+)
+  Intrinsic.PrefixPlus -> prefixPlus
   Intrinsic.Minus -> liftNum (-)
+  Intrinsic.PrefixMinus -> prefixMinus
   Intrinsic.Multiply -> liftNum (*)
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
@@ -402,6 +404,39 @@ liftNum f var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Val.Rational $ f x y
           _ -> empty
+      pure var')
+  (k . Just)
+  (k Nothing)
+
+prefixPlus :: MonadVerse m =>
+              Var m (Val f) ->
+              (Maybe (Var m (Val f)) -> m ()) ->
+              m ()
+prefixPlus var k =
+  ifte'
+  (do
+      whenBound var $ \ case
+        Val.Int _ -> pure ()
+        Val.Float _ -> pure ()
+        Val.Rational _ -> pure ()
+        _ -> empty
+      pure var)
+  (k . Just)
+  (k Nothing)
+
+prefixMinus :: (MonadVerse m, Zippable f) =>
+               Var m (Val f) ->
+               (Maybe (Var m (Val f)) -> m ()) ->
+               m ()
+prefixMinus var k =
+  ifte'
+  (do
+      var' <- freshVar
+      whenBound var $ \ val -> unify var' =<< case val of
+        Val.Int x -> newVar . Val.Int $ negate x
+        Val.Float x -> newVar . Val.Float $ negate x
+        Val.Rational x -> newVar . Val.Rational $ negate x
+        _ -> empty
       pure var')
   (k . Just)
   (k Nothing)
@@ -514,7 +549,9 @@ newEnv = execWriterT $ do
   tell' "operator'>'" Intrinsic.Greater
   tell' "operator'>='" Intrinsic.GreaterEqual
   tell' "operator'+'" Intrinsic.Plus
+  tell' "prefix'+'" Intrinsic.PrefixPlus
   tell' "operator'-'" Intrinsic.Minus
+  tell' "prefix'-'" Intrinsic.PrefixMinus
   tell' "operator'*'" Intrinsic.Multiply
   tell' "operator'/'" Intrinsic.Divide
   tell' "int" Intrinsic.Int

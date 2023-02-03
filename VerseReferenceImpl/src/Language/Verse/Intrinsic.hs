@@ -10,7 +10,9 @@ data Intrinsic
   | Greater
   | GreaterEqual
   | Plus
+  | PrefixPlus
   | Minus
+  | PrefixMinus
   | Multiply
   | Divide
   | Int deriving (Show, Eq)
