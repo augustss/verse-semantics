@@ -56,6 +56,27 @@ Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 
 \section{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
+\begin{lemma}[Disjoint] \label{lem:disjoint}
+Let $e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots$
+be an expression with two \emph{disjoint} reducts
+$\rdx{1}$ and $\rdx{2}$.
+%
+If $\rstep{}{e}{\ldots \rdx{1}' \ldots \rdx{2} \ldots \equiv e_1}$ and
+   $\rstep{}{e}{\ldots \rdx{1} \ldots \rdx{2}' \ldots \equiv e_2}$
+then there exists $e'$ such that
+		$\rstep{}{e_1}{e'}$ and
+		$\rstep{}{e_2}{e'}$.
+\end{lemma}
+
+\begin{proof}
+Trivial.
+\end{proof}
+
+In the rest of the proof, the above \cref{lem:disjoint} lemma
+allows us to focus our attention on the cases where one reduct
+\emph{occurs under} the other and vice versa.
+
+
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
@@ -94,8 +115,252 @@ then there exists $\rdx{\rapp}''$ such that
 \end{description}
 \end{proof}
 
-\ranjit{CURSOR:HEREHEREHEREHEREHERE}
+\begin{lemma}[Under-$\runi$] \label{lem:under-u}
+%
+Let $\rr' \equiv \rr - \rulename{subst} - \rulename{swap}$.
+%
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rstep{}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\rapp}{E[\rdx{}']}{\rdx{\runi}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzEsMSwiXFxyZHh7XFxydW5pfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDMsIlxccnInIl0sWzMsMiwiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMiwiXFxyciciLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\rdx{\runi} \equiv E[\rdx{}]} & {E[\rdx{}']} \\
+	{\rdx{\runi}'} & {\rdx{\runi}''}
+	\arrow["\runi"', from=1-1, to=2-1]
+	\arrow["{\rr'}", from=1-1, to=1-2]
+	\arrow["\runi", dotted, from=1-2, to=2-2]
+	\arrow["{\rr'}"', dotted, from=2-1, to=2-2]
+\end{tikzcd}\]
+\end{lemma}
 
+\begin{proof}
+Split cases on the rule used in $\runi$.
+\begin{description}
+\item[Case] \rulename{subst} Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
+	\begin{description}
+	\item[Case] $\rdx{} \subset X$, \ie $X \equiv X'[\rdx{}]$.
+	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYJ1tcXHJkeHt9XVt4PXZdIl0sWzAsMSwiWCdbXFxyZHh7fSddW3g9dl0iXSxbMiwwLCJYJ1xce3YveFxcfVtcXHJkeHt9XFx7di94XFx9XVt4PXZdIl0sWzIsMSwiWCdcXHt2L3hcXH1bXFxyZHh7fSdcXHt2L3hcXH1dW3g9dl0iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgXFx0ZXh0e3ZpYX1cXCBcXGNyZWZ7bGVtOnN1YnN0fSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X'[\rdx{}][x=v]} && {X'\{v/x\}[\rdx{}\{v/x\}][x=v]} \\
+	{X'[\rdx{}'][x=v]} && {X'\{v/x\}[\rdx{}'\{v/x\}][x=v]}
+	\arrow["{\rr'}"', from=1-1, to=2-1]
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["\runi", dotted, from=2-1, to=2-3]
+	\arrow["{\rr' \ \text{via}\ \cref{lem:subst}}", dotted, from=1-3, to=2-3]
+\end{tikzcd}\]
+
+	\item[Case] $\rdx{} \subset v$, \ie $\rstep{\rr'}{v}{v'}$
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3g9dl0iXSxbMCwxLCJYW3g9diddIl0sWzIsMCwiWFxce3YveFxcfVt4PXZdIl0sWzIsMSwiWFxce3YnL3hcXH1beD12J10iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgKFxcdGV4dHtyZXBlYXQgYXQgZWFjaH1cXCB2KSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x=v]} && {X\{v/x\}[x=v]} \\
+	{X[x=v']} && {X\{v'/x\}[x=v']}
+	\arrow["{\rr'}"', from=1-1, to=2-1]
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["\runi", dotted, from=2-1, to=2-3]
+	\arrow["{\rr' \ (\text{repeat at each}\ v)}", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+
+
+	\end{description}
+\item[Case:] \rulename{hnf-swap} $\rdx{\runi} \equiv |hnf == x|$ and $\rstep{\rr'}{h}{h'}$, so join at $\rdx{\runi}'' \equiv |x = hnf'|$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXG1hdGhpdHtobmZ9ID0geCJdLFsyLDAsInggPSBcXG1hdGhpdHtobmZ9Il0sWzAsMSwiXFxtYXRoaXR7aG5mfScgPSB4Il0sWzIsMSwieCA9IFxcbWF0aGl0e2huZn0nIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsxLDMsIlxccnInIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\mathit{hnf} = x} && {x = \mathit{hnf}} \\
+	{\mathit{hnf}' = x} && {x = \mathit{hnf}'}
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["{\rr'}"', from=1-1, to=2-1]
+	\arrow["{\rr'}", dotted, from=1-3, to=2-3]
+	\arrow["\runi", dotted, from=2-1, to=2-3]
+\end{tikzcd}\]
+
+\item[Case:] \rulename{u-occurs} $\rdx{\runi} \equiv x = V[x]$ and $\rstep{\rr'}{V[x]}{V'[x]}$, so join at $\rdx{\runi}'' \equiv |fail|$.
+% https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4ID0gVlt4XSJdLFsyLDAsIlxcdGV4dGJme2ZhaWx9Il0sWzAsMSwieCA9IFYnW3hdIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsyLDEsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{x = V[x]} && {\textbf{fail}} \\
+	{x = V'[x]}
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["{\rr'}"', from=1-1, to=2-1]
+	\arrow["\runi"', dotted, from=2-1, to=1-3]
+\end{tikzcd}\]
+\item[Case] \rulename{var-swap}: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case] \rulename{u-lit}: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case] \rulename{u-fail}: Join at $\rdx{\runi}'' \equiv |fail|$.
+\item[Case] \rulename{u-tup}: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
+	\begin{description}
+		\item[Case] $\rdx{} \subset u_i$ \ie $\rstep{\rr'}{u_i}{u_i'}$
+			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_i' = v_i; \ldots u_n = v_n$.
+		\item[Case] $\rdx{} \subset v_j$ \ie $\rstep{\rr'}{v_j}{v_j'}$
+			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
+	\end{description}
+\end{description}
+\end{proof}
+
+
+\begin{lemma}[Substitution] \label{lem:subst}
+	Let $\rr' \equiv \rr - \runi$.
+	If $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ then $\rstep{\rr'}{\subst{\rdx{}}{x}{v}}{\subst{\rdx{}'}{x}{v}}$.
+\end{lemma}
+
+\begin{proof} By induction on the structure of $\rdx{}$, splitting cases on the reduction rule used
+	and using the fact that $|e|, |v|, |X|, |CX|, |SX|$ are all closed under value substitution.
+\end{proof}
+
+\begin{lemma}[Subst-Swap] \label{lem:subst-swap-c}
+If $\rstep{\rulename{subst}}{e}{e_1}$ and $\rstep{\rulename{swap}}{e}{e_2}$
+then exists $e'$ such that $\rsteps{\runi}{e_1, e_2}{e'}$.
+\end{lemma}
+
+\begin{proof}
+Let $\rstep{\rulename{subst}}{\rdx{1}}{\rdx{1}'}$
+and $\rstep{\rulename{swap}}{\rdx{2}}{\rdx{2}'}$
+be the respective reducts. Via \cref{lem:disjoint}
+it suffices to consider two cases:
+\begin{description}
+\item[Case \rulename{swap} under \rulename{subst}]: \ie $\rdx{2} \subset \rdx{1}$
+Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
+	\begin{description}
+
+	\item[Case $\rdx{2} \equiv |x==v|$]: via rule \rulename{var-swap}:
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJYW3g9eV0iXSxbMiwwLCJYXFx7eS94XFx9W3g9eV0iXSxbMiwxLCJYXFx7eS94XFx9W3k9eF0iXSxbMiwyLCJYXFx7eC95XFx9W3k9eF0iXSxbMCwyLCJYW3k9eF0iXSxbMCwxLCJcXHJ1bmkiXSxbMSwyLCJcXHJyJyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDQsIlxccnInIiwyXSxbNCwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x=y]} && {X\{y/x\}[x=y]} \\
+	&& {X\{y/x\}[y=x]} \\
+	{X[y=x]} && {X\{x/y\}[y=x]}
+	\arrow["\runi", from=1-1, to=1-3]
+	\arrow["{\rr'}", dotted, from=1-3, to=2-3]
+	\arrow["{\rr'}"', from=1-1, to=3-1]
+	\arrow["\runi", dotted, from=3-1, to=3-3]
+	\arrow["\runi", dotted, from=2-3, to=3-3]
+\end{tikzcd}\]
+
+
+	\item[Case $\rdx{2} \subset v$]: \ie $\rstep{\rulename{swap}}{v}{v'}$.
+	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3ggPSB2XSJdLFsyLDAsIlhcXHt2L3hcXH1beCA9IHZdIl0sWzAsMSwiWFt4PXYnXSJdLFsyLDEsIlhcXHt2Jy94XFx9W3g9diddIl0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiXFxydWxlbmFtZXsqLXN3YXB9XFwgXFx0ZXh0e3JlcGVhdGVkIGF0IGVhY2h9XFwgdiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x = v]} && {X\{v/x\}[x = v]} \\
+	{X[x=v']} && {X\{v'/x\}[x=v']}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{swap}}"', from=1-1, to=2-1]
+	\arrow["{\rulename{subst}}"', dotted, from=2-1, to=2-3]
+	\arrow["{\rulename{swap}\ (\text{repeat at each}\ v)}", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+	\item[Case $\rdx{2} \subset X$]: \ie $X \equiv X'[\ldots \rdx{2} \ldots]$.
+ 		Let $u' \equiv \subst{u}{x}{v}$, split cases on \rulename{swap} RHS.
+		\begin{description}
+		\item[Case same variable]: $\rdx{2} \equiv |u == x|$ where $u$ is HNF or variable.
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJYJ1tcXGxkb3RzIHUgPSB4IFxcbGRvdHNdW3ggPSB2XSJdLFsyLDAsIlgnXFx7di94XFx9W1xcbGRvdHMgdScgPSB2IFxcbGRvdHNdW3ggPSB2XSJdLFswLDIsIlgnW1xcbGRvdHMgeCA9IHUgXFxsZG90c11beCA9IHZdIl0sWzIsMiwiWCdcXHt2L3hcXH1bXFxsZG90cyB2ID0gdScgXFxsZG90c11beD12XSJdLFszLDEsIlxcYnVsbGV0Il0sWzEsMV0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw0LCJcXGNyZWZ7bGVtOmVxLWpvaW4tZmxpcH0iLDEseyJsYWJlbF9wb3NpdGlvbiI6NzAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X'[\ldots u = x \ldots][x = v]} && {X'\{v/x\}[\ldots u' = v \ldots][x = v]} \\
+	& {} && \bullet \\
+	{X'[\ldots x = u \ldots][x = v]} && {X'\{v/x\}[\ldots v = u' \ldots][x=v]}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{swap}}"', from=1-1, to=3-1]
+	\arrow["{\rulename{subst}}"', dotted, from=3-1, to=3-3]
+	\arrow[dotted, two heads, from=3-3, to=2-4]
+	\arrow[dotted, two heads, from=1-3, to=2-4]
+	\arrow["{\cref{lem:eq-join-flip}}"{description, pos=0.7}, draw=none, from=2-2, to=2-4]
+\end{tikzcd}\]
+		\item[Case different variable]: $\rdx{2} \equiv |u == y|$ where $u$ is HNF or variable.
+		\end{description}
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYJ1tcXGxkb3RzIHUgPSB5IFxcbGRvdHNdW3ggPSB2XSJdLFsyLDAsIlgnXFx7di94XFx9W1xcbGRvdHMgdScgPSB5IFxcbGRvdHNdW3ggPSB2XSJdLFswLDIsIlgnW1xcbGRvdHMgeSA9IHUgXFxsZG90c11beCA9IHZdIl0sWzIsMiwiWCdcXHt2L3hcXH1bXFxsZG90cyB5ID0gdScgXFxsZG90c11beD12XSJdLFswLDEsIlxccnVsZW5hbWV7c3Vic3R9Il0sWzAsMiwiXFxydWxlbmFtZXsqLXN3YXB9IiwyXSxbMiwzLCJcXHJ1bGVuYW1le3N1YnN0fSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsIlxccnVsZW5hbWV7Ki1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X'[\ldots u = y \ldots][x = v]} && {X'\{v/x\}[\ldots u' = y \ldots][x = v]} \\
+	\\
+	{X'[\ldots y = u \ldots][x = v]} && {X'\{v/x\}[\ldots y = u' \ldots][x=v]}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{swap}}"', from=1-1, to=3-1]
+	\arrow["{\rulename{subst}}"', dotted, from=3-1, to=3-3]
+	\arrow["{\rulename{swap}}", dotted, from=1-3, to=3-3]
+\end{tikzcd}\]
+	\end{description}
+\item[Case \rulename{subst} under \rulename{swap}]: \ie $\rdx{1} \subset \rdx{2}$
+   Let $\rdx{2} \equiv |hnf == x|$, so $\rdx{1} \subset |hnf|$, \ie $\rstep{\rulename{subst}}{|hnf|}{|hnf'|}$,
+   so join at $|x = hnf'|$.
+   % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXG1hdGhpdHtobmZ9ID0geCJdLFsyLDAsIlxcbWF0aGl0e2huZn0nID0geCJdLFswLDEsInggPSBcXG1hdGhpdHtobmZ9Il0sWzIsMSwieCA9IFxcbWF0aGl0e2huZn0nIl0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsxLDMsIlxccnVsZW5hbWV7Ki1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\mathit{hnf} = x} && {\mathit{hnf}' = x} \\
+	{x = \mathit{hnf}} && {x = \mathit{hnf}'}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{swap}}"', from=1-1, to=2-1]
+	\arrow["{\rulename{swap}}", dotted, from=1-3, to=2-3]
+	\arrow["{\rulename{subst}}"', dotted, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{description}
+\end{proof}
+
+\begin{definition}[Levels]
+Let $eu_1 \equiv |x_1 == v_1|$ and $eu_2 \equiv |x_2 == v_2|$ be two equations in a term $e$.
+%
+We say $eu_2$ \emph{is under} $eu_1$ if $eu_2 \subset X$ and $|X^[eu_1]| \subset e$.
+\end{definition}
+
+\begin{lemma}[Subst-Subst] \label{lem:subst-subst-c}
+If $\rstep{\rulename{subst}}{e}{e_1}$ and $\rstep{\rulename{subst}}{e}{e_2}$
+then $\join{\runi}{e_1}{e_2}$.
+\end{lemma}
+
+\begin{proof}
+Suppose that the reduct $\rstep{}{e}{e_i}$ is using the equation $eu_i \equiv |x_i == v_i|$. Split cases on
+\begin{description}
+\item[Case] $eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$:
+	\cref{lem:subst-same} completes the proof.
+
+\item[Case] $eu_1$ is under $eu_2$ and $eu_2$ is not under $eu_1$:
+	\cref{lem:subst-diff} completes the proof.
+
+\item[Case] $eu_1$ is not under $eu_2$ and $eu_2$ is under $eu_1$:
+	\cref{lem:subst-diff} completes the proof.
+
+\item[Case] $eu_1$ is not under $eu_2$ and $eu_2$ is not under $eu_1$:
+	The substitutions are disjoint, so \cref{lem:disjoint} completes the proof.
+\end{description}
+\end{proof}
+
+
+\begin{lemma}[Subst-Same] \label{lem:subst-same}
+If $\rstep{\rulename{subst}}{e}{e_1}$ using $eu_1$ and
+$\rstep{\rulename{subst}}{e}{e_2}$ using $eu_2$ such that
+$eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$,
+then $\join{\runi}{e_1}{e_2}$.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:notes}
+\end{proof}
+
+\begin{lemma}[Subst-Diff] \label{lem:subst-diff}
+If $\rstep{\rulename{subst}}{e}{e_1}$ using $eu_1$ and
+$\rstep{\rulename{subst}}{e}{e_2}$ using $eu_2$ such that
+$eu_1$ is not under $eu_2$ and $eu_2$ is under $eu_1$,
+then $\join{\runi}{e_1}{e_2}$.
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:notes}
+\end{proof}
+
+\begin{lemma}[Unify] \label{lem:eq-join}
+If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$ then
+$\join{\runi}{ \subst{X}{\overline{z}}{\overline{u}}[\overline{u = v}]}{ \subst{X}{\overline{z}}{\overline{v}}[\overline{u = v}]  }$
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:notes}
+\end{proof}
+
+\begin{lemma}[Unify-Flip] \label{lem:eq-join-flip}
+If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$ then
+$\join{\runi}{ \subst{X}{\overline{z}}{\overline{u}}[\overline{u = v}]}{ \subst{X}{\overline{z}}{\overline{v}}[\overline{v = u}]  }$
+\end{lemma}
+
+\begin{proof}
+\ranjit{TODO:notes}
+\end{proof}
+
+\ranjit{CURSOR:HEREHEREHEREHEREHERE}
 
 % \begin{lemma}[Context-Step-$\runi$] \label{lem:context-step-o}
 % \begin{itemize}
