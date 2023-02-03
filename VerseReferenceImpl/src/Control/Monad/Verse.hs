@@ -165,16 +165,7 @@ instance ( MonadFix m
 
   split m f = do
     r <- ask'
-    world <- getWorld
-    world' <- freshVar
-    split' r { level = r.level + 1 } m $ \ x -> do
-      world'' <- getWorld
-      putWorld world
-      f x
-      world <- getWorld
-      unify world world'
-      putWorld world''
-    putWorld world'
+    split' r { level = r.level + 1 } m f
 
 unify' :: ( MonadFix m
           , MonadRef m
