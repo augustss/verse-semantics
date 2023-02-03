@@ -17,7 +17,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPR ]
+allSystemsICFP = [ systemICFP, systemICFPR, systemICFPV ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -38,6 +38,14 @@ systemICFPR = s
   { sname = "ICFPR"
   , description = description s ++ " + SUBST-REC"
   , rules = rules s <> rulesSubstRec
+  }
+  where s = systemICFP
+
+systemICFPV :: TRSystem Expr
+systemICFPV = s
+  { sname = "ICFPV"
+  , description = description s ++ " - EXI-SWAP + EXI-VAR-SWAP"
+  , confluenceRules = (confluenceRules s -= "EXI-SWAP") <> rulesExiVarSwap
   }
   where s = systemICFP
 
@@ -582,3 +590,10 @@ rulesStructural _ lhs =
   "VAL-SWAP" `name`
   do e1 :>: (e2@(_ :=: Val _) :>: e3) <- [lhs]
      pure $ e2 :>: (e1 :>: e3)
+
+rulesExiVarSwap :: ERule
+rulesExiVarSwap _ lhs =
+  "EXI-VAR-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     let e' = substExp (Var y :=: Var x) (Var x :=: Var y) e
+     pure (EXI y (EXI x e'))
