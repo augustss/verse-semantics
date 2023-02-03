@@ -22,7 +22,7 @@ allSystemsICFP = [ systemICFP, systemICFPR ]
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
   { sname = "ICFP"
-  , description = "ICFP, from doc/rewrites.ltx"
+  , description = "ICFP, from verse-icfp23/rewrites.ltx"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
