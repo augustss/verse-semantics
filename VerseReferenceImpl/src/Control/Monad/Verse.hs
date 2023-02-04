@@ -86,6 +86,38 @@ instance ( MonadFix m
 
   freezeBy f = lift . freezeBy' f
 
+newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
+newVar' x = fmap Var . newRef . Repr 1 . Bound x =<< supply
+
+freshen' :: ( MonadFix m
+            , MonadRef m
+            , MonadSupply Label m
+            , Traversable f
+            ) => Var m f -> StateT (IntMap (Var m f)) m (Var m f)
+freshen' var = lift (find' $ unVar var) >>= \ case
+  (_, _, Bound val i) -> gets (IntMap.lookup i) >>= \ case
+    Nothing -> mfix $ \ var -> do
+      modify $ IntMap.insert i var
+      lift . newVar' =<< for val freshen'
+    Just val -> pure val
+  (set, _, Unbound {}) -> pure $ Var set
+
+freezeBy' :: (MonadFix m, MonadRef m, Traversable g) =>
+             (forall a . f a -> g a) ->
+             Var m f -> m (Maybe (Fix g))
+freezeBy' f = runMaybeT . flip evalStateT mempty . freezeBy'' f
+
+freezeBy'' :: (MonadFix m, MonadRef m, Traversable g) =>
+              (forall a . f a -> g a) ->
+              Var m f -> StateT (IntMap (Fix g)) (MaybeT m) (Fix g)
+freezeBy'' f = unVar >>> find' >>> lift >>> lift >=> \ case
+  (_, _, Bound val i) -> gets (IntMap.lookup i) >>= \ case
+    Nothing -> mfix $ \ val' -> do
+      modify $ IntMap.insert i val'
+      Fix <$> traverse (freezeBy'' f) (f val)
+    Just val' -> pure val'
+  _ -> empty
+
 instance ( MonadFix m
          , MonadRef m
          , MonadSupply Label m
@@ -137,6 +169,16 @@ instance ( MonadFix m
         writeRef' p True
         pure $ whenM (readRef' p) . f
 
+unify' :: ( MonadFix m
+          , MonadRef m
+          , MonadSupply Label m
+          , EqRef (Ref m)
+          , Unifiable f
+          ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
+unify' val_x val_y = zipMatchM val_x val_y >>= \ case
+  Nothing -> empty
+  Just val_z -> for_ val_z $ uncurry unify
+
 instance ( MonadFix m
          , MonadRef m
          , MonadSupply Label m
@@ -166,71 +208,6 @@ instance ( MonadFix m
   split m f = do
     r <- ask'
     split' r { level = r.level + 1 } m f
-
-unify' :: ( MonadFix m
-          , MonadRef m
-          , MonadSupply Label m
-          , EqRef (Ref m)
-          , Unifiable f
-          ) => f (Var m f) -> f (Var m f)  -> VerseT m ()
-unify' val_x val_y = zipMatchM val_x val_y >>= \ case
-  Nothing -> empty
-  Just val_z -> for_ val_z $ uncurry unify
-
-runVerseT :: (MonadRef m, MonadSupply Label m) => VerseT m a -> m [a]
-runVerseT m = do
-  world <- newVar' RealWorld
-  runRefLogicT (evalRST (unVerseT m) R { level } S { promises, world })
-  where
-    level = minBound
-    promises = []
-
-newtype Var m f = Var { unVar :: Set m (VarState m f) }
-
-data World a = RealWorld deriving (Functor, Foldable, Traversable)
-
-instance Unifiable World
-
-instance Zippable World where
-  zipMatch _ _ = Just []
-
-data VarState m f
-  = Unbound !(Ref m (f (Var m f) -> VerseT m ())) !Level
-  | Bound !(f (Var m f)) !Label
-
-type Label = Int
-
-newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
-newVar' x = fmap Var . newRef . Repr 1 . Bound x =<< supply
-
-freshen' :: ( MonadFix m
-            , MonadRef m
-            , MonadSupply Label m
-            , Traversable f
-            ) => Var m f -> StateT (IntMap (Var m f)) m (Var m f)
-freshen' var = lift (find' $ unVar var) >>= \ case
-  (_, _, Bound val i) -> gets (IntMap.lookup i) >>= \ case
-    Nothing -> mfix $ \ var -> do
-      modify $ IntMap.insert i var
-      lift . newVar' =<< for val freshen'
-    Just val -> pure val
-  (set, _, Unbound {}) -> pure $ Var set
-
-freezeBy' :: (MonadFix m, MonadRef m, Traversable g) =>
-             (forall a . f a -> g a) ->
-             Var m f -> m (Maybe (Fix g))
-freezeBy' f = runMaybeT . flip evalStateT mempty . freezeBy'' f
-
-freezeBy'' :: (MonadFix m, MonadRef m, Traversable g) =>
-              (forall a . f a -> g a) ->
-              Var m f -> StateT (IntMap (Fix g)) (MaybeT m) (Fix g)
-freezeBy'' f = unVar >>> find' >>> lift >>> lift >=> \ case
-  (_, _, Bound val i) -> gets (IntMap.lookup i) >>= \ case
-    Nothing -> mfix $ \ val' -> do
-      modify $ IntMap.insert i val'
-      Fix <$> traverse (freezeBy'' f) (f val)
-    Just val' -> pure val'
-  _ -> empty
 
 split' :: ( MonadFix m
           , MonadRef m
@@ -276,8 +253,31 @@ splitPromise :: ( MonadFix m
                 ) => Promise m -> (Bool -> VerseT m ()) -> VerseT m ()
 splitPromise = whenResolved
 
+runVerseT :: (MonadRef m, MonadSupply Label m) => VerseT m a -> m [a]
+runVerseT m = do
+  world <- newVar' RealWorld
+  runRefLogicT (evalRST (unVerseT m) R { level } S { promises, world })
+  where
+    level = minBound
+    promises = []
+
+newtype Var m f = Var { unVar :: Set m (VarState m f) }
+
 findVar :: MonadRef m => Var m f -> VerseT m (Found m (VarState m f))
 findVar = find . unVar
+
+data VarState m f
+  = Unbound !(Ref m (f (Var m f) -> VerseT m ())) !Level
+  | Bound !(f (Var m f)) !Label
+
+type Label = Int
+
+data World a = RealWorld deriving (Functor, Foldable, Traversable)
+
+instance Unifiable World
+
+instance Zippable World where
+  zipMatch _ _ = Just []
 
 type Set m a = Ref m (SetState m a)
 

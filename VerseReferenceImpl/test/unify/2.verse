@@ -1,8 +1,6 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-C := 3
+B := 1
 all:
-  B := 5|6
-  X := all:
-    exists A
-    (A = 8; B = 6; A)|(A = 9; C = 3; A)
-  X
+  A := 1|2
+  all. (A = 1)|(B = 1)
+  A
