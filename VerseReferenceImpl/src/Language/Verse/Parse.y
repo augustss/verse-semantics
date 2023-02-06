@@ -113,6 +113,7 @@ import Language.Verse.Token qualified as Token
   one { L _ Token.One }
   set { L _ Token.Set }
   struct { L _ Token.Struct }
+  sync { L _ Token.Sync }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
@@ -335,9 +336,13 @@ For :: { L (Exp L Name) }
   | for Paren Block {
       Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
-  | for Block do Block {
-      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $4
+  | for Block Do {
+      Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
+
+Do :: { L (Exp L Name) }
+  : do Block { $1 .> $2 }
+  | do Exp { $1 .> $2 }
 
 Exists :: { L (Exp L Name) }
   : exists name {

@@ -537,7 +537,7 @@ constrain the \emph{output} of a function (here |2 == apply1 first x|), and ther
 affect its \emph{input} (here |tup(y,5)|).
 
 Although ``|;|\!'' is called ``sequencing'', the order of that sequence
-is immaterial for equations that do not contain choices (see \Cref{sec:choice-rules} for the latter caveat).
+is immaterial for equations that do not contain choices (see \Cref{sec:choice} for the latter caveat).
 For example
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
@@ -582,8 +582,15 @@ We duplicate the context surrounding the choice, and ``float the choice outwards
 The same thing happens when there are multiple choices.  For examplle
 $$
 |def (x y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
+\quad
+\text{yields the sequence |tup (7,31), tup(7,5), tup(22,31), tup(22,5)|}
 $$
-produces the sequence of values |tup (7,31), tup(7,5), tup(22,31), tup(22,5)|.
+Notice that the order of the two equations now \emph{is} significant:
+$$
+|(def (x y) y == (31 choice 5); (x == (7 choice 22); tup (x,y)))|
+\quad
+\text{yields the sequence |tup (7,31), tup(22,31), tup(7,5), tup(22,5)|}
+$$
 Readers familiar with list comprehensions in Haskell and other
 languages will recognise this nested-loop pattern, but here it
 emerges naturally from choice as a deeply-built-in primitive,
@@ -598,18 +605,13 @@ $$
 
 \subsection{Mixing choice and unification} \label{sec:mixing}
 
-We saw in \cref{sec:unify} that \emph{equations} are insensitive to sequencing---but \emph{choice} is not.
-Consider
-|def (x ^^ y) (x = (3 choice 4); y = (20 choice 30); tup (x,y))|.  The choices are made \emph{left-to-right}, so that the result is
-|((tup (3,20)) choice (tup (3,30)) choice (tup (4,20)) choice (tup (4,30)))|.
-
-So much for choice under unification.  What if we have
-unification under choice?  For example:
+In the last section we discussed what happens if there is a choice in the right-hand-side of
+a unification. What if we have unification under choice?  For example:
 $$
 |def x ((x=3; x+1) choice (x=4; x*2))|
 $$
-Intuitively, either unify |x| with |3| and return |x+1|, or unify |x| with |4| and return |x*2|.
-But so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
+Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x*2|''.
+But there is a problem: so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
 Well, we can see two equations here, |(x=3)| and |(x=4)|, which are mutually contradictory,
 so clearly we need to refine our notion of ``solving.''
 The answer is pretty clear: in a branch of a choice, solve the equations in that branch
@@ -644,7 +646,7 @@ language into unification. But what about multi-equation pattern matching, such 
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly, where
 we use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells
-(see \cref{fig:syntax} for the pattern matching lambda):
+(see \cref{fig:syntax} to desugar the pattern matching lambda):
 $$
 |append =lam (tup (xsl,ysl))
   (((xsl = emptytup; ysl) choice 
@@ -682,10 +684,11 @@ e_2 else e_3|.  But what is the equality operator in |(x=0)|?  One
 possibility, adopted by Curry, is this: there is one ``='' for
 equations (as in \cref{sec:unify}), and another, say ``=='', for
 testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
-different, more minimalist position. In \versecalc{} \emph{there is just one equality operator}, written ``='' just as in
-\cref{sec:unify}. The expression |if (x=0) then e_2 else e_3| tries to unify |x| with |0|.  If that succeeds (returns one or more values)
+different, more minimalist position, following Icon's lead \cite{icon}. \simon{Icon did this, correct?}
+In \versecalc{} \emph{there is just one equality operator}, written ``='' just as in
+\cref{sec:unify}. The expression |if (x=0) then e_2 else e_3| tries to unify |x| with |0|.  If that succeeds (yields one or more values)
 the |if| returns |e_2|; otherwise it returns |e_3|.  There are no data constructors |True| and |False|; instead
-failure plays the role of falsity.
+failure (returning zero values) plays the role of falsity.
 
 But something is terribly wrong here.  Consider |def (x ^^ y) (y = (if (x=0) then 3 else 4); x=7)|.  Presumably this is meant
 to set |x| to |7|, test if it is equal to |0| (it is not), and unify |y| with 4.
@@ -699,36 +702,45 @@ rigid and cannot be unified.  Instead, the |if| is stuck, and we move on to unif
 the |if| and all is well.  This special property is precisely the local propagation rule that we sketched for
 choice (\cref{sec:mixing}).
 
-In fact, \versecalc{} distills the three-part |if| into something simpler, the unary construct |one(e)|.
+In fact, \versecalc{} desugars the three-part |if| into something simpler, the unary construct |one(e)|.
 Its specification is this:
 if |e| fails, |one(e)| fails; otherwise |one(e)| returns the first of the values yielded by |e|.
 Now, |if e_1 then e_2 else e_3| can (nearly) be re-expressed like this:
 $$
 |one( (e_1; e_2) choice e_3 )|
 $$
-If |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
-get |e_2|, and the outer |oneKW| will select it from the choice.  But this isn't right:
-what if |e_2| or |e_3| themselves fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}, which wraps the then and else branches in a thunk:
+This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
+get |e_2|, and the outer |oneKW| will select it from the choice.
+But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
+given in \cref{fig:syntax}, which wraps the |then| and |else| branches in a thunk\footnote{Using thunks for the branches of a conditional is another old idea e.g. \cite[p54]{steele:rabbit}}:
 $$
 |apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
+The argument of |oneKW| reduces to either |(thunk e_2) `choice` (thunk e_3)| or |(thunk e_3)| depending on whether |e_1| succeeds or fails,
+respectively; |oneKW| then picks the first value, that is |thunk e_2| if |e_1| succeeded, or |thunk e_3| if |e_1| failed, and
+applies it to |tup ()| .
+
 The argument of |oneKW| evaluates to either |((thunk (e_2)) choice dots)| or |(thunk (e_3))|
 depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
-remain un-evaluated until the choice is made, just as we expect.
+remain un-evaluated until the choice is made, just as we expect from a conditional.
 
-We use the same local-propagation rule for |oneKW| that we do for choice (\cref{sec:mixing});
-together with the desugaring for |if| into |oneKW|, we get the ``special property'' of |if| described above.
+We use the same local-propagation rule for |oneKW| that we do for choice (\cref{sec:mixing}).
+This, together with the desugaring for |if| into |oneKW|, gives ``special property'' of |if| described above.
 
 \subsection{Tuples and |allKW|} \label{sec:tuple}
+
+\simon{This is where I have got to in my sweep through}
+
 The main data structure in \versecalc{} is the tuple.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|.
 It can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|.
 For example, |def t (t = tup (10,27,32); apply1 t 1)| reduces to |27| and |apply1 t 3| reduces to |fail|.
-The reduction rule for indexing in tuples admits multi-valued index expressions.
-For instance, |def t (t = tup (10,27,32); apply1 t (1 `choice` 0 `choice` 1))| reduces to |(27 `choice` 10 `choice` 27)|.
+
+What if we apply a tuple to a choice, thus |tup (10,27,32)(1 `choice` 0 `choice` 1)|?  First we must
+desugar the application to the form |(v_1 v_2)|, because that is all \versecalc{} permits (\cref{fig:syntax}),
+giving |def x (x=(1 `choice` 0 `choice` 1)); tup (10,27,32)(x)|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` dots `choice` v_n)| then |all e| reduces to

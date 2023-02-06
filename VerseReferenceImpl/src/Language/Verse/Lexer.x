@@ -184,6 +184,7 @@ $space = [\ \t]
   "one" { token Token.One }
   "set" { token Token.Set }
   "struct" { token Token.Struct }
+  "sync" { token Token.Sync }
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
