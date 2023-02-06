@@ -206,13 +206,9 @@ execX, execX1 :: Expr -> [(Context, Expr)]
 execX lhs = execX1 lhs ++ [(id,lhs)]
 -- X context, X /= hole
 execX1 lhs =
-  do x :=: e <- [lhs]
+  do (v :=: x) :>: e <- [lhs]
      (ctx, hole) <- execX x
-     pure ((:=: e) . ctx, hole)
- ++
-  do e :=: x <- [lhs]
-     (ctx, hole) <- execX x
-     pure ((e :=:) . ctx, hole)
+     pure (\ a -> (v :=: ctx a) :>: e, hole)
  ++
   do x :>: e <- [lhs]
      (ctx, hole) <- execX x
@@ -615,7 +611,7 @@ rulesSpeculation _ lhs =
   do One (Val v :|: _e) <- [lhs]
      pure (Val v)
  ++
-  "ONE-VALue" `name`
+  "ONE-VALUE" `name`
   do One (Val v) <- [lhs]
      pure (Val v)
  ++
@@ -631,7 +627,7 @@ rulesSpeculation _ lhs =
      vs <- choiceVals ves
      pure (Arr vs)
  ++
-  "ALL-VALue" `name`
+  "ALL-VALUE" `name`
   do All (Val v) <- [lhs]
      pure (Arr [v])
 
