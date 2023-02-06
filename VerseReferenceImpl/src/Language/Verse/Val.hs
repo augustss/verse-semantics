@@ -49,7 +49,7 @@ instance Zippable f => Unifiable (Val f) where
       pure $ Just []
     (Rational x, Rational y) | x == y ->
       pure $ Just []
-    (Float x, Float y) | x == y ->
+    (Float x, Float y) | if isNaN x then isNaN y else x == y ->
       pure $ Just []
     (Tuple xs, Tuple ys) ->
       pure $ zipMatch xs ys

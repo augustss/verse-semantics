@@ -49,8 +49,8 @@ data Exp f a
   | Truth (f (Exp f a))
   | True
   | False
-  | Int Integer
-  | Float Double
+  | Int !Integer
+  | Float !Double
   | Name a
   | PrefixColon (f (Exp f a))
   | InfixColon (f a) (f (Exp f a))

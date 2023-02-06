@@ -13,7 +13,6 @@ module Control.Monad.Verse.Class
   ) where
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Unify
@@ -21,10 +20,7 @@ import Control.Monad.Var
 
 import Data.Kind
 
-class ( MonadPlus m
-      , MonadUnify m
-      , Backtrack.MonadRef m
-      ) => MonadVerse m where
+class (MonadUnify m, Backtrack.MonadRef m) => MonadVerse m where
   type World m :: Type -> Type
   type World m = WorldDefault m
 
