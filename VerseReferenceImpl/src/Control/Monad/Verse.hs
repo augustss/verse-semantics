@@ -74,7 +74,7 @@ instance ( MonadFix m
   type Var (VerseT m) = Var m
 
   freshVar =
-    fmap Var . newRef' . Repr 1 =<<
+    fmap Var . newSet =<<
     Unbound <$> newRef' (const $ pure ()) <*> askLevel
 
   newVar = lift . newVar'
@@ -88,7 +88,7 @@ instance ( MonadFix m
   freezeBy f = lift . freezeBy' f
 
 newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
-newVar' x = fmap Var . newRef . Repr 1 . Bound x =<< supply
+newVar' x = fmap Var . newSet' . Bound x =<< supply
 
 freshen' :: ( MonadFix m
             , MonadRef m
@@ -285,6 +285,12 @@ data SetState m a
   = Repr !Word a
   | Link !(Set m a)
 
+newSet :: MonadRef m => a -> VerseT m (Set m a)
+newSet = lift . newSet'
+
+newSet' :: MonadRef m => a -> m (Set m a)
+newSet' = newRef . Repr 1
+
 type Found m a = (Set m a, Word, a)
 
 union :: ( MonadRef m
@@ -407,7 +413,7 @@ withListener f k = do
     world'' <- getWorld
     putWorld world
     f x
-    -- unify world' =<< getWorld
+    unify world' =<< getWorld
     putWorld world''
   pure () <|> join (lift $ readRef ref_m)
   pure x
