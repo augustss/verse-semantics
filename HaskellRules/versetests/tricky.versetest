@@ -66,7 +66,7 @@ testceq("QC7", SEq)  { ex x. ex c. <c> | (c = x; x) }
                      { ex x. ex c. <c> | (c = x; x) }
 # QC8 kills ICFP + Plan C
 testceq("QC8", SEq)  { ex x. ex y. ex z. z | (ex v. ex w. z = y; y) }
-                     { ex z. ex y. z | (y = z; z) }
+                     { ex y z. z | (z = y; y) }
 # QC9 kills ICFP
 testceq("QC9", SEq)  { ex a. (ex y. (a = y; <>) | <>); a = (ex b. b); a }
                      { ex a y. (a = y; ()) | (); a }
