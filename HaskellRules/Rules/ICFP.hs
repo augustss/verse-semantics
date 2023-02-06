@@ -18,7 +18,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP, systemICFPR,
-                   systemICFPA, systemICFPC, systemICFPD ]
+                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -36,7 +36,7 @@ systemICFP = TRSystem
 
 systemICFPR :: TRSystem Expr
 systemICFPR = s
-  { sname = "ICFPR"
+  { sname = "RICFP"
   , description = description s ++ " + SUBST-REC"
   , rules = rules s <> rulesSubstRec
   }
@@ -64,6 +64,24 @@ systemICFPD = s
   , description = description s ++ ", plan D: - VAR-SWAP + EXI-ELIMV + VAR-SWAP-SUBST"
   , rules = (rules s -= "VAR-SWAP") <> rulesExiElimV
   , confluenceRules = confluenceRules s <> rulesVarSwapSubst
+  }
+  where s = systemICFP
+
+systemICFPF :: TRSystem Expr
+systemICFPF = s
+  { sname = "ICFPF"
+  , description = description s ++ ", - NORM-EXI - NORM-SEQR - EXI-SWAP"
+  , rules = rules s -= "NORM-EXI" -= "NORM-SEQR"
+  , confluenceRules = confluenceRules s -= "EXI-SWAP"
+  }
+  where s = systemICFP
+
+systemICFPG :: TRSystem Expr
+systemICFPG = s
+  { sname = "ICFPG"
+  , description = description s ++ ", - NORM-EXI - EXI-SWAP + NORM-EXI-{R,L,E}"
+  , rules = (rules s -= "NORM-EXI") <> rulesNormExiCanon
+  , confluenceRules = confluenceRules s -= "EXI-SWAP"
   }
   where s = systemICFP
 
@@ -517,6 +535,37 @@ rulesNormalization _ lhs =
   "NORM-SEQR" `name`
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (Val v :=: e2))
+
+rulesNormExiCanon :: ERule
+rulesNormExiCanon _ lhs =
+  "NORM-EXI-L" `name`
+  do xe :>: EXI x e <- [lhs]
+     guard (isExistsFree xe)
+     let (x', e') = alphaExi (free xe) x e
+     pure (EXI x' (xe :>: e'))
+ <>
+  "NORM-EXI-R" `name`
+  do EXI x e1 :>: e2 <- [lhs]
+     let (x', e1') = alphaExi (free e2) x e1
+     pure (EXI x' (e1' :>: e2))
+ <>
+  "NORM-EXI-E" `name`
+  do v :=: EXI y e <- [lhs]
+     let (y', e') = alphaExi (free v) y e
+     pure (EXI y' ((v :=: e') :>: v))
+
+alphaExi :: [Ident] -> Ident -> Expr -> (Ident, Expr)
+alphaExi is x e | x `notElem` is = (x, e)
+                | otherwise =
+  let x' = identNotIn (is ++ free e)
+  in  (x', subst [(x, Var x')] e)
+
+isExistsFree :: Expr -> Bool
+isExistsFree (e1 :>: e2) = isExistsFree e1 && isExistsFree e2
+isExistsFree (e1 :=: e2) = isExistsFree e1 && isExistsFree e2
+isExistsFree (_ :@: _) = False
+isExistsFree EXI{} = False
+isExistsFree _ = True
 
 --------------------------------------------------------------------------------
 

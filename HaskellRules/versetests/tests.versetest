@@ -150,7 +150,7 @@ testeq(SEq) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq(SEq) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq(SEq) {for(x:=1|2|3){x>1}}                  {:false}
 testeq(SEq) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-testeq(SEq,POPLR=Skip,Block=Skip,ICFP=Skip) {
+testeq(SEq,POPLR=Skip,Block=Skip,ICFP*=Skip) {
   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
   for(x:=upto[1,3]){x}}                           {(1,2,3)}
 # SLOW with PLDI
@@ -190,7 +190,7 @@ testeq(SEq) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq(SEq) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
 # Recursion
-testeq(SEq,POPLR=Skip,Block=Skip,ICFP=Skip)
+testeq(SEq,POPLR=Skip,Block=Skip,ICFP*=Skip)
             {f(n:int) := if (n = 0)  {1} else  {n * f(n-1)}; f(5)}  {120}
 # SLOW with PLDI
 #testeq(SEq) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
@@ -198,9 +198,9 @@ testeq(SEq,POPLR=Skip,Block=Skip,ICFP=Skip)
 #            for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-testeq(SEq,POPLR=Skip,Block=Skip,ICFP=Skip)
+testeq(SEq,POPLR=Skip,Block=Skip,ICFP*=Skip)
              {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
-testeq(SEq,POPLR=Skip,Block=Skip,ICFP=Skip)
+testeq(SEq,POPLR=Skip,Block=Skip,ICFP*=Skip)
              {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
 
 # Function argument matching
