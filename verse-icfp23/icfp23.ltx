@@ -1933,17 +1933,17 @@ $$
                 & \movestoR{subst,exi-eliml}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
 \circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
                 & \movestoR{norm-exi}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-                & \movestoR{subst,exi-eliml}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
+\circlednum{3}  & \movestoR{subst,exi-eliml}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
                 & \movestoR{norm-exi,norm-exi} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
                 & \movestoR{norm-seqr,norm-seq}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{subst,exi-eliml}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
-                & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; emptytup; tup(x,y))| \\
+\circlednum{4}  & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; emptytup; tup(x,y))| \\
                 & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; emptytup; tup(x,y))| \\
-                & \movestoR{subst,exi-eliml}   & |def x (3==x; emptytup; tup(x,2))| \\
+\circlednum{5}  & \movestoR{subst,exi-eliml}   & |def x (3==x; emptytup; tup(x,2))| \\
                 & \movestoR{hnf-swap}          & |def x (x==3; emptytup; tup(x,2))| \\
-                & \movestoR{subst,exi-eliml}   & |emptytup; tup(3,2)| \\
-                & \movestoR{norm-val}          & |tup(3,2)| \\
+\circlednum{6}  & \movestoR{subst,exi-eliml}   & |emptytup; tup(3,2)| \\
+\circlednum{7}  & \movestoR{norm-val}          & |tup(3,2)| \\
 \multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
