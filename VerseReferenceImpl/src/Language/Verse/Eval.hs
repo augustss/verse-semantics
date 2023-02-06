@@ -49,6 +49,7 @@ import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:..:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Name
+import Language.Verse.Named (Named (..))
 import Language.Verse.Overload qualified as Overload
 import Language.Verse.Val (Val)
 import Language.Verse.Val qualified as Val
@@ -56,6 +57,8 @@ import Language.Verse.Val qualified as Val
 import Prettyprinter
 
 type EvalT m = WriterT (Defaults m) (ReaderT (Env m) m)
+
+type MutVar m = Var m (Val m)
 
 type MonadEval m =
   ( MonadError Error m
@@ -67,7 +70,7 @@ type MonadEval m =
 
 type Defaults m = HashMap (Ident Name) (MutVar m, Env m, L (Exp L (Ident Name)))
 
-type Env m = HashMap (Ident Name) (Named m)
+type Env m = HashMap (Ident Name) (Named m (Var m (Val m)))
 
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = runReaderT (evalWriterT m) =<< newEnv
@@ -75,12 +78,8 @@ runEvalT m = runReaderT (evalWriterT m) =<< newEnv
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-eval :: ( MonadError Error m
-        , MonadFix m
-        , MonadRef m
-        , EqRef (Ref m)
-        ) => L (Exp L (Ident Name)) -> m [Fix (Val Pure)]
-eval e = runSupplyT $ runVerseT $ runEvalT (eval' e) >>= freeze >>= \ case
+eval :: MonadEval m => L (Exp L (Ident Name)) -> m (Fix (Val m))
+eval e = runEvalT (eval' e) >>= freeze >>= \ case
   Nothing -> throwError $ StuckError $ loc e
   Just x -> pure x
 
@@ -293,10 +292,10 @@ eval' e = case extract e of
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
 
-invokeIntrinsic :: (MonadVerse m, Zippable f) =>
+invokeIntrinsic :: MonadVerse m =>
                    Intrinsic ->
-                   Var m (Val f) ->
-                   (Maybe (Var m (Val f)) -> m ()) ->
+                   Var m (Val g) ->
+                   (Maybe (Var m (Val g)) -> m ()) ->
                    m ()
 invokeIntrinsic = \ case
   Intrinsic.Less -> liftOrd (<)
@@ -311,10 +310,10 @@ invokeIntrinsic = \ case
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
-liftOrd :: (MonadVerse m, Zippable f) =>
+liftOrd :: MonadVerse m =>
            (forall a . Ord a => a -> a -> Bool) ->
-           Var m (Val f) ->
-           (Maybe (Var m (Val f)) -> m ()) ->
+           Var m (Val m) ->
+           (Maybe (Var m (Val m)) -> m ()) ->
            m ()
 liftOrd f var k =
   ifte'
@@ -341,10 +340,10 @@ liftOrd f var k =
       k $ Just var_x)
   (k Nothing)
 
-liftNum :: (MonadVerse m, Zippable f) =>
+liftNum :: MonadVerse m =>
            (forall a . Num a => a -> a -> a) ->
-           Var m (Val f) ->
-           (Maybe (Var m (Val f)) -> m ()) ->
+           Var m (Val m) ->
+           (Maybe (Var m (Val m)) -> m ()) ->
            m ()
 liftNum f var k =
   ifte'
@@ -453,7 +452,10 @@ div' var k =
       Just var -> k $ Just var)
   (k Nothing)
 
-int :: MonadVerse m => Var m (Val f) -> (Maybe (Var m (Val f)) -> m ()) -> m ()
+int :: MonadVerse m =>
+       Var m (Val f) ->
+       (Maybe (Var m (Val f)) -> m ()) ->
+       m ()
 int var k = whenBound var $ \ case
   Val.Int _ -> k $ Just var
   Val.Rational x | denominator x == 1 -> k $ Just var
@@ -461,7 +463,7 @@ int var k = whenBound var $ \ case
 
 instSuper :: MonadEval m =>
              Loc ->
-             Maybe (MutVar m) -> HashMap Name (Named m) ->
+             Maybe (MutVar m) -> HashMap Name (Named m (Var m (Val m))) ->
              (Maybe (MutVar m) -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instSuper loc var_super xs f = case var_super of
@@ -479,7 +481,7 @@ instSuper' loc var_super f = case var_super of
 
 instClass :: MonadEval m =>
              Loc ->
-             MutVar m -> HashMap Name (Named m) ->
+             MutVar m -> HashMap Name (Named m (Var m (Val m))) ->
              (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instClass loc var xs f = whenBound' var $ \ case
@@ -543,10 +545,10 @@ lookupName = lookupName' >=> \ case
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
-lookupName' :: Monad m => Ident Name -> EvalT m (Maybe (Named m))
+lookupName' :: Monad m => Ident Name -> EvalT m (Maybe (Named m (Var m (Val m))))
 lookupName' = asks . HashMap.lookup
 
-localName :: Monad m => Ident Name -> Named m -> EvalT m a -> EvalT m a
+localName :: Monad m => Ident Name -> Named m (Var m (Val m)) -> EvalT m a -> EvalT m a
 localName x = local . HashMap.insert x
 
 localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
@@ -573,7 +575,7 @@ fromIdents =
 unifyNamed :: ( MonadVerse m
               , Unifiable (World m)
               , EqRef (Backtrack.Ref m)
-              ) => Named m -> Named m -> EvalT m ()
+              ) => Named m (Var m (Val m)) -> Named m (Var m (Val m)) -> EvalT m ()
 unifyNamed = curry $ lift . \ case
   (Val var_x, Val var_y) ->
     unify var_x var_y
@@ -588,7 +590,7 @@ unifyNamed = curry $ lift . \ case
 
 freshNamed :: ( Backtrack.MonadRef m
               , MonadVar m
-              ) => Bool -> EvalT m (Named m)
+              ) => Bool -> EvalT m (Named m (Var m (Val m)))
 freshNamed = \ case
   False -> Val <$> freshVar
   True -> Ref <$> freshRef
