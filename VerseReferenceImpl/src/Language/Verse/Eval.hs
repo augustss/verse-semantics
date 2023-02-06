@@ -69,40 +69,6 @@ type Defaults m = HashMap (Ident Name) (MutVar m, Env m, L (Exp L (Ident Name)))
 
 type Env m = HashMap (Ident Name) (Named m)
 
-type Named m = Mut m (MutVar m)
-
-type MutVar m = Var m (MutVal m)
-
-type MutVal m = Val (Mut m)
-
-data Mut m a
-  = Ref (Backtrack.Ref m (MutVar m))
-  | Val a deriving (Functor, Foldable, Traversable)
-
-instance EqRef (Backtrack.Ref m) => Unifiable (Mut m)
-
-instance EqRef (Backtrack.Ref m) => Zippable (Mut m) where
-  zipMatch = curry $ \ case
-    (Ref x, Ref y) | eqRef x y -> Just []
-    (Val x, Val y) -> Just [(x, y)]
-    _ -> Nothing
-
-data Pure a
-  = Read
-  | Pure a deriving (Show, Functor, Foldable, Traversable)
-
-instance Pretty a => Pretty (Pure a) where
-  pretty = \ case
-    Read -> "ref"
-    Pure x -> pretty x
-
-freeze' :: ( Backtrack.MonadRef m
-           , MonadVar m
-           ) => MutVar m -> m (Maybe (Fix (Val Pure)))
-freeze' = freezeBy $ Val.hoist $ \ case
-  Ref _ -> Read
-  Val var -> Pure var
-
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = runReaderT (evalWriterT m) =<< newEnv
 
@@ -114,7 +80,7 @@ eval :: ( MonadError Error m
         , MonadRef m
         , EqRef (Ref m)
         ) => L (Exp L (Ident Name)) -> m [Fix (Val Pure)]
-eval e = runSupplyT $ runVerseT $ runEvalT (eval' e) >>= freeze' >>= \ case
+eval e = runSupplyT $ runVerseT $ runEvalT (eval' e) >>= freeze >>= \ case
   Nothing -> throwError $ StuckError $ loc e
   Just x -> pure x
 

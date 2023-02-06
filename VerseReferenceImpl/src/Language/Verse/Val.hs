@@ -1,16 +1,17 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Val
   ( Val (..)
-  , hoist
-  , hoistA
+  -- , prettyM
   ) where
 
 import Control.Applicative
+import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Trans.Maybe
 import Control.Monad.Var
 import Control.Monad.Writer.CPS
@@ -21,27 +22,29 @@ import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
+import Data.Ref
 import Data.Unifiable
 
 import Language.Verse.Label
 import Language.Verse.Name
+import {-# SOURCE #-} Language.Verse.Named (Named)
 import Language.Verse.Overload (Overload)
 import Language.Verse.Overload qualified as Overload
 
 import Prettyprinter
 
-data Val f a
+data Val m a
   = Int !Integer
   | Float !Double
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module !Label !(HashMap Name (f a))
-  | StructInst !Label !(HashMap Name (f a))
-  | ClassInst !Label (Maybe a) !(HashMap Name (f a))
-  | Overloads !(Overload f a) a deriving (Show, Functor, Foldable, Traversable)
+  | Module !Label !(HashMap Name (Named m a))
+  | StructInst !Label !(HashMap Name (Named m a))
+  | ClassInst !Label (Maybe a) !(HashMap Name (Named m a))
+  | Overloads !(Overload m a) a deriving (Functor, Foldable, Traversable)
 
-instance Zippable f => Unifiable (Val f) where
+instance EqRef (Backtrack.Ref m) => Unifiable (Val m) where
   zipMatchM = curry $ \ case
     (Truth x, Truth y) ->
       pure $ Just [(x, y)]
@@ -104,75 +107,64 @@ uncons xs = readVar xs >>= \ case
   Just (Overloads x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
-
-instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
-  pretty = \ case
-    Int x ->
-      pretty x
-    Float x ->
-      pretty x
-    Rational x | denominator x == 1 ->
-      pretty $ numerator x
-    Rational x ->
-      pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x ->
-      align $ "truth" <> group (braces $ pretty x)
-    Overloads {} ->
-      "function"
-    Tuple [] ->
-      "false"
-    Tuple xs ->
-      align . tupled $ pretty <$> xs
-    Module i xs ->
-      align $ "module#" <> prettyLabel i <> group (braced $ names xs)
-    StructInst i xs ->
-      align $
-      "struct#" <>
-      prettyLabel i <>
-      group (braced $ names xs)
-    ClassInst i Nothing xs ->
-      align $
-      "class#" <>
-      prettyLabel i <>
-      group (braced $ names xs)
-    ClassInst i (Just x) xs ->
-      align $
-      "class#" <>
-      prettyLabel i <>
-      parens (pretty x) <>
-      group (braced $ names xs)
-    where
-      names xs =
-        (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)) <$>
-        HashMap.toList xs
-      tupled =
-        group .
-        encloseSep
-        (flatAlt "( " lparen)
-        (flatAlt (hardline <> rparen) rparen)
-        ", "
-      braces x =
-        flatAlt (hardline <> "{ ") lbrace <>
-        x <>
-        flatAlt (hardline <> rbrace) rbrace
-      braced =
-        group .
-        encloseSep
-        (flatAlt (hardline <> "{ ") lbrace)
-        (flatAlt (hardline <> rbrace) rbrace)
-        ", "
-
-hoist :: (forall b . f b -> g b) -> Val f a -> Val g a
-hoist f = runIdentity . hoistA (Identity . f)
-
-hoistA :: Applicative m => (forall b . f b -> m (g b)) -> Val f a -> m (Val g a)
-hoistA f = \ case
-  Int x -> pure $ Int x
-  Float x -> pure $ Float x
-  Rational x -> pure $ Rational x
-  Truth x -> pure $ Truth x
-  Tuple xs -> pure $ Tuple xs
-  Module i xs -> Module i <$> traverse f xs
-  StructInst i xs -> StructInst i <$> traverse f xs
-  ClassInst i x xs -> ClassInst i x <$> traverse f xs
-  Overloads x xs -> Overload.hoistA f x <&> \ x -> Overloads x xs
+{-
+prettyM :: (Backtrack.MonadRef m, Pretty a) => Val m a -> m (Doc ann)
+prettyM = \ case
+  Int x ->
+    pure $ pretty x
+  Float x ->
+    pure $ pretty x
+  Rational x | denominator x == 1 ->
+    pure $ pretty $ numerator x
+  Rational x ->
+    pure $ pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+  Truth x ->
+    pure . align $ "truth" <> group (braces $ pretty x)
+  Overloads {} ->
+    pure "function"
+  Tuple [] ->
+    pure "false"
+  Tuple xs ->
+    pure . align . tupled $ pretty <$> xs
+  Module i xs ->
+    pure $ align $ "module#" <> prettyLabel i <> group (braced $ names xs)
+  StructInst i xs ->
+    pure .
+    align $
+    "struct#" <>
+    prettyLabel i <>
+    group (braced $ names xs)
+  ClassInst i Nothing xs ->
+    pure .
+    align $
+    "class#" <>
+    prettyLabel i <>
+    group (braced $ names xs)
+  ClassInst i (Just x) xs ->
+    pure .
+    align $
+    "class#" <>
+    prettyLabel i <>
+    parens (pretty x) <>
+    group (braced $ names xs)
+  where
+    names xs =
+      (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> Named.prettyM v)) <$>
+      HashMap.toList xs
+    tupled =
+      group .
+      encloseSep
+      (flatAlt "( " lparen)
+      (flatAlt (hardline <> rparen) rparen)
+      ", "
+    braces x =
+      flatAlt (hardline <> "{ ") lbrace <>
+      x <>
+      flatAlt (hardline <> rbrace) rbrace
+    braced =
+      group .
+      encloseSep
+      (flatAlt (hardline <> "{ ") lbrace)
+      (flatAlt (hardline <> rbrace) rbrace)
+      ", "
+-}
