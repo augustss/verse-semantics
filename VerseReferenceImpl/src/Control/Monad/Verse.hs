@@ -37,6 +37,7 @@ import Control.Monad.Var qualified as Var
 import Control.Monad.Verse.Class (MonadVerse, whenBound, getWorld, putWorld)
 import Control.Monad.Verse.Class qualified
 
+import Data.Coerce
 import Data.Fix
 import Data.Foldable (for_)
 import Data.Functor
@@ -189,14 +190,13 @@ instance ( MonadFix m
   whenBound var_x f = do
     (_, _, repr_x) <- findVar var_x
     case repr_x of
-      Unbound f_x _ -> do
-        f' <- toListener' f
-        lift $ modifyRef f_x $ flip (liftA2 (*>)) f'
+      Unbound f_x _ ->
+        withListener f $
+        lift . modifyRef f_x . flip (liftA2 (*>)) <=< toListener
       Bound val_x _ ->
         f val_x
     where
-      toListener' f = do
-        f <- toListener f
+      toListener f = do
         p <- newRef' False
         writeRef' p True
         pure $ whenM (readRef' p) . f
@@ -342,15 +342,22 @@ resolvePromise :: ( MonadFix m
                   , MonadRef m
                   , MonadSupply Label m
                   , EqRef (Ref m)
-                  ) => Promise m -> R -> VerseT m () -> VerseT m ()
-resolvePromise (Promise ref) r m = readRef' ref >>= \ case
+                  ) => Promise m -> R -> Ref m (VerseT m ()) -> VerseT m () -> VerseT m ()
+resolvePromise (Promise ref) r ref_m m = readRef' ref >>= \ case
   Pending xs -> hasListeners xs >>= \ case
     False -> msplit' (local' (const r) m) >>= \ case
       Nothing -> empty
-      Just ((), _) -> writeRef' ref (Resolved True)
+      Just ((), m) -> do
+        writeRef' ref $ Resolved True
+        lift $ writeRef ref_m m
     True -> split' r m $ \ case
-      Nothing -> writeRef' ref (Resolved False) *> apListeners xs False
-      Just ((), _) -> writeRef' ref (Resolved True) *> apListeners xs True
+      Nothing -> do
+        writeRef' ref $ Resolved False
+        apListeners xs False
+      Just ((), m) -> do
+        writeRef' ref $ Resolved True
+        lift $ writeRef ref_m m
+        apListeners xs True
   Resolved _ -> error "resolve"
 
 hasListeners :: MonadRef m => [Listener m] -> VerseT m Bool
@@ -373,35 +380,37 @@ whenResolved :: ( MonadFix m
                 , EqRef (Ref m)
                 ) => Promise m -> (Bool -> VerseT m ()) -> VerseT m ()
 whenResolved (Promise ref_x) f = readRef' ref_x >>= \ case
-  Pending xs -> do
-    f <- toListener' f
-    lift . writeRef ref_x . Pending $ f : xs
+  Pending xs ->
+    withListener f $
+    lift . writeRef ref_x . Pending . (: xs) <=< toListener
   Resolved x -> f x
   where
-    toListener' f = do
-      f <- toListener f
+    toListener f = do
       p <- newRef' False
       writeRef' p True
       pure $ Listener p f
 
-toListener :: ( MonadFix m
-              , MonadRef m
-              , MonadSupply Label m
-              , EqRef (Ref m)
-              ) => (a -> VerseT m ()) -> VerseT m (a -> VerseT m ())
-toListener f = do
+withListener :: ( MonadFix m
+                , MonadRef m
+                , MonadSupply Label m
+                , EqRef (Ref m)
+              ) => (a -> VerseT m ()) -> ((a -> VerseT m ()) -> VerseT m b) -> VerseT m b
+withListener f k = do
   r <- ask'
   promise <- freshPromise
   modifyPromises (promise:)
   world <- getWorld
   world' <- freshVar
   putWorld world'
-  pure $ resolvePromise promise r . \ x -> do
+  ref_m <- lift $ newRef empty
+  x <- k $ \ x -> resolvePromise promise r ref_m $ do
     world'' <- getWorld
     putWorld world
     f x
-    unify world' =<< getWorld
+    -- unify world' =<< getWorld
     putWorld world''
+  pure () <|> join (lift $ readRef ref_m)
+  pure x
 
 askLevel :: Monad m => VerseT m Level
 askLevel = asks' level
@@ -434,7 +443,11 @@ writeRef' :: MonadRef m => Ref m a -> a -> VerseT m ()
 writeRef' ref = VerseT . lift . writeRef ref
 
 msplit' :: Monad m => VerseT m a -> VerseT m (Maybe (a, VerseT m a))
-msplit' = VerseT . fmap (fmap (fmap VerseT)) . msplit . unVerseT
+msplit' = coerceSplit . msplit . coerce
+
+coerceSplit :: RST R (S m) (RefLogicT m) (Maybe (a, RST R (S m) (RefLogicT m) a)) ->
+               VerseT m (Maybe (a, VerseT m a))
+coerceSplit = coerce
 
 backtrack' :: MonadRef m => VerseT m ()
 backtrack' = VerseT $ lift backtrack

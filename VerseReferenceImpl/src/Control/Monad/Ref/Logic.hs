@@ -114,7 +114,7 @@ instance MonadRef m => Backtrack.MonadRef (RefLogicT m) where
     where
       loop x y = do
         tellForward $ loop x y
-        tellBackward $ whenFailed (writeRef ref y *> loop y x)
+        tellBackward $ whenFailed $ writeRef ref y *> loop y x
   backtrack = RefLogicT . lift $ putFailed True
 
 whenFailed :: Monad m => StateT m () -> StateT m ()
