@@ -227,6 +227,7 @@
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
+  \multicolumn{2}{l}{\text{\lennart{Not in Plan D:}}}\\
   \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| ``less than'' |y| } \\
 
     \\[-2mm]
@@ -240,8 +241,9 @@
 % without \overline
 \rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
   & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
-%\rulename{exi-elimv} & |def (x ys) (X^[z==x; e])| & \movesto & |def ys (subst (X^[e]) x z)|
-%    & \text{if $|z| \notin |{x,ys}|, |x| \notin |{ys}|$} \\
+\text{\lennart{Plan D:}}\\
+\rulename{exi-elimv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
+    & \text{if $|z| \notin |{x,y_1 tdots y_n}|, |x| \notin |{y_1 tdots y_n}|$} \\
 
     \\[-2mm]
 
@@ -294,7 +296,8 @@ $$\begin{array}{l}
       \begin{array}{lr@@{\;}c@@{\;}ll}
       \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
       \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
-      % \rulename{var-swap} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+      \text{\lennart{Plan D:}}\\
+      \rulename{var-swap-subst} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
       % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
       \end{array} \\
 
