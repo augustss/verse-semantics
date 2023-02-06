@@ -18,7 +18,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP, systemICFPR,
-                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG ]
+                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG, systemICFPH, systemICFPI ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -84,6 +84,25 @@ systemICFPG = s
   , confluenceRules = confluenceRules s -= "EXI-SWAP"
   }
   where s = systemICFP
+
+systemICFPH :: TRSystem Expr
+systemICFPH = s
+  { sname = "ICFPH"
+  , description = description s ++ ", Plan H"
+  , rules = (rules s -= "NORM-EXI") <> rulesNormExiLR
+  , confluenceRules = confluenceRules s -= "EXI-SWAP"
+  }
+  where s = systemICFP
+
+systemICFPI :: TRSystem Expr
+systemICFPI = s
+  { sname = "ICFPI"
+  , description = description s ++ ", Plan I"
+  , rules = (rules s -= "VAR-SWAP") <> rulesPlanI
+--  , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
+  }
+  where s = systemICFP
+
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -694,3 +713,47 @@ rulesVarSwapSubst _ lhs =
      let y0 = identNotIn (free (ctx Fail, y, x))
          sub = [(y, Var x), (y0, Var y)]
      pure (subst sub (ctx (Var y0 :=: Var x)))
+
+rulesNormExiLR :: ERule
+rulesNormExiLR _ lhs =
+  "NORM-EXI-2" `name`
+  do EXI x e1 :>: e2 <- [lhs]
+     let (x', e1') = alphaExi (free e2) x e1
+     pure (EXI x' (e1' :>: e2))
+ <>
+  "NORM-EXI-3" `name`
+  do (x :=: EXI y e1) :>: e2 <- [lhs]
+     let (y', e1') = alphaExi (free (x, e2)) y e1
+     pure (EXI y' ((x :=: e1') :>: e2))
+
+{-
+rulesPlanI :: ERule
+rulesPlanI env lhs =
+  "VAR-SWAP-FF" `name`
+  do EXI y a <- [lhs]
+     (ctx, (Var x :=: Var y') :>: e) <- defX x a
+     guard (y == y')
+     guard (x /= y)
+     guard (x `elem` flexVars env)
+     pure (subst [(y, Var x)] (ctx e))
+-}
+
+rulesPlanI :: ERule
+rulesPlanI env lhs =
+  "VAR-SWAP-RR" `name`
+  do (Var a :=: Var b) :>: e <- [lhs]
+     guard (a /= b)
+     let fs = flexVars env
+     guard (a `notElem` fs && b `notElem` fs)
+     let x = identNotIn (free (a, b, e))
+     pure (EXI x (Var a :=: Var x :>: Var b :=: Var x :>: e))
+ <>
+  "NORM-SWAP-FF" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var z :=: Var x') :>: e) <- defX x a
+     guard (x == x')
+     guard (x /= z)
+     guard (z `notElem` defVars ctx)
+     guard (z `elem` flexVars env)
+     pure (subst [(x, Var z)] (ctx e))
+
