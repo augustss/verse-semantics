@@ -39,7 +39,7 @@ testceq("Koen1", SEq){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>
                      { fail }
 # This test loops with substitution and reduction under lambda, e.g., POPL rules
 # because x=<\y.x>
-testceq("Koen3", SEq, POPL=Skip, POPLV=Skip, Block=Skip, POPLL=Skip,ICFP=Skip,ICFPV=Skip)
+testceq("Koen3", SEq, POPL=Skip, POPLV=Skip, Block=Skip, POPLL=Skip,ICFP*=Skip)
                      { exists x . (\y.x = <y>; (exists z . z))(\y.x) }
                      { exists z . z }
 testceq("Koen5", SEq){ exists y . (\x.x = (exists z . 0); x = y; <>) }
@@ -61,6 +61,15 @@ testceq("QC5", SEq)  { \x.(<<x>> = x)(<>) }
                      { \x.fail }
 testceq("QC6", SEq)  { ex a. ex y. ex c. (c = y; <>) | <>; a = c; c }
                      { ex y. ex c. (c = y; <>) | <>; c }
+# QC7 kills ICFP + Plan A
+testceq("QC7", SEq)  { ex x. ex c. <c> | (c = x; x) }
+                     { ex x. ex c. <c> | (c = x; x) }
+# QC8 kills ICFP + Plan C
+testceq("QC8", SEq)  { ex x. ex y. ex z. z | (ex v. ex w. z = y; y) }
+                     { ex z. ex y. z | (y = z; z) }
+# QC9 kills ICFP
+testceq("QC9", SEq)  { ex a. (ex y. (a = y; <>) | <>); a = (ex b. b); a }
+                     { ex a y. (a = y; ()) | (); a }
 testceq("Rec1", SEq, POPLL=Skip,ICFP*=Skip) { ex x. (\y.x(fail)) = x }
                      { \y.fail }
 # Result depends on how recursion is treated.

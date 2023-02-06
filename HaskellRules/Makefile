@@ -8,6 +8,8 @@ TESTER=./dist-newstyle/build/*/*/HaskellRules-0.1.0.0/x/tester/build/tester/test
 TESTER=cabal run tester --
 QCTEST=cabal run qctest --
 
+RULES=ICFP
+
 all:
 	@echo Specify a target
 
@@ -15,10 +17,13 @@ build:
 	cabal build
 
 testicfp:
-	$(TESTER) --quiet --dfs --rules=ICFP                    --max-steps=25000       $(TESTFILE)
+	make RULES=ICFP testrules
 	$(TESTER) --quiet --dfs --rules=ICFPR                   --max-steps=25000       $(TESTFILE)
-	$(TESTER) --quiet       --rules=ICFP --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
-	$(QCTEST)               --rules=ICFP --ignore-fuel-stop --max-success=1000 --ignore-recursive
+
+testrules:
+	$(TESTER) --quiet --dfs --rules=$(RULES)                    --max-steps=25000       $(TESTFILE)
+	$(TESTER) --quiet       --rules=$(RULES) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
+	$(QCTEST)               --rules=$(RULES) --ignore-fuel-stop --max-success=1000 --ignore-recursive
 
 testslow:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
