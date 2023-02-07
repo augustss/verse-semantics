@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\rdis}{\ensuremath{\rcon \cup \rgc}}
-
+\newcommand{\norecursion}{no recursion\xspace}
 \section{Confluence of \calcname} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
@@ -328,6 +328,44 @@ then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
+As $eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$, we have $e \equiv |X^[x = v_1; y = v_2]|$,
+\ie wlog the equations $eu_1$ and $eu_2$ are adjacent. Let us split cases on whether $x \equiv y$
+\begin{description}
+\item[Case $x \equiv y$]: We join $e_1$ and $e_2$ using \cref{lem:eq-join-flip}
+via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3ggPSB1OyB4ID0gdl0iXSxbMCwxLCJYXFx7di94XFx9W3YgPSB1OyB4ID0gdl0iXSxbMiwwLCJYXFx7dS94XFx9W3g9dTsgdT12XSJdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiZXVfMiIsMl0sWzAsMiwiZXVfMSJdLFsyLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFswLDMsIlxcY3JlZntsZW06ZXEtam9pbi1mbGlwfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x = u; x = v]} && {X\{u/x\}[x=u; u=v]} \\
+	{X\{v/x\}[v = u; x = v]} && \bullet
+	\arrow["{eu_2}"', from=1-1, to=2-1]
+	\arrow["{eu_1}", from=1-1, to=1-3]
+	\arrow[dotted, from=1-3, to=2-3]
+	\arrow[dotted, from=2-1, to=2-3]
+	\arrow["{\cref{lem:eq-join-flip}}"{description, pos=0.8}, draw=none, from=1-1, to=2-3]
+\end{tikzcd}\]
+
+\item[Case $x \not \equiv y$]: Let us split cases on whether $x, y$ appear in $\freevars{u}, \freevars{v}$ respectively.
+	\begin{description}
+	\item[Case $x \not \in \freevars{v}, y \not \in \freevars{u}$]:
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3ggPSB1OyB5ID0gdl0iXSxbMCwxLCJYXFx7di94XFx9W3ggPSB1OyB5ID0gdl0iXSxbMiwwLCJYXFx7dS94XFx9W3g9dTsgeT12XSJdLFsyLDEsIlhcXHt2L3hcXH1beCA9IHU7IHkgPSB2XSJdLFswLDEsImV1XzIiLDJdLFswLDIsImV1XzEiXSxbMiwzLCJldV8yIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiZXVfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x = u; y = v]} && {X\{u/x\}[x=u; y=v]} \\
+	{X\{v/x\}[x = u; y = v]} && {X\{v/x\}[x = u; y = v]}
+	\arrow["{eu_2}"', from=1-1, to=2-1]
+	\arrow["{eu_1}", from=1-1, to=1-3]
+	\arrow["{eu_2}", dotted, from=1-3, to=2-3]
+	\arrow["{eu_1}", dotted, from=2-1, to=2-3]
+\end{tikzcd}\]
+
+	\item[Case $x \not \in \freevars{v}, y \in \freevars{u}$]:
+
+	\item[Case $x \in \freevars{v}, y \not \in \freevars{u}$]: Symmetric to previous case.
+
+	\item[Case $x \in \freevars{v}, y \in \freevars{u}$]: Join at |fail| if \rulename{u-occurs} applies, else
+	impossible due to \norecursion.
+	\end{description}
+
+\end{description}
 \ranjit{TODO:notes}
 \end{proof}
 
