@@ -340,7 +340,7 @@ instance Rec Expr where
       a :=: b ->
            [ (n, a' :=: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :=: b') | (n,b') <- rec r s b ]
-    
+
       a :|: b ->
            [ (n, a' :|: b)  | (n,a') <- rec r s' a ]
         ++ [ (n, a  :|: b') | (n,b') <- rec r s' b ]
@@ -356,7 +356,7 @@ instance Rec Expr where
       f :@: a ->
            [ (n,f' :@: a)  | (n,f') <- rec r s f ]
         ++ [ (n,f  :@: a') | (n,a') <- rec r s a ]
-  
+
       Arr as -> [ (n,Arr (take i as ++ [a'] ++ drop (i+1) as))
                 | (i,a) <- [0..] `zip` as
                 , (n,a') <- rec r s a
@@ -496,6 +496,7 @@ arbIdents =
 instance Arbitrary Expr where
   arbitrary = sized (`arbExpr` map Name ["a","b","c"]) -- closed by default
 
+  -- shrink _ = []
   shrink (Var _)   = [ Int 0, Arr [] ]
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
   shrink (Op _)    = []
@@ -566,7 +567,7 @@ collect :: (Expr->a) -> (a->a->a) -> Expr -> a
 collect here (\/) = col
  where
   col e = recr (here e) e
-  
+
   recr a (Arr es)         = foldr (\/) a (map col es)
   recr a (Lam (Bind _ e)) = a \/ col e
   recr a (Exi (Bind _ e)) = a \/ col e

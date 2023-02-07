@@ -18,7 +18,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP, systemICFPR,
-                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG, systemICFPH, systemICFPI ]
+                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG, systemICFPH, systemICFPI, systemICFPJ ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -98,11 +98,19 @@ systemICFPI :: TRSystem Expr
 systemICFPI = s
   { sname = "ICFPI"
   , description = description s ++ ", Plan I"
-  , rules = (rules s -= "VAR-SWAP") <> rulesPlanI
+  , rules = (rules s -= "VAR-SWAP") <> rulesPlanI<> rulesExiElimV
 --  , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
   }
   where s = systemICFP
 
+systemICFPJ :: TRSystem Expr
+systemICFPJ = s
+  { sname = "ICFPJ"
+  , description = description s ++ ", Plan J"
+  , rules = (rules s -= "VAR-SWAP") <> rulesPlanJ
+  , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
+  }
+  where s = systemICFP
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -493,6 +501,17 @@ rulesUnification env lhs =
      guard (lessThan env x y)
      pure (Var x :=: Var y)
 
+rulesPlanJ :: ERule
+rulesPlanJ _ lhs =
+  "VAR-SWAP" `name`
+  do Var y :=: Var x <- [lhs]
+     -- guard (lessThan env x y)
+     pure (Var x :=: Var y)
+  ++
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     pure (EXI y (EXI x e))
+
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
   "SUBST-REC" `name`
@@ -691,7 +710,7 @@ rulesExiElimV _ lhs =
   "EXI-ELIMV" `name`
   do EXI x a <- [lhs]
      (ctx, (Var z :=: Var x') :>: e) <- defX x a
-     guard (x == x')
+     guard (x == x' && not(isUV x))
      guard (x /= z)
      guard (z `notElem` defVars ctx)
      pure (subst [(x, Var z)] (ctx e))
@@ -741,7 +760,8 @@ rulesPlanI env lhs =
      guard (a /= b)
      let fs = flexVars env
      guard (a `notElem` fs && b `notElem` fs)
-     let x = identNotIn (free (a, b, e))
+     -- let x = identNotIn (free (a, b, e))
+     let x = uvIdentNotIn (free (a, b, e))
      pure (EXI x (Var a :=: Var x :>: Var b :=: Var x :>: e))
  <>
   "NORM-SWAP-FF" `name`
@@ -752,4 +772,3 @@ rulesPlanI env lhs =
      guard (z `notElem` defVars ctx)
      guard (z `elem` flexVars env)
      pure (subst [(x, Var z)] (ctx e))
-
