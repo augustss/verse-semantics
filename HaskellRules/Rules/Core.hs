@@ -342,8 +342,9 @@ instance Rec Expr where
         ++ [ (n, a  :=: b') | (n,b') <- rec r s b ]
     
       a :|: b ->
-           [ (n, a' :|: b)  | (n,a') <- rec r s a ]
-        ++ [ (n, a  :|: b') | (n,b') <- rec r s b ]
+           [ (n, a' :|: b)  | (n,a') <- rec r s' a ]
+        ++ [ (n, a  :|: b') | (n,b') <- rec r s' b ]
+           where s' = addBound BBlk s
 
       a :>: b ->
            [ (n, a' :>: b)  | (n,a') <- rec r s a ]
