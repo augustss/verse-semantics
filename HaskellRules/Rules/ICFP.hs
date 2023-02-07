@@ -506,12 +506,11 @@ rulesPlanJ :: ERule
 rulesPlanJ _ lhs =
   "VAR-SWAP" `name`
   do Var y :=: Var x <- [lhs]
-     -- guard (lessThan env x y)
      pure (Var x :=: Var y)
-  -- ++
-  -- "EXI-SWAP" `name`
-  -- do EXI x (EXI y e) <- [lhs]
-  --    pure (EXI y (EXI x e))
+  ++
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     pure (EXI y (EXI x e))
 
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
