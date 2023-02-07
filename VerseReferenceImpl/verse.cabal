@@ -50,6 +50,7 @@ library
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos
+    Language.Verse.Pretty
     Language.Verse.Token
     Language.Verse.Val
   build-tool-depends:

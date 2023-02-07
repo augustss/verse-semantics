@@ -7,8 +7,9 @@ module Language.Verse
 
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class
-import Control.Monad.Fix
-import Control.Monad.Ref
+import Control.Monad.Ref.Backtrack qualified as Backtrack
+import Control.Monad.Supply
+import Control.Monad.Verse.Class
 
 import Data.ByteString (ByteString)
 import Data.Fix
@@ -17,13 +18,14 @@ import Data.Ref
 import Language.Verse.Desugar
 import Language.Verse.Error
 import Language.Verse.Eval qualified as Eval
+import Language.Verse.Label
 import Language.Verse.Lexer
 import Language.Verse.Parse
 import Language.Verse.Val
 
 eval :: ( MonadError Error m
-        , MonadFix m
-        , MonadRef m
-        , EqRef (Ref m)
+        , MonadSupply Label m
+        , MonadVerse m
+        , EqRef (Backtrack.Ref m)
         ) => ByteString -> m (Fix (Val m))
 eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)

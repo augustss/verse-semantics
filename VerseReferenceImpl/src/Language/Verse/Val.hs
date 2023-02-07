@@ -2,12 +2,14 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Val
   ( Val (..)
-  -- , prettyM
+  , prettyM
   ) where
 
 import Control.Applicative
@@ -18,7 +20,6 @@ import Control.Monad.Writer.CPS
 
 import Data.Foldable
 import Data.Functor
-import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
@@ -29,7 +30,7 @@ import Language.Verse.Label
 import Language.Verse.Name
 import {-# SOURCE #-} Language.Verse.Named (Named)
 import Language.Verse.Overload (Overload)
-import Language.Verse.Overload qualified as Overload
+import Language.Verse.Pretty
 
 import Prettyprinter
 
@@ -107,64 +108,72 @@ uncons xs = readVar xs >>= \ case
   Just (Overloads x xs) -> pure $ Just (x, xs)
   Just _ -> empty
   _ -> pure Nothing
-{-
-prettyM :: (Backtrack.MonadRef m, Pretty a) => Val m a -> m (Doc ann)
-prettyM = \ case
-  Int x ->
-    pure $ pretty x
-  Float x ->
-    pure $ pretty x
-  Rational x | denominator x == 1 ->
-    pure $ pretty $ numerator x
-  Rational x ->
-    pure $ pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-  Truth x ->
-    pure . align $ "truth" <> group (braces $ pretty x)
-  Overloads {} ->
-    pure "function"
-  Tuple [] ->
-    pure "false"
-  Tuple xs ->
-    pure . align . tupled $ pretty <$> xs
-  Module i xs ->
-    pure $ align $ "module#" <> prettyLabel i <> group (braced $ names xs)
-  StructInst i xs ->
-    pure .
-    align $
-    "struct#" <>
-    prettyLabel i <>
-    group (braced $ names xs)
-  ClassInst i Nothing xs ->
-    pure .
-    align $
-    "class#" <>
-    prettyLabel i <>
-    group (braced $ names xs)
-  ClassInst i (Just x) xs ->
-    pure .
-    align $
-    "class#" <>
-    prettyLabel i <>
-    parens (pretty x) <>
-    group (braced $ names xs)
-  where
-    names xs =
-      (\ (k, v) -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> Named.prettyM v)) <$>
-      HashMap.toList xs
-    tupled =
-      group .
-      encloseSep
-      (flatAlt "( " lparen)
-      (flatAlt (hardline <> rparen) rparen)
-      ", "
-    braces x =
-      flatAlt (hardline <> "{ ") lbrace <>
-      x <>
-      flatAlt (hardline <> rbrace) rbrace
-    braced =
-      group .
-      encloseSep
-      (flatAlt (hardline <> "{ ") lbrace)
-      (flatAlt (hardline <> rbrace) rbrace)
-      ", "
--}
+
+instance ( Backtrack.MonadRef m
+         , MonadVar m
+         , PrettyM a m
+         ) => PrettyM (Val m a) m where
+  prettyM = \ case
+    Int x ->
+      pure $ pretty x
+    Float x ->
+      pure $ pretty x
+    Rational x | denominator x == 1 ->
+      pure $ pretty $ numerator x
+    Rational x ->
+      pure $ pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x ->
+      prettyM x <&> \ doc -> align $ "truth" <> group (braces doc)
+    Overloads {} ->
+      pure "function"
+    Tuple [] ->
+      pure "false"
+    Tuple xs ->
+      align . tupled <$> traverse prettyM xs
+    Module i xs ->
+      namesM xs <&> \ docs ->
+      align $
+      "module#" <>
+      prettyLabel i <>
+      group (braced docs)
+    StructInst i xs ->
+      namesM xs <&> \ docs ->
+      align $
+      "struct#" <>
+      prettyLabel i <>
+      group (braced docs)
+    ClassInst i Nothing xs ->
+      namesM xs <&> \ docs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      group (braced docs)
+    ClassInst i (Just x) xs -> do
+      doc <- prettyM x
+      docs <- namesM xs
+      pure . align $
+        "class#" <>
+        prettyLabel i <>
+        parens doc <>
+        group (braced docs)
+    where
+      namesM xs =
+        traverse
+        (\ (k, v) -> prettyM v <&> \ doc -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> doc))
+        (HashMap.toList xs)
+      tupled =
+        group .
+        encloseSep
+        (flatAlt "( " lparen)
+        (flatAlt (hardline <> rparen) rparen)
+        ", "
+      braces x =
+        flatAlt (hardline <> "{ ") lbrace <>
+        x <>
+        flatAlt (hardline <> rbrace) rbrace
+      braced =
+        group .
+        encloseSep
+        (flatAlt (hardline <> "{ ") lbrace)
+        (flatAlt (hardline <> rbrace) rbrace)
+        ", "
