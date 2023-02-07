@@ -9,7 +9,6 @@ LATEX=pdflatex -halt-on-error
 
 rules.tex: $(COMMON) rules.ltx
 rules-eqn.tex: $(COMMON) ../../verse-icfp23/rewrites.tex rules-eqn.ltx
-rewrites.tex: $(COMMON) rewrites.ltx
 block.tex: $(COMMON) block.ltx
 lfblock.tex: $(COMMON) lfblock.ltx
 
