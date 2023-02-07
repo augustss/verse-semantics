@@ -20,7 +20,7 @@ data Error
   | DefError !Loc !Loc !Name
   | AnonError !Loc
   | NameError !Loc !Name
-  | IdentError !Loc !(Ident Name)
+  | IdentError !Loc !Ident
   | DomainError !Loc
   | StuckError !Loc deriving Show
 

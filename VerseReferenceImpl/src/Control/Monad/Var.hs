@@ -1,4 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -34,14 +33,11 @@ class Monad m => MonadVar m where
   readVar = lift . readVar
 
   freeze :: Traversable f => Var m f -> m (Maybe (Fix f))
-  freeze = freezeBy id
-
-  freezeBy :: Traversable g => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
-  default freezeBy :: ( m ~ t n
-                      , MonadVarTrans t n
-                      , Traversable g
-                      ) => (forall a . f a -> g a) -> Var m f -> m (Maybe (Fix g))
-  freezeBy f = lift . freezeBy f
+  default freeze :: ( m ~ t n
+                    , MonadVarTrans t n
+                    , Traversable f
+                    ) => Var m f -> m (Maybe (Fix f))
+  freeze = lift . freeze
 
   freshen :: Traversable f => Var m f -> m (Var m f)
   default freshen :: ( m ~ t n

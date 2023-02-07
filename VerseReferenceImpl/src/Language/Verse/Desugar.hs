@@ -16,13 +16,14 @@ import Control.Monad.Trans.Class
 import Data.Foldable
 import Data.Functor
 import Data.Functor.Apply
-import Data.HashMap.Strict (HashMap, foldlWithKey')
+import Data.HashMap.Strict (foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
 import Data.Traversable
 
 import Language.Verse.Desugar.Exp
 import Language.Verse.Error
-import Language.Verse.Ident
+import Language.Verse.Ident (Ident, IdentMap)
+import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
@@ -30,17 +31,17 @@ import Language.Verse.Parse.Exp qualified as Parse
 
 type Desugar = RST Bool Env (SupplyT Label (Except Error))
 
-type Env = HashMap (Ident Name) (Loc, Bool)
+type Env = IdentMap (Loc, Bool)
 
 runDesugar :: Desugar a -> SupplyT Label (Except Error) (a, Env)
 runDesugar m = runRST m False mempty
 
-desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L (Ident Name)))
+desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L Ident))
 desugar e = runExcept . runSupplyT $ do
   (e, xs) <- runDesugar $ desugar' e
   pure $ exists' xs e
 
-desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L (Ident Name)))
+desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
 desugar' e = for e $ \ case
   (Parse.:=:) e1 e2 -> ask >>= \ case
     False -> (:=:) <$> desugar' e1 <*> desugar' e2
@@ -131,18 +132,18 @@ desugar' e = for e $ \ case
     extract <$> exists (desugar' e)
   Parse.Exists x -> do
     tellName x False
-    pure . Name . Pure $ extract x
+    pure . Name . Ident.Name $ extract x
   Parse.Var x -> do
     tellName x True
-    pure . Name . Pure $ extract x
+    pure . Name . Ident.Name $ extract x
   Parse.Set x e ->
-    Set (Pure <$> x) <$> desugar' e
+    Set (Ident.Name <$> x) <$> desugar' e
   Parse.Function e1 e2 -> do
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     Function (snd <$> xs) e1 <$> exists (desugar' e2)
   Parse.Overload x e1 e2 -> do
     tellName' x False
-    let x' = Pure <$> x
+    let x' = Ident.Name <$> x
     (e1, xs) <- lift $ runDesugar $ desugar' e1
     e2 <- exists $ desugar' e2
     let e = Function (snd <$> xs) <$> duplicate e1 <.> duplicate e2
@@ -166,7 +167,7 @@ desugar' e = for e $ \ case
   Parse.Float x ->
     pure $ Float x
   Parse.Name x ->
-    pure . Name $ Pure x
+    pure . Name $ Ident.Name x
   Parse.PrefixColon e -> do
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
@@ -175,50 +176,50 @@ desugar' e = for e $ \ case
       True -> (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
     tellName x False
-    let e1 = Name . Pure <$> x
+    let e1 = Name . Ident.Name <$> x
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
     let e2 = Invoke <$> duplicate e <.> duplicate e_i
     pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.ArrowInfixColon x y e -> do
     tellName x False
-    let e3 = Name . Pure <$> x
+    let e3 = Name . Ident.Name <$> x
     tellName y False
-    let e1 = Name . Pure <$> y
+    let e1 = Name . Ident.Name <$> y
     e <- desugar' e
     let e2 = Invoke <$> duplicate e <.> duplicate e3
     pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e3
   Parse.InfixColonEqual x e -> do
     tellName x False
-    let x' = Pure <$> x
+    let x' = Ident.Name <$> x
     ask >>= \ case
       False -> desugar' e <&> ((Name <$> x') :=:)
       True -> local (const False) (desugar' e) <&> Default x' (Name <$> x')
 
 desugarOperator1 :: Name ->
                     L (Parse.Exp L Name) ->
-                    Desugar (Exp L (Ident Name))
+                    Desugar (Exp L Ident)
 desugarOperator1 x e =
   desugar' e <&> \ e ->
-  Invoke (Name (Pure x) <$ e) e
+  Invoke (Name (Ident.Name x) <$ e) e
 
 desugarOperator2 :: Name ->
                     L (Parse.Exp L Name) ->
                     L (Parse.Exp L Name) ->
-                    Desugar (Exp L (Ident Name))
+                    Desugar (Exp L Ident)
 desugarOperator2 x e1 e2 =
   (,) <$> desugar' e1 <*> desugar' e2 <&> \ (e1, e2) ->
-  Invoke (Name (Pure x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
+  Invoke (Name (Ident.Name x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
 
-getIdent :: L (Parse.Exp L Name) -> Desugar (L (Ident Name))
+getIdent :: L (Parse.Exp L Name) -> Desugar (L Ident)
 getIdent e = case extract e of
-  Parse.Exists x -> pure $ Pure <$> x
-  Parse.InfixColon x _ -> pure $ Pure <$> x
+  Parse.Exists x -> pure $ Ident.Name <$> x
+  Parse.InfixColon x _ -> pure $ Ident.Name <$> x
   _ -> throwError $ AnonError $ loc e
 
-freshIdent :: Loc -> Bool -> Desugar (Ident Name)
+freshIdent :: Loc -> Bool -> Desugar Ident
 freshIdent loc var = do
-  x <- Label <$> supply
+  x <- Ident.Label <$> supply
   modify $ HashMap.insert x (loc, var)
   pure x
 
@@ -229,19 +230,19 @@ tellName x var =
   (\ case
       Nothing -> pure $ Just (loc x, var)
       Just (y, _) -> throwError $ DefError y (loc x) (extract x))
-  (Pure $ extract x) =<<
+  (Ident.Name $ extract x) =<<
   get
 
 tellName' :: L Name -> Bool -> Desugar ()
 tellName' x var =
-  modify $ HashMap.insertWith (flip const) (Pure $ extract x) (loc x, var)
+  modify $ HashMap.insertWith (flip const) (Ident.Name $ extract x) (loc x, var)
 
-exists :: Desugar (L (Exp L (Ident Name))) -> Desugar (L (Exp L (Ident Name)))
+exists :: Desugar (L (Exp L Ident)) -> Desugar (L (Exp L Ident))
 exists m = lift $ do
   (e, xs) <- runDesugar m
   pure $ exists' xs e
 
-exists' :: Env -> L (Exp L (Ident Name)) -> L (Exp L (Ident Name))
+exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)
 exists' xs e = foldlWithKey' f e xs
   where
     f z x (loc, var) =

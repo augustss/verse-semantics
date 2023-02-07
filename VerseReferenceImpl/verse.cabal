@@ -45,10 +45,12 @@ library
     Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Name
+    Language.Verse.Named
     Language.Verse.Overload
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos
+    Language.Verse.Pretty
     Language.Verse.Token
     Language.Verse.Val
   build-tool-depends:
