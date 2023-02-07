@@ -358,15 +358,21 @@ via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
 \end{tikzcd}\]
 
 	\item[Case $x \not \in \freevars{v}, y \in \freevars{u}$]:
-
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3ggPSB1OyB5ID0gdl0iXSxbMCwxLCJYXFx7di95XFx9W3ggPSB1XFx7di95XFx9OyB5ID0gdl0iXSxbMiwwLCJYXFx7dS94XFx9W3g9dTsgeT12XSJdLFsyLDEsIlhcXHt1XFx7di95XFx9L3gsdi95XFx9W3ggPSB1XFx7di95XFx9OyB5ID0gdl0iXSxbMCwxLCJldV8yIiwyXSxbMCwyLCJldV8xIl0sWzIsMywiZXVfMiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsImV1XzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x = u; y = v]} && {X\{u/x\}[x=u; y=v]} \\
+	{X\{v/y\}[x = u\{v/y\}; y = v]} && {X\{u\{v/y\}/x,v/y\}[x = u\{v/y\}; y = v]}
+	\arrow["{eu_2}"', from=1-1, to=2-1]
+	\arrow["{eu_1}", from=1-1, to=1-3]
+	\arrow["{eu_2}", dotted, from=1-3, to=2-3]
+	\arrow["{eu_1}", dotted, from=2-1, to=2-3]
+\end{tikzcd}\]
 	\item[Case $x \in \freevars{v}, y \not \in \freevars{u}$]: Symmetric to previous case.
 
-	\item[Case $x \in \freevars{v}, y \in \freevars{u}$]: Join at |fail| if \rulename{u-occurs} applies, else
+	\item[Case $x \in \freevars{v}, y \in \freevars{u}$]: Join at |fail| if \rulename{u-occurs}, else
 	impossible due to \norecursion.
 	\end{description}
-
 \end{description}
-\ranjit{TODO:notes}
 \end{proof}
 
 \begin{lemma}[Subst-Diff] \label{lem:subst-diff}
