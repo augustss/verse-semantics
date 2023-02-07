@@ -19,21 +19,32 @@ import Control.Monad.Unify
 import Control.Monad.Var
 
 import Data.Kind
-import Data.Unifiable
 
-class (MonadUnify m, Backtrack.MonadRef m, Unifiable (World m)) => MonadVerse m where
-  type World m :: Type -> Type
+class (MonadUnify m, Backtrack.MonadRef m) => MonadVerse m where
+  type World m
   type World m = WorldDefault m
 
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
-  getWorld :: m (Var m (World m))
-  default getWorld :: (m ~ t n, MonadVerseTrans t n) => m (Var m (World m))
+  freshWorld :: m (World m)
+  default freshWorld :: (m ~ t n, MonadVerseTrans t n) => m (World m)
+  freshWorld = lift freshWorld
+
+  getWorld :: m (World m)
+  default getWorld :: (m ~ t n, MonadVerseTrans t n) => m (World m)
   getWorld = lift getWorld
 
-  putWorld :: Var m (World m) -> m ()
-  default putWorld :: (m ~ t n, MonadVerseTrans t n) => Var m (World m) -> m ()
+  putWorld :: World m -> m ()
+  default putWorld :: (m ~ t n, MonadVerseTrans t n) => World m -> m ()
   putWorld = lift . putWorld
+
+  unifyWorld :: World m -> World m -> m ()
+  default unifyWorld :: ( m ~ t n
+                        , MonadVerseTrans t n
+                        ) => World m -> World m -> m ()
+  unifyWorld x y = lift $ unifyWorld x y
+
+  whenWorldBound :: World m -> m () -> m ()
 
   split :: m a -> (Maybe (a, m a) -> m ()) -> m ()
 
@@ -53,7 +64,7 @@ class (MonadUnify m, Backtrack.MonadRef m, Unifiable (World m)) => MonadVerse m 
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
 
-type family WorldDefault (m :: Type -> Type) :: Type -> Type where
+type family WorldDefault (m :: Type -> Type) where
   WorldDefault (t n) = World n
 
 type MonadVerseTrans t n =
