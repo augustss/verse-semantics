@@ -17,5 +17,5 @@ normalFormsFuelTrace sys | rulesHaveStructural sys = normalFormsFuelTraceWithGra
 
 normalFormFuelTrace :: (Show a, Ord a, Rec a)
                      => TRSystem a -> Int -> a -> NormResult a
-normalFormFuelTrace sys | rulesHaveStructural sys = error "normalFormFuelTraceWithGraph not implemented"
+normalFormFuelTrace sys -- | rulesHaveStructural sys = error "normalFormFuelTraceWithGraph not implemented"
                         | otherwise               = normalFormFuelTracePlain sys

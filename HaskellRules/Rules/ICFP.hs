@@ -9,6 +9,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+import Debug.Trace (traceShow, trace)
 --import Debug.Trace
 
 isRecursive :: Expr -> Bool
@@ -503,14 +504,19 @@ rulesUnification env lhs =
      pure (Var x :=: Var y)
 
 rulesPlanJ :: ERule
-rulesPlanJ _ lhs =
-  "VAR-SWAP" `name`
+rulesPlanJ env lhs =
+  "VAR-SWAP-J" `name`
   do Var y :=: Var x <- [lhs]
+     guard ({- myTraceShow ("lessThan: " ++ show (x, y)) -} (lessThan env x y))
      pure (Var x :=: Var y)
   ++
   "EXI-SWAP" `name`
   do EXI x (EXI y e) <- [lhs]
      pure (EXI y (EXI x e))
+
+
+myTraceShow :: Show a => String -> a -> a
+myTraceShow msg x = trace ("TRACE: " ++ msg ++ show x) x
 
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
