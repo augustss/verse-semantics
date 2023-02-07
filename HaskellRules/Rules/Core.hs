@@ -89,9 +89,9 @@ instance Show Expr where
   showsPrec p (Op o)           = showsPrec p o
   showsPrec _ (Arr es)         = showString $ "<" ++ intercalate ", " (map show es) ++ ">"
   showsPrec p (Lam (Bind x e)) = showParen (p > 0) $ showString "\\" . showsPrec 0 x . showString "." . showsPrec 0 e
-  showsPrec p (a :|: b)        = showParen (p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
+  showsPrec p (a :|: b)        = showParen (extraParens || p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
   showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
-  showsPrec p (a :=: b)        = showParen (p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
+  showsPrec p (a :=: b)        = showParen (extraParens || p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
   showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
   showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
   showsPrec _ Fail             = showString "fail"
@@ -105,6 +105,10 @@ instance Show Expr where
   showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
                                  showsPrec 0 e . showString "}"
   showsPrec p (Ref r)          = showsPrec p r
+
+-- Be extra clear about binding.
+extraParens :: Bool
+extraParens = True
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
