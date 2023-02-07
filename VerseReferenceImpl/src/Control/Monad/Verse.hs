@@ -85,7 +85,7 @@ instance ( MonadFix m
 
   freshen = lift . flip evalStateT mempty . freshen'
 
-  freezeBy f = lift . freezeBy' f
+  freeze = lift . freeze'
 
 newVar' :: (MonadRef m, MonadSupply Label m) => f (Var m f) -> m (Var m f)
 newVar' x = fmap Var . newSet' . Bound x =<< supply
@@ -103,19 +103,21 @@ freshen' var = lift (find' $ unVar var) >>= \ case
     Just val -> pure val
   (set, _, Unbound {}) -> pure $ Var set
 
-freezeBy' :: (MonadFix m, MonadRef m, Traversable g) =>
-             (forall a . f a -> g a) ->
-             Var m f -> m (Maybe (Fix g))
-freezeBy' f = runMaybeT . flip evalStateT mempty . freezeBy'' f
+freeze' :: ( MonadFix m
+           , MonadRef m
+           , Traversable f
+           ) => Var m f -> m (Maybe (Fix f))
+freeze' = runMaybeT . flip evalStateT mempty . freeze''
 
-freezeBy'' :: (MonadFix m, MonadRef m, Traversable g) =>
-              (forall a . f a -> g a) ->
-              Var m f -> StateT (IntMap (Fix g)) (MaybeT m) (Fix g)
-freezeBy'' f = unVar >>> find' >>> lift >>> lift >=> \ case
+freeze'' :: ( MonadFix m
+            , MonadRef m
+            , Traversable f
+            ) => Var m f -> StateT (IntMap (Fix f)) (MaybeT m) (Fix f)
+freeze'' = unVar >>> find' >>> lift >>> lift >=> \ case
   (_, _, Bound val i) -> gets (IntMap.lookup i) >>= \ case
     Nothing -> mfix $ \ val' -> do
       modify $ IntMap.insert i val'
-      Fix <$> traverse (freezeBy'' f) (f val)
+      Fix <$> traverse freeze'' val
     Just val' -> pure val'
   _ -> empty
 

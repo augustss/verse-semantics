@@ -1,59 +1,40 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Ident
   ( Ident (..)
   , IdentMap
   ) where
 
-import Data.Functor.Classes
 import Data.Hashable
-import Data.Hashable.Lifted
 import Data.HashMap.Strict (HashMap)
 import Data.String
 
 import Language.Verse.Label
+import Language.Verse.Name
 
 import Prettyprinter
 
-data Ident a
-  = Pure a
-  | Label !Label deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+data Ident
+  = Name !Name
+  | Label !Label deriving (Show, Eq, Ord)
 
-instance Applicative Ident where
-  pure = Pure
-  f <*> x = case f of
-    Label f -> Label f
-    Pure f -> case x of
-      Label x -> Label x
-      Pure x -> Pure (f x)
-
-instance Eq1 Ident where
-  liftEq f = curry $ \ case
-    (Pure x, Pure y) -> f x y
-    (Label x, Label y) -> x == y
-    _ -> False
-
-instance Hashable a => Hashable (Ident a) where
+instance Hashable Ident where
   hash = \ case
-    Pure x -> 0 `hashWithSalt` x
+    Name x -> 0 `hashWithSalt` x
     Label x -> distinguisher `hashWithSalt` x
-  hashWithSalt = hashWithSalt1
-
-instance Hashable1 Ident where
-  liftHashWithSalt f s = \ case
-    Pure x -> s `hashWithSalt` distinguisher `f` x
+  hashWithSalt s = \ case
+    Name x -> s `hashWithSalt` distinguisher `hashWithSalt` x
     Label x -> s `hashWithSalt` distinguisher `hashWithSalt` x
 
-instance IsString a => IsString (Ident a) where
-  fromString = pure . fromString
+instance IsString Ident where
+  fromString = Name . fromString
 
-instance Pretty a => Pretty (Ident a) where
+instance Pretty Ident where
   pretty = \ case
-    Pure x -> pretty x
+    Name x -> pretty x
     Label x -> "t" <> prettyLabel x
 
-type IdentMap a v = HashMap (Ident a) v
+type IdentMap = HashMap Ident
 
 distinguisher :: Int
 distinguisher = fromIntegral $ (maxBound :: Word) `quot` 3

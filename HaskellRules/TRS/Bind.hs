@@ -2,8 +2,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module TRS.Bind where
 import Data.Data(Data)
-import Data.List( union, (\\) )
+import Data.List( union, (\\), isPrefixOf )
 import Data.Char( isDigit )
+import Data.Maybe (maybeToList)
 
 --------------------------------------------------------------------------------
 
@@ -22,9 +23,17 @@ ident = Name
 prim :: Int -> Ident
 prim = Prim
 
+identsNotInPrefix :: String -> [Ident] -> [Ident]
+identsNotInPrefix prefix zs = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
+  -- where m = maximum (0 : [ read s :: Integer | Name ('v':s) <- zs, not (null s), all isDigit s ])
+  where m = maximum (0 : [ read s :: Integer | Name str <- zs, s <- maybeToList (removePrefix prefix str), not (null s), all isDigit s ])
+
+removePrefix :: String -> String -> Maybe String
+removePrefix p x = if p `isPrefixOf` x then Just (drop (length p) x) else Nothing
+
 identsNotIn :: [Ident] -> [Ident]
-identsNotIn zs = [ Name ("v" ++ show (m+i)) | i <- [1..] ]
- where m = maximum (0 : [ read s :: Integer | Name ('v':s) <- zs, not (null s), all isDigit s ])
+identsNotIn = identsNotInPrefix "v"
+
 {-
 identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
  where m = maximum (0 : [ n | Prim n <- zs ])
@@ -33,6 +42,15 @@ identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
 
+uvIdentNotIn :: [Ident] -> Ident
+uvIdentNotIn = head . identsNotInPrefix uvPrefix
+
+uvPrefix :: String
+uvPrefix = "uni$"
+
+isUV :: Ident -> Bool
+isUV (Name x) = uvPrefix `isPrefixOf` x
+isUV _ = False
 --------------------------------------------------------------------------------
 
 class Free a where

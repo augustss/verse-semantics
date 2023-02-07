@@ -5,8 +5,10 @@ module Data.Unifiable
   , Zippable (..)
   ) where
 
+import Control.Monad
 import Control.Monad.Var
 
+import Data.Functor
 import Data.Functor.Const
 
 class Traversable f => Unifiable f where
@@ -39,7 +41,7 @@ instance Zippable Maybe where
     (Just x, Just y) -> Just [(x, y)]
     _ -> Nothing
 
-instance Unifiable (Const a)
+instance Eq a => Unifiable (Const a)
 
-instance Zippable (Const a) where
-  zipMatch _ _ = Nothing
+instance Eq a => Zippable (Const a) where
+  zipMatch x y = guard (getConst x == getConst y) $> []
