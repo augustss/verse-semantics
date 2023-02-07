@@ -18,5 +18,5 @@ import System.IO
 
 main :: IO ()
 main = ByteString.getContents >>= runExceptT . eval >>= \ case
-  Left e -> hPutDoc stderr $ pretty e <> line
-  Right xs -> for_ xs $ putDoc . (<> line) . pretty
+  Left e -> hPutDoc stderr . (<> line) =<< prettyM e
+  Right xs -> for_ xs $ putDoc . (<> line) <=< prettyM

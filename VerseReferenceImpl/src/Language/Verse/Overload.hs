@@ -11,18 +11,17 @@ import Language.Verse.Ident
 import Language.Verse.Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc
-import Language.Verse.Name
 import {-# SOURCE #-} Language.Verse.Named (Named)
 
 import Prettyprinter
 
 data Overload m a
-  = Function !Label !(IdentMap Name (Named m a)) !(IdentMap Name Bool) Exp Exp
-  | Struct !Label !(IdentMap Name (Named m a)) !(IdentMap Name Bool) Exp
-  | Class !Label !(IdentMap Name (Named m a)) (Maybe a) !(IdentMap Name Bool) Exp
+  = Function !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp Exp
+  | Struct !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp
+  | Class !Label !(IdentMap (Named m a)) (Maybe a) !(IdentMap Bool) Exp
   | Intrinsic Intrinsic deriving (Functor, Foldable, Traversable)
 
-type Exp = L (Desugar.Exp L (Ident Name))
+type Exp = L (Desugar.Exp L Ident)
 
 instance Eq (Overload f a) where
   (==) = curry $ \ case

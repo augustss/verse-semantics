@@ -9,8 +9,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Eval
-  ( Pure (..)
-  , eval
+  ( eval
   ) where
 
 import Control.Applicative
@@ -20,13 +19,11 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
-import Control.Monad.Ref
 import Control.Monad.Ref.Backtrack qualified as Backtrack
 import Control.Monad.Supply
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Unify
 import Control.Monad.Var
-import Control.Monad.Verse (runVerseT)
 import Control.Monad.Verse.Class
 
 import Data.Fix
@@ -54,11 +51,7 @@ import Language.Verse.Overload qualified as Overload
 import Language.Verse.Val (Val)
 import Language.Verse.Val qualified as Val
 
-import Prettyprinter
-
 type EvalT m = WriterT (Defaults m) (ReaderT (Env m) m)
-
-type MutVar m = Var m (Val m)
 
 type MonadEval m =
   ( MonadError Error m
@@ -68,9 +61,9 @@ type MonadEval m =
   , EqRef (Backtrack.Ref m)
   )
 
-type Defaults m = HashMap (Ident Name) (MutVar m, Env m, L (Exp L (Ident Name)))
+type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
 
-type Env m = HashMap (Ident Name) (Named m (Var m (Val m)))
+type Env m = HashMap Ident (Named m (Var m (Val m)))
 
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = runReaderT (evalWriterT m) =<< newEnv
@@ -78,12 +71,12 @@ runEvalT m = runReaderT (evalWriterT m) =<< newEnv
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-eval :: MonadEval m => L (Exp L (Ident Name)) -> m (Fix (Val m))
+eval :: MonadEval m => L (Exp L Ident) -> m (Fix (Val m))
 eval e = runEvalT (eval' e) >>= freeze >>= \ case
   Nothing -> throwError $ StuckError $ loc e
   Just x -> pure x
 
-eval' :: MonadEval m => L (Exp L (Ident Name)) -> EvalT m (MutVar m)
+eval' :: MonadEval m => L (Exp L Ident) -> EvalT m (Var m (Val m))
 eval' e = case extract e of
   e1 :*>: e2 ->
     eval' e1 *> eval' e2
@@ -268,11 +261,13 @@ eval' e = case extract e of
                   unify var2 =<< newVar (Val.ClassInst i var_super $ fromIdents xs)
               Val.ClassInst _ (Just var2) _ -> recur var2
               _ -> empty) var2
-          Overload.Intrinsic intrinsic -> invokeIntrinsic intrinsic var2 $ \ case
-            Just var' -> unify var var'
-            Nothing -> whenBound var1 $ \ case
-              Val.Overloads overload var1 -> recur overload var1
-              _ -> throwDomainError $ loc e) overload var1
+          Overload.Intrinsic intrinsic -> do
+            env <- ask
+            lift . invokeIntrinsic intrinsic var2 $ \ case
+              Just var' -> unify var var'
+              Nothing -> whenBound var1 $ \ case
+                Val.Overloads overload var1 -> runReaderT (recur overload var1) env
+                _ -> throwDomainError $ loc e) overload var1
       _ -> throwDomainError $ loc e
     pure var
   Exp.Tuple exps ->
@@ -292,10 +287,10 @@ eval' e = case extract e of
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
 
-invokeIntrinsic :: MonadVerse m =>
+invokeIntrinsic :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
                    Intrinsic ->
-                   Var m (Val g) ->
-                   (Maybe (Var m (Val g)) -> m ()) ->
+                   Var m (Val m) ->
+                   (Maybe (Var m (Val m)) -> m ()) ->
                    m ()
 invokeIntrinsic = \ case
   Intrinsic.Less -> liftOrd (<)
@@ -310,7 +305,7 @@ invokeIntrinsic = \ case
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
-liftOrd :: MonadVerse m =>
+liftOrd :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
            (forall a . Ord a => a -> a -> Bool) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> m ()) ->
@@ -340,7 +335,7 @@ liftOrd f var k =
       k $ Just var_x)
   (k Nothing)
 
-liftNum :: MonadVerse m =>
+liftNum :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
            (forall a . Num a => a -> a -> a) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> m ()) ->
@@ -393,9 +388,9 @@ prefixPlus var k =
   (k . Just)
   (k Nothing)
 
-prefixMinus :: (MonadVerse m, Zippable f) =>
-               Var m (Val f) ->
-               (Maybe (Var m (Val f)) -> m ()) ->
+prefixMinus :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+               Var m (Val m) ->
+               (Maybe (Var m (Val m)) -> m ()) ->
                m ()
 prefixMinus var k =
   ifte'
@@ -410,9 +405,11 @@ prefixMinus var k =
   (k . Just)
   (k Nothing)
 
-div' :: (MonadVerse m, Zippable f) =>
-        Var m (Val f) ->
-        (Maybe (Var m (Val f)) -> m ()) ->
+data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
+
+div' :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+        Var m (Val m) ->
+        (Maybe (Var m (Val m)) -> m ()) ->
         m ()
 div' var k =
   ifte'
@@ -426,30 +423,32 @@ div' var k =
           (Val.Int _, Val.Int 0) -> do
             newVar $ Const Nothing
           (Val.Int x, Val.Int y) ->
-            newVar . Const . Just <=< newVar $ Val.Rational $ x % y
+            newVar . Const . Just . Rational $ x % y
           (Val.Int x, Val.Float y) ->
-            newVar . Const . Just <=< newVar $ Val.Float $ fromInteger x / y
+            newVar . Const . Just . Float $ fromInteger x / y
           (Val.Int x, Val.Rational y) ->
-            newVar . Const . Just <=< newVar $ Val.Rational $ fromInteger x / y
+            newVar . Const . Just . Rational $ fromInteger x / y
           (Val.Float x, Val.Int y) ->
-            newVar . Const . Just <=< newVar $ Val.Float $ x / fromInteger y
+            newVar . Const . Just . Float $ x / fromInteger y
           (Val.Float x, Val.Float y) ->
-            newVar . Const . Just <=< newVar $ Val.Float $ x / y
+            newVar . Const . Just . Float $ x / y
           (Val.Float x, Val.Rational y) ->
-            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ toRational x / y
+            newVar . Const . Just . Float $ fromRational $ toRational x / y
           (Val.Rational x, Val.Int y) ->
-            newVar . Const . Just <=< newVar $ Val.Rational $ x / fromInteger y
+            newVar . Const . Just . Rational $ x / fromInteger y
           (Val.Rational x, Val.Float y) ->
-            newVar . Const . Just <=< newVar $ Val.Float $ fromRational $ x / toRational y
+            newVar . Const . Just . Float $ fromRational $ x / toRational y
           (Val.Rational _, Val.Rational 0) ->
             newVar $ Const Nothing
           (Val.Rational x, Val.Rational y) ->
-            newVar . Const . Just <=< newVar $ Val.Rational $ x / y
+            newVar . Const . Just . Rational $ x / y
           _ -> empty
       pure var')
   (\ var -> whenBound var $ getConst >>> \ case
       Nothing -> empty
-      Just var -> k $ Just var)
+      Just (Int x) -> k . Just =<< newVar (Val.Int x)
+      Just (Float x) -> k . Just =<< newVar (Val.Float x)
+      Just (Rational x) -> k . Just =<< newVar (Val.Rational x))
   (k Nothing)
 
 int :: MonadVerse m =>
@@ -463,8 +462,8 @@ int var k = whenBound var $ \ case
 
 instSuper :: MonadEval m =>
              Loc ->
-             Maybe (MutVar m) -> HashMap Name (Named m (Var m (Val m))) ->
-             (Maybe (MutVar m) -> Defaults m -> Env m -> EvalT m ()) ->
+             Maybe (Var m (Val m)) -> HashMap Name (Named m (Var m (Val m))) ->
+             (Maybe (Var m (Val m)) -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instSuper loc var_super xs f = case var_super of
   Nothing -> f Nothing mempty mempty
@@ -472,8 +471,8 @@ instSuper loc var_super xs f = case var_super of
 
 instSuper' :: MonadEval m =>
              Loc ->
-             Maybe (MutVar m) ->
-             (Maybe (MutVar m) -> Env m -> EvalT m ()) ->
+             Maybe (Var m (Val m)) ->
+             (Maybe (Var m (Val m)) -> Env m -> EvalT m ()) ->
              EvalT m ()
 instSuper' loc var_super f = case var_super of
   Nothing -> f Nothing mempty
@@ -481,8 +480,8 @@ instSuper' loc var_super f = case var_super of
 
 instClass :: MonadEval m =>
              Loc ->
-             MutVar m -> HashMap Name (Named m (Var m (Val m))) ->
-             (MutVar m -> Defaults m -> Env m -> EvalT m ()) ->
+             Var m (Val m) -> HashMap Name (Named m (Var m (Val m))) ->
+             (Var m (Val m) -> Defaults m -> Env m -> EvalT m ()) ->
              EvalT m ()
 instClass loc var xs f = whenBound' var $ \ case
   Val.Overloads overload var -> case overload of
@@ -500,8 +499,8 @@ instClass loc var xs f = whenBound' var $ \ case
 
 instClass' :: MonadEval m =>
               Loc ->
-              MutVar m ->
-              (MutVar m-> Env m -> EvalT m ()) ->
+              Var m (Val m) ->
+              (Var m (Val m)-> Env m -> EvalT m ()) ->
               EvalT m ()
 instClass' loc var f = whenBound' var $ \ case
   Val.Overloads overload var -> case overload of
@@ -536,7 +535,7 @@ newEnv = execWriterT $ do
 lookupName :: ( MonadVerse m
               , Unifiable (World m)
               , EqRef (Backtrack.Ref m)
-              ) => Ident Name -> EvalT m (Maybe (MutVar m))
+              ) => Ident -> EvalT m (Maybe (Var m (Val m)))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
@@ -545,10 +544,10 @@ lookupName = lookupName' >=> \ case
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
-lookupName' :: Monad m => Ident Name -> EvalT m (Maybe (Named m (Var m (Val m))))
+lookupName' :: Monad m => Ident -> EvalT m (Maybe (Named m (Var m (Val m))))
 lookupName' = asks . HashMap.lookup
 
-localName :: Monad m => Ident Name -> Named m (Var m (Val m)) -> EvalT m a -> EvalT m a
+localName :: Monad m => Ident -> Named m (Var m (Val m)) -> EvalT m a -> EvalT m a
 localName x = local . HashMap.insert x
 
 localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
@@ -557,18 +556,18 @@ localNames = local . (<>)
 throwDomainError :: MonadError Error m => Loc -> m a
 throwDomainError = throwError . DomainError
 
-throwIdentError :: MonadError Error m => Loc -> Ident Name -> m a
+throwIdentError :: MonadError Error m => Loc -> Ident -> m a
 throwIdentError x = throwError . IdentError x
 
 throwNameError :: MonadError Error m => Loc -> Name -> m a
 throwNameError x = throwError . NameError x
 
-fromIdents :: Hashable a => HashMap (Ident a) v -> HashMap a v
+fromIdents :: HashMap Ident a -> HashMap Name a
 fromIdents =
   HashMap.fromList .
   HashMap.foldrWithKey
   (\ case
-      Ident.Pure x -> \ y z -> (x, y) : z
+      Ident.Name x -> \ y z -> (x, y) : z
       Ident.Label _ -> \ _ z -> z)
   []
 
