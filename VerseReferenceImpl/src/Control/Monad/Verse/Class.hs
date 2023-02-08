@@ -35,6 +35,7 @@ class (MonadUnify m, Backtrack.MonadRef m) => MonadVerse m where
   getWorld = lift getWorld
 
   putWorld :: World m -> m ()
+
   default putWorld :: (m ~ t n, MonadVerseTrans t n) => World m -> m ()
   putWorld = lift . putWorld
 
@@ -77,7 +78,7 @@ type MonadVerseTrans t n =
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
     whenBound x $ flip runReaderT r . f
-  whenWorldBound x m = ReaderT $ \ r ->
-    whenWorldBound x $ runReaderT m r
+  whenWorldBound x m = ReaderT $
+    whenWorldBound x . runReaderT m
   split m f = ReaderT $ \ r ->
     split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)
