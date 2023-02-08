@@ -106,7 +106,7 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
     | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
-    | null ts''  = error "normalFormFuelTracePlain : no children"  -- a loop.  Maybe because of structural rules.
+    | null ts''  = error "normalFormFuelTracePlain: no children (maybe there are structural rules?)"  -- a loop
     | otherwise  =
       stepper "STEP" ttr $
       go (n-1) seen' (t' :<-- ((s, t) : tr))
