@@ -6,9 +6,6 @@ module Language.Verse.Pretty
   ( PrettyM (..)
   ) where
 
-import Control.Monad.Ref.Backtrack qualified as Backtrack
-import Control.Monad.Var
-
 import Data.Fix
 
 import Prettyprinter
