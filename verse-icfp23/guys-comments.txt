@@ -505,6 +505,7 @@ On line 630 we have "normalization" and on line 632 we have "normalisation".
 
 This is always a hazard when authors have different backgrounds. I suggest that you all make a global decision as to whether you collectively intend to follow UK spelling or USA spelling for all Verse-connected publications. Then make a little "house style" guide for yourselves, starting with these two words.
 
+NOT DONE YET: but I agree we should be consistent
 
 line 577: "the expression wrapped in that heap" What do you mean by "_the_ expression"? Two points:
 
@@ -516,56 +517,74 @@ MOOT
 
 line 589: As I read this figure, I wondered whether a rewrite rule "exists x. exists x. e --> exists x. e" is needed, but later I realized that this is a special case of the garbage collection rule ELIM-DEF.
 
+OK
 
 line 592: I note that the parentheses on the LHS of the rewrite rule NORM-SEQ-ASSOC are required, but the parentheses on the RHS are redundant and therefore optional. I suppose those redundant parentheses are there to satisfy a likely reader expectation about how rewriting rules for associativity typically look. But this alerted me to the issue, and as I read and reread the paper, I could not divine any other specific principle that governs when you choose to insert such optional parentheses and when you choose to omit them. In NORM-SEQ-DEFL, the parentheses on the LHS are redundant.
 
+UNSURE: I have not done anything about this yes.
 
 line 598: In the restriction at the right of rule NORM-DEFR, "fvs(v, e_2)" is not defined because the two-argument form of "fvs" has not yet been defined or discussed, only the one-argument form.
 
+UNSURE: I think it's unambigjous
 
 line 506: In the restriction at the right of rule ELIM-DEF, I regarde "\bar{x} \not\in fvs(e_2)" as an abuse of notation; let me recommend "{ \bar{x} } \cap fvs(e_2) = \emptyset".
 
+UNSURE: I don't think we are using this form any more.
 
 line 618: In rule WF-EQ, in the premise "v \neq x" and also the premise to it right, the "v" should be a pointy-bottomed "v".
 
+MOOT
 
 line 619: In rule WF-EQ, the fifth premise mentions an otherwise unmentioned variable "h"; surely this is a typo.
 
+MOOT
 
 line 641: "with be" => "will be"
 
 Also I think this note is not quite correct: I think the general result of a non-stuck reduction may involve choices, and therefore will be one of (a) fail; (b) a "final expression" e (c) a sequence of choices e_1 | e_2 | ... | e_n, n >= 2, where each e_k is a "final expression"; where a "final expression" is one that the squiggly arrow takes to a value with a set of equations for heap values.
 
+MOOT
+
 
 line 648: "to ensure that each arm of the choice consists of a value wrapped in a heap" This is true only for the "all" construct. For the "one" construct, the rules ensure that the _first_ arm of the choice consists of a value wrapped in a heap.
 
+MOOT
 
 line 655: "(syntax in Fig. 1)" The syntax is actually in Fig. 3.
 
+DONE
 
 line 670: In the code, I think a set of parentheses is missing: it should be "((x = 1; 77) | (x = 1; 99))".
 
+DONE
 
 line 674: "the branches might contain choices" Then it would be more effective just to begin with an example for which that is true. So, back on line 662, begin with the expression "exists x. (if (x > 0) then (55 | 66) else 44); x = 1; (77 | 99)" (that is, simply replace "55" with "(55 | 66)").
 
+DONE
 
 line 675: "innermost enclosing scope construct" The paper has not defined the term "scope construct".
 
+REWORDED
 
 line 681: "rules ASSOC-CHOICE, FAIL-L, and FAIL-R" But Fig. 3 actually uses different names for these rules.
 
+MOOT
 
 line 684: Footnote 7 promises to "return" to a point in Section 3.3, but that section precedes Section 3.5, which contains the footnote.
 
+DONE
 
 lines 687, 690, 693: A better name for rule FAIL-L-NO-SX would be "CHOOSE-R-NO-SX".
 
+MOOT
 
 line 690: Add a little vertical space between line 690 and line 691, to separate the two reduction sequences.
 
+MOOT
 
 line 700 "Consider a function call f(e)." Make that "Consider a function call f(e), where f is a variable and e is an expression that is not a value."
 
+DONE.  'f' is always a variable (Fig 1), so I just said "where e is not a value".
 
 line 722: "when the RHS is a value" => "when the RHS of an equation is a value”
 
@@ -614,6 +633,7 @@ SECTION 5 COMMENTS
 
 line 921: "A key rewrite rule" What is the source of this rewrite rule?
 
+NOT SURE: it's in the papers we cite here: L-F et al 2007.  I suppose we could cite it again?
 
 SECTION 6 COMMENTS
 
