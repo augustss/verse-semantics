@@ -77,5 +77,7 @@ type MonadVerseTrans t n =
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
     whenBound x $ flip runReaderT r . f
+  whenWorldBound x m = ReaderT $ \ r ->
+    whenWorldBound x $ runReaderT m r
   split m f = ReaderT $ \ r ->
     split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)

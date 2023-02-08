@@ -34,7 +34,6 @@ import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Ref
 import Data.Traversable
-import Data.Unifiable
 
 import Language.Verse.Error
 import Language.Verse.Ident (Ident)
@@ -57,7 +56,6 @@ type MonadEval m =
   ( MonadError Error m
   , MonadSupply Label m
   , MonadVerse m
-  , Unifiable (World m)
   , EqRef (Backtrack.Ref m)
   )
 
@@ -533,7 +531,6 @@ newEnv = execWriterT $ do
       freshVar
 
 lookupName :: ( MonadVerse m
-              , Unifiable (World m)
               , EqRef (Backtrack.Ref m)
               ) => Ident -> EvalT m (Maybe (Var m (Val m)))
 lookupName = lookupName' >=> \ case
@@ -572,7 +569,6 @@ fromIdents =
   []
 
 unifyNamed :: ( MonadVerse m
-              , Unifiable (World m)
               , EqRef (Backtrack.Ref m)
               ) => Named m (Var m (Val m)) -> Named m (Var m (Val m)) -> EvalT m ()
 unifyNamed = curry $ lift . \ case
@@ -616,30 +612,28 @@ newRef' = Backtrack.newRef
 
 readRef' :: ( Backtrack.MonadRef m
             , MonadVerse m
-            , Unifiable (World m)
             ) => Backtrack.Ref m a -> (a -> m ()) -> m ()
 readRef' ref f = do
   world <- getWorld
-  world' <- freshVar
-  whenBound world $ \ _ -> do
+  world' <- freshWorld
+  whenWorldBound world $ do
     world'' <- getWorld
     putWorld world
     f =<< Backtrack.readRef ref
-    unify world' =<< getWorld
+    unifyWorld world' =<< getWorld
     putWorld world''
 
 writeRef' :: ( Backtrack.MonadRef m
              , MonadVerse m
-             , Unifiable (World m)
              ) => Backtrack.Ref m a -> a -> m ()
 writeRef' ref x = do
   world <- getWorld
-  world' <- freshVar
-  whenBound world $ \ _ -> do
+  world' <- freshWorld
+  whenWorldBound world $ do
     world'' <- getWorld
     putWorld world
     Backtrack.writeRef ref x
-    unify world' =<< getWorld
+    unifyWorld world' =<< getWorld
     putWorld world''
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a

@@ -34,7 +34,13 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Unify
 import Control.Monad.Var (MonadVar, freshVar)
 import Control.Monad.Var qualified as Var
-import Control.Monad.Verse.Class (MonadVerse, whenBound, freshWorld, getWorld, putWorld)
+import Control.Monad.Verse.Class ( MonadVerse
+                                 , whenBound
+                                 , freshWorld
+                                 , getWorld
+                                 , putWorld
+                                 , unifyWorld
+                                 )
 import Control.Monad.Verse.Class qualified
 
 import Data.Coerce
@@ -75,7 +81,7 @@ instance ( MonadFix m
 
   freshVar =
     fmap Var . newSet =<<
-    Unbound <$> newRef' (const $ pure ()) <*> askLevel
+    Unbound <$> lift (newRef . const $ pure ()) <*> askLevel
 
   newVar = lift . newVar'
 
@@ -134,7 +140,7 @@ instance ( MonadFix m
         level <- askLevel
         case (level_x == level, level_y == level) of
           (True, True) -> do
-            f <- newRef' =<< liftA2 (*>) <$> readRef' f_x <*> readRef' f_y
+            f <- lift $ newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
             union' (\ _ _ -> Unbound f level_x) x y
           (True, False) -> do
             link set_y set_x
@@ -203,9 +209,59 @@ instance ( MonadFix m
         writeRef' p True
         pure $ whenM (readRef' p) . f
 
-  getWorld = asks' world >>= Backtrack.readRef
+  freshWorld =
+    fmap World . newSet . UnboundWorld =<<
+    lift (newRef $ pure ())
 
-  putWorld x = asks' world >>= flip Backtrack.writeRef x
+  getWorld = Backtrack.readRef =<< asks' world
+
+  putWorld x = flip Backtrack.writeRef x =<< asks' world
+
+  unifyWorld world_x world_y = do
+    x@(set_x, _, repr_x) <- find $ unWorld world_x
+    y@(set_y, _, repr_y) <- find $ unWorld world_y
+    unless (eqRef set_x set_y) $ case (repr_x, repr_y) of
+      (UnboundWorld m_x, UnboundWorld m_y) -> do
+        m <- lift $ newRef =<< (*>) <$> readRef m_x <*> readRef m_y
+        unionWorld' (UnboundWorld m) x y
+      (UnboundWorld m_x, BoundWorld) -> do
+        unionWorld y x
+        join $ Backtrack.readRef m_x
+      (BoundWorld, UnboundWorld m_y) -> do
+        unionWorld x y
+        join $ Backtrack.readRef m_y
+      (BoundWorld, BoundWorld) ->
+        pure ()
+
+  whenWorldBound world_x m = do
+    (_, _, repr_x) <- find $ unWorld world_x
+    case repr_x of
+      UnboundWorld m_x ->
+        withWorldListener m $
+        lift . modifyRef m_x . flip (*>) <=< toWorldListener
+      BoundWorld -> m
+    where
+      toWorldListener m = do
+        p <- Backtrack.newRef False
+        Backtrack.writeRef p True
+        pure $ whenM (Backtrack.readRef p) m
+      withWorldListener m k = do
+        r <- ask'
+        promise <- freshPromise
+        modifyPromises (promise:)
+        world <- getWorld
+        world' <- freshWorld
+        putWorld world'
+        ref_m <- lift $ newRef empty
+        x <- k $ resolvePromise promise r ref_m $ do
+          world'' <- getWorld
+          putWorld world
+          _ <- m
+          unifyWorld world' =<< getWorld
+          putWorld world''
+        pure () <|> join (lift $ readRef ref_m)
+        pure x
+
 
   split m f = do
     r <- ask'
@@ -257,7 +313,7 @@ splitPromise = whenResolved
 
 runVerseT :: (MonadRef m, MonadSupply Label m) => VerseT m a -> m [a]
 runVerseT m = do
-  world <- newWorld'
+  world <- newRef =<< newWorld'
   runRefLogicT (evalRST (unVerseT m) R { level, world } S { promises })
   where
     level = minBound
@@ -313,29 +369,34 @@ find' set = readRef set >>= \ case
   Repr size repr -> pure (set, size, repr)
   Link set -> find' set
 
-newtype World m = World { unWorld :: Ref m (Set m (WorldState m)) }
+newtype World m = World { unWorld :: Set m (WorldState m) }
 
 data WorldState m
   = UnboundWorld !(Ref m (VerseT m ()))
   | BoundWorld
 
-unionWorld :: MonadRef m => Found m (World m) -> Found m (World m) -> VerseT m ()
-unionWorld (set_x, size_x, repr_x) (set_y, size_y, repr_y) = do
+newWorld' :: MonadRef m => m (World m)
+newWorld' = World <$> newSet' BoundWorld
+
+unionWorld :: MonadRef m => Found m (WorldState m) -> Found m (WorldState m) -> VerseT m ()
+unionWorld x@(_, _, repr) y = unionWorld' repr x y
+
+unionWorld' :: MonadRef m =>
+               WorldState m ->
+               Found m (WorldState m) ->
+               Found m (WorldState m) ->
+               VerseT m ()
+unionWorld' repr (set_x, size_x, _) (set_y, size_y, _) = do
   if size_y > size_x then do
     Backtrack.writeRef set_x $ Link set_y
-    Backtrack.writeRef set_y $ Repr (size_x + size_y) (f repr_x repr_y)
+    Backtrack.writeRef set_y $ Repr (size_x + size_y) repr
   else do
-    Backtrack.writeRef set_x $ Repr (size_x + size_y) (f repr_x repr_y)
+    Backtrack.writeRef set_x $ Repr (size_x + size_y) repr
     Backtrack.writeRef set_y $ Link set_x
-
-findWorld :: MonadRef m => World m -> VerseT m (Found m (WorldState m))
-findWorld world = Backtrack.readRef (unWorld world) >>= \ case
-  Repr size repr -> pure (set, size, repr)
-  Link world -> findWorld world
 
 data R m = R
   { level :: Level
-  , world :: Backtrack.Ref m (World m)
+  , world :: Ref m (World m)
   }
 
 type Level = Word
@@ -426,7 +487,7 @@ withListener f k = do
     world'' <- getWorld
     putWorld world
     f x
-    unify world' =<< getWorld
+    unifyWorld world' =<< getWorld
     putWorld world''
   pure () <|> join (lift $ readRef ref_m)
   pure x
