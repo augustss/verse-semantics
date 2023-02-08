@@ -32,9 +32,9 @@ instance EqRef (Backtrack.Ref m) => Zippable (Named m) where
     _ -> Nothing
 
 instance ( Backtrack.MonadRef m
+         , MonadPretty a m
          , MonadVar m
-         , PrettyM a m
-         ) => PrettyM (Named m a) m where
+         ) => MonadPretty (Named m a) m where
   prettyM = \ case
     Val x -> prettyM x
     Ref ref -> Backtrack.readRef ref >>= freeze >>= \ case

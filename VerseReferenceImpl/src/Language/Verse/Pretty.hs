@@ -3,15 +3,15 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Pretty
-  ( PrettyM (..)
+  ( MonadPretty (..)
   ) where
 
 import Data.Fix
 
 import Prettyprinter
 
-class Monad m => PrettyM a m where
+class Monad m => MonadPretty a m where
   prettyM :: a -> m (Doc ann)
 
-instance (Monad m, PrettyM (f (Fix f)) m) => PrettyM (Fix f) m where
+instance (Monad m, MonadPretty (f (Fix f)) m) => MonadPretty (Fix f) m where
   prettyM = prettyM . getFix

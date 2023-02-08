@@ -32,4 +32,7 @@ instance EqRef (Backtrack.Ref m) => Unifiable (Named m)
 
 instance EqRef (Backtrack.Ref m) => Zippable (Named m)
 
-instance (Backtrack.MonadRef m, MonadVar m, PrettyM a m) => PrettyM (Named m a) m
+instance ( Backtrack.MonadRef m
+         , MonadPretty a m
+         , MonadVar m
+         ) => MonadPretty (Named m a) m
