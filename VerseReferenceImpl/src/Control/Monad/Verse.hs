@@ -34,7 +34,13 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Unify
 import Control.Monad.Var (MonadVar, freshVar)
 import Control.Monad.Var qualified as Var
-import Control.Monad.Verse.Class (MonadVerse, whenBound, getWorld, putWorld)
+import Control.Monad.Verse.Class ( MonadVerse
+                                 , whenBound
+                                 , freshWorld
+                                 , getWorld
+                                 , putWorld
+                                 , unifyWorld
+                                 )
 import Control.Monad.Verse.Class qualified
 
 import Data.Coerce
@@ -48,7 +54,7 @@ import Data.Traversable
 import Data.Unifiable
 
 newtype VerseT m a = VerseT
-  { unVerseT :: RST R (S m) (RefLogicT m) a
+  { unVerseT :: RST (R m) (S m) (RefLogicT m) a
   } deriving ( Functor
              , Applicative
              , Alternative
@@ -75,7 +81,7 @@ instance ( MonadFix m
 
   freshVar =
     fmap Var . newSet =<<
-    Unbound <$> newRef' (const $ pure ()) <*> askLevel
+    Unbound <$> lift (newRef . const $ pure ()) <*> askLevel
 
   newVar = lift . newVar'
 
@@ -134,7 +140,7 @@ instance ( MonadFix m
         level <- askLevel
         case (level_x == level, level_y == level) of
           (True, True) -> do
-            f <- newRef' =<< liftA2 (*>) <$> readRef' f_x <*> readRef' f_y
+            f <- lift $ newRef =<< liftA2 (*>) <$> readRef f_x <*> readRef f_y
             union' (\ _ _ -> Unbound f level_x) x y
           (True, False) -> do
             link set_y set_x
@@ -187,7 +193,7 @@ instance ( MonadFix m
          , MonadSupply Label m
          , EqRef (Ref m)
          ) => MonadVerse (VerseT m) where
-  type World (VerseT m) = World
+  type World (VerseT m) = World m
 
   whenBound var_x f = do
     (_, _, repr_x) <- findVar var_x
@@ -203,9 +209,59 @@ instance ( MonadFix m
         writeRef' p True
         pure $ whenM (readRef' p) . f
 
-  getWorld = VerseT $ gets world
+  freshWorld =
+    fmap World . newSet . UnboundWorld =<<
+    lift (newRef $ pure ())
 
-  putWorld world = VerseT . modify $ \ s -> s { world }
+  getWorld = Backtrack.readRef =<< asks' world
+
+  putWorld x = flip Backtrack.writeRef x =<< asks' world
+
+  unifyWorld world_x world_y = do
+    x@(set_x, _, repr_x) <- find $ unWorld world_x
+    y@(set_y, _, repr_y) <- find $ unWorld world_y
+    unless (eqRef set_x set_y) $ case (repr_x, repr_y) of
+      (UnboundWorld m_x, UnboundWorld m_y) -> do
+        m <- lift $ newRef =<< (*>) <$> readRef m_x <*> readRef m_y
+        unionWorld' (UnboundWorld m) x y
+      (UnboundWorld m_x, BoundWorld) -> do
+        unionWorld y x
+        join $ Backtrack.readRef m_x
+      (BoundWorld, UnboundWorld m_y) -> do
+        unionWorld x y
+        join $ Backtrack.readRef m_y
+      (BoundWorld, BoundWorld) ->
+        pure ()
+
+  whenWorldBound world_x m = do
+    (_, _, repr_x) <- find $ unWorld world_x
+    case repr_x of
+      UnboundWorld m_x ->
+        withWorldListener m $
+        lift . modifyRef m_x . flip (*>) <=< toWorldListener
+      BoundWorld -> m
+    where
+      toWorldListener m = do
+        p <- Backtrack.newRef False
+        Backtrack.writeRef p True
+        pure $ whenM (Backtrack.readRef p) m
+      withWorldListener m k = do
+        r <- ask'
+        promise <- freshPromise
+        modifyPromises (promise:)
+        world <- getWorld
+        world' <- freshWorld
+        putWorld world'
+        ref_m <- lift $ newRef empty
+        x <- k $ resolvePromise promise r ref_m $ do
+          world'' <- getWorld
+          putWorld world
+          _ <- m
+          unifyWorld world' =<< getWorld
+          putWorld world''
+        pure () <|> join (lift $ readRef ref_m)
+        pure x
+
 
   split m f = do
     r <- ask'
@@ -215,7 +271,7 @@ split' :: ( MonadFix m
           , MonadRef m
           , MonadSupply Label m
           , EqRef (Ref m)
-          ) => R -> VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
+          ) => R m -> VerseT m a -> (Maybe (a, VerseT m a) -> VerseT m ()) -> VerseT m ()
 split' r m f = do
   s <- getPromises
   putPromises []
@@ -257,8 +313,8 @@ splitPromise = whenResolved
 
 runVerseT :: (MonadRef m, MonadSupply Label m) => VerseT m a -> m [a]
 runVerseT m = do
-  world <- newVar' RealWorld
-  runRefLogicT (evalRST (unVerseT m) R { level } S { promises, world })
+  world <- newRef =<< newWorld'
+  runRefLogicT (evalRST (unVerseT m) R { level, world } S { promises })
   where
     level = minBound
     promises = []
@@ -273,13 +329,6 @@ data VarState m f
   | Bound !(f (Var m f)) !Label
 
 type Label = Int
-
-data World a = RealWorld deriving (Functor, Foldable, Traversable)
-
-instance Unifiable World
-
-instance Zippable World where
-  zipMatch _ _ = Just []
 
 type Set m a = Ref m (SetState m a)
 
@@ -300,9 +349,7 @@ union :: ( MonadRef m
          ) => Found m a -> Found m a -> VerseT m ()
 union = union' const
 
-union' :: ( MonadRef m
-          , EqRef (Ref m)
-          ) => (a -> a -> a) -> Found m a -> Found m a -> VerseT m ()
+union' :: MonadRef m => (a -> a -> a) -> Found m a -> Found m a -> VerseT m ()
 union' f (set_x, size_x, repr_x) (set_y, size_y, repr_y) = do
   if size_y > size_x then do
     writeRef' set_x $ Link set_y
@@ -322,15 +369,40 @@ find' set = readRef set >>= \ case
   Repr size repr -> pure (set, size, repr)
   Link set -> find' set
 
-newtype R = R
+newtype World m = World { unWorld :: Set m (WorldState m) }
+
+data WorldState m
+  = UnboundWorld !(Ref m (VerseT m ()))
+  | BoundWorld
+
+newWorld' :: MonadRef m => m (World m)
+newWorld' = World <$> newSet' BoundWorld
+
+unionWorld :: MonadRef m => Found m (WorldState m) -> Found m (WorldState m) -> VerseT m ()
+unionWorld x@(_, _, repr) y = unionWorld' repr x y
+
+unionWorld' :: MonadRef m =>
+               WorldState m ->
+               Found m (WorldState m) ->
+               Found m (WorldState m) ->
+               VerseT m ()
+unionWorld' repr (set_x, size_x, _) (set_y, size_y, _) = do
+  if size_y > size_x then do
+    Backtrack.writeRef set_x $ Link set_y
+    Backtrack.writeRef set_y $ Repr (size_x + size_y) repr
+  else do
+    Backtrack.writeRef set_x $ Repr (size_x + size_y) repr
+    Backtrack.writeRef set_y $ Link set_x
+
+data R m = R
   { level :: Level
+  , world :: Ref m (World m)
   }
 
 type Level = Word
 
-data S m = S
+newtype S m = S
   { promises :: Promises m
-  , world :: Var m World
   }
 
 type Promises m = [Promise m]
@@ -350,7 +422,7 @@ resolvePromise :: ( MonadFix m
                   , MonadRef m
                   , MonadSupply Label m
                   , EqRef (Ref m)
-                  ) => Promise m -> R -> Ref m (VerseT m ()) -> VerseT m () -> VerseT m ()
+                  ) => Promise m -> R m -> Ref m (VerseT m ()) -> VerseT m () -> VerseT m ()
 resolvePromise (Promise ref) r ref_m m = readRef' ref >>= \ case
   Pending xs -> hasListeners xs >>= \ case
     False -> msplit' (local' (const r) m) >>= \ case
@@ -408,14 +480,14 @@ withListener f k = do
   promise <- freshPromise
   modifyPromises (promise:)
   world <- getWorld
-  world' <- freshVar
+  world' <- freshWorld
   putWorld world'
   ref_m <- lift $ newRef empty
   x <- k $ \ x -> resolvePromise promise r ref_m $ do
     world'' <- getWorld
     putWorld world
     f x
-    unify world' =<< getWorld
+    unifyWorld world' =<< getWorld
     putWorld world''
   pure () <|> join (lift $ readRef ref_m)
   pure x
@@ -423,13 +495,13 @@ withListener f k = do
 askLevel :: Monad m => VerseT m Level
 askLevel = asks' level
 
-ask' :: Monad m => VerseT m R
+ask' :: Monad m => VerseT m (R m)
 ask' = VerseT ask
 
-asks' :: Monad m => (R -> a) -> VerseT m a
+asks' :: Monad m => (R m -> a) -> VerseT m a
 asks' = VerseT . asks
 
-local' :: Monad m => (R -> R) -> VerseT m a -> VerseT m a
+local' :: Monad m => (R m -> R m) -> VerseT m a -> VerseT m a
 local' f = VerseT . local f . unVerseT
 
 getPromises :: VerseT m (Promises m)
@@ -453,7 +525,7 @@ writeRef' ref = VerseT . lift . writeRef ref
 msplit' :: Monad m => VerseT m a -> VerseT m (Maybe (a, VerseT m a))
 msplit' = coerceSplit . msplit . coerce
 
-coerceSplit :: RST R (S m) (RefLogicT m) (Maybe (a, RST R (S m) (RefLogicT m) a)) ->
+coerceSplit :: RST (R m) (S m) (RefLogicT m) (Maybe (a, RST (R m) (S m) (RefLogicT m) a)) ->
                VerseT m (Maybe (a, VerseT m a))
 coerceSplit = coerce
 
