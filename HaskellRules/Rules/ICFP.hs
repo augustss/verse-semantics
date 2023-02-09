@@ -9,7 +9,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Debug.Trace (traceShow, trace)
+--import Debug.Trace (traceShow, trace)
 --import Debug.Trace
 
 isRecursive :: Expr -> Bool
@@ -19,7 +19,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP, systemICFPR,
-                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG, systemICFPH, systemICFPI, systemICFPJ ]
+                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG, systemICFPH, systemICFPI, systemICFPJ, systemICFPK ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
@@ -113,6 +113,15 @@ systemICFPJ = s
   , rulesHaveStructural = True
   }
   where s = systemICFP
+
+systemICFPK :: TRSystem Expr
+systemICFPK = s
+  { sname = "ICFPK"
+  , description = description s ++ ", Plan K"
+  , rules = (rules s -= "EXI-ELIMV" -= "EXI-ELIML") <> rulesValSwapK <> rulesExiElimL
+  , confluenceRules = \ _ _ -> []
+  }
+  where s = systemICFPJ
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -515,8 +524,8 @@ rulesPlanJ env lhs =
      pure (EXI y (EXI x e))
 
 
-myTraceShow :: Show a => String -> a -> a
-myTraceShow msg x = trace ("TRACE: " ++ msg ++ show x) x
+--myTraceShow :: Show a => String -> a -> a
+--myTraceShow msg x = trace ("TRACE: " ++ msg ++ show x) x
 
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
@@ -778,3 +787,45 @@ rulesPlanI env lhs =
      guard (z `notElem` defVars ctx)
      guard (z `elem` flexVars env)
      pure (subst [(x, Var z)] (ctx e))
+
+rulesValSwapK :: ERule
+rulesValSwapK env lhs =
+  "VAL-SWAP-K" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+--     traceM $ show (e1, e2, _ltExpr _env e2 e1, boundVars _env)
+     guard $
+       -- First, order by choice-free-ness;
+       -- choice free goes first
+       case (isChoiceFree e1, isChoiceFree e2) of
+         (False, False) -> False  -- cannot change order of choices
+         (False, True)  -> True   -- put ce before e
+         (True, False)  -> False  -- ce is already first
+         (True, True)   ->
+           -- Next, order so equations go before expressions.
+           -- (This is an arbitrary choice)
+           case (isEqn e1, isEqn e2) of
+             (False, False) -> ltExpr env e2 e1  -- use ordering
+             (False, True)  -> True              -- need to swap
+             (True, False)  -> False             -- already in correct order
+             (True, True)   -> ltExpr env e2 e1  -- use ordering
+     pure $ e2 :>: (e1 :>: e3)
+
+-- Compare two expression using lessThan for identifiers
+ltExpr :: TRSFlags -> Expr -> Expr -> Bool
+ltExpr env e1 e2 = comp vs vs e1 e2 == LT
+  where
+    vs = boundVars env
+
+isEqn :: Expr -> Bool
+isEqn (_ :=: _) = True
+isEqn _ = False
+
+rulesExiElimL :: ERule
+rulesExiElimL _ lhs =
+  "EXI-ELIML" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- execX a
+     guard (x == x')
+     guard (x `notElem` free (ctx (v :>: e)))
+     pure (ctx e)
+
