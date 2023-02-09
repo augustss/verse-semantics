@@ -241,18 +241,19 @@
     \\[-2mm]
 
 \rulegroupname{Elimination:~\rgc}
-\rulename{norm-val} & |v ; e| & \movesto & |e| \\
-\rulename{exi-elim} & |def x e| & \movesto & |e|
+\rulename{elim-val} & |v ; e| & \movesto & |e| \\
+\rulename{elim-exi} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
 % This uses \overline
 %\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
 %  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
 % without \overline
-\rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 dots y_n) (X^[x==v;e])| & \movesto & |def (y_1 dots y_n) (X^[e])|
+\rulename{elim-exil} & \hspace{-3mm}|def (x^ y_1 dots y_n) (X^[x==v;e])| & \movesto & |def (y_1 dots y_n) (X^[e])|
   & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
 \text{\lennart{Plan D:}}\\
-\rulename{exi-elimv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
+\rulename{elim-exiv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
     & \text{if $|z| \notin |{x,y_1 tdots y_n}|, |x| \notin |{y_1 tdots y_n}|$} \\
+\rulename{elim-fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
     \\[-2mm]
 
@@ -268,10 +269,6 @@
 \rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
 
-    \\[-2mm]
-
-\rulegroupname{Fail propagation:~\rfail}
-\rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
 \end{array}
 \end{array}$

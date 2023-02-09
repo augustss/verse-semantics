@@ -428,13 +428,13 @@ $$
 \begin{array}{ll}
                          & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
-\movestoR{exi-eliml}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+\movestoR{elim-exil}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
 \movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3; emptytup); y)| \\
-\movestoR{exi-eliml}     & |def y ((2==y; emptytup); y)| \\
+\movestoR{elim-exil}     & |def y ((2==y; emptytup); y)| \\
 \movestoR{norm-seq}      & |def y (2==y; emptytup; y)| \\
 \movestoR{hnf-swap}      & |def y (y==2; emptytup; y)| \\
 \movestoR{subst}         & |def y (y==2; emptytup; 2)| \\
-\movestoR{exi-eliml}     & |emptytup; 2| \\
+\movestoR{elim-exil}     & |emptytup; 2| \\
 \movestoR{norm-val}      & |2| \\
 \text{\lennart{ICFP conversion done}}
 \end{array}
@@ -454,17 +454,16 @@ The (abstract) syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
-\item \emph{Values.}  A value |v| is either a \emph{scalar value} |s|, which can be freely duplicated,
-  or a \emph{heap value} |h|.  A heap value is a lambda or a tuple; and tuples only have value components.
+\item \emph{Values.}  A value |v| is either a variable |x| or a head-normal form |hnf|.
   In \versecalc{} a variable counts as a value, because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
-  \lennart{This item needs some rewriting for the ICFP grammar.}
-\item \emph{Built-in functions.}
-  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|.
+  A head-normal form is a conventional value: a built-in constant |k|, an operator |op|, a tuple, or
+  a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
-  \lennart{Mention |eu|}
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
+\item An \emph{equational expression} |eu| is either an ordinary expression |e|, or
+an \emph{equation} |v=e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
@@ -488,13 +487,14 @@ explores some possible alternative design choices.
 
 \subsection{Logical variables and equations} \label{sec:unify}
 
-The Verse calculus includes first class \emph{logical variables} and \emph{equations} that constrain their values;
-you can bring a fresh logical variable into scope with |defKW|; equate a value with an expression (\lennart{not really an expression})
-|v == e|; and sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
+The Verse calculus includes first class \emph{logical variables} and \emph{equations} that constrain their values.
+You can bring a fresh logical variable into scope with |defKW|; equate a value with an expression (\lennart{not really an expression}\simon{Yes it is! In |v=e|, |e| is an expression.})
+|v == e|; and compose expressions in sequence with |eu ; e| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
-|def x (x=e_1; e_2)| in \versecalc{}.  An equation |(v=e)| always equates a \emph{value} $v$ to an expression $e$;
+|def x (x=e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
+equations and where they can appear: an equation |(v=e)| always equates a \emph{value} $v$ to an expression $e$;
 and an equation can only appear to the left of a ``|;|'' (see |eu| in \cref{fig:syntax}).
-Again the desugaring rules rewrite a general equation |e_1 == e_2| into this simpler form.
+The desugaring rules in \cref{fig:syntax} rewrite a general equation |e_1 == e_2| into this simpler form.
 
 \emph{A program executes by solving its equations}, using the process of unification.
 For example,
@@ -562,7 +562,7 @@ Order is maintained and duplicates are not eliminated; we shall see why in \cref
 In short, an expression yields a \emph{sequence} of values, not a bag, and certainly not a set.
 
 The equations we saw in \cref{sec:unify} can fail, if the arguments
-are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3| (\lennart{Not true anymore}),
+are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |tup ()|,
 while |3=4| fails, returning no results.  In general, we use ``fail''
 and ``returns no results'' synonymously.
 
@@ -717,10 +717,6 @@ $$
 The argument of |oneKW| reduces to either |(thunk e_2) `choice` (thunk e_3)| or |(thunk e_3)| depending on whether |e_1| succeeds or fails,
 respectively; |oneKW| then picks the first value, that is |thunk e_2| if |e_1| succeeded, or |thunk e_3| if |e_1| failed, and
 applies it to |tup ()| .
-
-\lennart{This paragraph is very similar to the previous one}.
-The argument of |oneKW| evaluates to either |((thunk (e_2)) choice dots)| or |(thunk (e_3))|
-depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain un-evaluated until the choice is made, just as we expect from a conditional.
 
@@ -1149,8 +1145,7 @@ $$
 \movestoR{u-fail,fail}          & |def x (x = if fail then 33 else 55; x)|\\
 \movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
 \movestoR{subst}                & |def x (x = 55; 55)| \\
-\movestoR{exi-eliml}            & |55| \\
-\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
+\movestoR{elim-exi}             & |55|
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1185,15 +1180,6 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 
 \subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
 
-The syntax of \cref{fig:syntax} allows |(def x e)|, |(v == e)| \lennart{not anymore}, and |(e_1;e_2)|
-to occur anywhere
-in an expression. But to make other rules more applicable, it may be necessary to
-``float'' these expression upward.
-
-But if we were to float the semicolon outwards to give |(e; x = 3; x+2)|, we could then
-substitute for |x|.
-
-%
 % Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
 % \rulename{norm-seqr} gives us |(y==x+1; x==3; y)|; to make further progress we must
 % move the |x==3| to the left, using \rulename{norm-seq-swap2}, giving |(x==3; y==x+1; y)|.
@@ -1211,18 +1197,18 @@ tpo get |(e; x=3); x+2|, and then \rulename{norm-seq} to get |e; x=3; x+2|.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
-Moreover, \emph{they do not float equalities or existentials out of choices}.
-That restriction is the key to localizing unification (\cref{sec:mixing}), and
+Moreover, they do not float equalities or existentials out of choices:
+that restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
 We must not float the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
 
-Finally, three \emph{elimination (or garbage-collection) rules} allow dead code to be dropped:
-\rulename{norm-val} discards a value to the left of semicolon; \rulename{exi-elim} dicards
-a dead existential; while \rulename{exi-eliml} discards an existential $|defKW| |x|$ whose only
-occurrence is a equation |x=v|.
+Finally, four \emph{elimination (or garbage-collection) rules} allow dead code to be dropped:
+\rulename{norm-val} discards a value to the left of semicolon; \rulename{elim-exi} dicards
+a dead existential; \rulename{elim-exil} discards an existential $|defKW| |x|$ whose only
+occurrence is a equation |x=v|; and \rulename{elim-fail} dicards the context surrounding a |fail|.
 
 % If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
 % the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
@@ -1285,8 +1271,7 @@ $$
                                  & |def x ((if (x>0) then 55 else (44 `choice` 2)); x=1; (77 choice 99))|\\
  \movestoR{subst}                & |def x ((if (1>0) then 55 else (44 `choice` 2)); x=1; (77 choice 99))|\\
  \movestoC{\text{simplify |if|}} & |def x (55; x=1; (77 choice 99))|\\
- \movestoR{norm-val, exi-eliml}  & |77 choice 99|\\
-\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
+ \movestoR{norm-val, elim-exil}  & |77 choice 99|\\
 \end{array}
 $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
@@ -1902,22 +1887,21 @@ $$
                 & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
 
 
-\circlednum{1}  & \movestoR{subst,exi-eliml}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-                & \movestoR{subst,exi-eliml}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{1}  & \movestoR{subst,elim-exil}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+                & \movestoR{subst,elim-exil}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
 \circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
                 & \movestoR{norm-exi}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-\circlednum{3}  & \movestoR{subst,exi-eliml}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
+\circlednum{3}  & \movestoR{subst,elim-exil}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
                 & \movestoR{norm-exi,norm-exi} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
                 & \movestoR{norm-seqr,norm-seq}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
-                & \movestoR{subst,exi-eliml}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
+                & \movestoR{subst,elim-exil}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
 \circlednum{4}  & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; emptytup; tup(x,y))| \\
                 & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; emptytup; tup(x,y))| \\
-\circlednum{5}  & \movestoR{subst,exi-eliml}   & |def x (3==x; emptytup; tup(x,2))| \\
+\circlednum{5}  & \movestoR{subst,elim-exil}   & |def x (3==x; emptytup; tup(x,2))| \\
                 & \movestoR{hnf-swap}          & |def x (x==3; emptytup; tup(x,2))| \\
-\circlednum{6}  & \movestoR{subst,exi-eliml}   & |emptytup; tup(3,2)| \\
+\circlednum{6}  & \movestoR{subst,elim-exil}   & |emptytup; tup(3,2)| \\
 \circlednum{7}  & \movestoR{norm-val}          & |tup(3,2)| \\
-\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 \end{footnotesize}
@@ -2050,16 +2034,8 @@ a lazy variant of \versecalc{} could be worth exploring.
 
 
 % ----------------------- Denotational semantics  -----
-\iffalse
-\input{densem-pldi}
-\fi
+\input{densem-icfp23}
 
-
-
-% ----------------------- Updatable references  -----
-\iffalse
-\input{updatable-refs}
-\fi
 
 
 \end{document}
