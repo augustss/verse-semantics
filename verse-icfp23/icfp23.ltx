@@ -600,7 +600,7 @@ Just as we never bind a variable to a multi-value, we never bind it to |fail| ei
 we iterate over zero values, and that iteration of course returns zero
 values.  So
 $$
-|def x (x = fail; 33)| \quad \movesto \quad |def x (fail; 33)|  \quad \movesto \quad |fail|
+|def x (x = fail; 33)| \quad \movesto \quad |fail|
 $$
 
 \subsection{Mixing choice and equations} \label{sec:mixing}
@@ -1150,7 +1150,8 @@ $$
 \movestoR{u-fail,fail}          & |def x (x = if fail then 33 else 55; x)|\\
 \movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
 \movestoR{subst}                & |def x (x = 55; 55)| \\
-\movestoR{exi-eliml}            & |55|
+\movestoR{exi-eliml}            & |55| \\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1286,6 +1287,7 @@ $$
  \movestoR{subst}                & |def x ((if (1>0) then 55 else (44 `choice` 2)); x=1; (77 choice 99))|\\
  \movestoC{\text{simplify |if|}} & |def x (55; x=1; (77 choice 99))|\\
  \movestoR{norm-val, exi-eliml}  & |77 choice 99|\\
+\multicolumn{2}{l}{\text{\lennart{ICFP conversion done}}}
 \end{array}
 $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
@@ -1888,7 +1890,7 @@ While most of the reductions are administrative in nature, these are the highlig
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
 
 Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
-At \circlednum{5} and \circlednum{6} the actual numbers are inline.
+At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
 After removing some garbage we reach the result at \circlednum{7}.
 \begin{figure}
 \begin{footnotesize}
@@ -1969,6 +1971,7 @@ We discuss some of them here.
 \subsection{Dead existentials}
 
 \simon{I don't think this section is persuasive; let's drop it.}
+\lennart{Drop it!}
 
 Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
 argue that it should instead be stuck.
@@ -2004,8 +2007,8 @@ may be worse than the disease.
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (e_1 `choice` e_2) f g| & \movesto & |applyN g (e_1, thunk e_2)| & \text{if } \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|}, \text{|x| fresh}  \\
-    \rulename{split-value} & |split e f g| & \movesto & |applyN g (e, thunk fail)| & \text{if } \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|}, \text{|x| fresh}  \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
 
