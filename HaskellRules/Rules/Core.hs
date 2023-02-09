@@ -19,6 +19,7 @@ module Rules.Core(
   pattern EXI,
   pattern LAM,
   pattern Block, Eqn,
+  comp,
   subst,
   alphaRename,
   invariant,
@@ -115,92 +116,95 @@ instance Eq Expr where
 
 instance Ord Expr where
   compare = comp [] []
-   where
-    -- so much code... this can probably simplified a lot
-    comp  xs  ys (Var x) (Var y) =
-      case (elemIndex x xs, elemIndex y ys) of
-        (Just i, Just j)   -> i `compare` j
-        (Nothing, Nothing) -> x `compare` y
-        (Just _, Nothing)  -> LT
-        (Nothing, Just _)  -> GT
-    comp _xs _ys (Var _) _       = LT
-    comp _xs _ys _       (Var _) = GT
 
-    comp _xs _ys (Int a) (Int b) = compare a b
-    comp _xs _ys (Int _) _       = LT
-    comp _xs _ys _       (Int _) = GT
+-- so much code... this can probably simplified a lot
+comp :: [Ident] -> [Ident] -> Expr -> Expr -> Ordering
+comp  xs  ys (Var x) (Var y) =
+  case (elemIndex x xs, elemIndex y ys) of
+    (Just i, Just j)   -> i `compare` j
+    (Nothing, Nothing) -> x `compare` y
+    (Just _, Nothing)  -> LT
+    (Nothing, Just _)  -> GT
+comp _xs _ys (Var _) _       = LT
+comp _xs _ys _       (Var _) = GT
 
-    comp _xs _ys (Op a) (Op b) = compare a b
-    comp _xs _ys (Op _) _      = LT
-    comp _xs _ys _      (Op _) = GT
+comp _xs _ys (Int a) (Int b) = compare a b
+comp _xs _ys (Int _) _       = LT
+comp _xs _ys _       (Int _) = GT
 
-    comp  xs  ys (Arr vs) (Arr ws)
-      | n == m    = head (dropWhile (==EQ) (zipWith (comp xs ys) vs ws) ++ [EQ])
-      | otherwise = n `compare` m
-     where
-      n  = length vs
-      m  = length ws
-    comp _xs _ys (Arr _) _       = LT
-    comp _xs _ys _       (Arr _) = GT
+comp _xs _ys (Op a) (Op b) = compare a b
+comp _xs _ys (Op _) _      = LT
+comp _xs _ys _      (Op _) = GT
 
-    comp  xs  ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
-    comp _xs _ys (Lam _) _       = LT
-    comp _xs _ys _       (Lam _) = GT
+comp  xs  ys (Arr vs) (Arr ws)
+  | n == m    = foldr (<>) EQ (zipWith (comp xs ys) vs ws)
+  | otherwise = n `compare` m
+ where
+  n  = length vs
+  m  = length ws
+comp _xs _ys (Arr _) _       = LT
+comp _xs _ys _       (Arr _) = GT
 
-    comp _xs _ys Wrong Wrong = EQ
-    comp _xs _ys Wrong _     = LT
-    comp _xs _ys _     Wrong = GT
+comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
+comp _xs _ys (Lam _) _       = LT
+comp _xs _ys _       (Lam _) = GT
 
-    comp _xs _ys Fail Fail = EQ
-    comp _xs _ys Fail _    = LT
-    comp _xs _ys _    Fail = GT
+comp _xs _ys Wrong Wrong = EQ
+comp _xs _ys Wrong _     = LT
+comp _xs _ys _     Wrong = GT
 
-    comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:=:_) _       = LT
-    comp _xs _ys _       (_:=:_) = GT
+comp _xs _ys Fail Fail = EQ
+comp _xs _ys Fail _    = LT
+comp _xs _ys _    Fail = GT
 
-    comp  xs  ys (a:~:b) (c:~:d) = comp xs ys (Var a) (Var c) <> comp xs ys (Var b) (Var d)
-    comp _xs _ys (_:~:_) _       = LT
-    comp _xs _ys _       (_:~:_) = GT
+comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:=:_) _       = LT
+comp _xs _ys _       (_:=:_) = GT
 
-    comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:>:_) _       = LT
-    comp _xs _ys _       (_:>:_) = GT
+comp  xs  ys (a:~:b) (c:~:d) = comp xs ys (Var a) (Var c) <> comp xs ys (Var b) (Var d)
+comp _xs _ys (_:~:_) _       = LT
+comp _xs _ys _       (_:~:_) = GT
 
-    comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:|:_) _       = LT
-    comp _xs _ys _       (_:|:_) = GT
+comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:>:_) _       = LT
+comp _xs _ys _       (_:>:_) = GT
 
-    comp  xs  ys (a:@:b) (c:@:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:@:_) _       = LT
-    comp _xs _ys _       (_:@:_) = GT
+comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:|:_) _       = LT
+comp _xs _ys _       (_:|:_) = GT
 
-    comp  xs  ys (One a) (One b) = comp xs ys a b
-    comp _xs _ys (One _) _       = LT
-    comp _xs _ys _       (One _) = GT
+comp  xs  ys (a:@:b) (c:@:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:@:_) _       = LT
+comp _xs _ys _       (_:@:_) = GT
 
-    comp  xs  ys (All a) (All b) = comp xs ys a b
-    comp _xs _ys (All _) _       = LT
-    comp _xs _ys _       (All _) = GT
+comp  xs  ys (One a) (One b) = comp xs ys a b
+comp _xs _ys (One _) _       = LT
+comp _xs _ys _       (One _) = GT
 
-    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
-    comp _xs _ys Split {} _ = LT
-    comp _xs _ys _ Split {} = GT
+comp  xs  ys (All a) (All b) = comp xs ys a b
+comp _xs _ys (All _) _       = LT
+comp _xs _ys _       (All _) = GT
 
-    comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
-    comp _xs _ys BlockC{} _ = LT
-    comp _xs _ys _ BlockC{} = GT
+comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
+comp _xs _ys Split {} _ = LT
+comp _xs _ys _ Split {} = GT
 
-    comp  xs  ys (Store h e) (Store h' e') =
-      compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
-    comp _xs _ys Store {} _ = LT
-    comp _xs _ys _ Store {} = GT
+comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
+comp _xs _ys BlockC{} _ = LT
+comp _xs _ys _ BlockC{} = GT
 
-    comp _xs _ys (Ref p) (Ref q) = compare p q
-    comp _xs _ys Ref {} _        = LT
-    comp _xs _ys _ Ref {}        = GT
+comp  xs  ys (Store h e) (Store h' e') =
+  compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
+comp _xs _ys Store {} _ = LT
+comp _xs _ys _ Store {} = GT
 
-    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
+comp _xs _ys (Ref p) (Ref q) = compare p q
+comp _xs _ys Ref {} _        = LT
+comp _xs _ys _ Ref {}        = GT
+
+comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
+
+comp _ _ _ _ = undefined -- GHC bug
 
 --------------------------------------------------------------------------------
 
