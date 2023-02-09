@@ -123,8 +123,8 @@
       \\[-3mm]
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
-            \text{``|choice|'', ``;'', and ``|=|'' are right-associative} \\
-            \text{``|=|'' binds more tightly than ``;''} \\
+            \text{``|choice|'' and ``;'' are right-associative} \\
+            \text{``|choice|'' and ``|=|'' bind more tightly than ``;''} \\
             \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
             \hspace{4mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|} \\
       \end{array} \\
@@ -137,7 +137,7 @@
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
-      |e_1 e_2| & \text{means} & |def (f x) (f == e_1 ; x == e_2; f x)|  & |f,x|\ \text{fresh} \\
+      |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
@@ -147,7 +147,7 @@
       & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
       |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |lamhdr (tup(x,y)) e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
+      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
     \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
