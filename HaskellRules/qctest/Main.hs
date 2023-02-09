@@ -95,8 +95,8 @@ prop_Confluence2 flags sys =
 arbTrace :: TestFlags -> TRSystem Expr -> Expr -> Gen (Maybe (Traced Expr))
 arbTrace flags sys p = go (5 :: Int) (15 :: Int) [] p
  where
-  go k0 k1 _t p' | k1 <= 0 || (ignoreRecursive flags && isRecursive p') =
-    do return Nothing
+  go _k0 k1 _t p' | k1 <= 0 || (ignoreRecursive flags && isRecursive p') =
+    return Nothing
 
   go k0 k1 t p' | k0 > 0 =
     frequency
@@ -148,6 +148,8 @@ prop_Terminates flags sys =
         | (rule,q) <- step (rules sys) (ruleEnv sys) p
         ]
        ++ ps  
+
+  diverges _ _ _ = undefined
 
 --------------------------------------------------------------------------------
 
