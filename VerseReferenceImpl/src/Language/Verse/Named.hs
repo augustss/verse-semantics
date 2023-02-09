@@ -20,15 +20,15 @@ import Language.Verse.Pretty
 import Language.Verse.Val
 
 data Named m a
-  = Ref (Backtrack.Ref m (Var m (Val m)))
-  | Val a deriving (Functor, Foldable, Traversable)
+  = Val a
+  | Ref (Backtrack.Ref m (Var m (Val m))) deriving (Functor, Foldable, Traversable)
 
 instance EqRef (Backtrack.Ref m) => Unifiable (Named m)
 
 instance EqRef (Backtrack.Ref m) => Zippable (Named m) where
   zipMatch = curry $ \ case
-    (Ref x, Ref y) | eqRef x y -> Just []
     (Val x, Val y) -> Just [(x, y)]
+    (Ref x, Ref y) | eqRef x y -> Just []
     _ -> Nothing
 
 instance ( Backtrack.MonadRef m
@@ -36,7 +36,7 @@ instance ( Backtrack.MonadRef m
          , PrettyM a m
          ) => PrettyM (Named m a) m where
   prettyM = \ case
+    Val x -> prettyM x
     Ref ref -> Backtrack.readRef ref >>= freeze >>= \ case
       Nothing -> pure "_"
       Just x -> prettyM x
-    Val x -> prettyM x
