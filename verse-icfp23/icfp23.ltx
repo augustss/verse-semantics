@@ -300,10 +300,6 @@
 %  ``magical'' semantics, and very low-level operational semantics.
   \par
   \vspace{3mm}
-
-\emph{This draft paper describes our current thinking about Verse.   It is very much a work in progress, not a finished product.  The broad outlines of the design are stable.  However, the details of the rewrite rules may well change; we think that the current rules are not  confluent, in tiresome ways.  (If you are knowledgeable about confluence proofs, please talk to us!)}
-
-\emph{We are eager to engage in a dialogue with the community.  Please do write to us.}
 \end{abstract}
 
 
@@ -462,10 +458,12 @@ some built-in operations and tuples as data constructors:
   or a \emph{heap value} |h|.  A heap value is a lambda or a tuple; and tuples only have value components.
   In \versecalc{} a variable counts as a value, because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
+  \lennart{This item needs some rewriting for the ICFP grammar.}
 \item \emph{Built-in functions.}
-  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|
+  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
+  \lennart{Mention |eu|}
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
@@ -491,7 +489,7 @@ explores some possible alternative design choices.
 \subsection{Logical variables and equations} \label{sec:unify}
 
 The Verse calculus includes first class \emph{logical variables} and \emph{equations} that constrain their values;
-you can bring a fresh logical variable into scope with |defKW|; equate a value with an expression
+you can bring a fresh logical variable into scope with |defKW|; equate a value with an expression (\lennart{not really an expression})
 |v == e|; and sequence two expressions with |e_1 ; e_2| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
 |def x (x=e_1; e_2)| in \versecalc{}.  An equation |(v=e)| always equates a \emph{value} $v$ to an expression $e$;
@@ -564,7 +562,7 @@ Order is maintained and duplicates are not eliminated; we shall see why in \cref
 In short, an expression yields a \emph{sequence} of values, not a bag, and certainly not a set.
 
 The equations we saw in \cref{sec:unify} can fail, if the arguments
-are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3|,
+are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |3| (\lennart{Not true anymore}),
 while |3=4| fails, returning no results.  In general, we use ``fail''
 and ``returns no results'' synonymously.
 
@@ -720,6 +718,7 @@ The argument of |oneKW| reduces to either |(thunk e_2) `choice` (thunk e_3)| or 
 respectively; |oneKW| then picks the first value, that is |thunk e_2| if |e_1| succeeded, or |thunk e_3| if |e_1| failed, and
 applies it to |tup ()| .
 
+\lennart{This paragraph is very similar to the previous one}.
 The argument of |oneKW| evaluates to either |((thunk (e_2)) choice dots)| or |(thunk (e_3))|
 depending on whether |e_1| succeeds or fails, respectively, and |oneKW| then picks that lambda and applies it to |emptytup|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
@@ -1186,7 +1185,7 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 
 \subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
 
-The syntax of \cref{fig:syntax} allows |(def x e)|, |(v == e)|, and |(e_1;e_2)|
+The syntax of \cref{fig:syntax} allows |(def x e)|, |(v == e)| \lennart{not anymore}, and |(e_1;e_2)|
 to occur anywhere
 in an expression. But to make other rules more applicable, it may be necessary to
 ``float'' these expression upward.
