@@ -654,6 +654,7 @@ readRef' ref f = do
     f =<< Backtrack.readRef ref
     unifyWorld world' =<< getWorld
     putWorld world''
+  putWorld world'
 
 writeRef' :: ( Backtrack.MonadRef m
              , MonadVerse m
@@ -667,6 +668,7 @@ writeRef' ref x = do
     Backtrack.writeRef ref x
     unifyWorld world' =<< getWorld
     putWorld world''
+  putWorld world'
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference

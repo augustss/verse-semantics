@@ -463,7 +463,6 @@ withListener f k = do
   modifyPromises (promise:)
   world <- getWorld
   world' <- freshWorld
-  putWorld world'
   ref_m <- lift $ newRef empty
   x <- k $ \ x -> resolvePromise promise r ref_m $ do
     world'' <- getWorld
@@ -471,6 +470,7 @@ withListener f k = do
     f x
     unifyWorld world' =<< getWorld
     putWorld world''
+  putWorld world'
   pure () <|> join (lift $ readRef ref_m)
   pure x
 

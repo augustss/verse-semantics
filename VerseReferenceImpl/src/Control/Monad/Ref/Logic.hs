@@ -110,11 +110,11 @@ instance MonadRef m => Backtrack.MonadRef (RefLogicT m) where
   writeRef ref x = RefLogicT $ LogicT $ \ sk fk -> do
     y <- readRef ref
     writeRef ref x *> loop x y
-    sk () $ whenFailed (writeRef ref y *> loop y x) *> fk
+    sk () $ whenFailed (writeRef ref y) *> fk
     where
       loop x y = do
         tellForward $ loop x y
-        tellBackward $ whenFailed $ writeRef ref y *> loop y x
+        tellBackward $ whenFailed $ writeRef ref y
   backtrack = RefLogicT . lift $ putFailed True
 
 whenFailed :: Monad m => StateT m () -> StateT m ()
