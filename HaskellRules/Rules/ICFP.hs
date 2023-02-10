@@ -813,7 +813,18 @@ rulesValSwapK env lhs =
              (True, False)  -> False             -- already in correct order
              (True, True)   -> ltExpr env e2 e1  -- use ordering
      pure $ e2 :>: (e1 :>: e3)
-
+{-
+  "VAL-SWAPL" `name`
+  do e1 :>: (e2@(Var{} :=: Val{}) :>: e3) <- [lhs]
+     guard (ltExpr env e2 e1)
+     pure $ e2 :>: (e1 :>: e3)
+ <>
+  "VAL-SWAPR" `name`
+  do e1@(Var{} :=: Val{}) :>: (e2 :>: e3) <- [lhs]
+     guard (ltExpr env e2 e1)
+     pure $ e2 :>: (e1 :>: e3)
+-}
+  
 -- Compare two expression using lessThan for identifiers
 ltExpr :: TRSFlags -> Expr -> Expr -> Bool
 ltExpr env e1 e2 = comp vs vs e1 e2 == LT
