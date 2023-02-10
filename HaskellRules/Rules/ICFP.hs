@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.ICFP(allSystemsICFP, isRecursive) where
 import Control.Monad( guard )
@@ -217,6 +217,10 @@ anf = expr
 --------------------------------------------------------------------------------
 
 type Context = Expr -> Expr
+
+instance Free Context where
+  -- Get free variables that are not in the hole.
+  free ctx = free (ctx Fail)
 
 -- scope contexts
 
@@ -495,7 +499,7 @@ rulesUnification env lhs =
  ++
   "SUBST" `name`
   do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
-     let freeX = free (ctx Fail, e)
+     let freeX = free (ctx, e)
          freeV = free v
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
@@ -567,7 +571,7 @@ rulesNormalization :: ERule
 rulesNormalization _ lhs =
   "NORM-EXI" `name`
   do (ctx, EXI x e) <- execX1 lhs
-     let freeX = free (ctx Fail)
+     let freeX = free ctx
          x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
        then pure (EXI x' (ctx (subst [(x,Var x')] e)))
@@ -740,7 +744,7 @@ rulesVarSwapSubst :: ERule
 rulesVarSwapSubst _ lhs =
   "VAR-SWAP-SUBST" `name`
   do (ctx, Var x :=: Var y) <- execX lhs
-     let y0 = identNotIn (free (ctx Fail, y, x))
+     let y0 = identNotIn (free (ctx, y, x))
          sub = [(y, Var x), (y0, Var y)]
      pure (subst sub (ctx (Var y0 :=: Var x)))
 
