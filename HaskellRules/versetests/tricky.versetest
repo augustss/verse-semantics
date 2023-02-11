@@ -72,8 +72,8 @@ testceq("QC8", SEq)  { ex x. ex y. ex z. z | (ex v. ex w. z = y; y) }
 testceq("QC9", SEq)  { ex a. (ex y. (a = y; <>) | <>); a = (ex b. b); a }
                      { ex a y. (a = y; ()) | (); a }
 # QC10 kills ICFPK with unidirectional VAL-SWAP
-testceq("QC10", SEq) { (ex a. a = (add | <>); c); c = add; c }
-                     { ex a. a = (add | <>); c = add; add }
+testceq("QC10", SEq) { \c.(ex a. a = (add | <>); c); c = add; c }
+                     { \c.ex a. a = (add | <>); c = add; add }
 testceq("Rec1", SEq, POPLL=Skip,ICFP*=Skip) { ex x. (\y.x(fail)) = x }
                      { \y.fail }
 # Result depends on how recursion is treated.
