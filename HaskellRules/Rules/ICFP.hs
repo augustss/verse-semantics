@@ -896,11 +896,12 @@ isResult v = isVal v
 
 isStoreFree :: Expr -> Bool
 isStoreFree Val{}   = True
-isStoreFree (Val{} :=: b) = isStoreFree b
+isStoreFree (_ :=: b) = isStoreFree b
 isStoreFree (a :>: b) = isStoreFree a && isStoreFree b
+isStoreFree (a :|: b) = isStoreFree a && isStoreFree b
+isStoreFree (Op op :@: _) = not (isStoreOp op)
 isStoreFree (One e)   = isStoreFree e
 isStoreFree (All e)   = isStoreFree e
-isStoreFree (Op op :@: _) = not (isStoreOp op)
 isStoreFree (Split e _ _) = isStoreFree e
 isStoreFree Wrong     = True
 isStoreFree (EXI _ e) = isStoreFree e
