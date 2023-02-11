@@ -1,0 +1,123 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+\cleardoublepage
+
+\section{Updateable references} \label{sec:store}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax extension} \\
+    \begin{array}{lrcl}
+      \text{References}         & r \\
+      \text{Expressions}        & e   & ::= & \cdots \vb |store h e| \\
+      \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
+      \text{Head values}        & hnf & ::= & \cdots \vb r \\
+      \text{Execution contexts} & X   & ::= & \cdots \vb |store h X| \\
+      \text{Scope contexts}     & SC  & ::= & \cdots \vb |store h SC| \\
+      \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
+      \text{Heap context}       & H   & ::= & \hole|,h| \vb |cell r v, H| \\
+      \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \\
+      \text{Store-op free exprs}&|sf| & ::= & |v| \vb |sf_1 = sf_2| \vb |sf_1; sf_2| \vb |def x sf|
+                                              \vb |apply1 sp v|
+                                              %%% need sv \vb |split sf sv_1 sv_2|
+                                              \\
+      \text{Results}            & w   & ::= & |v| \vb |v `choice` e| \\
+      \text{Non-store primops}  & sp  & ::= & \text{any, except } |alloc|, |read|, |write| \\
+      \text{Non-store expression} & oe  & ::= & \text{like |e|, that is not |w|, and also not a |storeKW| nor |fail|} \\
+    \end{array} \\
+\\
+
+  \textbf{Axiom extensions} \\
+  \textit{Reference ops} \\
+  \begin{array}{lrcll}
+    \rulename{ref-alloc} & |store h (S^[apply1 alloc v])| & \movesto & |store (cell r v, h) (S^[r])| & \text{|r| fresh} \\
+    \rulename{ref-read} & |store (H^[cell r v]) (S^[apply1 read r])| & \movesto & |store (H^[cell r v]) (S^[v])| \\
+    \rulename{ref-write} &
+        | store (H^[cell r v_1]) (S^[applyN write (r,v_2)])|
+        & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
+  \end{array} \\
+    \\
+
+  \textit{Store duplication} \\
+  \begin{array}{lrcll}
+    \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
+    \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \quad
+    |oe| \in |ce| \\
+  \end{array} \\
+
+    \\
+  \textit{Store commit} \\
+  \begin{array}{lrcll}
+     \rulename{st-split} & |store h_1 (S^[split (store h_2 w) f g])| & \movesto &
+         |store h_2 (S^[split w f g])| \\
+     \rulename{st-choice} & |store h_1 (S^[(store h_2 w) `choice` e]| & \movesto & |store h_2 (S^[w `choice` e])| \\
+  \end{array} \\
+
+    \\
+    \textit{Unification} \\
+    \begin{array}{lrcll}
+      \text{Extension with the obvious axioms making equal references unify,
+        and anything else fail.}
+    \end{array} \\
+  \\
+  \textit{Top level} \\
+  \begin{array}{lrcll}
+    \text{Start top level reduction of |e| with |store emp e|.}
+  \end{array} \\
+
+  \end{array}
+   $$
+  \caption{The Verse calculus: store axioms} \label{fig:store-axioms}
+\end{figure}
+
+To add updateable references we extend the system with syntax and rules from figure~\ref{fig:store-axioms}.
+The |store h e| indicates that |e| should be reduced using the heap |h|.
+A heap is simply a mapping from references to values (one mapping being |cell r v|).
+A reference is some opaque type that supports equality (unification) and creation of a new reference.
+
+There are three new primitive operations, |alloc|, |read|, and |write|.
+Their interaction with the store can be seen from the axioms.
+The |apply1 alloc v| operation creates a new reference and adds a binding with |v| to the store.
+The |apply1 read r| operation retrieves the value for reference |r| from the store,
+and |applyN write (r, v)| updates the reference |r| with |v| in the store.
+All of these operations use the context |S| which ensures that there are no store operations
+to the left of the hole, i.e., a store operation in the hole is the next one that should execute.
+
+The interesting rules involve choice and |splitKW| because store operations are transactional in the sense
+that when an expressions fails, none of its store operations will happen.
+
+When reducing |split e f g| in an |S| hole, rule \rulename{st-split-dup}, the store is duplicated.
+Any store operations inside the |splitKW| will happen in this local copy of the store.
+Note the two occurrences of |h| in the right hand side of \rulename{st-split-dup}.
+If the reduction of |e| results in |fail| then rule \rulename{fail} is used,
+and the store from the failing computation is simply thrown away.
+If the reduction of |e| results in a value (with or without more alternatives) then rule
+\rulename{st-split} is used.  This rule replaces the outer store with the inner store,
+since we know the inner computation has succeeded.
+
+Similarely, the reduction of |e_1 `choice` e_2| will duplicate the store into the first branch, \rulename{st-choice-dup}.
+Here |e_1| must not contain any store operation nor any choices.
+And again, similarely, \rulename{st-choice} commits the new store and throws away the old.
+
+The use of |oe| in the rules is to ensure that the rules cannot get stuck in a loop.
+Using |e| instead of |oe| would mean that failing or committing would make the expression match the duplication rule again.
+It also prevents the duplication rule from repeatedly duplicating the |storeKW|.
+
+Note that |storeKW| is part of the |X| context, which means that the |storeKW| can float inside
+existentials.
+This is necessary for the store rules to fire since the |S| context does not allow
+going under existentials.
+If |S| contained |storeKW| then an |alloc| or |write| could update the store with
+a variable that is not in scope.
+
+To support limited store operations ({\eg}, |read|,
+but not |write|) we can equip the store with a set of currently allowed operations.
+We also need some extra expressions that modify this set.
+
+\subsection{Examples}
+\lennart{Not yet}
+
