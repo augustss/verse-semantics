@@ -74,7 +74,7 @@ trsGraphFuelTrace' env afuel rule x = M.fromListWith (++) (go S.empty afuel [] [
   children tx = [ y :<-- ((n,term tx):trace tx) | (n,y) <- step rule env (term tx) ]
 -}
 
-normalFormsFuelTraceWithGraph :: (Show a, Ord a, Rec a)
+normalFormsFuelTraceWithGraph :: (Ord a, Rec a)
                               => TRSystem a -> Int -> a -> NormResult a
 normalFormsFuelTraceWithGraph sys fuel t = NormResult
   { nrDone = [ tx | Just tx <- lvs ]

@@ -5,6 +5,7 @@ import Control.Monad( guard )
 import Data.List
 import Data.Maybe
 
+import Epic.Print hiding ((<>))
 import Epic.Uniplate(universe)
 import qualified Epic.SIntMap as IM
 import TRS.Bind
@@ -202,7 +203,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
-    expr e = error $ "anf: " ++ show e
+    expr e = error $ "anf: " ++ prettyShow e
 
     -- Expression or unification
     expru (e1 :=: e2) =

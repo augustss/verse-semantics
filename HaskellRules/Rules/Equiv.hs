@@ -1,6 +1,7 @@
 module Rules.Equiv(equiv, norm, normalForm) where
 import Data.Maybe
 import GHC.Stack
+import Epic.Print
 import Rules.Core
 import TRS.TRS( step )
 import TRS.Tarjan
@@ -13,7 +14,7 @@ equiv :: (HasCallStack) => TRSystem Expr -> Expr -> Expr -> Bool
 equiv sys e1 e2 = normalForm sys e1 == normalForm sys e2
 
 normalForm :: (HasCallStack) => TRSystem Expr -> Expr -> Expr
-normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out (steps=" ++ show (tfNormSteps (ruleEnv sys)) ++ "): " ++ show e) $
+normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out (steps=" ++ show (tfNormSteps (ruleEnv sys)) ++ "): " ++ prettyShow e) $
                           norm sys $ start e
 
 -- Normalize an expression.  Return Nothing if the normalization times out.

@@ -5,17 +5,18 @@ import Data.Data(Data)
 import Data.List( union, (\\), isPrefixOf )
 import Data.Char( isDigit )
 import Data.Maybe (maybeToList)
+import Epic.Print
 
 --------------------------------------------------------------------------------
 
 data Ident
   = Name String
   | Prim Int
- deriving ( Eq, Ord, Data )
+ deriving ( Show, Eq, Ord, Data )
 
-instance Show Ident where
-  show (Name x) = x
-  show (Prim n) = "$" ++ show n
+instance Pretty Ident where
+  pPrintPrec _ _ (Name x) = text x
+  pPrintPrec _ _ (Prim n) = text ("$" ++ show n)
 
 ident :: String -> Ident
 ident = Name

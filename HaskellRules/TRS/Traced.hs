@@ -2,6 +2,7 @@ module TRS.Traced(
   Traced(..), term, trace, start, toList,
   showTrace, showRevTrace,
   ) where
+import Epic.Print(Pretty, prettyShow)
 
 data Traced a = a :<-- [(String,a)]
   deriving (Show)
@@ -30,10 +31,10 @@ instance Eq a => Eq (Traced a) where
 instance Ord a => Ord (Traced a) where
   (x :<-- _) `compare` (y :<-- _) = x `compare` y
 
-showTrace, showRevTrace :: Show a => Traced a -> [String]
+showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace (x :<-- tr) =
-  reverse (show x : concat [ ["  --"++n++"-->", show y] | (n,y) <- tr ])
+  reverse (prettyShow x : concat [ ["  --"++n++"-->", prettyShow y] | (n,y) <- tr ])
 
 showRevTrace (x :<-- tr) =
-  show x : concat [ ["  <--"++n++"--", show y] | (n,y) <- tr ]
+  prettyShow x : concat [ ["  <--"++n++"--", prettyShow y] | (n,y) <- tr ]
 

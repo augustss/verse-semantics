@@ -5,6 +5,7 @@ import Control.Monad( guard )
 import Data.List
 import Data.Maybe
 
+import Epic.Print(prettyShow)
 import qualified Epic.SIntMap as IM
 import Epic.Uniplate(universe)
 import TRS.Bind
@@ -192,7 +193,7 @@ anf = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
     expr (Store h e) | IM.null h = Store h $ expr e
-    expr e = error $ "anf: impossible: " ++ show e
+    expr e = error $ "anf: impossible: " ++ prettyShow e
     value :: Ident -> Expr -> ([(Ident, Expr)], Expr)
     value _ e@Var{} = ([], e)
     value _ e@Int{} = ([], e)
@@ -272,7 +273,7 @@ anfV = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (exprR e) v1 v2)
     expr (Store h e) | IM.null h = Store h $ expr e
-    expr e = error $ "anf: impossible: " ++ show e
+    expr e = error $ "anf: impossible: " ++ prettyShow e
     exprR = valR . expr
     valR e@(_ :>: _) = e
     valR e | isVal e = e
