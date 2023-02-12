@@ -108,7 +108,7 @@ systemICFPJ :: TRSystem Expr
 systemICFPJ = s
   { sname = "ICFPJ"
   , description = description s ++ ", Plan J"
-  , rules = (rules s -= "VAR-SWAP") <> rulesPlanJ
+  , rules = (rules s -= "VAR-SWAP") <> rulesPlanJ -- <> rulesExiElimV
   , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
   , rulesHaveStructural = True
   }
@@ -505,10 +505,17 @@ rulesUnification env lhs =
 
 rulesPlanJ :: ERule
 rulesPlanJ env lhs =
-  "VAR-SWAP-J" `name`
-  do Var y :=: Var x <- [lhs]
-     guard ({- myTraceShow ("lessThan: " ++ show (x, y)) -} (lessThan env x y))
-     pure (Var x :=: Var y)
+  -- "VAR-SWAP-J" `name`
+  -- do Var y :=: Var x <- [lhs]
+  --    guard (lessThan env x y)
+  --    pure (Var x :=: Var y)
+  -- ++
+ "VAR-SWAP-SUBST" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     guard (lessThan env y x)
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
   ++
   "EXI-SWAP" `name`
   do EXI x (EXI y e) <- [lhs]
