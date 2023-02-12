@@ -231,30 +231,45 @@ DONE
 
 line 315: "Indexing out of range is fail." What happens if the index is not an integer? I am guessing that it is fail if the index is an op or a lambda expression or a tuple; it gets stuck if it is a variable that has not yet been unified with a value; it (eventually) reduces to the integer case if the index is a variable that has been unified with an integer; it (eventually) reduces to fail if the index is a variable that has been unified with an op or a lambda expression or a tuple. (Now I look ahead to the definition of rewrite rule APP-TUP on line 462, and I _think_ my prose description is consistent with that, possibly with a few more occurrences of "eventually".)
 
+DONE: "Indexing out of range is |fail|, as is indexing with a non-integer value."
 
 line 319: Given that there has been no mention of singleton choices, there is some doubt in my mind whether the notation "(v_1 | \cdots | v_n)" is intended to include the form "v_1". Moreover, it certainly does not include the form "( )", which is not defined in the syntax. Therefore I would say that (a) the words "as a consequence," should be struck (the empty case does need to be described separately), and for clarity I would recommend describing the case of a single value separately: "If e produces a single value v (rather than a choice or no values), then all{e} reduces to the singleton tuple <v>."
 
+DONE.
 
 line 322: This is a really nice theoretical treatment of indexing. The practical consequences for compilation may be very interesting.
 
+HA HA!
 
 line 328: At the end of this paragraph I suggest adding "In either case, left-to-right order is preserved."
 
+UNSURE: I'm not sure what you mean here.
 
 line 330: "But all really requires the evaluation of all choices before proceeding" Just how far do the choices need to be evaluated? To values? To values or stuck computations? Or merely reduced to expressions that contain no choices?
 
+DONE: I have clarified.  " But |allKW| really \emph{every} arm of the
+choice tree to resolve to a value before proceeding, while |oneKW|
+only needs the \emph{first} choice to be a value.
 
-line 340: This treatment of filters in **for** is of course very nice, similar to what can be done in Icon but without use of side effects. As Simon said in the talk, it's list comprehensions everywhere!
+line 340: This treatment of filters in **for** is of course very nice,
+similar to what can be done in Icon but without use of side
+effects. As Simon said in the talk, it's list comprehensions
+everywhere!
 
+UNSURE: anything to add here?
 
 line 344: You need to warn the reader quite explicitly in the caption for Figure 2 that these functions do NOT use the list representation introduced in footnote 4 for the append example on line 250! A good start would be to caption the figure "Functions on tuples, analogous to list or array functions in some other languages" in line 359.
 
+DONE
 
 lines 346–347: These two lines are not merely "Notation"; they are additional "Desugaring" rules, and arguably belong in Figure 1 with the other desugaring rules; failing that, try changing the word "Notation" to "Desugaring" in line 345.
 
+CHECK: I changed to "Desugaring"; and I beefed up the ":=" notation introduced in 2.1.
 
 line 354: Prior languages that support binding (not just assigning) a variable in the predicate part of an "if", with the scope of the variable including the "then" part of the construct but not the "else" part, are Fortress and Swift.
 
+DONE: I added \footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
+  the subsequent desugaring into |allKW|.}
 
 line 357: To complement "every", one might consider adding
 
@@ -262,33 +277,43 @@ line 357: To complement "every", one might consider adding
 
 if I have that right.
 
+DONE: I like that; added it.
+
 
 line 358: A striking feature of Figure 2 is that it contains no examples of reduction functions such as reduce, foldl, foldr, or mapreduce.
 
+NOT SURE: true. Lennart whas should we do here.
 
 line 362: I wrote this note in the margin during my first pass: "It's beginning to smell like Icon." :-)
 
 
 line 366: "using the map function defined in Fig. 2" Figure 2 is not really discussed until Section 2.8, so this is something of a forward reference. Please consider swapping Sections 2.7 and 2.8.
 
+DONE: I swapped 2.7 and 2.8.
 
 line 370: "for a fresh variable v"  The variable "x" also needs to be fresh (or you could use <>, as discussed in my comment on line 304).
 
+DONE, using <>.
 
 line 372: Unless you are absolutely desperate to save space in order to obey conference paper page limits, I recommend avoiding abbreviations such as "e.g." and "i.e." and "cf."; instead use "for example" and "that is" and "see". This will make your paper much more accessible to readers who are not native speakers of Latin.
 
+CHECK: I have done some.
 
 line 372: After the keyword "do", I think the braces surrounding "x | x + 1" should be replaced with parentheses.
 
+NOT SURE: Lennart I'm hazy about braces in `do`.
 
 line 373: "At this point it is crucial to use" => "It is crucial that the definition of **for** uses"
 
+DONE
 
 lines 382–383: "The choice operator, |, serves as both cons and append for choices." => "The choice operator, |, serves as both cons and append for choices. VC has no corresponding built-in operators for tuples, so they are defined in Fig. 2."
 
+DONE
 
 line 391: In fact, can we not write simply "fcn<x, 1, y, 2> = x + y", given the desugaring rule on line 347?
 
+NOT SURE: the whole point is that we can *call* `pat` in the defn of fcn, rather than *expanding* pat.
 
 Comments on Section 3 of Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, and Sweeney,
 "The Verse Calculus: a Core Calculus for Functional Logic Programming", draft dated January 2003.
@@ -297,6 +322,12 @@ Comments on Section 3 of Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Sh
 BIG-PICTURE COMMENTS
 
 The text of Section 3 does not say explicitly whether the expectation is that a VC program should be fully desugared before applying the rewrite rules, and the indirect evidence is contradictory: on the one hand, some of the examples (line 548, line 662, line 689) apply rewrite rules to VC expressions that have not been desugared; on the other hand, if the intention is to desugar "on the fly" or not at all, then the discussion of confluence in Section 4 should include the rewriting rules for desugaring as part of the overall set of rules expected to be confluent, and the proof of confluence should take those rules into account.
+
+DONE: rules apply to core langauge only.  I added a footnote
+  Here and elsewhere we rewrite terms that have not
+  been fully desugared, but that is just an expository aid;
+  formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
+to the first occurrence in 3.2.
 
 The organization of the figures and the organization of the text are mismatched big-time. Avoid chiasmus! Please organize Figures 3, 4, and 5 so that the sets of rules (both rewrite rules and Gentzen rules) appear in the order that they are discussed in the text. (The current order in the Figures is Contexts, Unification, Application, Speculation, Normalization, Fail Propagation, Garbage Collection, Structural rules, and Well-formedness; the current order in the text is Application, Unification, the first two Contexts, Normalization, Garbage Collection, Fail Propagation, Speculation, and the other two contexts—and the Structural Rules are not mentioned at all in the text.)
 
@@ -312,9 +343,11 @@ DETAILED COMMENTS
 
 line 428: Should "All the variables on the right-hand side" be "All the free variables on the right-hand side"?
 
+DONE
 
 line 436: When I read Figure 2 in Section 2, I was slightly surprised by the choice of "gt" rather than "lt" as the one primitive comparison operation, because I anticipated (from experience with Icon) that VC would be defined so as to allow chaining of comparison operators, and using "lt" would allow chaining in the customary "ascending" order "0 < x < 10"; but because "gt" is primitive, the example here in line 436 is the more unusual "10 > x > 0". This is not a huge deal in the grand scheme of things, but it does prompt me to ask if there is some other deep reason why "gt" was chosen.
 
+NOT SURE: no deep reason.  Shall we switch to "lt".  Might affect the confluence proof tpyesetting.
 
 line 442: I suggest grouping the context definitions with the rewrite rules that use them. (If we are lucky, scope contexts and choice contexts will go away, and that means just putting evaluation contexts and application contexts closer to the Application rewrite rules. The definition of "Choice-free expr" could be moved to Figure 2 or put next to the Speculation rewrite rules.)
 
@@ -325,20 +358,25 @@ Also, consider using the form
 
   < v_1, ..., v_{i-1}, \Box, v_{i+1}, ..., v_n >
 
+DONE
+
 
 lines 450–451: Provide a full formal definition of "bvs", perhaps in a separate figure, similar to my suggestion for "fvs".
-
-
 line 454: Technically, lines 450–451 provide a definition only of "bvs(E)", leaving "bvs(A)" undefined in rule DEREF-H. I think a single definition of "bvs" can be crafted that will accept both E and A contexts.
 
 In addition, the second use of "\not\in" is an abuse of notation; better to write "fvs(h) \cap bvs(A) = \emptyset".
 
 
+MOOT
+
+
 line 455: As we discussed by Zoom (Jan 11 or 13), U-SCALAR should be "k = k; e --> e", not "s = s; e --> e". (Apparently it is important that "x = x" not disappear, if it ever appears in the first place; and "add = add" should be treated in the same way as "\lambda x.x = \lambda x.x", that is, it should fail. If "x = x; e" should simply not be rewritten, then the restriction on rule U-FAIL needs to be rewritten.)
 
+MOOT
 
 line 456: The three occurrences of \cdots should be \ldots.
 
+DONE
 
 line 458: For rule U-FAIL, it may be difficult for the reader to figure out the details of the condition "if neither U-SCALAR nor U-TUP match"; part of the problem is that the LHS "hnf_1 = hnf_2" of rule U-FAIL does not match the form "eu; e" of the LHS of U-SCALAR and U-TUP. A simple patch would be to present the rule U-FAIL as
 
@@ -363,6 +401,7 @@ U-LAMBDA-LAMBDA-FAIL   \lambda x_1. e_1 = \lambda x_2. e_2; e_3   -->   fail
 
 line 462: In APP-TUP, it is not sufficient that x\not\in fvs(v); it is important that x also not be a free variable in v_0, ..., v_n. Also, this is not really a condition onn the application of the rule, because it is a restriction on a manufactured variable rather than on the form of the LHS. So the comment on the right should really be "x fresh\qquad if n\geq 0".
 
+DONE
 
 line 463: Rule APP-ADD is incorrect. It is not intended to replace an expression of the form "add<k_1, k_2>" with the expression "k_1 + k_2": that would just be a "resugaring", the inverse of the desugaring rule in Figure 2 at line 120.
 
@@ -372,22 +411,42 @@ APP-ADD   add<k_1, k_2>   -->   k_3       where k_3 = k_1 + k_2
 
 (Compare this to the rule for APP-GT, where the actual comparison of k_1 and k_2 is similarly done over on the right, in mathematics-land.)
 
+DONE
+
 Also, I strongly suspect that in VC (but maybe not in Verse) there should be various additional rules to express cases where "add" fails: when the tuple is of length other than 2, or the tuple has elements that are not variables or integers, or the argument is not a tuple at all.
 
-
 line 465: I strongly suspect that in VC (but maybe not in Verse) there should be various additional rules to express cases where "gt" fails: when the tuple is of length other than 2, or the tuple has elements that are not variables or integers, or the argument is not a tuple at all.
+
+NOT SURE: fail or stuck?
 
 
 lines 474, 475, 477: I was very confused by the notation after the squiggly arrow. It is eventually explained briefly on line 575, with reference to Figure 5. It seems to me a really bad idea to overload the vertical bar "|" in this way; it's bad enough that it is used in BNF and a slightly shorter and bolder one is used as the choice operator. I strongly recommend that you choose a different separator for use in the syntax of the judgment defined in Figure 5. An obvious possibility is the double vertical bar obtained in LaTeX by using "\|".
 
+MOOT
 
 line 477: On the RHS of rule ALL-CHOICE, the "v" in the tuple should be a pointy-bottomed "v".
 
+DONE
 
 line 480: Consider breaking Figure 3 into three figures (one each for Unification rewrite rules, Application rewrite rules, and Speculation rewrite rules).
 
+CHECK: all in one giant figure for now.
 
-line 486: "just use $\alpha$-conversion" => "$\alpha$-conversion may be used", and before the period add "throughout $\lambda x.e". Also, in the argument to "fvs", the "v" should be a pointy-bottomed "v". Also, it is not sufficient that "x' \not\in fvs(v)"; we also need "x' \not\in fvs(e)", lest a free variable in "e" be captured. So make that "x' \not\in fvs(v, e)". But now the form "fvs(e_1, e_2)" needs to be defined (it is also used in the rule NORM-DEFR at line 598). So if you provide a complete formal definition of "fvs", add to that definition "fvs(e_1, e_2) = fvs(e_1) \cup fvs(e_2)".
+line 486: "just use $\alpha$-conversion" => "$\alpha$-conversion may be used", and before the period add "throughout $\lambda x.e".
+
+DONE
+
+Also, in the argument to "fvs", the "v" should be a pointy-bottomed "v".
+
+DONE
+
+Also, it is not sufficient that "x' \not\in fvs(v)"; we also need "x' \not\in fvs(e)", lest a free variable in "e" be captured.
+
+DISAGREE!
+
+So make that "x' \not\in fvs(v, e)". But now the form "fvs(e_1, e_2)" needs to be defined (it is also used in the rule NORM-DEFR at line 598). So if you provide a complete formal definition of "fvs", add to that definition "fvs(e_1, e_2) = fvs(e_1) \cup fvs(e_2)".
+
+NOT SURE: I don't think we need make a meal of this.
 
 While we are add it: I suggest that alpha-conversion be added explicitly as a rewrite rule. After all, beta-conversion is not taken for granted (Figure 3 has APP-BETA), so why take alpha-conversion for granted when it is so easy to define?
 
@@ -397,12 +456,15 @@ ALPHA-EXISTS   \exists x.e   -->   \exists x'.e[x'/x]   if x' \not\in fvs(e)
 
 and add to the text "We use the notation "e[x'/x]" to represent the expression obtained by performing standard capture-free substitution of x' for x within e."
 
+NOT DONE: we don't want our rules to be gratuitously non-terminating.
 
 line 487: Rule APP-TUP0 should be mentioned in the text.
 
+DONE
 
 line 499: I see " -- " being used where "---" should be used in the LaTeX source. However, even better would be to repunctuate as "any other value, including itself (see Section 4.2)."
 
+DONE
 
 lines 511–512: "a \emph{scalar value}; that is, a variable or integer literal" Make that semicolon a comma, and add "or operator" after "integer literal".
 
@@ -428,12 +490,14 @@ In this paper, I find that not only are the terms "equality" and "equation" used
 
 I recommend that the term "unification" be reserved to refer to the actual process, or an instance of the process, of unifying two terms. This is an process or action that may be spurred by the processing of an equation. I recommend that the syntax form "x = e" always be referred to as an "equation", not an "equality" or "unification".
 
+CHECK.  I agree!  I have tried to use "equation" consistently.
 
 line 569: "upward and to the left" With respect to what? I think these words may apply to the conceptual expression _tree_, but not to the syntactic forms generated by the BNF, which are linear. Possibly adding with words "within the expression tree" would help the reader. But given that ";" is right-associative, "upward within the expression tree" may be sufficient.
 
+REWORDED
 
 line 570: Confusing terminology: from the example, it appears that the term "heap equality" refers to equations of the form "x = h" but "heap bindings" refers to equations of the more general form "h = v". Indeed, it appears that the contained word "heap" has two very different intended meanings: a "heap equality" appears to be an equation whose RHS is a "heap value" (see lines 105 and 140), that is, a value (lambda or tuple) that is typically allocated within "heap storage" that may be managed by a garbage collector or other storage management algorithm; whereas a "heap binding" appears to be an equation that appears within a set of equations that is regarded as a (possibly partial or local) "heap", and this sense of "heap" is actually not defined until line 576. 
-
+MOOT
 
 line 576: "judgement" This word is used only here and in line 578. This is not a big deal, but this spelling struck me as (please pardon my use of the term) "Brit", so I looked it up. Apparently, nowadays "judgment" is strongly preferred in the US; in the UK/Canada/Australia/New Zealand/South Africa, "judgement" is preferred in non-legal contexts but "judgment" is mandatory in legal contexts. I saw one claim that the Times, The Guardian, and The Telegraph have recently moved to using "judgment" in all contexts (this claim by a copyeditor who has worked for all three).  See https://www.theguardian.com/guardian-observer-style-guide-j and https://www.telegraph.co.uk/style-book/j/ (the style guide for the Times is behind a paywall).
 
@@ -441,6 +505,7 @@ On line 630 we have "normalization" and on line 632 we have "normalisation".
 
 This is always a hazard when authors have different backgrounds. I suggest that you all make a global decision as to whether you collectively intend to follow UK spelling or USA spelling for all Verse-connected publications. Then make a little "house style" guide for yourselves, starting with these two words.
 
+NOT DONE YET: but I agree we should be consistent
 
 line 577: "the expression wrapped in that heap" What do you mean by "_the_ expression"? Two points:
 
@@ -448,59 +513,78 @@ line 577: "the expression wrapped in that heap" What do you mean by "_the_ expre
 
 (b) The operation of the rules in Figure 5 may implicitly require alpha-conversion.
 
+MOOT
 
 line 589: As I read this figure, I wondered whether a rewrite rule "exists x. exists x. e --> exists x. e" is needed, but later I realized that this is a special case of the garbage collection rule ELIM-DEF.
 
+OK
 
 line 592: I note that the parentheses on the LHS of the rewrite rule NORM-SEQ-ASSOC are required, but the parentheses on the RHS are redundant and therefore optional. I suppose those redundant parentheses are there to satisfy a likely reader expectation about how rewriting rules for associativity typically look. But this alerted me to the issue, and as I read and reread the paper, I could not divine any other specific principle that governs when you choose to insert such optional parentheses and when you choose to omit them. In NORM-SEQ-DEFL, the parentheses on the LHS are redundant.
 
+UNSURE: I have not done anything about this yes.
 
 line 598: In the restriction at the right of rule NORM-DEFR, "fvs(v, e_2)" is not defined because the two-argument form of "fvs" has not yet been defined or discussed, only the one-argument form.
 
+UNSURE: I think it's unambigjous
 
 line 506: In the restriction at the right of rule ELIM-DEF, I regarde "\bar{x} \not\in fvs(e_2)" as an abuse of notation; let me recommend "{ \bar{x} } \cap fvs(e_2) = \emptyset".
 
+UNSURE: I don't think we are using this form any more.
 
 line 618: In rule WF-EQ, in the premise "v \neq x" and also the premise to it right, the "v" should be a pointy-bottomed "v".
 
+MOOT
 
 line 619: In rule WF-EQ, the fifth premise mentions an otherwise unmentioned variable "h"; surely this is a typo.
 
+MOOT
 
 line 641: "with be" => "will be"
 
 Also I think this note is not quite correct: I think the general result of a non-stuck reduction may involve choices, and therefore will be one of (a) fail; (b) a "final expression" e (c) a sequence of choices e_1 | e_2 | ... | e_n, n >= 2, where each e_k is a "final expression"; where a "final expression" is one that the squiggly arrow takes to a value with a set of equations for heap values.
 
+MOOT
+
 
 line 648: "to ensure that each arm of the choice consists of a value wrapped in a heap" This is true only for the "all" construct. For the "one" construct, the rules ensure that the _first_ arm of the choice consists of a value wrapped in a heap.
 
+MOOT
 
 line 655: "(syntax in Fig. 1)" The syntax is actually in Fig. 3.
 
+DONE
 
 line 670: In the code, I think a set of parentheses is missing: it should be "((x = 1; 77) | (x = 1; 99))".
 
+DONE
 
 line 674: "the branches might contain choices" Then it would be more effective just to begin with an example for which that is true. So, back on line 662, begin with the expression "exists x. (if (x > 0) then (55 | 66) else 44); x = 1; (77 | 99)" (that is, simply replace "55" with "(55 | 66)").
 
+DONE
 
 line 675: "innermost enclosing scope construct" The paper has not defined the term "scope construct".
 
+REWORDED
 
 line 681: "rules ASSOC-CHOICE, FAIL-L, and FAIL-R" But Fig. 3 actually uses different names for these rules.
 
+MOOT
 
 line 684: Footnote 7 promises to "return" to a point in Section 3.3, but that section precedes Section 3.5, which contains the footnote.
 
+DONE
 
 lines 687, 690, 693: A better name for rule FAIL-L-NO-SX would be "CHOOSE-R-NO-SX".
 
+MOOT
 
 line 690: Add a little vertical space between line 690 and line 691, to separate the two reduction sequences.
 
+MOOT
 
 line 700 "Consider a function call f(e)." Make that "Consider a function call f(e), where f is a variable and e is an expression that is not a value."
 
+DONE.  'f' is always a variable (Fig 1), so I just said "where e is not a value".
 
 line 722: "when the RHS is a value" => "when the RHS of an equation is a value”
 
@@ -549,6 +633,7 @@ SECTION 5 COMMENTS
 
 line 921: "A key rewrite rule" What is the source of this rewrite rule?
 
+NOT SURE: it's in the papers we cite here: L-F et al 2007.  I suppose we could cite it again?
 
 SECTION 6 COMMENTS
 

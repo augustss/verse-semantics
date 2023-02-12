@@ -123,8 +123,8 @@
       \\[-3mm]
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
-            \text{``|choice|'', ``;'', and ``|=|'' are right-associative} \\
-            \text{``|=|'' binds more tightly than ``;''} \\
+            \text{``|choice|'' and ``;'' are right-associative} \\
+            \text{``|choice|'' and ``|=|'' bind more tightly than ``;''} \\
             \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
             \hspace{4mm} \text{{\eg}, |(lam y (def x (x=1; x+y)))| means |(lam y ((def x (((x=1); (x+y))))))|} \\
       \end{array} \\
@@ -137,7 +137,7 @@
       v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 dots x_n) e| & \text{means} & |def x_1 (def x_2 (dots ^ def x_n e))| & \\
-      |e_1 e_2| & \text{means} & |def (f x) (f == e_1 ; x == e_2; f x)|  & |f,x|\ \text{fresh} \\
+      |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
       |tup (e_1, dots, e_n)| & \text{means} &
           |def (x_1 ^^ x_2 dots x_n) (x_1=e_1; dots; x_n=e_n; tup (x_1,dots, x_n)| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
@@ -147,7 +147,7 @@
       & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
       |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |lamhdr (tup(x,y)) e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
+      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
     \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
@@ -165,7 +165,7 @@
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
 %       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
-      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,V, dots, v_n)|\\
+      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,v_im1, V, v_ip1, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
       
@@ -180,7 +180,7 @@
     \end{array}
      $$
     \caption{The syntax of contexts}
-      \label{fig:contexts}
+      \label{fig:contexts} \label{fig:choice-free-syntax}
 \end{figure}
 }
 
@@ -207,14 +207,14 @@
     \fi
 
 \rulegroupname{Application:~\rapp}
-\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
-              & \text{if $x \not\in \freevars{|v|}$} \\
-\rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
-\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
-         \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
-\rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
+\rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+              & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
+         \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
+\rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 
     \\[-2mm]
 
@@ -232,46 +232,44 @@
 
     \\[-2mm]
 
+\rulegroupname{Normalization:~\rcon}
+\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
+\rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
+% \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
+
+    \\[-2mm]
+
 \rulegroupname{Elimination:~\rgc}
-\rulename{exi-elim} & |def x e| & \movesto & |e|
+\rulename{elim-val} & |v ; e| & \movesto & |e| \\
+\rulename{elim-exi} & |def x e| & \movesto & |e|
   & \text{if $|x| \notin \freevars{|e|}$}\\
 % This uses \overline
 %\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
 %  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
 % without \overline
-\rulename{exi-eliml} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[x==v;e])| & \movesto & |def (y_1 tdots y_n) (X^[e])|
+\rulename{elim-exil} & \hspace{-3mm}|def (x^ y_1 dots y_n) (X^[x==v;e])| & \movesto & |def (y_1 dots y_n) (X^[e])|
   & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
 \text{\lennart{Plan D:}}\\
-\rulename{exi-elimv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
+\rulename{elim-exiv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
     & \text{if $|z| \notin |{x,y_1 tdots y_n}|, |x| \notin |{y_1 tdots y_n}|$} \\
-
-    \\[-2mm]
-
-\rulegroupname{Normalization:~\rcon}
-\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
-\rulename{norm-val} & |v ; e| & \movesto & |e| \\
-\rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
-\rulename{norm-seqr} & |v == (eu ; e)| & \movesto & |eu ; v == e| \\
-% \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
+\rulename{elim-fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
     \\[-2mm]
 
 \rulegroupname{Speculation:~\rspc}
-\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
-\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one v| & \movesto & |v| \\
+\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{all-choice} & |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
 \rulename{choose-r} & |fail choice e| & \movesto & |e| \\
 \rulename{choose-l} & |e choice fail| & \movesto & |e| \\
-\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
-\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
-\rulename{one-value}  & |one v| & \movesto & |v| \\
-\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (v_1 choice dots choice v_n)| & \movesto & |tup (v_1, dots, v_n)| \\
-\rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
 
-    \\[-2mm]
 
-\rulegroupname{Fail propagation:~\rfail}
-\rulename{fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$}
 \end{array}
 \end{array}$
 \iffullverse
@@ -305,10 +303,8 @@ $$\begin{array}{l}
      $$
     \caption{The Verse calculus: Structural Rules}
       \label{fig:rules-structural}  \label{fig:structural}
-  \end{figure}
-
+   \end{figure}
 }
-
 
 \newcommand{\figureRewriteRulesPLDI}{
 \begin{figure}

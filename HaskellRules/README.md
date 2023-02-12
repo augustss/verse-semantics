@@ -117,12 +117,3 @@ To get a summary for all the rules
 ```
 cabal run -- tester -r PLDIT --summary versetests/tricky.versetest
 ```
-
-
-(x = y; x); (y = x); STUFF
-
-(x = y; y); (y = y); STUFF
-
-    --> (x = y; y); (y = x); STUFF
-
-    --> (x = x; x); (y = x); STUFF
