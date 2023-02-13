@@ -5,8 +5,6 @@
 module Epic.SIntMap (SIntMap, empty, lookup, member, insert, (!), lookupMax, delete
                     , toList, fromList, map, restrictKeys, keys, elems, null, findMax) where
 import Prelude hiding (lookup, map, null)
-import qualified Prelude
-import Control.Arrow (first)
 import Data.Coerce
 import Data.Data(Data)
 import qualified Data.IntMap as M
@@ -15,10 +13,13 @@ import Epic.SIntSet (SIntSet, toIntSet)
 import GHC.Stack (HasCallStack)
 
 newtype SIntMap k v = SIntMap (M.IntMap v)
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Data)
+
+instance forall k v. (Show k, Show v, Coercible k Int) => Show (SIntMap k v) where
+  showsPrec p m = showParen (p > 0) $ showString "fromList " . showsPrec 0 (toList m)
 
 instance forall k v. (Pretty k, Pretty v, Coercible k Int) => Pretty (SIntMap k v) where
-  pPrintPrec l p (SIntMap m) = pPrintPrec l p $ Prelude.map (first (coerce :: Int -> k)) $ M.toList m
+  pPrintPrec l p m = pPrintPrec l p $ toList m
 
 empty :: forall k v. (Coercible k Int) => SIntMap k v
 empty = coerce (M.empty :: M.IntMap v)
