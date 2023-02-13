@@ -6,6 +6,7 @@
 
 \newcommand{\rdis}{\ensuremath{\rcon \cup \rgc}}
 \newcommand{\norecursion}{no recursion\xspace}
+\newcommand{\sz}[1]{\ensuremath{\sharp{#1}}}
 \section{Confluence of \calcname} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
@@ -251,17 +252,17 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
  		Let $u' \equiv \subst{u}{x}{v}$, split cases on \rulename{swap} RHS.
 		\begin{description}
 		\item[Case same variable]: $\rdx{2} \equiv |u == x|$ where $u$ is HNF or variable.
-% https://q.uiver.app/?q=WzAsNixbMCwwLCJYJ1tcXGxkb3RzIHUgPSB4IFxcbGRvdHNdW3ggPSB2XSJdLFsyLDAsIlgnXFx7di94XFx9W1xcbGRvdHMgdScgPSB2IFxcbGRvdHNdW3ggPSB2XSJdLFswLDIsIlgnW1xcbGRvdHMgeCA9IHUgXFxsZG90c11beCA9IHZdIl0sWzIsMiwiWCdcXHt2L3hcXH1bXFxsZG90cyB2ID0gdScgXFxsZG90c11beD12XSJdLFszLDEsIlxcYnVsbGV0Il0sWzEsMV0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDQsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw0LCJcXGNyZWZ7bGVtOmVxLWpvaW4tZmxpcH0iLDEseyJsYWJlbF9wb3NpdGlvbiI6NzAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+		% https://q.uiver.app/?q=WzAsNixbMCwwLCJYJ1tcXGxkb3RzIHUgPSB4IFxcbGRvdHNdW3ggPSB2XSJdLFsyLDAsIlgnXFx7di94XFx9W1xcbGRvdHMgdScgPSB2IFxcbGRvdHNdW3ggPSB2XSJdLFswLDIsIlgnW1xcbGRvdHMgeCA9IHUgXFxsZG90c11beCA9IHZdIl0sWzIsMiwiWCdcXHt2L3hcXH1bXFxsZG90cyB2ID0gdScgXFxsZG90c11beD12XSJdLFsxLDFdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDUsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXGNyZWZ7bGVtOmVxLWpvaW4tZmxpcH0iLDEseyJsYWJlbF9wb3NpdGlvbiI6NzAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X'[\ldots u = x \ldots][x = v]} && {X'\{v/x\}[\ldots u' = v \ldots][x = v]} \\
-	& {} && \bullet \\
+	& {} & \bullet \\
 	{X'[\ldots x = u \ldots][x = v]} && {X'\{v/x\}[\ldots v = u' \ldots][x=v]}
 	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
-	\arrow["{\rulename{swap}}"', from=1-1, to=3-1]
+	\arrow["{\rulename{*-swap}}"', from=1-1, to=3-1]
 	\arrow["{\rulename{subst}}"', dotted, from=3-1, to=3-3]
-	\arrow[dotted, two heads, from=3-3, to=2-4]
-	\arrow[dotted, two heads, from=1-3, to=2-4]
-	\arrow["{\cref{lem:eq-join-flip}}"{description, pos=0.7}, draw=none, from=2-2, to=2-4]
+	\arrow[dotted, two heads, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=3-3, to=2-3]
+	\arrow["{\cref{lem:eq-join-flip}}"{description, pos=0.7}, draw=none, from=2-2, to=2-3]
 \end{tikzcd}\]
 		\item[Case different variable]: $\rdx{2} \equiv |u == y|$ where $u$ is HNF or variable.
 		\end{description}
@@ -383,8 +384,75 @@ then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:notes}
+% As $eu_1$ is \emph{not under} $eu_2$ and $eu_2$ is under $eu_1$,
+Here, we have $e \equiv X_1[ ... X_2[x_2 = v_2] ... ][x_1 = v_1]$
+where the substitution with $|x_2=v_2|$ does not affect $X_1, x_1, v_1$.
+%
+Split cases on whether $x_1 \equiv x_2$.
+
+\begin{description}
+\item[Case $x_1 \equiv x_2 \equiv x$]: By \norecursion we have $x \not \in \freevars{v_1}, x \not \in \freevars{v_2}$.
+Hence, we can join $e_1$ and $e_2$ using \cref{lem:eq-join} on the sub-terms
+$\subst{X_2}{x}{v_1}[v_1=v_2]$ and $\subst{X_2}{x}{v_2}[v_1=v_2]$.
+%
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJYXzFbXFxsZG90cyBYXzJbeCA9IHZfMl0gXFxsZG90c11beCA9IHZfMV0iXSxbMCwxLCJYXzFcXHt2XzEveFxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XFx9W3ZfMSA9IHZfMl0gXFxsZG90c11beCA9IHZfMV0iXSxbMiwwLCJYXzFbXFxsZG90cyBYXzJcXHt2XzIveFxcfVt4ID0gdl8yXSBcXGxkb3RzXVt4ID0gdl8xXSJdLFsyLDEsIlhfMVxce3ZfMS94XFx9W1xcbGRvdHMgWF8yXFx7dl8yL3hcXH1bdl8xID0gdl8yXSBcXGxkb3RzXVt4ID0gdl8xXSJdLFsxLDBdLFsxLDEsIlxcYnVsbGV0Il0sWzAsMSwiZXVfMSIsMl0sWzAsMiwiZXVfMiJdLFsyLDMsImV1XzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDUsIlxcY3JlZntsZW06ZXEtam9pbn0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_1[\ldots X_2[x = v_2] \ldots][x = v_1]} & {} & {X_1[\ldots X_2\{v_2/x\}[x = v_2] \ldots][x = v_1]} \\
+	{X_1\{v_1/x\}[\ldots X_2\{v_1/x\}[v_1 = v_2] \ldots][x = v_1]} & \bullet & {X_1\{v_1/x\}[\ldots X_2\{v_2/x\}[v_1 = v_2] \ldots][x = v_1]}
+	\arrow["{eu_1}"', from=1-1, to=2-1]
+	\arrow["{eu_2}", from=1-1, to=1-3]
+	\arrow["{eu_1}", dotted, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=2-1, to=2-2]
+	\arrow[dotted, two heads, from=2-3, to=2-2]
+	\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=2-2]
+\end{tikzcd}\]
+
+\item[Case $x_1 \not \equiv x_2$]:
+Let
+	$|v_1'| \equiv \subst{v_1}{x_2}{v_2}$ and
+	$|v_2'| \equiv \subst{v_2}{x_1}{v_1}$.
+Split cases on whether $x_i \in \freevars{v_{3-i}}$.
+\begin{description}
+	\item[Case $x_2 \not \in \freevars{v_1}$]
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XFx9W3hfMiA9IHZfMiddIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMSwxLCJYXzFcXHt2XzEveFxcfVtcXGxkb3RzIFhfMlxce3ZfMicveF8yLCB2XzEveF8xXFx9W3hfMiA9IHZfMiddIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMSwwLCJYXzFbXFxsZG90cyBYXzJcXHt2XzIveF8yXFx9W3hfMiA9IHZfMl0gXFxsZG90c11beF8xID0gdl8xXSJdLFswLDEsImV1XzEiLDJdLFsxLDIsImV1XzIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMCwzLCJldV8yIl0sWzMsMiwiZXVfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
+	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x\}[x_2 = v_2'] \ldots][x_1 = v_1]} & {X_1\{v_1/x\}[\ldots X_2\{v_2'/x_2, v_1/x_1\}[x_2 = v_2'] \ldots][x_1 = v_1]}
+	\arrow["{eu_1}"', from=1-1, to=2-1]
+	\arrow["{eu_2}"', dotted, from=2-1, to=2-2]
+	\arrow["{eu_2}", from=1-1, to=1-2]
+	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
+\end{tikzcd}\]
+
+	\item[Case $x_2 \in \freevars{v_1}, x_1 \not \in \freevars{v_2}$]
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XzFcXH1beF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzEsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XzEsIHZfMi94XzJcXH1beF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzEsMCwiWF8xW1xcbGRvdHMgWF8yXFx7dl8yL3hfMlxcfVt4XzIgPSB2XzJdIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMSwyLCJYXzFcXHt2XzEveF8xXFx9W1xcbGRvdHMgWF8yXFx7dl8xJy94XzEsIHZfMi94XzJcXH1beF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiZXVfMSIsMl0sWzAsMywiZXVfMiJdLFszLDIsImV1XzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSw0LCJldV8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiZXVfMiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
+	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1\}[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1, v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
+	& {X_1\{v_1/x_1\}[\ldots X_2\{v_1'/x_1, v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]}
+	\arrow["{eu_1}"', from=1-1, to=2-1]
+	\arrow["{eu_2}", from=1-1, to=1-2]
+	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
+	\arrow["{eu_2}"', dotted, from=2-1, to=3-2]
+	\arrow["{eu_2}", dotted, from=2-2, to=3-2]
+\end{tikzcd}\]
+	\item[Case $x_2 \in \freevars{v_1}, x_1 \in \freevars{v_2}$] In this case, we get the below diagram
+	where, since $x_2 \in \freevars{v_2'}$, the term $x_2 = v_2'$ either steps to |fail| (and so we can
+	join at |fail|) or the term violates the \norecursion assumption.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XzFcXH1beF8yID0gdl8yJ10gXFxsZG90c11beF8xID0gdl8xXSJdLFsxLDEsIlhfMVxce3ZfMS94XzFcXH1bXFxsZG90cyBYXzJcXHt2XzEveF8xLCB2XzInL3hfMlxcfVt4XzIgPSB2XzInXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzEsMCwiWF8xW1xcbGRvdHMgWF8yXFx7dl8yL3hfMlxcfVt4XzIgPSB2XzJdIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMCwxLCJldV8xIiwyXSxbMCwzLCJldV8yIl0sWzMsMiwiZXVfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
+	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1\}[x_2 = v_2'] \ldots][x_1 = v_1]} & {X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1, v_2'/x_2\}[x_2 = v_2'] \ldots][x_1 = v_1]}
+	\arrow["{eu_1}"', from=1-1, to=2-1]
+	\arrow["{eu_2}", from=1-1, to=1-2]
+	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
+\end{tikzcd}\]
+\end{description}
+\end{description}
 \end{proof}
+
+\mypara{Unification Lemmas} The next two \emph{unification} lemmas state
+that our rewrite rules encode classical unification algorithms.
 
 \begin{lemma}[Unify] \label{lem:eq-join}
 If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$ then
@@ -392,7 +460,79 @@ $\join{\runi}{ \subst{X}{\overline{z}}{\overline{u}}[\overline{u = v}]}{ \subst{
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:notes}
+Let $X_{\overline{u}} \equiv \subst{X}{\overline{z}}{\overline{u}}$
+and $X_{\overline{v}} \equiv \subst{X}{\overline{z}}{\overline{v}}$.
+%
+The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}}, \sz{n})$ where
+\begin{align*}
+	\sz{\text{free}} & \doteq\ \sz{\freevars{\overline{u}}} + \sz{\freevars{\overline{v}}} \\
+	\sz{\text{size}} & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
+	\sz{n}   	     & \doteq\ \mbox{the cardinality of}\ \overline{u}, \overline{v} \\
+\end{align*}
+
+Split cases on the \emph{first} equation $u_1 = v_1$.
+\begin{description}
+\item[Case $\hnf_1 = \hnf_2$] with \emph{incompatible} values:
+	join at |fail| via \rulename{u-fail} and \rulename{elim-fail}.
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVtcXG1hdGhpdHtobmZ9XzEgPSBcXG1hdGhpdHtobmZ9XzI7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDAsIlhfe1xcb3ZlcmxpbmV7dX19W1xcbWF0aHR0e2ZhaWx9XSJdLFswLDIsIlhfe1xcb3ZlcmxpbmV7dn19W1xcbWF0aGl0e2huZn1fMSA9IFxcbWF0aGl0e2huZn1fMjsgXFxvdmVybGluZXt1Jz12J31dIl0sWzIsMiwiWF97XFxvdmVybGluZXt2fX1bXFxtYXRodHR7ZmFpbH1dIl0sWzIsMSwiXFxtYXRodHR7ZmFpbH0iXSxbMCwxLCJcXHJ1bGVuYW1le3UtZmFpbH0iXSxbMiwzLCJcXHJ1bGVuYW1le3UtZmFpbH0iLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_{\overline{u}}[\mathit{hnf}_1 = \mathit{hnf}_2; \overline{u'=v'}]} && {X_{\overline{u}}[\mathtt{fail}]} \\
+	&& {\mathtt{fail}} \\
+	{X_{\overline{v}}[\mathit{hnf}_1 = \mathit{hnf}_2; \overline{u'=v'}]} && {X_{\overline{v}}[\mathtt{fail}]}
+	\arrow["{\rulename{u-fail}}", from=1-1, to=1-3]
+	\arrow["{\rulename{u-fail}}"', dotted, from=3-1, to=3-3]
+	\arrow[dotted, two heads, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=3-3, to=2-3]
+\end{tikzcd}\]
+\item[Case $|tup (u_1,dots,u_k) == tup(v_1,dots,v_k)|$] with tuples of the same arity $k$:
+	use \rulename{u-tup} to get equations per component and join using the induction hypothesis,
+	which is well-founded as the $\sz{\text{size}}$ is strictly smaller:
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVtcXGxhbmdsZSB1XzEsLi4uLHVfa1xccmFuZ2xlID0gXFxsYW5nbGUgdl8xLC4uLix2X2tcXHJhbmdsZTsgXFxvdmVybGluZXt1Jz12J31dIl0sWzIsMCwiWF97XFxvdmVybGluZXt1fX1bdV8xPXZfMSwuLi4sdV9rPXZfazsgXFxvdmVybGluZXt1Jz12J31dIl0sWzAsMiwiWF97XFxvdmVybGluZXt2fX1bXFxsYW5nbGUgdV8xLC4uLix1X2tcXHJhbmdsZSA9IFxcbGFuZ2xlIHZfMSwuLi4sdl9rXFxyYW5nbGU7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDIsIlhfe1xcb3ZlcmxpbmV7dn19W3VfMT12XzEsLi4uLHVfaz12X2s7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsxLDFdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiXFxydWxlbmFtZXt1LXR1cH0iXSxbMiwzLCJcXHJ1bGVuYW1le3UtdHVwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiSUgiLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_{\overline{u}}[\langle u_1,...,u_k\rangle = \langle v_1,...,v_k\rangle; \overline{u'=v'}]} && {X_{\overline{u}}[u_1=v_1,...,u_k=v_k; \overline{u'=v'}]} \\
+	& {} & \bullet \\
+	{X_{\overline{v}}[\langle u_1,...,u_k\rangle = \langle v_1,...,v_k\rangle; \overline{u'=v'}]} && {X_{\overline{v}}[u_1=v_1,...,u_k=v_k; \overline{u'=v'}]}
+	\arrow["{\rulename{u-tup}}", from=1-1, to=1-3]
+	\arrow["{\rulename{u-tup}}"', dotted, from=3-1, to=3-3]
+	\arrow[dotted, two heads, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=3-3, to=2-3]
+	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
+\end{tikzcd}\]
+\item[Case $|x = y|$] use \rulename{subst} to replace all occurrences of $x$ with $y$, and then apply the
+IH on the \emph{remaining} $n-1$ equations $\overline{u' = v'}$. Note that the induction is well-founded as
+in this case $\sz{\text{free}}$ and $\sz{\text{size}}$ are unchanged but the number of equations decreases
+by one.
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVt4PXk7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDAsIlhfe1xcb3ZlcmxpbmV7dX19XFx7eS94XFx9W3g9eTsgXFxvdmVybGluZXt1J1xce3kveFxcfT12J1xce3kveFxcfX1dIl0sWzAsMiwiWF97XFxvdmVybGluZXt2fX1beD15OyBcXG92ZXJsaW5le3UnPXYnfV0iXSxbMiwyLCJYX3tcXG92ZXJsaW5le3Z9fVxce3kveFxcfVt4PXk7IFxcb3ZlcmxpbmV7dSdcXHt5L3hcXH09didcXHt5L3hcXH19XSJdLFsxLDFdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMiwzLCJcXHJ1bGVuYW1le3N1YnN0fSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiSUgiLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_{\overline{u}}[x=y; \overline{u'=v'}]} && {X_{\overline{u}}\{y/x\}[x=y; \overline{u'\{y/x\}=v'\{y/x\}}]} \\
+	& {} & \bullet \\
+	{X_{\overline{v}}[x=y; \overline{u'=v'}]} && {X_{\overline{v}}\{y/x\}[x=y; \overline{u'\{y/x\}=v'\{y/x\}}]}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{subst}}"', dotted, from=3-1, to=3-3]
+	\arrow[dotted, two heads, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=3-3, to=2-3]
+	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
+\end{tikzcd}\]
+\item[Case $|x = h|$] where $h$ is an HNF value and $x \not \in \freevars{h}$:
+use \rulename{subst} to replace all occurrences of $x$ with $h$, and then apply the
+IH on the remaining $n-1$ equations $\overline{u' = v'}$. Note that the induction is
+well-founded in this case as $\sz{\text{free}}$ decreases since $x$ is removed from
+the free variables of $\overline{u'}$ and $\overline{v'}$ and $X_{\overline{u}}$ and
+$X_{\overline{v}}$ even though the $\sz{\text{size}}$ may increase due to the substitution.
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVt4PWg7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDAsIlhfe1xcb3ZlcmxpbmV7dX19XFx7aC94XFx9W3g9aDsgXFxvdmVybGluZXt1J1xce2gveFxcfT12J1xce2gveFxcfX1dIl0sWzAsMiwiWF97XFxvdmVybGluZXt2fX1beD1oOyBcXG92ZXJsaW5le3UnPXYnfV0iXSxbMiwyLCJYX3tcXG92ZXJsaW5le3Z9fVxce2gveFxcfVt4PWg7IFxcb3ZlcmxpbmV7dSdcXHtoL3hcXH09didcXHtoL3hcXH19XSJdLFsxLDFdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMiwzLCJcXHJ1bGVuYW1le3N1YnN0fSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiSUgiLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_{\overline{u}}[x=h; \overline{u'=v'}]} && {X_{\overline{u}}\{h/x\}[x=h; \overline{u'\{h/x\}=v'\{h/x\}}]} \\
+	& {} & \bullet \\
+	{X_{\overline{v}}[x=h; \overline{u'=v'}]} && {X_{\overline{v}}\{h/x\}[x=h; \overline{u'\{h/x\}=v'\{h/x\}}]}
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["{\rulename{subst}}"', dotted, from=3-1, to=3-3]
+	\arrow[dotted, two heads, from=1-3, to=2-3]
+	\arrow[dotted, two heads, from=3-3, to=2-3]
+	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
+\end{tikzcd}\]
+\item[Case $|x = v|$] where $x \in \freevars{v}$: either join at |fail|
+via \rulename{u-occurs} or violates the \norecursion assumption.
+\end{description}
 \end{proof}
 
 \begin{lemma}[Unify-Flip] \label{lem:eq-join-flip}
@@ -401,7 +541,8 @@ $\join{\runi}{ \subst{X}{\overline{z}}{\overline{u}}[\overline{u = v}]}{ \subst{
 \end{lemma}
 
 \begin{proof}
-\ranjit{TODO:notes}
+Same as \cref{lem:eq-join} except using \rulename{hnf-swap} and \rulename{var-swap}
+to make the equations the same on both sides.
 \end{proof}
 
 \ranjit{CURSOR:HEREHEREHEREHEREHERE}

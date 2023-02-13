@@ -6,6 +6,7 @@ module Rules.Block(allSystemsBlock, anf, valid) where
 import Control.Monad.State.Strict
 import Data.List(delete)
 import Epic.List(pick, pickLR)
+import Epic.Print(prettyShow)
 import TRS.Bind
 import TRS.System
 import TRS.TRS
@@ -110,7 +111,7 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
     expr e@Fail = pure e
     expr e@Wrong = pure e
     expr (Split e e1 e2) = Split <$> expr e <*> value e1 <*> value e2
-    expr e = error $ "anf: impossible: " ++ show e
+    expr e = error $ "anf: impossible: " ++ prettyShow e
 
     value :: Expr -> A Value
     value e@Var{} = pure e
@@ -609,7 +610,7 @@ addFailV x (Arr vs) | any (== Fail) vs' = Fail
                     where vs' = map (addFailV x) vs
 addFailV _ e@(Int _) = e
 addFailV _ e@(Op _) = e
-addFailV _ e = error $ "impossible: " ++ show e
+addFailV _ e = error $ "impossible: " ++ prettyShow e
 
 addFailE :: Ident -> Expr -> Expr
 addFailE x (Val v) = addFailV x v
@@ -627,7 +628,7 @@ addFailE x (EXI y e) | x == y = EXI y e
                      | otherwise = EXI x (addFailE x e)
 addFailE x (One e) = One (addFailE x e)
 addFailE x (All e) = All (addFailE x e)
-addFailE _ e = error $ "impossible: " ++ show e
+addFailE _ e = error $ "impossible: " ++ prettyShow e
 
 --------------------------------------------------------------------------------
 

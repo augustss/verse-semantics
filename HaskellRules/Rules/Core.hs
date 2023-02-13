@@ -19,6 +19,7 @@ module Rules.Core(
   pattern EXI,
   pattern LAM,
   pattern Block, Eqn,
+  comp,
   subst,
   alphaRename,
   invariant,
@@ -30,8 +31,9 @@ module Rules.Core(
   boundVars, flexVars, rigidVars,
   ) where
 import qualified Epic.SIntMap as IM
+import Data.Char
 import Data.Data(Data)
-import Data.List( intercalate, union, elemIndex )
+import Data.List( union, elemIndex )
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 
@@ -39,6 +41,8 @@ import TRS.Bind
 import TRS.TRS
 import Test.QuickCheck hiding ( collect )
 import Epic.List(nub)
+import Epic.Print hiding ((<>))
+import qualified Epic.Print as P
 
 type ERule = Rule Expr
 type EContext = Expr -> Expr
@@ -69,13 +73,14 @@ data Expr
   -- only used for updatable references
   | Store Heap Expr
   | Ref Ptr
-  deriving (Data)
+  deriving (Show, Data)
 
 type Value = Expr
 
 type Heap = IM.SIntMap Ptr Value
-newtype Ptr = Ptr Int deriving (Eq, Ord, Data)
-instance Show Ptr where show (Ptr i) = "r" ++ show i
+newtype Ptr = Ptr Int deriving (Show, Eq, Ord, Data)
+
+instance Pretty Ptr where pPrintPrec _ _ (Ptr i) = text ("r" ++ show i)
 
 infixr 1 :>:
 infixr 3 :|:
@@ -83,124 +88,125 @@ infixr 2 :=:
 infixl 4 :@:
 infix  5 :~:
 
-instance Show Expr where
-  showsPrec p (Var v)          = showsPrec p v
-  showsPrec p (Int k)          = showsPrec p k
-  showsPrec p (Op o)           = showsPrec p o
-  showsPrec _ (Arr es)         = showString $ "<" ++ intercalate ", " (map show es) ++ ">"
-  showsPrec p (Lam (Bind x e)) = showParen (p > 0) $ showString "\\" . showsPrec 0 x . showString "." . showsPrec 0 e
-  showsPrec p (a :|: b)        = showParen (extraParens || p > 3) $ showsPrec 4 a . showString " | " . showsPrec 4 b
-  showsPrec p (a :>: b)        = showParen (p > 1) $ showsPrec 2 a . showString "; "  . showsPrec 1 b
-  showsPrec p (a :=: b)        = showParen (extraParens || p > 2) $ showsPrec 3 a . showString " = " . showsPrec 3 b
-  showsPrec p (a :~: b)        = showParen (p > 5) $ showsPrec 6 a . showString " ~ " . showsPrec 6 b
-  showsPrec p (a :@: b)        = showParen (p > 4) $ showsPrec 4 a . showString "(" . showsPrec 0 b . showString ")"
-  showsPrec _ Fail             = showString "fail"
-  showsPrec p (Exi (Bind x a)) = showParen (p > 0) $ showString "ex " . showsPrec 0 x . showString ". " . showsPrec 0 a
-  showsPrec _ (One a)          = showString "one {" . showsPrec 0 a . showString "}"
-  showsPrec _ (All a)          = showString "all {" . showsPrec 0 a . showString "}"
-  showsPrec _ Wrong            = showString "wrong"
-  showsPrec _ (Split e v1 v2)  = showString "split{" . showsPrec 0 e . showString ", " .
-                                 showsPrec 0 v1 . showString ", " . showsPrec 0 v2 . showString "}"
-  showsPrec _ (BlockC e)       = showString "block {" . showsPrec 0 e . showString "}"
-  showsPrec _ (Store h e)      = showString "store{" . showsPrec 0 (IM.toList h) . showString ", " .
-                                 showsPrec 0 e . showString "}"
-  showsPrec p (Ref r)          = showsPrec p r
-
--- Be extra clear about binding.
-extraParens :: Bool
-extraParens = True
+instance Pretty Expr where
+  pPrintPrec l p (Var v)          = pPrintPrec l p v
+  pPrintPrec l p (Int k)          = pPrintPrec l p k
+  pPrintPrec l p (Op o)           = pPrintPrec l p o
+  pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+  pPrintPrec l p (Lam (Bind x e)) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <> pPrintPrec l 0 e
+  pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ pPrintPrec l 4 a <+> text "|" <+> pPrintPrec l 4 b
+  pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
+                                    where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
+  pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
+  pPrintPrec l p (a :~: b)        = maybeParens (p > 5) $ pPrintPrec l 6 a <+> text "~" <+> pPrintPrec l 6 b
+  pPrintPrec l p (a :@: b)        = maybeParens (p > 4) $ pPrintPrec l 4 a <> text "(" <> pPrintPrec l 0 b <> text ")"
+  pPrintPrec _ _ Fail             = text "fail"
+  pPrintPrec l p (Exi (Bind x a)) = maybeParens (p > 0) $ text "ex" <+> pPrintPrec l 0 x P.<> text "." <+> pPrintPrec l 0 a
+  pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec _ _ Wrong            = text "wrong"
+  pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
+                                                             pPrintPrec l 0 v1 P.<> text ",",
+                                                             pPrintPrec l 0 v2] P.<> text "}"
+  pPrintPrec l _ (BlockC e)       = text "block {" <> pPrintPrec l 0 e <> text "}"
+  pPrintPrec l _ (Store h e)      = text "store {" P.<> sep [pPrintPrec l 0 (IM.toList h) P.<> text ",",
+                                                             pPrintPrec l 0 e] P.<> text "}"
+  pPrintPrec l p (Ref r)          = pPrintPrec l p r
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
 
 instance Ord Expr where
   compare = comp [] []
-   where
-    -- so much code... this can probably simplified a lot
-    comp  xs  ys (Var x) (Var y) =
-      case (elemIndex x xs, elemIndex y ys) of
-        (Just i, Just j)   -> i `compare` j
-        (Nothing, Nothing) -> x `compare` y
-        (Just _, Nothing)  -> LT
-        (Nothing, Just _)  -> GT
-    comp _xs _ys (Var _) _       = LT
-    comp _xs _ys _       (Var _) = GT
 
-    comp _xs _ys (Int a) (Int b) = compare a b
-    comp _xs _ys (Int _) _       = LT
-    comp _xs _ys _       (Int _) = GT
+-- so much code... this can probably simplified a lot
+comp :: [Ident] -> [Ident] -> Expr -> Expr -> Ordering
+comp  xs  ys (Var x) (Var y) =
+  case (elemIndex x xs, elemIndex y ys) of
+    (Just i, Just j)   -> i `compare` j
+    (Nothing, Nothing) -> x `compare` y
+    (Just _, Nothing)  -> LT
+    (Nothing, Just _)  -> GT
+comp _xs _ys (Var _) _       = LT
+comp _xs _ys _       (Var _) = GT
 
-    comp _xs _ys (Op a) (Op b) = compare a b
-    comp _xs _ys (Op _) _      = LT
-    comp _xs _ys _      (Op _) = GT
+comp _xs _ys (Int a) (Int b) = compare a b
+comp _xs _ys (Int _) _       = LT
+comp _xs _ys _       (Int _) = GT
 
-    comp  xs  ys (Arr vs) (Arr ws)
-      | n == m    = head (dropWhile (==EQ) (zipWith (comp xs ys) vs ws) ++ [EQ])
-      | otherwise = n `compare` m
-     where
-      n  = length vs
-      m  = length ws
-    comp _xs _ys (Arr _) _       = LT
-    comp _xs _ys _       (Arr _) = GT
+comp _xs _ys (Op a) (Op b) = compare a b
+comp _xs _ys (Op _) _      = LT
+comp _xs _ys _      (Op _) = GT
 
-    comp  xs  ys (Lam (Bind x a)) (Lam (Bind y b)) = comp (x:xs) (y:ys) a b
-    comp _xs _ys (Lam _) _       = LT
-    comp _xs _ys _       (Lam _) = GT
+comp  xs  ys (Arr vs) (Arr ws)
+  | n == m    = foldr (<>) EQ (zipWith (comp xs ys) vs ws)
+  | otherwise = n `compare` m
+ where
+  n  = length vs
+  m  = length ws
+comp _xs _ys (Arr _) _       = LT
+comp _xs _ys _       (Arr _) = GT
 
-    comp _xs _ys Wrong Wrong = EQ
-    comp _xs _ys Wrong _     = LT
-    comp _xs _ys _     Wrong = GT
+comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
+comp _xs _ys (Lam _) _       = LT
+comp _xs _ys _       (Lam _) = GT
 
-    comp _xs _ys Fail Fail = EQ
-    comp _xs _ys Fail _    = LT
-    comp _xs _ys _    Fail = GT
+comp _xs _ys Wrong Wrong = EQ
+comp _xs _ys Wrong _     = LT
+comp _xs _ys _     Wrong = GT
 
-    comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:=:_) _       = LT
-    comp _xs _ys _       (_:=:_) = GT
+comp _xs _ys Fail Fail = EQ
+comp _xs _ys Fail _    = LT
+comp _xs _ys _    Fail = GT
 
-    comp  xs  ys (a:~:b) (c:~:d) = comp xs ys (Var a) (Var c) <> comp xs ys (Var b) (Var d)
-    comp _xs _ys (_:~:_) _       = LT
-    comp _xs _ys _       (_:~:_) = GT
+comp  xs  ys (a:=:b) (c:=:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:=:_) _       = LT
+comp _xs _ys _       (_:=:_) = GT
 
-    comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:>:_) _       = LT
-    comp _xs _ys _       (_:>:_) = GT
+comp  xs  ys (a:~:b) (c:~:d) = comp xs ys (Var a) (Var c) <> comp xs ys (Var b) (Var d)
+comp _xs _ys (_:~:_) _       = LT
+comp _xs _ys _       (_:~:_) = GT
 
-    comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:|:_) _       = LT
-    comp _xs _ys _       (_:|:_) = GT
+comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:>:_) _       = LT
+comp _xs _ys _       (_:>:_) = GT
 
-    comp  xs  ys (a:@:b) (c:@:d) = comp xs ys a c <> comp xs ys b d
-    comp _xs _ys (_:@:_) _       = LT
-    comp _xs _ys _       (_:@:_) = GT
+comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:|:_) _       = LT
+comp _xs _ys _       (_:|:_) = GT
 
-    comp  xs  ys (One a) (One b) = comp xs ys a b
-    comp _xs _ys (One _) _       = LT
-    comp _xs _ys _       (One _) = GT
+comp  xs  ys (a:@:b) (c:@:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:@:_) _       = LT
+comp _xs _ys _       (_:@:_) = GT
 
-    comp  xs  ys (All a) (All b) = comp xs ys a b
-    comp _xs _ys (All _) _       = LT
-    comp _xs _ys _       (All _) = GT
+comp  xs  ys (One a) (One b) = comp xs ys a b
+comp _xs _ys (One _) _       = LT
+comp _xs _ys _       (One _) = GT
 
-    comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
-    comp _xs _ys Split {} _ = LT
-    comp _xs _ys _ Split {} = GT
+comp  xs  ys (All a) (All b) = comp xs ys a b
+comp _xs _ys (All _) _       = LT
+comp _xs _ys _       (All _) = GT
 
-    comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
-    comp _xs _ys BlockC{} _ = LT
-    comp _xs _ys _ BlockC{} = GT
+comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
+comp _xs _ys Split {} _ = LT
+comp _xs _ys _ Split {} = GT
 
-    comp  xs  ys (Store h e) (Store h' e') =
-      compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
-    comp _xs _ys Store {} _ = LT
-    comp _xs _ys _ Store {} = GT
+comp  xs  ys (BlockC a) (BlockC b) = comp xs ys a b
+comp _xs _ys BlockC{} _ = LT
+comp _xs _ys _ BlockC{} = GT
 
-    comp _xs _ys (Ref p) (Ref q) = compare p q
-    comp _xs _ys Ref {} _        = LT
-    comp _xs _ys _ Ref {}        = GT
+comp  xs  ys (Store h e) (Store h' e') =
+  compare (IM.keys h) (IM.keys h') <> comp xs ys (Arr (IM.elems h)) (Arr (IM.elems h')) <> comp xs ys e e'
+comp _xs _ys Store {} _ = LT
+comp _xs _ys _ Store {} = GT
 
-    comp  xs  ys (Exi (Bind x a)) (Exi (Bind y b)) = comp (x:xs) (y:ys) a b
+comp _xs _ys (Ref p) (Ref q) = compare p q
+comp _xs _ys Ref {} _        = LT
+comp _xs _ys _ Ref {}        = GT
+
+comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
+
+comp _ _ _ _ = undefined -- GHC bug
 
 --------------------------------------------------------------------------------
 
@@ -223,27 +229,10 @@ data Op
   | Read
   | Write
   | AddTo
- deriving ( Eq, Ord, Data )
+ deriving ( Show, Eq, Ord, Data )
 
-instance Show Op where
-  show Gt    = "gt"
-  show Ge    = "ge"
-  show Lt    = "lt"
-  show Le    = "le"
-  show Ne    = "ne"
-  show Add   = "add"
-  show Sub   = "sub"
-  show Mul   = "mul"
-  show Div   = "div"
-  show Neg   = "neg"
-  show Plus  = "plus"
-  show IsInt = "isInt"
-  show MapAp = "mapAp"
-  show Cons  = "cons"
-  show Alloc = "alloc"
-  show Read  = "read"
-  show Write = "write"
-  show AddTo = "addto"
+instance Pretty Op where
+  pPrintPrec _ _ = text . map toLower . show
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -607,7 +596,7 @@ allVars = nub . expr
 -- XXX Move somewhere better
 check :: (HasCallStack) => (Expr -> Bool) -> Expr -> Expr
 check p a | p a = a
-          | otherwise = error $ "check failed: " ++ show a
+          | otherwise = error $ "check failed: " ++ prettyShow a
 
 --------------------------------------------------------------------------------
 
