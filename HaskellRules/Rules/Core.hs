@@ -94,9 +94,10 @@ instance Pretty Expr where
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l p (Lam (Bind x e)) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <> pPrintPrec l 0 e
-  pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ pPrintPrec l 4 a <+> text "|" P.<> pPrintPrec l 4 b
-  pPrintPrec l p (a :>: b)        = maybeParens (p > 1) $ pPrintPrec l 2 a P.<> text ";"  <+> pPrintPrec l 1 b
-  pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" P.<> pPrintPrec l 3 b
+  pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ pPrintPrec l 4 a <+> text "|" <+> pPrintPrec l 4 b
+  pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
+                                    where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
+  pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
   pPrintPrec l p (a :~: b)        = maybeParens (p > 5) $ pPrintPrec l 6 a <+> text "~" <+> pPrintPrec l 6 b
   pPrintPrec l p (a :@: b)        = maybeParens (p > 4) $ pPrintPrec l 4 a <> text "(" <> pPrintPrec l 0 b <> text ")"
   pPrintPrec _ _ Fail             = text "fail"
@@ -104,11 +105,12 @@ instance Pretty Expr where
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec _ _ Wrong            = text "wrong"
-  pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> pPrintPrec l 0 e P.<> text "," <+>
-                                    pPrintPrec l 0 v1 P.<> text "," <+> pPrintPrec l 0 v2 P.<> text "}"
+  pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
+                                                             pPrintPrec l 0 v1 P.<> text ",",
+                                                             pPrintPrec l 0 v2] P.<> text "}"
   pPrintPrec l _ (BlockC e)       = text "block {" <> pPrintPrec l 0 e <> text "}"
-  pPrintPrec l _ (Store h e)      = text "store {" P.<> pPrintPrec l 0 (IM.toList h) P.<> text "," <+>
-                                    pPrintPrec l 0 e P.<> text "}"
+  pPrintPrec l _ (Store h e)      = text "store {" P.<> sep [pPrintPrec l 0 (IM.toList h) P.<> text ",",
+                                                             pPrintPrec l 0 e] P.<> text "}"
   pPrintPrec l p (Ref r)          = pPrintPrec l p r
 
 instance Eq Expr where
