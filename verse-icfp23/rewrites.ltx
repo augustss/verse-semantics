@@ -4,6 +4,8 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newcommand\mydots{\makebox[0.8em][c]{\text{$\cdot\!\!\cdot\!\!\cdot$}}}
+
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
 \newcommand{\vb}{\; |vbar| \;}    % Vertical bar
@@ -219,9 +221,8 @@
     \\[-2mm]
 
 \rulegroupname{Unification:~\runi}
-  \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
-  % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-tup} & \hspace{-7mm} |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & |v_1==v1';dots;v_n=v_n'; emptytup| \\
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
