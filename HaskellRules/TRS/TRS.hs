@@ -75,16 +75,16 @@ normalFormsFuelTracePlain sys an at = go an S.empty [start at]
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)
 --    | Debug.Trace.trace ("go: " ++ show (rn tr, t)) False = undefined
-    | t `S.member` seen = stepper "SEEN" ttr $ go n seen trs
-    | null ts'          = stepper "DONE" ttr $ addDone ttr $ go n seen' trs
+    | t `S.member` seen = stepper "SEEN" ttr $
+                          go n seen trs
+    | null ts'          = stepper "DONE" ttr $
+                          addDone ttr $ go n seen' trs
     | otherwise         =
       stepper "STEP" ttr $
       go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = stepS sys t
---    rn [] = "refl"
---    rn ((s,_):_) = s
 
 singleStep :: Bool
 singleStep = False
