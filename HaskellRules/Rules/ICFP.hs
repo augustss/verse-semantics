@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.ICFP(allSystemsICFP, isRecursive) where
 import Control.Monad( guard )
-import Data.List
 import Data.Maybe
 
 import Epic.Print hiding ((<>))
@@ -22,22 +21,20 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP, systemICFPR,
-                   systemICFPA, systemICFPC, systemICFPD, systemICFPF, systemICFPG,
-                   systemICFPH, systemICFPI, systemICFPJ, systemICFPK,
                    systemICFPS
                  ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
-  { sname = "ICFP"
-  , description = "ICFP, from verse-icfp23/rewrites.ltx"
+  { sname               = "ICFP"
+  , description         = "ICFP, from verse-icfp23/rewrites.ltx"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
   , rules               = allRules
-  , rules2              = \ _ _ -> []
-  , rulesHaveStructural = False
-  , confluenceRules     = rulesStructural
+  , rules2              = noRules
+  , rulesHaveStructural = True
+  , confluenceRules     = noRules
   , validExpr           = const valid
   }
 
@@ -49,86 +46,6 @@ systemICFPR = s
   }
   where s = systemICFP
 
-systemICFPA :: TRSystem Expr
-systemICFPA = s
-  { sname = "ICFPA"
-  , description = description s ++ ", plan A: - EXI-SWAP + EXI-VAR-SWAP"
-  , confluenceRules = (confluenceRules s -= "EXI-SWAP") <> rulesExiVarSwap
-  }
-  where s = systemICFP
-
-systemICFPC :: TRSystem Expr
-systemICFPC = s
-  { sname = "ICFPC"
-  , description = description s ++ ", plan C: + EXI-SWAP-ND"
-  , confluenceRules = confluenceRules s <> rulesVarSwapND
-  }
-  where s = systemICFP
-
-systemICFPD :: TRSystem Expr
-systemICFPD = s
-  { sname = "ICFPD"
-  , description = description s ++ ", plan D: - VAR-SWAP + EXI-ELIMV + VAR-SWAP-SUBST"
-  , rules = (rules s -= "VAR-SWAP") <> rulesExiElimV
-  , confluenceRules = confluenceRules s <> rulesVarSwapSubst
-  }
-  where s = systemICFP
-
-systemICFPF :: TRSystem Expr
-systemICFPF = s
-  { sname = "ICFPF"
-  , description = description s ++ ", - NORM-EXI - NORM-SEQR - EXI-SWAP"
-  , rules = rules s -= "NORM-EXI" -= "NORM-SEQR"
-  , confluenceRules = confluenceRules s -= "EXI-SWAP"
-  }
-  where s = systemICFP
-
-systemICFPG :: TRSystem Expr
-systemICFPG = s
-  { sname = "ICFPG"
-  , description = description s ++ ", - NORM-EXI - EXI-SWAP + NORM-EXI-{R,L,E}"
-  , rules = (rules s -= "NORM-EXI") <> rulesNormExiCanon
-  , confluenceRules = confluenceRules s -= "EXI-SWAP"
-  }
-  where s = systemICFP
-
-systemICFPH :: TRSystem Expr
-systemICFPH = s
-  { sname = "ICFPH"
-  , description = description s ++ ", Plan H"
-  , rules = (rules s -= "NORM-EXI") <> rulesNormExiLR
-  , confluenceRules = confluenceRules s -= "EXI-SWAP"
-  }
-  where s = systemICFP
-
-systemICFPI :: TRSystem Expr
-systemICFPI = s
-  { sname = "ICFPI"
-  , description = description s ++ ", Plan I"
-  , rules = (rules s -= "VAR-SWAP") <> rulesPlanI<> rulesExiElimV
---  , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
-  }
-  where s = systemICFP
-
-systemICFPJ :: TRSystem Expr
-systemICFPJ = s
-  { sname = "ICFPJ"
-  , description = description s ++ ", Plan J"
-  , rules = (rules s -= "VAR-SWAP") <> rulesPlanJ -- <> rulesExiElimV
-  , confluenceRules = confluenceRules s -= "VAR-SWAP-SUBST"
-  , rulesHaveStructural = True
-  }
-  where s = systemICFP
-
-systemICFPK :: TRSystem Expr
-systemICFPK = s
-  { sname = "ICFPK"
-  , description = description s ++ ", Plan K"
-  , rules = (rules s -= "EXI-ELIMV" -= "EXI-ELIML") <> rulesValSwapK <> rulesExiElimL
-  , confluenceRules = \ _ _ -> []
-  }
-  where s = systemICFPJ
-
 systemICFPS :: TRSystem Expr
 systemICFPS = s
   { sname = "ICFPS"
@@ -137,7 +54,7 @@ systemICFPS = s
   , preProcess = \ e -> addStore . preProcess s e
   , postProcess = const dropStore
   }
-  where s = systemICFPK
+  where s = systemICFP
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -332,16 +249,6 @@ valueX1 lhs =
      (ctx2, v2) <- valueX v1
      pure (ctx1 . ctx2, v2)
 
--- X context, or exist x . defX
-defX :: Ident -> Expr -> [(Context, Expr)]
-defX xx lhs =
-  do execX lhs
- ++
-  do EXI x dx <- [lhs]
-     guard (x /= xx)
-     (ctx, hole) <- defX xx dx
-     return (EXI x . ctx, hole)
-
 --------------------------------------------------------------------------------
 
 allRules :: ERule
@@ -350,7 +257,6 @@ allRules =  rulesApplication
          <> rulesElimination
          <> rulesNormalization
          <> rulesSpeculation
-         <> rulesFail
          -- SPLIT rules only trigger in case of a SPLIT
          <> rulesSplit
 
@@ -481,19 +387,19 @@ rulesApplication env lhs =
 rulesUnification :: ERule
 rulesUnification env lhs =
   "U-LIT" `name`
-  do Int k1 :=: Int k2 <- [lhs]
+  do (Int k1 :=: Int k2) :>: e <- [lhs]
      guard (k1 == k2)
-     pure unit
+     pure e
  ++
   "U-REF" `name`
-  do Ref k1 :=: Ref k2 <- [lhs]
+  do (Ref k1 :=: Ref k2) :>: e <- [lhs]
      guard(k1 == k2)
-     pure unit
+     pure e
  ++
   "U-TUP" `name`
-  do Arr vs :=: Arr vs' <- [lhs]
+  do (Arr vs :=: Arr vs') :>: e <- [lhs]
      guard (length vs == length vs')
-     pure (foldr (:>:) unit [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
+     pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
   do HNF e1 :=: HNF e2 <- [lhs]
@@ -521,35 +427,43 @@ rulesUnification env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`
-  do Val (HNF hnf) :=: Var x <- [lhs]
-     pure (Var x :=: Val hnf)
+  do hnf@HNF{} :=: x@Var{} <- [lhs]
+     pure (x :=: hnf)
  ++
   "VAR-SWAP" `name`
-  do Var y :=: Var x <- [lhs]
-     guard (lessThan env x y)
-     pure (Var x :=: Var y)
+  do y@Var{} :=: x@Var{} <- [lhs]
+     guard (ltExpr env x y)
+     pure (x :=: y)
+ ++
+  "VAL-SWAP" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+--     traceM $ show (e1, e2, _ltExpr _env e2 e1, boundVars _env)
+     guard $
+       -- First, order by choice-free-ness;
+       -- choice free goes first
+       case (isEffFree e1, isEffFree e2) of
+         (False, False) -> False  -- cannot change order of choices
+         (False, True)  -> True   -- put ce before e
+         (True, False)  -> False  -- ce is already first
+         (True, True)   ->
+           -- Next, order so equations go before expressions.
+           -- (This is an arbitrary choice)
+           case (isEqn e1, isEqn e2) of
+             (False, False) -> ltExpr env e2 e1  -- use ordering
+             (False, True)  -> True              -- need to swap
+             (True, False)  -> False             -- already in correct order
+             (True, True)   -> ltExpr env e2 e1  -- use ordering
+     pure $ e2 :>: (e1 :>: e3)
 
-rulesPlanJ :: ERule
-rulesPlanJ env lhs =
-  -- "VAR-SWAP-J" `name`
-  -- do Var y :=: Var x <- [lhs]
-  --    guard (lessThan env x y)
-  --    pure (Var x :=: Var y)
-  -- ++
- "VAR-SWAP-SUBST" `name`
-  do (ctx, Var x :=: Var y) <- execX lhs
-     guard (lessThan env y x)
-     let y0 = identNotIn (free (ctx Fail, y, x))
-         sub = [(y, Var x), (y0, Var y)]
-     pure (subst sub (ctx (Var y0 :=: Var x)))
-  ++
-  "EXI-SWAP" `name`
-  do EXI x (EXI y e) <- [lhs]
-     pure (EXI y (EXI x e))
+isEqn :: Expr -> Bool
+isEqn (_ :=: _) = True
+isEqn _ = False
 
-
---myTraceShow :: Show a => String -> a -> a
---myTraceShow msg x = trace ("TRACE: " ++ msg ++ show x) x
+-- Compare two expression using lessThan for identifiers
+ltExpr :: TRSFlags -> Expr -> Expr -> Bool
+ltExpr env e1 e2 = comp vs vs e1 e2 == LT
+  where
+    vs = boundVars env
 
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
@@ -559,20 +473,14 @@ rulesSubstRec _ lhs =
      guard (x `elem` free (LAM y e))
      pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
 
--- Order variables by binding depth, innermost is smaller.
--- Use name comparison for unbound variables.
-lessThan :: TRSFlags -> Ident -> Ident -> Bool
-lessThan env x y =
-  case (elemIndex x (boundVars env), elemIndex y (boundVars env)) of
-    (Nothing, Nothing) -> x < y   -- Both unbound, use names
-    (Just _,  Nothing) -> True    -- Bound is smaller than unbound
-    (Nothing, Just _ ) -> False
-    (Just i,  Just j ) -> i < j   -- Use binding depth
-
 --------------------------------------------------------------------------------
 
 rulesElimination :: ERule
 rulesElimination _ lhs =
+  "ELIM-VAL" `name`
+  do Val _ :>: e <- [lhs]
+     pure e
+ ++
   "EXI-ELIM" `name`
   do EXI x e <- [lhs]
      guard (x `notElem` free e)
@@ -580,10 +488,14 @@ rulesElimination _ lhs =
  ++
   "EXI-ELIML" `name`
   do EXI x a <- [lhs]
-     (ctx, (Var x' :=: Val v) :>: e) <- defX x a
+     (ctx, (Var x' :=: Val v) :>: e) <- execX a
      guard (x == x')
      guard (x `notElem` free (ctx (v :>: e)))
      pure (ctx e)
+ ++
+  "ELIM-FAIL" `name`
+  do (_cx, Fail) <- execX1 lhs
+     pure Fail
 
 --------------------------------------------------------------------------------
 
@@ -597,10 +509,6 @@ rulesNormalization _ lhs =
        then pure (EXI x' (ctx (subst [(x,Var x')] e)))
        else pure (EXI x (ctx e))
  ++
-  "NORM-VAL" `name`
-  do Val _ :>: e <- [lhs]
-     pure e
- ++
   "NORM-SEQ" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
      pure (e1 :>: (e2 :>: e3))
@@ -608,37 +516,10 @@ rulesNormalization _ lhs =
   "NORM-SEQR" `name`
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (Val v :=: e2))
-
-rulesNormExiCanon :: ERule
-rulesNormExiCanon _ lhs =
-  "NORM-EXI-L" `name`
-  do xe :>: EXI x e <- [lhs]
-     guard (isExistsFree xe)
-     let (x', e') = alphaExi (free xe) x e
-     pure (EXI x' (xe :>: e'))
- <>
-  "NORM-EXI-R" `name`
-  do EXI x e1 :>: e2 <- [lhs]
-     let (x', e1') = alphaExi (free e2) x e1
-     pure (EXI x' (e1' :>: e2))
- <>
-  "NORM-EXI-E" `name`
-  do v :=: EXI y e <- [lhs]
-     let (y', e') = alphaExi (free v) y e
-     pure (EXI y' ((v :=: e') :>: v))
-
-alphaExi :: [Ident] -> Ident -> Expr -> (Ident, Expr)
-alphaExi is x e | x `notElem` is = (x, e)
-                | otherwise =
-  let x' = identNotIn (is ++ free e)
-  in  (x', subst [(x, Var x')] e)
-
-isExistsFree :: Expr -> Bool
-isExistsFree (e1 :>: e2) = isExistsFree e1 && isExistsFree e2
-isExistsFree (e1 :=: e2) = isExistsFree e1 && isExistsFree e2
-isExistsFree (_ :@: _) = False
-isExistsFree EXI{} = False
-isExistsFree _ = True
+ ++
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+     pure (EXI y (EXI x e))
 
 --------------------------------------------------------------------------------
 
@@ -691,14 +572,6 @@ rulesSpeculation _ lhs =
 
 --------------------------------------------------------------------------------
 
-rulesFail :: ERule
-rulesFail _ lhs =
-  "FAIL" `name`
-  do (_cx, Fail) <- execX1 lhs
-     pure Fail
-
---------------------------------------------------------------------------------
-
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
@@ -720,151 +593,6 @@ rulesSplit _ lhs =
      pure (EXI h (gv :>: hlam))
 
 --------------------------------------------------------------------------------
-
-rulesStructural :: ERule
-rulesStructural _ lhs =
-  "EXI-SWAP" `name`
-  do EXI x (EXI y e) <- [lhs]
-     pure (EXI y (EXI x e))
- <>
-  "VAL-SWAP" `name`
-  do e1 :>: (e2@(_ :=: Val _) :>: e3) <- [lhs]
-     pure $ e2 :>: (e1 :>: e3)
-
-rulesExiVarSwap :: ERule
-rulesExiVarSwap _ lhs =
-  "EXI-VAR-SWAP" `name`
-  do EXI x (EXI y e) <- [lhs]
-     let e' = substExp (Var y :=: Var x) (Var x :=: Var y) e
-     pure (EXI y (EXI x e'))
-
-rulesVarSwapND :: ERule
-rulesVarSwapND _ lhs =
-  "VAR-SWAP-ND" `name`
-  do x@Var{} :=: y@Var{} <- [lhs]
-     pure (y :=: x)
-
-rulesExiElimV :: ERule
-rulesExiElimV _ lhs =
-  "EXI-ELIMV" `name`
-  do EXI x a <- [lhs]
-     (ctx, (Var z :=: Var x') :>: e) <- defX x a
-     guard (x == x' && not(isUV x))
-     guard (x /= z)
-     guard (z `notElem` defVars ctx)
-     pure (subst [(x, Var z)] (ctx e))
-
--- Get initially quantified variables from a defX context
-defVars :: Context -> [Ident]
-defVars ctx = loop (ctx Fail)
-  where loop (EXI x e) = x : loop e
-        loop _ = []
-
-rulesVarSwapSubst :: ERule
-rulesVarSwapSubst _ lhs =
-  "VAR-SWAP-SUBST" `name`
-  do (ctx, Var x :=: Var y) <- execX lhs
-     let y0 = identNotIn (free (ctx, y, x))
-         sub = [(y, Var x), (y0, Var y)]
-     pure (subst sub (ctx (Var y0 :=: Var x)))
-
-rulesNormExiLR :: ERule
-rulesNormExiLR _ lhs =
-  "NORM-EXI-2" `name`
-  do EXI x e1 :>: e2 <- [lhs]
-     let (x', e1') = alphaExi (free e2) x e1
-     pure (EXI x' (e1' :>: e2))
- <>
-  "NORM-EXI-3" `name`
-  do (x :=: EXI y e1) :>: e2 <- [lhs]
-     let (y', e1') = alphaExi (free (x, e2)) y e1
-     pure (EXI y' ((x :=: e1') :>: e2))
-
-{-
-rulesPlanI :: ERule
-rulesPlanI env lhs =
-  "VAR-SWAP-FF" `name`
-  do EXI y a <- [lhs]
-     (ctx, (Var x :=: Var y') :>: e) <- defX x a
-     guard (y == y')
-     guard (x /= y)
-     guard (x `elem` flexVars env)
-     pure (subst [(y, Var x)] (ctx e))
--}
-
-rulesPlanI :: ERule
-rulesPlanI env lhs =
-  "VAR-SWAP-RR" `name`
-  do (Var a :=: Var b) :>: e <- [lhs]
-     guard (a /= b)
-     let fs = flexVars env
-     guard (a `notElem` fs && b `notElem` fs)
-     -- let x = identNotIn (free (a, b, e))
-     let x = uvIdentNotIn (free (a, b, e))
-     pure (EXI x (Var a :=: Var x :>: Var b :=: Var x :>: e))
- <>
-  "NORM-SWAP-FF" `name`
-  do EXI x a <- [lhs]
-     (ctx, (Var z :=: Var x') :>: e) <- defX x a
-     guard (x == x')
-     guard (x /= z)
-     guard (z `notElem` defVars ctx)
-     guard (z `elem` flexVars env)
-     pure (subst [(x, Var z)] (ctx e))
-
-rulesValSwapK :: ERule
-rulesValSwapK env lhs =
-  "VAL-SWAP-K" `name`
-  do e1 :>: (e2 :>: e3) <- [lhs]
---     traceM $ show (e1, e2, _ltExpr _env e2 e1, boundVars _env)
-     guard $
-       -- First, order by choice-free-ness;
-       -- choice free goes first
-       case (isEffFree e1, isEffFree e2) of
-         (False, False) -> False  -- cannot change order of choices
-         (False, True)  -> True   -- put ce before e
-         (True, False)  -> False  -- ce is already first
-         (True, True)   ->
-           -- Next, order so equations go before expressions.
-           -- (This is an arbitrary choice)
-           case (isEqn e1, isEqn e2) of
-             (False, False) -> ltExpr env e2 e1  -- use ordering
-             (False, True)  -> True              -- need to swap
-             (True, False)  -> False             -- already in correct order
-             (True, True)   -> ltExpr env e2 e1  -- use ordering
-     pure $ e2 :>: (e1 :>: e3)
-{-
-  "VAL-SWAPL" `name`
-  do e1 :>: (e2@(Var{} :=: Val{}) :>: e3) <- [lhs]
-     guard (ltExpr env e2 e1)
-     pure $ e2 :>: (e1 :>: e3)
- <>
-  "VAL-SWAPR" `name`
-  do e1@(Var{} :=: Val{}) :>: (e2 :>: e3) <- [lhs]
-     guard (ltExpr env e2 e1)
-     pure $ e2 :>: (e1 :>: e3)
--}
-  
--- Compare two expression using lessThan for identifiers
-ltExpr :: TRSFlags -> Expr -> Expr -> Bool
-ltExpr env e1 e2 = comp vs vs e1 e2 == LT
-  where
-    vs = boundVars env
-
-isEqn :: Expr -> Bool
-isEqn (_ :=: _) = True
-isEqn _ = False
-
-rulesExiElimL :: ERule
-rulesExiElimL _ lhs =
-  "EXI-ELIML" `name`
-  do EXI x a <- [lhs]
-     (ctx, (Var x' :=: Val v) :>: e) <- execX a
-     guard (x == x')
-     guard (x `notElem` free (ctx (v :>: e)))
-     pure (ctx e)
-
-----------------------
 
 storeEmpty :: Heap
 storeEmpty = IM.empty

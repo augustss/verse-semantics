@@ -23,7 +23,7 @@ testicfp:
 testrules:
 	$(TESTER) --quiet --dfs --rules=$(RULES)                    --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet       --rules=$(RULES) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
-	$(QCTEST)               --rules=$(RULES) --ignore-fuel-stop --max-success=1000 --ignore-recursive
+	$(QCTEST)               --rules=$(RULES) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
 
 testslow:
 	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
