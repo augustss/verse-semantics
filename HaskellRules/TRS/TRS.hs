@@ -12,6 +12,7 @@ module TRS.TRS(
   normalFormsFuelTracePlain,
   normalFormFuelTracePlain,
   TRSystem(..),
+  noRules,
   ) where
 
 import Epic.List( nub )
@@ -28,7 +29,6 @@ import Text.Printf
 
 type Rule a = RuleEnv a -> a -> [(String, a)]
 
-
 instance Show (Rule t) where
   show _ = "<<Rule>>"
 
@@ -41,6 +41,9 @@ name s as = [(s,a) | a <- as]
 infixl 8 -=
 (-=) :: Rule a -> String -> Rule a
 rule -= nm = \ env a -> filter ((/= nm) . fst) (rule env a)
+
+noRules :: Rule a
+noRules _ _ = []
 
 --------------------------------------------------------------------------------
 
