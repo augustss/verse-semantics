@@ -230,7 +230,7 @@ isChoiceFree (All _)   = True
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op
 isChoiceFree Split{}   = True  -- XXX This isn't true!!
 isChoiceFree Wrong     = True
-isChoiceFree (EXI _ e) = isChoiceFree e
+--isChoiceFree (EXI _ e) = isChoiceFree e
 isChoiceFree _         = False
 -- KC: what about @?
 
