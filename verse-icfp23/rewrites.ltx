@@ -4,6 +4,8 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newcommand\mydots{\makebox[0.8em][c]{\text{$\cdot\!\!\cdot\!\!\cdot$}}}
+
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
 \newcommand{\vb}{\; |vbar| \;}    % Vertical bar
@@ -219,16 +221,15 @@
     \\[-2mm]
 
 \rulegroupname{Unification:~\runi}
-  \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
-  % \rulename{u-tup}   & |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';dots;v_n=v_n'; emptytup|} \\
-  \rulename{u-tup} & \hspace{-7mm} |tup (v_1,dots,v_n) == tup (v1',dots,v_n')| & \movesto & |v_1==v1';dots;v_n=v_n'; emptytup| \\
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
-  \multicolumn{2}{l}{\text{\lennart{Not in Plan D:}}}\\
-  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| ``less than'' |y| } \\
+  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
+  \rulename{val-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1|; not both with choices } \\
 
     \\[-2mm]
 
@@ -236,6 +237,7 @@
 \rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
 \rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| & \text{\textit{Note}: structural} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
@@ -248,12 +250,8 @@
 %\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
 %  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
 % without \overline
-\rulename{elim-exil} & \hspace{-3mm}|def (x^ y_1 dots y_n) (X^[x==v;e])| & \movesto & |def (y_1 dots y_n) (X^[e])|
-  & \text{if $|x| \notin \freevars{|X^[v;e]|} \cup |{y_i}|$} \\
-\text{\lennart{Plan D:}}\\
-\rulename{elim-exiv} & \hspace{-3mm}|def (x^ y_1 tdots y_n) (X^[z==x; e])| & \movesto & |def (y_1 tdots y_n) (subst (X^[e]) x z)|
-    & \text{if $|z| \notin |{x,y_1 tdots y_n}|, |x| \notin |{y_1 tdots y_n}|$} \\
-\rulename{elim-fail}     & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
+\rulename{exi-eliml} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{elim-fail} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
     \\[-2mm]
 

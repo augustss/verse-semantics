@@ -5,6 +5,7 @@ import Control.Monad( guard )
 import Data.List
 import Data.Maybe
 
+import Epic.Print hiding ((<>))
 import Epic.Uniplate(universe)
 import qualified Epic.SIntMap as IM
 import TRS.Bind
@@ -202,7 +203,7 @@ anf = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
-    expr e = error $ "anf: " ++ show e
+    expr e = error $ "anf: " ++ prettyShow e
 
     -- Expression or unification
     expru (e1 :=: e2) =
@@ -903,11 +904,12 @@ isResult v = isVal v
 
 isStoreFree :: Expr -> Bool
 isStoreFree Val{}   = True
-isStoreFree (Val{} :=: b) = isStoreFree b
+isStoreFree (_ :=: b) = isStoreFree b
 isStoreFree (a :>: b) = isStoreFree a && isStoreFree b
+isStoreFree (a :|: b) = isStoreFree a && isStoreFree b
+isStoreFree (Op op :@: _) = not (isStoreOp op)
 isStoreFree (One e)   = isStoreFree e
 isStoreFree (All e)   = isStoreFree e
-isStoreFree (Op op :@: _) = not (isStoreOp op)
 isStoreFree (Split e _ _) = isStoreFree e
 isStoreFree Wrong     = True
 isStoreFree (EXI _ e) = isStoreFree e

@@ -21,10 +21,10 @@ testceq("Yikes2",SEq) { exists x y. x=<1,2>; y=x; \w.<x,y> }
 testceq("QC1", SEq)  { exists x . (exists y . x = y; x) | <> }
                      { exists x . x | <> }
 # There are too many existentials in Block for the structural rules to terminate.
-testceq("Ex1", SEq, Block=Skip, POPLL=Skip, ICFPJ=Skip)
+testceq("Ex1", SEq, Block=Skip, POPLL=Skip, ICFPJ=Skip, ICFPK=Skip)
                      { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
                      { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
-testceq("Ex2", SEq, ICFPJ=Skip)
+testceq("Ex2", SEq, ICFPJ=Skip, ICFPK=Skip)
                      { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
                      { exists f g c d       . f(c); g(d); <c, d> }
 testceq("Wombat1a",SEq){ x := <1>; one { exists y . x = y; < x > } }
@@ -72,8 +72,8 @@ testceq("QC8", SEq)  { ex x. ex y. ex z. z | (ex v. ex w. z = y; y) }
 testceq("QC9", SEq)  { ex a. (ex y. (a = y; <>) | <>); a = (ex b. b); a }
                      { ex a y. (a = y; ()) | (); a }
 # QC10 kills ICFPK with unidirectional VAL-SWAP
-testceq("QC10", SEq) { (ex a. a = (add | <>); c); c = add; c }
-                     { ex a. a = (add | <>); c = add; add }
+testceq("QC10", SEq) { \c.(ex a. a = (add | <>); c); c = add; c }
+                     { \c.ex a. a = (add | <>); c = add; add }
 testceq("Rec1", SEq, POPLL=Skip,ICFP*=Skip) { ex x. (\y.x(fail)) = x }
                      { \y.fail }
 # Result depends on how recursion is treated.

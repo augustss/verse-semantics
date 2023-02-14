@@ -73,7 +73,7 @@ moreTrace :: Bool
 moreTrace = False
 
 start :: T.Expr -> T.Expr
-start e | moreTrace = trace ("start:\n" ++ show e) e
+start e | moreTrace = trace ("start:\n" ++ prettyShow e) e
         | otherwise = e
 
 nrTrace :: ESystem -> NormResult T.Expr -> NormResult T.Expr
@@ -84,12 +84,12 @@ normDump :: ESystem -> NormResult T.Expr -> String
 normDump sys nr =
   unlines $
   ("done=" ++ show (length (nrDone nr)) ++ ", left=" ++ show (length (nrLeft nr))) :
-  map ((++ "\n=====") . show . term) (nrDone nr) ++
+  map ((++ "\n=====") . prettyShow . term) (nrDone nr) ++
   ["\n*****"] ++
   map (dumpOne sys . term) (nrLeft nr)
 
 dumpOne :: ESystem -> T.Expr -> String
-dumpOne sys e = show e ++ "\n   " ++ red ++ "\n====="
+dumpOne sys e = prettyShow e ++ "\n   " ++ red ++ "\n====="
   where red =
           case normalFormsFuelTrace sys 20000 e of
             NormResult { nrLeft = [] } -> "reduces"

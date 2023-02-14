@@ -15,6 +15,7 @@ module TRS.TRS(
   ) where
 
 import Epic.List( nub )
+import Epic.Print(Pretty, prettyShow)
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
@@ -67,31 +68,31 @@ data NormResult a = NormResult
   deriving (Show)
 
 -- Traces are produced in reverse order, i.e. final result first
-normalFormsFuelTracePlain :: (Show a, Ord a, Rec a) => TRSystem a -> Int -> a -> NormResult a
+normalFormsFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
 normalFormsFuelTracePlain sys an at = go an S.empty [start at]
  where
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
   go  n  seen (ttr@(t:<--tr):trs)
 --    | Debug.Trace.trace ("go: " ++ show (rn tr, t)) False = undefined
-    | t `S.member` seen = stepper "SEEN" ttr $ go n seen trs
-    | null ts'          = stepper "DONE" ttr $ addDone ttr $ go n seen' trs
+    | t `S.member` seen = stepper "SEEN" ttr $
+                          go n seen trs
+    | null ts'          = stepper "DONE" ttr $
+                          addDone ttr $ go n seen' trs
     | otherwise         =
       stepper "STEP" ttr $
       go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
    where
     seen' = S.insert t seen
     ts'   = stepS sys t
---    rn [] = "refl"
---    rn ((s,_):_) = s
 
 singleStep :: Bool
 singleStep = False
 
-stepper :: (Show a) => String -> Traced a -> b -> b
+stepper :: (Pretty a) => String -> Traced a -> b -> b
 stepper msg (t:<--tr) x | singleStep = unsafePerformIO $ do
   let s = case tr of ((ss,_):_) -> ss; _ -> "REFL"
-  printf "%s %10s %s\n" msg s (show t)
+  printf "%s %10s %s\n" msg s (prettyShow t)
   _ <- getLine
   pure x
               | otherwise = x
@@ -100,7 +101,7 @@ addDone :: Traced a -> NormResult a -> NormResult a
 addDone a nr = nr{ nrDone = a : nrDone nr }
 
 -- Like normalFormsFuelTrace, but only does a depth first search
-normalFormFuelTracePlain :: (Show a, Ord a, Rec a) => TRSystem a -> Int -> a -> NormResult a
+normalFormFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
 normalFormFuelTracePlain sys an at = go an S.empty (start at)
  where
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }

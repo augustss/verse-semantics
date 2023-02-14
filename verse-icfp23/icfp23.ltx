@@ -429,13 +429,12 @@ $$
                          & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{elim-exil}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
-\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3; emptytup); y)| \\
-\movestoR{elim-exil}     & |def y ((2==y; emptytup); y)| \\
-\movestoR{norm-seq}      & |def y (2==y; emptytup; y)| \\
-\movestoR{hnf-swap}      & |def y (y==2; emptytup; y)| \\
-\movestoR{subst}         & |def y (y==2; emptytup; 2)| \\
-\movestoR{elim-exil}     & |emptytup; 2| \\
-\movestoR{norm-val}      & |2| \\
+\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| \\
+\movestoR{elim-exil}     & |def y (2==y; y)| \\
+\movestoR{norm-seq}      & |def y (2==y; y)| \\
+\movestoR{hnf-swap}      & |def y (y==2; y)| \\
+\movestoR{subst}         & |def y (y==2; 2)| \\
+\movestoR{elim-exil}     & |2| \\
 \text{\lennart{ICFP conversion done}}
 \end{array}
 $$
@@ -1010,7 +1009,15 @@ has the following properties:
 
 \figureRewriteRules
 \figureContexts
-\figureStructuralRules
+%% \figureStructuralRules
+
+\subsection{Ordering terms}
+The \rulename{var-swap} and \rulename{val-swap} orders expressions using the ordering |lte|.
+The reason for this is to simplify the confluence proof by having a canonical ordering.
+The ordering is based on using de Bruijn indices as the variable representation.
+The ordering is defined for |eu|, \ie, expressions and equalities.
+The |lte| is defined so that all |v==e| are less than all |e|.
+Furthermore, |e_1 lte e_2| if the natural lexicographical comparison of the terms with de Bruijn indices is |e_1 < e_2|.
 
 
 \subsection{Functions and function application} \label{sec:beta}
@@ -1876,7 +1883,6 @@ At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\b
 
 Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
 At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
-After removing some garbage we reach the result at \circlednum{7}.
 \begin{figure}
 \begin{footnotesize}
 % no space needed around math environments in a figure
@@ -1897,12 +1903,11 @@ $$
                 & \movestoR{norm-seqr,norm-seq}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{subst,elim-exil}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
-\circlednum{4}  & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; emptytup; tup(x,y))| \\
-                & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; emptytup; tup(x,y))| \\
-\circlednum{5}  & \movestoR{subst,elim-exil}   & |def x (3==x; emptytup; tup(x,2))| \\
-                & \movestoR{hnf-swap}          & |def x (x==3; emptytup; tup(x,2))| \\
-\circlednum{6}  & \movestoR{subst,elim-exil}   & |emptytup; tup(3,2)| \\
-\circlednum{7}  & \movestoR{norm-val}          & |tup(3,2)| \\
+\circlednum{4}  & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; tup(x,y))| \\
+                & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; tup(x,y))| \\
+\circlednum{5}  & \movestoR{subst,elim-exil}   & |def x (3==x; tup(x,2))| \\
+                & \movestoR{hnf-swap}          & |def x (x==3; tup(x,2))| \\
+\circlednum{6}  & \movestoR{subst,elim-exil}   & |tup(3,2)| \\
 \end{array}
 $$
 \end{footnotesize}
