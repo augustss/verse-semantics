@@ -1055,7 +1055,7 @@ Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
 ensures that the $|defKW| |x|$
 % hacky typesetting to ge the \exists right next to the x.
 does not capture any variables free in |v|.  If |x| appears free in |v|,
-\textalpha-conversion may be used on |lam x e| to rename |x| to $x' \not\in \freevars{v}$.
+\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{v}$.
 
 In \versecalc{}, tuples behave like (finite) functions, in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works on non-empty
