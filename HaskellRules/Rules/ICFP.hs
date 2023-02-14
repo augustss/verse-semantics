@@ -600,7 +600,7 @@ storeEmpty = IM.empty
 storeAlloc :: Heap -> Value -> (Heap, Ptr)
 storeAlloc h v =
   let p | IM.null h = Ptr 0
-        | otherwise = fst $ IM.findMax h
+        | otherwise = succ (fst (IM.findMax h))
       h' = IM.insert p v h
   in  (h', p)
 

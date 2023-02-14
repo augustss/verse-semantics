@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -78,7 +79,7 @@ data Expr
 type Value = Expr
 
 type Heap = IM.SIntMap Ptr Value
-newtype Ptr = Ptr Int deriving (Show, Eq, Ord, Data)
+newtype Ptr = Ptr Int deriving (Show, Eq, Ord, Data, Enum)
 
 instance Pretty Ptr where pPrintPrec _ _ (Ptr i) = text ("r" ++ show i)
 
