@@ -430,10 +430,19 @@ rulesUnification env lhs =
   do hnf@HNF{} :=: x@Var{} <- [lhs]
      pure (x :=: hnf)
  ++
+  "VAR-SWAP-SUBST" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     guard (ltExpr env (Var y) (Var x))
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
+{-
+ ++
   "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+-}
  ++
   "VAL-SWAP" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
