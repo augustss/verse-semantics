@@ -186,6 +186,7 @@
 \end{figure}
 }
 
+\newcommand{\alphamark}{use $\alpha$}
 
 % ------------------ ICFP rewrite rules -------------------
 
@@ -213,7 +214,7 @@
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
-              & \text{if $x \not\in \freevars{|v|}$} \\
+              & \text{if $x \not\in \freevars{|v|}$, \alphamark} \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
          \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
@@ -234,7 +235,7 @@
     \\[-2mm]
 
 \rulegroupname{Normalization:~\rcon}
-\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
 \rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| & \text{\textit{Note}: structural} \\
@@ -268,7 +269,9 @@
 \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
 
 
-\end{array}
+\end{array} \\
+\\    
+\text{\textit{Note}: In the rules marked with ``\alphamark'', use $\alpha$-conversion to avoid name capture.}
 \end{array}$
 \iffullverse
 $$\begin{array}{l}
