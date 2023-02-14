@@ -127,8 +127,27 @@ If $\rr$ is locally confluent and Noetherian then $\rr$ is confluent.
 %
 A reduction is \emph{strongly confluent} if whenever
 $\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, either $\rsteps{}{b}{c}$ or
-there is a $d$ such that $\rsteps{}{b}{d}$ and $\rstep{}{c}{d}$.
+there is a $d$ such that $\rsteps{}{b}{d}$ and $\rstep{}{c}{d}$,
+as shown in \cref{fig:strong-confluence}, where the $\epsilon$ label
+indicates $0$ or $1$ step.
 \end{definition}
+
+\begin{figure}[h]
+% https://q.uiver.app/?q=WzAsNSxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMCwyLCJcXGJ1bGxldCJdLFsyLDIsIlxcYnVsbGV0Il0sWzAsMl0sWzAsMV0sWzEsMywiXFxlcHNpbG9uIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiXFxlcHNpbG9uIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	& a \\
+	b && c \\
+	\bullet && \bullet
+	\arrow[from=1-2, to=2-3]
+	\arrow[from=1-2, to=2-1]
+	\arrow["\epsilon"', dotted, from=2-1, to=3-1]
+	\arrow["\epsilon", dotted, from=2-3, to=3-3]
+	\arrow[dotted, two heads, from=2-1, to=3-3]
+	\arrow[dotted, two heads, from=2-3, to=3-1]
+\end{tikzcd}\]
+\caption{\textbf{Strong Confluence}}
+\label{fig:strong-confluence}
+\end{figure}
 
 \begin{lemma}[\cite{Huet80}] \label{lem:strong}
 	If $\rr$ is strongly confluent then $\rr$ is confluent.
