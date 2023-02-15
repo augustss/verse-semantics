@@ -4,9 +4,7 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\rdis}{\ensuremath{\rcon \cup \rgc}}
-\newcommand{\norecursion}{no recursion\xspace}
-\newcommand{\sz}[1]{\ensuremath{\sharp{#1}}}
+
 \section{Confluence of \calcname} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
@@ -905,9 +903,9 @@ $$\rulename{subst-var} \quad  |X^[x==y;e]|  \movesto  |(subst X x y)^[x==y; subs
 It will be convenient to \emph{factor out} \rulename{norm-exi} so let
 %
 \begin{align*}
-\rss   \ \doteq\ \rulename{subst-var} + \rulename{var-swap} \\
-\rconm \ \doteq\ \rss + \rulename{exi-swap} \\
-\rcon  \ \doteq\ \rconm + \rulename{norm-exi} \\
+\rss   &  \doteq\ \rulename{subst-var} + \rulename{var-swap} \\
+\rconm &  \doteq\ \rss + \rulename{exi-swap} \\
+\rcon  &  \doteq\ \rconm + \rulename{norm-exi} \\
 \end{align*}
 
 \begin{lemma}[$\rcon$-Confluent]\label{lem:d-c}
@@ -1021,6 +1019,45 @@ Via the following diagram, where:
 	\arrow["\rss"{description}, dotted, two heads, from=4-2, to=5-3]
 	\arrow["\rss"{description}, dotted, two heads, from=4-4, to=5-3]
 \end{tikzcd}\]
+\end{proof}
+
+\begin{lemma} \label{lem:exi-swap-con}
+	\rulename{exi-swap} is confluent.
+\end{lemma}
+
+\begin{proof}
+	Trivial, via the diamond property.
+\end{proof}
+
+\begin{lemma} \label{lem:ss-con}
+	$\rss = \rulename{subst-var} + \rulename{swap}$ is confluent.
+\end{lemma}
+
+\begin{proof}
+Note that $\rss$ is a subset of $\runi$; the proof follows similar to the
+proof of \cref{lem:u-c} (ignoring the bits about \rulename{u-tup} and
+\rulename{u-lit} and \rulename{u-fail} and substituting HNF values.)
+% \ranjit{TODO:tedious copy-paste}
+\end{proof}
+
+\begin{lemma} \label{lem:ss-m-com}
+	\rss commutes with \rconm.
+\end{lemma}
+
+\begin{proof}
+Recall that $\rconm \equiv \rss + \rulename{exi-swap}$.
+%
+The proof follows by observing that $\rss$ \emph{\halfcommutes} with \rulename{exi-swap} \cref{lem:ss-half-com-exi},
+recalling that $\rss$ is confluent \cref{lem:ss-con}, after which \cref{lem:half-com} yields
+the conclusion $\rss$ commutes with $\rss + \rulename{exi-swap} \equiv \rconm$.
+\end{proof}
+
+
+
+\begin{lemma}
+\end{lemma}
+\begin{proof}
+	\ranjit{TODO:notes}
 \end{proof}
 
 
