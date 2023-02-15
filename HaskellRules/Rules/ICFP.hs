@@ -20,7 +20,8 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPR,
+allSystemsICFP = [ systemICFP, systemICFPE,
+                   systemICFPR,
                    systemICFPS
                  ]
 
@@ -38,13 +39,23 @@ systemICFP = TRSystem
   , validExpr           = const valid
   }
 
+systemICFPE :: TRSystem Expr
+systemICFPE = s
+  { sname = "ICFPE"
+  , description = description s ++ " - EXI-SWAP"
+  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP"
+  , rulesHaveStructural = False
+  }
+  where s = systemICFP
+
 systemICFPR :: TRSystem Expr
 systemICFPR = s
   { sname = "RICFP"
   , description = description s ++ " + SUBST-REC"
   , rules = rules s <> rulesSubstRec
+  , rulesHaveStructural = False
   }
-  where s = systemICFP
+  where s = systemICFPE
 
 systemICFPS :: TRSystem Expr
 systemICFPS = s
@@ -54,7 +65,7 @@ systemICFPS = s
   , preProcess = \ e -> addStore . preProcess s e
   , postProcess = const dropStore
   }
-  where s = systemICFP
+  where s = systemICFPE
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
