@@ -378,9 +378,27 @@ If $R$ is confluent and hops after $S$ then
 \end{lemma}
 
 \begin{proof}
-By induction on the number of $S$ steps in $\rsteps{R \cup S}{}{}$.
-
-	\ranjit{TODO:notes}
+By induction on the number of $S$ steps in $\rsteps{R \cup S}{}{}$, via the following diagram.
+% https://q.uiver.app/?q=WzAsOSxbMCwwLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsIlxcYnVsbGV0Il0sWzQsMCwiXFxidWxsZXQiXSxbNCwxLCJcXGJ1bGxldCJdLFs0LDIsIlxcYnVsbGV0Il0sWzAsMiwiXFxidWxsZXQiXSxbMCwxLCJSIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiUyJdLFswLDMsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDUsIihSXiogXFxjdXAgUyleayIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDQsIlxcY3JlZntsZW06aG9wc30iLDEseyJsYWJlbF9wb3NpdGlvbiI6NjAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs0LDYsIihSXipcXGN1cCBTKV5rIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDYsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNiwiXFxjcmVme2xlbTpoYWxmLWNvbS1tYW55LWt9IiwxLHsibGFiZWxfcG9zaXRpb24iOjYwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMyw4LCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw3LCJJSCIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet && \bullet \\
+	\bullet && \bullet && \bullet \\
+	\bullet &&&& \bullet
+	\arrow["R", two heads, from=1-1, to=1-2]
+	\arrow["S", from=1-2, to=1-3]
+	\arrow["S"', dotted, from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["{(R^* \cup S)^k}", dotted, two heads, from=1-3, to=1-5]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["{\cref{lem:hops}}"{description, pos=0.6}, draw=none, from=1-1, to=2-3]
+	\arrow["{(R^*\cup S)^k}"', dashed, two heads, from=2-3, to=2-5]
+	\arrow["R", dotted, two heads, from=1-5, to=2-5]
+	\arrow["{\cref{lem:half-com-many-k}}"{description, pos=0.6}, draw=none, from=1-3, to=2-5]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-1]
+	\arrow["R"', dotted, two heads, from=3-1, to=3-5]
+	\arrow["R", dotted, two heads, from=2-5, to=3-5]
+	\arrow["IH"{description, pos=0.8}, draw=none, from=2-1, to=3-5]
+\end{tikzcd}\]
 \end{proof}
 
 \begin{definition}[\halfcommutes]
@@ -468,6 +486,49 @@ then exists $e'$ such that $\rsteps{R \cup S}{e_1}{e'}$
 	\arrow["{(R^* \cup S)}"', dotted, two heads, from=2-3, to=2-4]
 	\arrow["{(R^* \cup S)_k}"', dotted, two heads, from=2-4, to=2-5]
 \end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}\label{lem:half-com-many-k}
+If $R$ is confluent and $R$ half-commutes with $S$ then
+if $\rsteps{R}{e}{e_1}$ and $\rstep{(R^* \cup S)^k}{e}{e_2}$
+then exists $e'$ such that $\rsteps{(R^* \cup S)^k}{e_1}{e'}$
+					 and $\rsteps{R}{e_2}{e'}$.
+	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzAsMSwiZV8xIl0sWzIsMCwiZV8yIl0sWzIsMSwiZSciXSxbMCwxLCJSIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiU15rIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCIoUl4qIFxcY3VwIFMpXmsiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+		e && {e_2} \\
+		{e_1} && {e'}
+		\arrow["R"', two heads, from=1-1, to=2-1]
+		\arrow["{(R^* \cup S)^k}", two heads, from=1-1, to=1-3]
+		\arrow["R", dotted, two heads, from=1-3, to=2-3]
+		\arrow["{(R^* \cup S)^k}"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+Similar to \cref{lem:half-com-many-s}, by repeatedly ``tiling''
+(1)~\cref{lem:half-com-many-r}
+and using
+(2)~$R$ is confluent to match the $R^*$ reductions.
+%
+% https://q.uiver.app/?q=WzAsMTAsWzAsMCwiXFxidWxsZXQiXSxbMSwwLCJcXGJ1bGxldCJdLFsyLDAsIlxcYnVsbGV0Il0sWzMsMCwiXFxidWxsZXQiXSxbNCwwLCJcXGJ1bGxldCJdLFswLDEsIlxcYnVsbGV0Il0sWzEsMSwiKDIpIl0sWzIsMSwiKDEpIl0sWzMsMSwiKDEpIl0sWzQsMSwiKDEpIl0sWzAsMSwiUiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlNfMSJdLFsyLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFszLDQsIlNfayJdLFswLDUsIlIiLDJdLFsxLDYsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw4LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDksIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsNiwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiw3LCIoUl4qIFxcY3VwIFMpXzEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsOCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDksIihSXiogXFxjdXAgUylfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & {(2)} & {(1)} & {(1)} & {(1)}
+	\arrow["R", two heads, from=1-1, to=1-2]
+	\arrow["{S_1}", from=1-2, to=1-3]
+	\arrow[dashed, from=1-3, to=1-4]
+	\arrow["{S_k}", from=1-4, to=1-5]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R"', dotted, two heads, from=1-4, to=2-4]
+	\arrow["R", dotted, two heads, from=1-5, to=2-5]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["{(R^* \cup S)_1}"', dotted, two heads, from=2-2, to=2-3]
+	\arrow[dashed, two heads, from=2-3, to=2-4]
+	\arrow["{(R^* \cup S)_k}"', dotted, two heads, from=2-4, to=2-5]
+\end{tikzcd}\]
+
 \end{proof}
 
 \begin{lemma}\label{lem:half-com-many-r}
