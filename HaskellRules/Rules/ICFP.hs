@@ -71,7 +71,11 @@ valid = expr
     expr (All e) = expr e
     expr Fail = True
     expr Wrong = True
-    expr (Split e v1 v2) = expr e && value v1 && value v2
+    expr (Split e (LAM _ e1) (LAM _ (LAM _ (LAM _ e2)))) =
+      expr e && expr e1 && expr e2
+    expr (Split e (LAM _ e1) Var{}) =
+      expr e && expr e1
+    expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr _ = undefined -- GHC bug
     expru (v :=: e) = value v && expr e
     expru e = expr e
@@ -228,11 +232,12 @@ isChoiceFree (a :>: b) = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)   = True
 isChoiceFree (All _)   = True
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op
-isChoiceFree Split{}   = True  -- XXX This isn't true!!
+isChoiceFree (Split _ (LAM _ f) (LAM _ (LAM _ (LAM _ g)))) = isChoiceFree f && isChoiceFree g
+isChoiceFree (Split _ (LAM _ f) (Var _)) = isChoiceFree f
+isChoiceFree e@Split{} = error $ "bad split: " ++ prettyShow e
 isChoiceFree Wrong     = True
---isChoiceFree (EXI _ e) = isChoiceFree e
+isChoiceFree (EXI _ e) = isChoiceFree e  -- necessary when using split
 isChoiceFree _         = False
--- KC: what about @?
 
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
@@ -430,10 +435,19 @@ rulesUnification env lhs =
   do hnf@HNF{} :=: x@Var{} <- [lhs]
      pure (x :=: hnf)
  ++
+  "VAR-SWAP-SUBST" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     guard (ltExpr env (Var y) (Var x))
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
+{-
+ ++
   "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+-}
  ++
   "VAL-SWAP" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
@@ -575,23 +589,45 @@ rulesSpeculation _ lhs =
 rulesSplit :: ERule
 rulesSplit _ lhs =
   "SPLIT-FAIL" `name`
+  do Split Fail (LAM x f) _g <- [lhs]
+     pure (subst [(x, unit)] f)
+ ++
+  "SPLIT-CHOICE" `name`
+  do Split (Val v :|: e) _f g@(LAM x (LAM k (LAM h b))) <- [lhs]
+     pure $ doSplit lhs v e g x k h b
+ ++
+  "SPLIT-VALUE" `name`
+  do Split (Val v) _f g@(LAM x (LAM k (LAM h b))) <- [lhs]
+     pure $ doSplit lhs v Fail g x k h b
+
+doSplit :: Expr -> Expr -> Expr -> Expr -> Ident -> Ident -> Ident -> Expr -> Expr
+doSplit lhs v e g x k h b =
+  let u = identNotIn (free lhs)
+  in  subst [(x, v), (k, LAM u e), (h, g)] b
+
+{-
+  "SPLIT-FAIL" `name`
   do Split Fail f _g <- [lhs]
      pure (f :@: unit)
  ++
   "SPLIT-CHOICE" `name`
   do Split (Val v :|: e) _f g <- [lhs]
-     let x:h:_ = identsNotIn (free lhs)
-         gv = Var h :=: (g :@: v)
-         hlam = Var h :@: LAM x e
-     pure (EXI h (gv :>: hlam))
+     pure $ doSplit lhs v e g
  ++
   "SPLIT-VALUE" `name`
   do Split (Val v) _f g <- [lhs]
-     let x:h:_ = identsNotIn (free lhs)
-         gv = Var h :=: (g :@: v)
-         hlam = Var h :@: LAM x Fail
-     pure (EXI h (gv :>: hlam))
+     pure $ doSplit lhs v Fail g
 
+doSplit :: Expr -> Value -> Expr -> Value -> Expr
+doSplit lhs v e g =
+--  trace ("doSplit " ++ prettyShow (lhs, v, e, g)) $
+  let x:h:t:_ = identsNotIn (free lhs)
+      gv = Var h :=: (g :@: v)
+      hlam = Var t :=: (Var h :@: LAM x e)
+      res = Var t :@: g
+  in  EXI h (EXI t (gv :>: hlam :>: res))
+-}
+  
 --------------------------------------------------------------------------------
 
 storeEmpty :: Heap
