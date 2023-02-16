@@ -738,7 +738,7 @@ storeX1 lhs =
      pure ((:>: e) . ctx, hole)
  ++
   do se :>: sx <- [lhs]
-     guard (isStoreFree se)
+     guard (isEffFree se)
      (ctx, hole) <- storeX sx
      pure ((se :>:) . ctx, hole)
 {-
