@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.ICFP(allSystemsICFP, isRecursive) where
 import Control.Monad( guard )
+import Data.List
 import Data.Maybe
 
 import Epic.Print hiding ((<>))
@@ -722,53 +723,55 @@ isStoreOp Write = True
 isStoreOp AddTo = True
 isStoreOp _ = False
 
-storeX, storeX1 :: Expr -> [(Context, Expr)]
+storeX, storeX1 :: Expr -> [(Context, [Ident], Expr)]
 -- S context
-storeX lhs = storeX1 lhs ++ [(id,lhs)]
+storeX lhs = storeX1 lhs ++ [(id, [], lhs)]
 -- S context, S /= hole
 storeX1 One{} = error "storeX: one"
 storeX1 All{} = error "storeX: all"
 storeX1 lhs =
   do Val v :=: sx <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure ((v :=:) . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure ((v :=:) . ctx, is, hole)
  ++
   do sx :>: e <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure ((:>: e) . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure ((:>: e) . ctx, is, hole)
  ++
   do se :>: sx <- [lhs]
      guard (isEffFree se)
-     (ctx, hole) <- storeX sx
-     pure ((se :>:) . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure ((se :>:) . ctx, is, hole)
  ++
   do EXI x sx <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure (EXI x . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure (EXI x . ctx, x:is, hole)
 
 rulesStore :: ERule
 rulesStore _ lhs =
   "REF-ALLOC" `name`
   do Store h e <- [lhs]
-     (ctx, Op Alloc :@: Val v) <- storeX e
+     (ctx, is, Op Alloc :@: Val v) <- storeX e
+     guard (null (intersect is (free v)))
      let (h', p) = storeAlloc h v
      pure (Store h' (ctx (Ref p)))
  ++
   "REF-READ" `name`
   do Store h e <- [lhs]
-     (ctx, Op Read :@: Ref p) <- storeX e
+     (ctx, _, Op Read :@: Ref p) <- storeX e
      let v = storeRead h p
      pure (Store h (ctx v))
  ++
   "REF-WRITE" `name`
   do Store h e <- [lhs]
-     (ctx, Op Write :@: Arr [Ref p, Val v]) <- storeX e
+     (ctx, is, Op Write :@: Arr [Ref p, Val v]) <- storeX e
+     guard (null (intersect is (free v)))
      let h' = storeWrite h p v
      pure (Store h' (ctx (Arr [])))
  ++
   "ST-SPLIT-DUP" `name`
   do Store h e <- [lhs]
-     (ctx, Split oe f g) <- storeX e
+     (ctx, _, Split oe f g) <- storeX e
      guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
      pure (Store h (ctx (Split (Store h oe) f g)))
@@ -781,22 +784,22 @@ rulesStore _ lhs =
  ++
   "ST-SPLIT" `name`
   do Store _ e <- [lhs]
-     (ctx, Split (Store h w) f g) <- storeX e
+     (ctx, _, Split (Store h w) f g) <- storeX e
      guard (isResult w)
      pure (Store h (ctx (Split w f g)))
  ++
   "ST-CHOICE" `name`
   do Store _ ee <- [lhs]
-     (ctx, Store h w :|: e) <- storeX ee
+     (ctx, _, Store h w :|: e) <- storeX ee
      guard (isResult w)
      pure (Store h (ctx (w :|: e)))
  ++
   "REF-ADDTO" `name`
   do Store h e <- [lhs]
-     (ctx, Op AddTo :@: Arr [Ref p, Int i]) <- storeX e
+     (ctx, _, Op AddTo :@: Arr [Ref p, Int i]) <- storeX e
      Int j <- [storeRead h p]
      let h' = storeWrite h p v
-         v = Int (j + i)
+         v = Int (j + i)  -- No free vars
      pure (Store h' (ctx v))
 {-
  ++
