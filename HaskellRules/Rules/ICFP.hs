@@ -741,12 +741,10 @@ storeX1 lhs =
      guard (isEffFree se)
      (ctx, hole) <- storeX sx
      pure ((se :>:) . ctx, hole)
-{-
  ++
-  do Exi (Bind x sx) <- [lhs]
+  do EXI x sx <- [lhs]
      (ctx, hole) <- storeX sx
-     pure (Exi . Bind x . ctx, hole)
--}
+     pure (EXI x . ctx, hole)
 
 rulesStore :: ERule
 rulesStore _ lhs =
@@ -800,4 +798,9 @@ rulesStore _ lhs =
      let h' = storeWrite h p v
          v = Int (j + i)
      pure (Store h' (ctx v))
-
+{-
+ ++
+  "ST-FAIL" `name`
+  do Store _ Fail <- [lhs]
+     pure Fail
+-}
