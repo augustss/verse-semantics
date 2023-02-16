@@ -44,7 +44,7 @@ rules in \cref{fig:rules}
 	\rulename{elim-fail},
 	\rulename{elim-val},
 	\rulename{elim-exi};
-	\rulename{elim-exil};
+	\rulename{exi-eliml};
 
 \item $\rspc$ (Speculation)
 	\rulename{one-*},
@@ -397,6 +397,7 @@ so join at $|SX^[CX'^[e1'] choice CX'^[e2']]|$.
 
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
+\subsubsection{Application}
 
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
@@ -436,6 +437,8 @@ then there exists $\rdx{\rapp}''$ such that
 \end{description}
 \end{proof}
 
+\subsubsection{Unification}
+
 \begin{lemma}[Under-$\runi$] \label{lem:under-u}
 %
 Let $\rr' \equiv \rr - \rulename{subst} - \rulename{var-swap}$.
@@ -460,7 +463,7 @@ then there exists $\rdx{\runi}''$ such that
 \begin{proof}
 Split cases on the rule used in $\runi$.
 \begin{description}
-\item[Case] \rulename{subst} Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
+\item[Case \rulename{subst}]: Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
 	\begin{description}
 	\item[Case] $\rdx{} \subset X$, \ie $X \equiv X'[\rdx{}]$.
 	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYJ1tcXHJkeHt9XVt4PXZdIl0sWzAsMSwiWCdbXFxyZHh7fSddW3g9dl0iXSxbMiwwLCJYJ1xce3YveFxcfVtcXHJkeHt9XFx7di94XFx9XVt4PXZdIl0sWzIsMSwiWCdcXHt2L3hcXH1bXFxyZHh7fSdcXHt2L3hcXH1dW3g9dl0iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgXFx0ZXh0e3ZpYX1cXCBcXGNyZWZ7bGVtOnN1YnN0fSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
@@ -486,7 +489,7 @@ Split cases on the rule used in $\runi$.
 
 
 	\end{description}
-\item[Case:] \rulename{hnf-swap} $\rdx{\runi} \equiv |hnf == x|$ and $\rstep{\rr'}{h}{h'}$, so join at $\rdx{\runi}'' \equiv |x = hnf'|$.
+\item[Case \rulename{hnf-swap}]: $\rdx{\runi} \equiv |hnf == x|$ and $\rstep{\rr'}{h}{h'}$, so join at $\rdx{\runi}'' \equiv |x = hnf'|$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXG1hdGhpdHtobmZ9ID0geCJdLFsyLDAsInggPSBcXG1hdGhpdHtobmZ9Il0sWzAsMSwiXFxtYXRoaXR7aG5mfScgPSB4Il0sWzIsMSwieCA9IFxcbWF0aGl0e2huZn0nIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsxLDMsIlxccnInIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{\mathit{hnf} = x} && {x = \mathit{hnf}} \\
@@ -497,7 +500,7 @@ Split cases on the rule used in $\runi$.
 	\arrow["\runi", dotted, from=2-1, to=2-3]
 \end{tikzcd}\]
 
-\item[Case:] \rulename{u-occurs} $\rdx{\runi} \equiv x = V[x]$ and $\rstep{\rr'}{V[x]}{V'[x]}$, so join at $\rdx{\runi}'' \equiv |fail|$.
+\item[Case \rulename{u-occurs}]: $\rdx{\runi} \equiv x = V[x]$ and $\rstep{\rr'}{V[x]}{V'[x]}$, so join at $\rdx{\runi}'' \equiv |fail|$.
 % https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4ID0gVlt4XSJdLFsyLDAsIlxcdGV4dGJme2ZhaWx9Il0sWzAsMSwieCA9IFYnW3hdIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsyLDEsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{x = V[x]} && {\textbf{fail}} \\
@@ -506,10 +509,10 @@ Split cases on the rule used in $\runi$.
 	\arrow["{\rr'}"', from=1-1, to=2-1]
 	\arrow["\runi"', dotted, from=2-1, to=1-3]
 \end{tikzcd}\]
-\item[Case] \rulename{var-swap}: Impossible, no $\rdx{} \subset \rdx{\runi}$
-\item[Case] \rulename{u-lit}: Impossible, no $\rdx{} \subset \rdx{\runi}$
-\item[Case] \rulename{u-fail}: Join at $\rdx{\runi}'' \equiv |fail|$.
-\item[Case] \rulename{u-tup}: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
+\item[Case \rulename{var-swap}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case \rulename{u-lit}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case \rulename{u-fail}]: Join at $\rdx{\runi}'' \equiv |fail|$.
+\item[Case \rulename{u-tup}]: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset u_i$ \ie $\rstep{\rr'}{u_i}{u_i'}$
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_i' = v_i; \ldots u_n = v_n$.
@@ -517,7 +520,7 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
 	\end{description}
 
-\item[Case] \rulename{norm-seq}: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{norm-seq}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eu$ or in $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
@@ -530,7 +533,7 @@ Split cases on the rule used in $\runi$.
 			Join at $|fail|$.
 	\end{description}
 
-\item[Case] \rulename{norm-seqr}: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{norm-seqr}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eu$, $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
@@ -545,6 +548,7 @@ Split cases on the rule used in $\runi$.
 			Join at $|fail|$.
 	\end{description}
 
+\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
 
 \end{description}
 \end{proof}
@@ -893,6 +897,162 @@ $\join{\runi}{ \subst{X}{\overline{z}}{\overline{u}}[\overline{u = v}]}{ \subst{
 \begin{proof}
 Same as \cref{lem:eq-join} except using \rulename{hnf-swap} and \rulename{var-swap}
 to make the equations the same on both sides.
+\end{proof}
+
+\subsubsection{Normalization}
+
+\begin{lemma}[Under-$\rcon$] \label{lem:under-c}
+%
+Let $\rr' = \rr - \rcon - \runi$.
+%
+If $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
+   $\rdx{\rcon} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then exists $\rdx{\rcon}''$ such that
+   $\rstep{\rr'}{\rdx{\rcon}'}{\rdx{\rcon}''}$ and
+   $\rstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
+\end{lemma}
+
+\begin{proof}
+Let $\rcon : \rdx{\rcon} \movesto \rdx{\rcon}'$ be the $\rcon$ redex and split cases
+on the reduction rule used in the step.
+%
+\begin{description}
+\item[Case \rulename{exi-swap}]: \ie $\rcon: |def x (def y e)| \movesto |def y (def x e)|$.
+Split cases on the position of $\rdx{}$.
+	\begin{description}
+	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
+	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def y e|}{e'}$; join at $|def x e'|$.
+	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def x (def y e)|}{|def y e'|}$; join at $|def y e'|$.
+	\end{description}
+
+\item[Case \rulename{norm-exi}]: \ie $\rcon: |X^[def x e]| \movesto |def x (X^[e])|$.
+Split cases on the position of $\rdx{}$.
+	\begin{description}
+	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
+	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def x e|}{e'}$; join at $|X^[e']|$.
+	\item[Case $\rdx{} \subset X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
+	\end{description}
+
+\item[Case \rulename{subst-var}]: \ie $\rcon: |X^[x=y]|  \movesto |(subst X x y)^[x=y]|$.
+	The only possible position of $\rdx{}$ is $\rdx{} \subset X$ \ie
+	$\rstep{\rr'}{X^[x=y]}{X'^[x=y]}$; join at $|(subst X' x y)^[x=y]|$.
+
+\item[Case \rulename{var-swap}]: \ie $\rcon:  |x=y| \movesto |y=x|$.
+	Impossible to have $\rdx{} \subset |x=y|$.
+\end{description}
+\end{proof}
+
+\subsubsection{Garbage Collection}
+
+\begin{lemma}[Under-$\rgc$] \label{lem:under-g}
+If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
+	   $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rgc}''$ such that
+	   $\rstepo{\rr}{\rdx{\rgc}'}{\rdx{\rgc}''}$ and
+	   $\rstep{\rgc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+Let $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ be the $\rgc$ redex and split cases
+on the reduction rule used in the step.
+%
+\begin{description}
+\item[Case \rulename{elim-val}]: \ie $\rgc : |v;e| \movesto |e|$.
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |v|$]: Join at $|e|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
+	\end{description}
+
+\item[Case \rulename{elim-fail}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
+	Then $\rstep{\rr}{|X^[fail]|}{|X'^[fail]|}$ hence join at $|fail|$.
+
+\item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys^x^zs) e| \movesto |def (ys^zs) e|$;
+	%
+	\ranjit{Generalize elim-exi to use $\exists ...x...e$ to avoid spurious interference}
+	%
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$; join at $|def (ys^zs) e'|$.
+	\item[Case $\rdx{} \subset |def (ys^x^zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys^zs) e|$.
+	\end{description}
+
+\item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
+	%
+	\ranjit{Generalize exi-eliml to use $\exists ...x...e$ to avoid spurious interference}
+	%
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |v|$]: \ie $\rstep{rr}{v}{v'}$; join at $|X^[e]|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
+	\item[Case $\rdx{} \subset |X|$]: \ie $\rstep{rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
+	\end{description}
+\end{description}
+\end{proof}
+
+\subsubsection{Speculation}
+
+\begin{lemma}[Under-$\rspc$] \label{lem:under-s}
+	If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
+	   $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+	then there exists $\rdx{\rspc}''$ such that
+	   $\rstepo{\rr}{\rdx{\rspc}'}{\rdx{\rspc}''}$ and
+	   $\rstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
+
+\begin{description}
+\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Impossible as $\rdx{} \not \subset \rdx{\rspc}$.
+
+\item[Case \rulename{one-value}]:
+	Here $\tx{\rspc} \equiv |one v| \movesto |v|$.
+	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |v'|.
+\item[Case \rulename{all-value}]:
+	Here $\tx{\rspc} \equiv |all v| \movesto |tup (v)|$.
+	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |(v')|.
+
+\item[Case \rulename{one-choice}]:
+	Here $\tx{\rspc} \equiv |one (v `choice` e)| \movesto |v|$.
+	If $\rdx{} \subset |v|$, \ie $\rr : |v| \movesto |v'|$ then join at $|v'|$.
+	If $\rdx{} \subset |e|$, \ie $\rr : |e| \movesto |e'|$ then join at $|v|$.
+
+\item[Case \rulename{all-choice}]:
+	Here $\tx{\rspc} \equiv |all (v_1 `choice` dots `choice` v_n)| \movesto |tup (v_1,dots,v_n)|$.
+	%
+	If $\rdx{} \subset |v_i|$ ie $\rr : |v_i| \movesto |v_i'|$
+	then join at $|tup (v_1,dots,v_i',dots, v_n)|$.
+
+\item[Case \rulename{choose-l}]: (symmetric \rulename{choose-r})
+	Here $\tx{\rspc} \equiv |fail choice e| \movesto e$.
+	Here, $\rdx{} \subset e$, \ie $\rr : e \movesto e'$ so join at $|e'|$.
+
+\item[Case \rulename{choose-assoc}]: \ie $\tx{\rspc} \equiv (e_1 |choice| e_2) |choice| e_3 \movesto e_1 |choice| (e_2 |choice| e_3)$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+	\item[Case] $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ so join at $e_1' |choice| (e_2 |choice| e_3)$.
+	\item[Case] $\rdx{} \subset e_2$, \ie $\rr : e_2 \movesto e_2'$ so join at $e_1 |choice| (e_2' |choice| e_3)$.
+	\item[Case] $\rdx{} \subset e_3$, \ie $\rr : e_3 \movesto e_3'$ so join at $e_1 |choice| (e_2 |choice| e_3')$.
+	\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so join at $e_1 |choice| e_3$.
+	\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so join at $e_2 |choice| e_3$.
+	\end{description}
+
+\item[Case \rulename{one-choice}]: (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|v|}$.
+	If $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ then by \cref{lem:wf-step}, $\rdx{\rspc}'' \equiv e_1'$.
+	If $\rdx{} \subset e_2$, then join at $e_1$.
+\end{description}
 \end{proof}
 
 
@@ -1308,15 +1468,8 @@ Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ res
 \end{description}
 \end{proof}
 
-\begin{lemma}
-\end{lemma}
-\begin{proof}
-	\ranjit{TODO:notes}
-	\ranjit{CURSOR}
-\end{proof}
-
-
 % ------------------------------------------------------------------------------------------------------------------------
+
 \begin{lemma}[$\runi-\rfail$-Comm] \label{lem:u-f-c}
 	$\runi$ and $\rfail$ commute.
 \end{lemma}
@@ -1338,12 +1491,16 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rfail}$ or vice 
 
 
 
+
+
+
+
 \begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-g-c}
 	$\runi$ and $\rgc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\runi$ strongly commutes wth $\rgc$.
+We show that $\runi$ $*$-commutes commutes wth $\rgc$.
 %
 Let $\tx{\runi}$ and $\tx{\rgc}$ denote the reducts for $\runi$ and $\rgc$ respectively.
 %
@@ -1352,18 +1509,28 @@ If the reducts are disjoint then terms can be trivially joined.
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice versa.
 %
 \begin{description}
-	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$:
-		Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
-		If $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$, then as $\freevars{e'} \subset \freevars{e}$ we can join at $e'$.
-		If $\rdx{\runi} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
-		If $\rdx{\runi}$ spans some $x_i, v_i$ and $e$, then $\runi$ is via a \rulename{deref-*}, \ie
-		$\tx{\runi} \equiv x_i = |v_i|; E[x_i] \movesto x_i = |v_i|; E[|v_i|]$.
-		However, this $E[x_i]$ is disjoint from $e$ as $x_i \not \in \freevars{e}$,
-		so we can still join at $e$.
+	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$: via \cref{lem:under-g}.
+		% Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
+		% If $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$, then as $\freevars{e'} \subset \freevars{e}$ we can join at $e'$.
+		% If $\rdx{\runi} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
+		% If $\rdx{\runi}$ spans some $x_i, v_i$ and $e$, then $\runi$ is via a \rulename{deref-*}, \ie
+		% $\tx{\runi} \equiv x_i = |v_i|; E[x_i] \movesto x_i = |v_i|; E[|v_i|]$.
+		% However, this $E[x_i]$ is disjoint from $e$ as $x_i \not \in \freevars{e}$,
+		% so we can still join at $e$.
 	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 %
 \end{proof}
+\begin{lemma}
+\end{lemma}
+\begin{proof}
+	\ranjit{TODO:notes}
+	\ranjit{CURSOR}
+\end{proof}
+
+
+% ------------------------------------------------------------------------------------------------------------------------
+
 
 \begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
 	$\runi$ and $\rspc$ commute.
@@ -1783,7 +1950,7 @@ Let us split cases on whether $\rdx{\rfail}$ occurs under $\rdx{\rgc}$ or vice v
 \end{description}
 \end{proof}
 
-\begin{lemma}[Under-$\rcon$] \label{lem:under-c}
+\begin{lemma}[Under-$\rcon$]% \label{lem:under-c}
 %
 Let $\rr' = \rr - \rfail - \rgc - \rcon$.
 %
@@ -2000,7 +2167,7 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 %
 \end{proof}
 
-\begin{lemma}[Under-$\rgc$] \label{lem:under-g}
+\begin{lemma}[Under-$\rgc$] % \label{lem:under-g}
 If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
    $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
    $\rstep{\rr}{\rdx{}}{\rdx{}'}$
@@ -2065,7 +2232,7 @@ has the diamond property (as $\rspc \subset \rr$),
 and hence $\rspc$ is confluent via \cref{lem:diamond}.
 \end{proof}
 
-\begin{lemma}[Under-$\rspc$] \label{lem:under-s}
+\begin{lemma}[Under-$\rspc$] %\label{lem:under-s}
 If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
    $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
    $\rstep{\rr}{\rdx{}}{\rdx{}'}$
