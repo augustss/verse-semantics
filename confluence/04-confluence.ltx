@@ -1053,7 +1053,7 @@ reduction that precedes the \rulename{exi-swap}.
 \item[Case \rulename{subst-var}] Trivial as as there is no overlap, so
 any sequence of \rulename{subst-var} followed by \rulename{exi-swap}
 is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subst-var}.
-\item[Case \rulename{swap-var}] Let the $\rdx{\rulename{swap}} \equiv |X^[x == y]|$.
+\item[Case \rulename{var-swap}] Let the $\rdx{\rulename{swap}} \equiv |X^[x == y]|$.
 %
 	If the \rulename{exi-swap} preserves the order of $x$ and $y$ then the result follows
 	trivially (as the reductions are non-overlapping.)
@@ -1064,9 +1064,9 @@ is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subs
 	{\exists x, y. \ldots X[x=y]} && {\exists x, y. \ldots X[y=x]} \\
 	{\exists y, x. \ldots X[x=y]} && {\exists y, x. \ldots X[y=x]}
 	\arrow["{\rulename{exi-swap}}"', dotted, from=1-1, to=2-1]
-	\arrow["{\rulename{swap-var}}"', dotted, tail reversed, no head, from=2-1, to=2-3]
+	\arrow["{\rulename{var-swap}}"', dotted, tail reversed, no head, from=2-1, to=2-3]
 	\arrow["{\rulename{exi-swap}}", from=1-3, to=2-3]
-	\arrow["{\rulename{swap-var}}", from=1-1, to=1-3]
+	\arrow["{\rulename{var-swap}}", from=1-1, to=1-3]
 \end{tikzcd}\]
 \end{description}
 \end{proof}
@@ -1103,6 +1103,35 @@ the conclusion $\rss$ commutes with $\rss + \rulename{exi-swap} \equiv \rconm$.
 \end{proof}
 
 
+\begin{lemma} \label{lem:ss-half-com-exi}
+	$\rss$ \halfcommutes with \rulename{exi-swap}.
+\end{lemma}
+
+\begin{proof}
+Recall that $\rss \equiv \rulename{subst-var} + \rulename{var-swap}$.
+Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
+%
+\begin{description}
+\item[Case \rulename{subst-var}] As \rulename{subst-var} does not overlap with
+  rulename{exi-swap}, it \halfcommutes trivially via the diamond property.
+
+\item[Case \rulename{var-swap} (under \rulename{exi-swap})] The non-trivial cases are where the \emph{same}
+  variables $x$, $y$ are being swapped by both rules (otherwise, the reductions
+  \halfcommutes trivially via the diamond property).
+  For the variables to be the same, the \rulename{var-swap}
+  \emph{must} occur under the \rulename{exi-swap} (as otherwise the same variables
+  are not in scope.) Hence, the proof is completed by the following diagram.
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXGV4aXN0cyB4LCB5LiBcXGxkb3RzIFhbeD15XSJdLFsyLDAsIlxcZXhpc3RzIHksIHguIFxcbGRvdHMgWFt4PXldIl0sWzAsMSwiXFxleGlzdHMgeCwgeS4gXFxsZG90cyBYW3k9eF0iXSxbMiwxLCJcXGV4aXN0cyB5LCB4LiBcXGxkb3RzIFhbeT14XSJdLFswLDIsIlxccnVsZW5hbWV7dmFyLXN3YXB9IiwyXSxbMiwzLCJcXHJ1bGVuYW1le2V4aS1zd2FwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsIlxccnVsZW5hbWV7dmFyLXN3YXB9IiwwLHsic3R5bGUiOnsidGFpbCI6eyJuYW1lIjoiYXJyb3doZWFkIn0sImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMSwiXFxydWxlbmFtZXtleGktc3dhcH0iXV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\exists x, y. \ldots X[x=y]} && {\exists y, x. \ldots X[x=y]} \\
+	{\exists x, y. \ldots X[y=x]} && {\exists y, x. \ldots X[y=x]}
+	\arrow["{\rulename{var-swap}}"', from=1-1, to=2-1]
+	\arrow["{\rulename{exi-swap}}"', dotted, from=2-1, to=2-3]
+	\arrow["{\rulename{var-swap}}", dotted, tail reversed, no head, from=1-3, to=2-3]
+	\arrow["{\rulename{exi-swap}}", from=1-1, to=1-3]
+\end{tikzcd}\]
+\end{description}
+\end{proof}
 
 \begin{lemma}
 \end{lemma}
