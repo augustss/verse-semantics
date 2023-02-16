@@ -230,6 +230,7 @@ data Op
   | Read
   | Write
   | AddTo
+  | DotDot
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where

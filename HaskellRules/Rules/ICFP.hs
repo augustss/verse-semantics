@@ -252,6 +252,7 @@ isChoiceFree _         = False
 
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
+isChoiceFreeOp DotDot = False
 isChoiceFreeOp _ = True
 
 valueX, valueX1 :: Value -> [(Value->Value, Value)]
@@ -349,6 +350,10 @@ rulesPrimOps _ lhs =
   "APP-CONS" `name`
   do Op Cons :@: Arr [v, Arr vs] <- [lhs]
      pure (Arr (v:vs))
+ ++
+  "APP-DOTDOT" `name`
+  do Op DotDot :@: Arr [Int lo, Int hi] <- [lhs]
+     pure (foldr (:|:) Fail (map Int [lo .. hi]))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
