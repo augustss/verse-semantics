@@ -771,10 +771,14 @@ rulesStore _ lhs =
  ++
   "ST-SPLIT-DUP" `name`
   do Store h e <- [lhs]
-     (ctx, _, Split oe f g) <- storeX e
+     (ctx, is, Split oe f g) <- storeX e
      guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
-     pure (Store h (ctx (Split (Store h oe) f g)))
+     if null (intersect is (free h)) then
+       pure (Store h (ctx (Split (Store h oe) f g)))
+      else
+       -- Should rename binders in ctx
+       error "unimplemented"
  ++
   "ST-CHOICE-DUP" `name`
   do Store h (oe :|: e) <- [lhs]
@@ -784,13 +788,15 @@ rulesStore _ lhs =
  ++
   "ST-SPLIT" `name`
   do Store _ e <- [lhs]
-     (ctx, _, Split (Store h w) f g) <- storeX e
+     (ctx, is, Split (Store h w) f g) <- storeX e
+     guard (null (intersect is (free h)))
      guard (isResult w)
      pure (Store h (ctx (Split w f g)))
  ++
   "ST-CHOICE" `name`
   do Store _ ee <- [lhs]
-     (ctx, _, Store h w :|: e) <- storeX ee
+     (ctx, is, Store h w :|: e) <- storeX ee
+     guard (null (intersect is (free h)))
      guard (isResult w)
      pure (Store h (ctx (w :|: e)))
  ++
