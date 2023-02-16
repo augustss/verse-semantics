@@ -44,6 +44,7 @@ rules in \cref{fig:rules}
 	\rulename{elim-fail},
 	\rulename{elim-val},
 	\rulename{elim-exi};
+	\rulename{elim-exil};
 
 \item $\rspc$ (Speculation)
 	\rulename{one-*},
@@ -58,7 +59,7 @@ rules in \cref{fig:rules}
 \toprule
 					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		  & \rspc \\
 \midrule
-Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-d-c} & \ref{lem:u-a-c} & \ref{lem:u-f-c} & \ref{lem:u-s-c} \\
+Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-f-c} & \ref{lem:u-s-c} \\
 Normalization 		& \rcon  &      		 & \ref{lem:d-c}   & \ref{lem:a-d-c} & \ref{lem:d-f-c} & \ref{lem:d-s-c} \\
 Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-f-c} & \ref{lem:a-s-c} \\
 Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-s-c} \\
@@ -915,14 +916,14 @@ It will be convenient to \emph{factor out} \rulename{norm-exi} so let
 \begin{proof}
 The above result follows in two steps.
 %
-First we show that \rconm -- \ie normalization-without-\rulename{norm-exi} -- is confluent \cref{lem:m-con}.
+First we show that \rconm -- \ie normalization-without-\rulename{norm-exi} -- is confluent \cref{lem:m-conf}.
 %
 Second we show that \rconm \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:m-pp-float}.
 %
 Consequently, each $\rsteps{\rcon}{}{}$ can be rewritten as the composition of
 $\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\rconm}{}{}$ after which
 the following diagram completes the proof.
-% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNywiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiwxMCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEwLDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOCwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw5LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs3LDExLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMTEsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCwxMiwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOSwxMiwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw1LCJcXGNyZWZ7bGVtOmYtbS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzEsOCwiXFxjcmVme2xlbTpmLW0tY29tbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDksIlxcY3JlZntsZW06Zi1tLWNvbW19IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNSwxMiwiXFxjcmVme2xlbTptLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJjb25tIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccmNvbm0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtci1jb219IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMiw5LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzUsMTIsIlxcY3JlZntsZW06bS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	&& \bullet \\
 	\bullet &&&& \bullet \\
@@ -937,39 +938,40 @@ the following diagram completes the proof.
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-2, to=4-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-4, to=4-3]
-	\arrow["\rconm"{description}, dotted, two heads, from=2-1, to=4-1]
-	\arrow["\rconm"{description}, dotted, two heads, from=2-5, to=4-5]
+	\arrow["\rconm"{description}, two heads, from=2-1, to=4-1]
+	\arrow["\rconm"{description}, two heads, from=2-5, to=4-5]
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
-	\arrow["\rconm"{description}, dotted, two heads, from=5-1, to=6-2]
+	\arrow["\rconm"', dotted, two heads, from=5-1, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-4]
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
-	\arrow["\rconm"{description}, dotted, two heads, from=5-5, to=6-4]
+	\arrow["\rconm", dotted, two heads, from=5-5, to=6-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-2, to=7-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-4, to=7-3]
-	\arrow["{\cref{lem:f-m-join}}"{description, pos=0.8}, draw=none, from=1-3, to=4-3]
-	\arrow["{\cref{lem:f-m-com}}"{description, pos=0.9}, draw=none, from=2-1, to=6-2]
-	\arrow["{\cref{lem:f-m-com}}"{description, pos=0.9}, draw=none, from=2-5, to=6-4]
-	\arrow["{\cref{lem:m-con}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.8}, draw=none, from=1-3, to=4-3]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-1, to=6-2]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-5, to=6-4]
+	\arrow["{\cref{lem:m-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
 \end{tikzcd}\]
 \end{proof}
 
-\begin{lemma} \label{lem:f-m-join}
+\begin{lemma} \label{lem:f-exi-swap-join}
 	If $\rsteps{\rulename{norm-exi}}{e}{e_1}$ and
 	   $\rsteps{\rulename{norm-exi}}{e}{e_2}$
 	then exists
 	   $\rsteps{\rulename{norm-exi}}{e_1}{e_1'}$,
 	   $\rsteps{\rulename{norm-exi}}{e_2}{e_2'}$,
-	   $\join{\rconm}{e_1'}{e_2'}$.
+	such that
+	   $\join{\rulename{exi-swap}}{e_1'}{e_2'}$.
 \end{lemma}
 
 \begin{proof}
 On each side add the (missing) \rulename{norm-exi} steps on the other side,
-and then use (multiple) \rulename{exi-swap} (\rconm) to join.
+and then use (multiple) \rulename{exi-swap} to join.
 \end{proof}
 
-\begin{lemma} \label{lem:f-m-com}
-\rulename{norm-exi} strongly commutes with \rconm.
+\begin{lemma} \label{lem:f-rr-com}
+\rulename{norm-exi} strongly commutes with \rr - \rulename{norm-exi}.
 \end{lemma}
 
 \begin{proof}
@@ -985,7 +987,7 @@ so $\rcon^{*} \equiv \rulename{norm-exi}^{*} \cdot \rconm^{*}$.
 Split cases on each possible case of \rconm; the diamond is completed trivially as the rules are non-overlapping.
 \end{proof}
 
-\begin{lemma} \label{lem:m-con}
+\begin{lemma} \label{lem:m-conf}
 	\rconm is confluent.
 \end{lemma}
 
@@ -1024,7 +1026,7 @@ Via the following diagram, where:
 \begin{lemma} \label{lem:hops-many-exi}
 If $\rsteps{\rconm}{e}{e'}$ there exists $e''$ such that $\rsteps{\rss}{e'}{e''}$ and
 $\rsteps{\rulename{exi-swap}}{e}{\rsteps{\rss}{\cdot}{e''}}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnNzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnNzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccmNvbm0iLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7ZXhpLXN3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnNzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnNzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccmNvbm0iLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	e && {e'} \\
 	\bullet && {e''}
@@ -1043,16 +1045,12 @@ By using \cref{lem:hops-many} with the facts that
 $\rss$ \emph{hops after} $\rulename{exi-swap}$ (\cref{lem:ss-hops-exi}).
 \end{proof}
 
-\begin{lemma} \label{lem:ss-hops-exi}
-\rss\ hops after \rulename{exi-swap}.
+\begin{lemma} \label{lem:ss-hops-exi} \label{lem:u-hops-exi}
+\rss (resp. \runi) hops after \rulename{exi-swap}.
 \end{lemma}
 \begin{proof}
-By splitting cases on the $\rss$
-reduction that precedes the \rulename{exi-swap}.
+By splitting cases on the \rss (resp. \runi) reduction that precedes the \rulename{exi-swap}.
 \begin{description}
-\item[Case \rulename{subst-var}] Trivial as as there is no overlap, so
-any sequence of \rulename{subst-var} followed by \rulename{exi-swap}
-is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subst-var}.
 \item[Case \rulename{var-swap}] Let the $\rdx{\rulename{swap}} \equiv |X^[x == y]|$.
 %
 	If the \rulename{exi-swap} preserves the order of $x$ and $y$ then the result follows
@@ -1068,6 +1066,12 @@ is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subs
 	\arrow["{\rulename{exi-swap}}", from=1-3, to=2-3]
 	\arrow["{\rulename{var-swap}}", from=1-1, to=1-3]
 \end{tikzcd}\]
+
+\item[Case \emph{non}-\rulename{var-swap}]
+An $\runi$ reduction \emph{other than} \rulename{var-swap}
+is variable-order independent, so the sequence of \runi-step
+followed by \rulename{exi-swap} is equivalent to first doing
+the \rulename{exi-swap} and then the \runi step.
 \end{description}
 \end{proof}
 
@@ -1133,12 +1137,159 @@ Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
 \end{description}
 \end{proof}
 
-\begin{lemma}
+\subsection{Unification + Normalization is Confluent} % ------------------------------------------------------------------------
+
+Recall that
+\begin{align*}
+\rcon & \doteq\ \rulename{norm-exi} + \rulename{exi-swap} + \rss \\
+\intertext{and define}
+\runi' & \doteq \ \runi + \rulename{exi-swap} \\
+\end{align*}
+
+\begin{lemma}\label{lem:u-c-c}
+	$\runi \cup \rcon$ is confluent.
 \end{lemma}
+
 \begin{proof}
-	\ranjit{TODO:notes}
-	\ranjit{CURSOR}
+%
+We prove $\runi \cup \rcon$ is confluent by a generalization of the proof of \cref{lem:d-c}
+where we use the full $\runi$ relation (instead of the subset $\rss$).
+%
+First we show that \runi' -- \ie $\runi \cup \rcon$ without-\rulename{norm-exi} -- is confluent \cref{lem:ue-conf}.
+%
+Second we show that \runi' \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:u-pp-float}.
+%
+Consequently, each $\rsteps{\runi \cup \rcon}{}{}$ can be rewritten as the composition of
+$\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\runi'}{}{}$ after which
+the following diagram completes the proof.
+
+% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJ1bmknIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccnVuaSciLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjcwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsOSwiXFxjcmVme2xlbTpmLXJyLWNvbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDEyLCJcXGNyZWZ7bGVtOnVlLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&& \bullet \\
+	\bullet &&&& \bullet \\
+	& \bullet && \bullet \\
+	\bullet && \bullet && \bullet \\
+	\bullet &&&& \bullet \\
+	& \bullet && \bullet \\
+	&& \bullet
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-1]
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-5]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-3]
+	\arrow["{\runi'}"{description}, two heads, from=2-1, to=4-1]
+	\arrow["{\runi'}"{description}, two heads, from=2-5, to=4-5]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
+	\arrow["{\runi'}"', dotted, two heads, from=5-1, to=6-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-4]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
+	\arrow["{\runi'}", dotted, two heads, from=5-5, to=6-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-2, to=7-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-4, to=7-3]
+	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.7}, draw=none, from=1-3, to=4-3]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-1, to=6-2]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-5, to=6-4]
+	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+\end{tikzcd}\]
 \end{proof}
+
+\begin{lemma} \label{lem:u-pp-float}
+Let $\runi' \doteq \runi + \rulename{exi-swap}$.
+%
+\runi' strongly postpones after \rulename{norm-exi},
+so $\runi'^{*} \equiv \rulename{norm-exi}^{*} \cdot \runi'^{*}$.
+\end{lemma}
+
+\begin{proof}
+Same as \cref{lem:m-pp-float}.
+\end{proof}
+
+\begin{lemma} \label{lem:ue-conf}
+Let $\runi' \doteq \runi + \rulename{exi-swap}$. $\runi'$ is confluent.
+\end{lemma}
+
+\begin{proof}
+	Via the following diagram, where:
+	(1)~is \cref{lem:hops-many-exi-u};
+	(2)~is \cref{lem:u-ue-com};
+	(3)~is \cref{lem:u-c};
+	(4)~is \cref{lem:exi-swap-con}.
+% https://q.uiver.app/?q=WzAsMTEsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiKDEpIl0sWzIsMiwiKDQpIl0sWzMsMiwiKDEpIl0sWzEsMywiKDIpIl0sWzMsMywiKDIpIl0sWzEsMSwiXFxidWxsZXQiXSxbMywxLCJcXGJ1bGxldCJdLFsyLDQsIigzKSJdLFswLDEsIlxccnVuaSciLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwyLCJcXHJ1bmknIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsOCwiRSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw5LCJFIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDMsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJ1bmkiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksNSwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDUsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCw0LCJFIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs5LDQsIkUiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNiwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDcsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw2LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDcsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMCwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&& \bullet \\
+	\bullet & \bullet && \bullet & \bullet \\
+	& {(1)} & {(4)} & {(1)} \\
+	& {(2)} && {(2)} \\
+	&& {(3)}
+	\arrow["{\runi'}"', two heads, from=1-3, to=2-1]
+	\arrow["{\runi'}", two heads, from=1-3, to=2-5]
+	\arrow["E"{description}, dotted, two heads, from=1-3, to=2-2]
+	\arrow["E"{description}, dotted, two heads, from=1-3, to=2-4]
+	\arrow["\runi"{description}, dotted, two heads, from=2-2, to=3-2]
+	\arrow["\runi"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["\runi"{description}, dotted, two heads, from=2-4, to=3-4]
+	\arrow["\runi"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["E"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["E"{description}, dotted, two heads, from=2-4, to=3-3]
+	\arrow["\runi"{description}, dotted, two heads, from=3-3, to=4-2]
+	\arrow["\runi"{description}, dotted, two heads, from=3-3, to=4-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-4]
+	\arrow["\runi"{description}, dotted, two heads, from=4-2, to=5-3]
+	\arrow["\runi"{description}, dotted, two heads, from=4-4, to=5-3]
+\end{tikzcd}\]
+\end{proof}
+
+
+\begin{lemma} \label{lem:hops-many-exi-u}
+Let $\runi' = \runi + \rulename{exi-swap}$.
+%
+If $\rsteps{\runi'}{e}{e'}$ there exists $e''$ such that $\rsteps{\runi}{e'}{e''}$ and
+$\rsteps{\rulename{exi-swap}}{e}{\rsteps{\runi}{\cdot}{e''}}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7ZXhpLXN3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMSwiXFxydW5pJyIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e'} \\
+	\bullet && {e''}
+	\arrow["{\rulename{exi-swap}}"', dotted, two heads, from=1-1, to=2-1]
+	\arrow["\runi"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["\runi", dotted, two heads, from=1-3, to=2-3]
+	\arrow["{\runi'}", two heads, from=1-1, to=1-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+(Similar to \cref{lem:hops-many-exi}),
+By using \cref{lem:hops-many} with the facts that
+%
+\runi is confluent (\cref{lem:u-c}) and
+%
+$\runi$ \emph{hops after} $\rulename{exi-swap}$ (\cref{lem:u-hops-exi}).
+\end{proof}
+
+\begin{lemma} \label{lem:u-ue-com}
+Let $\runi' = \runi + \rulename{exi-swap}$.
+\runi' commutes with \runi.
+\end{lemma}
+
+\begin{proof}
+%
+The proof follows by observing that
+$\runi$ \emph{\halfcommutes} with \rulename{exi-swap} \cref{lem:u-half-com-exi},
+recalling that $\runi$ is confluent \cref{lem:u-c}, after which \cref{lem:half-com}
+yields the conclusion $\runi$ commutes with $\runi + \rulename{exi-swap} \equiv \runi'$.
+\end{proof}
+
+\begin{lemma} \label{lem:u-half-com-exi}
+	$\runi$ \halfcommutes with \rulename{exi-swap}.
+\end{lemma}
+
+\begin{proof}
+Same as \cref{lem:ss-half-com-exi}; the rules in \runi \emph{other than those}
+in the subset $\rss$ trivially \halfcommutes as they do not overlap with \rulename{exi-swap}.
+\end{proof}
+
 
 \subsection{Unification is Commutative} % ------------------------------------------------------------------------
 
@@ -1157,56 +1308,15 @@ Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ res
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\runi-\rdis$-Comm] \label{lem:u-d-c}
-	$\runi$ and $\rdis$ commute.
+\begin{lemma}
 \end{lemma}
-
 \begin{proof}
-Via \cref{lem:u-c-c} and \cref{lem:u-g-c} and \cref{lem:comm-union}.
+	\ranjit{TODO:notes}
+	\ranjit{CURSOR}
 \end{proof}
 
-\begin{lemma}[$\runi-\rcon$-Comm] \label{lem:u-c-c}
-	$\runi$ and $\rcon$ commute.
-\end{lemma}
 
-\begin{proof}
-We show that $\runi$ $*$-commutes with $\rcon$ and hence commutes via \cref{lem:star-comm}.
-%
-Let $\tx{\runi}$ and $\tx{\rcon}$ denote the reducts for $\runi$ and $\rcon$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined.
-%
-Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rcon}$ or vice versa.
-
-
-\begin{description}
-\item[Case $\rdx{runi} \subset \rdx{\rcon}$:] Split cases on the rule used in $\rcon$.
-	\begin{description}
-	\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
-		If $\rdx{\runi} \subset |v|$, \ie $\runi : |v| \movesto |v'|$, then join at $|e|$.
-		If $\rdx{\runi} \subset |e|$, \ie $\runi : |e| \movesto |e'|$, then join at $|e'|$.
-	\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
-		If $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
-		If $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
-		If $\rdx{\runi} \subset e_3$, \ie $\runi : e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
-		If $\rdx{\runi} \subset (e_1; e_2)$, \ie $\runi : (e_1; e_2) \movesto (e_1'; e_2')$, then join at $(e_1'; (e_2'; e_3))$.
-	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\runi} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\runi} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-		If $\rdx{\runi} \subset |x == v; e_2|$, \ie $\runi : |x == v| \movesto x = |v|; e_2'$, then join at $x = |v|; e_1; e_2'$.
-	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\runi} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
-	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
-		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
-	\end{description}
-
-\item[Case $\rdx{\rcon} \subset \rdx{\runi}$:] via \cref{lem:under-u}.
-
-\end{description}
-\end{proof}
-
+% ------------------------------------------------------------------------------------------------------------------------
 \begin{lemma}[$\runi-\rfail$-Comm] \label{lem:u-f-c}
 	$\runi$ and $\rfail$ commute.
 \end{lemma}
@@ -1452,7 +1562,7 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 \subsection{Distillation: Normalization and Garbage Collection} % --------------------------------------------------------------------------
 
 
-\begin{lemma}[$\rdis$-Confluent]%\label{lem:d-c}
+\begin{lemma}[$\rdis$-Confluent]
     $\rdis$ is confluent.
 \end{lemma}
 
