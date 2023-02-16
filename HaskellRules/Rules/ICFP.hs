@@ -758,9 +758,10 @@ rulesStore _ lhs =
  ++
   "REF-READ" `name`
   do Store h e <- [lhs]
-     (ctx, _, Op Read :@: Ref p) <- storeX e
-     let v = storeRead h p
-     pure (Store h (ctx v))
+     (ctx, is, Op Read :@: Ref p) <- storeX e
+     let v = storeRead h p 
+         ctx' = ctxAlpha v is ctx
+     pure (Store h (ctx' v))
  ++
   "REF-WRITE" `name`
   do Store h e <- [lhs]
@@ -774,11 +775,8 @@ rulesStore _ lhs =
      (ctx, is, Split oe f g) <- storeX e
      guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
-     if null (intersect is (free h)) then
-       pure (Store h (ctx (Split (Store h oe) f g)))
-      else
-       -- Should rename binders in ctx
-       error "unimplemented"
+     let (ctx', oe', f', g') = ctxAlpha h is (ctx, oe, f, g)
+     pure (Store h (ctx' (Split (Store h oe') f' g')))
  ++
   "ST-CHOICE-DUP" `name`
   do Store h (oe :|: e) <- [lhs]
@@ -813,3 +811,8 @@ rulesStore _ lhs =
   do Store _ Fail <- [lhs]
      pure Fail
 -}
+
+ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
+ctxAlpha e is ctx | null (intersect (free e) is) = ctx
+                  | otherwise = error "unimplemented"
+                  
