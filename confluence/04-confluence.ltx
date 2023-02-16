@@ -1137,8 +1137,8 @@ Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
 \end{lemma}
 \begin{proof}
 	\ranjit{TODO:notes}
+	\ranjit{CURSOR}
 \end{proof}
-
 
 \subsection{Unification is Commutative} % ------------------------------------------------------------------------
 
@@ -1148,22 +1148,10 @@ Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
 
 \begin{proof}
 We show that $\runi$ $*$-commutes with $\rapp$ and hence commutes via \cref{lem:star-comm}.
-%
 Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ respectively.
 
 \begin{description}
-\item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint]
-Here $e \equiv \ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots$. Hence, we have
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCJcXGxkb3RzIFxccmR4e1xccnVuaX0gXFxsZG90cyBcXHJkeHtcXHJhcHB9IFxcbGRvdHMiXSxbMCwxLCJcXGxkb3RzIFxccmR4e1xccnVuaX0nIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzIsMSwiXFxsZG90cyBcXHJkeHtcXHJ1bml9IFxcbGRvdHMgXFxyZHh7XFxyYXBwfScgXFxsZG90cyJdLFsxLDIsIlxcbGRvdHMgXFxyZHh7XFxydW5pfScgXFxsZG90cyBcXHJkeHtcXHJhcHB9JyBcXGxkb3RzIl0sWzAsMiwiXFxyYXBwIl0sWzAsMSwiXFxydW5pIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	& {\ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots} \\
-	{\ldots \rdx{\runi}' \ldots \rdx{\rapp} \ldots} && {\ldots \rdx{\runi} \ldots \rdx{\rapp}' \ldots} \\
-	& {\ldots \rdx{\runi}' \ldots \rdx{\rapp}' \ldots}
-	\arrow["\rapp", from=1-2, to=2-3]
-	\arrow["\runi"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-2]
-	\arrow[dotted, from=2-3, to=3-2]
-\end{tikzcd}\]
+\item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint] via \cref{lem:disjoint}.
 \item[Case: $\rdx{\runi} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] via \cref{lem:under-u}.
 \end{description}
