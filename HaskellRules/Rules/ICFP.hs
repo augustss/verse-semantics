@@ -775,12 +775,6 @@ rulesStore _ lhs =
      (ctx, Store h w :|: e) <- storeX ee
      guard (isResult w)
      pure (Store h (ctx (w :|: e)))
-{-
- ++
-  "ST-FAIL" `name`
-  do Store _ Fail <- [lhs]
-     pure Fail
--}
  ++
   "REF-ADDTO" `name`
   do Store h e <- [lhs]
