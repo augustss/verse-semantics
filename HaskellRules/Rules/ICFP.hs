@@ -771,16 +771,15 @@ rulesStore _ lhs =
   "ST-SPLIT-DUP" `name`
   do Store h e <- [lhs]
      (ctx, Split oe f g) <- storeX e
+     guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
      pure (Store h (ctx (Split (Store h oe) f g)))
  ++
   "ST-CHOICE-DUP" `name`
-  do Store h ee <- [lhs]
-     (ctx, oe :|: e) <- storeX ee
-     guard (isChoiceFree oe)
+  do Store h (oe :|: e) <- [lhs]
+     guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
-     --traceM $ "ST-CHOICE-DUP " ++ show oe
-     pure (Store h (ctx (Store h oe :|: e)))
+     pure (Store h (Store h oe :|: e))
  ++
   "ST-SPLIT" `name`
   do Store _ e <- [lhs]
