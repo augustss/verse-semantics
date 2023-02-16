@@ -1470,37 +1470,12 @@ Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ res
 
 % ------------------------------------------------------------------------------------------------------------------------
 
-\begin{lemma}[$\runi-\rfail$-Comm] \label{lem:u-f-c}
-	$\runi$ and $\rfail$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\runi$ strongly commutes wth $\rfail$.
-%
-Let $\tx{\runi}$ and $\tx{\rfail}$ denote the reducts for $\runi$ and $\rfail$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined.
-%
-Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rfail}$ or vice versa.
-%
-\begin{description}
-	\item[Case] $\rdx{\runi} \subset \rdx{\rfail}$ via \cref{lem:under-f}.
-	\item[Case] $\rdx{\rfail} \subset \rdx{\runi}$: via \cref{lem:under-u}.
-\end{description}
-\end{proof}
-
-
-
-
-
-
-
 \begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-g-c}
 	$\runi$ and $\rgc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\runi$ $*$-commutes commutes wth $\rgc$.
+We show that $\runi$ $*$-commutes commutes wth $\rgc$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rgc$.
 %
 Let $\tx{\runi}$ and $\tx{\rgc}$ denote the reducts for $\runi$ and $\rgc$ respectively.
 %
@@ -1510,17 +1485,11 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice ve
 %
 \begin{description}
 	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$: via \cref{lem:under-g}.
-		% Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
-		% If $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$, then as $\freevars{e'} \subset \freevars{e}$ we can join at $e'$.
-		% If $\rdx{\runi} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
-		% If $\rdx{\runi}$ spans some $x_i, v_i$ and $e$, then $\runi$ is via a \rulename{deref-*}, \ie
-		% $\tx{\runi} \equiv x_i = |v_i|; E[x_i] \movesto x_i = |v_i|; E[|v_i|]$.
-		% However, this $E[x_i]$ is disjoint from $e$ as $x_i \not \in \freevars{e}$,
-		% so we can still join at $e$.
 	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 %
 \end{proof}
+
 \begin{lemma}
 \end{lemma}
 \begin{proof}
@@ -1528,16 +1497,14 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice ve
 	\ranjit{CURSOR}
 \end{proof}
 
-
 % ------------------------------------------------------------------------------------------------------------------------
-
 
 \begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
 	$\runi$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ $*$-commutes with $\runi$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rspc$.
+We show that $\runi$ $*$-commutes with $\rspc$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rspc$.
 %
 Let $\tx{\runi}$ and $\tx{\rspc}$ denote the reducts for $\runi$ and $\rspc$ respectively.
 %
