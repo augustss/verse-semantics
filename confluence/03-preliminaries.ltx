@@ -6,6 +6,13 @@
 
 \newpage
 
+\newcommand{\rdis}{\ensuremath{\rcon \cup \rgc}}
+\newcommand{\norecursion}{no recursion\xspace}
+\newcommand{\sz}[1]{\ensuremath{\sharp{#1}}}
+\newcommand{\halfcommutes}{half-commutes\xspace}
+
+
+
 \section{Preliminaries} \label{sec:preliminaries}
 
 \begin{definition}[Reductions] A \emph{reduction} \rr is a binary relation on a set of terms \univ.
@@ -281,6 +288,296 @@ Via the following chase diagram (probably well known?)
 	\arrow["{S_2}", dotted, two heads, from=2-5, to=2-6]
 \end{tikzcd}\]
 \end{proof}
+
+\begin{definition}[Postpones]
+	A reduction $R$ \emph{strongly postpones} after $S$
+	if $\rstep{R}{e}{\rstep{S}{\cdot}{e'}}$
+	implies $\rsteps{S}{e}{\rstep{R}{\cdot}{e'}}$.
+\end{definition}
+
+\begin{lemma}[\cite{Hindley}] \label{lem:strong-pp}
+%% CITATION https://www.irif.fr/~faggian/LMFI_2021/Home1_PP.pdf
+If $R$ strongly postpones after $S$ then
+if $\rsteps{R \cup S}{e}{e'}$ then
+   $\rsteps{S}{e}{\rsteps{R}{\cdot}{e'}}$.
+\end{lemma}
+
+\begin{definition}[Hops]
+A reduction $R$ \emph{hops after} $S$
+if $\rstep{R}{e}{\rstep{S}{\cdot}{e'}}$
+implies there is an $e''$ such that
+$\rsteps{R}{e'}{e''}$ and
+$\rstep{S}{e}{\rsteps{R}{\cdot}{e''}}$.
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJlIl0sWzEsMCwiXFxidWxsZXQiXSxbMiwwLCJlJyJdLFswLDEsIlxcYnVsbGV0Il0sWzIsMSwiZScnIl0sWzAsMSwiUiJdLFsxLDIsIlMiXSxbMCwzLCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw0LCJSIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e & \bullet & {e'} \\
+	\bullet && {e''}
+	\arrow["R", from=1-1, to=1-2]
+	\arrow["S", from=1-2, to=1-3]
+	\arrow["S"', dotted, from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+\end{definition}
+
+\begin{lemma} \label{lem:hops}
+If $R$ is confluent and hops after $S$ then
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJlIl0sWzEsMCwiXFxidWxsZXQiXSxbMiwwLCJlJyJdLFswLDEsIlxcYnVsbGV0Il0sWzIsMSwiZScnIl0sWzAsMSwiUiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlMiXSxbMCwzLCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzMsNCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw0LCJSIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e & \bullet & {e'} \\
+	\bullet && {e''}
+	\arrow["R", two heads, from=1-1, to=1-2]
+	\arrow["S", from=1-2, to=1-3]
+	\arrow["S"', dotted, from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+By induction on size of $\rsteps{R}{}{}$.
+\begin{description}
+\item[Base case] By definition of \emph{hops after}.
+\item[Inductive case] Assume the lemma for reductions of size upto $k$
+and complete the proof via the following diagram where
+(1)~is from the induction hypothesis,
+(2)~is from the definition of hops over, and
+(3)~is from the assumption that $R$ is confluent.
+%
+% https://q.uiver.app/?q=WzAsOSxbMCwwLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMywwLCJcXGJ1bGxldCJdLFswLDEsIlxcYnVsbGV0Il0sWzEsMSwiXFxidWxsZXQiXSxbMywxLCIoMSkiXSxbMSwyLCIoMikiXSxbMywyLCIoMykiXSxbMCwxLCJSIl0sWzEsMiwiUl5rIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUyJdLFswLDQsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSw1LCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzUsNiwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw2LCJSIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNyw4LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDgsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet \\
+	\bullet & \bullet && {(1)} \\
+	& {(2)} && {(3)}
+	\arrow["R", from=1-1, to=1-2]
+	\arrow["{R^k}", two heads, from=1-2, to=1-3]
+	\arrow["S", from=1-3, to=1-4]
+	\arrow["S"', dotted, from=1-1, to=2-1]
+	\arrow["S"', dotted, from=1-2, to=2-2]
+	\arrow["R"', dotted, two heads, from=2-2, to=2-4]
+	\arrow["R", dotted, two heads, from=1-4, to=2-4]
+	\arrow["R"', dotted, two heads, from=2-2, to=3-2]
+	\arrow["R"', dotted, two heads, from=2-1, to=3-2]
+	\arrow["R"', dotted, two heads, from=3-2, to=3-4]
+	\arrow["R", dotted, two heads, from=2-4, to=3-4]
+\end{tikzcd}\]
+\end{description}
+\end{proof}
+
+\begin{lemma}\label{lem:hops-many}
+If $R$ is confluent and hops after $S$ then
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJSIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlIgXFxjdXAgUyIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e'} \\
+	\bullet && {e''}
+	\arrow["S"', dotted, two heads, from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+	\arrow["{R \cup S}", two heads, from=1-1, to=1-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+By induction on the number of $S$ steps in $\rsteps{R \cup S}{}{}$, via the following diagram.
+% https://q.uiver.app/?q=WzAsOSxbMCwwLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsIlxcYnVsbGV0Il0sWzQsMCwiXFxidWxsZXQiXSxbNCwxLCJcXGJ1bGxldCJdLFs0LDIsIlxcYnVsbGV0Il0sWzAsMiwiXFxidWxsZXQiXSxbMCwxLCJSIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiUyJdLFswLDMsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw0LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDUsIihSXiogXFxjdXAgUyleayIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw0LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDQsIlxcY3JlZntsZW06aG9wc30iLDEseyJsYWJlbF9wb3NpdGlvbiI6NjAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs0LDYsIihSXipcXGN1cCBTKV5rIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDYsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNiwiXFxjcmVme2xlbTpoYWxmLWNvbS1tYW55LWt9IiwxLHsibGFiZWxfcG9zaXRpb24iOjYwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMyw4LCJTIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw3LCJJSCIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet && \bullet \\
+	\bullet && \bullet && \bullet \\
+	\bullet &&&& \bullet
+	\arrow["R", two heads, from=1-1, to=1-2]
+	\arrow["S", from=1-2, to=1-3]
+	\arrow["S"', dotted, from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["{(R^* \cup S)^k}", dotted, two heads, from=1-3, to=1-5]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["{\cref{lem:hops}}"{description, pos=0.6}, draw=none, from=1-1, to=2-3]
+	\arrow["{(R^*\cup S)^k}"', dashed, two heads, from=2-3, to=2-5]
+	\arrow["R", dotted, two heads, from=1-5, to=2-5]
+	\arrow["{\cref{lem:half-com-many-k}}"{description, pos=0.6}, draw=none, from=1-3, to=2-5]
+	\arrow["S"', dotted, two heads, from=2-1, to=3-1]
+	\arrow["R"', dotted, two heads, from=3-1, to=3-5]
+	\arrow["R", dotted, two heads, from=2-5, to=3-5]
+	\arrow["IH"{description, pos=0.8}, draw=none, from=2-1, to=3-5]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{definition}[\halfcommutes]
+A reduction $R$ \emph{\halfcommutes} with $S$ if
+whenever $\rstep{R}{e}{e_1$} and $\rstep{S}{e}{e_2}$
+there exists $e'$ such that
+$\rsteps{R}{e_2}{e'}$ and
+$\rstep{S\epsilon}{e_1}{\rsteps{R}{\cdot}{e'}}$.
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJlIl0sWzIsMCwiZV8yIl0sWzAsMSwiZV8xIl0sWzEsMSwiXFxidWxsZXQiXSxbMiwxLCJlJyJdLFswLDEsIlMiXSxbMCwyLCJSIiwyXSxbMiwzLCJTXlxcZXBzaWxvbiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsNCwiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e_2} \\
+	{e_1} & \bullet & {e'}
+	\arrow["S", from=1-1, to=1-3]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["{S^\epsilon}"', dotted, from=2-1, to=2-2]
+	\arrow["R"', dotted, two heads, from=2-2, to=2-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+\end{tikzcd}\]
+\end{definition}
+
+\begin{lemma}\label{lem:half-com}
+If $R$ is confluent and $R$ \halfcommutes with $S$ then $R$ commutes with $R \cup S$.
+\end{lemma}
+
+\begin{proof}
+Via the following diagram, where:
+(1)~is $R$ is confluent, and
+(2)~is \cref{lem:half-com-many-s}.
+% https://q.uiver.app/?q=WzAsMTIsWzAsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFsxLDAsIlxcYnVsbGV0Il0sWzIsMCwiXFxidWxsZXQiXSxbMywwLCJcXGJ1bGxldCJdLFs0LDAsIlxcYnVsbGV0Il0sWzUsMCwiXFxidWxsZXQiXSxbMSwxLCIoMSkiXSxbMiwxLCIoMikiXSxbMywxLCIoMSkiXSxbNCwxLCIoMikiXSxbNSwxLCIoMikiXSxbMCwyLCJSIl0sWzIsMywiUyJdLFszLDQsIlIiXSxbNCw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDYsIlMiXSxbMCwxLCJSIiwyXSxbMiw3LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDgsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsOSwiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSwxMCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiwxMSwiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw3LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs3LDgsIlIgXFxjdXAgUyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCw5LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs5LDEwLCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEwLDExLCJSIFxcY3VwIFMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & {(1)} & {(2)} & {(1)} & {(2)} & {(2)}
+	\arrow["R", from=1-1, to=1-2]
+	\arrow["S", from=1-2, to=1-3]
+	\arrow["R", from=1-3, to=1-4]
+	\arrow[dotted, no head, from=1-4, to=1-5]
+	\arrow["S", from=1-5, to=1-6]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R", dotted, two heads, from=1-4, to=2-4]
+	\arrow["R"', dotted, two heads, from=1-5, to=2-5]
+	\arrow["R", dotted, two heads, from=1-6, to=2-6]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["{R \cup S}"', dotted, two heads, from=2-2, to=2-3]
+	\arrow["R"', dotted, two heads, from=2-3, to=2-4]
+	\arrow[dotted, two heads, from=2-4, to=2-5]
+	\arrow["{R \cup S}"', dotted, two heads, from=2-5, to=2-6]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}\label{lem:half-com-many-s}
+If $R$ is confluent and $R$ half-commutes with $S$ then
+if $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
+then exists $e'$ such that $\rsteps{R \cup S}{e_1}{e'}$
+                 and $\rsteps{R}{e_2}{e'}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzAsMSwiZV8xIl0sWzIsMCwiZV8yIl0sWzIsMSwiZSciXSxbMCwxLCJSIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiU15rIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCIoUl4qIFxcY3VwIFMpXmsiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e_2} \\
+	{e_1} && {e'}
+	\arrow["R"', two heads, from=1-1, to=2-1]
+	\arrow["{S^k}", two heads, from=1-1, to=1-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+	\arrow["{(R^* \cup S)^k}"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+	By repeatedly ``tiling'' (1)~\cref{lem:half-com-many-r} as follows
+% https://q.uiver.app/?q=WzAsMTAsWzAsMCwiXFxidWxsZXQiXSxbMSwwLCJcXGJ1bGxldCJdLFsyLDAsIlxcYnVsbGV0Il0sWzMsMCwiXFxidWxsZXQiXSxbNCwwLCJcXGJ1bGxldCJdLFswLDEsIlxcYnVsbGV0Il0sWzEsMSwiKDEpIl0sWzIsMSwiKDEpIl0sWzMsMSwiKDEpIl0sWzQsMSwiKDEpIl0sWzAsMSwiU18xIl0sWzEsMiwiU18yIl0sWzIsMywiUyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFszLDQsIlNfayJdLFswLDUsIlIiLDJdLFsxLDYsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw4LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDksIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsNiwiKFJeKiBcXGN1cCBTKV8xIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDcsIihSXiogXFxjdXAgUylfMiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNyw4LCIoUl4qIFxcY3VwIFMpIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDksIihSXiogXFxjdXAgUylfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & {(1)} & {(1)} & {(1)} & {(1)}
+	\arrow["{S_1}", from=1-1, to=1-2]
+	\arrow["{S_2}", from=1-2, to=1-3]
+	\arrow["S", dashed, from=1-3, to=1-4]
+	\arrow["{S_k}", from=1-4, to=1-5]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R"', dotted, two heads, from=1-4, to=2-4]
+	\arrow["R", dotted, two heads, from=1-5, to=2-5]
+	\arrow["{(R^* \cup S)_1}"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["{(R^* \cup S)_2}"', dotted, two heads, from=2-2, to=2-3]
+	\arrow["{(R^* \cup S)}"', dotted, two heads, from=2-3, to=2-4]
+	\arrow["{(R^* \cup S)_k}"', dotted, two heads, from=2-4, to=2-5]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma}\label{lem:half-com-many-k}
+If $R$ is confluent and $R$ half-commutes with $S$ then
+if $\rsteps{R}{e}{e_1}$ and $\rstep{(R^* \cup S)^k}{e}{e_2}$
+then exists $e'$ such that $\rsteps{(R^* \cup S)^k}{e_1}{e'}$
+					 and $\rsteps{R}{e_2}{e'}$.
+	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzAsMSwiZV8xIl0sWzIsMCwiZV8yIl0sWzIsMSwiZSciXSxbMCwxLCJSIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiU15rIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCIoUl4qIFxcY3VwIFMpXmsiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+		e && {e_2} \\
+		{e_1} && {e'}
+		\arrow["R"', two heads, from=1-1, to=2-1]
+		\arrow["{(R^* \cup S)^k}", two heads, from=1-1, to=1-3]
+		\arrow["R", dotted, two heads, from=1-3, to=2-3]
+		\arrow["{(R^* \cup S)^k}"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+Similar to \cref{lem:half-com-many-s}, by repeatedly ``tiling''
+(1)~\cref{lem:half-com-many-r}
+and using
+(2)~$R$ is confluent to match the $R^*$ reductions.
+%
+% https://q.uiver.app/?q=WzAsMTAsWzAsMCwiXFxidWxsZXQiXSxbMSwwLCJcXGJ1bGxldCJdLFsyLDAsIlxcYnVsbGV0Il0sWzMsMCwiXFxidWxsZXQiXSxbNCwwLCJcXGJ1bGxldCJdLFswLDEsIlxcYnVsbGV0Il0sWzEsMSwiKDIpIl0sWzIsMSwiKDEpIl0sWzMsMSwiKDEpIl0sWzQsMSwiKDEpIl0sWzAsMSwiUiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlNfMSJdLFsyLDMsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dLFszLDQsIlNfayJdLFswLDUsIlIiLDJdLFsxLDYsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw4LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDksIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsNiwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiw3LCIoUl4qIFxcY3VwIFMpXzEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsOCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDksIihSXiogXFxjdXAgUylfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	\bullet & \bullet & \bullet & \bullet & \bullet \\
+	\bullet & {(2)} & {(1)} & {(1)} & {(1)}
+	\arrow["R", two heads, from=1-1, to=1-2]
+	\arrow["{S_1}", from=1-2, to=1-3]
+	\arrow[dashed, from=1-3, to=1-4]
+	\arrow["{S_k}", from=1-4, to=1-5]
+	\arrow["R"', from=1-1, to=2-1]
+	\arrow["R"', dotted, two heads, from=1-2, to=2-2]
+	\arrow["R"', dotted, two heads, from=1-3, to=2-3]
+	\arrow["R"', dotted, two heads, from=1-4, to=2-4]
+	\arrow["R", dotted, two heads, from=1-5, to=2-5]
+	\arrow["R"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["{(R^* \cup S)_1}"', dotted, two heads, from=2-2, to=2-3]
+	\arrow[dashed, two heads, from=2-3, to=2-4]
+	\arrow["{(R^* \cup S)_k}"', dotted, two heads, from=2-4, to=2-5]
+\end{tikzcd}\]
+
+\end{proof}
+
+\begin{lemma}\label{lem:half-com-many-r}
+If $R$ is confluent and $R$ half-commutes with $S$ then
+if $\rsteps{R}{e}{e_1}$ and $\rstep{S}{e}{e_2}$
+then exists $e'$
+    such that $\rstep{S^{\epsilon}}{e_1}{\rsteps{R}{\cdot}{e'}}$
+    and $\rsteps{R}{e_2}{e'}$.
+% https://q.uiver.app/?q=WzAsNSxbMCwwLCJlIl0sWzAsMSwiZV8xIl0sWzIsMCwiZV8yIl0sWzIsMSwiZSciXSxbMSwxLCJcXGJ1bGxldCJdLFswLDEsIlIiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwyLCJTIl0sWzIsMywiUiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw0LCJTXlxcZXBzaWxvbiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDMsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e_2} \\
+	{e_1} & \bullet & {e'}
+	\arrow["R"', two heads, from=1-1, to=2-1]
+	\arrow["S", from=1-1, to=1-3]
+	\arrow["R", dotted, two heads, from=1-3, to=2-3]
+	\arrow["{S^\epsilon}"', dotted, from=2-1, to=2-2]
+	\arrow["R"', dotted, two heads, from=2-2, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+By induction on the size of $\rsteps{R}{e}{e_1}$.
+\begin{description}
+\item[Base Case] Immediate from the definition of \halfcommutes.
+\item[Inductive Case] Assume the lemma holds for reductions of size $k$,
+complete the proof via the following diagram where
+(1)~is due to the induction hypothesis,
+(2)~is from the definition of $R$ \halfcommutes with $S$ and,
+(3)~follows from the fact that $R$ is confluent.
+% https://q.uiver.app/?q=WzAsOSxbMCwwLCJlIl0sWzAsMSwiXFxidWxsZXQiXSxbMCwyLCJlXzEiXSxbMywxLCIoMSkiXSxbMywwLCJlXzIiXSxbMiwxLCJcXGJ1bGxldCJdLFsxLDIsIlxcYnVsbGV0Il0sWzIsMiwiKDIpIl0sWzMsMiwiKDMpIl0sWzAsMSwiUl5rIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiUiIsMl0sWzAsNCwiUyJdLFs0LDMsIlIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsMywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw1LCJTXlxcZXBzaWxvbiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs1LDcsIlIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsOCwiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw4LCJSIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDYsIlNeXFxlcHNpbG9uIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzYsNywiUiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e &&& {e_2} \\
+	\bullet && \bullet & {(1)} \\
+	{e_1} & \bullet & {(2)} & {(3)}
+	\arrow["{R^k}"', two heads, from=1-1, to=2-1]
+	\arrow["R"', from=2-1, to=3-1]
+	\arrow["S", from=1-1, to=1-4]
+	\arrow["R", dotted, two heads, from=1-4, to=2-4]
+	\arrow["R"', dotted, two heads, from=2-3, to=2-4]
+	\arrow["{S^\epsilon}"', dotted, from=2-1, to=2-3]
+	\arrow["R"', dotted, two heads, from=2-3, to=3-3]
+	\arrow["R"', dotted, two heads, from=3-3, to=3-4]
+	\arrow["R"', dotted, two heads, from=2-4, to=3-4]
+	\arrow["{S^\epsilon}"', dotted, from=3-1, to=3-2]
+	\arrow["R"', dotted, two heads, from=3-2, to=3-3]
+\end{tikzcd}\]
+\end{description}
+\end{proof}
+
 
 \begin{comment}
 \subsection{Semi-Commutativity}
