@@ -5,7 +5,7 @@ testeq(SEq) {p := alloc$[99]; write$[p,88]; read$[p]} {88}
 
 # Sugared operators
 testeq(SEq) {p := new[int][99]; p^}                   {99}
-#testeq(SEq) {p := new[int][99]; p .= 88; p^}          {88}
+testeq(SEq) {p := new[int][99]; p .= 88; p^}          {88}
 testeq(SEq) {p := new[int][99]; p += 88; p^}          {187}
 #testeq(SEq) {p := new[int][99]; p -= 88; p^}          {11}
 #testeq(SEq) {p := new[int][99]; p *= 88; p^}          {8712}
@@ -36,7 +36,7 @@ testeq(SEq){var x:any=5; if (a:=1|2; a>1)            then set x+=1 else set x+=2
 testeq(SEq){var x:any=5; if (set x+=10; a:=1|2; a>1) then set x+=1 else set x+=2; x }    {16}
 testeq(SEq){var x:any=5; if (a:=1|2; a>1; set x+=10) then set x+=1 else set x+=2; x }    {16}
 
-# store propagation on failure, choice
+# store propagation on failure, choice 3
 testeq(SEq){var x:any=5; if (a:=1|2; a>2)            then set x+=1 else set x+=2; x }    {7}
 testeq(SEq){var x:any=5; if (set x+=10; a:=1|2; a>2) then set x+=1 else set x+=2; x }    {7}
 testeq(SEq){var x:any=5; if (a:=1|2; a>2; set x+=10) then set x+=1 else set x+=2; x }    {7}
@@ -134,7 +134,11 @@ testeq(SEq) {
 testeq(SEq) { var a:int=0; for(x:=(set a=100; 10) | (set a=200; 20)) { (a, x) } } { (100,10), (200, 20) }
 testeq(SEq) { var a:int=0; for(x:=(set a+=100; 10) | (set a+=200; 20)) { (a, x) } } { (100,10), (300, 20) }
 
-#testeq(SEq) { var a:any=0; for{for(set a+=1; x:=(set a+=10; 10) | (set a+=100; 20)) { set a+=1000; (set a+=10000; (a, x)) | (set a += 100000; (a, x+1)) }} } {0}
+#testeq(SEq) { var a:any=0; for{for(set a+=1; x:=(set a+=10; 10) | (set a+=100; 20)) { set a+=1000; (set a+=10000; (a, x)) | (set a += 100000; (a, x+1)) }} } {
+# is this correct?
+#  (((11011,  10), (22111,  20)), ((11011,  10), (122111, 21)),
+#   ((222111, 11), (233211, 20)), ((222111, 11), (333211, 21)))
+# }
 
 #testeq(SEq) { for{var a:any=0; for(set a+=1; x:=(set a+=10; 10) | (set a+=100; 20)) { set a+=1000; (a, x) | (a, x+1) } } } { 0 }
 #  {(((100, 10), (300, 20))
@@ -143,7 +147,7 @@ testeq(SEq) { var a:int=0; for(x:=(set a+=100; 10) | (set a+=200; 20)) { (a, x) 
 #   ,((301, 11), (501, 21))
 #   ) }
 
-# XXX Check what thios should be
+# XXX Check what this should be
 testeq(SEq) { for{a:=alloc$[0]; for(a+=1; x:=(a+=10; 10) | (a+=100; 20)) { a+=1000; (read$[a], x) | (read$[a], x+1) } } }
   { (((1011, 10), (2111, 20)), ((1011, 10), (2111, 21)),
      ((2111, 11), (3211, 20)), ((2111, 11), (3211, 21)))

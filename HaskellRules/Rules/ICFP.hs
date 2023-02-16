@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Rules.ICFP(allSystemsICFP, isRecursive) where
 import Control.Monad( guard )
+import Data.List
 import Data.Maybe
 
 import Epic.Print hiding ((<>))
@@ -20,7 +21,8 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPR,
+allSystemsICFP = [ systemICFP, systemICFPE,
+                   systemICFPR,
                    systemICFPS
                  ]
 
@@ -38,13 +40,23 @@ systemICFP = TRSystem
   , validExpr           = const valid
   }
 
+systemICFPE :: TRSystem Expr
+systemICFPE = s
+  { sname = "ICFPE"
+  , description = description s ++ " - EXI-SWAP"
+  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP"
+  , rulesHaveStructural = False
+  }
+  where s = systemICFP
+
 systemICFPR :: TRSystem Expr
 systemICFPR = s
   { sname = "RICFP"
   , description = description s ++ " + SUBST-REC"
   , rules = rules s <> rulesSubstRec
+  , rulesHaveStructural = False
   }
-  where s = systemICFP
+  where s = systemICFPE
 
 systemICFPS :: TRSystem Expr
 systemICFPS = s
@@ -54,7 +66,7 @@ systemICFPS = s
   , preProcess = \ e -> addStore . preProcess s e
   , postProcess = const dropStore
   }
-  where s = systemICFP
+  where s = systemICFPE
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -182,6 +194,24 @@ execX1 lhs =
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
 
+-- Like execX, but no Store allowed
+execnX, execnX1 :: Expr -> [(Context, Expr)]
+-- X context
+execnX lhs = execnX1 lhs ++ [(id,lhs)]
+-- X context, X /= hole
+execnX1 lhs =
+  do (v :=: x) :>: e <- [lhs]
+     (ctx, hole) <- execnX x
+     pure (\ a -> (v :=: ctx a) :>: e, hole)
+ ++
+  do x :>: e <- [lhs]
+     (ctx, hole) <- execnX x
+     pure ((:>: e) . ctx, hole)
+ ++
+  do e :>: x <- [lhs]
+     (ctx, hole) <- execnX x
+     pure ((e :>:) . ctx, hole)
+
 scopeX :: Expr -> [(Context, Expr)]
 scopeX lhs =
   do One hole <- [lhs]
@@ -241,6 +271,7 @@ isChoiceFree _         = False
 
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
+isChoiceFreeOp DotDot = False
 isChoiceFreeOp _ = True
 
 valueX, valueX1 :: Value -> [(Value->Value, Value)]
@@ -338,6 +369,10 @@ rulesPrimOps _ lhs =
   "APP-CONS" `name`
   do Op Cons :@: Arr [v, Arr vs] <- [lhs]
      pure (Arr (v:vs))
+ ++
+  "APP-DOTDOT" `name`
+  do Op DotDot :@: Arr [Int lo, Int hi] <- [lhs]
+     pure (foldr (:|:) Fail (map Int [lo .. hi]))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
@@ -516,7 +551,7 @@ rulesElimination _ lhs =
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
   "NORM-EXI" `name`
-  do (ctx, EXI x e) <- execX1 lhs
+  do (ctx, EXI x e) <- execnX1 lhs  -- Note: Store not allowed in ctx
      let freeX = free ctx
          x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
@@ -674,7 +709,9 @@ isStoreFree (a :|: b) = isStoreFree a && isStoreFree b
 isStoreFree (Op op :@: _) = not (isStoreOp op)
 isStoreFree (One e)   = isStoreFree e
 isStoreFree (All e)   = isStoreFree e
-isStoreFree (Split e _ _) = isStoreFree e
+isStoreFree (Split e (LAM _ f) (LAM _ (LAM _ (LAM _ g)))) = isStoreFree e && isStoreFree f && isStoreFree g
+isStoreFree (Split (Var _ :@: Arr []) (LAM _ f) (Var _)) = isStoreFree f
+isStoreFree e@Split{} = error $ "bad split: " ++ prettyShow e
 isStoreFree Wrong     = True
 isStoreFree (EXI _ e) = isStoreFree e
 isStoreFree _         = False
@@ -686,89 +723,96 @@ isStoreOp Write = True
 isStoreOp AddTo = True
 isStoreOp _ = False
 
-storeX, storeX1 :: Expr -> [(Context, Expr)]
+storeX, storeX1 :: Expr -> [(Context, [Ident], Expr)]
 -- S context
-storeX lhs = storeX1 lhs ++ [(id,lhs)]
+storeX lhs = storeX1 lhs ++ [(id, [], lhs)]
 -- S context, S /= hole
 storeX1 One{} = error "storeX: one"
 storeX1 All{} = error "storeX: all"
 storeX1 lhs =
   do Val v :=: sx <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure ((v :=:) . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure ((v :=:) . ctx, is, hole)
  ++
   do sx :>: e <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure ((:>: e) . ctx, hole)
+     (ctx, is, hole) <- storeX sx
+     pure ((:>: e) . ctx, is, hole)
  ++
   do se :>: sx <- [lhs]
-     guard (isStoreFree se)
-     (ctx, hole) <- storeX sx
-     pure ((se :>:) . ctx, hole)
-{-
+     guard (isEffFree se)
+     (ctx, is, hole) <- storeX sx
+     pure ((se :>:) . ctx, is, hole)
  ++
-  do Exi (Bind x sx) <- [lhs]
-     (ctx, hole) <- storeX sx
-     pure (Exi . Bind x . ctx, hole)
--}
+  do EXI x sx <- [lhs]
+     (ctx, is, hole) <- storeX sx
+     pure (EXI x . ctx, x:is, hole)
 
 rulesStore :: ERule
 rulesStore _ lhs =
   "REF-ALLOC" `name`
   do Store h e <- [lhs]
-     (ctx, Op Alloc :@: Val v) <- storeX e
+     (ctx, is, Op Alloc :@: Val v) <- storeX e
+     guard (null (intersect is (free v)))
      let (h', p) = storeAlloc h v
      pure (Store h' (ctx (Ref p)))
  ++
   "REF-READ" `name`
   do Store h e <- [lhs]
-     (ctx, Op Read :@: Ref p) <- storeX e
-     let v = storeRead h p
-     pure (Store h (ctx v))
+     (ctx, is, Op Read :@: Ref p) <- storeX e
+     let v = storeRead h p 
+         ctx' = ctxAlpha v is ctx
+     pure (Store h (ctx' v))
  ++
   "REF-WRITE" `name`
   do Store h e <- [lhs]
-     (ctx, Op Write :@: Arr [Ref p, Val v]) <- storeX e
+     (ctx, is, Op Write :@: Arr [Ref p, Val v]) <- storeX e
+     guard (null (intersect is (free v)))
      let h' = storeWrite h p v
      pure (Store h' (ctx (Arr [])))
  ++
   "ST-SPLIT-DUP" `name`
   do Store h e <- [lhs]
-     (ctx, Split oe f g) <- storeX e
+     (ctx, is, Split oe f g) <- storeX e
+     guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
-     pure (Store h (ctx (Split (Store h oe) f g)))
+     let (ctx', oe', f', g') = ctxAlpha h is (ctx, oe, f, g)
+     pure (Store h (ctx' (Split (Store h oe') f' g')))
  ++
   "ST-CHOICE-DUP" `name`
-  do Store h ee <- [lhs]
-     (ctx, oe :|: e) <- storeX ee
-     guard (isChoiceFree oe)
+  do Store h (oe :|: e) <- [lhs]
+     guard (not (isResult oe) && oe /= Fail)
      guard (isNonStore oe)
-     --traceM $ "ST-CHOICE-DUP " ++ show oe
-     pure (Store h (ctx (Store h oe :|: e)))
+     pure (Store h (Store h oe :|: e))
  ++
   "ST-SPLIT" `name`
   do Store _ e <- [lhs]
-     (ctx, Split (Store h w) f g) <- storeX e
+     (ctx, is, Split (Store h w) f g) <- storeX e
+     guard (null (intersect is (free h)))
      guard (isResult w)
      pure (Store h (ctx (Split w f g)))
  ++
   "ST-CHOICE" `name`
   do Store _ ee <- [lhs]
-     (ctx, Store h w :|: e) <- storeX ee
+     (ctx, is, Store h w :|: e) <- storeX ee
+     guard (null (intersect is (free h)))
      guard (isResult w)
      pure (Store h (ctx (w :|: e)))
+ ++
+  "REF-ADDTO" `name`
+  do Store h e <- [lhs]
+     (ctx, _, Op AddTo :@: Arr [Ref p, Int i]) <- storeX e
+     Int j <- [storeRead h p]
+     let h' = storeWrite h p v
+         v = Int (j + i)  -- No free vars
+     pure (Store h' (ctx v))
 {-
  ++
   "ST-FAIL" `name`
   do Store _ Fail <- [lhs]
      pure Fail
 -}
- ++
-  "REF-ADDTO" `name`
-  do Store h e <- [lhs]
-     (ctx, Op AddTo :@: Arr [Ref p, Int i]) <- storeX e
-     Int j <- [storeRead h p]
-     let h' = storeWrite h p v
-         v = Int (j + i)
-     pure (Store h' (ctx v))
 
+ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
+ctxAlpha e is ctx | null (intersect (free e) is) = ctx
+                  | otherwise = error "unimplemented"
+                  

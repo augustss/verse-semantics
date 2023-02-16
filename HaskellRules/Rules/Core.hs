@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Core(
   Expr(..), Op(..),
@@ -79,6 +81,9 @@ data Expr
 type Value = Expr
 
 type Heap = IM.SIntMap Ptr Value
+instance Free Heap where
+  free h = free (IM.elems h)
+
 newtype Ptr = Ptr Int deriving (Show, Eq, Ord, Data, Enum)
 
 instance Pretty Ptr where pPrintPrec _ _ (Ptr i) = text ("r" ++ show i)
@@ -230,6 +235,7 @@ data Op
   | Read
   | Write
   | AddTo
+  | DotDot
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where

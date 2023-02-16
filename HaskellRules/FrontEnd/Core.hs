@@ -133,10 +133,10 @@ vEmpty = CArray []
 
 type C = ReaderT Flags (State Int)
 
-seqC :: [Core] -> Core
+seqC :: (HasCallStack) => [Core] -> Core
 seqC acs =
   case concatMap flat acs of
-    [] -> impossible acs
+    [] -> CArray []
     [c] -> c
     cs -> CSeq cs
   where
