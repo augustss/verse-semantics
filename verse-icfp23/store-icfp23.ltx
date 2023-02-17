@@ -17,7 +17,6 @@
       \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
       \text{Head values}        & hnf & ::= & \cdots \vb r \\
       \text{Execution contexts} & X   & ::= & \cdots \vb |store h X| \\
-                                & X'  & ::= & \text{like old X} \\
       \text{Scope contexts}     & SC  & ::= & \cdots \vb |store h SC| \\
       \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
       \text{Heap context}       & H   & ::= & \hole|,h| \vb |cell r v, H| \\
@@ -33,17 +32,18 @@
 \\
 
   \textbf{Axiom extensions} \\
-  \textit{Normalization change (use X')} \\
+  \textit{Normalization change} \\
   \begin{array}{lrcll}
-  \rulename{norm-exi} & |X'^[def x e]| & \movesto & |def x (X'^[e])| & \text{if $|X'| \ne \hole,\,  x \notin \freevars{|X'|}$, \alphamark}\\
+    \rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
+    &&&& \text{if there is |storeKW| in |X| then |e| $\in$ |ce|} \\
   \end{array} \\
-\\
+
   \textit{Reference ops} \\
   \begin{array}{lrcll}
     \rulename{ref-alloc} & |store h (S^[apply1 alloc v])| & \movesto & |store (cell r v, h) (S^[r])| \\
     &&& \quad \freevars{|v|} \# \boundvars{|S|}, \text{|r| fresh}  \\
     \rulename{ref-read} & |store (H^[cell r v]) (S^[apply1 read r])| & \movesto & |store (H^[cell r v]) (S^[v])| \\
-    &&& \quad \freevars{|v|} \# \boundvars{|S|}  \\
+    &&& \quad \freevars{|v|} \# \boundvars{|S|}, \text{\alphamark}  \\
     \rulename{ref-write} &
         | store (H^[cell r v_1]) (S^[applyN write (r,v_2)])|
         & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
@@ -54,7 +54,7 @@
   \textit{Store duplication} \\
   \begin{array}{lrcll}
     \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
-    &&& \quad \freevars{|h|} \# \boundvars{|S|}  \\
+    &&& \quad \freevars{|h|} \# \boundvars{|S|}, \text{\alphamark}  \\
     \rulename{st-choice-dup} & |store h (oe `choice` e)| & \movesto & |store h (store h oe `choice` e)| \\
   \end{array} \\
 
