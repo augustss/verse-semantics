@@ -685,12 +685,20 @@ storeWrite h p v = IM.insert p v h
 addStore :: Expr -> Expr
 addStore e = Store storeEmpty e
 
+-- If there are no store operations, drop the store
+-- and any existentials that are no longer needed.
 dropStore :: Expr -> Expr
-dropStore (Store _ e) | hasNoStoreOps e = e
-dropStore e = e
+dropStore ee | hasStoreOps ee = ee
+            | otherwise = drops ee
+  where drops (Store _ e) = e
+        drops (EXI x e) | x `elem` free e' = EXI x e'
+                        | otherwise = e'
+          where e' = drops e
+        drops e = e
 
-hasNoStoreOps :: Expr -> Bool
-hasNoStoreOps e = null [ () | Op o <- universe e, isStoreOp o ]
+hasStoreOps :: Expr -> Bool
+hasStoreOps e = not $ null [ () | Op o <- universe e, isStoreOp o ]
+
 hasStore :: Expr -> Bool
 hasStore e = not $ null [ () | Store{} <- universe e ]
 
