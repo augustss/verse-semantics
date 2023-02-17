@@ -67,6 +67,9 @@
 \newcommand{\runi}{\ensuremath{\mathcal{U}}}
 \newcommand{\rapp}{\ensuremath{\mathcal{A}}}
 \newcommand{\rcon}{\ensuremath{\mathcal{N}}}
+\newcommand{\rconm}{\ensuremath{\rcon'}}
+\newcommand{\rss}{\ensuremath{\mathcal{SS}}}
+
 \newcommand{\rgc}{\ensuremath{\mathcal{G}}}
 \newcommand{\rfail}{\ensuremath{\mathcal{F}}}
 \newcommand{\rspc}{\ensuremath{\mathcal{S}}}
@@ -179,6 +182,7 @@
                                      \vb |one e| \vb |all e|
                                      \vb |apply1 op v| \\
                                & ceu & ::= & |ce| \vb |v == ce| \\
+      \multicolumn{4}{l}{\text{\lennart{Should |ce| contain |defKW|?}}} \\
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -186,6 +190,7 @@
 \end{figure}
 }
 
+\newcommand{\alphamark}{use $\alpha$}
 
 % ------------------ ICFP rewrite rules -------------------
 
@@ -213,7 +218,7 @@
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
 \rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
-              & \text{if $x \not\in \freevars{|v|}$} \\
+              & \text{if $x \not\in \freevars{|v|}$, \alphamark} \\
 \rulename{app-tup} & |apply1 (tup (v_0,dots v_n)) v| & \movesto &
          \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
@@ -228,13 +233,14 @@
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
-  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
+%%  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
+  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
   \rulename{val-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1|; not both with choices } \\
 
     \\[-2mm]
 
 \rulegroupname{Normalization:~\rcon}
-\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$}\\
+\rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
 \rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| & \text{\textit{Note}: structural} \\
@@ -268,7 +274,9 @@
 \rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
 
 
-\end{array}
+\end{array} \\
+\\    
+\text{\textit{Note}: In the rules marked with ``\alphamark'', use $\alpha$-conversion to avoid name capture.}
 \end{array}$
 \iffullverse
 $$\begin{array}{l}

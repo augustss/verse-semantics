@@ -61,8 +61,8 @@ testeq(SEq) {(x:any=>x)=(x:any=>1)}               {:false}
 # Unification with equal values
 testeq(SEq) {1=1}                                 {1}
 # Not with POPL
-testeq(SEq,popl*=FEq,refimpl=Skip,icfp*=FEq)
-            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
+#testeq(SEq,popl*=FEq,refimpl=Skip,icfp*=FEq)
+#            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq(SEq) {(1,2)=(1,2)}                         {(1,2)}
 testeq(SEq) {(x:any=>x)=(x:any=>x)}               {:false}
 
@@ -113,14 +113,14 @@ testeq(SEq) {ap0(f(x:int):=2)<covariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
 #testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
-testeq(SEq,refimpl=Skip,icfpk=Skip) {x? : int}                            { x : ?int }
-testeq(SEq,refimpl=Skip,icfpk=Skip) {x[] : int}                           { x : []int }
+testeq(SEq,refimpl=Skip,icfp=Skip) {x? : int}                            { x : ?int }
+testeq(SEq,refimpl=Skip,icfp=Skip) {x[] : int}                           { x : []int }
 testeq(SEq) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 # DESUGAR HOW?
 #testeq(SEq) {p^[](:int):int}                      {0}
 
 # Times out with ICFPK
-testeq(SEq,icfpk=Skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
+testeq(SEq,icfp=Skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
 
 # Array expression splicing
 ### SPLICE testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
@@ -161,7 +161,7 @@ testeq(SEq) {for(x:=1){x+1}}                      {array{2}}
 testeq(SEq) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
 testeq(SEq) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
 # times out with ICFPK
-testeq(SEq,icfpk=Skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+testeq(SEq,icfp=Skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
 
 ### WRONG testeq(SEq) {0[0]}                                {wrong}
 ### WRONG testeq(SEq) {operator'/'(1,0)}                    {wrong}

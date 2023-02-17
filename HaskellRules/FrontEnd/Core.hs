@@ -133,10 +133,10 @@ vEmpty = CArray []
 
 type C = ReaderT Flags (State Int)
 
-seqC :: [Core] -> Core
+seqC :: (HasCallStack) => [Core] -> Core
 seqC acs =
   case concatMap flat acs of
-    [] -> impossible acs
+    [] -> CArray []
     [c] -> c
     cs -> CSeq cs
   where
@@ -246,8 +246,7 @@ coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
 
 forSplit :: Expr -> Expr -> C Core
 forSplit (Exists vs e1) e2 = do
-  f <- newTmp
-  g <- newTmp
+  h <- newTmp
   u <- newTmp
   x <- newTmp
   y <- newTmp
@@ -255,18 +254,14 @@ forSplit (Exists vs e1) e2 = do
   b <- newTmp
   e1' <- core (Exists vs $ Seq [e1, Array $ map Variable vs])
   e2' <- core e2
-  let fDef e = CDef [f] (cSeq [CUnify (CVar f) (CLam u $ CArray []), e])
-      gDef e = CDef [g] (cSeq [CUnify (CVar g) $
-                               CLam x $ CLam y $ CDef (a:b:vs) $ cSeq [
-                                  CUnify (CVar x) (CArray $ map CVar vs),
-                                  CUnify (CVar a) e2',
-                                  CUnify (CVar b) (CSplit (CApply (CVar y) (CArray [])) (CVar f) (CVar g)),
-                                  CApply (CPrim "cons$") (CArray [CVar a, CVar b])
-                                  ],
-                               e
-                              ])
-
-  pure $ fDef $ gDef $ CSplit e1' (CVar f) (CVar g)
+  let fe = CLam u $ CArray []
+      ge = CLam x $ CLam y $ CLam h $ CDef (a:b:vs) $ cSeq [
+             CUnify (CVar x) (CArray $ map CVar vs),
+             CUnify (CVar a) e2',
+             CUnify (CVar b) (CSplit (CApply (CVar y) (CArray [])) fe (CVar h)),
+             CApply (CPrim "cons$") (CArray [CVar a, CVar b])
+             ]
+  pure $ CSplit e1' fe ge
 forSplit e1 e2 = impossible (e1,e2)
 
 cOne :: Core -> C Core
@@ -275,7 +270,7 @@ cOne e = do
  if not useSplit then pure $ COne e
  else do
   v <- newTmp
-  pure $ CSplit e (CLam underscore CFail) (CLam v $ CLam underscore $ CVar v)
+  pure $ CSplit e (CLam underscore CFail) (CLam v $ CLam underscore $ CLam underscore $ CVar v)
 
 underscore :: Ident
 underscore = Ident noLoc "_"
@@ -285,22 +280,17 @@ cAll e = do
  useSplit <- asks fSplit
  if not useSplit then pure $ CAll e
  else do
-  f <- newTmp
-  g <- newTmp
+  h <- newTmp
   v <- newTmp
   r <- newTmp
   x <- newTmp
-  pure $ CDef [f, g] $
-           CSeq [
-             CUnify (CVar f) (CLam underscore $ CArray []),
-             CUnify (CVar g) (CLam v $ CLam r $
-                               CDef [x] $
-                                 CSeq [
-                                   CUnify (CVar x) (CSplit (CApply (CVar r) (CArray [])) (CVar f) (CVar g)),
-                                   CApply (CPrim "cons$") (CArray [CVar v, CVar x])
-                                   ]),
-             CSplit e (CVar f) (CVar g)
+  let fe = CLam underscore $ CArray []
+      ge = CLam v $ CLam r $ CLam h $
+             CDef [x] $ CSeq [
+               CUnify (CVar x) (CSplit (CApply (CVar r) (CArray [])) fe (CVar h)),
+               CApply (CPrim "cons$") (CArray [CVar v, CVar x])
              ]
+  pure $ CSplit e fe ge
 
 cSucceeds :: Core -> C Core
 cSucceeds e = do
@@ -315,9 +305,10 @@ cSucceeds e = do
   y <- newTmp
   pure $ CSplit e
                 (CLam u1 (CWrong "succeeds-fail"))
-                (CLam x $ CLam y $ CSplit (CApply (CVar y) (CArray []))
-                                          (CLam u2 (CVar x))
-                                          (CLam u3 $ CLam u4 $ CWrong "succeed-many")
+                (CLam x $ CLam y $ CLam underscore $
+                          CSplit (CApply (CVar y) (CArray []))
+                                 (CLam u2 (CVar x))
+                                 (CLam u3 $ CLam u4 $ CLam underscore $ CWrong "succeed-many")
                 )
 
 cDecides :: Core -> C Core
@@ -335,7 +326,7 @@ cDecides e = do
                 (CLam u1 CFail)
                 (CLam x $ CLam y $ CSplit (CApply (CVar y) (CArray []))
                                           (CLam u2 (CVar x))
-                                          (CLam u3 $ CLam u4 $ CWrong "succeed-many")
+                                          (CLam u3 $ CLam u4 $ CLam underscore $ CWrong "succeed-many")
                 )
 
 -- A small optimization to get smaller examples.

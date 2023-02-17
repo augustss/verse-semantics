@@ -17,36 +17,45 @@
       \text{Primops}            & op  & ::= & \cdots \vb |alloc| \vb |read| \vb |write| \\
       \text{Head values}        & hnf & ::= & \cdots \vb r \\
       \text{Execution contexts} & X   & ::= & \cdots \vb |store h X| \\
+                                & X'  & ::= & \text{like old X} \\
       \text{Scope contexts}     & SC  & ::= & \cdots \vb |store h SC| \\
       \text{Heap}               & h   & ::= & |emp| \vb |cell r v, h| \\
       \text{Heap context}       & H   & ::= & \hole|,h| \vb |cell r v, H| \\
-      \text{Store contexts}     & S   & ::= & \hole \vb |S == e| \vb |sf == S| \vb |S ; e| \vb |sf; S| \\
+      \text{Store contexts}     & S   & ::= & \hole \vb |v == S| \vb |S ; e| \vb |sf; S| \vb |def x S| \\
       \text{Store-op free exprs}&|sf| & ::= & |v| \vb |sf_1 = sf_2| \vb |sf_1; sf_2| \vb |def x sf|
                                               \vb |apply1 sp v|
                                               %%% need sv \vb |split sf sv_1 sv_2|
                                               \\
       \text{Results}            & w   & ::= & |v| \vb |v `choice` e| \\
       \text{Non-store primops}  & sp  & ::= & \text{any, except } |alloc|, |read|, |write| \\
-      \text{Non-store expression} & oe  & ::= & \text{like |e|, that is not |w|, and also not a |storeKW| nor |fail|} \\
+      \text{Non-store expression} & oe  & ::= & \text{like |e|, but not |w|, |storeKW|, or |fail|} \\
     \end{array} \\
 \\
 
   \textbf{Axiom extensions} \\
+  \textit{Normalization change (use X')} \\
+  \begin{array}{lrcll}
+  \rulename{norm-exi} & |X'^[def x e]| & \movesto & |def x (X'^[e])| & \text{if $|X'| \ne \hole,\,  x \notin \freevars{|X'|}$, \alphamark}\\
+  \end{array} \\
+\\
   \textit{Reference ops} \\
   \begin{array}{lrcll}
-    \rulename{ref-alloc} & |store h (S^[apply1 alloc v])| & \movesto & |store (cell r v, h) (S^[r])| & \text{|r| fresh} \\
+    \rulename{ref-alloc} & |store h (S^[apply1 alloc v])| & \movesto & |store (cell r v, h) (S^[r])| \\
+    &&& \quad \freevars{|v|} \# \boundvars{|S|}, \text{|r| fresh}  \\
     \rulename{ref-read} & |store (H^[cell r v]) (S^[apply1 read r])| & \movesto & |store (H^[cell r v]) (S^[v])| \\
+    &&& \quad \freevars{|v|} \# \boundvars{|S|}  \\
     \rulename{ref-write} &
         | store (H^[cell r v_1]) (S^[applyN write (r,v_2)])|
         & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
+    &&& \quad \freevars{|v_2|} \# \boundvars{|S|}  \\
   \end{array} \\
     \\
 
   \textit{Store duplication} \\
   \begin{array}{lrcll}
     \rulename{st-split-dup} & |store h (S^[split oe f g])| & \movesto & |store h (S^[split (store h oe) f g])| \\
-    \rulename{st-choice-dup} & |store h (S^[oe `choice` e])| & \movesto & |store h (S^[store h oe `choice` e])| \quad
-    |oe| \in |ce| \\
+    &&& \quad \freevars{|h|} \# \boundvars{|S|}  \\
+    \rulename{st-choice-dup} & |store h (oe `choice` e)| & \movesto & |store h (store h oe `choice` e)| \\
   \end{array} \\
 
     \\
@@ -54,7 +63,9 @@
   \begin{array}{lrcll}
      \rulename{st-split} & |store h_1 (S^[split (store h_2 w) f g])| & \movesto &
          |store h_2 (S^[split w f g])| \\
+    &&& \quad \freevars{|h_2|} \# \boundvars{|S|}  \\
      \rulename{st-choice} & |store h_1 (S^[(store h_2 w) `choice` e]| & \movesto & |store h_2 (S^[w `choice` e])| \\
+    &&& \quad \freevars{|h_2|} \# \boundvars{|S|}  \\
   \end{array} \\
 
     \\

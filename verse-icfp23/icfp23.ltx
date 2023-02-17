@@ -435,7 +435,6 @@ $$
 \movestoR{hnf-swap}      & |def y (y==2; y)| \\
 \movestoR{subst}         & |def y (y==2; 2)| \\
 \movestoR{elim-exil}     & |2| \\
-\text{\lennart{ICFP conversion done}}
 \end{array}
 $$
 %
@@ -1013,11 +1012,17 @@ has the following properties:
 
 \subsection{Ordering terms}
 The \rulename{var-swap} and \rulename{val-swap} orders expressions using the ordering |lte|.
-The reason for this is to simplify the confluence proof by having a canonical ordering.
+The reason for this is to simplify the confluence proof by having a more canonical representation.
 The ordering is based on using de Bruijn indices as the variable representation.
-The ordering is defined for |eu|, \ie, expressions and equalities.
-The |lte| is defined so that all |v==e| are less than all |e|.
+The ordering is defined for expressions |eu|, \ie, expressions and equalities.
+The |lte| is defined so that all equalities, |v==e|, are less than all expressions, |e|.
 Furthermore, |e_1 lte e_2| if the natural lexicographical comparison of the terms with de Bruijn indices is |e_1 < e_2|.
+\Eg, in the expressions |def (y x) (y == x; 0)| the |x| is considered less than the |y| since
+the de Bruijn index for |x| is 0, and for |y| is is |1|.
+So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
+
+Note that the \rulename{val-swap} rule does not reorder choices;
+the rule only applies if at least one of the |eu| has no choice.
 
 
 \subsection{Functions and function application} \label{sec:beta}
@@ -1050,7 +1055,7 @@ Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
 ensures that the $|defKW| |x|$
 % hacky typesetting to ge the \exists right next to the x.
 does not capture any variables free in |v|.  If |x| appears free in |v|,
-\textalpha-conversion may be used on |lam x e| to rename |x| to $x' \not\in \freevars{v}$.
+\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{v}$.
 
 In \versecalc{}, tuples behave like (finite) functions, in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works on non-empty
@@ -1772,13 +1777,20 @@ When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
 User-defined functions can be defined at top level only;
 and function symbols (the names of such functions) are syntactically
-distinguished from ordinary variables. As Hanus describes, it is possible
+distinguished from ordinary variables.
+% As Hanus describes, it is possible
+% to translate a higher-order program into a first-order
+% form\footnote{
+%   Hanus does not mention this, but for a language with arbitrarily nested lambdas
+%   one would need to do lambda-lifting as well, but that is perhaps a minor point.}
+% using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+% |apply| function.
+As Hanus describes, it is possible
 to translate a higher-order program into a first-order
-form\footnote{
-  Hanus does not mention this, but for a language with arbitrarily nested lambdas
-  one would need to do lambda-lifting as well, but that is perhaps a minor point.}
-using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+form using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
+(Hanus does not mention this, but for a language with arbitrarily nested lambdas
+one would need to do lambda-lifting as well; this is perhaps a minor point.)
 Sadly, this encoding is hardly a natural rendition of the lambda calculus, and
 it obstructs the goal of using rewrite rules to explain to programmers how
 their program might execute. In contrast, a strength of our \versecalc{}
@@ -1804,6 +1816,65 @@ FLC has let-expressions \verb!(let x=e in b)!, where \versecalc{} uses
 FLC also uses the same construct for a different purpose, to
 bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
 In contrast, |def x e| seems more direct.
+
+\subsection{Comparison with Icon}
+
+There are many obvious similarities between Verse and the Icon programming language
+\cite{griswold:icon-users-manual,griswold:icon-overview,griswold:generators-in-icon,griswold:icon-book-1983}:
+\begin{itemize}
+\item An expression can (successively) produce any number of values.
+\item An expression that produces zero values is said to \emph{fail} \cite[\S 3.1]{griswold:generators-in-icon};
+  an expression that produces at least one value is said to \emph{succeed}.
+\item The expression ``|e_1 choice e_2|'' produces all the values of |e_1| followed by all the values of |e_2|.
+\item There is a way to turn an array (or tuple) $a$ into a sequence of produced values.
+  In Icon, this is written ``\texttt{!|a|}'' \cite[\S 3]{griswold:icon-overview}; in Verse, ``\texttt{|a|\,?}''; in \versecalc{}, ``|def (i) (x=a; x i)|''.
+\item Most ``scalar'' operations (such as addition and comparisons) run through
+  all possible combinations of values of their operand expressions,
+  using a specific left-to-right evaluation order and automatic chronological backtracking.
+\item Some operations, such as comparisons, can fail as part of their defined semantics.
+\item Success and failure are used in place of boolean values for control-structure purposes.
+  The expression ``|if e_1 then e_2 else e_3|'' checks to see whether |e_1| succeeds;
+  it then produces the values of |e_2| (if |e_1| succeeded) \emph{or} produces the values of |e_3| (if |e_1| failed).
+  If |e_1| succeeds and then |e_2| fails, backtracking does \emph{not} attempt to examine further values from |e_1|.
+\item The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
+\item There is a control structure that executes a specified expression once for every value produced by another expression.
+  In Icon this is ``\texttt{every |e_1| do |e_2|}'' and in Verse it is ``\texttt{for(|e_1|) do |e_2|}'';
+  in each, the ``\texttt{do |e_2|}'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
+  (In Icon, ``\texttt{every |e|}'' may also be written as ``\texttt{repeat |e|}''.)
+\item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
+  ``\texttt{|x| := |e|}'' will provide one value at a time from ``|e|'' to be named by variable ``|x|''.
+\end{itemize}
+
+But there are also important differences between Verse and Icon:
+\begin{itemize}
+\item Icon typically processes multiple values from an expression by using \emph{assignment} (a \emph{side effect});
+  Verse typically processes multiple values by using \emph{equations} (which are then \emph{solved})
+  but also has a concise way to turn a finite sequence of multiple values into an array.
+  For example, to make variable |a| refer to an array containing all values generated by expression |e|,
+  code such as the following is idiomatic in Icon \cite[\S 8]{griswold:icon-overview}:
+  \begin{center}
+  \texttt{a := array 0 string; i := 0; repeat a[i+] := e; close(a)}
+  \end{center}
+  (In Icon, \emph{postfix} ``\texttt{+}'' is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual} similar to \emph{prefix} ``\texttt{++}'' in C.)
+  In Verse, one may use ``\texttt{a~=~for (x := e) do~x}'' or even just ``\texttt{a~=~for~\{ e \}}''; in \versecalc{}, ``|a = all(e)|'' does the job.
+\item Backtracking in Icon is ``only control backtracking''; assignments are not undone.
+\item Both languages have an implicit ``cut'' (permanent acceptance of the first produced value) after the predicate part of an |if|-|then|-|else|;
+  Icon furthermore has an implicit cut at each semicolon (or end of line), each
+  closing brace ``\texttt{\}}'', and most keywords \cite{icon-programming-corner-4}.
+\end{itemize}
+
+Icon was designed primarily to use expressions as generators to automatically
+explore a combinatorial space of possibilities, and secondarily to use
+success/failure rather than booleans to drive control structure.
+But in other respects Icon is a fairly conventional imperative language, relying
+on side effects (assignments) to process the generated combinations.
+The designers judged that the interactions of such side effects with completely
+unrestrained control backtracking would be difficult for programmers to
+understand; therefore the design of Icon emphasizes limited scopes for control
+backtracking and tools for controlling the backtracking process.
+Verse avoids many of these difficulties by using a functional/logical approach
+rather than an imperative approach to processing generated combinations.
+
 
 \section{Looking back, looking forward}
 
@@ -1866,6 +1937,8 @@ but they are not included here.
 
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
+
+\cleardoublepage
 
 \appendix
 

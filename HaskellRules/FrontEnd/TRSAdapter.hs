@@ -202,7 +202,8 @@ allOps = [
   (T.Alloc, "alloc$"),
   (T.Read,  "read$"),
   (T.Write, "write$"),
-  (T.AddTo, "in'+='")
+  (T.AddTo, "in'+='"),
+  (T.DotDot,"in'..'")
   ]
 
 ----------------------------------------------
