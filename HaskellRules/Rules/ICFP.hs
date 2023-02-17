@@ -551,7 +551,8 @@ rulesElimination _ lhs =
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
   "NORM-EXI" `name`
-  do (ctx, EXI x e) <- execnX1 lhs  -- Note: Store not allowed in ctx
+  do (ctx, EXI x e) <- execX1 lhs  -- Note: Store not allowed in ctx
+     guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      let freeX = free ctx
          x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
@@ -690,6 +691,8 @@ dropStore e = e
 
 hasNoStoreOps :: Expr -> Bool
 hasNoStoreOps e = null [ () | Op o <- universe e, isStoreOp o ]
+hasStore :: Expr -> Bool
+hasStore e = not $ null [ () | Store{} <- universe e ]
 
 isNonStore :: Expr -> Bool
 isNonStore Store{} = False
