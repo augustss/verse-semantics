@@ -401,9 +401,11 @@ on the reduction rule used in the step.
 \item[Case \rulename{elim-fail}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
 	Then $\rstep{\rr}{|X^[fail]|}{|X'^[fail]|}$ hence join at $|fail|$.
 
-\item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys^x^zs) e| \movesto |def (ys^zs) e|$;
+\item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys,x,zs) e| \movesto |def (ys,zs) e|$;
 	%
-	%\ranjit{Generalize elim-exi to use $\exists ...x...e$ to avoid spurious interference}
+	(We can generalize \rulename{elim-exi} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
+	before applying \rulename{elim-exi} as this does not change the order of the \emph{remaining} binders.)
+	%
 	%
 	Split cases on position of $\rdx{}$
 	%
@@ -414,7 +416,8 @@ on the reduction rule used in the step.
 
 \item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
 	%
-	%\ranjit{Generalize exi-eliml to use $\exists ...x...e$ to avoid spurious interference}
+	(We can generalize \rulename{elim-exi} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
+	before applying \rulename{elim-exil} as this does not change the order of the \emph{remaining} binders.)
 	%
 	Split cases on position of $\rdx{}$
 	%
