@@ -72,30 +72,31 @@ for the respective relation (resp. pairs of relations).}
 \label{fig:confluence-summary}
 \end{figure}
 
-
-% \begin{figure}
-% \begin{tabular}{rrrrrrrr}
-% \toprule
-% 					& 	  	& \runi 		 & \rapp 		   & \rdis 		 	 & \rfail 		   & \rspc \\
-% \midrule
-% Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-a-c} & \ref{lem:u-d-c} & \ref{lem:u-f-c} & \ref{lem:u-s-c} \\
-% $\beta$-Application & \rapp  &      		 & \ref{lem:a-c}   & \ref{lem:a-d-c} & \ref{lem:a-f-c} & \ref{lem:a-s-c} \\
-% Normalize \& GC		& \rdis  &      		 &                 & \ref{lem:n-c}   & \ref{lem:d-f-c} & \ref{lem:d-s-c} \\
-% Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-s-c} \\
-% Speculation 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
-% \bottomrule
-% \end{tabular}
-% \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
-% The lemmas on the diagonal (resp. non-diagonal) entries establish confluence (resp. commutativity)
-% for the respective relation (resp. pairs of relations).}
-% \label{fig:confluence-summary}
-% \end{figure}
+\begin{definition}[Recursive Equations] \label{def:norec}
+A \emph{recursive equation} is a term of the form
+%
+$$|x == V^[(lam y e)]| \quad \text{where}\ x \in \freevars{e}$$
+%
+where the LHS is a variable and the RHS is a value containing
+a $\lambda$ within which $|x|$ occurs free.
+%
+A term $e$ is \emph{recursive} if it contains a recursive equation.
+%
+A term $e$ is \emph{transitively recursive} if $\rsteps{e}{e'}$ where $e'$ is recursive.
+%
+A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
+\end{definition}
 
 \begin{theorem}[Confluence] \label{thm:confluence}
-The reduction relation $\rr$ is confluent.
+%
+If $e$ has \norecursion and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ then $\join{\rr}{e_1}{e_2}$.
+%
+% The reduction relation $\rr$ is confluent for all terms with \norecursion.
+%
 \end{theorem}
 
 \begin{proof}
+%
 First, we partition $\rr$ into the relations $\runi$, $\rcon$, $\rapp$, $\rgc$ and $\rspc$.
 %
 Next, we show that each of these relations is confluent and pairwise
@@ -104,9 +105,16 @@ commutative (\cref{fig:confluence-summary}).
 Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
 
-In the rest of the proof, the below \cref{lem:disjoint} lemma
-allows us to focus our attention on the cases where one reduct
-\emph{occurs under} the other and vice versa.
+In the rest of the proof:
+%
+\begin{enumerate}
+	\item We assume that we are working with terms with \norecursion.
+		  The condition is only need to prove $\runi$ is confluent,
+		  but we assume it globally for clarity.
+	\item We use the below \cref{lem:disjoint} lemma to focus attention
+		  on the cases where one reduct \emph{occurs under} the other
+		  and vice versa.
+\end{enumerate}
 
 \begin{lemma}[Disjoint] \label{lem:disjoint}
 Let $e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots$
@@ -384,6 +392,7 @@ on the reduction rule used in the step.
 	\begin{description}
 	\item[Case $\rdx{} \subset |v|$]: Join at $|e|$.
 	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
+	\item[Case $\rdx{} \subset |v;e|$]: \ie $\rstep{\rulename{elim-fail}}{v;e}{|fail|}$ as $e \equiv X[|fail|]$; join at $|fail|$.
 	\end{description}
 
 \item[Case \rulename{elim-fail}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
@@ -391,7 +400,7 @@ on the reduction rule used in the step.
 
 \item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys^x^zs) e| \movesto |def (ys^zs) e|$;
 	%
-	\ranjit{Generalize elim-exi to use $\exists ...x...e$ to avoid spurious interference}
+	%\ranjit{Generalize elim-exi to use $\exists ...x...e$ to avoid spurious interference}
 	%
 	Split cases on position of $\rdx{}$
 	%
@@ -402,7 +411,7 @@ on the reduction rule used in the step.
 
 \item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
 	%
-	\ranjit{Generalize exi-eliml to use $\exists ...x...e$ to avoid spurious interference}
+	%\ranjit{Generalize exi-eliml to use $\exists ...x...e$ to avoid spurious interference}
 	%
 	Split cases on position of $\rdx{}$
 	%
@@ -1051,6 +1060,38 @@ Split cases on the rule used in $\runi$.
 	hence join at $x = \hnf'$.
 \item[Case \rulename{subst}]: via \cref{lem:subst-subst-c}.
 \item[Case \rulename{choose}]: via \cref{lem:under-choose}.
+
+\item[Case \rulename{norm-seq}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
+		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
+		\item[Case] $\rdx{} \subset (eu; e_1)$ \ie $\rulename{subst} : (eu; e_1) \movesto (eu'; e_1')$
+			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset ((eu; e_1); e_2)$ \ie $\rulename{subst} : (eu; e_1);e_2 \movesto (eu'; e_1'); e_2'$
+			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2')$.
+	\end{description}
+
+\item[Case \rulename{norm-seqr}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
+		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
+		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
+		\item[Case] $\rdx{} \subset (eu; e_1)$ \ie $\rulename{subst} : v = (eu; e_1); e_2 \movesto v = (eu'; e_1'); e_2$.
+			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset v = (eu; e_1); e_2$ \ie $\rulename{subst} : (v = eu; e_1);e_2 \movesto (v' = eu'; e_1'); e_2'$
+			Join at $\rdx{\runi}'' \equiv eu'; (v' = e_1'; e_2')$.
+	\end{description}
 \end{description}
 \end{proof}
 
