@@ -223,9 +223,9 @@
          \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice dots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 
-    \\[-2mm]
+\\[-2mm]
 
-\rulegroupname{Unification:~\runi}
+\rulegroupname{Unification} %:~\runi
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
   \rulename{u-tup} & \hspace{-8mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\

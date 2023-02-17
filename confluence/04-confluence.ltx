@@ -75,7 +75,10 @@ for the respective relation (resp. pairs of relations).}
 \begin{definition}[Recursive Equations] \label{def:norec}
 A \emph{recursive equation} is a term of the form
 %
-$$|x == V^[(lam y e)]| \quad \text{where}\ x \in \freevars{e}$$
+$$
+% |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
+|x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
+$$
 %
 where the LHS is a variable and the RHS is a value containing
 a $\lambda$ within which $|x|$ occurs free.
@@ -472,11 +475,6 @@ Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
 	\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so join at $e_1 |choice| e_3$.
 	\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so join at $e_2 |choice| e_3$.
 	\end{description}
-
-\item[Case \rulename{one-choice}]: (symmetric \rulename{one-value}, \rulename{all-value})
-	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|v|}$.
-	If $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ then by \cref{lem:wf-step}, $\rdx{\rspc}'' \equiv e_1'$.
-	If $\rdx{} \subset e_2$, then join at $e_1$.
 \end{description}
 \end{proof}
 
