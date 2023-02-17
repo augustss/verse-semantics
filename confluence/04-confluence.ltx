@@ -932,13 +932,31 @@ By induction on $k$.
 We prove that for any term $c \equiv \overline{u = v}; ee$ that it is only possible to take
 finitely many $\runib{0}$ steps from $c$.
 %
-The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}}, \sz{n})$ where
+The proof follows by lexicographic induction on the tuple
+%
 \begin{align*}
-	\sz{\text{free}} & \doteq\ \sz{\freevars{\overline{u}}} + \sz{\freevars{\overline{v}}} \\
-	\sz{\text{size}} & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
-	\sz{n}   	     & \doteq\ \mbox{the cardinality of}\ \overline{u}, \overline{v} \\
-\ranjit{TODO:finish}
+	\sz{\text{choose}} & \doteq\ \mbox{number of locations to apply \rulename{choose}} \\
+	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{norm-seq}, \rulename{norm-seqr}} \\
+	\sz{\text{free}}   & \doteq\ \mbox{number of variables that can be used as LHS of \rulename{subst}} \\ % TODO: "per" X-block ... ordered by X-block nesting
+	\sz{\text{size}}   & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
+	\sz{\text{swap}}   & \doteq\ \mbox{number of locations to apply \rulename{var-swap}} \\
 \end{align*}
+%
+where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$)
+where the rule can be applied.
+%
+Each application of
+%
+\begin{itemize}
+\item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
+\item \rulename{norm-seq*} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
+\item \rulename{subst} strictly reduces $\sz{\text{free}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{u-*} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
+\end{itemize}
+%
+Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to terminate.
+%
 \end{proof}
 
 \begin{lemma}[$\runik$-join] \label{lem:uk-join}
