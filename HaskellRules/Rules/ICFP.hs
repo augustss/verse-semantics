@@ -44,7 +44,7 @@ systemICFPE :: TRSystem Expr
 systemICFPE = s
   { sname = "ICFPE"
   , description = description s ++ " - EXI-SWAP"
-  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP"
+  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP" -= "EXI-ELIML" <> ruleElimL
   , rulesHaveStructural = False
   }
   where s = systemICFP
@@ -527,6 +527,28 @@ rulesElimination _ lhs =
   "ELIM-FAIL" `name`
   do (_cx, Fail) <- execX1 lhs
      pure Fail
+
+ruleElimL :: ERule
+ruleElimL _ lhs =
+  "EXI-ELIML-OLD" `name`
+  do EXI x a <- [lhs]
+     (ctx, Var x' :=: Val v) <- defX x a
+     guard (x == x')
+     let freeX = free ctx
+         freeV = free v
+     guard (x `notElem` freeX)
+     guard (x `notElem` freeV)
+     pure (ctx (Val v))
+
+-- X context, or exist x . defX
+defX :: Ident -> Expr -> [(Context, Expr)]
+defX xx lhs =
+  do execX lhs
+ ++
+  do Exi (Bind x dx) <- [lhs]
+     guard (x /= xx)
+     (ctx, hole) <- defX xx dx
+     return (Exi . Bind x . ctx, hole)
 
 --------------------------------------------------------------------------------
 
