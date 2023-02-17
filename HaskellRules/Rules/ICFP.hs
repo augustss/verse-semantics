@@ -21,7 +21,8 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPE,
+allSystemsICFP = [ systemICFP, systemICFPV,
+                   systemICFPE,
                    systemICFPR,
                    systemICFPS
                  ]
@@ -39,6 +40,14 @@ systemICFP = TRSystem
   , confluenceRules     = noRules
   , validExpr           = const valid
   }
+
+systemICFPV :: TRSystem Expr
+systemICFPV = s
+  { sname = "ICFPV"
+  , description = description s ++ " - VAL-SWAP + VAL-SWAP-UNORD"
+  , rules = rules s -= "VAL-SWAP" <> rulesValSwapUnord
+  }
+  where s = systemICFP
 
 systemICFPE :: TRSystem Expr
 systemICFPE = s
@@ -468,7 +477,6 @@ rulesUnification env lhs =
  ++
   "VAL-SWAP" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
---     traceM $ show (e1, e2, _ltExpr _env e2 e1, boundVars _env)
      guard $
        -- First, order by choice-free-ness;
        -- choice free goes first
@@ -484,6 +492,14 @@ rulesUnification env lhs =
              (False, True)  -> True              -- need to swap
              (True, False)  -> False             -- already in correct order
              (True, True)   -> ltExpr env e2 e1  -- use ordering
+     pure $ e2 :>: (e1 :>: e3)
+
+rulesValSwapUnord :: ERule
+rulesValSwapUnord _ lhs =
+  "VAL-SWAP-UNORD" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+     -- Don't reorder effects
+     guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
 
 isEqn :: Expr -> Bool
