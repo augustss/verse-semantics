@@ -10,7 +10,7 @@
 \begin{definition}[Reductions] \label{def:reductions}
 Let $\rr$ be the reduction relation defined as $\runi \cup \rcon \cup \rapp \cup \rgc$,
 each of which is defined as the reduction relation induced by the following
-rules in \cref{fig:rewrite-rules}
+rules in \cref{fig:rules}
 %
 \begin{itemize}
 \item $\runi$ (Unification)
@@ -44,6 +44,7 @@ rules in \cref{fig:rewrite-rules}
 	\rulename{elim-fail},
 	\rulename{elim-val},
 	\rulename{elim-exi};
+	\rulename{exi-eliml};
 
 \item $\rspc$ (Speculation)
 	\rulename{one-*},
@@ -58,10 +59,10 @@ rules in \cref{fig:rewrite-rules}
 \toprule
 					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		  & \rspc \\
 \midrule
-Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-d-c} & \ref{lem:u-a-c} & \ref{lem:u-f-c} & \ref{lem:u-s-c} \\
-Normalization 		& \rcon  &      		 & \ref{lem:d-c}   & \ref{lem:a-d-c} & \ref{lem:d-f-c} & \ref{lem:d-s-c} \\
-Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-f-c} & \ref{lem:a-s-c} \\
-Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-s-c} \\
+Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
+Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\
+Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
+Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
 Speculation 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
 \bottomrule
 \end{tabular}
@@ -79,7 +80,7 @@ for the respective relation (resp. pairs of relations).}
 % \midrule
 % Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-a-c} & \ref{lem:u-d-c} & \ref{lem:u-f-c} & \ref{lem:u-s-c} \\
 % $\beta$-Application & \rapp  &      		 & \ref{lem:a-c}   & \ref{lem:a-d-c} & \ref{lem:a-f-c} & \ref{lem:a-s-c} \\
-% Normalize \& GC		& \rdis  &      		 &                 & \ref{lem:d-c}   & \ref{lem:d-f-c} & \ref{lem:d-s-c} \\
+% Normalize \& GC		& \rdis  &      		 &                 & \ref{lem:n-c}   & \ref{lem:d-f-c} & \ref{lem:d-s-c} \\
 % Fail Propagation	& \rfail &      	     &                 &                 & \ref{lem:f-c}   & \ref{lem:f-s-c} \\
 % Speculation 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
 % \bottomrule
@@ -123,279 +124,9 @@ then there exists $e'$ such that
 Trivial.
 \end{proof}
 
-
-\subsection{Unification is Confluent} % --------------------------------------------------------------------------
-
-\newcommand{\runib}[1]{\ensuremath{\runi_{#1}}}
-\newcommand{\runik}{\ensuremath{\runib{k}}}
-
-\begin{lemma}[$\runi$-Confluent] \label{lem:u-c}
-$\runi$ is confluent.
-\end{lemma}
-
-\begin{proof}
-We prove that $\runi$ is confluent via the following strategy.
-%
-Let $\runik$ which is a subset of $\runi$ that only applies reductions to
-terms that are \emph{under less than} $k$ $\lambda$s.
-%
-\begin{enumerate}
-\item First, we show that $\runik$ is \emph{locally confluent} for all $k$ (\cref{lem:uk-lc}).
-\item Second, we show that $\runik$ is \emph{terminating} for all $k$ (\cref{lem:uk-term}).
-\item Third, consequently, by \cref{lem:local} we obtain that $\runik$ is confluent for all $k$.
-\item Finally, we show that $\runi$ is confluent by using the largest $k$ in two traces, to join two
-arbitrary sequences of $\runi$ reductions \cref{lem:uk-join}.
-\end{enumerate}
-\end{proof}
-
-\begin{figure}
-$$
-% \begin{array}{l@@rcl}
-\begin{array}{lr@@{\;}c@@{\;}l}
-\text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \\
-\text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
-\text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
-\text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
-
-\text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
-\text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
-\text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
-\text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
-\end{array}$$
-\caption{Bounded Contexts}
-\label{fig:bounded-contexts}
-\end{figure}
-
-\begin{definition}[$k$-Unification]
-\cref{fig:bounded-contexts} defines the grammar of \emph{$k$-bounded contexts} $C^k$
-which denote the set of expression-contexts where the hole occurs under at most
-$k$ \emph{scope delimiters} ($\lambda$, $\exists$, $\textbf{one}$, $\textbf{all}$ or $|choice|$).
-%
-Let $\runik$ be defined as the set of all $\runi$ reductions where the $\runi$-redex occurs under
-at most $k$ delimiters.
-%
-$$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{}'} \mbox{is a $\runi$ redex}, 0 \leq i \leq k \}$$
-\end{definition}
-
-\begin{lemma} \label{lem:uk-lc}
-\runik is locally confluent.
-\end{lemma}
-
-\begin{proof}
-For simplicity, we directly prove that $\runi$ is locally confluent (\cref{lem:u-lc}).
-The proof carries over to $\runik$ as it never requires $\runi$-reductions
-that are \emph{under} a $\lambda$-subterm.
-\end{proof}
-
-\begin{lemma} \label{lem:uk-term}
-\runib{k} is Noetherian.
-\end{lemma}
-
-\begin{proof}
-%\ranjit{TODO:crispen}
-By induction on $k$.
-\begin{description}
-	\item[Base case ($k \equiv 0$)] via \cref{lem:uk-term-0}.
-	\item[Inductive case]
-		Assume the induction hypothesis that $\runib{k}$
-		is Noetherian and prove $\runib{k+1}$ is Noetherian.
-		Consider any $c \equiv \overline{u = v}; ee$.
-		We will prove  that it is only possible to take
-		finitely many $\runib{k+1}$ steps from $c$.
-		%
-		Suppose there is an infinite trace starting from $c$.
-		%
-		By \cref{lem:uk-term-0} there is some finite prefix
-		of the trace $\rsteps{\runib{k+1}}{e}{e'}$ after which
-		there are no more $\runib{0}$ steps.
-		%
-		Note that $e'$ is finite and of the form $\ldots d_1 \ldots d_n \ldots$
-		comprising disjoint terms $d_1 \ldots d_n$.
-		%
-		Every $\runib{k+1}$ reduction from $e'$ is a $\runib{k}$ reduction
-		from some $d_i$.
-		%
-		By the induction hypothesis, each of these reduction sequences is finite,
-		and hence the complete reduction sequence must be finite.
-\end{description}
-\end{proof}
-
-
-\begin{lemma} \label{lem:uk-term-0}
-\runib{0} is Noetherian.
-\end{lemma}
-
-\begin{proof}
-We prove that for any term $c \equiv \overline{u = v}; ee$ that it is only possible to take
-finitely many $\runib{0}$ steps from $c$.
-%
-The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}}, \sz{n})$ where
-\begin{align*}
-	\sz{\text{free}} & \doteq\ \sz{\freevars{\overline{u}}} + \sz{\freevars{\overline{v}}} \\
-	\sz{\text{size}} & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
-	\sz{n}   	     & \doteq\ \mbox{the cardinality of}\ \overline{u}, \overline{v} \\
-\ranjit{TODO:finish}
-\end{align*}
-\end{proof}
-
-\begin{lemma}[$\runik$-join] \label{lem:uk-join}
-If $\rsteps{\runib{i}}{e}{e_i}$ and $\rsteps{\runib{j}}{e}{e_j}$
-then there exists $e'$ such that $\rsteps{\runi}{e_i, e_j}{e'}$.
-\end{lemma}
-
-\begin{proof}
-Let $k = \max(i, j)$.
-%
-As $\runib{i}, \runib{j} \subseteq \runib{k}$ we have
-$\rsteps{\runib{k}}{e}{e_i}$ and $\rsteps{\runib{k}}{e}{e_j}$.
-%
-By \cref{lem:uk-term} and \cref{lem:uk-lc} and \cref{lem:local},
-$\runib{k}$ is confluent, hence there exists $e'$ such that
-$\rsteps{\runib{j}}{e_i, e_j}{e'}$.
-%
-The fact that $\runib{k} \subseteq \runi$ completes the proof.
-\end{proof}
-
-\subsection{Unification is Locally Confluent} % --------------------------------------------------------------------------
-
-\begin{lemma} \label{lem:u-lc}
-\runi is locally confluent.
-\end{lemma}
-
-\begin{proof}
-Let $\tx{1}$ and $\tx{2}$ denote the two $\runi$ reducts.
-%
-If the reducts are disjoint, then the terms can be joined trivially in a single step via \cref{lem:disjoint}.
-%
-By symmetry it suffices to consider the case where $\rdx{1}$ occurs under $\rdx{2}$.
-%
-Let us split cases on the rule used for $\rdx{1}$.
-%
-\begin{description}
-\item[Case $\rdx{1}$ via $\runi - \rulename{subst} - \rulename{var-swap}$] join using \cref{lem:under-u}.
-\item[Case $\rdx{1}$ via \rulename{var-swap}] join using \cref{lem:swap-under}.
-\item[Case $\rdx{1}$ via \rulename{subst}] join using \cref{lem:subst-under}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[\rulename{var-swap} under] \label{lem:swap-under}
-%
-If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
-   $\rdx{\runi} \equiv E[\rdx{}]$ and
-   $\rstep{\rulename{swap}}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\runi}''$ such that
-   $\rsteps{\rulename{swap}}{\rdx{\runi}'}{\rdx{\runi}''}$ and
-   $\rstep{\runi}{E[\rdx{}']}{\rdx{\rr}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzIsMCwiRVtcXHJkeHt9J10iXSxbMiwxLCJcXHJkeHtcXHJ1bml9JyciXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDIsIlxccnVsZW5hbWV7c3dhcH0iXSxbMiwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJ1bGVuYW1le3N3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	{\rdx{\runi} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
-	{\rdx{\runi}'} && {\rdx{\runi}''}
-	\arrow["\runi"', from=1-1, to=2-1]
-	\arrow["{\rulename{swap}}", from=1-1, to=1-3]
-	\arrow["\runi", dotted, from=1-3, to=2-3]
-	\arrow["{\rulename{swap}}"', dotted, two heads, from=2-1, to=2-3]
-\end{tikzcd}\]
-\end{lemma}
-
-\begin{proof}
-Split cases on the rule used in $\runi$.
-\begin{description}
-\item[Case \rulename{u-lit} or \rulename{var-swap}]:
-	impossible as no \rulename{subst} redex under $|k_1 == k_2|$ or $|x == y|$.
-\item[Case \rulename{u-tup}]:
-	Here, $\rdx{\runi} \equiv |tup (u_1,dots,u_n) == tup (v_1,dots,v_n)|$ and wlog
-	the \rulename{subst} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
-\item[Case \rulename{u-fail}]:
-	Here, $\rdx{\runi} \equiv \rstep{}{\hnf_i}{\hnf_i'}$ so join at $|fail|$
-\item[Case \rulename{u-occurs}]:
-	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{subst} redex is under $|V^[x]|$, \ie
-	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{subst}
-	hence we can join at $|fail|$.
-\item[Case \rulename{hnf-swap}]:
-	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{subst} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
-	hence join at $x = \hnf'$.
-\item[Case \rulename{subst}]: via \cref{lem:subst-swap-c}.
-\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[\rulename{subst}-under] \label{lem:subst-under}
-%
-If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
-   $\rdx{\runi} \equiv E[\rdx{}]$ and
-   $\rstep{\rulename{subst}}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\runi}''$ such that
-   $\rsteps{\rulename{subst}}{\rdx{\runi}'}{\rdx{\runi}''}$ and
-   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzIsMCwiRVtcXHJkeHt9J10iXSxbMiwxLCJcXHJkeHtcXHJ1bml9JyciXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDIsIlxccnVsZW5hbWV7c3Vic3R9Il0sWzIsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiXFxydWxlbmFtZXtzdWJzdH0iLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	{\rdx{\runi} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
-	{\rdx{\runi}'} && {\rdx{\runi}''}
-	\arrow["\runi"', from=1-1, to=2-1]
-	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
-	\arrow["\runi", dotted, from=1-3, to=2-3]
-	\arrow["{\rulename{subst}}"', dotted, two heads, from=2-1, to=2-3]
-\end{tikzcd}\]
-\end{lemma}
-
-\begin{proof}
-Split cases on the rule used in $\runi$.
-\begin{description}
-\item[Case \rulename{u-lit} or \rulename{var-swap}]:
-	impossible as no \rulename{subst} redex under $|k_1 == k_2|$ or $|x == y|$.
-\item[Case \rulename{u-tup}]:
-	Here, $\rdx{\runi} \equiv |tup (u_1,dots,u_n) == tup (v_1,dots,v_n)|$ and wlog
-	the \rulename{subst} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
-\item[Case \rulename{u-fail}]:
-	Here, $\rdx{\runi} \equiv \rstep{}{\hnf_i}{\hnf_i'}$ so join at $|fail|$
-\item[Case \rulename{u-occurs}]:
-	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{subst} redex is under $|V^[x]|$, \ie
-	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{subst}
-	hence we can join at $|fail|$.
-\item[Case \rulename{hnf-swap}]:
-	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{subst} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
-	hence join at $x = \hnf'$.
-\item[Case \rulename{subst}]: via \cref{lem:subst-subst-c}.
-\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[Under \rulename{choose}] \label{lem:under-choose}
-If $\rstep{\rulename{choose}}{\rdx{ch}}{\rdx{ch}'}$ and
-	$\rdx{ch} \equiv E[\rdx{}]$ and
-	$\rstep{\rr}{\rdx{}}{\rdx{}'}$
- then there exists $\rdx{ch}''$ such that
-	$\rsteps{\rr}{\rdx{ch}'}{\rdx{ch}''}$ and
-	$\rstep{\rulename{choose}}{E[\rdx{}']}{\rdx{ch}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtjaH0gXFxlcXVpdiBFW1xccmR4e31dIl0sWzAsMSwiXFxyZHh7Y2h9JyJdLFsyLDAsIkVbXFxyZHh7fSddIl0sWzIsMSwiXFxyZHh7Y2h9JyciXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iLDJdLFswLDIsIlxccnIiXSxbMiwzLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	{\rdx{ch} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
-	{\rdx{ch}'} && {\rdx{ch}''}
-	\arrow["{\rulename{choose}}"', from=1-1, to=2-1]
-	\arrow["\rr", from=1-1, to=1-3]
-	\arrow["{\rulename{choose}}", dotted, from=1-3, to=2-3]
-	\arrow["\rr"', dotted, two heads, from=2-1, to=2-3]
-\end{tikzcd}\]
-\end{lemma}
-
-\begin{proof}
-By the definition of \rulename{choose} we have
-$$\rdx{ch} \equiv |SX^[CX^[e_1 choice e_2]]| \movesto |SX^[CX^[e_1] choice CX^[e_2]]| \equiv \rdx{ch}'$$
-Split cases on where $\rdx{}$ occurs
-\begin{description}
-\item[Case $\rdx{} \subset e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e_1'] choice CX^[e_2]]|$.
-\item[Case $\rdx{} \subset e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e_2']]|$.
-\item[Case $\rdx{} \subset |e_1 choice e_2|$] \ie \rstep{\rr}{|e_1 choice e_2|}{|e_i|} where $e_{3-i}$ is $|fail|$
-so join at $|SX^[CX^[e_i]]|$.
-\item[Case $\rdx{} \subset CX$] \ie \rstep{\rr}{CX}{CX'} so join (via \emph{two} $\rr$ steps) at $|SX^[CX'^[e_1] choice CX'^[e_2]]|$.
-\item[Case $\rdx{} \subset |CX^[e_1 choice e_2]|$] \ie $\rstep{\rr}{|CX^[e_1 choice e_2]|}{|CX'^[e1' choice e2']|}$,
-so join at $|SX^[CX'^[e1'] choice CX'^[e2']]|$.
-\end{description}
-\end{proof}
-
-
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
+\subsubsection{Application}
 
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
@@ -435,6 +166,8 @@ then there exists $\rdx{\rapp}''$ such that
 \end{description}
 \end{proof}
 
+\subsubsection{Unification}
+
 \begin{lemma}[Under-$\runi$] \label{lem:under-u}
 %
 Let $\rr' \equiv \rr - \rulename{subst} - \rulename{var-swap}$.
@@ -459,7 +192,7 @@ then there exists $\rdx{\runi}''$ such that
 \begin{proof}
 Split cases on the rule used in $\runi$.
 \begin{description}
-\item[Case] \rulename{subst} Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
+\item[Case \rulename{subst}]: Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
 	\begin{description}
 	\item[Case] $\rdx{} \subset X$, \ie $X \equiv X'[\rdx{}]$.
 	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYJ1tcXHJkeHt9XVt4PXZdIl0sWzAsMSwiWCdbXFxyZHh7fSddW3g9dl0iXSxbMiwwLCJYJ1xce3YveFxcfVtcXHJkeHt9XFx7di94XFx9XVt4PXZdIl0sWzIsMSwiWCdcXHt2L3hcXH1bXFxyZHh7fSdcXHt2L3hcXH1dW3g9dl0iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgXFx0ZXh0e3ZpYX1cXCBcXGNyZWZ7bGVtOnN1YnN0fSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
@@ -485,7 +218,7 @@ Split cases on the rule used in $\runi$.
 
 
 	\end{description}
-\item[Case:] \rulename{hnf-swap} $\rdx{\runi} \equiv |hnf == x|$ and $\rstep{\rr'}{h}{h'}$, so join at $\rdx{\runi}'' \equiv |x = hnf'|$.
+\item[Case \rulename{hnf-swap}]: $\rdx{\runi} \equiv |hnf == x|$ and $\rstep{\rr'}{h}{h'}$, so join at $\rdx{\runi}'' \equiv |x = hnf'|$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXG1hdGhpdHtobmZ9ID0geCJdLFsyLDAsInggPSBcXG1hdGhpdHtobmZ9Il0sWzAsMSwiXFxtYXRoaXR7aG5mfScgPSB4Il0sWzIsMSwieCA9IFxcbWF0aGl0e2huZn0nIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsxLDMsIlxccnInIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{\mathit{hnf} = x} && {x = \mathit{hnf}} \\
@@ -496,7 +229,7 @@ Split cases on the rule used in $\runi$.
 	\arrow["\runi", dotted, from=2-1, to=2-3]
 \end{tikzcd}\]
 
-\item[Case:] \rulename{u-occurs} $\rdx{\runi} \equiv x = V[x]$ and $\rstep{\rr'}{V[x]}{V'[x]}$, so join at $\rdx{\runi}'' \equiv |fail|$.
+\item[Case \rulename{u-occurs}]: $\rdx{\runi} \equiv x = V[x]$ and $\rstep{\rr'}{V[x]}{V'[x]}$, so join at $\rdx{\runi}'' \equiv |fail|$.
 % https://q.uiver.app/?q=WzAsMyxbMCwwLCJ4ID0gVlt4XSJdLFsyLDAsIlxcdGV4dGJme2ZhaWx9Il0sWzAsMSwieCA9IFYnW3hdIl0sWzAsMSwiXFxydW5pIl0sWzAsMiwiXFxyciciLDJdLFsyLDEsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{x = V[x]} && {\textbf{fail}} \\
@@ -505,10 +238,10 @@ Split cases on the rule used in $\runi$.
 	\arrow["{\rr'}"', from=1-1, to=2-1]
 	\arrow["\runi"', dotted, from=2-1, to=1-3]
 \end{tikzcd}\]
-\item[Case] \rulename{var-swap}: Impossible, no $\rdx{} \subset \rdx{\runi}$
-\item[Case] \rulename{u-lit}: Impossible, no $\rdx{} \subset \rdx{\runi}$
-\item[Case] \rulename{u-fail}: Join at $\rdx{\runi}'' \equiv |fail|$.
-\item[Case] \rulename{u-tup}: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
+\item[Case \rulename{var-swap}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case \rulename{u-lit}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case \rulename{u-fail}]: Join at $\rdx{\runi}'' \equiv |fail|$.
+\item[Case \rulename{u-tup}]: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset u_i$ \ie $\rstep{\rr'}{u_i}{u_i'}$
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_i' = v_i; \ldots u_n = v_n$.
@@ -516,7 +249,7 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
 	\end{description}
 
-\item[Case] \rulename{norm-seq}: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{norm-seq}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eu$ or in $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
@@ -529,7 +262,7 @@ Split cases on the rule used in $\runi$.
 			Join at $|fail|$.
 	\end{description}
 
-\item[Case] \rulename{norm-seqr}: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{norm-seqr}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eu$, $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
@@ -544,10 +277,202 @@ Split cases on the rule used in $\runi$.
 			Join at $|fail|$.
 	\end{description}
 
+\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
 
 \end{description}
 \end{proof}
 
+\begin{lemma}[Under \rulename{choose}] \label{lem:under-choose}
+If $\rstep{\rulename{choose}}{\rdx{ch}}{\rdx{ch}'}$ and
+	$\rdx{ch} \equiv E[\rdx{}]$ and
+	$\rstep{\rr}{\rdx{}}{\rdx{}'}$
+ then there exists $\rdx{ch}''$ such that
+	$\rsteps{\rr}{\rdx{ch}'}{\rdx{ch}''}$ and
+	$\rstep{\rulename{choose}}{E[\rdx{}']}{\rdx{ch}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtjaH0gXFxlcXVpdiBFW1xccmR4e31dIl0sWzAsMSwiXFxyZHh7Y2h9JyJdLFsyLDAsIkVbXFxyZHh7fSddIl0sWzIsMSwiXFxyZHh7Y2h9JyciXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iLDJdLFswLDIsIlxccnIiXSxbMiwzLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\rdx{ch} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
+	{\rdx{ch}'} && {\rdx{ch}''}
+	\arrow["{\rulename{choose}}"', from=1-1, to=2-1]
+	\arrow["\rr", from=1-1, to=1-3]
+	\arrow["{\rulename{choose}}", dotted, from=1-3, to=2-3]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+By the definition of \rulename{choose} we have
+$$\rdx{ch} \equiv |SX^[CX^[e_1 choice e_2]]| \movesto |SX^[CX^[e_1] choice CX^[e_2]]| \equiv \rdx{ch}'$$
+Split cases on where $\rdx{}$ occurs
+\begin{description}
+\item[Case $\rdx{} \subset e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e_1'] choice CX^[e_2]]|$.
+\item[Case $\rdx{} \subset e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e_2']]|$.
+\item[Case $\rdx{} \subset |e_1 choice e_2|$] \ie \rstep{\rr}{|e_1 choice e_2|}{|e_i|} where $e_{3-i}$ is $|fail|$
+so join at $|SX^[CX^[e_i]]|$.
+\item[Case $\rdx{} \subset CX$] \ie \rstep{\rr}{CX}{CX'} so join (via \emph{two} $\rr$ steps) at $|SX^[CX'^[e_1] choice CX'^[e_2]]|$.
+\item[Case $\rdx{} \subset |CX^[e_1 choice e_2]|$] \ie $\rstep{\rr}{|CX^[e_1 choice e_2]|}{|CX'^[e1' choice e2']|}$,
+so join at $|SX^[CX'^[e1'] choice CX'^[e2']]|$.
+\end{description}
+\end{proof}
+
+\subsubsection{Normalization}
+
+\begin{lemma}[Under-$\rcon$] \label{lem:under-n}
+%
+Let $\rr' = \rr - \rcon - \runi$.
+%
+If $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
+   $\rdx{\rcon} \equiv E[\rdx{}]$ and
+   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+then exists $\rdx{\rcon}''$ such that
+   $\rstep{\rr'}{\rdx{\rcon}'}{\rdx{\rcon}''}$ and
+   $\rstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
+\end{lemma}
+
+\begin{proof}
+Let $\rcon : \rdx{\rcon} \movesto \rdx{\rcon}'$ be the $\rcon$ redex and split cases
+on the reduction rule used in the step.
+%
+\begin{description}
+\item[Case \rulename{exi-swap}]: \ie $\rcon: |def x (def y e)| \movesto |def y (def x e)|$.
+Split cases on the position of $\rdx{}$.
+	\begin{description}
+	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
+	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def y e|}{e'}$; join at $|def x e'|$.
+	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def x (def y e)|}{|def y e'|}$; join at $|def y e'|$.
+	\end{description}
+
+\item[Case \rulename{norm-exi}]: \ie $\rcon: |X^[def x e]| \movesto |def x (X^[e])|$.
+Split cases on the position of $\rdx{}$.
+	\begin{description}
+	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
+	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+		$\rstep{\rr'}{|def x e|}{e'}$; join at $|X^[e']|$.
+	\item[Case $\rdx{} \subset X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
+	\end{description}
+
+\item[Case \rulename{subst-var}]: \ie $\rcon: |X^[x=y]|  \movesto |(subst X x y)^[x=y]|$.
+	The only possible position of $\rdx{}$ is $\rdx{} \subset X$ \ie
+	$\rstep{\rr'}{X^[x=y]}{X'^[x=y]}$; join at $|(subst X' x y)^[x=y]|$.
+
+\item[Case \rulename{var-swap}]: \ie $\rcon:  |x=y| \movesto |y=x|$.
+	Impossible to have $\rdx{} \subset |x=y|$.
+\end{description}
+\end{proof}
+
+\subsubsection{Garbage Collection}
+
+\begin{lemma}[Under-$\rgc$] \label{lem:under-g}
+If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
+	   $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\rgc}''$ such that
+	   $\rstepo{\rr}{\rdx{\rgc}'}{\rdx{\rgc}''}$ and
+	   $\rstep{\rgc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+Let $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ be the $\rgc$ redex and split cases
+on the reduction rule used in the step.
+%
+\begin{description}
+\item[Case \rulename{elim-val}]: \ie $\rgc : |v;e| \movesto |e|$.
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |v|$]: Join at $|e|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
+	\end{description}
+
+\item[Case \rulename{elim-fail}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
+	Then $\rstep{\rr}{|X^[fail]|}{|X'^[fail]|}$ hence join at $|fail|$.
+
+\item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys^x^zs) e| \movesto |def (ys^zs) e|$;
+	%
+	\ranjit{Generalize elim-exi to use $\exists ...x...e$ to avoid spurious interference}
+	%
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$; join at $|def (ys^zs) e'|$.
+	\item[Case $\rdx{} \subset |def (ys^x^zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys^zs) e|$.
+	\end{description}
+
+\item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
+	%
+	\ranjit{Generalize exi-eliml to use $\exists ...x...e$ to avoid spurious interference}
+	%
+	Split cases on position of $\rdx{}$
+	%
+	\begin{description}
+	\item[Case $\rdx{} \subset |v|$]: \ie $\rstep{rr}{v}{v'}$; join at $|X^[e]|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
+	\item[Case $\rdx{} \subset |X|$]: \ie $\rstep{rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
+	\end{description}
+\end{description}
+\end{proof}
+
+\subsubsection{Speculation}
+
+\begin{lemma}[Under-$\rspc$] \label{lem:under-s}
+	If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
+	   $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+	then there exists $\rdx{\rspc}''$ such that
+	   $\rstepo{\rr}{\rdx{\rspc}'}{\rdx{\rspc}''}$ and
+	   $\rstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
+
+\begin{description}
+\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
+	Impossible as $\rdx{} \not \subset \rdx{\rspc}$.
+
+\item[Case \rulename{one-value}]:
+	Here $\tx{\rspc} \equiv |one v| \movesto |v|$.
+	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |v'|.
+\item[Case \rulename{all-value}]:
+	Here $\tx{\rspc} \equiv |all v| \movesto |tup (v)|$.
+	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |(v')|.
+
+\item[Case \rulename{one-choice}]:
+	Here $\tx{\rspc} \equiv |one (v `choice` e)| \movesto |v|$.
+	If $\rdx{} \subset |v|$, \ie $\rr : |v| \movesto |v'|$ then join at $|v'|$.
+	If $\rdx{} \subset |e|$, \ie $\rr : |e| \movesto |e'|$ then join at $|v|$.
+
+\item[Case \rulename{all-choice}]:
+	Here $\tx{\rspc} \equiv |all (v_1 `choice` dots `choice` v_n)| \movesto |tup (v_1,dots,v_n)|$.
+	%
+	If $\rdx{} \subset |v_i|$ ie $\rr : |v_i| \movesto |v_i'|$
+	then join at $|tup (v_1,dots,v_i',dots, v_n)|$.
+
+\item[Case \rulename{choose-l}]: (symmetric \rulename{choose-r})
+	Here $\tx{\rspc} \equiv |fail choice e| \movesto e$.
+	Here, $\rdx{} \subset e$, \ie $\rr : e \movesto e'$ so join at $|e'|$.
+
+\item[Case \rulename{choose-assoc}]: \ie $\tx{\rspc} \equiv (e_1 |choice| e_2) |choice| e_3 \movesto e_1 |choice| (e_2 |choice| e_3)$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+	\item[Case] $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ so join at $e_1' |choice| (e_2 |choice| e_3)$.
+	\item[Case] $\rdx{} \subset e_2$, \ie $\rr : e_2 \movesto e_2'$ so join at $e_1 |choice| (e_2' |choice| e_3)$.
+	\item[Case] $\rdx{} \subset e_3$, \ie $\rr : e_3 \movesto e_3'$ so join at $e_1 |choice| (e_2 |choice| e_3')$.
+	\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so join at $e_1 |choice| e_3$.
+	\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so join at $e_2 |choice| e_3$.
+	\end{description}
+
+\item[Case \rulename{one-choice}]: (symmetric \rulename{one-value}, \rulename{all-value})
+	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|v|}$.
+	If $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ then by \cref{lem:wf-step}, $\rdx{\rspc}'' \equiv e_1'$.
+	If $\rdx{} \subset e_2$, then join at $e_1$.
+\end{description}
+\end{proof}
+
+
+\subsection{Lemmas for Substitution and Unification} \label{sec:unify-lemmas}
 
 \begin{lemma}[Substitution] \label{lem:subst}
 	Let $\rr' \equiv \rr - \runi$.
@@ -895,6 +820,241 @@ to make the equations the same on both sides.
 \end{proof}
 
 
+\subsection{Unification is Confluent} % --------------------------------------------------------------------------
+
+\newcommand{\runib}[1]{\ensuremath{\runi_{#1}}}
+\newcommand{\runik}{\ensuremath{\runib{k}}}
+
+\begin{lemma}[$\runi$-Confluent] \label{lem:u-c}
+$\runi$ is confluent.
+\end{lemma}
+
+\begin{proof}
+We prove that $\runi$ is confluent via the following strategy.
+%
+Let $\runik$ which is a subset of $\runi$ that only applies reductions to
+terms that are \emph{under less than} $k$ $\lambda$s.
+%
+\begin{enumerate}
+\item First, we show that $\runik$ is \emph{locally confluent} for all $k$ (\cref{lem:uk-lc}).
+\item Second, we show that $\runik$ is \emph{terminating} for all $k$ (\cref{lem:uk-term}).
+\item Third, consequently, by \cref{lem:local} we obtain that $\runik$ is confluent for all $k$.
+\item Finally, we show that $\runi$ is confluent by using the largest $k$ in two traces, to join two
+arbitrary sequences of $\runi$ reductions \cref{lem:uk-join}.
+\end{enumerate}
+\end{proof}
+
+\begin{figure}
+$$
+% \begin{array}{l@@rcl}
+\begin{array}{lr@@{\;}c@@{\;}l}
+\text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \\
+\text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
+\text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
+\text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
+
+\text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
+\text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
+\text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
+\text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
+\end{array}$$
+\caption{Bounded Contexts}
+\label{fig:bounded-contexts}
+\end{figure}
+
+\begin{definition}[$k$-Unification]
+\cref{fig:bounded-contexts} defines the grammar of \emph{$k$-bounded contexts} $C^k$
+which denote the set of expression-contexts where the hole occurs under at most
+$k$ \emph{scope delimiters} ($\lambda$, $\exists$, $\textbf{one}$, $\textbf{all}$ or $|choice|$).
+%
+Let $\runik$ be defined as the set of all $\runi$ reductions where the $\runi$-redex occurs under
+at most $k$ delimiters.
+%
+$$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{}'} \mbox{is a $\runi$ redex}, 0 \leq i \leq k \}$$
+\end{definition}
+
+\begin{lemma} \label{lem:uk-lc}
+\runik is locally confluent.
+\end{lemma}
+
+\begin{proof}
+For simplicity, we directly prove that $\runi$ is locally confluent (\cref{lem:u-lc}).
+The proof carries over to $\runik$ as it never requires $\runi$-reductions
+that are \emph{under} a $\lambda$-subterm.
+\end{proof}
+
+\begin{lemma} \label{lem:uk-term}
+\runib{k} is Noetherian.
+\end{lemma}
+
+\begin{proof}
+%\ranjit{TODO:crispen}
+By induction on $k$.
+\begin{description}
+	\item[Base case ($k \equiv 0$)] via \cref{lem:uk-term-0}.
+	\item[Inductive case]
+		Assume the induction hypothesis that $\runib{k}$
+		is Noetherian and prove $\runib{k+1}$ is Noetherian.
+		Consider any $c \equiv \overline{u = v}; ee$.
+		We will prove  that it is only possible to take
+		finitely many $\runib{k+1}$ steps from $c$.
+		%
+		Suppose there is an infinite trace starting from $c$.
+		%
+		By \cref{lem:uk-term-0} there is some finite prefix
+		of the trace $\rsteps{\runib{k+1}}{e}{e'}$ after which
+		there are no more $\runib{0}$ steps.
+		%
+		Note that $e'$ is finite and of the form $\ldots d_1 \ldots d_n \ldots$
+		comprising disjoint terms $d_1 \ldots d_n$.
+		%
+		Every $\runib{k+1}$ reduction from $e'$ is a $\runib{k}$ reduction
+		from some $d_i$.
+		%
+		By the induction hypothesis, each of these reduction sequences is finite,
+		and hence the complete reduction sequence must be finite.
+\end{description}
+\end{proof}
+
+
+\begin{lemma} \label{lem:uk-term-0}
+\runib{0} is Noetherian.
+\end{lemma}
+
+\begin{proof}
+We prove that for any term $c \equiv \overline{u = v}; ee$ that it is only possible to take
+finitely many $\runib{0}$ steps from $c$.
+%
+The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}}, \sz{n})$ where
+\begin{align*}
+	\sz{\text{free}} & \doteq\ \sz{\freevars{\overline{u}}} + \sz{\freevars{\overline{v}}} \\
+	\sz{\text{size}} & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
+	\sz{n}   	     & \doteq\ \mbox{the cardinality of}\ \overline{u}, \overline{v} \\
+\ranjit{TODO:finish}
+\end{align*}
+\end{proof}
+
+\begin{lemma}[$\runik$-join] \label{lem:uk-join}
+If $\rsteps{\runib{i}}{e}{e_i}$ and $\rsteps{\runib{j}}{e}{e_j}$
+then there exists $e'$ such that $\rsteps{\runi}{e_i, e_j}{e'}$.
+\end{lemma}
+
+\begin{proof}
+Let $k = \max(i, j)$.
+%
+As $\runib{i}, \runib{j} \subseteq \runib{k}$ we have
+$\rsteps{\runib{k}}{e}{e_i}$ and $\rsteps{\runib{k}}{e}{e_j}$.
+%
+By \cref{lem:uk-term} and \cref{lem:uk-lc} and \cref{lem:local},
+$\runib{k}$ is confluent, hence there exists $e'$ such that
+$\rsteps{\runib{j}}{e_i, e_j}{e'}$.
+%
+The fact that $\runib{k} \subseteq \runi$ completes the proof.
+\end{proof}
+
+\begin{lemma} \label{lem:u-lc}
+\runi is locally confluent.
+\end{lemma}
+
+\begin{proof}
+Let $\tx{1}$ and $\tx{2}$ denote the two $\runi$ reducts.
+%
+If the reducts are disjoint, then the terms can be joined trivially in a single step via \cref{lem:disjoint}.
+%
+By symmetry it suffices to consider the case where $\rdx{1}$ occurs under $\rdx{2}$.
+%
+Let us split cases on the rule used for $\rdx{1}$.
+%
+\begin{description}
+\item[Case $\rdx{1}$ via $\runi - \rulename{subst} - \rulename{var-swap}$] join using \cref{lem:under-u}.
+\item[Case $\rdx{1}$ via \rulename{var-swap}] join using \cref{lem:swap-under}.
+\item[Case $\rdx{1}$ via \rulename{subst}] join using \cref{lem:subst-under}.
+\end{description}
+\end{proof}
+
+\begin{lemma}[\rulename{var-swap} under] \label{lem:swap-under}
+%
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rulename{swap}}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rsteps{\rulename{swap}}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\runi}{E[\rdx{}']}{\rdx{\rr}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzIsMCwiRVtcXHJkeHt9J10iXSxbMiwxLCJcXHJkeHtcXHJ1bml9JyciXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDIsIlxccnVsZW5hbWV7c3dhcH0iXSxbMiwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJ1bGVuYW1le3N3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\rdx{\runi} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
+	{\rdx{\runi}'} && {\rdx{\runi}''}
+	\arrow["\runi"', from=1-1, to=2-1]
+	\arrow["{\rulename{swap}}", from=1-1, to=1-3]
+	\arrow["\runi", dotted, from=1-3, to=2-3]
+	\arrow["{\rulename{swap}}"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in $\runi$.
+\begin{description}
+\item[Case \rulename{u-lit} or \rulename{var-swap}]:
+	impossible as no \rulename{subst} redex under $|k_1 == k_2|$ or $|x == y|$.
+\item[Case \rulename{u-tup}]:
+	Here, $\rdx{\runi} \equiv |tup (u_1,dots,u_n) == tup (v_1,dots,v_n)|$ and wlog
+	the \rulename{subst} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
+\item[Case \rulename{u-fail}]:
+	Here, $\rdx{\runi} \equiv \rstep{}{\hnf_i}{\hnf_i'}$ so join at $|fail|$
+\item[Case \rulename{u-occurs}]:
+	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{subst} redex is under $|V^[x]|$, \ie
+	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{subst}
+	hence we can join at $|fail|$.
+\item[Case \rulename{hnf-swap}]:
+	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{subst} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
+	hence join at $x = \hnf'$.
+\item[Case \rulename{subst}]: via \cref{lem:subst-swap-c}.
+\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
+\end{description}
+\end{proof}
+
+\begin{lemma}[\rulename{subst}-under] \label{lem:subst-under}
+%
+If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+   $\rdx{\runi} \equiv E[\rdx{}]$ and
+   $\rstep{\rulename{subst}}{\rdx{}}{\rdx{}'}$
+then there exists $\rdx{\runi}''$ such that
+   $\rsteps{\rulename{subst}}{\rdx{\runi}'}{\rdx{\runi}''}$ and
+   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzIsMCwiRVtcXHJkeHt9J10iXSxbMiwxLCJcXHJkeHtcXHJ1bml9JyciXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDIsIlxccnVsZW5hbWV7c3Vic3R9Il0sWzIsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiXFxydWxlbmFtZXtzdWJzdH0iLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\rdx{\runi} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
+	{\rdx{\runi}'} && {\rdx{\runi}''}
+	\arrow["\runi"', from=1-1, to=2-1]
+	\arrow["{\rulename{subst}}", from=1-1, to=1-3]
+	\arrow["\runi", dotted, from=1-3, to=2-3]
+	\arrow["{\rulename{subst}}"', dotted, two heads, from=2-1, to=2-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+Split cases on the rule used in $\runi$.
+\begin{description}
+\item[Case \rulename{u-lit} or \rulename{var-swap}]:
+	impossible as no \rulename{subst} redex under $|k_1 == k_2|$ or $|x == y|$.
+\item[Case \rulename{u-tup}]:
+	Here, $\rdx{\runi} \equiv |tup (u_1,dots,u_n) == tup (v_1,dots,v_n)|$ and wlog
+	the \rulename{subst} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
+\item[Case \rulename{u-fail}]:
+	Here, $\rdx{\runi} \equiv \rstep{}{\hnf_i}{\hnf_i'}$ so join at $|fail|$
+\item[Case \rulename{u-occurs}]:
+	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{subst} redex is under $|V^[x]|$, \ie
+	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{subst}
+	hence we can join at $|fail|$.
+\item[Case \rulename{hnf-swap}]:
+	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{subst} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
+	hence join at $x = \hnf'$.
+\item[Case \rulename{subst}]: via \cref{lem:subst-subst-c}.
+\item[Case \rulename{choose}]: via \cref{lem:under-choose}.
+\end{description}
+\end{proof}
+
+
 \subsection{Normalization is Confluent} % ------------------------------------------------------------------------
 
 Recall that $\rcon \ \equiv\ \rulename{exi-swap} + \rulename{norm-exi} + \rulename{var-swap} + \rulename{subst-var}$
@@ -908,21 +1068,21 @@ It will be convenient to \emph{factor out} \rulename{norm-exi} so let
 \rcon  &  \doteq\ \rconm + \rulename{norm-exi} \\
 \end{align*}
 
-\begin{lemma}[$\rcon$-Confluent]\label{lem:d-c}
+\begin{lemma}[$\rcon$-Confluent]\label{lem:n-c}
     $\rcon$ is confluent.
 \end{lemma}
 
 \begin{proof}
 The above result follows in two steps.
 %
-First we show that \rconm -- \ie normalization-without-\rulename{norm-exi} -- is confluent \cref{lem:m-con}.
+First we show that \rconm -- \ie normalization-without-\rulename{norm-exi} -- is confluent \cref{lem:m-conf}.
 %
 Second we show that \rconm \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:m-pp-float}.
 %
 Consequently, each $\rsteps{\rcon}{}{}$ can be rewritten as the composition of
 $\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\rconm}{}{}$ after which
 the following diagram completes the proof.
-% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNywiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiwxMCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEwLDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOCwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw5LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs3LDExLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMTEsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCwxMiwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOSwxMiwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw1LCJcXGNyZWZ7bGVtOmYtbS1qb2lufSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzEsOCwiXFxjcmVme2xlbTpmLW0tY29tbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6OTAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDksIlxcY3JlZntsZW06Zi1tLWNvbW19IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNSwxMiwiXFxjcmVme2xlbTptLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJjb25tIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccmNvbm0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtci1jb219IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMiw5LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzUsMTIsIlxcY3JlZntsZW06bS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	&& \bullet \\
 	\bullet &&&& \bullet \\
@@ -937,39 +1097,40 @@ the following diagram completes the proof.
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-2, to=4-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-4, to=4-3]
-	\arrow["\rconm"{description}, dotted, two heads, from=2-1, to=4-1]
-	\arrow["\rconm"{description}, dotted, two heads, from=2-5, to=4-5]
+	\arrow["\rconm"{description}, two heads, from=2-1, to=4-1]
+	\arrow["\rconm"{description}, two heads, from=2-5, to=4-5]
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
-	\arrow["\rconm"{description}, dotted, two heads, from=5-1, to=6-2]
+	\arrow["\rconm"', dotted, two heads, from=5-1, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-4]
 	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
-	\arrow["\rconm"{description}, dotted, two heads, from=5-5, to=6-4]
+	\arrow["\rconm", dotted, two heads, from=5-5, to=6-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-2, to=7-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-4, to=7-3]
-	\arrow["{\cref{lem:f-m-join}}"{description, pos=0.8}, draw=none, from=1-3, to=4-3]
-	\arrow["{\cref{lem:f-m-com}}"{description, pos=0.9}, draw=none, from=2-1, to=6-2]
-	\arrow["{\cref{lem:f-m-com}}"{description, pos=0.9}, draw=none, from=2-5, to=6-4]
-	\arrow["{\cref{lem:m-con}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.8}, draw=none, from=1-3, to=4-3]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-1, to=6-2]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-5, to=6-4]
+	\arrow["{\cref{lem:m-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
 \end{tikzcd}\]
 \end{proof}
 
-\begin{lemma} \label{lem:f-m-join}
+\begin{lemma} \label{lem:f-exi-swap-join}
 	If $\rsteps{\rulename{norm-exi}}{e}{e_1}$ and
 	   $\rsteps{\rulename{norm-exi}}{e}{e_2}$
 	then exists
 	   $\rsteps{\rulename{norm-exi}}{e_1}{e_1'}$,
 	   $\rsteps{\rulename{norm-exi}}{e_2}{e_2'}$,
-	   $\join{\rconm}{e_1'}{e_2'}$.
+	such that
+	   $\join{\rulename{exi-swap}}{e_1'}{e_2'}$.
 \end{lemma}
 
 \begin{proof}
 On each side add the (missing) \rulename{norm-exi} steps on the other side,
-and then use (multiple) \rulename{exi-swap} (\rconm) to join.
+and then use (multiple) \rulename{exi-swap} to join.
 \end{proof}
 
-\begin{lemma} \label{lem:f-m-com}
-\rulename{norm-exi} strongly commutes with \rconm.
+\begin{lemma} \label{lem:f-rr-com}
+\rulename{norm-exi} strongly commutes with \rr - \rulename{norm-exi}.
 \end{lemma}
 
 \begin{proof}
@@ -985,7 +1146,7 @@ so $\rcon^{*} \equiv \rulename{norm-exi}^{*} \cdot \rconm^{*}$.
 Split cases on each possible case of \rconm; the diamond is completed trivially as the rules are non-overlapping.
 \end{proof}
 
-\begin{lemma} \label{lem:m-con}
+\begin{lemma} \label{lem:m-conf}
 	\rconm is confluent.
 \end{lemma}
 
@@ -1024,7 +1185,7 @@ Via the following diagram, where:
 \begin{lemma} \label{lem:hops-many-exi}
 If $\rsteps{\rconm}{e}{e'}$ there exists $e''$ such that $\rsteps{\rss}{e'}{e''}$ and
 $\rsteps{\rulename{exi-swap}}{e}{\rsteps{\rss}{\cdot}{e''}}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnNzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnNzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccmNvbm0iLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7ZXhpLXN3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnNzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnNzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccmNvbm0iLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	e && {e'} \\
 	\bullet && {e''}
@@ -1043,17 +1204,13 @@ By using \cref{lem:hops-many} with the facts that
 $\rss$ \emph{hops after} $\rulename{exi-swap}$ (\cref{lem:ss-hops-exi}).
 \end{proof}
 
-\begin{lemma} \label{lem:ss-hops-exi}
-\rss\ hops after \rulename{exi-swap}.
+\begin{lemma} \label{lem:ss-hops-exi} \label{lem:u-hops-exi}
+\rss (resp. \runi) hops after \rulename{exi-swap}.
 \end{lemma}
 \begin{proof}
-By splitting cases on the $\rss$
-reduction that precedes the \rulename{exi-swap}.
+By splitting cases on the \rss (resp. \runi) reduction that precedes the \rulename{exi-swap}.
 \begin{description}
-\item[Case \rulename{subst-var}] Trivial as as there is no overlap, so
-any sequence of \rulename{subst-var} followed by \rulename{exi-swap}
-is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subst-var}.
-\item[Case \rulename{swap-var}] Let the $\rdx{\rulename{swap}} \equiv |X^[x == y]|$.
+\item[Case \rulename{var-swap}] Let the $\rdx{\rulename{swap}} \equiv |X^[x == y]|$.
 %
 	If the \rulename{exi-swap} preserves the order of $x$ and $y$ then the result follows
 	trivially (as the reductions are non-overlapping.)
@@ -1064,10 +1221,16 @@ is equivalent to first doing the \rulename{exi-swap} and then the \rulename{subs
 	{\exists x, y. \ldots X[x=y]} && {\exists x, y. \ldots X[y=x]} \\
 	{\exists y, x. \ldots X[x=y]} && {\exists y, x. \ldots X[y=x]}
 	\arrow["{\rulename{exi-swap}}"', dotted, from=1-1, to=2-1]
-	\arrow["{\rulename{swap-var}}"', dotted, tail reversed, no head, from=2-1, to=2-3]
+	\arrow["{\rulename{var-swap}}"', dotted, tail reversed, no head, from=2-1, to=2-3]
 	\arrow["{\rulename{exi-swap}}", from=1-3, to=2-3]
-	\arrow["{\rulename{swap-var}}", from=1-1, to=1-3]
+	\arrow["{\rulename{var-swap}}", from=1-1, to=1-3]
 \end{tikzcd}\]
+
+\item[Case \emph{non}-\rulename{var-swap}]
+An $\runi$ reduction \emph{other than} \rulename{var-swap}
+is variable-order independent, so the sequence of \runi-step
+followed by \rulename{exi-swap} is equivalent to first doing
+the \rulename{exi-swap} and then the \runi step.
 \end{description}
 \end{proof}
 
@@ -1103,15 +1266,191 @@ the conclusion $\rss$ commutes with $\rss + \rulename{exi-swap} \equiv \rconm$.
 \end{proof}
 
 
-
-\begin{lemma}
+\begin{lemma} \label{lem:ss-half-com-exi}
+	$\rss$ \halfcommutes with \rulename{exi-swap}.
 \end{lemma}
+
 \begin{proof}
-	\ranjit{TODO:notes}
+Recall that $\rss \equiv \rulename{subst-var} + \rulename{var-swap}$.
+Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
+%
+\begin{description}
+\item[Case \rulename{subst-var}] As \rulename{subst-var} does not overlap with
+  rulename{exi-swap}, it \halfcommutes trivially via the diamond property.
+
+\item[Case \rulename{var-swap} (under \rulename{exi-swap})] The non-trivial cases are where the \emph{same}
+  variables $x$, $y$ are being swapped by both rules (otherwise, the reductions
+  \halfcommutes trivially via the diamond property).
+  For the variables to be the same, the \rulename{var-swap}
+  \emph{must} occur under the \rulename{exi-swap} (as otherwise the same variables
+  are not in scope.) Hence, the proof is completed by the following diagram.
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXGV4aXN0cyB4LCB5LiBcXGxkb3RzIFhbeD15XSJdLFsyLDAsIlxcZXhpc3RzIHksIHguIFxcbGRvdHMgWFt4PXldIl0sWzAsMSwiXFxleGlzdHMgeCwgeS4gXFxsZG90cyBYW3k9eF0iXSxbMiwxLCJcXGV4aXN0cyB5LCB4LiBcXGxkb3RzIFhbeT14XSJdLFswLDIsIlxccnVsZW5hbWV7dmFyLXN3YXB9IiwyXSxbMiwzLCJcXHJ1bGVuYW1le2V4aS1zd2FwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDMsIlxccnVsZW5hbWV7dmFyLXN3YXB9IiwwLHsic3R5bGUiOnsidGFpbCI6eyJuYW1lIjoiYXJyb3doZWFkIn0sImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMSwiXFxydWxlbmFtZXtleGktc3dhcH0iXV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{\exists x, y. \ldots X[x=y]} && {\exists y, x. \ldots X[x=y]} \\
+	{\exists x, y. \ldots X[y=x]} && {\exists y, x. \ldots X[y=x]}
+	\arrow["{\rulename{var-swap}}"', from=1-1, to=2-1]
+	\arrow["{\rulename{exi-swap}}"', dotted, from=2-1, to=2-3]
+	\arrow["{\rulename{var-swap}}", dotted, tail reversed, no head, from=1-3, to=2-3]
+	\arrow["{\rulename{exi-swap}}", from=1-1, to=1-3]
+\end{tikzcd}\]
+\end{description}
+\end{proof}
+
+\subsection{Unification + Normalization is Confluent} % ------------------------------------------------------------------------
+
+Recall that
+\begin{align*}
+\rcon & \doteq\ \rulename{norm-exi} + \rulename{exi-swap} + \rss \\
+\intertext{and define}
+\runi' & \doteq \ \runi + \rulename{exi-swap} \\
+\end{align*}
+
+\begin{lemma}\label{lem:u-c-c}
+	$\runi \cup \rcon$ is confluent.
+\end{lemma}
+
+\begin{proof}
+%
+We prove $\runi \cup \rcon$ is confluent by a generalization of the proof of \cref{lem:n-c}
+where we use the full $\runi$ relation (instead of the subset $\rss$).
+%
+First we show that \runi' -- \ie $\runi \cup \rcon$ without-\rulename{norm-exi} -- is confluent \cref{lem:ue-conf}.
+%
+Second we show that \runi' \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:u-pp-float}.
+%
+Consequently, each $\rsteps{\runi \cup \rcon}{}{}$ can be rewritten as the composition of
+$\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\runi'}{}{}$ after which
+the following diagram completes the proof.
+
+% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJ1bmknIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccnVuaSciLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjcwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsOSwiXFxjcmVme2xlbTpmLXJyLWNvbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDEyLCJcXGNyZWZ7bGVtOnVlLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&& \bullet \\
+	\bullet &&&& \bullet \\
+	& \bullet && \bullet \\
+	\bullet && \bullet && \bullet \\
+	\bullet &&&& \bullet \\
+	& \bullet && \bullet \\
+	&& \bullet
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-1]
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-5]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-3]
+	\arrow["{\runi'}"{description}, two heads, from=2-1, to=4-1]
+	\arrow["{\runi'}"{description}, two heads, from=2-5, to=4-5]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
+	\arrow["{\runi'}"', dotted, two heads, from=5-1, to=6-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-4]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
+	\arrow["{\runi'}", dotted, two heads, from=5-5, to=6-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-2, to=7-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-4, to=7-3]
+	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.7}, draw=none, from=1-3, to=4-3]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-1, to=6-2]
+	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-5, to=6-4]
+	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{lemma} \label{lem:u-pp-float}
+Let $\runi' \doteq \runi + \rulename{exi-swap}$.
+%
+\runi' strongly postpones after \rulename{norm-exi},
+so $\runi'^{*} \equiv \rulename{norm-exi}^{*} \cdot \runi'^{*}$.
+\end{lemma}
+
+\begin{proof}
+Same as \cref{lem:m-pp-float}.
+\end{proof}
+
+\begin{lemma} \label{lem:ue-conf}
+Let $\runi' \doteq \runi + \rulename{exi-swap}$. $\runi'$ is confluent.
+\end{lemma}
+
+\begin{proof}
+	Via the following diagram, where:
+	(1)~is \cref{lem:hops-many-exi-u};
+	(2)~is \cref{lem:u-ue-com};
+	(3)~is \cref{lem:u-c};
+	(4)~is \cref{lem:exi-swap-con}.
+% https://q.uiver.app/?q=WzAsMTEsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiKDEpIl0sWzIsMiwiKDQpIl0sWzMsMiwiKDEpIl0sWzEsMywiKDIpIl0sWzMsMywiKDIpIl0sWzEsMSwiXFxidWxsZXQiXSxbMywxLCJcXGJ1bGxldCJdLFsyLDQsIigzKSJdLFswLDEsIlxccnVuaSciLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwyLCJcXHJ1bmknIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsOCwiRSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCw5LCJFIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDMsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJ1bmkiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksNSwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDUsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbOCw0LCJFIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs5LDQsIkUiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNiwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDcsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw2LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDcsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVuaSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMCwiXFxydW5pIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&& \bullet \\
+	\bullet & \bullet && \bullet & \bullet \\
+	& {(1)} & {(4)} & {(1)} \\
+	& {(2)} && {(2)} \\
+	&& {(3)}
+	\arrow["{\runi'}"', two heads, from=1-3, to=2-1]
+	\arrow["{\runi'}", two heads, from=1-3, to=2-5]
+	\arrow["E"{description}, dotted, two heads, from=1-3, to=2-2]
+	\arrow["E"{description}, dotted, two heads, from=1-3, to=2-4]
+	\arrow["\runi"{description}, dotted, two heads, from=2-2, to=3-2]
+	\arrow["\runi"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["\runi"{description}, dotted, two heads, from=2-4, to=3-4]
+	\arrow["\runi"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["E"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["E"{description}, dotted, two heads, from=2-4, to=3-3]
+	\arrow["\runi"{description}, dotted, two heads, from=3-3, to=4-2]
+	\arrow["\runi"{description}, dotted, two heads, from=3-3, to=4-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-4]
+	\arrow["\runi"{description}, dotted, two heads, from=4-2, to=5-3]
+	\arrow["\runi"{description}, dotted, two heads, from=4-4, to=5-3]
+\end{tikzcd}\]
 \end{proof}
 
 
-\subsection{Unification is Commutative} % ------------------------------------------------------------------------
+\begin{lemma} \label{lem:hops-many-exi-u}
+Let $\runi' = \runi + \rulename{exi-swap}$.
+%
+If $\rsteps{\runi'}{e}{e'}$ there exists $e''$ such that $\rsteps{\runi}{e'}{e''}$ and
+$\rsteps{\rulename{exi-swap}}{e}{\rsteps{\runi}{\cdot}{e''}}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJlIl0sWzIsMCwiZSciXSxbMCwxLCJcXGJ1bGxldCJdLFsyLDEsImUnJyJdLFswLDIsIlxccnVsZW5hbWV7ZXhpLXN3YXB9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnVuaSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJ1bmkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMSwiXFxydW5pJyIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	e && {e'} \\
+	\bullet && {e''}
+	\arrow["{\rulename{exi-swap}}"', dotted, two heads, from=1-1, to=2-1]
+	\arrow["\runi"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["\runi", dotted, two heads, from=1-3, to=2-3]
+	\arrow["{\runi'}", two heads, from=1-1, to=1-3]
+\end{tikzcd}\]
+\end{lemma}
+
+\begin{proof}
+(Similar to \cref{lem:hops-many-exi}),
+By using \cref{lem:hops-many} with the facts that
+%
+\runi is confluent (\cref{lem:u-c}) and
+%
+$\runi$ \emph{hops after} $\rulename{exi-swap}$ (\cref{lem:u-hops-exi}).
+\end{proof}
+
+\begin{lemma} \label{lem:u-ue-com}
+Let $\runi' = \runi + \rulename{exi-swap}$.
+\runi' commutes with \runi.
+\end{lemma}
+
+\begin{proof}
+%
+The proof follows by observing that
+$\runi$ \emph{\halfcommutes} with \rulename{exi-swap} \cref{lem:u-half-com-exi},
+recalling that $\runi$ is confluent \cref{lem:u-c}, after which \cref{lem:half-com}
+yields the conclusion $\runi$ commutes with $\runi + \rulename{exi-swap} \equiv \runi'$.
+\end{proof}
+
+\begin{lemma} \label{lem:u-half-com-exi}
+	$\runi$ \halfcommutes with \rulename{exi-swap}.
+\end{lemma}
+
+\begin{proof}
+Same as \cref{lem:ss-half-com-exi}; the rules in \runi \emph{other than those}
+in the subset $\rss$ trivially \halfcommutes as they do not overlap with \rulename{exi-swap}.
+\end{proof}
+
+
+\subsection{$\runi \cup \rcon$ Commute With $\rapp \cup \rgc \cup \rspc$} % ------------------------------------------------------------------------
 
 \begin{lemma}[$\runi$-$\rapp$-Comm]\label{lem:u-a-c}
     $\runi$ and $\rapp$ commute.
@@ -1119,104 +1458,23 @@ the conclusion $\rss$ commutes with $\rss + \rulename{exi-swap} \equiv \rconm$.
 
 \begin{proof}
 We show that $\runi$ $*$-commutes with $\rapp$ and hence commutes via \cref{lem:star-comm}.
-%
 Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ respectively.
 
 \begin{description}
-\item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint]
-Here $e \equiv \ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots$. Hence, we have
-% https://q.uiver.app/?q=WzAsNCxbMSwwLCJcXGxkb3RzIFxccmR4e1xccnVuaX0gXFxsZG90cyBcXHJkeHtcXHJhcHB9IFxcbGRvdHMiXSxbMCwxLCJcXGxkb3RzIFxccmR4e1xccnVuaX0nIFxcbGRvdHMgXFxyZHh7XFxyYXBwfSBcXGxkb3RzIl0sWzIsMSwiXFxsZG90cyBcXHJkeHtcXHJ1bml9IFxcbGRvdHMgXFxyZHh7XFxyYXBwfScgXFxsZG90cyJdLFsxLDIsIlxcbGRvdHMgXFxyZHh7XFxydW5pfScgXFxsZG90cyBcXHJkeHtcXHJhcHB9JyBcXGxkb3RzIl0sWzAsMiwiXFxyYXBwIl0sWzAsMSwiXFxydW5pIiwyXSxbMSwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	& {\ldots \rdx{\runi} \ldots \rdx{\rapp} \ldots} \\
-	{\ldots \rdx{\runi}' \ldots \rdx{\rapp} \ldots} && {\ldots \rdx{\runi} \ldots \rdx{\rapp}' \ldots} \\
-	& {\ldots \rdx{\runi}' \ldots \rdx{\rapp}' \ldots}
-	\arrow["\rapp", from=1-2, to=2-3]
-	\arrow["\runi"', from=1-2, to=2-1]
-	\arrow[dotted, from=2-1, to=3-2]
-	\arrow[dotted, from=2-3, to=3-2]
-\end{tikzcd}\]
+\item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint] via \cref{lem:disjoint}.
 \item[Case: $\rdx{\runi} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] via \cref{lem:under-u}.
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\runi-\rdis$-Comm] \label{lem:u-d-c}
-	$\runi$ and $\rdis$ commute.
-\end{lemma}
-
-\begin{proof}
-Via \cref{lem:u-c-c} and \cref{lem:u-g-c} and \cref{lem:comm-union}.
-\end{proof}
-
-\begin{lemma}[$\runi-\rcon$-Comm] \label{lem:u-c-c}
-	$\runi$ and $\rcon$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\runi$ $*$-commutes with $\rcon$ and hence commutes via \cref{lem:star-comm}.
-%
-Let $\tx{\runi}$ and $\tx{\rcon}$ denote the reducts for $\runi$ and $\rcon$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined.
-%
-Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rcon}$ or vice versa.
-
-
-\begin{description}
-\item[Case $\rdx{runi} \subset \rdx{\rcon}$:] Split cases on the rule used in $\rcon$.
-	\begin{description}
-	\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
-		If $\rdx{\runi} \subset |v|$, \ie $\runi : |v| \movesto |v'|$, then join at $|e|$.
-		If $\rdx{\runi} \subset |e|$, \ie $\runi : |e| \movesto |e'|$, then join at $|e'|$.
-	\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
-		If $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
-		If $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
-		If $\rdx{\runi} \subset e_3$, \ie $\runi : e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
-		If $\rdx{\runi} \subset (e_1; e_2)$, \ie $\runi : (e_1; e_2) \movesto (e_1'; e_2')$, then join at $(e_1'; (e_2'; e_3))$.
-	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\runi} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\runi} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-		If $\rdx{\runi} \subset |x == v; e_2|$, \ie $\runi : |x == v| \movesto x = |v|; e_2'$, then join at $x = |v|; e_1; e_2'$.
-	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\runi} \subset \hnf$, \ie $\runi : \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
-	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
-		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\runi} \subset e_1$, \ie $\runi : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\runi} \subset e_2$, \ie $\runi : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
-	\end{description}
-
-\item[Case $\rdx{\rcon} \subset \rdx{\runi}$:] via \cref{lem:under-u}.
-
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\runi-\rfail$-Comm] \label{lem:u-f-c}
-	$\runi$ and $\rfail$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\runi$ strongly commutes wth $\rfail$.
-%
-Let $\tx{\runi}$ and $\tx{\rfail}$ denote the reducts for $\runi$ and $\rfail$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined.
-%
-Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rfail}$ or vice versa.
-%
-\begin{description}
-	\item[Case] $\rdx{\runi} \subset \rdx{\rfail}$ via \cref{lem:under-f}.
-	\item[Case] $\rdx{\rfail} \subset \rdx{\runi}$: via \cref{lem:under-u}.
-\end{description}
-\end{proof}
-
-
+% ------------------------------------------------------------------------------------------------------------------------
 
 \begin{lemma}[$\runi-\rgc$-Comm] \label{lem:u-g-c}
 	$\runi$ and $\rgc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\runi$ strongly commutes wth $\rgc$.
+We show that $\runi$ $*$-commutes commutes wth $\rgc$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rgc$.
 %
 Let $\tx{\runi}$ and $\tx{\rgc}$ denote the reducts for $\runi$ and $\rgc$ respectively.
 %
@@ -1225,25 +1483,20 @@ If the reducts are disjoint then terms can be trivially joined.
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice versa.
 %
 \begin{description}
-	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$:
-		Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$, where no $x_i \in \freevars{e}$.
-		If $\rdx{\runi} \subset e$, \ie $\runi : e \movesto e'$, then as $\freevars{e'} \subset \freevars{e}$ we can join at $e'$.
-		If $\rdx{\runi} \subset v_i$, \ie $\runi : v_i \movesto v_i'$, then we can join at $e$.
-		If $\rdx{\runi}$ spans some $x_i, v_i$ and $e$, then $\runi$ is via a \rulename{deref-*}, \ie
-		$\tx{\runi} \equiv x_i = |v_i|; E[x_i] \movesto x_i = |v_i|; E[|v_i|]$.
-		However, this $E[x_i]$ is disjoint from $e$ as $x_i \not \in \freevars{e}$,
-		so we can still join at $e$.
+	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$: via \cref{lem:under-g}.
 	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 %
 \end{proof}
+
+% ------------------------------------------------------------------------------------------------------------------------
 
 \begin{lemma}[$\runi-\rspc$-Comm] \label{lem:u-s-c}
 	$\runi$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ $*$-commutes with $\runi$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rspc$.
+We show that $\runi$ $*$-commutes with $\rspc$, and hence by \cref{lem:star-comm}, $\runi$ commutes wth $\rspc$.
 %
 Let $\tx{\runi}$ and $\tx{\rspc}$ denote the reducts for $\runi$ and $\rspc$ respectively.
 %
@@ -1257,10 +1510,68 @@ Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice v
 \end{description}
 \end{proof}
 
+% \subsection{Normalization is Commutative} % ------------------------------------------------------------------------
+
+\begin{lemma} \label{lem:n-a-c}
+	$\rcon$ and $\rapp$ commute.
+\end{lemma}
+
+\begin{proof}
+We show that $\rcon$ strongly commutes with $\rapp$, hence commutes via \cref{lem:strong-commute}.
+%
+Let $\tx{\rapp}$ and $\tx{\rcon}$ denote the reducts for $\rapp$ and $\rcon$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice versa.
+
+\begin{description}
+\item[Case $\rdx{\rapp} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
+\end{description}
+\end{proof}
+
+\begin{lemma} \label{lem:n-g-c}
+	$\rcon$ and $\rgc$ commute.
+\end{lemma}
+
+\begin{proof}
+We show that $\rcon$ strongly commutes with $\rgc$, hence commutes via \cref{lem:strong-commute}.
+%
+Let $\tx{\rgc}$ and $\tx{\rcon}$ denote the reducts for $\rgc$ and $\rcon$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rcon}$ or vice versa.
+
+\begin{description}
+\item[Case $\rdx{\rgc} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
+\end{description}
+\end{proof}
+
+\begin{lemma} \label{lem:n-s-c}
+	$\rcon$ and $\rspc$ commute.
+\end{lemma}
+
+\begin{proof}
+We show that $\rcon$ strongly commutes with $\rspc$, hence commutes via \cref{lem:strong-commute}.
+%
+Let $\tx{\rspc}$ and $\tx{\rcon}$ denote the reducts for $\rspc$ and $\rcon$ respectively.
+%
+If the reducts are disjoint then terms can be trivially joined in a single step.
+%
+Split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rcon}$ or vice versa.
+%
+\begin{description}
+\item[Case $\rdx{\rspc} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
+\end{description}
+\end{proof}
+
 \subsection{Application} % --------------------------------------------------------------------------
 
-
-\begin{lemma}[$\rapp$-Confluent]\label{lem:a-c}
+\begin{lemma} \label{lem:a-c}
     $\rapp$ is confluent.
 \end{lemma}
 
@@ -1275,147 +1586,37 @@ $\rstep{\rapp}{e}{e_2}$ via the redux $\tx{2}$.
 If $\rdx{1}$ and $\rdx{2}$ are disjoint, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
 %
-Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
-%
-\begin{description}
-\item[Case $\Delta_2 \subset \Delta_1$:] via \cref{lem:under-a}.
-\item[Case $\Delta_1 \subset \Delta_2$:] via \cref{lem:under-a}.
-
-% \item[Case $\Delta_1$ disjoint from $\Delta_2$:] Trivial, as $e \equiv \ldots \Delta_1 \ldots \Delta_2 \ldots$ so join at $\ldots \Delta_1' \ldots \Delta_2' \ldots$.
-% % https://q.uiver.app/?q=WzAsNCxbMSwwLCJcXGxkb3RzIFxccmR4e31fMSBcXGxkb3RzIFxccmR4e31fMiBcXGxkb3RzIl0sWzAsMSwiXFxsZG90cyBcXHJkeHt9XzEnIFxcbGRvdHMgXFxyZHh7fV8yIFxcbGRvdHMiXSxbMiwxLCJcXGxkb3RzIFxccmR4e31fMSBcXGxkb3RzIFxccmR4e31fMicgXFxsZG90cyJdLFsxLDIsIlxcbGRvdHMgXFxyZHh7fV8xJyBcXGxkb3RzIFxccmR4e31fMicgXFxsZG90cyJdLFswLDIsIlxccmFwcF8yIl0sWzAsMSwiXFxyYXBwXzEiLDJdLFsxLDMsIlxccmFwcF8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-% \[\begin{tikzcd}
-% 	& {\ldots \Delta_1 \ldots \Delta_2 \ldots} \\
-% 	{\ldots \Delta_1' \ldots \Delta_2 \ldots} && {\ldots \Delta_1 \ldots \Delta_2' \ldots} \\
-% 	& {\ldots \Delta_1' \ldots \Delta_2' \ldots}
-% 	\arrow["{\rapp_2}", from=1-2, to=2-3]
-% 	\arrow["{\rapp_1}"', from=1-2, to=2-1]
-% 	\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
-% 	\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
-% \end{tikzcd}\]
-%
-% \item[Case $\Delta_2 \subset \Delta_1$:] Let $\Delta_1 \equiv |apply1N (lam x e_1) v_1|$, and split cases on where $\Delta_2$ occurs in $\Delta_1$.
-% 	\begin{description}
-% 		\item[Case: $\Delta_2 \subset e_1$] \ie $e_1 \equiv E_1[\Delta_2]$, so we have:
-%         % https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC5cXCBFXzFbXFxyZHh7fV8yXSlcXCB2XzEiXSxbMCwxLCJcXGV4aXN0cyB4LlxcIHggPSB2XzE7XFwgRV8xW1xccmR4e31fMl0pIl0sWzIsMSwiKFxcbGFtYmRhIHguXFwgRV8xW1xccmR4e31fMiddKVxcIHZfMSJdLFsxLDIsIlxcZXhpc3RzIHguXFwgeCA9IHZfMTtcXCBFXzFbXFxyZHh7fV8yJ10pIl0sWzAsMiwiXFxyYXBwXzIiXSxbMCwxLCJcXHJhcHBfMSIsMl0sWzEsMywiXFxyYXBwXzIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiwzLCJcXHJhcHBfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-%         \[\begin{tikzcd}
-%         	& {(\lambda x.\ E_1[\Delta_2])\ v_1} \\
-%         	{\exists x.\ x = v_1;\ E_1[\Delta_2])} && {(\lambda x.\ E_1[\Delta_2'])\ v_1} \\
-%         	& {\exists x.\ x = v_1;\ E_1[\Delta_2'])}
-%         	\arrow["{\rapp_2}", from=1-2, to=2-3]
-%         	\arrow["{\rapp_1}"', from=1-2, to=2-1]
-%         	\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
-%         	\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
-%         \end{tikzcd}\]
-
-% 		\item[Case: $\Delta_2 \subset v_1$] \ie $v_1 \equiv V_1[\Delta_2]$, so we have:
-% 		% https://q.uiver.app/?q=WzAsNCxbMSwwLCIoXFxsYW1iZGEgeC5cXCBlXzEpXFwgVl8xW1xccmR4e31fMl0iXSxbMCwxLCJcXGV4aXN0cyB4LlxcIHggPSBWXzFbXFxyZHh7fV8yXTtcXCBlXzEiXSxbMiwxLCIoXFxsYW1iZGEgeC5cXCBlXzEpXFwgVl8xW1xccmR4e31fMiddIl0sWzEsMiwiXFxleGlzdHMgeC5cXCB4ID0gVl8xW1xccmR4e31fMiddO1xcIGVfMSJdLFswLDIsIlxccmFwcF8yIl0sWzAsMSwiXFxyYXBwXzEiLDJdLFsxLDMsIlxccmFwcF8yIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxyYXBwXzEiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2F26d6237c689e2e0a66907fdf266fa5e9775efdc7%2Ffresh_macros.tex
-% 		\[\begin{tikzcd}
-% 			& {(\lambda x.\ e_1)\ V_1[\Delta_2]} \\
-% 			{\exists x.\ x = V_1[\Delta_2];\ e_1} && {(\lambda x.\ e_1)\ V_1[\Delta_2']} \\
-% 			& {\exists x.\ x = V_1[\Delta_2'];\ e_1}
-% 			\arrow["{\rapp_2}", from=1-2, to=2-3]
-% 			\arrow["{\rapp_1}"', from=1-2, to=2-1]
-% 			\arrow["{\rapp_2}"', dotted, from=2-1, to=3-2]
-% 			\arrow["{\rapp_1}", dotted, from=2-3, to=3-2]
-% 		\end{tikzcd}\]
-% 	\end{description}
-\end{description}
-
-\end{proof}
-
-\begin{lemma}[$\rapp-\rdis$-Comm] \label{lem:a-d-c}
-	$\rapp$ and $\rdis$ commute.
-\end{lemma}
-
-\begin{proof}
-	Via \cref{lem:a-c-c} and \cref{lem:a-g-c} and \cref{lem:comm-union}.
-\end{proof}
-
-\begin{lemma}[$\rapp-\rcon$-Comm] \label{lem:a-c-c}
-	$\rapp$ and $\rcon$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\rapp$ $*$-commutes with $\rcon$, hence commutes via \cref{lem:star-comm}.
-%
-Let $\tx{\rapp}$ and $\tx{\rcon}$ denote the reducts for $\rapp$ and $\rcon$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice versa.
-
-\begin{description}
-\item[Case $\rdx{\rapp} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$. Crucially,
-the $\rapp$ rules apply at application sites which are disjoint from any of the $\rcon$ sites, hence
-the proof is similar to but simpler than the case of $\rdx{\runi} \subset \rdx{\rcon}$ in \cref{lem:u-c-c}
-as each $\rapp$-reduct must be strictly under \emph{one} of the components of the $\rcon$-reduct.
-	\begin{description}
-		\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
-		If $\rdx{\rapp} \subset |v|$, \ie $\rapp : |v| \movesto |v'|$, then join at $|e|$.
-		If $\rdx{\rapp} \subset |e|$, \ie $\rapp : |e| \movesto |e'|$, then join at $|e'|$.
-	\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
-		If $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
-		If $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
-		If $\rdx{\rapp} \subset e_3$, \ie $\rapp : e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
-	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\rapp} \subset |e_1|$, \ie $\runi : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\rapp} \subset |e_2|$, \ie $\runi : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\rapp} \subset \hnf$, \ie $\rapp: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
-	\item[Case:] \rulename{norm-seq-def}, \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}]
-		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\rapp} \subset e_1$, \ie $\rapp : e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\rapp} \subset e_2$, \ie $\rapp : e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
-	\end{description}
-\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
-\end{description}
+If $\rdx{1} \subset \rdx{2}$ (or $\rdx{2} \subset \rdx{1}$) then \cref{lem:under-a} completes the proof.
 \end{proof}
 
 
-\begin{lemma}[$\rapp-\rfail$-Comm] \label{lem:a-f-c}
-	$\rapp$ and $\rfail$ commute.
-\end{lemma}
 
-\begin{proof}
-We show that $\rapp$ strongly commutes with $\rfail$.
-%
-Let $\tx{\rapp}$ and $\tx{\rfail}$ denote the reducts for $\rapp$ and $\rfail$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rfail}$ or vice versa.
 
-\begin{description}
-\item[Case $\rdx{\rapp} \subset \rdx{\rfail}$] via \cref{lem:under-f}.
-\item[Case $\rdx{\rfail} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\rapp-\rgc$-Comm] \label{lem:a-g-c}
+\begin{lemma} \label{lem:a-g-c}
 	$\rapp$ and $\rgc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\rapp$ $*$-commutes with $\rgc$.
+We show that $\rapp$ strongly commutes with $\rgc$, hence commutes via \cref{lem:strong-commute}.
 %
 Let $\tx{\rapp}$ and $\tx{\rgc}$ denote the reducts for $\rapp$ and $\rgc$ respectively.
 %
 If the reducts are disjoint then terms can be trivially joined in a single step.
 %
-Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rgc}$ or vice versa.
-
+Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice versa.
+%
 \begin{description}
 \item[Case $\rdx{\rapp} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
 \item[Case $\rdx{\rgc} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
-\begin{lemma}[$\rapp-\rspc$-Comm] \label{lem:a-s-c}
+\begin{lemma} \label{lem:a-s-c}
 	$\rapp$ and $\rspc$ commute.
 \end{lemma}
 
 \begin{proof}
-We show that $\rspc$ strongly commutes with $\rapp$.
+We show that $\rapp$ strongly commutes with $\rspc$, hence commutes via \cref{lem:strong-commute}.
 %
 Let $\tx{\rapp}$ and $\tx{\rspc}$ denote the reducts for $\rapp$ and $\rspc$ respectively.
 %
@@ -1430,430 +1631,27 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 %
 \end{proof}
 
-
-
-\subsection{Distillation: Normalization and Garbage Collection} % --------------------------------------------------------------------------
-
-
-\begin{lemma}[$\rdis$-Confluent]%\label{lem:d-c}
-    $\rdis$ is confluent.
-\end{lemma}
-
-\begin{proof}
-We will show that $\rdis$ is locally confluent
-via \cref{lem:d-local} and terminating \cref{lem:d-term},
-and hence confluent by Newman's \cref{lem:local}.
-\end{proof}
-
-\begin{lemma} \label{lem:d-term}
-    $\rdis$ is Noetherian.
-\end{lemma}
-
-\begin{proof}
-Each step of $\rdis$ brings the term closer to a canonical \emph{normal form}
-defined by the following grammar,
-%
-$$\begin{array}{rcl}
-e_1 & := & |def x e_1| \vb e_2 \\
-e_2 & := & |x == s ; e_2| \vb e_3 \\
-e_3 & := & |x == h ; e_3| \vb e_4 \\
-e_4 & := & |v| \vb \mathit{nv} \vb |v| = \mathit{nv} \\
-\mathit{nv} & := & |v_1 v_2| \vb |e_1 `choice` e_1| \vb |one e_1| \vb |all e_1| \\
-\end{array}$$
-%
-where each expression is either $|fail|$ or has
-existentials at the top, then $|x == s|$ bindings,
-then $|x == h|$ bindings, and no $|v|$ to the left of a semicolon.
-%
-Once a term is in this normalized form, no further $\rdis$ steps are possible.
-%
-\end{proof}
-
-\begin{lemma}[$\rdis$-LC]\label{lem:d-local}
-$\rdis$ is locally confluent.
-\end{lemma}
-
-\begin{proof}
-Suppose we have two $\rdis$-steps:
-via the redux $\rdx{1} \movesto \rdx{1}'$ and
-via the redux $\rdx{2} \movesto \rdx{2}'$.
-%
-Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
-%
-The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
-%
-Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
-%
-Split cases on the $\rdis$ rule used in $\rdx{2}$.
-%
-\begin{description}
-\item[Case:] \rulename{norm-val} \ie $\tx{2} \equiv |v; e| \movesto |e|$.
-		If $\rdx{1} \subset |v|$, \ie $\rdis_{1}: |v| \movesto |v'|$, then join at $|e|$.
-		If $\rdx{1} \subset |e|$, \ie $\rdis_{1}: |e| \movesto |e'|$, then join at $|e'|$.
-
-\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{2} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
-		If $\rdx{1} \subset e_1$, \ie $\rdis_{1}: e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
-		If $\rdx{1} \subset e_2$, \ie $\rdis_{1}: e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
-		If $\rdx{1} \subset e_3$, \ie $\rdis_{1}: e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
-		If $e_1 \equiv |def x e_1'|$ and $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defr}
-			then join at $|def x (e_1'; (e_2; e_3))|$.
-		If $e_2 \equiv |def x e_2'|$ and $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defl}
-			then join at $|def x (e_1; (e_2'; e_3))|$.
-		If $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defr} where $e_1 \equiv |def x e_1'|$,
-			then join at $|def x (e_1'; (e_2; e_3))|$.
-		If $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-defl} where $e_2 \equiv |def x e_2'|$
-			then join at $|def x (e_1; (e_2'; e_3))|$.
-		If $\rdx{1} \subset e_1; e_2$ via \rulename{norm-seq-swap-*} where $e_2 \equiv |x == v; e_2'|$
-			then join at $|def x (x==v; (e_1; (e_2'; e_3)))|$.
-		If $\rdx{1} \subset e_1; e_2$ via \rulename{norm-eq} where $e_2 \equiv |x == v'|$
-			then join at $(e_1; (x = |v|; (x; e_3)))$.
-
-\item[Case:] \rulename{norm-seq-swap} \ie $\tx{2} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-	If $\rdx{1} \subset |e_1|$, \ie $\rdis_{1}: e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-	If $\rdx{1} \subset |e_2|$, \ie $\rdis_{1}: e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-	If $e_1 \equiv |def y e_1'|$ and $\rdx{1} \subset |e_1; (x == v; e_2)|$ via \rulename{norm-seq-defr}
-		then join at $|def y (x == |v|; e_1'; e_2)|$.
-	If $e_2 \equiv |def y e_2'|$ and $\rdx{1} \subset |e_1; (x == v; e_2)|$ via \rulename{norm-seq-defl}
-		then join at $|def y (x == |v|; e_1; e_2')|$.
-
-\item[Case:] \rulename{norm-swap-eq} \ie $\rdx{2} \equiv \hnf = x \movesto x = \hnf \equiv \rdx{2}'$.
-	Here $\rdx{1} \subset \hnf$, \ie $\rdis_{1}: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
-
-\item[Case:] \rulename{norm-seq-defr} \ie $\rdx{2} \equiv |def x e_1; e_2| \movesto |def x (e_1; e_2)| \equiv \rdx{2}'$.
-	If $\rdx{1} \subset e_1$, \ie $\rdis_{1} : e_1 \movesto e_1'$, then join at $|def x e_1'; e_2|$.
-	If $\rdx{1} \subset e_2$, \ie $\rdis_{1} : e_2 \movesto e_2'$, then join at $|def x e_1; e_2'|$.
-    If $\rdx{1} \subset |def x e_1; e_2|$ via \rulename{norm-seq-defl} where $e_2 \equiv |def y e_2'|$
-		then join at $|def x (def y (e_1; e_2'))|$ (using structural equivalance \rulename{swap-d}).
-    If $\rdx{1} \subset |def x e_1|$ via \rulename{elim-def} where $\rgc : |def x e_1| \movesto e_1'$
-		then by \cref{lem:wf-shape} $\rsteps{\rcon}{|e_1|}{|def xs (cs; e_1')|}$ where $x, |xs|$ not in $\freevars{e_1'}$.
-		Hence, $\rsteps{\rcon}{|def x (e_1; e_2)}{def x (def xs (cs; e_1'; e_2))}$ after which we do another \rulename{elim-def}
-		and join at $e_1'; e_2$.
-
-\item[Case:] \rulename{norm-seq-defl} \ie $\tx{2} \equiv |e_1; def x e_2| \movesto |def x (e_1; e_2)|$.
-	Symmetric to the previous case.
-
-\item[Case:] \rulename{norm-defr} \ie $\rdx{2} \equiv |v| = |(def y e)| \movesto |def y (v == e)| \equiv \rdx{2}'$.
-	If $\rdx{1} \subset v$, \ie $\rdis_{1} : v \movesto v'$, then join at $|def y (v' == e)|$.
-	If $\rdx{1} \subset e$, \ie $\rdis_{1} : e \movesto e'$, then join at $|def y (v == e')|$.
-	%
-    If $\rdx{1} \subset |def y e|$ via \rulename{elim-def} where $\rgc : |def y e| \movesto e'$
-		then by \cref{lem:wf-shape} $\rsteps{\rcon}{|e|}{|def xs (cs; e')|}$ where $x, |xs|$ not in $\freevars{e'}$.
-		Hence, $\rsteps{\rcon}{|def y (v = e)}{def y (def xs (cs; v = e'))}$ after which we do another \rulename{elim-def}
-		to join at $v = e'$.
-
-\item[Case:] \rulename{norm-seqr} \ie $\rdx{2} \equiv |v == e_1; e_2| \movesto |e_1; v == e2| \equiv \rdx{2}'$.
-    If $\rdx{1} \subset v$,   \ie $\rdis_{1} : v \movesto v'$,     then join at $|e_1; v' == e2|$.
-    If $\rdx{1} \subset e_1$, \ie $\rdis_{1} : e_1 \movesto e_1'$, then join at $|e_1'; v == e_2|$.
-    If $\rdx{1} \subset e_2$, \ie $\rdis_{1} : e_2 \movesto e_2'$, then join at $|e_1; v == e_2'|$.
-
-\item[Case:] \rulename{norm-unifyr} \ie $\rdx{\rcon} \equiv |v_1 == (v_2 == e)| \movesto |def x (x == v_1; x == v_2; x == e)|$.
-	If $\rdx{1} \subset v_1$, \ie $\rdis_{1} : v_1 \movesto v_1'$, then join at $|def x (x == v_1'; x == v_2; x == e)|$.
-	If $\rdx{1} \subset v_2$, \ie $\rdis_{1} : v_2 \movesto v_2'$, then join at $|def x (x == v_1; x == v_2'; x == e)|$.
-	If $\rdx{1} \subset e$  , \ie $\rdis_{1} : e   \movesto e'$,   then join at $|def x (x == v_1; x == v_2; x == e')|$.
-
-\item[Case:] \rulename{elim-def} via \cref{lem:under-g} and \cref{lem:g-c}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\rdis-\rfail$-Comm] \label{lem:d-f-c}
-$\rdis$ and $\rfail$ commute.
-\end{lemma}
-
-\begin{proof}
-Via \cref{lem:c-f-c} and \cref{lem:g-f-c} and \cref{lem:comm-union}.
-\end{proof}
-
-
-\begin{lemma}[$\rcon-\rfail$-Comm] \label{lem:c-f-c}
-$\rcon$ and $\rfail$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\rcon$ $*$-commutes with $\rfail$, hence commutes via \cref{lem:star-comm}.
-%
-Let $\tx{\rcon}$ and $\tx{\rfail}$ denote the reducts for $\rcon$ and $\rfail$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rfail}$ or vice versa.
-
-\begin{description}
-\item[Case $\rdx{\rcon} \subset \rdx{\rfail}$] via \cref{lem:under-f}.
-\item[Case $\rdx{\rfail} \subset \rdx{\rcon}$] Split cases on the rule used in $\rcon$.
-	\begin{description}
-
-	\item[Case:] \rulename{norm-val} \ie $\tx{\rcon} \equiv |v; e| \movesto |e|$.
-		If $\rdx{\rfail} \subset |v|$, \ie $\rfail: |v| \movesto |v'|$, then join at $|e|$.
-		If $\rdx{\rfail} \subset |e|$, \ie $\rfail: |e| \movesto |e'|$, then join at $|e'|$.
-
-	\item[Case:] \rulename{norm-seq-assoc} \ie $\tx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3)$.
-		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $(e_1'; (e_2; e_3)$.
-		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $(e_1; (e_2'; e_3)$.
-		If $\rdx{\rfail} \subset e_3$, \ie $\rfail: e_3 \movesto e_3'$, then join at $(e_1; (e_2; e_3'))$.
-		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-l}
-			then join at $|fail|$ via multiple $\rfail$ steps.
-		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset e_1; e_2$ via \rulename{fail-seq-r}
-			then join at $|fail|$ via multiple $\rfail$ steps.
-
-	\item[Case:] \rulename{norm-seq-swap} \ie $\tx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2|$.
-		If $\rdx{\rfail} \subset |e_1|$, \ie $\rfail : e_1 \movesto e_1'$, then join at $x = |v|; e_1'; e_2$.
-		If $\rdx{\rfail} \subset |e_2|$, \ie $\rfail : e_2 \movesto e_2'$, then join at $x = |v|; e_1; e_2'$.
-		If $e_1 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-l}
-			then join at $|fail|$ via multiple $\rfail$ steps.
-		If $e_2 \equiv |fail|$ and $\rdx{\rfail} \subset |e_1; x == v; e_2|$ via \rulename{fail-seq-r}
-			then join at $|fail|$ via multiple $\rfail$ steps.
-
-	\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-		Here $\rdx{\rfail} \subset \hnf$, \ie $\rfail: \hnf \movesto \hnf'$, hence join at $x = \hnf'$.
-
-	\item[Case:] \rulename{norm-seq-def*}
-		In this case $\tx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2]$.
-		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $C'[e_1', e_2]$.
-		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $C'[e_1, e_2']$.
-
-	% FIXME \rulename{norm-defr}, \rulename{norm-seqr}, \rulename{norm-unifyr}
-	\item[Case:] \rulename{norm-defr} \ie $\rdx{\rcon} \equiv |v| = |(def y e)| \movesto |def y (v == e)|$.
-		If $\rdx{\rfail} \subset v$, \ie $\rfail: v \movesto v'$, then join at $|def y (v' == e)|$.
-		If $\rdx{\rfail} \subset v$, \ie $\rfail: v \movesto e'$, then join at $|def y (v == e')|$.
-
-	\item[Case:] \rulename{norm-seqr} \ie $\rdx{\rcon} \equiv |v == (e_1; e_2)| \movesto |e_1; v == e2|$.
-		If $\rdx{\rfail} \subset v$,   \ie $\rfail: v \movesto v'$,     then join at $|e_1; v' == e2|$.
-		If $\rdx{\rfail} \subset e_1$, \ie $\rfail: e_1 \movesto e_1'$, then join at $|e_1'; v == e_2|$.
-		If $\rdx{\rfail} \subset e_2$, \ie $\rfail: e_2 \movesto e_2'$, then join at $|e_1; v == e_2'|$.
-
-	\item[Case:] \rulename{norm-unifyr} \ie $\rdx{\rcon} \equiv |v_1 == (v_2 == e)| \movesto |def x (x == v_1; x == v_2; x == e)|$.
-		If $\rdx{\rfail} \subset v_1$, \ie $\rfail: v_1 \movesto v_1'$, then join at $|def x (x == v_1'; x == v_2; x == e)|$.
-		If $\rdx{\rfail} \subset v_2$, \ie $\rfail: v_2 \movesto v_2'$, then join at $|def x (x == v_1; x == v_2'; x == e)|$.
-		If $\rdx{\rfail} \subset e$  , \ie $\rfail: e   \movesto e'$,   then join at $|def x (x == v_1; x == v_2; x == e')|$.
-		If $\rdx{\rfail} \subset |v_2 == e|$ via \rulename{fail-eq}, \ie $e \equiv |fail|$ hence join at $|fail|$ via multiple $\rfail$ steps.
-	\end{description}
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\rgc-\rfail$-Comm] \label{lem:g-f-c}
-	$\rgc$ and $\rfail$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\rfail$ strongly commutes with $\rgc$.
-%
-Let $\tx{\rfail}$ and $\tx{\rgc}$ denote the reducts for $\rfail$ and $\rgc$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rfail}$ occurs under $\rdx{\rgc}$ or vice versa.
-%
-\begin{description}
-\item[Case $\rdx{\rgc} \subset \rdx{\rfail}$] via \cref{lem:under-f}.
-
-\item[Case $\rdx{\rfail} \subset \rdx{\rgc}$]
-	Suppose that $\tx{\rgc} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$,
-	where no $x_i \in \freevars{e}$.
-	If $\rdx{\rfail} \subset e$, \ie $\rfail: e \movesto e'$,
-		then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
-	If $\rdx{\rapp} \subset v_i$, \ie $\runi : v_i \movesto v_i'$,
-		then we can join at $e$.
-\end{description}
-\end{proof}
-
-\begin{lemma}[Under-$\rcon$] \label{lem:under-c}
-%
-Let $\rr' = \rr - \rfail - \rgc - \rcon$.
-%
-If $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
-   $\rdx{\rcon} \equiv E[\rdx{}]$ and
-   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\rcon}''$ such that
-   $\rstep{\rr'}{\rdx{\rcon}'}{\rdx{\rcon}''}$ and
-   $\rstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
-\end{lemma}
-
-\begin{proof}
-Split cases on the rule used in $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$.
-\begin{description}
-%
-\item[Case:] \rulename{norm-val} \ie $\rdx{\rcon} \equiv |v; e| \movesto |e| \equiv \rdx{\rcon}'$.
-%
-If $\rdx{} \subset |v|$, \ie $\rr': |v| \movesto |v'|$, then $\rdx{\rcon}'' \equiv |e|$.
-If $\rdx{} \subset |e|$, \ie $\rr': |e| \movesto |e'|$, then $\rdx{\rcon}'' \equiv |e'|$.
-
-\item[Case:] \rulename{norm-seq-assoc} \ie $\rdx{\rcon} \equiv (e_1; e_2); e_3 \movesto e_1; (e_2 ; e_3) \equiv \rdx{\rcon}'$.
-If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv (e_1'; (e_2; e_3)$.
-If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv (e_1; (e_2'; e_3)$.
-If $\rdx{} \subset e_3$, \ie $\rr': e_3 \movesto e_3'$, then $\rdx{\rcon}'' \equiv (e_1; (e_2; e_3'))$.
-If $\rdx{} \subset e_1;e_2$ \ie via \rulename{deref-s} $\rr' : e_1;e_2 \movesto e_1;e_2'$, then $\rdx{\rcon}'' \equiv e_1;(e_2';e_3)$.
-
-\item[Case:] \rulename{norm-seq-swap-*} \ie $\rdx{\rcon} \equiv |e_1; x == v; e_2| \movesto |x == v; e_1; e_2| \equiv \rdx{\rcon}'$.
-If $\rdx{} \subset |e_1|$, \ie $\rr' : e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv x = |v|; e_1'; e_2$.
-If $\rdx{} \subset |e_2|$, \ie $\rr' : e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv x = |v|; e_1; e_2'$.
-If $\rdx{} \subset |x==v;e_2|$ \ie via \rulename{deref-s} $\rr' : |x==v;e_2| \movesto |x==v;e_2'|$, then $\rdx{\rcon}'' \equiv |x==v; (e_1; e_2')|$.
-
-\item[Case:] \rulename{norm-swap-eq} \ie $\tx{\rcon} \equiv \hnf = x \movesto x = \hnf$.
-Here $\rdx{} \subset \hnf$, \ie $\rr': \hnf \movesto \hnf'$, hence $\rdx{\rcon}'' \equiv x = \hnf'$.
-
-\item[Case:] \rulename{norm-seq-def*}, \ie $\rdx{\rcon} \equiv C[e_1, e_2] \movesto C'[e_1, e_2] \equiv \rdx{\rcon}'$.
-If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv C'[e_1', e_2]$.
-If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv C'[e_1, e_2']$.
-
-\item[Case:] \rulename{norm-defr} \ie $\rdx{\rcon} \equiv |v| = |(def y e)| \movesto |def y (v == e)|$.
-If $\rdx{} \subset v$, \ie $\rr': v \movesto v'$, then $\rdx{\rcon}'' \equiv |def y (v' == e)|$.
-If $\rdx{} \subset e$, \ie $\rr': e \movesto e'$, then $\rdx{\rcon}'' \equiv |def y (v == e')|$.
-
-\item[Case:] \rulename{norm-seqr} \ie $\rdx{\rcon} \equiv |v == e_1; e_2| \movesto |e_1; v == e2|$.
-If $\rdx{} \subset v$, \ie $\rr': v \movesto v'$, then $\rdx{\rcon}'' \equiv |e_1; v' == e2|$.
-If $\rdx{} \subset e_1$, \ie $\rr': e_1 \movesto e_1'$, then $\rdx{\rcon}'' \equiv |e_1'; v == e_2|$.
-If $\rdx{} \subset e_2$, \ie $\rr': e_2 \movesto e_2'$, then $\rdx{\rcon}'' \equiv |e_1; v == e_2'|$.
-
-\item[Case:] \rulename{norm-unifyr} \ie $\rdx{\rcon} \equiv |v_1 == (v_2 == e)| \movesto |def x (x == v_1; x == v_2; x == e)|$.
-If $\rdx{} \subset v_1$, \ie $\rr': v_1 \movesto v_1'$, then $\rdx{\rcon}'' \equiv |def x (x == v_1'; x == v_2; x == e)|$.
-If $\rdx{} \subset v_2$, \ie $\rr': v_2 \movesto v_2'$, then $\rdx{\rcon}'' \equiv |def x (x == v_1; x == v_2'; x == e)|$.
-If $\rdx{} \subset e$  , \ie $\rr': e   \movesto e'$,   then $\rdx{\rcon}'' \equiv |def x (x == v_1; x == v_2; x == e')|$.
-
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\rdis-\rspc$-Comm] \label{lem:d-s-c}
-	$\rdis$ and $\rspc$ commute.
-\end{lemma}
-
-\begin{proof}
-Via \cref{lem:c-s-c} and \cref{lem:g-s-c} and \cref{lem:comm-union}.
-\end{proof}
-
-
-\begin{lemma}[$\rcon-\rspc$-Comm] \label{lem:c-s-c}
-	$\rcon$ and $\rspc$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\rcon$ and $\rspc$ strongly commute, and hence commute.
-%
-Let $\tx{\rcon}$ and $\tx{\rspc}$ denote the reducts for $\rcon$ and $\rspc$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rcon}$ occurs under $\rdx{\rspc}$ or vice versa.
-%
-\begin{description}
-%
-\item[Case $\rdx{\rspc} \subset \rdx{\rcon}$] via \cref{lem:under-c}.
-%
-\item[Case $\rdx{\rcon} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
-%
-\end{description}
-\end{proof}
-
-\begin{lemma}[$\rfail$-Confluent] \label{lem:f-c}
-	$\rfail$ is confluent.
-\end{lemma}
-
-\begin{proof}
-We show that $\rfail$ has the diamond property hence is confluent.
-%
-Suppose we have two $\rfail$-steps:
-via the redux $\rdx{1} \movesto \rdx{1}'$ and
-via the redux $\rdx{2} \movesto \rdx{2}'$.
-%
-Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
-%
-The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
-%
-Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
-%
-Split cases on the $\rfail$ rule used in $\rdx{2}$.
-%
-\begin{description}
-\item[Case] \rulename{fail-seq-l} \ie $\tx{2} \equiv |fail|; e \movesto |fail|$.
-		  	Here $\rdx{1} \subset e$ so join at $|fail|$.
-\item[Case] \rulename{fail-seq-l} \ie $\tx{2} \equiv e; |fail| \movesto |fail|$.
-		  	Here $\rdx{1} \subset e$ so join at $|fail|$.
-\item[Case] \rulename{fail-eq} \ie $\tx{2} \equiv x = |fail| \movesto |fail|$.
-			Here $\rdx{1} \not \subset \rdx{\rfail}$.
-\end{description}
-\end{proof}
-
-
-\begin{lemma}[$\rfail-\rspc$-Comm] \label{lem:f-s-c}
-	$\rfail$ and $\rspc$ commute.
-\end{lemma}
-
-\begin{proof}
-We show that $\rspc$ strongly commutes with $\rfail$.
-%
-Let $\tx{\rspc}$ and $\tx{\rfail}$ denote the reducts for $\rspc$ and $\rfail$ respectively.
-%
-If the reducts are disjoint then terms can be trivially joined in a single step.
-%
-Let us split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rfail}$ or vice versa.
-%
-\begin{description}
-\item[Case $\rdx{\rspc} \subset \rfail$] via \cref{lem:under-f}
-\item[Case $\rdx{\rfail} \subset \rspc$] via \cref{lem:under-s}.
-\end{description}
-\end{proof}
-
-\begin{lemma}[Under-$\rfail$] \label{lem:under-f}
-If $\rstep{\rfail}{\rdx{\rfail}}{\rdx{\rfail}'}$ and
-   $\rdx{\rfail} \equiv E[\rdx{}]$ and
-   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\rfail}''$ such that
-   $\rstepo{\rr}{\rdx{\rfail}'}{\rdx{\rfail}''}$ and
-   $\rstep{\rfail}{E[\rdx{}']}{\rdx{\rfail}''}$.
-\end{lemma}
-
-\begin{proof}
-Split cases on the rule used in $\rdx{\rfail}$.
-\begin{description}
-\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv |fail|; e \movesto |fail|$.
-	Here $\rdx{} \subset e$ so $\rdx{\rfail}'' \equiv |fail|$.
-\item[Case] \rulename{fail-seq-l} \ie $\tx{\rfail} \equiv e; |fail| \movesto |fail|$.
-	Here $\rdx{} \subset e$ so $\rdx{\rfail}'' \equiv |fail|$.
-\item[Case] \rulename{fail-eq} \ie $\tx{\rfail} \equiv x = |fail| \movesto |fail|$.
-	Here $\rdx{} \not \subset \rdx{\rfail}$.
-\end{description}
-\end{proof}
-
 \subsection{Garbage Collection} % --------------------------------------------------------------------------
 
-\begin{lemma}[$\rgc$-Confluent] \label{lem:g-c}
-	$\rgc$ has the diamond property, hence is confluent.
+\begin{lemma} \label{lem:g-c}
+    $\rgc$ is confluent.
 \end{lemma}
 
 \begin{proof}
-By \cref{lem:diamond} after showing that $\rgc$ satisfies the diamond property.
-Suppose we have two $\rgc$-steps:
-via the redux $\rdx{1} \movesto \rdx{1}'$ and
-via the redux $\rdx{2} \movesto \rdx{2}'$.
+We show that $\rgc$ satisfies the diamond property and hence,
+is confluent by \cref{lem:diamond}. Suppose that
 %
-Let us split cases on the relative positions of $\rdx{1}$ and $\rdx{2}$.
+$\rstep{\rgc}{e}{e_1}$ via the redux $\tx{1}$
 %
-The case where $\rdx{1}$ is disjoint from $\rdx{2}$ is trivial.
+$\rstep{\rgc}{e}{e_2}$ via the redux $\tx{2}$.
 %
-Suppose that $\rdx{1} \subset \rdx{2}$ (the case where $\rdx{2} \subset \rdx{1}$ is symmetric).
+If $\rdx{1}$ and $\rdx{2}$ are disjoint, the terms $e_1$ and $e_2$
+can be trivially joined in a single step.
 %
-Suppose that $\tx{2} \equiv \exists x_1,\ldots. x_1=v_1; \ldots; e \movesto e$,
-where no $x_i \in \freevars{e}$.
-\begin{description}
-\item[Case $\rdx{1} \subset e$], \ie $\rgc_1: e \movesto e'$,
-	then as $\freevars{e'} \subseteq \freevars{e}$ we can join at $e'$.
-\item[Case $\rdx{1} \subset v_i$], \ie $\runi : v_i \movesto v_i'$,
-	then we can join at $e$.
-\item[Case $\rdx{1}$ and $\rdx{2}$ overlap], \ie the reducts are of the form
-	$$\rgc_1 \equiv   \exists \overline{w},\overline{z},\overline{x},\overline{y}. x_1=\ldots; y_1=\ldots; z_1=\ldots; e
-			 \movesto \exists \overline{w},\overline{z}. z_1=\ldots; e$$
-	$$\rgc_2 \equiv   \exists \overline{w},\overline{y},\overline{x},\overline{z}. x_1=\ldots; z_1=\ldots; y_1=\ldots; e
-			 \movesto \exists \overline{w},\overline{y}. y_1=\ldots; e$$
-That is $\overline{x}$ denotes the common eliminated variables, $\overline{y}$ and $\overline{z}$ denote distinct
-variables eliminated in the first and second redexes, and $\overline{w}$ denotes the variables not eliminated in
-either step. Note that as each of the above is a valid \rgc step, the variables $\overline{y}$ and $\overline{z}$
-do not appear free in $e$, and each binder is defined uniquely in the constraints $y_1=\ldots$ and $z_1=\ldots$.
-Hence, we can perform a second GC step from each of the terms above and join them as:
-	$$\rgc_1' \equiv   \exists \overline{w},\overline{z}. z_1=\ldots; e \movesto \exists \overline{y}. e$$
-	$$\rgc_2' \equiv   \exists \overline{w},\overline{y}. y_1=\ldots; e \movesto \exists \overline{y}. e$$
-\end{description}
+If $\rdx{1} \subset \rdx{2}$ (or $\rdx{2} \subset \rdx{1}$) then \cref{lem:under-g} completes the proof.
 \end{proof}
 
-\begin{lemma}[$\rgc-\rspc$-Comm] \label{lem:g-s-c}
+\begin{lemma} \label{lem:g-s-c}
 	$\rgc$ and $\rspc$ commute.
 \end{lemma}
 
@@ -1873,62 +1671,9 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 %
 \end{proof}
 
-\begin{lemma}[Under-$\rgc$] \label{lem:under-g}
-If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
-   $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
-   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\rgc}''$ such that
-   $\rstepo{\rr}{\rdx{\rgc}'}{\rdx{\rgc}''}$ and
-   $\rstep{\rgc}{E[\rdx{}']}{\rdx{\rspc}''}$.
-\end{lemma}
-
-\begin{proof}
-Suppose that $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ is a $\rgc$
-redex via \rulename{elim-def}.
-%
-Then $\wff{\emptyset}{\rdx{\rgc}}{|xs|}{c_1 \dots c_n}{\rdx{\rgc}'}$
-where $|xs| \not \in \freevars{\rdx{\rgc}'}$.
-%
-If $\rr : E[\rdx{}] \movesto E[\rdx{}']$ then by \cref{lem:wf-step}
-we have $\wff{\emptyset}{E[\rdx{}'}{|xs|}{c_1' \dots c_n'}{e_2'}$
-where either
-%
-(a)~$\rdx{\rgc}' \equiv e_2'$ or
-%
-(b)~$\rstep{}{\rdx{\rgc}'}{e_2'}$.
-%
-and hence, picking $\rdx{\rgc}''$ to be $e_2'$ completes the proof.
-\end{proof}
-
-\begin{lemma}[WF-Shape] \label{lem:wf-shape}
-If $\wff{\Gamma}{e}{|xs|}{|cs|}{e'}$
-then $\rsteps{\rcon}{e}{|def xs (cs; e')|}$.
-\end{lemma}
-
-\begin{proof}
-By induction on the derivation of $\wff{\Gamma}{e}{|xs|}{|cs|}{e'}$.
-\end{proof}
-
-\begin{lemma}[WF-Step] \label{lem:wf-step}
-If $\wff{\emptyset}{e_1}{|xs|}{c_1 \dots c_n}{e_2}$
-   and $\rstep{}{e_1}{e_1'}$
-then $\wff{\emptyset}{e_1'}{|xs|}{c_1' \dots c_n'}{e_2'}$ where either
-%
-(a) there exists $i$ such that  $\rstep{}{c_i}{c_i'}$ and $\forall j \neq i.\ c_j \equiv c_j'$ and $e_2 \equiv e_2'$,
-or
-(b) $\forall j.\ c_j \equiv c_j'$ and $\rstep{}{e_2}{e_2'}$.
-%
-\end{lemma}
-
-\begin{proof}
-By induction on the derivation of $\wff{\emptyset}{e_1}{|xs|}{|cs|}{e_2}$,
-splitting cases on the rule used for $\rstep{\rr}{e_1}{e_1'}$.
-\end{proof}
-
-
 \subsection{Speculation} % --------------------------------------------------------------------------
 
-\begin{lemma}[$\rspc$-Conf] \label{lem:s-c}
+\begin{lemma} \label{lem:s-c}
 	$\rspc$ is confluent.
 \end{lemma}
 
@@ -1936,50 +1681,4 @@ splitting cases on the rule used for $\rstep{\rr}{e_1}{e_1'}$.
 \cref{lem:under-s} shows that $\rspc$
 has the diamond property (as $\rspc \subset \rr$),
 and hence $\rspc$ is confluent via \cref{lem:diamond}.
-\end{proof}
-
-\begin{lemma}[Under-$\rspc$] \label{lem:under-s}
-If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
-   $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
-   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
-then there exists $\rdx{\rspc}''$ such that
-   $\rstepo{\rr}{\rdx{\rspc}'}{\rdx{\rspc}''}$ and
-   $\rstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
-\end{lemma}
-
-\begin{proof}
-Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
-
-\begin{description}
-
-	\item[Case] \rulename{choose-assoc} \ie $\tx{\rspc} \equiv SX[(e_1 |choice| e_2) |choice| e_3] \movesto SX[e_1 |choice| (e_2 |choice| e_3)]$.
-	Let us split cases on where $\rdx{}$ occurs.
-		\begin{description}
-		\item[Case] $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ so  $\rdx{\rspc}'' \equiv SX[e_1' |choice| (e_2 |choice| e_3)]$.
-		\item[Case] $\rdx{} \subset e_2$, \ie $\rr : e_2 \movesto e_2'$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| (e_2' |choice| e_3)]$.
-		\item[Case] $\rdx{} \subset e_3$, \ie $\rr : e_3 \movesto e_3'$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| (e_2 |choice| e_3')]$.
-		\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so  $\rdx{\rspc}'' \equiv SX[e_1 |choice| e_3)]$.
-		\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so  $\rdx{\rspc}'' \equiv SX[e_2 |choice| e_3)]$.
-		\end{description}
-
-	\item[Case] \rulename{choose-l} (symmetric \rulename{choose-r}) \ie $\tx{\rspc} \equiv SX[|fail choice e|] \movesto SX[e]$.
-	Here, $\rdx{} \subset e$, \ie $\rr : e \movesto e'$ so $\rdx{\rspc}'' \equiv SX[e']$.
-
-	\item[Case] \rulename{one-choice} (symmetric \rulename{one-value}, \rulename{all-value})
-	Here $\tx{\rspc} \equiv |one (e_1 `choice` e_2)| \movesto e_1$ where $\wff{\emptyset}{e_1}{|xs|}{|cs|}{|v|}$.
-	If $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ then by \cref{lem:wf-step}, $\rdx{\rspc}'' \equiv e_1'$.
-	If $\rdx{} \subset e_2$, then join at $e_1$.
-
-	\item[Case] \rulename{all-choice}
- 	Here $\tx{\rspc} \equiv |all (e_1 `choice` dots `choice` e_n)| \movesto e'$
-	where each $\wff{\emptyset}{e_i}{\overline{x_i}}{\overline{c_i}}{\overline{|v_i|}}$ and $e'$
-	is the concatenation of binders, constraints and values of each $e_i$.
-	If $\rdx{} \subset e_i$ ie $\rr : e_i \movesto e_i'$ then by \cref{lem:wf-step}
-	$\wff{\emptyset}{e_i'}{\overline{x_i}}{\overline{c'_i}}{|v_i|'}$
-	so $\rdx{\rspc}''$ is obtained by suitably concatenating the above binders, constraints and value
-	with those of the other $e_j$.
-
-	\item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
-	Trivially $\rdx{} \not \subset \rdx{\rspc}$.
-\end{description}
 \end{proof}

@@ -111,8 +111,8 @@ uncons xs = readVar xs >>= \ case
 
 instance ( Backtrack.MonadRef m
          , MonadVar m
-         , PrettyM a m
-         ) => PrettyM (Val m a) m where
+         , MonadPretty a m
+         ) => MonadPretty (Val m a) m where
   prettyM = \ case
     Int x ->
       pure $ pretty x
