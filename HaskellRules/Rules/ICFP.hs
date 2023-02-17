@@ -194,24 +194,6 @@ execX1 lhs =
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
 
--- Like execX, but no Store allowed
-execnX, execnX1 :: Expr -> [(Context, Expr)]
--- X context
-execnX lhs = execnX1 lhs ++ [(id,lhs)]
--- X context, X /= hole
-execnX1 lhs =
-  do (v :=: x) :>: e <- [lhs]
-     (ctx, hole) <- execnX x
-     pure (\ a -> (v :=: ctx a) :>: e, hole)
- ++
-  do x :>: e <- [lhs]
-     (ctx, hole) <- execnX x
-     pure ((:>: e) . ctx, hole)
- ++
-  do e :>: x <- [lhs]
-     (ctx, hole) <- execnX x
-     pure ((e :>:) . ctx, hole)
-
 scopeX :: Expr -> [(Context, Expr)]
 scopeX lhs =
   do One hole <- [lhs]
