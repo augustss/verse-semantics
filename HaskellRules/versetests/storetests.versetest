@@ -171,6 +171,6 @@ testeq(SEq) { for{a:=alloc$[0]; for(a+=1; x:=(a+=10; 10) | (a+=100; 20)) { a+=10
 #  0
 #  }
 
--- Logical variables escaping via ref cells.
+# Logical variables escaping via ref cells.
 testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[0]] } { 10 }
 testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[1]] } { x:any }
