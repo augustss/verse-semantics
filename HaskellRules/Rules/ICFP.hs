@@ -442,7 +442,7 @@ rulesUnification env lhs =
      pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
-  do HNF e1 :=: HNF e2 <- [lhs]
+  do (HNF e1 :=: HNF e2) :>: _ <- [lhs]
      -- Avoid the cases handled above
      guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
                             (Ref k1,Ref k2) -> k1 /= k2
@@ -451,7 +451,7 @@ rulesUnification env lhs =
      pure Fail
  ++
    "U-OCCURS" `name`
-   do Var x :=: Val v <- [lhs]
+   do (Var x :=: Val v) :>: _ <- [lhs]
       (_, Var x') <- valueX1 v
       guard (x == x')
       pure Fail
@@ -467,8 +467,8 @@ rulesUnification env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`
-  do hnf@HNF{} :=: x@Var{} <- [lhs]
-     pure (x :=: hnf)
+  do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
+     pure ((x :=: hnf) :>: e)
  ++
   "VAR-SWAP-SUBST" `name`
   do (ctx, Var x :=: Var y) <- execX lhs
