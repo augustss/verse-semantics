@@ -44,7 +44,7 @@ systemICFPE :: TRSystem Expr
 systemICFPE = s
   { sname = "ICFPE"
   , description = description s ++ " - EXI-SWAP"
-  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP"
+  , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP" -= "EXI-ELIML" <> ruleElimL
   , rulesHaveStructural = False
   }
   where s = systemICFP
@@ -193,24 +193,6 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
-
--- Like execX, but no Store allowed
-execnX, execnX1 :: Expr -> [(Context, Expr)]
--- X context
-execnX lhs = execnX1 lhs ++ [(id,lhs)]
--- X context, X /= hole
-execnX1 lhs =
-  do (v :=: x) :>: e <- [lhs]
-     (ctx, hole) <- execnX x
-     pure (\ a -> (v :=: ctx a) :>: e, hole)
- ++
-  do x :>: e <- [lhs]
-     (ctx, hole) <- execnX x
-     pure ((:>: e) . ctx, hole)
- ++
-  do e :>: x <- [lhs]
-     (ctx, hole) <- execnX x
-     pure ((e :>:) . ctx, hole)
 
 scopeX :: Expr -> [(Context, Expr)]
 scopeX lhs =
@@ -442,7 +424,7 @@ rulesUnification env lhs =
      pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
-  do HNF e1 :=: HNF e2 <- [lhs]
+  do (HNF e1 :=: HNF e2) :>: _ <- [lhs]
      -- Avoid the cases handled above
      guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
                             (Ref k1,Ref k2) -> k1 /= k2
@@ -451,7 +433,7 @@ rulesUnification env lhs =
      pure Fail
  ++
    "U-OCCURS" `name`
-   do Var x :=: Val v <- [lhs]
+   do (Var x :=: Val v) :>: _ <- [lhs]
       (_, Var x') <- valueX1 v
       guard (x == x')
       pure Fail
@@ -467,8 +449,8 @@ rulesUnification env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`
-  do hnf@HNF{} :=: x@Var{} <- [lhs]
-     pure (x :=: hnf)
+  do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
+     pure ((x :=: hnf) :>: e)
  ++
   "VAR-SWAP-SUBST" `name`
   do (ctx, Var x :=: Var y) <- execX lhs
@@ -546,12 +528,35 @@ rulesElimination _ lhs =
   do (_cx, Fail) <- execX1 lhs
      pure Fail
 
+ruleElimL :: ERule
+ruleElimL _ lhs =
+  "EXI-ELIML-OLD" `name`
+  do EXI x a <- [lhs]
+     (ctx, Var x' :=: Val v) <- defX x a
+     guard (x == x')
+     let freeX = free ctx
+         freeV = free v
+     guard (x `notElem` freeX)
+     guard (x `notElem` freeV)
+     pure (ctx (Val v))
+
+-- X context, or exist x . defX
+defX :: Ident -> Expr -> [(Context, Expr)]
+defX xx lhs =
+  do execX lhs
+ ++
+  do Exi (Bind x dx) <- [lhs]
+     guard (x /= xx)
+     (ctx, hole) <- defX xx dx
+     return (Exi . Bind x . ctx, hole)
+
 --------------------------------------------------------------------------------
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
   "NORM-EXI" `name`
-  do (ctx, EXI x e) <- execnX1 lhs  -- Note: Store not allowed in ctx
+  do (ctx, EXI x e) <- execX1 lhs  -- Note: Store not allowed in ctx
+     guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      let freeX = free ctx
          x'    = identNotIn (freeX ++ free e)
      if x `elem` freeX
@@ -684,12 +689,22 @@ storeWrite h p v = IM.insert p v h
 addStore :: Expr -> Expr
 addStore e = Store storeEmpty e
 
+-- If there are no store operations, drop the store
+-- and any existentials that are no longer needed.
 dropStore :: Expr -> Expr
-dropStore (Store _ e) | hasNoStoreOps e = e
-dropStore e = e
+dropStore ee | hasStoreOps ee = ee
+            | otherwise = drops ee
+  where drops (Store _ e) = e
+        drops (EXI x e) | x `elem` free e' = EXI x e'
+                        | otherwise = e'
+          where e' = drops e
+        drops e = e
 
-hasNoStoreOps :: Expr -> Bool
-hasNoStoreOps e = null [ () | Op o <- universe e, isStoreOp o ]
+hasStoreOps :: Expr -> Bool
+hasStoreOps e = not $ null [ () | Op o <- universe e, isStoreOp o ]
+
+hasStore :: Expr -> Bool
+hasStore e = not $ null [ () | Store{} <- universe e ]
 
 isNonStore :: Expr -> Bool
 isNonStore Store{} = False

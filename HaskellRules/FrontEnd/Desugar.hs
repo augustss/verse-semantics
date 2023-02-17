@@ -788,11 +788,11 @@ errMultiple =
                          prettyShow [ l | Ident l _ <- is ])
 
 scope :: S.Set Ident -> Expr -> D Expr
-scope s = expr
+scope sc = expr
   where
     expr e@LitInt{} = pure e
     expr e@LitRat{} = pure e
-    expr e@(Variable i) | i `S.member` s = pure e
+    expr e@(Variable i) | i `S.member` sc = pure e
                         | otherwise = do errUndefined [i]; pure e
     expr (Array es) = Array <$> mapM expr es
     expr (Seq es) = Seq <$> mapM expr es
@@ -802,19 +802,19 @@ scope s = expr
       errUndefined (is \\ knownEffects)
       expr e
     expr (If3 e1 e2 e3) = do
-      (e1', s') <- defs s e1
-      If3 e1' <$> scope s' e2 <*> expr e3
+      (e1', sc') <- defs sc e1
+      If3 e1' <$> scopeD sc' e2 <*> exprD e3
     expr (For2 e1 e2) = do
-      (e1', s') <- defs s e1
-      For2 e1' <$> scope s' e2
+      (e1', sc') <- defs sc e1
+      For2 e1' <$> scopeD sc' e2
     expr (Let e1 e2) = do
-      (e1', s') <- defs s e1
-      Let e1' <$> scope s' e2
+      (e1', sc') <- defs sc e1
+      Let e1' <$> scope sc' e2
     expr (Do e) = exprD e
     expr (Function [] e2) = Function [] <$> exprD e2
     expr (Function ((a,r):ars) e2) = do
-      (a', s') <- defs s a
-      f' <- scope s' (Function ars e2)
+      (a', sc') <- defs sc a
+      f' <- scope sc' (Function ars e2)
       case f' of
         Function ars' e2' -> pure (Function ((a',r):ars') e2')
         _ -> undefined
@@ -827,20 +827,21 @@ scope s = expr
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (Lambda i r e1 e2) = do
-      (e1', s') <- defs (S.insert i s) e1
-      Lambda i r e1' <$> scope s' (Do e2)
+      (e1', sc') <- defs (S.insert i sc) e1
+      Lambda i r e1' <$> scope sc' (Do e2)
     expr e@AnyT = pure e
     expr e@EmptyT = pure e
-    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert s is) e
+    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert sc is) e
     expr e = impossible e
 
-    exprD e = fst <$> defs s e
+    exprD e = fst <$> defs sc e
+    scopeD s e = fst <$> defs s e
 
     defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
     defs as e = do
       let is = getVisible e
           errM = filter ((> 1) . length) $ group $ sort is
-          errS = [ i | i <- is, i `S.member` s ]
+          errS = [ i | i <- is, i `S.member` sc ]
           s' = foldr S.insert as is
       e' <- scope s' e
       errMultiple errM

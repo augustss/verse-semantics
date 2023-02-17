@@ -4,7 +4,7 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand\mydots{\makebox[0.8em][c]{\text{$\cdot\!\!\cdot\!\!\cdot$}}}
+\newcommand\mydots{\makebox[0.8em][c]{\text{$\cdot\!\cdot\!\cdot$}}}
 
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -227,15 +227,15 @@
 
 \rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
-  \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{u-tup} & \hspace{-8mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+  \rulename{u-occurs} & |x=V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
-  \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
+  \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
 %%  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
   \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
-  \rulename{val-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1|; not both with choices } \\
+  \rulename{val-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1| } \\
 
     \\[-2mm]
 
