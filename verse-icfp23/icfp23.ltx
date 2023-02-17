@@ -15,13 +15,13 @@
 %include polycode.fmt
 %include ../calculus.fmt
 
-\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
-\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
-\newcommand{\eg}{\emph{e.g.}}
-\newcommand{\Eg}{\emph{E.g.}}
-\newcommand{\etc}{\emph{etc.}}
-\newcommand{\etal}{\emph{et al.}}
-\newcommand{\vs}{\emph{vs.}}
+\newcommand{\ie}{\emph{i.e.}\xspace}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}\xspace}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}\xspace}
+\newcommand{\Eg}{\emph{E.g.}\xspace}
+\newcommand{\etc}{\emph{etc.}\xspace}
+\newcommand{\etal}{\emph{et al.}\xspace}
+\newcommand{\vs}{\emph{vs.}\xspace}
 
 \RequirePackage[utf8]{inputenc}
 
@@ -1465,7 +1465,7 @@ If $\rr$ is confluent then every term reduces to at most one normal form.
 % \begin{definition}[Recursive Equations] \label{def:norec}
 
 
-\mypara{Recursion and Non-Confluence: The odd/even problem.}
+\mypara{Recursion and Non-Confluence: The odd/even problem}
 %
 Our rules are not confluent in the presence
 of (mutually) recursive equations.
@@ -1498,9 +1498,9 @@ as \emph{skew confluence}~\cite{ariola:skew-confluence}.
 
 \mypara{Non-Recursive Terms}
 %
-However, for the present, we will content ourselves by
-restricting our rewrite rules to terms that have \norecursion,
-\ie do not (transitively) contain recursive equations.
+For now, we will content ourselves by restricting attention
+to terms that have \norecursion, \ie do not (transitively)
+contain recursive equations.
 %
 A \emph{recursive equation} is a term of the form
 %
@@ -1514,11 +1514,14 @@ that is or contains a $\lambda$ in which $|x|$ occurs free.
 %
 A term $e$ is \emph{recursive} if it contains a recursive equation.
 %
-A term $e$ is \emph{transitively recursive} if $\rsteps{e}{e'}$ where $e'$ is recursive.
+A term $e$ is \emph{transitively recursive} if $\rsteps{}{e}{e'}$ where $e'$ is recursive.
 %
 A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
 % \end{definition}
-
+%
+The \norecursion condition is not as severe as might first appear: it only prohibits
+recursion through equations. We still allow arbitrary $\lambda$-terms and so one can
+write recursive (and non-terminating) programs using one's favorite fixpoint combinator.
 
 \subsection{Confluence}
 
@@ -1592,36 +1595,39 @@ also confluent.
 
 \subsection{Design for confluence} \label{sec:design-confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
 
-\ranjit{HEREHEREHEREHERE}
-
 \versecalc{} is carefully designed to ensure confluence.
-Rule \rulename{deref-h} is particularly important.
-It prevents substituting heap values |h| under lambdas and inside tuples; and
-the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
-application or unification.  These restrictions matter for at least three different reasons.
 
-\mypara{Nested tuples.}
+
+% Rule \rulename{deref-h} is particularly important.
+% It prevents substituting heap values |h| under lambdas and inside tuples; and
+% the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
+% application or unification.  These restrictions matter for at least three different reasons.
+
+\mypara{Ensuring Unification Terminates}
+%
 Our proof strategy for the confluence of $\runi$ requires that $\runi$ terminates.
-But if \rulename{deref-h} substituted inside tuples, or inside lambdas, it \emph{doesn't} terminate:
+%
+Our free-variable side condition in \rulename{subst}, ensures this by ensuring that
+a substitution $|x == v|$ eliminates $x$ from further consideration.
+%
+If instead we dropped that condition, the following sequence of \rulename{subst}
+reductions would not terminate
 $$
 |def x (x = tup (1,x); x)|
 \; \rightarrow \; |def x (x = tup (1,x); tup (1,x))|
 \; \rightarrow \; |def x (x = tup (1,x); tup (1,tup (1,x)))|
 \; \rightarrow \; \ldots
 $$
-Here, each step makes one substitution for |x|. An exactly analogous example can be made
-for a lambda value.
-We avoid this fruitless divergence by preventing \rulename{deref-h} from substituting
-under tuples or lambdas. Instead an equation like |(x==h)| is left as a ``heap-constraint'' which
-can be used (via \rulename{deref-h}) whenever we actually need to access the contents of the value,
-via unification or application; or it can be eliminated via the garbage collection rules.
+Here, each step makes one substitution for |x|.
+%
+An exactly analogous example can be made for a lambda value.
 
 
-
-\mypara{Unifying lambdas.} In \versecalc{} an attempt to unify two
+\mypara{Unifying lambdas} In \versecalc{} an attempt to unify two
 lambdas fails, even if the lambdas are semantically identical (rule
 \rulename{u-fail}). Why? Because semantic identity of functions is
 un-implementable.
+%
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{deref-h} first:
 \[ |(lam p 1) = (lam q 2); 1 <-* def x (x = (lam p 1); x = (lam q 2); x emptytup) ->* (lam q 2) = (lam p 1); 2| \]
@@ -1635,21 +1641,64 @@ Here is an expression that rewrites in two different ways, depending on which eq
 These two outcomes cannot be joined.  But making unification on lambdas fail, both outcomes
 lead to |fail|, and confluence is restored.
 
-There is a very delicate interaction between \rulename{u-fail}
-and the apparently-innocuous
-rule \rulename{u-scalar} (\cref{fig:rules}).
-Consider |(def x (x==(lam y y); x==x; 0))|.
-If we apply \rulename{u-scalar}, and then \rulename{deref-h} we get |(lam y y)|. But if we \emph{first}
-apply \rulename{deref-h}, twice, we get |((lam y y) == (lam y y); 0)|, and that fails.  Yikes!
+\mypara{Unifying variables}
+%
+Note that while \rulename{u-lit} lets us eliminate equalities on the same literal $|k == k|$,
+there is no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$
+as that would lead to non-confluence.
+%
+To see why, suppose we had such a \rulename{u-var}, and consider the term |(def x (x==(lam y y); x==x; 0))|.
+%
+If first apply \rulename{u-var} to eliminate the equality $|x==x|$ then the remainder
+reduces to |0|.
+However, if we first \rulename{subst} the equality |x == (lam y y)|,
+we get |((lam y y) == (lam y y); 0)| which |fail|s.  Yikes!
+%
+Thus, there is no \rulename{u-var}: such equalities can only be eliminated
+after the value of |x| is substituted in and checked to not be a $\lambda$.
 
-But in fact all is well: the |A| context (\cref{fig:rules}) \emph{only
-  allows \rulename{deref-h} to apply in positions where the value is immediately
-  consumed in some way}, by being applied to an argument, or being
-unified with a value.  So in our example, \rulename{deref-h} simply does not apply. Only \rulename{u-scalar} does,
-so we get |(def x (x==(lam y y); x; 0))|.
-Confluence is restored.
-But the ice is thin here, so it is reassuring that we have a proof of confluence.
-
+\mypara{Ordering variables} (\ranjit{redundant:delete?})
+%
+\rulename{var-swap} has a curious side condition: it only rewrites
+$|x == y|$ to $|y == x|$ if $y \prec x$.
+%
+To understand why the \rulename{var-swap} is necessary and why it
+has this side condition, consider the expression $|lam a (lam b (def x (x == a; x == b; x)))|$.
+%
+Depending on which equality we \rulename{subst} first, we get either
+%
+$$\begin{array}{lcll}
+|lam a (lam b (def x (x == a; x == b; x)))|
+  & \movesto
+  & |lam a (lam b (def x (x == a; a == b; a)))|
+  &  \text {(1: substitute |x == a| first)} \\[0.5mm]
+  & \movesto
+  & |lam a (lam b (def x (b == a; x == b; b)))|
+  &  \text {(2: substitute |x == b| first)} \\[0.5mm]
+\end{array}$$
+%
+Now we are in a pickle: the two expressions are not syntactically the same!
+%
+Fortunately, \rulename{var-swap} rule lets us join the two expressions as follows.
+%
+Here, $b \prec a$ as the binder for $|b|$ is ``closer'', so we can
+join the two terms as
+%
+$$\text{(1)}\ |lam a (lam b (def x (x == a; a == b; a)))| \ \movesto\
+    |lam a (lam b (def x (x == a; b == a; a)))|
+    \ \movesfrom \ |lam a (lam b (def x (b == a; x == a; a)))|\ \text{(2)}$$
+%
+where from (1) we \rulename{var-swap} $|a == b| \movesto |b == a|$,
+and from (2) we \rulename{subst} $|b == a|$ and reorder the equations
+with \rulename{val-swap}.
+%
+Thus, \rulename{var-swap} lets us pick a ``canonical representative''
+for all the variables that are equal to each other (here, we pick $|a|$
+to represent $|a|$, $|b|$ and $|x|$).
+%
+Furthermore, the ordering (based on binding-depth) ensures that the
+\rulename{var-swap} cannot apply forever, \ie\ that unification
+terminates.
 
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
