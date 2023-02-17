@@ -410,8 +410,8 @@ on the reduction rule used in the step.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
-	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$; join at $|def (ys^zs) e'|$.
-	\item[Case $\rdx{} \subset |def (ys^x^zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys^zs) e|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|def (ys,zs) e'|$.
+	\item[Case $\rdx{} \subset |def (ys,x,zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys,zs) e|$.
 	\end{description}
 
 \item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
@@ -422,9 +422,9 @@ on the reduction rule used in the step.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
-	\item[Case $\rdx{} \subset |v|$]: \ie $\rstep{rr}{v}{v'}$; join at $|X^[e]|$.
-	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
-	\item[Case $\rdx{} \subset |X|$]: \ie $\rstep{rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
+	\item[Case $\rdx{} \subset |v|$]: \ie $\rstep{\rr}{v}{v'}$; join at $|X^[e]|$.
+	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
+	\item[Case $\rdx{} \subset |X|$]: \ie $\rstep{\rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
 	\end{description}
 \end{description}
 \end{proof}
