@@ -73,7 +73,7 @@
 \newcommand{\rgc}{\ensuremath{\mathcal{G}}}
 \newcommand{\rfail}{\ensuremath{\mathcal{F}}}
 \newcommand{\rspc}{\ensuremath{\mathcal{S}}}
-
+\newcommand{\norecursion}{no recursion\xspace}
 \newcommand{\rdx}[1]{\ensuremath{\Delta_{#1}}}
 \newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
 \newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
@@ -173,7 +173,7 @@
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, dots ,v_im1, V, v_ip1, dots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
-      
+
   \iffullverse
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
@@ -275,7 +275,7 @@
 
 
 \end{array} \\
-\\    
+\\
 \text{\textit{Note}: In the rules marked with ``\alphamark'', use $\alpha$-conversion to avoid name capture.}
 \end{array}$
 \iffullverse

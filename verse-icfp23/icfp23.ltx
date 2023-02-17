@@ -1505,8 +1505,8 @@ restricting our rewrite rules to terms that have \norecursion,
 A \emph{recursive equation} is a term of the form
 %
 $$
-% |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
-|x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
+|x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
+% |x == V^[lam y E^[x]]| % \quad \text{where}\ x \in \freevars{e}
 $$
 %
 where the LHS is a variable and the RHS is a \emph{value}
@@ -1526,7 +1526,7 @@ Our main result is that \versecalc{}'s reduction rules are confluent for terms w
 
 \begin{theorem}[Confluence] \label{thm:confluence}
 %
-The reduction relation defined in \cref{fig:rules}
+The reduction relation in \cref{fig:rules}
 is confluent for terms with \norecursion.
 %
 %  If $e$ has \norecursion and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ then $\join{\rr}{e_1}{e_2}$.
