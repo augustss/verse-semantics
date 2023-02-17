@@ -190,7 +190,7 @@
 %  \state{State1}
 %  \postcode{Post-Code1}
 %  \country{Germany}                    %% \country is recommended
-% } 
+% }
 \email{mail@@joachim-breitner.de}          %% \email is recommended
 
 \author{Koen Claessen}
@@ -538,7 +538,7 @@ For example
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
 consider |(def (x ^^ y) (x = 3+y; y = 7; x))|.  The sub-expression |3+y| is stuck until |y| gets a value.
-In \versecalc{} we can only unify |x| with a \emph{value} --- 
+In \versecalc{} we can only unify |x| with a \emph{value} ---
 we will see why in \cref{sec:call-time-choice} --- and
 hence the equation |x=3+y| is stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y=7|;
@@ -645,7 +645,7 @@ we use the empty tuple |emptytup| to represent the empty list and pairs to repre
 (see \cref{fig:syntax} to desugar the pattern matching lambda):
 $$
 |append := lam (tup (xsl,ysl))
-  (((xsl = emptytup; ysl) choice 
+  (((xsl = emptytup; ysl) choice
    (def (x ^^ xr) (xsl = tup (x,xr); tup (x, applyN append (xr, ysl))))))|
 $$
 If |xsl| is |emptytup|, the left-hand choice succeeds, returning |ysl|; and the right-hand choice
@@ -774,7 +774,7 @@ The choice operator, |choice|, serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
 
 % \subsection{Syntactic sugar}
-% 
+%
 % \begin{figure}
 % % no space needed around math environments in a figure
 % \setlength{\abovedisplayskip}{0pt}%
@@ -797,7 +797,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % \caption{Syntactic sugar}
 % \label{fig:sugar}
 % \end{figure}
-% 
+%
 % The {\versecalc} grammar can be a bit unwieldy, with explicit |defKW| and ANF-like restrictions allowing only values,
 % not arbitrary expressions, in tuple literals and applications \cite{felleisen:anf}.
 % To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
@@ -847,22 +847,22 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % \begin{itemize}
 % \item |head|.
 % To obtain the first element of a tuple, we can simply use array indexing. This fails if the tuple is empty.
-% 
+%
 % \item |tail|.
 % To get the tail of a tuple, we apply the tuple to a fresh variable, and restrict that variable with |i > 0|.
 % This way, the expression fails at the first value and only the other values are collected by |allKW|.
 % It returns the empty tuple if |xs| is empty or not even a tuple.
-% 
+%
 % \item |cons| and |append|.
 % We can implement |applyN cons (x,xs)| by collecting with |allKW| the choices we get from choosing |x|
 % or all the elements of |xs|, and similarly we can define |append|.
-% 
+%
 % \item |flatMap|.
 % For the function |map|, which applies a function to each element of a tuple and collects the results,
 % two possible implementation come to mind, and they differ when the function passed to |map| fails or produces more than a single value.
 % |flatMap| flattens the choices from iterating through |xs| with
 % the choices taken by |f|, so |applyN flatMap ( (lam x ((x choice x+1))), tup (10,20)))| $\equiv$ |tup (10,11,20,21)|.
-% 
+%
 % \item |map|.
 % But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 % to affect the whole expression and obtain the cartesian product of these choices.
@@ -870,15 +870,15 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % We get that behaviour if we simply define |map| much like in any other functional programming language:
 % if taking the head of the tuple fails, we return an empty tuple.
 % Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
-% 
+%
 % \item |filter|.
 % How can we filter a tuple with a predicate |p|?
 % We turn the tuple into the sequence of choices, and let those fail where |p| fails before collecting the other values into a tuple.
-% 
+%
 % \item |find|.
 % If we use |oneKW| instead of |allKW|, we get the function that checks if |p| holds for some element of the tuple,
 % and returns the first matching element, or fails if |p| does not hold for any element.
-% 
+%
 % \item |every|.
 % To test if a predicate |p| holds for every element of a tuple |xs|, we can simply use |applyN map (p,xs)|!
 % If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
@@ -1138,7 +1138,7 @@ suffice to express the necessary sharing.
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
 \end{itemize}
 \simon{Need to discuss \rulename{var-swap} somewhere.}
-  
+
 \subsection{Local substitution} \label{sec:local-subst}
 
 Consider this (extremely) tricky term:
@@ -1232,11 +1232,11 @@ occurrence is a equation |x=v|; and \rulename{elim-fail} dicards the context sur
 % Rule \rulename{def-float} moves an |defKW| ``out of the way.'' For example,
 % the expression |(y = (def x (tup (x,2))); dots)| does not bind |y| to a value, but if we float the |defKW| out
 % we get |def x (y=tup(x,2); dots)|, and now we may be able to make progress by substituting for |y|.
-% 
+%
 % Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 % again to make it more likely to get the form |(x=v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
 % same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
-% 
+%
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
 % Without these rules |(x=y)=1;y>0| would be stuck; but \rulename{unify-unifyl}
 % rewrites it to |((x=y);(y=1);y>0|, thus exposing |y=1| for further use by \rulename{subst}. Furthermore, in order
@@ -1462,75 +1462,137 @@ evaluation strategy \cite{Barendregt}.
 If $\rr$ is confluent then every term reduces to at most one normal form.
 \end{lemma}
 
+% \begin{definition}[Recursive Equations] \label{def:norec}
+
+
+\mypara{Recursion and Non-Confluence: The odd/even problem.}
+%
+Our rules are not confluent in the presence
+of (mutually) recursive equations.
+%
+To see why, consider the term:
+%
+$$
+\begin{array}{lcll}
+ |def (x,y) (x == tup (1, y); y == lam z x; x)|
+& \rightarrow^* & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
+
+ |def (x,y) (x == tup (1, y); y == lam z x; x)|
+& \rightarrow^* & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
+\end{array}
+$$
+%
+The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
+but cannot be joined by rewrite rules.
+%
+This is a well known problem, and the same phenomenon arises
+with inlining mutually recursive $\lambda$-terms.
+%
+Examples like this show that \emph{syntactic} confluence is
+too strong: what we really need is that our rewrites rules
+are \emph{semantics} preserving --- but of course that requires
+an independent notion of semantics (see \cref{sec:den-sem} for an initial attempt),
+or alternatively, to seek a different form of confluence, such
+as \emph{skew confluence}~\cite{ariola:skew-confluence}.
+
+
+\mypara{Non-Recursive Terms}
+%
+However, for the present, we will content ourselves by
+restricting our rewrite rules to terms that have \norecursion,
+\ie do not (transitively) contain recursive equations.
+%
+A \emph{recursive equation} is a term of the form
+%
+$$
+% |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
+|x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
+$$
+%
+where the LHS is a variable and the RHS is a \emph{value}
+that is or contains a $\lambda$ in which $|x|$ occurs free.
+%
+A term $e$ is \emph{recursive} if it contains a recursive equation.
+%
+A term $e$ is \emph{transitively recursive} if $\rsteps{e}{e'}$ where $e'$ is recursive.
+%
+A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
+% \end{definition}
+
+
 \subsection{Confluence}
 
-Our main result is that \versecalc{}'s reduction rules are confluent:
-%
-% defined as the union of the reduction relations
-% $\runi$ (Unification),
-% $\rapp$ ($\beta$-Application),
-% $\rcon$ (Normalization),
-% $\rgc$  (Garbage Collection),
-% $\rfail$ (Fail Propagation) and
-% $\rspc$ (Speculation)
-% in \cref{fig:rules} and \ref{fig:normalization-rules} % \cref{fig:rulesI}
-% is confluent.
-% \lennart{It's not confluent without the structural rules.}
+Our main result is that \versecalc{}'s reduction rules are confluent for terms with \norecursion.
 
 \begin{theorem}[Confluence] \label{thm:confluence}
-  The reduction relation defined in \cref{fig:rules}
-  and \ref{fig:normalization-rules} is confluent.
+%
+The reduction relation defined in \cref{fig:rules}
+is confluent for terms with \norecursion.
+%
+%  If $e$ has \norecursion and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ then $\join{\rr}{e_1}{e_2}$.
+%
 \end{theorem}
+
 \noindent
-\emph{Proof sketch.}  Our proof strategy is to divide the rules into groups,
-named $\runi$, $\rapp$, etc in the Figures, prove confluence for each separately,
-and then prove that their combination is confluent.
+\emph{Proof sketch.}  Our proof strategy is to
+%
+(1)~divide the rules into groups named $\runi$, $\rapp$,
+    \etc as in the figure,
+(2)~prove confluence for each separately, and then
+(3)~prove that their combination is confluent via commutativity.
+%
 Given two reduction relations $R$ and $S$, we say that $R$ \emph{commutes} with $S$ if for all terms
 $e, e_1, e_2$ such that $\rsteps{R}{e}{e_1}$ and $\rsteps{S}{e}{e_2}$
 there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
 %
 We prove each individual sub-relation is confluent;
-and that they pairwise commute. Then confluence of their union follows,
-using \citet{Huet80}:
+and that they pairwise commute. Then confluence of
+their union follows, using \citet{Huet80}:
 
 \begin{lemma}[Commutativity] \label{lem:comm}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
-Proving confluence for $\rr$, $\rapp$, $\rcon$, $\rfail$ and $\rgc$ is easy: they
-all satisfy the \emph{diamond property}, namely, that two
+%
+Proving confluence for $\rapp$, $\rgc$ and $\rspc$ is easy: they
+all satisfy the \emph{diamond property} --- namely, that two
 different reduction steps can be joined at a common
-term \emph{by a single step}.  This property can be verified easily by taking critical pairs.
-Any relation satisfying the diamond property is confluent \cite{Barendregt}.
+term \emph{by a single step} --- which suffices to show the
+relations are confluent \cite{Barendregt}.
+%
+The diamond property itself can be verified easily by considering
+critical pairs of transitions.
 
-Alas, the unification relation $\runi$ does not satisfy the diamond property, because
-it may need multiple steps to join the results of two different
-one-step reductions.
+Alas, the unification relation $\runi$ does \emph{not} satisfy
+the diamond property, as it may need multiple steps to join the
+results of two different one-step reductions.
+%
 For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); 3)|$.
-It can be reduced in one step by substituting |x| in the final equation
-by either |arr(1,y)| or |arr(z,2)|.
+%
+The term can be reduced in one step by substituting |x|
+in the final equation by either |arr(1,y)| or |arr(z,2)|.
 After this it will take multiple steps to join the two terms.
 
-Following a well-trodden path in proofs of confluence for the $\lambda$-calculus (e.g. \cite{Barendregt}),
-our proof of confluence for $\runi$ works as follows: we find
-a \emph{sub-relation} that satisfies three properties.
+Following a well-trodden path in proofs of confluence
+for the $\lambda$-calculus (e.g. \cite{Barendregt}),
+our proof of confluence for $\runi$ works in two steps.
 %
-First, it is \emph{locally} confluent, meaning if $e$ single-steps to $e_1$
-and $e_2$ then $e_1$ and $e_2$ can be joined at some $e'$.
+First, the $\runi$ reductions are \emph{locally} confluent,
+meaning if $e$ single-steps to $e_1$ and $e_2$ then $e_1$
+and $e_2$ can be joined at some $e'$ in \emph{multiple}
+$\runi$ steps.
 %
-Second, it is terminating. Newman's Lemma \cite{Barendregt} then implies
-the relation is confluent; and hence so is its reflexive transitive closure.
+Second, that the $\runi$ reductions are terminating (which also relies
+upon eliminating recursion in tuples via \rulename{u-occurs} and $\lambda$s
+via the \norecursion condition.)
 %
-Third, that the \emph{closure} of the sub-relation is the same as the full reduction
-relation, which then implies that the full reduction relation is also confluent.
-
-% \simon{I'm afraid that in my refactoring this sentence has gotten oprhaned.
-%  I don't see how it fits into the narrative.  It was previously there to
-%  explain something about unification...}
-% It is possible to prove confluence even for potentially diverging
-% (non-terminating) reductions, most famously, for the $\lambda$-calculus.
+Newman's Lemma \cite{Barendregt} then implies the
+locally confluent, terminating $\runi$ relation is
+also confluent.
 
 \subsection{Design for confluence} \label{sec:design-confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
+
+\ranjit{HEREHEREHEREHERE}
 
 \versecalc{} is carefully designed to ensure confluence.
 Rule \rulename{deref-h} is particularly important.
@@ -1554,31 +1616,7 @@ under tuples or lambdas. Instead an equation like |(x==h)| is left as a ``heap-c
 can be used (via \rulename{deref-h}) whenever we actually need to access the contents of the value,
 via unification or application; or it can be eliminated via the garbage collection rules.
 
-\mypara{The odd/even problem.}
-Suppose we combined \rulename{deref-s} and \rulename{deref-h} into a
-a single rule that freely substituted \emph{any} value |v| for an occurrence of |x|.  Then we would
-lose confluence in the case of mutual recursion:
-$$
-\begin{array}{lcll}
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
-& \rightarrow^* & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
 
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
-& \rightarrow^* & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
-
-\end{array}
-$$
-%
-The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
-but cannot be joined by rewrite rules.
-This is a well known problem, and an exactly similar phenomenon arises with inlining mutually recursive
-$\lambda$-terms.
-Examples like this show that \emph{syntactic} confluence is too strong: what we
-really need is that our rewrites rules are \emph{semantics} preserving --- but of course that requires
-an independent notion of semantics (see \cref{sec:den-sem} for an initial attempt).
-We restore confluence by restricting \rulename{deref-h},
-but an interesting alternative approach would be to seek a weaker form of confluence, such
-as \emph{skew confluence}~\cite{ariola:skew-confluence}.
 
 \mypara{Unifying lambdas.} In \versecalc{} an attempt to unify two
 lambdas fails, even if the lambdas are semantically identical (rule
