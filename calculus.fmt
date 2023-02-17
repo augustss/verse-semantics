@@ -183,7 +183,7 @@
 %format hole = "\hole"
 %format lte = "\prec"
 
-%format xdots = "\!\mydots\!"
+%format xdots = "\mydots"
 
 %% Unification
 %format == = "="
