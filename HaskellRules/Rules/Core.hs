@@ -419,7 +419,7 @@ instance Free Expr where
   free (BlockC e) = free e
   free Fail      = []
   free Wrong     = []
-  free (Store h e) = free (IM.elems h) `union` free e
+  free (Store h e) = free h `union` free e
   free Ref{}     = []
 
 --------------------------------------------------------------------------------
