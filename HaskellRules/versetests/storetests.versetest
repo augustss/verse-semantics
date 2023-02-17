@@ -134,11 +134,21 @@ testeq(SEq) {
 testeq(SEq) { var a:int=0; for(x:=(set a=100; 10) | (set a=200; 20)) { (a, x) } } { (100,10), (200, 20) }
 testeq(SEq) { var a:int=0; for(x:=(set a+=100; 10) | (set a+=200; 20)) { (a, x) } } { (100,10), (300, 20) }
 
-#testeq(SEq) { var a:any=0; for{for(set a+=1; x:=(set a+=10; 10) | (set a+=100; 20)) { set a+=1000; (set a+=10000; (a, x)) | (set a += 100000; (a, x+1)) }} } {
-# is this correct?
-#  (((11011,  10), (22111,  20)), ((11011,  10), (122111, 21)),
-#   ((222111, 11), (233211, 20)), ((222111, 11), (333211, 21)))
-# }
+testeq(SEq) {
+  var a:any=0;
+  for{for(set a+=1;
+          x:=(set a+=10; 10) | (set a+=100; 20)
+         )
+         { set a+=1000;
+           (set a+=10000; (a, x)) | (set a += 100000;
+           (a, x+1))
+         }
+     }
+  } {
+# this looks wrong
+  ((( 11011, 10), ( 22111, 20)), (( 11011, 10), (122111, 21)),
+   ((222111, 11), (233211, 20)), ((222111, 11), (333211, 21)))
+  }
 
 #testeq(SEq) { for{var a:any=0; for(set a+=1; x:=(set a+=10; 10) | (set a+=100; 20)) { set a+=1000; (a, x) | (a, x+1) } } } { 0 }
 #  {(((100, 10), (300, 20))
@@ -152,3 +162,15 @@ testeq(SEq) { for{a:=alloc$[0]; for(a+=1; x:=(a+=10; 10) | (a+=100; 20)) { a+=10
   { (((1011, 10), (2111, 20)), ((1011, 10), (2111, 21)),
      ((2111, 11), (3211, 20)), ((2111, 11), (3211, 21)))
   }
+
+
+#testeq(SEq) {
+#  var a:any=0;
+#  for{for( 0 | (set a+=1) ) { y:=10|20; (a, y) } }
+#  } {
+#  0
+#  }
+
+-- Logical variables escaping via ref cells.
+testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[0]] } { 10 }
+testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[1]] } { x:any }
