@@ -1011,14 +1011,14 @@ has the following properties:
 %% \figureStructuralRules
 
 \subsection{Ordering terms}
-The \rulename{var-swap} and \rulename{val-swap} orders expressions using the ordering |lte|.
+The \rulename{var-swap} orders expressions using the ordering |lte|.
 The reason for this is to simplify the confluence proof by having a more canonical representation.
-The ordering is based on using de Bruijn indices as the variable representation.
-The ordering is defined for expressions |eu|, \ie, expressions and equalities.
-The |lte| is defined so that all equalities, |v==e|, are less than all expressions, |e|.
-Furthermore, |e_1 lte e_2| if the natural lexicographical comparison of the terms with de Bruijn indices is |e_1 < e_2|.
+The ordering is based on using de~Bruijn indices as the variable representation;
+%%The ordering is defined for expressions |eu|, \ie, expressions and equalities.
+%%The |lte| is defined so that all equalities, |v==e|, are less than all expressions, |e|.
+|e_1 lte e_2| if the natural lexicographical comparison of the terms with de~Bruijn indices is |e_1 < e_2|.
 \Eg, in the expressions |def (y x) (y == x; 0)| the |x| is considered less than the |y| since
-the de Bruijn index for |x| is 0, and for |y| is is |1|.
+the de~Bruijn index for |x| is 0, and for |y| it is |1|.
 So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
 
 Note that the \rulename{val-swap} rule does not reorder choices;

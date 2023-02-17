@@ -21,7 +21,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 --------------------------------------------------------------------------------
 
 allSystemsICFP :: [TRSystem Expr]
-allSystemsICFP = [ systemICFP, systemICFPV,
+allSystemsICFP = [ systemICFP,
                    systemICFPE,
                    systemICFPR,
                    systemICFPS
@@ -40,14 +40,6 @@ systemICFP = TRSystem
   , confluenceRules     = noRules
   , validExpr           = const valid
   }
-
-systemICFPV :: TRSystem Expr
-systemICFPV = s
-  { sname = "ICFPV"
-  , description = description s ++ " - VAL-SWAP + VAL-SWAP-UNORD"
-  , rules = rules s -= "VAL-SWAP" <> rulesValSwapUnord
-  }
-  where s = systemICFP
 
 systemICFPE :: TRSystem Expr
 systemICFPE = s
@@ -461,21 +453,20 @@ rulesUnification env lhs =
   do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
      pure ((x :=: hnf) :>: e)
  ++
-  "VAR-SWAP-SUBST" `name`
-  do (ctx, Var x :=: Var y) <- execX lhs
-     guard (ltExpr env (Var y) (Var x))
-     let y0 = identNotIn (free (ctx Fail, y, x))
-         sub = [(y, Var x), (y0, Var y)]
-     pure (subst sub (ctx (Var y0 :=: Var x)))
-{-
- ++
   "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
--}
  ++
   "VAL-SWAP" `name`
+  do e1 :>: (e2 :>: e3) <- [lhs]
+     -- Don't reorder effects
+     guard (isEffFree e1 || isEffFree e2)
+     pure $ e2 :>: (e1 :>: e3)
+
+_rulesValSwapOrd :: ERule
+_rulesValSwapOrd env lhs =
+  "VAL-SWAP-ORD" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      guard $
        -- First, order by choice-free-ness;
@@ -494,13 +485,14 @@ rulesUnification env lhs =
              (True, True)   -> ltExpr env e2 e1  -- use ordering
      pure $ e2 :>: (e1 :>: e3)
 
-rulesValSwapUnord :: ERule
-rulesValSwapUnord _ lhs =
-  "VAL-SWAP-UNORD" `name`
-  do e1 :>: (e2 :>: e3) <- [lhs]
-     -- Don't reorder effects
-     guard (isEffFree e1 || isEffFree e2)
-     pure $ e2 :>: (e1 :>: e3)
+_rulesVarSwapSubst :: ERule
+_rulesVarSwapSubst env lhs =
+  "VAR-SWAP-SUBST" `name`
+  do (ctx, Var x :=: Var y) <- execX lhs
+     guard (ltExpr env (Var y) (Var x))
+     let y0 = identNotIn (free (ctx Fail, y, x))
+         sub = [(y, Var x), (y0, Var y)]
+     pure (subst sub (ctx (Var y0 :=: Var x)))
 
 isEqn :: Expr -> Bool
 isEqn (_ :=: _) = True
