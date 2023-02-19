@@ -58,6 +58,7 @@
 %format vs = "\overline{v}"
 %format es = "\overline{e}"
 %format ys = "\overline{y}"
+%format zs = "\overline{z}"
 %format es_1
 %format es_2
 %format hnf = "\mathit{hnf}"
@@ -425,3 +426,4 @@
 %format stepXr      = "\movesfromX"
 %format stepXrs     = "\movesfromX^{\ast}"
 %format mu x (e)    = "\mu" x".\," e
+%format muKW        = "\mu{}"

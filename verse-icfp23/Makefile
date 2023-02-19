@@ -8,7 +8,7 @@ all: $(NAME).pdf
 
 LATEX=pdflatex -halt-on-error
 
-PAPERSRC = $(NAME).tex rewrites.tex densem-icfp23.tex store-icfp23.tex ../verse.bib
+PAPERSRC = $(NAME).tex rewrites.tex densem-icfp23.tex store-icfp23.tex ../confluence/03-preliminaries.tex ../confluence/04-confluence.tex ../verse.bib
 
 rewrites.tex:   rewrites.ltx   ../calculus.fmt
 
