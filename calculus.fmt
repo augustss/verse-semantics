@@ -426,3 +426,4 @@
 %format stepXr      = "\movesfromX"
 %format stepXrs     = "\movesfromX^{\ast}"
 %format mu x (e)    = "\mu" x".\," e
+%format muKW        = "\mu{}"
