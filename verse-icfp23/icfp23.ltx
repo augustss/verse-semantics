@@ -1422,6 +1422,53 @@ Any calculus in which a redex to the ``right'' may unblock one to the
 ``left''---that is, residuation---must grapple with this problem,
 so we leave evaluation strategy and compilation for future work.
 
+\subsection{Developing and debugging rules}
+The rules we describe here should both be able to transform a program to its value,
+and also be confluent.
+To aid in the development of the rules we have used several mechanized tools.
+Initially, we used PLT Redex, \cite{pltredex}, which is very easy to use,
+albeit not very efficient.
+For better efficiency we switched to a Haskell library for term
+rewriting.
+The library provides a DSL for writing rules, and provides the infrastructure
+to apply the rules everywhere, detect cycles, provide traces, \etc.
+Some sample rewrite rules can be found in \cref{fig:sample-rules}.
+
+\begin{figure}
+{\small
+\begin{code}
+rules =
+  "APP-ADD" `name`
+  do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1+k2))
+ <>
+  "EXI-SWAP" `name`
+  do EXI x (EXI y e) <- [lhs]
+    pure (EXI y (EXI x e))
+ <>
+  "EXI-ELIML" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- execX a
+     guard (x == x')
+     guard (x `notElem` free (ctx (v :>: e)))
+     pure (ctx e)
+\end{code}
+}
+\caption{Sample Haskell reduction rules} \label{fig:sample-rules}
+\end{figure}
+
+For debugging we have a set of examples with known results, which every
+potential rule set will have to evaluate correctly.
+We cannot prove formally that the rules evaluates all the programs we
+expect, since we have no specification of what we expect.
+
+For confluence it is easier to be formal; we know what confluence means.
+We used QuickCheck, \cite{quickcheck}, to test the rule sets for confluence
+before beginning a proof.
+QuickCheck turned out to be invaluable at finding counter examples to
+otherwise reasonable looking rules.
+
+
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
 
