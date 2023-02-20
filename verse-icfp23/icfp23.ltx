@@ -1436,6 +1436,7 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 
 \begin{figure}
 {\small
+\vspace*{-0.5em}
 \begin{code}
 rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs]
                                          pure (Int (k1+k2)))
@@ -1445,10 +1446,11 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
 
            <>  "EXI-ELIML"  `name`  (do  EXI x a <- [lhs]
                                          (ctx, (Var x' :=: Val v) :>: e) <- execX a
-                                         guard (x == x')
-                                         guard (x `notElem` free (ctx (v :>: e)))
+                                         guard (x == x' && x `notElem` free (ctx (v :>: e)))
                                          pure (ctx e))
-\end{code}}
+\end{code}
+\vspace*{-1.5em}
+}
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
 \end{figure}
 
@@ -1461,7 +1463,8 @@ For confluence it is easier to be formal; we know what confluence means.
 We used QuickCheck, \cite{quickcheck}, to test the rule sets for confluence
 before beginning a proof.
 QuickCheck turned out to be invaluable at finding counter examples to
-otherwise reasonable looking rules.
+otherwise reasonable looking rules;
+it has run on the order of 100M tests on the current rule set.
 
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
