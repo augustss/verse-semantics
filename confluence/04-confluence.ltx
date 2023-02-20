@@ -114,7 +114,7 @@ In the rest of the proof:
 	\item We assume that we are working with terms with \norecursion.
 		  The condition is only need to prove $\runi$ is confluent,
 		  but we assume it globally for clarity.
-	\item We use the below \cref{lem:disjoint} lemma to focus attention
+	\item We use the below \cref{lem:disjoint} to focus attention
 		  on the cases where one reduct \emph{occurs under} the other
 		  and vice versa.
 \end{enumerate}
@@ -316,8 +316,8 @@ By the definition of \rulename{choose} we have
 $$\rdx{ch} \equiv |SX^[CX^[e_1 choice e_2]]| \movesto |SX^[CX^[e_1] choice CX^[e_2]]| \equiv \rdx{ch}'$$
 Split cases on where $\rdx{}$ occurs
 \begin{description}
-\item[Case $\rdx{} \subset e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e_1'] choice CX^[e_2]]|$.
-\item[Case $\rdx{} \subset e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e_2']]|$.
+\item[Case $\rdx{} \subset e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e1'] choice CX^[e_2]]|$.
+\item[Case $\rdx{} \subset e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e2']]|$.
 \item[Case $\rdx{} \subset |e_1 choice e_2|$] \ie \rstep{\rr}{|e_1 choice e_2|}{|e_i|} where $e_{3-i}$ is $|fail|$
 so join at $|SX^[CX^[e_i]]|$.
 \item[Case $\rdx{} \subset CX$] \ie \rstep{\rr}{CX}{CX'} so join (via \emph{two} $\rr$ steps) at $|SX^[CX'^[e_1] choice CX'^[e_2]]|$.
