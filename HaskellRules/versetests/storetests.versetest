@@ -164,12 +164,12 @@ testeq(SEq) { for{a:=alloc$[0]; for(a+=1; x:=(a+=10; 10) | (a+=100; 20)) { a+=10
   }
 
 
-#testeq(SEq) {
-#  var a:any=0;
-#  for{for( 0 | (set a+=1) ) { y:=10|20; (a, y) } }
-#  } {
-#  0
-#  }
+testeq(SEq) { var a:any=0; for{for( 0 | (set a+=1) ) { y:=10|20; (a, y) } } }
+            { (((0, 10), (1, 10)),
+               ((0, 10), (1, 20)),
+               ((1, 20), (2, 10)),
+               ((1, 20), (2, 20)))
+            }
 
 # Logical variables escaping via ref cells.
 testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[0]] } { 10 }
