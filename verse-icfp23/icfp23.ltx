@@ -1023,7 +1023,7 @@ The ordering is based on using de~Bruijn indices as the variable representation;
 the de~Bruijn index for |x| is 0, and for |y| it is |1|.
 So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
 
-Note that the \rulename{val-swap} rule does not reorder choices;
+Note that the \rulename{seq-swap} rule does not reorder choices;
 the rule only applies if at least one of the |eu| has no choice.
 
 
@@ -1739,7 +1739,7 @@ $$\text{(1)}\ |lam a (lam b (def x (x == a; a == b; a)))| \ \movesto\
 %
 where from (1) we \rulename{var-swap} $|a == b| \movesto |b == a|$,
 and from (2) we \rulename{subst} $|b == a|$ and reorder the equations
-with \rulename{val-swap}.
+with \rulename{seq-swap}.
 %
 Thus, \rulename{var-swap} lets us pick a ``canonical representative''
 for all the variables that are equal to each other (here, we pick $|a|$

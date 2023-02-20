@@ -225,7 +225,7 @@
 
 \\[-2mm]
 
-\rulegroupname{Unification} %:~\runi
+\rulegroupname{Unification:~\runi}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
   \rulename{u-tup} & \hspace{-8mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
@@ -236,7 +236,6 @@
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1| } \\
-  \rulename{val-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if $|eu_1| \in |ceu| \lor |eu_2| \in |ceu|$} \\
 
     \\[-2mm]
 
@@ -245,19 +244,15 @@
 \rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| & \text{\textit{Note}: structural} \\
+\rulename{seq-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if $|eu_1| \in |ceu| \lor |eu_2| \in |ceu|$} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
 
 \rulegroupname{Elimination:~\rgc}
 \rulename{elim-val} & |v ; e| & \movesto & |e| \\
-\rulename{elim-exi} & |def x e| & \movesto & |e|
-  & \text{if $|x| \notin \freevars{|e|}$}\\
-% This uses \overline
-%\rulename{exi-eliml} & |def (x ys) (X^[x==v; e])| & \movesto & |def ys (X^[e])|
-%  & \text{if $|x| \notin \freevars{|X|}\cup \freevars{|v|} \cup |{ys}|$} \\
-% without \overline
-\rulename{exi-eliml} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{elim-exi} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{elim-eqn} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
 \rulename{elim-fail} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
     \\[-2mm]

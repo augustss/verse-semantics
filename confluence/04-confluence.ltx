@@ -44,7 +44,7 @@ rules in \cref{fig:rules}
 	\rulename{elim-fail},
 	\rulename{elim-val},
 	\rulename{elim-exi};
-	\rulename{exi-eliml};
+	\rulename{elim-eqn};
 
 \item $\rspc$ (Speculation)
 	\rulename{one-*},
@@ -349,9 +349,9 @@ on the reduction rule used in the step.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
 	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
-	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
 		$\rstep{\rr'}{|def y e|}{e'}$; join at $|def x e'|$.
-	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
 		$\rstep{\rr'}{|def x (def y e)|}{|def y e'|}$; join at $|def y e'|$.
 	\end{description}
 
@@ -359,7 +359,7 @@ Split cases on the position of $\rdx{}$.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
 	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
-	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{exi-eliml}
+	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
 		$\rstep{\rr'}{|def x e|}{e'}$; join at $|X^[e']|$.
 	\item[Case $\rdx{} \subset X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
 	\end{description}
@@ -414,7 +414,7 @@ on the reduction rule used in the step.
 	\item[Case $\rdx{} \subset |def (ys,x,zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys,zs) e|$.
 	\end{description}
 
-\item[Case \rulename{exi-eliml}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
+\item[Case \rulename{elim-eqn}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
 	%
 	(We can generalize \rulename{elim-exi} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
 	before applying \rulename{elim-exil} as this does not change the order of the \emph{remaining} binders.)
