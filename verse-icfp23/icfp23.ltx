@@ -1437,7 +1437,7 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 \begin{figure}
 {\small
 \begin{code}
-rules =
+rules lhs =
   "APP-ADD" `name`
   do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
      pure (Int (k1+k2))
@@ -1519,7 +1519,7 @@ If $\rr$ is confluent then every term reduces to at most one normal form.
 Our rules are not confluent in the presence
 of (mutually) recursive equations.
 %
-To see why, consider the term:
+To see why, consider the term: \lennart{Our rules do not allow recursive tuples, so we might want to switch this example to lambda terms.}
 %
 $$
 \begin{array}{lcll}
@@ -1548,7 +1548,7 @@ as \emph{skew confluence}~\cite{ariola:skew-confluence}.
 \mypara{Non-Recursive Terms}
 %
 For now, we will content ourselves by restricting attention
-to terms that have \norecursion, \ie do not (transitively)
+to terms that have \norecursion, \ie, do not (transitively)
 contain recursive equations.
 %
 A \emph{recursive equation} is a term of the form
