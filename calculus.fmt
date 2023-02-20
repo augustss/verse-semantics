@@ -190,6 +190,7 @@
 %format == = "="
 
 % format := = "\mapsto"
+%format :@: = ":\!@\!:"
 %format ; = ";\,"
 %format csp = ",\,"  %% Comma with space
 %format , = ","

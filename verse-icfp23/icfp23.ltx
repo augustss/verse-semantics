@@ -638,7 +638,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 We remarked in \cref{sec:unify} that we can desugar the pattern matching of a high-level
 language into equations. But what about multi-equation pattern matching, such as this definition in Haskell:
 \begin{code}
-  append []      ysl = ysl
+  append []       ysl = ysl
   append (x:xsl)  ysl = x : append xsl ysl
 \end{code}
 If pattern matching on the first equation fails, we want to fall through to the second.
@@ -1437,23 +1437,18 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 \begin{figure}
 {\small
 \begin{code}
-rules lhs =
-  "APP-ADD" `name`
-  do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
-     pure (Int (k1+k2))
- <>
-  "EXI-SWAP" `name`
-  do EXI x (EXI y e) <- [lhs]
-    pure (EXI y (EXI x e))
- <>
-  "EXI-ELIML" `name`
-  do EXI x a <- [lhs]
-     (ctx, (Var x' :=: Val v) :>: e) <- execX a
-     guard (x == x')
-     guard (x `notElem` free (ctx (v :>: e)))
-     pure (ctx e)
-\end{code}
-}
+rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+                                         pure (Int (k1+k2)))
+
+           <>  "EXI-SWAP"   `name`  (do  EXI x (EXI y e) <- [lhs]
+                                         pure (EXI y (EXI x e)))
+
+           <>  "EXI-ELIML"  `name`  (do  EXI x a <- [lhs]
+                                         (ctx, (Var x' :=: Val v) :>: e) <- execX a
+                                         guard (x == x')
+                                         guard (x `notElem` free (ctx (v :>: e)))
+                                         pure (ctx e))
+\end{code}}
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
 \end{figure}
 
