@@ -41,10 +41,13 @@ systemICFP = TRSystem
   , validExpr           = const valid
   }
 
+-- A system without the structural rules.
+-- Without EXI-SWAP we need a more powerful EXI-ELIML.
+-- These rules are useful for regression tests, since the ICFP rules are very slow.
 systemICFPE :: TRSystem Expr
 systemICFPE = s
   { sname = "ICFPE"
-  , description = description s ++ " - EXI-SWAP"
+  , description = description s ++ " - EXI-SWAP - VAL-SWAP"
   , rules = rules s -= "EXI-SWAP" -= "VAL-SWAP" -= "EXI-ELIML" <> ruleElimL
   , rulesHaveStructural = False
   }
