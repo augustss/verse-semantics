@@ -847,6 +847,8 @@ to make the equations the same on both sides.
 
 \newcommand{\runib}[1]{\ensuremath{\runi_{#1}}}
 \newcommand{\runik}{\ensuremath{\runib{k}}}
+\newcommand{\lamsub}[3]{\ensuremath{(\lambda #2. #3)[#1]}}
+\newcommand{\unex}[1]{\ensuremath{\llparenthesis #1 \rrparenthesis}}
 
 \begin{lemma}[$\runi$-Confluent] \label{lem:u-c}
 $\runi$ is confluent.
@@ -867,11 +869,14 @@ arbitrary sequences of $\runi$ reductions \cref{lem:uk-join}.
 \end{enumerate}
 \end{proof}
 
+
 \begin{figure}
 $$
 % \begin{array}{l@@rcl}
 \begin{array}{lr@@{\;}c@@{\;}l}
-\text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \\
+\text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
+
+\text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \vb $\lamsub{\sigma}{x}{c}$ \\
 \text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
 \text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
 \text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
@@ -883,6 +888,7 @@ $$
 \end{array}$$
 \caption{Bounded Contexts}
 \label{fig:bounded-contexts}
+\label{fig:explicit-subst}
 \end{figure}
 
 \begin{definition}[$k$-Unification]
@@ -896,6 +902,53 @@ at most $k$ delimiters.
 $$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{}'} \mbox{is a $\runi$ redex}, 0 \leq i \leq k \}$$
 \end{definition}
 
+Next, we show that $\runik$ is locally confluent for all $k$.
+Note that plain substitutions \emph{do not} satisfy this property.
+%
+For example, consider the following two $\runib{1}$ reductions,
+%
+$$\begin{array}{rcll}
+	x = (|lam a (1=1; 1)|); |lam z x|
+		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); (|lam z (lam a 1)|) & \ldots (e_1) \\
+		& \movesto & x = (|lam a (1=1;1)|); (|lam z (lam a (1=1;1))|)			  & \ldots (e_2)
+\end{array}$$
+%
+We cannot directly join $e_2$ and $e_1$ as that would require a $\runib{2}$ step since the $|1=1;1|$
+term in $e_2$ occurs under \emph{two} $\lambda$s.
+
+
+\mypara{Explicit Substitutions}
+%
+To ensure local confluence of $\runik$ we use the method of
+\emph{explicit substitutions} \cite{abadi-explicit}.
+%
+\cref{fig:explicit-subst} shows the definition of explicit
+substitutions $\sigma$ which is a sequence $[x_1 \mapsto v_1, \ldots, x_n \mapsto v_n]$.
+%
+In $\runik$ any substitutions under lambda at level $\geq k$
+is made \emph{explicit}. That is
+%
+$$\subst{\lambda y.e}{x}{|v|}  \ \doteq \ \begin{cases}
+	\lambda y. (\subst{e}{x}{|v|})  & \mbox{if level} < k \\
+    \lamsub{[x \mapsto |v|]}{y}{e}  & \mbox{otherwise}
+\end{cases}$$
+%
+Furthermore, we can define substitutions on explicit substitutions as
+%%
+\begin{align*}
+\subst{[x_1 \mapsto |v_1|,\ldots,x_n \mapsto |v_n|]}{x}{|v|} & \doteq\  [x \mapsto |v|, x_1 \mapsto \subst{|v_1|}{x}{|v|},\ldots,x_n \mapsto \subst{|v_n|}{x}{|v|}] \\
+\subst{\lamsub{\sigma}{y}{e}}{x}{|v|} & \doteq\ \lamsub{\subst{\sigma}{x}{|v|}}{y}{e}
+\end{align*}
+%
+With the above, note that the problematic $\runib{1}$ reductions above become
+$$\begin{array}{rcll}
+x = (|lam a (1=1; 1)|); |lam z x|
+		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); \lamsub{x \mapsto \lambda a. 1}{z}{x} & \ldots (e_1') \\
+		& \movesto & x = (|lam a (1=1;1)|); \lamsub{x \mapsto \lambda a. (1=1;1)}{z}{x}  				       & \ldots (e_2')
+\end{array}$$
+%
+which can readily be joined at $e_1'$ using $\runib{1}$ steps.
+
 \begin{lemma} \label{lem:uk-lc}
 \runik is locally confluent.
 \end{lemma}
@@ -904,6 +957,64 @@ $$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{
 For simplicity, we directly prove that $\runi$ is locally confluent (\cref{lem:u-lc}).
 The proof carries over to $\runik$ as it never requires $\runi$-reductions
 that are \emph{under} a $\lambda$-subterm.
+\end{proof}
+
+\mypara{Un-Explicit Substitutions}
+Define an \emph{un-apply} operator $\unex{e}$
+that recursively applies (and eliminates) the explicit substitutions
+%
+\begin{align*}
+[x \mapsto |v|, \sigma](e)   & \doteq\ \sigma(\subst{e}{x}{|v|}) \\
+\unex{\lamsub{\sigma}{x}{e}} & \doteq\ \lambda x. \sigma(\unex{e}) \\
+\end{align*}
+%
+Next, we show that all $\runik$ reductions, including
+those that use explicit substitutions, correspond to \runi
+reductions, to terms where the explicit substitutions have
+been applied and eliminated.
+
+\begin{lemma} \label{lem:unex}
+If $\rsteps{\runi{k}}{e}{e'}$ then $\rsteps{\runi}{e}{\unex{e}}$.
+\end{lemma}
+
+\begin{proof}
+By induction on the size of $\rsteps{\runik}{e}{e'}$.
+\end{proof}
+
+We can now prove that any two $\runik$ reductions (and hence $\runi$ reductions) can be joined.
+
+\begin{lemma}[$\runik$-join] \label{lem:uk-join}
+If $\rsteps{\runib{i}}{e}{e_i}$ and $\rsteps{\runib{j}}{e}{e_j}$
+then there exists $e'$ such that $\rsteps{\runi}{e_i, e_j}{e'}$.
+\end{lemma}
+
+\begin{proof}
+Let $k = \max(i, j)$.
+%
+As $\runib{i}, \runib{j} \subseteq \runib{k}$ we have
+$\rsteps{\runib{k}}{e}{e_i}$ and $\rsteps{\runib{k}}{e}{e_j}$.
+%
+By \cref{lem:uk-term} and \cref{lem:uk-lc} and \cref{lem:local},
+$\runib{k}$ is confluent, hence there exists $e'$ such that
+$\rsteps{\runib{k}}{e_i, e_j}{e'}$.
+%
+Finally, we complete the proof with \cref{lem:unex} via the following diagram.
+% fact that $\runib{k} \subseteq \runi$ completes the proof.
+% https://q.uiver.app/?q=WzAsNSxbMSwwLCJlIl0sWzAsMSwiZV9pIl0sWzIsMSwiZV9qIl0sWzEsMiwiZSciXSxbMSwzLCJcXHVuZXh7ZSd9Il0sWzAsMSwiVV9pIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiVV9qIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiVV9rIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlVfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxcY3JlZntsZW06dWstbGN9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzMsNCwiXFxjcmVme2xlbTp1bmV4fSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjoyMCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	& e \\
+	{e_i} && {e_j} \\
+	& {e'} \\
+	& {\unex{e'}}
+	\arrow["{U_i}"', two heads, from=1-2, to=2-1]
+	\arrow["{U_j}", two heads, from=1-2, to=2-3]
+	\arrow["{U_k}", dotted, two heads, from=2-1, to=3-2]
+	\arrow["{U_k}"', dotted, two heads, from=2-3, to=3-2]
+	\arrow[dotted, two heads, from=2-1, to=4-2]
+	\arrow[dotted, two heads, from=2-3, to=4-2]
+	\arrow["{\cref{lem:uk-lc}}"{description}, draw=none, from=1-2, to=3-2]
+	\arrow["{\cref{lem:unex}}"{description, pos=0.2}, no body, from=3-2, to=4-2]
+\end{tikzcd}\]
 \end{proof}
 
 \begin{lemma} \label{lem:uk-term}
@@ -975,23 +1086,6 @@ Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to termin
 %
 \end{proof}
 
-\begin{lemma}[$\runik$-join] \label{lem:uk-join}
-If $\rsteps{\runib{i}}{e}{e_i}$ and $\rsteps{\runib{j}}{e}{e_j}$
-then there exists $e'$ such that $\rsteps{\runi}{e_i, e_j}{e'}$.
-\end{lemma}
-
-\begin{proof}
-Let $k = \max(i, j)$.
-%
-As $\runib{i}, \runib{j} \subseteq \runib{k}$ we have
-$\rsteps{\runib{k}}{e}{e_i}$ and $\rsteps{\runib{k}}{e}{e_j}$.
-%
-By \cref{lem:uk-term} and \cref{lem:uk-lc} and \cref{lem:local},
-$\runib{k}$ is confluent, hence there exists $e'$ such that
-$\rsteps{\runib{k}}{e_i, e_j}{e'}$.
-%
-The fact that $\runib{k} \subseteq \runi$ completes the proof.
-\end{proof}
 
 \begin{lemma} \label{lem:u-lc}
 \runi{} is locally confluent.
