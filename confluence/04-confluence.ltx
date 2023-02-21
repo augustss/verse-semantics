@@ -855,7 +855,7 @@ $\runi$ is confluent.
 \end{lemma}
 
 \begin{proof}
-We prove that $\runi$ is confluent via the following strategy.
+We prove that $\runi$ is confluent via the following strategy inspired by the \emph{labeled reductions} \cite{Levy76}.
 %
 Let $\runik$ which is a subset of $\runi$ that only applies reductions to
 terms that are \emph{under less than} $k$ $\lambda$s.
@@ -870,84 +870,98 @@ arbitrary sequences of $\runi$ reductions \cref{lem:uk-join}.
 \end{proof}
 
 
-\begin{figure}
-$$
-% \begin{array}{l@@rcl}
-\begin{array}{lr@@{\;}c@@{\;}l}
-\text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
-
-\text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \vb $\lamsub{\sigma}{x}{c}$ \\
-\text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
-\text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
-\text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
-
-\text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
-\text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
-\text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
-\text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
-\end{array}$$
-\caption{Bounded Contexts}
-\label{fig:bounded-contexts}
-\label{fig:explicit-subst}
-\end{figure}
+%% LABELS: \begin{figure}
+%% LABELS: $$
+%% LABELS: \begin{array}{lr@@{\;}c@@{\;}l}
+%% LABELS: \text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
+%% LABELS:
+%% LABELS: \text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \vb $\lamsub{\sigma}{x}{c}$ \\
+%% LABELS: \text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
+%% LABELS: \text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
+%% LABELS: \text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
+%% LABELS:
+%% LABELS: \text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
+%% LABELS: \text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
+%% LABELS: \text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
+%% LABELS: \text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
+%% LABELS: \end{array}$$
+%% LABELS: \caption{Bounded Contexts}
+%% LABELS: \label{fig:bounded-contexts}
+%% LABELS: \label{fig:explicit-subst}
+%% LABELS: \end{figure}
+%% LABELS:
+%% LABELS: \begin{definition}[$k$-Unification]
+%% LABELS: \cref{fig:bounded-contexts} defines the grammar of \emph{$k$-bounded contexts} $C^k$
+%% LABELS: which denote the set of expression-contexts where the hole occurs under at most
+%% LABELS: $k$ \emph{scope delimiters} ($\lambda$, $\exists$, $\textbf{one}$, $\textbf{all}$ or $|choice|$).
+%% LABELS: %
+%% LABELS: Let $\runik$ be defined as the set of all $\runi$ reductions where the $\runi$-redex occurs under
+%% LABELS: at most $k$ delimiters.
+%% LABELS: %
+%% LABELS: $$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{}'} \mbox{is a $\runi$ redex}, 0 \leq i \leq k \}$$
+%% LABELS: \end{definition}
 
 \begin{definition}[$k$-Unification]
-\cref{fig:bounded-contexts} defines the grammar of \emph{$k$-bounded contexts} $C^k$
-which denote the set of expression-contexts where the hole occurs under at most
-$k$ \emph{scope delimiters} ($\lambda$, $\exists$, $\textbf{one}$, $\textbf{all}$ or $|choice|$).
 %
-Let $\runik$ be defined as the set of all $\runi$ reductions where the $\runi$-redex occurs under
-at most $k$ delimiters.
+A $k$-labeled term is a term where each subterm
+occurring under at most $k$ $\lambda$'s is marked
+by a special label $\ell$.
 %
-$$ \runik \doteq \{ (C_i[\rdx{}], C_i[\rdx{}']) \mid \rstep{\runi}{\rdx{}}{\rdx{}'} \mbox{is a $\runi$ redex}, 0 \leq i \leq k \}$$
+Let $\runik$ be defined as the set of all $\runi$
+reductions where:
+%
+(1)~the $\runi$-redex is a $\ell$-labeled, and
+(2)~the \rulename{subst} preserves labels.
+%
 \end{definition}
 
-Next, we show that $\runik$ is locally confluent for all $k$.
-Note that plain substitutions \emph{do not} satisfy this property.
-%
-For example, consider the following two $\runib{1}$ reductions,
-%
-$$\begin{array}{rcll}
-	x = (|lam a (1=1; 1)|); |lam z x|
-		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); (|lam z (lam a 1)|) & \ldots (e_1) \\
-		& \movesto & x = (|lam a (1=1;1)|); (|lam z (lam a (1=1;1))|)			  & \ldots (e_2)
-\end{array}$$
-%
-We cannot directly join $e_2$ and $e_1$ as that would require a $\runib{2}$ step since the $|1=1;1|$
-term in $e_2$ occurs under \emph{two} $\lambda$s.
+% LABELS: Next, we show that $\runik$ is locally confluent for all $k$.
+% LABELS: Note that plain substitutions \emph{do not} satisfy this property.
+% LABELS: %
+% LABELS: For example, consider the following two $\runib{1}$ reductions,
+% LABELS: %
+% LABELS: $$\begin{array}{rcll}
+% LABELS: 	x = (|lam a (1=1; 1)|); |lam z x|
+% LABELS: 		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); (|lam z (lam a 1)|) & \ldots (e_1) \\
+% LABELS: 		& \movesto & x = (|lam a (1=1;1)|); (|lam z (lam a (1=1;1))|)			  & \ldots (e_2)
+% LABELS: \end{array}$$
+% LABELS: %
+% LABELS: We cannot directly join $e_2$ and $e_1$ as that would require a $\runib{2}$ step since the $|1=1;1|$
+% LABELS: term in $e_2$ occurs under \emph{two} $\lambda$s.
 
 
-\mypara{Explicit Substitutions}
-%
-To ensure local confluence of $\runik$ we use the method of
-\emph{explicit substitutions} \cite{abadi-explicit}.
-%
-\cref{fig:explicit-subst} shows the definition of explicit
-substitutions $\sigma$ which is a sequence $[x_1 \mapsto v_1, \ldots, x_n \mapsto v_n]$.
-%
-In $\runik$ any substitutions under lambda at level $\geq k$
-is made \emph{explicit}. That is
-%
-$$\subst{\lambda y.e}{x}{|v|}  \ \doteq \ \begin{cases}
-	\lambda y. (\subst{e}{x}{|v|})  & \mbox{if level} < k \\
-    \lamsub{[x \mapsto |v|]}{y}{e}  & \mbox{otherwise}
-\end{cases}$$
-%
-Furthermore, we can define substitutions on explicit substitutions as
-%%
-\begin{align*}
-\subst{[x_1 \mapsto |v_1|,\ldots,x_n \mapsto |v_n|]}{x}{|v|} & \doteq\  [x \mapsto |v|, x_1 \mapsto \subst{|v_1|}{x}{|v|},\ldots,x_n \mapsto \subst{|v_n|}{x}{|v|}] \\
-\subst{\lamsub{\sigma}{y}{e}}{x}{|v|} & \doteq\ \lamsub{\subst{\sigma}{x}{|v|}}{y}{e}
-\end{align*}
-%
-With the above, note that the problematic $\runib{1}$ reductions above become
-$$\begin{array}{rcll}
-x = (|lam a (1=1; 1)|); |lam z x|
-		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); \lamsub{x \mapsto \lambda a. 1}{z}{x} & \ldots (e_1') \\
-		& \movesto & x = (|lam a (1=1;1)|); \lamsub{x \mapsto \lambda a. (1=1;1)}{z}{x}  				       & \ldots (e_2')
-\end{array}$$
-%
-which can readily be joined at $e_1'$ using $\runib{1}$ steps.
+% LABELS: \mypara{Explicit Substitutions}
+% LABELS: %
+% LABELS: To ensure local confluence of $\runik$ we use the method of
+% LABELS: \emph{explicit substitutions} \cite{abadi-explicit}.
+% LABELS: %
+% LABELS: \cref{fig:explicit-subst} shows the definition of explicit
+% LABELS: substitutions $\sigma$ which is a sequence $[x_1 \mapsto v_1, \ldots, x_n \mapsto v_n]$.
+% LABELS: %
+% LABELS: In $\runik$ any substitutions under lambda at level $\geq k$
+% LABELS: is made \emph{explicit}. That is
+% LABELS: %
+% LABELS: $$\subst{\lambda y.e}{x}{|v|}  \ \doteq \ \begin{cases}
+% LABELS: 	\lambda y. (\subst{e}{x}{|v|})  & \mbox{if level} < k \\
+% LABELS:     \lamsub{[x \mapsto |v|]}{y}{e}  & \mbox{otherwise}
+% LABELS: \end{cases}$$
+% LABELS: %
+% LABELS: Furthermore, we can define substitutions on explicit substitutions as
+% LABELS: %%
+% LABELS: \begin{align*}
+% LABELS: \subst{[x_1 \mapsto |v_1|,\ldots,x_n \mapsto |v_n|]}{x}{|v|} & \doteq\  [x \mapsto |v|, x_1 \mapsto \subst{|v_1|}{x}{|v|},\ldots,x_n \mapsto \subst{|v_n|}{x}{|v|}] \\
+% LABELS: \subst{\lamsub{\sigma}{y}{e}}{x}{|v|} & \doteq\ \lamsub{\subst{\sigma}{x}{|v|}}{y}{e}
+% LABELS: \end{align*}
+% LABELS: %
+% LABELS: With the above, note that the problematic $\runib{1}$ reductions above become
+% LABELS: $$\begin{array}{rcll}
+% LABELS: x = (|lam a (1=1; 1)|); |lam z x|
+% LABELS: 		& \movesto & x = (|lam a 1|); |lam z x| \movesto x = (|lam a 1|); \lamsub{x \mapsto \lambda a. 1}{z}{x} & \ldots (e_1') \\
+% LABELS: 		& \movesto & x = (|lam a (1=1;1)|); \lamsub{x \mapsto \lambda a. (1=1;1)}{z}{x}  				       & \ldots (e_2')
+% LABELS: \end{array}$$
+% %
+% LABELS: which can readily be joined at $e_1'$ using $\runib{1}$ steps.
+
 
 \begin{lemma} \label{lem:uk-lc}
 \runik is locally confluent.
@@ -955,31 +969,32 @@ which can readily be joined at $e_1'$ using $\runib{1}$ steps.
 
 \begin{proof}
 For simplicity, we directly prove that $\runi$ is locally confluent (\cref{lem:u-lc}).
-The proof carries over to $\runik$ as it never requires $\runi$-reductions
-that are \emph{under} a $\lambda$-subterm.
+The proof carries over to $\runik$ as the only required $\runi$-reductions under $ > k$
+$\lambda$s are on \emph{labeled} subterms.
+%it never requires $\runi$-reductions that are \emph{under} a $\lambda$-subterm.
 \end{proof}
 
-\mypara{Un-Explicit Substitutions}
-Define an \emph{un-apply} operator $\unex{e}$
-that recursively applies (and eliminates) the explicit substitutions
-%
-\begin{align*}
-[x \mapsto |v|, \sigma](e)   & \doteq\ \sigma(\subst{e}{x}{|v|}) \\
-\unex{\lamsub{\sigma}{x}{e}} & \doteq\ \lambda x. \sigma(\unex{e}) \\
-\end{align*}
-%
-Next, we show that all $\runik$ reductions, including
-those that use explicit substitutions, correspond to \runi
-reductions, to terms where the explicit substitutions have
-been applied and eliminated.
-
-\begin{lemma} \label{lem:unex}
-If $\rsteps{\runi{k}}{e}{e'}$ then $\rsteps{\runi}{e}{\unex{e}}$.
-\end{lemma}
-
-\begin{proof}
-By induction on the size of $\rsteps{\runik}{e}{e'}$.
-\end{proof}
+%% LABELS: \mypara{Un-Explicit Substitutions}
+%% LABELS: Define an \emph{un-apply} operator $\unex{e}$
+%% LABELS: that recursively applies (and eliminates) the explicit substitutions
+%% LABELS: %
+%% LABELS: \begin{align*}
+%% LABELS: [x \mapsto |v|, \sigma](e)   & \doteq\ \sigma(\subst{e}{x}{|v|}) \\
+%% LABELS: \unex{\lamsub{\sigma}{x}{e}} & \doteq\ \lambda x. \sigma(\unex{e}) \\
+%% LABELS: \end{align*}
+%% LABELS: %
+%% LABELS: Next, we show that all $\runik$ reductions, including
+%% LABELS: those that use explicit substitutions, correspond to \runi
+%% LABELS: reductions, to terms where the explicit substitutions have
+%% LABELS: been applied and eliminated.
+%% LABELS:
+%% LABELS: \begin{lemma} \label{lem:unex}
+%% LABELS: If $\rsteps{\runi{k}}{e}{e'}$ then $\rsteps{\runi}{e}{\unex{e}}$.
+%% LABELS: \end{lemma}
+%% LABELS:
+%% LABELS: \begin{proof}
+%% LABELS: By induction on the size of $\rsteps{\runik}{e}{e'}$.
+%% LABELS: \end{proof}
 
 We can now prove that any two $\runik$ reductions (and hence $\runi$ reductions) can be joined.
 
@@ -996,25 +1011,26 @@ $\rsteps{\runib{k}}{e}{e_i}$ and $\rsteps{\runib{k}}{e}{e_j}$.
 %
 By \cref{lem:uk-term} and \cref{lem:uk-lc} and \cref{lem:local},
 $\runib{k}$ is confluent, hence there exists $e'$ such that
-$\rsteps{\runib{k}}{e_i, e_j}{e'}$.
+$\rsteps{\runib{k}}{e_i, e_j}{e'}$, after which $\runib{k} \subseteq \runi$
+completes the proof.
 %
-Finally, we complete the proof with \cref{lem:unex} via the following diagram.
-% fact that $\runib{k} \subseteq \runi$ completes the proof.
-% https://q.uiver.app/?q=WzAsNSxbMSwwLCJlIl0sWzAsMSwiZV9pIl0sWzIsMSwiZV9qIl0sWzEsMiwiZSciXSxbMSwzLCJcXHVuZXh7ZSd9Il0sWzAsMSwiVV9pIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiVV9qIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiVV9rIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlVfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxcY3JlZntsZW06dWstbGN9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzMsNCwiXFxjcmVme2xlbTp1bmV4fSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjoyMCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	& e \\
-	{e_i} && {e_j} \\
-	& {e'} \\
-	& {\unex{e'}}
-	\arrow["{U_i}"', two heads, from=1-2, to=2-1]
-	\arrow["{U_j}", two heads, from=1-2, to=2-3]
-	\arrow["{U_k}", dotted, two heads, from=2-1, to=3-2]
-	\arrow["{U_k}"', dotted, two heads, from=2-3, to=3-2]
-	\arrow[dotted, two heads, from=2-1, to=4-2]
-	\arrow[dotted, two heads, from=2-3, to=4-2]
-	\arrow["{\cref{lem:uk-lc}}"{description}, draw=none, from=1-2, to=3-2]
-	\arrow["{\cref{lem:unex}}"{description, pos=0.2}, no body, from=3-2, to=4-2]
-\end{tikzcd}\]
+% LABELS: Finally, we complete the proof with \cref{lem:unex} via the following diagram.
+% LABELS: % fact that $\runib{k} \subseteq \runi$ completes the proof.
+% LABELS: % https://q.uiver.app/?q=WzAsNSxbMSwwLCJlIl0sWzAsMSwiZV9pIl0sWzIsMSwiZV9qIl0sWzEsMiwiZSciXSxbMSwzLCJcXHVuZXh7ZSd9Il0sWzAsMSwiVV9pIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMiwiVV9qIiwwLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiVV9rIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlVfayIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDMsIlxcY3JlZntsZW06dWstbGN9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzMsNCwiXFxjcmVme2xlbTp1bmV4fSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjoyMCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% LABELS: \[\begin{tikzcd}
+% LABELS: 	& e \\
+% LABELS: 	{e_i} && {e_j} \\
+% LABELS: 	& {e'} \\
+% LABELS: 	& {\unex{e'}}
+% LABELS: 	\arrow["{U_i}"', two heads, from=1-2, to=2-1]
+% LABELS: 	\arrow["{U_j}", two heads, from=1-2, to=2-3]
+% LABELS: 	\arrow["{U_k}", dotted, two heads, from=2-1, to=3-2]
+% LABELS: 	\arrow["{U_k}"', dotted, two heads, from=2-3, to=3-2]
+% LABELS: 	\arrow[dotted, two heads, from=2-1, to=4-2]
+% LABELS: 	\arrow[dotted, two heads, from=2-3, to=4-2]
+% LABELS: 	\arrow["{\cref{lem:uk-lc}}"{description}, draw=none, from=1-2, to=3-2]
+% LABELS: 	\arrow["{\cref{lem:unex}}"{description, pos=0.2}, no body, from=3-2, to=4-2]
+% LABELS: \end{tikzcd}\]
 \end{proof}
 
 \begin{lemma} \label{lem:uk-term}
