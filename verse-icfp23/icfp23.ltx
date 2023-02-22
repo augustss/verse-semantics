@@ -1806,6 +1806,129 @@ to put the equation in a canonical orientation, and thus avoid non-termination o
 % \rulename{var-swap} cannot apply forever, \ie\ that unification
 % terminates.
 
+% ----------------------- Variations
+
+\section{Variations and choices} \label{sec:variations}
+
+%% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
+
+In a calculus like \versecalc{} there is room for many design variations.
+We discuss some of them here.
+
+
+% JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
+
+% \subsection{Choice and failure} \label{sec:choice-and-failure}
+%
+% In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
+% and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
+% only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
+% $$
+% |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
+% $$
+% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
+% |if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
+% $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
+% and make progress.  But to do this we must look at the right branch of the choice, before we know whether
+% the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
+% |(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
+% for |x|.
+%
+% An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
+% the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
+
+
+% \subsection{Administrative normal form}
+%
+% We have chosen to restrict tuple formation and function application to
+% \emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
+% |e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
+% It would be entirely straightforward to allow expressions rather than values, but doing so
+% would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
+% Restricting to values involves no loss of expressive power:
+% it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
+
+% \subsection{Dead existentials}
+% 
+% \simon{I don't think this section is persuasive; let's drop it.}
+% \lennart{Drop it!}
+% 
+% Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
+% argue that it should instead be stuck.
+% For example, the term
+% |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
+%   solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
+% It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
+
+\subsection{Ordering and choices}
+
+As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
+First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
+the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
+$$
+\rulename{simpler-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[e_1] choice CX^[e_2]|
+$$
+The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
+Another possibility would be to accept that results may come out in the ``wrong'' order, but have
+some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
+$$
+\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[left e_1] choice CX^[right e_2]|
+$$
+Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
+labelled expressions, something in the spirit of
+$$
+\rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
+$$
+We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
+semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
+
+\subsection{Generalizing |oneKW| and |allKW|}
+
+In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
+\[\begin{array}{lrcll}
+    \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
+    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
+\end{array}\]
+The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
+
+Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
+\[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
+    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
+    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
+\end{array}\]
+For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
+to avoid confusing the presentation with these higher-order encodings, but there are no complications using |splitKW| instead.
+
+% \subsection{Laziness} \label{sec:laziness}
+%
+% As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
+% For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
+% yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
+% prevent the expression from returning a value.
+% There a good reason for this choice: the call to |apply0 loop| might fail, and we should not return |3| until
+% we know there is no failure.  With laziness we could easily lose confluence.
+% % $$
+% % |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+% % $$
+% % Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
+% % |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
+% % |ones = tup(1,ones)|, which has an ``occurs check.''
+% 
+% Another place that laziness could play a role is this.
+% Remembering the duality between values and choices,
+% one might also want |allKW| to return a lazy stream
+% of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
+% this program would converge:
+% $$
+% |def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
+% $$
+% Here we suppose that |allKW| returns a lazy stream of values (represented as nested
+% pairs), from which we may pick the first and discard the rest.
+% 
+% In short, there are good reasons for lenience, but
+% a lazy variant of \versecalc{} could be worth exploring.
+
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
@@ -2186,128 +2309,6 @@ $$
 \end{figure}
 
 
-% ----------------------- Variations
-
-\section{Variations and choices} \label{sec:variations}
-
-%% \lennart{Mention binary {\vs} n-ary for choice and tuples?}
-
-In a calculus like \versecalc{} there is room for many design variations.
-We discuss some of them here.
-
-
-% JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
-
-% \subsection{Choice and failure} \label{sec:choice-and-failure}
-%
-% In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
-% and certainly not a set (\cref{sec:choice}).  That suggests that a good evaluation strategy might be to
-% only explore the left branch of a choice first, and try the right branch only if former fails.  But consider
-% $$
-% |(if (x > 2) then e1 else e2); (x = 1 choice  fail)|
-% $$
-% The |if| is stuck until we have a value for |x|; we cannot float the choice out with \rulename{choose} because
-% |if| is not choice-free.  With the rules in \cref{fig:rules2} we \emph{can} use \rulename{fail-r} to rewrite
-% $|(x=1 choice fail)| \movesto |(x=1)|$; and now we can propagate the |(x=1)| to the |if| via \rulename{subst}
-% and make progress.  But to do this we must look at the right branch of the choice, before we know whether
-% the left branch will reach a value or fail.  There is nothing wrong with this, but it is arguably a bit peculiar that
-% |(x=1 choice e)| can substitute for |x| if and only if |e| fails.  Even |(x=1) choice (x=1)| cannot substitute
-% for |x|.
-%
-% An alternative would be to drop \rulename{fail-l} and \rulename{fail-r}, and drop the |fail| terms only in
-% the rules for |oneKW| and |allKW|.  Both alternatives seem reasonable.
-
-
-% \subsection{Administrative normal form}
-%
-% We have chosen to restrict tuple formation and function application to
-% \emph{values} and not \emph{expressions}; thus we allow |apply1 v_1 v_2|, but not |apply1 e_1 e_2| unless
-% |e_1| and |e_2| are values; and similarly |tup(v_1,v_2)| but not |tup(e_1,e_2)|.
-% It would be entirely straightforward to allow expressions rather than values, but doing so
-% would require many more rules, to describe how to distribute, {\eg}, application over sequencing.
-% Restricting to values involves no loss of expressive power:
-% it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
-
-% \subsection{Dead existentials}
-% 
-% \simon{I don't think this section is persuasive; let's drop it.}
-% \lennart{Drop it!}
-% 
-% Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
-% argue that it should instead be stuck.
-% For example, the term
-% |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
-%   solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
-% It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
-
-\subsection{Ordering and choices}
-
-As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying, for two reasons.
-First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
-the |SX| context is needed to force |CX| to be maximal.  A rule like this would be more satisfying:
-$$
-\rulename{simpler-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[e_1] choice CX^[e_2]|
-$$
-The trouble with that is that it may change the order of the results (\cref{sec:mixing}).
-Another possibility would be to accept that results may come out in the ``wrong'' order, but have
-some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
-$$
-\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[left e_1] choice CX^[right e_2]|
-$$
-Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
-labelled expressions, something in the spirit of
-$$
-\rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
-$$
-We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
-semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
-
-\subsection{Generalizing |oneKW| and |allKW|}
-
-In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
-\[\begin{array}{lrcll}
-    \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
-    \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
-\end{array}\]
-The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
-
-Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
-\[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
-\end{array}\]
-For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
-to avoid confusing the presentation with these higher-order encodings, but there are no complications using |splitKW| instead.
-
-% \subsection{Laziness} \label{sec:laziness}
-%
-% As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
-% For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
-% yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
-% prevent the expression from returning a value.
-% There a good reason for this choice: the call to |apply0 loop| might fail, and we should not return |3| until
-% we know there is no failure.  With laziness we could easily lose confluence.
-% % $$
-% % |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
-% % $$
-% % Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
-% % |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
-% % |ones = tup(1,ones)|, which has an ``occurs check.''
-% 
-% Another place that laziness could play a role is this.
-% Remembering the duality between values and choices,
-% one might also want |allKW| to return a lazy stream
-% of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
-% this program would converge:
-% $$
-% |def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
-% $$
-% Here we suppose that |allKW| returns a lazy stream of values (represented as nested
-% pairs), from which we may pick the first and discard the rest.
-% 
-% In short, there are good reasons for lenience, but
-% a lazy variant of \versecalc{} could be worth exploring.
 
 
 % ----------------------- Denotational semantics  -----
