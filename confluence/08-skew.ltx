@@ -307,8 +307,10 @@ Every rewrite rule in \versecalc{} is monotonic with respect to $\leqomegavc$.
 \end{lemma}
 
 \begin{proof}
-  Proof sketch. The left-hand side of every rule in $\rapp \cup \runi \cup \rcon \cup \rgc \cup \rspc$ is an expression that is mapped to |Omega| by the function $\omegavc$,
-  which necessarily compares $\leqomegavc$ to any result produced by $\omegavc$ when applied to the right-hand side.
+  For every rewrite rule in $\rapp \cup \runi \cup \rcon \cup \rgc \cup \rspc$,
+  the left-hand side is an expression that is mapped to |Omega| by the function $\omegavc$,
+  and no matter what expression |e| is the result of applying $\omegavc$ to the right-hand side,
+  we have $|Omega| \leqomega |e|$.
  \end{proof}
 
 \subsection{Preliminaries about Skew Confluence}
