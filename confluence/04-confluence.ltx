@@ -870,26 +870,33 @@ arbitrary sequences of $\runi$ reductions \cref{lem:uk-join}.
 \end{enumerate}
 \end{proof}
 
+\newcommand{\lblk}[2]{\ensuremath{\{ #2 \}_{#1}}}
 
-%% LABELS: \begin{figure}
-%% LABELS: $$
-%% LABELS: \begin{array}{lr@@{\;}c@@{\;}l}
-%% LABELS: \text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
-%% LABELS:
-%% LABELS: \text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \vb $\lamsub{\sigma}{x}{c}$ \\
-%% LABELS: \text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
-%% LABELS: \text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
-%% LABELS: \text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
-%% LABELS:
-%% LABELS: \text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
-%% LABELS: \text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
-%% LABELS: \text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
-%% LABELS: \text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
-%% LABELS: \end{array}$$
-%% LABELS: \caption{Bounded Contexts}
-%% LABELS: \label{fig:bounded-contexts}
-%% LABELS: \label{fig:explicit-subst}
-%% LABELS: \end{figure}
+\begin{figure}
+$$
+\begin{array}{lr@@{\;}c@@{\;}l}
+%
+% \text{Values} & |v| & ::= & x \vb k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x c| \\ %\vb $\lamsub{\sigma}{x}{c}$ \\
+% \text{V-Eqs}  & c   & ::= & |v_1 == v_2; c| \vb ee \\
+% \text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
+% \text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
+%
+\text{Block}  & |b|   & ::= & \lblk{\ell}{|v == r; b|} \vb t \\
+\text{RHS}    & |r|   & ::= & |b| \vb |t| \\
+\text{Tail}   & |t|   & ::= & |v| \vb |apply1N v_1 v_2| \vb |def x e| \vb |e_1 choice e_2| \vb |one e| \vb |all e|  \\[0.05in]
+%
+%% \text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
+%% \text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
+%% \text{V-Eq-Ctx}  & C^k   & ::= & \hole^k \vb V^k = |v|; c \vb |v| = V^k; c \vb |v_1 == v_2|; C^k \vb EE^{k} \\
+%% \text{E-Eq-Ctx}  & EE^k  & ::= & \hole^k \vb V^k = d; ee \vb v = D^k; ee  \vb |v = d|; EE^k \vb D^k \\
+%% \text{Delim-Ctx} & D^k   & ::= & \exists x. C^{k+1} \vb V^{k+1}\ |v| \vb |v|\ V^{k+1} \vb C^{k+1}\ |choice|\ c \vb c\ |choice|\ C^{k+1} \vb \textbf{one}\{ C^{k+1} \} \vb \textbf{all}\{ C^{k+1} \}  \\
+\end{array}$$
+\caption{Labeled Blocks}
+\label{fig:labeled-blocks}
+\label{fig:bounded-contexts}
+\label{fig:explicit-subst}
+\end{figure}
+
 %% LABELS:
 %% LABELS: \begin{definition}[$k$-Unification]
 %% LABELS: \cref{fig:bounded-contexts} defines the grammar of \emph{$k$-bounded contexts} $C^k$
@@ -911,7 +918,8 @@ by a special label $\ell$.
 Let $\runik$ be defined as the set of all $\runi$
 reductions where:
 %
-(1)~the $\runi$-redex is a $\ell$-labeled, and
+(1)~the $\runi$-redex is a $\ell$-labeled or occurs under $\leq k$ $\lambda$s, and
+%
 (2)~the \rulename{subst} preserves labels.
 %
 \end{definition}
@@ -1046,60 +1054,86 @@ By induction on $k$.
 	\item[Inductive case]
 		Assume the induction hypothesis that $\runib{k}$
 		is Noetherian and prove $\runib{k+1}$ is Noetherian.
-		Consider any $c \equiv \overline{u = v}; ee$.
-		We will prove  that it is only possible to take
-		finitely many $\runib{k+1}$ steps from $c$.
 		%
-		Suppose there is an infinite trace starting from $c$.
+		Let $\sigma$ be a $\runib{k+1}$ reduction sequence $e \movesto \ldots$.
 		%
-		By \cref{lem:uk-term-0} there is some finite prefix
+		We will prove that $\sigma$ is finite.
+		%
+		By the IH there is some \emph{finite prefix}
 		of the trace $\rsteps{\runib{k+1}}{e}{e'}$ after which
-		there are no more $\runib{0}$ steps.
+		there are no more $\runib{k}$ steps.
 		%
-		Note that $e'$ is finite and of the form $\ldots d_1 \ldots d_n \ldots$
-		comprising disjoint terms $d_1 \ldots d_n$.
+		Note that $e'$ is finite and of the form $\ldots |lam x_1 e_1| \ldots |lam xn e_n| \ldots$
+		comprising disjoint $\lambda$ terms.
 		%
 		Every $\runib{k+1}$ reduction from $e'$ is a $\runib{k}$ reduction
-		from some $d_i$.
+		from some $|e_i|$, that occur ``in parallel'' i.e. without influencing
+		each other, and which can be sequenced to get a $\runib{k+1}$ reduction sequence.
 		%
-		By the induction hypothesis, each of these reduction sequences is finite,
-		and hence the complete reduction sequence must be finite.
+		Again, by the induction hypothesis, each of these reduction sequences (for each $|v_i|$)
+		is finite, and hence their sequencing is finite, hence $\sigma$ must be finite.
 \end{description}
 \end{proof}
 
+\mypara{Labeled Blocks}
+%
+We prove the base case of \cref{lem:uk-term} by stratifying expressions
+into \emph{labeled blocks}, \emph{tails}, \emph{rhs} and \emph{expressions} as
+shown in \cref{fig:labeled-blocks}.
+%
+A \emph{tail} is a term that is ``inert'' for the purposes of \runib{0} reduction: namely a
+value, application, existential, one, all or choice.
+%
+An \emph{rhs} is either a block or a tail (which includes a value).
+%
+A (labeled) \emph{block} is a sequence of equations $|v=r|$ of a value and an RHS $|r|$ followed by a tail $|t|$.
+%
+We assume each block carries a unique ``ghost'' label $\ell$ (that will be used to prove termination).
+%
+In any block $b$, for any two labels $\ell_1$ and $\ell_2$ we write $\ell_1 \prec_b \ell_2$ if
+the block labelled by $\ell_2$ occurs \emph{inside} (under) the block labelled by $\ell_1$ in $b$.
+%
+We will use $b_{\ell}$ to denote the (unique) block labeled by $\ell$.
 
 \begin{lemma} \label{lem:uk-term-0}
-\runib{0} is Noetherian.
+\runib{0} is Noetherian for all \emph{tails} $t$, \emph{rhs} $r$ and \emph{expressions} $e$.
+\end{lemma}
+
+\begin{proof}
+By induction on the structure of $|t|$, $|r|$ and $|e|$, using \cref{lem:uk-term-0-block} for the base case.
+\end{proof}
+
+\begin{lemma} \label{lem:uk-term-0-block}
+\runib{0} is Noetherian for all \emph{blocks} $|b|$.
 \end{lemma}
 
 \begin{proof}
 %
-\ranjit{What about any term}?
+We prove that for any term $|b|$ that it is only possible to take
+finitely many $\runib{0}$ steps from $|b|$.
 %
-We prove that for any term $c \equiv \overline{u = v}; ee$ that it is only possible to take
-finitely many $\runib{0}$ steps from $c$. Let $\text{All}$ be the set $\freevars{u,v,ee}$.
-%
-The proof follows by lexicographic induction on the tuple
+For a label $\ell$ let
 %
 \begin{align*}
+	\sz{\mathit{free}(\ell)} & \doteq\  \sharp \{ x \mid x\ \mbox{appears free} \geq 2\ \mbox{times}\ \mbox{in}\ b_{\ell} \} \\
+	{\mathit{size}(\ell)} & \doteq\  \mbox{size of the block}\ b_{\ell} \\
+\intertext{The proof follows by lexicographic induction on the following tuple}
+%
 	\sz{\text{choose}} & \doteq\ \mbox{number of locations to apply \rulename{choose}} \\
 	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{seq-assoc}, \rulename{eqn-float}} \\
-	\sz{\text{free}}   & \doteq\ \mbox{number of variables in}\ \text{All} - \text{Used} \\ % TODO: "per" X-block ... ordered by X-block nesting
-	\mbox{where}\ \sz{\text{Used}}   & \doteq\ \mbox{variables that have been used as LHS of \rulename{subst}} \\ % TODO: "per" X-block ... ordered by X-block nesting
-	\sz{\text{size}}   & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
-	\sz{\text{swap}}   & \doteq\ \mbox{number of locations to apply \rulename{var-swap}} \\
+	\sz{\text{free}}   & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{free}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
+	\sz{\text{swap}}   & \doteq\ \mbox{number of locations to apply \rulename{var-swap}}
 \end{align*}
 %
-where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$)
-where the rule can be applied.
+where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
 %
 Each application of
 %
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
-\item \rulename{seq-assoc*} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
+\item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
 \item \rulename{subst} strictly reduces $\sz{\text{free}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{u-*} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
 \item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
 \end{itemize}
 %
