@@ -86,7 +86,7 @@ and then go on to prove that \versecalc{} itself, with this modification, is ske
 
 We use the conventional notation $\freevars{|e|}$ to denote the set of variables that occur free
 in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e|, and |mu x hnf|.
-Figure~\ref{fig:fvs} contains a formal definition of this function for \versecalc{}.
+\Cref{fig:fvs} contains a formal definition of this function for \versecalc{}.
 
 \begin{figure}
 $
@@ -120,7 +120,7 @@ As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, 
 \item |y| is bound by |lambda|, so it is not free. 
 \item |z| is free, but appears only in a position that is within the body of a lambda expression.
 \end{itemize}
-Figure~\ref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
+\Cref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
 only in its handling of lambda expressions.
 
 \begin{figure}
@@ -150,7 +150,7 @@ $
 \subsection{Substitution}
 
 We use the notation |subst e x v| to denote the expression that results from performing standard capture-avoiding substitution of the value |v| for every occurrence of the variable |x| within the expression |e| (it turns out that, for \versecalc{}, substitution of general expressions for variables is not required, only substitution of values for variables).
-Figure~\ref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
+\Cref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
 
 \begin{figure}
 $
@@ -220,7 +220,7 @@ $
 For every term of \versecalc{} there is a corresponding term of $\vcOmega$, identical in structure and appearance and containing no occurrence of |Omega|;
 we identify such terms and regard the set of terms of \versecalc{} as simply a subset of the terms of $\vcOmega$.
 
-The definition of substitution (FIgure~\ref{fig:substitution}) is extended in the expected trivial manner: $|subst Omega x v| \equiv |Omega|$.
+The definition of substitution (\cref{fig:substitution}) is extended in the expected trivial manner: $|subst Omega x v| \equiv |Omega|$.
 
 \begin{definition}
 (after \cite[Definition 2.3]{Ariola2002})
@@ -229,7 +229,7 @@ Define $\leqomega^T$ be the relation such that $|Omega| \leqomega^T |M|$ for eve
 then define $\leqomega$ to be the transitive, reflexive, and compatible closure of $\leqomega^T$.
 \end{definition}
 
-Figure~\ref{fig:info-rewrite-rules} shows a system $\rinfo$ of rewrite rules on $\vcOmega$.
+\Cref{fig:info-rewrite-rules} shows a system $\rinfo$ of rewrite rules on $\vcOmega$.
 These may be compared to similar rules for the $\lambda\circ$ calculus \cite[Definition 5.20]{Ariola2002}.
 
 \begin{figure}
@@ -287,7 +287,7 @@ No other pairs of rules produce any critical pairs.
 All critical pairs can be joined; therefore by \cref{lem:critpairs} $\rinfo$ is locally confluent.
 
 Let the size of a term of $\vcOmega$ be the number of tokens it contains other than parentheses.
-Each of the rewrite rules in Figure~\ref{fig:info-rewrite-rules} strictly decreases the number of such tokens.
+Each of the rewrite rules in \cref{fig:info-rewrite-rules} strictly decreases the number of such tokens.
 Because any given term has a finite number $n$ of such tokens, and the number of tokens cannot be less than zero,
 for every term every rewriting sequence from that term can have no more than $n$ steps. So $\rinfo$ is bounded and therefore Noetherian.
 
