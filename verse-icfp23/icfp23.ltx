@@ -1183,7 +1183,7 @@ $$
 \begin{array}{l@@{\;}l}
                                 & |def x (x = if (x=0; x>1) then 33 else 55; x)| \\
 \movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55; x)| \\
-\movestoR{u-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
+\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
 \movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
 \movestoR{subst}                & |def x (x = 55; 55)| \\
 \movestoR{exi-elim}             & |55|
@@ -1610,6 +1610,7 @@ Thus motivated, we restrict our attention to terms that have \emph{\norecursion}
 which equates a variable |x| with a value that contains a lambda in which |x| is free.
 \end{itemize}
 %
+
 \noindent
 The no-recursion condition is not as severe as might first appear: it only prohibits
 recursion through \emph{equations}.
