@@ -243,8 +243,8 @@
 \rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
 \rulename{norm-seq} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{norm-seqr} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
-\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| & \text{\textit{Note}: structural} \\
-\rulename{seq-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if $|eu_1| \in |ceu| \lor |eu_2| \in |ceu|$} \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+\rulename{seq-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if $eu_1 \in ceu$ or $eu_2 \in ceu$} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]

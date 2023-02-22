@@ -1012,22 +1012,22 @@ has the following properties:
 \figureContexts
 %% \figureStructuralRules
 
-\subsection{Ordering terms}
-The \rulename{var-swap} orders expressions using the ordering |lte|.
-The reason for this is to simplify the confluence proof by having a more canonical representation.
-The ordering is based on using de~Bruijn indices as the variable representation;
+% \subsection{Ordering terms}
+% The \rulename{var-swap} orders expressions using the ordering |lte|.
+% The reason for this is to simplify the confluence proof by having a more canonical representation.
+% The ordering is based on using de~Bruijn indices as the variable representation;
 %%The ordering is defined for expressions |eu|, \ie, expressions and equalities.
 %%The |lte| is defined so that all equalities, |v==e|, are less than all expressions, |e|.
-|e_1 lte e_2| if the natural lexicographical comparison of the terms with de~Bruijn indices is |e_1 < e_2|.
-\Eg, in the expressions |def (y x) (y == x; 0)| the |x| is considered less than the |y| since
-the de~Bruijn index for |x| is 0, and for |y| it is |1|.
-So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
+% |e_1 lte e_2| if the natural lexicographical comparison of the terms with de~Bruijn indices is |e_1 < e_2|.
+% \Eg, in the expressions |def (y x) (y == x; 0)| the |x| is considered less than the |y| since
+% the de~Bruijn index for |x| is 0, and for |y| it is |1|.
+% So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
+%
+% Note that the \rulename{seq-swap} rule does not reorder choices;
+% the rule only applies if at least one of the |eu| has no choice.
 
-Note that the \rulename{seq-swap} rule does not reorder choices;
-the rule only applies if at least one of the |eu| has no choice.
 
-
-\subsection{Functions and function application} \label{sec:beta}
+\subsection{Functions and function application: rules $\rapp$} \label{sec:beta}
 
 Looking at \cref{fig:rules}, rule \rulename{app-add}
 should be familiar: it simply rewrites an application of |add| to integer
@@ -1068,7 +1068,7 @@ does not suspend awaiting a value for |x|; instead it explores all the
 alternatives, returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
 
-\subsection{Unification} \label{sec:unification-rules}
+\subsection{Unification: rules $\runi$} \label{sec:unification-rules}
 
 Next we study unification, again in \cref{fig:rules}.
 Rules \rulename{u-lit} and \rulename{u-tup}
@@ -1139,7 +1139,34 @@ suffice to express the necessary sharing.
 \item The side condition $x \not\in \freevars{v}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
 \end{itemize}
-\simon{Need to discuss \rulename{var-swap} somewhere.}
+Rules \rulename{hnf-swap} helps \rulename{subst} to fire, by putting the variable on the left.
+Rule \rulename{var-swap} is trickier.  Consider this example, where |a| and |b| are
+bound further out, perhaps by lambdas:
+$$
+\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+  \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
+  \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
+     \movesto & |def x (tup b == tup a ; x == tup b; tup b)| \\
+  \movestoR{u-tup, elim-eqn} & |a == b; tup a| &
+     \movesto & |b == a; tup b| \\
+  \movestoR{subst} & |a == b; tup b| &
+      \movesto & |b == a; tup a| \\
+
+\end{array}
+$$
+Each column is a reduction sequence starting from the same common term at the top;
+the two seqeunces differ in which equation for |x| is chosen for \rulename{subst}
+in the first step. As you can see, they conclude with two terms that are ``obviously''
+the same, but which are syntactically different.  Rule \rulename{var-swap} allows
+them to be brought together, so that the unification rules are confluent.
+In the overall proof of confluence (\cref{sec:confluence}), it turns out to
+be very helpful if the unification rules $\runi$
+are \emph{terminating}.  To achieve this \rulename{var-swap} fires on |y==x| only if
+|x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
+ends up on the left.  Other rules, notably \rulename{exi-swap}, may change this binding order
+and thereby re-enable \rulename{var-swap},
+but the unification rules $\runi$ \emph{considered in isolation} are terminating and confluent,
+and that is what we need for the proof.
 
 \subsection{Local substitution} \label{sec:local-subst}
 
@@ -1192,37 +1219,58 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
 % the simpler \rulename{global-subst}: to establish confluence.
 
-\subsection{Normalization rules} \label{sec:gc} \label{sec:normalization}
+\subsection{Garbage collection and normalization: rules $\rgc$ and $\rcon$} \label{sec:gc} \label{sec:normalization}
 
 % Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
 % \rulename{norm-seqr} gives us |(y==x+1; x==3; y)|; to make further progress we must
 % move the |x==3| to the left, using \rulename{norm-seq-swap2}, giving |(x==3; y==x+1; y)|.
 % Now we can substitute for |x|, and then for |y|.
 
-Four \emph{normalisation rules} (\cref{fig:rules}) help to put the expression in a form that
-allows other rules to fire:  \rulename{norm-exi} allows an existential to float outwards;
-\rulename{norm-seqr} makes semicolon right-associated; \rulename{norm-seqr} moves work out
-of the right hand side of a equation |v=e|; and \rulename{hnf-swap} puts a variable
-on the left hand side of an equation if possible to allow \rulename{subst} to fire.
-For example, we can't use \rulename{subst} to
-substitute for |x| in |(x == (e; 3); x+2)|,
-because the RHS of the |x|-equation is not a value; but we can apply \rulename{norm-seqr}
-tpo get |(e; x=3); x+2|, and then \rulename{norm-seq} to get |e; x=3; x+2|.
+Four \emph{elimination (or garbage-collection)} rules $\rgc$ allow dead code to be dropped (\cref{fig:rules}):
+\rulename{elim-val} discards a value to the left of semicolon; \rulename{elim-exi} discards
+a dead existential; \rulename{elim-eqn} discards an existential $|defKW| |x|$ whose only
+occurrence is a equation |x=v|; and \rulename{elim-fail} discards the context surrounding a |fail|.
+
+Five \emph{normalisation} rules $\rcon$ help to put the expression in a form that
+allows other rules to fire (\cref{fig:rules}):  \rulename{norm-exi} allows an existential to float outwards;
+\rulename{norm-seq} makes semicolon right-associated; \rulename{norm-seqr} moves work out
+of the right hand side of a equation |v=e|.
+For example, we can't use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
+because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{norm-seqr}
+to get |(e; x=3); x+2|, and then \rulename{norm-seq} to get |e; x=3; x+2|; and now we \emph{can}
+apply \rulename{subst}.
+
+Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
+applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
+\rulename{exi-swap} allows you to move an existential inwards so that it can be garbage-collected
+by \rulename{elim-exi}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
+this example, where |a,b,c| are bound in that order; that is $|c| \prec |b| \prec |a|$: 
+$$
+\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+  \multicolumn{4}{c}{|c==a; c==b; c|} \\
+  \movestoR{subst} & |c==a; a==b; a| &
+     \movestoR{subst} & |b==a; c==b; b| \\
+
+  \movestoR{var-swap} & |c==a; b==a; a| &
+     \movestoR{subst}   & |b==a; c==b; a| \\
+\end{array}
+$$
+Again the concluding terms of the two colums are ``obviously'' the same,
+because they differ only in the order of the equations |(b==a)| and |(c==b)|;
+\rulename{seq-swap} allows them to be brought together, and makes explicit
+our intution that order does not matter.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
-Moreover, they do not float equalities or existentials out of choices:
+Thhat is why the \rulename{seq-swap} insists that both equations are \emph{choice-free}
+expressions $ceu$ (\cref{fig:choice-free-syntax}).
+Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
 |(y = ((x=3; x*2) choice (x=4)); tup (x+1,y))|.
 We must not float the binding |(x=3)| to the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
-
-Finally, four \emph{elimination (or garbage-collection) rules} allow dead code to be dropped:
-\rulename{norm-val} discards a value to the left of semicolon; \rulename{elim-exi} discards
-a dead existential; \rulename{elim-exil} discards an existential $|defKW| |x|$ whose only
-occurrence is a equation |x=v|; and \rulename{elim-fail} dicards the context surrounding a |fail|.
 
 % If the equality |(x=v)| turns out to be the sole remaining occurrence of |x| in
 % the body of an |defKW|, then rule \rulename{def-eliml} can drop both the |defKW|
@@ -1248,7 +1296,7 @@ occurrence is a equation |x=v|; and \rulename{elim-fail} dicards the context sur
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 
-\subsection{Rules for choice} \label{sec:choice-rules}
+\subsection{Rules for choice: rules $\rspc$} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:rules}:
 \begin{itemize}
@@ -1376,9 +1424,13 @@ $$
 $$
 Here, |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
-Laziness would be another possible design choice, one that is even more expressive, as we discuss in
-\cref{sec:laziness}.
-\lennart{This makes it sound like using laziness is straightforward, but due to failure it's not.}
+
+However, moving to \emph{laziness} seems problematic.
+For example, consider: |def x (x = apply0 wombat; 3)|.  In a lazy language this expression would
+yield |3|, but in \versecalc{} everything is evaluated, and 
+the expression will not return a value until |apply0 wombat| converges.
+There a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
+we know there is no failure.  With laziness we could easily lose confluence.
 
 \subsection{Evaluation strategy} \label{sec:eval-strategy}
 
@@ -1425,9 +1477,10 @@ so we leave evaluation strategy and compilation for future work.
 \subsection{Developing and debugging rules}
 The rules we describe here should both be able to transform a program to its value,
 and also be confluent.
-To aid in the development of the rules we have used several mechanized tools.
+To aid in the development of the rules we have used several mechanized tools to automate
+reduction, random test-case generation, and confluence checking
 Initially, we used PLT Redex, \cite{pltredex}, which is very easy to use,
-albeit not very efficient.
+but not very efficient.
 For better efficiency we switched to a Haskell library for term
 rewriting.
 The library provides a DSL for writing rules, and provides the infrastructure
@@ -1454,18 +1507,16 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
 \end{figure}
 
-For debugging we have a set of examples with known results, which every
-potential rule set will have to evaluate correctly.
-We cannot prove formally that the rules evaluates all the programs we
-expect, since we have no specification of what we expect.
-
-For confluence it is easier to be formal; we know what confluence means.
-We used QuickCheck, \cite{quickcheck}, to test the rule sets for confluence
-before beginning a proof.
+We used this infrastructure in two ways.
+First, we have a set of examples with known results, against which we can test a
+potential rule set.
+% We cannot prove formally that the rules evaluates all the programs we
+% expect, since we have no specification of what we expect.
+Second, before beginning a proof of confluence we used QuickCheck \cite{quickcheck}
+to generate test cases, and check them for confluence.
 QuickCheck turned out to be invaluable at finding counter examples to
 otherwise reasonable looking rules;
 it has run on the order of 100M tests on the current rule set.
-
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
@@ -2172,17 +2223,17 @@ We discuss some of them here.
 % Restricting to values involves no loss of expressive power:
 % it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
-\subsection{Dead existentials}
-
-\simon{I don't think this section is persuasive; let's drop it.}
-\lennart{Drop it!}
-
-Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
-argue that it should instead be stuck.
-For example, the term
-|(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
-  solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
-It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
+% \subsection{Dead existentials}
+% 
+% \simon{I don't think this section is persuasive; let's drop it.}
+% \lennart{Drop it!}
+% 
+% Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
+% argue that it should instead be stuck.
+% For example, the term
+% |(def x (x=(1 choice 2); 99))| rewrites to |(99 choice 99)|, producing two results, \emph{one for each
+%   solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
+% It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
 
 \subsection{Ordering and choices}
 
@@ -2196,15 +2247,15 @@ The trouble with that is that it may change the order of the results (\cref{sec:
 Another possibility would be to accept that results may come out in the ``wrong'' order, but have
 some kind of sorting mechanism to put them back into the ``right'' order.  Something like this:
 $$
-\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[L; e_1] choice CX^[R; e_2]|
+\rulename{labeled-choose} \quad   |CX^[ e_1 choice e_2 ]| \movesto |CX^[left e_1] choice CX^[right e_2]|
 $$
 Here the two branches are labeled with |L| and |R|.  We can add new rules to reorder such
 labelled expressions, something in the spirit of
 $$
-\rulename{sort} \quad   |(R; e_1) choice (L; e_2)| \movesto |(L; e_2) choice (R; e_1)|
+\rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
 $$
-We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure
-may be worse than the disease.
+We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
+semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
 \subsection{Generalizing |oneKW| and |allKW|}
 
@@ -2224,34 +2275,34 @@ Indeed, this is more general, as we can implement |oneKW| and |allKW| with |spli
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
 to avoid confusing the presentation with these higher-order encodings, but there are no complications using |splitKW| instead.
 
-\subsection{Laziness} \label{sec:laziness}
-
-As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
-For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
-yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
-prevent the expression from returning a value.
-There a good reason for this choice: the call to |apply0 loop| might fail, and we should not return |3| until
-we know there is no failure.  With laziness we could easily lose confluence.
+% \subsection{Laziness} \label{sec:laziness}
+%
+% As \cref{sec:lenient} discussed, \versecalc{} is lenient. Unlike Curry however, \versecalc{} is not \emph{lazy}.
+% For example, consider: |def x (x = apply0 loop; 3)|.  In a lazy language this expression would
+% yield |3|, but in \versecalc{} everything is evaluated, and the infinite computation |apply0 loop| will
+% prevent the expression from returning a value.
+% There a good reason for this choice: the call to |apply0 loop| might fail, and we should not return |3| until
+% we know there is no failure.  With laziness we could easily lose confluence.
+% % $$
+% % |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+% % $$
+% % Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
+% % |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
+% % |ones = tup(1,ones)|, which has an ``occurs check.''
+% 
+% Another place that laziness could play a role is this.
+% Remembering the duality between values and choices,
+% one might also want |allKW| to return a lazy stream
+% of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
+% this program would converge:
 % $$
-% |def (ones ^^ y ^^ z) (ones = tup (1,ones); tup (y,z) = ones; y)|
+% |def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
 % $$
-% Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
-% |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
-% |ones = tup(1,ones)|, which has an ``occurs check.''
-
-Another place that laziness could play a role is this.
-Remembering the duality between values and choices,
-one might also want |allKW| to return a lazy stream
-of results, one by one, rather than waiting for them all to terminate.  For example, one might hope that
-this program would converge:
-$$
-|def (y ^^ z) (tup (y, z) = all (def onec (onec = (1 choice onec))); y|
-$$
-Here we suppose that |allKW| returns a lazy stream of values (represented as nested
-pairs), from which we may pick the first and discard the rest.
-
-In short, there are good reasons for lenience, but
-a lazy variant of \versecalc{} could be worth exploring.
+% Here we suppose that |allKW| returns a lazy stream of values (represented as nested
+% pairs), from which we may pick the first and discard the rest.
+% 
+% In short, there are good reasons for lenience, but
+% a lazy variant of \versecalc{} could be worth exploring.
 
 
 % ----------------------- Denotational semantics  -----

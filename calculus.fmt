@@ -108,6 +108,9 @@
 %format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
 
+%format left (x)  = "L \triangleright" x
+%format right (x)  = "R \triangleright" x
+
 %format tuple = "\textbf{tup}"
 %format typeKW (x) = "\textbf{type}"
 %format typex (x) = "\textbf{type}\{" x "\}"
