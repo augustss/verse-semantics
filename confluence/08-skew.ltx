@@ -1,0 +1,460 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% For later:
+%% \newcommand{\go}[1]{\mathbin{\smash{\mathop{\xrightarrow{}}\limits_{\smash{\hbox{\raise0.55ex\hbox{$\scriptstyle#1\mskip13mu$}}}}}}}
+\newcommand{\inccon}[1]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#1$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle\preceq$}}}\vss}}}}}
+
+
+\newcommand{\xleftrightarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow}
+
+%format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
+%format applyNP (a) (b) = a "\," b
+%format Omega = "\mathit{\Omega}"
+
+\newcommand{\rinfo}{\mathcal{I}}
+\newcommand{\vcOmega}{\mathcal{VC}_\mathit{\Omega}}
+\newcommand{\omegavc}{\omega_{\mathrm{VC}}}
+\newcommand{\leqomega}{\mathrel{\leq_\omega}} 
+\newcommand{\leqomegavc}{\mathrel{\leq_{\omegavc}}} 
+
+\newpage
+
+
+\section{Skew Confluence}
+
+We now consider a modified grammar for \versecalc{} in which there is an additional kind of value, a \emph{fixpoint} value:
+\begin{quote}
+$
+\begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Values} & |v| & ::= & |x|  \vb \hnf \vb |mu x hnf| \\
+\end{array}
+$
+\end{quote}
+and a modified set of unification rewrite rules $\mathcal{U}$ in which rule \rulename{u-occurs} is modified from
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+\end{array}
+$
+\end{quote}
+to
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$} \\
+\end{array}
+$
+\end{quote}
+and to which a new rewrite rule is added:
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-unwrap} & |mu x hnf| & \movesto & |subst hnf x (mu x hnf)| \\
+\end{array}
+$
+\end{quote}
+As we will see, rule \rulename{u-unwrap} is confluent but not Noetherian.
+
+The resulting grammar is not confluent. \guy{explain even-odd-problem}
+Therefore we will modify the proof of confluence for $\runi$ to become a proof of \emph{skew confluence} \cite{Ariola2002},
+and then go on to prove that \versecalc{} itself, with this modification, is skew confluent.
+
+
+\subsection{Substitution}
+
+We use the notation |subst e x v| to denote the expression that results from performing standard capture-avoiding substitution of the value |v| for every occurrence of the variable |x| within the expression |e| (it turns out that, for \versecalc{}, substitution of general expressions for variables is not required, only substitution of values for variables).
+Figure~\ref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  |subst x x v| & \equiv & |v| \\
+  |subst y x v| & \equiv & |y| & \text{if $y \neq x$}  \\
+  |subst k x v| & \equiv & |k| \\
+  |subst op x v| & \equiv & |op| \\
+  |substNP (arr (v_1, dots, v_n)) x v| & \equiv & |arr (subst v_1 x v, dots, subst v_n x v)| \\
+  |subst (lam y e) x v| & \equiv & |lam y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst (mu y v') x v| & \equiv & |mu y (subst v' x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst (eu; e) x v| & \equiv &  |subst eu x v; subst e x v| \\
+  |subst (v' = e) x v| & \equiv &  |subst v' x v = subst e x v| \\
+  |subst (def y e) x v| & \equiv & |def y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst fail x v| & \equiv & |fail| \\
+  |subst (e_1 choice e_2) x v| & \equiv &  |subst e_1 x v`choice`subst e_2 x v| \\
+  |subst (apply1N v_1 v_2) x v| & \equiv &  |applyNP (subst v_1 x v) (subst v_2 x v)| \\
+  |subst (one e) x v| & \equiv & |one (subst e x v)| \\
+  |subst (all e) x v| & \equiv & |all (subst e x v)| \\
+\end{array}
+$
+\caption{Definition of the substitution notation |subst e x v|}\label{fig:substitution}
+\end{figure}
+
+\subsection{Unwrapping of Fixpoints is Confluent but not Noetherian}
+
+\begin{lemma}\label{lem:unwrap-confluent}
+The rule \rulename{u-unwrap} is confluent.
+\end{lemma}
+
+\begin{proof}
+  Suppose that $\rstep{\rulename{u-unwrap}}{|e|}{|e_1|}$ and $\rstep{\rulename{u-unwrap}}{|e|}{|e_2|}$ for distinct redexes within $e$.
+  
+  If the redexes are disjoint, then \cref{lem:disjoint} applies.
+
+  Otherwise, without loss of generality assume the redex for $\rstep{\rulename{u-unwrap}}{|e|}{|e_1|}$ contains the redex for $\rstep{\rulename{u-unwrap}}{|e|}{|e_2|}$;
+  let $e$ must be of the form |C_1^[mu x (C_2^[mu y hnf])]| ($\alpha$-conversion may be used to ensure that $x$ and $y$ are distinct variables).
+
+  Then |e_1 = C_1^[substNP (C_2^[mu y hnf]) x (mu x (C_2^[mu y hnf]))]|
+  and |e_2 = C_1^[mu x (C_2^[subst hnf y (mu y hnf)])]|.
+
+  From |e_2| we can take just one more \rulename{u-unwrap} step, using the outermost redex |mu x (C_2^[cdots])|, obtaining |e' = C_1^[subst (C_2^[subst hnf y (mu y hnf)]) x (mu x (C_2^[subst hnf y (mu y hnf)]))]|.
+
+  \guy{More to come.}
+
+  Thus we have $\rsteps{\rulename{u-unwrap}}{|e_1|}{|e'|}$ and $\rstep{\rulename{u-unwrap}}{|e_2|}{|e'|}$, so \rulename{u-unwrap} is strongly confluent,
+  and therefore by \cref{lem:strong} is confluent.
+\end{proof}
+
+To see that \rulename{u-unwrap} is not Noetherian, observe that
+$$\ensuremath{|mu x (tup (1,x))| \go{\rulename{u-unwrap}}  |tup (1, mu x (tup (1,x)))| \go{\rulename{u-unwrap}} |tup (1, (tup (1, mu x (tup (1,x)))))| \go{\rulename{u-unwrap}} \cdots}$$
+is an unending sequence of reduction steps.
+
+\subsection{Information Content}
+
+We define a second grammar, for a second language $\vcOmega$, by adding one more value |Omega|, which indicates a lack of information as to just what will be computed.
+When |Omega| appears in a context where only a value is permitted, it indicates uncertainty as to what value will be provided; 
+when |Omega| appears in a context where any expression permitted, it furthermore indicates uncertainty as to how many values will be provided (possibly none).
+\begin{quote}
+$
+\begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Values} & |v| & ::= & |x| \vb \hnf \vb |mu x hnf| \vb |Omega| \\
+\end{array}
+$
+\end{quote}
+
+For every term of \versecalc{} there is a corresponding term of $\vcOmega$, identical in structure and appearance and containing no occurrence of |Omega|;
+we identify such terms and regard the set of terms of \versecalc{} as simply a subset of the terms of $\vcOmega$.
+
+The definition of substitution (FIgure~\ref{fig:substitution}) is extended in the expected trivial manner: $|subst Omega x v| \equiv |Omega|$.
+
+\begin{definition}
+(after \cite[Definition 2.3]{Ariola2002})
+Let |T| be a set of terms over a signature that includes the constant |Omega|.
+Define $\leqomega^T$ be the relation such that $|Omega| \leqomega^T |M|$ for every term $|M| \in |T|$;
+then define $\leqomega$ to be the transitive, reflexive, and compatible closure of $\leqomega^T$.
+\end{definition}
+
+Figure~\ref{fig:info-rewrite-rules} shows a system $\rinfo$ of rewrite rules on $\vcOmega$.
+These may be compared to similar rules for the $\lambda\circ$ calculus \cite[Definition 5.20]{Ariola2002}.
+
+\begin{figure}
+ $
+  \begin{array}{l}
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulegroupname{Information Content:~$\rinfo${}}
+  \rulename{info-fix} & |mu x v| & \movesto & |Omega| \\
+  \rulename{info-seq} & |eu; e| & \movesto & |Omega| \\
+  \rulename{info-exi} & |def x e| & \movesto & |Omega| \\
+  \rulename{info-fail} & |fail| & \movesto & |Omega| \\
+  \rulename{info-choice-omega} & |Omega choice e| & \movesto & |Omega| \\
+  \rulename{info-choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |Omega| \\
+  \rulename{info-app-omega} & |apply1N Omega v| & \movesto & |Omega| \\
+  \rulename{info-app-hnf} & |apply1N hnf v| & \movesto & |Omega| \\
+  \rulename{info-one} & |one e| & \movesto & |Omega| \\
+  \rulename{info-all} & |all e| & \movesto & |Omega| \\
+\end{array}
+\end{array}
+$
+\caption{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}\label{fig:info-rewrite-rules}
+\end{figure}
+
+\begin{lemma}[$\rinfo$-Confluent] \label{lem:rinfo-c}
+$\rinfo$ is locally confluent and noetherian; therefore $\rinfo$ is confluent.
+\end{lemma}
+
+\begin{proof}
+There is only one critical pair, arising from rules \rulename{info-choice} and \rulename{info-assoc}; that pair is |Omega choice e| and |Omega|.
+That pair joins at |Omega| in one step, using rule \rulename{info-choice}. Therefore $\rinfo$ is locally confluent.
+
+Let the size of a term of $\vcOmega$ be the number of tokens it contains other than |Omega| and parentheses.
+Each of the rewrite rules in Figure~\ref{fig:info-rewrite-rules} strictly decreases the number of such tokens.
+Because any given term has a finite number $n$ of such tokens, and the number of tokens cannot be less than zero,
+for every term every rewriting sequence from that term can have no more than $n$ steps. So $\rinfo$ is bounded and therefore noetherian.
+
+Because $\rinfo$ is locally confluent and noetherian, it is confluent by Newman's lemma.
+\end{proof}
+
+Because $\rinfo$ is confluent and noetherian, it follows that $\rinfo$ defines unique normal forms for $\vcOmega$. Therefore we are justified in defining
+$\omegavc(e)$ to be the function that takes any term in $\vcOmega$ and returns the term that is its normal form.
+
+\begin{definition}
+The comparison $e \leqomegavc e'$ is defined to mean $\omegavc(e) \leqomega \omegavc(e')$.
+\end{definition}
+\guy{Need to prove that $\leqomegavc$ is monotonic with respect to $\leqomega$; this should be routine as per Skew paper \cite[Proposition 5.21]{Ariola2002}.}
+
+\begin{lemma}[\versecalc{} monotonic] \label{lem:vc-monotonic}
+Every rewrite rule in \versecalc{} is monotonic with respect to $\leqomegavc$.
+\end{lemma}
+
+\begin{proof}
+  Proof sketch. The left-hand side of every rule in $\rapp \cup \runi \cup \rcon \cup \rgc \cup \rspc$ is an expression that is mapped to |Omega| by the function $\omegavc$,
+  which necessarily compares $\leqomegavc$ to any result produced by $\omegavc$ when applied to the right-hand side.
+ \end{proof}
+
+\subsection{Preliminaries about Skew Confluence}
+
+
+\subsection{New Lemmas about Skew Confluence}
+
+\begin{lemma}
+If relation $\rr$ is monotonic in some quasi order $\preceq$ and confluent, then it is skew confluent using $\preceq$.
+\end{lemma}
+\begin{proof}
+  By the definition of confluence,
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYyJdLFswLDEsImIiXSxbMSwxLCJkIl0sWzAsMiwiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	a & c \\
+	b & d
+	\arrow["\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow["\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+\end{tikzcd}\]
+Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore 
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYyJdLFswLDEsImIiXSxbMSwxLCJkIl0sWzAsMiwiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & c \\
+	b & d
+	\arrow["\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow["\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+\end{tikzcd}\]
+\end{proof}
+
+
+
+\begin{lemma}\label{lem:skewrowinduction}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^{\leftarrow}$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^{\leftarrow}$.
+  Then
+
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsNiwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', dotted, two heads, from=1-1, to=1-2]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+\end{lemma}
+\begin{proof}
+  By induction on the size of the top edge of the diagram. At each step one of four diagrams will be used:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\text{(this follows because $\rr$ is confluent)}\]
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\text{(this follows because $\rr$ and $\rs$ commute)}\]
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\text{(easy: right edge|b| to |d| equals |b| to |a| to |c|, bottom edge is $\equiv$)}\]
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+    \qquad\text{(this one is tricky)}\]
+
+ \guy{More to come}
+\end{proof}
+
+
+\begin{lemma}\label{lem:skewrow}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  Then
+
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiXFxyclxcY3VwXFxycyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyXFxjdXBcXHJzIiwyXSxbMywyLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNyw2LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', dotted, two heads, from=1-1, to=1-2]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr\cup\rs"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+
+\end{lemma}
+\begin{proof}
+By case analysis on whether left edge uses $\rr$ or $\rs$; then project that left edge into $\rr^*$ or $\rs^*$ respectively and apply \cref{lem:skewrowinduction}.
+
+  
+ \guy{More to come}
+\end{proof}
+
+
+\begin{lemma}\label{lem:skewgrid}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  Then
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyXFxjdXBcXHJzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDAsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+ \end{lemma}
+\begin{proof}
+  By induction on the size of the left edge of the diagram. 
+
+  \begin{description}
+  \item[Base case] This diagram clearly holds by letting the bottom edge be the same as the top edge:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiXFxlcXVpdiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXGVxdWl2IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsMywiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMywyLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMCwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\equiv"{description}, draw=none, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\equiv"{description}, draw=none, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+
+    and it implies this diagram:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiKFxccnJcXGN1cFxccnMpXjAiLDJdLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyXFxjdXBcXHJzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDAsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["{(\rr\cup\rs)^0}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+    
+	\item[Inductive case] Assume the diagram holds for left edges of all sizes up to $n$. Then this diagram:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiKFxccnJcXGN1cFxccnMpXntuKzF9IiwyXSxbMCwxLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxyclxcY3VwXFxycyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["{(\rr\cup\rs)^{n+1}}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+
+    \noindent
+    follows from this diagram:
+
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiZSJdLFsxLDIsImYiXSxbMCwyLCIoXFxyclxcY3VwXFxycylebiIsMl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnJcXGN1cFxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMywyLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMCwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDQsIlxccnJcXGN1cFxccnMiLDJdLFszLDUsIlxccnJcXGN1cFxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw0LCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEyLDEzLCJcXGxhYmVsY3JlZntsZW06c2tld3Jvd30iLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d \\
+	e & f
+	\arrow["{(\rr\cup\rs)^n}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr\cup\rs"', from=2-1, to=3-1]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr\cup\rs", dotted, two heads, from=2-2, to=3-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=3-1, to=3-2]
+	\arrow["\preceq"', no body, two heads, from=3-2, to=3-1]
+	\arrow["{\labelcref{lem:skewrow}}"{description}, draw=none, from=0, to=1]
+\end{tikzcd}\]
+
+\noindent
+  where the top half is the inductive hypothesis and the bottom half follows from \cref{lem:skewrow}.
+\end{description}
+\end{proof}
+
+
+\begin{lemma}\label {lem:skew-union}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  If $\rr$ commutes with $\rs$, then $\rt=\rr\cup\rs$ is monotonic in$\preceq$ and skew confluent using $\preceq$ and $\rt_\preceq^\leftarrow$.
+\end{lemma}
+\begin{proof}
+
+\end{proof}
+
+
+
+\subsection{Proof that \versecalc{} Is Skew Confluent}
+
+
+Proof sketch:
+
+First prove that the modified $\runi$ is skew confluent. (In doing so we will define $\runi_{\leqomegavc}^{\leftarrow}$.)
+
+Then use existing proofs to demonstrate that $\rapp \cup \rcon \cup \rgc \cup \rspc$ is confluent.
+Because they are also monotonic, they are therefore skew confluent, and $(\rapp \cup \rcon \cup \rgc \cup \rspc) _{\leqomegavc}^{\leftarrow}$ is trivial.
+
+Prove that $\rapp \cup \rcon \cup \rgc \cup \rspc$ commutes with $\runi_{\leqomegavc}^{\leftarrow}$.
+
+Then apply \cref {lem:skew-union} to show that $\runi \cup (\rapp \cup \rcon \cup \rgc \cup \rspc)$ is skew confluent.
