@@ -430,17 +430,17 @@ $$
 \begin{array}{ll}
                          & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
-\movestoR{eqn-elim}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+\movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
 \movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| \\
-\movestoR{eqn-elim}     & |def y (2==y; y)| \\
-\movestoR{seq-assoc}      & |def y (2==y; y)| \\
+\movestoR{eqn-elim}      & |def y (2==y; y)| \\
 \movestoR{hnf-swap}      & |def y (y==2; y)| \\
 \movestoR{subst}         & |def y (y==2; 2)| \\
-\movestoR{eqn-elim}     & |2| \\
+\movestoR{eqn-elim}      & |2| \\
 \end{array}
 $$
 %
-Rules may be applied anywhere they match, again just like the lambda calculus. The question of confluence arises, as we discuss in \cref{sec:confluence}.
+Rules may be applied anywhere they match, again just like the lambda calculus.
+The question of confluence arises, as we discuss in \cref{sec:metatheory}.
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
 
@@ -562,7 +562,7 @@ Order is maintained and duplicates are not eliminated; we shall see why in \cref
 In short, an expression yields a \emph{sequence} of values, not a bag, and certainly not a set.
 
 The equations we saw in \cref{sec:unify} can fail, if the arguments
-are not equal, yielding no results.  Thus |3=3| succeeds, returns a single result, namely |tup ()|,
+are not equal, yielding no results.  Thus |3=3| succeeds,
 while |3=4| fails, returning no results.  In general, we use ``fail''
 and ``returns no results'' synonymously.
 
@@ -659,13 +659,13 @@ results at all.
 
 This approach to pattern matching is akin to \emph{narrowing}~\cite{hanus:survey}.
 Suppose |single = tup (1, emptytup)|, a singleton list whose only element is 1.
-Consider the call |def zs (applyN append ( zs, single) = single; zs)|.
+Consider the call |def zsl (applyN append ( zsl, single) = single; zsl)|.
 The call to |append| expands into a choice
 $$
-  |(zs = emptytup; single)| \quad |choice| \quad
-  |(def (x ^^ xr) (zs = tup (x,xr); tup(x, applyN append (xr, single))))|
+  |(zsl = emptytup; single)| \quad |choice| \quad
+  |(def (x ^^ xr) (zsl = tup (x,xr); tup(x, applyN append (xr, single))))|
 $$
-which amounts to exploring the possibility that |zs| is headed by |emptytup| or a pair---the
+which amounts to exploring the possibility that |zsl| is headed by |emptytup| or a pair---the
 essence of narrowing.  It should not take long to reassure yourself that the program
 evaluates to |emptytup|, effectively running |append| backwards in the classic logic-programming manner.
 
@@ -682,7 +682,7 @@ e_2 else e_3|.  But what is the equality operator in |(x=0)|?  One
 possibility, adopted by Curry, is this: there is one ``='' for
 equations (as in \cref{sec:unify}), and another, say ``=='', for
 testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
-different, more minimalist position, following Icon's lead \cite{icon}. \simon{Icon did this, correct?}\lennart{Yes}
+different, more minimalist position, following Icon's lead, see \cref{sec:icon}.
 In \versecalc{} \emph{there is just one equality operator}, written ``='' just as in
 \cref{sec:unify}. The expression |if (x=0) then e_2 else e_3| tries to unify |x| with |0|.  If that succeeds (yields one or more values)
 the |if| returns |e_2|; otherwise it returns |e_3|.  There are no data constructors |True| and |False|; instead
@@ -908,12 +908,12 @@ rather like a list comprehension in languages like Haskell or Python.
 The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
-So, for example, |for^(def x (x = 2 `choice` 3 `choice` 5)) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
+So, for example, |for^(x := 2 `choice` 3 `choice` 5) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
 % This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
 
 Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
-So, |for^(def x (x = 2 `choice` 3 `choice` 5; x > 2)) do (x+1)| reduces to |tup (4,6)|.
+So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
 So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
@@ -921,7 +921,7 @@ Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we ca
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the tuple to |emptytup| afterwards, using the |map| function defined in \cref{fig:list-functions}.
+apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
 |for^(e_1) do e_2| \; \equiv \; |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
@@ -994,7 +994,7 @@ Up to this point there has been no satisfying rewrite semantics for functional l
 Our main technical contribution is to fill this gap with a rewrite semantics for \versecalc{}, one that
 has the following properties:
 \begin{itemize}
-\item The semantics is expressed as a set of rewrite rules (\cref{fig:rules} and \ref{fig:normalization-rules}). These rules apply to the core language of \cref{fig:syntax}, after
+\item The semantics is expressed as a set of rewrite rules (\cref{fig:rules}). These rules apply to the core language of \cref{fig:syntax}, after
   all desugaring.
 \item Any rule can be applied, in either direction,
   anywhere in the program term (including under lambdas) to obtain an equivalent program.
@@ -2004,7 +2004,7 @@ FLC also uses the same construct for a different purpose, to
 bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
 In contrast, |def x e| seems more direct.
 
-\subsection{Comparison with Icon}
+\subsection{Comparison with Icon} \label{sec:icon}
 
 There are many obvious similarities between Verse and the Icon programming language
 \cite{griswold:icon-users-manual,griswold:icon-overview,griswold:generators-in-icon,griswold:icon-book-1983}:

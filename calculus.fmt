@@ -70,6 +70,7 @@
 %% xs etc stole syntax used in examples.
 %format xsl = " xs "
 %format ysl = " ys "
+%format zsl = " zs "
 
 %% Old version: | for BNF, [] for choice
 %format vbar = "\mathop{\mid}"
