@@ -22,7 +22,7 @@
 
 \newcommand{\rinfo}{\mathcal{I}}
 \newcommand{\vcOmega}{\mathcal{VC}_\mathit{\Omega}}
-\newcommand{\omegavc}{\omega_{\mathrm{VC}}}
+\newcommand{\omegavc}{\omega_{\scriptscriptstyle\mathrm{VC}}}
 \newcommand{\leqomega}{\mathrel{\leq_\omega}} 
 \newcommand{\leqomegavc}{\mathrel{\leq_{\omegavc}}} 
 
@@ -254,7 +254,7 @@ $
 \caption{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}\label{fig:info-rewrite-rules}
 \end{figure}
 
-\begin{lemma}\label{lem:critpairs}[\cite[Lemma 3.1]{Huet80}]
+\begin{lemma}\label{lem:critpairs}\cite[Lemma 3.1]{Huet80}
 The relation $\go{\rr}$ is locally confluent iff for every critical pair |(e_1, e_2)| of $\rr$, |e_1| and |e_2| can be \emph{joined}---that is, there exists |e_3| such that
  $|e_1| \go{\rr} |e_3|$ and  $|e_2| \go{\rr} |e_3|$.
 \end{lemma}
@@ -265,24 +265,24 @@ $\rinfo$ is locally confluent and Noetherian; therefore $\rinfo$ is confluent.
 \end{lemma}
 
 \begin{proof}
- Consider critical pairs 
-Rules \rulename{info-fail-l} and \rulename{info-fail-r} produce the critical pair |Omega| and |Omega|, which are already joined.
+  Consider all critical pairs of $\rinfo$:
+  \begin{itemize}
+\item  Rules \rulename{info-fail-l} and \rulename{info-fail-r} produce the critical pair |(Omega, Omega)|.
 
-Rules \rulename{info-fail-l} and \rulename{info-choice-omega} produce no critical pairs.
+\item  Rules \rulename{info-fail-l} and \rulename{info-choice-omega} produce no critical pairs.
 
-Rules \rulename{info-fail-l} and \rulename{info-choice-assoc} produce the critical pair |Omega choice e| and |Omega|,
-which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+\item  Rules \rulename{info-fail-l} and \rulename{info-choice-assoc} produce the critical pair |(Omega choice e, Omega)|.
 
-Rules \rulename{info-fail-r} and \rulename{info-choice-omega} produce the critical pair |Omega| and |Omega|, which are already joined.
+\item  Rules \rulename{info-fail-r} and \rulename{info-choice-omega} produce the critical pair |(Omega, Omega)|.
 
-Rules \rulename{info-fail-r} and \rulename{info-choice-assoc} produce the critical pair |Omega| and |Omega|, which are already joined,
-amd also produce the critical pair |Omega choice e| and |Omega|,
-which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+\item  Rules \rulename{info-fail-r} and \rulename{info-choice-assoc} produce the critical pairs |(Omega, Omega)| and |(Omega choice e, Omega)|.
 
-Rules \rulename{info-choice-omega} and \rulename{info-choice-assoc} produce the critical pair |Omega choice e| and |Omega|,
-which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+\item  Rules \rulename{info-choice-omega} and \rulename{info-choice-assoc} produce the critical pair |(Omega choice e, Omega)|.
 
-No other pairs of rules produce any critical pairs.
+\item  No other pairs of rules produce any critical pairs.
+\end{itemize}
+The critical pair |(Omega, Omega)| can be trivially joined at |Omega|.
+The critical pair |(Omega choice e, Omega)| can be joined at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
 
 All critical pairs can be joined; therefore by \cref{lem:critpairs} $\rinfo$ is locally confluent.
 
@@ -295,7 +295,7 @@ Because $\rinfo$ is locally confluent and Noetherian, it is confluent by Newman'
 \end{proof}
 
 Because $\rinfo$ is confluent and Noetherian, it follows that $\rinfo$ defines unique normal forms for $\vcOmega$. Therefore we are justified in defining
-$\omegavc(e)$ to be the function that takes any term in $\vcOmega$ and returns the term that is its normal form.
+$\omegavc(e)$ to be the function that takes any term in $\vcOmega$ and returns the term that is its normal form under $\rinfo$.
 
 \begin{definition}
 The comparison $e \leqomegavc e'$ is defined to mean $\omegavc(e) \leqomega \omegavc(e')$.
