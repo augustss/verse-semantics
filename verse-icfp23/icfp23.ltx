@@ -1159,9 +1159,9 @@ the two seqeunces differ in which equation for |x| is chosen for \rulename{subst
 in the first step. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are confluent.
-In the overall proof of confluence (\cref{sec:confluence}), it turns out to
+In the overall proof of confluence it turns out to
 be very helpful if the unification rules $\runi$
-are \emph{terminating}.  To achieve this \rulename{var-swap} fires on |y==x| only if
+are \emph{terminating} (see \cref{sec:design-confluence}).  To achieve this \rulename{var-swap} fires on |y==x| only if
 |x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.  Other rules, notably \rulename{exi-swap}, may change this binding order
 and thereby re-enable \rulename{var-swap},
@@ -1478,7 +1478,7 @@ so we leave evaluation strategy and compilation for future work.
 The rules we describe here should both be able to transform a program to its value,
 and also be confluent.
 To aid in the development of the rules we have used several mechanized tools to automate
-reduction, random test-case generation, and confluence checking
+reduction, random test-case generation, and confluence checking.
 Initially, we used PLT Redex, \cite{pltredex}, which is very easy to use,
 but not very efficient.
 For better efficiency we switched to a Haskell library for term
@@ -1530,10 +1530,13 @@ committing to a particular evaluation strategy.
 %
 But then it had better be the case that no matter how the
 rules are applied, one always obtains the same result!
+That is, our rules should be \emph{confluent}.  In this section we describe
+our proof of confluence.  Because the rule set is quite big (compared, say, to the
+pure lambda calculus), this proof turns out to be a substantial undertaking.
 
 \mypara{Reductions and Confluence}
 %
-A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+A \emph{reduction relation} \rr is a binary relation on a set of terms \univ.
 %
 We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
 for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
@@ -1541,34 +1544,33 @@ for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \
 We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
 $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
 %
-A reduction $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
+A reduction relation $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
 there exists an $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.
 %
 Confluence gives us the assurance that we will not get
 different results when choosing different rules, or get
 stuck with some rules and not with others.
 
-\mypara{Normal Forms}
+\mypara{Normal Forms and unicity}
 %
 A term $e$ is an $\rr$-\emph{Normal Form} if there does
 not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
-Confluence implies that ultimately, rewriting terminates
-with at most one unique normal form, regardless of the
-evaluation strategy \cite{Barendregt}.
+Confluence implies uniqueness of normal forms (unicity): if $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
+and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
+\cite{Barendregt}.
 
-\begin{lemma}[Unicity] \label{lem:nf}
-If $\rr$ is confluent then every term reduces to at most one normal form.
-\end{lemma}
+% \begin{lemma}[Unicity] \label{lem:nf}
+% If $\rr$ is confluent then every term reduces to at most one normal form.
+% \end{lemma}
 
 % \begin{definition}[Recursive Equations] \label{def:norec}
 
 
-\mypara{Recursion and Non-Confluence: The odd/even problem}
+\subsection{Recursion, and the notorious even/odd problem}  \label{sec:even-odd}
 %
-Our rules are not confluent in the presence
-of (mutually) recursive equations.
-%
-To see why, consider the term: \lennart{Our rules do not allow recursive tuples, so we might want to switch this example to lambda terms.}
+It is well known that adding {\bf letrec} to the lambda calculus
+makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
+In our context, consider the term:
 %
 $$
 \begin{array}{lcll}
@@ -1581,50 +1583,54 @@ $$
 $$
 %
 The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
-but cannot be joined by rewrite rules.
-%
-This is a well known problem, and the same phenomenon arises
-with inlining mutually recursive $\lambda$-terms.
-%
-Examples like this show that \emph{syntactic} confluence is
-too strong: what we really need is that our rewrites rules
-are \emph{semantics} preserving --- but of course that requires
-an independent notion of semantics (see \cref{sec:den-sem} for an initial attempt),
-or alternatively, to seek a different form of confluence, such
-as \emph{skew confluence}~\cite{ariola:skew-confluence}.
+but cannot be joined by our rewrite rules. Nor is this easily fixed by adding new
+rules, as we did when we added \rulename{var-swap} (\cref{sec:unification-rules})
+and \rulename{seq-swap} (\cref{sec:normalization}).  Why not? Because the terms
+are equivalent only under some kind of graph isomorphism.
 
+We tackle this problem in two different ways.  First, we can simply prohibit recusion, and prove
+confluence under that restriction (\cref{sec:confluence-sketch}).
+This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
+In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
+recursion emerges from unifying terms.  For example, is this recursive: |def (x y) (x=tup (1,y); applyN f (x,y))|?
+It might be if |f = (lam (tup (v, w)) (v=w))|!
+For \emph{tuples} we have a simple solution: rule \rulename{u-occurs} make the entire
+term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
+leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
+The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
+of |const|, the occurrence of |f| disappears.
 
-\mypara{Non-Recursive Terms}
+Thus motivated, we restrict our attention to terms that have \emph{\norecursion}:
+\begin{itemize}
+\item A term $e$ has \emph{\norecursion} if it is not transitively recursive.
+\item A term $e$ is \emph{transitively recursive} if $\rsteps{}{e}{e'}$ where $e'$ is recursive.
+\item A term $e$ is \emph{recursive} if it contains a recursive equation.
+\item A \emph{recursive equation} is an equation of the form
+|x == V^[lam y e]|, where $x \in \freevars{e}$,
+which equates a variable |x| with a value that contains a lambda in which |x| is free.
+\end{itemize}
 %
-For now, we will content ourselves by restricting attention
-to terms that have \norecursion, \ie, do not (transitively)
-contain recursive equations.
-%
-A \emph{recursive equation} is a term of the form
-%
-$$
-|x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
-% |x == V^[lam y E^[x]]| % \quad \text{where}\ x \in \freevars{e}
-$$
-%
-where the LHS is a variable and the RHS is a \emph{value}
-that is or contains a $\lambda$ in which $|x|$ occurs free.
-%
-A term $e$ is \emph{recursive} if it contains a recursive equation.
-%
-A term $e$ is \emph{transitively recursive} if $\rsteps{}{e}{e'}$ where $e'$ is recursive.
-%
-A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
-% \end{definition}
-%
-The \norecursion condition is not as severe as might first appear: it only prohibits
-recursion through equations. We still allow arbitrary $\lambda$-terms and so one can
-still write recursive (and non-terminating) programs using one's favorite fixpoint
-combinator.
+\noindent
+The no-recursion condition is not as severe as might first appear: it only prohibits
+recursion through \emph{equations}.
+But no expressiveness is lost thereby: in our un-typed setting, one can still write recursive (and non-terminating) programs
+using one's favorite fixpoint combinator, such as Y or Z.
 
-\subsection{Confluence}
+This approach is not entirely satisfying: it is is hard to prove that a term
+has no recursion, and it is clumsy to write recursive programs using only Y-combinators.
+Our second approach is to adopt the idea of \emph{skew confluence} from
+\cite{ariola:skew-confluence}, a clever technique that the authors developed
+specifically to handle the even/odd problem.  We sketch our skew confluence proof in \cref{sec:skew-confluence}.
+
+A third approach is simply to abandon confluence as a goal. Confluence is \emph{syntactic}, and hence
+much stronger than what we really need, which that each of our rules is
+\emph{semantics}-preserving.  But of course that requires
+an independent notion of semantics, a direction we pursue in \cref{sec:den-sem}.
+
+\subsection{Proof of confluence} \label{sec:confluence-sketch}
 
 Our main result is that \versecalc{}'s reduction rules are confluent for terms with \norecursion.
+We sketch the proof here, with full details in \cref{sec:confluence}.
 
 
 \begin{theorem}[Confluence] \label{thm:confluence}
@@ -1640,7 +1646,7 @@ is confluent for terms with \norecursion.
 \emph{Proof sketch.}  Our proof strategy is to
 %
 (1)~divide the rules into groups named $\runi$, $\rapp$,
-    \etc as in the figure,
+    \etc as in \cref{fig:rules},
 (2)~prove confluence for each separately, and then
 (3)~prove that their combination is confluent via commutativity.
 %
@@ -1678,22 +1684,22 @@ After this it will take multiple steps to join the two terms.
 
 Following a well-trodden path in proofs of confluence
 for the $\lambda$-calculus (e.g. \cite{Barendregt}),
-our proof of confluence for $\runi$ works in two steps.
+our proof of confluence for $\runi$ works in two stages.
 %
-First, the $\runi$ reductions are \emph{locally} confluent,
+First, we prove that the $\runi$ reductions are \emph{locally confluent},
 meaning if $e$ single-steps to $e_1$ and $e_2$ then $e_1$
 and $e_2$ can be joined at some $e'$ in \emph{multiple}
 $\runi$ steps.
 %
-Second, that the $\runi$ reductions are terminating (which also relies
-upon eliminating recursion in tuples via \rulename{u-occurs} and $\lambda$s
-via the \norecursion condition.)
+Second, we prove that the $\runi$ reductions are \emph{terminating}, which relies
+upon eliminating recursion in tuples via \rulename{u-occurs} and in lambdas
+via the \norecursion condition.
 %
 Newman's Lemma \cite{Barendregt} then implies the
 locally confluent, terminating $\runi$ relation is
 also confluent.
 
-\subsection{Design for confluence} \label{sec:design-confluence} \label{sec:even-odd}  \label{sec:unifying-lambda}
+\subsection{Design for confluence} \label{sec:design-confluence}  \label{sec:unifying-lambda}
 
 \versecalc{} is carefully designed to ensure confluence.
 
@@ -1703,13 +1709,12 @@ also confluent.
 % the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
 % application or unification.  These restrictions matter for at least three different reasons.
 
-\mypara{Ensuring Unification Terminates}
+\mypara{Ensuring that unification terminates.}
 %
 Our proof strategy for the confluence of $\runi$ requires that $\runi$ terminates.
 %
-Our free-variable side condition in \rulename{subst}, ensures this by ensuring that
-a substitution $|x == v|$ eliminates $x$ from further consideration.
-%
+The side condition $|x| \not\in \freevars{v}$ in \rulename{subst} avoids infinite
+substitutution.
 If instead we dropped that condition, the following sequence of \rulename{subst}
 reductions would not terminate
 $$
@@ -1719,11 +1724,10 @@ $$
 \; \rightarrow \; \ldots
 $$
 Here, each step makes one substitution for |x|.
-%
 An exactly analogous example can be made for a lambda value.
 
 
-\mypara{Unifying lambdas} In \versecalc{} an attempt to unify two
+\mypara{Unifying lambdas.} In \versecalc{} an attempt to unify two
 lambdas fails, even if the lambdas are semantically identical (rule
 \rulename{u-fail}). Why? Because semantic identity of functions is
 un-implementable.
@@ -1744,61 +1748,63 @@ lead to |fail|, and confluence is restored.
 \mypara{Unifying variables}
 %
 Note that while \rulename{u-lit} lets us eliminate equalities on the same literal $|k == k|$,
-there is no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$
-as that would lead to non-confluence.
+there is no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$.
+Perhaps surprisingly, adding that rule would lead to non-confluence.
 %
 To see why, suppose we had such a \rulename{u-var}, and consider the term |(def x (x==(lam y y); x==x; 0))|.
 %
 If first apply \rulename{u-var} to eliminate the equality $|x==x|$ then the remainder
 reduces to |0|.
 However, if we first \rulename{subst} the equality |x == (lam y y)|,
-we get |((lam y y) == (lam y y); 0)| which |fail|s.  Yikes!
+we get |((lam y y) == (lam y y); 0)| which |fail|s.
 %
 Thus, there is no \rulename{u-var}: such equalities can only be eliminated
 after the value of |x| is substituted in and checked to not be a $\lambda$.
 
-\mypara{Ordering variables} (\ranjit{redundant:delete?})
-%
-\rulename{var-swap} has a curious side condition: it only rewrites
-$|x == y|$ to $|y == x|$ if $y \prec x$.
-%
-To understand why the \rulename{var-swap} is necessary and why it
-has this side condition, consider the expression $|lam a (lam b (def x (x == a; x == b; x)))|$.
-%
-Depending on which equality we \rulename{subst} first, we get either
-%
-$$\begin{array}{lcll}
-|lam a (lam b (def x (x == a; x == b; x)))|
-  & \movesto
-  & |lam a (lam b (def x (x == a; a == b; a)))|
-  &  \text {(1: substitute |x == a| first)} \\[0.5mm]
-  & \movesto
-  & |lam a (lam b (def x (b == a; x == b; b)))|
-  &  \text {(2: substitute |x == b| first)} \\[0.5mm]
-\end{array}$$
-%
-Now we are in a pickle: the two expressions are not syntactically the same!
-%
-Fortunately, \rulename{var-swap} rule lets us join the two expressions as follows.
-%
-Here, $b \prec a$ as the binder for $|b|$ is ``closer'', so we can
-join the two terms as
-%
-$$\text{(1)}\ |lam a (lam b (def x (x == a; a == b; a)))| \ \movesto\
-    |lam a (lam b (def x (x == a; b == a; a)))|
-    \ \movesfrom \ |lam a (lam b (def x (b == a; x == a; a)))|\ \text{(2)}$$
-%
-where from (1) we \rulename{var-swap} $|a == b| \movesto |b == a|$,
-and from (2) we \rulename{subst} $|b == a|$ and reorder the equations
-with \rulename{seq-swap}.
-%
-Thus, \rulename{var-swap} lets us pick a ``canonical representative''
-for all the variables that are equal to each other (here, we pick $|a|$
-to represent $|a|$, $|b|$ and $|x|$).
-%
-Furthermore, the ordering (based on binding-depth) ensures that the
-\rulename{var-swap} cannot apply forever, \ie\ that unification
-terminates.
+\mypara{Ordering variables}. As we discussed in \cref{sec:unification-rules},
+rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
+to put the equation in a canonical orientation, and thus avoid non-termination of $\runi$.
+% %
+% \rulename{var-swap} has a curious side condition: it only rewrites
+% $|x == y|$ to $|y == x|$ if $y \prec x$.
+% %
+% To understand why the \rulename{var-swap} is necessary and why it
+% has this side condition, consider the expression $|lam a (lam b (def x (x == a; x == b; x)))|$.
+% %
+% Depending on which equality we \rulename{subst} first, we get either
+% %
+% $$\begin{array}{lcll}
+% |lam a (lam b (def x (x == a; x == b; x)))|
+%   & \movesto
+%   & |lam a (lam b (def x (x == a; a == b; a)))|
+%   &  \text {(1: substitute |x == a| first)} \\[0.5mm]
+%   & \movesto
+%   & |lam a (lam b (def x (b == a; x == b; b)))|
+%   &  \text {(2: substitute |x == b| first)} \\[0.5mm]
+% \end{array}$$
+% %
+% Now we are in a pickle: the two expressions are not syntactically the same!
+% %
+% Fortunately, \rulename{var-swap} rule lets us join the two expressions as follows.
+% %
+% Here, $b \prec a$ as the binder for $|b|$ is ``closer'', so we can
+% join the two terms as
+% %
+% $$\text{(1)}\ |lam a (lam b (def x (x == a; a == b; a)))| \ \movesto\
+%     |lam a (lam b (def x (x == a; b == a; a)))|
+%     \ \movesfrom \ |lam a (lam b (def x (b == a; x == a; a)))|\ \text{(2)}$$
+% %
+% where from (1) we \rulename{var-swap} $|a == b| \movesto |b == a|$,
+% and from (2) we \rulename{subst} $|b == a|$ and reorder the equations
+% with \rulename{seq-swap}.
+% %
+% Thus, \rulename{var-swap} lets us pick a ``canonical representative''
+% for all the variables that are equal to each other (here, we pick $|a|$
+% to represent $|a|$, $|b|$ and $|x|$).
+% %
+% Furthermore, the ordering (based on binding-depth) ensures that the
+% \rulename{var-swap} cannot apply forever, \ie\ that unification
+% terminates.
 
 \section{\versecalc{} in context: reflections and related work} \label{sec:related}
 
@@ -1860,17 +1866,16 @@ or what is ``inside'' and ``outside'' the set function, something that appears a
 consequence of \versecalc{}'s single rule \rulename{choose}.
 
 Second, even under the reification of |allKW|,
-\versecalc{} is \emph{deterministic}.  Choice is not
-non-deterministic: \versecalc{} takes pains to maintain order, so that
+\versecalc{} is \emph{deterministic}.
+\versecalc{} takes pains to maintain order, so that
 when reifying choice into a tuple, the order of elements in that
 tuple is completely determined.
-This determinism has a price: as we saw in \cref{sec:mixing}
-and \cref{sec:choice-rules}, we have to take care to maintain the
-left-to-right order of choices.
+This determinism has a price: we have to take care to maintain the
+left-to-right order of choices (see \cref{sec:mixing} and \cref{sec:choice-rules}, for example).
 However, maintaining that order has other payoffs. For example, it is relatively easy to add
 effects other than choice, including mutable variables and input/output, to \versecalc{}.
-%% To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
-%% for mutable variables.
+To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
+for mutable variables.
 
 Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
 depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour,
@@ -2018,8 +2023,8 @@ There are many obvious similarities between Verse and the Icon programming langu
 \item Most ``scalar'' operations (such as addition and comparisons) run through
   all possible combinations of values of their operand expressions,
   using a specific left-to-right evaluation order and automatic chronological backtracking.
-\item Some operations, such as comparisons, can fail as part of their defined semantics.
 \item Success and failure are used in place of boolean values for control-structure purposes.
+  Some operations, especially comparisons, can fail as part of their defined semantics.
   The expression ``|if e_1 then e_2 else e_3|'' checks to see whether |e_1| succeeds;
   it then produces the values of |e_2| (if |e_1| succeeded) \emph{or} produces the values of |e_3| (if |e_1| failed).
   If |e_1| succeeds and then |e_2| fails, backtracking does \emph{not} attempt to examine further values from |e_1|.
