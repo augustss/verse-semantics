@@ -8,7 +8,7 @@
 \section{Confluence of \calcname: Proof} \label{sec:confluence}
 
 \begin{definition}[Reductions] \label{def:reductions}
-Let $\rr$ be the reduction relation defined as $\runi \cup \rcon \cup \rapp \cup \rgc$,
+Let $\rr$ be the reduction relation defined as $\runi \cup \rcon \cup \rapp \cup \rgc \cup \rspc$,
 each of which is defined as the reduction relation induced by the following
 rules in \cref{fig:rules}
 %
@@ -47,10 +47,10 @@ rules in \cref{fig:rules}
 	\rulename{exi-elim};
 	\rulename{eqn-elim};
 
-\item $\rspc$ (Speculation)
-	\rulename{one-*},
-	\rulename{all-*},
-	\rulename{choose-*}.
+\item $\rspc$ (Choice)
+	\rulename{one-fail, one-value, one-choice},
+	\rulename{all-fail, all-value, all-choice},
+	\rulename{choose-l, choose-r}.
 \end{itemize}
 %
 \end{definition}
@@ -64,7 +64,7 @@ Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \re
 Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\
 Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
 Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
-Speculation 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
+Choice 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
 \bottomrule
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
@@ -101,7 +101,7 @@ If $e$ has \norecursion and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ th
 
 \begin{proof}
 %
-First, we partition $\rr$ into the relations $\runi$, $\rcon$, $\rapp$, $\rgc$ and $\rspc$.
+First, we partition $\rr$ into the relations $\runi \cup \rcon$, $\rapp$, $\rgc$ and $\rspc$.
 %
 Next, we show that each of these relations is confluent and pairwise
 commutative (\cref{fig:confluence-summary}).
@@ -430,7 +430,7 @@ on the reduction rule used in the step.
 \end{description}
 \end{proof}
 
-\subsubsection{Speculation}
+\subsubsection{Choice}
 
 \begin{lemma}[Under-$\rspc$] \label{lem:under-s}
 	If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
@@ -1073,6 +1073,9 @@ By induction on $k$.
 \end{lemma}
 
 \begin{proof}
+%
+\ranjit{What about any term}?
+%
 We prove that for any term $c \equiv \overline{u = v}; ee$ that it is only possible to take
 finitely many $\runib{0}$ steps from $c$. Let $\text{All}$ be the set $\freevars{u,v,ee}$.
 %
@@ -1856,7 +1859,7 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 %
 \end{proof}
 
-\subsection{Speculation} % --------------------------------------------------------------------------
+\subsection{Choice} % --------------------------------------------------------------------------
 
 \begin{lemma} \label{lem:s-c}
 	$\rspc$ is confluent.
