@@ -16,6 +16,9 @@
 %format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
 %format applyNP (a) (b) = a "\," b
 %format Omega = "\mathit{\Omega}"
+%format ctrdots = "\cdots"
+%format lowdots = "\ldots"
+%format commadots = "\;\ldots"
 
 \newcommand{\rinfo}{\mathcal{I}}
 \newcommand{\vcOmega}{\mathcal{VC}_\mathit{\Omega}}
@@ -43,11 +46,23 @@ $
 \end{array}
 $
 \end{quote}
-to
+to the two rules\footnote{This design allows equations to be recursive through lambda expressions but not through tuples only;
+  thus equations such as |f = lam y (tup (y, f))| and |x = (tup (1,  lam y (tup (y, x))))| can be processed by rule \rulename{u-occurs-wrap},
+  but the equation |x = (tup (1, x))| can be processed only by rule \rulename{u-occurs-fail}.
+  An alternate design using the single rule
+  \begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs-wrap} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$} \\
+\end{array}
+$
+\end{quote}
+plus rule \rulename{u-unwrap} could be used instead to support recursion through tuples only as well as through lambda expressions.}
 \begin{quote}
 $
 \begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
-  \rulename{u-occurs} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$} \\
+  \rulename{u-occurs-fail} & |x=hnf| & \movesto & |fail| & \text{if $|x| \in \freevarsoutsidelambdas{|hnf|}$} \\
+  \rulename{u-occurs-wrap} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$ and $|x| \not\in \freevarsoutsidelambdas{|hnf|}$} \\
 \end{array}
 $
 \end{quote}
@@ -64,6 +79,72 @@ As we will see, rule \rulename{u-unwrap} is confluent but not Noetherian.
 The resulting grammar is not confluent. \guy{explain even-odd-problem}
 Therefore we will modify the proof of confluence for $\runi$ to become a proof of \emph{skew confluence} \cite{Ariola2002},
 and then go on to prove that \versecalc{} itself, with this modification, is skew confluent.
+
+
+\subsection{Free Variables}
+
+
+We use the conventional notation $\freevars{|e|}$ to denote the set of variables that occur free
+in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e|, and |mu x hnf|.
+Figure~\ref{fig:fvs} contains a formal definition of this function for \versecalc{}.
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  \freevars{|x|} & = & \{ |x| \} \\
+  \freevars{|k|} & = & \{\,\} \\
+  \freevars{|op|} & = & \{\,\} \\
+  \freevars{|tup (v_1, commadots, v_n)|} & = & \freevars{|v_1|} \cup \cdots \cup \freevars{|v_n|} \\
+  \freevars{|lam x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|mu x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|eu; e|} & = & \freevars{|eu|} \cup \freevars{|e|} \\
+  \freevars{|v = e|} & = & \freevars{|v|} \cup \freevars{|e|} \\
+  \freevars{|def x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|fail|} & = & \{\,\}  \\
+  \freevars{|e_1 choice e_2|} & = & \freevars{|e_1|} \cup \freevars{|e_2|} \\
+  \freevars{|v_1 v_2|} & = & \freevars{|v_1|} \cup \freevars{|v_2|} \\
+  \freevars{|one e|} & = & \freevars{|e|} \\
+  \freevars{|all e|} & = & \freevars{|e|} \\
+\end{array}
+$
+\caption{Definition of the free-variables function $\freevars{\cdot}$}\label{fig:fvs}
+\end{figure}
+
+We use the variation $\freevarsoutsidelambdas{|e|}$ to denote the set of variables that occur free
+in the expression |e| in at least one position that is not within the body of a lambda expression.
+As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, y, z))))|} = \{ f, g \}$ because:
+\begin{itemize}
+\item |x| is bound by |defKW|, so it is not free. 
+\item |f| is free in a position not within the body of a lambda expression.
+\item |g| is free in at least one position not within the body of a lambda expression (it also happens to be free in a second position that is within the body of a lambda expression).
+\item |y| is bound by |lambda|, so it is not free. 
+\item |z| is free, but appears only in a position that is within the body of a lambda expression.
+\end{itemize}
+Figure~\ref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
+only in its handling of lambda expressions.
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  \freevarsoutsidelambdas{|x|} & = & \{ |x| \} \\
+  \freevarsoutsidelambdas{|k|} & = & \{\,\} \\
+  \freevarsoutsidelambdas{|op|} & = & \{\,\} \\
+  \freevarsoutsidelambdas{|tup (v_1, commadots, v_n)|} & = & \freevarsoutsidelambdas{|v_1|} \cup \cdots \cup \freevarsoutsidelambdas{|v_n|} \\
+  \freevarsoutsidelambdas{|lam x e|} & = & \{\,\} \\
+  \freevarsoutsidelambdas{|mu x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+  \freevarsoutsidelambdas{|eu; e|} & = & \freevarsoutsidelambdas{|eu|} \cup \freevarsoutsidelambdas{|e|} \\
+  \freevarsoutsidelambdas{|v = e|} & = & \freevarsoutsidelambdas{|v|} \cup \freevarsoutsidelambdas{|e|} \\
+  \freevarsoutsidelambdas{|def x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+  \freevarsoutsidelambdas{|fail|} & = & \{\,\}  \\
+  \freevarsoutsidelambdas{|e_1 choice e_2|} & = & \freevarsoutsidelambdas{|e_1|} \cup \freevarsoutsidelambdas{|e_2|} \\
+  \freevarsoutsidelambdas{|v_1 v_2|} & = & \freevarsoutsidelambdas{|v_1|} \cup \freevarsoutsidelambdas{|v_2|} \\
+  \freevarsoutsidelambdas{|one e|} & = & \freevarsoutsidelambdas{|e|} \\
+  \freevarsoutsidelambdas{|all e|} & = & \freevarsoutsidelambdas{|e|} \\
+\end{array}
+$
+\caption{Definition of the free-variables-outside-lambdas function $\freevarsoutsidelambdas{\cdot}$}\label{fig:fvsol}
+\end{figure}
+
 
 
 \subsection{Substitution}
@@ -159,7 +240,8 @@ These may be compared to similar rules for the $\lambda\circ$ calculus \cite[Def
   \rulename{info-fix} & |mu x v| & \movesto & |Omega| \\
   \rulename{info-seq} & |eu; e| & \movesto & |Omega| \\
   \rulename{info-exi} & |def x e| & \movesto & |Omega| \\
-  \rulename{info-fail} & |fail| & \movesto & |Omega| \\
+  \rulename{info-fail-l} & |fail choice e| & \movesto & |Omega| \\
+  \rulename{info-fail-r} & |e choice fail| & \movesto & |Omega| \\
   \rulename{info-choice-omega} & |Omega choice e| & \movesto & |Omega| \\
   \rulename{info-choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |Omega| \\
   \rulename{info-app-omega} & |apply1N Omega v| & \movesto & |Omega| \\
@@ -172,18 +254,42 @@ $
 \caption{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}\label{fig:info-rewrite-rules}
 \end{figure}
 
+\begin{lemma}\label{lem:critpairs}[\cite[Lemma 3.1]{Huet80}]
+The relation $\go{\rr}$ is locally confluent iff for every critical pair |(e_1, e_2)| of $\rr$, |e_1| and |e_2| can be \emph{joined}---that is, there exists |e_3| such that
+ $|e_1| \go{\rr} |e_3|$ and  $|e_2| \go{\rr} |e_3|$.
+\end{lemma}
+
+
 \begin{lemma}[$\rinfo$-Confluent] \label{lem:rinfo-c}
 $\rinfo$ is locally confluent and noetherian; therefore $\rinfo$ is confluent.
 \end{lemma}
 
 \begin{proof}
-There is only one critical pair, arising from rules \rulename{info-choice} and \rulename{info-assoc}; that pair is |Omega choice e| and |Omega|.
-That pair joins at |Omega| in one step, using rule \rulename{info-choice}. Therefore $\rinfo$ is locally confluent.
+ Consider critical pairs 
+Rules \rulename{info-fail-l} and \rulename{info-fail-r} produce the critical pair |Omega| and |Omega|, which are already joined.
 
-Let the size of a term of $\vcOmega$ be the number of tokens it contains other than |Omega| and parentheses.
+Rules \rulename{info-fail-l} and \rulename{info-choice-omega} produce no critical pairs.
+
+Rules \rulename{info-fail-l} and \rulename{info-choice-assoc} produce the critical pair |Omega choice e| and |Omega|,
+which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+
+Rules \rulename{info-fail-r} and \rulename{info-choice-omega} produce the critical pair |Omega| and |Omega|, which are already joined.
+
+Rules \rulename{info-fail-r} and \rulename{info-choice-assoc} produce the critical pair |Omega| and |Omega|, which are already joined,
+amd also produce the critical pair |Omega choice e| and |Omega|,
+which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+
+Rules \rulename{info-choice-omega} and \rulename{info-choice-assoc} produce the critical pair |Omega choice e| and |Omega|,
+which join at |Omega| in one step by using rule \rulename{info-choice-omega} on |Omega choice e|.
+
+No other pairs of rules produce any critical pairs.
+
+All critical pairs can be joined; therefore by \cref{lem:critpairs} $\rinfo$ is locally confluent.
+
+Let the size of a term of $\vcOmega$ be the number of tokens it contains other than parentheses.
 Each of the rewrite rules in Figure~\ref{fig:info-rewrite-rules} strictly decreases the number of such tokens.
 Because any given term has a finite number $n$ of such tokens, and the number of tokens cannot be less than zero,
-for every term every rewriting sequence from that term can have no more than $n$ steps. So $\rinfo$ is bounded and therefore noetherian.
+for every term every rewriting sequence from that term can have no more than $n$ steps. So $\rinfo$ is bounded and therefore Noetherian.
 
 Because $\rinfo$ is locally confluent and noetherian, it is confluent by Newman's lemma.
 \end{proof}
