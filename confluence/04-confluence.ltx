@@ -47,7 +47,7 @@ rules in \cref{fig:rules}
 	\rulename{exi-elim};
 	\rulename{eqn-elim};
 
-\item $\rspc$ (Speculation)
+\item $\rspc$ (Choice)
 	\rulename{one-*},
 	\rulename{all-*},
 	\rulename{choose-*}.
@@ -64,7 +64,7 @@ Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \re
 Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\
 Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
 Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
-Speculation 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
+Choice 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
 \bottomrule
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
@@ -430,7 +430,7 @@ on the reduction rule used in the step.
 \end{description}
 \end{proof}
 
-\subsubsection{Speculation}
+\subsubsection{Choice}
 
 \begin{lemma}[Under-$\rspc$] \label{lem:under-s}
 	If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
@@ -1856,7 +1856,7 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 %
 \end{proof}
 
-\subsection{Speculation} % --------------------------------------------------------------------------
+\subsection{Choice} % --------------------------------------------------------------------------
 
 \begin{lemma} \label{lem:s-c}
 	$\rspc$ is confluent.
