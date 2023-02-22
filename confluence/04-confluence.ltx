@@ -856,7 +856,7 @@ $\runi$ is confluent.
 \end{lemma}
 
 \begin{proof}
-We prove that $\runi$ is confluent via the following strategy inspired by the \emph{labeled reductions} \cite{Levy76}.
+We prove that $\runi$ is confluent via the following strategy inspired by \emph{labeled reductions} \cite{Levy76}.
 %
 Let $\runik$ which is a subset of $\runi$ that only applies reductions to
 terms that are \emph{under less than} $k$ $\lambda$s.
@@ -881,9 +881,9 @@ $$
 % \text{E-Eqs}  & ee  & ::= & |v == d; ee| \vb d \\
 % \text{Delim}  & d   & ::= & |def x c| \vb |apply1N v_1 v_2| \vb |c_1 choice c_2| \vb |one c| \vb |all c|  \\[0.05in]
 %
-\text{Block}  & |b|   & ::= & \lblk{\ell}{|v == r; b|} \vb t \\
+\text{Block}  & |b|   & ::= & \lblk{\ell}{|v == r; b|} \vb \lblk{\ell}{b; b} \vb t \\
 \text{RHS}    & |r|   & ::= & |b| \vb |t| \\
-\text{Tail}   & |t|   & ::= & |v| \vb |apply1N v_1 v_2| \vb |def x e| \vb |e_1 choice e_2| \vb |one e| \vb |all e|  \\[0.05in]
+\text{Tail}   & |t|   & ::= & |v| \vb |apply1N v_1 v_2| \vb |def x e| \vb |e_1 choice e_2| \vb |one e| \vb |all e| \vb |fail|  \\[0.05in]
 %
 %% \text{Substs} & \sigma & ::= & [ |x_1| \mapsto |v_1|, \ldots, |x_n| \mapsto |v_n|] \\
 %% \text{Value-Ctx} & V^k   & ::= & \hole^k \vb \langle |v_1| \ldots V^{k+1} \dots |v_n| \rangle \vb \lambda x. C^{k+1} \\
@@ -1162,6 +1162,7 @@ Let us split cases on the rule used for $\rdx{1}$.
 \end{description}
 \end{proof}
 
+
 \begin{lemma}[\rulename{var-swap} under] \label{lem:swap-under}
 %
 If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
@@ -1175,9 +1176,9 @@ then there exists $\rdx{\runi}''$ such that
 	{\rdx{\runi} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
 	{\rdx{\runi}'} && {\rdx{\runi}''}
 	\arrow["\runi"', from=1-1, to=2-1]
-	\arrow["{\rulename{swap}}", from=1-1, to=1-3]
+	\arrow["{\rulename{var-swap}}", from=1-1, to=1-3]
 	\arrow["\runi", dotted, from=1-3, to=2-3]
-	\arrow["{\rulename{swap}}"', dotted, two heads, from=2-1, to=2-3]
+	\arrow["{\rulename{var-swap}}"', dotted, two heads, from=2-1, to=2-3]
 \end{tikzcd}\]
 \end{lemma}
 
@@ -1185,21 +1186,46 @@ then there exists $\rdx{\runi}''$ such that
 Split cases on the rule used in $\runi$.
 \begin{description}
 \item[Case \rulename{u-lit} or \rulename{var-swap}]:
-	impossible as no \rulename{subst} redex under $|k_1 == k_2|$ or $|x == y|$.
+	impossible as no \rulename{var-swap} redex under $|k_1 == k_2|$ or $|x == y|$.
 \item[Case \rulename{u-tup}]:
 	Here, $\rdx{\runi} \equiv |tup (u_1,dots,u_n) == tup (v_1,dots,v_n)|$ and wlog
-	the \rulename{subst} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
+	the \rulename{var-swap} redex is $\rstep{u_1}{u_1'}$ so join at $|u_1' == v_1; dots; u_n == v_n|$.
 \item[Case \rulename{u-fail}]:
 	Here, $\rdx{\runi} \equiv \rstep{}{\hnf_i}{\hnf_i'}$ so join at $|fail|$
 \item[Case \rulename{u-occurs}]:
-	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{subst} redex is under $|V^[x]|$, \ie
-	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{subst}
+	Here, $\rdx{\runi} \equiv |x == V^[x]|$ and the \rulename{var-swap} redex is under $|V^[x]|$, \ie
+	$\rstep{\rulename{subst}}{V^[x]}{V^[x]'}$ as the free variables are preserved by \rulename{var-swap}
 	hence we can join at $|fail|$.
 \item[Case \rulename{hnf-swap}]:
-	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{subst} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
+	Here, $\rdx{\runi} \equiv \hnf = x$ and the \rulename{var-swap} redex is under $\hnf$ \ie $\rstep{\rulename{subst}}{\hnf}{\hnf'}$,
 	hence join at $x = \hnf'$.
 \item[Case \rulename{subst}]: via \cref{lem:subst-swap-c}.
 \item[Case \rulename{choose}]: via \cref{lem:under-choose}.
+\item[Case \rulename{seq-assoc}]:
+    Here, $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
+		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
+			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
+			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
+	\end{description}
+
+\item[Case \rulename{eqn-float}]:
+	$\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs.
+	\begin{description}
+		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rulename{var-swap}}{v}{v'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
+		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
+		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
+		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
+			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
+	\end{description}
 \end{description}
 \end{proof}
 
