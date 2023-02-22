@@ -34,7 +34,7 @@
   \textbf{Axiom extensions} \\
   \textit{Normalization change} \\
   \begin{array}{lrcll}
-    \rulename{norm-exi} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
+    \rulename{exi-float} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
     &&&& \text{if there is |storeKW| in |X| then |e| $\in$ |ce|} \\
   \end{array} \\
 
@@ -104,7 +104,7 @@ that when an expressions fails, none of its store operations will happen.
 When reducing |split e f g| in an |S| hole, rule \rulename{st-split-dup}, the store is duplicated.
 Any store operations inside the |splitKW| will happen in this local copy of the store.
 Note the two occurrences of |h| in the right hand side of \rulename{st-split-dup}.
-If the reduction of |e| results in |fail| then rule \rulename{fail} is used,
+If the reduction of |e| results in |fail| then rule \rulename{fail-elim} is used,
 and the store from the failing computation is simply thrown away.
 If the reduction of |e| results in a value (with or without more alternatives) then rule
 \rulename{st-split} is used.  This rule replaces the outer store with the inner store,

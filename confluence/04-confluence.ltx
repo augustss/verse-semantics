@@ -23,13 +23,13 @@ rules in \cref{fig:rules}
 	\rulename{var-swap},
 	 %%%
 	\rulename{choose},
-	\rulename{norm-seq},
-	\rulename{norm-seqr},
+	\rulename{seq-assoc},
+	\rulename{eqn-float},
 	\rulename{seq-swap};
 
 \item $\rcon$ (Normalization)
 	\rulename{exi-swap};
-	\rulename{norm-exi};
+	\rulename{exi-float};
 	\rulename{subst} (restricted to $|x == y|$),
 	\rulename{var-swap};
 
@@ -42,10 +42,10 @@ rules in \cref{fig:rules}
 	\rulename{app-tup-0};
 
 \item $\rgc$ (Garbage Collection)
-	\rulename{elim-fail},
-	\rulename{elim-val},
-	\rulename{elim-exi};
-	\rulename{elim-eqn};
+	\rulename{fail-elim},
+	\rulename{val-elim},
+	\rulename{exi-elim};
+	\rulename{eqn-elim};
 
 \item $\rspc$ (Speculation)
 	\rulename{one-*},
@@ -261,7 +261,7 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
 	\end{description}
 
-\item[Case \rulename{norm-seq}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eu$ or in $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
@@ -270,11 +270,11 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
 		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
-		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $(eu; e_1); e_2$ via \rulename{elim-fail}.
+		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $(eu; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
 	\end{description}
 
-\item[Case \rulename{norm-seqr}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eu$, $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
@@ -285,7 +285,7 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
 		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
-		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $v = (eu; e_1); e_2$ via \rulename{elim-fail}.
+		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $v = (eu; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
 	\end{description}
 
@@ -350,17 +350,17 @@ on the reduction rule used in the step.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
 	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
-	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
+	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def y e|}{e'}$; join at $|def x e'|$.
-	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
+	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def x (def y e)|}{|def y e'|}$; join at $|def y e'|$.
 	\end{description}
 
-\item[Case \rulename{norm-exi}]: \ie $\rcon: |X^[def x e]| \movesto |def x (X^[e])|$.
+\item[Case \rulename{exi-float}]: \ie $\rcon: |X^[def x e]| \movesto |def x (X^[e])|$.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
 	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
-	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{elim-exi} or \rulename{elim-eqn}
+	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def x e|}{e'}$; join at $|X^[e']|$.
 	\item[Case $\rdx{} \subset X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
 	\end{description}
@@ -390,22 +390,22 @@ Let $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ be the $\rgc$ redex and split cases
 on the reduction rule used in the step.
 %
 \begin{description}
-\item[Case \rulename{elim-val}]: \ie $\rgc : |v;e| \movesto |e|$.
+\item[Case \rulename{val-elim}]: \ie $\rgc : |v;e| \movesto |e|$.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
 	\item[Case $\rdx{} \subset |v|$]: Join at $|e|$.
 	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
-	\item[Case $\rdx{} \subset |v;e|$]: \ie $\rstep{\rulename{elim-fail}}{v;e}{|fail|}$ as $e \equiv X[|fail|]$; join at $|fail|$.
+	\item[Case $\rdx{} \subset |v;e|$]: \ie $\rstep{\rulename{fail-elim}}{v;e}{|fail|}$ as $e \equiv X[|fail|]$; join at $|fail|$.
 	\end{description}
 
-\item[Case \rulename{elim-fail}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
+\item[Case \rulename{fail-elim}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
 	Then $\rstep{\rr}{|X^[fail]|}{|X'^[fail]|}$ hence join at $|fail|$.
 
-\item[Case \rulename{elim-exi}]: \ie  $\rgc : |def (ys,x,zs) e| \movesto |def (ys,zs) e|$;
+\item[Case \rulename{exi-elim}]: \ie  $\rgc : |def (ys,x,zs) e| \movesto |def (ys,zs) e|$;
 	%
-	(We can generalize \rulename{elim-exi} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
-	before applying \rulename{elim-exi} as this does not change the order of the \emph{remaining} binders.)
+	(We can generalize \rulename{exi-elim} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
+	before applying \rulename{exi-elim} as this does not change the order of the \emph{remaining} binders.)
 	%
 	%
 	Split cases on position of $\rdx{}$
@@ -415,10 +415,10 @@ on the reduction rule used in the step.
 	\item[Case $\rdx{} \subset |def (ys,x,zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys,zs) e|$.
 	\end{description}
 
-\item[Case \rulename{elim-eqn}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
+\item[Case \rulename{eqn-elim}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
 	%
-	(We can generalize \rulename{elim-exi} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
-	before applying \rulename{elim-exil} as this does not change the order of the \emph{remaining} binders.)
+	(We can generalize \rulename{exi-elim} to first use a sequence of \rulename{exi-swap} to bring the $|x|$ binder to the end
+	before applying \rulename{eqn-elim} as this does not change the order of the \emph{remaining} binders.)
 	%
 	Split cases on position of $\rdx{}$
 	%
@@ -769,9 +769,9 @@ and
 		{X_{\overline{v}}[\mathit{hnf}_1 = \mathit{hnf}_2; \overline{u'=v'}]}
 		{X_{\overline{v}}[\mathtt{fail}]}
 	$$
-after which we can join at |fail| via \rulename{elim-fail}.
+after which we can join at |fail| via \rulename{fail-elim}.
 % RJ: commenting out diagram due to odd latex error (!)
-%	join at |fail| via \rulename{u-fail} and \rulename{elim-fail}.
+%	join at |fail| via \rulename{u-fail} and \rulename{fail-elim}.
 % https://q.uiver.app/?q=WzAsNSxbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVtcXG1hdGhpdHtobmZ9XzEgPSBcXG1hdGhpdHtobmZ9XzI7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDAsIlhfe1xcb3ZlcmxpbmV7dX19W1xcbWF0aHR0e2ZhaWx9XSJdLFswLDIsIlhfe1xcb3ZlcmxpbmV7dn19W1xcbWF0aGl0e2huZn1fMSA9IFxcbWF0aGl0e2huZn1fMjsgXFxvdmVybGluZXt1Jz12J31dIl0sWzIsMiwiWF97XFxvdmVybGluZXt2fX1bXFxtYXRodHR7ZmFpbH1dIl0sWzIsMSwiXFxtYXRodHR7ZmFpbH0iXSxbMCwxLCJcXHJ1bGVuYW1le3UtZmFpbH0iXSxbMiwzLCJcXHJ1bGVuYW1le3UtZmFpbH0iLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSw0LCIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 % \[\begin{tikzcd}
 % 	{X_{\overline{u}}[\mathit{hnf}_1 = \mathit{hnf}_2; \overline{u'=v'}]}; && {X_{\overline{u}}[\mathtt{fail}]} \\
@@ -1080,7 +1080,7 @@ The proof follows by lexicographic induction on the tuple
 %
 \begin{align*}
 	\sz{\text{choose}} & \doteq\ \mbox{number of locations to apply \rulename{choose}} \\
-	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{norm-seq}, \rulename{norm-seqr}} \\
+	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{seq-assoc}, \rulename{eqn-float}} \\
 	\sz{\text{free}}   & \doteq\ \mbox{number of variables in}\ \text{All} - \text{Used} \\ % TODO: "per" X-block ... ordered by X-block nesting
 	\mbox{where}\ \sz{\text{Used}}   & \doteq\ \mbox{variables that have been used as LHS of \rulename{subst}} \\ % TODO: "per" X-block ... ordered by X-block nesting
 	\sz{\text{size}}   & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
@@ -1094,7 +1094,7 @@ Each application of
 %
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
-\item \rulename{norm-seq*} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
+\item \rulename{seq-assoc*} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
 \item \rulename{subst} strictly reduces $\sz{\text{free}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
 \item \rulename{u-*} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
 \item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
@@ -1205,7 +1205,7 @@ Split cases on the rule used in $\runi$.
 \item[Case \rulename{subst}]: via \cref{lem:subst-subst-c}.
 \item[Case \rulename{choose}]: via \cref{lem:under-choose}.
 
-\item[Case \rulename{norm-seq}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
 		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
@@ -1220,7 +1220,7 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2')$.
 	\end{description}
 
-\item[Case \rulename{norm-seqr}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
 		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
@@ -1242,15 +1242,15 @@ Split cases on the rule used in $\runi$.
 
 \subsection{Normalization is Confluent} % ------------------------------------------------------------------------
 
-Recall that $\rcon \ \equiv\ \rulename{exi-swap} + \rulename{norm-exi} + \rulename{var-swap} + \rulename{subst-var}$
+Recall that $\rcon \ \equiv\ \rulename{exi-swap} + \rulename{exi-float} + \rulename{var-swap} + \rulename{subst-var}$
 where
 $$\rulename{subst-var} \quad  |X^[x==y;e]|  \movesto  |(subst X x y)^[x==y; subst e x y]|$$
-It will be convenient to \emph{factor out} \rulename{norm-exi} so let
+It will be convenient to \emph{factor out} \rulename{exi-float} so let
 %
 \begin{align*}
 \rss   &  \doteq\ \rulename{subst-var} + \rulename{var-swap} \\
 \rconm &  \doteq\ \rss + \rulename{exi-swap} \\
-\rcon  &  \doteq\ \rconm + \rulename{norm-exi} \\
+\rcon  &  \doteq\ \rconm + \rulename{exi-float} \\
 \end{align*}
 
 \begin{lemma}[$\rcon$-Confluent]\label{lem:n-c}
@@ -1260,12 +1260,12 @@ It will be convenient to \emph{factor out} \rulename{norm-exi} so let
 \begin{proof}
 The above result follows in two steps.
 %
-First we show that \rconm -- \ie normalization-without-\rulename{norm-exi} -- is confluent in \cref{lem:m-conf}.
+First we show that \rconm -- \ie normalization-without-\rulename{exi-float} -- is confluent in \cref{lem:m-conf}.
 %
-Second we show that \rconm \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:m-pp-float}.
+Second we show that \rconm \emph{strongly postpones} after \rulename{exi-float} \cref{lem:m-pp-float}.
 %
 Consequently, each $\rsteps{\rcon}{}{}$ can be rewritten as the composition of
-$\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\rconm}{}{}$ after which
+$\rsteps{\rulename{exi-float}}{}{}$ followed by $\rsteps{\rconm}{}{}$ after which
 the following diagram completes the proof.
 % https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJjb25tIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccmNvbm0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtci1jb219IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMiw5LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzUsMTIsIlxcY3JlZntsZW06bS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
@@ -1276,19 +1276,19 @@ the following diagram completes the proof.
 	\bullet &&&& \bullet \\
 	& \bullet && \bullet \\
 	&& \bullet
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-1]
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-5]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-1, to=3-2]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-1]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-5]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-5, to=3-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-2, to=4-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-4, to=4-3]
 	\arrow["\rconm"{description}, two heads, from=2-1, to=4-1]
 	\arrow["\rconm"{description}, two heads, from=2-5, to=4-5]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-1, to=5-1]
 	\arrow["\rconm"', dotted, two heads, from=5-1, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-2]
 	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-4]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-5, to=5-5]
 	\arrow["\rconm", dotted, two heads, from=5-5, to=6-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-2, to=7-3]
 	\arrow["\rconm"{description}, dotted, two heads, from=6-4, to=7-3]
@@ -1300,22 +1300,22 @@ the following diagram completes the proof.
 \end{proof}
 
 \begin{lemma} \label{lem:f-exi-swap-join}
-	If $\rsteps{\rulename{norm-exi}}{e}{e_1}$ and
-	   $\rsteps{\rulename{norm-exi}}{e}{e_2}$
+	If $\rsteps{\rulename{exi-float}}{e}{e_1}$ and
+	   $\rsteps{\rulename{exi-float}}{e}{e_2}$
 	then exists
-	   $\rsteps{\rulename{norm-exi}}{e_1}{e_1'}$,
-	   $\rsteps{\rulename{norm-exi}}{e_2}{e_2'}$,
+	   $\rsteps{\rulename{exi-float}}{e_1}{e_1'}$,
+	   $\rsteps{\rulename{exi-float}}{e_2}{e_2'}$,
 	such that
 	   $\join{\rulename{exi-swap}}{e_1'}{e_2'}$.
 \end{lemma}
 
 \begin{proof}
-On each side add the (missing) \rulename{norm-exi} steps on the other side,
+On each side add the (missing) \rulename{exi-float} steps on the other side,
 and then use (multiple) \rulename{exi-swap} to join.
 \end{proof}
 
 \begin{lemma} \label{lem:f-rr-com}
-\rulename{norm-exi} strongly commutes with \rr - \rulename{norm-exi}.
+\rulename{exi-float} strongly commutes with \rr - \rulename{exi-float}.
 \end{lemma}
 
 \begin{proof}
@@ -1323,8 +1323,8 @@ Split cases on each possible case of \rconm, the diamond is completed trivially 
 \end{proof}
 
 \begin{lemma} \label{lem:m-pp-float}
-\rconm strongly postpones after \rulename{norm-exi},
-so $\rcon^{*} \equiv \rulename{norm-exi}^{*} \cdot \rconm^{*}$.
+\rconm strongly postpones after \rulename{exi-float},
+so $\rcon^{*} \equiv \rulename{exi-float}^{*} \cdot \rconm^{*}$.
 \end{lemma}
 
 \begin{proof}
@@ -1485,7 +1485,7 @@ Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
 
 Recall that
 \begin{align*}
-\rcon & \doteq\ \rulename{norm-exi} + \rulename{exi-swap} + \rss \\
+\rcon & \doteq\ \rulename{exi-float} + \rulename{exi-swap} + \rss \\
 \intertext{and define}
 \runi' & \doteq \ \runi + \rulename{exi-swap} \\
 \end{align*}
@@ -1499,12 +1499,12 @@ Recall that
 We prove $\runi \cup \rcon$ is confluent by a generalization of the proof of \cref{lem:n-c}
 where we use the full $\runi$ relation (instead of the subset $\rss$).
 %
-First we show that \runi' -- \ie $\runi \cup \rcon$ without-\rulename{norm-exi} -- is confluent \cref{lem:ue-conf}.
+First we show that \runi' -- \ie $\runi \cup \rcon$ without-\rulename{exi-float} -- is confluent \cref{lem:ue-conf}.
 %
-Second we show that \runi' \emph{strongly postpones} after \rulename{norm-exi} \cref{lem:u-pp-float}.
+Second we show that \runi' \emph{strongly postpones} after \rulename{exi-float} \cref{lem:u-pp-float}.
 %
 Consequently, each $\rsteps{\runi \cup \rcon}{}{}$ can be rewritten as the composition of
-$\rsteps{\rulename{norm-exi}}{}{}$ followed by $\rsteps{\runi'}{}{}$ after which
+$\rsteps{\rulename{exi-float}}{}{}$ followed by $\rsteps{\runi'}{}{}$ after which
 the following diagram completes the proof.
 
 % https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJ1bmknIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccnVuaSciLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjcwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsOSwiXFxjcmVme2xlbTpmLXJyLWNvbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDEyLCJcXGNyZWZ7bGVtOnVlLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
@@ -1516,19 +1516,19 @@ the following diagram completes the proof.
 	\bullet &&&& \bullet \\
 	& \bullet && \bullet \\
 	&& \bullet
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-1]
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-3, to=2-5]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-1, to=3-2]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-5, to=3-4]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-1]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-5]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-1, to=3-2]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-5, to=3-4]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-3]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-3]
 	\arrow["{\runi'}"{description}, two heads, from=2-1, to=4-1]
 	\arrow["{\runi'}"{description}, two heads, from=2-5, to=4-5]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-1]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-1, to=5-1]
 	\arrow["{\runi'}"', dotted, two heads, from=5-1, to=6-2]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-2]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-4]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-5, to=5-5]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-5, to=5-5]
 	\arrow["{\runi'}", dotted, two heads, from=5-5, to=6-4]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=6-2, to=7-3]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=6-4, to=7-3]
@@ -1542,8 +1542,8 @@ the following diagram completes the proof.
 \begin{lemma} \label{lem:u-pp-float}
 Let $\runi' \doteq \runi + \rulename{exi-swap}$.
 %
-\runi' strongly postpones after \rulename{norm-exi},
-so $\runi'^{*} \equiv \rulename{norm-exi}^{*} \cdot \runi'^{*}$.
+\runi' strongly postpones after \rulename{exi-float},
+so $\runi'^{*} \equiv \rulename{exi-float}^{*} \cdot \runi'^{*}$.
 \end{lemma}
 
 \begin{proof}

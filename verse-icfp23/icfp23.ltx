@@ -430,13 +430,13 @@ $$
 \begin{array}{ll}
                          & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
-\movestoR{elim-exil}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+\movestoR{eqn-elim}     & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
 \movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| \\
-\movestoR{elim-exil}     & |def y (2==y; y)| \\
-\movestoR{norm-seq}      & |def y (2==y; y)| \\
+\movestoR{eqn-elim}     & |def y (2==y; y)| \\
+\movestoR{seq-assoc}      & |def y (2==y; y)| \\
 \movestoR{hnf-swap}      & |def y (y==2; y)| \\
 \movestoR{subst}         & |def y (y==2; 2)| \\
-\movestoR{elim-exil}     & |2| \\
+\movestoR{eqn-elim}     & |2| \\
 \end{array}
 $$
 %
@@ -1147,7 +1147,7 @@ $$
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
   \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
      \movesto & |def x (tup b == tup a ; x == tup b; tup b)| \\
-  \movestoR{u-tup, elim-eqn} & |a == b; tup a| &
+  \movestoR{u-tup, eqn-elim} & |a == b; tup a| &
      \movesto & |b == a; tup b| \\
   \movestoR{subst} & |a == b; tup b| &
       \movesto & |b == a; tup a| \\
@@ -1183,10 +1183,10 @@ $$
 \begin{array}{l@@{\;}l}
                                 & |def x (x = if (x=0; x>1) then 33 else 55; x)| \\
 \movestoR{subst}                & |def x (x = if (x=0; 0>1) then 33 else 55; x)| \\
-\movestoR{u-fail,fail}          & |def x (x = if fail then 33 else 55; x)|\\
+\movestoR{u-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
 \movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
 \movestoR{subst}                & |def x (x = 55; 55)| \\
-\movestoR{elim-exi}             & |55|
+\movestoR{exi-elim}             & |55|
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1222,28 +1222,28 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 \subsection{Garbage collection and normalization: rules $\rgc$ and $\rcon$} \label{sec:gc} \label{sec:normalization}
 
 % Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
-% \rulename{norm-seqr} gives us |(y==x+1; x==3; y)|; to make further progress we must
-% move the |x==3| to the left, using \rulename{norm-seq-swap2}, giving |(x==3; y==x+1; y)|.
+% \rulename{eqn-float} gives us |(y==x+1; x==3; y)|; to make further progress we must
+% move the |x==3| to the left, using \rulename{seq-assoc-swap2}, giving |(x==3; y==x+1; y)|.
 % Now we can substitute for |x|, and then for |y|.
 
 Four \emph{elimination (or garbage-collection)} rules $\rgc$ allow dead code to be dropped (\cref{fig:rules}):
-\rulename{elim-val} discards a value to the left of semicolon; \rulename{elim-exi} discards
-a dead existential; \rulename{elim-eqn} discards an existential $|defKW| |x|$ whose only
-occurrence is a equation |x=v|; and \rulename{elim-fail} discards the context surrounding a |fail|.
+\rulename{val-elim} discards a value to the left of semicolon; \rulename{exi-elim} discards
+a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
+occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 
 Five \emph{normalisation} rules $\rcon$ help to put the expression in a form that
-allows other rules to fire (\cref{fig:rules}):  \rulename{norm-exi} allows an existential to float outwards;
-\rulename{norm-seq} makes semicolon right-associated; \rulename{norm-seqr} moves work out
+allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
+\rulename{seq-assoc} makes semicolon right-associated; \rulename{eqn-float} moves work out
 of the right hand side of a equation |v=e|.
 For example, we can't use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
-because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{norm-seqr}
-to get |(e; x=3); x+2|, and then \rulename{norm-seq} to get |e; x=3; x+2|; and now we \emph{can}
+because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{eqn-float}
+to get |(e; x=3); x+2|, and then \rulename{seq-assoc} to get |e; x=3; x+2|; and now we \emph{can}
 apply \rulename{subst}.
 
 Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
 applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
 \rulename{exi-swap} allows you to move an existential inwards so that it can be garbage-collected
-by \rulename{elim-exi}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
+by \rulename{exi-elim}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
 this example, where |a,b,c| are bound in that order; that is $|c| \prec |b| \prec |a|$: 
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
@@ -1333,7 +1333,7 @@ $$
                                  & |def x ((if (x>0) then 55 else (44 `choice` 2)); x=1; (77 choice 99))|\\
  \movestoR{subst}                & |def x ((if (1>0) then 55 else (44 `choice` 2)); x=1; (77 choice 99))|\\
  \movestoC{\text{simplify |if|}} & |def x (55; x=1; (77 choice 99))|\\
- \movestoR{norm-val, elim-exil}  & |77 choice 99|\\
+ \movestoR{val-elim, eqn-elim}   & |77 choice 99|\\
 \end{array}
 $$
 But suppose instead we floated the choice out, \emph{part-way}, like this:
@@ -1497,7 +1497,7 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
            <>  "EXI-SWAP"   `name`  (do  EXI x (EXI y e) <- [lhs]
                                          pure (EXI y (EXI x e)))
 
-           <>  "EXI-ELIML"  `name`  (do  EXI x a <- [lhs]
+           <>  "EQN-ELIM"   `name`  (do  EXI x a <- [lhs]
                                          (ctx, (Var x' :=: Val v) :>: e) <- execX a
                                          guard (x == x' && x `notElem` free (ctx (v :>: e)))
                                          pure (ctx e))
@@ -2160,20 +2160,20 @@ $$
                 & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
 
 
-\circlednum{1}  & \movestoR{subst,elim-exil}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-                & \movestoR{subst,elim-exil}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{1}  & \movestoR{subst,eqn-elim}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+                & \movestoR{subst,eqn-elim}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
 \circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-                & \movestoR{norm-exi}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-\circlednum{3}  & \movestoR{subst,elim-exil}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
-                & \movestoR{norm-exi,norm-exi} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
-                & \movestoR{norm-seqr,norm-seq}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
+                & \movestoR{exi-float}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+\circlednum{3}  & \movestoR{subst,eqn-elim}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
+                & \movestoR{exi-float,exi-float} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+                & \movestoR{eqn-float,seq-assoc}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
                 & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
-                & \movestoR{subst,elim-exil}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
-\circlednum{4}  & \movestoR{u-tup,norm-seq}    & |def (x ^^ y) (2==y; 3==x; tup(x,y))| \\
+                & \movestoR{subst,eqn-elim}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
+\circlednum{4}  & \movestoR{u-tup,seq-assoc}    & |def (x ^^ y) (2==y; 3==x; tup(x,y))| \\
                 & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; tup(x,y))| \\
-\circlednum{5}  & \movestoR{subst,elim-exil}   & |def x (3==x; tup(x,2))| \\
+\circlednum{5}  & \movestoR{subst,eqn-elim}   & |def x (3==x; tup(x,2))| \\
                 & \movestoR{hnf-swap}          & |def x (x==3; tup(x,2))| \\
-\circlednum{6}  & \movestoR{subst,elim-exil}   & |tup(3,2)| \\
+\circlednum{6}  & \movestoR{subst,eqn-elim}   & |tup(3,2)| \\
 \end{array}
 $$
 \end{footnotesize}
