@@ -1683,19 +1683,25 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
 %
-Proving confluence for application, garbage collection, normalization, and choice is easy:
-\simon{added normalization to this list -- Ranjit check}
+Proving confluence for application, garbage collection and choice is easy:
+%
+% \simon{added normalization to this list -- Ranjit check} \ranjit{ACK: check updated}
+%
 they all satisfy the \emph{diamond property} --- namely, that two
-different reduction steps can be joined at a common
-term \emph{by a single step} --- which suffices to show the
+different reduction steps can be joined at a common term 
+\emph{by a single step} --- which suffices to show the
 relations are confluent \cite{Barendregt}.
 %
 The diamond property itself can be verified easily by considering
 critical pairs of transitions.
+%
+The rules for unification and normalization pose two problems.
+%
 
-Alas, the unification relation does \emph{not} satisfy
-the diamond property, as it may need multiple steps to join the
-results of two different one-step reductions.
+\mypara{The Unification Problem}
+%
+The first problem is that the unification relation does \emph{not} satisfy the diamond property 
+as it may need multiple steps to join the results of two different one-step reductions.
 %
 For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); 3)|$.
 %
@@ -1719,6 +1725,26 @@ via the \norecursion condition.
 Newman's Lemma \cite{Barendregt} then implies the
 locally confluent, terminating unification relation is
 also confluent.
+
+\mypara{The Normalization Problem}
+%
+The second problem is that the normalization rules \rulename{exi-swap} 
+and \rulename{exi-float} interact with the unification \rulename{var-swap} 
+rule in way that precludes the classic commutativity-based composition.
+%
+Recall from \cref{sec:unification-rules} that the unification rules crucially rely 
+on the variable ordering to orient equations between variables in a canonical fashion.
+%
+The normalization rules \rulename{exi-float} and \rulename{exi-swap} can \emph{change}
+the variable order and hence, their behavior is deeply intertwined with unification 
+and cannot be factored out via a commutativity argument. 
+%
+Instead we prove that the union of unification and normalization 
+is confluent by showing that unification \emph{postpones after} normalization \cite{Hindley}, 
+\ie that a mixed sequence of unification-or-normalization steps can be reordered, 
+roughly speaking, into two blocks normalization-only steps followed by unification-only 
+steps, after which the confluence of the union can be established by suitably 
+composing the confluence properties for the individual relations.
 
 \subsection{Design for confluence} \label{sec:design-confluence}  \label{sec:unifying-lambda}
 

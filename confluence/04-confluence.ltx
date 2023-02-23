@@ -30,6 +30,9 @@ $$
 \end{array}
 \end{array}
 $$
+%
+\textbf{Note:} $e_1 \occunder e_2$ is equivalent to $\exists E.\ E[e_1] \equiv e_2$.
+%
 \caption{Summary of notation} \label{fig:notation}
 \end{figure}
 
@@ -112,7 +115,7 @@ $$
 |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
 % |x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
 $$
-% \simon{We changed this back to match te defn in 4.1.} \ranjit{ack}
+\simon{We changed this back to match the defn in 4.1.} \ranjit{ACK}
 %
 where the LHS is a variable and the RHS is a \emph{value}
 that is or contains a $\lambda$ in which $|x|$ occurs free.
@@ -147,16 +150,21 @@ In the rest of the proof we assume that we are working with terms with \norecurs
 The condition is only need to prove $\runi$ is confluent,
 but we assume it globally for clarity.
 
-\subsection{Disjointness, reduction under, and the diamond property}
+\subsection{Disjointness, Reduction under, and the Diamond property}
 
 In talking about confluence we often speak of two different reduction steps with a common
 starting point, thus $\rstep{\rr}{e}{e_1}$ and $\rstep{\rr}{e}{e_2}$.
 In the first of these there is a sub-term of $e$, say $\Delta_1$, that is the actual redex;
 the root of $\Delta_1$ matches some rule in $\rr$.  $\Delta_1$ is just an ordinary
 expression, but we use the notation ``$\Delta$'' to stress that it is the root of a redex
-(see \cref{fig:notation}).  $\Delta_1$ is a sub-term of $e$ (or possibly $\Delta = e$),
-which we write $\Delta_1 \subseteq e$ (again in \cref{fig:notation}).
-
+(see \cref{fig:notation}).
+%
+$\Delta_1$ is a sub-term of $e$ (or possibly $\Delta = e$),
+which we write $\Delta_1 \occunder e$ (again in \cref{fig:notation}).
+%
+Note that $e_1 \occunder e_2$ is equivalent to saying that there exists some expression
+context $E$ such that $E[e_1] \equiv e_2$, \ie that $e_2$ can be decomposed into a context
+$E$ whose hole is filled by $e_1$.
 
 Similarly we may identify $\Delta_2$, the redex that is reduced by $\rstep{\rr}{e}{e_2}$.
 Now there are two cases to consider:
@@ -165,11 +173,11 @@ Now there are two cases to consider:
 \item $\Delta_1 \occunder \Delta_2$, or $\Delta_2 \occunder \Delta_1$.
 \end{enumerate}
 %
-% \simon{What if $\Delta_1 = \Delta_2$?} \ranjit{ACK: $\occunder$ includes that, let me change to clarify}
+\simon{What if $\Delta_1 = \Delta_2$?} \ranjit{ACK: $\occunder$ includes that, let me change to clarify}
 %
 One might wonder if $\Delta_1$ can \emph{overlap} $\Delta_2$, but that is not possible:
-we are discussing syntax trees, not graphs, and so either the root of $\Delta_1$ is a child of
-the root of $\Delta_2$, or vice versa, or neither.
+we are discussing syntax trees, not graphs, and so for distinct $\Delta_1$ and $\Delta_2$,
+either the root of $\Delta_1$ is a child of the root of $\Delta_2$, or vice versa, or neither.
 
 In the first case (a) we have the diamond property immediately:
 \begin{lemma}[Disjoint] \label{lem:disjoint}
@@ -183,7 +191,7 @@ then there exists $e'$ such that
 		$\rstep{}{e_1}{e'}$ and
 		$\rstep{}{e_2}{e'}$.
 \end{lemma}
-%\simon{What is a ``reduct''?  Same as ``redex''?  Say so.} \ranjit{ACK: reduct is "redex" plus thing it steps to, so here we just want "redex}
+\simon{What is a ``reduct''?  Same as ``redex''?  Say so.} \ranjit{ACK: reduct is "redex" plus thing it steps to, so here we just want "redex}
 
 \begin{proof}
 Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
@@ -194,20 +202,49 @@ only on case (b).
 
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
-\simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement
-  of Lemma B.5!}
-\ranjit{TODO}
+\simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement of Lemma B.5!} \ranjit{ACK: check}
+
+Next, we prove a set of ``reductions-under'' $R$ lemmas that say that
+%
+if a term $e$ can be
+%
+(1)~reduced using two different rules $R$ and $S$ as $\rstep{R}{e}{e_R}$ and $\rstep{S}{e_S}$, such that
+%
+(2)~the redex for the $S$ reduction is a \emph{sub-term} of the redex for the $R$ reduction,
+%
+then there exists some $e'$ such that
+%
+$e_R$ (resp. $e_S$) can be reduced to $e'$ using some number of $S$ (resp. $R$) reductions.
+%
+These lemmas will be used to prove that two relations $R$ and $S$ commute \eg have the diamond
+property, by splitting cases on which relation is the ``outer'' reduction and which is the ``inner''
+and then applying the appropriate ``reduction-under'' lemma for the outer relation, and using
+\cref{lem:disjoint} for the case where the redexes are disjoint.
+
 
 \subsubsection{Application}
 
-% \simon{Where is $E$ defined?  I have added it to Figure 11.} \ranjit{ACK: Thanks!}
+\simon{Where is $E$ defined?  I have added it to Figure 11.} \ranjit{ACK: Thanks!}
+
+The following lemma says that
+%
+if a term $\rdx{\rapp}$ is the root of an $\rapp$ reduction $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$
+%
+and the $\rdx{\rapp}$ additionally contains under it a \emph{subterm} $\rdx{}$
+that is the root of some $\rr$ reduction $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+%
+then it is possible to join the result of the $\rr$ and $\rapp$ reduction at a
+common term $\rdx{\rapp}''$ by executing a single step of the \emph{other} reduction,
+\ie $\rapp$ and $\rr$ respectively.
+%
+(Recall that $E[e'] \equiv e$ means that $e' \occunder e$ \ie $e'$ occurs under or is a sub-term of $e$).
 
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
    $\rstep{\rr}{\rdx{}}{\rdx{}'}$
 then there exists $\rdx{\rapp}''$ such that
-   $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$ and
+   $\rstep{\rr}{\rdx{\rapp}'}{\rdx{\rapp}''}$ and
    $\rstep{\rapp}{E[\rdx{}']}{\rdx{\rapp}''}$.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJhcHB9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccmFwcH0nIl0sWzEsMSwiXFxyZHh7XFxyYXBwfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJhcHAiLDJdLFswLDMsIlxccnIiXSxbMywyLCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwyLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
@@ -219,15 +256,17 @@ then there exists $\rdx{\rapp}''$ such that
 	\arrow["\rr"', dotted, from=2-1, to=2-2]
 \end{tikzcd}\]
 \end{lemma}
-\simon{Do we have to have $\rdx{\rapp} \equiv E[\rdx{}]$. Why not just use $E[\rdx{}]$ throughout?}
-\simon{``...such that $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$''.  What is the arrow in this reduction?  is it maybe $\rr$, the full relation?}
+\simon{Do we have to have $\rdx{\rapp} \equiv E[\rdx{}]$. Why not just use $E[\rdx{}]$ throughout?} \ranjit{To indicate that the term is also an $\rapp$ redex, so we can do "inversion"/case-split on the $\rapp$ rule}.
 
-\simon{I think (but I am not sure) that in the premises $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and $\rstep{\rr}{\rdx{}}{\rdx{}'}$ you mean that the reduction takes place \emph{at the root} not buried inside. But usually the arrow lets you take a step ``inside''.}
+\simon{``...such that $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$''.  What is the arrow in this reduction?  is it maybe $\rr$, the full relation?} \ranjit{ACK: correct, fixed!}
 
-\simon{What if the two are neither disjoint nor in a subset relationship, but rather just overlappping? I think that can't happen, but if not, it's a property of $\rapp$. In other rule sets they could overlap couldn't they?}
+\simon{I think (but I am not sure) that in the premises $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and $\rstep{\rr}{\rdx{}}{\rdx{}'}$ you mean that the reduction takes place \emph{at the root} not buried inside. But usually the arrow lets you take a step ``inside''.} \ranjit{ACK: correct "redex" means reduction is "at the root of" thanks for clarifying in the notation section!}
+
+\simon{What if the two are neither disjoint nor in a subset relationship, but rather just overlappping? I think that can't happen, but if not, it's a property of $\rapp$. In other rule sets they could overlap couldn't they?} \ranjit{ACK: A term is a syntax tree -- so two redex roots are either (a) the same node in the tree, (b) one occurs under the other or (c) are totally disjoint. In VC a single root can only be a redex for a single reduction, so "occurs under" is the same as "is a strict subterm of".}
+
 
 \begin{proof} Split cases on the rule used in $\rapp$.
-\simon{Here is the first use of $\subset$ on terms. Needs a definition}
+\simon{Here is the first use of $\subset$ on terms. Needs a definition} \ranjit{ACK: thanks!}
 \begin{description}
 
 \item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
@@ -2008,13 +2047,12 @@ Split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rcon}$ or vice versa.
 We show that $\rapp$ satisfies the diamond property and hence,
 is confluent by \cref{lem:diamond}. Suppose that
 %
-$\rstep{\rapp}{e}{e_1}$ via the redux $\tx{1}$, and
+$\rstep{\rapp}{e}{e_1}$ via the redux $\txr{\rapp}{1}$, and
 %
-$\rstep{\rapp}{e}{e_2}$ via the redux $\tx{2}$.
+$\rstep{\rapp}{e}{e_2}$ via the redux $\txr{\rapp}{2}$.
 %
-\simon{In $\tx{1}$ what is the subscript ``1'' on the arrow?  I expect to see a reduction relation there.
-  Here it should be $\rapp$.  I'm baffled.}
-
+\simon{In $\tx{1}$ what is the subscript ``1'' on the arrow?  I expect to see a reduction relation there. Here it should be $\rapp$.  I'm baffled.} \ranjit{ACK:fixed, thanks!}
+%
 If $\rdx{1}$ and $\rdx{2}$ are disjoint in $e$, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
 %
@@ -2073,9 +2111,9 @@ Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice v
 We show that $\rgc$ satisfies the diamond property and hence,
 is confluent by \cref{lem:diamond}. Suppose that
 %
-$\rstep{\rgc}{e}{e_1}$ via the redux $\tx{1}$
+$\rstep{\rgc}{e}{e_1}$ via the redux $\txr{\rgc}{1}$
 %
-$\rstep{\rgc}{e}{e_2}$ via the redux $\tx{2}$.
+$\rstep{\rgc}{e}{e_2}$ via the redux $\txr{\rgc}{2}$.
 %
 If $\rdx{1}$ and $\rdx{2}$ are disjoint, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
