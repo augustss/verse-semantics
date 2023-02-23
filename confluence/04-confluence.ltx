@@ -1097,13 +1097,13 @@ We will use $b_{\ell}$ to denote the (unique) sub-block of $b$ labeled by $\ell$
 %
 % \mypara{Block Labels and Rewriting}
 %
-For rewrites like \rulename{choose}, \rulename{seq-assoc} and \rulename{eqn-float}, 
-we assume that the rewritten term is given a fresh set of distinct block labels. 
+For rewrites like \rulename{choose}, \rulename{seq-assoc} and \rulename{eqn-float},
+we assume that the rewritten term is given a fresh set of distinct block labels.
 %
-For rewrites with \rulename{u-tup}, we assume fresh labels are given to the 
+For rewrites with \rulename{u-tup}, we assume fresh labels are given to the
 new (inner) blocks created by tuple matching equations.
 %
-All other $\runi$ rewrites preserve blocks or delete them, 
+All other $\runi$ rewrites preserve blocks or delete them,
 so we assume that the same labels carry over to the rewritten terms.
 
 
@@ -1132,9 +1132,9 @@ For a label $\ell$ let
 %
 % where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
 %
-Intuitively, $\mathit{substs}(\ell)$ denotes the number of ``substitution candidates'' for the block $\ell$, 
+Intuitively, $\mathit{substs}(\ell)$ denotes the number of ``substitution candidates'' for the block $\ell$,
 \ie the number of variables that could possibly be used as the LHS of a \rulename{subst} spanning the block $\ell$.
-Such a variable must appear at least twice in the block: as a ``source'' \ie the LHS of an equation, and as a ``target'' 
+Such a variable must appear at least twice in the block: as a ``source'' \ie the LHS of an equation, and as a ``target''
 occurrence elsewhere in the block.
 %
 Each application of
@@ -1346,36 +1346,43 @@ Second we show that \rconm \emph{strongly postpones} after \rulename{exi-float} 
 %
 Consequently, each $\rsteps{\rcon}{}{}$ can be rewritten as the composition of
 $\rsteps{\rulename{exi-float}}{}{}$ followed by $\rsteps{\rconm}{}{}$ after which
-the following diagram completes the proof.
-% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJjb25tIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccmNvbm0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtci1jb219IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMiw5LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo5MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzUsMTIsIlxcY3JlZntsZW06bS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+the following diagram completes the proof, where
+%
+(1)~\cref{lem:f-exi-swap-join}
+%
+(2)~\cref{lem:f-rr-com}
+%
+(3)~\cref{lem:m-conf}.
+%
+(4)~\cref{lem:m-conf}
+%
+% https://q.uiver.app/?q=WzAsMTMsWzMsMCwiXFxidWxsZXQiXSxbMSwxLCJcXGJ1bGxldCJdLFs1LDEsIlxcYnVsbGV0Il0sWzIsMiwiXFxidWxsZXQiXSxbNCwyLCJcXGJ1bGxldCJdLFszLDMsIigxKSJdLFsyLDUsIigzKSJdLFs0LDUsIigzKSJdLFsxLDQsIigyKSJdLFs1LDQsIigyKSJdLFszLDYsIig0KSJdLFswLDMsIlxcYnVsbGV0Il0sWzYsMywiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDYsIlxccmNvbm0iLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsNiwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw3LCJcXHJjb25tIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs5LDcsIlxccmNvbm0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsMTAsIlxccmNvbm0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsOCwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwxMSwiXFxyY29ubSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMSw4LCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo2MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDEyLCJcXHJjb25tIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEyLDksIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs0LDksIiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
-	&& \bullet \\
-	\bullet &&&& \bullet \\
-	& \bullet && \bullet \\
-	\bullet && \bullet && \bullet \\
-	\bullet &&&& \bullet \\
-	& \bullet && \bullet \\
-	&& \bullet
-	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-1]
-	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-5]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-1, to=3-2]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-5, to=3-4]
-	\arrow["\rconm"{description}, dotted, two heads, from=3-2, to=4-3]
-	\arrow["\rconm"{description}, dotted, two heads, from=3-4, to=4-3]
-	\arrow["\rconm"{description}, two heads, from=2-1, to=4-1]
-	\arrow["\rconm"{description}, two heads, from=2-5, to=4-5]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-1, to=5-1]
-	\arrow["\rconm"', dotted, two heads, from=5-1, to=6-2]
-	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-2]
-	\arrow["\rconm"{description}, dotted, two heads, from=4-3, to=6-4]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-5, to=5-5]
-	\arrow["\rconm", dotted, two heads, from=5-5, to=6-4]
-	\arrow["\rconm"{description}, dotted, two heads, from=6-2, to=7-3]
-	\arrow["\rconm"{description}, dotted, two heads, from=6-4, to=7-3]
-	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.8}, draw=none, from=1-3, to=4-3]
-	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-1, to=6-2]
-	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.9}, draw=none, from=2-5, to=6-4]
-	\arrow["{\cref{lem:m-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+	&&& \bullet \\
+	& \bullet &&&& \bullet \\
+	&& \bullet && \bullet \\
+	\bullet &&& {(1)} &&& \bullet \\
+	& {(2)} &&&& {(2)} \\
+	&& {(3)} && {(3)} \\
+	&&& {(4)}
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-2]
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-6]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-6, to=3-5]
+	\arrow["\rconm"{description}, dotted, two heads, from=3-3, to=4-4]
+	\arrow["\rconm"{description}, dotted, two heads, from=3-5, to=4-4]
+	\arrow["\rconm"', dotted, two heads, from=5-2, to=6-3]
+	\arrow["\rconm"{description}, dotted, two heads, from=4-4, to=6-3]
+	\arrow["\rconm"{description}, dotted, two heads, from=4-4, to=6-5]
+	\arrow["\rconm", dotted, two heads, from=5-6, to=6-5]
+	\arrow["\rconm"{description}, dotted, two heads, from=6-3, to=7-4]
+	\arrow["\rconm"{description}, dotted, two heads, from=6-5, to=7-4]
+	\arrow["\rconm"{description}, dotted, two heads, from=3-3, to=5-2]
+	\arrow["\rconm"{description}, two heads, from=2-2, to=4-1]
+	\arrow["{\rulename{norm-exi}}"{description, pos=0.6}, dotted, two heads, from=4-1, to=5-2]
+	\arrow["\rconm"{description}, two heads, from=2-6, to=4-7]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-7, to=5-6]
+	\arrow[dotted, two heads, from=3-5, to=5-6]
 \end{tikzcd}\]
 \end{proof}
 
@@ -1395,7 +1402,7 @@ and then use (multiple) \rulename{exi-swap} to join.
 \end{proof}
 
 \begin{lemma} \label{lem:f-rr-com}
-\rulename{exi-float} strongly commutes with \rr - \rulename{exi-float}.
+\rulename{exi-float} strongly commutes with \rconm. %\rr - \rulename{exi-float}.
 \end{lemma}
 
 \begin{proof}
@@ -1565,9 +1572,9 @@ Split cases and show each reduction \halfcommutes with \rulename{exi-swap}.
 
 Recall that
 \begin{align*}
-\rcon & \doteq\ \rulename{exi-float} + \rulename{exi-swap} + \rss \\
+\rcon & \doteq\ \rulename{exi-float} + \rulename{exi-swap} + \rss
 \intertext{and define}
-\runi' & \doteq \ \runi + \rulename{exi-swap} \\
+\runi' & \doteq \ \runi + \rulename{exi-swap}
 \end{align*}
 
 \begin{lemma}\label{lem:u-c-c}
