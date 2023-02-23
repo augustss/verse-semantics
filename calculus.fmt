@@ -120,7 +120,7 @@
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
 %format splitKW = "\textbf{split}"
-%format split (x) (y) (z) = "\textbf{split}\{" x "," y "," z "\}"
+%format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
 %format def (x) (y) = "\exists" x ".\," y
