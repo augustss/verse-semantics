@@ -920,7 +920,7 @@ So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
-simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
+simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
@@ -997,7 +997,7 @@ has the following properties:
 \item The semantics is expressed as a set of rewrite rules (\cref{fig:rules}). These rules apply to the core language of \cref{fig:syntax}, after
   all desugaring.
 \item Any rule can be applied, in either direction,
-  anywhere in the program term (including under lambdas) to obtain an equivalent program.
+  anywhere in the program term (including under lambdas).
 \item The rules are oriented, with the intent that using them left-to-right makes progress.
 \item Despite this orientation, the rules do not say which rule should be
   applied where; that is the task of a separate \emph{evaluation strategy} (\cref{sec:eval-strategy}).
@@ -1447,7 +1447,7 @@ and thereby express call-by-name, call-by-name, and call-by-need
 Even with these constraints, there may be many redexes in a term.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
 out of the many possible redexes, should be rewritten next to make progress towards the result?
-Any decent evaluation strategy should (a) guarantee to terminate if there
+A good evaluation strategy should (a) guarantee to terminate if there
 is \emph{any} terminating sequence of reductions; and (b) be amenable
 to compilation into efficient code\footnote{
 It would be even better if the strategy could (c) guarantee to find the
@@ -1459,7 +1459,8 @@ guarantees to terminate if any strategy does so.
 
 We believe that the same leftmost-outermost strategy works for
 \versecalc{}: just repeatedly reduce the leftmost-outermost
-redex. That is easy in theory, but it is tricky in practice.  For
+redex, with some tweaks to avoid infinite application of \rulename{seq-swap} and \rulename{exi-swap}.
+That is easy in theory, but it is tricky in practice.  For
 example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
 substitution to rewrite the |(x+y)| to |(2+3)|; and
@@ -1554,9 +1555,10 @@ pure lambda calculus), this proof turns out to be a substantial undertaking.
 %
 A \emph{reduction relation} \rr is a binary relation on a set of terms \univ.
 %
-We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
-for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
-\lennart{I don't see $\rr^k$ being used anywhere below, so maybe exclude it here.}
+We write $\rr^{*}$ for the reflexive transitive closure of $\rr$.
+% We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
+% for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+\lennart{We don't see $\rr^k$ being used anywhere below, so we dropped it here.}
 %
 We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
 $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
@@ -1588,15 +1590,14 @@ and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
 It is well known that adding {\bf letrec} to the lambda calculus
 makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
 In our context, consider the term:
-\lennart{Isn't the $\rightarrow^*$ the same as $\rsteps{}{}{}$ above?}
 %
 $$
 \begin{array}{lcll}
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
-& \rightarrow^* & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
+ |def (x y) (x == tup (1, y); y == lam z x; x)|
+ & \rsteps{}{}{} & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
 
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
-& \rightarrow^* & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
+ |def (x y) (x == tup (1, y); y == lam z x; x)|
+& \rsteps{}{}{} & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
 \end{array}
 $$
 %
@@ -1610,9 +1611,9 @@ We tackle this problem in two different ways.  First, we can simply prohibit rec
 confluence under that restriction (\cref{sec:confluence-sketch}).
 This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
-recursion emerges from unifying terms.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
+recursion emerges during execution.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
 It might be if |f == (lam (tup (v, w)) (v==w))|!
-For \emph{tuples} we have a simple solution: rule \rulename{u-occurs} make the entire
+For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} make the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
 The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
@@ -1664,8 +1665,8 @@ is confluent for terms with \norecursion.
 \noindent
 \emph{Proof sketch.}  Our proof strategy is to
 %
-(1)~divide the rules into groups for application, unificaton,
-    \etc as in \cref{fig:rules},
+(1)~divide the rules into groups for application, unification,
+    \etc, approximately as in \cref{fig:rules},
 (2)~prove confluence for each separately, and then
 (3)~prove that their combination is confluent via commutativity.
 %
@@ -1682,7 +1683,8 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
 %
-Proving confluence for application, garbage collection, and choice is easy:
+Proving confluence for application, garbage collection, normalization, and choice is easy:
+\simon{added normalization to this list -- Ranjit check}
 they all satisfy the \emph{diamond property} --- namely, that two
 different reduction steps can be joined at a common
 term \emph{by a single step} --- which suffices to show the
@@ -1745,6 +1747,9 @@ $$
 Here, each step makes one substitution for |x|.
 An exactly analogous example can be made for a lambda value.
 
+Similarly, as we discussed in \cref{sec:unification-rules},
+rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
+to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
 
 \mypara{Unifying lambdas.} In \versecalc{} an attempt to unify two
 lambdas fails, even if the lambdas are semantically identical (rule
@@ -1780,9 +1785,6 @@ we get |((lam y y) == (lam y y); 0)| which |fail|s.
 Thus, there is no \rulename{u-var}: such equalities can only be eliminated
 after the value of |x| is substituted in and checked to not be a $\lambda$.
 
-\mypara{Ordering variables}. As we discussed in \cref{sec:unification-rules},
-rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
-to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
 % %
 % \rulename{var-swap} has a curious side condition: it only rewrites
 % $|x == y|$ to $|y == x|$ if $y \prec x$.
@@ -2155,61 +2157,64 @@ In contrast, |def x e| seems more direct.
 \subsection{Comparison with Icon} \label{sec:icon}
 
 There are many obvious similarities between Verse and the Icon programming language
-\cite{griswold:icon-users-manual,griswold:icon-overview,griswold:generators-in-icon,griswold:icon-book-1983}:
+\cite{griswold:icon-users-manual,griswold:generators-in-icon,griswold:icon-book-1983,griswold:icon-overview}:
 \begin{itemize}
 \item An expression can (successively) produce any number of values.
 \item An expression that produces zero values is said to \emph{fail} \cite[\S 3.1]{griswold:generators-in-icon};
   an expression that produces at least one value is said to \emph{succeed}.
-\item The expression ``|e_1 choice e_2|'' produces all the values of |e_1| followed by all the values of |e_2|.
+\item The expression |e_1 choice e_2| produces all the values of |e_1| followed by all the values of |e_2|.
 \item There is a way to turn an array (or tuple) $a$ into a sequence of produced values.
-  In Icon, this is written ``\texttt{!|a|}'' \cite[\S 3]{griswold:icon-overview}; in Verse, ``\texttt{|a|\,?}''; in \versecalc{}, ``|def (i) (x=a; x i)|''.
+  In Icon, this is written \texttt{!|a|} \cite[\S 3]{griswold:icon-overview}; in Verse, \texttt{|a|\,?}; in \versecalc{}, |def (i) (x=a; x i)|.
 \item Most ``scalar'' operations (such as addition and comparisons) run through
   all possible combinations of values of their operand expressions,
   using a specific left-to-right evaluation order and automatic chronological backtracking.
 \item Success and failure are used in place of boolean values for control-structure purposes.
   Some operations, especially comparisons, can fail as part of their defined semantics.
-  The expression ``|if e_1 then e_2 else e_3|'' checks to see whether |e_1| succeeds;
+  The expression |if e_1 then e_2 else e_3| checks to see whether |e_1| succeeds;
   it then produces the values of |e_2| (if |e_1| succeeded) \emph{or} produces the values of |e_3| (if |e_1| failed).
   If |e_1| succeeds and then |e_2| fails, backtracking does \emph{not} attempt to examine further values from |e_1|.
 \item The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
 \item There is a control structure that executes a specified expression once for every value produced by another expression.
-  In Icon this is ``\texttt{every |e_1| do |e_2|}'' and in Verse it is ``\texttt{for(|e_1|) do |e_2|}'';
-  in each, the ``\texttt{do |e_2|}'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
-  (In Icon, ``\texttt{every |e|}'' may also be written as ``\texttt{repeat |e|}''.)
+  In Icon this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|;
+  in each, the ``\texttt{do}~|e_2|'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
+  (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
-  ``\texttt{|x| := |e|}'' will provide one value at a time from ``|e|'' to be named by variable ``|x|''.
+  \texttt{|x| := |e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
 
 But there are also major differences between Verse and Icon.
 Icon was designed primarily to use expressions as generators to automatically
-explore a combinatorial space of possibilities, and secondarily to use
+explore a combinatorial space of possibilities (``goal-directed evaluation''), and secondarily to use
 success/failure rather than booleans to drive control structure.
 But in other respects \emph{Icon is a fairly conventional imperative language}, relying
 on side effects (assignments) to process the generated combinations.
 The designers judged that the interactions of such side effects with completely
 unrestrained control backtracking would be difficult for programmers to
-understand; therefore the design of Icon emphasizes limited scopes for control
-backtracking and tools for controlling the backtracking process.
+understand \cite[\S 3.1]{griswold:generators-in-icon}; therefore the design of Icon emphasizes limited scopes for control
+backtracking and tools for controlling the backtracking process \cite[\S 3.3]{griswold:generators-in-icon}.
 
-In contrast, \emph{Verse is a declarative language}, and
-avoids many of these difficulties by using a functional-logic approach
-rather than an imperative approach to processing generated combinations.
-For example: \simon{I have moved the intro, but I'm not sure that the ``for example'' quite works.  Maybe re-visit the choice of bulleted items?}
+In contrast, \emph{Verse is a declarative language} and
+avoids these difficulties by using a functional-logic approach
+rather than an imperative approach to processing generated combinations:
 \begin{itemize}
-\item Icon typically processes multiple values from an expression by using \emph{assignment} (a \emph{side effect});
-  Verse typically processes multiple values by using \emph{equations} (which are then \emph{solved})
-  but also has a concise way to turn a finite sequence of multiple values into an array.
+\item While Icon typically processes multiple values from an expression by using \emph{assignment},
+  Verse typically processes multiple values by using \emph{equations}
+  (which are then \emph{solved}).
+\item
+  Verse also has a concise way to turn a finite sequence of multiple
+  values into an array directly.
   For example, to make variable |a| refer to an array containing all values generated by expression |e|,
-  code such as the following is idiomatic in Icon \cite[\S 8]{griswold:icon-overview}:
+  code such as the following (using a \texttt{repeat} loop containing an assignment) is idiomatic in Icon \cite[\S 8]{griswold:icon-overview}:
   \begin{center}
   \texttt{a := array 0 string; i := 0; repeat a[i+] := e; close(a)}
   \end{center}
-  (In Icon, \emph{postfix} ``\texttt{+}'' is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual}
-  similar to \emph{prefix} ``\texttt{++}'' in~C \cite[\S 2.8]{kr-c-book}.)
-  In Verse, ``\texttt{a~=~for(x := e) do~x}'' or even just ``\texttt{a~=~for\{ e \}}'' does the job; in \versecalc{}, ``|a = all(e)|'' is the way to say it.
-\item Backtracking in Icon is ``only control backtracking''; assignments are not undone.
-\item Both languages have an implicit ``cut'' (permanent acceptance of the first produced value) after the predicate part of an |if|-|then|-|else|;
-  Icon furthermore has an implicit cut at each semicolon (or end of line), each
+  (In Icon, \emph{postfix} \texttt{+} is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual}
+  with the same behavior as \emph{prefix} \texttt{++} in~C \cite[\S 2.8]{kr-c-book}.)
+  In Verse, \texttt{a~=~for(x := e) do~x} or even just
+  \texttt{a~=~for\{e\}} does the job; in \versecalc{}, |a = all(e)| is all it takes.
+\item Backtracking in Icon is ``only control backtracking''; side effects, such as assignments, are not undone \cite[\S 3.1]{griswold:generators-in-icon}.
+\item Both languages have an implicit ``cut'' (permanent acceptance of the first produced value) after the predicate part of an |if|-|then|-|else|,
+  but Icon furthermore has an implicit cut at each statement end (semicolon or end of line) \cite[\S 3.1]{griswold:generators-in-icon}, each
   closing brace ``\texttt{\}}'', and most keywords \cite{icon-programming-corner-4}.
 \end{itemize}
 
@@ -2217,20 +2222,23 @@ For example: \simon{I have moved the intro, but I'm not sure that the ``for exam
 
 \section{Looking back, looking forward}
 
-The semantics of \versecalc{} is designed at a level intended to capture the
-\emph{computational model} of the language; not all formal semantics do so.
-Defining a language by giving its low-level semantics is \emph{precise} but not necessarily \emph{illuminating}.
-For example, giving a reference compiler that compiles
+Defining the semantics of \versecalc{} through rewrite rules
+is sufficently low-level to capture
+the \emph{computational model} of the language; and yet sufficiently high-level to
+be \emph{illuminating} to a programmer or compiler writer.
+Defining a language by giving its low-level semantics is precise but not necessarily illuminating;
+for example, giving a reference compiler that compiles
 the program to x86 instructions is precise, but is not helpful
 to a human who is trying to understand exactly what the original program
-meant. Likewise, a high-level semantics simply provides the eventual answer
-produced by the program, without insight into the \emph{computational steps}
+meant. Likewise, a high-level (e.g. denotational) semantics simply provides the eventual answer
+produced by the program, without insight into the computational steps
 that got us from program start to program completion.
 
-The moral here is that \emph{formal specifications can be obfuscatory---or
-illuminating.} The latter kind shed light because they are defined \emph{in
-terms of the intended mechanisms of the language}. \versecalc{} does this; it
-respects the conceptual structures of the Verse language.
+\simon{dropped a short para here that interrupted the flow}
+% The moral here is that \emph{formal specifications can be obfuscatory---or
+% illuminating.} The latter kind shed light because they are defined \emph{in
+% terms of the intended mechanisms of the language}. \versecalc{} does this; it
+% respects the conceptual structures of the Verse language.
 
 Note that when we say ``illuminating'' we mean that in multiple ways.
 A semantics can be illuminating for humans who are trying to understand
@@ -2271,7 +2279,8 @@ see \cref{sec:store}.
   Andy Pitts,
   Niklas R\"ojemo,
   Jaime S\'anches-Hern\'andez,
-  and Andrew Scheidecker.
+  Andrew Scheidecker,
+  and Stephanie Weirich.
 \end{acks}
 
 % -------------------- Bibliography ----------------
@@ -2281,17 +2290,6 @@ see \cref{sec:store}.
 
 \appendix
 
-% \section{Confluence proof}
-% \simon{Ranjit to fill in here}
-
-\input{../confluence/03-preliminaries}
-\input{../confluence/04-confluence}
-
-\clearpage
-\input{../confluence/08-skew}
-
-
-
 \clearpage
 % ----------------------- Example
 
@@ -2300,10 +2298,9 @@ A complete reduction sequence for a small example can be found in figure \ref{fi
 This example shows how constraining the output of a function call can constrain the argument.
 While most of the reductions are administrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
-
 Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
 At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
-\begin{figure}
+\begin{figure}[h]
 \begin{footnotesize}
 % no space needed around math environments in a figure
 \setlength{\abovedisplayskip}{0pt}%
@@ -2335,6 +2332,12 @@ $$
 \end{figure}
 
 
+
+\input{../confluence/03-preliminaries}
+\input{../confluence/04-confluence}
+
+\clearpage
+\input{../confluence/08-skew}
 
 
 \clearpage

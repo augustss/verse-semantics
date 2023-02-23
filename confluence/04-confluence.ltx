@@ -6,6 +6,30 @@
 
 
 \section{Confluence of \calcname: Proof} \label{sec:confluence}
+\begin{figure}
+$$
+\begin{array}{l}
+\text{Notation} \\
+\begin{array}{rl}
+  a,b,c,d,e & \text{Expressions (syntax in \cref{fig:syntax})} \\
+  \rdx{} & \text{An expression $e$ that is has a redex at the root} \\
+  e_1 \subset e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
+  e_1 \subseteq e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
+\rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
+\rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
+\rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
+\rstepk{\rr}{k}{a}{b}& \text{$a$ reduces to $b$ in $k$ steps of $\rr$}\\
+\end{array} \\
+\\
+\text{Expression contexts} \\
+\begin{array}{rcl}
+  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E|
+    \vb |one E| \vb |all E|
+\end{array}
+\end{array}
+$$
+\caption{Summary of notation} \label{fig:notation}
+\end{figure}
 
 \begin{definition}[Reductions] \label{def:reductions}
 Let $\rr$ be the reduction relation defined as $\runi \cup \rcon \cup \rapp \cup \rgc \cup \rspc$,
@@ -54,10 +78,17 @@ rules in \cref{fig:rules}
 \end{itemize}
 %
 \end{definition}
+\noindent
+These groups correspond approximately to the sub-headings in \cref{fig:rules},
+\emph{but not precisely}.
+In particular, some rules appear in more than one group;
+for example \rulename{var-swap} is in both $\runi$ and $\rcon$; and
+\rulename{subst} is in both $\runi$ and (in restricted form) $\rcon$.
+Moreover, \rulename{choose} is in $\runi$, although it is listed under ``choice''
+in \cref{fig:rules}.
 
 \begin{figure}
 \begin{tabular}{rrrrrrrr}
-\toprule
 					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		  & \rspc \\
 \midrule
 Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
@@ -65,7 +96,6 @@ Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{le
 Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
 Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
 Choice 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
-\bottomrule
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
 The lemmas on the diagonal (resp. non-diagonal) entries establish confluence (resp. commutativity)
@@ -77,9 +107,10 @@ for the respective relation (resp. pairs of relations).}
 A \emph{recursive equation} is a term of the form
 %
 $$
-% |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
-|x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
+|x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
+% |x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
 $$
+\simon{We changed this back to match te defn in 4.1.}
 %
 where the LHS is a variable and the RHS is a \emph{value}
 that is or contains a $\lambda$ in which $|x|$ occurs free.
@@ -90,6 +121,7 @@ A term $e$ is \emph{transitively recursive} if $\rsteps{\rr}{e}{e'}$ where $e'$ 
 %
 A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
 \end{definition}
+Our main confluence theorem is as follows:
 
 \begin{theorem}[Confluence] \label{thm:confluence}
 %
@@ -109,37 +141,60 @@ commutative (\cref{fig:confluence-summary}).
 Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
 
-In the rest of the proof:
-%
-\begin{enumerate}
-	\item We assume that we are working with terms with \norecursion.
-		  The condition is only need to prove $\runi$ is confluent,
-		  but we assume it globally for clarity.
-	\item We use the below \cref{lem:disjoint} to focus attention
-		  on the cases where one reduct \emph{occurs under} the other
-		  and vice versa.
-\end{enumerate}
+In the rest of the proof we assume that we are working with terms with \norecursion.
+The condition is only need to prove $\runi$ is confluent,
+but we assume it globally for clarity.
 
+\subsection{Disjointness, reduction under, and the diamond property}
+
+In talking about confluence we often speak of two different reduction steps with a common
+starting point, thus $\rstep{\rr}{e}{e_1}$ and $\rstep{\rr}{e}{e_2}$.
+In the first of these there is a sub-term of $e$, say $\Delta_1$, that is the actual redex;
+the root of $\Delta_1$ matches some rule in $\rr$.  $\Delta_1$ is just an ordinary
+expression, but we use the notation ``$\Delta$'' to stress that it is the root of a redex
+(see \cref{fig:notation}).  $\Delta_1$ is a sub-term of $e$ (or possibly $\Delta = e$),
+which we write $\Delta_1 \subseteq e$ (again in \cref{fig:notation}).
+
+Similarly we may identify $\Delta_2$, the redex that is reduced by $\rstep{\rr}{e}{e_2}$.
+Now there are two cases to consider:
+\begin{enumerate}
+\item $\Delta_1$ is disjoint from $\Delta_2$ in $e$; or
+\item $\Delta_1 \subset \Delta_2$, or $\Delta_2 \subset \Delta_1$.
+\end{enumerate}
+\simon{What if $\Delta_1 = \Delta_2$?}
+One might wonder if $\Delta_1$ can \emph{overlap} $\Delta_2$, but that is not possible:
+we are discussing syntax trees, not graphs, and so either the root of $\Delta_1$ is a child of
+the root of $\Delta_2$, or vice versa, or neither.
+
+In the first case (a) we have the diamond property immediately:
 \begin{lemma}[Disjoint] \label{lem:disjoint}
 Let $e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots$
 be an expression with two \emph{disjoint} reducts
 $\rdx{1}$ and $\rdx{2}$.
 %
 If $\rstep{}{e}{\ldots \rdx{1}' \ldots \rdx{2} \ldots \equiv e_1}$ and
-   $\rstep{}{e}{\ldots \rdx{1} \ldots \rdx{2}' \ldots \equiv e_2}$
+   $\rstep{}{e}{ \ldots \rdx{1} \ldots \rdx{2}' \ldots \equiv e_2}$
 then there exists $e'$ such that
 		$\rstep{}{e_1}{e'}$ and
 		$\rstep{}{e_2}{e'}$.
 \end{lemma}
+\simon{What is a ``reduct''?  Same as ``redex''?  Say so.}
 
 \begin{proof}
-Trivial.
+Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
 \end{proof}
+\noindent
+So to prove the diamond property for a relation $\rr$, we should focus attention
+only on case (b).
 
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
+\simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement
+  of Lemma B.5!}
+
 \subsubsection{Application}
 
+\simon{Where is $E$ defined?  I have added it to Figure 11.}
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
@@ -157,8 +212,15 @@ then there exists $\rdx{\rapp}''$ such that
 	\arrow["\rr"', dotted, from=2-1, to=2-2]
 \end{tikzcd}\]
 \end{lemma}
+\simon{Do we have to have $\rdx{\rapp} \equiv E[\rdx{}]$. Why not just use $E[\rdx{}]$ throughout?}
+\simon{``...such that $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$''.  What is the arrow in this reduction?  is it maybe $\rr$, the full relation?}
+
+\simon{I think (but I am not sure) that in the premises $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and $\rstep{\rr}{\rdx{}}{\rdx{}'}$ you mean that the reduction takes place \emph{at the root} not buried inside. But usually the arrow lets you take a step ``inside''.}
+
+\simon{What if the two are neither disjoint nor in a subset relationship, but rather just overlappping? I think that can't happen, but if not, it's a property of $\rapp$. In other rule sets they could overlap couldn't they?}
 
 \begin{proof} Split cases on the rule used in $\rapp$.
+\simon{Here is the first use of $\subset$ on terms. Needs a definition}
 \begin{description}
 
 \item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
@@ -589,7 +651,7 @@ then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-Suppose that the reduct $\rstep{}{e}{e_i}$ is using the equation $eu_i \equiv |x_i == v_i|$. Split cases on
+Suppose that the redex $\rstep{}{e}{e_i}$ is using the equation $eu_i \equiv |x_i == v_i|$. Split cases on
 \begin{description}
 \item[Case] $eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$:
 	\cref{lem:subst-same} completes the proof.
@@ -1939,11 +2001,14 @@ Split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rcon}$ or vice versa.
 We show that $\rapp$ satisfies the diamond property and hence,
 is confluent by \cref{lem:diamond}. Suppose that
 %
-$\rstep{\rapp}{e}{e_1}$ via the redux $\tx{1}$
+$\rstep{\rapp}{e}{e_1}$ via the redux $\tx{1}$, and
 %
 $\rstep{\rapp}{e}{e_2}$ via the redux $\tx{2}$.
 %
-If $\rdx{1}$ and $\rdx{2}$ are disjoint, the terms $e_1$ and $e_2$
+\simon{In $\tx{1}$ what is the subscript ``1'' on the arrow?  I expect to see a reduction relation there.
+  Here it should be $\rapp$.  I'm baffled.}
+
+If $\rdx{1}$ and $\rdx{2}$ are disjoint in $e$, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
 %
 If $\rdx{1} \subset \rdx{2}$ (or $\rdx{2} \subset \rdx{1}$) then \cref{lem:under-a} completes the proof.

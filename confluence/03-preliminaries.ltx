@@ -39,7 +39,7 @@ A term $a$ is an $\rr$-\emph{Normal Form} if there does not exist any $b$
 such that $\rstep{\rr}{a}{b}$.
 \end{definition}
 
-For clarity, we will omit the reduction $\rr$ when it is clear from the context.
+For clarity, we will omit the subscript $\rr$ when it is clear from the context.
 
 \begin{definition}[Diamond Property]
 %
@@ -58,6 +58,12 @@ A reduction $\rr$ is \emph{confluent} if whenever
 $\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{definition}
 
+\begin{definition}[Local Confluence]
+%
+A reduction $\rr$ is \emph{locally confluent} if whenever
+$\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
+%
+\end{definition}
 
 \begin{figure}[h]
 \begin{minipage}[t]{0.30\textwidth}
@@ -114,13 +120,6 @@ $\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \begin{definition}[Noetherian Reduction]
 A reduction $\rr$ is \emph{Noetherian} if there is no infinite
 sequence $a_0 \go{\rr} a_1 \go{\rr} \ldots \go{\rr} a_n \go{\rr} \ldots$.
-\end{definition}
-
-\begin{definition}[Local Confluence]
-%
-A reduction $\rr$ is \emph{locally confluent} if whenever
-$\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
-%
 \end{definition}
 
 The following result is known as Newman's Lemma \cite{Barendregt, Huet80}.
