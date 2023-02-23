@@ -1556,6 +1556,7 @@ A \emph{reduction relation} \rr is a binary relation on a set of terms \univ.
 %
 We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
 for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
+\lennart{I don't see $\rr^k$ being used anywhere below, so maybe exclude it here.}
 %
 We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
 $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
@@ -1587,6 +1588,7 @@ and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
 It is well known that adding {\bf letrec} to the lambda calculus
 makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
 In our context, consider the term:
+\lennart{Isn't the $\rightarrow^*$ the same as $\rsteps{}{}{}$ above?}
 %
 $$
 \begin{array}{lcll}
@@ -1608,8 +1610,8 @@ We tackle this problem in two different ways.  First, we can simply prohibit rec
 confluence under that restriction (\cref{sec:confluence-sketch}).
 This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
-recursion emerges from unifying terms.  For example, is this recursive: |def (x y) (x=tup (1,y); applyN f (x,y))|?
-It might be if |f = (lam (tup (v, w)) (v=w))|!
+recursion emerges from unifying terms.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
+It might be if |f == (lam (tup (v, w)) (v==w))|!
 For \emph{tuples} we have a simple solution: rule \rulename{u-occurs} make the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
@@ -1899,7 +1901,7 @@ $$
 We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
-\subsection{Generalizing |oneKW| and |allKW|}
+\subsection{Generalizing |oneKW| and |allKW|} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
@@ -1908,6 +1910,7 @@ In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consu
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
+When adding more effects, see \cref{sec:store}, to \versecalc{} it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
@@ -2267,14 +2270,14 @@ but they are not included here.
   Dale Miller,
   Andy Pitts,
   Niklas R\"ojemo,
-  Jaime S\'anches-Hern\'andez.
+  Jaime S\'anches-Hern\'andez,
   and Andrew Scheidecker.
 \end{acks}
 
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
 
-\cleardoublepage
+\clearpage
 
 \appendix
 
@@ -2283,10 +2286,13 @@ but they are not included here.
 
 \input{../confluence/03-preliminaries}
 \input{../confluence/04-confluence}
+
+\clearpage
 \input{../confluence/08-skew}
 
 
 
+\clearpage
 % ----------------------- Example
 
 \section{Example}
@@ -2331,8 +2337,11 @@ $$
 
 
 
+\clearpage
 % ----------------------- Denotational semantics  -----
 \input{densem-icfp23}
+
+\clearpage
 \input{store-icfp23}
 
 
