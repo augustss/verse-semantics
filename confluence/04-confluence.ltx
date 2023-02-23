@@ -110,7 +110,7 @@ $$
 |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
 % |x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
 $$
-\simon{We changed this back to match te defn in 4.1.}
+% \simon{We changed this back to match te defn in 4.1.} \ranjit{ack}
 %
 where the LHS is a variable and the RHS is a \emph{value}
 that is or contains a $\lambda$ in which $|x|$ occurs free.
@@ -161,7 +161,7 @@ Now there are two cases to consider:
 \item $\Delta_1$ is disjoint from $\Delta_2$ in $e$; or
 \item $\Delta_1 \subset \Delta_2$, or $\Delta_2 \subset \Delta_1$.
 \end{enumerate}
-\simon{What if $\Delta_1 = \Delta_2$?}
+\simon{What if $\Delta_1 = \Delta_2$?} \ranjit{$\subset$ includes that, let me change to $\subseteq$}
 One might wonder if $\Delta_1$ can \emph{overlap} $\Delta_2$, but that is not possible:
 we are discussing syntax trees, not graphs, and so either the root of $\Delta_1$ is a child of
 the root of $\Delta_2$, or vice versa, or neither.
