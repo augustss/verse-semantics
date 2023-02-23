@@ -2162,24 +2162,24 @@ There are many obvious similarities between Verse and the Icon programming langu
 \item An expression can (successively) produce any number of values.
 \item An expression that produces zero values is said to \emph{fail} \cite[\S 3.1]{griswold:generators-in-icon};
   an expression that produces at least one value is said to \emph{succeed}.
-\item The expression ``|e_1 choice e_2|'' produces all the values of |e_1| followed by all the values of |e_2|.
+\item The expression |e_1 choice e_2| produces all the values of |e_1| followed by all the values of |e_2|.
 \item There is a way to turn an array (or tuple) $a$ into a sequence of produced values.
-  In Icon, this is written ``\texttt{!|a|}'' \cite[\S 3]{griswold:icon-overview}; in Verse, ``\texttt{|a|\,?}''; in \versecalc{}, ``|def (i) (x=a; x i)|''.
+  In Icon, this is written \texttt{!|a|} \cite[\S 3]{griswold:icon-overview}; in Verse, \texttt{|a|\,?}; in \versecalc{}, |def (i) (x=a; x i)|.
 \item Most ``scalar'' operations (such as addition and comparisons) run through
   all possible combinations of values of their operand expressions,
   using a specific left-to-right evaluation order and automatic chronological backtracking.
 \item Success and failure are used in place of boolean values for control-structure purposes.
   Some operations, especially comparisons, can fail as part of their defined semantics.
-  The expression ``|if e_1 then e_2 else e_3|'' checks to see whether |e_1| succeeds;
+  The expression |if e_1 then e_2 else e_3| checks to see whether |e_1| succeeds;
   it then produces the values of |e_2| (if |e_1| succeeded) \emph{or} produces the values of |e_3| (if |e_1| failed).
   If |e_1| succeeds and then |e_2| fails, backtracking does \emph{not} attempt to examine further values from |e_1|.
 \item The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
 \item There is a control structure that executes a specified expression once for every value produced by another expression.
-  In Icon this is ``\texttt{every |e_1| do |e_2|}'' and in Verse it is ``\texttt{for(|e_1|) do |e_2|}'';
-  in each, the ``\texttt{do |e_2|}'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
-  (In Icon, ``\texttt{every |e|}'' may also be written as ``\texttt{repeat |e|}''.)
+  In Icon this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|;
+  in each, the ``\texttt{do}~|e_2|'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
+  (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
-  ``\texttt{|x| := |e|}'' will provide one value at a time from ``|e|'' to be named by variable ``|x|''.
+  \texttt{|x| := |e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
 
 But there are also major differences between Verse and Icon.
@@ -2208,10 +2208,10 @@ rather than an imperative approach to processing generated combinations:
   \begin{center}
   \texttt{a := array 0 string; i := 0; repeat a[i+] := e; close(a)}
   \end{center}
-  (In Icon, \emph{postfix} ``\texttt{+}'' is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual}
-  with the same behavior as \emph{prefix} ``\texttt{++}'' in~C \cite[\S 2.8]{kr-c-book}.)
-  In Verse, ``\texttt{a~=~for(x := e) do~x}'' or even just
-  ``\texttt{a~=~for\{ e \}}'' does the job; in \versecalc{}, ``|a = all(e)|'' is all it takes.
+  (In Icon, \emph{postfix} \texttt{+} is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual}
+  with the same behavior as \emph{prefix} \texttt{++} in~C \cite[\S 2.8]{kr-c-book}.)
+  In Verse, \texttt{a~=~for(x := e) do~x} or even just
+  \texttt{a~=~for\{e\}} does the job; in \versecalc{}, |a = all(e)| is all it takes.
 \item Backtracking in Icon is ``only control backtracking''; side effects, such as assignments, are not undone \cite[\S 3.1]{griswold:generators-in-icon}.
 \item Both languages have an implicit ``cut'' (permanent acceptance of the first produced value) after the predicate part of an |if|-|then|-|else|,
   but Icon furthermore has an implicit cut at each statement end (semicolon or end of line) \cite[\S 3.1]{griswold:generators-in-icon}, each
