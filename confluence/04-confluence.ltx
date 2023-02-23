@@ -8,15 +8,24 @@
 \section{Confluence of \calcname: Proof} \label{sec:confluence}
 \begin{figure}
 $$
+\begin{array}{l}
+\text{Notation} \\
 \begin{array}{rl}
   a,b,c,d,e & \text{Expressions (syntax in \cref{fig:syntax})} \\
-  \rdx{} & \text{An expression $e$ that is a redex} \\
+  \rdx{} & \text{An expression $e$ that is has a redex at the root} \\
   e_1 \subset e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
   e_1 \subseteq e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
 \rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
 \rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
 \rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
 \rstepk{\rr}{k}{a}{b}& \text{$a$ reduces to $b$ in $k$ steps of $\rr$}\\
+\end{array} \\
+\\
+\text{Expression contexts} \\
+\begin{array}{rcl}
+  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E|
+    \vb |one E| \vb |all E|
+\end{array}
 \end{array}
 $$
 \caption{Summary of notation} \label{fig:notation}
@@ -136,7 +145,7 @@ In the rest of the proof we assume that we are working with terms with \norecurs
 The condition is only need to prove $\runi$ is confluent,
 but we assume it globally for clarity.
 
-\subsection{Disjoint, reduction under, and the diamond property}
+\subsection{Disjointness, reduction under, and the diamond property}
 
 In talking about confluence we often speak of two different reduction steps with a common
 starting point, thus $\rstep{\rr}{e}{e_1}$ and $\rstep{\rr}{e}{e_2}$.
@@ -174,7 +183,7 @@ then there exists $e'$ such that
 \begin{proof}
 Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
 \end{proof}
-
+\noindent
 So to prove the diamond property for a relation $\rr$, we should focus attention
 only on case (b).
 
@@ -185,7 +194,7 @@ only on case (b).
 
 \subsubsection{Application}
 
-\simon{Where is $E$ defined?  Syntax figure!}
+\simon{Where is $E$ defined?  I have added it to Figure 11.}
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and

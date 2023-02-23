@@ -920,7 +920,7 @@ So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
-simply writing |all (e1;e2)| would give the wrong semantics. So we put |e_2| under a lambda, and
+simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
@@ -997,7 +997,7 @@ has the following properties:
 \item The semantics is expressed as a set of rewrite rules (\cref{fig:rules}). These rules apply to the core language of \cref{fig:syntax}, after
   all desugaring.
 \item Any rule can be applied, in either direction,
-  anywhere in the program term (including under lambdas) to obtain an equivalent program.
+  anywhere in the program term (including under lambdas).
 \item The rules are oriented, with the intent that using them left-to-right makes progress.
 \item Despite this orientation, the rules do not say which rule should be
   applied where; that is the task of a separate \emph{evaluation strategy} (\cref{sec:eval-strategy}).
@@ -1593,10 +1593,10 @@ In our context, consider the term:
 %
 $$
 \begin{array}{lcll}
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
+ |def (x y) (x == tup (1, y); y == lam z x; x)|
  & \rsteps{}{}{} & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
 
- |def (x,y) (x == tup (1, y); y == lam z x; x)|
+ |def (x y) (x == tup (1, y); y == lam z x; x)|
 & \rsteps{}{}{} & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
 \end{array}
 $$
@@ -1611,9 +1611,9 @@ We tackle this problem in two different ways.  First, we can simply prohibit rec
 confluence under that restriction (\cref{sec:confluence-sketch}).
 This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
-recursion emerges from unifying terms.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
+recursion emerges during execution.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
 It might be if |f == (lam (tup (v, w)) (v==w))|!
-For \emph{tuples} we have a simple solution: rule \rulename{u-occurs} make the entire
+For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} make the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
 The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
@@ -2279,7 +2279,8 @@ see \cref{sec:store}.
   Andy Pitts,
   Niklas R\"ojemo,
   Jaime S\'anches-Hern\'andez,
-  and Andrew Scheidecker.
+  Andrew Scheidecker,
+  and Stephanie Weirich.
 \end{acks}
 
 % -------------------- Bibliography ----------------
