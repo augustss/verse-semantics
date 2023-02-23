@@ -1729,22 +1729,22 @@ also confluent.
 
 \mypara{The Normalization Problem}
 %
-The second problem is that the normalization rules \rulename{exi-swap} 
-and \rulename{exi-float} interact with the unification \rulename{var-swap} 
-rule in way that precludes the classic commutativity-based composition.
+The second problem is that the normalization rules and interact with the unification
+rule in way that precludes commutativity-based composition.
 %
-Recall from \cref{sec:unification-rules} that the unification rules crucially rely 
-on the variable ordering to orient equations between variables in a canonical fashion.
+Recall from \cref{sec:unification-rules} that the unification rules rely upon
+variable ordering to orient equations between variables in a canonical fashion.
 %
-The normalization rules \rulename{exi-float} and \rulename{exi-swap} can \emph{change}
-the variable order and hence, their behavior is deeply intertwined with unification 
-and cannot be factored out via a commutativity argument. 
+The normalization rule \rulename{exi-swap} can \emph{change}
+the variable order and hence, its behavior is deeply intertwined 
+with unification and cannot be factored out via a commutativity argument. 
 %
 Instead we prove that the union of unification and normalization 
-is confluent by showing that unification \emph{postpones after} normalization \cite{Hindley}, 
-\ie that a mixed sequence of unification-or-normalization steps can be reordered, 
-roughly speaking, into two blocks normalization-only steps followed by unification-only 
-steps, after which the confluence of the union can be established by suitably 
+is confluent by showing that unification \emph{postpones after} 
+normalization \cite{Hindley}, \ie informally speaking, that a 
+mixed sequence of unification-or-normalization steps can be reordered 
+into two blocks of normalization-only steps followed by unification-only 
+steps. The confluence of the union can then be established by suitably 
 composing the confluence properties for the individual relations.
 
 \subsection{Design for confluence} \label{sec:design-confluence}  \label{sec:unifying-lambda}
