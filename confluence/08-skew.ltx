@@ -30,7 +30,7 @@
 
 \section{Skew Confluence} \label{sec:skew-confluence}
 
-We now consider a modified grammar for \versecalc{} in which there is an additional kind of value, a \emph{fixpoint} value:
+We now consider a modified grammar for \versecalc{} in which there is one more kind of value, a~\emph{fixpoint} value |mu x hnf|:
 \begin{quote}
 $
 \begin{array}{lr@@{\;}c@@{\;}l}
@@ -46,7 +46,7 @@ $
 \end{array}
 $
 \end{quote}
-to the two rules\footnote{This design allows equations to be recursive through lambda expressions but not through tuples only;
+to the two rules\footnote{These two rules allow equations to be recursive through lambda expressions and possibly also tuples, but not through tuples only;
   thus equations such as |f = lam y (tup (y, f))| and |x = (tup (1,  lam y (tup (y, x))))| can be processed by rule \rulename{u-occurs-wrap},
   but the equation |x = (tup (1, x))| can be processed only by rule \rulename{u-occurs-fail}.
   An alternate design using the single rule
