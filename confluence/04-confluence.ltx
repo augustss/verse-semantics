@@ -1126,14 +1126,16 @@ We say a reduction \emph{eliminates} a variable $x$ from a block $b$ if the redu
 %
 (2)~using an equation $|x = v|$ where
 %
-(3) $|v|$ is either an HNF or a variable $y$ such that $|x \prec y|$.
+(3) $|v|$ is either an HNF or a variable $y$ such that $x \prec y$.
 %
-A reduction sequence \emph{eliminates} a variable $x$ from a block $b$ if there is some
-reduction in the sequence that eliminates $x$ from $b$.
+A reduction sequence \emph{eliminates} a variable $x$ from a block $b$
+if there is some reduction in the sequence that eliminates $x$ from
+$b$, and the sequence contains no subsequent \rulename{subst} reductions
+spanning any block strictly enclosing $b$.
 \end{definition}
 
 \begin{definition}[Early Substitution Redex]
-An \emph{early} substitution redex is a redex of the form $X^[|y = x|]$ where $|x| \prec |y|$.
+An \emph{early} substitution redex is a redex of the form $|X^[y = x]|$ where $|x| \prec |y|$.
 \end{definition}
 
 \begin{lemma} \label{lem:uk-term-0-block}
@@ -1169,8 +1171,8 @@ Next, we show neither case is possible.
     swapping equations till they reach a canonical linear order after which no further
     swaps are possible.
 
-\textbf{Case (b)} Next, we ignore \rulename{seq-swap} to show there is no infinite
-    sequence of $\runib{0}'$ reductions. To so, suppose that $\sigma$ is such a reduction
+\textbf{Case (b)} Next, we (ignore \rulename{seq-swap} to) show there is no infinite
+    sequence of $\runib{0}'$ reductions. To do so, suppose that $\sigma$ is such a reduction
 	sequence.
 	%
 	For each prefix $(\sigma_i, e_i)$ we define the following lexicographic termination metric
@@ -1183,19 +1185,19 @@ Next, we show neither case is possible.
 	\mathsf{block}(\sigma_i, e_i) & \doteq\ [\ldots \ell \mapsto (\sz{\mathsf{cand}(\sigma_i, b_i, \ell)},
 																      \mathsf{size}(b_i,\ell),
 																  \sz{\mathsf{early}(b_i, \ell)},
-																  \sz{\mathsf{swap}(b_i, \ell)}) \ldots \mid \ell \in b_i ]\
-											\mbox{where labels are ordered by}\ \prec_{b_i}
-\intertext{and where, for a block $b$ and label $\ell$}
-	\mathsf{cand}(\sigma, b, \ell) & \doteq\ \freevars{b_{\ell}} - \mathit{elim}(\sigma, b, \ell) \\
-	\mathsf{elim}(\sigma, b, \ell) & \doteq\ \{ x \mid \sigma \mbox{ eliminates } x \mbox{ from }  b_{\ell} \} \\
-	\mathsf{size}(b, \ell) 		   & \doteq\ \mbox{size of the block}\ b_{\ell} \\
-    \mathsf{early}(b, \ell)		   & \doteq\ \mbox{early substitution redexes in}\ b_{\ell} \\
-	\mathsf{swap}(b, \ell)   	   & \doteq\ \mbox{\rulename{var-swap} redexes in}\ b_{\ell}
+																  \sz{\mathsf{swap}(b_i, \ell)}) \ldots \mid \ell \in b_i ] \\
+								  & \quad \quad \mbox{where labels are ordered by}\ \prec_{b_i} \\
+\intertext{and where, for a finite reduction (prefix) $\sigma'$ block $b$ and label $\ell$}
+	\mathsf{cand}(\sigma', b, \ell) & \doteq\ \freevars{b_{\ell}} - \mathit{elim}(\sigma', b, \ell) \\
+	\mathsf{elim}(\sigma', b, \ell) & \doteq\ \{ x \mid \sigma' \mbox{ eliminates } x \mbox{ from }  b_{\ell} \} \\
+	\mathsf{size}(b, \ell) 		    & \doteq\ \mbox{size of the block}\ b_{\ell} \\
+    \mathsf{early}(b, \ell)		    & \doteq\ \mbox{early substitution redexes in}\ b_{\ell} \\
+	\mathsf{swap}(b, \ell)   	    & \doteq\ \mbox{\rulename{var-swap} redexes in}\ b_{\ell}
 \end{align*}
 %
 % where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
 %
-The unification reductions preserve the following key invariant: once a variable has been \emph{eliminated} from a block,
+The unification reductions preserve the following invariant: once a variable $x$ has been eliminated from a block,
 it appears at most once in the block as an LHS of an equation $|x = v|$, and that equation can \emph{never} again be used
 to perform a substitution in that block \emph{unless} new occurrences of $x$ are injected into the block by a substitution
 performed in an \emph{enclosing} block, in which case, the $\mathsf{block}$ metric for the outer block will be strictly smaller.
@@ -1205,7 +1207,7 @@ performed in an \emph{enclosing} block, in which case, the $\mathsf{block}$ metr
 % Such a variable must appear at least twice in the block: as a ``source'' \ie the LHS of an equation, and as a ``target''
 % occurrence elsewhere in the block.
 %
-More concretely, each application of
+Specifically, each application of
 %
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\mathsf{choose}}$;
@@ -1214,7 +1216,7 @@ More concretely, each application of
       it \emph{eliminates} a variable from the block $\ell$ that the substitution spans \emph{or} it is an \emph{early} substitution
 	  that preserves the block size, but reduces the number of early substitution redexes for $\ell$;
 \item \rulename{u-tup} strictly reduces $\sz{\mathsf{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\mathsf{choose}}$ unchanged), as it
-	  preserves $\mathsf{elim}$ and hence $\mathsf{cand}$, but reduces the \mathsf{size} of $\ell$;
+	  preserves $\mathsf{elim}$ and hence $\mathsf{cand}$, but reduces the $\mathsf{size}$ of $\ell$;
 \item \rulename{u-lit}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged),
 	  as they strictly reduce $\mathsf{size}$ while preserving or reducing $\mathsf{cand}$;
 \item \rulename{var-swap} strictly reduces the $\mathsf{swap}$ component of $\mathsf{block}$,
