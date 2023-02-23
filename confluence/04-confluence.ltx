@@ -1122,15 +1122,15 @@ For a label $\ell$ let
 \begin{align*}
 	\sz{\mathit{substs}(\ell)} & \doteq\  \sharp \{ x \mid x\ \mbox{appears free} \geq 2\ \mbox{times}\ \mbox{in}\ b_{\ell} \} \\
 	\mathit{size}(\ell) & \doteq\  \mbox{size of the block}\ b_{\ell} \\
-\intertext{The proof follows by lexicographic induction on the following tuple}
+	\intertext{The proof follows by lexicographic termination metric using the tuple $(\sz{\text{choose}}, \sz{\text{semi}}, \sz{\text{block}}, \sz{\text{swap}})$}
 %
-	\sz{\text{choose}} & \doteq\ \mbox{number of locations to apply \rulename{choose}} \\
-	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{seq-assoc}, \rulename{eqn-float}} \\
-	\sz{\text{substs}}   & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{substs}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
-	\sz{\text{swap}}   & \doteq\ \mbox{number of locations to apply \rulename{var-swap}}
+	\sz{\text{choose}} & \doteq\ \mbox{number of \rulename{choose} redexes} \\
+	\sz{\text{semi}}   & \doteq\ \mbox{number of \rulename{seq-assoc} or \rulename{eqn-float} redexes} \\
+	\sz{\text{block}} & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{substs}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
+	\sz{\text{swap}}   & \doteq\ \mbox{number of \rulename{var-swap} redexes}
 \end{align*}
 %
-where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
+% where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
 %
 Intuitively, $\mathit{substs}(\ell)$ denotes the number of ``substitution candidates'' for the block $\ell$, 
 \ie the number of variables that could possibly be used as the LHS of a \rulename{subst} spanning the block $\ell$.
@@ -1142,9 +1142,9 @@ Each application of
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
 \item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
-\item \rulename{subst} strictly reduces $\sz{\text{substs}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{substs}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{substs}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
+\item \rulename{subst} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{block}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
 \end{itemize}
 %
 Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to terminate.
