@@ -1095,13 +1095,18 @@ the block labelled by $\ell_2$ occurs \emph{inside} (under) the block labelled b
 %
 We will use $b_{\ell}$ to denote the (unique) block labeled by $\ell$.
 
-\begin{lemma} \label{lem:uk-term-0}
-\runib{0} is Noetherian for all \emph{tails} $t$, \emph{rhs} $r$ and \emph{expressions} $e$.
-\end{lemma}
+\mypara{Block Labels and Rewriting}
+%
+For rewrites like \rulename{choose}, \rulename{seq-assoc} and \rulename{eqn-float}, 
+we assume that the rewritten term is given a fresh set of distinct block labels. 
+%
+For rewrites with \rulename{u-tup}, we assume fresh labels are given to the 
+new (inner) blocks created by tuple matching equations.
+%
+All other $\runi$ rewrites preserve blocks or delete them, 
+so we assume that the same labels carry over to the rewritten terms.
 
-\begin{proof}
-By induction on the structure of $|t|$, $|r|$ and $|e|$, using \cref{lem:uk-term-0-block} for the base case.
-\end{proof}
+
 
 \begin{lemma} \label{lem:uk-term-0-block}
 \runib{0} is Noetherian for all \emph{blocks} $|b|$.
@@ -1141,6 +1146,13 @@ Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to termin
 %
 \end{proof}
 
+\begin{lemma} \label{lem:uk-term-0}
+\runib{0} is Noetherian for all \emph{tails} $t$, \emph{rhs} $r$ and \emph{expressions} $e$.
+\end{lemma}
+
+\begin{proof}
+By induction on the structure of $|t|$, $|r|$ and $|e|$, using \cref{lem:uk-term-0-block} for the base case.
+\end{proof}
 
 \begin{lemma} \label{lem:u-lc}
 \runi{} is locally confluent.
