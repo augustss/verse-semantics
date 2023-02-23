@@ -1593,37 +1593,50 @@ Second we show that \runi' \emph{strongly postpones} after \rulename{exi-float} 
 Consequently, each $\rsteps{\runi \cup \rcon}{}{}$ can be rewritten as the composition of
 $\rsteps{\rulename{exi-float}}{}{}$ followed by $\rsteps{\runi'}{}{}$ after which
 the following diagram completes the proof.
-
-% https://q.uiver.app/?q=WzAsMTMsWzIsMCwiXFxidWxsZXQiXSxbMCwxLCJcXGJ1bGxldCJdLFs0LDEsIlxcYnVsbGV0Il0sWzEsMiwiXFxidWxsZXQiXSxbMywyLCJcXGJ1bGxldCJdLFsyLDMsIlxcYnVsbGV0Il0sWzAsMywiXFxidWxsZXQiXSxbNCwzLCJcXGJ1bGxldCJdLFsxLDUsIlxcYnVsbGV0Il0sWzMsNSwiXFxidWxsZXQiXSxbMCw0LCJcXGJ1bGxldCJdLFs0LDQsIlxcYnVsbGV0Il0sWzIsNiwiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDYsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiw3LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxMCw4LCJcXHJ1bmknIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs1LDgsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsOSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNywxMSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzExLDksIlxccnVuaSciLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzgsMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzksMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjcwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtcnItY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsOSwiXFxjcmVme2xlbTpmLXJyLWNvbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDEyLCJcXGNyZWZ7bGVtOnVlLWNvbmZ9IiwxLHsibGFiZWxfcG9zaXRpb24iOjgwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+%
+% https://q.uiver.app/?q=WzAsMTMsWzMsMCwiXFxidWxsZXQiXSxbMSwxLCJcXGJ1bGxldCJdLFs1LDEsIlxcYnVsbGV0Il0sWzIsMiwiXFxidWxsZXQiXSxbNCwyLCJcXGJ1bGxldCJdLFszLDMsIlxcYnVsbGV0Il0sWzIsNSwiXFxidWxsZXQiXSxbNCw1LCJcXGJ1bGxldCJdLFsxLDQsIlxcYnVsbGV0Il0sWzUsNCwiXFxidWxsZXQiXSxbMyw2LCJcXGJ1bGxldCJdLFswLDMsIlxcYnVsbGV0Il0sWzYsMywiXFxidWxsZXQiXSxbMCwxLCJcXHJ1bGVuYW1le25vcm0tZXhpfSIsMSx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDIsIlxccnVsZW5hbWV7bm9ybS1leGl9IiwxLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsNCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsNSwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs4LDYsIlxccnVuaSciLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzUsNiwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw3LCJcXHJ1bmknIiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs5LDcsIlxccnVuaSciLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsMTAsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsMTAsIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTpmLWV4aS1zd2FwLWpvaW59IiwxLHsibGFiZWxfcG9zaXRpb24iOjcwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNSwxMCwiXFxjcmVme2xlbTp1ZS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzEsMTEsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMTEsOCwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsOCwiXFxydW5pJyIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSw4LCJcXGNyZWZ7bGVtOmYtdWUtY29tfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzMsNiwiXFxjcmVme2xlbTp1ZS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsMTIsIlxccnVuaSciLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMTIsOSwiXFxydWxlbmFtZXtub3JtLWV4aX0iLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsOSwiXFxjcmVme2xlbTpmLXVlLWNvbX0iLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs0LDksIlxccnVuaSciLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNywiXFxjcmVme2xlbTp1ZS1jb25mfSIsMSx7ImxhYmVsX3Bvc2l0aW9uIjo4MCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
-	&& \bullet \\
-	\bullet &&&& \bullet \\
-	& \bullet && \bullet \\
-	\bullet && \bullet && \bullet \\
-	\bullet &&&& \bullet \\
-	& \bullet && \bullet \\
-	&& \bullet
-	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-1]
-	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-3, to=2-5]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-1, to=3-2]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-5, to=3-4]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=3-2, to=4-3]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=3-4, to=4-3]
-	\arrow["{\runi'}"{description}, two heads, from=2-1, to=4-1]
-	\arrow["{\runi'}"{description}, two heads, from=2-5, to=4-5]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-1, to=5-1]
-	\arrow["{\runi'}"', dotted, two heads, from=5-1, to=6-2]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-2]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=4-3, to=6-4]
-	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-5, to=5-5]
-	\arrow["{\runi'}", dotted, two heads, from=5-5, to=6-4]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=6-2, to=7-3]
-	\arrow["{\runi'}"{description}, dotted, two heads, from=6-4, to=7-3]
-	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.7}, draw=none, from=1-3, to=4-3]
-	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-1, to=6-2]
-	\arrow["{\cref{lem:f-rr-com}}"{description, pos=0.8}, draw=none, from=2-5, to=6-4]
-	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=4-3, to=7-3]
+	&&& \bullet \\
+	& \bullet &&&& \bullet \\
+	&& \bullet && \bullet \\
+	\bullet &&& \bullet &&& \bullet \\
+	& \bullet &&&& \bullet \\
+	&& \bullet && \bullet \\
+	&&& \bullet
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-2]
+	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-6]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-6, to=3-5]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-3, to=4-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-5, to=4-4]
+	\arrow["{\runi'}"', dotted, two heads, from=5-2, to=6-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-4, to=6-3]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=4-4, to=6-5]
+	\arrow["{\runi'}", dotted, two heads, from=5-6, to=6-5]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-3, to=7-4]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=6-5, to=7-4]
+	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.7}, draw=none, from=1-4, to=4-4]
+	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=4-4, to=7-4]
+	\arrow["{\runi'}"{description}, two heads, from=2-2, to=4-1]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-2]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-3, to=5-2]
+	\arrow["{\cref{lem:f-ue-com}}"{description, pos=0.8}, draw=none, from=2-2, to=5-2]
+	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=3-3, to=6-3]
+	\arrow["{\runi'}"{description}, two heads, from=2-6, to=4-7]
+	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-7, to=5-6]
+	\arrow["{\cref{lem:f-ue-com}}"{description, pos=0.8}, draw=none, from=2-6, to=5-6]
+	\arrow["{\runi'}"{description}, dotted, two heads, from=3-5, to=5-6]
+	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=3-5, to=6-5]
 \end{tikzcd}\]
+\end{proof}
+
+\begin{lemma} \label{lem:f-ue-com}
+	\rulename{exi-float} strongly commutes with \runi'.
+\end{lemma}
+
+\begin{proof}
+Split cases on each possible case of \runi'; the diamond
+is completed trivially as the rules are non-overlapping.
 \end{proof}
 
 \begin{lemma} \label{lem:u-pp-float}
