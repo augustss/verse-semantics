@@ -132,7 +132,7 @@
   \iffullverse
       && \vb & |succeeds e| \vb |decides e| \\
   \fi
-      \text{Values} & v & ::= & x  \vb \hnf \\
+      \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
       \text{Primops} & op  & ::= & |gt| \vb |add|
   \iffullverse
@@ -153,8 +153,8 @@
     \begin{array}{rcll}
 %%      |emptytup| & \text{means} & |arr ()|\\
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
-      v_1 + v_2 & \text{means} & |applyN add ( v_1, v_2 ) | & \\
-      v_1 > v_2 & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
+      |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | & \\
+      |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
       |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
       |tup (e_1, xdots, e_n)| & \text{means} &
@@ -162,11 +162,11 @@
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
 
-      |if e_1 then e_2 else e_3| & \text{means}
-      & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
       |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh}
+      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p = tup (x,y); e)| & \text{|p| fresh} \\
+      |if e_1 then e_2 else e_3| & \text{means}
+      & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
     \end{array} \\
   \\[-2mm]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
@@ -182,9 +182,9 @@
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Execution contexts (hole is |e|)} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
+      \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
 %       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
-      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots ,v_im1, V, v_ip1, xdots, v_n)|\\
+      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
 
