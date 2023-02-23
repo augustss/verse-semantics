@@ -1086,16 +1086,16 @@ value, application, existential, one, all or choice.
 %
 An \emph{rhs} is either a block or a tail (which includes a value).
 %
-A (labeled) \emph{block} is a sequence of equations $|v=r|$ of a value and an RHS $|r|$ followed by a tail $|t|$.
+A \emph{labeled block} is a sequence of equations $|v=r|$ of a value and an RHS $|r|$ followed by a tail $|t|$.
 %
 We assume each block carries a unique ``ghost'' label $\ell$ (that will be used to prove termination).
 %
 In any block $b$, for any two labels $\ell_1$ and $\ell_2$ we write $\ell_1 \prec_b \ell_2$ if
 the block labelled by $\ell_2$ occurs \emph{inside} (under) the block labelled by $\ell_1$ in $b$.
 %
-We will use $b_{\ell}$ to denote the (unique) block labeled by $\ell$.
-
-\mypara{Block Labels and Rewriting}
+We will use $b_{\ell}$ to denote the (unique) sub-block of $b$ labeled by $\ell$.
+%
+% \mypara{Block Labels and Rewriting}
 %
 For rewrites like \rulename{choose}, \rulename{seq-assoc} and \rulename{eqn-float}, 
 we assume that the rewritten term is given a fresh set of distinct block labels. 
@@ -1120,26 +1120,31 @@ finitely many $\runib{0}$ steps from $|b|$.
 For a label $\ell$ let
 %
 \begin{align*}
-	\sz{\mathit{free}(\ell)} & \doteq\  \sharp \{ x \mid x\ \mbox{appears free} \geq 2\ \mbox{times}\ \mbox{in}\ b_{\ell} \} \\
-	{\mathit{size}(\ell)} & \doteq\  \mbox{size of the block}\ b_{\ell} \\
+	\sz{\mathit{substs}(\ell)} & \doteq\  \sharp \{ x \mid x\ \mbox{appears free} \geq 2\ \mbox{times}\ \mbox{in}\ b_{\ell} \} \\
+	\mathit{size}(\ell) & \doteq\  \mbox{size of the block}\ b_{\ell} \\
 \intertext{The proof follows by lexicographic induction on the following tuple}
 %
 	\sz{\text{choose}} & \doteq\ \mbox{number of locations to apply \rulename{choose}} \\
 	\sz{\text{semi}}   & \doteq\ \mbox{number of locations to apply \rulename{seq-assoc}, \rulename{eqn-float}} \\
-	\sz{\text{free}}   & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{free}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
+	\sz{\text{substs}}   & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{substs}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
 	\sz{\text{swap}}   & \doteq\ \mbox{number of locations to apply \rulename{var-swap}}
 \end{align*}
 %
 where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
+%
+Intuitively, $\mathit{substs}(\ell)$ denotes the number of ``substitution candidates'' for the block $\ell$, 
+\ie the number of variables that could possibly be used as the LHS of a \rulename{subst} spanning the block $\ell$.
+Such a variable must appear at least twice in the block: as a ``source'' \ie the LHS of an equation, and as a ``target'' 
+occurrence elsewhere in the block.
 %
 Each application of
 %
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
 \item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
-\item \rulename{subst} strictly reduces $\sz{\text{free}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{free}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
+\item \rulename{subst} strictly reduces $\sz{\text{substs}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{size}}$ (leaving $\sz{\text{substs}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{size}}$, $\sz{\text{substs}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
 \end{itemize}
 %
 Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to terminate.
