@@ -1262,8 +1262,9 @@ our intution that order does not matter.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
-Thhat is why the \rulename{seq-swap} insists that both equations are \emph{choice-free}
-expressions $ceu$ (\cref{fig:choice-free-syntax}).
+That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eu_1$ and $eu_2$
+is \emph{choice-free}, via the side condition $eu_1 \in ceu$ or $eu_2 \in ceu$ in \rulename{seq-swap}
+(see \cref{fig:choice-free-syntax} for the syntax of $ceu$).
 Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
@@ -1439,40 +1440,55 @@ the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then
 or the other way around.
 The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
 rule \rulename{subst} only fires when the RHS is a value.
-By choosing rewrite rules carefully, we can for example express call-by-name,
-call-by-name, and call-by-need
+In general, by choosing rewrite rules carefully, we can enforce restrictions on evaluation order
+and thereby express call-by-name, call-by-name, and call-by-need
 \cite{ariola:call-by-need}.
 
+Even with these constraints, there may be many redexes in a term.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
-out of the many possible redexes, should I rewrite next to make progress towards the result?
+out of the many possible redexes, should be rewritten next to make progress towards the result?
 Any decent evaluation strategy should (a) guarantee to terminate if there
 is \emph{any} terminating sequence of reductions; and (b) be amenable
-to compilation into efficient code.
+to compilation into efficient code\footnote{
+It would be even better if the strategy could (c) guarantee to find the
+result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
+invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
 guarantees to terminate if any strategy does so.
 
-It would be even better if the strategy could (c) guarantee to find the
-result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
-invariably involves reducing under lambdas, so for practical purposes it is well out of reach.
+We believe that the same leftmost-outermost strategy works for
+\versecalc{}: just repeatedly reduce the leftmost-outermost
+redex. That is easy in theory, but it is tricky in practice.  For
+example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
+redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
+substitution to rewrite the |(x+y)| to |(2+3)|; and
+\emph{now} the |(2+3)| is a redex.  So a reduction may ``unlock'' a
+redex far to its left.  A major challenge of an implementation is to
+find the next redex efficiently.
 
-Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
-we can make some informal comments.  First, in service of (b) we envisage compiling
-lambdas to code, and thus we never rewrite under a lambda \cite{pj-book}.
-Second, it never makes sense to evaluate in the right-hand argument of
-a choice\footnote{Except perhaps in parallel, of course.}, because
-\versecalc{}'s strong-ordering semantics mean that we must first find out what the left-hand argument
-is (especially, whether it fails) before the right-hand one can be used.
-So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
+We have several prototype implementations of \versecalc{}, each involving an abstract
+machine with a stack, a heap, a bunch of blocked computations, and so on. Exploring this
+design space is, however, beyond the scope of this paper.
 
-The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; tup(x,3)=tup(2,y))|,
-the equation may or may not be the leftmost redex, depending on whether |e| is stuck ({\ie}, contains no
-redexes); and whether or not |e| is stuck is a not syntactic property, and
-(worse) may depend not only on |e| itself, but on its context. Even worse, |e| may subsequently
-become un-stuck when we rewrite the equation.
-Any calculus in which a redex to the ``right'' may unblock one to the
-``left''---that is, residuation---must grapple with this problem,
-so we leave evaluation strategy and compilation for future work.
+% The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; tup(x,3)=tup(2,y))|,
+% the equation may or may not be the leftmost redex, depending on whether |e| is stuck ({\ie}, contains no
+% redexes); and whether or not |e| is stuck is a not syntactic property, and
+% (worse) may depend not only on |e| itself, but on its context. Even worse, |e| may subsequently
+% become un-stuck when we rewrite the equation.
+% Any calculus in which a redex to the ``right'' may unblock one to the
+% ``left''---that is, residuation---must grapple with this problem,
+% so we leave evaluation strategy and compilation for future work.
+
+% Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
+% we can make some informal comments.  First, in service of (b) we envisage compiling
+% lambdas to code, and thus we never rewrite under a lambda \cite{pj-book}.
+% Second, it never makes sense to evaluate in the right-hand argument of
+% a choice\footnote{Except perhaps in parallel, of course.}, because
+% \versecalc{}'s strong-ordering semantics mean that we must first find out what the left-hand argument
+% is (especially, whether it fails) before the right-hand one can be used.
+% So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
+
 
 \subsection{Developing and debugging rules}
 The rules we describe here should both be able to transform a program to its value,
@@ -1626,7 +1642,7 @@ specifically to handle the even/odd problem.  We sketch our skew confluence proo
 A third approach is simply to abandon confluence as a goal. Confluence is \emph{syntactic}, and hence
 much stronger than what we really need, which that each of our rules is
 \emph{semantics}-preserving.  But of course that requires
-an independent notion of semantics, a direction we pursue in \cref{sec:den-sem}.
+an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
 \subsection{Proof of confluence} \label{sec:confluence-sketch}
 
@@ -2161,7 +2177,21 @@ There are many obvious similarities between Verse and the Icon programming langu
   ``\texttt{|x| := |e|}'' will provide one value at a time from ``|e|'' to be named by variable ``|x|''.
 \end{itemize}
 
-But there are also important differences between Verse and Icon:
+But there are also major differences between Verse and Icon.
+Icon was designed primarily to use expressions as generators to automatically
+explore a combinatorial space of possibilities, and secondarily to use
+success/failure rather than booleans to drive control structure.
+But in other respects \emph{Icon is a fairly conventional imperative language}, relying
+on side effects (assignments) to process the generated combinations.
+The designers judged that the interactions of such side effects with completely
+unrestrained control backtracking would be difficult for programmers to
+understand; therefore the design of Icon emphasizes limited scopes for control
+backtracking and tools for controlling the backtracking process.
+
+In contrast, \emph{Verse is a declarative language}, and
+avoids many of these difficulties by using a functional-logic approach
+rather than an imperative approach to processing generated combinations.
+For example: \simon{I have moved the intro, but I'm not sure that the ``for example'' quite works.  Maybe re-visit the choice of bulleted items?}
 \begin{itemize}
 \item Icon typically processes multiple values from an expression by using \emph{assignment} (a \emph{side effect});
   Verse typically processes multiple values by using \emph{equations} (which are then \emph{solved})
@@ -2180,17 +2210,6 @@ But there are also important differences between Verse and Icon:
   closing brace ``\texttt{\}}'', and most keywords \cite{icon-programming-corner-4}.
 \end{itemize}
 
-Icon was designed primarily to use expressions as generators to automatically
-explore a combinatorial space of possibilities, and secondarily to use
-success/failure rather than booleans to drive control structure.
-But in other respects Icon is a fairly conventional imperative language, relying
-on side effects (assignments) to process the generated combinations.
-The designers judged that the interactions of such side effects with completely
-unrestrained control backtracking would be difficult for programmers to
-understand; therefore the design of Icon emphasizes limited scopes for control
-backtracking and tools for controlling the backtracking process.
-Verse avoids many of these difficulties by using a functional/logical approach
-rather than an imperative approach to processing generated combinations.
 
 
 \section{Looking back, looking forward}
