@@ -1061,17 +1061,19 @@ By induction on $k$.
 		%
 		By the IH there is some \emph{finite prefix}
 		of the trace $\rsteps{\runib{k+1}}{e}{e'}$ after which
-		there are no more $\runib{k}$ steps.
+		there are no more $\runi$ steps at level $\leq k$. % $\runib{k}$ steps.
 		%
-		Note that $e'$ is finite and of the form $\ldots |lam x_1 e_1| \ldots |lam xn e_n| \ldots$
-		comprising disjoint $\lambda$ terms.
+		Note that $e'$ is finite and of the form $\ldots (|lam x_1 e_1|) \ldots (|lam x_n e_n|) \ldots$
+		comprising $n$ disjoint $\lambda$ terms.
 		%
 		Every $\runib{k+1}$ reduction from $e'$ is a $\runib{k}$ reduction
-		from some $|e_i|$, that occur ``in parallel'' i.e. without influencing
-		each other, and which can be sequenced to get a $\runib{k+1}$ reduction sequence.
+		from some $|e_i|$, that occur ``in parallel'' \ie without influencing
+		each other, and which can be sequenced to get a $\runib{k+1}$ reduction
+		sequence.
 		%
-		Again, by the induction hypothesis, each of these reduction sequences (for each $|v_i|$)
-		is finite, and hence their sequencing is finite, hence $\sigma$ must be finite.
+		Again, by the induction hypothesis, each of these reduction
+		sequences (for each $e_i$) is finite, and hence their sequencing
+		is finite, hence $\sigma$ must be finite.
 \end{description}
 \end{proof}
 

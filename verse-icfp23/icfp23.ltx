@@ -1764,7 +1764,7 @@ after the value of |x| is substituted in and checked to not be a $\lambda$.
 
 \mypara{Ordering variables}. As we discussed in \cref{sec:unification-rules},
 rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
-to put the equation in a canonical orientation, and thus avoid non-termination of $\runi$.
+to put the equation in a canonical orientation, and thus ensure $\runi$ terminates.
 % %
 % \rulename{var-swap} has a curious side condition: it only rewrites
 % $|x == y|$ to $|y == x|$ if $y \prec x$.
