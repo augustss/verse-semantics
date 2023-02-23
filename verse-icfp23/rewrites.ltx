@@ -226,7 +226,7 @@
           \end{array}\right.$
     \fi
 
-\rulegroupname{Application:~\rapp}
+\rulegroupname{Application:}
 \rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
@@ -238,7 +238,7 @@
 
 \\[-2mm]
 
-\rulegroupname{Unification:~\runi}
+\rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
   \rulename{u-tup} & \hspace{-8mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
@@ -252,7 +252,7 @@
 
     \\[-2mm]
 
-\rulegroupname{Normalization:~\rcon}
+\rulegroupname{Normalization:}
 \rulename{exi-float} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
 \rulename{seq-assoc} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
@@ -262,7 +262,7 @@
 
     \\[-2mm]
 
-\rulegroupname{Elimination:~\rgc}
+\rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
@@ -270,7 +270,7 @@
 
     \\[-2mm]
 
-\rulegroupname{Choice:~\rspc}
+\rulegroupname{Choice:}
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one v| & \movesto & |v| \\
 \rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
@@ -321,67 +321,3 @@ $$\begin{array}{l}
    \end{figure}
 }
 
-\newcommand{\figureRewriteRulesPLDI}{
-\begin{figure}
-$$\begin{array}{lr@@{\;}c@@{\;}l}
-\textit{Expression context}     & E  & ::= & \hole \vb |tup (s_1, dots , hole , dots, s_n)| \vb |lam x E| \vb |def x E|
-                                              \vb |E == e| \vb |e == E| \\
-                                &    & \vb & |E ; e| \vb |e ; E| \vb |apply1N E v| \vb |apply1N v E|
-                                       \vb |E choice e| \vb |e choice E| \vb |all E| \vb |one E| \\
-\textit{Application context}    & A  & ::= & |apply1N hole v| \vb |apply1N op hole| \vb |hole == hnf| \vb |v == A| \vb |def x A| \vb |A ; e| \vb |e ; A| \\
-                                &    & \vb & |A choice e| \vb |e choice A| \vb |all A| \vb |one A| \\
-\textit{Scope context}          & SX & ::= & |hole choice e| \vb |e choice hole| \vb |one hole| \vb |all hole| \\
-\textit{Choice context}         & CX & ::= & \hole \vb |v == CX| \vb |CX; e| \vb |ce ; CX|  \vb |def x CX| \\
-\textit{Choice-free expr}      & ce & ::= & |v| \vb |v == ce| \vb |ce_1 ; ce_2| \vb |one e| \vb |all e|
-                                             %%% NOTE: the following is not in the POPL submission,
-                                             %%% but needed to make progress in (1,2)[x:int]
-                                             \vb |apply1 op v|
-                                             \vb |def x ce| \\
-\textit{Bound variables} & \multicolumn{3}{l}{
-  \boundvars{E} =
-  \begin{array}[t]{l}
-      \text{The variables that are bound by |E| at the hole} \\
-      \text{e.g. $\boundvars{|(def x (x=3)) `choice` (def y (hole = 4)))|} = \{y\}$}
-  \end{array}
-   }
-\end{array}$$
-\vspace{-6mm}
-\begin{longtable}[l]{@@{\quad} l @@{\hspace{-.5em}} r >{$}c<{$} l l}
-\rulegroupname{Unification:~\runi}
-\rulename{deref-s}  & |x == s ;  E^[x]| & \movesto & |x == s ; E^[s]| & $x \not \equiv s, x \not\in \boundvars{|E|}, s \not\in \boundvars{|E|}$ \\
-\rulename{deref-h}  & |x == h ;  A^[x]| & \movesto & |x == h ; A^[h]| & $x \not\in \boundvars{A}, \freevars{h} \not\in \boundvars{A}$ \\
-\rulename{u-scalar} & |s == s; e |                                    & \movesto & e \\
-\rulename{u-tup}    & |tup (v_1,dots,v_n) == tup (v1' ,dots, v_n'); e| & \movesto & \multicolumn{2}{l} {|v_1==v1';dots;v_n==v_n'; e|} \\
-\rulename{u-fail}   & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if neither \rulename{u-scalar} nor \rulename{u-tup} match} \\
-\end{longtable}
-\vspace{-4mm}
-\begin{longtable}[l]{@@{\quad} l r >{$}c<{$} l l}
-\rulegroupname{Application:~\rapp}
-\rulename{app-beta} & |apply1N (lam x e) v| & \movesto & |def x (x=v; e)|  & if $|x| \not \in \freevars{|v|}$ \\
-\rulename{app-tup0} & |apply1N (tup ()) v| & \movesto & |fail| \\
-\rulename{app-tup}  & |apply1N (tup (v_0 dots v_n)) v| & \movesto
-	& |def x (x == v; (x = 0; v_0 choice dots choice x = n; v_n)| & if $|x| \not \in \freevars{|v|}, n \geq 0$ \\
-\rulename{app-add}  & |applyN add (k_1 ,k_2)| & \movesto & |k_1+k_2| \\
-\rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
-\rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$}
-\end{longtable}
-\vspace{-4mm}
-\begin{longtable}[l]{@@{\quad} l @@{\;}  r >{$}c<{$} l l}
-\rulegroupname{Speculation:~\rspc}
-\rulename{choose}     & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & if $|CX| \ne \hole$ \\
-\rulename{choose-assoc} & |SX^[(e_1 choice e_2) choice e_3]| & \movesto & |SX^[e_1 choice (e_2 choice e_3)]| \\
-\rulename{choose-r}   & |SX^[fail choice e]|       & \movesto & |SX^[e]| \\
-\rulename{choose-l}   & |SX^[e choice fail]|       & \movesto & |SX^[e]| \\
-\rulename{one-fail}   & |one fail|           & \movesto & |fail| \\
-\rulename{one-choice} & |one (e_1 `choice` e_2)| & \movesto & |e_1| & if \wff{\emptyset}{|e_1|}{|xs|}{|cs|}{|v|} \\
-\rulename{one-value}  & |one e|              & \movesto & |e| & if \wff{\emptyset}{|e|}{|xs|}{|cs|}{|v|} \\
-\rulename{all-fail}   & |all fail|           & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (e_1 choice dots choice e_n)| & \movesto &
-   |def xs cs ; tup (vs)| &
-               if \wffmany{|es|}{|xs|}{|cs|}{\overline{|v|}}, $n \geq 1$ \\
-%% \rulename{all-value}  & |all e|              & \movesto & |def xs cs ; tup v|     & if \wffv{e}{|xs|}{|cs|}{|v|}
-\end{longtable}
-\caption{\textbf{The Verse Calculus: Rewrite Rules}}
-   \label{fig:rewrite-rules} \label{fig:choice-rules} \label{fig:contexts}
-\end{figure}
-}
