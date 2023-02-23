@@ -94,7 +94,7 @@ $
   \semapp{V}{|k|}{\rho} & = & k \\
   \semapp{V}{op}\rho & = & \semapp{O}{op} \\
   \semapp{V}{|lam x e|}{\rho} & = & \lambda w . \semapp{E}{e} (\extendrho{\rho}{x \mapsto w}) \\
-  \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
+  \semapp{V}{|tup (v_1,xdots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \mydots, \semapp{V}{v_n}{\rho}} \\
 \\
   \semapp{O}{|op|}{} & : & \Value \\
   \semapp{O}{|add|} & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
@@ -112,7 +112,7 @@ $
 \begin{array}{rcll}
 apply & : & (\Value \times \Value) \rightarrow \mtype \\
 apply( k, w) & = & \wrong & k \in \mathbb{Z} \\
-apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
+apply( \tuple{v_0, \mydots, v_n}, k) & = & \munit(v_k) & 0 \leq k \leq n \\
   & = &  \mempty & \text{otherwise} \\
 apply( f, w ) & = & f(w) & f \in \Value \rightarrow \mtype \\
 \end{array}
@@ -236,7 +236,7 @@ value and returns a \emph{collection} of values.
   |(one e)| returns the first.  Of course that begs the question of what ``the first'' means -- for bags
   it would be non-deterministic. We will fix this problem in \Cref{sec:order-sensitive}, but for now we simply ignore it.
 \item The semantics of |(all e)| is similar, but it always returns a singleton collection
-  (hence the $\munit$ in the semantics of |all|) whose
+  (hence the $\munit$ in the semantics of |allKW|) whose
   element is a (possibly-empty) tuple that contains all the values in the collection returned by |e|.
 \end{itemize}
 The fact that unification ``|=|'' maps onto intersection, and choice ``|choice|'' onto union, is
@@ -277,7 +277,7 @@ But not all unification-over-functions is ruled out.  We do expect the implement
 $$
 |def f (((lam x (x+1)) = f); apply1N f 3)|
 $$
-Here the |defKW| will iterate over all values of |f|, and the equality will pick out the (unique) iteration
+Here the |defKW| will ``iterate'' over all values of |f|, and the equality will pick out the (unique) iteration
 in which |f| is bound to the incrementing function.
 
 So our touchstone must be:
@@ -331,7 +331,7 @@ $$
 \begin{array}{rrcll}
 \text{Empty}        & \mempty & : &  \mtype \\
     & \mempty & = & \varnothing \\[1mm]
-\text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
+\text{Singleton}    & \munit & : & \Value \rightarrow \mtype \\
      & \munits{w} & = & \setform{ ([], w) } \\[1mm]
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
  &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
@@ -346,11 +346,13 @@ $$
 & \mone(s) & = & \shead (\msort( s)) \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
  & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
-\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
+\text{Head}  & \shead & : & ([\Value] + \wrong) \rightarrow \mtype \\
+             & \shead(\wrong) & = & \wrong \\
              & \shead [] & = & empty \\
              & \shead (w \scons s) & = & \munits{w} \\[1mm]
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \tuple{\Value} \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+\text{To tuple} & \stuple & : & ([\Value] + \wrong) \rightarrow \tuple{\Value} \\
+     & \stuple(\wrong) & = & \wrong \\
+     & \stuple [w_1, \mydots, w_n] & = & \tuple{w_1,\mydots,w_n} \\
   \end{array} \\
 \\
 \begin{array}{rrcll}
@@ -370,7 +372,7 @@ $$
 \end{figure}
 
 There is a Big Problem with this approach.  Consider |def x (x= (4 choice 3))|.  The existential
-enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (i.e. concatentation)
+enumerates all possible values of x \emph{in some arbitrary order}, and takes the union (\ie, ``concatentation'')
 of the results from each of these bindings.  Suppose that |defKW| enumerates |3| before |4|; then
 the semantics of this expression is the sequence $[3,4]$, and not $[4,3]$ as it should be.
 And yet returning a sequence (not a set nor a bag) is a key design choice in Verse.  What can we do?
@@ -389,7 +391,7 @@ A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
 a \emph{set of labelled values}, each of type $\LblValue$.
 \item A labelled value (of type $\LblValue$)
 is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
-\item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
+\item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$, similar to \cref{sec:ord-choice}.
 \item The union (or concatentation) operation $\munion$, defined in \cref{fig:labelled-sem},
 adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
 and a $\lblright$ tag to those coming from the right.
