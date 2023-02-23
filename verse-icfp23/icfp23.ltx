@@ -1607,7 +1607,7 @@ rules, as we did when we added \rulename{var-swap} (\cref{sec:unification-rules}
 and \rulename{seq-swap} (\cref{sec:normalization}).  Why not? Because the terms
 are equivalent only under some kind of graph isomorphism.
 
-We tackle this problem in two different ways.  First, we can simply prohibit recusion, and prove
+We have tackled this problem in three different ways.  First, we can simply prohibit recursion, and prove
 confluence under that restriction (\cref{sec:confluence-sketch}).
 This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
@@ -1638,19 +1638,20 @@ using one's favorite fixpoint combinator, such as Y or Z.
 
 This approach is not entirely satisfying: it is is hard to prove that a term
 has no recursion, and it is clumsy to write recursive programs using only Y-combinators.
-Our second approach is to adopt the idea of \emph{skew confluence} from
-\cite{ariola:skew-confluence}, a clever technique that the authors developed
-specifically to handle the even/odd problem.  We sketch our skew confluence proof in \cref{sec:skew-confluence}.
+Our second approach is to adopt the idea of \emph{skew confluence}
+\cite{ariola:skew-confluence}, a clever technique developed
+specifically to handle the even/odd problem.  We sketch our approach to a proof of skew confluence for \versecalc{} in \cref{sec:skew-confluence},
+including several new lemmas, but we emphasize that this proof is not yet complete.
 
-A third approach is simply to abandon confluence as a goal. Confluence is \emph{syntactic}, and hence
-much stronger than what we really need, which that each of our rules is
+A third approach is simply to abandon confluence as a goal. Confluence is, after all, purely \emph{syntactic}, and hence
+much stronger than what we really need, which that each of our rules be
 \emph{semantics}-preserving.  But of course that requires
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
 \subsection{Proof of confluence} \label{sec:confluence-sketch}
 
 Our main result is that \versecalc{}'s reduction rules are confluent for terms with \norecursion.
-We sketch the proof here, with full details in \cref{sec:confluence}.
+We sketch the proof here, with full details in \cref{sec:confluence} (and relevant preliminaries in \cref{sec:preliminaries}).
 
 
 \begin{theorem}[Confluence] \label{thm:confluence}
