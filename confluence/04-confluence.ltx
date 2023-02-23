@@ -4,6 +4,8 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\newcommand{\soccunder}{\ensuremath{\subset}}
+\newcommand{\occunder}{\ensuremath{\subseteq}}
 
 \section{Confluence of \calcname: Proof} \label{sec:confluence}
 \begin{figure}
@@ -13,8 +15,8 @@ $$
 \begin{array}{rl}
   a,b,c,d,e & \text{Expressions (syntax in \cref{fig:syntax})} \\
   \rdx{} & \text{An expression $e$ that is has a redex at the root} \\
-  e_1 \subset e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
-  e_1 \subseteq e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
+  e_1 \soccunder e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
+  e_1 \occunder e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
 \rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
 \rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
 \rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
@@ -23,8 +25,8 @@ $$
 \\
 \text{Expression contexts} \\
 \begin{array}{rcl}
-  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E|
-    \vb |one E| \vb |all E|
+  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E| \vb |one E| \vb |all E| \\
+		& \vb & |apply1 E v| \vb |apply1 v E| \vb |tup (v_1, xdots, E, xdots, v_n)| \vb |lam x E| \\
 \end{array}
 \end{array}
 $$
@@ -155,13 +157,16 @@ expression, but we use the notation ``$\Delta$'' to stress that it is the root o
 (see \cref{fig:notation}).  $\Delta_1$ is a sub-term of $e$ (or possibly $\Delta = e$),
 which we write $\Delta_1 \subseteq e$ (again in \cref{fig:notation}).
 
+
 Similarly we may identify $\Delta_2$, the redex that is reduced by $\rstep{\rr}{e}{e_2}$.
 Now there are two cases to consider:
 \begin{enumerate}
 \item $\Delta_1$ is disjoint from $\Delta_2$ in $e$; or
-\item $\Delta_1 \subset \Delta_2$, or $\Delta_2 \subset \Delta_1$.
+\item $\Delta_1 \occunder \Delta_2$, or $\Delta_2 \occunder \Delta_1$.
 \end{enumerate}
-\simon{What if $\Delta_1 = \Delta_2$?} \ranjit{$\subset$ includes that, let me change to $\subseteq$}
+%
+% \simon{What if $\Delta_1 = \Delta_2$?} \ranjit{ACK: $\occunder$ includes that, let me change to clarify}
+%
 One might wonder if $\Delta_1$ can \emph{overlap} $\Delta_2$, but that is not possible:
 we are discussing syntax trees, not graphs, and so either the root of $\Delta_1$ is a child of
 the root of $\Delta_2$, or vice versa, or neither.
@@ -169,7 +174,7 @@ the root of $\Delta_2$, or vice versa, or neither.
 In the first case (a) we have the diamond property immediately:
 \begin{lemma}[Disjoint] \label{lem:disjoint}
 Let $e \equiv \ldots \rdx{1} \ldots \rdx{2} \ldots$
-be an expression with two \emph{disjoint} reducts
+be an expression with two \emph{disjoint} redexes
 $\rdx{1}$ and $\rdx{2}$.
 %
 If $\rstep{}{e}{\ldots \rdx{1}' \ldots \rdx{2} \ldots \equiv e_1}$ and
@@ -178,7 +183,7 @@ then there exists $e'$ such that
 		$\rstep{}{e_1}{e'}$ and
 		$\rstep{}{e_2}{e'}$.
 \end{lemma}
-\simon{What is a ``reduct''?  Same as ``redex''?  Say so.}
+%\simon{What is a ``reduct''?  Same as ``redex''?  Say so.} \ranjit{ACK: reduct is "redex" plus thing it steps to, so here we just want "redex}
 
 \begin{proof}
 Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
@@ -191,10 +196,12 @@ only on case (b).
 
 \simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement
   of Lemma B.5!}
+\ranjit{TODO}
 
 \subsubsection{Application}
 
-\simon{Where is $E$ defined?  I have added it to Figure 11.}
+% \simon{Where is $E$ defined?  I have added it to Figure 11.} \ranjit{ACK: Thanks!}
+
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
 If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
@@ -224,19 +231,19 @@ then there exists $\rdx{\rapp}''$ such that
 \begin{description}
 
 \item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
-		If $\rdx{} \subset |e|$, \ie $\rr : e \movesto e'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v; e')|$.
-		If $\rdx{} \subset |v|$, \ie $\rr : |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v'; e)|$.
+		If $\rdx{} \occunder |e|$, \ie $\rr : e \movesto e'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v; e')|$.
+		If $\rdx{} \occunder |v|$, \ie $\rr : |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |def x (x == v'; e)|$.
 
 \item[Case:] \rulename{app-tup} \ie $\tx{\rapp} \equiv |arr (v_0 dots v_n)| |v| \movesto |def x (x == v; (x == 0; v_0 `choice` dots `choice` x == n; v_n))|$.
-		If $\rdx{} \subset |v_i|$, \ie $\rr: |v_i| \movesto |v_i|'$,
+		If $\rdx{} \occunder |v_i|$, \ie $\rr: |v_i| \movesto |v_i|'$,
 		then join at $|def x (x == v; (x == 0; v_0 `choice` dots x = i; v_i' dots `choice` x == n; v_n))|$.
-		If $\rdx{} \subset |v|$, \ie $\rr: |v| \movesto |v|'$,
+		If $\rdx{} \occunder |v|$, \ie $\rr: |v| \movesto |v|'$,
 		then join at $|def x (x == v'; (x == 0; v_0 `choice` dots `choice` x == n; v_n))|$.
 
 \item[Case:] \rulename{app-tup0} \ie $\tx{\rapp} \equiv |arr ()| |v| \movesto |fail|$.
-		Here, $\rdx{} \subset v$, \ie $\rr: |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |fail|$.
+		Here, $\rdx{} \occunder v$, \ie $\rr: |v| \movesto |v|'$, then join at $\rdx{\rapp}'' \equiv |fail|$.
 
-\item[Case:] \rulename{app-add}, \rulename{app-gt-*} In any of the primitive application rules, $\rdx{} \not\subset \rdx{\rapp}$.
+\item[Case:] \rulename{app-add}, \rulename{app-gt-*} In any of the primitive application rules, $\rdx{} \not\occunder \rdx{\rapp}$.
 \end{description}
 \end{proof}
 
@@ -268,7 +275,7 @@ Split cases on the rule used in $\runi$.
 \begin{description}
 \item[Case \rulename{subst}]: Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
 	\begin{description}
-	\item[Case] $\rdx{} \subset X$, \ie $X \equiv X'[\rdx{}]$.
+	\item[Case] $\rdx{} \occunder X$, \ie $X \equiv X'[\rdx{}]$.
 	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYJ1tcXHJkeHt9XVt4PXZdIl0sWzAsMSwiWCdbXFxyZHh7fSddW3g9dl0iXSxbMiwwLCJYJ1xce3YveFxcfVtcXHJkeHt9XFx7di94XFx9XVt4PXZdIl0sWzIsMSwiWCdcXHt2L3hcXH1bXFxyZHh7fSdcXHt2L3hcXH1dW3g9dl0iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgXFx0ZXh0e3ZpYX1cXCBcXGNyZWZ7bGVtOnN1YnN0fSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X'[\rdx{}][x=v]} && {X'\{v/x\}[\rdx{}\{v/x\}][x=v]} \\
@@ -279,7 +286,7 @@ Split cases on the rule used in $\runi$.
 	\arrow["{\rr' \ \text{via}\ \cref{lem:subst}}", dotted, from=1-3, to=2-3]
 \end{tikzcd}\]
 
-	\item[Case] $\rdx{} \subset v$, \ie $\rstep{\rr'}{v}{v'}$
+	\item[Case] $\rdx{} \occunder v$, \ie $\rstep{\rr'}{v}{v'}$
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3g9dl0iXSxbMCwxLCJYW3g9diddIl0sWzIsMCwiWFxce3YveFxcfVt4PXZdIl0sWzIsMSwiWFxce3YnL3hcXH1beD12J10iXSxbMCwxLCJcXHJyJyIsMl0sWzAsMiwiXFxydW5pIl0sWzEsMywiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsMywiXFxycicgXFwgKFxcdGV4dHtyZXBlYXQgYXQgZWFjaH1cXCB2KSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X[x=v]} && {X\{v/x\}[x=v]} \\
@@ -312,25 +319,25 @@ Split cases on the rule used in $\runi$.
 	\arrow["{\rr'}"', from=1-1, to=2-1]
 	\arrow["\runi"', dotted, from=2-1, to=1-3]
 \end{tikzcd}\]
-\item[Case \rulename{var-swap}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
-\item[Case \rulename{u-lit}]: Impossible, no $\rdx{} \subset \rdx{\runi}$
+\item[Case \rulename{var-swap}]: Impossible, no $\rdx{} \occunder \rdx{\runi}$
+\item[Case \rulename{u-lit}]: Impossible, no $\rdx{} \occunder \rdx{\runi}$
 \item[Case \rulename{u-fail}]: Join at $\rdx{\runi}'' \equiv |fail|$.
 \item[Case \rulename{u-tup}]: $\rdx{\runi} \equiv |(u_1 ... u_n)| == |(v_1 ... v_n)|$.
 	\begin{description}
-		\item[Case] $\rdx{} \subset u_i$ \ie $\rstep{\rr'}{u_i}{u_i'}$
+		\item[Case] $\rdx{} \occunder u_i$ \ie $\rstep{\rr'}{u_i}{u_i'}$
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_i' = v_i; \ldots u_n = v_n$.
-		\item[Case] $\rdx{} \subset v_j$ \ie $\rstep{\rr'}{v_j}{v_j'}$
+		\item[Case] $\rdx{} \occunder v_j$ \ie $\rstep{\rr'}{v_j}{v_j'}$
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
 	\end{description}
 
 \item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eu$ or in $e_1$ or in $e_2$.
 	\begin{description}
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
 		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $(eu; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
@@ -339,13 +346,13 @@ Split cases on the rule used in $\runi$.
 \item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eu$, $e_1$ or in $e_2$.
 	\begin{description}
-		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
+		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rr'}{v}{v'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
 		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $v = (eu; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
@@ -379,12 +386,12 @@ By the definition of \rulename{choose} we have
 $$\rdx{ch} \equiv |SX^[CX^[e_1 choice e_2]]| \movesto |SX^[CX^[e_1] choice CX^[e_2]]| \equiv \rdx{ch}'$$
 Split cases on where $\rdx{}$ occurs
 \begin{description}
-\item[Case $\rdx{} \subset e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e1'] choice CX^[e_2]]|$.
-\item[Case $\rdx{} \subset e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e2']]|$.
-\item[Case $\rdx{} \subset |e_1 choice e_2|$] \ie \rstep{\rr}{|e_1 choice e_2|}{|e_i|} where $e_{3-i}$ is $|fail|$
+\item[Case $\rdx{} \occunder e_1$] \ie \rstep{\rr}{e_1}{e_1'}, so join at $|SX^[CX^[e1'] choice CX^[e_2]]|$.
+\item[Case $\rdx{} \occunder e_2$] \ie \rstep{\rr}{e_2}{e_2'}, so join at $|SX^[CX^[e_1 choice e2']]|$.
+\item[Case $\rdx{} \occunder |e_1 choice e_2|$] \ie \rstep{\rr}{|e_1 choice e_2|}{|e_i|} where $e_{3-i}$ is $|fail|$
 so join at $|SX^[CX^[e_i]]|$.
-\item[Case $\rdx{} \subset CX$] \ie \rstep{\rr}{CX}{CX'} so join (via \emph{two} $\rr$ steps) at $|SX^[CX'^[e_1] choice CX'^[e_2]]|$.
-\item[Case $\rdx{} \subset |CX^[e_1 choice e_2]|$] \ie $\rstep{\rr}{|CX^[e_1 choice e_2]|}{|CX'^[e1' choice e2']|}$,
+\item[Case $\rdx{} \occunder CX$] \ie \rstep{\rr}{CX}{CX'} so join (via \emph{two} $\rr$ steps) at $|SX^[CX'^[e_1] choice CX'^[e_2]]|$.
+\item[Case $\rdx{} \occunder |CX^[e_1 choice e_2]|$] \ie $\rstep{\rr}{|CX^[e_1 choice e_2]|}{|CX'^[e1' choice e2']|}$,
 so join at $|SX^[CX'^[e1'] choice CX'^[e2']]|$.
 \end{description}
 \end{proof}
@@ -411,28 +418,28 @@ on the reduction rule used in the step.
 \item[Case \rulename{exi-swap}]: \ie $\rcon: |def x (def y e)| \movesto |def y (def x e)|$.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
-	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
-	\item[Case $\rdx{} \subset |(def y e)|$]: \ie $y$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
+	\item[Case $\rdx{} \occunder e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (def y e')|$.
+	\item[Case $\rdx{} \occunder |(def y e)|$]: \ie $y$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def y e|}{e'}$; join at $|def x e'|$.
-	\item[Case $\rdx{} \subset |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
+	\item[Case $\rdx{} \occunder |(def x (def y e))|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def x (def y e)|}{|def y e'|}$; join at $|def y e'|$.
 	\end{description}
 
 \item[Case \rulename{exi-float}]: \ie $\rcon: |X^[def x e]| \movesto |def x (X^[e])|$.
 Split cases on the position of $\rdx{}$.
 	\begin{description}
-	\item[Case $\rdx{} \subset e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
-	\item[Case $\rdx{} \subset |(def x e)|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
+	\item[Case $\rdx{} \occunder e$]: \ie $\rstep{\rr'}{e}{e'}$; join at $|def x (X^[e'])|$.
+	\item[Case $\rdx{} \occunder |(def x e)|$]: \ie $x$ eliminated via an \rulename{exi-elim} or \rulename{eqn-elim}
 		$\rstep{\rr'}{|def x e|}{e'}$; join at $|X^[e']|$.
-	\item[Case $\rdx{} \subset X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
+	\item[Case $\rdx{} \occunder X$]: \ie $\rstep{\rr'}{|X^[def x e]|}{|X'^[def x e']|}$; join at $|def x (X'^[e'])|$.
 	\end{description}
 
 \item[Case \rulename{subst-var}]: \ie $\rcon: |X^[x=y]|  \movesto |(subst X x y)^[x=y]|$.
-	The only possible position of $\rdx{}$ is $\rdx{} \subset X$ \ie
+	The only possible position of $\rdx{}$ is $\rdx{} \occunder X$ \ie
 	$\rstep{\rr'}{X^[x=y]}{X'^[x=y]}$; join at $|(subst X' x y)^[x=y]|$.
 
 \item[Case \rulename{var-swap}]: \ie $\rcon:  |x=y| \movesto |y=x|$.
-	Impossible to have $\rdx{} \subset |x=y|$.
+	Impossible to have $\rdx{} \occunder |x=y|$.
 \end{description}
 \end{proof}
 
@@ -456,9 +463,9 @@ on the reduction rule used in the step.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
-	\item[Case $\rdx{} \subset |v|$]: Join at $|e|$.
-	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
-	\item[Case $\rdx{} \subset |v;e|$]: \ie $\rstep{\rulename{fail-elim}}{v;e}{|fail|}$ as $e \equiv X[|fail|]$; join at $|fail|$.
+	\item[Case $\rdx{} \occunder |v|$]: Join at $|e|$.
+	\item[Case $\rdx{} \occunder |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|e'|$.
+	\item[Case $\rdx{} \occunder |v;e|$]: \ie $\rstep{\rulename{fail-elim}}{v;e}{|fail|}$ as $e \equiv X[|fail|]$; join at $|fail|$.
 	\end{description}
 
 \item[Case \rulename{fail-elim}]: \ie $\rgc : |X^[fail]| \movesto |fail|$.
@@ -473,8 +480,8 @@ on the reduction rule used in the step.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
-	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|def (ys,zs) e'|$.
-	\item[Case $\rdx{} \subset |def (ys,x,zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys,zs) e|$.
+	\item[Case $\rdx{} \occunder |e|$]: \ie $\rstep{\rr}{e}{e'}$; join at $|def (ys,zs) e'|$.
+	\item[Case $\rdx{} \occunder |def (ys,x,zs) e|$]: \ie via \rulename{exi-swap}; join at $|def (ys,zs) e|$.
 	\end{description}
 
 \item[Case \rulename{eqn-elim}]: \ie $\rgc : |def x (X^[x = v;e])| \movesto |X^[e]|$ where $x \not \in \freevars{|X^[v;e]|}$.
@@ -485,9 +492,9 @@ on the reduction rule used in the step.
 	Split cases on position of $\rdx{}$
 	%
 	\begin{description}
-	\item[Case $\rdx{} \subset |v|$]: \ie $\rstep{\rr}{v}{v'}$; join at $|X^[e]|$.
-	\item[Case $\rdx{} \subset |e|$]: \ie $\rstep{\rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
-	\item[Case $\rdx{} \subset |X|$]: \ie $\rstep{\rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
+	\item[Case $\rdx{} \occunder |v|$]: \ie $\rstep{\rr}{v}{v'}$; join at $|X^[e]|$.
+	\item[Case $\rdx{} \occunder |e|$]: \ie $\rstep{\rr}{e}{e'}$ (where $\freevars{e'} = \freevars{e}$); join at $|X^[e']|$.
+	\item[Case $\rdx{} \occunder |X|$]: \ie $\rstep{\rr}{|X^[x = v; e]|}{|X'^[x=v;e]|}$ (where $\freevars{X'} = \freevars{X}$); join at $|X'^[e]|$.
 	\end{description}
 \end{description}
 \end{proof}
@@ -508,36 +515,36 @@ Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
 
 \begin{description}
 \item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
-	Impossible as $\rdx{} \not \subset \rdx{\rspc}$.
+	Impossible as $\rdx{} \not \occunder \rdx{\rspc}$.
 
 \item[Case \rulename{one-value}]:
 	Here $\tx{\rspc} \equiv |one v| \movesto |v|$.
-	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |v'|.
+	Hence $\rdx{} \occunder |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |v'|.
 \item[Case \rulename{all-value}]:
 	Here $\tx{\rspc} \equiv |all v| \movesto |tup (v)|$.
-	Hence $\rdx{} \subset |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |(v')|.
+	Hence $\rdx{} \occunder |v|$ \ie $\rr : |v| \movesto |v'|$, so join at |(v')|.
 
 \item[Case \rulename{one-choice}]:
 	Here $\tx{\rspc} \equiv |one (v `choice` e)| \movesto |v|$.
-	If $\rdx{} \subset |v|$, \ie $\rr : |v| \movesto |v'|$ then join at $|v'|$.
-	If $\rdx{} \subset |e|$, \ie $\rr : |e| \movesto |e'|$ then join at $|v|$.
+	If $\rdx{} \occunder |v|$, \ie $\rr : |v| \movesto |v'|$ then join at $|v'|$.
+	If $\rdx{} \occunder |e|$, \ie $\rr : |e| \movesto |e'|$ then join at $|v|$.
 
 \item[Case \rulename{all-choice}]:
 	Here $\tx{\rspc} \equiv |all (v_1 `choice` dots `choice` v_n)| \movesto |tup (v_1,dots,v_n)|$.
 	%
-	If $\rdx{} \subset |v_i|$ ie $\rr : |v_i| \movesto |v_i'|$
+	If $\rdx{} \occunder |v_i|$ ie $\rr : |v_i| \movesto |v_i'|$
 	then join at $|tup (v_1,dots,v_i',dots, v_n)|$.
 
 \item[Case \rulename{choose-l}]: (symmetric \rulename{choose-r})
 	Here $\tx{\rspc} \equiv |fail choice e| \movesto e$.
-	Here, $\rdx{} \subset e$, \ie $\rr : e \movesto e'$ so join at $|e'|$.
+	Here, $\rdx{} \occunder e$, \ie $\rr : e \movesto e'$ so join at $|e'|$.
 
 \item[Case \rulename{choose-assoc}]: \ie $\tx{\rspc} \equiv (e_1 |choice| e_2) |choice| e_3 \movesto e_1 |choice| (e_2 |choice| e_3)$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-	\item[Case] $\rdx{} \subset e_1$, \ie $\rr : e_1 \movesto e_1'$ so join at $e_1' |choice| (e_2 |choice| e_3)$.
-	\item[Case] $\rdx{} \subset e_2$, \ie $\rr : e_2 \movesto e_2'$ so join at $e_1 |choice| (e_2' |choice| e_3)$.
-	\item[Case] $\rdx{} \subset e_3$, \ie $\rr : e_3 \movesto e_3'$ so join at $e_1 |choice| (e_2 |choice| e_3')$.
+	\item[Case] $\rdx{} \occunder e_1$, \ie $\rr : e_1 \movesto e_1'$ so join at $e_1' |choice| (e_2 |choice| e_3)$.
+	\item[Case] $\rdx{} \occunder e_2$, \ie $\rr : e_2 \movesto e_2'$ so join at $e_1 |choice| (e_2' |choice| e_3)$.
+	\item[Case] $\rdx{} \occunder e_3$, \ie $\rr : e_3 \movesto e_3'$ so join at $e_1 |choice| (e_2 |choice| e_3')$.
 	\item[Case] $\rdx{} \equiv  |e_1 `choice` fail|$, \ie $\rr : |e_1 choice fail| \movesto e_1$ so join at $e_1 |choice| e_3$.
 	\item[Case] $\rdx{} \equiv  |fail `choice` e_2|$, \ie $\rr : |fail choice e_2| \movesto e_2$ so join at $e_2 |choice| e_3$.
 	\end{description}
@@ -567,7 +574,7 @@ and $\rstep{\rulename{swap}}{\rdx{2}}{\rdx{2}'}$
 be the respective reducts. Via \cref{lem:disjoint}
 it suffices to consider two cases:
 \begin{description}
-\item[Case \rulename{swap} under \rulename{subst}]: \ie $\rdx{2} \subset \rdx{1}$
+\item[Case \rulename{swap} under \rulename{subst}]: \ie $\rdx{2} \occunder \rdx{1}$
 Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 	\begin{description}
 
@@ -585,7 +592,7 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 \end{tikzcd}\]
 
 
-	\item[Case $\rdx{2} \subset v$]: \ie $\rstep{\rulename{swap}}{v}{v'}$.
+	\item[Case $\rdx{2} \occunder v$]: \ie $\rstep{\rulename{swap}}{v}{v'}$.
 	% https://q.uiver.app/?q=WzAsNCxbMCwwLCJYW3ggPSB2XSJdLFsyLDAsIlhcXHt2L3hcXH1beCA9IHZdIl0sWzAsMSwiWFt4PXYnXSJdLFsyLDEsIlhcXHt2Jy94XFx9W3g9diddIl0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiXFxydWxlbmFtZXsqLXN3YXB9XFwgXFx0ZXh0e3JlcGVhdGVkIGF0IGVhY2h9XFwgdiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X[x = v]} && {X\{v/x\}[x = v]} \\
@@ -595,7 +602,7 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 	\arrow["{\rulename{subst}}"', dotted, from=2-1, to=2-3]
 	\arrow["{\rulename{swap}\ (\text{repeat at each}\ v)}", dotted, two heads, from=1-3, to=2-3]
 \end{tikzcd}\]
-	\item[Case $\rdx{2} \subset X$]: \ie $X \equiv X'[\ldots \rdx{2} \ldots]$.
+	\item[Case $\rdx{2} \occunder X$]: \ie $X \equiv X'[\ldots \rdx{2} \ldots]$.
  		Let $u' \equiv \subst{u}{x}{v}$, split cases on \rulename{swap} RHS.
 		\begin{description}
 		\item[Case same variable]: $\rdx{2} \equiv |u == x|$ where $u$ is HNF or variable.
@@ -624,8 +631,8 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 	\arrow["{\rulename{swap}}", dotted, from=1-3, to=3-3]
 \end{tikzcd}\]
 	\end{description}
-\item[Case \rulename{subst} under \rulename{swap}]: \ie $\rdx{1} \subset \rdx{2}$
-   Let $\rdx{2} \equiv |hnf == x|$, so $\rdx{1} \subset |hnf|$, \ie $\rstep{\rulename{subst}}{|hnf|}{|hnf'|}$,
+\item[Case \rulename{subst} under \rulename{swap}]: \ie $\rdx{1} \occunder \rdx{2}$
+   Let $\rdx{2} \equiv |hnf == x|$, so $\rdx{1} \occunder |hnf|$, \ie $\rstep{\rulename{subst}}{|hnf|}{|hnf'|}$,
    so join at $|x = hnf'|$.
    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXG1hdGhpdHtobmZ9ID0geCJdLFsyLDAsIlxcbWF0aGl0e2huZn0nID0geCJdLFswLDEsInggPSBcXG1hdGhpdHtobmZ9Il0sWzIsMSwieCA9IFxcbWF0aGl0e2huZn0nIl0sWzAsMSwiXFxydWxlbmFtZXtzdWJzdH0iXSxbMCwyLCJcXHJ1bGVuYW1leyotc3dhcH0iLDJdLFsxLDMsIlxccnVsZW5hbWV7Ki1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIlxccnVsZW5hbWV7c3Vic3R9IiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
@@ -642,7 +649,7 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 \begin{definition}[Levels]
 Let $eu_1 \equiv |x_1 == v_1|$ and $eu_2 \equiv |x_2 == v_2|$ be two equations in a term $e$.
 %
-We say $eu_2$ \emph{is under} $eu_1$ if $eu_2 \subset X$ and $|X^[eu_1]| \subset e$.
+We say $eu_2$ \emph{is under} $eu_1$ if $eu_2 \occunder X$ and $|X^[eu_1]| \occunder e$.
 \end{definition}
 
 \begin{lemma}[Subst-Subst] \label{lem:subst-subst-c}
@@ -1359,11 +1366,11 @@ Split cases on the rule used in $\runi$.
     Here, $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
 	\end{description}
 
@@ -1371,13 +1378,13 @@ Split cases on the rule used in $\runi$.
 	$\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rulename{var-swap}}{v}{v'}$
+		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rulename{var-swap}}{v}{v'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
 	\end{description}
 \end{description}
@@ -1425,32 +1432,32 @@ Split cases on the rule used in $\runi$.
 \item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
-		\item[Case] $\rdx{} \subset (eu; e_1)$ \ie $\rulename{subst} : (eu; e_1) \movesto (eu'; e_1')$
+		\item[Case] $\rdx{} \occunder (eu; e_1)$ \ie $\rulename{subst} : (eu; e_1) \movesto (eu'; e_1')$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset ((eu; e_1); e_2)$ \ie $\rulename{subst} : (eu; e_1);e_2 \movesto (eu'; e_1'); e_2'$
+		\item[Case] $\rdx{} \occunder ((eu; e_1); e_2)$ \ie $\rulename{subst} : (eu; e_1);e_2 \movesto (eu'; e_1'); e_2'$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2')$.
 	\end{description}
 
 \item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \subset v$ \ie $\rstep{\rr'}{v}{v'}$
+		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rr'}{v}{v'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
-		\item[Case] $\rdx{} \subset e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
+		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
+		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
 			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
-		\item[Case] $\rdx{} \subset (eu; e_1)$ \ie $\rulename{subst} : v = (eu; e_1); e_2 \movesto v = (eu'; e_1'); e_2$.
+		\item[Case] $\rdx{} \occunder (eu; e_1)$ \ie $\rulename{subst} : v = (eu; e_1); e_2 \movesto v = (eu'; e_1'); e_2$.
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1'; e_2)$.
-		\item[Case] $\rdx{} \subset v = (eu; e_1); e_2$ \ie $\rulename{subst} : (v = eu; e_1);e_2 \movesto (v' = eu'; e_1'); e_2'$
+		\item[Case] $\rdx{} \occunder v = (eu; e_1); e_2$ \ie $\rulename{subst} : (v = eu; e_1);e_2 \movesto (v' = eu'; e_1'); e_2'$
 			Join at $\rdx{\runi}'' \equiv eu'; (v' = e_1'; e_2')$.
 	\end{description}
 \end{description}
@@ -1884,8 +1891,8 @@ Let $\tx{\runi}$ and $\tx{\rapp}$ denote the reducts for $\runi$ and $\rapp$ res
 
 \begin{description}
 \item[Case: $\rdx{\runi}$ and $\rdx{\rapp}$ disjoint] via \cref{lem:disjoint}.
-\item[Case: $\rdx{\runi} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
-\item[Case: $\rdx{\rapp} \subset \rdx{\runi}$] via \cref{lem:under-u}.
+\item[Case: $\rdx{\runi} \occunder \rdx{\rapp}$] via \cref{lem:under-a}.
+\item[Case: $\rdx{\rapp} \occunder \rdx{\runi}$] via \cref{lem:under-u}.
 \end{description}
 \end{proof}
 
@@ -1905,8 +1912,8 @@ If the reducts are disjoint then terms can be trivially joined.
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rgc}$ or vice versa.
 %
 \begin{description}
-	\item[Case] $\rdx{\runi} \subset \rdx{\rgc}$: via \cref{lem:under-g}.
-	\item[Case] $\rdx{\rgc} \subset \rdx{\runi}$: via \cref{lem:under-u}.
+	\item[Case] $\rdx{\runi} \occunder \rdx{\rgc}$: via \cref{lem:under-g}.
+	\item[Case] $\rdx{\rgc} \occunder \rdx{\runi}$: via \cref{lem:under-u}.
 \end{description}
 %
 \end{proof}
@@ -1927,8 +1934,8 @@ If the reducts are disjoint then terms can be trivially joined.
 Let us split cases on whether $\rdx{\runi}$ occurs under $\rdx{\rspc}$ or vice versa.
 %
 \begin{description}
-\item[Case] $\rdx{\runi} \subset \rdx{\rspc}$ via \cref{lem:under-s}.
-\item[Case] $\rdx{\rspc} \subset \rdx{\runi}$ via \cref{lem:under-u}.
+\item[Case] $\rdx{\runi} \occunder \rdx{\rspc}$ via \cref{lem:under-s}.
+\item[Case] $\rdx{\rspc} \occunder \rdx{\runi}$ via \cref{lem:under-u}.
 \end{description}
 \end{proof}
 
@@ -1948,8 +1955,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice versa.
 
 \begin{description}
-\item[Case $\rdx{\rapp} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
-\item[Case $\rdx{\rcon} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
+\item[Case $\rdx{\rapp} \occunder \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \occunder \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
@@ -1967,8 +1974,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rcon}$ or vice versa.
 
 \begin{description}
-\item[Case $\rdx{\rgc} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
-\item[Case $\rdx{\rcon} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
+\item[Case $\rdx{\rgc} \occunder \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \occunder \rdx{\rgc}$] via \cref{lem:under-g}.
 \end{description}
 \end{proof}
 
@@ -1986,8 +1993,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Split cases on whether $\rdx{\rspc}$ occurs under $\rdx{\rcon}$ or vice versa.
 %
 \begin{description}
-\item[Case $\rdx{\rspc} \subset \rdx{\rcon}$] via \cref{lem:under-n}.
-\item[Case $\rdx{\rcon} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
+\item[Case $\rdx{\rspc} \occunder \rdx{\rcon}$] via \cref{lem:under-n}.
+\item[Case $\rdx{\rcon} \occunder \rdx{\rspc}$] via \cref{lem:under-s}.
 \end{description}
 \end{proof}
 
@@ -2011,7 +2018,7 @@ $\rstep{\rapp}{e}{e_2}$ via the redux $\tx{2}$.
 If $\rdx{1}$ and $\rdx{2}$ are disjoint in $e$, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
 %
-If $\rdx{1} \subset \rdx{2}$ (or $\rdx{2} \subset \rdx{1}$) then \cref{lem:under-a} completes the proof.
+If $\rdx{1} \occunder \rdx{2}$ (or $\rdx{2} \occunder \rdx{1}$) then \cref{lem:under-a} completes the proof.
 \end{proof}
 
 
@@ -2031,8 +2038,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rcon}$ or vice versa.
 %
 \begin{description}
-\item[Case $\rdx{\rapp} \subset \rdx{\rgc}$] via \cref{lem:under-g}.
-\item[Case $\rdx{\rgc} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
+\item[Case $\rdx{\rapp} \occunder \rdx{\rgc}$] via \cref{lem:under-g}.
+\item[Case $\rdx{\rgc} \occunder \rdx{\rapp}$] via \cref{lem:under-a}.
 \end{description}
 \end{proof}
 
@@ -2050,8 +2057,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rapp}$ occurs under $\rdx{\rspc}$ or vice versa.
 %
 \begin{description}
-\item[Case $\rdx{\rspc} \subset \rdx{\rapp}$] via \cref{lem:under-a}.
-\item[Case $\rdx{\rapp} \subset \rdx{\rspc}$] via \cref{lem:under-s}.
+\item[Case $\rdx{\rspc} \occunder \rdx{\rapp}$] via \cref{lem:under-a}.
+\item[Case $\rdx{\rapp} \occunder \rdx{\rspc}$] via \cref{lem:under-s}.
 \end{description}
 %
 \end{proof}
@@ -2073,7 +2080,7 @@ $\rstep{\rgc}{e}{e_2}$ via the redux $\tx{2}$.
 If $\rdx{1}$ and $\rdx{2}$ are disjoint, the terms $e_1$ and $e_2$
 can be trivially joined in a single step.
 %
-If $\rdx{1} \subset \rdx{2}$ (or $\rdx{2} \subset \rdx{1}$) then \cref{lem:under-g} completes the proof.
+If $\rdx{1} \occunder \rdx{2}$ (or $\rdx{2} \occunder \rdx{1}$) then \cref{lem:under-g} completes the proof.
 \end{proof}
 
 \begin{lemma} \label{lem:g-s-c}
@@ -2090,8 +2097,8 @@ If the reducts are disjoint then terms can be trivially joined in a single step.
 Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice versa.
 %
 \begin{description}
-\item[Case $\rdx{\rgc} \subset \rdx{\rspc}$:] via \cref{lem:under-s}.
-\item[Case $\rdx{\rspc} \subset \rdx{\rgc}$:] via \cref{lem:under-g}.
+\item[Case $\rdx{\rgc} \occunder \rdx{\rspc}$:] via \cref{lem:under-s}.
+\item[Case $\rdx{\rspc} \occunder \rdx{\rgc}$:] via \cref{lem:under-g}.
 \end{description}
 %
 \end{proof}
@@ -2104,6 +2111,6 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 
 \begin{proof}
 \cref{lem:under-s} shows that $\rspc$
-has the diamond property (as $\rspc \subset \rr$),
+has the diamond property (as $\rspc \occunder \rr$),
 and hence $\rspc$ is confluent via \cref{lem:diamond}.
 \end{proof}
