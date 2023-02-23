@@ -316,6 +316,24 @@ Every rewrite rule in \versecalc{} is monotonic with respect to $\leqomegavc$.
 \subsection{Preliminaries about Skew Confluence}
 
 
+\begin{definition}
+  Reduction relation $\rr$ over the set of terms $T$ is \emph{skew confluent} using quasi order $\preceq$ if for all $a, b, c \in T$,
+  if $a \gos{\rr} b$ and $a \gos{\rr} c$, there exists $d\in T$ such that $b \gos{\rr} d$ and $c \preceq d$. As a diagram:
+  
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+\end{definition}
+
+
 \subsection{New Lemmas about Skew Confluence}
 
 \begin{lemma}
@@ -345,11 +363,146 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 \end{tikzcd}\]
 \end{proof}
 
+\begin{definition}
+  Let reduction relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$.
+  Let reduction relation $\rr_\preceq^{\leftarrow}$ be defined by a set of rewrite rules that are converses of those rewrite rules of $\rr$ whose converses are used in the proof that $\rr$ is skew
+  confluent.
+  Then we say that $\rr$ is \emph{skew confluent using $\preceq$ and  $\rr_\preceq^{\leftarrow}$}.
+\end{definition}
 
 
+\begin{lemma}\label{lem:four-diagrams}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^{\leftarrow}$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^{\leftarrow}$.
+  Suppose furthermore that $\rr$ and $\rs$ commute and that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute. 
+  Then the following four diagrams hold:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+  \end{lemma}
+  \begin{proof}
+    
+    (1) Because $\rr$ is skew confluent, we have
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+\noindent    Because $\inccon{\rr} \subset \inccon{\rr\cup\rs}$, the first diagram follows.
+
+        (2) Because $\rr$ and $\rs$ commute, we have
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiw1LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+
+\noindent    Because $\gos{\rs} \subset \inccon{\rr\cup\rs}$, the second diagram follows.
+
+(3) The following diagram clearly holds if the sequence of reduction steps from |b| to |d| is the same as the sequence of reduction steps from |b| to |a| to |d|:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxcZXF1aXYiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNiw1LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\equiv"{description}, draw=none, from=2-1, to=2-2]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+    \noindent    Because $\equiv \subset \inccon{\rr\cup\rs}$, the third diagram follows.
+
+    (4) Because $\rr$ and $\rs_\preceq^{\leftarrow}$ commute, we have
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rs", dotted, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+        \noindent    Because $\ungos{\rs} \subset \inccon{\rr\cup\rs}$, the fourth diagram follows.
+
+        \guy{Remark: It may turn out to be impossible to prove for our specific application that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute.
+          In that case, it may be necessary to use a more complicated or more subtle precondition.
+        The important thing is to prove the fourth diagram somehow.}
+\end{proof}
+
+
+
+
+
+
+  
 \begin{lemma}\label{lem:skewrowinduction}
   Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^{\leftarrow}$;
   similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^{\leftarrow}$.
+  Suppose furthermore that $\rr$ and $\rs$ commute and that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute. 
   Then
 
   % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsNiwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
@@ -366,60 +519,9 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 \end{tikzcd}\]
 \end{lemma}
 \begin{proof}
-  By induction on the size of the top edge of the diagram. At each step one of four diagrams will be used:
+  By induction on the size of the top edge of the diagram. At each step one of the four diagrams from \cref{lem:four-diagrams} will be used.
 
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
-\[\begin{tikzcd}
-	a & b \\
-	c & d
-	\arrow["\rr"', from=1-1, to=1-2]
-	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
-	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
-	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
-	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
-	\arrow[draw=none, from=1, to=0]
-      \end{tikzcd}
-      \qquad\text{(this follows because $\rr$ is confluent)}\]
-
-    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
-\[\begin{tikzcd}
-	a & b \\
-	c & d
-	\arrow["\rs"', from=1-1, to=1-2]
-	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
-	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
-	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
-	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
-	\arrow[draw=none, from=1, to=0]
-      \end{tikzcd}
-      \qquad\text{(this follows because $\rr$ and $\rs$ commute)}\]
-
-    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
-\[\begin{tikzcd}
-	a & b \\
-	c & d
-	\arrow["\rr", from=1-2, to=1-1]
-	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
-	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
-	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
-	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
-	\arrow[draw=none, from=1, to=0]
-      \end{tikzcd}
-      \qquad\text{(easy: right edge|b| to |d| equals |b| to |a| to |c|, bottom edge is $\equiv$)}\]
-
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
-\[\begin{tikzcd}
-	a & b \\
-	c & d
-	\arrow["\rs", from=1-2, to=1-1]
-	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
-	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
-	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
-	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
-	\arrow[draw=none, from=1, to=0]
-      \end{tikzcd}
-    \qquad\text{(this one is tricky)}\]
-
+  
  \guy{More to come}
 \end{proof}
 
