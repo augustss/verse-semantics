@@ -25,7 +25,7 @@ rules in \cref{fig:rules}
 	\rulename{choose},
 	\rulename{seq-assoc},
 	\rulename{eqn-float},
-	\rulename{seq-swap};
+	\rulename{seq-swap} (restricted to $eu_2 \prec eu_1$);
 
 \item $\rcon$ (Normalization)
 	\rulename{exi-swap};
@@ -1097,8 +1097,9 @@ We will use $b_{\ell}$ to denote the (unique) sub-block of $b$ labeled by $\ell$
 %
 % \mypara{Block Labels and Rewriting}
 %
-For rewrites like \rulename{choose}, \rulename{seq-assoc} and \rulename{eqn-float},
-we assume that the rewritten term is given a fresh set of distinct block labels.
+For rewrites like \rulename{choose}, \rulename{seq-assoc}, \rulename{seq-swap}
+and \rulename{eqn-float}, we assume that the rewritten term is given a fresh
+set of distinct block labels.
 %
 For rewrites with \rulename{u-tup}, we assume fresh labels are given to the
 new (inner) blocks created by tuple matching equations.
@@ -1122,12 +1123,15 @@ For a label $\ell$ let
 \begin{align*}
 	\sz{\mathit{substs}(\ell)} & \doteq\  \sharp \{ x \mid x\ \mbox{appears free} \geq 2\ \mbox{times}\ \mbox{in}\ b_{\ell} \} \\
 	\mathit{size}(\ell) & \doteq\  \mbox{size of the block}\ b_{\ell} \\
-	\intertext{The proof follows by lexicographic termination metric using the tuple $(\sz{\text{choose}}, \sz{\text{semi}}, \sz{\text{block}}, \sz{\text{swap}})$}
+	\intertext{We show the sequence terminates via the well-founded lexicographic metric}
+		& \quad (\sz{\text{choose}}, \sz{\text{semi}}, \sz{\text{eqn-swap}}, \sz{\text{block}}, \sz{\text{var-swap}})
+	\intertext{where}
 %
 	\sz{\text{choose}} & \doteq\ \mbox{number of \rulename{choose} redexes} \\
 	\sz{\text{semi}}   & \doteq\ \mbox{number of \rulename{seq-assoc} or \rulename{eqn-float} redexes} \\
+	\sz{\text{seq-swap}} & \doteq\ \mbox{number of \rulename{seq-swap} redexes} \\
 	\sz{\text{block}} & \doteq\ [\ldots \ell_i \mapsto (\sz{\mathit{substs}(\ell_i)}, \mathit{size}(\ell_i)) \ldots ]\ \mbox{where labels are ordered by}\ \prec_b \\
-	\sz{\text{swap}}   & \doteq\ \mbox{number of \rulename{var-swap} redexes}
+	\sz{\text{var-swap}}   & \doteq\ \mbox{number of \rulename{var-swap} redexes}
 \end{align*}
 %
 % where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
@@ -1142,9 +1146,10 @@ Each application of
 \begin{itemize}
 \item \rulename{choose} strictly reduces $\sz{\text{choose}}$;
 \item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\text{semi}}$ (leaving $\sz{\text{choose}}$ unchanged);
-\item \rulename{subst} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
-\item \rulename{swap-var} strictly reduces $\sz{\text{swap}}$ (leaving $\sz{\text{block}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
+\item \rulename{seq-swap} strictly reduces $\sz{\text{seq-swap}}$ (leaving $\sz{\text{semi}}$, $\sz{\text{choose}}$  unchanged);
+\item \rulename{subst} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{seq-swap}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{u-lit}, \rulename{u-tup}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\sz{\text{block}}$ (leaving $\sz{\text{seq-swap}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged);
+\item \rulename{var-swap} strictly reduces $\sz{\text{var-swap}}$ (leaving $\sz{\text{block}}$, $\sz{\text{seq-swap}}$, $\sz{\text{semi}}$, $\sz{\text{choose}}$ unchanged).
 \end{itemize}
 %
 Thus, any sequence of $\runib{0}$ steps is well-founded and guaranteed to terminate.
