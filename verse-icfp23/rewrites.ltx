@@ -48,6 +48,10 @@
 \newcommand{\xrightarrowdbl}[2][]{%
   \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
 }
+\newcommand{\leftarrowdbl}{\leftarrow\mathrel{\mkern-14mu}\leftarrow}
+\newcommand{\xleftarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\xleftarrow[#1]{#2}%
+}
 
 \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
 \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
@@ -60,6 +64,14 @@
 \newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
 \newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
 \newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+\newcommand{\ungoone}[1]{\xleftarrow{\epsilon}_{#1}}
+\newcommand{\ungo}[1]{\xleftarrow{}_{#1}}
+\newcommand{\ungos}[1]{\xleftarrowdbl{}_{#1}}
+\newcommand{\ungok}[2]{\xleftarrowdbl{#2}_{#1}}
+\newcommand{\unrstepo}[3]{\ensuremath{#2 \ungoone{#1} #3}}
+\newcommand{\unrstep}[3]{\ensuremath{#2 \ungo{#1} #3}}
+\newcommand{\unrsteps}[3]{\ensuremath{#2 \ungos{#1} #3}}
+\newcommand{\unrstepk}[4]{\ensuremath{#3 \ungok{#1}{#2} #4}}
 \newcommand{\univ}{\ensuremath{\mathcal{E}}}
 \newcommand{\join}[3]{{#2} \sim_{#1} {#3}}
 \newcommand{\dia}{\ensuremath{\diamond}}
