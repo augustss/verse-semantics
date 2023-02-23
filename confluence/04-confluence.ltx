@@ -1195,8 +1195,6 @@ Next, we show neither case is possible.
 	\mathsf{swap}(b, \ell)   	    & \doteq\ \mbox{\rulename{var-swap} redexes in}\ b_{\ell}
 \end{align*}
 %
-% where \emph{locations} refers to places at ``level $0$'' (\ie not under a $\lambda$) that are redexes for the rule.
-%
 The unification reductions preserve the following invariant: once a variable $x$ has been eliminated from a block,
 it appears at most once in the block as an LHS of an equation $|x = v|$, and that equation can \emph{never} again be used
 to perform a substitution in that block \emph{unless} new occurrences of $x$ are injected into the block by a substitution
