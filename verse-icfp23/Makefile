@@ -11,6 +11,8 @@ LATEX=pdflatex -halt-on-error
 PAPERSRC = $(NAME).tex rewrites.tex densem-icfp23.tex store-icfp23.tex ../confluence/03-preliminaries.tex ../confluence/04-confluence.tex ../confluence/08-skew.tex ../verse.bib
 
 rewrites.tex:   rewrites.ltx   ../calculus.fmt
+store-icfp23.tex: store-icfp23.ltx ../calculus.fmt
+densem-icfp23.tex: densem-icfp23.ltx ../calculus.fmt
 
 $(NAME).tex: $(NAME).ltx ../calculus.fmt
 
