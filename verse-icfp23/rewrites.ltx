@@ -240,7 +240,7 @@
 
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-8mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
+  \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
