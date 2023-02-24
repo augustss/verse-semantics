@@ -121,11 +121,11 @@
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
-      \text{Expressions}   & e     & ::= & |v| \vb |eu ; e| \vb |def x e| \vb |fail|
+      \text{Expressions}   & e     & ::= & |v| \vb |eq ; e| \vb |def x e| \vb |fail|
                                            \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
                              \vb |one e| \vb |all e| \\
-                             & eu     & ::= & |e| \vb |v == e| \quad \quad
-                                       \text{``$eu$'' is pronounced ``expression or unification''} \\
+                             & eq     & ::= & |e| \vb |v == e| \quad \quad
+                                       \text{``$eq$'' is pronounced ``expression or equation} \\
   %    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
   %       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
   %    \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
@@ -184,7 +184,7 @@
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
-%       \text{Equation contexts (hole is |eu|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
+%       \text{Equation contexts (hole is |eq|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
@@ -252,16 +252,16 @@
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
-%%  \rulename{val-swap-ord} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if |eu_2| $\prec$ |eu_1| } \\
+%%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
 
     \\[-2mm]
 
 \rulegroupname{Normalization:}
 \rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
-\rulename{seq-assoc} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
-\rulename{eqn-float} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
+\rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
+\rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-swap} & |eu_1; eu_2; e| & \movesto & |eu_2; eu_1; e| & \text{if $eu_1 \in ceu$ or $eu_2 \in ceu$} \\
+\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if $eq_1 \in ceu$ or $eq_2 \in ceu$} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
@@ -312,7 +312,7 @@ $$\begin{array}{l}
       \textit{Structural rules} \\
       \begin{array}{lr@@{\;}c@@{\;}ll}
       \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-      \rulename{val-swap} & |eu; x==v; e| & \movesto & |x==v; eu; e| \\
+      \rulename{val-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| \\
       \text{\lennart{Plan D:}}\\
       \rulename{var-swap-subst} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
       % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\

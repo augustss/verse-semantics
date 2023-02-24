@@ -97,7 +97,7 @@ $
   \freevars{|tup (v_1, commadots, v_n)|} & = & \freevars{|v_1|} \cup \cdots \cup \freevars{|v_n|} \\
   \freevars{|lam x e|} & = & \freevars{|e|} \setminus \{ x \} \\
   \freevars{|mu x e|} & = & \freevars{|e|} \setminus \{ x \} \\
-  \freevars{|eu; e|} & = & \freevars{|eu|} \cup \freevars{|e|} \\
+  \freevars{|eq; e|} & = & \freevars{|eq|} \cup \freevars{|e|} \\
   \freevars{|v = e|} & = & \freevars{|v|} \cup \freevars{|e|} \\
   \freevars{|def x e|} & = & \freevars{|e|} \setminus \{ x \} \\
   \freevars{|fail|} & = & \{\,\}  \\
@@ -132,7 +132,7 @@ $
   \freevarsoutsidelambdas{|tup (v_1, commadots, v_n)|} & = & \freevarsoutsidelambdas{|v_1|} \cup \cdots \cup \freevarsoutsidelambdas{|v_n|} \\
   \freevarsoutsidelambdas{|lam x e|} & = & \{\,\} \\
   \freevarsoutsidelambdas{|mu x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
-  \freevarsoutsidelambdas{|eu; e|} & = & \freevarsoutsidelambdas{|eu|} \cup \freevarsoutsidelambdas{|e|} \\
+  \freevarsoutsidelambdas{|eq; e|} & = & \freevarsoutsidelambdas{|eq|} \cup \freevarsoutsidelambdas{|e|} \\
   \freevarsoutsidelambdas{|v = e|} & = & \freevarsoutsidelambdas{|v|} \cup \freevarsoutsidelambdas{|e|} \\
   \freevarsoutsidelambdas{|def x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
   \freevarsoutsidelambdas{|fail|} & = & \{\,\}  \\
@@ -162,7 +162,7 @@ $
   |substNP (arr (v_1, dots, v_n)) x v| & \equiv & |arr (subst v_1 x v, dots, subst v_n x v)| \\
   |subst (lam y e) x v| & \equiv & |lam y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
   |subst (mu y v') x v| & \equiv & |mu y (subst v' x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
-  |subst (eu; e) x v| & \equiv &  |subst eu x v; subst e x v| \\
+  |subst (eq; e) x v| & \equiv &  |subst eq x v; subst e x v| \\
   |subst (v' = e) x v| & \equiv &  |subst v' x v = subst e x v| \\
   |subst (def y e) x v| & \equiv & |def y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
   |subst fail x v| & \equiv & |fail| \\
@@ -238,7 +238,7 @@ These may be compared to similar rules for the $\lambda\circ$ calculus \cite[Def
 \begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
   \rulegroupname{Information Content:~$\rinfo${}}
   \rulename{info-fix} & |mu x v| & \movesto & |Omega| \\
-  \rulename{info-seq} & |eu; e| & \movesto & |Omega| \\
+  \rulename{info-seq} & |eq; e| & \movesto & |Omega| \\
   \rulename{info-exi} & |def x e| & \movesto & |Omega| \\
   \rulename{info-fail-l} & |fail choice e| & \movesto & |Omega| \\
   \rulename{info-fail-r} & |e choice fail| & \movesto & |Omega| \\

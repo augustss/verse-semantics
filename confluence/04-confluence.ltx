@@ -54,7 +54,7 @@ rules in \cref{fig:rules}
 	\rulename{choose},
 	\rulename{seq-assoc},
 	\rulename{eqn-float},
-	\rulename{seq-swap} (restricted to $eu_2 \prec eu_1$);
+	\rulename{seq-swap} (restricted to $eq_2 \prec eq_1$);
 
 \item $\rcon$ (Normalization)
 	\rulename{exi-swap};
@@ -407,31 +407,31 @@ Split cases on the rule used in $\runi$.
 			Join at $\rdx{\runi}'' \equiv  u_1 = v_1; \ldots u_j = v_j'; \ldots u_n = v_n$.
 	\end{description}
 
-\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
-	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eu$ or in $e_1$ or in $e_2$.
+\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eq; e_1); e_2}{eq;(e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $eq$ or in $e_1$ or in $e_2$.
 	\begin{description}
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rr'}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
-		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $(eu; e_1); e_2$ via \rulename{fail-elim}.
+			Join at $\rdx{\runi}'' \equiv eq; (e_1; e_2')$.
+		\item[Case] $\rdx{}$ spans $(eq; e_1)$ or $(eq; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
 	\end{description}
 
-\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
-	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eu$, $e_1$ or in $e_2$.
+\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eq; e_1); e_2}{eq;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+	Split cases on where $\rdx{}$ occurs, which as we're precluding \rulename{subst} is either in $v$, $eq$, $e_1$ or in $e_2$.
 	\begin{description}
 		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rr'}{v}{v'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eq; (v' = e_1; e_2)$.
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rr'}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
-		\item[Case] $\rdx{}$ spans $(eu; e_1)$ or $v = (eu; e_1); e_2$ via \rulename{fail-elim}.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1; e_2')$.
+		\item[Case] $\rdx{}$ spans $(eq; e_1)$ or $v = (eq; e_1); e_2$ via \rulename{fail-elim}.
 			Join at $|fail|$.
 	\end{description}
 
@@ -724,9 +724,9 @@ Let $\rdx{1} \equiv |X^[x==v]|$; split cases on $\rdx{2}$ position.
 \end{proof}
 
 \begin{definition}[Levels]
-Let $eu_1 \equiv |x_1 == v_1|$ and $eu_2 \equiv |x_2 == v_2|$ be two equations in a term $e$.
+Let $eq_1 \equiv |x_1 == v_1|$ and $eq_2 \equiv |x_2 == v_2|$ be two equations in a term $e$.
 %
-We say $eu_2$ \emph{is under} $eu_1$ if $eu_2 \occunder X$ and $|X^[eu_1]| \occunder e$.
+We say $eq_2$ \emph{is under} $eq_1$ if $eq_2 \occunder X$ and $|X^[eq_1]| \occunder e$.
 \end{definition}
 
 \begin{lemma}[Subst-Subst] \label{lem:subst-subst-c}
@@ -735,33 +735,33 @@ then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-Suppose that the redex $\rstep{}{e}{e_i}$ is using the equation $eu_i \equiv |x_i == v_i|$. Split cases on
+Suppose that the redex $\rstep{}{e}{e_i}$ is using the equation $eq_i \equiv |x_i == v_i|$. Split cases on
 \begin{description}
-\item[Case] $eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$:
+\item[Case] $eq_1$ is under $eq_2$ and $eq_2$ is under $eq_1$:
 	\cref{lem:subst-same} completes the proof.
 
-\item[Case] $eu_1$ is under $eu_2$ and $eu_2$ is not under $eu_1$:
+\item[Case] $eq_1$ is under $eq_2$ and $eq_2$ is not under $eq_1$:
 	\cref{lem:subst-diff} completes the proof.
 
-\item[Case] $eu_1$ is not under $eu_2$ and $eu_2$ is under $eu_1$:
+\item[Case] $eq_1$ is not under $eq_2$ and $eq_2$ is under $eq_1$:
 	\cref{lem:subst-diff} completes the proof.
 
-\item[Case] $eu_1$ is not under $eu_2$ and $eu_2$ is not under $eu_1$:
+\item[Case] $eq_1$ is not under $eq_2$ and $eq_2$ is not under $eq_1$:
 	The substitutions are disjoint, so \cref{lem:disjoint} completes the proof.
 \end{description}
 \end{proof}
 
 
 \begin{lemma}[Subst-Same] \label{lem:subst-same}
-If $\rstep{\rulename{subst}}{e}{e_1}$ using $eu_1$ and
-$\rstep{\rulename{subst}}{e}{e_2}$ using $eu_2$ such that
-$eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$,
+If $\rstep{\rulename{subst}}{e}{e_1}$ using $eq_1$ and
+$\rstep{\rulename{subst}}{e}{e_2}$ using $eq_2$ such that
+$eq_1$ is under $eq_2$ and $eq_2$ is under $eq_1$,
 then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-As $eu_1$ is under $eu_2$ and $eu_2$ is under $eu_1$, we have $e \equiv |X^[x = v_1; y = v_2]|$,
-\ie wlog the equations $eu_1$ and $eu_2$ are adjacent. Let us split cases on whether $x \equiv y$
+As $eq_1$ is under $eq_2$ and $eq_2$ is under $eq_1$, we have $e \equiv |X^[x = v_1; y = v_2]|$,
+\ie wlog the equations $eq_1$ and $eq_2$ are adjacent. Let us split cases on whether $x \equiv y$
 \begin{description}
 \item[Case $x \equiv y$]: We join $e_1$ and $e_2$ using \cref{lem:eq-join-flip}
 via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
@@ -769,8 +769,8 @@ via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
 \[\begin{tikzcd}
 	{X[x = u; x = v]} && {X\{u/x\}[x=u; u=v]} \\
 	{X\{v/x\}[v = u; x = v]} && \bullet
-	\arrow["{eu_2}"', from=1-1, to=2-1]
-	\arrow["{eu_1}", from=1-1, to=1-3]
+	\arrow["{eq_2}"', from=1-1, to=2-1]
+	\arrow["{eq_1}", from=1-1, to=1-3]
 	\arrow[dotted, from=1-3, to=2-3]
 	\arrow[dotted, from=2-1, to=2-3]
 	\arrow["{\cref{lem:eq-join-flip}}"{description, pos=0.8}, draw=none, from=1-1, to=2-3]
@@ -783,10 +783,10 @@ via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
 \[\begin{tikzcd}
 	{X[x = u; y = v]} && {X\{u/x\}[x=u; y=v]} \\
 	{X\{v/x\}[x = u; y = v]} && {X\{v/x\}[x = u; y = v]}
-	\arrow["{eu_2}"', from=1-1, to=2-1]
-	\arrow["{eu_1}", from=1-1, to=1-3]
-	\arrow["{eu_2}", dotted, from=1-3, to=2-3]
-	\arrow["{eu_1}", dotted, from=2-1, to=2-3]
+	\arrow["{eq_2}"', from=1-1, to=2-1]
+	\arrow["{eq_1}", from=1-1, to=1-3]
+	\arrow["{eq_2}", dotted, from=1-3, to=2-3]
+	\arrow["{eq_1}", dotted, from=2-1, to=2-3]
 \end{tikzcd}\]
 
 	\item[Case $x \not \in \freevars{v}, y \in \freevars{u}$]:
@@ -794,10 +794,10 @@ via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
 \[\begin{tikzcd}
 	{X[x = u; y = v]} && {X\{u/x\}[x=u; y=v]} \\
 	{X\{v/y\}[x = u\{v/y\}; y = v]} && {X\{u\{v/y\}/x,v/y\}[x = u\{v/y\}; y = v]}
-	\arrow["{eu_2}"', from=1-1, to=2-1]
-	\arrow["{eu_1}", from=1-1, to=1-3]
-	\arrow["{eu_2}", dotted, from=1-3, to=2-3]
-	\arrow["{eu_1}", dotted, from=2-1, to=2-3]
+	\arrow["{eq_2}"', from=1-1, to=2-1]
+	\arrow["{eq_1}", from=1-1, to=1-3]
+	\arrow["{eq_2}", dotted, from=1-3, to=2-3]
+	\arrow["{eq_1}", dotted, from=2-1, to=2-3]
 \end{tikzcd}\]
 	\item[Case $x \in \freevars{v}, y \not \in \freevars{u}$]: Symmetric to previous case.
 
@@ -808,14 +808,14 @@ via the context $X' \equiv |subst X x z|^[x = z]$ where $z$ is a fresh variable.
 \end{proof}
 
 \begin{lemma}[Subst-Diff] \label{lem:subst-diff}
-If $\rstep{\rulename{subst}}{e}{e_1}$ using $eu_1$ and
-$\rstep{\rulename{subst}}{e}{e_2}$ using $eu_2$ such that
-$eu_1$ is not under $eu_2$ and $eu_2$ is under $eu_1$,
+If $\rstep{\rulename{subst}}{e}{e_1}$ using $eq_1$ and
+$\rstep{\rulename{subst}}{e}{e_2}$ using $eq_2$ such that
+$eq_1$ is not under $eq_2$ and $eq_2$ is under $eq_1$,
 then $\join{\runi}{e_1}{e_2}$.
 \end{lemma}
 
 \begin{proof}
-% As $eu_1$ is \emph{not under} $eu_2$ and $eu_2$ is under $eu_1$,
+% As $eq_1$ is \emph{not under} $eq_2$ and $eq_2$ is under $eq_1$,
 Here, we have $e \equiv X_1[ ... X_2[x_2 = v_2] ... ][x_1 = v_1]$
 where the substitution with $|x_2=v_2|$ does not affect $X_1, x_1, v_1$.
 %
@@ -830,9 +830,9 @@ $\subst{X_2}{x}{v_1}[v_1=v_2]$ and $\subst{X_2}{x}{v_2}[v_1=v_2]$.
 \[\begin{tikzcd}
 	{X_1[\ldots X_2[x = v_2] \ldots][x = v_1]} & {} & {X_1[\ldots X_2\{v_2/x\}[x = v_2] \ldots][x = v_1]} \\
 	{X_1\{v_1/x\}[\ldots X_2\{v_1/x\}[v_1 = v_2] \ldots][x = v_1]} & \bullet & {X_1\{v_1/x\}[\ldots X_2\{v_2/x\}[v_1 = v_2] \ldots][x = v_1]}
-	\arrow["{eu_1}"', from=1-1, to=2-1]
-	\arrow["{eu_2}", from=1-1, to=1-3]
-	\arrow["{eu_1}", dotted, from=1-3, to=2-3]
+	\arrow["{eq_1}"', from=1-1, to=2-1]
+	\arrow["{eq_2}", from=1-1, to=1-3]
+	\arrow["{eq_1}", dotted, from=1-3, to=2-3]
 	\arrow[dotted, two heads, from=2-1, to=2-2]
 	\arrow[dotted, two heads, from=2-3, to=2-2]
 	\arrow["{\cref{lem:eq-join}}"{description, pos=0.9}, draw=none, from=1-2, to=2-2]
@@ -849,10 +849,10 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 \[\begin{tikzcd}
 	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
 	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x\}[x_2 = v_2'] \ldots][x_1 = v_1]} & {X_1\{v_1/x\}[\ldots X_2\{v_2'/x_2, v_1/x_1\}[x_2 = v_2'] \ldots][x_1 = v_1]}
-	\arrow["{eu_1}"', from=1-1, to=2-1]
-	\arrow["{eu_2}"', dotted, from=2-1, to=2-2]
-	\arrow["{eu_2}", from=1-1, to=1-2]
-	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
+	\arrow["{eq_1}"', from=1-1, to=2-1]
+	\arrow["{eq_2}"', dotted, from=2-1, to=2-2]
+	\arrow["{eq_2}", from=1-1, to=1-2]
+	\arrow["{eq_1}", dotted, from=1-2, to=2-2]
 \end{tikzcd}\]
 
 	\item[Case $x_2 \in \freevars{v_1}, x_1 \not \in \freevars{v_2}$]
@@ -861,11 +861,11 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
 	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1\}[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1, v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
 	& {X_1\{v_1/x_1\}[\ldots X_2\{v_1'/x_1, v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]}
-	\arrow["{eu_1}"', from=1-1, to=2-1]
-	\arrow["{eu_2}", from=1-1, to=1-2]
-	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
-	\arrow["{eu_2}"', dotted, from=2-1, to=3-2]
-	\arrow["{eu_2}", dotted, from=2-2, to=3-2]
+	\arrow["{eq_1}"', from=1-1, to=2-1]
+	\arrow["{eq_2}", from=1-1, to=1-2]
+	\arrow["{eq_1}", dotted, from=1-2, to=2-2]
+	\arrow["{eq_2}"', dotted, from=2-1, to=3-2]
+	\arrow["{eq_2}", dotted, from=2-2, to=3-2]
 \end{tikzcd}\]
 	\item[Case $x_2 \in \freevars{v_1}, x_1 \in \freevars{v_2}$] In this case, we get the below diagram
 	where, since $x_2 \in \freevars{v_2'}$, the term $x_2 = v_2'$ either steps to |fail| (and so we can
@@ -874,9 +874,9 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 \[\begin{tikzcd}
 	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
 	{X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1\}[x_2 = v_2'] \ldots][x_1 = v_1]} & {X_1\{v_1/x_1\}[\ldots X_2\{v_1/x_1, v_2'/x_2\}[x_2 = v_2'] \ldots][x_1 = v_1]}
-	\arrow["{eu_1}"', from=1-1, to=2-1]
-	\arrow["{eu_2}", from=1-1, to=1-2]
-	\arrow["{eu_1}", dotted, from=1-2, to=2-2]
+	\arrow["{eq_1}"', from=1-1, to=2-1]
+	\arrow["{eq_2}", from=1-1, to=1-2]
+	\arrow["{eq_1}", dotted, from=1-2, to=2-2]
 \end{tikzcd}\]
 \end{description}
 \end{description}
@@ -1441,29 +1441,29 @@ Split cases on the rule used in $\runi$.
 \item[Case \rulename{subst}]: via \cref{lem:subst-swap-c}.
 \item[Case \rulename{choose}]: via \cref{lem:under-choose}.
 \item[Case \rulename{seq-assoc}]:
-    Here, $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+    Here, $\rdx{\runi} \equiv \rstep{}{(eq; e_1); e_2}{eq;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rulename{var-swap}}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
+			Join at $\rdx{\runi}'' \equiv eq; (e_1; e_2')$.
 	\end{description}
 
 \item[Case \rulename{eqn-float}]:
-	$\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+	$\rdx{\runi} \equiv \rstep{}{v = (eq; e_1); e_2}{eq;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
 		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rulename{var-swap}}{v}{v'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rulename{var-swap}}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eq; (v' = e_1; e_2)$.
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rulename{var-swap}}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rulename{var-swap}}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rulename{var-swap}}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1; e_2')$.
 	\end{description}
 \end{description}
 \end{proof}
@@ -1507,35 +1507,35 @@ Split cases on the rule used in $\runi$.
 \item[Case \rulename{subst}]: via \cref{lem:subst-subst-c}.
 \item[Case \rulename{choose}]: via \cref{lem:under-choose}.
 
-\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eu; e_1); e_2}{eu;(e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{seq-assoc}]: $\rdx{\runi} \equiv \rstep{}{(eq; e_1); e_2}{eq;(e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rr'}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (e_1; e_2')$.
-		\item[Case] $\rdx{} \occunder (eu; e_1)$ \ie $\rulename{subst} : (eu; e_1) \movesto (eu'; e_1')$
+			Join at $\rdx{\runi}'' \equiv eq; (e_1; e_2')$.
+		\item[Case] $\rdx{} \occunder (eq; e_1)$ \ie $\rulename{subst} : (eq; e_1) \movesto (eu'; e_1')$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2)$.
-		\item[Case] $\rdx{} \occunder ((eu; e_1); e_2)$ \ie $\rulename{subst} : (eu; e_1);e_2 \movesto (eu'; e_1'); e_2'$
+		\item[Case] $\rdx{} \occunder ((eq; e_1); e_2)$ \ie $\rulename{subst} : (eq; e_1);e_2 \movesto (eu'; e_1'); e_2'$
 			Join at $\rdx{\runi}'' \equiv eu'; (e_1'; e_2')$.
 	\end{description}
 
-\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eu; e_1); e_2}{eu;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
+\item[Case \rulename{eqn-float}]: $\rdx{\runi} \equiv \rstep{}{v = (eq; e_1); e_2}{eq;(v = e_1; e_2)} \equiv \rdx{\runi}'$.
 	Split cases on where $\rdx{}$ occurs.
 	\begin{description}
 		\item[Case] $\rdx{} \occunder v$ \ie $\rstep{\rr'}{v}{v'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v' = e_1; e_2)$.
-		\item[Case] $\rdx{} \occunder eu$ \ie $\rstep{\rr'}{eu}{eu'}$
+			Join at $\rdx{\runi}'' \equiv eq; (v' = e_1; e_2)$.
+		\item[Case] $\rdx{} \occunder eq$ \ie $\rstep{\rr'}{eq}{eu'}$
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1; e_2)$.
 		\item[Case] $\rdx{} \occunder e_1$ \ie $\rstep{\rr'}{e_1}{e_1'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1'; e_2)$.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1'; e_2)$.
 		\item[Case] $\rdx{} \occunder e_2$ \ie $\rstep{\rr'}{e_2}{e_2'}$
-			Join at $\rdx{\runi}'' \equiv eu; (v = e_1; e_2')$.
-		\item[Case] $\rdx{} \occunder (eu; e_1)$ \ie $\rulename{subst} : v = (eu; e_1); e_2 \movesto v = (eu'; e_1'); e_2$.
+			Join at $\rdx{\runi}'' \equiv eq; (v = e_1; e_2')$.
+		\item[Case] $\rdx{} \occunder (eq; e_1)$ \ie $\rulename{subst} : v = (eq; e_1); e_2 \movesto v = (eu'; e_1'); e_2$.
 			Join at $\rdx{\runi}'' \equiv eu'; (v = e_1'; e_2)$.
-		\item[Case] $\rdx{} \occunder v = (eu; e_1); e_2$ \ie $\rulename{subst} : (v = eu; e_1);e_2 \movesto (v' = eu'; e_1'); e_2'$
+		\item[Case] $\rdx{} \occunder v = (eq; e_1); e_2$ \ie $\rulename{subst} : (v = eq; e_1);e_2 \movesto (v' = eu'; e_1'); e_2'$
 			Join at $\rdx{\runi}'' \equiv eu'; (v' = e_1'; e_2')$.
 	\end{description}
 \end{description}

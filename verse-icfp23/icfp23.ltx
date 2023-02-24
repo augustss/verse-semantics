@@ -377,27 +377,26 @@ the Verse calculus or \versecalc{} for short
 As in any functional logic language,
 \versecalc{} supports logical variables, equalities, and choice, but it is distinctive in several ways:
 \begin{itemize}
-\item \versecalc{} natively supports \emph{higher-order programming}, just like the lambda calculus.
+\item \versecalc{} natively supports \emph{higher-order functions}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
-\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables,
-  or ``suspending'' {\vs} ``narrowing'' operations.  \versecalc{} offers a new
+\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables
+  \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
   there is just one equality (other languages have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
-\item \versecalc{} uses \emph{spatial choice}, meaning that the choice operator behaves
-  a bit like a data constructor: it appears in normal forms (\cref{sec:choice-rules}).
-  This makes \versecalc{} \emph{deterministic}, unlike most
-  functional logic languages which are non-deterministic (\cref{sec:deterministic}).
-  In \versecalc{} choices are laid out in \emph{space},
-  in the syntax of the term, rather than in \emph{time}.
+\item \emph{Choice and determinism.} Choice is a fundamental feature of all functional-logic languages.
+  In \versecalc{} choice is expressed in the syntax of the term (``laid out in space'')
+  rather than, as is more typical, handled by non-deterministic rewrites and bactracking (``laid out in time'').
+  This makes \versecalc{} completely \emph{deterministic}, unlike most
+  functional logic languages which are non-deterministic by design (\cref{sec:deterministic}).
 \end{itemize}
 As always with a calculus, the idea is that \versecalc{} distills the essence of functional logic programming.
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
 We believe that it is possible to use \versecalc{} as the compilation target for a variety of
-functional logic languages such as Curry~\cite{hanus:curry-report} (although see \cref{sec:laziness}).
+functional logic languages such as Curry~\cite{hanus:curry-report}.
 We are ourselves working on Verse, a new general purpose programming language, built directly on \versecalc{}; indeed,
 our motivation for developing \versecalc{} is practical rather than theoretical.
 No single aspect of \versecalc{} is unique, but we believe that their combination
@@ -407,19 +406,19 @@ We discuss the rich related work in \cref{sec:related}, and design alternatives 
 Our second contribution is to equip \versecalc{} with a
 \emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
 We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
-semantics using rewrite rules, just like the lambda calculus.  That seems problematical, however, because
-logical variables and unification involve sharing and non-local communication that seems hard
-to express in a rewrite system.
+semantics using rewrite rules, just like the lambda calculus.  That seems challenging, however, because
+logical variables and unification involve sharing and non-local communication. How can that
+be expressed in a rewrite system?
 
-Exactly the same difficulty arises with call-by-need.  For a long time, the only semantics of
+Happily, we can build on prior work: exactly the same difficulty arises with call-by-need.
+For a long time, the only semantics of
 call-by-need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
 was an operational semantics that sequentially threads a global heap through execution~\cite{launchbury:natural}.
 But then Ariola {\etal}, in a seminal paper, showed how to \emph{reify the heap into the term itself},
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic programs, that reifies
 logical variables and unification into the term itself,
-and exploits our notion of spatial choice to replace non-deterministic
-search with a (deterministic) tree of successful results.
+and replaces non-deterministic search with a (deterministic) tree of successful results.
 % Just like rewriting for the lambda calculus, this semantics
 % gives programmers a set of equivalences with which
 % they can reason equationally about their programs.
@@ -427,13 +426,13 @@ For example, the expression above can be rewritten
 thus\footnote{The rule names come from \cref{fig:rules}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
 $$
-\begin{array}{ll}
-                         & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \\
-\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
+\begin{array}{ll@@{\quad}ll}
+\multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
+\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| &
 \movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
-\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| \\
+\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| &
 \movestoR{eqn-elim}      & |def y (2==y; y)| \\
-\movestoR{hnf-swap}      & |def y (y==2; y)| \\
+\movestoR{hnf-swap}      & |def y (y==2; y)| &
 \movestoR{subst}         & |def y (y==2; 2)| \\
 \movestoR{eqn-elim}      & |2| \\
 \end{array}
@@ -462,7 +461,7 @@ some built-in operations and tuples as data constructors:
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
-\item An \emph{equational expression} |eu| is either an ordinary expression |e|, or
+\item An \emph{equational expression} |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v=e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
@@ -480,9 +479,9 @@ adding a type system is an excellent goal, but is the subject of another paper.
 Expressions also include two other key collections of constructs:
 logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
 The details of choice and unification, and especially their
-interaction, are rather tricky, so this section will do a lot of
-arm-waving.  But fear not: \cref{sec:rewrite-rules} will make all this
-precise.  We only have space to describe one incarnation of \versecalc{}; \cref{sec:variations}
+interaction, are subtle, so this section will do a lot of
+arm-waving.  But fear not: \cref{sec:rewrite-rules} will spell out the precise details.
+We only have space to describe one incarnation of \versecalc{}; \cref{sec:variations}
 explores some possible alternative design choices.
 
 \subsection{Logical variables and equations} \label{sec:unify}
@@ -490,11 +489,11 @@ explores some possible alternative design choices.
 The Verse calculus includes first class \emph{logical variables} and \emph{equations} that constrain their values.
 You can bring a fresh logical variable into scope with |defKW|; constrain a value to be equal to
 an expression with an equation
-|v == e|; and compose expressions in sequence with |eu ; e| (see \cref{fig:syntax}).
+|v == e|; and compose expressions in sequence with |eq ; e| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
 |def x (x=e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
 equations and where they can appear: an equation |(v=e)| always equates a \emph{value} $v$ to an expression $e$;
-and an equation can only appear to the left of a ``|;|'' (see |eu| in \cref{fig:syntax}).
+and an equation can only appear to the left of a ``|;|'' (see |eq| in \cref{fig:syntax}).
 The desugaring rules in \cref{fig:syntax} rewrite a general equation |e_1 == e_2| into this simpler form.
 
 \emph{A program executes by solving its equations}, using the process of unification.
@@ -580,13 +579,13 @@ $$
 We duplicate the context surrounding the choice, and ``float the choice outwards.''
 The same thing happens when there are multiple choices.  For examplle
 $$
-|def (x y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
+|def (x ^^ y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
 \quad
 \text{yields the sequence |tup (7,31), tup(7,5), tup(22,31), tup(22,5)|}
 $$
 Notice that the order of the two equations now \emph{is} significant:
 $$
-|(def (x y) y == (31 choice 5); (x == (7 choice 22); tup (x,y)))|
+|(def (x ^^ y) y == (31 choice 5); (x == (7 choice 22); tup (x,y)))|
 \quad
 \text{yields the sequence |tup (7,31), tup(22,31), tup(7,5), tup(22,5)|}
 $$
@@ -946,7 +945,7 @@ So, for example, |for^(x:=10 `choice` 20) do (x `choice` x+1)| will reduce to
 At this point it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def (i x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
+For example |for^(def (i ^^ x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
 fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most languages.
 
 
@@ -988,10 +987,11 @@ programming language?  Here are some possibilities:
   which we offer for completeness in \cref{sec:den-sem}, but that is the subject of another paper.
 \item \emph{A big-step operational semantics} typically involves explaining how a (heap, expression) starting point
   evaluates to a (heap, value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
-\item \emph{A small-step operational semantics}. Despite its ``operational semantics'' title, the big-step approach
+  Despite its ``operational semantics'' title, the big-step approach
   does not convey accurate operational intuition, because it goes all the way to a value
-  in one step. So-called ``small-step'' operational semantics are therefore widely used;
-  they typically describe how a (heap, expression, stack) configuration evolves, one small
+  in one step. 
+\item \emph{A small-step operational semantics} addresses this criticism:
+  it typically describe how a (heap, expression, stack) configuration evolves, one small
   step at a time ({\eg}, ~\cite{pj:stg-machine}).
   The difficulty is that the description is now so low level that it is again hard to explain to programmers.
 \item \emph{A rewrite semantics} steers between these two extremes.
@@ -1028,7 +1028,7 @@ has the following properties:
 % The \rulename{var-swap} orders expressions using the ordering |lte|.
 % The reason for this is to simplify the confluence proof by having a more canonical representation.
 % The ordering is based on using de~Bruijn indices as the variable representation;
-%%The ordering is defined for expressions |eu|, \ie, expressions and equalities.
+%%The ordering is defined for expressions |eq|, \ie, expressions and equalities.
 %%The |lte| is defined so that all equalities, |v==e|, are less than all expressions, |e|.
 % |e_1 lte e_2| if the natural lexicographical comparison of the terms with de~Bruijn indices is |e_1 < e_2|.
 % \Eg, in the expressions |def (y x) (y == x; 0)| the |x| is considered less than the |y| since
@@ -1036,7 +1036,7 @@ has the following properties:
 % So in this case \rulename{var-swap} will turn it into |def (y x) (x == y; 0)|.
 %
 % Note that the \rulename{seq-swap} rule does not reorder choices;
-% the rule only applies if at least one of the |eu| has no choice.
+% the rule only applies if at least one of the |eq| has no choice.
 
 
 \subsection{Functions and function application rules} \label{sec:beta}
@@ -1146,7 +1146,7 @@ suffice to express the necessary sharing.
   big enough to encompass all occurrences of |x|.
   For example, we can rewrite |(y=x+1; (x=3; z=x+3))| to |(y=x+1; (x=3; z=3+3))|, using
   |X = (hole; z=x+3)|, but that leaves an occurrence of |x| in |(y=x+1)|.
-  When there are no remaining occurrences of |x| we may garbage collect
+  When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
 \item The side condition $x \not\in \freevars{v}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
@@ -1231,14 +1231,14 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
 % the simpler \rulename{global-subst}: to establish confluence.
 
-\subsection{Garbage collection and normalization rules} \label{sec:gc} \label{sec:normalization}
+\subsection{Elimination and normalization rules} \label{sec:gc} \label{sec:normalization}
 
 % Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
 % \rulename{eqn-float} gives us |(y==x+1; x==3; y)|; to make further progress we must
 % move the |x==3| to the left, using \rulename{seq-assoc-swap2}, giving |(x==3; y==x+1; y)|.
 % Now we can substitute for |x|, and then for |y|.
 
-Four \emph{elimination (or garbage-collection)} rules allow dead code to be dropped (\cref{fig:rules}):
+Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 \rulename{val-elim} discards a value to the left of semicolon; \rulename{exi-elim} discards
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
 occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
@@ -1254,7 +1254,7 @@ apply \rulename{subst}.
 
 Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
 applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
-\rulename{exi-swap} allows you to move an existential inwards so that it can be garbage-collected
+\rulename{exi-swap} allows you to move an existential inwards so that it can be eliminated
 by \rulename{exi-elim}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
 this example, where |a,b,c| are bound in that order; that is $|c| \prec |b| \prec |a|$: 
 $$
@@ -1274,8 +1274,8 @@ our intution that order does not matter.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
-That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eu_1$ and $eu_2$
-is \emph{choice-free}, via the side condition $eu_1 \in ceu$ or $eu_2 \in ceu$ in \rulename{seq-swap}
+That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eq_1$ and $eq_2$
+is \emph{choice-free}, via the side condition $eq_1 \in ceu$ or $eq_2 \in ceu$ in \rulename{seq-swap}
 (see \cref{fig:choice-free-syntax} for the syntax of $ceu$).
 Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}), and
@@ -1370,9 +1370,11 @@ the choice tree (context |SC|) immediately under a |oneKW| or |allKW| construct 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
 \emph{decompose} choices.
 So choice behaves a bit like a data constructor, or normal form, of the language.
-For this reason we call
-this approach \emph{spatial choice}, in contrast to approaches that eliminate choice by non-deterministically
+This contrasts with other approaches that eliminate choice by non-deterministically
 picking one branch or the other, which immediately gives up confluence.
+% For this reason we call
+% this approach \emph{spatial choice}, in contrast to approaches that eliminate choice by non-deterministically
+% picking one branch or the other, which immediately gives up confluence.
 
 % The rules for |oneKW| and |allKW| expect multiple choices to be
 % normalized into a right-associative list of non-failing values, and
@@ -1605,10 +1607,10 @@ In our context, consider the term:
 %
 $$
 \begin{array}{lcll}
- |def (x y) (x == tup (1, y); y == lam z x; x)|
+ |def (x ^^ y) (x == tup (1, y); y == lam z x; x)|
  & \rsteps{}{}{} & |def y (y == lam z (tup (1, y); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
 
- |def (x y) (x == tup (1, y); y == lam z x; x)|
+ |def (x ^^ y) (x == tup (1, y); y == lam z x; x)|
 & \rsteps{}{}{} & |def x (x = tup (1, lam z x)); x| & \text {(2: substitute for |y| first)}
 \end{array}
 $$
@@ -1623,7 +1625,7 @@ We have tackled this problem in three different ways.  First, we can simply proh
 confluence under that restriction (\cref{sec:confluence-sketch}).
 This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
-recursion emerges during execution.  For example, is this recursive: |def (x y) (x==tup (1,y); applyN f (x,y))|?
+recursion emerges during execution.  For example, is this recursive: |def (x ^^ y) (x==tup (1,y); applyN f (x,y))|?
 It might be if |f == (lam (tup (v, w)) (v==w))|!
 For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} make the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
@@ -1696,7 +1698,7 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
 %
-Proving confluence for application, garbage collection and choice is easy:
+Proving confluence for application, elimination and choice is easy:
 %
 \simon{added normalization to this list -- Ranjit check} \ranjit{ACK: please check updated}
 %
