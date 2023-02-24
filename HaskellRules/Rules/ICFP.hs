@@ -30,7 +30,7 @@ allSystemsICFP = [ systemICFP,
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
   { sname               = "ICFP"
-  , description         = "ICFP, from verse-icfp23/rewrites.ltx"
+  , description         = "ICFP with ord-subst from verse-icfp23/rewrites.ltx"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
@@ -450,6 +450,7 @@ rulesUnification env lhs =
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
+     guard (ltExprV env x v)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`
@@ -466,6 +467,10 @@ rulesUnification env lhs =
      -- Don't reorder effects
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
+
+ltExprV :: TRSFlags -> Ident -> Expr -> Bool
+ltExprV env x y@Var{} = ltExpr env (Var x) y
+ltExprV _   _ _       = True
 
 _rulesValSwapOrd :: ERule
 _rulesValSwapOrd env lhs =
@@ -678,7 +683,7 @@ doSplit lhs v e g =
       res = Var t :@: g
   in  EXI h (EXI t (gv :>: hlam :>: res))
 -}
-  
+
 --------------------------------------------------------------------------------
 
 storeEmpty :: Heap
@@ -785,7 +790,7 @@ rulesStore _ lhs =
   "REF-READ" `name`
   do Store h e <- [lhs]
      (ctx, is, Op Read :@: Ref p) <- storeX e
-     let v = storeRead h p 
+     let v = storeRead h p
          ctx' = ctxAlpha v is ctx
      pure (Store h (ctx' v))
  ++
@@ -841,4 +846,3 @@ rulesStore _ lhs =
 ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
 ctxAlpha e is ctx | null (intersect (free e) is) = ctx
                   | otherwise = error "unimplemented"
-                  
