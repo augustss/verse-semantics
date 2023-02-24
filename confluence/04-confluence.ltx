@@ -17,6 +17,7 @@ $$
   \rdx{} & \text{An expression $e$ that has a redex at the root} \\
   e_1 \soccunder e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
   e_1 \occunder e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
+\tstep{\rr}{a}{b} & \text{$a$ reduces to $b$ via one root-level step of $\rr$ \ranjit{CHECK:notion}} \\
 \rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
 \rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
 \rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
@@ -155,10 +156,12 @@ but we assume it globally for clarity.
 
 In talking about confluence we often speak of two different reduction steps with a common
 starting point, thus $\rstep{\rr}{e}{e_1}$ and $\rstep{\rr}{e}{e_2}$.
+%
 In the first of these there is a sub-term of $e$, say $\Delta_1$, that is the actual redex;
-the root of $\Delta_1$ matches some rule in $\rr$.  $\Delta_1$ is just an ordinary
-expression, but we use the notation ``$\Delta$'' to stress that it is the root of a redex
-(see \cref{fig:notation}).
+the root of $\Delta_1$ matches some rule in $\rr$.
+%
+$\Delta_1$ is just an ordinary expression, but we use the notation
+``$\Delta$'' to stress that it is the root of a redex (see \cref{fig:notation}).
 %
 $\Delta_1$ is a sub-term of $e$ (or possibly $\Delta = e$),
 which we write $\Delta_1 \occunder e$ (again in \cref{fig:notation}).
@@ -228,12 +231,22 @@ one could pick different brackets or just be wordy: ``uses rewrite rule $\langle
 Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
 \end{proof}
 \noindent
-So to prove the diamond property for a relation $\rr$, we should focus attention
-only on case (b).
+
+
 
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
 \simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement of Lemma B.5!} \ranjit{ACK: check}
+
+So to prove the diamond property for a relation $\rr$, we should focus attention
+only on case (b) where the redexes are not disjoint, \ie one occurs under the other.
+%
+To this end, it suffices to consider the case where
+%
+one of the reductions is \emph{at the root}, written $\tstep{\rr}{e}{e_1}$ (\cref{fig:notation}),
+%
+and the \emph{other} occurs under $e$ \ie is of the form $\rstep{\rr}{E[\rdx{}]}{e_2}$
+where $e_2 \equiv E[\rdx{}']$, and $\tstep{\rr}{\rdx{}}{\rdx{}'}$.
 
 Next, we prove a set of ``reductions-under'' $R$ lemmas that say that
 %
@@ -241,29 +254,30 @@ if a term $e$ can be
 %
 (1)~reduced using two different rules $R$ and $S$ as $\rstep{R}{e}{e_R}$ and $\rstep{S}{e_S}$, such that
 %
-(2)~the redex for the $S$ reduction is a \emph{sub-term} of the redex for the $R$ reduction,
+(2)~the redex for the $S$ reduction \emph{occurs under} the redex for the $R$ reduction,
 %
 then there exists some $e'$ such that
 %
 $e_R$ (resp. $e_S$) can be reduced to $e'$ using some number of $S$ (resp. $R$) reductions.
+
+The lemmas will be used in two ways.
 %
-The lemmas will be used in TWO ways.
-
-1. Two different relations commute,
-
-2. The relation (strongly) commutes with itself, \ie has the diamond property.
-
-To prove, firstly that two different relations $R$ and $S$ commute, we will use these lemmas
-These lemmas will be used to prove that two relations $R$ and $S$ commute
+First, to show that two \emph{different} relations commute.
+%
+Second, that a relation (strongly) commutes with \emph{itself},
+\ie has the diamond property, and hence is confluent.
+%
+% To prove, firstly that two different relations $R$ and $S$ commute, we will use these lemmas
+% These lemmas will be used to prove that two relations $R$ and $S$ commute
 % \eg have the diamond property,
-by splitting cases on which relation is the ``outer'' reduction and which is the ``inner''
-and then applying the appropriate ``reduction-under'' lemma for the outer relation, and using
+%
+In each case, we will split cases on which relation is the ``outer''
+reduction and which is the ``inner'' and then applying the appropriate
+``reduction-under'' lemma for the outer relation, and using
 \cref{lem:disjoint} for the case where the redexes are disjoint.
 
 
 \subsubsection{Application}
-
-\simon{Where is $E$ defined?  I have added it to Figure 11.} \ranjit{ACK: Thanks!}
 
 The following lemma says that
 %
@@ -279,33 +293,39 @@ common term $\rdx{\rapp}''$ by executing a single step of the \emph{other} reduc
 (Recall that $E[e'] \equiv e$ means that $e' \occunder e$ \ie $e'$ occurs under or is a sub-term of $e$).
 
 \begin{lemma}[Under-$\rapp$] \label{lem:under-a}
-If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
+% If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
+%    $\rdx{\rapp} \equiv E[\rdx{}]$ and
+%    $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+% then there exists $\rdx{\rapp}''$ such that
+%    $\rstep{\rr}{\rdx{\rapp}'}{\rdx{\rapp}''}$ and
+%    $\rstep{\rapp}{E[\rdx{}']}{\rdx{\rapp}''}$.
+%
+If $\tstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and
    $\rdx{\rapp} \equiv E[\rdx{}]$ and
-   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+   $\tstep{\rr}{\rdx{}}{\rdx{}'}$
 then there exists $\rdx{\rapp}''$ such that
    $\rstep{\rr}{\rdx{\rapp}'}{\rdx{\rapp}''}$ and
-   $\rstep{\rapp}{E[\rdx{}']}{\rdx{\rapp}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJhcHB9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccmFwcH0nIl0sWzEsMSwiXFxyZHh7XFxyYXBwfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJhcHAiLDJdLFswLDMsIlxccnIiXSxbMywyLCJcXHJhcHAiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwyLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+   $\tstep{\rapp}{E[\rdx{}']}{\rdx{\rapp}''}$.
+%
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJhcHB9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccmFwcH0nIl0sWzEsMSwiXFxyZHh7XFxyYXBwfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHRyZWx7XFxyYXBwfSIsMl0sWzAsMywiXFxyciJdLFszLDIsIlxcdHJlbHtcXHJhcHB9IiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMiwiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{\rdx{\rapp} \equiv E[\rdx{}]} & {E[\rdx{}']} \\
 	{\rdx{\rapp}'} & {\rdx{\rapp}''}
-	\arrow["\rapp"', from=1-1, to=2-1]
+	\arrow["{\trel{\rapp}}"', from=1-1, to=2-1]
 	\arrow["\rr", from=1-1, to=1-2]
-	\arrow["\rapp", dotted, from=1-2, to=2-2]
+	\arrow["{\trel{\rapp}}", dotted, from=1-2, to=2-2]
 	\arrow["\rr"', dotted, from=2-1, to=2-2]
 \end{tikzcd}\]
 \end{lemma}
-\simon{Do we have to have $\rdx{\rapp} \equiv E[\rdx{}]$. Why not just use $E[\rdx{}]$ throughout?} \ranjit{To indicate that the term is also an $\rapp$ redex, so we can do "inversion"/case-split on the $\rapp$ rule}.
+% \simon{Do we have to have $\rdx{\rapp} \equiv E[\rdx{}]$. Why not just use $E[\rdx{}]$ throughout?} \ranjit{To indicate that the term is also an $\rapp$ redex, so we can do "inversion"/case-split on the $\rapp$ rule}.
 
-\simon{``...such that $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$''.  What is the arrow in this reduction?  is it maybe $\rr$, the full relation?} \ranjit{ACK: correct, fixed!}
+% \simon{``...such that $\rstep{}{\rdx{\rapp}'}{\rdx{\rapp}''}$''.  What is the arrow in this reduction?  is it maybe $\rr$, the full relation?} \ranjit{ACK: correct, fixed!}
 
-\simon{I think (but I am not sure) that in the premises $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and $\rstep{\rr}{\rdx{}}{\rdx{}'}$ you mean that the reduction takes place \emph{at the root} not buried inside. But usually the arrow lets you take a step ``inside''.} \ranjit{ACK: correct "redex" means reduction is "at the root of" thanks for clarifying in the notation section!}
+% \simon{I think (but I am not sure) that in the premises $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$ and $\rstep{\rr}{\rdx{}}{\rdx{}'}$ you mean that the reduction takes place \emph{at the root} not buried inside. But usually the arrow lets you take a step ``inside''.} \ranjit{ACK: correct "redex" means reduction is "at the root of" thanks for clarifying in the notation section!}
 
-\simon{What if the two are neither disjoint nor in a subset relationship, but rather just overlappping? I think that can't happen, but if not, it's a property of $\rapp$. In other rule sets they could overlap couldn't they?} \ranjit{ACK: A term is a syntax tree -- so two redex roots are either (a) the same node in the tree, (b) one occurs under the other or (c) are totally disjoint. In VC a single root can only be a redex for a single reduction, so "occurs under" is the same as "is a strict subterm of".}
+% \simon{What if the two are neither disjoint nor in a subset relationship, but rather just overlappping? I think that can't happen, but if not, it's a property of $\rapp$. In other rule sets they could overlap couldn't they?} \ranjit{ACK: A term is a syntax tree -- so two redex roots are either (a) the same node in the tree, (b) one occurs under the other or (c) are totally disjoint. In VC a single root can only be a redex for a single reduction, so "occurs under" is the same as "is a strict subterm of".}
 
-
-\begin{proof} Split cases on the rule used in $\rapp$.
-\simon{Here is the first use of $\subset$ on terms. Needs a definition} \ranjit{ACK: thanks!}
+\begin{proof} Split cases on the rule used in $\trel{\rapp}$.
 \begin{description}
 
 \item[Case:] \rulename{app-beta} \ie $\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$.
@@ -331,25 +351,34 @@ then there exists $\rdx{\rapp}''$ such that
 %
 Let $\rr' \equiv \rr - \rulename{subst} - \rulename{var-swap}$.
 %
-If $\rstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
+If $\tstep{\runi}{\rdx{\runi}}{\rdx{\runi}'}$ and
    $\rdx{\runi} \equiv E[\rdx{}]$ and
-   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+   $\tstep{\rr'}{\rdx{}}{\rdx{}'}$
 then there exists $\rdx{\runi}''$ such that
    $\rsteps{\rr'}{\rdx{\runi}'}{\rdx{\runi}''}$ and
-   $\rstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzEsMSwiXFxyZHh7XFxydW5pfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDMsIlxccnInIl0sWzMsMiwiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMiwiXFxyciciLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+   $\tstep{\runi}{E[\rdx{}']}{\rdx{\runi}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzEsMSwiXFxyZHh7XFxydW5pfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHRyZWx7XFxydW5pfSIsMl0sWzAsMywiXFxyciciXSxbMywyLCJcXHRyZWx7XFxydW5pfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDIsIlxccnInIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{\rdx{\runi} \equiv E[\rdx{}]} & {E[\rdx{}']} \\
 	{\rdx{\runi}'} & {\rdx{\runi}''}
-	\arrow["\runi"', from=1-1, to=2-1]
+	\arrow["{\trel{\runi}}"', from=1-1, to=2-1]
 	\arrow["{\rr'}", from=1-1, to=1-2]
-	\arrow["\runi", dotted, from=1-2, to=2-2]
+	\arrow["{\trel{\runi}}", dotted, from=1-2, to=2-2]
 	\arrow["{\rr'}"', dotted, two heads, from=2-1, to=2-2]
 \end{tikzcd}\]
+% % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtcXHJ1bml9IFxcZXF1aXYgRVtcXHJkeHt9XSJdLFswLDEsIlxccmR4e1xccnVuaX0nIl0sWzEsMSwiXFxyZHh7XFxydW5pfScnIl0sWzEsMCwiRVtcXHJkeHt9J10iXSxbMCwxLCJcXHJ1bmkiLDJdLFswLDMsIlxccnInIl0sWzMsMiwiXFxydW5pIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMiwiXFxyciciLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% \[\begin{tikzcd}
+% 	{\rdx{\runi} \equiv E[\rdx{}]} & {E[\rdx{}']} \\
+% 	{\rdx{\runi}'} & {\rdx{\runi}''}
+% 	\arrow["\runi"', from=1-1, to=2-1]
+% 	\arrow["{\rr'}", from=1-1, to=1-2]
+% 	\arrow["\runi", dotted, from=1-2, to=2-2]
+% 	\arrow["{\rr'}"', dotted, two heads, from=2-1, to=2-2]
+% \end{tikzcd}\]
 \end{lemma}
 
 \begin{proof}
-Split cases on the rule used in $\runi$.
+Split cases on the rule used in $\trel{\runi}$.
 \begin{description}
 \item[Case \rulename{subst}]: Here, $\rdx{\runi} \equiv |X^[x==v]|$. Split cases on the occurrence of $\rdx{}$.
 	\begin{description}
@@ -441,22 +470,32 @@ Split cases on the rule used in $\runi$.
 \end{description}
 \end{proof}
 
-\begin{lemma}[Under \rulename{choose}] \label{lem:under-choose}
-If $\rstep{\rulename{choose}}{\rdx{ch}}{\rdx{ch}'}$ and
+\begin{lemma}[Under-\rulename{choose}] \label{lem:under-choose}
+If $\tstep{\rulename{choose}}{\rdx{ch}}{\rdx{ch}'}$ and
 	$\rdx{ch} \equiv E[\rdx{}]$ and
-	$\rstep{\rr}{\rdx{}}{\rdx{}'}$
+	$\tstep{\rr}{\rdx{}}{\rdx{}'}$
  then there exists $\rdx{ch}''$ such that
 	$\rsteps{\rr}{\rdx{ch}'}{\rdx{ch}''}$ and
-	$\rstep{\rulename{choose}}{E[\rdx{}']}{\rdx{ch}''}$.
-% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtjaH0gXFxlcXVpdiBFW1xccmR4e31dIl0sWzAsMSwiXFxyZHh7Y2h9JyJdLFsyLDAsIkVbXFxyZHh7fSddIl0sWzIsMSwiXFxyZHh7Y2h9JyciXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iLDJdLFswLDIsIlxccnIiXSxbMiwzLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+	$\tstep{\rulename{choose}}{E[\rdx{}']}{\rdx{ch}''}$.
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtjaH0gXFxlcXVpdiBFW1xccmR4e31dIl0sWzAsMSwiXFxyZHh7Y2h9JyJdLFsyLDAsIkVbXFxyZHh7fSddIl0sWzIsMSwiXFxyZHh7Y2h9JyciXSxbMCwxLCJcXHRyZWx7XFxydWxlbmFtZXtjaG9vc2V9fSIsMl0sWzAsMiwiXFxyciJdLFsyLDMsIlxcdHJlbHtcXHJ1bGVuYW1le2Nob29zZX19IiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsMywiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{\rdx{ch} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
 	{\rdx{ch}'} && {\rdx{ch}''}
-	\arrow["{\rulename{choose}}"', from=1-1, to=2-1]
+	\arrow["{\trel{\rulename{choose}}}"', from=1-1, to=2-1]
 	\arrow["\rr", from=1-1, to=1-3]
-	\arrow["{\rulename{choose}}", dotted, from=1-3, to=2-3]
+	\arrow["{\trel{\rulename{choose}}}", dotted, from=1-3, to=2-3]
 	\arrow["\rr"', dotted, two heads, from=2-1, to=2-3]
 \end{tikzcd}\]
+%
+% % https://q.uiver.app/?q=WzAsNCxbMCwwLCJcXHJkeHtjaH0gXFxlcXVpdiBFW1xccmR4e31dIl0sWzAsMSwiXFxyZHh7Y2h9JyJdLFsyLDAsIkVbXFxyZHh7fSddIl0sWzIsMSwiXFxyZHh7Y2h9JyciXSxbMCwxLCJcXHJ1bGVuYW1le2Nob29zZX0iLDJdLFswLDIsIlxccnIiXSxbMiwzLCJcXHJ1bGVuYW1le2Nob29zZX0iLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMSwzLCJcXHJyIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+% \[\begin{tikzcd}
+% 	{\rdx{ch} \equiv E[\rdx{}]} && {E[\rdx{}']} \\
+% 	{\rdx{ch}'} && {\rdx{ch}''}
+% 	\arrow["{\rulename{choose}}"', from=1-1, to=2-1]
+% 	\arrow["\rr", from=1-1, to=1-3]
+% 	\arrow["{\rulename{choose}}", dotted, from=1-3, to=2-3]
+% 	\arrow["\rr"', dotted, two heads, from=2-1, to=2-3]
+% \end{tikzcd}\]
 \end{lemma}
 
 \begin{proof}
@@ -476,21 +515,22 @@ so join at $|SX^[CX'^[e1'] choice CX'^[e2']]|$.
 
 \subsubsection{Normalization}
 
+
 \begin{lemma}[Under-$\rcon$] \label{lem:under-n}
 %
 Let $\rr' = \rr - \rcon - \runi$.
 %
-If $\rstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
+If $\tstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$ and
    $\rdx{\rcon} \equiv E[\rdx{}]$ and
-   $\rstep{\rr'}{\rdx{}}{\rdx{}'}$
+   $\tstep{\rr'}{\rdx{}}{\rdx{}'}$
 then exists $\rdx{\rcon}''$ such that
    $\rstep{\rr'}{\rdx{\rcon}'}{\rdx{\rcon}''}$ and
-   $\rstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
+   $\tstep{\rcon}{E[\rdx{}']}{\rdx{\rcon}''}$.
 \end{lemma}
 
 \begin{proof}
-Let $\rcon : \rdx{\rcon} \movesto \rdx{\rcon}'$ be the $\rcon$ redex and split cases
-on the reduction rule used in the step.
+Split cases on the reduction rule used in
+$\tstep{\rcon}{\rdx{\rcon}}{\rdx{\rcon}'}$
 %
 \begin{description}
 \item[Case \rulename{exi-swap}]: \ie $\rcon: |def x (def y e)| \movesto |def y (def x e)|$.
@@ -524,16 +564,17 @@ Split cases on the position of $\rdx{}$.
 \subsubsection{Garbage Collection}
 
 \begin{lemma}[Under-$\rgc$] \label{lem:under-g}
-If $\rstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
-	   $\rdx{\rgc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
-	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
+If $\tstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$ and
+   $\rdx{\rgc} \equiv E[\rdx{}]$ and
+   $\tstep{\rr}{\rdx{}}{\rdx{}'}$
 then there exists $\rdx{\rgc}''$ such that
 	   $\rstepo{\rr}{\rdx{\rgc}'}{\rdx{\rgc}''}$ and
-	   $\rstep{\rgc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+	   $\tstep{\rgc}{E[\rdx{}']}{\rdx{\rgc}''}$.
 \end{lemma}
 
 \begin{proof}
-Let $\rgc : \rdx{\rgc} \movesto \rdx{\rgc}'$ be the $\rgc$ redex and split cases
+Let $\tstep{\rgc}{\rdx{\rgc}}{\rdx{\rgc}'}$
+be the $\rgc$ redex and split cases
 on the reduction rule used in the step.
 %
 \begin{description}
@@ -580,16 +621,16 @@ on the reduction rule used in the step.
 \subsubsection{Choice}
 
 \begin{lemma}[Under-$\rspc$] \label{lem:under-s}
-	If $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
-	   $\rdx{\rspc} \equiv E[\rdx{}]$ where $E \not \equiv |hole|$ and
+	If $\tstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$ and
+	   $\rdx{\rspc} \equiv E[\rdx{}]$ and %where $E \not \equiv |hole|$ and
 	   $\rstep{\rr}{\rdx{}}{\rdx{}'}$
 	then there exists $\rdx{\rspc}''$ such that
 	   $\rstepo{\rr}{\rdx{\rspc}'}{\rdx{\rspc}''}$ and
-	   $\rstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
+	   $\tstep{\rspc}{E[\rdx{}']}{\rdx{\rspc}''}$.
 \end{lemma}
 
 \begin{proof}
-Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
+Split cases on the rule used in  $\tstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
 
 \begin{description}
 \item[Case] \rulename{one-fail} (symmetric \rulename{all-fail})
@@ -629,12 +670,13 @@ Split cases on the rule used in  $\rstep{\rspc}{\rdx{\rspc}}{\rdx{\rspc}'}$.
 \end{description}
 \end{proof}
 
+%% Ranjit: I did the rstep --> tstep till here.
 
 \subsection{Lemmas for Substitution and Unification} \label{sec:unify-lemmas}
 
 \begin{lemma}[Substitution] \label{lem:subst}
 	Let $\rr' \equiv \rr - \runi$.
-	If $\rstep{\rr'}{\rdx{}}{\rdx{}'}$ then $\rstep{\rr'}{\subst{\rdx{}}{x}{v}}{\subst{\rdx{}'}{x}{v}}$.
+	If $\tstep{\rr'}{\rdx{}}{\rdx{}'}$ then $\tstep{\rr'}{\subst{\rdx{}}{x}{v}}{\subst{\rdx{}'}{x}{v}}$.
 \end{lemma}
 
 \begin{proof} By induction on the structure of $\rdx{}$, splitting cases on the reduction rule used
@@ -751,7 +793,6 @@ Suppose that the redex $\rstep{}{e}{e_i}$ is using the equation $eq_i \equiv |x_
 	The substitutions are disjoint, so \cref{lem:disjoint} completes the proof.
 \end{description}
 \end{proof}
-
 
 \begin{lemma}[Subst-Same] \label{lem:subst-same}
 If $\rstep{\rulename{subst}}{e}{e_1}$ using $eq_1$ and
