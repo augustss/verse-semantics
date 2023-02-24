@@ -272,6 +272,9 @@
 %format eu = "eu"
 %format eu_1 = "eu_1"
 %format eu_2 = "eu_2"
+%format eq = "eq"
+%format eq_1 = "eq_1"
+%format eq_2 = "eq_2"
 
 %format h_1
 %format h_2
