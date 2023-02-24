@@ -483,9 +483,6 @@ rulesSubst env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 -}
 
-_rulesValSwapOrd :: ERule
-_rulesValSwapOrd env lhs =
-
 ltExprV :: TRSFlags -> Ident -> Expr -> Bool
 ltExprV env x y@Var{} = ltExpr env (Var x) y
 ltExprV _   _ _       = True
