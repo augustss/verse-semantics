@@ -162,6 +162,7 @@ data TestFlags = TestFlags
   , ignoreFuelStop :: !Bool
   , koen           :: !Bool
   , ignoreRecursive :: !Bool
+  , maxShrinks     :: !Int
   }
 
 testFlags :: Parser TestFlags
@@ -201,8 +202,14 @@ testFlags = TestFlags
          ( long "ignore-recursive"
         <> short 'r'
         <> help "Discard failures involving recursion" )
+  <*> option auto
+         ( long "max-shrinks"
+        <> metavar "NUM"
+        <> value mShrink
+        <> help ("Maximum number of shrink steps (default " ++ show mShrink ++ ")") )
  where nDef = maxSuccess stdArgs
        mDef = 1000
+       mShrink = 10000
 
 testArgs :: IO TestFlags
 testArgs = do
