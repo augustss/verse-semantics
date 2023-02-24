@@ -24,7 +24,8 @@ allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
                    systemICFPR,
-                   systemICFPS
+                   systemICFPS,
+                   systemICFPU
                  ]
 
 systemICFP :: TRSystem Expr
@@ -71,6 +72,14 @@ systemICFPS = s
   , postProcess = const dropStore
   }
   where s = systemICFPE
+
+systemICFPU :: TRSystem Expr
+systemICFPU = s
+  { sname = "ICFPU"
+  , description = description s ++ ", modified SUBST"
+  , rules = rules s -= "SUBST" <> rulesSubst
+  }
+  where s = systemICFP
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -466,6 +475,20 @@ rulesUnification env lhs =
      -- Don't reorder effects
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
+
+rulesSubst :: ERule
+rulesSubst env lhs =
+  "SUBST" `name`
+  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
+     let freeX = free (ctx, e)
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+  
 
 _rulesValSwapOrd :: ERule
 _rulesValSwapOrd env lhs =
