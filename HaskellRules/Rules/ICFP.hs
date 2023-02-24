@@ -468,6 +468,21 @@ rulesUnification env lhs =
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
 
+{-
+rulesSubst :: ERule
+rulesSubst env lhs =
+  "SUBST" `name`
+  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
+     let freeX = free (ctx, e)
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+-}
+
 ltExprV :: TRSFlags -> Ident -> Expr -> Bool
 ltExprV env x y@Var{} = ltExpr env (Var x) y
 ltExprV _   _ _       = True
