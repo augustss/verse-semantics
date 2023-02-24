@@ -14,7 +14,7 @@
 
 \section{Confluence: Preliminaries} \label{sec:preliminaries}
 
-\begin{definition}[Reductions] A \emph{reduction} \rr is a binary relation on a set of terms \univ.
+\begin{definition}[Reductions] A \emph{reduction relation} \rr is a binary relation on a set of terms \univ.
 We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$ for the reflexive
 and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
 %
@@ -41,9 +41,9 @@ such that $\rstep{\rr}{a}{b}$.
 
 For clarity, we will omit the subscript $\rr$ when it is clear from the context.
 
-\begin{definition}[Diamond Property]
+\begin{definition}[Diamond Property] \label{def:diamond}
 %
-A reduction satisfies the \emph{diamond} property if whenever
+A reduction relation satisfies the \emph{diamond} property if whenever
 $\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, there is a $d$ such
 that $\rstep{}{b}{d}$ and $\rstep{}{c}{d}$.
 %
@@ -54,13 +54,13 @@ that $\rstep{}{b}{d}$ and $\rstep{}{c}{d}$.
 Two terms $b$, $c$ can be $\rr$-\emph{joined} written $\join{\rr}{b}{c}$,
 if there is a $d$ such that $\rsteps{\rr}{b}{d}$ and $\rsteps{\rr}{c}{d}$.
 %
-A reduction $\rr$ is \emph{confluent} if whenever
+A reduction relation $\rr$ is \emph{confluent} if whenever
 $\rsteps{\rr}{a}{b}$ and $\rsteps{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{definition}
 
 \begin{definition}[Local Confluence]
 %
-A reduction $\rr$ is \emph{locally confluent} if whenever
+A reduction relation $\rr$ is \emph{locally confluent} if whenever
 $\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 %
 \end{definition}
@@ -118,7 +118,7 @@ $\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{lemma}
 
 \begin{definition}[Noetherian Reduction]
-A reduction $\rr$ is \emph{Noetherian} if there is no infinite
+A reduction relation $\rr$ is \emph{Noetherian} if there is no infinite
 sequence $a_0 \go{\rr} a_1 \go{\rr} \ldots \go{\rr} a_n \go{\rr} \ldots$.
 \end{definition}
 
@@ -130,7 +130,7 @@ If $\rr$ is locally confluent and Noetherian then $\rr$ is confluent.
 
 \begin{definition}[Strong Confluence]
 %
-A reduction is \emph{strongly confluent} if whenever
+A reduction relation is \emph{strongly confluent} if whenever
 $\rstep{}{a}{b}$ and $\rstep{}{a}{c}$, either $\rsteps{}{b}{c}$ or
 there is a $d$ such that $\rsteps{}{b}{d}$ and $\rstep{}{c}{d}$,
 as shown in \cref{fig:strong-confluence}, where the $\epsilon$ label
@@ -163,16 +163,20 @@ indicates $0$ or $1$ step.
 
 \begin{definition}[Commutativity]
 %
-A reduction $R$ \emph{commutes} with $S$ if for all terms
+A reduction relation $R$ \emph{commutes} with $S$ if for all terms
 $a, b, c$ such that $\rsteps{R}{a}{b}$ and $\rsteps{S}{a}{c}$
 there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rsteps{R}{c}{d}$,
 as illustrated on the left in \cref{fig:commutativity}.
+\end{definition}
 %
-A reduction $R$ \emph{strongly commutes} with $S$ if for all terms
+\begin{definition}[Strong commutativity]
+A reduction relation $R$ \emph{strongly commutes} with $S$ if for all terms
 $a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{R}{a}{c}$
 there exists $d$ such that $\rstep{S}{b}{d}$ and $\rstep{R}{c}{d}$,
 as illustrated in the middle in \cref{fig:commutativity}.
 \end{definition}
+\noindent
+Note that if $R$ strongly commutes with itself then, by \Cref{def:diamond}, $R$ has the diamond property.
 
 \begin{figure}[h]
 %
@@ -288,7 +292,7 @@ Via the following chase diagram (probably well known?)
 \end{proof}
 
 \begin{definition}[Postpones]
-	A reduction $R$ \emph{strongly postpones} after $S$
+	A reduction relation $R$ \emph{strongly postpones} after $S$
 	if $\rstep{R}{e}{\rstep{S}{\cdot}{e'}}$
 	implies $\rsteps{S}{e}{\rstep{R}{\cdot}{e'}}$.
 \end{definition}
@@ -301,7 +305,7 @@ if $\rsteps{R \cup S}{e}{e'}$ then
 \end{lemma}
 
 \begin{definition}[Hops]
-A reduction $R$ \emph{hops after} $S$
+A reduction relation $R$ \emph{hops after} $S$
 if $\rstep{R}{e}{\rstep{S}{\cdot}{e'}}$
 implies there is an $e''$ such that
 $\rsteps{R}{e'}{e''}$ and
@@ -400,7 +404,7 @@ By induction on the number of $S$ steps in $\rsteps{R \cup S}{}{}$, via the foll
 \end{proof}
 
 \begin{definition}[\halfcommutes]
-A reduction $R$ \emph{\halfcommutes} with $S$ if
+A reduction relation $R$ \emph{\halfcommutes} with $S$ if
 whenever $\rstep{R}{e}{e_1$} and $\rstep{S}{e}{e_2}$
 there exists $e'$ such that
 $\rsteps{R}{e_2}{e'}$ and
@@ -581,7 +585,7 @@ complete the proof via the following diagram where
 \subsection{Semi-Commutativity}
 
 \begin{definition}[Semi-Commutativity] \label{def:semi-comm}
-A reduction $R$ \emph{semi-commutes} with $S$ if for all terms
+A reduction relation $R$ \emph{semi-commutes} with $S$ if for all terms
 $a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
 there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
 (right in \cref{fig:commutativity}.
@@ -627,7 +631,7 @@ there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
 \subsection{$*$-Commutativity}
 
 \begin{definition}[$*$-Commutativity] \label{def:star-comm}
-A reduction $R$ $*$-commutes with $S$ if for all terms
+A reduction relation $R$ $*$-commutes with $S$ if for all terms
 $a, b, c$ such that $\rstep{R}{a}{b}$ and $\rstep{S}{a}{c}$
 there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstepo{R}{c}{d}$
 (right in \cref{fig:commutativity}.)
@@ -748,9 +752,9 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \begin{lemma}[N-Commutativity] \label{lem:comm-n}
 If
 %
-(i)~$\forall 0 \leq i \leq n$, the reduction $R_i$ is confluent, and
+(i)~$\forall 0 \leq i \leq n$, the reduction relation $R_i$ is confluent, and
 %
-(ii)~$\forall 0 \leq i < j \leq n$, the reductions $R_i$ and $R_j$ commute
+(ii)~$\forall 0 \leq i < j \leq n$, the reduction relations $R_i$ and $R_j$ commute
 %
 then $\cup_{i=0}^n R_i$ is confluent.
 \end{lemma}
@@ -764,7 +768,7 @@ then $\cup_{i=0}^n R_i$ is confluent.
 \newcommand{\kernel}[2]{\ensuremath{#1 \preceq #2}}
 
 \begin{definition}[Kernel]
-A reduction $S$ is a \emph{kernel} of $R$, written $\kernel{S}{R}$ if
+A reduction relation $S$ is a \emph{kernel} of $R$, written $\kernel{S}{R}$ if
 %
 (1)~$S \subseteq R$ and
 (2)~If $\rstep{R}{a}{b}$ there exists $c$ such that $\rsteps{S}{a,b}{c}$.
