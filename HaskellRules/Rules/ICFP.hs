@@ -24,18 +24,17 @@ allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
                    systemICFPR,
-                   systemICFPS,
-                   systemICFPU
+                   systemICFPS
                  ]
 
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
   { sname               = "ICFP"
-  , description         = "ICFP, from verse-icfp23/rewrites.ltx"
+  , description         = "ICFP with ord-subst, ord-swap, from verse-icfp23/rewrites.ltx"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = allRules
+  , rules               = (allRules -= "VAL-SWAP") <> rulesValSwapOrd
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules
@@ -72,14 +71,6 @@ systemICFPS = s
   , postProcess = const dropStore
   }
   where s = systemICFPE
-
-systemICFPU :: TRSystem Expr
-systemICFPU = s
-  { sname = "ICFPU"
-  , description = description s ++ ", modified SUBST"
-  , rules = rules s -= "SUBST" <> rulesSubst
-  }
-  where s = systemICFP
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid :: Expr -> Bool
@@ -459,6 +450,7 @@ rulesUnification env lhs =
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
+     guard (ltExprV env x v)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`
@@ -476,6 +468,7 @@ rulesUnification env lhs =
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
 
+{-
 rulesSubst :: ERule
 rulesSubst env lhs =
   "SUBST" `name`
@@ -488,10 +481,17 @@ rulesSubst env lhs =
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
-  
+-}
 
 _rulesValSwapOrd :: ERule
 _rulesValSwapOrd env lhs =
+
+ltExprV :: TRSFlags -> Ident -> Expr -> Bool
+ltExprV env x y@Var{} = ltExpr env (Var x) y
+ltExprV _   _ _       = True
+
+rulesValSwapOrd :: ERule
+rulesValSwapOrd env lhs =
   "VAL-SWAP-ORD" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      guard $
@@ -701,7 +701,7 @@ doSplit lhs v e g =
       res = Var t :@: g
   in  EXI h (EXI t (gv :>: hlam :>: res))
 -}
-  
+
 --------------------------------------------------------------------------------
 
 storeEmpty :: Heap
@@ -808,7 +808,7 @@ rulesStore _ lhs =
   "REF-READ" `name`
   do Store h e <- [lhs]
      (ctx, is, Op Read :@: Ref p) <- storeX e
-     let v = storeRead h p 
+     let v = storeRead h p
          ctx' = ctxAlpha v is ctx
      pure (Store h (ctx' v))
  ++
@@ -864,4 +864,3 @@ rulesStore _ lhs =
 ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
 ctxAlpha e is ctx | null (intersect (free e) is) = ctx
                   | otherwise = error "unimplemented"
-                  

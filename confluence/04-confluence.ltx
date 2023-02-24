@@ -60,7 +60,6 @@ rules in \cref{fig:rules}
 	\rulename{exi-swap},
 	\rulename{exi-float},
 	\rulename{subst} (restricted to $|x == y|$),
-	\rulename{seq-swap},
 	\rulename{var-swap};
 
 \item $\rapp$ (Application)
@@ -95,13 +94,14 @@ in \cref{fig:rules}.
 
 \begin{figure}
 \begin{tabular}{rrrrrrrr}
-					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		  & \rspc \\
+					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		   & \rspc 			 \\ % & \rstr \\
 \midrule
-Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
-Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\
-Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
-Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
-Choice 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
+Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\ % & \ref{lem:u-str-c} \\
+Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\ % & \ref{lem:other-str-c} \\
+Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\ % & \ref{lem:other-str-c} \\
+Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\ % & \ref{lem:other-str-c} \\
+Choice 			    & \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\ % & \ref{lem:other-str-c} \\
+% Structural          & \rstr  &			     &                 &                 &                 &                 \\ % & \ref{lem:str-c} \\
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
 The lemmas on the diagonal (resp. non-diagonal) entries establish confluence (resp. commutativity)
@@ -1588,10 +1588,10 @@ the following diagram completes the proof, where
 	& {(2)} &&&& {(2)} \\
 	&& {(3)} && {(3)} \\
 	&&& {(4)}
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-2]
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-6]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-2, to=3-3]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-6, to=3-5]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-4, to=2-2]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-4, to=2-6]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-6, to=3-5]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-3, to=4-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-5, to=4-4]
 	\arrow["\rconm"', dotted, two heads, from=5-2, to=6-3]
@@ -1602,9 +1602,9 @@ the following diagram completes the proof, where
 	\arrow["\rconm"{description}, dotted, two heads, from=6-5, to=7-4]
 	\arrow["\rconm"{description}, dotted, two heads, from=3-3, to=5-2]
 	\arrow["\rconm"{description}, two heads, from=2-2, to=4-1]
-	\arrow["{\rulename{norm-exi}}"{description, pos=0.6}, dotted, two heads, from=4-1, to=5-2]
+	\arrow["{\rulename{exi-float}}"{description, pos=0.6}, dotted, two heads, from=4-1, to=5-2]
 	\arrow["\rconm"{description}, two heads, from=2-6, to=4-7]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-7, to=5-6]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-7, to=5-6]
 	\arrow[dotted, two heads, from=3-5, to=5-6]
 \end{tikzcd}\]
 \end{proof}
@@ -1840,10 +1840,10 @@ the following diagram completes the proof.
 	& \bullet &&&& \bullet \\
 	&& \bullet && \bullet \\
 	&&& \bullet
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-2]
-	\arrow["{\rulename{norm-exi}}"{description}, two heads, from=1-4, to=2-6]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-2, to=3-3]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=2-6, to=3-5]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-4, to=2-2]
+	\arrow["{\rulename{exi-float}}"{description}, two heads, from=1-4, to=2-6]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-2, to=3-3]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=2-6, to=3-5]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-3, to=4-4]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-5, to=4-4]
 	\arrow["{\runi'}"', dotted, two heads, from=5-2, to=6-3]
@@ -1855,12 +1855,12 @@ the following diagram completes the proof.
 	\arrow["{\cref{lem:f-exi-swap-join}}"{description, pos=0.7}, draw=none, from=1-4, to=4-4]
 	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=4-4, to=7-4]
 	\arrow["{\runi'}"{description}, two heads, from=2-2, to=4-1]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-1, to=5-2]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-1, to=5-2]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-3, to=5-2]
 	\arrow["{\cref{lem:f-ue-com}}"{description, pos=0.8}, draw=none, from=2-2, to=5-2]
 	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=3-3, to=6-3]
 	\arrow["{\runi'}"{description}, two heads, from=2-6, to=4-7]
-	\arrow["{\rulename{norm-exi}}"{description}, dotted, two heads, from=4-7, to=5-6]
+	\arrow["{\rulename{exi-float}}"{description}, dotted, two heads, from=4-7, to=5-6]
 	\arrow["{\cref{lem:f-ue-com}}"{description, pos=0.8}, draw=none, from=2-6, to=5-6]
 	\arrow["{\runi'}"{description}, dotted, two heads, from=3-5, to=5-6]
 	\arrow["{\cref{lem:ue-conf}}"{description, pos=0.8}, draw=none, from=3-5, to=6-5]
@@ -1879,8 +1879,8 @@ is completed trivially as the rules are non-overlapping.
 \begin{lemma} \label{lem:u-pp-float}
 Let $\runi' \doteq \runi + \rulename{exi-swap}$.
 %
-\runi' strongly postpones after \rulename{exi-float},
-so $\runi'^{*} \equiv \rulename{exi-float}^{*} \cdot \runi'^{*}$.
+\runi strongly postpones after \rulename{exi-float},
+so $\runi'^{*} \equiv \rulename{exi-float}^{*} \cdot \runi^{*}$.
 \end{lemma}
 
 \begin{proof}
@@ -2206,3 +2206,27 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 has the diamond property (as $\rspc \occunder \rr$),
 and hence $\rspc$ is confluent via \cref{lem:diamond}.
 \end{proof}
+
+% \subsection{Structural}
+
+% The $\rstr \doteq \rulename{seq-swap}$ relation
+% strongly commutes with all rules from $\rr - \runi$.
+
+% \begin{lemma} \cref{lem:other-str-c}
+% 	\rstr strongly commutes with $\rr - \runi$.
+% \end{lemma}
+
+% \begin{proof}
+% 	Split cases on the rule from $\rr - \runi$; the diamond follows as the rules are non-overlapping.
+% \end{proof}
+
+% \begin{lemma} \cref{lem:str-c}
+% 	$\rstr$ is confluent.
+% \end{lemma}
+% \begin{proof}
+% 	Corollary of \cref{lem:other-str-c} as $\rstr$ is included in $\rr - \runi$.
+% \end{proof}
+
+% \begin{lemma} \cref{lem:u-str-c}
+% 	\runi \rstr commutes with \runi.
+% \end{lemma}
