@@ -1242,6 +1242,9 @@ Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 \rulename{val-elim} discards a value to the left of semicolon; \rulename{exi-elim} discards
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
 occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
+Note that none of these rules, except \rulename{fail-elim}, discard an un-evaluated expression,
+because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenience}).
+The exception is \rulename{fail-elim}, which propagates failure
 
 Five \emph{normalisation} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
