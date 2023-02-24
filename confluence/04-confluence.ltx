@@ -60,7 +60,6 @@ rules in \cref{fig:rules}
 	\rulename{exi-swap},
 	\rulename{exi-float},
 	\rulename{subst} (restricted to $|x == y|$),
-	\rulename{seq-swap},
 	\rulename{var-swap};
 
 \item $\rapp$ (Application)
@@ -95,13 +94,14 @@ in \cref{fig:rules}.
 
 \begin{figure}
 \begin{tabular}{rrrrrrrr}
-					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		  & \rspc \\
+					& 	  	& \runi 		 & \rcon 		   & \rapp			 & \rgc 		   & \rspc 			 \\ % & \rstr \\
 \midrule
-Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\
-Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\
-Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\
-Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\
-Choice 		& \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\
+Unification 		& \runi  & \ref{lem:u-c} & \ref{lem:u-c-c} & \ref{lem:u-a-c} & \ref{lem:u-g-c} & \ref{lem:u-s-c} \\ % & \ref{lem:u-str-c} \\
+Normalization 		& \rcon  &      		 & \ref{lem:n-c}   & \ref{lem:n-a-c} & \ref{lem:n-g-c} & \ref{lem:n-s-c} \\ % & \ref{lem:other-str-c} \\
+Application 		& \rapp  &      		 &    			   & \ref{lem:a-c} 	 & \ref{lem:a-g-c} & \ref{lem:a-s-c} \\ % & \ref{lem:other-str-c} \\
+Garbage Collection  & \rgc   &      	     &                 &                 & \ref{lem:g-c}   & \ref{lem:g-s-c} \\ % & \ref{lem:other-str-c} \\
+Choice 			    & \rspc  &				 & 			       & 	             & 	   			   & \ref{lem:s-c}   \\ % & \ref{lem:other-str-c} \\
+% Structural          & \rstr  &			     &                 &                 &                 &                 \\ % & \ref{lem:str-c} \\
 \end{tabular}
 \caption{Summary of the confluence and commutativity of the reductions in \cref{def:reductions}.
 The lemmas on the diagonal (resp. non-diagonal) entries establish confluence (resp. commutativity)
@@ -1879,8 +1879,8 @@ is completed trivially as the rules are non-overlapping.
 \begin{lemma} \label{lem:u-pp-float}
 Let $\runi' \doteq \runi + \rulename{exi-swap}$.
 %
-\runi' strongly postpones after \rulename{exi-float},
-so $\runi'^{*} \equiv \rulename{exi-float}^{*} \cdot \runi'^{*}$.
+\runi strongly postpones after \rulename{exi-float},
+so $\runi'^{*} \equiv \rulename{exi-float}^{*} \cdot \runi^{*}$.
 \end{lemma}
 
 \begin{proof}
@@ -2206,3 +2206,27 @@ Let us split cases on whether $\rdx{\rgc}$ occurs under $\rdx{\rspc}$ or vice ve
 has the diamond property (as $\rspc \occunder \rr$),
 and hence $\rspc$ is confluent via \cref{lem:diamond}.
 \end{proof}
+
+% \subsection{Structural}
+
+% The $\rstr \doteq \rulename{seq-swap}$ relation
+% strongly commutes with all rules from $\rr - \runi$.
+
+% \begin{lemma} \cref{lem:other-str-c}
+% 	\rstr strongly commutes with $\rr - \runi$.
+% \end{lemma}
+
+% \begin{proof}
+% 	Split cases on the rule from $\rr - \runi$; the diamond follows as the rules are non-overlapping.
+% \end{proof}
+
+% \begin{lemma} \cref{lem:str-c}
+% 	$\rstr$ is confluent.
+% \end{lemma}
+% \begin{proof}
+% 	Corollary of \cref{lem:other-str-c} as $\rstr$ is included in $\rr - \runi$.
+% \end{proof}
+
+% \begin{lemma} \cref{lem:u-str-c}
+% 	\runi \rstr commutes with \runi.
+% \end{lemma}

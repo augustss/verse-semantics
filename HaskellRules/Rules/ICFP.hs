@@ -30,11 +30,11 @@ allSystemsICFP = [ systemICFP,
 systemICFP :: TRSystem Expr
 systemICFP = TRSystem
   { sname               = "ICFP"
-  , description         = "ICFP with ord-subst from verse-icfp23/rewrites.ltx"
+  , description         = "ICFP with ord-subst, ord-swap, from verse-icfp23/rewrites.ltx"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = allRules
+  , rules               = (allRules -= "VAL-SWAP") <> rulesValSwapOrd
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules
@@ -472,8 +472,8 @@ ltExprV :: TRSFlags -> Ident -> Expr -> Bool
 ltExprV env x y@Var{} = ltExpr env (Var x) y
 ltExprV _   _ _       = True
 
-_rulesValSwapOrd :: ERule
-_rulesValSwapOrd env lhs =
+rulesValSwapOrd :: ERule
+rulesValSwapOrd env lhs =
   "VAL-SWAP-ORD" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      guard $
