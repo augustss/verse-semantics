@@ -211,11 +211,6 @@
 \newcommand{\figureRewriteRules}{
   \begin{figure}
     $\begin{array}{l}
-    \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
-    % The quad indents the lines
-    % The \hspace{-..} removes redundant space between rule name column and LHS column
-    % that arises because the longest rule name and the longer LHS are not on the same line
-    % The \; reduces the spacing around the arrow
 
     % \rulegroupname{Primitive operations}
 
@@ -227,18 +222,26 @@
           \end{array}\right.$
     \fi
 
+\begin{array}{@@{\quad} l  r @@{\;}c@@{\;} l l}
 \rulegroupname{Application:}
 \rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail} & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
-\rulename{app-beta} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
-              & \text{if $x \not\in \freevars{|v|}$, \alphamark} \\
+\rulename{app-beta}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+              & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup} & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-         \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice xdots choice (x = n; v_n))| \quad\quad \text{|x| fresh}} \\
+\multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice xdots choice (x = n; v_n))|
+    \quad \text{if} \; |x| \not\in \freevars{|v|, |v_1, xdots,v_n|}} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
-
+\end{array}
+\\
 \\[-2mm]
 
+\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+    % The quad indents the lines
+    % The \hspace{-..} removes redundant space between rule name column and LHS column
+    % that arises because the longest rule name and the longer LHS are not on the same line
+    % The \; reduces the spacing around the arrow
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
   \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n=v_n'; e| \\
@@ -254,7 +257,7 @@
     \\[-2mm]
 
 \rulegroupname{Normalization:}
-\rulename{exi-float} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$, \alphamark}\\
+\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
 \rulename{seq-assoc} & |(eu ; e_1) ; e_2| & \movesto & |eu ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eu ; e_1); e_2| & \movesto & |eu ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
@@ -286,7 +289,7 @@
 
 \end{array} \\
 \\
-\text{\textit{Note}: In the rules marked with ``\alphamark'', use $\alpha$-conversion to avoid name capture.}
+\text{\textit{Note}: \parbox[t]{8cm}{In the rules marked with a superscript $\alpha$, you may need to use $\alpha$-conversion to satisfy the side condition.}}
 \end{array}$
 \iffullverse
 $$\begin{array}{l}

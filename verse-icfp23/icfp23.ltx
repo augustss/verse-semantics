@@ -488,7 +488,8 @@ explores some possible alternative design choices.
 \subsection{Logical variables and equations} \label{sec:unify}
 
 The Verse calculus includes first class \emph{logical variables} and \emph{equations} that constrain their values.
-You can bring a fresh logical variable into scope with |defKW|; equate a value with an expression
+You can bring a fresh logical variable into scope with |defKW|; constrain a value to be equal to
+an expression with an equation
 |v == e|; and compose expressions in sequence with |eu ; e| (see \cref{fig:syntax}).
 As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
 |def x (x=e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
@@ -745,9 +746,11 @@ $n$-way choice.
 \label{sec:all}
 
 You might think that tuple indexing would be stuck until we know the index,
-but \versecalc{} uses narrowing to make progress.
-The expression |def t (t = tup (10,27,32); def i (apply1 t i))|
-looks stuck because we have no value for |i|, but in fact it rewrites to
+but in \versecalc{} the application of a tuple to a value rewrites to a choice of all the possible
+values of the index.
+For example,
+|def t (t = tup (10,27,32); def i (apply1 t i))|
+looks stuck because we have no value for |i|, but actually rewrites to:
 $$
 |def i ((i=0; 10) choice (i=1; 27) choice (i=2; 32)|
 $$
@@ -755,6 +758,8 @@ which (as we will see in \cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
 So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 t i))| allows a
 tuple to be turned back into a choice.
+(The ``rewrite a call of a function with a finite domain into a finite choice''
+is called ``narrowing'' in the literature.)
 
 Do we even need |oneKW| as a primitive construct, given that we have
 |allKW|? Can we not use |apply1 (all e) 0| instead of |one e|? Indeed
@@ -886,7 +891,8 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % If |p| fails for any value, the whole call to |applyN map (p,xs)| fails.
 % \end{itemize}
 
-Pattern matching for function definitions is simply done by unification of ordinary expressions.
+Pattern matching for function definitions is simply done by unification of ordinary expressions;
+see the desugaring of pattern-matching lambda in \cref{fig:syntax}.
 This means that we can use ordinary abstraction mechanisms for patterns.
 For example, here is a function that should be called like |applyN fcn (88,1,99,2)|.
 $$
@@ -899,6 +905,12 @@ $$
 |applyN pat (v,w) := tup(v,1,w,2);| \quad \quad
 |apply1 fcn t := def (x ^^ y) (t = applyN pat (x,y); x+y)|
 $$
+Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
+in Haskell.  For example |pat| could be \emph{computed}, like this:
+$$
+|applyN pat (v,w) := if t=0 then tup (v,1,w,3) else tup (1,1,w,v)|
+$$
+so that the pattern depends on the value of |t|.
 
 \subsection{|for| loops} \label{sec:for}
 
