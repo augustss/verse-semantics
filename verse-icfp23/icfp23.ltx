@@ -1454,24 +1454,28 @@ the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then
 or the other way around.
 The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
 rule \rulename{subst} only fires when the RHS is a value.
-In general, by choosing rewrite rules carefully, we can enforce restrictions on evaluation order
-and thereby express call-by-name, call-by-name, and call-by-need
-\cite{ariola:call-by-need}.
+The rewrite rules thereby express \emph{semantics}.
 
-Even with these constraints, there may be many redexes in a term.
+For example, in the lambda calculus, by changing the rewrite
+rule $\beta$ to $\beta{}V$ we change the language from call-by-name to call-by-value; and by
+adding {\bf let}, plus suitable rewrite rules, we can express call-by-need \cite{ariola:call-by-need}.
+In \versecalc{} the rewrite rules are carefully crafted in a similar way; for example \rulename{subst} will
+only substitute |x=v| when the equation binds a variable to a \emph{value}, rather like $\beta{}V$ in
+lambda calculus.  Similarly, the elimination rules never discard a term that could fail.
+
+In any term there may of course be many redexes -- that is good.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
 out of the many possible redexes, should be rewritten next to make progress towards the result?
-A good evaluation strategy should (a) guarantee to terminate if there
-is \emph{any} terminating sequence of reductions; and (b) be amenable
-to compilation into efficient code\footnote{
+Let's call an evaluation strategy \emph{good} if it guarantees to terminate if there
+is \emph{any} terminating sequence of reductions; that is, if any path terminates with a value,
+then a good evaluation strategy will terminate with that same value\footnote{
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
-sometimes called \emph{leftmost outermost reduction}, is an evaluation strategy that
-guarantees to terminate if any strategy does so.
+sometimes called \emph{leftmost outermost reduction}, is a \emph{good} evaluation strategy.
 
-We believe that the same leftmost-outermost strategy works for
+We believe that the same leftmost-outermost strategy is \emph{good} for
 \versecalc{}: just repeatedly reduce the leftmost-outermost
 redex, with some tweaks to avoid infinite application of \rulename{seq-swap} and \rulename{exi-swap}.
 That is easy in theory, but it is tricky in practice.  For
