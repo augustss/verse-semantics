@@ -17,7 +17,7 @@ $$
   \rdx{} & \text{An expression $e$ that has a redex at the root} \\
   e_1 \soccunder e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
   e_1 \occunder e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
-\tstep{\rr}{a}{b} & \text{$a$ reduces to $b$ via one root-level step of $\rr$ \ranjit{CHECK:notion}} \\
+\tstep{\rr}{a}{b} & \text{$a$ reduces to $b$ via one root-level step of $\rr$} \\
 \rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
 \rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
 \rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
@@ -117,7 +117,6 @@ $$
 |x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
 % |x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
 $$
-\simon{We changed this back to match the defn in 4.1.} \ranjit{ACK}
 %
 where the LHS is a variable and the RHS is a \emph{value}
 that is or contains a $\lambda$ in which $|x|$ occurs free.
@@ -126,7 +125,7 @@ A term $e$ is \emph{recursive} if it contains a recursive equation.
 %
 A term $e$ is \emph{transitively recursive} if $\rsteps{\rr}{e}{e'}$ where $e'$ is recursive.
 %
-A term $e$ has \emph{\norecursion} if it is \emph{not} transitively recursive.
+A term $e$ \emph{has \norecursion} if it is not transitively recursive.
 \end{definition}
 Our main confluence theorem is as follows:
 
@@ -148,8 +147,7 @@ commutative (\cref{fig:confluence-summary}).
 Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 \end{proof}
 
-In the rest of the proof we assume that we are working with terms with \norecursion.
-The condition is only need to prove $\runi$ is confluent,
+The no-recursion condition is only needed to prove $\runi$ is confluent,
 but we assume it globally for clarity.
 
 \subsection{Disjointness, Reduction under, and the Diamond property}
@@ -176,8 +174,6 @@ Now there are two cases to consider:
 \item $\Delta_1$ is disjoint from $\Delta_2$ in $e$; or
 \item $\Delta_1 \occunder \Delta_2$, or $\Delta_2 \occunder \Delta_1$.
 \end{enumerate}
-%
-\simon{What if $\Delta_1 = \Delta_2$?} \ranjit{ACK: $\occunder$ includes that, let me change to clarify}
 %
 One might wonder if $\Delta_1$ can \emph{overlap} $\Delta_2$, but that is not possible:
 we are discussing syntax trees, not graphs, and so for distinct $\Delta_1$ and $\Delta_2$,
@@ -236,14 +232,13 @@ Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
 
 \subsection{Lemmas for Reductions-Under} \label{sec:under-lemmas}
 
-\simon{Badly needs an intro sentence or two.  What is ``reductions under''?  I can't even parse the statement of Lemma B.5!} \ranjit{ACK: check}
-
 So to prove the diamond property for a relation $\rr$, we should focus attention
 only on case (b) where the redexes are not disjoint, \ie one occurs under the other.
 %
 To this end, it suffices to consider the case where
 %
-one of the reductions is \emph{at the root}, written $\tstep{\rr}{e}{e_1}$ (\cref{fig:notation}),
+one of the reductions is \emph{at the root}, written $\tstep{\rr}{e}{e_1}$
+(see \cref{fig:notation} and \cref{sec:red-relns}),
 %
 and the \emph{other} occurs under $e$ \ie is of the form $\rstep{\rr}{E[\rdx{}]}{e_2}$
 where $e_2 \equiv E[\rdx{}']$, and $\tstep{\rr}{\rdx{}}{\rdx{}'}$.

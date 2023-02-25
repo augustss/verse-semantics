@@ -56,15 +56,15 @@
 \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
 \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
 \newcommand{\rt}{\ensuremath{\mathcal{T}}\xspace}
-\newcommand{\rrhat}{\ensuremath{\widehat{\mathcal{R}}}\xspace}
-\newcommand{\rshat}{\ensuremath{\widehat{\mathcal{S}}}\xspace}
-\newcommand{\rthat}{\ensuremath{\widehat{\mathcal{T}}}\xspace}
+\newcommand{\rrhat}{\trel{\rr}}
+\newcommand{\rshat}{\trel{\rs}}
+\newcommand{\rthat}{\trel{\rt}}
 \newcommand{\goone}[1]{\xrightarrow{\epsilon}_{#1}}
 \newcommand{\go}[1]{\xrightarrow{}_{#1}}
 \newcommand{\gos}[1]{\xrightarrowdbl{}_{#1}}
 \newcommand{\gok}[2]{\xrightarrowdbl{#2}_{#1}}
 
-\newcommand{\trel}[1]{\ensuremath{\hat{#1}}}
+\newcommand{\trel}[1]{\ensuremath{\widehat{#1}}}
 \newcommand{\tstep}[3]{\ensuremath{#2 \go{\trel{#1}} #3}}
 
 \newcommand{\rstepo}[3]{\ensuremath{#2 \goone{#1} #3}}
@@ -193,7 +193,7 @@
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |e; X| \\
+      \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |eq; X| \\
 %       \text{Equation contexts (hole is |eq|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
