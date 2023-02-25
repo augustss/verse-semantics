@@ -191,7 +191,7 @@
 %format xdots = "\mydots"
 
 %% Unification
-%format == = "="
+%format == = "\!=\!"
 
 % format := = "\mapsto"
 %format :@: = ":\!@\!:"
