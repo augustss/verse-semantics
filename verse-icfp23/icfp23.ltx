@@ -380,7 +380,7 @@ As in any functional logic language,
 \item \versecalc{} natively supports \emph{higher-order functions}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
-  addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
+  addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
 \item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables
   \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
@@ -2118,7 +2118,7 @@ of the lambda calculus, that successively rewrite the term, one step at
 a time, until it reaches a normal form.
 Their paper does exactly this, and proves equivalence to the
 CRWL framework.  Their key insight (like us, inspired by
-\citet{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
+\citet{ariola:call-by-need}'s formalization of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
 However both CRWL and Fraguas {\etal} suffer from a major problem:
@@ -2179,11 +2179,11 @@ distinguished from ordinary variables.
 % form\footnote{
 %   Hanus does not mention this, but for a language with arbitrarily nested lambdas
 %   one would need to do lambda-lifting as well, but that is perhaps a minor point.}
-% using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+% using defunctionalization~\cite[Section 3.3]{hanus:survey}, and a built-in
 % |apply| function.
 As Hanus describes, it is possible
 to translate a higher-order program into a first-order
-form using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+form using defunctionalization~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
 (Hanus does not mention this, but for a language with arbitrarily nested lambdas
 one would need to do lambda-lifting as well; this is perhaps a minor point.)
@@ -2410,7 +2410,7 @@ $$
 \end{document}
 
 % LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
-% LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
+% LocalWords:  desc tup optimise defunctionalization oneKW allKW lll
 % LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
 % LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
@@ -2418,7 +2418,7 @@ $$
 % LocalWords:  featureful multivalued mapFlat powerset denotational
 % LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
 % LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
-% LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
+% LocalWords:  ReWrite CRWL fraguas formalization rhs dom fvs hanus
 % LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
 % LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
 % LocalWords:  subexpression Claessen equationally eliml fcn elimr
