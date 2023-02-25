@@ -301,7 +301,7 @@
 %   This semantics elegantly fills the gap between very high level
 %  ``magical'' semantics, and very low-level operational semantics.
   \par
-  \vspace{3mm}
+  \vspace{1em}
 \end{abstract}
 
 
@@ -490,7 +490,7 @@ The Verse calculus includes first class \emph{logical variables} and \emph{equat
 You can bring a fresh logical variable into scope with |defKW|; constrain a value to be equal to
 an expression with an equation
 |v == e|; and compose expressions in sequence with |eq ; e| (see \cref{fig:syntax}).
-As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
+As an example, what might be written |llet x e_1 e_2| in a conventional functional language can be written
 |def x (x==e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
 equations and where they can appear: an equation |(v==e)| always equates a \emph{value} $v$ to an expression $e$;
 and an equation can only appear to the left of a ``|;|'' (see |eq| in \cref{fig:syntax}).
@@ -914,20 +914,20 @@ so that the pattern depends on the value of |t|.
 
 \subsection{|for| loops} \label{sec:for}
 
-The expression |for^(e_1) do e_2| will evaluate |e_2| for each of the choices in |e_1|,
+The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
 % The |e_1| is called the \emph{domain} of the loop.
 The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
-So, for example, |for^(x := 2 `choice` 3 `choice` 5) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
+So, for example, |fordo(x := 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
 % This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
 
 Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
-So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
+So, |fordo(x := 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |fordo(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
@@ -936,17 +936,18 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| u
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
-|for^(e_1) do e_2| \; \equiv \; |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|fordo(def (x_1 xdots x_n) e_1) e_2| \; \equiv \;
+|def v (v == all (def (x_1 xdots x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
 Moreover, any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
-So, for example, |for^(x:=10 `choice` 20) do (x `choice` x+1)| will reduce to
+So, for example, |fordo(x:=10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def (i ^^ x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
+For example |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
 fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most languages.
 
 
@@ -1124,7 +1125,7 @@ of logical variables are propagated.
 The key rule is:
 $$
 \begin{array}{rrcll}
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
 \end{array}
@@ -1564,7 +1565,7 @@ otherwise reasonable looking rules;
 it has run on the order of 100M tests on the current rule set.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
-\newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
+\newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
 
 
 \section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}

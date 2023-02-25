@@ -1,5 +1,5 @@
 %format ^ = " "
-%format ^^ = "\hspace{0.3mm}"
+%format ^^ = "\hspace{0.1em}"
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
@@ -31,10 +31,10 @@
 
 %% ----------- End of Applications --------------
 
-%format space = "\hspace{1mm}"
+%format space = "\hspace{0.3em}"
 %format lam x (e) = "\lambda" x".\," e
 %format lamhdr x = "\lambda" x".\,"
-%format mlam (e1) (e2) = "\mu\hspace{0.1mm}" e1 ".\," e2
+%format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
@@ -49,6 +49,7 @@
 %format upsilon = "\upsilon"
 %format colonequals = "\colonequals"
 %format dollar = "\$"
+%format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
 
 %% Sequences e1; ...; en; v
 %format se = "es"
@@ -76,8 +77,9 @@
 %format vbar = "\mathop{\mid}"
 %%%format choice = "[ \! ]"
 %%%format `choice` = "\mathop{[ \! ]}"
-%format choice = "\rule[-0.3mm]{0.5mm}{2.5mm}"
-%format `choice` = "\hspace{1mm}\mathop{\rule[-0.3mm]{0.5mm}{2.5mm}}\hspace{1mm}"
+%format choice = "\rule[-0.1em]{0.15em}{0.75em}"
+%% 1mm is about 0.3em with the current font
+%format `choice` = "\hspace{0.3em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.3em}"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"

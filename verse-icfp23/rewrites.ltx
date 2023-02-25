@@ -150,13 +150,13 @@
       \vb |isInt|
   \fi
       \end{array} \\
-      \\[-3mm]
+      \\[-0.9em]
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
             \text{``|choice|'' and ``;'' are right-associative} \\
             \text{``|choice|'' and ``|==|'' bind more tightly than ``;''} \\
             \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
-            \hspace{4mm} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
+            \hspace{1.2em} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
       \end{array} \\
       \text{Parentheses may be used freely to aid readability and override default precedence}
   \\
@@ -179,7 +179,7 @@
       |if e_1 then e_2 else e_3| & \text{means}
       & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
     \end{array} \\
-  \\[-2mm]
+  \\[-0.6em]
   \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
@@ -250,7 +250,7 @@
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
-\\[-2mm]
+\\[-0.6em]
 
 %% GS: change \quad to \hskip0.5em to get a little more horizontal space to work with in this figure 
 %% \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
@@ -261,10 +261,10 @@
     % The \; reduces the spacing around the arrow
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-6mm} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+  \rulename{u-tup} & \hspace{-2em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
   & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$}, \\
   &&&& \text{\hskip 0.7em and ($|v| = |y| \implies |x| \prec |y|$)} \\
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
@@ -272,7 +272,7 @@
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
 
-    \\[-2mm]
+    \\[-0.6em]
 
 \rulegroupname{Normalization:}
 \rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
@@ -283,7 +283,7 @@
                       \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
-    \\[-2mm]
+    \\[-0.6em]
 
 \rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
@@ -291,7 +291,7 @@
 \rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
 \rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
-    \\[-2mm]
+    \\[-0.6em]
 
 \rulegroupname{Choice:}
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
