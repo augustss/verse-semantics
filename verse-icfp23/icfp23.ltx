@@ -874,7 +874,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 % to affect the whole expression and obtain the cartesian product of these choices.
 % The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
-% We get that behaviour if we simply define |map| much like in any other functional programming language:
+% We get that behavior if we simply define |map| much like in any other functional programming language:
 % if taking the head of the tuple fails, we return an empty tuple.
 % Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
 %
@@ -2082,7 +2082,7 @@ To substantiate this claim, \cref{sec:store} gives the additional syntax and rew
 for mutable variables.
 
 Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
-depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour,
+depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavor,
 and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
@@ -2414,7 +2414,7 @@ $$
 % LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
 % LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
-% LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
+% LocalWords:  boolean un rcll ANF flatMap cartesian behavior fromTo
 % LocalWords:  featureful multivalued mapFlat powerset denotational
 % LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
 % LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
@@ -2425,7 +2425,7 @@ $$
 % LocalWords:  rll redex Formalising equational stepX compositionally
 % LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
 % LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
-% LocalWords:  Smolka flavour FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  Smolka flavor FLC urefl onec obfuscatory opez Rodr
 % LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
 % LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
 % LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
