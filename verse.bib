@@ -2,13 +2,15 @@
 
 @article{Levy76,
   author    = {Jean{-}Jacques L{\'{e}}vy},
-  title     = {An Algebraic Interpretation of the \emph{ lambda beta } K-Calculus;
-               and an Application of a Labelled \emph{ lambda } -Calculus},
-  journal   = {Theor. Comput. Sci.},
+  title     = {An Algebraic Interpretation of the $\lambda\beta$K-Calculus;
+               and an Application of a Labelled $\lambda$-Calculus},
+  journal   = {Theoretical Computer Science},
   volume    = {2},
   number    = {1},
   pages     = {97--114},
   year      = {1976},
+  month     = jun,
+  publisher = {Elsevier (North-Holland)},
   url       = {https://doi.org/10.1016/0304-3975(76)90009-8},
   doi       = {10.1016/0304-3975(76)90009-8},
   timestamp = {Wed, 17 Feb 2021 22:00:07 +0100},
@@ -31,21 +33,27 @@ booktitle = {Proceedings of the 17th ACM SIGPLAN-SIGACT Symposium on Principles 
 pages = {31–46},
 numpages = {16},
 location = {San Francisco, California, USA},
-series = {POPL '90}
+series = {POPL~'90}
 }
 
-@phdthesis{steele:rabbit,
-author = {Guy Steele},
-title = {Rabbit: a compiler for Scheme},
-institution={MIT},
-year=1978
+@techreport{steele:rabbit,
+author = {Guy Lewis {Steele Jr.}},
+title = {Rabbit: A Compiler for {S}cheme},
+institution={Artificial Intelligence Laboratory, Massachusetts Institute of Technology},
+address={Cambridge, Massachusetts, USA},
+number = {474},
+year=1978,
+month = may,
+note = {Master's Dissertation},
+url = {https://web.archive.org/web/20211108071621/https://dspace.mit.edu/bitstream/handle/1721.1/6913/AITR-474.pdf},
 }
 
 @phdthesis{hindley,
 author = {J. Roger Hindley},
 title = {The Church-Rosser Property and a Result in Combinatory Logic},
 year = 1964, 
-institution={University of Newcastle-upon-Tyne}
+school={University of Newcastle-upon-Tyne},
+address = {United Kingdom}
 }
 
 @book{clrs,
@@ -59,32 +67,28 @@ edition = {3rd}
 
 @book{Barendregt,
 author = {Barendregt, H. P. (Hendrik Pieter)},
-address = {Amsterdam ;},
-booktitle = {The lambda calculus : its syntax and semantics},
-edition = {Rev. ed.},
+address = {Amsterdam},
+title = {The Lambda Calculus: Its Syntax and Semantics},
+edition = {Revised},
 isbn = {0444867481},
 language = {eng},
 lccn = {84005966},
-publisher = {North-Holland},
-series = {Studies in logic and the foundations of mathematics ; v. 103},
-title = {The lambda calculus : its syntax and semantics },
+publisher = {North-Holland (Elsevier Science Publishers)},
+volume = {103},
+series = {Studies in Logic and the Foundations of Mathematics},
 year = {1984},
 }
 
 @book{pltredex,
-  added-at = {2011-02-09T00:00:00.000+0100},
   author = {Felleisen, Matthias and Findler, Robert Bruce and Flatt, Matthew},
   biburl = {https://www.bibsonomy.org/bibtex/2b019475389bcb133487c331dab8d435f/dblp},
   ee = {http://mitpress.mit.edu/catalog/item/default.asp?ttype=2&tid=11885},
-  interhash = {9b10f2c6ebf15517a32913448863528f},
-  intrahash = {b019475389bcb133487c331dab8d435f},
   isbn = {978-0-262-06275-6},
-  keywords = {dblp},
-  pages = {I-XII, 1-502},
   publisher = {MIT Press},
-  timestamp = {2011-04-29T15:26:00.000+0200},
-  title = {Semantics Engineering with PLT Redex.},
-  year = 2009
+  address = {Cambridge, Massachusetts, USA},
+  title = {Semantics Engineering with PLT Redex},
+  year = 2009,
+  url = {https://mitpress.mit.edu/9780262062756/semantics-engineering-with-plt-redex/}
 }
 
 @article{ariola:skew-confluence,
@@ -118,7 +122,7 @@ keywords = {Lambda calculus, Cycles, Letrec, Axiomatic semantics, Confluence, B�
 
 @article{Huet80,
 author = {Huet, G\'{e}rard},
-title = {Confluent Reductions: Abstract Properties and Applications to Term Rewriting Systems: Abstract Properties and Applications to Term Rewriting Systems},
+title = {Confluent Reductions: Abstract Properties and Applications to Term Rewriting Systems},
 year = {1980},
 issue_date = {Oct. 1980},
 publisher = {Association for Computing Machinery},
@@ -129,19 +133,27 @@ issn = {0004-5411},
 url = {https://doi.org/10.1145/322217.322230},
 doi = {10.1145/322217.322230},
 journal = {J. ACM},
-month = {oct},
+month = oct,
 pages = {797–821},
 numpages = {25}
 }
 
 @article{robinson:unification,
-author = {JA Robinson},
-title = {A machine-oriented logic based on the resolution principle},
-journal = {Journal of the ACM},
-volume = 12,
-issue = 1,
-year = 1965,
-pages = {23--41}
+author = {Robinson, J. A.},
+title = {A Machine-Oriented Logic Based on the Resolution Principle},
+year = {1965},
+issue_date = {Jan. 1965},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {12},
+number = {1},
+issn = {0004-5411},
+url = {https://doi.org/10.1145/321250.321253},
+doi = {10.1145/321250.321253},
+journal = {J. ACM},
+month = jan,
+pages = {23–41},
+numpages = {19}
 }
 
 @book{pj-book,
@@ -152,47 +164,77 @@ publisher = {Prentice Hall}
 }
 
 @inproceedings{brassel:encapsulated,
-author = {Bernd Brassel and Frank Huch},
-title = {On a tighter integration of functional and logic programming},
-editors = {Z Shao},
-booktitle = {5th Asian Symposium on programming languages and systems (APLAS'07)},
-year = {2007},
-series = {LNCS},
-volume = {4807},
-pages = {122-138},
-publisher = {Springer}
+author="Bra{\ss}el, Bernd and Huch, Frank",
+editor="Shao, Zhong",
+title="On a Tighter Integration of Functional and Logic Programming",
+booktitle = {5th Asian Symposium on Programming Languages and Systems (APLAS 2007)},
+year="2007",
+publisher="Springer-Verlag",
+address="Berlin, Heidelberg",
+series = {LNCS 4807},
+pages="122--138",
+isbn="978-3-540-76637-7",
+doi = {10.1007/978-3-540-76637-7_9}
 }
 
 @article{fraguas:let-narrowing,
-author = {Francisco Javier López-Fraguas and Enrique Martin-Martin and Juan Rodríguez-Hortalá and Jaime Sánchez-Hernández},
-title = {Rewriting and narrowing for constructor systems with call-time choice semantics},
-journal = {Theory and Practice of Logic programming},
-volume= 14,
-issue = 2,
-pages = {165-213},
-year = {2014},
-publisher = {CUP}
+  author = {Francisco Javier L\'{o}pez-Fraguas and Enrique Martin-Martin and Juan Rodr\'{\i}guez-Hortal\'{a} and Jaime S\'{a}nchez-Hern\'{a}ndez},
+  title = {Rewriting and narrowing for constructor systems with call-time choice semantics},
+  journal = {Theory and Practice of Logic programming},
+  volume= 14,
+  number = 2,
+  pages = {165-213},
+  year = {2014},
+  month = mar,
+  publisher = {Cambridge University Press},
+  note = {Published online on 30 October 2012},
+  doi = {doi:10.1017/S1471068412000373}
 }
 
+@article{lópez-fraguas_martin-martin_rodríguez-hortalá_sánchez-hernández_2014,
+  title={Rewriting and narrowing for constructor systems with call-time choice semantics},
+  volume={14},
+  DOI={10.1017/S1471068412000373},
+  number={2},
+  journal={Theory and Practice of Logic Programming},
+  publisher={Cambridge University Press},
+  author={López-Fraguas, Francisco J. and Martin-Martin, Enrique and Rodríguez-Hortalá, Juan and Sánchez-Hernández, Jaime},
+  year={2014},
+  pages={165–213}
+  }
+
 @inproceedings{schmidt-schauss:non-det2,
-author = {Schmidt-Schauß, M. and Machkasova, E.},
+author = {Schmidt-Schauß, Manfred and Machkasova, Elena},
 year = {2008},
-title = {A finite simulation method in a nondeterministic call-by-need lambda-calculus with letrec, constructors, and case},
-booktitle = {19th International Conference on Rewriting Techniques and Applications (RTA’08)},
+month = jul,
+title = {A Finite Simulation Method in a Non-deterministic Call-by-Need Lambda-Calculus with Letrec, Constructors, and Case},
+booktitle = {19th International Conference on Rewriting Techniques and Applications (RTA~’08)},
 publisher = {Springer},
-series = {LNCS},
-volume = {5117},
-pages = {321-335}
+address="Berlin, Heidelberg",
+series = {LNCS 5117},
+pages = {321-335},
+isbn="978-3-540-70590-1",
+doi = {https://doi.org/10.1007/978-3-540-70590-1_22}
 }
 
 @inproceedings{schmidt-schauss:non-det1,
-author = {Kutzner, A. and Schmidt-Schauß, M.},
+author = {Kutzner, Arne and Schmidt-Schau{\ss}, Manfred},
+title = {A Non-Deterministic Call-by-Need Lambda Calculus},
 year = {1998},
-title = {A non-deterministic call-by-need lambda calculus},
-booktitle = {3th ACM SIGPLAN International Conference on Functional Programming (ICFP’98)},
-publisher = {ACM},
-pages = {324-335}
+isbn = {1581130244},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/289423.289462},
+doi = {10.1145/289423.289462},
+booktitle = {Proceedings of the Third ACM SIGPLAN International Conference on Functional Programming},
+pages = {324–335},
+numpages = {12},
+location = {Baltimore, Maryland, USA},
+series = {ICFP~'98}
 }
+
+
+
 
 
 @article{antoy:bubbling,
@@ -202,6 +244,7 @@ volume = {176},
 number = {1},
 pages = {3-23},
 year = {2007},
+month = may,
 note = {Proceedings of the Third International Workshop on Term Graph Rewriting (TERMGRAPH 2006)},
 issn = {1571-0661},
 doi = {https://doi.org/10.1016/j.entcs.2006.10.026},
@@ -213,15 +256,20 @@ publisher = {Elsevier}
 }
 
 @ARTICLE{crwl,
-author       = {Gonz{\'a}lez-Moreno, J.C. and Hortal{\'a}-Gonz{\'a}lez,
-M.T. and L{\'o}pez-Fraguas, F.J. and Rodr{\'\i}guez-Artalejo, M.},
-title        = {An approach to declarative programming based on a
-rewriting logic},
-year         = {1999},
-doi          = {10.1016/S0743-1066(98)10029-8},
-journal      = {Journal of Logic Programming},
-pages        = {47-87},
-volume       = {40} }
+author = {Gonz{\'a}lez-Moreno, J.C. and Hortal{\'a}-Gonz{\'a}lez, M.T. and L{\'o}pez-Fraguas, F.J. and Rodr{\'\i}guez-Artalejo, M.},
+title = {An approach to declarative programming based on a rewriting logic},
+journal = {The Journal of Logic Programming},
+volume = {40},
+number = {1},
+pages = {47-87},
+year = {1999},
+month = jul,
+issn = {0743-1066},
+publisher = {Elsevier},
+doi = {https://doi.org/10.1016/S0743-1066(98)10029-8},
+url = {https://www.sciencedirect.com/science/article/pii/S0743106698100298},
+}
+
 
 @ARTICLE{antoy:pull-tabbing,
 author       = {Antoy, Sergio},
@@ -253,18 +301,24 @@ year = {2021},
 month = jul,
 day = {6},
 institution = {Kiel University (Christian-Albrechts-Universit\"{a}t zu Kiel)},
-url = {https://www.informatik.uni-kiel.de/~curry/tutorial/tutorial.pdf}
+url = {https://web.archive.org/web/20220121070135/https://www.informatik.uni-kiel.de/~curry/tutorial/tutorial.pdf}
 }
 
 @inproceedings{kics,
-author = {B Brassel and F Huch},
-title = {The Kiel Curry System KiCS},
-booktitle = {Applications of Declarative Programing and Knowledge Management},
-pages = {195-205},
-publisher = {Springer},
-volume = {5437},
-year = 2009
+author="Bra{\ss}el, Bernd and Huch, Frank",
+editor="Seipel, Dietmar and Hanus, Michael and Wolf, Armin",
+title="The {K}iel {C}urry System {KiCS}",
+booktitle="Applications of Declarative Programming and Knowledge Management",
+year="2009",
+month = oct,
+series = {LNAI 5437},
+publisher="Springer-Verlag",
+address="Berlin, Heidelberg",
+pages="195--205",
+isbn="978-3-642-00675-3",
+doi = {https://doi.org/10.1007/978-3-642-00675-3_13}
 }
+
 
 @inproceedings{hanus:set-functions,
 author = {Antoy, Sergio and Hanus, Michael},
@@ -280,7 +334,7 @@ pages = {73–82},
 numpages = {10},
 keywords = {rewrite systems, non-determinism, subspaces, functional logic programming languages},
 location = {Coimbra, Portugal},
-series = {PPDP '09}
+series = {PPDP~'09}
 }
 @ARTICLE{AntoyHanus17TPLP,
 author       = {Antoy, S. and Hanus, M.},
@@ -294,78 +348,106 @@ publisher    = {Cambridge University Press},
 volume       = {17} }
 
 @article{liguoro:non-det,
-author = {Ugor de'Liguoro and Adolfo Piperno},
-title = {Nondeterministic extensions of untyped lambda calculus},
+author = {Ugo de'Liguoro and Adolfo Piperno},
+title = {Nondeterministic Extensions of Untyped $\lambda$-Calculus},
 journal = {Information and Computation},
-volume = 122,
+volume = {122},
+number = {2},
 pages = {149-177},
-year = 1995
+year = {1995},
+publisher = {Academic Press},
+issn = {0890-5401},
+doi = {https://doi.org/10.1006/inco.1995.1145},
+url = {https://www.sciencedirect.com/science/article/pii/S0890540185711455},
 }
 
 @inproceedings{lago:probabilistic,
-author = {Dal Lago, U. and Guerrieri, G. and Heijltjes, W.},
-year = 2020,
-title = {Decomposing Probabilistic Lambda-Calculi},
-editors = {Goubault-Larrecq, J. and König, B.},
-booktitle = {Foundations of Software Science and Computation Structures (FoSSaCS'20)},
-series = {Lecture Notes in Computer Science},
-volume = {12077},
-publisher = {Springer}
+author="Dal Lago, Ugo and Guerrieri, Giulio and Heijltjes, Willem",
+editor="Goubault-Larrecq, Jean and K{\"o}nig, Barbara",
+title="Decomposing Probabilistic Lambda-Calculi",
+booktitle="Foundations of Software Science and Computation Structures: 23rd International Conference (FoSSaCS'20)",
+series = {LNCS 12077},
+year="2020",
+publisher="Springer International",
+pages="136--156",
+isbn="978-3-030-45231-5",
+doi = {10.1007/978-3-030-45231-5_8}
 }
+
 
 @inproceedings{felleisen:anf,
 author = {Amr Sabry and Matthias Felleisen},
 title = {Reasoning about Programs in Continuation-Passing Style},
-booktitle = {Proceedings of the 1992 ACM Conference on LISP and Functional Programming, LFP'92},
+booktitle = {Proceedings of the 1992 ACM Conference on LISP and Functional Programming, LFP~'92},
 publisher = {ACM},
 year = 1992
 }
 
 @inproceedings{felleisen:contexts1,
 author = {Matthias Felleisen and Daniel P. Friedman},
-title = {Control operators, the SECD machine, and the lambda calculus},
-booktitle = {Formal Description of Programming Concepts III},
+title = {Control Operators, the {SECD} Machine, and the $\lambda$-Calculus},
+booktitle = {Formal Description of Programming Concepts III: Proceedings of the IFIP TC 2/WG 2.2 Working Conference},
+location = {Ebberup, Denmark},
 editors = {Martin Wirsing},
 pages = {193–217},
-publisher = {Elsevier},
-year = 1986}
+publisher = {Elsevier Science Publishers (North-Holland)},
+year = 1986,
+month = aug,
+ISBN = {978-0444702531},
+url = {https://web.archive.org/web/20220709064643/https://www.cs.tufts.edu/~nr/cs257/archive/matthias-felleisen/cesk.pdf}
+}
 
 @article{felleisen:contexts2,
 author = {Matthias Felleisen and Daniel P. Friedman and Eugene Kohlbecker and Bruce Duba},
-title = {A syntactic theory of sequential control},
+title = {A Syntactic Theory of Sequential Control},
 journal = {Theoretical Computer Science},
-issue = 52,
-number = 3,
-pages = {205–237},
-year = 1987}
+volume = {52},
+number = {3},
+pages = {205-237},
+year = {1987},
+issn = {0304-3975},
+publisher = {Elsevier Science Publishers (North-Holland)},
+doi = {https://doi.org/10.1016/0304-3975(87)90109-5},
+}
 
 @techreport{smolka:fresh,
 author = {Smolka, Gert and Panangaden, Prakash},
 title = {{FRESH}: A Higher-Order Language with Unification and Multiple Results},
 year = 1985,
+month = may,
 institution = {Cornell University},
-number = {TR85-685},
+address = {Ithaca, New York, USA},
+number = {TR 85-685},
 url = {https://hdl.handle.net/1813/6525}
 }
 
 @techreport{hanus:curry-report,
-author = {Michael Hanus},
-title = {Curry: an integrated functional logic language},
+author = {Michael Hanus and Sergio Antoy and Bernd Bra{\ss}el and Herbert Kuchen and Francisco J. L\'{o}pez-Fraguas
+          and Wolfgang Lux and Juan Jos\'{e} Moreno Navarro and Bj\"{o}rn Peem\"{o}ller and Frank Steiner},
+title = {Curry: An Integrated Functional Logic Language (Version 0.9.0)},
 year = 2016,
-institution = {University of Kiel}
+month = jan,
+day = {13},
+institution = {University of Kiel},
+url = {https://web.archive.org/web/20161020144634/https://www-ps.informatik.uni-kiel.de/currywiki/_media/documentation/report.pdf}
 }
 
-@incollection{hanus:survey,
-author = {Michael Hanus},
-title = {Functional Logic Programming: From Theory to Curry},
-editor = {A Voronkov and C Weidenbach},
-booktitle = {Programming Logics},
-series = {Lecture Notes in Computer Science},
+@inbook{hanus:survey,
+author="Hanus, Michael",
+editor="Voronkov, Andrei and Weidenbach, Christoph",
+title="Functional Logic Programming: From Theory to {C}urry",
+bookTitle="Programming Logics: Essays in Memory of Harald Ganzinger",
+series = {LNCS},
 volume = {7797},
-publisher = {Springer Verlag},
-year = {2013},
-url = {https://doi.org/10.1007/978-3-642-37651-1_6}
+year="2013",
+publisher="Springer",
+address="Berlin, Heidelberg",
+pages="123--168",
+isbn="978-3-642-37651-1",
+doi="10.1007/978-3-642-37651-1_6",
+url="https://doi.org/10.1007/978-3-642-37651-1_6"
 }
+
 
 @inproceedings{launchbury:natural,
 author = {Launchbury, John},
@@ -377,23 +459,24 @@ address = {New York, NY, USA},
 url = {https://doi.org/10.1145/158511.158618},
 doi = {10.1145/158511.158618},
 booktitle = {Proceedings of the 20th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
-pages = {144154},
+pages = {144-154},
 numpages = {11},
 location = {Charleston, South Carolina, USA},
-series = {POPL '93}
+series = {POPL~'93}
 }
 
 @article{pj:stg-machine,
-author = {Peyton Jones, Simon},
-title = {Implementing Lazy Functional Languages on Stock Hardware: The Spineless Tagless G-machine},
+author = {{Peyton Jones}, Simon L.},
+title = {Implementing Lazy Functional Languages on Stock Hardware: The {S}pineless {T}agless {G}-machine},
 year = {1992},
-month = {July},
+month = apr,
 publisher = {Cambridge University Press},
-url = {https://www.microsoft.com/en-us/research/publication/implementing-lazy-functional-languages-on-stock-hardware-the-spineless-tagless-g-machine/},
 pages = {127-202},
 journal = {Journal of Functional Programming},
 volume = {2},
-edition = {Journal of Functional Programming},
+  number={2},
+  doi={10.1017/S0956796800000319},
+  note = {Also available at \url{https://www.microsoft.com/en-us/research/publication/implementing-lazy-functional-languages-on-stock-hardware-the-spineless-tagless-g-machine/}}
 }
 
 @inproceedings{ariola:call-by-need,
@@ -409,7 +492,7 @@ booktitle = {Proceedings of the 22nd ACM SIGPLAN-SIGACT Symposium on Principles 
 pages = {233246},
 numpages = {14},
 location = {San Francisco, California, USA},
-series = {POPL '95}
+series = {POPL~'95}
 }
 
 
@@ -423,11 +506,11 @@ address = {New York, NY, USA},
 url = {https://doi.org/10.1145/1273920.1273947},
 doi = {10.1145/1273920.1273947},
 booktitle = {Proceedings of the 9th ACM SIGPLAN International Conference on Principles and Practice of Declarative Programming},
-pages = {197208},
+pages = {197-208},
 numpages = {12},
 keywords = {constructor-based rewriting logic, sharing, non-determinism calltime choice semantics, functional-logic programming, term rewriting systems, local bindings},
 location = {Wroclaw, Poland},
-series = {PPDP '07}
+series = {PPDP~'07}
 }
 
 @article{hanus:semantics,
@@ -448,7 +531,7 @@ keywords = {Functional logic programming, Operational semantics},
 
 @inproceedings{lenience,
 author = {Schauser, Klaus E. and Goldstein, Seth C.},
-title = {How Much Non-Strictness Do Lenient Programs Require?},
+title = {How Much Non-strictness Do Lenient Programs Require?},
 year = {1995},
 isbn = {0897917197},
 publisher = {Association for Computing Machinery},
@@ -456,27 +539,29 @@ address = {New York, NY, USA},
 url = {https://doi.org/10.1145/224164.224208},
 doi = {10.1145/224164.224208},
 booktitle = {Proceedings of the Seventh International Conference on Functional Programming Languages and Computer Architecture},
-pages = {216225},
+pages = {216-225},
 numpages = {10},
 location = {La Jolla, California, USA},
-series = {FPCA '95}
+series = {FPCA~'95}
 }
 
 @inproceedings{quickcheck,
-  author    = {Koen Claessen and
-               John Hughes},
-  title     = {QuickCheck: a lightweight tool for random testing of Haskell programs},
-  booktitle = {Proceedings of the Fifth {ACM} {SIGPLAN} International Conference
-               on Functional Programming {(ICFP} '00), Montreal, Canada, September
-               18-21, 2000.},
-  pages     = {268--279},
-  year      = {2000},
-  url       = {http://doi.acm.org/10.1145/351240.351266},
-  doi       = {10.1145/351240.351266},
-  timestamp = {Tue, 11 Jun 2013 13:51:25 +0200},
-  biburl    = {https://dblp.org/rec/bib/conf/icfp/ClaessenH00},
-  bibsource = {dblp computer science bibliography, https://dblp.org}
+  author = {Claessen, Koen and Hughes, John},
+  title = {QuickCheck: A Lightweight Tool for Random Testing of {H}askell Programs},
+  year = {2000},
+  month = sep,
+  location = {Montreal, Canada},
+  isbn = {1581132026},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  url = {https://doi.org/10.1145/351240.351266},
+  doi = {10.1145/351240.351266},
+  booktitle = {Proceedings of the Fifth ACM SIGPLAN International Conference on Functional Programming},
+  pages = {268–279},
+  numpages = {12},
+  series = {ICFP~'00}
 }
+
 
 
 @inproceedings{ohlebusch:modulo,
@@ -499,12 +584,19 @@ series = {FPCA '95}
 }
 
 @inproceedings{lamping1989algorithm,
-  title={An algorithm for optimal lambda-calculus reduction},
-  author={Lamping, John},
-  booktitle={Proceedings of the Seventeenth ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
-  pages={16--30},
-  month=jan,
-  year={1990}
+author = {Lamping, John},
+title = {An Algorithm for Optimal Lambda Calculus Reduction},
+year = {1990},
+isbn = {0897913434},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/96709.96711},
+doi = {10.1145/96709.96711},
+booktitle = {Proceedings of the 17th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {16–30},
+numpages = {15},
+location = {San Francisco, California, USA},
+series = {POPL~'90}
 }
 
 @book{asperti1998optimal,
@@ -518,27 +610,38 @@ series = {FPCA '95}
   title={R{\'e}ductions Correctes et Optimales dans le Lambda-calcul},
   author={L{\'e}vy, Jean-Jacques},
   year={1978},
-  school={Universit\'e Paris \textsc{vii}}
+  school={Universit\'e Paris \textsc{vii}},
+  url = {https://web.archive.org/web/20051016053439/http://pauillac.inria.fr/~levy/pubs/78phd.pdf}
 }
 
 @inproceedings{christiansen:denotational,
-  author = {Jan Christiansen and Daniel Seidel and Janis Voigtländer},
-  title = {An Adequate, Denotational, Functional-Style Semantics for Typed FlatCurry},
-  year = {2010},
-  booktitle = {International Workshop on Functional and Constraint Logic Programming},
-  journal = {International Workshop on Functional and Constraint Logic Programming},
-  pages = {119-136},
+  author="Christiansen, Jan and Seidel, Daniel and Voigtl{\"a}nder, Janis",
+  editor="Mari{\~{n}}o, Julio",
+  title="An Adequate, Denotational, Functional-Style Semantics for Typed {FlatCurry}",
+  booktitle="Functional and Constraint Logic Programming: 19th International Workshop, WFLP 2010",
+  year="2011",
+  publisher="Springer-Verlag",
+  address="Berlin, Heidelberg",
+  pages="119--136",
+  isbn="978-3-642-20775-4",
   doi = {10.1007/978-3-642-20775-4_7},
 }
 
-
 @book{griswold:icon-book-1983,
   title={The Icon Programming Language},
-  author={Griswold, Ralph E and Griswold, Madge T},
-  volume={55},
+  author={Griswold, Ralph E. and Griswold, Madge T.},
   year={1983},
   publisher={Prentice-Hall},
   address = {Englewood Cliffs, New Jersey}
+}
+
+@book{griswold:icon-book-2002,
+  title={The Icon Programming Language},
+  author={Griswold, Ralph E. and Griswold, Madge T.},
+  year={2002},
+  edition = {Third},
+  publisher={Peer-to-Peer Communications},
+  url = {https://web.archive.org/web/20040723085807/https://www2.cs.arizona.edu/icon/ftp/doc/lb1up.pdf}
 }
 
 @article{griswold:generators-in-icon,
@@ -554,7 +657,7 @@ issn = {0164-0925},
 url = {https://doi.org/10.1145/357133.357136},
 doi = {10.1145/357133.357136},
 journal = {ACM Trans.\ Programming Languages and Systems},
-month = {apr},
+month = apr,
 pages = {144–161},
 numpages = {18}
 }
@@ -572,7 +675,7 @@ issn = {0362-1340},
 url = {https://doi.org/10.1145/988078.988082},
 doi = {10.1145/988078.988082},
 journal = {SIGPLAN Notices},
-month = {apr},
+month = apr,
 pages = {18–31},
 numpages = {14}
 }
@@ -605,5 +708,6 @@ url={https://www2.cs.arizona.edu/icon/ftp/doc/tr78_14.pdf}
  ,publisher="Prentice-Hall"
  ,year="1978"
  ,address="Englewood Cliffs, New Jersey"
- ,ISBN="0-13-110163-3"
+ ,ISBN="0-13-110163-3",
+  url = {https://archive.org/details/TheCProgrammingLanguageFirstEdition}
 }

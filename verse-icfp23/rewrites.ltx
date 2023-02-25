@@ -56,6 +56,9 @@
 \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
 \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
 \newcommand{\rt}{\ensuremath{\mathcal{T}}\xspace}
+\newcommand{\rrhat}{\ensuremath{\widehat{\mathcal{R}}}\xspace}
+\newcommand{\rshat}{\ensuremath{\widehat{\mathcal{S}}}\xspace}
+\newcommand{\rthat}{\ensuremath{\widehat{\mathcal{T}}}\xspace}
 \newcommand{\goone}[1]{\xrightarrow{\epsilon}_{#1}}
 \newcommand{\go}[1]{\xrightarrow{}_{#1}}
 \newcommand{\gos}[1]{\xrightarrowdbl{}_{#1}}
@@ -111,7 +114,9 @@
 \newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
 
 
-\newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+%% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3
+%% \newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{@@{}l}{\textit{#1}}\\}
 \newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
 
 
@@ -120,7 +125,7 @@
 \newcommand{\figureSyntax}{
 \begin{figure}[t]
     $$
-    \begin{array}{l}
+  \begin{array}{l}
       \textbf{Syntax} \\
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Integers} & k \\
@@ -198,10 +203,10 @@
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
       \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceu ; ce|
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceq ; ce|
                                      \vb |one e| \vb |all e| \vb |def x ce|
                                      \vb |apply1 op v| \\
-                               & ceu & ::= & |ce| \vb |v == ce| \\
+                               & ceq & ::= & |ce| \vb |v == ce| \\
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -215,7 +220,9 @@
 
 \newcommand{\figureRewriteRules}{
   \begin{figure}
-    $\begin{array}{l}
+%% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3 
+%%    $\begin{array}{l}
+    $\begin{array}{@@{}l}
 
     % \rulegroupname{Primitive operations}
 
@@ -227,7 +234,9 @@
           \end{array}\right.$
     \fi
 
-\begin{array}{@@{\quad} l  r @@{\;}c@@{\;} l l}
+%% GS: change \quad to \hskip0.5em to get a little more horizontal space to work with in this figure; also add @@{}
+%% \begin{array}{@@{\quad} l  r @@{\;}c@@{\;} l l}
+\begin{array}{@@{\hskip0.5em} l @@{}r @@{\;}c@@{\;} l@@{\hskip4em}l}
 \rulegroupname{Application:}
 \rulename{app-add} & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}      & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
@@ -236,13 +245,15 @@
               & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup} & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
 \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice xdots choice (x = n; v_n))|
-    \quad \text{if} \; |x| \not\in \freevars{|v|, |v_1, xdots,v_n|}} \\
+    \quad\; \text{fresh  $|x| \not\in \freevars{|v|, |v_1, xdots,v_n|}$}} \\
 \rulename{app-tup-0} & |apply1 emptytup v| & \movesto & |fail| \\
 \end{array}
 \\
 \\[-2mm]
 
-\begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+%% GS: change \quad to \hskip0.5em to get a little more horizontal space to work with in this figure 
+%% \begin{array}{@@{\quad} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
     % The quad indents the lines
     % The \hspace{-..} removes redundant space between rule name column and LHS column
     % that arises because the longest rule name and the longer LHS are not on the same line
@@ -253,7 +264,8 @@
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+  & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$}, \\
+  &&&& \text{\hskip 0.7em and ($|v| = |y| \implies |x| \prec |y|$)} \\
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
@@ -266,8 +278,8 @@
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if ($eq_1 \in ceu$ or $eq_2 \in ceu$)}\\
-                    &                &           &                & \text{and $eq_2 \prec eq_1$} \\
+\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto &
+\multicolumn{2}{l}{|eq_2; eq_1; e|  \quad\quad\;  \text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$}} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
@@ -295,7 +307,7 @@
 
 \end{array} \\
 \\
-\text{\textit{Note}: \parbox[t]{8cm}{In the rules marked with a superscript $\alpha$, you may need to use $\alpha$-conversion to satisfy the side condition.}}
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 \iffullverse
 $$\begin{array}{l}

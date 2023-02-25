@@ -380,7 +380,7 @@ As in any functional logic language,
 \item \versecalc{} natively supports \emph{higher-order functions}, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
-  addresses higher-order features via an encoding called defunctionalisation~\cite[3.3]{hanus:survey}.
+  addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
 \item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables
   \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
@@ -389,7 +389,7 @@ As in any functional logic language,
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
 \item \emph{Choice and determinism.} Choice is a fundamental feature of all functional-logic languages.
   In \versecalc{} choice is expressed in the syntax of the term (``laid out in space'')
-  rather than, as is more typical, handled by non-deterministic rewrites and bactracking (``laid out in time'').
+  rather than, as is more typical, handled by non-deterministic rewrites and backtracking (``laid out in time'').
   This makes \versecalc{} completely \emph{deterministic}, unlike most
   functional logic languages which are non-deterministic by design (\cref{sec:deterministic}).
 \end{itemize}
@@ -468,7 +468,7 @@ an \emph{equation} |v=e|; this syntax ensures that equations can only occur to t
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
 rules in \cref{fig:syntax} show how to desugar more applications |(e_1 e_2)|. This ANF-like
-normalisation is not fundamental; it simply reduces the number of rewrite rules we need.
+normalization is not fundamental; it simply reduces the number of rewrite rules we need.
 The desugaring rules are more suggestive than precise; we aim to be precise about \versecalc{} but
 less so about the source language.
 
@@ -577,7 +577,7 @@ $$
 |def x (x = (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x=7; tup (3,x))) choice (def x (x=5; tup (3,x))))|
 $$
 We duplicate the context surrounding the choice, and ``float the choice outwards.''
-The same thing happens when there are multiple choices.  For examplle
+The same thing happens when there are multiple choices.  For example
 $$
 |def (x ^^ y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
 \quad
@@ -590,7 +590,7 @@ $$
 \text{yields the sequence |tup (7,31), tup(22,31), tup(7,5), tup(22,5)|}
 $$
 Readers familiar with list comprehensions in Haskell and other
-languages will recognise this nested-loop pattern, but here it
+languages will recognize this nested-loop pattern, but here it
 emerges naturally from choice as a deeply-built-in primitive,
 rather than being a special construct for lists.
 
@@ -710,7 +710,8 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}, which wraps the |then| and |else| branches in a thunk\footnote{Using thunks for the branches of a conditional is another old idea; for example \cite[p54]{steele:rabbit}.}:
+given in \cref{fig:syntax}, which wraps the |then| and |else| branches
+in a thunk\footnote{Using thunks for the branches of a conditional is another old idea; for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
 |apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
@@ -873,7 +874,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % But often this is not what we want: we may want the effects of |f|, such as failure or returning multiple values,
 % to affect the whole expression and obtain the cartesian product of these choices.
 % The expression |applyN map ((lam x ((x `choice` x+1))), tup (10,20))| should reduce to |tup (10,20)`choice` tup(10,21) `choice` tup (11,20) `choice` tup (11,21)|.
-% We get that behaviour if we simply define |map| much like in any other functional programming language:
+% We get that behavior if we simply define |map| much like in any other functional programming language:
 % if taking the head of the tuple fails, we return an empty tuple.
 % Else we apply |f| to the head, recur on the |tail| and assemble the result with |cons|.\label{sec:map}
 %
@@ -1125,6 +1126,7 @@ $$
 \begin{array}{rrcll}
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+  &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x=v)|,
@@ -1150,6 +1152,7 @@ suffice to express the necessary sharing.
   the binding: see \cref{sec:gc}.
 \item The side condition $x \not\in \freevars{v}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
+  The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire, by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example, where |a| and |b| are
@@ -1167,7 +1170,7 @@ $$
 \end{array}
 $$
 Each column is a reduction sequence starting from the same common term at the top;
-the two seqeunces differ in which equation for |x| is chosen for \rulename{subst}
+the two sequences differ in which equation for |x| is chosen for \rulename{subst}
 in the first step. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are confluent.
@@ -1175,7 +1178,10 @@ In the overall proof of confluence it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).  To achieve this \rulename{var-swap} fires on |y==x| only if
 |x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
-ends up on the left.  Other rules, notably \rulename{exi-swap}, may change this binding order
+ends up on the left.
+Similarly, the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
+prevents the rule from firing until \rulename{var-swap} has done its work.
+Other rules, notably \rulename{exi-swap}, may change this binding order
 and thereby re-enable \rulename{var-swap},
 but the unification rules \emph{considered in isolation} are terminating and confluent,
 and that is what we need for the proof.
@@ -1246,7 +1252,7 @@ Note that none of these rules, except \rulename{fail-elim}, discard an un-evalua
 because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenience}).
 The exception is \rulename{fail-elim}, which propagates failure
 
-Five \emph{normalisation} rules help to put the expression in a form that
+Five \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
 \rulename{seq-assoc} makes semicolon right-associated; \rulename{eqn-float} moves work out
 of the right hand side of a equation |v=e|.
@@ -1270,16 +1276,16 @@ $$
      \movestoR{subst}   & |b==a; c==b; a| \\
 \end{array}
 $$
-Again the concluding terms of the two colums are ``obviously'' the same,
+Again the concluding terms of the two columns are ``obviously'' the same,
 because they differ only in the order of the equations |(b==a)| and |(c==b)|;
 \rulename{seq-swap} allows them to be brought together, and makes explicit
-our intution that order does not matter.
+our intuition that order does not matter.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
 That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eq_1$ and $eq_2$
-is \emph{choice-free}, via the side condition $eq_1 \in ceu$ or $eq_2 \in ceu$ in \rulename{seq-swap}
-(see \cref{fig:choice-free-syntax} for the syntax of $ceu$).
+is \emph{choice-free}, via the side condition $eq_1 \in ceq$ or $eq_2 \in ceq$ in \rulename{seq-swap}
+(see \cref{fig:choice-free-syntax} for the syntax of $ceq$).
 Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
@@ -1316,7 +1322,7 @@ because the latter is outside the choice, and a different branch of the choice b
 
 The rules for choice are given in \cref{fig:rules}:
 \begin{itemize}
-\item Rules \rulename{one-fail}, \rulename{one-value}, ane \rulename{one-choice} describe
+\item Rules \rulename{one-fail}, \rulename{one-value}, and \rulename{one-choice} describe
   the semantics of |oneKW|, just as in \cref{sec:one}.
 \item Similarly \rulename{all-fail}, \rulename{all-value}, and \rulename{all-choice} describe
   the semantics of |allKW| (\cref{sec:all}).
@@ -1366,7 +1372,7 @@ Nor can we use \rulename{choose} again to float the choice further out,
 because the |if| is not guaranteed choice-free (in this case the |else| branch has a choice).
 So, alas, we are stuck!
 Our not-entirely-satisfying solution is to force \rulename{choose} to float the choice all the way
-to the top.  The |SX| context (\cref{fig:contexts}) formalises what we mean by ``the top'':
+to the top.  The |SX| context (\cref{fig:contexts}) formalizes what we mean by ``the top'':
 rule \rulename{choose} can float a choice outwards only when it becomes part of
 the choice tree (context |SC|) immediately under a |oneKW| or |allKW| construct (context |SX|).
 
@@ -1574,12 +1580,17 @@ pure lambda calculus), this proof turns out to be a substantial undertaking.
 
 \mypara{Reductions and Confluence}
 %
-A \emph{reduction relation} \rr is a binary relation on a set of terms \univ.
+A \emph{binary relation} is a set of pairs of related items.
+%
+A \emph{reduction relation} \rr is the \emph{compatible closure} of any binary relation on a set of tree-structured  \emph{terms},
+such as the terms generated by some BNF grammar.
+(``Compatible closure'' means that, for any context $E$ and any two terms $M$ and $N$,
+if $(M,N)\in\rr$ then $(E[M],E[N])\in\rr$.)
 %
 We write $\rr^{*}$ for the reflexive transitive closure of $\rr$.
 % We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
 % for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
-\lennart{We don't see $\rr^k$ being used anywhere below, so we dropped it here.}
+%\lennart{We don't see $\rr^k$ being used anywhere below, so we dropped it here.}\guy{And now dropping Lennart's comment.}
 %
 We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
 $\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
@@ -1630,11 +1641,11 @@ are equivalent only under some kind of graph isomorphism.
 
 We have tackled this problem in three different ways.  First, we can simply prohibit recursion, and prove
 confluence under that restriction (\cref{sec:confluence-sketch}).
-This is akin to proving confluence for the lambda caluclus with {\bf let} but not {\bf letrec}.
+This is akin to proving confluence for the lambda calculus with {\bf let} but not {\bf letrec}.
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
 recursion emerges during execution.  For example, is this recursive: |def (x ^^ y) (x==tup (1,y); applyN f (x,y))|?
 It might be if |f == (lam (tup (v, w)) (v==w))|!
-For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} make the entire
+For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} makes the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
 The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
@@ -1783,7 +1794,7 @@ composing the confluence properties for the individual relations.
 Our proof strategy for the confluence of the unification rules requires that they terminate.
 %
 The side condition $|x| \not\in \freevars{v}$ in \rulename{subst} avoids infinite
-substitutution.
+substitution.
 If instead we dropped that condition, the following sequence of \rulename{subst}
 reductions would not terminate
 $$
@@ -2071,7 +2082,7 @@ To substantiate this claim, \cref{sec:store} gives the additional syntax and rew
 for mutable variables.
 
 Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
-depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavour,
+depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavor,
 and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
@@ -2107,7 +2118,7 @@ of the lambda calculus, that successively rewrite the term, one step at
 a time, until it reaches a normal form.
 Their paper does exactly this, and proves equivalence to the
 CRWL framework.  Their key insight (like us, inspired by
-\citet{ariola:call-by-need}'s formalisation of the call-by-need lambda calculus)
+\citet{ariola:call-by-need}'s formalization of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
 However both CRWL and Fraguas {\etal} suffer from a major problem:
@@ -2168,11 +2179,11 @@ distinguished from ordinary variables.
 % form\footnote{
 %   Hanus does not mention this, but for a language with arbitrarily nested lambdas
 %   one would need to do lambda-lifting as well, but that is perhaps a minor point.}
-% using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+% using defunctionalization~\cite[Section 3.3]{hanus:survey}, and a built-in
 % |apply| function.
 As Hanus describes, it is possible
 to translate a higher-order program into a first-order
-form using defunctionalisation~\cite[Section 3.3]{hanus:survey}, and a built-in
+form using defunctionalization~\cite[Section 3.3]{hanus:survey}, and a built-in
 |apply| function.
 (Hanus does not mention this, but for a language with arbitrarily nested lambdas
 one would need to do lambda-lifting as well; this is perhaps a minor point.)
@@ -2205,7 +2216,7 @@ In contrast, |def x e| seems more direct.
 \subsection{Comparison with Icon} \label{sec:icon}
 
 There are many obvious similarities between Verse and the Icon programming language
-\cite{griswold:icon-users-manual,griswold:generators-in-icon,griswold:icon-book-1983,griswold:icon-overview}:
+\cite{griswold:icon-users-manual,griswold:generators-in-icon,griswold:icon-book-1983,griswold:icon-overview,griswold:icon-book-2002}:
 \begin{itemize}
 \item An expression can (successively) produce any number of values.
 \item An expression that produces zero values is said to \emph{fail} \cite[\S 3.1]{griswold:generators-in-icon};
@@ -2271,7 +2282,7 @@ rather than an imperative approach to processing generated combinations:
 \section{Looking back, looking forward}
 
 Defining the semantics of \versecalc{} through rewrite rules
-is sufficently low-level to capture
+is sufficiently low-level to capture
 the \emph{computational model} of the language; and yet sufficiently high-level to
 be \emph{illuminating} to a programmer or compiler writer.
 Defining a language by giving its low-level semantics is precise but not necessarily illuminating;
@@ -2399,22 +2410,22 @@ $$
 \end{document}
 
 % LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
-% LocalWords:  desc tup optimise defunctionalisation oneKW allKW lll
+% LocalWords:  desc tup optimise defunctionalization oneKW allKW lll
 % LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
 % LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
-% LocalWords:  boolean un rcll ANF flatMap cartesian behaviour fromTo
+% LocalWords:  boolean un rcll ANF flatMap cartesian behavior fromTo
 % LocalWords:  featureful multivalued mapFlat powerset denotational
 % LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
 % LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
-% LocalWords:  ReWrite CRWL fraguas formalisation rhs dom fvs hanus
+% LocalWords:  ReWrite CRWL fraguas formalization rhs dom fvs hanus
 % LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
 % LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
 % LocalWords:  subexpression Claessen equationally eliml fcn elimr
 % LocalWords:  rll redex Formalising equational stepX compositionally
 % LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
 % LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
-% LocalWords:  Smolka flavour FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  Smolka flavor FLC urefl onec obfuscatory opez Rodr
 % LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
 % LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
 % LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
