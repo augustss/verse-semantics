@@ -24,6 +24,7 @@ allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
                    systemICFPR,
+                   systemICFPP,
                    systemICFPS
                  ]
 
@@ -50,6 +51,14 @@ systemICFPE = s
   , description = description s ++ " - EXI-SWAP - SEQ-SWAP"
   , rules = rules s -= "EXI-SWAP" -= "SEQ-SWAP" -= "EXI-ELIML" <> ruleElimL
   , rulesHaveStructural = False
+  }
+  where s = systemICFP
+
+systemICFPP :: TRSystem Expr
+systemICFPP = s
+  { sname = "ICFPP"
+  , description = description s ++ " - Simon's new SUBST and SEQ-SWAP"
+  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" -= "SUBST" <> rulesSimon
   }
   where s = systemICFP
 
@@ -470,6 +479,21 @@ rulesUnification env lhs =
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+
+rulesSimon :: ERule
+rulesSimon env lhs =
+  "SEQ-SWAP-SIMON" `name`
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+     pure $ e2 :>: (e1 :>: e3)
+ <>
+  "SUBST-SIMON" `name`
+  do eq@(Var x :=: Val v) :>: e <- [lhs]
+     let freeV = free v
+         sub   = [(x, v)]
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (eq :>: subst sub e)
 
 rulesSeqSwapOrd :: ERule
 rulesSeqSwapOrd env lhs =
