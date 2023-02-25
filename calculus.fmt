@@ -79,7 +79,7 @@
 %%%format `choice` = "\mathop{[ \! ]}"
 %format choice = "\rule[-0.1em]{0.15em}{0.75em}"
 %% 1mm is about 0.3em with the current font
-%format `choice` = "\hspace{0.3em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.3em}"
+%format `choice` = "\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"
