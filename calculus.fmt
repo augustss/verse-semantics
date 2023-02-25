@@ -229,8 +229,8 @@
 %format y_i
 %format y_n
 
-%format hnf_1
-%format hnf_2
+%format hnf_1 = "\mathit{hnf}_{\!1}"
+%format hnf_2= "\mathit{hnf}_{\!2}"
 
 %format y1
 %format y2
