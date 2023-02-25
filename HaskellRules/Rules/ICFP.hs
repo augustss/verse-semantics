@@ -193,10 +193,12 @@ execX1 lhs =
   do e :>: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
+{-
  ++
   do EXI y x <- [lhs]
      (ctx, hole) <- execX x
      pure (EXI y . ctx, hole)
+-}
  ++
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
@@ -454,7 +456,9 @@ rulesUnification env lhs =
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
+{-
      guard (x `notElem` (boundVars env (ctx Fail)))
+-}
      guard (ltExprV env x v)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
