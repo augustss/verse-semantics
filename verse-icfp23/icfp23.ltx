@@ -710,7 +710,8 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}, which wraps the |then| and |else| branches in a thunk\footnote{Using thunks for the branches of a conditional is another old idea; for example \cite[p54]{steele:rabbit}.}:
+given in \cref{fig:syntax}, which wraps the |then| and |else| branches
+in a thunk\footnote{Using thunks for the branches of a conditional is another old idea; for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
 |apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
@@ -1639,7 +1640,7 @@ This is akin to proving confluence for the lambda calculus with {\bf let} but no
 In \versecalc{} excluding recursion is not so simple, because \versecalc{} has no {\bf letrec}; rather,
 recursion emerges during execution.  For example, is this recursive: |def (x ^^ y) (x==tup (1,y); applyN f (x,y))|?
 It might be if |f == (lam (tup (v, w)) (v==w))|!
-For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} make the entire
+For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} makes the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f = (lam x (applyN const (x, f)))|, where |const = (lam (tup (p,q)) p)|.
 The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
