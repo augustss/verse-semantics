@@ -4,7 +4,7 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand\mydots{\makebox[0.8em][c]{\text{$\cdot\!\cdot\!\cdot$}}}
+\newcommand\mydots{\makebox[0.6em][c]{\text{$\cdot\hspace{-0.25em}\cdot\hspace{-0.25em}\cdot$}}}
 
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
@@ -245,8 +245,8 @@
 \rulename{app-beta}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-                              \multicolumn{2}{@@{}l}{|def x (x==v; (x = 0; v_0) choice xdots choice (x == n; v_n))|
-                              \hspace{1.5em} \text{$|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
+                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
+                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
