@@ -191,37 +191,6 @@ then there exists $e'$ such that
 		$\rstep{}{e_1}{e'}$ and
 		$\rstep{}{e_2}{e'}$.
 \end{lemma}
-\simon{What is a ``reduct''?  Same as ``redex''?  Say so.} \ranjit{ACK: reduct is "redex" plus thing it steps to, so here we just want "redex}
-
-\guy{As I pointed out in my email, this is not the standard meaning of ``reduct'' in either Huet or Barendregt, and attempting to redefine
-  this word may cause confusion. (I think Barendregt would call it a ``contraction'' and I think Huet does not provide a word for this.)
-  As a result of $\rstep{}{e}{e_1}$ using a rewrite rule $\langle \rdx{1} \go{} \rdx{1}' \rangle$,
-  (I am using Huet's angle brackets to make clear that I am talking about a rewrite rule and not a reduction), $e$ is the reduct, not $\rdx{1}'$.
-  The point is that a reduction \emph{relation} always replaces an entire term with another complete term; if that replacement is dictated
-  by a rewriting rule, then it may be that the two terms differ in only a subterm.  But when, in a proof, we say something like (this is borrowed from
-  the proof of \cref{lem:under-a} below) ``$\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$'', this is \emph{not} an equivalence
-  between two reductions; it is an equivalence between two rewrite rules,
-  and might be less confusing if written $\langle\tx{\rapp}\rangle \equiv \langle(|lam x e|) |v| \movesto |def x (x == v; e)|\rangle$.
-  And the wording of the proof even says so: it says ``Split cases on the rule used in $\rapp$.''
-  But this does not match the wording and the diagram used in the statement of the lemma, where it is clear that ``If $\rstep{\rapp}{\rdx{\rapp}}{\rdx{\rapp}'}$''
-  does not refer to a rewrite rule, but to a reduction.}
-
-\guy{Now that I think about it, the attempt to use $\rdx{}$ in this way is an abuse of notation. No matter how much we say that
-  $\rdx{}$ ``has a redex at the root,'' that is no guarantee that a separately defined relation such as $\go{\rapp}$ or $\go{\rr}$,
-  in relating that term to another term, will in effect apply a rewriting rule to that redex rather than to some subterm;
-  that is the blessing and curse of these relations being compatible. Indeed, the diagram in the statement of \cref{lem:under-a}
-  utterly depends on the fact that the left edge, using reduction relation $\go{\rapp}$, will apply a contraction to the root of $\rdx{\rapp}$, but the top edge,
-  using reduction relation $\go{\rr}$, will not.
-  It seems to me that in order to express what you want to say
-  in these proofs accurately, you need a way to talk about the relation specified by a rewrite rule \emph{without taking its compatible closure}.
-  I suggest that that calls for using a different kind of arrow, not trying to impose some sort of weird type system on $\rdx{}$.
-For this example I will use $\hookrightarrow$ for that different kind of arrow: I suggest that ``$\tx{\rapp} \equiv (|lam x e|) |v| \movesto |def x (x == v; e)|$''
-might be more clearly written as ``$\rdx{\rapp} \hookrightarrow_{\rapp}\rdx{\rapp}'$ uses $\langle(|lam x e|) |v| \movesto |def x (x == v; e)|\rangle$''.
-The use of $\hookrightarrow$ indicates that this particular reduction involves a redex at the root; the use of angle brackets indicates
-that the thing after ``uses'' is a rewrite rule rather than a reduction. (If using angle brackets would be too confusing because of tuples,
-one could pick different brackets or just be wordy: ``uses rewrite rule $\langle(|lam x e|) |v| \movesto |def x (x == v; e)|\rangle$''.)}
-
-\guy{I would not blame anyone for wanting to defer all the issues I have raised above until after the Wednesday submission!}
 
 \begin{proof}
 Trivial: $e' = \ldots \rdx{1}' \ldots \rdx{2}' \ldots$.
