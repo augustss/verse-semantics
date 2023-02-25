@@ -38,59 +38,66 @@ $$
 \end{figure}
 
 \begin{definition}[Reductions] \label{def:reductions}
-Let $\rr$ be the reduction relation defined as $\runi \cup \rcon \cup \rapp \cup \rgc \cup \rspc$,
-each of which is defined as the reduction relation induced by the following
-rules in \cref{fig:rules}
+Let $\rr$ be the reduction relation defined as the union $\runi \cup \rcon \cup \rapp \cup \rgc \cup \rspc$ of five distinct reduction relations,
+each of which is defined as the compatible closure of a prototype reduction relation that is in turn defined by rewrite rules in \cref{fig:rules}, as follows:
 %
 \begin{itemize}
-\item $\runi$ (Unification)
-	\rulename{u-lit},
-	\rulename{u-tup},
-	\rulename{u-fail},
-	\rulename{u-occurs},
-	\rulename{subst},
-	\rulename{hnf-swap},
-	\rulename{var-swap},
+%% \hbox is used heavily here to avoid bad line breaks at hyphens in rule names.
+\item $\runi$ (Unification) is the compatible closure of $\runihat$, which is the union of the prototype reduction relations specified by rules
+	\hbox{\rulename{u-lit}},
+	\hbox{\rulename{u-tup}},
+	\hbox{\rulename{u-fail}},
+	\hbox{\rulename{u-occurs}},
+	\hbox{\rulename{subst}},
+	\hbox{\rulename{hnf-swap}},
+	\hbox{\rulename{var-swap}},
 	 %%%
-	\rulename{choose},
-	\rulename{seq-assoc},
-	\rulename{eqn-float},
-	\rulename{seq-swap} (restricted to $eq_2 \prec eq_1$);
+	\hbox{\rulename{choose}},
+	\hbox{\rulename{seq-assoc}},
+	\hbox{\rulename{eqn-float}}, and
+	\hbox{\rulename{seq-swap}} (restricted to $eq_2 \prec eq_1$).
 
-\item $\rcon$ (Normalization)
-	\rulename{exi-swap},
-	\rulename{exi-float},
-	\rulename{subst} (restricted to $|x == y|$),
-	\rulename{var-swap};
+\item $\rcon$ (Normalization) is the compatible closure of $\rconhat$, which is the union of the prototype reduction relations specified by rules
+	\hbox{\rulename{exi-swap}},
+	\hbox{\rulename{exi-float}},
+	\hbox{\rulename{subst}} (restricted to $|x == y|$), and
+	\hbox{\rulename{var-swap}}.
 
-\item $\rapp$ (Application)
-	\rulename{app-add},
-	\rulename{app-gt},
-	\rulename{app-gt-fail},
-	\rulename{app-beta},
-	\rulename{app-tup},
-	\rulename{app-tup-0};
+\item $\rapp$ (Application) is the compatible closure of $\rapphat$, which is the union of the prototype reduction relations specified by rules
+	\hbox{\rulename{app-add}},
+	\hbox{\rulename{app-gt}},
+	\hbox{\rulename{app-gt-fail}},
+	\hbox{\rulename{app-beta}},
+	\hbox{\rulename{app-tup}}, and
+	\hbox{\rulename{app-tup-0}}.
 
-\item $\rgc$ (Garbage Collection)
-	\rulename{fail-elim},
-	\rulename{val-elim},
-	\rulename{exi-elim};
-	\rulename{eqn-elim};
+\item $\rgc$ (Garbage Collection) is the compatible closure of $\rgchat$, which is the union of the prototype reduction relations specified by rules
+	\hbox{\rulename{fail-elim}},
+	\hbox{\rulename{val-elim}},
+	\hbox{\rulename{exi-elim}}, and
+	\hbox{\rulename{eqn-elim}}.
 
-\item $\rspc$ (Choice)
-	\rulename{one-fail, one-value, one-choice},
-	\rulename{all-fail, all-value, all-choice},
-	\rulename{choose-l, choose-r}.
+\item $\rspc$ (Choice) is the compatible closure of $\rspchat$, which is the union of the prototype reduction relations specified by rules
+	\hbox{\rulename{one-fail}},
+	\hbox{\rulename{one-value}},
+	\hbox{\rulename{one-choice}},
+	\hbox{\rulename{all-fail}},
+	\hbox{\rulename{all-value}},
+	\hbox{\rulename{all-choice}},
+	\hbox{\rulename{choose-l}}, and
+	\hbox{\rulename{choose-r}}.
 \end{itemize}
 %
+Let $\rrhat =  \runihat \cup \rconhat \cup \rapphat \cup \rgchat \cup \rspchat$; then $\rr$ may also be described as the compatible closure of $\rrhat$
+(because the operation of taking a compatible closure distributes over $\cup$).
 \end{definition}
 \noindent
 These groups correspond approximately to the sub-headings in \cref{fig:rules},
 \emph{but not precisely}.
-In particular, some rules appear in more than one group;
-for example \rulename{var-swap} is in both $\runi$ and $\rcon$; and
-\rulename{subst} is in both $\runi$ and (in restricted form) $\rcon$.
-Moreover, \rulename{choose} is in $\runi$, although it is listed under ``choice''
+In particular, somerewrite  rules appear in more than one group;
+for example \rulename{var-swap} is used in both $\runi$ and $\rcon$; and
+\rulename{subst} isused  in both $\runi$ and (in restricted form) $\rcon$.
+Moreover, \rulename{choose} is used in $\runi$ but not in $\rspc$, although it is listed under ``Choice''
 in \cref{fig:rules}.
 
 \begin{figure}
