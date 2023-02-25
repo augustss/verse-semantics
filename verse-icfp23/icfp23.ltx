@@ -430,7 +430,7 @@ $$
 \multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| &
 \movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
-\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| &
+\movestoR{u-tup}         & |def (y ^^ z) (2==y; z==3; y)| &
 \movestoR{eqn-elim}      & |def y (2==y; y)| \\
 \movestoR{hnf-swap}      & |def y (y==2; y)| &
 \movestoR{subst}         & |def y (y==2; 2)| \\
@@ -1261,6 +1261,7 @@ because the RHS of the |x|-equation is not a value; but we can instead apply \ru
 to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
 apply \rulename{subst}.
 
+\lennart{This needs updating if we are usiung the ordered seq-swap.}
 Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
 applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
 \rulename{exi-swap} allows you to move an existential inwards so that it can be eliminated
