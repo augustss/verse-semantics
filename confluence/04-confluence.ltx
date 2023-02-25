@@ -8,34 +8,6 @@
 \newcommand{\occunder}{\ensuremath{\subseteq}}
 
 \section{Confluence of \calcname: Proof} \label{sec:confluence}
-\begin{figure}
-$$
-\begin{array}{l}
-\text{Notation} \\
-\begin{array}{rl}
-  a,b,c,d,e & \text{Expressions (syntax in \cref{fig:syntax})} \\
-  \rdx{} & \text{An expression $e$ that has a redex at the root} \\
-  e_1 \soccunder e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
-  e_1 \occunder e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
-\tstep{\rr}{a}{b} & \text{$a$ reduces to $b$ via one root-level step of $\rr$} \\
-\rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
-\rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
-\rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
-\rstepk{\rr}{k}{a}{b}& \text{$a$ reduces to $b$ in $k$ steps of $\rr$}\\
-\end{array} \\
-\\
-\text{Expression contexts} \\
-\begin{array}{rcl}
-  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E| \vb |one E| \vb |all E| \\
-		& \vb & |apply1 E v| \vb |apply1 v E| \vb |tup (v_1, xdots, E, xdots, v_n)| \vb |lam x E| \\
-\end{array}
-\end{array}
-$$
-%
-\textbf{Note:} $e_1 \occunder e_2$ is equivalent to $\exists E.\ E[e_1] \equiv e_2$.
-%
-\caption{Summary of notation} \label{fig:notation}
-\end{figure}
 
 \begin{definition}[Reductions] \label{def:reductions}
 Let $\rr$ be the reduction relation defined as the union $\runi \cup \rcon \cup \rapp \cup \rgc \cup \rspc$ of five distinct reduction relations,
@@ -178,6 +150,35 @@ Finally, we use \cref{lem:comm-n} to prove their union $\rr$ is confluent.
 
 The no-recursion condition is only needed to prove $\runi$ is confluent,
 but we assume it globally for clarity.
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{Notation} \\
+\begin{array}{rl}
+  a,b,c,d,e & \text{Expressions (syntax in \cref{fig:syntax})} \\
+  \rdx{} & \text{An expression $e$ that has a redex at the root} \\
+  e_1 \soccunder e_2 & \text{The expression $e_1$ is a strict sub-term of $e_2$} \\
+  e_1 \occunder e_2 & \text{The expression $e_1$ is a sub-term of $e_2$, including $e_2$ itself} \\
+\tstep{\rr}{a}{b} & \text{$a$ reduces to $b$ via one root-level step of $\rr$} \\
+\rstep{\rr}{a}{b} & \text{$a$ reduces to $b$ in one step of $\rr$} \\
+\rstepo{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or one step of $\rr$} \\
+\rsteps{\rr}{a}{b}& \text{$a$ reduces to $b$ in zero or more steps of $\rr$} \\
+\rstepk{\rr}{k}{a}{b}& \text{$a$ reduces to $b$ in $k$ steps of $\rr$}\\
+\end{array} \\
+\\
+\text{Expression contexts} \\
+\begin{array}{rcl}
+  E     & ::= & \hole \vb |E ; e| \vb |v==E;e| \vb |def x E| \vb |E `choice` e| \vb |e `choice` E| \vb |one E| \vb |all E| \\
+		& \vb & |apply1 E v| \vb |apply1 v E| \vb |tup (v_1, xdots, E, xdots, v_n)| \vb |lam x E| \\
+\end{array}
+\end{array}
+$$
+%
+\textbf{Note:} $e_1 \occunder e_2$ is equivalent to $\exists E.\ E[e_1] \equiv e_2$.
+%
+\caption{Summary of notation} \label{fig:notation}
+\end{figure}
 
 \subsection{Disjointness, Reduction under, and the Diamond property}
 
