@@ -198,10 +198,10 @@
       && \vb & |succeeds hole| \vb |decides hole| \\
   \fi
       \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
-      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceu ; ce|
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceq ; ce|
                                      \vb |one e| \vb |all e| \vb |def x ce|
                                      \vb |apply1 op v| \\
-                               & ceu & ::= & |ce| \vb |v == ce| \\
+                               & ceq & ::= & |ce| \vb |v == ce| \\
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -253,7 +253,8 @@
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x=V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+  & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+  &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
@@ -266,7 +267,8 @@
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if $eq_1 \in ceu$ or $eq_2 \in ceu$ and $eq_2 \prec eq_1$} \\
+\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto &
+\multicolumn{2}{l}{|eq_2; eq_1; e|  \quad\quad  \text{if $eq_1 \in ceq$ or $eq_2 \in ceq$ and $eq_2 \prec eq_1$}} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
@@ -294,7 +296,7 @@
 
 \end{array} \\
 \\
-\text{\textit{Note}: \parbox[t]{8cm}{In the rules marked with a superscript $\alpha$, you may need to use $\alpha$-conversion to satisfy the side condition.}}
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 \iffullverse
 $$\begin{array}{l}
