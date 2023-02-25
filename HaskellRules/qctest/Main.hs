@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 import Data.Maybe
 import Epic.List( nub )
@@ -11,6 +12,16 @@ import TRS.Traced
 import Test.QuickCheck as QC
 import Options.Applicative
 import qualified Data.Set as S
+import GitHash
+
+gitHash :: String
+gitHash = giHash gitInfo
+
+gitDirty :: Bool
+gitDirty = giDirty gitInfo
+
+gitInfo :: GitInfo
+gitInfo = $$tGitInfoCwd
 
 --------------------------------------------------------------------------------
 
@@ -23,6 +34,7 @@ main = do
           Right s -> s
       qcargs = stdArgs{ maxSuccess = numtests flags, replay = read <$> replayStr flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
+  putStrLn $ "This source code has git hash " ++ gitHash ++ if gitDirty then " (with uncommited files)" else ""
   quickCheckWith qcargs (prop_Confluence flags sys)
 
 prop_Confluence :: TestFlags -> TRSystem Expr -> Property

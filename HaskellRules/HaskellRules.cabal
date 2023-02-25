@@ -101,6 +101,7 @@ executable qctest
     build-depends:    all,
                       optparse-applicative,
                       QuickCheck,
+                      githash,
 
     main-is:          Main.hs
 
