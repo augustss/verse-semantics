@@ -23,6 +23,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
+                   systemICFPJ,
                    systemICFPR,
                    systemICFPP,
                    systemICFPS
@@ -58,7 +59,15 @@ systemICFPP :: TRSystem Expr
 systemICFPP = s
   { sname = "ICFPP"
   , description = description s ++ " - Simon's new SUBST and SEQ-SWAP"
-  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" -= "SUBST" <> rulesSimon
+  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" -= "SUBST" <> rulesSimonSwap <> rulesSimonSubst
+  }
+  where s = systemICFP
+
+systemICFPJ :: TRSystem Expr
+systemICFPJ = s
+  { sname = "ICFPJ"
+  , description = description s ++ " - Simon's SEQ-SWAP"
+  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap
   }
   where s = systemICFP
 
@@ -480,13 +489,28 @@ rulesUnification env lhs =
      guard (ltExpr env x y)
      pure (x :=: y)
 
-rulesSimon :: ERule
-rulesSimon env lhs =
+rulesSimonSwap :: ERule
+rulesSimonSwap env lhs =
   "SEQ-SWAP-SIMON" `name`
-  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
-     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+  do e1 :>: (e2@(Var _x :=: Val _) :>: e3) <- [lhs]
+--     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+
+     guard $
+       -- First, order by choice-free-ness;
+       -- choice free goes first
+       case isEffFree e1 of
+         False  -> True   -- put ce before e
+         True   ->
+           -- Next, order so equations go before expressions.
+           -- (This is an arbitrary choice)
+           case isEqn e1 of
+             False  -> True              -- need to swap
+             True   -> ltExpr env e2 e1  -- use ordering
+
      pure $ e2 :>: (e1 :>: e3)
- <>
+
+rulesSimonSubst :: ERule
+rulesSimonSubst env lhs =
   "SUBST-SIMON" `name`
   do eq@(Var x :=: Val v) :>: e <- [lhs]
      let freeV = free v
