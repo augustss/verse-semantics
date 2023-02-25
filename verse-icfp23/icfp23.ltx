@@ -936,12 +936,12 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| u
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
-|fordo(def (x_1 xdots x_n) e_1) e_2| \; \equiv \;
-|def v (v == all (def (x_1 xdots x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|fordo(def (x_1^^xdots^^x_n) e_1) e_2| \; \equiv \;
+|def v (v == all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
-Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
-Moreover, any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
+Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
+Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
 So, for example, |fordo(x:=10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
@@ -1190,7 +1190,7 @@ and that is what we need for the proof.
 \subsection{Local substitution} \label{sec:local-subst}
 
 Consider this (extremely) tricky term:
-|def x (x == if (x==0; x>1) then 33 else 55)|.
+|def x (x = if (x==0; x>1) then 33 else 55)|.
 What should this do? At first you might think it was stuck; how can we simplify the |if|
 when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any X-context surrounding the equation |(x==0)|
@@ -1200,11 +1200,11 @@ thus\footnote{
   formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
 $$
 \begin{array}{l@@{\;}l}
-                                & |def x (x == if (x==0; x>1) then 33 else 55; x)| \\
-\movestoR{subst}                & |def x (x == if (x=0; 0>1) then 33 else 55; x)| \\
-\movestoR{app-gt-fail,fail-elim}     & |def x (x == if fail then 33 else 55; x)|\\
-\movestoC{\text{simplify |if|}} & |def x (x == 55; x)| \\
-\movestoR{subst}                & |def x (x == 55; 55)| \\
+                                & |def x (x = if (x==0; x>1) then 33 else 55; x)| \\
+\movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
+\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
+\movestoR{subst}                & |def x (x = 55; 55)| \\
 \movestoR{exi-elim}             & |55|
 \end{array}
 $$
@@ -1214,7 +1214,7 @@ is a solution to the equations, namely |x==55|.
 And if you replace |(x==0)| with |(x==55)| then rewriting again
 gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
 Perhaps this is not surprising: we cannot reasonably expect the program to solve arbitrary equations.
-For example, |def x (x*x == x)| has two solutions but discovering that involves solving a quadratic equation.
+For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
 
 % It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
 % substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
@@ -1818,7 +1818,7 @@ lambdas fails, even if the lambdas are semantically identical (rule
 un-implementable.
 %
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that rewrites in two different ways, depending on which equation we \rulename{deref-h} first:
+Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
 \[ |(lam p 1) == (lam q 2); 1 <-* def x (x == (lam p 1); x == (lam q 2); x emptytup) ->* (lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
@@ -1966,14 +1966,15 @@ semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifull
 
 \subsection{Generalizing |oneKW| and |allKW|} \label{sec:split}
 
-In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
+In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
+We could have introduced a more general operator |splitKW|\footnote{The name inspired by \cite{oleglogict}.} as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
-When adding more effects, see \cref{sec:store}, to \versecalc{} it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
+When adding more effects to \versecalc{}, see \cref{sec:store}, it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
