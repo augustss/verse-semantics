@@ -266,7 +266,8 @@
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if $eq_1 \in ceu$ or $eq_2 \in ceu$ and $eq_2 \prec eq_1$} \\
+\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if ($eq_1 \in ceu$ or $eq_2 \in ceu$)}\\
+                    &                &           &                & \text{and $eq_2 \prec eq_1$} \\
 % \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
 
     \\[-2mm]
