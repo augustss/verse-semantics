@@ -26,7 +26,8 @@ allSystemsICFP = [ systemICFP,
                    systemICFPJ,
                    systemICFPR,
                    systemICFPP,
-                   systemICFPS
+                   systemICFPS,
+                   systemICFPBX
                  ]
 
 systemICFP :: TRSystem Expr
@@ -37,6 +38,21 @@ systemICFP = TRSystem
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
   , rules               = (allRules -= "SEQ-SWAP") <> rulesSeqSwapOrd
+  , rules2              = noRules
+  , rulesHaveStructural = True
+  , confluenceRules     = noRules
+  , validExpr           = const valid
+  }
+
+
+systemICFPBX :: TRSystem Expr
+systemICFPBX = TRSystem
+  { sname               = "ICFPBX"
+  , description         = "ICFP with BX for SUBST and EXI-FLOAT and no EXI-SWAP"
+  , ruleEnv             = defaultTRSFlags
+  , preProcess          = const (check valid . anf)
+  , postProcess         = const id
+  , rules               = (allRules -= "SEQ-SWAP" -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSeqSwapOrd <> rulesSubstBX <> rulesExiFloatBX
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules
@@ -221,6 +237,34 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
+
+-- X context additionally descending under EXI and returning boundVars at hole
+execBX, execBX1 :: Expr -> [(Context, [Ident], Expr)]
+-- X context
+execBX lhs = execBX1 lhs ++ [(id, [], lhs)]
+-- X context, X /= hole
+execBX1 lhs =
+  do (v :=: x) :>: e <- [lhs]
+     (ctx, bs, hole) <- execBX x
+     pure (\ a -> (v :=: ctx a) :>: e, bs, hole)
+ ++
+  do x :>: e <- [lhs]
+     (ctx, bs, hole) <- execBX x
+     pure ((:>: e) . ctx, bs, hole)
+ ++
+  do e :>: x <- [lhs]
+     (ctx, bs, hole) <- execBX x
+     pure ((e :>:) . ctx, bs, hole)
+ ++
+  do Store h e <- [lhs]
+     (ctx, bs, hole) <- execBX e
+     pure (Store h . ctx, bs, hole)
+ ++
+  do EXI x e <- [lhs]
+     (ctx, bs, hole) <- execBX e
+     pure (EXI x . ctx, x:bs, hole)
+
+
 
 scopeX :: Expr -> [(Context, Expr)]
 scopeX lhs =
@@ -474,9 +518,6 @@ rulesUnification env lhs =
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
-{-
-     guard (x `notElem` (boundVars env (ctx Fail)))
--}
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
@@ -488,6 +529,25 @@ rulesUnification env lhs =
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+
+rulesSubstBX :: ERule
+rulesSubstBX env lhs =
+  "SUBST-BX" `name`
+  do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
+     let freeX = free (ctx, e)
+         freeV = free v
+     let allBoundVars = boundVars env ++ xBoundVars
+     let x0    = identNotIn (freeX ++ freeV ++ allBoundVars) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     guard (all (`notElem` allBoundVars) (x:freeV))          -- NEW PRECONDITION
+     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+
+
+
+
 
 rulesSimonSwap :: ERule
 rulesSimonSwap env lhs =
@@ -643,6 +703,18 @@ rulesNormalization _ lhs =
      -- Don't reorder effects
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
+
+rulesExiFloatBX :: ERule
+rulesExiFloatBX _ lhs =
+  "NORM-EXI-BX" `name`
+  do (ctx, bVars, EXI x e) <- execBX1 lhs  -- Note: Store not allowed in ctx
+     guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
+     guard (x `notElem` bVars)
+     let freeX = free ctx
+         x'    = identNotIn (freeX ++ free e ++ bVars)
+     if x `elem` freeX
+       then pure (EXI x' (ctx (subst [(x,Var x')] e)))
+       else pure (EXI x (ctx e))
 
 --------------------------------------------------------------------------------
 
