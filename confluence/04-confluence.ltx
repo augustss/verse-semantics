@@ -94,11 +94,33 @@ Let $\rrhat =  \runihat \cup \rconhat \cup \rapphat \cup \rgchat \cup \rspchat$;
 \noindent
 These groups correspond approximately to the sub-headings in \cref{fig:rules},
 \emph{but not precisely}.
-In particular, somerewrite  rules appear in more than one group;
-for example \rulename{var-swap} is used in both $\runi$ and $\rcon$; and
-\rulename{subst} isused  in both $\runi$ and (in restricted form) $\rcon$.
-Moreover, \rulename{choose} is used in $\runi$ but not in $\rspc$, although it is listed under ``Choice''
-in \cref{fig:rules}.
+In particular, some rewrite rules appear in more than one group:
+\rulename{var-swap} is used in both $\runi$ and $\rcon$, and
+\rulename{subst} is used in both $\runi$ and (in restricted form) $\rcon$.
+Moreover, \rulename{choose} is used in $\runi$ but not in $\rspc$,
+although it is listed under ``Choice'' in \cref{fig:rules}.
+
+For convenient reference, the five lists of rules are also displayed in tabular form in \cref{fig:rule-groups}.
+
+\begin{figure}
+\begin{center}
+  \begin{tabular}{@@{}l@@{\qquad}l@@{\qquad}l@@{\qquad}l@@{\qquad}l@@{}}
+$\runi$ and $\runihat$ & $\rcon$ and $\rconhat$ & $\rapp$ and $\rapphat$ & $\rgc$ and $\rgchat$ & $\rspc$ and $\rspchat$ \\
+\rulename{u-lit} &           \rulename{exi-swap} &                                    \rulename{app-add} &                \rulename{fail-elim} &          \rulename{one-fail} \\
+\rulename{u-tup} &           \rulename{exi-float} &                                   \rulename{app-gt} &                 \rulename{val-elim} &           \rulename{one-value} \\
+\rulename{u-fail} &          \rulename{subst} (restricted to $|x == y|$) &            \rulename{app-gt-fail} &            \rulename{exi-elim} &           \rulename{one-choice} \\
+\rulename{u-occurs} &        \rulename{var-swap} &                                    \rulename{app-beta} &               \rulename{eqn-elim} &           \rulename{all-fail} \\
+\rulename{subst} &                                             &                       \rulename{app-tup} &                                                     &       \rulename{all-value} \\
+\rulename{hnf-swap} &                                           &                      \rulename{app-tup-0} &                                              &     \rulename{all-choice} \\
+\rulename{var-swap} &                                            &                                                       &                                     &   \rulename{choose-l} \\
+\rulename{choose} &                                               &                                                       &                                   &     \rulename{choose-r} \\
+\rulename{seq-assoc} \\
+\rulename{eqn-float} \\
+\multicolumn{5}{@@{}l@@{}}{\rulename{seq-swap} (restricted to $eq_2 \prec eq_1$)} \\
+\end{tabular}
+\end{center}
+\caption{Division of the rewrite rules shown in \cref{fig:rules} into groups}\label{fig:rule-groups}
+\end{figure}
 
 \begin{figure}
 \begin{tabular}{rrrrrrrr}
