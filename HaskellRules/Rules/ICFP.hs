@@ -46,18 +46,12 @@ systemICFP = TRSystem
 
 
 systemICFPBX :: TRSystem Expr
-systemICFPBX = TRSystem
+systemICFPBX = s
   { sname               = "ICFPBX"
-  , description         = "ICFP with BX for SUBST and EXI-FLOAT and no EXI-SWAP"
-  , ruleEnv             = defaultTRSFlags
-  , preProcess          = const (check valid . anf)
-  , postProcess         = const id
-  , rules               = (allRules -= "SEQ-SWAP" -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSeqSwapOrd <> rulesSubstBX <> rulesExiFloatBX
-  , rules2              = noRules
-  , rulesHaveStructural = True
-  , confluenceRules     = noRules
-  , validExpr           = const valid
+  , description         = description s ++ ", BX for SUBST and EXI-FLOAT and no EXI-SWAP"
+  , rules               = (rules s -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSubstBX <> rulesExiFloatBX
   }
+  where s = systemICFP
 
 -- A system without the structural rules.
 -- Without EXI-SWAP we need a more powerful EXI-ELIML.
@@ -545,10 +539,6 @@ rulesSubstBX env lhs =
      guard (all (`notElem` allBoundVars) (x:freeV))          -- NEW PRECONDITION
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
-
-
-
-
 rulesSimonSwap :: ERule
 rulesSimonSwap env lhs =
   "SEQ-SWAP-SIMON" `name`
@@ -706,7 +696,7 @@ rulesNormalization _ lhs =
 
 rulesExiFloatBX :: ERule
 rulesExiFloatBX _ lhs =
-  "NORM-EXI-BX" `name`
+  "EXI-FLOAT-BX" `name`
   do (ctx, bVars, EXI x e) <- execBX1 lhs  -- Note: Store not allowed in ctx
      guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      guard (x `notElem` bVars)
