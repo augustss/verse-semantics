@@ -586,7 +586,9 @@ rulesSimonSubst env lhs =
   "SUBST-SIMON" `name`
   do eq@(Var x :=: Val v) :>: e <- [lhs]
      let freeV = free v
+         freeE = free e
          sub   = [(x, v)]
+     guard (x `elem` freeE)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (eq :>: subst sub e)
