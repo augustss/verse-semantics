@@ -27,7 +27,8 @@ allSystemsICFP = [ systemICFP,
                    systemICFPR,
                    systemICFPP,
                    systemICFPS,
-                   systemICFPBX
+                   systemICFPBX,
+                   systemICFPBXS
                  ]
 
 systemICFP :: TRSystem Expr
@@ -48,10 +49,18 @@ systemICFP = TRSystem
 systemICFPBX :: TRSystem Expr
 systemICFPBX = s
   { sname               = "ICFPBX"
-  , description         = description s ++ ", BX for SUBST and EXI-FLOAT and no EXI-SWAP"
+  , description         = description s ++ ", BX for EXI-FLOAT and no EXI-SWAP"
   , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
   }
   where s = systemICFP
+
+systemICFPBXS :: TRSystem Expr
+systemICFPBXS = s
+  { sname               = "ICFPBXS"
+  , description         = description s ++ ", BX for SUBST"
+  , rules               = (rules s -= "SUBST") <> rulesSubstBX
+  }
+  where s = systemICFPBX
 
 -- A system without the structural rules.
 -- Without EXI-SWAP we need a more powerful EXI-ELIML.
@@ -524,8 +533,8 @@ rulesUnification env lhs =
      guard (ltExpr env x y)
      pure (x :=: y)
 
-_rulesSubstBX :: ERule
-_rulesSubstBX env lhs =
+rulesSubstBX :: ERule
+rulesSubstBX env lhs =
   "SUBST-BX" `name`
   do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
      let freeX = free (ctx, e)
@@ -536,7 +545,7 @@ _rulesSubstBX env lhs =
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     guard (all (`notElem` allBoundVars) (x:freeV))          -- NEW PRECONDITION
+     guard (all (`notElem` xBoundVars) (x:freeV))          -- NEW PRECONDITION
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 rulesSimonSwap :: ERule
