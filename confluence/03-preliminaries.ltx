@@ -14,8 +14,10 @@
 
 \section{Confluence: Preliminaries} \label{sec:preliminaries}
 
+\subsection{Reduction relations} \label{sec:red-relns}
+
 \begin{definition}[Binary relations]
-A \emph{binary relation} is a set of pairs of related items; if $R$ is a relation, then we may write $a \mathbin{R} b$ to mean $(a,b)\in R$. 
+A \emph{binary relation} is a set of pairs of related items; if $R$ is a relation, then we may write $a \mathbin{R} b$ to mean $(a,b)\in R$.
 \end{definition}
 
 \begin{definition}[Prototype reduction relations and rewrite rules]
@@ -29,7 +31,7 @@ that consistently instantiates all the metavariables (BNF nonterminals) in $\alp
 $(\sigma(\alpha),\sigma(\beta))$ is a member of the prototype reduction relation.
 A prototype reduction relation may also be specified by a set of rewrite rules,
 in which case the prototype reduction relation is the union of the prototype reduction relations
-indicated by the individual rewrite rules.
+specified by the individual rewrite rules.
 \end{definition}
 
 \begin{definition}[Reduction relations]
@@ -56,8 +58,10 @@ We write
 \item $\rstepk{\rr}{k}{a}{b}$ ($a$ \emph{$k$-steps to} $b$) if $(a, b) \in \rr^{k}$, and
 %
 \end{itemize}
-Sometimes we use this same notation and terminology with a prototype reduction relation $\rrhat$.
-In such cases, the effect is that the arrows indicate the rewriting only of entire terms, not subterms.
+Sometimes we use this same notation and terminology with a prototype reduction relation $\rrhat$,
+thus for example $\rstep{\rrhat}{a}{b}$.
+In such a case, the arrow indicates rewriting of the entire term $a$ (at the root),
+and not of some subterm of $a$.
 
 \end{definition}
 
@@ -71,6 +75,8 @@ such that $\rstep{\rr}{a}{b}$.
 \end{definition}
 
 For clarity, we will omit the subscript $\rr$ when it is clear from the context.
+
+\subsection{Confluence} \label{sec:confluence-defns}
 
 \begin{definition}[Diamond Property] \label{def:diamond}
 %
