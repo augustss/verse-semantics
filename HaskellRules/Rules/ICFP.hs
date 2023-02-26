@@ -542,8 +542,8 @@ _rulesSubstBX env lhs =
 rulesSimonSwap :: ERule
 rulesSimonSwap env lhs =
   "SEQ-SWAP-SIMON" `name`
-  do e1 :>: (e2@(Var _x :=: Val _) :>: e3) <- [lhs]
---     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
 
 {-
      -- This side condition is not confluent, see tricky:QC11
