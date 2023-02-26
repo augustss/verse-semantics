@@ -135,13 +135,15 @@ type C = ReaderT Flags (State Int)
 
 seqC :: (HasCallStack) => [Core] -> Core
 seqC acs =
-  case concatMap flat acs of
+  case {-concatMap flat-} acs of
     [] -> CArray []
     [c] -> c
     cs -> CSeq cs
+{-
   where
     flat (CSeq cs) = concatMap flat cs
     flat c = [c]
+-}
 
 newTmp :: C Ident
 newTmp = do
@@ -382,7 +384,7 @@ instance Pretty Core where
   pPrintPrec l _ (CArray vs) = parens $ commaSep l vs
   pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
   pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
-  pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 0) cs
+  pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 1) cs
   pPrintPrec l p (CApply (CVar (Ident _ "~")) (CArray [c1, c2])) =
                   maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "~" <+> pPrintPrec l 6 c2
   pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
@@ -566,7 +568,7 @@ pSeq :: P Expr
 pSeq = choice [ pLam, pExists, cons <$> pEqu <*> optional (pOp ";" *> pSeq) ]
   where
     cons e Nothing = e
-    cons e (Just e') = seqE [e, e']
+    cons e (Just e') = Seq [e, e']
 
 pEqu :: P Expr
 pEqu = try (Define <$> (pIdent <* pOp ":=") <*> pChoice)
