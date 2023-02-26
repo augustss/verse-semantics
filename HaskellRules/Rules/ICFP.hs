@@ -49,7 +49,7 @@ systemICFPBX :: TRSystem Expr
 systemICFPBX = s
   { sname               = "ICFPBX"
   , description         = description s ++ ", BX for SUBST and EXI-FLOAT and no EXI-SWAP"
-  , rules               = (rules s -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSubstBX <> rulesExiFloatBX
+  , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
   }
   where s = systemICFP
 
@@ -68,15 +68,15 @@ systemICFPE = s
 systemICFPP :: TRSystem Expr
 systemICFPP = s
   { sname = "ICFPP"
-  , description = description s ++ " - Simon's new SUBST and SEQ-SWAP"
-  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" -= "SUBST" <> rulesSimonSwap <> rulesSimonSubst
+  , description = description s ++ ", Simon's SUBST"
+  , rules = rules s -= "SUBST" <> rulesSimonSubst
   }
-  where s = systemICFP
+  where s = systemICFPJ
 
 systemICFPJ :: TRSystem Expr
 systemICFPJ = s
   { sname = "ICFPJ"
-  , description = description s ++ " - Simon's SEQ-SWAP"
+  , description = description s ++ ", Simon's SEQ-SWAP"
   , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap
   }
   where s = systemICFP
@@ -524,8 +524,8 @@ rulesUnification env lhs =
      guard (ltExpr env x y)
      pure (x :=: y)
 
-rulesSubstBX :: ERule
-rulesSubstBX env lhs =
+_rulesSubstBX :: ERule
+_rulesSubstBX env lhs =
   "SUBST-BX" `name`
   do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
      let freeX = free (ctx, e)
@@ -545,6 +545,10 @@ rulesSimonSwap env lhs =
   do e1 :>: (e2@(Var _x :=: Val _) :>: e3) <- [lhs]
 --     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
 
+{-
+     -- This side condition is not confluent, see tricky:QC11
+     guard (ltExpr env e2 e1)
+     -- This side condition has the same problem
      guard $
        -- First, order by choice-free-ness;
        -- choice free goes first
@@ -556,7 +560,7 @@ rulesSimonSwap env lhs =
            case isEqn e1 of
              False  -> True              -- need to swap
              True   -> ltExpr env e2 e1  -- use ordering
-
+-}
      pure $ e2 :>: (e1 :>: e3)
 
 rulesSimonSubst :: ERule
