@@ -28,6 +28,7 @@ allSystemsICFP = [ systemICFP,
                    systemICFPP,
                    systemICFPS,
                    systemICFPBX,
+                   systemICFPBXP,
                    systemICFPBXS
                  ]
 
@@ -59,6 +60,14 @@ systemICFPBXS = s
   { sname               = "ICFPBXS"
   , description         = description s ++ ", BX for SUBST"
   , rules               = (rules s -= "SUBST") <> rulesSubstBX
+  }
+  where s = systemICFPBX
+
+systemICFPBXP :: TRSystem Expr
+systemICFPBXP = s
+  { sname               = "ICFPBXP"
+  , description         = description s ++ ", Simon's SEQ-SWAP and SUBST"
+  , rules               = rules s -= "SUBST" -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap <> rulesSimonSubst
   }
   where s = systemICFPBX
 
