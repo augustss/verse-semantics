@@ -193,7 +193,8 @@
 %format xdots = "\mydots"
 
 %% Unification
-%format == = "\!=\!"
+%format == = "\hspace{-0.14em}=\hspace{-0.14em}"
+%%%format == = "\!=\!"
 
 
 % format := = "\mapsto"
