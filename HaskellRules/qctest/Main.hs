@@ -12,6 +12,7 @@ import TRS.Traced
 import Test.QuickCheck as QC
 import Options.Applicative
 import qualified Data.Set as S
+import System.Exit
 import GitHash
 
 gitHash :: String
@@ -35,7 +36,15 @@ main = do
       qcargs = stdArgs{ maxSuccess = numtests flags, replay = read <$> replayStr flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   putStrLn $ "This source code has git hash " ++ gitHash ++ if gitDirty then " (with uncommited files)" else ""
-  quickCheckWith qcargs (prop_Confluence flags sys)
+  res <- quickCheckWithResult qcargs (prop_Confluence flags sys)
+  case res of
+    QC.Failure{usedSeed = seed, usedSize = size} ->
+      putStrLn $ "To replay use --replay '" ++ show (seed, size) ++ "'"
+    _ ->
+      pure ()
+  case res of
+    QC.Success{} -> exitWith ExitSuccess
+    _            -> exitWith (ExitFailure 1)
 
 prop_Confluence :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence flags | koen flags = prop_Confluence2 flags
