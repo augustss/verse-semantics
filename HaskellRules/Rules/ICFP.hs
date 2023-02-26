@@ -49,7 +49,7 @@ systemICFPBX :: TRSystem Expr
 systemICFPBX = s
   { sname               = "ICFPBX"
   , description         = description s ++ ", BX for SUBST and EXI-FLOAT and no EXI-SWAP"
-  , rules               = (rules s -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSubstBX <> rulesExiFloatBX
+  , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
   }
   where s = systemICFP
 
@@ -524,8 +524,8 @@ rulesUnification env lhs =
      guard (ltExpr env x y)
      pure (x :=: y)
 
-rulesSubstBX :: ERule
-rulesSubstBX env lhs =
+_rulesSubstBX :: ERule
+_rulesSubstBX env lhs =
   "SUBST-BX" `name`
   do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
      let freeX = free (ctx, e)
