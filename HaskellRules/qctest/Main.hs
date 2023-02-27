@@ -33,7 +33,9 @@ main = do
         case lookupSystem (rulesys flags) of
           Left msg -> error msg
           Right s -> s
-      qcargs = stdArgs{ maxSuccess = numtests flags, replay = read <$> replayStr flags }
+      qcargs = stdArgs{ maxSuccess = numtests flags
+                      , replay = read <$> replayStr flags
+                      , maxShrinks = maxShrink flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   putStrLn $ "This source code has git hash " ++ gitHash ++ if gitDirty then " (with uncommited files)" else ""
   res <- quickCheckWithResult qcargs (prop_Confluence flags sys)
@@ -183,7 +185,7 @@ data TestFlags = TestFlags
   , ignoreFuelStop :: !Bool
   , koen           :: !Bool
   , ignoreRecursive :: !Bool
-  , maxShrinks     :: !Int
+  , maxShrink      :: !Int
   }
 
 testFlags :: Parser TestFlags
