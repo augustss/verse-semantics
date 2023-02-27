@@ -23,6 +23,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
+                   systemICFPF,
                    systemICFPJ,
                    systemICFPR,
                    systemICFPP,
@@ -96,6 +97,14 @@ systemICFPJ = s
   { sname = "ICFPJ"
   , description = description s ++ ", Simon's SEQ-SWAP"
   , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap
+  }
+  where s = systemICFP
+
+systemICFPF :: TRSystem Expr
+systemICFPF = s
+  { sname               = "ICFPF"
+  , description         = description s ++ ", - FAIL-ELIM + FAIL-ELIM1 + FAIL-ELIM2"
+  , rules               = (rules s -= "FAIL-ELIM") <> rulesFailElim12
   }
   where s = systemICFP
 
@@ -663,6 +672,16 @@ rulesElimination _ lhs =
  ++
   "FAIL-ELIM" `name`
   do (_cx, Fail) <- execX1 lhs
+     pure Fail
+
+rulesFailElim12 :: ERule
+rulesFailElim12 _ lhs =
+  "FAIL-ELIM1" `name`
+  do Fail :>: _ <- [lhs]
+     pure Fail
+ <>
+  "FAIL-ELIM2" `name`
+  do (_ :=: Fail) :>: _ <- [lhs]
      pure Fail
 
 ruleElimL :: ERule
