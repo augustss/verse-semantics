@@ -331,6 +331,18 @@
 %% Keywords
 %% comma separated list
 % \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
+\keywords{%
+  confluence,
+  declarative programming,
+  functional programming,
+  lambda calculus,
+  logic programming,
+  rewrite rules,
+  skew confluence,
+  unification,
+  Verse Calculus, 
+  Verse language
+}
 
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
@@ -1252,8 +1264,8 @@ Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
 occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 Note that none of these rules, except \rulename{fail-elim}, discard an un-evaluated expression,
-because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenience}).
-The exception is \rulename{fail-elim}, which propagates failure
+because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
+The exception is \rulename{fail-elim}, which propagates failure.
 
 Five \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;

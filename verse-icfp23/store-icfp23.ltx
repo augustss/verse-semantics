@@ -49,7 +49,7 @@
         & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
     &&& \quad \freevars{|v_2|} \# \boundvars{|S|}  \\
   \end{array} \\
-    \\
+    \\[-0.6em]
 
   \textit{Store duplication} \\
   \begin{array}{l r @@{\;}c@@{\;} l l}
@@ -59,7 +59,7 @@
     \rulename{st-choice-dup} & |store h (oe `choice` e)| & \movesto & |store h (store h oe `choice` e)| \\
   \end{array} \\
 
-    \\
+    \\[-0.6em]
   \textit{Store commit} \\
   \begin{array}{l r @@{\;}c@@{\;} l l}
 %  \begin{array}{lrcll}
@@ -70,7 +70,7 @@
     &&& \quad \freevars{|h_2|} \# \boundvars{|S|}  \\
   \end{array} \\
 
-    \\
+    \\[-0.6em]
     \textit{Unification} \\
     \begin{array}{lrcll}
       \text{Extension with the obvious axioms making equal references unify,
