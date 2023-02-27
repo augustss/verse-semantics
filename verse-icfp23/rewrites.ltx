@@ -22,7 +22,8 @@
 % Name of the language
 \newcommand{\versecalc}{$\mathcal{VC}$}
 \newcommand{\calcname}{\versecalc\xspace}
-\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}
+%%\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}  ACMART gives warning about use of \\smallskip for some reason
+\newcommand{\mypara}[1]{\vskip\smallskipamount\noindent\textbf{#1}\xspace}
 
 % \newcommand{\calcname}{Fresh Calculus\xspace}
 % \newcommand{\lcalcname}{Lenient Calculus\xspace}
@@ -80,7 +81,7 @@
 \newcommand{\unrsteps}[3]{\ensuremath{#2 \ungos{#1} #3}}
 \newcommand{\unrstepk}[4]{\ensuremath{#3 \ungok{#1}{#2} #4}}
 \newcommand{\univ}{\ensuremath{\mathcal{E}}}
-\newcommand{\join}[3]{{#2} \sim_{#1} {#3}}
+\newcommand{\join}[3]{{#2} \downarrow_{#1} {#3}}
 \newcommand{\dia}{\ensuremath{\diamond}}
 
 \newcommand{\rnk}{\ensuremath{\rho}}
@@ -190,6 +191,8 @@
   \end{array}
   $$
   \caption{\textbf{\calcname: Syntax}} \label{fig:syntax}
+  \Description{A table that exhibits a BNF grammar for the syntax of the Verse Calculus, some rules about resolving parsing ambiguity,
+      and a list of rules for desugaring constructs that are notationally convenient but not part of the Verse Calculus proper}
 \end{figure}
 }
 
@@ -215,6 +218,7 @@
     \end{array}
      $$
     \caption{The syntax of contexts}
+    \Description{A table that exhibits a BNF grammar that defines execution contexts, value contexts., scope contexts, choice contexts, and chouce-free expressions}
       \label{fig:contexts} \label{fig:choice-free-syntax}
 \end{figure}
 }
@@ -312,7 +316,7 @@
 
 
 \end{array} \\
-\\
+\\[-0.3em]
 \text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 \iffullverse
@@ -326,6 +330,7 @@ $$\begin{array}{l}
   \end{array}$$
 \fi
 \caption{\textbf{The \vcname: Rewrite rules}} \label{fig:rules}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
 \end{figure}
 }
 
@@ -345,6 +350,7 @@ $$\begin{array}{l}
      \end{array}
      $$
     \caption{The Verse calculus: Structural Rules}
+    \Description{The Verse calculus: Structural Rules}
       \label{fig:rules-structural}  \label{fig:structural}
    \end{figure}
 }

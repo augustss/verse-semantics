@@ -331,13 +331,26 @@
 %% Keywords
 %% comma separated list
 % \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
-
+\keywords{%
+  confluence,
+  declarative programming,
+  functional programming,
+  lambda calculus,
+  logic programming,
+  rewrite rules,
+  skew confluence,
+  unification,
+  Verse calculus, 
+  Verse language
+}
 
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
 \maketitle
+
+
 
 % \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
 %   a work in progress.  So please don't share it; if there is anyone you think would be
@@ -675,7 +688,7 @@ go into an infinite loop if you keep fruitlessly inlining the function in its ow
 It is the business of an \emph{evaluation strategy} to do only rewrites that make
 progress towards a solution (\cref{sec:eval-strategy}).
 
-\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one} \label{sec:if}
+\subsection{Conditionals and \texorpdfstring{|oneKW|}{``one''}} \label{sec:rigid} \label{sec:one} \label{sec:if}
 
 Every source language will provide a conditional, such as |if (x==0) then
 e_2 else e_3|.  But what is the equality operator in |(x==0)|?  One
@@ -724,7 +737,7 @@ remain un-evaluated until the choice is made, just as we expect from a condition
 We use the same local-propagation rule for |oneKW| that we do for choice (\cref{sec:mixing}).
 This, together with the desugaring for |if| into |oneKW|, gives ``special property'' of |if| described above.
 
-\subsection{Tuples and |allKW|} \label{sec:tuple}
+\subsection{Tuples and \texorpdfstring{|allKW|}{``all''}} \label{sec:tuple}
 
 The main data structure in \versecalc{} is the \emph{tuple}.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
@@ -846,6 +859,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
   \end{array}
   $$
 \caption{Functions on tuples, analogous to list or array functions in some other languages} \label{fig:list-functions}
+\Description{Functions on tuples, analogous to list or array functions in some other languages}
 \end{figure}
 
 %and |oneKW| is like |head| for choices.
@@ -912,7 +926,7 @@ $$
 $$
 so that the pattern depends on the value of |t|.
 
-\subsection{|for| loops} \label{sec:for}
+\subsection{\texorpdfstring{|for|}{``for''} loops} \label{sec:for}
 
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
@@ -1250,8 +1264,8 @@ Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
 occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 Note that none of these rules, except \rulename{fail-elim}, discard an un-evaluated expression,
-because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenience}).
-The exception is \rulename{fail-elim}, which propagates failure
+because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
+The exception is \rulename{fail-elim}, which propagates failure.
 
 Five \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
@@ -1421,7 +1435,7 @@ picking one branch or the other, which immediately gives up confluence.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{\versecalc{} is lenient} \label{sec:lenient}
+\subsection{The Verse calculus is lenient} \label{sec:lenient}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1551,6 +1565,7 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
 \vspace*{-1.5em}
 }
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
+\Description{Sample Haskell reduction rules}
 \end{figure}
 
 We used this infrastructure in two ways.
@@ -1568,7 +1583,7 @@ it has run on the order of 100M tests on the current rule set.
 \newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
 
 
-\section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}
+\section{Metatheory} \label{sec:metatheory}
 
 The rules of our rewrite semantics can be applied anywhere,
 in any order, and they give meaning to programs without
@@ -1688,7 +1703,7 @@ Our main result is that \versecalc{}'s reduction rules are confluent for terms w
 We sketch the proof here, with full details in \cref{sec:confluence} (and relevant preliminaries in \cref{sec:preliminaries}).
 
 
-\begin{theorem}[Confluence] \label{thm:confluence}
+\begin{theorem}[Confluence] \label{thm:confluence-sketch}
 %
 The reduction relation in \cref{fig:rules}
 is confluent for terms with \norecursion.
@@ -1713,7 +1728,7 @@ We prove each individual sub-relation is confluent;
 and that they pairwise commute. Then confluence of
 their union follows, using \citet{Huet80}:
 
-\begin{lemma}[Commutativity] \label{lem:comm}
+\begin{lemma}[Commutativity] \label{lem:comm-summary}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
@@ -1964,7 +1979,7 @@ $$
 We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
-\subsection{Generalizing |oneKW| and |allKW|} \label{sec:split}
+\subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
 We could have introduced a more general operator |splitKW|\footnote{The name inspired by \cite{oleglogict}.} as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
@@ -2013,7 +2028,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 % In short, there are good reasons for lenience, but
 % a lazy variant of \versecalc{} could be worth exploring.
 
-\section{\versecalc{} in context: reflections and related work} \label{sec:related}
+\section{\texorpdfstring{\versecalc{}}{The Verse calculus} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
@@ -2390,7 +2405,8 @@ $$
 \end{array}
 $$
 \end{footnotesize}
-\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\caption{A sample reduction sequence} \label{fig:sample-reductions}
+\Description{A sample reduction sequence}
 \end{figure}
 
 
