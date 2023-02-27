@@ -474,7 +474,7 @@ some built-in operations and tuples as data constructors:
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
-\item An \emph{equational expression} |eq| is either an ordinary expression |e|, or
+\item A term |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v==e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
@@ -519,7 +519,9 @@ unifies |y| with |2| and |z| with |3|.  Finally |2| is returned as the result.
 Note carefully that, as in any declarative language,
 \emph{logical variables are not mutable}; a logical variable stands for a single, immutable value.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
-mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
+mean ``there exists an |x| such that ...''.
+% Koen found this is confusing
+% Logical variables \emph{are} existential variables.
 
 High-level functional languages usually provide some kind of
 pattern matching; in such a language, we might define |first| by
@@ -942,7 +944,7 @@ Like list comprehension, |for| supports filtering; in \versecalc{} this falls ou
 a possibly failing expression in |e_1|.
 So, |fordo(x := 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |fordo(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |fordo(def (x ^^ y) (x=10 `choice` 20; y = 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
@@ -2074,6 +2076,7 @@ Introduced in a technical report nearly 40 years ago~\cite{smolka:fresh},
 Fresh has \emph{confinement} (equivalent to |oneKW|) and \emph{collection} (equivalent to |allKW|).
 It is a very interesting design, but one does not appear to have been implemented,
 and its treatment of equality and thus logical variables is rather different to ours.
+\simon{Ranjit and Koen are going to rewrite this}.
 
 Several aspects of |allKW| and |oneKW| are worth noting.
 First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
