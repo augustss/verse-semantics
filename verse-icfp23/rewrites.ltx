@@ -292,7 +292,9 @@
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
 \rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| &
                       \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
-% \rulename{norm-unifyr} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e| \\
+\multicolumn{5}{l}{\text{\lennart{Plan: remove rule above, use rule below, move to unification group}}}\\
+\rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
+                      \text{unless |eq| is |y==v'| and |y| $\prec$ |x|} \\
 
     \\[-0.6em]
 
