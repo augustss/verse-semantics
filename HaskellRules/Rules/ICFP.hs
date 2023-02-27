@@ -568,6 +568,7 @@ rulesSubstBX env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 
+-- rulesSeqSwap1 is the same as rulesSimonSwap
 --   e1; x=v; e3   -->   x=v; e1; e3    if not (eq is (y=v2) and y<x)
 rulesSeqSwap1 :: ERule
 rulesSeqSwap1 env lhs =
