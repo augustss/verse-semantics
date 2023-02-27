@@ -52,7 +52,7 @@ systemICFPBX = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = (allRules -= "SEQ-SWAP" -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSeqSwapOrd <> rulesSubstBX <> rulesExiFloatBX
+  , rules               = (allRules -= "SEQ-SWAP" -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSeqSwap1 <> {- rulesSeqSwapOrd <> -} rulesSubstBX <> rulesExiFloatBX
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules
@@ -536,17 +536,23 @@ rulesSubstBX env lhs =
   do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
      let freeX = free (ctx, e)
          freeV = free v
-     let allBoundVars = boundVars env ++ xBoundVars
-     let x0    = identNotIn (freeX ++ freeV ++ allBoundVars) -- replacing x temporarily
+     -- let allBoundVars = {- boundVars env ++ -} xBoundVars
+     let x0    = identNotIn (freeX ++ freeV ++ xBoundVars) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     guard (all (`notElem` allBoundVars) (x:freeV))          -- NEW PRECONDITION
+     guard (all (`notElem` xBoundVars) (x:freeV))          -- NEW PRECONDITION
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 
-
+--   eq; x=v; e3   -->   x=v; eq; e3    if not (eq is (y=v2) and y<x)
+rulesSeqSwap1 :: ERule
+rulesSeqSwap1 env lhs =
+  "SEQ-SWAP1" `name`
+  do eq :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case eq of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+     pure $ e2 :>: (eq :>: e3)
 
 
 rulesSimonSwap :: ERule
