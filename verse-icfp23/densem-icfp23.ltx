@@ -56,7 +56,7 @@
 \newcommand{\stuple}{\mathit{tuple}}
 \newcommand{\scons}{:}
 
-\section{A denotational semantics for \versecalc} \label{sec:den-sem}
+\section{A denotational semantics for \texorpdfstring{\versecalc{}}{VC}} \label{sec:den-sem}
 
 
 \begin{figure}
@@ -119,6 +119,7 @@ apply( f, w ) & = & f(w) & f \in \Value \rightarrow \mtype \\
 \end{array}
 $
 \caption{Expression semantics}
+\Description{A denotational semantics for expressions in the Verse calculus}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -155,6 +156,7 @@ $$
 \end{array}
 $$
 \caption{Set semantics for $\mtype$}
+\Description{A set semantics for a domain that includes "WRONG"}
 \label{fig:set-sem}
 \end{figure}
 
@@ -288,7 +290,7 @@ So our touchstone must be:
 
 % This reminded Koen of something that Esterelle does.  (Details, Koen?)
 
-\subsection{Getting $\wrong$ right}
+\subsection{Getting \texorpdfstring{$\wrong$}{``wrong''} right}
 
 Getting $\wrong$ right is a bit tricky.
 
@@ -368,6 +370,7 @@ $$
 \end{array}
 $$
 \caption{Labelled set semantics for $\mtype$}
+\Description{A labelled set semantics for a domain that includes "WRONG"}
 \label{fig:labelled-sem}
 \end{figure}
 

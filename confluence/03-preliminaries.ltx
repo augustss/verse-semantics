@@ -14,8 +14,10 @@
 
 \section{Confluence: Preliminaries} \label{sec:preliminaries}
 
+\subsection{Reduction relations} \label{sec:red-relns}
+
 \begin{definition}[Binary relations]
-A \emph{binary relation} is a set of pairs of related items; if $R$ is a relation, then we may write $a \mathbin{R} b$ to mean $(a,b)\in R$. 
+A \emph{binary relation} is a set of pairs of related items; if $R$ is a relation, then we may write $a \mathbin{R} b$ to mean $(a,b)\in R$.
 \end{definition}
 
 \begin{definition}[Prototype reduction relations and rewrite rules]
@@ -29,7 +31,7 @@ that consistently instantiates all the metavariables (BNF nonterminals) in $\alp
 $(\sigma(\alpha),\sigma(\beta))$ is a member of the prototype reduction relation.
 A prototype reduction relation may also be specified by a set of rewrite rules,
 in which case the prototype reduction relation is the union of the prototype reduction relations
-indicated by the individual rewrite rules.
+specified by the individual rewrite rules.
 \end{definition}
 
 \begin{definition}[Reduction relations]
@@ -56,8 +58,10 @@ We write
 \item $\rstepk{\rr}{k}{a}{b}$ ($a$ \emph{$k$-steps to} $b$) if $(a, b) \in \rr^{k}$, and
 %
 \end{itemize}
-Sometimes we use this same notation and terminology with a prototype reduction relation $\rrhat$.
-In such cases, the effect is that the arrows indicate the rewriting only of entire terms, not subterms.
+Sometimes we use this same notation and terminology with a prototype reduction relation $\rrhat$,
+thus for example $\rstep{\rrhat}{a}{b}$.
+In such a case, the arrow indicates rewriting of the entire term $a$ (at the root),
+and not of some subterm of $a$.
 
 \end{definition}
 
@@ -71,6 +75,8 @@ such that $\rstep{\rr}{a}{b}$.
 \end{definition}
 
 For clarity, we will omit the subscript $\rr$ when it is clear from the context.
+
+\subsection{Confluence} \label{sec:confluence-defns}
 
 \begin{definition}[Diamond Property] \label{def:diamond}
 %
@@ -96,7 +102,7 @@ $\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 %
 \end{definition}
 
-\begin{figure}[h]
+\begin{figure}
 \begin{minipage}[t]{0.30\textwidth}
 % https://q.uiver.app/?q=WzAsNCxbMSwwLCJ4Il0sWzAsMSwieV8xIl0sWzIsMSwieV8yIl0sWzEsMiwieiJdLFswLDJdLFswLDFdLFsxLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsyLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==
 \[\begin{tikzcd}
@@ -134,6 +140,7 @@ $\rstep{\rr}{a}{b}$ and $\rstep{\rr}{a}{c}$, we have $\join{\rr}{b}{c}$.
 \end{tikzcd}\]
 \end{minipage}
 \caption{\textbf{Diamond Property (L), Local Confluence (M), and Confluence (R)}}
+\Description{Three commutative diagrams illustrating the Diamond Property, Local Confluence, and Confluence}
 \end{figure}
 
 \begin{lemma}[Diamond~\cite{Barendregt}] \label{lem:diamond}
@@ -168,7 +175,7 @@ as shown in \cref{fig:strong-confluence}, where the $\epsilon$ label
 indicates $0$ or $1$ step.
 \end{definition}
 
-\begin{figure}[h]
+\begin{figure}
 % https://q.uiver.app/?q=WzAsNSxbMSwwLCJhIl0sWzAsMSwiYiJdLFsyLDEsImMiXSxbMCwyLCJcXGJ1bGxldCJdLFsyLDIsIlxcYnVsbGV0Il0sWzAsMl0sWzAsMV0sWzEsMywiXFxlcHNpbG9uIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzIsNCwiXFxlcHNpbG9uIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV0sWzEsNCwiIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
 \[\begin{tikzcd}
 	& a \\
@@ -182,6 +189,7 @@ indicates $0$ or $1$ step.
 	\arrow[dotted, two heads, from=2-3, to=3-1]
 \end{tikzcd}\]
 \caption{\textbf{Strong Confluence}}
+\Description{A commuttaive diagram illustrating Strong Confluence}
 \label{fig:strong-confluence}
 \end{figure}
 
@@ -209,7 +217,7 @@ as illustrated in the middle in \cref{fig:commutativity}.
 \noindent
 Note that if $R$ strongly commutes with itself then, by \Cref{def:diamond}, $R$ has the diamond property.
 
-\begin{figure}[h]
+\begin{figure}
 %
 \begin{minipage}[t]{0.30\textwidth}
 %% COMMUTATIVE
@@ -249,6 +257,7 @@ Note that if $R$ strongly commutes with itself then, by \Cref{def:diamond}, $R$ 
 \end{tikzcd}\]
 \end{minipage}
 \caption{\textbf{Commutativity (L), Strong Commutativity (C), $*$-Commutativity (R)}}
+\Description{Three commutative diagrams illustrating Commutativity, Strong Commutativity, and $*$-Commutativity}
 \label{fig:commutativity}
 \end{figure}
 
@@ -659,7 +668,7 @@ there exists $d$ such that $\rsteps{S}{b}{d}$ and $\rstep{R}{c}{d}$
 \end{proof}
 \end{comment}
 
-\subsection{$*$-Commutativity}
+\subsection{\texorpdfstring{$*$}{*}-Commutativity}
 
 \begin{definition}[$*$-Commutativity] \label{def:star-comm}
 A reduction relation $R$ $*$-commutes with $S$ if for all terms
@@ -805,7 +814,7 @@ A reduction relation $S$ is a \emph{kernel} of $R$, written $\kernel{S}{R}$ if
 (2)~If $\rstep{R}{a}{b}$ there exists $c$ such that $\rsteps{S}{a,b}{c}$.
 \end{definition}
 
-\begin{figure}[h]
+\begin{figure}
 % https://q.uiver.app/?q=WzAsMyxbMCwwLCJhIl0sWzAsMSwiYiJdLFsxLDEsImMiXSxbMCwxLCJSIiwyXSxbMCwyLCJTIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
 \[\begin{tikzcd}
 	a \\
@@ -815,6 +824,7 @@ A reduction relation $S$ is a \emph{kernel} of $R$, written $\kernel{S}{R}$ if
 	\arrow["S"', dotted, two heads, from=2-1, to=2-2]
 \end{tikzcd}\]
 \caption{\textbf{$S$ is a kernel of $R$ written $\kernel{S}{R}$}}
+\Description{A commutative diagram illustrating what it means for relation $S$ to be a kernel of relation $R$}
 \end{figure}
 
 \begin{lemma}[Kernel-Steps] \label{lem:kernel-steps}

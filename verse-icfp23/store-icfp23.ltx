@@ -49,7 +49,7 @@
         & \movesto & |store (H^[cell r v_2]) (S^[emptytup])| \\
     &&& \quad \freevars{|v_2|} \# \boundvars{|S|}  \\
   \end{array} \\
-    \\
+    \\[-0.6em]
 
   \textit{Store duplication} \\
   \begin{array}{l r @@{\;}c@@{\;} l l}
@@ -59,7 +59,7 @@
     \rulename{st-choice-dup} & |store h (oe `choice` e)| & \movesto & |store h (store h oe `choice` e)| \\
   \end{array} \\
 
-    \\
+    \\[-0.6em]
   \textit{Store commit} \\
   \begin{array}{l r @@{\;}c@@{\;} l l}
 %  \begin{array}{lrcll}
@@ -70,7 +70,7 @@
     &&& \quad \freevars{|h_2|} \# \boundvars{|S|}  \\
   \end{array} \\
 
-    \\
+    \\[-0.6em]
     \textit{Unification} \\
     \begin{array}{lrcll}
       \text{Extension with the obvious axioms making equal references unify,
@@ -84,6 +84,7 @@
   \end{array}
    $$
   \caption{The Verse calculus: store axioms} \label{fig:store-axioms}
+  \Description{The Verse calculus: store axioms}
 \end{figure}
 The full Verse language has updatable references (à la ML).
 There are three new primitive operations, |alloc|, |read|, and |write|.
@@ -138,14 +139,14 @@ going under existentials.
 %If |S| contained |storeKW| then an |alloc| or |write| could update the store with
 %a variable that is not in scope.
 
-The semantics of |for(d) do e| with respect to store effects is somewhat intricate.
+The semantics of |fordo d e| with respect to store effects is somewhat intricate.
 The expression |d| is possibly multi-valued; any effects that happens when computing the
 first value of |d| will be visible the first time |e| is computed.
 Both these effects are then visible when computing the second value of |d|, and so on.
 If any iteration of |d| fails, then the effects of that computation are not visible outside |d|.
-This means that the desugaring of |for| into |split| needs to be more elaborate.
+This means that the desugaring of |for| into |splitKW| needs to be more elaborate.
 
-|for(def (x_1 xdots x_n) d) do e|\\
+|fordo (def (x_1^xdots^x_n) d) e|\\
 means\\
 \hspace*{5mm}|apply1N f emptytup := emptytup;|\\
 \hspace*{5mm}|g^(v)^(r) := (v==tup(x_1,xdots,x_n); applyN cons (e, split (apply1N r emptytup) f g);|\\

@@ -23,11 +23,14 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
                    systemICFPE,
+                   systemICFPF,
                    systemICFPJ,
                    systemICFPR,
                    systemICFPP,
                    systemICFPS,
-                   systemICFPBX
+                   systemICFPBX,
+                   systemICFPBXP,
+                   systemICFPBXS
                  ]
 
 systemICFP :: TRSystem Expr
@@ -46,18 +49,29 @@ systemICFP = TRSystem
 
 
 systemICFPBX :: TRSystem Expr
-systemICFPBX = TRSystem
+systemICFPBX = s
   { sname               = "ICFPBX"
-  , description         = "ICFP with BX for SUBST and EXI-FLOAT and no EXI-SWAP"
-  , ruleEnv             = defaultTRSFlags
-  , preProcess          = const (check valid . anf)
-  , postProcess         = const id
-  , rules               = (allRules -= "SEQ-SWAP" -= "EXI-SWAP" -= "SUBST" -= "EXI-FLOAT") <> rulesSeqSwap1 <> {- rulesSeqSwapOrd <> -} rulesSubstBX <> rulesExiFloatBX
-  , rules2              = noRules
-  , rulesHaveStructural = True
-  , confluenceRules     = noRules
-  , validExpr           = const valid
+  , description         = "ICFP with BX for SUBST and EXI-FLOAT, no EXI-SWAP, SEQ-SWAP1"
+  , rules               = (allRules -= "EXI-SWAP" -= "EXI-FLOAT" -= "SUBST" -= "SEQ-SWAP") <> rulesExiFloatBX <> rulesSeqSwap1 <> rulesSubstBX
+  -- , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
   }
+  where s = systemICFP
+
+systemICFPBXS :: TRSystem Expr
+systemICFPBXS = s
+  { sname               = "ICFPBXS"
+  , description         = description s ++ ", BX for SUBST"
+  , rules               = (rules s -= "SUBST") <> rulesSubstBX
+  }
+  where s = systemICFPBX
+
+systemICFPBXP :: TRSystem Expr
+systemICFPBXP = s
+  { sname               = "ICFPBXP"
+  , description         = description s ++ ", Simon's SEQ-SWAP and SUBST"
+  , rules               = rules s -= "SUBST" -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap <> rulesSimonSubst
+  }
+  where s = systemICFPBX
 
 -- A system without the structural rules.
 -- Without EXI-SWAP we need a more powerful EXI-ELIML.
@@ -74,16 +88,24 @@ systemICFPE = s
 systemICFPP :: TRSystem Expr
 systemICFPP = s
   { sname = "ICFPP"
-  , description = description s ++ " - Simon's new SUBST and SEQ-SWAP"
-  , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" -= "SUBST" <> rulesSimonSwap <> rulesSimonSubst
+  , description = description s ++ ", Simon's SUBST"
+  , rules = rules s -= "SUBST" <> rulesSimonSubst
   }
-  where s = systemICFP
+  where s = systemICFPJ
 
 systemICFPJ :: TRSystem Expr
 systemICFPJ = s
   { sname = "ICFPJ"
-  , description = description s ++ " - Simon's SEQ-SWAP"
+  , description = description s ++ ", Simon's SEQ-SWAP"
   , rules = rules s -= "SEQ-SWAP" -= "SEQ-SWAP-ORD" <> rulesSimonSwap
+  }
+  where s = systemICFP
+
+systemICFPF :: TRSystem Expr
+systemICFPF = s
+  { sname               = "ICFPF"
+  , description         = description s ++ ", - FAIL-ELIM + FAIL-ELIM1 + FAIL-ELIM2"
+  , rules               = (rules s -= "FAIL-ELIM") <> rulesFailElim12
   }
   where s = systemICFP
 
@@ -546,21 +568,24 @@ rulesSubstBX env lhs =
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 
---   eq; x=v; e3   -->   x=v; eq; e3    if not (eq is (y=v2) and y<x)
+--   e1; x=v; e3   -->   x=v; e1; e3    if not (eq is (y=v2) and y<x)
 rulesSeqSwap1 :: ERule
 rulesSeqSwap1 env lhs =
   "SEQ-SWAP1" `name`
-  do eq :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
-     guard (case eq of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
-     pure $ e2 :>: (eq :>: e3)
-
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+     pure $ e2 :>: (e1 :>: e3)
 
 rulesSimonSwap :: ERule
 rulesSimonSwap env lhs =
   "SEQ-SWAP-SIMON" `name`
-  do e1 :>: (e2@(Var _x :=: Val _) :>: e3) <- [lhs]
---     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
 
+{-
+     -- This side condition is not confluent, see tricky:QC11
+     guard (ltExpr env e2 e1)
+     -- This side condition has the same problem
      guard $
        -- First, order by choice-free-ness;
        -- choice free goes first
@@ -572,7 +597,7 @@ rulesSimonSwap env lhs =
            case isEqn e1 of
              False  -> True              -- need to swap
              True   -> ltExpr env e2 e1  -- use ordering
-
+-}
      pure $ e2 :>: (e1 :>: e3)
 
 rulesSimonSubst :: ERule
@@ -580,7 +605,9 @@ rulesSimonSubst env lhs =
   "SUBST-SIMON" `name`
   do eq@(Var x :=: Val v) :>: e <- [lhs]
      let freeV = free v
+         freeE = free e
          sub   = [(x, v)]
+     guard (x `elem` freeE)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (eq :>: subst sub e)
@@ -657,6 +684,16 @@ rulesElimination _ lhs =
   do (_cx, Fail) <- execX1 lhs
      pure Fail
 
+rulesFailElim12 :: ERule
+rulesFailElim12 _ lhs =
+  "FAIL-ELIM1" `name`
+  do Fail :>: _ <- [lhs]
+     pure Fail
+ <>
+  "FAIL-ELIM2" `name`
+  do (_ :=: Fail) :>: _ <- [lhs]
+     pure Fail
+
 ruleElimL :: ERule
 ruleElimL _ lhs =
   "EXI-ELIML-OLD" `name`
@@ -712,7 +749,7 @@ rulesNormalization _ lhs =
 
 rulesExiFloatBX :: ERule
 rulesExiFloatBX _ lhs =
-  "NORM-EXI-BX" `name`
+  "EXI-FLOAT-BX" `name`
   do (ctx, bVars, EXI x e) <- execBX1 lhs  -- Note: Store not allowed in ctx
      guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      guard (x `notElem` bVars)

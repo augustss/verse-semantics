@@ -301,7 +301,7 @@
 %   This semantics elegantly fills the gap between very high level
 %  ``magical'' semantics, and very low-level operational semantics.
   \par
-  \vspace{3mm}
+  \vspace{1em}
 \end{abstract}
 
 
@@ -331,13 +331,26 @@
 %% Keywords
 %% comma separated list
 % \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
-
+\keywords{%
+  confluence,
+  declarative programming,
+  functional programming,
+  lambda calculus,
+  logic programming,
+  rewrite rules,
+  skew confluence,
+  unification,
+  Verse calculus, 
+  Verse language
+}
 
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
 \maketitle
+
+
 
 % \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
 %   a work in progress.  So please don't share it; if there is anyone you think would be
@@ -381,11 +394,11 @@ As in any functional logic language,
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional-logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
-\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables
+\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables.
   \versecalc{} offers a new
   way to address these notions, namely the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
-  there is just one equality (other languages have a suspending equality and a narrowing equality),
+  there is just one equality (other languages may have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
 \item \emph{Choice and determinism.} Choice is a fundamental feature of all functional-logic languages.
   In \versecalc{} choice is expressed in the syntax of the term (``laid out in space'')
@@ -401,7 +414,7 @@ We are ourselves working on Verse, a new general purpose programming language, b
 our motivation for developing \versecalc{} is practical rather than theoretical.
 No single aspect of \versecalc{} is unique, but we believe that their combination
 is particularly harmonious and orthogonal.
-We discuss the rich related work in \cref{sec:related}, and design alternatives in \cref{sec:variations}.
+We discuss the related work in \cref{sec:related}, and design alternatives in \cref{sec:variations}.
 
 Our second contribution is to equip \versecalc{} with a
 \emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
@@ -430,7 +443,7 @@ $$
 \multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| &
 \movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
-\movestoR{u-tup}         & |def (y ^^ z) ((2==y; z==3); y)| &
+\movestoR{u-tup}         & |def (y ^^ z) (2==y; z==3; y)| &
 \movestoR{eqn-elim}      & |def y (2==y; y)| \\
 \movestoR{hnf-swap}      & |def y (y==2; y)| &
 \movestoR{subst}         & |def y (y==2; 2)| \\
@@ -457,11 +470,11 @@ some built-in operations and tuples as data constructors:
   In \versecalc{} a variable counts as a value, because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
   A head-normal form is a conventional value: a built-in constant |k|, an operator |op|, a tuple, or
-  a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|.
+  a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative integer operators |op|, namely |gt| and |add|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
 For clarity we sometimes write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
-\item An \emph{equational expression} |eq| is either an ordinary expression |e|, or
+\item A term |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v==e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
@@ -490,7 +503,7 @@ The Verse calculus includes first class \emph{logical variables} and \emph{equat
 You can bring a fresh logical variable into scope with |defKW|; constrain a value to be equal to
 an expression with an equation
 |v == e|; and compose expressions in sequence with |eq ; e| (see \cref{fig:syntax}).
-As an example, what might be written |dlet x e_1 e_2| in a conventional functional language can be written
+As an example, what might be written |llet x e_1 e_2| in a conventional functional language can be written
 |def x (x==e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
 equations and where they can appear: an equation |(v==e)| always equates a \emph{value} $v$ to an expression $e$;
 and an equation can only appear to the left of a ``|;|'' (see |eq| in \cref{fig:syntax}).
@@ -506,7 +519,9 @@ unifies |y| with |2| and |z| with |3|.  Finally |2| is returned as the result.
 Note carefully that, as in any declarative language,
 \emph{logical variables are not mutable}; a logical variable stands for a single, immutable value.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
-mean ``there exists an |x| such that ...''.  Logical variables \emph{are} existential variables.
+mean ``there exists an |x| such that ...''.
+% Koen found this is confusing
+% Logical variables \emph{are} existential variables.
 
 High-level functional languages usually provide some kind of
 pattern matching; in such a language, we might define |first| by
@@ -514,7 +529,7 @@ pattern matching; in such a language, we might define |first| by
 more primitive |case| expressions, but in \versecalc{} we do not need |case| expressions:
 unification does the job.  For example we can define |first| like this:
 $$
-|first := lam pr (def (a ^^ b) (pr == tup (a,b); a))|
+|first := lam p (def (a ^^ b) (p == tup (a,b); a))|
 $$
 % The lambda unifies its argument (presumably a pair)
 %with |tup(a,b)|, where |a,b| are fresh logical
@@ -675,7 +690,7 @@ go into an infinite loop if you keep fruitlessly inlining the function in its ow
 It is the business of an \emph{evaluation strategy} to do only rewrites that make
 progress towards a solution (\cref{sec:eval-strategy}).
 
-\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one} \label{sec:if}
+\subsection{Conditionals and \texorpdfstring{|oneKW|}{``one''}} \label{sec:rigid} \label{sec:one} \label{sec:if}
 
 Every source language will provide a conditional, such as |if (x==0) then
 e_2 else e_3|.  But what is the equality operator in |(x==0)|?  One
@@ -724,21 +739,21 @@ remain un-evaluated until the choice is made, just as we expect from a condition
 We use the same local-propagation rule for |oneKW| that we do for choice (\cref{sec:mixing}).
 This, together with the desugaring for |if| into |oneKW|, gives ``special property'' of |if| described above.
 
-\subsection{Tuples and |allKW|} \label{sec:tuple}
+\subsection{Tuples and \texorpdfstring{|allKW|}{``all''}} \label{sec:tuple}
 
 The main data structure in \versecalc{} is the \emph{tuple}.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
 A tuple can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|, as is indexing with
 a non-integer value.
-For example, |def t (t == tup (10,27,32); apply1 t 1)| reduces to |27| and |apply1 t 3| reduces to |fail|.
+For example, |t := tup (10,27,32); apply1 t 1| reduces to |27| and |apply1 t 3| reduces to |fail|.
 
 What if we apply a tuple to a choice, thus |apply1 (tup (10,27,32))(1 `choice` 0 `choice` 1)|?  First we must
 desugar the application to the form |(apply1N v_1 v_2)|, because that is all \versecalc{} permits (\cref{fig:syntax}),
-giving |def x (x==(1 `choice` 0 `choice` 1)); apply1(tup (10,27,32)) x|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
+giving |x:=(1 `choice` 0 `choice` 1); apply1(tup (10,27,32)) x|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
-if |e| reduces to |(v_1 `choice` dots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
+if |e| reduces to |(v_1 `choice` xdots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
 the tuple |tup (v_1, dots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
@@ -749,7 +764,7 @@ You might think that tuple indexing would be stuck until we know the index,
 but in \versecalc{} the application of a tuple to a value rewrites to a choice of all the possible
 values of the index.
 For example,
-|def t (t == tup (10,27,32); def i (apply1 t i))|
+|t := tup (10,27,32); def i (apply1 t i)|
 looks stuck because we have no value for |i|, but actually rewrites to:
 $$
 |def i ((i==0; 10) choice (i==1; 27) choice (i==2; 32)|
@@ -779,6 +794,7 @@ A tuple can be turned into choices by indexing with a logical variable |i|.
 Conversely, choices can be turned into a tuple using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
+Partial functions, \eg, |head|, will |fail| when the argument is outside of the function domain.
 
 % \subsection{Syntactic sugar}
 %
@@ -846,6 +862,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
   \end{array}
   $$
 \caption{Functions on tuples, analogous to list or array functions in some other languages} \label{fig:list-functions}
+\Description{Functions on tuples, analogous to list or array functions in some other languages}
 \end{figure}
 
 %and |oneKW| is like |head| for choices.
@@ -906,28 +923,28 @@ $$
 |apply1 fcn t := def (x ^^ y) (t == applyN pat (x,y); x+y)|
 $$
 Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
-in Haskell.  For example |pat| could be \emph{computed}, like this:
+in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $$
-|applyN pat (v,w) := if t==0 then tup (v,1,w,3) else tup (1,1,w,v)|
+|applyN pat (a,v,w) := if a==0 then tup (v,1,w,3) else tup (1,1,w,v)|
 $$
-so that the pattern depends on the value of |t|.
+so that the pattern depends on the value of |a|.
 
-\subsection{|for| loops} \label{sec:for}
+\subsection{\texorpdfstring{|for|}{``for''} loops} \label{sec:for}
 
-The expression |for^(e_1) do e_2| will evaluate |e_2| for each of the choices in |e_1|,
+The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
 % The |e_1| is called the \emph{domain} of the loop.
-The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
+The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and explicated by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
-So, for example, |for^(x := 2 `choice` 3 `choice` 5) do (x+1)| will reduce to the tuple |tup (3,4,6)|.
+So, for example, |fordo(x := 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
 % This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
 
 Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
-So, |for^(x := 2 `choice` 3 `choice` 5; x > 2) do (x+1)| reduces to |tup (4,6)|.
+So, |fordo(x := 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |for^(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) do (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |fordo(def (x ^^ y) (x=10 `choice` 20; y = 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
@@ -936,17 +953,18 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| u
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, like defined in \cref{fig:list-functions}.
 The full desugaring is
 \[
-|for^(e_1) do e_2| \; \equiv \; |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
+|def v (v == all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
-Note how this achieves that peculiar scoping rule: variables defined in |e_1| are in scope in |e_2|.
-Moreover, any effects (like being multivalued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
-So, for example, |for^(x:=10 `choice` 20) do (x `choice` x+1)| will reduce to
+Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
+Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
+So, for example, |fordo(x:=10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example |for^(def (i ^^ x) (x == apply1 t i)) do (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
+For example |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
 fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most languages.
 
 
@@ -980,7 +998,8 @@ fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most lan
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
 How can we give a precise semantics to a non-strict functional
-programming language?  Here are some possibilities:
+programming language? \lennart{Why are we mentioning non-strict functional here?}
+Here are some possibilities:
 \begin{itemize}
 \item \emph{A denotational semantics} is the classical approach,
   but it is tricky to give a (perspicuous) denotational semantics to a functional logic language,
@@ -1011,7 +1030,7 @@ has the following properties:
   all desugaring.
 \item Any rule can be applied, in either direction,
   anywhere in the program term (including under lambdas).
-\item The rules are oriented, with the intent that using them left-to-right makes progress.
+\item The rules are (mostly) oriented, with the intent that using them left-to-right makes progress.
 \item Despite this orientation, the rules do not say which rule should be
   applied where; that is the task of a separate \emph{evaluation strategy} (\cref{sec:eval-strategy}).
 \item The rules can be applied by programmers, to reason about what their program does;
@@ -1124,7 +1143,7 @@ of logical variables are propagated.
 The key rule is:
 $$
 \begin{array}{rrcll}
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-1mm}
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
     & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
   &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
 \end{array}
@@ -1156,7 +1175,7 @@ suffice to express the necessary sharing.
 \end{itemize}
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire, by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example, where |a| and |b| are
-bound further out, perhaps by lambdas:
+bound further out, perhaps by lambdas.  It can rewrite in two different ways:
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
@@ -1189,7 +1208,7 @@ and that is what we need for the proof.
 \subsection{Local substitution} \label{sec:local-subst}
 
 Consider this (extremely) tricky term:
-|def x (x == if (x==0; x>1) then 33 else 55)|.
+|def x (x = if (x==0; x>1) then 33 else 55)|.
 What should this do? At first you might think it was stuck; how can we simplify the |if|
 when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any X-context surrounding the equation |(x==0)|
@@ -1199,11 +1218,11 @@ thus\footnote{
   formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
 $$
 \begin{array}{l@@{\;}l}
-                                & |def x (x == if (x==0; x>1) then 33 else 55; x)| \\
-\movestoR{subst}                & |def x (x == if (x=0; 0>1) then 33 else 55; x)| \\
-\movestoR{app-gt-fail,fail-elim}     & |def x (x == if fail then 33 else 55; x)|\\
-\movestoC{\text{simplify |if|}} & |def x (x == 55; x)| \\
-\movestoR{subst}                & |def x (x == 55; 55)| \\
+                                & |def x (x = if (x==0; x>1) then 33 else 55; x)| \\
+\movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
+\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
+\movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
+\movestoR{subst}                & |def x (x = 55; 55)| \\
 \movestoR{exi-elim}             & |55|
 \end{array}
 $$
@@ -1213,7 +1232,7 @@ is a solution to the equations, namely |x==55|.
 And if you replace |(x==0)| with |(x==55)| then rewriting again
 gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
 Perhaps this is not surprising: we cannot reasonably expect the program to solve arbitrary equations.
-For example, |def x (x*x == x)| has two solutions but discovering that involves solving a quadratic equation.
+For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
 
 % It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
 % substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
@@ -1249,8 +1268,8 @@ Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
 occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 Note that none of these rules, except \rulename{fail-elim}, discard an un-evaluated expression,
-because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenience}).
-The exception is \rulename{fail-elim}, which propagates failure
+because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
+The exception is \rulename{fail-elim}, which propagates failure.
 
 Five \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
@@ -1261,6 +1280,7 @@ because the RHS of the |x|-equation is not a value; but we can instead apply \ru
 to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
 apply \rulename{subst}.
 
+\lennart{This needs updating if we are usiung the ordered seq-swap.}
 Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
 applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
 \rulename{exi-swap} allows you to move an existential inwards so that it can be eliminated
@@ -1273,11 +1293,11 @@ $$
      \movestoR{subst} & |b==a; c==b; b| \\
 
   \movestoR{var-swap} & |c==a; b==a; a| &
-     \movestoR{subst}   & |b==a; c==b; a| \\
+     \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
 $$
 Again the concluding terms of the two columns are ``obviously'' the same,
-because they differ only in the order of the equations |(b==a)| and |(c==b)|;
+because they differ only in the order of the equations |(b==a)| and |(c==a)|;
 \rulename{seq-swap} allows them to be brought together, and makes explicit
 our intuition that order does not matter.
 
@@ -1328,8 +1348,8 @@ The rules for choice are given in \cref{fig:rules}:
   the semantics of |allKW| (\cref{sec:all}).
 \item Rules \rulename{choose-r} and \rulename{choose-l} eliminate |fail|, which behaves as
   an identity for choice.
-\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice} has
-  a better chance of firing.  (The dots on the left of \rulename{all-choice} should be read as
+\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice}/\rulename{all-choice}
+  can fire.  (The dots on the left of \rulename{all-choice} should be read as
   a string of right-associated choices.)
 \end{itemize}
 The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
@@ -1419,7 +1439,7 @@ picking one branch or the other, which immediately gives up confluence.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{\versecalc{} is lenient} \label{sec:lenient}
+\subsection{The Verse calculus is lenient} \label{sec:lenient}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1535,7 +1555,7 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 {\small
 \vspace*{-0.5em}
 \begin{code}
-rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Tup [Int k1, Int k2] <- [lhs]
                                          pure (Int (k1+k2)))
 
            <>  "EXI-SWAP"   `name`  (do  EXI x (EXI y e) <- [lhs]
@@ -1549,6 +1569,7 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
 \vspace*{-1.5em}
 }
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
+\Description{Sample Haskell reduction rules}
 \end{figure}
 
 We used this infrastructure in two ways.
@@ -1563,10 +1584,10 @@ otherwise reasonable looking rules;
 it has run on the order of 100M tests on the current rule set.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
-\newcommand{\xmovesto}{\hspace{-2mm}\movesto\hspace{-2mm}}
+\newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
 
 
-\section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}
+\section{Metatheory} \label{sec:metatheory}
 
 The rules of our rewrite semantics can be applied anywhere,
 in any order, and they give meaning to programs without
@@ -1676,7 +1697,7 @@ specifically to handle the even/odd problem.  We sketch our approach to a proof 
 including several new lemmas, but we emphasize that this proof is not yet complete.
 
 A third approach is simply to abandon confluence as a goal. Confluence is, after all, purely \emph{syntactic}, and hence
-much stronger than what we really need, which that each of our rules be
+much stronger than what we really need, which is that each of our rules is
 \emph{semantics}-preserving.  But of course that requires
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
@@ -1686,7 +1707,7 @@ Our main result is that \versecalc{}'s reduction rules are confluent for terms w
 We sketch the proof here, with full details in \cref{sec:confluence} (and relevant preliminaries in \cref{sec:preliminaries}).
 
 
-\begin{theorem}[Confluence] \label{thm:confluence}
+\begin{theorem}[Confluence] \label{thm:confluence-sketch}
 %
 The reduction relation in \cref{fig:rules}
 is confluent for terms with \norecursion.
@@ -1711,7 +1732,7 @@ We prove each individual sub-relation is confluent;
 and that they pairwise commute. Then confluence of
 their union follows, using \citet{Huet80}:
 
-\begin{lemma}[Commutativity] \label{lem:comm}
+\begin{lemma}[Commutativity] \label{lem:comm-summary}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
@@ -1773,7 +1794,7 @@ with unification and cannot be factored out via a commutativity argument.
 %
 Instead we prove that the union of unification and normalization 
 is confluent by showing that unification \emph{postpones after} 
-normalization \cite{Hindley}, \ie informally speaking, that a 
+normalization \cite{Hindley}, \ie, informally speaking, that a 
 mixed sequence of unification-or-normalization steps can be reordered 
 into two blocks of normalization-only steps followed by unification-only 
 steps. The confluence of the union can then be established by suitably 
@@ -1816,8 +1837,8 @@ lambdas fails, even if the lambdas are semantically identical (rule
 un-implementable.
 %
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
-Here is an expression that rewrites in two different ways, depending on which equation we \rulename{deref-h} first:
-\[ |(lam p 1) == (lam q 2); 1 <-* def x (x == (lam p 1); x == (lam q 2); x emptytup) ->* (lam q 2) == (lam p 1); 2| \]
+Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
+\[ |(lam p 1) == (lam q 2); 1| \lgos{} |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \gos{} |(lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
 %  \multicolumn{3}{l}{|def x (x == (lam p 1); x == (lam q 2); x emptytup)|} \\
@@ -1962,16 +1983,17 @@ $$
 We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
-\subsection{Generalizing |oneKW| and |allKW|} \label{sec:split}
+\subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
-In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}. We could have introduced a more general operator |splitKW| as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
+In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
+We could have introduced a more general operator |splitKW|\footnote{The name inspired by \cite{oleglogict}.} as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
     \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
-When adding more effects, see \cref{sec:store}, to \versecalc{} it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
+When adding more effects to \versecalc{}, see \cref{sec:store}, it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
@@ -2010,7 +2032,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 % In short, there are good reasons for lenience, but
 % a lazy variant of \versecalc{} could be worth exploring.
 
-\section{\versecalc{} in context: reflections and related work} \label{sec:related}
+\section{\texorpdfstring{\versecalc{}}{The Verse calculus} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
@@ -2054,6 +2076,7 @@ Introduced in a technical report nearly 40 years ago~\cite{smolka:fresh},
 Fresh has \emph{confinement} (equivalent to |oneKW|) and \emph{collection} (equivalent to |allKW|).
 It is a very interesting design, but one does not appear to have been implemented,
 and its treatment of equality and thus logical variables is rather different to ours.
+\simon{Ranjit and Koen are going to rewrite this}.
 
 Several aspects of |allKW| and |oneKW| are worth noting.
 First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
@@ -2353,7 +2376,7 @@ see \cref{sec:store}.
 % ----------------------- Example
 
 \section{Example}
-A complete reduction sequence for a small example can be found in figure \ref{fig:sample-reductions}.
+A complete reduction sequence for a small example can be found in \cref{fig:sample-reductions}.
 This example shows how constraining the output of a function call can constrain the argument.
 While most of the reductions are administrative in nature, these are the highlights:
 At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
@@ -2387,7 +2410,8 @@ $$
 \end{array}
 $$
 \end{footnotesize}
-\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\caption{A sample reduction sequence} \label{fig:sample-reductions}
+\Description{A sample reduction sequence}
 \end{figure}
 
 
