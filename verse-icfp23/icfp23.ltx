@@ -932,7 +932,7 @@ so that the pattern depends on the value of |a|.
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
 % The |e_1| is called the \emph{domain} of the loop.
-The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
+The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and explicated by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
 So, for example, |fordo(x := 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
