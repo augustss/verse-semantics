@@ -336,7 +336,7 @@
 %% Note: \maketitle command must come after title commands, author
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
-\null\maketitle
+\maketitle
 
 
 
@@ -1571,7 +1571,7 @@ it has run on the order of 100M tests on the current rule set.
 \newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
 
 
-\section{Metatheory} \label{sec:metatheory}  \label{sec:confluence}
+\section{Metatheory} \label{sec:metatheory}
 
 The rules of our rewrite semantics can be applied anywhere,
 in any order, and they give meaning to programs without
@@ -1691,7 +1691,7 @@ Our main result is that \versecalc{}'s reduction rules are confluent for terms w
 We sketch the proof here, with full details in \cref{sec:confluence} (and relevant preliminaries in \cref{sec:preliminaries}).
 
 
-\begin{theorem}[Confluence] \label{thm:confluence}
+\begin{theorem}[Confluence] \label{thm:confluence-sketch}
 %
 The reduction relation in \cref{fig:rules}
 is confluent for terms with \norecursion.
@@ -1716,7 +1716,7 @@ We prove each individual sub-relation is confluent;
 and that they pairwise commute. Then confluence of
 their union follows, using \citet{Huet80}:
 
-\begin{lemma}[Commutativity] \label{lem:comm}
+\begin{lemma}[Commutativity] \label{lem:comm-summary}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 \end{lemma}
 \noindent
