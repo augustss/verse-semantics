@@ -332,12 +332,13 @@
 %% comma separated list
 % \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
 
-
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
-\maketitle
+\null\maketitle
+
+
 
 % \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
 %   a work in progress.  So please don't share it; if there is anyone you think would be
@@ -846,6 +847,7 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
   \end{array}
   $$
 \caption{Functions on tuples, analogous to list or array functions in some other languages} \label{fig:list-functions}
+\Description{Functions on tuples, analogous to list or array functions in some other languages}
 \end{figure}
 
 %and |oneKW| is like |head| for choices.
@@ -1551,6 +1553,7 @@ rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs
 \vspace*{-1.5em}
 }
 \caption{Sample Haskell reduction rules} \label{fig:sample-rules}
+\Description{Sample Haskell reduction rules}
 \end{figure}
 
 We used this infrastructure in two ways.
@@ -2390,7 +2393,8 @@ $$
 \end{array}
 $$
 \end{footnotesize}
-\caption{Sample reduction sequence} \label{fig:sample-reductions}
+\caption{A sample reduction sequence} \label{fig:sample-reductions}
+\Description{A sample reduction sequence}
 \end{figure}
 
 
