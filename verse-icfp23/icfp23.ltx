@@ -1553,7 +1553,7 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 {\small
 \vspace*{-0.5em}
 \begin{code}
-rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Tup [Int k1, Int k2] <- [lhs]
                                          pure (Int (k1+k2)))
 
            <>  "EXI-SWAP"   `name`  (do  EXI x (EXI y e) <- [lhs]
@@ -1695,7 +1695,7 @@ specifically to handle the even/odd problem.  We sketch our approach to a proof 
 including several new lemmas, but we emphasize that this proof is not yet complete.
 
 A third approach is simply to abandon confluence as a goal. Confluence is, after all, purely \emph{syntactic}, and hence
-much stronger than what we really need, which that each of our rules be
+much stronger than what we really need, which is that each of our rules is
 \emph{semantics}-preserving.  But of course that requires
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
@@ -1792,7 +1792,7 @@ with unification and cannot be factored out via a commutativity argument.
 %
 Instead we prove that the union of unification and normalization 
 is confluent by showing that unification \emph{postpones after} 
-normalization \cite{Hindley}, \ie informally speaking, that a 
+normalization \cite{Hindley}, \ie, informally speaking, that a 
 mixed sequence of unification-or-normalization steps can be reordered 
 into two blocks of normalization-only steps followed by unification-only 
 steps. The confluence of the union can then be established by suitably 
@@ -1836,7 +1836,7 @@ un-implementable.
 %
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
-\[ |(lam p 1) == (lam q 2); 1 <-* def x (x == (lam p 1); x == (lam q 2); x emptytup) ->* (lam q 2) == (lam p 1); 2| \]
+\[ |(lam p 1) == (lam q 2); 1| \lgos{} |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \gos{} |(lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
 %  \multicolumn{3}{l}{|def x (x == (lam p 1); x == (lam q 2); x emptytup)|} \\
