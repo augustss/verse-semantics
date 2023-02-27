@@ -675,7 +675,7 @@ go into an infinite loop if you keep fruitlessly inlining the function in its ow
 It is the business of an \emph{evaluation strategy} to do only rewrites that make
 progress towards a solution (\cref{sec:eval-strategy}).
 
-\subsection{Conditionals and |oneKW|} \label{sec:rigid} \label{sec:one} \label{sec:if}
+\subsection{Conditionals and \texorpdfstring{|oneKW|}{``one''}} \label{sec:rigid} \label{sec:one} \label{sec:if}
 
 Every source language will provide a conditional, such as |if (x==0) then
 e_2 else e_3|.  But what is the equality operator in |(x==0)|?  One
@@ -724,7 +724,7 @@ remain un-evaluated until the choice is made, just as we expect from a condition
 We use the same local-propagation rule for |oneKW| that we do for choice (\cref{sec:mixing}).
 This, together with the desugaring for |if| into |oneKW|, gives ``special property'' of |if| described above.
 
-\subsection{Tuples and |allKW|} \label{sec:tuple}
+\subsection{Tuples and \texorpdfstring{|allKW|}{``all''}} \label{sec:tuple}
 
 The main data structure in \versecalc{} is the \emph{tuple}.
 A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
@@ -912,7 +912,7 @@ $$
 $$
 so that the pattern depends on the value of |t|.
 
-\subsection{|for| loops} \label{sec:for}
+\subsection{\texorpdfstring{|for|}{``for''} loops} \label{sec:for}
 
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
@@ -1421,7 +1421,7 @@ picking one branch or the other, which immediately gives up confluence.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{\versecalc{} is lenient} \label{sec:lenient}
+\subsection{The Verse Calculus is lenient} \label{sec:lenient}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1964,7 +1964,7 @@ $$
 We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
-\subsection{Generalizing |oneKW| and |allKW|} \label{sec:split}
+\subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
 We could have introduced a more general operator |splitKW|\footnote{The name inspired by \cite{oleglogict}.} as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules
@@ -2013,7 +2013,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 % In short, there are good reasons for lenience, but
 % a lazy variant of \versecalc{} could be worth exploring.
 
-\section{\versecalc{} in context: reflections and related work} \label{sec:related}
+\section{\texorpdfstring{\versecalc{}}{The Verse Calculus} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; an excellent
 starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
