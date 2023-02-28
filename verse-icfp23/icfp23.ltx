@@ -374,7 +374,7 @@ But it is somewhat tricky for programmers to \emph{reason} about
 functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
 contrasts with functional programming, where one can say ``just apply
-rewrite rules, such as beta reduction, let-inlining, and
+rewrite rules, such as \textbeta reduction, let-inlining, and
 case-of-known-constructor.''
 % Moreover, these rewrite rules apply even
 % in the presence of free variables; {\eg}, under lambdas.
@@ -616,7 +616,7 @@ $$
 
 \subsection{Mixing choice and equations} \label{sec:mixing}
 
-In the last section, we discussed what happens if there is a choice in the right-hand-side of
+In the last section, we discussed what happens if there is a choice in the right-hand-side (RHS) of
 an equation. What if we have equations under choice?  For example:
 $$
 |def x ((x==3; x+1) choice (x==4; x*2))|
@@ -1072,8 +1072,8 @@ iff |x| is between |10| and |0| (comparison is right-associative).
 % \[
 % |applyN map ((lam x (x choice  x+1)), (10,20))| \movesto^\ast |(10,20) choice (10,21) choice (11,20) choice (11,21)|
 % \]
-Beta-reduction is performed quite conventionally by \rulename{app-beta}; the
-only unusual feature is that on the RHS of the rule we use a |defKW| to bind |x|,
+\textbeta-reduction is performed quite conventionally by \rulename{app-beta}; the
+only unusual feature is that on the RHS of the rule, we use an |defKW| to bind |x|,
 together with |(x==v)| to equate |x| to the argument.
 The rule may appear to use call-by-value, because the argument is a value |v|,
 but remember that values include variables, which may be bound to an
@@ -1089,7 +1089,7 @@ ensures that the $|defKW| |x|$
 does not capture any variables free in |v|.  If |x| appears free in |v|,
 \textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{v}$.
 
-In \versecalc{}, tuples behave like (finite) functions, in which application is
+In \versecalc{}, tuples behave like (finite) functions in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works on non-empty
 tuples, while \rulename{app-tup-0} deals with empty tuples.
 Notice that \rulename{app-tup} does not require the argument to be evaluated to an integer $k$; instead
@@ -1118,7 +1118,7 @@ so-called \emph{context} |V|, whose syntax is given in \cref{fig:contexts}
 \cite{felleisen:contexts1,felleisen:contexts2}.
 In general, a context is a syntax tree containing a single hole, written |hole|.
 The notation |V^[v]| is the term obtained by filling the hole
-in |V| with |v|.  For example \rulename{u-occurs} reduces |x == tup(1,x,3)| to |fail|,
+in |V| with |v|.  For example, \rulename{u-occurs} reduces |x == tup(1,x,3)| to |fail|
 using the context |V| = |tup( 1, hole , 3)|.
 
 
@@ -1153,10 +1153,10 @@ uses the notation |subst X x v| to mean ``substitute |v| for |x| in |X|'' and
 similarly |subst e x v|.
 There are several things to notice:
 \begin{itemize}
-\item \rulename{subst} fires only when the right-hand side of the equation
+\item \rulename{subst} fires only when the right-hand-side of the equation
   is a \emph{value} |v|, so that the substitution does not risk
   duplicating either work or choices. This
-restriction is precisely the same as the \rulename{let-v} rule of \cite{ariola:call-by-need}
+restriction is precisely the same as the \rulename{let-v} rule \cite{ariola:call-by-need}
 and, by not duplicating choices, it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
@@ -1171,8 +1171,8 @@ suffice to express the necessary sharing.
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
   The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
-Rules \rulename{hnf-swap} helps \rulename{subst} to fire, by putting the variable on the left.
-Rule \rulename{var-swap} is trickier.  Consider this example, where |a| and |b| are
+Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
+Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
@@ -1187,13 +1187,13 @@ $$
 \end{array}
 $$
 Each column is a reduction sequence starting from the same common term at the top;
-the two sequences differ in which equation for |x| is chosen for \rulename{subst}
+the two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
 in the first step. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are confluent.
-In the overall proof of confluence it turns out to
+In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
-are \emph{terminating} (see \cref{sec:design-confluence}).  To achieve this \rulename{var-swap} fires on |y==x| only if
+are \emph{terminating} (see \cref{sec:design-confluence}).  To achieve this, \rulename{var-swap} fires on |y==x| only if
 |x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
 Similarly, the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
@@ -1207,10 +1207,10 @@ and that is what we need for the proof.
 
 Consider this (extremely) tricky term:
 |def x (x = if (x==0; x>1) then 33 else 55)|.
-What should this do? At first you might think it was stuck; how can we simplify the |if|
+What should this do? At first you might think it was stuck---how can we simplify the |if|
 when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any X-context surrounding the equation |(x==0)|
-thus\footnote{
+thusly:\footnote{
   Here and elsewhere we rewrite terms that have not
   been fully desugared, but that is just an expository aid;
   formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
@@ -1227,7 +1227,7 @@ $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
 the |(x==0)| with |(x==100)| then rewriting gets stuck, as the reader may verify; and yet there
 is a solution to the equations, namely |x==55|.
-And if you replace |(x==0)| with |(x==55)| then rewriting again
+And if you replace |(x==0)| with |(x==55)|, then rewriting again
 gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
 Perhaps this is not surprising: we cannot reasonably expect the program to solve arbitrary equations.
 For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
@@ -1262,28 +1262,28 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % Now we can substitute for |x|, and then for |y|.
 
 Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
-\rulename{val-elim} discards a value to the left of semicolon; \rulename{exi-elim} discards
+\rulename{val-elim} discards a value to the left of a semicolon; \rulename{exi-elim} discards
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
-occurrence is a equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
-Note that none of these rules, except \rulename{fail-elim}, discard an un-evaluated expression,
+occurrence is an equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
+Note that none of these rules, except \rulename{fail-elim}, discard an unevaluated expression,
 because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
 The exception is \rulename{fail-elim}, which propagates failure.
 
 Five \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
 \rulename{seq-assoc} makes semicolon right-associated; \rulename{eqn-float} moves work out
-of the right hand side of a equation |v==e|.
-For example, we can't use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
+of the right-hand-side of an equation |v==e|.
+For example, we cannot use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
 because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{eqn-float}
 to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
 apply \rulename{subst}.
 
 \lennart{This needs updating if we are using the ordered seq-swap.}
-Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because can be infinitely
+Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because they can be infinitely
 applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
-\rulename{exi-swap} allows you to move an existential inwards so that it can be eliminated
+\rulename{exi-swap} allows you to move an existential inward so that it can be eliminated
 by \rulename{exi-elim}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
-this example, where |a,b,c| are bound in that order; that is $|c| \prec |b| \prec |a|$: 
+this example where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$: 
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
   \multicolumn{4}{c}{|c==a; c==b; c|} \\
@@ -1294,13 +1294,13 @@ $$
      \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
 $$
-Again the concluding terms of the two columns are ``obviously'' the same,
+Again, the concluding terms of the two columns are ``obviously'' the same,
 because they differ only in the order of the equations |(b==a)| and |(c==a)|;
 \rulename{seq-swap} allows them to be brought together, and makes explicit
 our intuition that order does not matter.
 
 Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
-which matters because choices are made left-to-right as we saw in \cref{sec:mixing}.
+which matters because choices are made left to right as we saw in \cref{sec:mixing}.
 That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eq_1$ and $eq_2$
 is \emph{choice-free}, via the side condition $eq_1 \in ceq$ or $eq_2 \in ceq$ in \rulename{seq-swap}
 (see \cref{fig:choice-free-syntax} for the syntax of $ceq$).
@@ -1448,7 +1448,7 @@ Consider a function
 call |apply1 f e|, where |e| is not a value.  In \versecalc{}, applications are in administrative normal form (ANF),
 so we must actually write |def x (x==e; apply1 f x)|. This expression will not return a value until
 |e| reduces to a value: that is, everything is eventually evaluated.  But even so |apply1 f x| can proceed
-to beta reduce (\cref{sec:beta}), assuming we know the definition of |f|.
+to \textbeta reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 
 Lenience supports \emph{abstraction}.  For example, we can replace an expression |(x==tup(y,3); y>7)| by
 $$
@@ -1484,7 +1484,7 @@ rule \rulename{subst} only fires when the RHS is a value.
 The rewrite rules thereby express \emph{semantics}.
 
 For example, in the lambda calculus, by changing the rewrite
-rule $\beta$ to $\beta{}V$ we change the language from call-by-name to call-by-value; and by
+rule \textbeta to $\beta{}V$ we change the language from call-by-name to call-by-value; and by
 adding {\bf let}, plus suitable rewrite rules, we can express call-by-need \cite{ariola:call-by-need}.
 In \versecalc{} the rewrite rules are carefully crafted in a similar way; for example \rulename{subst} will
 only substitute |x==v| when the equation binds a variable to a \emph{value}, rather like $\beta{}V$ in
@@ -1667,7 +1667,7 @@ It might be if |f == (lam (tup (v, w)) (v==w))|!
 For \emph{tuples} we have a simple sol\-ution: rule \rulename{u-occurs} makes the entire
 term fail if we get recursion through a tuple. But we cannot do this for lambdas, because it
 leads to non-confluence. Consider |f == (lam x (applyN const (x, f)))|, where |const == (lam (tup (p,q)) p)|.
-The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we beta-reduce the application
+The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we \textbeta-reduce the application
 of |const|, the occurrence of |f| disappears.
 
 Thus motivated, we restrict our attention to terms that have \emph{\norecursion}:
@@ -2456,7 +2456,7 @@ see \cref{sec:store}.
 A complete reduction sequence for a small example can be found in \cref{fig:sample-reductions}.
 This example shows how constraining the output of a function call can constrain the argument.
 While most of the reductions are administrative in nature, these are the highlights:
-At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a $\beta$-reduction can happen.
+At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a \textbeta-reduction can happen.
 Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
 At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
 \begin{figure}[h]
