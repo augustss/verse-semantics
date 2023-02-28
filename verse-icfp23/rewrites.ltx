@@ -333,6 +333,8 @@
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
+  \rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
+                      \text{unless |eq| is |y==v'| and |y| $\prec$ |x|} \\
 
     \\[-0.6em]
 
@@ -341,11 +343,9 @@
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| &
-                      \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
-\multicolumn{5}{l}{\text{\lennart{Plan: remove rule above, use rule below, move to unification group}}}\\
-\rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
-                      \text{unless |eq| is |y==v'| and |y| $\prec$ |x|} \\
+%\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| &
+%                      \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
+%\multicolumn{5}{l}{\text{\lennart{Plan: remove rule above, use rule below, move to unification group}}}\\
 
     \\[-0.6em]
 
