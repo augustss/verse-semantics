@@ -7,11 +7,7 @@
 
 %% For later:
 %% \newcommand{\go}[1]{\mathbin{\smash{\mathop{\xrightarrow{}}\limits_{\smash{\hbox{\raise0.55ex\hbox{$\scriptstyle#1\mskip13mu$}}}}}}}
-\newcommand{\inccon}[1]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#1$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle\preceq$}}}\vss}}}}}
 
-
-\newcommand{\xleftrightarrowdbl}[2][]{%
-  \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow}
 
 %format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
 %format applyNP (a) (b) = a "\," b
@@ -353,7 +349,7 @@ If relation $\rr$ is monotonic in some quasi order $\preceq$ and confluent, then
 	\arrow["\rr", dotted, two heads, from=1-2, to=2-2]
 	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
 \end{tikzcd}\]
-Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore 
+Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\preceq}{\rr}$, therefore 
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYyJdLFswLDEsImIiXSxbMSwxLCJkIl0sWzAsMiwiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
 \[\begin{tikzcd}
 	a & c \\
@@ -444,7 +440,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 	\arrow[draw=none, from=1, to=0]
       \end{tikzcd}\]
 
-\noindent    Because $\inccon{\rr} \subset \inccon{\rr\cup\rs}$, the first diagram follows.
+\noindent    Because $\inccon{\preceq}{\rr} \subset \inccon{\preceq}{\rr\cup\rs}$, the first diagram follows.
 
         (2) Because $\rr$ and $\rs$ commute, we have
 
@@ -459,7 +455,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 	\arrow[draw=none, from=1, to=0]
 \end{tikzcd}\]
 
-\noindent    Because $\gos{\rs} \subset \inccon{\rr\cup\rs}$, the second diagram follows.
+\noindent    Because $\gos{\rs} \subset \inccon{\preceq}{\rr\cup\rs}$, the second diagram follows.
 
 (3) The following diagram clearly holds if the sequence of reduction steps from |b| to |d| is the same as the sequence of reduction steps from |b| to |a| to |d|:
 
@@ -474,7 +470,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 	\arrow[draw=none, from=1, to=0]
       \end{tikzcd}\]
 
-    \noindent    Because $\equiv \subset \inccon{\rr\cup\rs}$, the third diagram follows.
+    \noindent    Because $\equiv \subset \inccon{\preceq}{\rr\cup\rs}$, the third diagram follows.
 
     (4) Because $\rr$ and $\rs_\preceq^{\leftarrow}$ commute, we have
 
@@ -489,7 +485,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\rr}$, therefore
 	\arrow[draw=none, from=1, to=0]
       \end{tikzcd}\]
 
-        \noindent    Because $\ungos{\rs} \subset \inccon{\rr\cup\rs}$, the fourth diagram follows.
+        \noindent    Because $\ungos{\rs} \subset \inccon{\preceq}{\rr\cup\rs}$, the fourth diagram follows.
 
         \guy{Remark: It may turn out to be impossible to prove for our specific application that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute.
           In that case, it may be necessary to use a more complicated or more subtle precondition.
