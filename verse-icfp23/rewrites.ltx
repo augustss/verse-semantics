@@ -334,7 +334,7 @@
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
   \rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
-                      \text{unless |eq| is |y==v'| and |y| $\prec$ |x|} \\
+                      \text{unless |eq| is |y==v'| and |y| $\preceq$ |x|} \\
 
     \\[-0.6em]
 
