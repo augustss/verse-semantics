@@ -198,6 +198,7 @@
 %% Unification
 %format == = "\hspace{-0.14em}=\hspace{-0.14em}"
 %%%format == = "\!=\!"
+%format :== = "\hspace{-0.14em}:=\hspace{-0.14em}"
 
 
 % format := = "\mapsto"
