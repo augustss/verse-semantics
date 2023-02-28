@@ -6,6 +6,28 @@
 
 \newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
 
+
+%% Complicated subscript tweak so that a subscript is the same height whether or not a superscript is present.
+%% See Knuth, "The TeXBook", page 179, second "double-dangerous-turn" paragraph.
+%% The implementation here affects only subscripts in the \mathcal font.
+\newif\ifalignsubscripts
+
+\global\alignsubscriptstrue
+
+\newcommand{\setsubscriptalignparameters}{
+\ifalignsubscripts
+{\setbox0=\hbox{$\mathcal{A
+\global\fontdimen16\textfont2=\fontdimen17\textfont2
+}$}}
+\fi
+}
+
+\setsubscriptalignparameters
+
+\newcommand{\alignsubscript}[1]{\ifalignsubscripts\smash{#1}\else#1\fi}
+%\newcommand{\alignsubscript}[1]{\ifalignsubscripts\vbox to 0pt{\vss$#1$}\else#1\fi}
+
+
 % Typesetting rewrite rules
 \newcommand{\rulename}[1]{\textsc{\small #1}}
 \newcommand{\vb}{\; |vbar| \;}    % Vertical bar
@@ -60,11 +82,11 @@
 \newcommand{\rrhat}{\trel{\rr}}
 \newcommand{\rshat}{\trel{\rs}}
 \newcommand{\rthat}{\trel{\rt}}
-\newcommand{\goone}[1]{\xrightarrow{\epsilon}_{#1}}
-\newcommand{\go}[1]{\xrightarrow{}_{#1}}
-\newcommand{\gos}[1]{\xrightarrowdbl{}_{#1}}
-\newcommand{\lgos}[1]{\xleftarrowdbl{}_{#1}}
-\newcommand{\gok}[2]{\xrightarrowdbl{#2}_{#1}}
+\newcommand{\goone}[1]{\xrightarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\go}[1]{\xrightarrow{}_{\alignsubscript{#1}}}
+\newcommand{\gos}[1]{\xrightarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\lgos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\gok}[2]{\xrightarrowdbl{#2}_{\alignsubscript{#1}}}
 
 \newcommand{\trel}[1]{\ensuremath{\widehat{#1}}}
 \newcommand{\tstep}[3]{\ensuremath{#2 \go{\trel{#1}} #3}}
@@ -74,16 +96,16 @@
 \newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
 \newcommand{\lsteps}[3]{\ensuremath{#2 \lgos{#1} #3}}
 \newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
-\newcommand{\ungoone}[1]{\xleftarrow{\epsilon}_{#1}}
-\newcommand{\ungo}[1]{\xleftarrow{}_{#1}}
-\newcommand{\ungos}[1]{\xleftarrowdbl{}_{#1}}
-\newcommand{\ungok}[2]{\xleftarrowdbl{#2}_{#1}}
+\newcommand{\ungoone}[1]{\xleftarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\ungo}[1]{\xleftarrow{}_{\alignsubscript{#1}}}
+\newcommand{\ungos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\ungok}[2]{\xleftarrowdbl{#2}_{\alignsubscript{#1}}}
 \newcommand{\unrstepo}[3]{\ensuremath{#2 \ungoone{#1} #3}}
 \newcommand{\unrstep}[3]{\ensuremath{#2 \ungo{#1} #3}}
 \newcommand{\unrsteps}[3]{\ensuremath{#2 \ungos{#1} #3}}
 \newcommand{\unrstepk}[4]{\ensuremath{#3 \ungok{#1}{#2} #4}}
 \newcommand{\univ}{\ensuremath{\mathcal{E}}}
-\newcommand{\join}[3]{{#2} \downarrow_{#1} {#3}}
+\newcommand{\join}[3]{{#2} \downarrow_{\alignsubscript{#1}} {#3}}
 \newcommand{\dia}{\ensuremath{\diamond}}
 
 \newcommand{\rnk}{\ensuremath{\rho}}
@@ -104,7 +126,7 @@
 \newcommand{\rspc}{\ensuremath{\mathcal{C}}}
 \newcommand{\rspchat}{\ensuremath{\trel{\mathcal{C}}}}
 \newcommand{\norecursion}{no recursion\xspace}
-\newcommand{\rdx}[1]{\ensuremath{\Delta_{#1}}}
+\newcommand{\rdx}[1]{\ensuremath{\Delta_{\alignsubscript{#1}}}}
 \newcommand{\txr}[2]{\ensuremath{\rstep{#1}{\rdx{#2}}{\rdx{#2}'}}}
 \newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
 \newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
