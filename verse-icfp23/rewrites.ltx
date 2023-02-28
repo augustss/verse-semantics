@@ -76,6 +76,10 @@
   \leftarrow\mathrel{\mkern-14mu}\xleftarrow[#1]{#2}%
 }
 
+\newcommand{\xleftrightarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow}
+
+
 \newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
 \newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
 \newcommand{\rt}{\ensuremath{\mathcal{T}}\xspace}
@@ -145,10 +149,12 @@
 
 
 %% Definitions for explaining skew confluence
+\newcommand{\inccon}[2]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#2$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle#1$}}}\vss}}}}}
 \newcommand{\leqomega}{\mathrel{\leq_\omega}} 
 \newcommand{\omegarr}{\omega_{\rr}}
 \newcommand{\leqomegarr}{\mathrel{\leq_{\omegarr}}} 
 \newcommand{\preceqomegarr}{\mathrel{\preceq_{\omega_{\rr}}}}
+\newcommand{\downclose}{\mathord{\Downarrow_{\leqomega}\!}}
 
 
 %% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3
