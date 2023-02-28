@@ -19,7 +19,7 @@ normalForm sys e = term $ fromMaybe (error $ "equiv: tarjan timed out (steps=" +
 
 -- Normalize an expression.  Return Nothing if the normalization times out.
 norm :: TRSystem Expr -> Traced Expr -> Maybe (Traced Expr)
-norm sys tre = minimum . head <$> tarjan (tfNormSteps (ruleEnv sys)) tstep tre
+norm sys tre = minimum <$> tarjan1 (tfNormSteps (ruleEnv sys)) tstep tre
  where
   tstep (t :<-- tr) =
     [ t' :<-- ((n,t):tr)
