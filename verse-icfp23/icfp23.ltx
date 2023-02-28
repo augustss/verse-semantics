@@ -2308,7 +2308,7 @@ There are many obvious similarities between Verse and the Icon programming langu
   an expression that produces at least one value is said to \emph{succeed}.
 \item The expression |e_1 choice e_2| produces all the values of |e_1| followed by all the values of |e_2|.
 \item There is a way to turn an array (or tuple) $a$ into a sequence of produced values.
-  In Icon, this is written \texttt{!|a|} \cite[\S 3]{griswold:icon-overview}; in Verse, \texttt{|a|\,?}; in \versecalc{}, |def (i) (x==a; x i)|.
+  In Icon, this is written \texttt{!|a|} \cite[\S 3]{griswold:icon-overview}; in Verse, \texttt{|a|?}; in \versecalc{}, |def (i) (apply1 a i)|.
 \item Most ``scalar'' operations (such as addition and comparisons) run through
   all possible combinations of values of their operand expressions,
   using a specific left-to-right evaluation order and automatic chronological backtracking.
@@ -2323,7 +2323,7 @@ There are many obvious similarities between Verse and the Icon programming langu
   in each, the ``\texttt{do}~|e_2|'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
   (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
-  \texttt{|x| :== |e|} will provide one value at a time from |e| to be named by variable |x|.
+  \texttt{|x| := |e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
 
 But there are also major differences between Verse and Icon.
