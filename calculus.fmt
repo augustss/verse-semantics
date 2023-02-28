@@ -191,6 +191,9 @@
 %format lte = "\prec"
 
 %format xdots = "\mydots"
+%format ctrdots = "\cdots"
+%format lowdots = "\ldots"
+%format commadots = "\;\ldots"
 
 %% Unification
 %format == = "\hspace{-0.14em}=\hspace{-0.14em}"
@@ -441,3 +444,4 @@
 %format stepXrs     = "\movesfromX^{\ast}"
 %format mu x (e)    = "\mu" x".\," e
 %format muKW        = "\mu{}"
+%format Omega       = "\mathit{\Omega}"
