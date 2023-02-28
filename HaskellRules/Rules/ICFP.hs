@@ -613,8 +613,8 @@ rulesSimonSubst env lhs =
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (eq :>: subst sub e)
 
-rulesSeqSwapOrd :: ERule
-rulesSeqSwapOrd env lhs =
+_rulesSeqSwapOrd :: ERule
+_rulesSeqSwapOrd env lhs =
   "SEQ-SWAP-ORD" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      guard $
