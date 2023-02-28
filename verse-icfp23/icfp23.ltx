@@ -1304,7 +1304,7 @@ apply \rulename{subst}.
 Rule \rulename{exi-swap} allows you to move an existential inward so that a dead equation can be eliminated
 by \rulename{eqn-elim}.
 Rule \rulename{exi-swap} is unusual because it can be infinitely applied;
-avoiding that eventuality is easily achieved by the evaluation strategy (\cref{sec:eval-strategy}).
+avoiding that eventuality is easily achieved by tweaking the evaluation strategy (\cref{sec:eval-strategy}).
 
 Note that all these swapping and normalization rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left to right as we saw in \cref{sec:mixing}.
@@ -1508,7 +1508,7 @@ sometimes called \emph{leftmost-outermost reduction}, is a \emph{good} evaluatio
 
 We believe that the same leftmost-outermost strategy is \emph{good} for
 \versecalc{}: just repeatedly reduce the leftmost-outermost
-redex, with some tweaks to avoid infinite application of \rulename{seq-swap} and \rulename{exi-swap}.
+redex, with some tweaks to avoid infinite application of \rulename{exi-swap}.
 That is easy in theory, but it is tricky in practice.  For
 example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
@@ -1982,7 +1982,7 @@ and (v) then apply our new result to show that the entire set of rewrite rules i
 At this time steps (iii) and (iv) are incomplete, so we emphasize that \emph{we do not yet have a complete proof of skew confluence for \versecalc{}}.
 \end{comment}
 
-\subsection{Overview of Skew Confluence (VERSION 2)} \label{sec:skew-overview-2}
+\subsection{Overview of skew confluence} \label{sec:skew-overview-2}
 
 We travel a path very similar to the one blazed by Zena Ariola and her co-authors.
 Ariola and Klop studied a form of the lambda calculus with an added $\mathsf{letrec}$ construct and
@@ -2027,19 +2027,21 @@ Skew confluence:\qquad
 \qquad
 \end{center}
 %
-\simon{why dotted arrows?}
-The meaning of $|e_2| \inccon{\preceq}{\rr} |e'|$ is that |e_2| is \emph{convertible} to |e'|, but only through a sequence of reductions
-and converse reductions that maintain a certain partial order $\preceqomegarr$ (see below).
-\simon{don't understand this}
-
+% \simon{why dotted arrows?}
+% The meaning of $|e_2| \inccon{\preceq}{\rr} |e'|$ is that |e_2| is \emph{convertible} to |e'|, but only through a sequence of reductions
+% and converse reductions that maintain a certain partial order $\preceqomegarr$ (see below).
+% \simon{don't understand this}
 You can understand skew confluence as follows: if two different reduction paths from |e| produce
-terms |e_1|, |e_2|, then |e_2| can be further reduced to |e'| so that all of |e_1|'s permanent structure
-is present in |e'|, written $|e_1| \preceqomegarr |e'|$.  By ``permanent structure'' we mean
-an outer shell of tuples or lambdas that will never change, no matter how much
+terms |e_1|, |e_2|, then |e_1| can be further reduced to |e'| so that all of |e_2|'s permanent structure
+is present in |e'|, written $|e_2| \preceqomegarr |e'|$.  By ``permanent structure'' we mean
+an outer shell of tuples, lambdas, and constants, that will never change no matter how much
 further reduction takes place.  For example, however far we reduce the term |tup (1, lam z e)|, the
-result will always look like |tup (1, lam z e')|.  We can formalise this by defining an
-\emph{erasure function} $\omegarr(|e|)$ which replaces all the impermanent bits
+result will always look like |tup (1, lam z e')|, where $\rsteps{\rr}{e}{e'}$.  We can formalise the notion of
+permanent structure by defining an
+\emph{erasure function} $\omegarr(|e|)$ which replaces all the impermanent bits of |e|a
 with a new term |Omega|.  Thus $\omegarr(|tup (1, lam z x)|) = |tup (1, lam z Omega)|$.
+Then $|e_2| \preceqomegarr |e'|$ if $\omegarr(|e_2|)$ can be made equal to |e'| by
+replacing each |Omega| in $\omegarr(|e_2|)$ with an (individually-chosen) term.
 
 Consider the even-odd problem discussed in \cref{sec:even-odd}.
 $$
@@ -2130,16 +2132,18 @@ that use commutative diagrams and case analysis. They also prove that if a reduc
 
 \end{comment}
 
-In \cref{sec:skew-confluence} we prove a new result: if two relations are skew confluent
+In \cref{sec:skew-confluence} we show to adapt the proof strategy
+of \cref{sec:confluence-sketch} and \cref{sec:confluence} for skew confluence.
+To do this we need a new result: if two relations are skew confluent
 with respect to the same information content function and commute, then their union is also skew confluent.
-(In fact, it is not required that the two relations fully commute; a slightly weaker precondition suffices.)
-This provides a detailed strategy for reusing parts of the proof of confluence for \versecalc{} sketched in \cref{sec:confluence-sketch}
-and detailed in \cref{sec:confluence}: our plan is to (i) define an appropriate information content function for \versecalc{} expressions;
+(In fact, it is not required that the two relations fully commute: a slightly weaker precondition suffices.)
+Using this result, our plan
+is to (i) define an appropriate information content function for \versecalc{} expressions;
 (ii) prove that all the rewrite rules for \versecalc{} are monotonic in this information content function;
 (iii) prove that the Unification rules (modified to permit recursive substitution) together with the Normalization rules are skew confluent;
 (iv) prove that this combined set of rules commutes in the necessary way with the rules for Application, Elimination, and Choice (which taken together are already known to be confluent);
 and (v) then apply our new result to show that the entire set of rewrite rules is skew confluent.
-At this time steps (iii) and (iv) are incomplete, so we emphasize that \emph{we do not yet have a complete proof of skew confluence for \versecalc{}}.
+At this time steps (iii) and (iv) are incomplete, so we emphasize that we do not yet have a complete proof of skew confluence for \versecalc{}.
 
 
 % ----------------------- Variations
@@ -2553,17 +2557,27 @@ rather than an imperative approach to processing generated combinations:
 
 \section{Looking back, looking forward}
 
-Defining the semantics of \versecalc{} through rewrite rules
-is sufficiently low-level to capture
-the \emph{computational model} of the language; and yet sufficiently high-level to
-be \emph{illuminating} to a programmer or compiler writer.
-Defining a language by giving its low-level semantics is precise but not necessarily illuminating;
-for example, giving a reference compiler that compiles
-the program to x86 instructions is precise, but is not helpful
-to a human who is trying to understand exactly what the original program
-meant. Likewise, a high-level (\eg, denotational) semantics simply provides the eventual answer
-produced by the program without insight into the computational steps
-that got us from program start to program completion.
+We believe that this is the first presentation of a functional logic
+language as a determinstic rewrite system.  A rewrite system has the
+advantage (compared to more denotational, or more operational,
+methods) that it is is sufficiently low-level to capture the
+\emph{computational model} of the language; and yet sufficiently
+high-level to be \emph{illuminating} to a programmer or compiler
+writer.  Our focus on rewriting as a way to define the
+semantics has forced us to focus on confluence, a rather syntactic
+property that is stronger (and hence more delicate and harder to prove) than the
+contextual equivalence that we really need.  That in turn led us to
+study the elegant and ingenious notion of skew confluence, which has been
+barely revisited in 25 years, but which we believe deserves a wider
+audience.
+
+% Defining a language by giving its low-level semantics is precise but not necessarily illuminating;
+% for example, giving a reference compiler that compiles
+% the program to x86 instructions is precise, but is not helpful
+% to a human who is trying to understand exactly what the original program
+%  meant. Likewise, a high-level (\eg, denotational) semantics simply provides the eventual answer
+% produced by the program without insight into the computational steps
+% that got us from program start to program completion.
 
 %%\simon{dropped a short para here that interrupted the flow}
 % The moral here is that \emph{formal specifications can be obfuscatory---or
@@ -2571,15 +2585,15 @@ that got us from program start to program completion.
 % terms of the intended mechanisms of the language}. \versecalc{} does this; it
 % respects the conceptual structures of the Verse language.
 
-Note that when we say ``illuminating'' we mean that in multiple ways.
-A semantics can be illuminating for humans who are trying to understand
-what a particular program does, or how a proposed change to the language
-will affect the language. It can drive analyses that help the compiler
-optimize programs. It underlies the use of formal methods and verification
-to provide machine-derived and -checkable proofs of correctness. All of
-these applications depend on the semantics being defined at the appropriate
-level: the level of the computational model that underlies the language.
-This has been our goal in this work.
+% Note that when we say ``illuminating'' we mean that in multiple ways.
+% A semantics can be illuminating for humans who are trying to understand
+% what a particular program does, or how a proposed change to the language
+% will affect the language. It can drive analyses that help the compiler
+% optimize programs. It underlies the use of formal methods and verification
+% to provide machine-derived and -checkable proofs of correctness. All of
+% these applications depend on the semantics being defined at the appropriate
+% level: the level of the computational model that underlies the language.
+% This has been our goal in this work.
 
 We have much left to do.  The full Verse language has
 statically checked types.  In the dynamic semantics, the types can be
