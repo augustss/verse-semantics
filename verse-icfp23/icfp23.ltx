@@ -1837,7 +1837,7 @@ un-implementable.
 %
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
-\[ |(lam p 1) == (lam q 2); 1 \lgos{} def x (x == (lam p 1); x == (lam q 2); x emptytup) \gos{} (lam q 2) == (lam p 1); 2| \]
+\[ |(lam p 1) == (lam q 2); 1| \lgos{} |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \gos{} |(lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
 %  \multicolumn{3}{l}{|def x (x == (lam p 1); x == (lam q 2); x emptytup)|} \\
