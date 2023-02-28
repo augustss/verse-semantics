@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 import Data.Maybe
@@ -133,9 +134,9 @@ prop_Confluence3 flags sys =
 
           _ -> discard
  where
-  arbPermute sys =
+  arbPermute rsys =
     do permf <- liftArbitrary arbPermutation
-       return $ sys{ rules = \env p -> permf p (rules sys env p) }
+       return $ rsys{ rules = \env p -> permf p (rules rsys env p) }
   
   arbExpr =
     do p <- arbitrary
@@ -147,7 +148,7 @@ prop_Confluence3 flags sys =
     , validExpr sys (ruleEnv sys) p'
     ]
 
-  normTrace sys p =
+  normTrace rsys p =
     if ignoreRecursive flags && isRecursive p then
       Nothing
     else
@@ -156,9 +157,9 @@ prop_Confluence3 flags sys =
          guard (not (ignoreRecursive flags && isRecursive (term p')))
          return p'
    where
-    next (p :<-- tr) =
-      [ q :<-- ((n,p):tr)
-      | (n,q) <- step (rules sys) (ruleEnv sys) p
+    next (t :<-- tr) =
+      [ q :<-- ((n,t):tr)
+      | (n,q) <- step (rules rsys) (ruleEnv rsys) t
       ]
 
 arbPermutation :: Gen ([a] -> [a])
