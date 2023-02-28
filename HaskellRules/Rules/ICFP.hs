@@ -51,8 +51,9 @@ systemICFP = TRSystem
 systemICFPBX :: TRSystem Expr
 systemICFPBX = s
   { sname               = "ICFPBX"
-  , description         = description s ++ ", BX for EXI-FLOAT and no EXI-SWAP"
-  , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
+  , description         = "ICFP with BX for SUBST and EXI-FLOAT, no EXI-SWAP, SEQ-SWAP1"
+  , rules               = (allRules -= "EXI-SWAP" -= "EXI-FLOAT" -= "SUBST" -= "SEQ-SWAP") <> rulesExiFloatBX <> rulesSeqSwap1 <> rulesSubstBX
+  -- , rules               = (rules s -= "EXI-SWAP" -= "EXI-FLOAT") <> rulesExiFloatBX
   }
   where s = systemICFP
 
@@ -557,14 +558,24 @@ rulesSubstBX env lhs =
   do (ctx, xBoundVars, (Var x :=: Val v) :>: e) <- execBX lhs
      let freeX = free (ctx, e)
          freeV = free v
-     let allBoundVars = boundVars env ++ xBoundVars
-     let x0    = identNotIn (freeX ++ freeV ++ allBoundVars) -- replacing x temporarily
+     -- let allBoundVars = {- boundVars env ++ -} xBoundVars
+     let x0    = identNotIn (freeX ++ freeV ++ xBoundVars) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      guard (all (`notElem` xBoundVars) (x:freeV))          -- NEW PRECONDITION
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+
+
+-- rulesSeqSwap1 is the same as rulesSimonSwap
+--   e1; x=v; e3   -->   x=v; e1; e3    if not (eq is (y=v2) and y<x)
+rulesSeqSwap1 :: ERule
+rulesSeqSwap1 env lhs =
+  "SEQ-SWAP1" `name`
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)); _ -> True)
+     pure $ e2 :>: (e1 :>: e3)
 
 rulesSimonSwap :: ERule
 rulesSimonSwap env lhs =
