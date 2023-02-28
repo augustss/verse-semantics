@@ -1,5 +1,5 @@
 module TRS.Traced(
-  Traced(..), term, trace, start, toList,
+  Traced(..), term, trace, start, (++>), toList,
   showTrace, showRevTrace,
   ) where
 import Epic.Print(Pretty, prettyShow)
@@ -15,6 +15,9 @@ trace (_ :<-- tr) = tr
 
 start :: a -> Traced a
 start x = x :<-- []
+
+(++>) :: (a -> (String,a)) -> Traced a -> Traced a
+f ++> (x :<-- tr) = let (s,y) = f x in y :<-- ((s,x):tr)
 
 -- should get deprecated because the old trace format is no good
 toList :: Traced a -> [(String,a)]

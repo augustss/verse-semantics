@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Rules.Core(
   Expr(..), Op(..),
   Heap, Ptr(..),
@@ -39,6 +40,7 @@ import Data.Data(Data)
 import Data.List( union, elemIndex )
 import Data.Maybe
 import GHC.Stack(HasCallStack)
+import GHC.Generics
 
 import TRS.Bind
 import TRS.TRS
@@ -77,6 +79,9 @@ data Expr
   | Store Heap Expr
   | Ref Ptr
   deriving (Show, Data)
+
+instance CoArbitrary Expr where
+  coarbitrary e = coarbitrary (show e) -- cool hack!
 
 type Value = Expr
 

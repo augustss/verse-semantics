@@ -40,7 +40,7 @@ systemICFP = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = (allRules -= "SEQ-SWAP") <> rulesSeqSwapOrd
+  , rules               = (allRules -= "SEQ-SWAP") <> rulesSimonSwap
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules

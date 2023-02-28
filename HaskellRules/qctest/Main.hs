@@ -1,13 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 import Data.Maybe
+import Control.Monad( guard )
 import Epic.List( nub )
 import Rules.Core
 import Rules.Equiv(norm)
 import Rules.Systems
 import TRS.TRS( step )
 import TRS.NormalForm( normalFormsFuelTrace, NormResult(..) )
---import TRS.Tarjan
+import TRS.Tarjan
 import TRS.Traced
 import Test.QuickCheck as QC
 import Options.Applicative
@@ -49,8 +50,10 @@ main = do
     _            -> exitWith (ExitFailure 1)
 
 prop_Confluence :: TestFlags -> TRSystem Expr -> Property
-prop_Confluence flags | koen flags = prop_Confluence2 flags
-                      | otherwise  = prop_Confluence1 flags
+prop_Confluence flags
+  | loopy flags = prop_Confluence3 flags
+  | koen  flags = prop_Confluence2 flags
+  | otherwise   = prop_Confluence1 flags
 
 prop_Confluence1 :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence1 flags sys =
@@ -114,6 +117,59 @@ prop_Confluence2 flags sys =
     | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
     , validExpr sys (ruleEnv sys) p'
     ]
+
+prop_Confluence3 :: TestFlags -> TRSystem Expr -> Property
+prop_Confluence3 flags sys =
+  forAllBlind (arbPermute sys) $ \sys' ->
+    forAllShrink arbExpr shrinkExpr $ \p0 ->
+      let p = if wrapOne flags then One p0 else p0 in
+        case (normTrace sys p, normTrace sys' p) of
+          (Just t1, Just t2) ->
+            whenFail (do putStrLn "==trace:1=="
+                         putStr (unlines (showTrace t1))
+                         putStrLn "==trace:2=="
+                         putStr (unlines (showTrace t2))) $
+              norm sys t1 == norm sys t2
+
+          _ -> discard
+ where
+  arbPermute sys =
+    do permf <- liftArbitrary arbPermutation
+       return $ sys{ rules = \env p -> permf p (rules sys env p) }
+  
+  arbExpr =
+    do p <- arbitrary
+       return (preProcess sys (ruleEnv sys) p)
+
+  shrinkExpr p =
+    [ p'
+    | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
+    , validExpr sys (ruleEnv sys) p'
+    ]
+
+  normTrace sys p =
+    if ignoreRecursive flags && isRecursive p then
+      Nothing
+    else
+      do ps <- tarjan1 100 next (start p)
+         let p' = minimum ps
+         guard (not (ignoreRecursive flags && isRecursive (term p')))
+         return p'
+   where
+    next (p :<-- tr) =
+      [ q :<-- ((n,p):tr)
+      | (n,q) <- step (rules sys) (ruleEnv sys) p
+      ]
+
+arbPermutation :: Gen ([a] -> [a])
+arbPermutation =
+  do is <- infiniteListOf (choose (0,maxBound::Int))
+     return (\xs -> perm is (length xs) xs)
+ where
+  perm _is     0 _xs = []
+  perm ~(i:is) n  xs = (xs!!j) : perm is (n-1) (take j xs ++ drop (j+1) xs)
+   where
+    j = i `mod` n
 
 arbTrace :: TestFlags -> TRSystem Expr -> Expr -> Gen (Maybe (Traced Expr))
 arbTrace flags sys p = go (5 :: Int) (15 :: Int) [] p
@@ -184,6 +240,7 @@ data TestFlags = TestFlags
   , replayStr      :: !(Maybe String)
   , ignoreFuelStop :: !Bool
   , koen           :: !Bool
+  , loopy          :: !Bool
   , ignoreRecursive :: !Bool
   , maxShrink      :: !Int
   }
@@ -221,6 +278,9 @@ testFlags = TestFlags
   <*> switch
          ( long "koen"
         <> help "Use Koen's prop_Confluence2" )
+  <*> switch
+         ( long "loopy"
+        <> help "Use Koen's new prop_Confluence3 (for loopy systems)" )
   <*> switch
          ( long "ignore-recursive"
         <> short 'r'
