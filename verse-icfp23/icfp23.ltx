@@ -939,9 +939,9 @@ So, for example, |fordo(x :== 2 `choice` 3 `choice` 5) (x+1)| will reduce to the
 
 Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
-So, |fordo(x := 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
+So, |fordo(x :== 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected, and requires nothing special.
-So, |fordo(x:=10 `choice` 20; y := 1 `choice` 2 `choice` 3) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
