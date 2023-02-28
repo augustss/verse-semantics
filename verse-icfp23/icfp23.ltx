@@ -340,7 +340,7 @@
   rewrite rules,
   skew confluence,
   unification,
-  Verse calculus, 
+  Verse calculus,
   Verse language
 }
 
@@ -1007,7 +1007,7 @@ Here are some possibilities:
   evaluates to a (heap, value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
   Despite its ``operational semantics'' title, the big-step approach
   does not convey accurate operational intuition, because it goes all the way to a value
-  in one step. 
+  in one step.
 \item \emph{A small-step operational semantics} addresses this criticism:
   it typically describe how a (heap, expression, stack) configuration evolves, one small
   step at a time ({\eg}, ~\cite{pj:stg-machine}).
@@ -1171,6 +1171,9 @@ suffice to express the necessary sharing.
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
   The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
+
+\subsection{Swapping} \label{sec:swapping}
+
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
@@ -1191,15 +1194,35 @@ the two sequences differ when it comes to which equation for |x| is chosen for \
 in the first step. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are confluent.
+Rule \rulename{seq-swap} is needed for a similar reason. Consider
+this example where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
+$$
+\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+  \multicolumn{4}{c}{|c==a; c==b; c|} \\
+  \movestoR{subst} & |c==a; a==b; a| &
+     \movestoR{subst} & |b==a; c==b; b| \\
+
+  \movestoR{var-swap} & |c==a; b==a; a| &
+     \movestoR{subst}   & |b==a; c==a; a| \\
+\end{array}
+$$
+Again, the concluding terms of the two columns are ``obviously'' the same,
+because they differ only in the order of the equations |(b==a)| and |(c==a)|;
+\rulename{seq-swap} allows them to be brought together, and makes explicit
+our intuition that order of equations |(x=v)| does not matter.
+
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
-are \emph{terminating} (see \cref{sec:design-confluence}).  To achieve this, \rulename{var-swap} fires on |y==x| only if
+are \emph{terminating} (see \cref{sec:design-confluence}).
+To achieve this, \rulename{var-swap} fires on |y==x| only if
 |x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
-Similarly, the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
-prevents the rule from firing until \rulename{var-swap} has done its work.
+Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely;
+and the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
+prevents the rule from firing until \rulename{var-swap} has done its work;
+
 Other rules, notably \rulename{exi-swap}, may change this binding order
-and thereby re-enable \rulename{var-swap},
+and thereby re-enable \rulename{var-swap} or \rulename{seq-swap},
 but the unification rules \emph{considered in isolation} are terminating and confluent,
 and that is what we need for the proof.
 
@@ -1216,12 +1239,12 @@ thusly:\footnote{
   formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
 $$
 \begin{array}{l@@{\;}l}
-                                & |def x (x = if (x==0; x>1) then 33 else 55; x)| \\
+\multicolumn{2}{l}{|def x (x = if (x==0; x>1) then 33 else 55; x)|} \\
 \movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
-\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)|\\
-\movestoC{\text{simplify |if|}} & |def x (x = 55; x)| \\
-\movestoR{subst}                & |def x (x = 55; 55)| \\
-\movestoR{exi-elim}             & |55|
+\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
+\multicolumn{2}{l}{\movestoC{\text{simplify |if|}} \; |def x (x = 55; x)| \quad
+\movestoR{subst} \; |def x (x = 55; 55)| \quad
+\movestoR{exi-elim}  \; |55|}
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1269,7 +1292,7 @@ Note that none of these rules, except \rulename{fail-elim}, discard an unevaluat
 because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
 The exception is \rulename{fail-elim}, which propagates failure.
 
-Five \emph{normalization} rules help to put the expression in a form that
+Four \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
 \rulename{seq-assoc} makes semicolon right-associated; \rulename{eqn-float} moves work out
 of the right-hand-side of an equation |v==e|.
@@ -1278,32 +1301,13 @@ because the RHS of the |x|-equation is not a value; but we can instead apply \ru
 to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
 apply \rulename{subst}.
 
-\lennart{This needs updating if we are using the ordered seq-swap.}
-Rules \rulename{exi-swap} and \rulename{seq-swap} are unusual because they can be infinitely
-applied; avoiding that eventuality is the role of an evaluation strategy (\cref{sec:eval-strategy}).
-\rulename{exi-swap} allows you to move an existential inward so that it can be eliminated
-by \rulename{exi-elim}.  Rule \rulename{seq-swap} is needed for a similar reason to \rulename{var-swap}. Consider
-this example where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$: 
-$$
-\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
-  \multicolumn{4}{c}{|c==a; c==b; c|} \\
-  \movestoR{subst} & |c==a; a==b; a| &
-     \movestoR{subst} & |b==a; c==b; b| \\
+Rule \rulename{exi-swap} allows you to move an existential inward so that a dead equation can be eliminated
+by \rulename{eqn-elim}.
+Rule \rulename{exi-swap} is unusual because it can be infinitely applied;
+avoiding that eventuality is easily achieved by the evaluation strategy (\cref{sec:eval-strategy}).
 
-  \movestoR{var-swap} & |c==a; b==a; a| &
-     \movestoR{subst}   & |b==a; c==a; a| \\
-\end{array}
-$$
-Again, the concluding terms of the two columns are ``obviously'' the same,
-because they differ only in the order of the equations |(b==a)| and |(c==a)|;
-\rulename{seq-swap} allows them to be brought together, and makes explicit
-our intuition that order does not matter.
-
-Note that all these rules \emph{preserve the left-to-right sequencing of expressions},
+Note that all these swapping and normalization rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left to right as we saw in \cref{sec:mixing}.
-That is why the \rulename{seq-swap} insists that at least one of the swapped expressions $eq_1$ and $eq_2$
-is \emph{choice-free}, via the side condition $eq_1 \in ceq$ or $eq_2 \in ceq$ in \rulename{seq-swap}
-(see \cref{fig:choice-free-syntax} for the syntax of $ceq$).
 Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}), and
 the flexible/rigid distinction of
@@ -1336,7 +1340,7 @@ because the latter is outside the choice, and a different branch of the choice b
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 
-\subsection{Choice rules} \label{sec:choice-rules}
+\subsection{Rules for choice} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:rules}:
 \begin{itemize}
@@ -1469,7 +1473,7 @@ value (in this case |7|) until |f| is called.  Without lenience this program wou
 
 However, moving to \emph{laziness} seems problematic.
 For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy, language this expression would
-yield |3|, but in \versecalc{}, everything is evaluated, and 
+yield |3|, but in \versecalc{}, everything is evaluated, and
 the expression will not return a value until |apply0 wombat| converges.
 There is a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
 we know there is no failure.  With laziness, we could easily lose confluence.
@@ -1601,10 +1605,11 @@ pure lambda calculus), this proof turns out to be a substantial undertaking.
 %
 A \emph{binary relation} is a set of pairs of related items.
 %
-A \emph{reduction relation} \rr is the \emph{compatible closure} of any binary relation on a set of tree-structured  \emph{terms},
+A \emph{reduction relation} \rr is the \emph{compatible closure}\footnote{
+``Compatible closure'' means that, for any context $E$ and any two terms $M$ and $N$,
+if $(M,N)\in\rr$ then $(E[M],E[N])\in\rr$.}
+of any binary relation on a set of tree-structured  \emph{terms},
 such as the terms generated by some BNF grammar.
-(``Compatible closure'' means that, for any context $E$ and any two terms $M$ and $N$,
-if $(M,N)\in\rr$ then $(E[M],E[N])\in\rr$.)
 %
 We write $\rr^{*}$ for the reflexive transitive closure of $\rr$.
 % We write $\rr^{k}$ for the $k$-step closure of $\rr$ and $\rr^{*}$
@@ -1691,11 +1696,13 @@ This approach is not entirely satisfying: it is hard to prove that a term
 has no recursion, and it is clumsy to write recursive programs using only \textbf{Y}-combinators.
 Our second approach is to adopt the idea of \emph{skew confluence}
 \cite{ariola:skew-confluence}, a clever technique developed
-specifically to handle the even/odd problem; we give an overview of skew confluence in \cref{sec:skew-overview}, and
+specifically to handle the even/odd problem; we give an overview of skew confluence
+in \cref{sec:skew-overview-2}, and
 provide details of our approach to a proof of skew confluence for \versecalc{} in \cref{sec:skew-confluence},
-including several new lemmas, but we emphasize that \emph{the proof of skew confluence is not yet complete}.
+including several new lemmas, but we emphasize that the proof of skew confluence is not yet complete.
 
-A third approach is simply to abandon confluence as a goal. Confluence is, after all, purely \emph{syntactic}, and hence
+A third approach is simply to abandon confluence as a goal altogether.
+Confluence is, after all, purely \emph{syntactic}, and hence
 much stronger than what we really need, which is that each of our rules be
 \emph{semantics}-preserving.  But, of course, that requires
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
@@ -1741,7 +1748,7 @@ Proving confluence for application, elimination and choice is easy:
 % \simon{added normalization to this list -- Ranjit check} \ranjit{ACK: please check updated}
 %
 they all satisfy the \emph{diamond property}---namely, that two
-different reduction steps can be joined at a common term 
+different reduction steps can be joined at a common term
 \emph{by a single step}---which suffices to show the
 relations are confluent \cite{Barendregt}.
 %
@@ -1753,7 +1760,7 @@ The rules for unification and normalization pose two problems.
 
 \mypara{The Unification Problem}
 %
-The first problem is that the unification relation does \emph{not} satisfy the diamond property 
+The first problem is that the unification relation does not satisfy the diamond property
 as it may need multiple steps to join the results of two different one-step reductions.
 %
 For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); 3)|$.
@@ -1781,23 +1788,24 @@ also confluent.
 
 \mypara{The Normalization Problem}
 %
-The second problem is that the normalization rules interact with the unification
-rules in a way that precludes commutativity-based composition.
+The second problem is that the normalization rules do not commute with the unification rules.
 %
-Recall from \cref{sec:unification-rules} that the unification rules rely upon
+Recall from \cref{sec:swapping} that the unification rules rely upon
 variable ordering to orient equations between variables in a canonical fashion.
 %
 The normalization rule \rulename{exi-swap} can \emph{change}
-the variable order and hence, its behavior is deeply intertwined 
-with unification and cannot be factored out via a commutativity argument. 
+the variable order and hence, its behavior is deeply intertwined
+with unification and cannot be factored out via a commutativity argument.
 %
-Instead, we prove that the union of unification and normalization 
-is confluent by showing that unification \emph{postpones after} 
-normalization \cite{Hindley}, \ie, informally speaking, that a 
-mixed sequence of unification-or-normalization steps can be reordered 
-into two blocks of normalization-only steps followed by unification-only 
-steps. The confluence of the union can then be established by suitably 
-composing the confluence properties for the individual relations.
+Instead, we prove that the union of unification and normalization
+is confluent by showing that unification \emph{postpones after}
+normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
+%
+% , \ie, informally speaking, that a
+% mixed sequence of unification-or-normalization steps can be reordered
+% into two blocks of normalization-only steps followed by unification-only
+% steps. The confluence of the union can then be established by suitably
+% composing the confluence properties for the individual relations.
 
 \subsection{Design for confluence} \label{sec:design-confluence}  \label{sec:unifying-lambda}
 
@@ -1907,11 +1915,12 @@ after the value of |x| is substituted in and checked to not be a \textlambda.
  % terminates.
 
 
+\begin{comment}
 \subsection{Overview of Skew Confluence (VERSION 1)} \label{sec:skew-overview}
 
 
 If a reduction relation $\rr$ is confluent, then for all |e|, |e_1|, and |e_2|,
-if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$ then there exists |e'| such that 
+if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$ then there exists |e'| such that
 if $\rstep{\rr}{|e_1|}{|e'|}$ and $\rstep{\rr}{|e_2|}{|e'|}$.
 This is useful because the $\rr$-normal form (if it exists) of any expression is if $\rr$ is confluent.
 
@@ -1943,7 +1952,7 @@ confluence is much easier to prove, using techniques that do not involve infinit
 that use commutative diagrams and case analysis.
 
 Here, then, is the idea behind skew confluence: for all |e|, |e_1|, and |e_2|,
-if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$, then there may not be any |e'| such that 
+if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$, then there may not be any |e'| such that
 if $\rstep{\rr}{|e_1|}{|e'|}$ and $\rstep{\rr}{|e_2|}{|e'|}$. Instead, you can choose either of |e_1| and |e_2| (let's say |e_2|),
 and then there does exists some |e'| such that $\rstep{\rr}{|e_1|}{|e'|}$ and |e'| has at least as much information content as |e_2|,
 that is, $\omegarr(|e_2|) \leqomega \omegarr(|e'|)$. This works both ways, by symmetry, because the choice of |e_1| or |e_2| is arbitrary.
@@ -1971,16 +1980,19 @@ and detailed in \cref{sec:confluence}: our plan is to (i) define an appropriate 
 (iv) prove that this combined set of rules commutes in the necessary way with the rules for Application, Elimination, and Choice (which taken together are already known to be confluent);
 and (v) then apply our new result to show that the entire set of rewrite rules is skew confluent.
 At this time steps (iii) and (iv) are incomplete, so we emphasize that \emph{we do not yet have a complete proof of skew confluence for \versecalc{}}.
+\end{comment}
 
 \subsection{Overview of Skew Confluence (VERSION 2)} \label{sec:skew-overview-2}
 
 We travel a path very similar to the one blazed by Zena Ariola and her co-authors.
 Ariola and Klop studied a form of the lambda calculus with an added $\mathsf{letrec}$ construct and
-determined that this calculus was not confluent; then they added a specific constraint on recursive substitution
+determined (like us) that this calculus was not confluent; then they added a specific
+constraint on recursive substitution
 and proved that the modified calculus is confluent \cite{ariola:lambda-letrec}.
 In a later paper, Ariola and Blom  proved that the calculus without the constraint, while not confluent,
-does obey the related property, which they invented, of \emph{skew confluence}.
-We strongly suspect, and currently are trying to prove, that a version \versecalc{} with a less constrained version of rule \rulename{SUBST} is also skew confluent.
+does obey a weaker related property, which they invented, of \emph{skew confluence} \cite{ariola:skew-confluence}.
+We believe, and currently are trying to prove, that \versecalc{} is skew confluent without the
+pesky no-recursion side condition of \cref{thm:confluence-sketch}.
 \begin{center}
   \begin{tabular}{rl}
     Confluence: & $\forall |e|, |e_1|, |e_2|. \rsteps{\rr}{|e|}{|e_1|} \wedge \rsteps{\rr}{|e|}{|e_2|} \implies \exists e'. \rsteps{\rr}{|e_1|}{|e'|} \wedge \rsteps{\rr}{|e_2|}{|e'|}$. \\
@@ -2015,8 +2027,68 @@ Skew confluence:\qquad
 \qquad
 \end{center}
 %
+\simon{why dotted arrows?}
 The meaning of $|e_2| \inccon{\preceq}{\rr} |e'|$ is that |e_2| is \emph{convertible} to |e'|, but only through a sequence of reductions
 and converse reductions that maintain a certain partial order $\preceqomegarr$ (see below).
+\simon{don't understand this}
+
+You can understand skew confluence as follows: if two different reduction paths from |e| produce
+terms |e_1|, |e_2|, then |e_2| can be further reduced to |e'| so that all of |e_1|'s permanent structure
+is present in |e'|, written $|e_1| \preceqomegarr |e'|$.  By ``permanent structure'' we mean
+an outer shell of tuples or lambdas that will never change, no matter how much
+further reduction takes place.  For example, however far we reduce the term |tup (1, lam z e)|, the
+result will always look like |tup (1, lam z e')|.  We can formalise this by defining an
+\emph{erasure function} $\omegarr(|e|)$ which replaces all the impermanent bits
+with a new term |Omega|.  Thus $\omegarr(|tup (1, lam z x)|) = |tup (1, lam z Omega)|$.
+
+Consider the even-odd problem discussed in \cref{sec:even-odd}.
+$$
+\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+\multicolumn{4}{c}{|def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|} \\
+    \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))|
+  & \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| \\
+    \rstep{}{}{} & |def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1,y))))|
+  & \rstep{}{}{} & |def x (x = tup (1, lam z x); tup (1, lam z x)))| \\
+    \rstep{}{}{} & |def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1,lam z (tup (1,y))))))|
+  & \rstep{}{}{} & |def x (x = tup (1, lam z x); tup (1, lam z (tup (1,lam z x))))|
+\end{array}
+$$
+The two columns can never join up, but if you pick any term, there is a term in the other
+column that has more permanent structure.  That in turn means that the terms in the left hand
+column are contextually equivalent to those in the right hand column, because the context can
+only inspect the permanent structure -- and this contextual equivalence is the real reason
+for seeking confluence in the first place.
+
+\begin{comment}
+
+further reductions on the two terms
+|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer terms such as
+|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
+and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
+One can see that each of these terms
+will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
+because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
+the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
+will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
+how long one expression becomes through substitution, the other one can be made even longer,
+so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+
+Old...
+and either term can be further reduced so as to contain \emph{all} the permanent structure of the other.
+This provides a notion of convergence even for infinite reduction sequences.
+
+In the case of the even-odd problem discussed in \cref{sec:even-odd}, further reductions on the two terms
+|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer terms such as
+|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
+and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
+One can see that each of these terms
+will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
+because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
+the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
+will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
+how long one expression becomes through substitution, the other one can be made even longer,
+so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+
 
 Why use skew confluence? Ordinary confluence is useful because if term |e| has an $\rr$-normal form, then that normal form is \emph{unique} if $\rr$ is confluent.
 Ariola and Blom define a related notion, which we refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
@@ -2056,21 +2128,7 @@ confluence is much easier to prove, using techniques that do not involve possibl
 that use commutative diagrams and case analysis. They also prove that if a reduction relation is confluent and monotonic, then it is skew confluent
 \cite[Corollary 5.5]{ariola:skew-confluence}.
 
-One way to think about skew confluence is that if two different reduction paths from |e| produce terms containing permanent structure (their information content is not simply |Omega|),
-then those permanent structures will be consistent, and either term can be further reduced so as to contain \emph{all} the permanent structure of the other.
-This provides a notion of convergence even for infinite reduction sequences.
-
-In the case of the even-odd problem discussed in \cref{sec:even-odd}, further reductions on the two terms
-|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer terms such as
-|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
-and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
-One can see that each of these terms
-will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
-because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
-the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
-will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
-how long one expression becomes through substitution, the other one can be made even longer,
-so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+\end{comment}
 
 In \cref{sec:skew-confluence} we prove a new result: if two relations are skew confluent
 with respect to the same information content function and commute, then their union is also skew confluent.
@@ -2127,10 +2185,10 @@ We discuss some of them here.
 % it is simply a form of administrative normal form (ANF) \cite{felleisen:anf}.
 
 % \subsection{Dead existentials}
-% 
+%
 % \simon{I don't think this section is persuasive; let's drop it.}
 % \lennart{Drop it!}
-% 
+%
 % Consider the term |(def x 99)|. This rewrites to |99| by \rulename{def-elim}, but you could
 % argue that it should instead be stuck.
 % For example, the term
@@ -2194,7 +2252,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 % % Here, |ones| denotes an infinite list of |1|'s, and we might hope that the expression returns
 % % |1|; but in \versecalc{} it won't because rule \rulename{subst} declines to substitute for the equality
 % % |ones == tup(1,ones)|, which has an ``occurs check.''
-% 
+%
 % Another place that laziness could play a role is this.
 % Remembering the duality between values and choices,
 % one might also want |allKW| to return a lazy stream
@@ -2205,7 +2263,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 % $$
 % Here we suppose that |allKW| returns a lazy stream of values (represented as nested
 % pairs), from which we may pick the first and discard the rest.
-% 
+%
 % In short, there are good reasons for lenience, but
 % a lazy variant of \versecalc{} could be worth exploring.
 
@@ -2250,16 +2308,16 @@ an identifier to each choice with its attendant complications.
 
 Logical variables, choice, and equalities are present in many functional logic
 languages.  However, |oneKW| and |allKW| are distinctive features of \versecalc{},
-with the notable exception of Fresh, a very interesting design introduced in a 
-technical report nearly 40 years ago~\cite{smolka:fresh} that also aims 
-to unify functional and logical constructs. 
+with the notable exception of Fresh, a very interesting design introduced in a
+technical report nearly 40 years ago~\cite{smolka:fresh} that also aims
+to unify functional and logical constructs.
 %
-Fresh reifies choice into data via \emph{confinement} (corresponding to |oneKW|) 
+Fresh reifies choice into data via \emph{confinement} (corresponding to |oneKW|)
 and \emph{collection} (corresponding to |allKW|).
 %
-However, Fresh differs from \versecalc{} in crucial ways. 
+However, Fresh differs from \versecalc{} in crucial ways.
 %
-First, it solves equations in a strictly left-to-right fashion, which means that 
+First, it solves equations in a strictly left-to-right fashion, which means that
 it is not lenient in the sense discussed in \cref{sec:lenient}.
 %
 Second, its semantics are presented in an operational fashion with explicit stacks and heaps,
