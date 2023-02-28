@@ -527,13 +527,13 @@ pattern matching; in such a language, we might define |first| by
 more primitive |case| expressions, but in \versecalc{} we do not need |case| expressions:
 unification does the job.  For example we can define |first| like this:
 $$
-|first := lam pr (def (a ^^ b) (pr == tup (a,b); a))|
+|first :== lam pr (def (a ^^ b) (pr == tup (a,b); a))|
 $$
 % The lambda unifies its argument (presumably a pair)
 %with |tup(a,b)|, where |a,b| are fresh logical
 % variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, we allow ourselves to write a term like
-|applyN first (2,5)|, where we define the library function |first| separately with ``|:=|''. Formally, you can imagine
+|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|''. Formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first == ...); e|,
 and similarly for other library functions.
 
@@ -659,7 +659,7 @@ Fortunately, choice allows us to express this idea directly, where
 we use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells
 (see \cref{fig:syntax} to desugar the pattern matching lambda):
 $$
-|append := lam (tup (xsl,ysl))
+|append :== lam (tup (xsl,ysl))
   (((xsl == emptytup; ysl) choice
    (def (x ^^ xr) (xsl == tup (x,xr); tup (x, applyN append (xr, ysl))))))|
 $$
@@ -801,17 +801,17 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % \setlength{\belowdisplayskip}{0pt}%
 %   $$
 %     \begin{array}{r@@{\;}c@@{\;}ll}
-%       |x := e; dots| & \equiv & |def x (x = e; dots)| \\
-%       |apply1 f x := e; dots| & \equiv & |f := lam x e; dots| \\
-%       |applyN f (x,y) := e; dots| & \equiv & |apply1 f p := (def (x ^^ y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
+%       |x :== e; dots| & \equiv & |def x (x = e; dots)| \\
+%       |apply1 f x :== e; dots| & \equiv & |f :== lam x e; dots| \\
+%       |applyN f (x,y) :== e; dots| & \equiv & |apply1 f p :== (def (x ^^ y) (p=tup (x,y); e)); dots| & \text{|p| fresh} \\
 %       |apply1 e_1 e_2| & \equiv & |def (x ^^ y) (x = e_1;y=e_2;apply1 x y)| & \text{|x,y| fresh} \\
 %       |tup (e_1, e_2)| & \equiv & |def (x ^^ y) (x = e_1;y=e_2; tup (x,y))| & \text{|x,y| fresh} \\
 % % already in the first figure
 % %      |e_1+e_2| & \equiv & |applyN add (e_1,e_2)| \\
 % %      |e_1>e_2| & \equiv & |applyN gt (e_1,e_2)| \\
-%       |if e_1 then e_2 else e_3| & \equiv & |v := one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh}
+%       |if e_1 then e_2 else e_3| & \equiv & |v :== one( (e_1; thunk e_2) choice (thunk e_3)); apply0 v| & \text{|v,x| fresh}
 % % only used in sectino about for, and there the equation is repeated
-% %      |for e_1 do e_2| & \equiv & |v := all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
+% %      |for e_1 do e_2| & \equiv & |v :== all (e_1; thunk e_2); applyN map (lam z (apply0 z), v)| & \text{|v,x| fresh} \\
 %     \end{array}
 %   $$
 % \caption{Syntactic sugar}
@@ -822,10 +822,10 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
 % not arbitrary expressions, in tuple literals and applications \cite{felleisen:anf}.
 % To keep the examples readable, we allow ourselves a bit of syntactic sugar, summarized in \cref{fig:sugar}:
 % \begin{itemize}
-% \item With |:=| we simultaneously introduce and ``assign'' a variable
+% \item With |:==| we simultaneously introduce and ``assign'' a variable
 %   an initial value. (Which later unification and choice may sharpen up
 %   or constrain.)
-% \item When defining functions, we allow simple patterns on the left of |:=|
+% \item When defining functions, we allow simple patterns on the left of |:==|
 % \item We allow the use of |if|, as explained in \cref{sec:if}.
 % % \item We allow the use of |for|, as we will explain in \cref{sec:for}.
 % \end{itemize}
@@ -837,24 +837,24 @@ the corresponding operations for tuples are defined in \cref{fig:list-functions}
   \begin{array}{l}
     \textbf{Desugaring}\\
     \begin{array}{rcll}
-      |apply1 f x := e| & \text{means} & |f := lam x e| \\
-      |applyN f (x,y) := e| & \text{means} &
-        |f := lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
+      |apply1 f x :== e| & \text{means} & |f :== lam x e| \\
+      |applyN f (x,y) :== e| & \text{means} &
+        |f :== lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
      \end{array} \\ \\[-3mm]
 
     \begin{array}{rcl}
-      |apply1 head xsl| & :=  & |apply1 xsl 0| \\
-      |apply1 tail xsl| & :=  & |all (def i (i > 0; apply1 xsl i))| \\
-      |applyN cons (x,xsl)| & :=  & |all (x `choice` def i (apply1 xsl i))| \\
-      |applyN append (xsl, ysl)| & :=  & |all ((def i (apply1 xsl i)) `choice` (def i (apply1 ysl i)))| \\
-      |applyN flatMap (f,xsl)| & := & |all (def i (apply1 f (apply1 xsl i)))| \\
-      |applyN map (f, xsl)| & :=  & |if x := apply1 head xsl then applyN cons (apply1 f x, applyN map (f,apply1 tail xsl)) else emptytup| \\
-      |applyN filter (p, xsl)| & := & |all (def i (x := apply1 xsl i; one (apply1 p x); x))| \\
-      |applyN find (p, xsl)| & := & |one (def i (x := apply1 xsl i; one (apply1 p x); x))| \\
-      |applyN every (p, xsl)| & := & |applyN map (p,xsl)| \\
-      |applyN some (p, xsl)| & := & |one (def i (apply1 p (apply1 xsl i)))|\\
-%      |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
-      |applyN zip (xsl,ysl)| & := & |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
+      |apply1 head xsl| & |:==|  & |apply1 xsl 0| \\
+      |apply1 tail xsl| & |:==|  & |all (def i (i > 0; apply1 xsl i))| \\
+      |applyN cons (x,xsl)| & |:==|  & |all (x `choice` def i (apply1 xsl i))| \\
+      |applyN append (xsl, ysl)| & |:==|  & |all ((def i (apply1 xsl i)) `choice` (def i (apply1 ysl i)))| \\
+      |applyN flatMap (f,xsl)| & |:==| & |all (def i (apply1 f (apply1 xsl i)))| \\
+      |applyN map (f, xsl)| & |:==|  & |if x :== apply1 head xsl then applyN cons (apply1 f x, applyN map (f,apply1 tail xsl)) else emptytup| \\
+      |applyN filter (p, xsl)| & |:==| & |all (def i (x :== apply1 xsl i; one (apply1 p x); x))| \\
+      |applyN find (p, xsl)| & |:==| & |one (def i (x :== apply1 xsl i; one (apply1 p x); x))| \\
+      |applyN every (p, xsl)| & |:==| & |applyN map (p,xsl)| \\
+      |applyN some (p, xsl)| & |:==| & |one (def i (apply1 p (apply1 xsl i)))|\\
+%      |applyN fromTo (lo,hi)| & |:==| & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
+      |applyN zip (xsl,ysl)| & |:==| & |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
     \end{array}
   \end{array}
   $$
@@ -911,18 +911,18 @@ This means that we can use ordinary abstraction mechanisms for patterns.
 For example, here is a function that should be called like |applyN fcn (88,1,99,2)|.
 $$
 \begin{array}{l}
-|apply1 fcn t := def (x ^^ y) (t == tup(x,1,y,2); x+y)|
+|apply1 fcn t :== def (x ^^ y) (t == tup(x,1,y,2); x+y)|
 \end{array}
 $$
 If we want to give a name to the pattern, it is simple to do so:
 $$
-|applyN pat (v,w) := tup(v,1,w,2);| \quad \quad
-|apply1 fcn t := def (x ^^ y) (t == applyN pat (x,y); x+y)|
+|applyN pat (v,w) :== tup(v,1,w,2);| \quad \quad
+|apply1 fcn t :== def (x ^^ y) (t == applyN pat (x,y); x+y)|
 $$
 Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example |pat| could be \emph{computed}, like this:
 $$
-|applyN pat (v,w) := if t==0 then tup (v,1,w,3) else tup (1,1,w,v)|
+|applyN pat (v,w) :== if t==0 then tup (v,1,w,3) else tup (1,1,w,v)|
 $$
 so that the pattern depends on the value of |t|.
 
@@ -934,8 +934,8 @@ rather like a list comprehension in languages like Haskell or Python.
 The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and elegantly explicated by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
-So, for example, |fordo(x := 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
-% This example can, with the |:=| shorthand, be written |for^(x := 2 `choice` 3 `choice` 5) do (x+1)|.
+So, for example, |fordo(x :== 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
+% This example can, with the |:==| shorthand, be written |for^(x :== 2 `choice` 3 `choice` 5) do (x+1)|.
 
 Like list comprehension, |for| supports filtering; in \versecalc{} this falls out naturally by just using
 a possibly failing expression in |e_1|.
@@ -956,7 +956,7 @@ The full desugaring is
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
 Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
-So, for example, |fordo(x:=10 `choice` 20) (x `choice` x+1)| will reduce to
+So, for example, |fordo(x:==10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
@@ -969,7 +969,7 @@ fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most lan
 % Making a choice between a sequence of numbers can be expressed like this
 % $$
 % \begin{array}{l@@{\;}c@@{\;}l}
-%   |applyN fromTo (lo,hi)| & := & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
+%   |applyN fromTo (lo,hi)| & :== & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
 % \end{array}
 % $$
 % so |all (applyN fromTo (1,5))| will reduce to the tuple |tup (1,2,3,4,5)|.
@@ -978,18 +978,18 @@ fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most lan
 %% Indexing out-of-bounds of a tuple results in |fail|.
 %% This means that we cannot avoid handling this case.
 %% $$
-%% |if x:=apply1 t 5 then apply1 print x else apply1 print "out of bounds"|
+%% |if x:==apply1 t 5 then apply1 print x else apply1 print "out of bounds"|
 %% $$
 
 %% \subsection{Subset and powerset}
 %% The subsets (subtuples) of a tuple can be expressed with this multi-valued function.
 %% First compute the subsets of all but the first element, and then return these with and without the first element added.
 %% $$
-%% |subset^(t) := if x:=apply1 head t then s:= apply1 subset (apply1 tail t); applyN cons (x, s) `choice` s else emptytup|
+%% |subset^(t) :== if x:==apply1 head t then s:== apply1 subset (apply1 tail t); applyN cons (x, s) `choice` s else emptytup|
 %% $$
 %% And computing the powerset is then simply a matter of collecting all the subsets into a tuple.
 %% $$
-%% |powerset^(t) := for x := apply1 subset t in x|
+%% |powerset^(t) :== for x :== apply1 subset t in x|
 %% $$
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
@@ -2060,8 +2060,8 @@ When adding more effects to \versecalc{}, see \cref{sec:store}, it is in fact cr
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
-    |one e| & \equiv |apply1 f x := fail; | & |applyN g (x,y):= x;| & |split e f g| \\
-    |all e| & \equiv |apply1 f x := emptytup;|    & |applyN g (x,y):= applyN cons (x, split (apply0 y) f g);| & |split e f g|
+    |one e| & \equiv |apply1 f x :== fail; | & |applyN g (x,y):== x;| & |split e f g| \\
+    |all e| & \equiv |apply1 f x :== emptytup;|    & |applyN g (x,y):== applyN cons (x, split (apply0 y) f g);| & |split e f g|
 \end{array}\]
 For this paper we stuck to the arguably simpler |oneKW| and |allKW|,
 to avoid confusing the presentation with these higher-order encodings, but there are no complications using |splitKW| instead.
@@ -2323,7 +2323,7 @@ There are many obvious similarities between Verse and the Icon programming langu
   in each, the ``\texttt{do}~|e_2|'' may be omitted, to simply evaluate |e_1| repeatedly until it has yielded all its values.
   (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
-  \texttt{|x| := |e|} will provide one value at a time from |e| to be named by variable |x|.
+  \texttt{|x| :== |e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
 
 But there are also major differences between Verse and Icon.
@@ -2354,7 +2354,7 @@ rather than an imperative approach to processing generated combinations:
   \end{center}
   (In Icon, \emph{postfix} \texttt{+} is an autoincrement operator \cite[\S 3.1.2]{griswold:icon-users-manual}
   with the same behavior as \emph{prefix} \texttt{++} in~C \cite[\S 2.8]{kr-c-book}.)
-  In Verse, \texttt{a~=~for(x := e) do~x} or even just
+  In Verse, \texttt{a~=~for(x :== e) do~x} or even just
   \texttt{a~=~for\{e\}} does the job; in \versecalc{}, |a == all(e)| is all it takes.
 \item Backtracking in Icon is ``only control backtracking''; side effects, such as assignments, are not undone \cite[\S 3.1]{griswold:generators-in-icon}.
 \item Both languages have an implicit ``cut'' (permanent acceptance of the first produced value) after the predicate part of an |if|-|then|-|else|,
@@ -2451,7 +2451,7 @@ At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
 \setlength{\belowdisplayskip}{0pt}%
 $$
 \begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-                &                    & |applyN swap (x,y) := tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+                &                    & |applyN swap (x,y) :== tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
                 & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
 
 

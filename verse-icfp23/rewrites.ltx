@@ -206,13 +206,14 @@
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
       |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
       |tup (e_1, xdots, e_n)| & \text{means} &
-          |def (x_1 ^^ x_2 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1,xdots, x_n)| & \text{|x_i| fresh} \\
+          |def (x_1 ^^ x_2 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1,xdots, x_n))| & \text{|x_i| fresh} \\
       |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
 
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
-      |x := e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p == tup (x,y); e)| & \text{|p| fresh} \\
+      |x :== e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
+      |lamhdr emptytup^^ e| & \text{means} & |lam p (p == emptytup; e)| & \text{|p| fresh} \\
+      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p == tup (x,y); e))| & \text{|p| fresh} \\
       |if e_1 then e_2 else e_3| & \text{means}
       & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|x,y| fresh} \\
     \end{array} \\
