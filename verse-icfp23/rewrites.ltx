@@ -171,7 +171,7 @@
       \text{Expressions}   & e     & ::= & |v| \vb |eq ; e| \vb |def x e| \vb |fail|
                                            \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
                              \vb |one e| \vb |all e| \\
-                             & |eq|     & ::= & |e| \vb |v == e| \quad \quad
+                             & |eq|     & ::= & |e| \vb |v == e| \quad \quad \quad \quad
                                        \text{Note: ``|eq|'' is pronounced ``expression or equation''} \\
   %    \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
   %       \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
@@ -195,7 +195,7 @@
             \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
             \hspace{1.2em} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
       \end{array} \\
-      \text{Parentheses may be used freely to aid readability and override default precedence}\\
+      \text{Parentheses may be used freely to aid readability and override default precedence.}\\
   \\[-0.6em]
       \textbf{Desugaring} \\
     \begin{array}{rcll}
@@ -239,7 +239,7 @@
 \fi
     \end{array} \\
   \\[-0.6em]
-  \text{$\freevars{e}$ means the free variable of $e$; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  \text{$\freevars{|e|}$ means the free variables of |e|; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
