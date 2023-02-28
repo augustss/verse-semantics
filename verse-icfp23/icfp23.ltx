@@ -470,11 +470,11 @@ some built-in operations and tuples as data constructors:
   In \versecalc{}, a variable counts as a value because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
   A head-normal form is a conventional value: a built-in constant |k|, an operator |op|, a tuple, or
-  a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative operators |op|, namely |gt| and |add|.
+  a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative integer operators |op|, namely |gt| and |add|.
 \item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
 For clarity, we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
-\item An \emph{equational expression} |eq| is either an ordinary expression |e|, or
+\item A term |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v==e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
 \item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
@@ -519,7 +519,8 @@ unifies |y| with |2| and |z| with |3|.  Finally, |2| is returned as the result.
 Note carefully that, as in any declarative language,
 \emph{logical variables are not mutable}; a logical variable stands for a single, immutable value.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
-mean ``there exists an |x| such that |xdots|.''  Logical variables \emph{are} existential variables.
+mean ``there exists an |x| such that |xdots|.''
+%% Logical variables \emph{are} existential variables.
 
 High-level functional languages usually provide some kind of
 pattern matching; in such a language, we might define |first| by
@@ -527,7 +528,7 @@ pattern matching; in such a language, we might define |first| by
 more primitive |case| expressions, but in \versecalc{} we do not need |case| expressions:
 unification does the job.  For example we can define |first| like this:
 $$
-|first :== lam pr (def (a ^^ b) (pr == tup (a,b); a))|
+|first :== lam p (def (a ^^ b) (p == tup (a,b); a))|
 $$
 % The lambda unifies its argument (presumably a pair)
 %with |tup(a,b)|, where |a,b| are fresh logical
@@ -743,14 +744,14 @@ A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
 A tuple can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|, as is indexing with
 a non-integer value.
-For example, |def t (t == tup (10,27,32); apply1 t 1)| reduces to |27| and |apply1 t 3| reduces to |fail|.
+For example, |t :== tup (10,27,32); apply1 t 1| reduces to |27| and |apply1 t 3| reduces to |fail|.
 
 What if we apply a tuple to a choice, thus |apply1 (tup (10,27,32))(1 `choice` 0 `choice` 1)|?  First we must
 desugar the application to the form |(apply1N v_1 v_2)|, because that is all \versecalc{} permits (\cref{fig:syntax}),
-giving |def x (x==(1 `choice` 0 `choice` 1)); apply1(tup (10,27,32)) x|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
+giving |x:==(1 `choice` 0 `choice` 1); apply1(tup (10,27,32)) x|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
-if |e| reduces to |(v_1 `choice` dots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
+if |e| reduces to |(v_1 `choice` xdots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
 the tuple |tup (v_1, dots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
@@ -761,7 +762,7 @@ You might think that tuple indexing would be stuck until we know the index,
 but in \versecalc{}, the application of a tuple to a value rewrites to a choice of all the possible
 values of the index.
 For example,
-|def t (t == tup (10,27,32); def i (apply1 t i))|
+|t :== tup (10,27,32); def i (apply1 t i)|
 looks stuck because we have no value for |i|, but actually rewrites to:
 $$
 |def i ((i==0; 10) choice (i==1; 27) choice (i==2; 32)|
@@ -791,6 +792,7 @@ A tuple can be turned into choices by indexing with a logical variable |i|.
 Conversely, choices can be turned into a tuple using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
+Partial functions, \eg, |head|, will |fail| when the argument is outside of the function domain.
 
 % \subsection{Syntactic sugar}
 %
@@ -921,7 +923,7 @@ $$
 Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $$
-|applyN pat (v,w) :== if t==0 then tup (v,1,w,3) else tup (1,1,w,v)|
+|applyN pat (a,v,w) :== if a==0 then tup (v,1,w,3) else tup (1,1,w,v)|
 $$
 so that the pattern depends on the value of |t|.
 
@@ -949,7 +951,7 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| u
 apply each element of the tuple to |emptytup| afterwards, using a |map| function, as defined in \cref{fig:list-functions}.
 The full desugaring is:
 \[
-|fordo(def (x_1^^xdots^^x_n) e_1) e_2| \; \equiv \;
+|fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
 |def v (v == all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
@@ -994,7 +996,8 @@ fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most lan
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
 How can we give a precise semantics to a non-strict functional
-programming language?  Here are some possibilities:
+programming language?  \lennart{Why are we mentioning non-strict functional here?}
+Here are some possibilities:
 \begin{itemize}
 \item \emph{A denotational semantics} is the classical approach,
   but it is tricky to give a (perspicuous) denotational semantics to a functional logic language
@@ -1170,7 +1173,7 @@ suffice to express the necessary sharing.
 \end{itemize}
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire, by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example, where |a| and |b| are
-bound further out, perhaps by lambdas:
+bound further out, perhaps by lambdas.  It can rewrite in two different ways:
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
@@ -1288,11 +1291,11 @@ $$
      \movestoR{subst} & |b==a; c==b; b| \\
 
   \movestoR{var-swap} & |c==a; b==a; a| &
-     \movestoR{subst}   & |b==a; c==b; a| \\
+     \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
 $$
 Again the concluding terms of the two columns are ``obviously'' the same,
-because they differ only in the order of the equations |(b==a)| and |(c==b)|;
+because they differ only in the order of the equations |(b==a)| and |(c==a)|;
 \rulename{seq-swap} allows them to be brought together, and makes explicit
 our intuition that order does not matter.
 
@@ -1343,8 +1346,8 @@ The rules for choice are given in \cref{fig:rules}:
   the semantics of |allKW| (\cref{sec:all}).
 \item Rules \rulename{choose-r} and \rulename{choose-l} eliminate |fail|, which behaves as
   an identity for choice.
-\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice} has
-  a better chance of firing.  (The dots on the left of \rulename{all-choice} should be read as
+\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice}/\rulename{all-choice}
+  can fire.  (The dots on the left of \rulename{all-choice} should be read as
   a string of right-associated choices.)
 \end{itemize}
 The most interesting rule is \rulename{choose} which, just as described in \cref{sec:choice},
@@ -1550,7 +1553,7 @@ Some sample rewrite rules can be found in \cref{fig:sample-rules}.
 {\small
 \vspace*{-0.5em}
 \begin{code}
-rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Arr [Int k1, Int k2] <- [lhs]
+rules lhs  =   "APP-ADD"    `name`  (do  Op Add :@: Tup [Int k1, Int k2] <- [lhs]
                                          pure (Int (k1+k2)))
 
            <>  "EXI-SWAP"   `name`  (do  EXI x (EXI y e) <- [lhs]
@@ -1641,10 +1644,10 @@ In our context, consider the term:
 %
 $$
 \begin{array}{lcll}
- |def (x ^^ y) (x == tup (1, y); y == lam z x; x)|
+ |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
  & \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
 
- |def (x ^^ y) (x == tup (1, y); y == lam z x; x)|
+ |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
 & \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| & \text {(2: substitute for |y| first)}
 \end{array}
 $$
@@ -1790,7 +1793,7 @@ with unification and cannot be factored out via a commutativity argument.
 %
 Instead we prove that the union of unification and normalization 
 is confluent by showing that unification \emph{postpones after} 
-normalization \cite{Hindley}, \ie informally speaking, that a 
+normalization \cite{Hindley}, \ie, informally speaking, that a 
 mixed sequence of unification-or-normalization steps can be reordered 
 into two blocks of normalization-only steps followed by unification-only 
 steps. The confluence of the union can then be established by suitably 
@@ -1834,7 +1837,7 @@ un-implementable.
 %
 We cannot instead say that the attempt to unify gets stuck, because that leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
-\[ |(lam p 1) == (lam q 2); 1 <-* def x (x == (lam p 1); x == (lam q 2); x emptytup) ->* (lam q 2) == (lam p 1); 2| \]
+\[ |(lam p 1) == (lam q 2); 1 \lgos{} def x (x == (lam p 1); x == (lam q 2); x emptytup) \gos{} (lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
 %  \multicolumn{3}{l}{|def x (x == (lam p 1); x == (lam q 2); x emptytup)|} \\
