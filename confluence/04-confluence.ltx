@@ -14,6 +14,7 @@ Let $\rr$ be the reduction relation defined as the union $\runi \cup \rcon \cup 
 each of which is defined as the compatible closure of a prototype reduction relation that is in turn defined by rewrite rules in \cref{fig:rules}, as follows:
 %
 \begin{itemize}
+%% BE SURE TO KEEP THE CONTENTS OF THIS BULLET LIST SYNCHRONIZED WITH THE TABLE ENTRIES IN \cref {fig:rule-groups}!
 %% \hbox is used heavily here to avoid bad line breaks at hyphens in rule names.
 \item $\runi$ (Unification) is the compatible closure of $\runihat$, which is the union of the prototype reduction relations specified by rules
 	\hbox{\rulename{u-lit}},
@@ -23,7 +24,6 @@ each of which is defined as the compatible closure of a prototype reduction rela
 	\hbox{\rulename{subst}},
 	\hbox{\rulename{hnf-swap}},
 	\hbox{\rulename{var-swap}},
-	 %%%
 	\hbox{\rulename{choose}},
 	\hbox{\rulename{seq-assoc}},
 	\hbox{\rulename{eqn-float}}, and
@@ -75,6 +75,7 @@ although it is listed under ``Choice'' in \cref{fig:rules}.
 For convenient reference, the five lists of rules are also displayed in tabular form in \cref{fig:rule-groups}.
 
 \begin{figure}
+  %% BE SURE TO KEEP THE CONTENTS OF THIS TABLE SYNCHRONIZED WITH THE BULLET ITEMS IN \cref{sec:confluence}!
 \begin{center}
   \begin{tabular}{@@{}l@@{\qquad}l@@{\qquad}l@@{\qquad}l@@{\qquad}l@@{}}
 $\runi$ and $\runihat$ & $\rcon$ and $\rconhat$ & $\rapp$ and $\rapphat$ & $\rgc$ and $\rgchat$ & $\rspc$ and $\rspchat$ \\
@@ -91,7 +92,7 @@ $\runi$ and $\runihat$ & $\rcon$ and $\rconhat$ & $\rapp$ and $\rapphat$ & $\rgc
 \multicolumn{5}{@@{}l@@{}}{\rulename{seq-swap} (restricted to $eq_2 \prec eq_1$)} \\
 \end{tabular}
 \end{center}
-\caption{Division of the rewrite rules shown in \cref{fig:rules} into groups}\label{fig:rule-groups}
+\caption{Division of the rewrite rules shown in \cref{fig:rules} into groups}\label {fig:rule-groups}
 \Description{A reference table with five columns, showing a division of the rewrite rules shown in \cref{fig:rules} into five groups for purposes of proving confluence}
 \end{figure}
 
