@@ -1735,7 +1735,7 @@ If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
 %
 Proving confluence for application, elimination and choice is easy:
 %
-\simon{added normalization to this list -- Ranjit check} \ranjit{ACK: please check updated}
+% \simon{added normalization to this list -- Ranjit check} \ranjit{ACK: please check updated}
 %
 they all satisfy the \emph{diamond property} --- namely, that two
 different reduction steps can be joined at a common term 
@@ -2133,11 +2133,24 @@ an identifier to each choice with its attendant complications.
 
 Logical variables, choice, and equalities are present in many functional logic
 languages.  However |oneKW| and |allKW| are distinctive features of \versecalc{},
-with the notable exception of Smolka {\etal}'s language Fresh.
-Introduced in a technical report nearly 40 years ago~\cite{smolka:fresh},
-Fresh has \emph{confinement} (equivalent to |oneKW|) and \emph{collection} (equivalent to |allKW|).
-It is a very interesting design, but one does not appear to have been implemented,
-and its treatment of equality and thus logical variables is rather different to ours.
+with the notable exception of Fresh, a very interesting design introduced in a 
+technical report nearly 40 years ago~\cite{smolka:fresh} that also aims 
+to unify functional and logical constructs. 
+%
+Fresh reifies choice into data via \emph{confinement} (corresponding to |oneKW|) 
+and \emph{collection} (corresponding to |allKW|).
+%
+However, Fresh differs from \versecalc{} in crucial ways. 
+%
+First, it solves equations in a strictly left-to-right fashion, which means that 
+it is not lenient in the sense discussed in \cref{sec:lenient}.
+%
+Second, its semantics are presented in an operational fashion with explicit stacks and heaps,
+in contrast to our focus on developing an equational account of functional logic programming.
+%
+Finally, Fresh appears not to have been implemented.
+%
+% It is a very interesting design, but one does not appear to have been implemented,
 
 Several aspects of |allKW| and |oneKW| are worth noting.
 First, |allKW| \emph{reifies} choice (a control operator) into a tuple (a data structure);
