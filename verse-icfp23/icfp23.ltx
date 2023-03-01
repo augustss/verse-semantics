@@ -369,7 +369,7 @@ constrains them with two equalities |(x==tup(y,3)| and |(x==tup(2,z))|, and fina
 The only solution to the two equalities is |y==2|, |z==3|, and |x==tup(2,3)|; so the result of the
 whole expression is |2|.
 
-Functional logic programming has a long history and a rich literature.
+Functional logic programming has a long history and a rich literature \cite{antoy-hanus:survey}.
 But it is somewhat tricky for programmers to \emph{reason} about
 functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
@@ -1150,7 +1150,7 @@ $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| in its surrounding context |X|.
 This rule makes use of new context |X| (see \cref{fig:contexts}), and
-uses the notation |subst X x v| to mean ``capture avoiding substitution of |v| for |x| in |X|'' and
+uses the notation |subst X x v| to mean ``capture-avoiding substitution of |v| for |x| in |X|'' and
 similarly |subst e x v|.
 There are several things to notice:
 \begin{itemize}
@@ -2150,8 +2150,9 @@ to avoid confusing the presentation with these higher-order encodings, but there
 
 \section{\texorpdfstring{\versecalc{}}{The Verse calculus} in context: reflections and related work} \label{sec:related}
 
-Functional logic programming has a rich literature; an excellent
-starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
+Functional logic programming has a rich literature; excellent
+starting points are Antoy and Hanus's CACM review article \cite{antoy-hanus:survey} and
+Hanus's longer survey~\cite{hanus:survey}.  Now that we
 know what \versecalc{} is, we can identify its distinctive features,
 and compare them to other approaches.
 
