@@ -660,7 +660,7 @@ language into equations. But what about multi-equation pattern matching, such as
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly, where
 we use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells
-(see \cref{fig:syntax} to desugar the pattern matching lambda):
+(see \cref{fig:syntax} to desugar the pattern-matching lambda):
 $$
 |append :== lam (tup (xsl,ysl))
   (((xsl == emptytup; ysl) choice
@@ -695,7 +695,7 @@ progress toward a solution (\cref{sec:eval-strategy}).
 
 Every source language will provide a conditional, such as |if (x==0) then
 e_2 else e_3|.  But what is the equality operator in |(x==0)|?  One
-possibility, adopted by Curry, is this: there is one ``='' for
+possibility, adopted by Curry \cite[\S 3.4]{curry:tutorial}, is this: there is one ``='' for
 equations (as in \cref{sec:unify}), and another, say ``=='', for
 testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
 different, more minimalist position, following Icon's lead, see \cref{sec:icon}.
@@ -727,7 +727,7 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
+the one given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
 in a thunk\footnote{Using thunks for the branches of a conditional is another very old idea;
 for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
