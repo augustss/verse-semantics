@@ -374,7 +374,7 @@ But it is somewhat tricky for programmers to \emph{reason} about
 functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
 contrasts with functional programming, where one can say ``just apply
-rewrite rules, such as \textbeta reduction, let-inlining, and
+rewrite rules, such as \textbeta-reduction, let-inlining, and
 case-of-known-constructor.''
 % Moreover, these rewrite rules apply even
 % in the presence of free variables; {\eg}, under lambdas.
@@ -386,7 +386,7 @@ and that compilers can use to optimize them.
 We make the following contributions in this paper.
 First, we describe a new core calculus for functional logic programming,
 the Verse calculus or \versecalc{} for short
-(\cref{sec:informal} and \ref{sec:verse}).
+(\cref{sec:informal}).
 As in any functional logic language,
 \versecalc{} supports logical variables, equalities, and choice, but it is distinctive in several ways:
 \begin{itemize}
@@ -396,7 +396,7 @@ As in any functional logic language,
   addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
 \item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables.
   \versecalc{} offers a new
-  way to address these notions, namely the operators |oneKW| (\cref{sec:one})
+  way to address these notions, through the operators |oneKW| (\cref{sec:one})
   and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
   there is just one equality (other languages may have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
@@ -423,7 +423,7 @@ semantics using rewrite rules, just like the lambda calculus.  That seems challe
 logical variables and unification involve sharing and non-local communication. How can that
 be expressed in a rewrite system?
 
-Happily, we can build on prior work: exactly the same difficulty arises with call-by-need.
+Happily, we can build on prior work: exactly the same difficulty arises with call-by-need in the lambda calculus.
 For a long time, the only semantics of
 call-by-need that was faithful to its sharing semantics (in which thunks are evaluated at most once)
 was an operational semantics that sequentially threads a global heap through execution~\cite{launchbury:natural}.
@@ -452,7 +452,9 @@ $$
 $$
 %
 Rules may be applied anywhere they match, again just like the lambda calculus.
-The question of confluence arises, as we discuss in \cref{sec:metatheory}.
+This freedom only makes sense, however, if each term ultimately reduces to a unique value,
+regardless of its reduction path,
+so we show that \versecalc{} is \emph{confluent}, in \cref{sec:metatheory}.
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
 
@@ -584,7 +586,7 @@ what does |tup (3, (7 choice 5))| mean?
 In \versecalc{}, it does \emph{not} mean a pair with some kind of multi-value in its second component.
 Indeed, as you can see from \cref{fig:syntax}, this expression is syntactically ill-formed.
 We must instead give a name to that choice, and then we can put it in the pair, thus: |def x (x == (7 choice 5); tup (3,x))|.
-This is syntactically legal, but what does it mean?  In \versecalc{}, a variable is never bound to a multi-value.
+Now the expression is syntactically legal, but what does it mean?  In \versecalc{}, a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
 |def x (x == (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x==7; tup (3,x))) choice (def x (x==5; tup (3,x))))|
@@ -623,7 +625,7 @@ $$
 $$
 Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x*2|''.
 But there is a problem: so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
-Well, we can see two equations here, |(x==3)| and |(x==4)|, which are mutually contradictory,
+Here, we can see two equations, |(x==3)| and |(x==4)|, which are mutually contradictory,
 so clearly we need to refine our notion of ``solving.''
 The answer is pretty clear: in a branch of a choice, solve the equations in that branch
 to get the value for some logical variables, \emph{and propagate those values to occurrences in
@@ -710,8 +712,9 @@ non-deterministic: the result is affected by the order in which we did unificati
 To address this, we give |if| a special property: in the expression |if e_1 then e_2 else e_3|, equations inside |e_1| (the condition of the |if|)
 can only unify variables bound inside |e_1|; variables bound outside |e_1| are called ``rigid.''  So in our example, the |x| in |(x==0)| is
 rigid and cannot be unified.  Instead, the |if| is stuck, and we move on to unify |x==7|.  That unblocks
-the |if| and all is well.  This special property is precisely the local propagation rule that we sketched for
-choice (\cref{sec:mixing}).
+the |if| and all is well.
+% This special property is precisely the local propagation rule that we sketched for
+% choice (\cref{sec:mixing}).
 
 In fact, \versecalc{} desugars the three-part |if| into something simpler, the unary construct |one(e)|.
 Its specification is this:
@@ -724,13 +727,14 @@ This isn't right yet, but the idea is this: if |e_1| fails, the first branch of 
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
 given in \cref{fig:syntax}, which wraps the |then| and |else| branches
-in a thunk\footnote{Using thunks for the branches of a conditional is another old idea; for example, see \cite[p.\ 54]{steele:rabbit}.}:
+in a thunk\footnote{Using thunks for the branches of a conditional is another very old idea;
+for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
 |apply0 (one( (e_1; (thunk (e_2))) choice (thunk (e_3))))|
 $$
 The argument of |oneKW| reduces to either |(thunk e_2) `choice` (thunk e_3)| or |(thunk e_3)| depending on whether |e_1| succeeds or fails,
 respectively; |oneKW| then picks the first value, that is |thunk e_2| if |e_1| succeeded, or |thunk e_3| if |e_1| failed, and
-applies it to |tup ()| .
+applies it to |tup ()|.
 As a bonus, provided we do no evaluation under a lambda, then |e_2| and |e_3| will
 remain unevaluated until the choice is made, just as we expect from a conditional.
 
@@ -771,8 +775,8 @@ which (as we will see in \cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
 So |allKW| allows a choice to be reified into a tuple; and |(def i (apply1 t i))| allows a
 tuple to be turned back into a choice.
-(The ``rewrite a call of a function with a finite domain into a finite choice''
-is called ``narrowing'' in the literature.)
+The idea of rewriting a call of a function with a finite domain into a finite choice
+is called ``narrowing'' in the literature.
 
 Do we even need |oneKW| as a primitive construct, given that we have
 |allKW|? Can we not use |apply1 (all e) 0| instead of |one e|? Indeed,
@@ -908,7 +912,7 @@ Partial functions, \eg, |head|, will |fail| when the argument is outside of the 
 
 Pattern matching for function definitions is simply done by unification of ordinary expressions;
 see the desugaring of pattern-matching lambda in \cref{fig:syntax}.
-This means that we can use ordinary abstraction mechanisms for patterns.
+This in turn means that we can use ordinary abstraction mechanisms for patterns.
 For example, here is a function, |fcn|, that should be called as follows: |applyN fcn (88,1,99,2)|.
 $$
 \begin{array}{l}
@@ -948,8 +952,7 @@ Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we ca
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the tuple to |emptytup| afterwards, using a |map| function, as defined in \cref{fig:list-functions}.
-The full desugaring is:
+apply each element of the tuple to |emptytup| afterwards, using a |map| function (defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
 |def v (v == all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
