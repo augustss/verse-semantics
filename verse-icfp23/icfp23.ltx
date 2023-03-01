@@ -537,7 +537,7 @@ $$
 %with |tup(a,b)|, where |a,b| are fresh logical
 % variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, we allow ourselves to write a term like
-|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|.'' Formally, you can imagine
+|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|''; formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first == ...); e|,
 and similarly for other library functions.
 
@@ -557,8 +557,8 @@ For example,
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
 consider |(def (x ^^ y) (x == 3+y; y == 7; x))|.  The sub-expression |3+y| is stuck until |y| gets a value.
-In \versecalc{}, we can only unify |x| with a \emph{value}---we will see why in \cref{sec:call-time-choice}---and
-hence the equation |x==3+y| is stuck.
+In \versecalc{}, we can unify |x| only with a \emph{value}---we will see why in \cref{sec:call-time-choice}---and
+hence the equation |x==3+y| is also stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y==7|,
 and that in turn unlocks |x == 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
 and unify |x| with that.  The idea of leaving stuck expressions aside and executing other parts of the
