@@ -1632,7 +1632,7 @@ A term $e$ is an $\rr$-\emph{Normal Form} if there does
 not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
 Confluence implies uniqueness of normal forms (unicity): if $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
 and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
-\cite{Barendregt}.
+\cite[Corollary 3.1.13(ii)]{Barendregt}.
 
 % \begin{lemma}[Unicity] \label{lem:nf}
 % If $\rr$ is confluent then every term reduces to at most one normal form.
@@ -1782,7 +1782,7 @@ Second, we prove that the unification reductions are \emph{terminating}, which r
 upon eliminating recursion in tuples via \rulename{u-occurs} and in lambdas
 via the \norecursion condition.
 %
-Newman's Lemma \cite{Barendregt} then implies the
+Newman's Lemma \cite[Lemma 2.4]{Huet80} then implies the
 locally confluent, terminating unification relation is
 also confluent.
 
@@ -1988,7 +1988,7 @@ We travel a path very similar to the one blazed by Zena Ariola and her co-author
 Ariola and Klop studied a form of the lambda calculus with an added $\mathsf{letrec}$ construct and
 determined (like us) that their calculus was not confluent; then they added a specific
 constraint on recursive substitution
-and proved that the modified calculus is confluent \cite{ariola:lambda-letrec}.
+and proved that the modified calculus is confluent \cite{ariola:cyclic-lambda,ariola:lambda-letrec}.
 In a later paper, Ariola and Blom proved that their calculus without the constraint, while not confluent,
 does obey a weaker related property, which they invented, of \emph{skew confluence} \cite{ariola:skew-confluence}.
 We believe, and currently are trying to prove, that \versecalc{} is skew confluent without the
