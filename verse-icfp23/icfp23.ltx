@@ -622,9 +622,9 @@ $$
 In the last section, we discussed what happens if there is a choice in the right-hand side (RHS) of
 an equation. What if we have equations under choice?  For example:
 $$
-|def x ((x==3; x+1) choice (x==4; x*2))|
+|def x ((x==3; x+1) choice (x==4; x+4))|
 $$
-Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x*2|''.
+Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x+4|''.
 But there is a problem: so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
 Here, we can see two equations, |(x==3)| and |(x==4)|, which are mutually contradictory,
 so clearly we need to refine our notion of ``solving.''
@@ -634,7 +634,7 @@ to get the value for some logical variables, \emph{and propagate those values to
 this \emph{local propagation}.
 This local-propagation rule would allow us to reason thus:
 $$
-|def x ((x==3; x+1) choice (x==4; x*2))| \movesto  |def x ((x==3; 4) choice (x==4; 8))|
+|def x ((x==3; x+1) choice (x==4; x+4))| \movesto  |def x ((x==3; 4) choice (x==4; 8))|
 $$
 Are we stuck now?  No, we can float the choice out as
 before\footnote{Indeed, we could have done so first, had we wished.},
