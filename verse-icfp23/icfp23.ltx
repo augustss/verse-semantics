@@ -1199,6 +1199,7 @@ the same, but which are syntactically different.  Rule \rulename{var-swap} allow
 them to be brought together, so that the unification rules are confluent.
 Rule \rulename{seq-swap} is needed for a similar reason. Consider
 this example where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
+\lennart{Using $\prec$ which has not been defined yet.}
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
   \multicolumn{4}{c}{|c==a; c==b; c|} \\
@@ -1222,7 +1223,8 @@ To achieve this, \rulename{var-swap} fires on |y==x| only if
 ends up on the left.
 Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely;
 and the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
-prevents the rule from firing until \rulename{var-swap} has done its work;
+prevents the rule from firing until \rulename{var-swap} has done its work.
+\lennart{Mention that \rulename{seq-swap} is only needed for confluence, not progress?}
 
 Other rules, notably \rulename{exi-swap}, may change this binding order
 and thereby re-enable \rulename{var-swap} or \rulename{seq-swap},
