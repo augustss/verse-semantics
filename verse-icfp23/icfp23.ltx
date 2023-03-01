@@ -726,7 +726,7 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}, which wraps the |then| and |else| branches
+given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
 in a thunk\footnote{Using thunks for the branches of a conditional is another very old idea;
 for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
