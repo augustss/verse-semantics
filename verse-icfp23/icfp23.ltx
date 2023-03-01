@@ -293,7 +293,7 @@
   Functional logic languages have a rich literature, but it is tricky
   to give them a satisfying semantics.  In this paper we describe the
   Verse calculus, \versecalc{}, a new core calculus for functional
-  logical programming. Our main contribution is to equip \versecalc{} with a
+  logic programming. Our main contribution is to equip \versecalc{} with a
   small-step rewrite semantics, so that we can reason
   about a \versecalc{} program in the same way as one does with lambda
   calculus; that is, by applying successive rewrites to it.
@@ -646,7 +646,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 % |square = lam x (x*x)|.  What does |apply1 square (3 choice 4)| mean? If we make the choice \emph{before}
 % the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
 % it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
-% All functional-logic languages, including
+% All functional logic languages, including
 
 \subsection{Pattern matching and narrowing}
 
@@ -1115,7 +1115,7 @@ Note in particular that unification fails if you attempt to unify a
 lambda with any other value, including itself (see \cref{sec:unifying-lambda}).
 
 The standard ``occurs check'' is rule \rulename{u-occurs}, which makes use of a
-so-called \emph{context} |V|, whose syntax is given in \cref{fig:contexts}
+\emph{context} |V|, whose syntax is given in \cref{fig:contexts}
 \cite{felleisen:contexts1,felleisen:contexts2}.
 In general, a context is a syntax tree containing a single hole, written |hole|.
 The notation |V^[v]| is the term obtained by filling the hole
@@ -1150,7 +1150,7 @@ $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| in its surrounding context |X|.
 This rule makes use of new context |X| (see \cref{fig:contexts}), and
-uses the notation |subst X x v| to mean ``substitute |v| for |x| in |X|'' and
+uses the notation |subst X x v| to mean ``capture avoiding substitution of |v| for |x| in |X|'' and
 similarly |subst e x v|.
 There are several things to notice:
 \begin{itemize}
