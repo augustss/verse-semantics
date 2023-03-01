@@ -618,7 +618,7 @@ $$
 
 \subsection{Mixing choice and equations} \label{sec:mixing}
 
-In the last section, we discussed what happens if there is a choice in the right-hand-side (RHS) of
+In the last section, we discussed what happens if there is a choice in the right-hand side (RHS) of
 an equation. What if we have equations under choice?  For example:
 $$
 |def x ((x==3; x+1) choice (x==4; x*2))|
@@ -686,7 +686,7 @@ evaluates to |emptytup|, effectively running |append| backwards in the classic l
 
 This example also illustrates that \versecalc{} allows an equation (for |append|)
 that is recursive. As in any functional language with recursive bindings, you can
-go into an infinite loop if you keep fruitlessly inlining the function in its own right-hand-side.
+go into an infinite loop if you keep fruitlessly inlining the function in its own right-hand side.
 It is the business of an \emph{evaluation strategy} to do only rewrites that make
 progress toward a solution (\cref{sec:eval-strategy}).
 
@@ -1038,7 +1038,7 @@ has the following properties:
   and by compilers to transform (and hopefully optimise) the program.
 \item There is no ``magical rewriting'' (\cref{sec:magical}):
   all the free variables on the
-  right-hand-side of a rule are bound on the left.
+  right-hand side of a rule are bound on the left.
 \end{itemize}
 
 \figureRewriteRules
@@ -1156,7 +1156,7 @@ uses the notation |subst X x v| to mean ``substitute |v| for |x| in |X|'' and
 similarly |subst e x v|.
 There are several things to notice:
 \begin{itemize}
-\item \rulename{subst} fires only when the right-hand-side of the equation
+\item \rulename{subst} fires only when the right-hand side of the equation
   is a \emph{value} |v|, so that the substitution does not risk
   duplicating either work or choices. This
 restriction is precisely the same as the \rulename{let-v} rule of \citet{ariola:call-by-need}
@@ -1300,7 +1300,7 @@ The exception is \rulename{fail-elim}, which propagates failure.
 Four \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
 \rulename{seq-assoc} makes semicolon right-associated; \rulename{eqn-float} moves work out
-of the right-hand-side of an equation |v==e|.
+of the right-hand side of an equation |v==e|.
 For example, we cannot use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
 because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{eqn-float}
 to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
@@ -2244,7 +2244,7 @@ cannot float outside |oneKW| and |allKW| (\cref{sec:normalization}).
 
 Our logical variables, introduced by |defKW|, are often called
 \emph{extra variables} in the literature, because they
-are typically introduced as variables that appear on the right-hand-side of a
+are typically introduced as variables that appear on the right-hand side of a
 function definition, but are not bound on the left.  For example, in Curry we can write:
 \begin{verbatim}
      first x | x =:= (a,b) = a where a,b free
