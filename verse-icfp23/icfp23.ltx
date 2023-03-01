@@ -478,7 +478,8 @@ some built-in operations and tuples as data constructors:
 For clarity, we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item A term |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v==e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
-\item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
+\item \emph{A program}, |p|, contains a closed expression from which we extract one result
+  using |oneKW| (see \cref{sec:one})---unless the expression fails, in which case the program fails (\cref{sec:choice}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
