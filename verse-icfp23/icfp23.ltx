@@ -855,7 +855,7 @@ Partial functions, \eg, |head|, will |fail| when the argument is outside of the 
       |applyN map (f, xsl)| & |:==|  & |if x :== apply1 head xsl then applyN cons (apply1 f x, applyN map (f,apply1 tail xsl)) else emptytup| \\
       |applyN filter (p, xsl)| & |:==| & |all (def i (x :== apply1 xsl i; one (apply1 p x); x))| \\
       |applyN find (p, xsl)| & |:==| & |one (def i (x :== apply1 xsl i; one (apply1 p x); x))| \\
-      |applyN every (p, xsl)| & |:==| & |applyN map (p,xsl)| \\
+%%      |applyN every (p, xsl)| & |:==| & |applyN map (p,xsl)| \\
       |applyN some (p, xsl)| & |:==| & |one (def i (apply1 p (apply1 xsl i)))|\\
 %      |applyN fromTo (lo,hi)| & |:==| & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
       |applyN zip (xsl,ysl)| & |:==| & |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
@@ -945,7 +945,7 @@ Like list comprehension, |for| supports filtering; in \versecalc{}, this falls o
 a possibly failing expression in |e_1|.
 So, |fordo(x :== 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected and requires nothing special.
-So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|
+So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|.
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
