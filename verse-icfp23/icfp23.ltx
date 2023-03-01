@@ -745,7 +745,7 @@ This, together with the desugaring for |if| into |oneKW|, gives the ``special pr
 \subsection{Tuples and \texorpdfstring{|allKW|}{``all''}} \label{sec:tuple}
 
 The main data structure in \versecalc{} is the \emph{tuple}.
-A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
+A tuple is a finite sequence of values, |tup (v_1,xdots,v_n)|, where $n\geq 0$.
 A tuple can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|, as is indexing with
 a non-integer value.
@@ -757,7 +757,7 @@ giving |x:==(1 `choice` 0 `choice` 1); apply1(tup (10,27,32)) x|, which readily 
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` xdots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
-the tuple |tup (v_1, dots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
+the tuple |tup (v_1, xdots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
 $n$-way choice.
@@ -793,9 +793,9 @@ before proceeding, while |oneKW| only needs the
 \versecalc{} is a fairly small language, but it is quite expressive.
 For example, we can define the typical list functions one would expect from functional programming
 by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
-A tuple can be turned into choices by indexing with a logical variable |i|.
+A tuple can be turned into choices by indexing with a logical variable~|i|.
 Conversely, choices can be turned into a tuple using |allKW|.
-The choice operator, |choice|, serves as both |cons| and |append| for choices;
+The choice operator ``|choice|'' serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
 Partial functions, \eg, |head|, will |fail| when the argument is outside of the domain.
 
@@ -924,7 +924,7 @@ $$
 |applyN pat (v,w) :== tup(v,1,w,2);| \quad \quad
 |apply1 fcn t :== def (x ^^ y) (t == applyN pat (x,y); x+y)|
 $$
-Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
+Patterns are truly first-class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $$
 |applyN pat (a,v,w) :== if a==0 then tup (v,1,w,2) else tup (1,1,w,v)|
