@@ -936,7 +936,7 @@ so that the pattern depends on the value of |a|.
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
 % The |e_1| is called the \emph{domain} of the loop.
-The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and explained by
+The scoping is peculiar\footnote{But similar to C++, Java, Fortress, and Swift, and explained in \versecalc{} by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
 So, for example, |fordo(x :== 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
@@ -951,7 +951,7 @@ So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
-simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
+simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| within a lambda expression, and
 apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
@@ -959,13 +959,13 @@ apply each element of the tuple to |emptytup| afterwards, using a |map| function
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
-Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
+Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since the effects are contained within that lambda.
 So, for example, |fordo(x:==10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point, it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example, |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
+For example, |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, each increased by its index within |t|.  Notice the absence of the
 fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most languages.
 
 
