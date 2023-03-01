@@ -1078,18 +1078,18 @@ iff |x| is between |10| and |0| (comparison is right-associative).
 only unusual feature is that on the RHS of the rule, we use an |defKW| to bind |x|,
 together with |(x==v)| to equate |x| to the argument.
 The rule may appear to use call-by-value, because the argument is a value |v|,
-but remember that values include variables, which may be bound to an
+but remember that values include variables, and a variable may be bound to an
 as-yet-unevaluated expression.  For example:
 $$
 |def y (y == 3+4; apply1 (lam x (x+1)) y)|
 \; \movesto \;
 |def y (y == 3+4; def x (x==y; x+1))|
 $$
-Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
+Finally, the side condition $x \not\in \freevars{|v|}$ in \rulename{app-beta}
 ensures that the $|defKW| |x|$
 % hacky typesetting to ge the \exists right next to the x.
 does not capture any variables free in |v|.  If |x| appears free in |v|,
-\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{v}$.
+\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{|v|}$.
 
 In \versecalc{}, tuples behave like (finite) functions in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works on non-empty
@@ -1144,7 +1144,7 @@ The key rule is:
 $$
 \begin{array}{rrcll}
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
   &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
 \end{array}
 $$
@@ -1169,7 +1169,7 @@ suffice to express the necessary sharing.
   |X == (hole; z==x+3)|, but that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
-\item The side condition $x \not\in \freevars{v}$ in \rulename{subst} prevents infinite substitution,
+\item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
   The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
@@ -1268,7 +1268,7 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
 % $$
 % \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
-%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{|v|}$} \\
 % $$
 % Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
 % $$
@@ -1833,7 +1833,7 @@ normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
 %
 Our proof strategy for the confluence of the unification rules requires that they terminate.
 %
-The side condition $|x| \not\in \freevars{v}$ in \rulename{subst} avoids infinite
+The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
 substitution.
 If instead we dropped that condition, the following sequence of \rulename{subst}
 reductions would not terminate:
