@@ -1509,8 +1509,11 @@ invariably involves reducing under lambdas, so for practical purposes it is well
 For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost-outermost reduction}, is a \emph{good} evaluation strategy.
 
-We believe that the same leftmost-outermost strategy is \emph{good} for
-\versecalc{}: just repeatedly reduce the leftmost-outermost
+We believe that the same leftmost-outermost strategy is close to being \emph{good} for
+\versecalc{}\footnote{
+  We say ``close to'' being good because we do not yet have a proof; indeed
+  rule \rulename{fail-elim} may be a bit too powerful.
+}: just repeatedly reduce the leftmost-outermost
 redex, with some tweaks to avoid infinite application of \rulename{exi-swap}.
 That is easy in theory, but it is tricky in practice.  For
 example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
