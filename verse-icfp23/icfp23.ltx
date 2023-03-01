@@ -1215,6 +1215,8 @@ because they differ only in the order of the equations |(b==a)| and |(c==a)|;
 our intuition that order of equations |(x=v)| does not matter.
 Both \rulename{var-swap} and \rulename{seq-swap} are needed only for \emph{confluence},
 not for \emph{progress}. \simon{I think this is true of both, isn't it?}
+\lennart{Without \rulename{var-swap} I think we need another \rulename{eqn-elim} rule for the |y==x| case.}
+\lennart{We also don't need \rulename{exi-swap} if we a stronger \rulename{eqn-elim}.}
 
 Next we study the mysterious $x \prec y$ side condition in \rulename{var-swap},
 and similar ones in \rulename{subst} and \rulename{seq-swap}.
