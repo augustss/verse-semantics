@@ -796,7 +796,7 @@ A tuple can be turned into choices by indexing with a logical variable |i|.
 Conversely, choices can be turned into a tuple using |allKW|.
 The choice operator, |choice|, serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
-Partial functions, \eg, |head|, will |fail| when the argument is outside of the function domain.
+Partial functions, \eg, |head|, will |fail| when the argument is outside of the domain.
 
 % \subsection{Syntactic sugar}
 %
@@ -843,8 +843,7 @@ Partial functions, \eg, |head|, will |fail| when the argument is outside of the 
     \textbf{Desugaring}\\
     \begin{array}{rcll}
       |apply1 f x :== e| & \text{means} & |f :== lam x e| \\
-      |applyN f (x,y) :== e| & \text{means} &
-        |f :== lam p (def (x ^^ y) (p=tup (x,y); e))| & \text{|p| fresh} \\
+      |applyN f (x,y) :== e| & \text{means} & |f :== lam (tup (x,y)) e|  \\
      \end{array} \\ \\[-3mm]
 
     \begin{array}{rcl}
@@ -913,7 +912,7 @@ Partial functions, \eg, |head|, will |fail| when the argument is outside of the 
 Pattern matching for function definitions is simply done by unification of ordinary expressions;
 see the desugaring of pattern-matching lambda in \cref{fig:syntax}.
 This in turn means that we can use ordinary abstraction mechanisms for patterns.
-For example, here is a function, |fcn|, that should be called as follows: |applyN fcn (88,1,99,2)|.
+For example, here is a function, |fcn|, that could be called as follows: |applyN fcn (88,1,99,2)|.
 $$
 \begin{array}{l}
 |apply1 fcn t :== def (x ^^ y) (t == tup(x,1,y,2); x+y)|
@@ -927,9 +926,9 @@ $$
 Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $$
-|applyN pat (a,v,w) :== if a==0 then tup (v,1,w,3) else tup (1,1,w,v)|
+|applyN pat (a,v,w) :== if a==0 then tup (v,1,w,2) else tup (1,1,w,v)|
 $$
-so that the pattern depends on the value of |t|.
+so that the pattern depends on the value of |a|.
 
 \subsection{\texorpdfstring{|for|}{``for''} loops} \label{sec:for}
 
@@ -952,10 +951,10 @@ Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we ca
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
-apply each element of the tuple to |emptytup| afterwards, using a |map| function (defined in \cref{fig:list-functions}):
+apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
-|def v (v == all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
