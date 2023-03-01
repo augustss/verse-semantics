@@ -998,8 +998,7 @@ fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most lan
 
 \section{Rewrite rules} \label{sec:rewrite-rules}
 
-How can we give a precise semantics to a non-strict functional
-programming language?  \lennart{Why are we mentioning non-strict functional here?}
+How can we give a precise semantics to a programming language?
 Here are some possibilities:
 \begin{itemize}
 \item \emph{A denotational semantics} is the classical approach,
@@ -1175,7 +1174,7 @@ suffice to express the necessary sharing.
   The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
 
-\subsection{Swapping} \label{sec:swapping}
+\subsection{Swapping and binding order} \label{sec:swapping}
 
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
@@ -1198,8 +1197,8 @@ in the first step. As you can see, they conclude with two terms that are ``obvio
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are confluent.
 Rule \rulename{seq-swap} is needed for a similar reason. Consider
-this example where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
-\lennart{Using $\prec$ which has not been defined yet.}
+this example:
+% where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
 $$
 \begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
   \multicolumn{4}{c}{|c==a; c==b; c|} \\
@@ -1214,17 +1213,20 @@ Again, the concluding terms of the two columns are ``obviously'' the same,
 because they differ only in the order of the equations |(b==a)| and |(c==a)|;
 \rulename{seq-swap} allows them to be brought together, and makes explicit
 our intuition that order of equations |(x=v)| does not matter.
+Both \rulename{var-swap} and \rulename{seq-swap} are needed only for \emph{confluence},
+not for \emph{progress}. \simon{I think this is true of both, isn't it?}
 
+Next we study the mysterious $x \prec y$ side condition in \rulename{var-swap},
+and similar ones in \rulename{subst} and \rulename{seq-swap}.
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).
-To achieve this, \rulename{var-swap} fires on |y==x| only if
-|x| is bound inside |y|, written $|x| \prec |y|$, so that the innermost-bound variable
+To achieve this, \rulename{var-swap} fires on |y==x| \emph{only if
+|x| is bound inside |y|}, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
 Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely;
-and the side condition $|v| = |y| \implies |x| \prec |y|$ on \rulename{subst}
+and the side condition $(|v| = |y| \implies |x| \prec |y|)$ on \rulename{subst}
 prevents the rule from firing until \rulename{var-swap} has done its work.
-\lennart{Mention that \rulename{seq-swap} is only needed for confluence, not progress?}
 
 Other rules, notably \rulename{exi-swap}, may change this binding order
 and thereby re-enable \rulename{var-swap} or \rulename{seq-swap},
