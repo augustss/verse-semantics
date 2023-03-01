@@ -293,7 +293,7 @@
   Functional logic languages have a rich literature, but it is tricky
   to give them a satisfying semantics.  In this paper we describe the
   Verse calculus, \versecalc{}, a new core calculus for functional
-  logical programming. Our main contribution is to equip \versecalc{} with a
+  logic programming. Our main contribution is to equip \versecalc{} with a
   small-step rewrite semantics, so that we can reason
   about a \versecalc{} program in the same way as one does with lambda
   calculus; that is, by applying successive rewrites to it.
@@ -646,7 +646,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 % |square = lam x (x*x)|.  What does |apply1 square (3 choice 4)| mean? If we make the choice \emph{before}
 % the call, the call will yield |9 choice 16|.  But if we a more call-by-name semantics, we might imagine
 % it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
-% All functional-logic languages, including
+% All functional logic languages, including
 
 \subsection{Pattern matching and narrowing}
 
