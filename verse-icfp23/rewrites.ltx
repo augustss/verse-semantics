@@ -168,9 +168,10 @@
 \newcommand{\figureSyntax}{
 \begin{figure}[t]
     $$
-  \begin{array}{l}
+%%  \begin{array}{l}
+  \begin{array}{l@@{}}
       \textbf{Syntax} \\
-      \begin{array}{lr@@{\;}c@@{\;}l}
+      \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
@@ -204,7 +205,8 @@
       \text{Parentheses may be used freely to aid readability and override default precedence.}\\
   \\[-0.6em]
       \textbf{Desugaring} \\
-    \begin{array}{rcl@@{\hspace{4em}}l}
+%%    \begin{array}{rcl@@{\hspace{4em}}l}
+    \begin{array}{rcl@@{\hspace{3.5em}}l}
 %%      |emptytup| & \text{means} & |arr ()|\\
 %%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
 \iffalse
@@ -292,6 +294,8 @@
   \begin{figure}
 %% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3 
 %%    $\begin{array}{l}
+
+         %%          $\begin{array}{@@{}l@@{}}
     $\begin{array}{@@{}l}
 
     % \rulegroupname{Primitive operations}
@@ -307,7 +311,9 @@
 %% GS: change \quad to \hskip0.5em to get a little more horizontal space to work with in this figure; also add @@{}
 %% \begin{array}{@@{\quad} l  r @@{\;}c@@{\;} l l}
 %%\begin{array}{@@{\hskip0.5em} l @@{}r @@{\;}c@@{\;} l@@{\hskip4em}l}
-\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+
+%% \begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Application:}
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
@@ -316,7 +322,8 @@
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
                               \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
-                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
+%%                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
+                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
@@ -331,7 +338,8 @@
     % The \; reduces the spacing around the arrow
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-1.8em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+%%  \rulename{u-tup} & \hspace{-1.8em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
@@ -346,6 +354,14 @@
 
     \\[-0.6em]
 
+\rulegroupname{Elimination:}
+\rulename{val-elim} & |v ; e| & \movesto & |e| \\
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
+
+    \\[-0.6em]
+
 \rulegroupname{Normalization:}
 \rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
@@ -354,14 +370,6 @@
 %\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| &
 %                      \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
 %\multicolumn{5}{l}{\text{\lennart{Plan: remove rule above, use rule below, move to unification group}}}\\
-
-    \\[-0.6em]
-
-\rulegroupname{Elimination:}
-\rulename{val-elim} & |v ; e| & \movesto & |e| \\
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
-\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
 
     \\[-0.6em]
 

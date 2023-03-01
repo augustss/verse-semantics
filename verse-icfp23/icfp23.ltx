@@ -369,7 +369,7 @@ constrains them with two equalities |(x==tup(y,3)| and |(x==tup(2,z))|, and fina
 The only solution to the two equalities is |y==2|, |z==3|, and |x==tup(2,3)|; so the result of the
 whole expression is |2|.
 
-Functional logic programming has a long history and a rich literature.
+Functional logic programming has a long history and a rich literature \cite{antoy-hanus:survey}.
 But it is somewhat tricky for programmers to \emph{reason} about
 functional logic programs: they must think about logical variables,
 narrowing, backtracking, Horn clauses, resolution, and the like.  This
@@ -419,7 +419,7 @@ We discuss the related work in \cref{sec:related}, and design alternatives in \c
 Our second contribution is to equip \versecalc{} with a
 \emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
 We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
-semantics using rewrite rules, just like the lambda calculus.  That seems challenging, however, because
+semantics using rewrite rules, just as for the lambda calculus.  That seems challenging, however, because
 logical variables and unification involve sharing and non-local communication. How can that
 be expressed in a rewrite system?
 
@@ -478,7 +478,8 @@ some built-in operations and tuples as data constructors:
 For clarity, we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item A term |eq| is either an ordinary expression |e|, or
 an \emph{equation} |v==e|; this syntax ensures that equations can only occur to the left of a ``|;|'' (\cref{sec:unify}).
-\item \emph{A program}, |p|, is a closed expression from which we extract one result using |oneKW| (see \cref{sec:one}).
+\item \emph{A program}, |p|, contains a closed expression from which we extract one result
+  using |oneKW| (see \cref{sec:one})---unless the expression fails, in which case the program fails (\cref{sec:choice}).
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
@@ -492,10 +493,10 @@ and has the same semantics. Just like the lambda calculus, \versecalc{} is untyp
 adding a type system is an excellent goal, but is the subject of another paper.
 
 Expressions also include two other key collections of constructs:
-logical variables and unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
+logical variables and the use of equations to perform unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
 The details of choice and unification, and especially their
-interaction, are subtle, so this section will do a lot of
-arm-waving.  But fear not: \cref{sec:rewrite-rules} will spell out the precise details.
+interaction, are subtle, so this section does a lot of
+arm-waving.  But fear not: \cref{sec:rewrite-rules} spells out the precise details.
 We only have space to describe one incarnation of \versecalc{}; \cref{sec:variations}
 explores some possible alternative design choices.
 
@@ -536,7 +537,7 @@ $$
 %with |tup(a,b)|, where |a,b| are fresh logical
 % variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, we allow ourselves to write a term like
-|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|.'' Formally, you can imagine
+|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|''; formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first == ...); e|,
 and similarly for other library functions.
 
@@ -556,8 +557,8 @@ For example,
 % foothand not needed, the figure introduces this shorthand
 %\footnote{We informally write |3+y| rather than |applyN add (3,y)|, and similarly with other operators.},
 consider |(def (x ^^ y) (x == 3+y; y == 7; x))|.  The sub-expression |3+y| is stuck until |y| gets a value.
-In \versecalc{}, we can only unify |x| with a \emph{value}---we will see why in \cref{sec:call-time-choice}---and
-hence the equation |x==3+y| is stuck.
+In \versecalc{}, we can unify |x| only with a \emph{value}---we will see why in \cref{sec:call-time-choice}---and
+hence the equation |x==3+y| is also stuck.
 No matter!  We simply leave it and try some other equation. In this case, we can make progress with |y==7|,
 and that in turn unlocks |x == 3+y| because now we know that |y| is |7|, so we can evaluate |3+7| to |10|
 and unify |x| with that.  The idea of leaving stuck expressions aside and executing other parts of the
@@ -589,7 +590,7 @@ We must instead give a name to that choice, and then we can put it in the pair, 
 Now the expression is syntactically legal, but what does it mean?  In \versecalc{}, a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
-|def x (x == (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x==7; tup (3,x))) choice (def x (x==5; tup (3,x))))|
+|def x (x == (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x==7; tup (3,x))) choice (def x (x==5; tup (3,x)))|
 $$
 We duplicate the context surrounding the choice, and ``float the choice outwards.''
 The same thing happens when there are multiple choices.  For example:
@@ -621,9 +622,9 @@ $$
 In the last section, we discussed what happens if there is a choice in the right-hand side (RHS) of
 an equation. What if we have equations under choice?  For example:
 $$
-|def x ((x==3; x+1) choice (x==4; x*2))|
+|def x ((x==3; x+1) choice (x==4; x+4))|
 $$
-Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x*2|''.
+Intuitively, ``either unify |x| with |3| and yield |x+1|, or unify |x| with |4| and yield |x+4|''.
 But there is a problem: so far we have said only ``a program executes by solving its equations'' (\cref{sec:unify}).
 Here, we can see two equations, |(x==3)| and |(x==4)|, which are mutually contradictory,
 so clearly we need to refine our notion of ``solving.''
@@ -633,7 +634,7 @@ to get the value for some logical variables, \emph{and propagate those values to
 this \emph{local propagation}.
 This local-propagation rule would allow us to reason thus:
 $$
-|def x ((x==3; x+1) choice (x==4; x*2))| \movesto  |def x ((x==3; 4) choice (x==4; 8))|
+|def x ((x==3; x+1) choice (x==4; x+4))| \movesto  |def x ((x==3; 4) choice (x==4; 8))|
 $$
 Are we stuck now?  No, we can float the choice out as
 before\footnote{Indeed, we could have done so first, had we wished.},
@@ -659,7 +660,7 @@ language into equations. But what about multi-equation pattern matching, such as
 If pattern matching on the first equation fails, we want to fall through to the second.
 Fortunately, choice allows us to express this idea directly, where
 we use the empty tuple |emptytup| to represent the empty list and pairs to represent cons cells
-(see \cref{fig:syntax} to desugar the pattern matching lambda):
+(see \cref{fig:syntax} to desugar the pattern-matching lambda):
 $$
 |append :== lam (tup (xsl,ysl))
   (((xsl == emptytup; ysl) choice
@@ -694,7 +695,7 @@ progress toward a solution (\cref{sec:eval-strategy}).
 
 Every source language will provide a conditional, such as |if (x==0) then
 e_2 else e_3|.  But what is the equality operator in |(x==0)|?  One
-possibility, adopted by Curry, is this: there is one ``='' for
+possibility, adopted by Curry \cite[\S 3.4]{curry:tutorial}, is this: there is one ``='' for
 equations (as in \cref{sec:unify}), and another, say ``=='', for
 testing equality (returning a boolean with constructors |True| and |False|).  \versecalc{} takes a
 different, more minimalist position, following Icon's lead, see \cref{sec:icon}.
@@ -726,7 +727,7 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
+the one given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
 in a thunk\footnote{Using thunks for the branches of a conditional is another very old idea;
 for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
@@ -744,7 +745,7 @@ This, together with the desugaring for |if| into |oneKW|, gives the ``special pr
 \subsection{Tuples and \texorpdfstring{|allKW|}{``all''}} \label{sec:tuple}
 
 The main data structure in \versecalc{} is the \emph{tuple}.
-A tuple is a finite sequence of values, |tup (v_1,dots,v_n)|, where $n\geq 0$.
+A tuple is a finite sequence of values, |tup (v_1,xdots,v_n)|, where $n\geq 0$.
 A tuple can be used like a function: indexing is simply function application
 with the argument being integers from 0 and up.  Indexing out of range is |fail|, as is indexing with
 a non-integer value.
@@ -756,7 +757,7 @@ giving |x:==(1 `choice` 0 `choice` 1); apply1(tup (10,27,32)) x|, which readily 
 
 Tuples can be constructed by collecting all the results from a multi-valued expression, using the |allKW| construct:
 if |e| reduces to |(v_1 `choice` xdots `choice` v_n)|, where $n \geq 2$, then |all e| reduces to
-the tuple |tup (v_1, dots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
+the tuple |tup (v_1, xdots, v_n)|; |all v| produces the singleton tuple |tup v|; and |all fail| produces the empty tuple |emptytup|.
 Note that |choice| is associative, which means that we
 can think of a sequence or tree of binary choices as really being a single
 $n$-way choice.
@@ -792,9 +793,9 @@ before proceeding, while |oneKW| only needs the
 \versecalc{} is a fairly small language, but it is quite expressive.
 For example, we can define the typical list functions one would expect from functional programming
 by using the duality between tuples and choices, as seen in \cref{fig:list-functions}.
-A tuple can be turned into choices by indexing with a logical variable |i|.
+A tuple can be turned into choices by indexing with a logical variable~|i|.
 Conversely, choices can be turned into a tuple using |allKW|.
-The choice operator, |choice|, serves as both |cons| and |append| for choices;
+The choice operator ``|choice|'' serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
 Partial functions, \eg, |head|, will |fail| when the argument is outside of the domain.
 
@@ -923,7 +924,7 @@ $$
 |applyN pat (v,w) :== tup(v,1,w,2);| \quad \quad
 |apply1 fcn t :== def (x ^^ y) (t == applyN pat (x,y); x+y)|
 $$
-Patterns are truly first class, going well beyond what can be done with, say, pattern synonyms
+Patterns are truly first-class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $$
 |applyN pat (a,v,w) :== if a==0 then tup (v,1,w,2) else tup (1,1,w,v)|
@@ -935,7 +936,7 @@ so that the pattern depends on the value of |a|.
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
 % The |e_1| is called the \emph{domain} of the loop.
-The scoping is peculiar\footnote{But similar to C++, Fortress, and Swift, and explained by
+The scoping is peculiar\footnote{But similar to C++, Java, Fortress, and Swift, and explained in \versecalc{} by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
 So, for example, |fordo(x :== 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
@@ -950,7 +951,7 @@ So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
-simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| under a lambda, and
+simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| within a lambda expression, and
 apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
@@ -958,13 +959,13 @@ apply each element of the tuple to |emptytup| afterwards, using a |map| function
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
-Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since they are inside that lambda.
+Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since the effects are contained within that lambda.
 So, for example, |fordo(x:==10 `choice` 20) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point, it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
 Given that tuple indexing expands into choices, we can iterate over tuple indices and elements using |for|.
-For example, |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, increased by their index in |t|.  Notice the absence of the
+For example, |fordo(def (i ^^ x) (x == apply1 t i)) (x+i)| produces a tuple with the elements of |t|, each increased by its index within |t|.  Notice the absence of the
 fencepost-error-prone iteration of |i| over |(0..size(t)-1)|, common in most languages.
 
 
@@ -1077,18 +1078,18 @@ iff |x| is between |10| and |0| (comparison is right-associative).
 only unusual feature is that on the RHS of the rule, we use an |defKW| to bind |x|,
 together with |(x==v)| to equate |x| to the argument.
 The rule may appear to use call-by-value, because the argument is a value |v|,
-but remember that values include variables, which may be bound to an
+but remember that values include variables, and a variable may be bound to an
 as-yet-unevaluated expression.  For example:
 $$
 |def y (y == 3+4; apply1 (lam x (x+1)) y)|
 \; \movesto \;
 |def y (y == 3+4; def x (x==y; x+1))|
 $$
-Finally, the side condition $x \not\in \freevars{v}$ in \rulename{app-beta}
+Finally, the side condition $x \not\in \freevars{|v|}$ in \rulename{app-beta}
 ensures that the $|defKW| |x|$
 % hacky typesetting to ge the \exists right next to the x.
 does not capture any variables free in |v|.  If |x| appears free in |v|,
-\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{v}$.
+\textalpha-conversion may be used on |lam x e| to rename |x| to $y \not\in \freevars{|v|}$.
 
 In \versecalc{}, tuples behave like (finite) functions in which application is
 indexing.  Rule \rulename{app-tup} describes how tuple application works on non-empty
@@ -1143,15 +1144,15 @@ The key rule is:
 $$
 \begin{array}{rrcll}
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{v}$} \\
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
   &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x==v)|,
-we can replace the occurrences of |x| by |v| in its surrounding context |X|.
-This rule makes use of new context |X| (see \cref{fig:contexts}), and
-uses the notation |subst X x v| to mean ``capture avoiding substitution of |v| for |x| in |X|'' and
-similarly |subst e x v|.
+we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
+This rule uses context~|X| (\cref{fig:contexts}), and
+uses the notation |subst e x v| to mean ``capture-avoiding substitution of |v| for |x| in~|e|''
+(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
@@ -1168,7 +1169,7 @@ suffice to express the necessary sharing.
   |X == (hole; z==x+3)|, but that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
-\item The side condition $x \not\in \freevars{v}$ in \rulename{subst} prevents infinite substitution,
+\item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
   The other side condition will be explained next, when we discuss \rulename{var-swap}.
 \end{itemize}
@@ -1267,7 +1268,7 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 % substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
 % $$
 % \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
-%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{v}$} \\
+%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{|v|}$} \\
 % $$
 % Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
 % $$
@@ -1832,7 +1833,7 @@ normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
 %
 Our proof strategy for the confluence of the unification rules requires that they terminate.
 %
-The side condition $|x| \not\in \freevars{v}$ in \rulename{subst} avoids infinite
+The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
 substitution.
 If instead we dropped that condition, the following sequence of \rulename{subst}
 reductions would not terminate:
@@ -2150,8 +2151,9 @@ to avoid confusing the presentation with these higher-order encodings, but there
 
 \section{\texorpdfstring{\versecalc{}}{The Verse calculus} in context: reflections and related work} \label{sec:related}
 
-Functional logic programming has a rich literature; an excellent
-starting point is Hanus's survey~\cite{hanus:survey}.  Now that we
+Functional logic programming has a rich literature; excellent
+starting points are Antoy and Hanus's CACM review article \cite{antoy-hanus:survey} and
+Hanus's longer survey~\cite{hanus:survey}.  Now that we
 know what \versecalc{} is, we can identify its distinctive features,
 and compare them to other approaches.
 
