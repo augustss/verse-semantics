@@ -1702,7 +1702,7 @@ which equates a variable |x| with a value that contains a lambda in which |x| is
 %
 
 \noindent
-The \norecursion condition is not as severe as it might first appear: it only prohibits
+The ``\norecursion'' condition is not as severe as it might first appear: it only prohibits
 recursion through \emph{equations}.
 But no expressiveness is lost thereby: in our untyped setting, one can still write recursive (and non-terminating) programs
 using one's favorite fixpoint combinator, such as \textbf{Y} or \textbf{Z}.
@@ -1770,18 +1770,18 @@ relations are confluent \cite{Barendregt}.
 The diamond property itself can be verified easily by considering
 critical pairs of transitions.
 %
-The rules for unification and normalization pose two problems.
+The rules for unification and normalization, however, pose two problems.
 %
 
 \mypara{The unification problem.}
 %
-The first problem is that the unification relation does not satisfy the diamond property
-as it may need multiple steps to join the results of two different one-step reductions.
+The first problem is that the unification relation does not satisfy the diamond property---it may need
+multiple steps to join the results of two different one-step reductions.
 %
 For example, consider the term $|(x == arr(1,y); x == arr(z,2); x == arr(1,2); 3)|$.
 %
 The term can be reduced in one step by substituting |x|
-in the final equation by either |arr(1,y)| or |arr(z,2)|.
+in the third equation by either |arr(1,y)| or |arr(z,2)|.
 After this, it will take multiple steps to join the two terms.
 
 Following a well-trodden path in proofs of confluence
@@ -1789,15 +1789,15 @@ for the \textlambda-calculus (\eg, \cite{Barendregt}),
 our proof of confluence for the unification rules works in two stages.
 %
 First, we prove that the reductions are \emph{locally confluent},
-meaning if $e$ single-steps to $e_1$ and $e_2$ then $e_1$
-and $e_2$ can be joined at some $e'$ in \emph{multiple}
+meaning if $e$ single-steps to each of $e_1$ and $e_2$, then $e_1$
+and $e_2$ can be joined at some $e'$ by taking \emph{multiple}
 unification rule steps.
 %
 Second, we prove that the unification reductions are \emph{terminating}, which relies
 upon eliminating recursion in tuples via \rulename{u-occurs} and in lambdas
-via the \norecursion condition.
+via the ``\norecursion'' condition.
 %
-Newman's Lemma \cite[Lemma 2.4]{Huet80} then implies the
+Newman's Lemma \cite[Lemma 2.4]{Huet80} then implies that the
 locally confluent, terminating unification relation is
 also confluent.
 
