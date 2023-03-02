@@ -799,6 +799,28 @@ The choice operator ``|choice|'' serves as both |cons| and |append| for choices;
 the corresponding operations for tuples are defined in \cref{fig:list-functions}.
 Partial functions, \eg, |head|, will |fail| when the argument is outside of the domain.
 
+Mapping a multi-valued function over a tuple is somewhat subtle.
+With |flatMap| the choices are flattened in the resulting list, \eg,
+|applyN flatMap ((lam x (x `choice` x+10)), tup(2,3))| reduces to |tup(2,12,3,13)|,
+%Whereas |map| keeps the choices, \eg, |applyN map ((lam x (x `choice` x+10)), tup(2,3))| reduces to
+%|tup(2, 3) `choice` tup(2, 13) `choice` tup(12, 3) `choice` tup(12, 13)|.
+%The latter corresponds exactly to unfolding |map|, \ie,
+%|tup(apply1 (lam x (x `choice` x+10)) 2,
+%apply1 (lam x (x `choice` x+10)) 3)|
+%which reduces to
+%|tup(2 `choice` 12, 3 `choice` 13)|.
+whereas |map| keeps the choices. For example:\\[0.2em]
+\centerline{
+|applyN map ((lam x (x `choice` x+10)), tup(2,3))|
+$\movesto$
+|tup(apply1 (lam x (x `choice` x+10)) 2, apply1 (lam x (x `choice` x+10)) 3)|
+$\movesto$}\\
+\centerline{
+|tup(2 `choice` 12, 3 `choice` 13)|
+$\movesto$
+|tup(2, 3) `choice` tup(2, 13) `choice` tup(12, 3) `choice` tup(12, 13)|
+}\vspace{0.2em}
+
 % \subsection{Syntactic sugar}
 %
 % \begin{figure}
