@@ -53,7 +53,7 @@ systemICFPK = systemICFP
   { sname               = "ICFPK"
   , description         = "ICFP simplified by removing 'eq'"
   , preProcess          = const (check validK . anfK)
-  , rules               = rules systemICFP -= "SEQ-ASSOC" -= "VAL_ELIM"
+  , rules               = rules systemICFP -= "SEQ-ASSOC" -= "VAL-ELIM"
   , validExpr           = const validK
   }
 
