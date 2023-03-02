@@ -1364,14 +1364,14 @@ The rules for choice are given in \cref{fig:rules}:
   the semantics of |allKW| (\cref{sec:all}).
 \item Rules \rulename{choose-r} and \rulename{choose-l} eliminate |fail|, which behaves as
   an identity for choice.
-\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice}/\rulename{all-choice}
+\item Rule \rulename{choose-assoc} associates choice to the right, so that \rulename{one-choice} or \rulename{all-choice}
   can fire.  (The dots on the left of \rulename{all-choice} should be read as
   a string of right-associated choices.)
 \end{itemize}
 The most interesting rule is \rulename{choose}, which, just as described in \cref{sec:choice},
 ``floats the choice outwards,'' duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
-defined in \cref{fig:syntax}. A \emph{choice context} |CX| is like an
+defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like an
 execution context |X|, \emph{but with no possible
   choices to the left of the hole}:
 $$
@@ -1380,12 +1380,12 @@ $$
 Here, |ce| is a guaranteed-choice-free expression (syntax in \cref{fig:choice-free-syntax}).
 This syntactic condition is necessarily conservative; for example, a call |apply1 f x|
 is considered not guaranteed-choice-free because it depends on what function |f| does.
-We must guarantee not to have choices to the left so that we preserve order---see \cref{sec:mixing}.
+We must guarantee not to have choices to the left so that we preserve the order of choices---see \cref{sec:mixing}.
 
 The context |SX| (\cref{fig:contexts}) in \rulename{choose} ensures that |CX| is as large as possible.
 This is a very subtle point:
 without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
-  a use of |oneKW|, see \cref{sec:one}, but using |if| makes the example easier to understand.}:
+  a use of |oneKW| (see \cref{sec:one}), but using |if| makes the example easier to understand.}:
 $$
 \begin{array}{l@@{\;}l}
                                  & |def x ((if (x>0) then 55 else (44 `choice` 2)); x==1; (77 choice 99))|\\
@@ -1405,7 +1405,7 @@ $$
 Now the |(x==1)| is inside the choice branches, so we cannot use \rulename{subst} to
 substitute for |x| in the condition of the |if|.
 Nor can we use \rulename{choose} again to float the choice further out
-because the |if| is not guaranteed choice-free (in this case the |else| branch has a choice).
+because the |if| is not guaranteed choice-free (in this example, the |else| branch has a choice).
 So, alas, we are stuck!
 Our not-entirely-satisfying solution is to force \rulename{choose} to float the choice all the way
 to the top.  The |SX| context (\cref{fig:contexts}) formalizes what we mean by ``the top'':
@@ -1486,7 +1486,7 @@ Here, |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
 However, moving to \emph{laziness} seems problematic.
-For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy, language this expression would
+For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy language this expression would
 yield |3|, but in \versecalc{}, everything is evaluated, and
 the expression will not return a value until |apply0 wombat| converges.
 There is a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
