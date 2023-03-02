@@ -365,7 +365,7 @@ $$
 |def (x ^^ y ^^ z) (x==tup(y,3); x==tup(2,z); y)|
 $$
 This expression introduces three logical (or existential) variables |x,y,z|,
-constrains them with two equalities |(x==tup(y,3)| and |(x==tup(2,z))|, and finally returns |y|.
+constrains them with two equalities (|x==tup(y,3)| and |x==tup(2,z)|), and finally returns |y|.
 The only solution to the two equalities is |y==2|, |z==3|, and |x==tup(2,3)|; so the result of the
 whole expression is |2|.
 
