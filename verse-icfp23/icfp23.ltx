@@ -1664,11 +1664,11 @@ In our context, consider the term:
 %
 $$
 \begin{array}{lcl@@{\qquad}l}
- |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
- & \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))| &  \text {(1) substitute for |x| first} \\[0.5mm]
+ |def (x ^^ y) (x == tup (1, y)); y == (lam z x); x|
+ & \rsteps{}{}{} & |def y (y == (lam z (tup (1, y))); tup (1,y))| &  \text {(1) substitute for |x| first} \\[0.5mm]
 
- |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
-& \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| & \text {(2) substitute for |y| first}
+ |def (x ^^ y) (x == tup (1, y)); y == (lam z x); x|
+& \rsteps{}{}{} & |def x (x == tup (1, lam z x); x)| & \text {(2) substitute for |y| first}
 \end{array}
 $$
 %
