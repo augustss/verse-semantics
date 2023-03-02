@@ -1616,7 +1616,7 @@ That is, our rules should be \emph{confluent}.  In this section, we describe
 our proof of confluence.  Because the rule set is quite big (compared, say, to the
 pure lambda calculus), this proof turns out to be a substantial undertaking.
 
-\mypara{Reductions and Confluence}
+\mypara{Reductions and confluence.}
 %
 A \emph{binary relation} is a set of pairs of related items.
 %
@@ -1641,7 +1641,7 @@ Confluence gives us the assurance that we will not get
 different results when choosing different rules, or get
 stuck with some rules and not with others.
 
-\mypara{Normal Forms and unicity}
+\mypara{Normal forms and unicity.}
 %
 A term $e$ is an $\rr$-\emph{Normal Form} if there does
 not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
@@ -1773,7 +1773,7 @@ critical pairs of transitions.
 The rules for unification and normalization pose two problems.
 %
 
-\mypara{The Unification Problem}
+\mypara{The unification problem.}
 %
 The first problem is that the unification relation does not satisfy the diamond property
 as it may need multiple steps to join the results of two different one-step reductions.
@@ -1801,7 +1801,7 @@ Newman's Lemma \cite[Lemma 2.4]{Huet80} then implies the
 locally confluent, terminating unification relation is
 also confluent.
 
-\mypara{The Normalization Problem}
+\mypara{The normalization problem.}
 %
 The second problem is that the normalization rules do not commute with the unification rules.
 %
@@ -1871,7 +1871,7 @@ Here is an expression that rewrites in two different ways, depending on which eq
 These two outcomes cannot be joined.  But making unification for lambdas fail, makes both outcomes
 lead to |fail|, and confluence is restored.
 
-\mypara{Unifying variables}
+\mypara{Unifying variables.}
 %
 Note that while \rulename{u-lit} lets us eliminate equalities on the same literal $|k == k|$,
 there is no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$.
