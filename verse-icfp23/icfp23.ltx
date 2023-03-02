@@ -1643,7 +1643,7 @@ stuck with some rules and not with others.
 
 \mypara{Normal forms and unicity.}
 %
-A term $e$ is an $\rr$-\emph{Normal Form} if there does
+A term $e$ is an \emph{$\rr$-normal form} if there does
 not exist any $e'$ such that $\rstep{\rr}{e}{e'}$.
 Confluence implies uniqueness of normal forms (unicity): if $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
 and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
@@ -1663,16 +1663,16 @@ makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:
 In our context, consider the term:
 %
 $$
-\begin{array}{lcll}
+\begin{array}{lcl@@{\qquad}l}
  |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
- & \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))| &  \text {(1: substitute for |x| first)} \\[0.5mm]
+ & \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))| &  \text {(1) substitute for |x| first} \\[0.5mm]
 
  |def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|
-& \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| & \text {(2: substitute for |y| first)}
+& \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| & \text {(2) substitute for |y| first}
 \end{array}
 $$
 %
-The result of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
+The results of (1) and (2) have the same meaning (are indistinguishable by a \versecalc{} context)
 but cannot be joined by our rewrite rules. Nor is this easily fixed by adding new
 rules, as we did when we added \rulename{var-swap} (\cref{sec:unification-rules})
 and \rulename{seq-swap} (\cref{sec:normalization}).  Why not? Because the terms
