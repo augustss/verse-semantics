@@ -40,7 +40,6 @@ import Data.Data(Data)
 import Data.List( union, elemIndex )
 import Data.Maybe
 import GHC.Stack(HasCallStack)
-import GHC.Generics
 
 import TRS.Bind
 import TRS.TRS
