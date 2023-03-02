@@ -22,7 +22,6 @@
 \newcommand{\etc}{\emph{etc.}\xspace}
 \newcommand{\etal}{\emph{et al.}\xspace}
 \newcommand{\vs}{\emph{vs.}\xspace}
-\newcommand{\cf}{\emph{cf.}\xspace}
 
 \RequirePackage[utf8]{inputenc}
 
@@ -1303,7 +1302,7 @@ Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ that binds a variable whose only
 occurrence is a single equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 Note that none of these rules, except \rulename{fail-elim}, discard an unevaluated expression,
-because that expression might fail and we don't want to ``lose'' that failure (\cf \cref{sec:lenient}).
+because that expression might fail and we don't want to ``lose'' that failure (see \cref{sec:lenient}).
 The exception is \rulename{fail-elim}, which propagates failure.
 
 Four \emph{normalization} rules help to put the expression in a form that
@@ -1343,7 +1342,7 @@ because the latter is outside the choice, and a different branch of the choice b
 %
 % Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 % again to make it more likely to get the form |(x==v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
-% same left-to-right order, there is no risk of re-ordering choices (\cf \cref{sec:mixing}).
+% same left-to-right order, there is no risk of re-ordering choices (see \cref{sec:mixing}).
 %
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
 % Without these rules |(x==y)==1;y>0| would be stuck; but \rulename{unify-unifyl}
