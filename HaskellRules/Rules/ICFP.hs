@@ -735,8 +735,8 @@ rulesNormalization _ lhs =
      pure (e1 :>: (e2 :>: e3))
  ++
   "EQN-FLOAT" `name`
-  do Val v :=: (e1 :>: e2) <- [lhs]
-     pure (e1 :>: (Val v :=: e2))
+  do (Val v :=: (eq :>: e1)) :>: e2 <- [lhs]
+     pure (eq :>: ((Val v :=: e1) :>: e2))
  ++
   "EXI-SWAP" `name`
   do EXI x (EXI y e) <- [lhs]
