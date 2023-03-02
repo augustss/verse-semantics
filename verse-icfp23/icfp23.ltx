@@ -1702,7 +1702,7 @@ which equates a variable |x| with a value that contains a lambda in which |x| is
 %
 
 \noindent
-The ``\norecursion'' condition is not as severe as it might first appear: it only prohibits
+The \noHYPHENrecursion condition is not as severe as it might first appear: it only prohibits
 recursion through \emph{equations}.
 But no expressiveness is lost thereby: in our untyped setting, one can still write recursive (and non-terminating) programs
 using one's favorite fixpoint combinator, such as \textbf{Y} or \textbf{Z}.
@@ -1795,7 +1795,7 @@ unification rule steps.
 %
 Second, we prove that the unification reductions are \emph{terminating}, which relies
 upon eliminating recursion in tuples via \rulename{u-occurs} and in lambdas
-via the ``\norecursion'' condition.
+via the \noHYPHENrecursion condition.
 %
 Newman's Lemma \cite[Lemma 2.4]{Huet80} then implies that the
 locally confluent, terminating unification relation is
@@ -1940,7 +1940,7 @@ and proved that the modified calculus is confluent \cite{ariola:cyclic-lambda,ar
 In a later paper, Ariola and Blom proved that their calculus without the constraint, while not confluent,
 does obey a weaker related property, which they invented, of \emph{skew confluence} \cite{ariola:skew-confluence}.
 We believe, and currently are trying to prove, that \versecalc{} is skew confluent without the
-pesky no-recursion side condition of \cref{thm:confluence-sketch}.
+pesky \noHYPHENrecursion side condition of \cref{thm:confluence-sketch}.
 \begin{center}
   \begin{tabular}{rl}
     Confluence: & $\forall |e|, |e_1|, |e_2|.\; \rsteps{\rr}{|e|}{|e_1|} \wedge \rsteps{\rr}{|e|}{|e_2|} \implies \exists e'.\; \rsteps{\rr}{|e_1|}{|e'|} \wedge \rsteps{\rr}{|e_2|}{|e'|}$. \\
