@@ -1493,10 +1493,10 @@ we know there is no failure.  With laziness, we could easily lose confluence.
 
 \subsection{Evaluation strategy} \label{sec:eval-strategy}
 
-Any rewrite rule can apply anywhere in the term, at any time.  For example, in the term |(x==3+4; y==3*2; x+y)|
-the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |3*2| $\rightarrow$ |6|,
+Any rewrite rule can apply anywhere in the term, at any time.  For example, in the term |(x==3+4; y==4+2; x+y)|
+the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |4+2| $\rightarrow$ |6|,
 or the other way around.
-The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y| because
+The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
 rule \rulename{subst} only fires when the RHS is a value.
 The rewrite rules thereby express \emph{semantics}.
 
@@ -1504,7 +1504,7 @@ For example, in the lambda calculus, by changing the rewrite
 rule \textbeta{} to \textbeta V, we change the language from call-by-name to call-by-value; by
 adding {\bf let}, plus suitable rewrite rules, we can express call-by-need \cite{ariola:call-by-need}.
 In \versecalc{}, the rewrite rules are carefully crafted in a similar way; for example, \rulename{subst} will
-only substitute |x==v| when the equation binds a variable to a \emph{value}, rather like \textbeta V in
+substitute |x==v| only when the equation binds a variable to a \emph{value}, rather like \textbeta V in
 lambda calculus.  Similarly, the elimination rules never discard a term that could fail.
 
 In any term there may of course be many redexes---that is good.
