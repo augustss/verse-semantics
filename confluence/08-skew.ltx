@@ -21,11 +21,54 @@
 \newcommand{\omegavc}{\omega_{\scriptscriptstyle\mathrm{VC}}}
 \newcommand{\leqomegavc}{\mathrel{\leq_{\omegavc}}} 
 
+\newcommand{\skewtodo}[1]{\par\vskip6pt\textbf{[#1]}\par\vskip6pt}
 
 
 \section{Skew Confluence} \label{sec:skew-confluence}
 
-We now consider a modified grammar for \versecalc{} in which there is one more kind of value, a~\emph{fixpoint} value |mu x hnf|:
+\skewtodo{This is an incomplete draft of a sketch of an incomplete proof of skew confluence.}
+
+We now consider a version of \versecalc{} that fully supports recursive substitution. Rather than lifting the side condition
+on rule \rulename{subst} that avoids using a recursive equation for substitution, we take another approach that we believe leads to a simpler proof:
+we introduce the familiar, conventional fixpoint operator |mu x hnf|, but allow it to be applied only to head values, not to general expressions.
+A new unification rule \rulename{u-occurs-wrap} can turn a recursive equation into one that is not recursive
+(by packaging up the right-hand side within a fixpoint), after which rule \rulename{subst} may be applied.
+A corresponding new rule \rulename{u-unwrap} can expand a fixpoint by applying the conventional rewrite rule
+$|mu x hnf| \movesto |subst hnf x (mu x hnf)|$. While this rule allows infinite application,
+a sensible evaluation strategy would apply this rule ``only when needed''---when it is on either side of an equation,
+or when it is in the function position of an application. If we regard any \versecalc{} data structure as tree,
+the fixpoint construct in effect can label any subtree in such a way that any node beneath it can have a ``back pointer'' up to the labeled node
+by referring to the bound variable that serves as the label. 
+
+\subsection{Free Variables}
+
+
+We use the conventional notation $\freevars{|e|}$ to denote the set of variables that occur free
+in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e|, and |mu x hnf|.
+\Cref{fig:fvs} contains a formal definition of this function for \versecalc{}.
+
+We use the variation $\freevarsoutsidelambdas{|e|}$ to denote the set of variables that occur free
+in the expression |e| in at least one position that is not within the body of a lambda expression.
+As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, y, z))))|} = \{ f, g \}$ because:
+\begin{itemize}
+\item |x| is bound by |defKW|, so it is not free. 
+\item |f| is free in a position not within the body of a lambda expression.
+\item |g| is free in at least one position not within the body of a lambda expression (it also happens to be free in a second position that is within the body of a lambda expression).
+\item |y| is bound by |lambda|, so it is not free. 
+\item |z| is free, but appears only in a position that is within the body of a lambda expression.
+\end{itemize}
+\Cref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
+only in its handling of lambda expressions.
+
+
+\subsection{Substitution}
+
+We use the notation |subst e x v| to denote the expression that results from performing standard capture-avoiding substitution of the value |v| for every occurrence of the variable |x| within the expression |e| (it turns out that, for \versecalc{}, substitution of general expressions for variables is not required, only substitution of values for variables).
+\Cref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
+
+\subsection{Modified grammar and rewrite rules}
+
+Let us modify the grammar for \versecalc{} to have one additional kind of value, a~\emph{fixpoint} value |mu x hnf|:
 \begin{quote}
 $
 \begin{array}{lr@@{\;}c@@{\;}l}
@@ -33,7 +76,7 @@ $
 \end{array}
 $
 \end{quote}
-and a modified set of unification rewrite rules $\mathcal{U}$ in which rule \rulename{u-occurs} is modified from
+and a modify the set of Unification rewrite rules $\runi$ so that rule \rulename{u-occurs}
 \begin{quote}
 $
 \begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
@@ -41,7 +84,7 @@ $
 \end{array}
 $
 \end{quote}
-to the two rules\footnote{These two rules allow equations to be recursive through lambda expressions and possibly also tuples, but not through tuples only;
+is replaced by the two rules\footnote{These two rules allow equations to be recursive through lambda expressions and possibly also tuples, but not through tuples only;
   thus equations such as |f = lam y (tup (y, f))| and |x = (tup (1,  lam y (tup (y, x))))| can be processed by rule \rulename{u-occurs-wrap},
   but the equation |x = (tup (1, x))| can be processed only by rule \rulename{u-occurs-fail}.
   An alternate design using the single rule
@@ -61,7 +104,7 @@ $
 \end{array}
 $
 \end{quote}
-and to which a new rewrite rule is added:
+Let us also add this rewrite rule:
 \begin{quote}
 $
 \begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
@@ -71,17 +114,10 @@ $
 \end{quote}
 As we will see, rule \rulename{u-unwrap} is confluent but not Noetherian.
 
-The resulting grammar is not confluent. \guy{explain even-odd-problem}
+The resulting grammar is not confluent; in particular, it suffers from the even-odd problem \cite[Example 4.1]{ariola:skew-confluence}.
 Therefore we will modify the proof of confluence for $\runi$ to become a proof of \emph{skew confluence} \cite{ariola:skew-confluence},
 and then go on to prove that \versecalc{} itself, with this modification, is skew confluent.
 
-
-\subsection{Free Variables}
-
-
-We use the conventional notation $\freevars{|e|}$ to denote the set of variables that occur free
-in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e|, and |mu x hnf|.
-\Cref{fig:fvs} contains a formal definition of this function for \versecalc{}.
 
 \begin{figure}
 $
@@ -105,19 +141,6 @@ $
 \caption{Definition of the free-variables function $\freevars{\cdot}$}\label{fig:fvs}
 \Description{Definition of the free-variables function ``fvs''}
 \end{figure}
-
-We use the variation $\freevarsoutsidelambdas{|e|}$ to denote the set of variables that occur free
-in the expression |e| in at least one position that is not within the body of a lambda expression.
-As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, y, z))))|} = \{ f, g \}$ because:
-\begin{itemize}
-\item |x| is bound by |defKW|, so it is not free. 
-\item |f| is free in a position not within the body of a lambda expression.
-\item |g| is free in at least one position not within the body of a lambda expression (it also happens to be free in a second position that is within the body of a lambda expression).
-\item |y| is bound by |lambda|, so it is not free. 
-\item |z| is free, but appears only in a position that is within the body of a lambda expression.
-\end{itemize}
-\Cref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
-only in its handling of lambda expressions.
 
 \begin{figure}
 $
@@ -143,12 +166,6 @@ $
 \end{figure}
 
 
-
-\subsection{Substitution}
-
-We use the notation |subst e x v| to denote the expression that results from performing standard capture-avoiding substitution of the value |v| for every occurrence of the variable |x| within the expression |e| (it turns out that, for \versecalc{}, substitution of general expressions for variables is not required, only substitution of values for variables).
-\Cref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
-
 \begin{figure}
 $
 \begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
@@ -173,6 +190,7 @@ $
 \Description{Definition of the substitution notation used in this paper}
 \end{figure}
 
+
 \subsection{Unwrapping of Fixpoints is Confluent but not Noetherian}
 
 \begin{lemma}\label{lem:unwrap-confluent}
@@ -192,7 +210,7 @@ The rule \rulename{u-unwrap} is confluent.
 
   From |e_2| we can take just one more \rulename{u-unwrap} step, using the outermost redex |mu x (C_2^[cdots])|, obtaining |e' = C_1^[subst (C_2^[subst hnf y (mu y hnf)]) x (mu x (C_2^[subst hnf y (mu y hnf)]))]|.
 
-  \guy{More to come.}
+  \skewtodo{More to come.}
 
   Thus we have $\rsteps{\rulename{u-unwrap}}{|e_1|}{|e'|}$ and $\rstep{\rulename{u-unwrap}}{|e_2|}{|e'|}$, so \rulename{u-unwrap} is strongly confluent,
   and therefore by \cref{lem:strong} is confluent.
@@ -299,7 +317,8 @@ $\omegavc(e)$ to be the function that takes any term in $\vcOmega$ and returns t
 \begin{definition}
 The comparison $e \leqomegavc e'$ is defined to mean $\omegavc(e) \leqomega \omegavc(e')$.
 \end{definition}
-\guy{Need to prove that $\leqomegavc$ is monotonic with respect to $\leqomega$; this should be routine as per Skew paper \cite[Proposition 5.21]{ariola:skew-confluence}.}
+
+\skewtodo{Need to prove that $\leqomegavc$ is monotonic with respect to $\leqomega$; this should be routine \cite[Proposition 5.21]{ariola:skew-confluence}.}
 
 \begin{lemma}[\versecalc{} monotonic] \label{lem:vc-monotonic}
 Every rewrite rule in \versecalc{} is monotonic with respect to $\leqomegavc$.
@@ -411,10 +430,11 @@ the first expression will always have one more occurrence of ``|1|'' than ``|lam
 will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
 how long one expression becomes through substitution, the other one can be made even longer,
 so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+\end{comment}
 
 
 Why use skew confluence? Ordinary confluence is useful because if term |e| has an $\rr$-normal form, then that normal form is \emph{unique} if $\rr$ is confluent.
-Ariola and Blom define a related notion, which we refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
+Ariola and Blom define a related notion, which we will refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
 
 A  $\rr$-skew-normal form is not a single term, but rather a possibly infinite set of \emph{erased} terms.
 We summarize this idea, using our own terminology, as follows:
@@ -451,7 +471,6 @@ confluence is much easier to prove, using techniques that do not involve possibl
 that use commutative diagrams and case analysis. They also prove that if a reduction relation is confluent and monotonic, then it is skew confluent
 \cite[Corollary 5.5]{ariola:skew-confluence}.
 
-\end{comment}
 
 
 
@@ -472,6 +491,7 @@ that use commutative diagrams and case analysis. They also prove that if a reduc
 \end{tikzcd}\]
 \end{definition}
 
+\skewtodo{More to come.}
 
 \subsection{New Lemmas about Skew Confluence}
 
@@ -627,7 +647,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\preceq}{\rr}$, therefore
 
         \noindent    Because $\ungos{\rs} \subset \inccon{\preceq}{\rr\cup\rs}$, the fourth diagram follows.
 
-        \guy{Remark: It may turn out to be impossible to prove for our specific application that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute.
+        \skewtodo{It may turn out to be impossible to prove for our specific application that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute.
           In that case, it may be necessary to use a more complicated or more subtle precondition.
         The important thing is to prove the fourth diagram somehow.}
 \end{proof}
@@ -661,7 +681,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\preceq}{\rr}$, therefore
   By induction on the size of the top edge of the diagram. At each step one of the four diagrams from \cref{lem:four-diagrams} will be used.
 
   
- \guy{More to come}
+ \skewtodo{More to come.}
 \end{proof}
 
 
@@ -688,7 +708,7 @@ Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\preceq}{\rr}$, therefore
 By case analysis on whether left edge uses $\rr$ or $\rs$; then project that left edge into $\rr^*$ or $\rs^*$ respectively and apply \cref{lem:skewrowinduction}.
 
   
- \guy{More to come}
+ \skewtodo{More to come.}
 \end{proof}
 
 
@@ -785,7 +805,7 @@ By case analysis on whether left edge uses $\rr$ or $\rs$; then project that lef
 \begin{lemma}\label {lem:skew-union}
   Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
   similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
-  If $\rr$ commutes with $\rs$, then $\rt=\rr\cup\rs$ is monotonic in$\preceq$ and skew confluent using $\preceq$ and $\rt_\preceq^\leftarrow$.
+  If $\rr$ commutes with $\rs$, then $\rt=\rr\cup\rs$ is monotonic in $\preceq$ and skew confluent using $\preceq$ and $\rt_\preceq^\leftarrow$.
 \end{lemma}
 \begin{proof}
 
@@ -796,7 +816,7 @@ By case analysis on whether left edge uses $\rr$ or $\rs$; then project that lef
 \subsection{Proof that \texorpdfstring{\versecalc{}}{VC} Is Skew Confluent}
 
 
-Proof sketch:
+\skewtodo{This is just a brief proof sketch.}
 
 First prove that the modified $\runi$ is skew confluent. (In doing so we will define $\runi_{\leqomegavc}^{\leftarrow}$.)
 
