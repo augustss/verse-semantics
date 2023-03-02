@@ -1844,7 +1844,7 @@ $$
 |def x (x == tup (1,x); x)|
 \; \rightarrow \; |def x (x == tup (1,x); tup (1,x))|
 \; \rightarrow \; |def x (x == tup (1,x); tup (1,tup (1,x)))|
-\; \rightarrow \; \ldots
+\; \rightarrow \; \cdots
 $$
 Here, each step makes one substitution for |x|.
 An exactly analogous example can be made for a lambda value.
@@ -1860,7 +1860,7 @@ unimplementable.
 %
 We cannot instead say that the attempt to unify gets stuck because that leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
-\[ |(lam p 1) == (lam q 2); 1| \lgos{} |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \gos{} |(lam q 2) == (lam p 1); 2| \]
+\[ |(lam p 1) == (lam q 2); 1| \quad\lgos{}\quad |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \quad\gos{}\quad |(lam q 2) == (lam p 1); 2| \]
 % $$
 % \begin{array}{lll}
 %  \multicolumn{3}{l}{|def x (x == (lam p 1); x == (lam q 2); x emptytup)|} \\
@@ -1868,7 +1868,7 @@ Here is an expression that rewrites in two different ways, depending on which eq
 % OR & \movesto \{\textit{use \rulename{SUBST} on second equality}\} & |(lam q 2) == (lam p 1); 2|
 % \end{array}
 % $$
-These two outcomes cannot be joined.  But making unification for lambdas fail, makes both outcomes
+These two outcomes cannot be joined.  Defining unification to fail for lambdas makes both outcomes
 lead to |fail|, and confluence is restored.
 
 \mypara{Unifying variables.}
@@ -1882,10 +1882,10 @@ To see why, suppose we had such a \rulename{u-var}, and consider the term |(def 
 If we first apply \rulename{u-var} to eliminate the equality $|x==x|$, then the remainder
 reduces to |0|.
 However, if we first \rulename{subst} the equality |x == (lam y y)|,
-we get |((lam y y) == (lam y y); 0)| which |fail|s.
+we get |((lam y y) == (lam y y); 0)|, which fails.
 %
-Thus, there is no \rulename{u-var}: such equalities can only be eliminated
-after the value of |x| is substituted in and checked to not be a \textlambda.
+Thus, there is no rule \rulename{u-var}: such equalities can be eliminated only
+after the value of |x| is substituted in and checked to not be a lambda.
 
 % %
 % \rulename{var-swap} has a curious side condition: it only rewrites
