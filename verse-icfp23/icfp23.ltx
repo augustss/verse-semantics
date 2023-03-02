@@ -1714,12 +1714,12 @@ of |const|, the occurrence of |f| disappears.
 
 Thus motivated, we restrict our attention to terms that have \emph{\norecursion}:
 \begin{itemize}
-\item A term $e$ has \emph{\norecursion} if it is not transitively recursive.
-\item A term $e$ is \emph{transitively recursive} if $\rsteps{}{e}{e'}$ where $e'$ is recursive.
-\item A term $e$ is \emph{recursive} if it contains a recursive equation.
 \item A \emph{recursive equation} is an equation of the form
 |x == V^[lam y e]|, where $x \in \freevars{e}$,
 which equates a variable |x| with a value that contains a lambda in which |x| is free.
+\item A term $e$ is \emph{recursive} if it contains a recursive equation.
+\item A term $e$ is \emph{transitively recursive} if $\rsteps{}{e}{e'}$ where $e'$ is recursive.
+\item A term $e$ has \emph{\norecursion} if it is not transitively recursive.
 \end{itemize}
 %
 
