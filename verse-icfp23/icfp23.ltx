@@ -1244,8 +1244,8 @@ and that is what we need for the proof.
 Consider this (extremely) tricky term:
 |def x (x = if (x==0; x>1) then 33 else 55)|.
 What should this do? At first you might think it was stuck---how can we simplify the |if|
-when its condition mentions |x| which is not yet defined?  But in fact, rule \rulename{subst} allows
-us to substitute \emph{locally} in any X-context surrounding the equation |(x==0)|
+when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
+us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
 thusly:\footnote{
   Here and elsewhere we rewrite terms that have not
   been fully desugared, but that is just an expository aid;
@@ -1257,7 +1257,7 @@ $$
 \movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
 \multicolumn{2}{l}{\movestoC{\text{simplify |if|}} \; |def x (x = 55; x)| \quad
 \movestoR{subst} \; |def x (x = 55; 55)| \quad
-\movestoR{exi-elim}  \; |55|}
+\movestoR{eqn-elim}  \; |55|}
 \end{array}
 $$
 Minor variants of the same example get stuck instead of reducing. For example, if you replace
@@ -1265,7 +1265,7 @@ the |(x==0)| with |(x==100)| then rewriting gets stuck, as the reader may verify
 is a solution to the equations, namely |x==55|.
 And if you replace |(x==0)| with |(x==55)|, then rewriting again
 gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
-Perhaps this is not surprising: we cannot reasonably expect the program to solve arbitrary equations.
+Perhaps this is not surprising: we cannot reasonably expect a program to solve arbitrary equations.
 For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
 
 % It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
