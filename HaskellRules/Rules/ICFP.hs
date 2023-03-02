@@ -22,6 +22,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
+                   systemICFPK,
                    systemICFPE,
                    systemICFPF,
                    systemICFPJ,
@@ -47,6 +48,14 @@ systemICFP = TRSystem
   , validExpr           = const valid
   }
 
+systemICFPK :: TRSystem Expr
+systemICFPK = systemICFP
+  { sname               = "ICFPK"
+  , description         = "ICFP simplified by removing 'eq'"
+  , preProcess          = const (check validK . anfK)
+  , rules               = rules systemICFP -= "SEQ-ASSOC" -= "VAL_ELIM"
+  , validExpr           = const validK
+  }
 
 systemICFPBX :: TRSystem Expr
 systemICFPBX = s
@@ -129,8 +138,12 @@ systemICFPS = s
   where s = systemICFPE
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
-valid :: Expr -> Bool
-valid = expr
+valid, validK :: Expr -> Bool
+valid  = valid' False
+validK = valid' True
+
+valid' :: Bool -> Expr -> Bool
+valid' onlyEq = expr
   where
     expr e@Val{} = value e
     expr (LAM _ e) = expr e
@@ -150,7 +163,7 @@ valid = expr
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr _ = undefined -- GHC bug
     expru (v :=: e) = value v && expr e
-    expru e = expr e
+    expru e = not onlyEq && expr e
     value Var{} = True
     value e = hnf e
     hnf Int{} = True
@@ -161,8 +174,12 @@ valid = expr
 
 -- Make the expression obey the ICFP (PLDI) grammar,
 -- i.e., valid (anf e) == True
-anf :: Expr -> Expr
-anf = expr
+anf, anfK :: Expr -> Expr
+anf  = anf' False
+anfK = anf' True
+
+anf' :: Bool -> Expr -> Expr
+anf' onlyEq = expr
   where
     expr e@Var{} = e
     expr e@Int{} = e
@@ -174,10 +191,17 @@ anf = expr
     expr e@(_ :=: _) =
       case expru e of
         -- Bare unifications not allowed as an expression
-        eu@(v :=: _) -> eu :>: v
-        eu -> eu
+        e'@(v :=: _) -> e' :>: v
+        e'           -> e'
     expr (_ :~: _) = error "anf: impossible"
-    expr (e1 :>: e2) = expru e1 :>: expr e2
+    expr (e1 :>: e2) =
+      case (expru e1, expr e2) of
+        (e1', e2')
+          | not onlyEq || isEq e1' -> e1' :>: e2'
+          | otherwise              -> EXI x $ (Var x :=: e1') :>: e2'
+         where x = identNotIn (free (e1',e2'))
+               isEq (_ :=: _) = True
+               isEq _         = False
     expr (e1 :|: e2) = expr e1 :|: expr e2
     expr (e1 :@: e2) =
       let i1:i2:_ = identsNotIn (free (e1 :@: e2))
@@ -198,12 +222,11 @@ anf = expr
       in  binds ds (Split (expr e) v1 v2)
     expr e = error $ "anf: " ++ prettyShow e
 
-    -- Expression or unification
     expru (e1 :=: e2) =
       case (expr e1, expr e2) of
-        (e1'@Val{}, e2') -> e1' :=: e2'
-        (e1', e2') -> EXI x $ (Var x :=: e1') :>: (Var x :=: e2') :>: Var x
-          where x = identNotIn (free (e1',  e2'))
+        (v@Val{}, e2') -> v :=: e2'
+        (e1',     e2') -> EXI x $ (Var x :=: e1') :>: (Var x :=: e2') :>: Var x
+          where x = identNotIn (free (e1',e2'))
     expru e = expr e
 
     value _ e@Var{} = ([], e)
@@ -222,7 +245,6 @@ anf = expr
     binds :: [(Ident, Expr)] -> Expr -> Expr
     binds [] b = b
     binds ((i,e):ds) b = EXI i $ (Var i :=: e) :>: binds ds b
-
 --------------------------------------------------------------------------------
 
 type Context = Expr -> Expr
