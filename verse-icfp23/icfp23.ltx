@@ -2165,7 +2165,7 @@ and compare them to other approaches.
 
 A significant difference between our presentation and earlier works is our
 treatment of choice. Consider an expression like |(3 + (20 choice 30))|.
-This is typically handled by a pair of non-deterministic rewrite rules:
+Choice is typically handled by a pair of non-deterministic rewrite rules:
 $$
 |e_1 choice e_2| \movesto |e_1| \hspace{1cm} |e_1 choice e_2| \movesto |e_2|
 $$
@@ -2186,7 +2186,7 @@ non-deterministic selection.  Rule \rulename{choose} is not a new idea:
 it is common in calculi with choice,
 %%see {\eg}, ~\citetext{\citealp[Section 6.1]{liguoro:non-det}, \citealp[Section 3]{lago:probabilistic}}
 see {\eg}, ~\citet[Section 6.1]{liguoro:non-det} and \citet[Section 3]{lago:probabilistic},
-and, more recently, has been used to describe functional logic languages where it is variously
+and, more recently, has been used to describe functional logic languages, where it is variously
 called \emph{bubbling} \cite{antoy:bubbling} or \emph{pull-tabbing} \cite{antoy:pull-tabbing}.
 However, our formulation appears simpler because we avoid the need for attaching
 an identifier to each choice with its attendant complications.
@@ -2280,7 +2280,7 @@ CRWL framework.  Their key insight (like us, inspired by
 \citet{ariola:call-by-need}'s formalization of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
-However, both CRWL and Fraguas {\etal} suffer from a major problem:
+However, both CRWL and L\'opez-Fraguas {\etal} suffer from a major problem:
 they require something we call \emph{magical rewriting}. A key rewrite rule is this:
 $$
 \begin{array}{l}
@@ -2298,7 +2298,7 @@ The substitution for the free variables of the left-hand-side can
 readily be chosen by matching the left-hand-side against the call.
 But the substitution for the extra variables must be chosen ``magically''
 \cite[Section 7]{fraguas:rewriting} or clairvoyantly, so as to make the future execution
-work out. This is admirably high level because it hides everything
+work out. This is admirably high-level because it hides everything
 about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
 In a subsequent journal paper, they refine CRWL to avoid magical rewriting using
@@ -2330,7 +2330,7 @@ residuation.
 
 When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
-User-defined functions can be defined at top level only;
+User-defined functions can be defined at top level only,
 and function symbols (the names of such functions) are syntactically
 distinguished from ordinary variables.
 % As Hanus describes, it is possible
@@ -2342,7 +2342,7 @@ distinguished from ordinary variables.
 % |apply| function.
 As Hanus describes, it is possible
 to translate a higher-order program into a first-order
-form using defunctionalization~\cite[Section 3.3]{hanus:survey}, and a built-in
+form using defunctionalization~\cite[Section 3.3]{hanus:survey} and a built-in
 |apply| function.
 (Hanus does not mention this, but for a language with arbitrarily nested lambdas,
 one would need to do lambda-lifting \cite{johnsson:lambdalift} as well; this is perhaps a minor point.)
@@ -2366,7 +2366,7 @@ if it encounters a logical variable; the latter unifies or narrows
 respectively. In contrast, \versecalc{}
 has a single equality |(=)|, and the orthogonal |oneKW| construct, to deal with all four concepts.
 
-FLC has let-expressions \verb!(let x=e in b)!, where \versecalc{} uses
+FLC has let-expressions \verb!(let x=e in b)! where \versecalc{} uses
 |defKW| and (again) unification.
 FLC also uses the same construct for a different purpose, to
 bring a logical variable into scope, using the strange binding \verb!x=x!, thus \verb!(let x=x in e)!.
