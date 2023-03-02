@@ -1514,7 +1514,7 @@ Let us call an evaluation strategy \emph{good} if it guarantees to terminate if 
 is \emph{any} terminating sequence of reductions; \ie, if any path terminates with a value,
 then a good evaluation strategy will terminate with that same value\footnote{
 It would be even better if the strategy could (c) guarantee to find the
-result in the minimal number of rewrite steps---so called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
+result in the minimal number of rewrite steps---so-called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost-outermost reduction}, is a \emph{good} evaluation strategy.
@@ -1561,8 +1561,7 @@ The rules we describe here should both be able to transform a program to its val
 and also be confluent.
 To aid in the development of the rules, we have used several mechanized tools to automate
 reduction, random test-case generation, and confluence checking.
-Initially, we used PLT Redex, \cite{pltredex}, which is very easy to use,
-but not very efficient.
+Initially, we used PLT Redex \cite{pltredex}, which is very easy to use but not very efficient.
 For better efficiency we switched to a Haskell library for term
 rewriting.
 The library provides a DSL for writing rules, and provides the infrastructure
@@ -1596,10 +1595,10 @@ potential rule set.
 % We cannot prove formally that the rules evaluates all the programs we
 % expect, since we have no specification of what we expect.
 Second, before beginning a proof of confluence, we used QuickCheck \cite{quickcheck}
-to generate test cases, and check them for confluence.
+to generate test cases and check them for confluence.
 QuickCheck turned out to be invaluable at finding counterexamples to
-otherwise reasonable looking rules;
-it has run on the order of 100M tests on the current rule set.
+otherwise reasonabl- looking rules;
+it has run on the order of 100~million tests on the current rule set.
 
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
