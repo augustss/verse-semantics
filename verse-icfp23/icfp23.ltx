@@ -1179,32 +1179,36 @@ suffice to express the necessary sharing.
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
+
 $$
-\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+\vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
+\begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
   \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
-     \movesto & |def x (tup b == tup a ; x == tup b; tup b)| \\
-  \movestoR{u-tup, eqn-elim} & |a == b; tup a| &
-     \movesto & |b == a; tup b| \\
+     \movestoR{subst}  & |def x (tup b == tup a ; x == tup b; tup b)| \\
+  \movestoR{u-tup} & |def x (x == tup a ; a == b; tup a)| &
+     \movestoR{u-tup}  & |def x (b == a ; x == tup b; tup b)| \\
+  \movestoR{eqn-elim} & |a == b; tup a| &
+     \movestoR{eqn-elim} & |b == a; tup b| \\
   \movestoR{subst} & |a == b; tup b| &
-      \movesto & |b == a; tup a| \\
+      \movestoR{subst} & |b == a; tup a| \\
 
 \end{array}
+$}
 $$
 Each column is a reduction sequence starting from the same common term at the top;
 the two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
 in the first step. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
-them to be brought together, so that the unification rules are confluent.
+them to be brought together, so that the unification rules are syntactically confluent.
 Rule \rulename{seq-swap} is needed for a similar reason. Consider
 this example:
 % where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
 $$
-\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
-  \multicolumn{4}{c}{|c==a; c==b; c|} \\
+\begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
+  \multicolumn{4}{c}{\quad|c==a; c==b; c|} \\
   \movestoR{subst} & |c==a; a==b; a| &
      \movestoR{subst} & |b==a; c==b; b| \\
-
   \movestoR{var-swap} & |c==a; b==a; a| &
      \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
@@ -1993,7 +1997,7 @@ replacing each occurrence of |Omega| in $\omegarr(|e_2|)$ with an (individually-
 
 Consider the even-odd problem discussed in \cref{sec:even-odd}.
 $$
-\begin{array}{l@@{\,}l@@{\hspace{1cm}}l@@{\,}l}
+\begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
 \multicolumn{4}{c}{|def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|} \\
     \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))|
   & \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| \\
