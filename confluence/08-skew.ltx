@@ -26,10 +26,13 @@
 
 \section{Skew Confluence} \label{sec:skew-confluence}
 
-\skewtodo{This is an incomplete draft of a sketch of an incomplete proof of skew confluence.}
+\skewtodo{This is a sketch of an incomplete proof of skew confluence.}
 
-We now consider a version of \versecalc{} that fully supports recursive substitution. Rather than lifting the side condition
-on rule \rulename{subst} that avoids using a recursive equation for substitution, we take another approach that we believe leads to a simpler proof:
+We now consider a version of \versecalc{} that fully supports recursive substitution,
+and lifts the pesky no-recursion precondition on the confluence theorem.
+Rather than lifting the side condition $|x| \not\in \freevars{v}$
+on rule \rulename{subst}, which avoids using a recursive equation for substitution,
+we take another approach that we believe leads to a simpler proof:
 we introduce the familiar, conventional fixpoint operator |mu x hnf|, but allow it to be applied only to head values, not to general expressions.
 A new unification rule \rulename{u-occurs-wrap} can turn a recursive equation into one that is not recursive
 (by packaging up the right-hand side within a fixpoint), after which rule \rulename{subst} may be applied.
@@ -48,7 +51,9 @@ in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e
 \Cref{fig:fvs} contains a formal definition of this function for \versecalc{}.
 
 We use the variation $\freevarsoutsidelambdas{|e|}$ to denote the set of variables that occur free
-in the expression |e| in at least one position that is not within the body of a lambda expression.
+in the expression |e| in at least one position that is not within the body of a
+lambda expression\footnote{
+  ``$\freevarsoutsidelambdas{\cdot}$'' abbreviates ``free variables outside lambda''}.
 As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, y, z))))|} = \{ f, g \}$ because:
 \begin{itemize}
 \item |x| is bound by |defKW|, so it is not free. 
@@ -57,9 +62,8 @@ As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, 
 \item |y| is bound by |lambda|, so it is not free. 
 \item |z| is free, but appears only in a position that is within the body of a lambda expression.
 \end{itemize}
-\Cref{fig:fvsol} contains a formal definition of this function. It differs from the definition of $\freevars{\cdot}$
-only in its handling of lambda expressions.
-
+\Cref{fig:fvsol} contains a formal definition of this function.
+Unlike $\freevars{e}$, $\freevarsoutsidelambdas{|v|}$ is only ever appplied to a value $|v|$.
 
 \subsection{Substitution}
 
@@ -95,12 +99,16 @@ $
 \end{array}
 $
 \end{quote}
-plus rule \rulename{u-unwrap} could be used instead to support recursion through tuples only as well as through lambda expressions.}
+plus rule \rulename{u-unwrap} could be used instead to support recursion through tuples only as well as through lambda expressions.}\footnote{
+  \rulename{u-occurs-fail} is identical to \rulename{u-occurs} in its effect,
+  but it is re-expressed using $\freevarsoutsidelambdas{\cdot}$, which we need anyway for \rulename{u-occurs-wrap}.  Now we can drop the context $V$, which was only
+  used in \rulename{u-occurs}.
+}
 \begin{quote}
 $
 \begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
-  \rulename{u-occurs-fail} & |x=hnf| & \movesto & |fail| & \text{if $|x| \in \freevarsoutsidelambdas{|hnf|}$} \\
-  \rulename{u-occurs-wrap} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$ and $|x| \not\in \freevarsoutsidelambdas{|hnf|}$} \\
+  \rulename{u-occurs-fail} & |x=hnf; e| & \movesto & |fail| & \text{if $|x| \in \freevarsoutsidelambdas{|hnf|}$} \\
+  \rulename{u-occurs-wrap} & |x=hnf; e| & \movesto & |x=mu x hnf; e| & \text{if $|x| \in \freevars{|hnf|}$ and $|x| \not\in \freevarsoutsidelambdas{|hnf|}$} \\
 \end{array}
 $
 \end{quote}
@@ -114,7 +122,8 @@ $
 \end{quote}
 As we will see, rule \rulename{u-unwrap} is confluent but not Noetherian.
 
-The resulting grammar is not confluent; in particular, it suffers from the even-odd problem \cite[Example 4.1]{ariola:skew-confluence}.
+The resulting grammar is not confluent; in particular, it suffers from the even-odd problem
+described in \cref{sec:even-odd} \cite[Example 4.1]{ariola:skew-confluence}.
 Therefore we will modify the proof of confluence for $\runi$ to become a proof of \emph{skew confluence} \cite{ariola:skew-confluence},
 and then go on to prove that \versecalc{} itself, with this modification, is skew confluent.
 
@@ -138,7 +147,7 @@ $
   \freevars{|all e|} & = & \freevars{|e|} \\
 \end{array}
 $
-\caption{Definition of the free-variables function $\freevars{\cdot}$}\label{fig:fvs}
+\caption{Definition of the free-variables function $\freevars{|e|}$}\label{fig:fvs}
 \Description{Definition of the free-variables function ``fvs''}
 \end{figure}
 
@@ -150,18 +159,19 @@ $
   \freevarsoutsidelambdas{|op|} & = & \{\,\} \\
   \freevarsoutsidelambdas{|tup (v_1, commadots, v_n)|} & = & \freevarsoutsidelambdas{|v_1|} \cup \cdots \cup \freevarsoutsidelambdas{|v_n|} \\
   \freevarsoutsidelambdas{|lam x e|} & = & \{\,\} \\
-  \freevarsoutsidelambdas{|mu x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
-  \freevarsoutsidelambdas{|eq; e|} & = & \freevarsoutsidelambdas{|eq|} \cup \freevarsoutsidelambdas{|e|} \\
-  \freevarsoutsidelambdas{|v = e|} & = & \freevarsoutsidelambdas{|v|} \cup \freevarsoutsidelambdas{|e|} \\
-  \freevarsoutsidelambdas{|def x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
-  \freevarsoutsidelambdas{|fail|} & = & \{\,\}  \\
-  \freevarsoutsidelambdas{|e_1 choice e_2|} & = & \freevarsoutsidelambdas{|e_1|} \cup \freevarsoutsidelambdas{|e_2|} \\
-  \freevarsoutsidelambdas{|v_1 v_2|} & = & \freevarsoutsidelambdas{|v_1|} \cup \freevarsoutsidelambdas{|v_2|} \\
-  \freevarsoutsidelambdas{|one e|} & = & \freevarsoutsidelambdas{|e|} \\
-  \freevarsoutsidelambdas{|all e|} & = & \freevarsoutsidelambdas{|e|} \\
+%   \freevarsoutsidelambdas{|mu x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+%  \freevarsoutsidelambdas{|eq; e|} & = & \freevarsoutsidelambdas{|eq|} \cup \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|v = e|} & = & \freevarsoutsidelambdas{|v|} \cup \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|def x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+%  \freevarsoutsidelambdas{|fail|} & = & \{\,\}  \\
+%  \freevarsoutsidelambdas{|e_1 choice e_2|} & = & \freevarsoutsidelambdas{|e_1|} \cup \freevarsoutsidelambdas{|e_2|} \\
+%  \freevarsoutsidelambdas{|v_1 v_2|} & = & \freevarsoutsidelambdas{|v_1|} \cup \freevarsoutsidelambdas{|v_2|} \\
+%  \freevarsoutsidelambdas{|one e|} & = & \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|all e|} & = & \freevarsoutsidelambdas{|e|} \\
 \end{array}
 $
-\caption{Definition of the free-variables-outside-lambdas function $\freevarsoutsidelambdas{\cdot}$}\label{fig:fvsol}
+\caption{Definition of the free-variables-outside-lambdas function $\freevarsoutsidelambdas{|v|}$}
+\label{fig:fvsol}
 \Description{Definition of the free-variables-outside-lambdas function ``fvsol''}
 \end{figure}
 
