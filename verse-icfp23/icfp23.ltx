@@ -2106,7 +2106,7 @@ semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifull
 \subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
-We could have introduced a more general operator |splitKW|\footnote{The name inspired by \citet{oleglogict}.} as $e \; ::= \; |dots| \vb |split e v_1 v_2|$ and rules:
+We could have introduced a more general operator |splitKW|\footnote{The name inspired by \citet{oleglogict}.} as $e \; ::= \; \cdots \vb |split e v_1 v_2|$ and rules:
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
