@@ -1938,9 +1938,9 @@ determined (like us) that their calculus was not confluent; then they added a sp
 constraint on recursive substitution
 and proved that the modified calculus is confluent \cite{ariola:cyclic-lambda,ariola:lambda-letrec}.
 In a later paper, Ariola and Blom proved that their calculus without the constraint, while not confluent,
-does obey a weaker related property, which they invented, of \emph{skew confluence} \cite{ariola:skew-confluence}.
-We believe, and currently are trying to prove, that \versecalc{} is skew confluent without the
-pesky \noHYPHENrecursion side condition of \cref{thm:confluence-sketch}.
+does obey a weaker related property, which they invented, called \emph{skew confluence} \cite{ariola:skew-confluence}.
+We believe, and currently are trying to prove, that \versecalc{} without the
+pesky \noHYPHENrecursion side condition of \cref{thm:confluence-sketch} is skew confluent.
 \begin{center}
   \begin{tabular}{rl}
     Confluence: & $\forall |e|, |e_1|, |e_2|.\; \rsteps{\rr}{|e|}{|e_1|} \wedge \rsteps{\rr}{|e|}{|e_2|} \implies \exists e'.\; \rsteps{\rr}{|e_1|}{|e'|} \wedge \rsteps{\rr}{|e_2|}{|e'|}$. \\
@@ -1983,13 +1983,13 @@ These are depicted here as two commutative diagrams, which differ only on the bo
 % and converse reductions that maintain a certain partial order $\preceqomegarr$ (see below).
 % \simon{don't understand this}
 You can understand skew confluence as follows: if two different reduction paths from |e| produce
-terms |e_1|, |e_2|, then |e_1| can be further reduced to |e'| so that all of |e_2|'s permanent structure
+terms |e_1|, |e_2|, then |e_1| can be further reduced to some |e'| such that all of |e_2|'s permanent structure
 is present in |e'|, written $|e_2| \preceqomegarr |e'|$.  By ``permanent structure'' we mean
 an outer shell of tuples, lambdas, and constants, that will never change no matter how much
 further reduction takes place.  For example, however far we reduce the term |tup (1, lam z e)|, the
 result will always look like |tup (1, lam z e')|, where $\rsteps{\rr}{e}{e'}$.  We can formalize the notion of
 permanent structure by defining an
-\emph{erasure function} $\omegarr(|e|)$ which replaces all the impermanent bits of |e|
+\emph{information content function} $\omegarr(|e|)$ that replaces all the impermanent bits of |e|
 with a new dummy term |Omega|.  Thus $\omegarr(|tup (1, lam z x)|) = |tup (1, lam z Omega)|$.
 Then $|e_2| \preceqomegarr |e'|$ if $\omegarr(|e_2|)$ can be made equal to |e'| by
 replacing each occurrence of |Omega| in $\omegarr(|e_2|)$ with an (individually-chosen) term.
@@ -2007,7 +2007,7 @@ $$
     \rstep{}{}{} & \cdots & \rstep{}{}{} & \cdots
 \end{array}
 $$
-The two columns can never join up, but if you pick any term, there is a term in the other
+The two columns can never join up, but if you pick any term in either column, there is a term in the other
 column that has a greater amount of permanent structure.  That in turn means that the terms in the left-hand
 column are contextually equivalent to those in the right-hand column, because the context can
 inspect only the permanent structure. This contextual equivalence is the real reason
@@ -2106,14 +2106,15 @@ semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifull
 \subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
-We could have introduced a more general operator |splitKW|\footnote{The name inspired by \citet{oleglogict}.} as $e ::=  |dots| \vb |split e v_1 v_2|$ and rules:
+We could have introduced a more general operator |splitKW|\footnote{The name inspired by \citet{oleglogict}.} as $e \; ::= \; |dots| \vb |split e v_1 v_2|$ and rules:
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
-    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |applyN g (v, thunk e)|  \\
 \end{array}\]
-The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value. If |e| fails, it calls |f|, and if |e| returns at least one value, it passes that to |g| together with the remaining computation, safely tucked away behind a lambda.
-When adding more effects to \versecalc{}, see \cref{sec:store}, it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
+The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value.
+If |e| fails, it calls |f|; but if |e| returns at least one value, it passes that to |g| together with the remaining computation, safely tucked away within a lambda.
+When adding more effects to \versecalc{} (see \cref{sec:store}), it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
