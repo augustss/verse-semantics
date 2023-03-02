@@ -22,6 +22,7 @@
 \newcommand{\etc}{\emph{etc.}\xspace}
 \newcommand{\etal}{\emph{et al.}\xspace}
 \newcommand{\vs}{\emph{vs.}\xspace}
+\newcommand{\cf}{\emph{cf.}\xspace}
 
 \RequirePackage[utf8]{inputenc}
 
@@ -1299,10 +1300,10 @@ For example, |def x (x*x = x)| has two solutions but discovering that involves s
 
 Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 \rulename{val-elim} discards a value to the left of a semicolon; \rulename{exi-elim} discards
-a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ whose only
-occurrence is an equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
+a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ that binds a variable whose only
+occurrence is a single equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
 Note that none of these rules, except \rulename{fail-elim}, discard an unevaluated expression,
-because that expression might fail and we don't want to ``lose'' that failure (c.f. \cref{sec:lenient}).
+because that expression might fail and we don't want to ``lose'' that failure (\cf \cref{sec:lenient}).
 The exception is \rulename{fail-elim}, which propagates failure.
 
 Four \emph{normalization} rules help to put the expression in a form that
@@ -1322,11 +1323,11 @@ avoiding that eventuality is easily achieved by tweaking the evaluation strategy
 Note that all these swapping and normalization rules \emph{preserve the left-to-right sequencing of expressions},
 which matters because choices are made left to right as we saw in \cref{sec:mixing}.
 Moreover, the rules do not float equalities or existentials out of choices:
-that restriction is the key to localizing unification (\cref{sec:mixing}), and
-the flexible/rigid distinction of
+that restriction is the key to localizing unification (\cref{sec:mixing}) and
+to the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
-|(y == ((x==3; x*2) choice (x==4)); tup (x+1,y))|.
-We must not float the binding |(x==3)| to the expression |(x+1)|,
+|(y == ((x==3; x+5) choice (x==4)); tup (x+1,y))|.
+We must not float the binding |(x==3)| up to a point where it might interact with the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
 
 % If the equality |(x==v)| turns out to be the sole remaining occurrence of |x| in
@@ -1342,7 +1343,7 @@ because the latter is outside the choice, and a different branch of the choice b
 %
 % Similarly, rules \rulename{unify-seql} and \rulename{unify-seqr} move sequencing out of unification,
 % again to make it more likely to get the form |(x==v)|.  Notice that |e_1|, |e_2| and |e_3| stay in the
-% same left-to-right order, there is no risk of re-ordering choices (c.f. \cref{sec:mixing}).
+% same left-to-right order, there is no risk of re-ordering choices (\cf \cref{sec:mixing}).
 %
 % Rules \rulename{unify-unifyl} and \rulename{unify-unifyr} move a unification between values out of another unification.
 % Without these rules |(x==y)==1;y>0| would be stuck; but \rulename{unify-unifyl}
