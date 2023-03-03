@@ -1,13 +1,15 @@
 %% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
 % \documentclass[acmsmall,review,anonymous,dvipsnames]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
 %% For double-blind review submission, w/ CCS and ACM Reference
-\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+% \documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
 %% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
 %\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
 %% For single-blind review submission, w/ CCS and ACM Reference
 %\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
 %% For final camera-ready submission, w/ required CCS and ACM Reference
 %\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false,authorsperrow=2}
 
 \let\Bbbk\relax % polycode defines that again?
 %include lhs2TeX.fmt
@@ -28,14 +30,15 @@
 %% Journal information
 %% Supplied to authors by publisher for camera-ready submission;
 %% use defaults for review submission.
-\acmJournal{PACMPL}
-\acmVolume{1}
-\acmNumber{ICFP} % CONF = POPL or ICFP or OOPSLA
-\acmArticle{1}
-\acmYear{2023}
-\acmMonth{1}
-\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
-\startPage{1}
+\acmConference{In submission}{March 2023}
+% \acmJournal{PACMPL}
+% \acmVolume{1}
+% \acmNumber{ICFP} % CONF = POPL or ICFP or OOPSLA
+% \acmArticle{1}
+% \acmYear{2023}
+% \acmMonth{1}
+% \acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+% \startPage{1}
 
 %% -------------- Copyright information ------------------
 %% Supplied to authors (based on authors' rights management selection;
@@ -349,7 +352,7 @@
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
 \maketitle
-
+\renewcommand{\shortauthors}{Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, Steele, Sweeney}
 
 
 % \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
