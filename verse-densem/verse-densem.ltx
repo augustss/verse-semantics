@@ -24,6 +24,8 @@
 \newcommand{\etal}{\emph{et al.}}
 \newcommand{\vs}{\emph{vs.}}
 
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+
 \RequirePackage[utf8]{inputenc}
 
 %% Journal information
@@ -1531,6 +1533,55 @@ $
 \subsection{Labelled semantics for TimLambda}
 See \Cref{fig:tim-labelled-sem}
 
+\section{Functions}
+Here is an alternative formulation of how function definitions are desugared.
+A function definition of the form
+$$
+|apply1 f (def (x_1 xdots x_n) e_1) := e_2|
+$$
+is desugared as (glossing over the fact that we need a |defKW f| somewhere)
+$$
+|f == lam x (if (def (x_1 xdots x_n) (x == e_1)) then e_2 else def y y)|
+$$
+\Eg,
+$$
+|apply1 fac 0 := 1|
+$$
+is desugared as
+$$
+|fac == lam x (if (x == 0) then 1 else def y y)|
+$$
+The meaning of |fac|, according to the denotational semantics,
+is the set of all functions that map |0| to |1| but otherwise can behave in any way.
+
+To continue with factorial
+$$
+|apply1 fac (def n (n>0)) := n * apply1 fac (n - 1)|
+$$
+desugars to
+$$
+|fac == lam x (if (def n (x == (n>0))) then n * apply1 fac (n - 1) else def y y|
+$$
+simplifies to
+$$
+|fac == lam x (if (x>0)) then x * apply1 fac (x - 1) else def y y|
+$$
+and, denotationally, this is the set of function that behave
+like factorial, except that the base case (when |x==0|) can be anything.
+Putting these together
+$$
+\begin{array}{l}
+|fac == lam x (if (x == 0) then 1 else def y y)| \\
+|fac == lam x (if (x>0)) then x * apply1 fac (x - 1) else def y y|
+\end{array}
+$$
+Since $=$ corresponds to set intersection the |fac| function is
+now the set of functions that behave like factorial for non-negative integers,
+but otherwise unconstrained.
+
+So the denotation of, \eg, |one (apply1 fac 5)| is $\{120\}$, whereas
+the denotation of |one (apply1 fac (-1))| is $\wrong$, since the set
+of results of the application is not a singleton.
 
 \end{document}
 
