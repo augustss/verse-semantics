@@ -6,7 +6,7 @@
 
 module FrontEnd.Expr(
   Loc, noLoc,
-  Ident(..),
+  Ident(..), unIdent,
   Expr(..),
   pattern Fail,
   pattern Unit,
@@ -15,6 +15,8 @@ module FrontEnd.Expr(
   Block,
   Eff,
   Op,
+  Effect(..), Effects,
+  EffectType(..),
   compos, composOp,
   seqE,
   ) where
@@ -61,7 +63,6 @@ data Expr
   | Array [Expr]              -- e1,e2,...
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
-  | ApplyEff [Eff] Expr       -- eff(rs){e}
   | EffAttr Expr Eff          -- f<e>
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
@@ -96,11 +97,12 @@ data Expr
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
   | Where Expr Expr           -- e1 where e2
-  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}
+  | Lambda Ident Effects Expr Expr -- function(x:any where e1)<eff>{e2}
   | AnyT                      -- :any
   | EmptyT                    -- :false
   | Wrong String              -- wrong
-  | Exists [Ident] Expr       -- exists xs . e
+  | Exists [(Ident, EffectType)] Expr       -- exists xs . e
+  | ApplyEff Effects Expr       -- eff(rs){e}
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -118,6 +120,19 @@ type Eff = Ident
 type Op = Ident
 
 type Block = Expr
+
+data Effect
+  = Ediverges
+  | Ecovariant
+  | Esucceeds | Efails | Edecides | Eiterates
+  | Eallocates | Ereads | Ewrites
+  | Einteracts
+  deriving (Eq, Ord, Show, Enum, Bounded, Data)
+
+type Effects = [Effect]
+
+data EffectType = ETNone | ETUnknown | ETArrow EffectType Effects EffectType
+  deriving (Eq, Ord, Show, Data)
 
 instance Pretty Expr where
   pPrintPrec l p
@@ -210,7 +225,9 @@ instance Pretty Expr where
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
           EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
-          Exists is e -> maybeParens (p > 0) $ text "exists" <+> hsep (map (ppr 0) is) <+> text "." <+> ppr 0 e
+          Exists ies e -> maybeParens (p > 0) $ text "exists" <+> hsep (map ppIE ies) <+> text "." <+> ppr 0 e
+            where ppIE (i, ETNone) = ppr 0 i
+                  ppIE (i, t) = ppr 0 i <> text "<" <> ppr 0 t <> text ">"
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -272,6 +289,17 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "macro"  12
       , inl "()"     13
       ]
+
+instance Pretty Effect where
+  pPrintPrec _ _ e = text $ tail $ show e
+
+instance Pretty EffectType where
+  pPrintPrec _ _ ETNone = text "none"
+  pPrintPrec _ _ ETUnknown = text "?"
+  pPrintPrec l p (ETArrow a rs b) = maybeParens (p>0) $ pPrintPrec l 1 a <> text "-" <> t <> pPrintPrec l 1 b
+    where t | [] <- rs = text ">"
+            | [Ediverges,Eallocates,Ereads,Ewrites] <- rs = text "-<heap>"
+            | otherwise = text "-<" <> commaSep l rs <> text ">"
 
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
 compos _ e@LitInt{} = pure e
