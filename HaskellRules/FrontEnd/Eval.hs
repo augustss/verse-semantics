@@ -72,7 +72,7 @@ eval trc ea = unStore $ loop (steps trc) $ evalTrace "eval" (const ea'') trc (CW
     unStore e = e
 
     -- HACK: Recognizer when we have loaded the prelude.verse file
-    hasPRELUDE = case ea of CDef (Ident _ "PRELUDE" : _) _ -> True; _ -> False
+    hasPRELUDE = case ea of CExists (Ident _ "PRELUDE" : _) _ -> True; _ -> False
 
     -- Loop until convergence or timeout
     loop :: Int -> Core -> Core
@@ -137,12 +137,12 @@ evalChoice flg = evalTrace "evalChoice" t flg
     isCE (CApply (CPrim p) (CValue _)) = not (isStorePrim p)
     isCE CFail = True
     isCE CWrong{} = True
-    isCE (CDef _ e) = isCE e
+    isCE (CExists _ e) = isCE e
     isCE _ = False
-    -- The g of CSplit is recursive, so it might get a CDef in front of the lambda.
+    -- The g of CSplit is recursive, so it might get a CExists in front of the lambda.
     --isCELam e | trace ("isCELam " ++ prettyShow e) False = undefined
     isCELam (CLam _ (CLam _ e)) = isCE e
-    isCELam (CLam _ (CDef [_] (CSeq [_, CLam _ e]))) = isCE e
+    isCELam (CLam _ (CExists [_] (CSeq [_, CLam _ e]))) = isCE e
     isCELam (CVar _) = True -- happens for recursive functions
     isCELam _ = False
 
@@ -178,15 +178,15 @@ evalChoice flg = evalTrace "evalChoice" t flg
                   pure $ x' : xs'
             es' <- loop es
             pure $ \ x -> CSeq $ map ($ x) es'
-          CDef h b -> do
+          CExists h b -> do
             b' <- findC b
-            pure $ \ x -> CDef h (b' x)
+            pure $ \ x -> CExists h (b' x)
           CBar e1 e2 -> do
             put $ Just [e1, e2]
             pure id
           _ -> pure $ const e
 
--- Handle CDef floating
+-- Handle CExists floating
 --  DEF-FLOAT
 evalDefFloat :: EvalCore
 evalDefFloat flg = evalTrace "evalDefFloat" f flg
@@ -199,7 +199,7 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
         (_, Nothing) -> e
         (e', Just d) ->
           case alphaConvert (fvs (e' (CArray []))) d of
-            CDef h b -> CDef h (e' b)
+            CExists h b -> CExists h (e' b)
             x -> impossible x
 
     findD e = do
@@ -215,7 +215,7 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
           CSeq es -> do
             es' <- mapM findD es
             pure $ \ x -> CSeq (map ($ x) es')
-          CDef _ _ -> do
+          CExists _ _ -> do
             put $ Just e
             pure id
           _ -> pure $ const e
@@ -226,14 +226,14 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
 evalWrong :: EvalCore
 evalWrong = evalTrace "evalWrong" f
   where
-    f (CDef (_:_) CValue{}) = CWrong "def-wrong"
+    f (CExists (_:_) CValue{}) = CWrong "def-wrong"
     f e | ws@(_:_) <- getWrongs e = cWrongs ws
     f e = composOp f e
 
     getWrongs (CWrong s) = [s]
     getWrongs (CUnify e1 e2) = getWrongs e1 ++ getWrongs e2
     getWrongs (CSeq es) = concatMap getWrongs es
-    getWrongs (CDef _ e) = getWrongs e
+    getWrongs (CExists _ e) = getWrongs e
     getWrongs (CSucceeds e) = getWrongs e
     getWrongs (CDecides e) = getWrongs e
     getWrongs (CSplit (CWrong s) _ _) = [s]
@@ -256,7 +256,7 @@ evalFail = evalTrace "evalFail" f
     hasFail CFail = True
     hasFail (CUnify e1 e2) = hasFail e1 || hasFail e2
     hasFail (CSeq es) = any hasFail es
-    hasFail (CDef _ e) = hasFail e
+    hasFail (CExists _ e) = hasFail e
     hasFail (CStore _ e) = hasFail e
     hasFail _ = False
 
@@ -297,7 +297,7 @@ evalUnify flg = evalTrace "evalUnify" f flg
 evalUnused :: EvalCore
 evalUnused flg = evalTrace "evalUnused" f flg
   where
-    f (CDef h e) | Just d <- bind h e = d
+    f (CExists h e) | Just d <- bind h e = d
     f e = composOpLam (underLambda flg) f e
 
     bind h e =
@@ -379,7 +379,7 @@ evalSubst flg = evalTrace "evalSubst" f flg
                   | otherwise =
       case runState (findLam vv) Nothing of
         (v', Just (y, e)) ->
-          let lam = CLam y $ CDef [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
+          let lam = CLam y $ CExists [x] $ CSeq [CUnify (CVar x) (CValue vv), e]
           in  Just $ CUnify (CVar x) $ CValue $ substHoleV lam v'
         _ -> Just $ CWrong $ "occurs check " ++ prettyShow x
       where
@@ -407,11 +407,11 @@ evalSubst flg = evalTrace "evalSubst" f flg
 evalDef :: EvalCore
 evalDef flg = evalTrace "evalDef" f flg
   where
-    f (CDef _ CFail) = CFail
-    f (CDef [] e) = f e
-    f (CDef h1 (CDef h2 e)) =
+    f (CExists _ CFail) = CFail
+    f (CExists [] e) = f e
+    f (CExists h1 (CExists h2 e)) =
       assert (null (intersect h1 h2)) ("DEF-MERGE: " ++ show (h1,h2)) $
-      f $ CDef (h1 ++ h2) e
+      f $ CExists (h1 ++ h2) e
     f e = composOpLam (underLambda flg) f e
 
 -- Handle 'split'
@@ -425,7 +425,7 @@ evalSplit flg = evalTrace "evalSplit" f flg
     f e = composOpLam (underLambda flg) f e
     val e g v r =
       let y : _ = newVars "a" (fvs e)
-      in  CDef [y] $ CSeq [CUnify (CVar y) (CApply g v), CApply (CVar y) r]
+      in  CExists [y] $ CSeq [CUnify (CVar y) (CApply g v), CApply (CVar y) r]
 
 dummy :: Ident
 dummy = Ident noLoc "_"
@@ -622,7 +622,7 @@ isHNF _ = False
 mkArr :: [Value] -> Core
 mkArr vs =
   let xs = take (length vs) $ newVars "x" $ fvs (CArray vs)
-  in  CDef xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply v CUnit) xs vs ++ [CArray $ map CVar xs]
+  in  CExists xs $ cSeq $ zipWith (\ x v -> CUnify (CVar x) $ CApply v CUnit) xs vs ++ [CArray $ map CVar xs]
 
 -- A gruesome hack to test if something is an uninstantiated logical variable.
 evalKnown :: EvalCore
@@ -675,11 +675,11 @@ prelude =
 
         arrowV =
           CLam st $
-            CDef [s, t] $
+            CExists [s, t] $
             CSeq [
               CUnify (CValue (CArray [CVar s, CVar t])) (CVar st),
               CLam g $ CLam y $
-                CDef [sy, gsy] $
+                CExists [sy, gsy] $
                 CSeq [
                   app "isFcn$" (CVar g),
                   CUnify (CVar sy) (CApply (CVar s) (CVar y)),
@@ -693,7 +693,7 @@ prelude =
 {-
         cmpV op =
           CLam xy $
-            CDef [x, y] $
+            CExists [x, y] $
             CSeq [
               CUnify (CValue (CArray [CVar x, CVar y])) (CVar xy),
               app op (CVar xy),
@@ -702,7 +702,7 @@ prelude =
 -}
         newV =
           CLam t $ CLam x $
-            CDef [y] $
+            CExists [y] $
             CSeq [
               CUnify (CVar y) (CApply (CVar t) (CVar x)),
               app "alloc$" (CVar y)
@@ -778,7 +778,7 @@ evalRef flg = evalTrace "evalRef" f flg
             (s'', CUnify e1' e2')
           else
             (s', CUnify e1' e2)
-    st s (CDef h e) = (s', CDef h e') where (s', e') = st s e
+    st s (CExists h e) = (s', CExists h e') where (s', e') = st s e
     st as (CSeq aes) = loop as [] aes
       where loop s rs [] = (s, CSeq $ reverse rs)
             loop s rs (e:es) =
@@ -798,7 +798,7 @@ isSE :: Core -> Bool
 isSE (CValue _) = True
 isSE (CUnify e1 e2) = isSE e1 && isSE e2
 isSE (CSeq es) = all isSE es
-isSE (CDef _ e) = isSE e
+isSE (CExists _ e) = isSE e
 isSE (CApply (CPrim p) (CValue _)) = not (isStorePrim p)
 isSE _ = False
 
@@ -827,7 +827,7 @@ evalStore flg = evalTrace "evalStore" f flg
             (s'', CUnify e1' e2')
           else
             (s', CUnify e1' e2)
-    st s (CDef h e) = (s', CDef h e') where (s', e') = st s e
+    st s (CExists h e) = (s', CExists h e') where (s', e') = st s e
     st as (CSeq aes) = loop as [] aes
       where loop s rs [] = (s, CSeq $ reverse rs)
             loop s rs (e:es) =

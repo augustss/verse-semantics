@@ -87,10 +87,10 @@ coreToExp' = nl . expl
     expl (C.CAll e) = All $ coreToExp' e
     expl (C.CSucceeds e) = expl e  -- XXX temporarily
     expl (C.CMacro i e) = error $ "expl: " ++ show (i, e)
-    expl (C.CDef [] e) = expl e
-    expl (C.CDef (i:is) e) = List
+    expl (C.CExists [] e) = expl e
+    expl (C.CExists (i:is) e) = List
       [ nl . Exists . nl $ identToName i
-      , coreToExp' (C.CDef is e)
+      , coreToExp' (C.CExists is e)
       ]
 --    expl (C.CWrong _) = undefined
 --    expl (C.CSplit _ _ _) = undefined
@@ -136,6 +136,6 @@ addPrelude :: C.Core -> C.Core
 addPrelude c | "mapAp$" `elem` primops = ins preludeCore
              | otherwise = c
   where primops = [ s | C.CPrim s <- universe c]
-        ins (C.CDef i e) = C.CDef i (ins e)
+        ins (C.CExists i e) = C.CExists i (ins e)
         ins e = C.CSeq [e, c]
 #endif

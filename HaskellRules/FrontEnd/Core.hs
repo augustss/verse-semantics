@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Core(
   Core(..),
@@ -35,8 +36,8 @@ import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
 
 import Epic.Print
 import FrontEnd.Expr hiding (compos, composOp)
-import FrontEnd.Desugar(primOps, covariantId, dsScope)
-import FrontEnd.Error(unimplemented, impossible, internalError)
+import FrontEnd.Desugar(primOps, dsScope)
+import FrontEnd.Error({-unimplemented,-} impossible, internalError)
 import FrontEnd.Flags
 import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
 --import Debug.Trace
@@ -55,7 +56,7 @@ data Core
   | CBar Core Core
   | CFail
   | CMacro Ident Core
-  | CDef Heap Core
+  | CExists [Ident] Core
   | CWrong String
   | CSplit Core Value Value
   | CLambda Ident [Ident] Bool Core Core
@@ -64,8 +65,6 @@ data Core
   deriving (Show, Eq, Data)
 
 type Value = Core
-
-type Heap = [Ident]
 
 data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
   deriving (Show, Eq, Data)
@@ -100,7 +99,7 @@ cSeq es = CSeq es
 
 cDef :: [Ident] -> Core -> Core
 cDef [] e = e
-cDef is e = CDef is e
+cDef is e = CExists is e
 
 cBar :: [Core] -> Core
 cBar [] = CFail
@@ -167,14 +166,14 @@ core (Wrong s) = pure $ CWrong s
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
 core (ApplyD e1 e2) = CApply <$> core e1 <*> core e2
-core (ApplyEff rs e) = coreEffs rs =<< core e
+--core (ApplyEff rs e) = coreEffs rs =<< core e
 core (Unify e1 e2) = cUnify <$> core e1 <*> core e2
 core e@Typedef{} = core e
 core e@Choice{} = cBar <$> mapM core (flat e)
   where flat (Choice e1 e2) = flat e1 ++ flat e2
         flat ee = [ee]
 core Fail = pure $ CFail
-core (For2 e1@(Exists (i:is) (Unify (Variable i') e)) e2@(Variable i'')) | i == i' && i == i'' = do
+core (For2 e1@(Exists ((i,_):is) (Unify (Variable i') e)) e2@(Variable i'')) | i == i' && i == i'' = do
   useSplit <- asks fSplit
   if useSplit then
     forSplit e1 e2
@@ -189,7 +188,7 @@ core (For2 e1 e2) = do
     ee <- coreBind e1 e2
     ea <- cAll ee
     xa <- newTmp
-    pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
+    pure $ CExists [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
 core (If3 e1 e2 e3) = do
   c1 <- core e1
   if isValue' c1 then
@@ -200,7 +199,7 @@ core (If3 e1 e2 e3) = do
     r <- core e3'
     fn <- cOne $ CBar l r
     i <- newTmp
-    pure $ CDef [i] $ seqC [cUnify (CVar i) fn, CApply (CVar i) vEmpty]
+    pure $ CExists [i] $ seqC [cUnify (CVar i) fn, CApply (CVar i) vEmpty]
 core (Macro1 (Ident _ "all") [] e) = cAll =<< core e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
@@ -208,16 +207,16 @@ core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
 core (Lambda i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   timLam <- asks fTimLambda
-  let covariant = covariantId `elem` rs || True -- XXX
+  let covariant = Ecovariant `elem` rs || True -- XXX
   if timLam then do
     let Exists is e1a = e1
     e1' <- core e1a
     e2' <- core e2
-    pure $ CLambda i is covariant e1' e2'
+    pure $ CLambda i (map fst is) covariant e1' e2'
   else
     lamFunc covariant i e1 e2
 core EmptyT = pure CFail
-core (Exists is e) = cDef is <$> core e
+core (Exists is e) = cDef (map fst is) <$> core e
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
@@ -240,24 +239,27 @@ lamFunc cov i (Exists is e1) e2 =
       If3 (Exists is e1) e2 (if cov then Fail else Wrong "outside domain")
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
+{-
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
 coreEffs [Ident _ "decides"] e = cDecides e
 coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
+-}
 
 forSplit :: Expr -> Expr -> C Core
-forSplit (Exists vs e1) e2 = do
+forSplit (Exists ves e1) e2 = do
+  let vs = map fst ves
   h <- newTmp
   u <- newTmp
   x <- newTmp
   y <- newTmp
   a <- newTmp
   b <- newTmp
-  e1' <- core (Exists vs $ Seq [e1, Array $ map Variable vs])
+  e1' <- core (Exists ves $ Seq [e1, Array $ map Variable vs])
   e2' <- core e2
   let fe = CLam u $ CArray []
-      ge = CLam x $ CLam y $ CLam h $ CDef (a:b:vs) $ cSeq [
+      ge = CLam x $ CLam y $ CLam h $ CExists (a:b:vs) $ cSeq [
              CUnify (CVar x) (CArray $ map CVar vs),
              CUnify (CVar a) e2',
              CUnify (CVar b) (CSplit (CApply (CVar y) (CArray [])) fe (CVar h)),
@@ -288,7 +290,7 @@ cAll e = do
   x <- newTmp
   let fe = CLam underscore $ CArray []
       ge = CLam v $ CLam r $ CLam h $
-             CDef [x] $ CSeq [
+             CExists [x] $ CSeq [
                CUnify (CVar x) (CSplit (CApply (CVar r) (CArray [])) fe (CVar h)),
                CApply (CPrim "cons$") (CArray [CVar v, CVar x])
              ]
@@ -391,7 +393,7 @@ instance Pretty Core where
   pPrintPrec _ _ CFail = text "fail"
   pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2
   pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
-  pPrintPrec l p (CDef is e) =
+  pPrintPrec l p (CExists is e) =
     maybeParens (p > 0) $ fsep [text "ex" <+> hsep (map (pPrintPrec l 0) is) <> text ".", pPrintPrec l 0 e]
   pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
   pPrintPrec l _ (CSplit e f g) =
@@ -399,7 +401,7 @@ instance Pretty Core where
                                  pPrintPrec l 0 f <> text ",",
                                  pPrintPrec l 0 g <> text ","])
   pPrintPrec l _ (CLambda x ys cov e1 e2) =
-    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
+    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CExists ys e1) <+>
              (if cov then text "<covariant> " else text "") <>
              text "." <+> pPrintPrec l 0 e2
   pPrintPrec l p (CStore s e) =
@@ -424,7 +426,7 @@ compos f (CApply e1 e2) = CApply <$> f e1 <*> f e2
 compos f (CBar e1 e2) = CBar <$> f e1 <*> f e2
 compos _ CFail = pure CFail
 compos f (CMacro i e) = CMacro i <$> f e
-compos f (CDef h e) = CDef h <$> f e
+compos f (CExists h e) = CExists h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
 compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
@@ -455,7 +457,7 @@ cfvs (CApply e1 e2) = cfvs e1 ++ cfvs e2
 cfvs (CBar e1 e2) = cfvs e1 ++ cfvs e2
 cfvs CFail = []
 cfvs (CMacro _ e) = cfvs e
-cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
+cfvs (CExists is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
 cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
@@ -489,8 +491,8 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
     sub (CBar e1 e2) = CBar (sub e1) (sub e2)
     sub CFail = CFail
     sub (CMacro i e) = CMacro i $ sub e
-    sub a@(CDef h e) | x `elem` h = a
-                     | null (intersect bs h) = CDef h $ sub e
+    sub a@(CExists h e) | x `elem` h = a
+                     | null (intersect bs h) = CExists h $ sub e
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (sub f) (sub g)
@@ -518,7 +520,7 @@ alphaConvert vs = alpha []
     alpha m (CBar e1 e2) = CBar (alpha m e1) (alpha m e2)
     alpha _ CFail = CFail
     alpha m (CMacro i e) = CMacro i (alpha m e)
-    alpha m (CDef h e) = CDef h' (alpha m' e)
+    alpha m (CExists h e) = CExists h' (alpha m' e)
       where h' = map fresh h
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
@@ -552,7 +554,7 @@ pExists :: P Expr
 pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
-    exists is e = Exists is e -- foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
+    exists is e = Exists (map (,ETUnknown) is) e -- foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
     pQuant = pKeyword "exists" <|> pKeyword "exi" <|> pKeyword "ex" <|> pKeyword "E"
       -- <|> void (pOp "∃")
 
