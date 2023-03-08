@@ -1,4 +1,5 @@
 :set -i..
+:set -iverse
 :set -Wall
 :set -package megaparsec
 :set -package parser-combinators
