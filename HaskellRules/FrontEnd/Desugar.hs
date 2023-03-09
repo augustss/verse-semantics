@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, dsScope) where
+module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId, dsScope) where
 --import Control.Arrow(first, second)
 import Control.Monad
 import Control.Monad.State.Strict
@@ -60,7 +60,7 @@ dropParens = f
         f e = compos f e
 
 -- This follows the D transformation in calculus.ltx
-dsD :: HasCallStack => Expr -> D SExpr
+dsD :: Expr -> D SExpr
 dsD = expr
   where
     expr :: HasCallStack => Expr -> D Expr
@@ -120,13 +120,10 @@ dsD = expr
     -- D[e1 => e2] = D[fn(e1){e2}]
     expr (InfixOp e1 (Ident _ "=>") e2) = expr $ Function [(e1, [covariantId])] e2
     -- See below
-    expr (Function [(e, rs)] b) =
-      function e (effsToEffects rs) b
-{-
+    expr (Function [(e, rs)] b)
       | all isLambdaEffect rs = function e rs b
       | otherwise = expr $ Function [(e, rs')] $ ApplyEff rs'' b
       where (rs', rs'') = partition isLambdaEffect rs
--}
     -- D[fn a1 a2 ... {b}] = D[fn a1 (fn a2 ... {e})]
     expr (Function (a:as) b) = expr $ Function [a] $ Function as b
 
@@ -141,7 +138,7 @@ dsD = expr
       e'' <- define noLoc r <$> dsM e' (Variable y)
       pure $ -- primFcn y e'' --  Lambda y [] e'' (Variable y)
              -- Function [(tAny noLoc y, [])] e
-             Lambda y [Ecovariant] e'' (Variable r)
+             Lambda y [covariantId] e'' (Variable r)
     expr (Macro1 m rs e) = Macro1 m rs <$> expr e
 
     -- Conditionals
@@ -254,8 +251,7 @@ unify e1 e2 = Unify e1 e2
 --primFcn :: Ident -> SExpr -> SExpr
 --primFcn y e = Function [(tAny noLoc y, [])] e
 
--- Desugar a pattern match with expr, with the input being y.
-dsM :: HasCallStack => SExpr -> SExpr -> D SExpr
+dsM :: SExpr -> SExpr -> D SExpr
 dsM expr y =
   case expr of
     e | isLiteral e -> dflt
@@ -297,15 +293,9 @@ dsM expr y =
     Choice e1 e2 -> Choice <$> dsM e1 y <*> dsM e2 y
     Range e -> pure $ ApplyD e y
     AnyT -> dflt
-    Function [(fexpr, rs)] gexpr -> func fexpr (effsToEffects rs) gexpr y
-    Lambda i rs e1 e2 -> --dsM (Function [(Where (tAny noLoc i) e1, rs)] e2) y
-                         func (Where (tAny noLoc i) e1) rs e2 y
-    _ -> impossible expr
-  where
-    dflt = pure $ unify y expr
-    func fexpr rs gexpr ye = do
+    Function [(fexpr, rs)] gexpr -> do
       known <- do
-        let h = ye
+        let h = y
         vy <- newIdent noLoc "y"
         x <- newIdent noLoc "x"
         z <- newIdent noLoc "z"
@@ -315,14 +305,16 @@ dsM expr y =
         er <- (define noLoc r . Do) <$> dsM gexpr (Variable z)
         pure $ -- Function [(tAny noLoc vy, rs)] $ seqE [ex, ez, er]
                Lambda vy rs (seqE [ex, ez, er]) (Variable r)
-      if useKnown then do
-        -- should have something like
-        -- expr = Function [(fexpr, rs)] gexpr
-        -- but rs is the wrong type
-        unknown <- undefined -- unify ye <$> dsD expr
-        pure $ If3 (applyPrimD "known$" ye) known unknown
+      unknown <-
+        unify y <$> dsD expr
+      if useKnown then
+        pure $ If3 (applyPrimD "known$" y) known unknown
        else
         pure known
+    Lambda i rs e1 e2 -> dsM (Function [(Where (tAny noLoc i) e1, rs)] e2) y
+    _ -> impossible expr
+  where
+    dflt = pure $ unify y expr
 
 useKnown :: Bool
 useKnown = False -- True
@@ -386,12 +378,12 @@ tAny :: Loc -> Ident -> SExpr
 tAny l i = define l i AnyT
 
 -- Desugar a definition e1 : e2
-dsColon :: HasCallStack => Loc -> Expr -> SExpr -> (SExpr, SExpr)
+dsColon :: Loc -> Expr -> SExpr -> (SExpr, SExpr)
 -- L[x] t = P (x := :t)
 dsColon _ x@Variable{} t =
   (x, t)
 -- L[l(a) t = L[l] (type{function(a){:t}})
-dsColon l f t | Just (lhs, arg, effs) <- getFun f = do
+dsColon l f@(ApplyS _ _) t | Just (lhs, arg, effs) <- getFun f = do
   dsColon l lhs (Typedef (Function [(arg, effs)] (Range t)))
 -- L[l^] t = L[l] new[t]
 dsColon l (PostfixOp f (Ident _ "^")) t =
@@ -405,7 +397,7 @@ dsColon l (ApplyD f (Array [])) t =
 -- L[p~>q] t = P[p~>q] (:t)
 dsColon _ p@(InfixOp _ (Ident _ "->") _) t =
   (p, t)
-dsColon l f _ = syntaxError l $ "bad LHS of :, " ++ prettyShow f ++ "\n" ++ show f
+dsColon l f _ = syntaxError l $ "bad LHS of :, " ++ prettyShow f
 
 -- Return function, argument, and attributes
 getFun :: Expr -> Maybe (Expr, Expr, [Ident])
@@ -654,41 +646,32 @@ unifyAnfS = anf
 ------------
 
 -- Get all visible identifiers from i := e
-getVisibleE :: HasCallStack => Expr -> [(Ident, EffectType)]
-getVisibleE LitInt{} = []
-getVisibleE LitRat{} = []
-getVisibleE Variable{} = []
-getVisibleE (Array es) = concatMap getVisibleE es
-getVisibleE (Seq es) = concatMap getVisibleE es
-getVisibleE (ApplyS e1 e2) = getVisibleE e1 ++ getVisibleE e2
-getVisibleE (ApplyD e1 e2) = getVisibleE e1 ++ getVisibleE e2
---getVisibleE (ApplyEff _ _e) = [] -- getVisibleE e
-getVisibleE If3{} = []
-getVisibleE For2{} = []
-getVisibleE (Let _ e) = getVisibleE e
-getVisibleE Do{} = []
-getVisibleE (Unify e1 e2) = getVisibleE e1 ++ getVisibleE e2
-getVisibleE (Where e1 e2) = getVisibleE e1 ++ getVisibleE e2
---getVisibleE (Typedef _) = []
-getVisibleE Macro1 {} = []
-getVisibleE (Define i e) = (i, getEffectType e) : getVisibleE e
-getVisibleE Choice{} = []
-getVisibleE (Range e) = getVisibleE e
-getVisibleE AnyT = []
-getVisibleE EmptyT = []
-getVisibleE Function{} = []
-getVisibleE Lambda{} = []
-getVisibleE Exists{} = []
-getVisibleE e = impossible e
-
 getVisible :: HasCallStack => Expr -> [Ident]
-getVisible = map fst . getVisibleE
-
-getEffectType :: Expr -> EffectType
-getEffectType (Lambda _ rs _ e) = ETArrow ETNone rs (getEffectType e)
--- XXX ETNone isn't correct when returning function types
-getEffectType _e = --trace ("getEffectType: " ++ show _e)
-                  ETNone
+getVisible LitInt{} = []
+getVisible LitRat{} = []
+getVisible Variable{} = []
+getVisible (Array es) = concatMap getVisible es
+getVisible (Seq es) = concatMap getVisible es
+getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (ApplyEff _ _e) = [] -- getVisible e
+getVisible If3{} = []
+getVisible For2{} = []
+getVisible (Let _ e) = getVisible e
+getVisible Do{} = []
+getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
+--getVisible (Typedef _) = []
+getVisible Macro1 {} = []
+getVisible (Define i e) = i : getVisible e
+getVisible Choice{} = []
+getVisible (Range e) = getVisible e
+getVisible AnyT = []
+getVisible EmptyT = []
+getVisible Function{} = []
+getVisible Lambda{} = []
+getVisible Exists{} = []
+getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
 getVar LitInt{} = []
@@ -781,27 +764,8 @@ addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
            pure e
 -}
 
-effsToEffects :: [Eff] -> Effects
-effsToEffects [] = defaultEffects
-effsToEffects rs = foldr union [Ediverges] (map (effToEffects . unIdent) rs) \\ concatMap (noEff . unIdent) rs
-  where
-    effToEffects "transacts" = [Eallocates, Ewrites, Ereads]
-    effToEffects "pure" = []
-    effToEffects "total" = []
-    effToEffects r = maybe (effErr r) (:[]) $ lookup r effTable
-    effTable = map (\ r -> (tail $ show r, r)) [minBound .. maxBound]
-    noEff "total" = [Ediverges]
-    noEff _ = []
-    effErr r = trace ("scopeCheck: Unknown effect " ++ show r) []
-
-defaultEffects :: Effects
---defaultEffects = [Ediverges, Eallocates, Ereads, Ewrites]
-defaultEffects = [Ediverges]
-
-{-
 knownEffects :: [Ident]
 knownEffects = map (Ident noLoc) [
-  "diverges",
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "covariant"
   ]
 
@@ -809,7 +773,6 @@ isLambdaEffect :: Ident -> Bool
 isLambdaEffect i = elem i [
   covariantId
   ]
--}
 
 errUndefined :: [Ident] -> D ()
 errUndefined =
@@ -835,10 +798,9 @@ scope sc = expr
     expr (Seq es) = Seq <$> mapM expr es
     expr (ApplyS e1 e2) = ApplyS <$> expr e1 <*> expr e2
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
---    expr (ApplyEff is e) = do
-      --errUndefined (is \\ knownEffects)
-      -- XXX
---      expr e
+    expr (ApplyEff is e) = do
+      errUndefined (is \\ knownEffects)
+      expr e
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
       If3 e1' <$> scopeD sc' e2 <*> exprD e3
@@ -869,7 +831,7 @@ scope sc = expr
       Lambda i r e1' <$> scope sc' (Do e2)
     expr e@AnyT = pure e
     expr e@EmptyT = pure e
-    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert sc $ map fst is) e
+    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert sc is) e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -877,15 +839,14 @@ scope sc = expr
 
     defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
     defs as e = do
-      let ies = getVisibleE e
-          is = map fst ies
+      let is = getVisible e
           errM = filter ((> 1) . length) $ group $ sort is
           errS = [ i | i <- is, i `S.member` sc ]
           s' = foldr S.insert as is
       e' <- scope s' e
       errMultiple errM
       errShadow errS
-      pure (Exists ies e', s')
+      pure (Exists is e', s')
 
 addDeref :: Expr -> D Expr
 addDeref = pure . exprD S.empty

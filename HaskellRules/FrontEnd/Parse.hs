@@ -245,7 +245,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 pAtom :: P Expr
 pAtom = choice [ pMacro, Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
                , Parens <$> pParens pExprSeq, pArray
-               , pOption, pFunction, pBlockM {-, pEffects-} ]
+               , pOption, pFunction, pBlockM, pEffects ]
   where pEmpty = try $ pParens (pure (Array []))
 
 pQualVariable :: P Expr
@@ -271,10 +271,8 @@ pAttr = pAngles pEffectId
 pEffectId :: P Ident
 pEffectId = pIdent <|> pEffectName
 
-{-
 pEffects :: P Expr
 pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pEffectId) <*> pBlockM)
--}
 
 pTerm :: P Expr
 pTerm = do
