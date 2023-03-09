@@ -34,7 +34,7 @@ simpAny = f
 simpFail :: Core -> Core
 simpFail = f
   where
-    f (CExists [x] (CApply (CArray []) (CVar x'))) | x == x' = CFail
+    f (CDef [x] (CApply (CArray []) (CVar x'))) | x == x' = CFail
     f e = composOp f e
 
 -- When there are definitions of the form x=y,
@@ -44,13 +44,13 @@ simpFail = f
 simpAlias :: Core -> Core
 simpAlias = fc . g
   where
-    fc (CExists h e) | Just d <- bind h e = fc d
+    fc (CDef h e) | Just d <- bind h e = fc d
     fc (CLambda i is cov e1 e2) =  -- CLambda has weird scoping, temporarily change it
-      case fc (CLam i (CExists is (CSeq [e1, e2]))) of
-        CLam i' (CExists is' (CSeq [e1', e2'])) -> CLambda i' is' cov e1' e2'
+      case fc (CLam i (CDef is (CSeq [e1, e2]))) of
+        CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' cov e1' e2'
         CLam i' (CSeq [e1', e2']) -> CLambda i' [] cov e1' e2'
         e -> error $ "simpAlias: CLambda " ++ prettyShow e
-    fc (CLam x (CExists h e)) | Just d <- lam x h e = fc d
+    fc (CLam x (CDef h e)) | Just d <- lam x h e = fc d
     fc e = composOp fc e
 
     -- x = (y = e)  -->  x = y; y = e
