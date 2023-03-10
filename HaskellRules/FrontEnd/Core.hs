@@ -218,6 +218,7 @@ core (Lambda i rs e1 e2) = do
     lamFunc covariant i e1 e2
 core EmptyT = pure CFail
 core (Exists is e) = cDef is <$> core e
+core (Lam i e) = CLam i <$> core e
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
