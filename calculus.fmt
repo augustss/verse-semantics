@@ -126,6 +126,7 @@
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
 %format def (x) (y) = "\exists" x ".\," y
+%format forall (x) (y) = "\forall" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
@@ -446,3 +447,12 @@
 %format mu x (e)    = "\mu" x".\," e
 %format muKW        = "\mu{}"
 %format Omega       = "\mathit{\Omega}"
+%format ell         = "\ell"
+%format ell_1       = "\ell_1"
+%format ell_2       = "\ell_2"
+%format phi_        = "\varphi"
+%format psi_        = "\psi"
+%format phi(x)      = "\varphi(" x ")"
+%format psi(x)      = "\psi(" x ")"
+%format `elem`      = "\in"
+%format ++          = "\bowtie"
