@@ -6,7 +6,7 @@ import qualified Data.Map as M
 import Data.Map( (!) )
 import qualified Data.Set as S
 
-import Epic.List(takeUntil, dropUntil)
+import Epic.List(takeUntil)
 
 -----------------------------------------------------------------------------------
 

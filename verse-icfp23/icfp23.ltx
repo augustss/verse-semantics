@@ -1190,8 +1190,8 @@ suffice to express the necessary sharing.
 \item \rulename{subst} replaces all occurrences of |x| in |X| and |e|, but
   \emph{it leaves the original |(x==v)| undisturbed}, because |X| might not be
   big enough to encompass all occurrences of |x|.
-  For example, we can rewrite |(y==x+1; (x==3; z==x+3))| to |(y==x+1; (x==3; z==3+3))|, using
-  |X == (hole; z==x+3)|, but that leaves an occurrence of |x| in |(y==x+1)|.
+  For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
+  |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
 \item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
@@ -1267,7 +1267,7 @@ and that is what we need for the proof.
 \subsection{Local substitution} \label{sec:local-subst}
 
 Consider this (extremely) tricky term:
-|def x (x = if (x==0; x>1) then 33 else 55)|.
+|def x (x = if (x==0; x>1; x) then 33 else 55)|.
 What should this do? At first you might think it was stuck---how can we simplify the |if|
 when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
