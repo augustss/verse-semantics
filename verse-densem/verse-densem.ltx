@@ -162,7 +162,8 @@
 \newcommand{\semfun}[1]{\mathcal{#1}}
 \newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
 \newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
-\newcommand{\folapp}[2]{\semfun{F}\llbracket #1 \rrbracket #2}
+\newcommand{\folapp}[2]{\semfun{L}\llbracket #1 \rrbracket #2}
+\newcommand{\termapp}[2]{\semfun{T}\llbracket #1 \rrbracket #2}
 \newcommand{\liftrel}[1]{\hat{#1}}
 \newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
@@ -835,21 +836,26 @@ $$
 \text{\bf First-order logic semantics of expressions}
 $$
   \begin{array}{rcll}
+  \termapp{|v|} & : & \Term \\
+  \termapp{|x|} & = & |x| \\
+  \termapp{|k|} & = & |k| \\
+  \termapp{|tup (v_1,..,v_n)|} & = & \mathbf{tuple}(\termapp{|v_1|},..,\termapp{|v_n|}) \\
+~ \\
   \folapp{|e|} & : & [\Term \rightarrow \Forml] \\
-  \folapp{|v|} & = & |[\t -> t = v]| \\
+  \folapp{|v|} & = & |[\t -> t = \termapp{v}]| \\
   \folapp{|fail|} & = & |[]| \\
   \folapp{|e_1 choice e_2|} & = &
     \folapp{|e_1|} |++| \folapp{|e_2|} \\
   \folapp{|v = e_1 ; e_2|} & = &
-    \lcompr{|\t -> phi(v) && psi(t)|}
+    \lcompr{|\t -> phi(\termapp{v}) && psi(t)|}
            {|phi_| \in \folapp{|e_1|}, ~~ |psi_| \in \folapp{|e_2|}} \\
   \folapp{|def x e|} & = &
     \lcompr{|\t -> def x (phi(t))|}
            {|phi_| \in \folapp{|e|}} \\
-  \folapp{|one e|} & = & [|\t ->| ONE(\folapp{|e|},t)] \\
+  \folapp{|one e|} & = & [|\t ->| ONE(\folapp{|e|})t] \\
 ~ \\
-  ONE([],t) & = & |false| \\
-  ONE(|phi_ : rest|,t) & = & |phi(t)| \vee ((\forall x . \neg{}|phi(x)|) |&&| ONE(|rest|,t)) \\
+  ONE([])t & = & |false| \\
+  ONE(|phi_ : rest|)t & = & |phi(t)| \vee ((\forall x . \neg{}|phi(x)|) |&&| ONE(|rest|)t) \\
   \end{array}
 $$
 \end{figure}
