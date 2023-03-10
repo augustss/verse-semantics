@@ -19,7 +19,7 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader
-import Control.Monad.Ref.Backtrack qualified as Backtrack
+import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Unify
@@ -28,12 +28,15 @@ import Control.Monad.Verse.Class
 
 import Data.Fix
 import Data.Foldable
+import Data.Functor.Compose
+import Data.Functor.Identity
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Ref
 import Data.Traversable
+import Data.Tuple.Duo
 
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
@@ -56,7 +59,7 @@ type MonadEval m =
   ( MonadError Error m
   , MonadSupply Label m
   , MonadVerse m
-  , EqRef (Backtrack.Ref m)
+  , EqRef (Ref m)
   )
 
 type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
@@ -93,16 +96,16 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    lift $ once' (evalWriterT $ eval' e) $ \ var_e ->
+    lift $ once' (evalWriterT $ Identity <$> eval' e) $ \ (Identity var_e) ->
       unify var var_e
     pure var
   Exp.All e -> do
     var <- freshVar
-    lift $ for' (evalWriterT $ eval' e) freshen $ \ vars_e ->
+    lift $ for' (evalWriterT $ Identity <$> eval' e) (pure . runIdentity) $ \ vars_e ->
       unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
-    lift . lnot' . evalWriterT $ eval' e
+    lift . lnot' . evalWriterT $ Identity <$> eval' e
     newVar $ Val.Tuple []
   Exp.Query e -> do
     var_e <- eval' e
@@ -124,13 +127,13 @@ eval' e = case extract e of
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    ifte''
-      (do
+    lift $ ifte'
+      (evalWriterT $ do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
-          pure xs)
-      (\ xs -> unify var =<< localNames xs (eval' t))
-      (unify var =<< eval' e)
+          pure $ Compose xs)
+      (\ (Compose xs) -> evalWriterT $ unify var =<< localNames xs (eval' t))
+      (evalWriterT $ unify var =<< eval' e)
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
@@ -138,15 +141,15 @@ eval' e = case extract e of
       (evalWriterT $ do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
-          pure xs)
-      (\ xs -> freshen =<< evalWriterT (localNames xs $ eval' e2))
+          pure $ Compose xs)
+      (\ (Compose xs) -> evalWriterT $ localNames xs $ eval' e2)
       (\ vars -> unify var =<< newVar (Val.Tuple vars))
     pure var
   Exp.Exists x e -> do
     var <- freshVar
     localName (extract x) (Val var) $ eval' e
   Exp.Var x e -> do
-    ref <- lift $ newRef' =<< freshVar
+    ref <- lift freshRef
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupName' (extract x) >>= \ case
     Nothing -> throwIdentError (loc x) (extract x)
@@ -287,8 +290,8 @@ evalInvoke loc e1 e2 = do
               xs <- for xs freshNamed
               let env' = xs <> env
               unify var2 =<< local (const env') (eval' e_domain)
-              pure env')
-          (\ env' -> unify var =<< evalWriterT (local (const env') $ eval' e)) $
+              pure $ Compose env')
+          (\ (Compose env') -> unify var =<< evalWriterT (local (const env') $ eval' e)) $
           whenBound var1 $ \ case
             Val.Overloads overload var1 -> recur overload var1
             _ -> throwDomainError loc
@@ -317,7 +320,7 @@ evalInvoke loc e1 e2 = do
     _ -> throwDomainError loc
   pure var
 
-invokeIntrinsic :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+invokeIntrinsic :: (MonadVerse m, EqRef (Ref m)) =>
                    Intrinsic ->
                    Var m (Val m) ->
                    (Maybe (Var m (Val m)) -> m ()) ->
@@ -335,7 +338,7 @@ invokeIntrinsic = \ case
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
-liftOrd :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+liftOrd :: (MonadVerse m, EqRef (Ref m)) =>
            (forall a . Ord a => a -> a -> Bool) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> m ()) ->
@@ -349,23 +352,28 @@ liftOrd f var k =
       var_p <- freshVar
       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
         unify var_p =<< case (val_x, val_y) of
-          (Val.Int x, Val.Int y) -> newVar . Const $ f x y
-          (Val.Int x, Val.Float y) -> newVar . Const $ f (fromInteger x) y
-          (Val.Int x, Val.Rational y) -> newVar . Const $ f (fromInteger x) y
-          (Val.Float x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
-          (Val.Float x, Val.Float y) -> newVar . Const $ f x y
-          (Val.Float x, Val.Rational y) -> newVar . Const $ f (toRational x) y
-          (Val.Rational x, Val.Int y) -> newVar . Const $ f x (fromInteger y)
-          (Val.Rational x, Val.Float y) -> newVar . Const $ f x (toRational y)
-          (Val.Rational x, Val.Rational y) -> newVar . Const $ f x y
+          (Val.Int x, Val.Int y) -> newBool $ f x y
+          (Val.Int x, Val.Float y) -> newBool $ f (fromInteger x) y
+          (Val.Int x, Val.Rational y) -> newBool $ f (fromInteger x) y
+          (Val.Float x, Val.Int y) -> newBool $ f x (fromInteger y)
+          (Val.Float x, Val.Float y) -> newBool $ f x y
+          (Val.Float x, Val.Rational y) -> newBool $ f (toRational x) y
+          (Val.Rational x, Val.Int y) -> newBool $ f x (fromInteger y)
+          (Val.Rational x, Val.Float y) -> newBool $ f x (toRational y)
+          (Val.Rational x, Val.Rational y) -> newBool $ f x y
           _ -> empty
-      pure (var_x, var_p))
-  (\ (var_x, var_p) -> whenBound var_p $ \ val_p -> do
-      guard $ getConst val_p
-      k $ Just var_x)
+      pure $ Duo var_p var_x)
+  (\ (Duo var_p var_x) -> whenBound var_p $ \ case
+      Val.Truth _ -> k $ Just var_x
+      _ -> empty)
   (k Nothing)
 
-liftNum :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+newBool :: MonadVar m => Bool -> m (Var m (Val m))
+newBool = \ case
+  False -> newVar (Val.Tuple [])
+  True -> newVar . Val.Truth =<< newVar (Val.Tuple [])
+
+liftNum :: (MonadVerse m, EqRef (Ref m)) =>
            (forall a . Num a => a -> a -> a) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> m ()) ->
@@ -398,8 +406,8 @@ liftNum f var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Val.Rational $ f x y
           _ -> empty
-      pure var')
-  (k . Just)
+      pure $ Identity var')
+  (k . Just . runIdentity)
   (k Nothing)
 
 prefixPlus :: MonadVerse m =>
@@ -414,11 +422,11 @@ prefixPlus var k =
         Val.Float _ -> pure ()
         Val.Rational _ -> pure ()
         _ -> empty
-      pure var)
-  (k . Just)
+      pure $ Identity var)
+  (k . Just . runIdentity)
   (k Nothing)
 
-prefixMinus :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+prefixMinus :: (MonadVerse m, EqRef (Ref m)) =>
                Var m (Val m) ->
                (Maybe (Var m (Val m)) -> m ()) ->
                m ()
@@ -431,13 +439,13 @@ prefixMinus var k =
         Val.Float x -> newVar . Val.Float $ negate x
         Val.Rational x -> newVar . Val.Rational $ negate x
         _ -> empty
-      pure var')
-  (k . Just)
+      pure $ Identity var')
+  (k . Just . runIdentity)
   (k Nothing)
 
 data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
 
-div' :: (MonadVerse m, EqRef (Backtrack.Ref m)) =>
+div' :: (MonadVerse m, EqRef (Ref m)) =>
         Var m (Val m) ->
         (Maybe (Var m (Val m)) -> m ()) ->
         m ()
@@ -473,8 +481,8 @@ div' var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Const . Just . Rational $ x / y
           _ -> empty
-      pure var')
-  (\ var -> whenBound var $ getConst >>> \ case
+      pure $ Identity var')
+  (\ (Identity var) -> whenBound var $ getConst >>> \ case
       Nothing -> empty
       Just (Int x) -> k . Just =<< newVar (Val.Int x)
       Just (Float x) -> k . Just =<< newVar (Val.Float x)
@@ -482,13 +490,19 @@ div' var k =
   (k Nothing)
 
 int :: MonadVerse m =>
-       Var m (Val f) ->
-       (Maybe (Var m (Val f)) -> m ()) ->
+       Var m (Val m) ->
+       (Maybe (Var m (Val m)) -> m ()) ->
        m ()
-int var k = whenBound var $ \ case
-  Val.Int _ -> k $ Just var
-  Val.Rational x | denominator x == 1 -> k $ Just var
-  _ -> empty
+int var k =
+  ifte'
+  (do
+      whenBound var $ \ case
+        Val.Int _ -> pure ()
+        Val.Rational x | denominator x == 1 -> pure ()
+        _ -> empty
+      pure $ Identity var)
+  (\ (Identity var) -> k $ Just var)
+  (k Nothing)
 
 instSuper :: MonadEval m =>
              Loc ->
@@ -563,7 +577,7 @@ newEnv = execWriterT $ do
       freshVar
 
 lookupName :: ( MonadVerse m
-              , EqRef (Backtrack.Ref m)
+              , EqRef (Ref m)
               ) => Ident -> EvalT m (Maybe (Var m (Val m)))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
@@ -601,7 +615,7 @@ fromIdents =
   []
 
 unifyNamed :: ( MonadVerse m
-              , EqRef (Backtrack.Ref m)
+              , EqRef (Ref m)
               ) => Named m (Var m (Val m)) -> Named m (Var m (Val m)) -> EvalT m ()
 unifyNamed = curry $ lift . \ case
   (Val var_x, Val var_y) ->
@@ -615,60 +629,24 @@ unifyNamed = curry $ lift . \ case
     readRef' ref_y $ \ var_y ->
     unify var_x var_y
 
-freshNamed :: ( Backtrack.MonadRef m
-              , MonadVar m
-              ) => Bool -> EvalT m (Named m (Var m (Val m)))
+freshNamed :: (MonadRef m, MonadVar m) => Bool -> EvalT m (Named m (Var m (Val m)))
 freshNamed = \ case
   False -> Val <$> freshVar
   True -> Ref <$> freshRef
 
-freshRef :: ( Backtrack.MonadRef m
-            , MonadVar m
-            ) => m (Backtrack.Ref m (Var m f))
-freshRef = newRef' =<< freshVar
+freshRef :: (MonadRef m, MonadVar m) => m (Ref m (Var m f))
+freshRef = newRef =<< freshVar
 
 whenBound' :: ( Monoid w
               , MonadVerse m
               ) => Var m f -> (f (Var m f) -> WriterT w m ()) -> WriterT w m ()
 whenBound' x f = lift . whenBound x $ evalWriterT . f
 
-ifte'' :: (Monoid w, MonadVerse m) =>
-          WriterT w m a ->
-          (a -> WriterT w m ()) ->
-          WriterT w m () ->
-          WriterT w m ()
-ifte'' p t e = lift $ ifte' (evalWriterT p) (evalWriterT . t) (evalWriterT e)
+readRef' :: (MonadRef m, MonadVerse m) => Ref m a -> (a -> m ()) -> m ()
+readRef' ref f = f =<< readRef ref
 
-newRef' :: Backtrack.MonadRef m => a -> m (Backtrack.Ref m a)
-newRef' = Backtrack.newRef
-
-readRef' :: ( Backtrack.MonadRef m
-            , MonadVerse m
-            ) => Backtrack.Ref m a -> (a -> m ()) -> m ()
-readRef' ref f = do
-  world <- getWorld
-  world' <- freshWorld
-  whenWorldBound world $ do
-    world'' <- getWorld
-    putWorld world
-    f =<< Backtrack.readRef ref
-    unifyWorld world' =<< getWorld
-    putWorld world''
-  putWorld world'
-
-writeRef' :: ( Backtrack.MonadRef m
-             , MonadVerse m
-             ) => Backtrack.Ref m a -> a -> m ()
-writeRef' ref x = do
-  world <- getWorld
-  world' <- freshWorld
-  whenWorldBound world $ do
-    world'' <- getWorld
-    putWorld world
-    Backtrack.writeRef ref x
-    unifyWorld world' =<< getWorld
-    putWorld world''
-  putWorld world'
+writeRef' :: (MonadRef m, MonadVerse m) => Ref m a -> a -> m ()
+writeRef' = writeRef
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference
