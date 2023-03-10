@@ -108,6 +108,18 @@ executable qctest
     hs-source-dirs:   qctest
     default-language: Haskell2010
 
+executable verifier
+    import:           shared-properties
+    build-depends:    all,
+                      optparse-applicative,
+                      QuickCheck,
+                      githash,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   verifier
+    default-language: Haskell2010
+
 executable timtest
     import:           shared-properties
     build-depends:    all,
@@ -117,3 +129,4 @@ executable timtest
 
     hs-source-dirs:   timtest
     default-language: Haskell2010
+

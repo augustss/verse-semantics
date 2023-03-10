@@ -178,9 +178,7 @@ $\begin{array}{@@{}l}
 \rulename{app-beta}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
-%%                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
-                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+                              |(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
@@ -206,8 +204,8 @@ $\begin{array}{@@{}l}
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
-  \rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
-                      \text{unless (|eq| is |y==v'| and |y| $\preceq$ |x|)} \\
+  \rulename{seq-swap} & |v_1==e_1; x==v_2; e_2| & \movesto & |x==v_2; v_1==e_1; e_2| &
+                      \text{unless (|v_1==y|, |e_1| is a value, and |y| $\preceq$ |x|)} \\
 
     \\[-0.6em]
 
@@ -289,10 +287,7 @@ $\begin{array}{@@{}l}
 \rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
 \rulename{app-beta}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
-\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
-%%                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
-                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &|(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
