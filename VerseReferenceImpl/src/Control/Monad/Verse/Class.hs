@@ -7,6 +7,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Verse.Class
   ( MonadVerse (..)
@@ -18,6 +19,9 @@ import Control.Monad.Ref
 import Control.Monad.Unify
 import Control.Monad.Var
 
+import Data.Functor.Identity
+import Data.Proxy
+
 class (MonadUnify m, MonadRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
@@ -25,15 +29,6 @@ class (MonadUnify m, MonadRef m) => MonadVerse m where
            m (t (Var m f)) ->
            (Maybe (t (Var m f), m (t (Var m f))) -> m ()) ->
            m ()
-
-  once' :: (Traversable t, Traversable f) =>
-           m (t (Var m f)) ->
-           (t (Var m f) -> m ()) ->
-           m ()
-  once' m f = ifte' m f empty
-
-  lnot' :: (Traversable t, Traversable f) => m (t (Var m f)) -> m ()
-  lnot' m = ifte' m (const empty) (pure ())
 
   ifte' :: (Traversable t, Traversable f) =>
            m (t (Var m f)) ->
@@ -44,6 +39,14 @@ class (MonadUnify m, MonadRef m) => MonadVerse m where
     Just (x, _) -> f x
     Nothing -> n
 
+  once' :: Traversable f => m (Var m f) -> (Var m f -> m ()) -> m ()
+  once' m f = ifte' (Identity <$> m) (f . runIdentity) empty
+
+  lnot' :: m a -> m ()
+  lnot' m = ifte' (proxy <$ m) (const empty) (pure ())
+    where
+      proxy = Proxy :: Proxy (Var m Proxy)
+
   for' :: (Traversable t, Traversable f) =>
           m (t (Var m f)) ->
           (t (Var m f) -> m (Var m f)) ->
@@ -52,6 +55,9 @@ class (MonadUnify m, MonadRef m) => MonadVerse m where
   for' m f g = split m $ \ case
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
+
+  all' :: Traversable f => m (Var m f) -> ([Var m f] -> m ()) -> m ()
+  all' m = for' (Identity <$> m) (pure . runIdentity)
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->

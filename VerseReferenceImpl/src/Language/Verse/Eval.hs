@@ -96,16 +96,16 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    lift $ once' (evalWriterT $ Identity <$> eval' e) $ \ (Identity var_e) ->
+    lift $ once' (evalWriterT $ eval' e) $ \ var_e ->
       unify var var_e
     pure var
   Exp.All e -> do
     var <- freshVar
-    lift $ for' (evalWriterT $ Identity <$> eval' e) (pure . runIdentity) $ \ vars_e ->
+    lift $ all' (evalWriterT $ eval' e) $ \ vars_e ->
       unify var =<< newVar (Val.Tuple vars_e)
     pure var
   Exp.Not e -> do
-    lift . lnot' . evalWriterT $ Identity <$> eval' e
+    lift . lnot' . evalWriterT $ eval' e
     newVar $ Val.Tuple []
   Exp.Query e -> do
     var_e <- eval' e
