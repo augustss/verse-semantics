@@ -403,7 +403,7 @@ insertListener :: Label -> Listener m a -> Listeners m -> Listeners m
 insertListener i = insertListeners i . (:[]) . toAnyListener
 
 insertListeners :: Label -> [Listener m Any] -> Listeners m -> Listeners m
-insertListeners i = LabelMap.insertWith (flip (<>)) i
+insertListeners = LabelMap.insertWith (flip (<>))
 
 toAnyListener :: Listener m a -> Listener m Any
 toAnyListener = Unsafe.unsafeCoerce

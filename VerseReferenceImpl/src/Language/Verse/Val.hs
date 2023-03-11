@@ -36,13 +36,13 @@ import Prettyprinter
 
 data Val m a
   = Int !Integer
-  | Float !Double
+  | Float {-# UNPACK #-} !Double
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module !Label !(HashMap Name (Named m a))
-  | StructInst !Label !(HashMap Name (Named m a))
-  | ClassInst !Label (Maybe a) !(HashMap Name (Named m a))
+  | Module {-# UNPACK #-} !Label !(HashMap Name (Named m a))
+  | StructInst {-# UNPACK #-} !Label !(HashMap Name (Named m a))
+  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name (Named m a))
   | Overloads !(Overload m a) a deriving (Functor, Foldable, Traversable)
 
 instance EqRef (Ref m) => Unifiable (Val m) where

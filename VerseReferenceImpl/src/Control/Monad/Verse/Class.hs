@@ -1,12 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Verse.Class
