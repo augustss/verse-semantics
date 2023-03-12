@@ -289,8 +289,10 @@ evalInvoke loc e1 e2 = do
               xs <- for xs freshNamed
               let env' = xs <> env
               unify var2 =<< local (const env') (eval' e_domain)
-              pure $ Compose env')
-          (\ (Compose env') -> unify var =<< evalWriterT (local (const env') $ eval' e)) $
+              pure $ Compose xs)
+          (\ (Compose xs) -> do
+              let env' = xs <> env
+              unify var =<< evalWriterT (local (const env') $ eval' e)) $
           whenBound var1 $ \ case
             Val.Overloads overload var1 -> recur overload var1
             _ -> throwDomainError loc
@@ -500,7 +502,7 @@ int var k =
         Val.Rational x | denominator x == 1 -> pure ()
         _ -> empty
       pure $ Identity var)
-  (\ (Identity var) -> k $ Just var)
+  (k . Just . runIdentity)
   (k Nothing)
 
 instSuper :: MonadEval m =>

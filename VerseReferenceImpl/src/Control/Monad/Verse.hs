@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -54,6 +53,12 @@ import Data.Unifiable
 import GHC.Exts (Any)
 
 import Unsafe.Coerce qualified as Unsafe
+
+-- import Debug.Trace
+
+trace _ = id
+
+traceM _ = pure ()
 
 newtype VerseT m a = VerseT
   { unVerseT :: RST Env (Susps m) (LogicT (StateT (Heaps m) (SupplyT Label m))) a
@@ -188,7 +193,7 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
         splitLabel <- askSplitLabel
         when (splitLabel_x /= splitLabel) $
           addBoundListener var_x i_x $ \ val_x ->
-            check val_x val_y
+            trace "unify Unbound Bound check" $ check val_x val_y
       (Bound _ val_x, Unbound i_y splitLabel_y) -> do
         unionVars var_x var_y
         notifyBoundListeners i_y val_x
@@ -209,11 +214,11 @@ check val_x val_y = zipMatchM val_x val_y >>= \ case
   Just val_z -> for_ val_z $ uncurry unify
 
 instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadVerse (VerseT m) where
-  whenBound var f = findVar var >>= \ case
-    (_, Unbound i _) -> addBoundListener var i f
-    (_, Bound _ x) -> f x
+  whenBound var f = trace "whenBound" $ findVar var >>= \ case
+    (_, Unbound i _) -> trace "whenBound Unbound" $ addBoundListener var i f
+    (_, Bound _ x) -> trace "whenBound Bound" $ f x
 
-  split m = split' do
+  split m = split' $ do
     splitLabel <- VerseT supply
     localSplitLabel (const splitLabel) $ do
       pushSplit
@@ -241,12 +246,13 @@ data Heaps m = Heaps
 
 type Commits m = LabelMap (Heap -> VerseT m ())
 
-data Listener m a = forall f . Traversable f => Listener
-  !(f Heap)
+data Listener m a = Listener
+  !Heap
+  !Heap
   !(Promise m)
-  !(Callback f m a)
+  !(Callback m a)
 
-type Callback f m a = f Heap -> a -> VerseT m ()
+type Callback m a = Heap -> a -> VerseT m ()
 
 data Promise m = Promise
   {-# UNPACK #-} !Label
@@ -266,24 +272,26 @@ split' :: (MonadFix m, MonadRef m, Traversable t, Traversable f) =>
           VerseT m (t (Var m f)) ->
           (Maybe (t (Var m f), VerseT m (t (Var m f))) -> VerseT m ()) ->
           VerseT m ()
-split' m f = do
+split' m f = trace "split'" $ do
   h <- getHeap
   msplit' m >>= \ case
     Just (x, s, m) -> do
       h' <- getHeap
+      traceM . ("split': " ++) . show =<< getHeap
       putHeap h
+      traceM . ("split': " ++) . show =<< getHeap
       for_ s.promises addListenable
       addListeners s.listeners
-      splitPromises s.promises (Duo h h') $ \ (Duo h h') -> \ case
-        True -> do
+      splitPromises s.promises h' $ \ h' -> \ case
+        True -> trace "split' True" $ do
+          h <- getHeap
           putHeap h'
           x <- traverse freshen x
           commit h'
           putHeap h
           f $ Just (x, putHeap h' *> m)
-        False -> do
+        False -> trace "split' False" $ do
           rollback h'
-          putHeap h
           split' (putHeap h' *> m) f
     Nothing -> do
       putHeap h
@@ -307,16 +315,10 @@ split'' m f = do
       putHeap h
       for_ s.promises addListenable
       putListeners s.listeners
-      splitPromises s.promises (Duo h h') $ \ (Duo h h') -> \ case
-        True -> do
-          putHeap h
-          f $ Just (x, putHeap h' *> m)
-        False -> do
-          putHeap h
-          split'' (putHeap h' *> m) f
-    Nothing -> do
-      putHeap h
-      f Nothing
+      splitPromises s.promises h' $ \ h' -> \ case
+        True -> putHeap h *> f (Just (x, putHeap h' *> m))
+        False -> putHeap h *> split'' (putHeap h' *> m) f
+    Nothing -> putHeap h *> f Nothing
 
 msplit'' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
 msplit'' m = VerseT . RST $ \ r s ->
@@ -324,19 +326,15 @@ msplit'' m = VerseT . RST $ \ r s ->
     (Nothing, _) -> (Nothing, s)
     (Just (x, m), s') -> (Just (x, s', VerseT m), s)
 
-splitPromises :: ( MonadRef m
-                 , Traversable f
-                 ) => Promises m -> f Heap -> (f Heap -> Bool -> VerseT m ()) -> VerseT m ()
+splitPromises :: MonadRef m => Promises m -> Heap -> Callback m Bool -> VerseT m ()
 splitPromises = splitPromises' . reverse
 
-splitPromises' :: ( MonadRef m
-                  , Traversable f
-                  ) => Promises m -> f Heap -> (f Heap -> Bool -> VerseT m ()) -> VerseT m ()
+splitPromises' :: MonadRef m => Promises m -> Heap -> Callback m Bool -> VerseT m ()
 splitPromises' xs h f = case xs of
-  [] -> f h True
-  x:xs -> whenResolved' x h $ \ h -> \ case
-    True -> splitPromises' xs h f
-    False -> f h False
+  [] -> trace "splitPromises' []" $ f h True
+  x:xs -> whenResolved x h $ \ h -> \ case
+    True -> trace "splitPromises' True" $ splitPromises' xs h f
+    False -> trace "splitPRomises' False" $ f h False
 
 freshPromise :: MonadRef m => VerseT m (Promise m)
 freshPromise = do
@@ -344,16 +342,14 @@ freshPromise = do
   modifyPromises (p:)
   pure p
 
-whenResolved' :: ( MonadRef m
-                 , Traversable f
-                 ) => Promise m -> f Heap -> Callback f m Bool -> VerseT m ()
-whenResolved' (Promise i ref) h f = readLRef ref >>= \ case
+whenResolved :: MonadRef m => Promise m -> Heap -> Callback m Bool -> VerseT m ()
+whenResolved (Promise i ref) h f = lift (readLRef' ref h) >>= \ case
   Nothing -> addResolveListener i h f
   Just x -> f h x
 
 resolve :: MonadRef m => Promise m -> Bool -> VerseT m ()
 resolve (Promise i ref) x = readLRef ref >>= \ case
-  Nothing -> do
+  Nothing -> trace "resolve Nothing" $ do
     writeLRef ref $ Just x
     notifyResolveListeners i x
   Just _ -> error "resolve"
@@ -362,38 +358,40 @@ addListenable :: Monad m => Promise m -> VerseT m ()
 addListenable (Promise i _) = modifyListeners $ LabelMap.insert i []
 
 notifyResolveListeners :: MonadRef m => Label -> Bool -> VerseT m ()
-notifyResolveListeners i x = stateListeners (deleteLookup i) >>= \ case
+notifyResolveListeners i x = trace "notifyResolveListeners" $ stateListeners (deleteLookup i) >>= \ case
   Nothing -> guard x
-  Just xs -> for_ xs $ toResolveListener >>> \ (Listener ys p f) ->
-    split'' (f ys x) $ \ case
+  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) ->
+    split'' (putHeap h *> f h' x) $ \ case
       Nothing -> resolve p False
       Just ((), _) -> resolve p True
 
 notifyBoundListeners :: MonadRef m => Label -> f (Var m f) -> VerseT m ()
-notifyBoundListeners i x = stateListeners (deleteLookup i) >>= \ case
-  Just xs -> for_ xs $ toBoundListener >>> \ (Listener ys p f) ->
-    split'' (f ys x) $ \ case
-      Nothing -> resolve p False
-      Just ((), _) -> resolve p True
+notifyBoundListeners i x = trace "notifyBoundListeners" $ stateListeners (deleteLookup i) >>= \ case
+  Just xs -> for_ xs $ toBoundListener >>> \ (Listener h h' p f) -> do
+    traceM . ("notifyBoundListeners: " ++) . show =<< getHeap
+    split'' (putHeap h *> f h' x) $ \ case
+      Nothing -> do
+        traceM . ("notifyBoundListeners split'': " ++) . show =<< getHeap
+        resolve p False
+      Just ((), _) -> do
+        traceM . ("notifyBoundListeners split'': " ++) . show =<< getHeap
+        resolve p True
   Nothing -> pure ()
 
-addResolveListener :: ( MonadRef m
-                      , Traversable f
-                      ) => Label -> f Heap -> Callback f m Bool -> VerseT m ()
+addResolveListener :: MonadRef m => Label -> Heap -> Callback m Bool -> VerseT m ()
 addResolveListener = addListener
 
 addBoundListener :: MonadRef m => Var m f -> Label -> (f (Var m f) -> VerseT m ()) -> VerseT m ()
 addBoundListener _ i f = do
   h <- getHeap
-  addListener i (Identity h) $ \ (Identity h) x -> putHeap h *> f x
+  addListener i h $ \ _ x -> f x
 
-addListener :: ( MonadRef m
-               , Traversable f
-               ) => Label -> f Heap -> Callback f m a -> VerseT m ()
+addListener :: MonadRef m => Label -> Heap -> Callback m a -> VerseT m ()
 addListener i h f = do
+  h' <- getHeap
   p <- freshPromise
   splitLabel <- askSplitLabel
-  modifyListeners . insertListener i $ Listener h p $ \ h x ->
+  modifyListeners . insertListener i $ Listener h' h p $ \ h x ->
     localSplitLabel (const splitLabel) $ f h x
 
 appendListeners :: Listeners m -> Listeners m -> Listeners m
@@ -526,7 +524,7 @@ writeLRef' ref x = \ case
 
 data RefState a = RefState
   !(LabelMap a)
-  !a
+  !a deriving Show
 
 commit :: Monad m => Heap -> VerseT m ()
 commit h = commit' h h
@@ -581,8 +579,8 @@ copyListeners :: Monad m => Listeners m -> CopyT m (Listeners m)
 copyListeners = traverse (traverse copyListener)
 
 copyListener :: Monad m => Listener m a -> CopyT m (Listener m a)
-copyListener (Listener xs p f) = traverse copyHeap xs <&> \ xs ->
-  Listener xs p f
+copyListener (Listener h h' p f) =
+  Listener <$> copyHeap h <*> copyHeap h' <*> pure p <*> pure f
 
 copyHeap :: Monad m => Heap -> CopyT m Heap
 copyHeap = \ case
