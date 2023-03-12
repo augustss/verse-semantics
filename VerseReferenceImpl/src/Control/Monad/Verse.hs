@@ -10,13 +10,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Control.Monad.Verse
   ( VerseT
   , Label
   , runVerseT
-  , split
   ) where
 
 import Control.Applicative
@@ -40,25 +38,17 @@ import Data.Fix
 import Data.Foldable
 import Data.Function
 import Data.Functor
-import Data.Functor.Identity
 import Data.IntMap.Internal qualified as LabelMap.Internal
 import Data.IntMap.Lazy qualified as LabelMap.Lazy
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as LabelMap
 import Data.Maybe
 import Data.Ref
-import Data.Tuple.Duo
 import Data.Unifiable
 
 import GHC.Exts (Any)
 
-import Unsafe.Coerce qualified as Unsafe
-
--- import Debug.Trace
-
-trace _ = id
-
-traceM _ = pure ()
+import Unsafe.Coerce qualified
 
 newtype VerseT m a = VerseT
   { unVerseT :: RST Env (Susps m) (LogicT (StateT (Heaps m) (SupplyT Label m))) a
@@ -193,7 +183,7 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
         splitLabel <- askSplitLabel
         when (splitLabel_x /= splitLabel) $
           addBoundListener var_x i_x $ \ val_x ->
-            trace "unify Unbound Bound check" $ check val_x val_y
+            check val_x val_y
       (Bound _ val_x, Unbound i_y splitLabel_y) -> do
         unionVars var_x var_y
         notifyBoundListeners i_y val_x
@@ -214,9 +204,9 @@ check val_x val_y = zipMatchM val_x val_y >>= \ case
   Just val_z -> for_ val_z $ uncurry unify
 
 instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadVerse (VerseT m) where
-  whenBound var f = trace "whenBound" $ findVar var >>= \ case
-    (_, Unbound i _) -> trace "whenBound Unbound" $ addBoundListener var i f
-    (_, Bound _ x) -> trace "whenBound Bound" $ f x
+  whenBound var f = findVar var >>= \ case
+    (_, Unbound i _) -> addBoundListener var i f
+    (_, Bound _ x) -> f x
 
   split m = split' $ do
     splitLabel <- VerseT supply
@@ -272,25 +262,23 @@ split' :: (MonadFix m, MonadRef m, Traversable t, Traversable f) =>
           VerseT m (t (Var m f)) ->
           (Maybe (t (Var m f), VerseT m (t (Var m f))) -> VerseT m ()) ->
           VerseT m ()
-split' m f = trace "split'" $ do
+split' m f = do
   h <- getHeap
   msplit' m >>= \ case
     Just (x, s, m) -> do
       h' <- getHeap
-      traceM . ("split': " ++) . show =<< getHeap
       putHeap h
-      traceM . ("split': " ++) . show =<< getHeap
       for_ s.promises addListenable
       addListeners s.listeners
       splitPromises s.promises h' $ \ h' -> \ case
-        True -> trace "split' True" $ do
+        True -> do
           h <- getHeap
           putHeap h'
           x <- traverse freshen x
           commit h'
           putHeap h
           f $ Just (x, putHeap h' *> m)
-        False -> trace "split' False" $ do
+        False -> do
           rollback h'
           split' (putHeap h' *> m) f
     Nothing -> do
@@ -299,7 +287,7 @@ split' m f = trace "split'" $ do
 
 msplit' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
 msplit' m = VerseT . RST $ \ r s ->
-  runRST (msplit (unVerseT m)) r emptySusps <&> \ case
+  runRST (msplit $ unVerseT m) r emptySusps <&> \ case
     (Nothing, _) -> (Nothing, s)
     (Just (x, m), s') -> (Just (x, s', VerseT m), s)
 
@@ -316,13 +304,13 @@ split'' m f = do
       for_ s.promises addListenable
       putListeners s.listeners
       splitPromises s.promises h' $ \ h' -> \ case
-        True -> f (Just (x, putHeap h' *> m))
+        True -> f $ Just (x, putHeap h' *> m)
         False -> split'' (putHeap h' *> m) f
     Nothing -> putHeap h *> f Nothing
 
 msplit'' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
 msplit'' m = VerseT . RST $ \ r s ->
-  runRST (msplit (unVerseT m)) r s { promises = mempty } <&> \ case
+  runRST (msplit $ unVerseT m) r s { promises = mempty } <&> \ case
     (Nothing, _) -> (Nothing, s)
     (Just (x, m), s') -> (Just (x, s', VerseT m), s)
 
@@ -331,10 +319,10 @@ splitPromises = splitPromises' . reverse
 
 splitPromises' :: MonadRef m => Promises m -> Heap -> Callback m Bool -> VerseT m ()
 splitPromises' xs h f = case xs of
-  [] -> trace "splitPromises' []" $ f h True
+  [] -> f h True
   x:xs -> whenResolved x h $ \ h -> \ case
-    True -> trace "splitPromises' True" $ splitPromises' xs h f
-    False -> trace "splitPromises' False" $ f h False
+    True -> splitPromises' xs h f
+    False -> f h False
 
 freshPromise :: MonadRef m => VerseT m (Promise m)
 freshPromise = do
@@ -350,45 +338,41 @@ whenResolved (Promise i ref) h f = lift (readLRef' ref h) >>= \ case
 resolve :: MonadRef m => Promise m -> Bool -> VerseT m ()
 resolve (Promise i ref) x = readLRef ref >>= \ case
   Nothing -> do
-    traceM . ("resolve Nothing: " ++) . show =<< getHeap
     writeLRef ref $ Just x
     notifyResolveListeners i x
-  Just _ -> do
-    traceM . show =<< getHeap
-    traceM $ show x
-    error "resolve"
+  Just _ -> error "resolve"
 
 addListenable :: Monad m => Promise m -> VerseT m ()
 addListenable (Promise i _) = modifyListeners $ LabelMap.insert i []
 
 notifyResolveListeners :: MonadRef m => Label -> Bool -> VerseT m ()
-notifyResolveListeners i x = trace "notifyResolveListeners" $ stateListeners (deleteLookup i) >>= \ case
+notifyResolveListeners i x = stateListeners (deleteLookup i) >>= \ case
   Nothing -> guard x
-  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) -> do
-    traceM . show =<< getHeap
-    traceM $ show h
-    traceM $ show h'
+  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) ->
     split'' (putHeap h *> f h' x) $ \ case
       Nothing -> resolve p False
-      Just ((), _) -> trace "notifyResolveListeners Just" $ resolve p True
+      Just ((), _) -> resolve p True
 
 notifyBoundListeners :: MonadRef m => Label -> f (Var m f) -> VerseT m ()
-notifyBoundListeners i x = trace "notifyBoundListeners" $ stateListeners (deleteLookup i) >>= \ case
-  Just xs -> for_ xs $ toBoundListener >>> \ (Listener h h' p f) -> do
-    traceM . ("notifyBoundListeners: " ++) . show =<< getHeap
+notifyBoundListeners i x = stateListeners (deleteLookup i) >>= \ case
+  Just xs -> for_ xs $ toBoundListener >>> \ (Listener h h' p f) ->
     split'' (putHeap h *> f h' x) $ \ case
-      Nothing -> do
-        traceM . ("notifyBoundListeners split'': " ++) . show =<< getHeap
-        resolve p False
-      Just ((), _) -> do
-        traceM . ("notifyBoundListeners split'': " ++) . show =<< getHeap
-        resolve p True
+      Nothing -> resolve p False
+      Just ((), _) -> resolve p True
   Nothing -> pure ()
 
-addResolveListener :: MonadRef m => Label -> Heap -> Callback m Bool -> VerseT m ()
+addResolveListener :: MonadRef m =>
+                      Label ->
+                      Heap ->
+                      Callback m Bool ->
+                      VerseT m ()
 addResolveListener = addListener
 
-addBoundListener :: MonadRef m => Var m f -> Label -> (f (Var m f) -> VerseT m ()) -> VerseT m ()
+addBoundListener :: MonadRef m =>
+                    Var m f ->
+                    Label ->
+                    (f (Var m f) -> VerseT m ()) ->
+                    VerseT m ()
 addBoundListener _ i f = do
   h <- getHeap
   addListener i h $ \ _ x -> f x
@@ -411,13 +395,13 @@ insertListeners :: Label -> [Listener m Any] -> Listeners m -> Listeners m
 insertListeners = LabelMap.insertWith (flip (<>))
 
 toAnyListener :: Listener m a -> Listener m Any
-toAnyListener = Unsafe.unsafeCoerce
+toAnyListener = Unsafe.Coerce.unsafeCoerce
 
 toResolveListener :: Listener m Any -> Listener m Bool
-toResolveListener = Unsafe.unsafeCoerce
+toResolveListener = Unsafe.Coerce.unsafeCoerce
 
 toBoundListener :: Listener m Any -> Listener m (f (Var m f))
-toBoundListener = Unsafe.unsafeCoerce
+toBoundListener = Unsafe.Coerce.unsafeCoerce
 
 newtype Var m f = Var
   { unVar :: LRef m (SetState m f)
@@ -587,7 +571,7 @@ copyListeners = traverse (traverse copyListener)
 
 copyListener :: Monad m => Listener m a -> CopyT m (Listener m a)
 copyListener (Listener h h' p f) =
-  Listener <$> copyHeap h <*> copyHeap h' <*> pure p <*> pure f
+  (\ h h' -> Listener h h' p f) <$> copyHeap h <*> copyHeap h'
 
 copyHeap :: Monad m => Heap -> CopyT m Heap
 copyHeap = \ case
