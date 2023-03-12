@@ -316,8 +316,8 @@ split'' m f = do
       for_ s.promises addListenable
       putListeners s.listeners
       splitPromises s.promises h' $ \ h' -> \ case
-        True -> putHeap h *> f (Just (x, putHeap h' *> m))
-        False -> putHeap h *> split'' (putHeap h' *> m) f
+        True -> f (Just (x, putHeap h' *> m))
+        False -> split'' (putHeap h' *> m) f
     Nothing -> putHeap h *> f Nothing
 
 msplit'' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
@@ -334,7 +334,7 @@ splitPromises' xs h f = case xs of
   [] -> trace "splitPromises' []" $ f h True
   x:xs -> whenResolved x h $ \ h -> \ case
     True -> trace "splitPromises' True" $ splitPromises' xs h f
-    False -> trace "splitPRomises' False" $ f h False
+    False -> trace "splitPromises' False" $ f h False
 
 freshPromise :: MonadRef m => VerseT m (Promise m)
 freshPromise = do
@@ -349,10 +349,14 @@ whenResolved (Promise i ref) h f = lift (readLRef' ref h) >>= \ case
 
 resolve :: MonadRef m => Promise m -> Bool -> VerseT m ()
 resolve (Promise i ref) x = readLRef ref >>= \ case
-  Nothing -> trace "resolve Nothing" $ do
+  Nothing -> do
+    traceM . ("resolve Nothing: " ++) . show =<< getHeap
     writeLRef ref $ Just x
     notifyResolveListeners i x
-  Just _ -> error "resolve"
+  Just _ -> do
+    traceM . show =<< getHeap
+    traceM $ show x
+    error "resolve"
 
 addListenable :: Monad m => Promise m -> VerseT m ()
 addListenable (Promise i _) = modifyListeners $ LabelMap.insert i []
@@ -360,10 +364,13 @@ addListenable (Promise i _) = modifyListeners $ LabelMap.insert i []
 notifyResolveListeners :: MonadRef m => Label -> Bool -> VerseT m ()
 notifyResolveListeners i x = trace "notifyResolveListeners" $ stateListeners (deleteLookup i) >>= \ case
   Nothing -> guard x
-  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) ->
+  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) -> do
+    traceM . show =<< getHeap
+    traceM $ show h
+    traceM $ show h'
     split'' (putHeap h *> f h' x) $ \ case
       Nothing -> resolve p False
-      Just ((), _) -> resolve p True
+      Just ((), _) -> trace "notifyResolveListeners Just" $ resolve p True
 
 notifyBoundListeners :: MonadRef m => Label -> f (Var m f) -> VerseT m ()
 notifyBoundListeners i x = trace "notifyBoundListeners" $ stateListeners (deleteLookup i) >>= \ case
