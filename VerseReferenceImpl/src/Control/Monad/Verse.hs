@@ -685,7 +685,25 @@ lookupInsert !k0 x0 t0 = loop k0 x0 t0
       LabelMap.Internal.Nil -> Right $! LabelMap.Lazy.singleton k x
 
 deleteLookup :: Label -> LabelMap a -> (Maybe a, LabelMap a)
-deleteLookup i xs = (LabelMap.lookup i xs, LabelMap.delete i xs)
+deleteLookup !k0 t0 = toTuple $ loop k0 t0
+  where
+    loop k = \ case
+      t@(LabelMap.Internal.Bin p m l r)
+        | LabelMap.Internal.nomatch k p m ->
+          Nothing :*: t
+        | LabelMap.Internal.zero k m ->
+          let x :*: l' = loop k l in x :*: LabelMap.Internal.binCheckLeft p m l' r
+        | otherwise ->
+          let x :*: r' = loop k r in x :*: LabelMap.Internal.binCheckRight p m l r'
+      t@(LabelMap.Internal.Tip k' x)
+        | k == k' -> Just x :*: LabelMap.Internal.Nil
+        | otherwise -> Nothing :*: t
+      LabelMap.Internal.Nil -> Nothing :*: LabelMap.Internal.Nil
+
+data Sum a b = !a :*: !b
+
+toTuple :: Sum a b -> (a, b)
+toTuple (x :*: y) = (x, y)
 
 or' :: Maybe a -> a -> a
 or' = flip fromMaybe
