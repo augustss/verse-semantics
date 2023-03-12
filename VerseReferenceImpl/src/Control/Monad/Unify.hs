@@ -18,12 +18,16 @@ import Data.Unifiable
 class (MonadPlus m, MonadVar m) => MonadUnify m where
   unify :: Unifiable f => Var m f -> Var m f -> m ()
   default unify :: ( m ~ t n
-                   , Var (t n) ~ Var n
-                   , MonadTrans t
-                   , MonadUnify n
+                   , MonadUnifyTrans t n
                    , Unifiable f
                    ) => Var m f -> Var m f -> m ()
   unify x y = lift $ unify x y
+
+type MonadUnifyTrans t n =
+  ( Var (t n) ~ Var n
+  , MonadTrans t
+  , MonadUnify n
+  )
 
 instance MonadUnify m => MonadUnify (ReaderT r m)
 

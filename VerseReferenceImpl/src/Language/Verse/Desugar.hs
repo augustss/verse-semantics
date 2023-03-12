@@ -235,7 +235,7 @@ tellName x var =
 
 tellName' :: L Name -> Bool -> Desugar ()
 tellName' x var =
-  modify $ HashMap.insertWith (flip const) (Ident.Name $ extract x) (loc x, var)
+  modify $ HashMap.insertWith (\ _ x -> x) (Ident.Name $ extract x) (loc x, var)
 
 exists :: Desugar (L (Exp L Ident)) -> Desugar (L (Exp L Ident))
 exists m = lift $ do
