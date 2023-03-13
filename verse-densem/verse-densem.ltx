@@ -451,7 +451,7 @@ $
   \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
      & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
-     & = & \semapp{E}{e_3} & \text{otherwise} \\
+     & = & \semapp{E}{e_3}{\rho} & \text{otherwise} \\
   \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
 %%     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_i}})})
 %%     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
