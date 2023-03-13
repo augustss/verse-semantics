@@ -72,9 +72,7 @@ observeAllT' :: Monad m =>
                 StateT (Heaps m) (SupplyT Label m) [a]
 observeAllT' m = unLogicT m sk fk
   where
-    sk x fk = do
-      commit' =<< gets heap
-      (x:) <$> fk
+    sk x fk = (commit' =<< gets heap) *> ((x:) <$> fk)
     fk = pure []
 
 emptyHeaps :: Heaps m
@@ -687,7 +685,7 @@ addCommit' :: Monad m => Commit m -> Heap -> StateT (Heaps m) (SupplyT Label m) 
 addCommit' f = \ case
   Nil -> pure ()
   Cons i _ _ _ -> modify $ \ s ->
-    s { commits = LabelMap.insertWith (\ f f' h -> f h *> f' h) i f s.commits }
+    s { commits = LabelMap.insertWith (\ f f' h -> f' h *> f h) i f s.commits }
 
 modifyCommits :: Monad m => (Commits m -> Commits m) -> VerseT m ()
 modifyCommits f = modifyHeaps $ \ s -> s { commits = f s.commits }
