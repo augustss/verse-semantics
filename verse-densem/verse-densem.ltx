@@ -842,12 +842,12 @@ $$
   \termapp{|tup (v_1,..,v_n)|} & = & \mathbf{tuple}(\termapp{|v_1|},..,\termapp{|v_n|}) \\
 ~ \\
   \folapp{|e|} & : & [\Term \rightarrow \Forml] \\
-  \folapp{|v|} & = & |[\t -> t = \termapp{v}]| \\
+  \folapp{|v|} & = & |[\t -> t = term v ]| \\
   \folapp{|fail|} & = & |[]| \\
   \folapp{|e_1 choice e_2|} & = &
     \folapp{|e_1|} |++| \folapp{|e_2|} \\
   \folapp{|v = e_1 ; e_2|} & = &
-    \lcompr{|\t -> phi(\termapp{v}) && psi(t)|}
+    \lcompr{|\t -> phi(term v) && psi(t)|}
            {|phi_| \in \folapp{|e_1|}, ~~ |psi_| \in \folapp{|e_2|}} \\
   \folapp{|def x e|} & = &
     \lcompr{|\t -> def x (phi(t))|}
