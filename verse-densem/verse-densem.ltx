@@ -188,7 +188,7 @@
 \newcommand{\mtage}[1]{([],#1)}
 \newcommand{\mlift}[1]{#1_{\bot}}
 \newcommand{\mplus}{\oplus}
-\newcommand{\mcross}{\mathit{cross}}
+\newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
 \newcommand{\powerset}[1]{{\mathcal P}(#1)}
 \newcommand{\wrong}{\mathrm{WRONG}}
 \newcommand{\apply}{\mathit{apply}}
@@ -452,10 +452,10 @@ $
   \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
      & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
      & = & \semapp{E}{e_3} & \text{otherwise} \\
-  \semapp{E}{|for e_1 do lam x e_2|}{\rho}
-     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_1}})}, \\
-     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
-                    \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
+  \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
+%%     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_i}})})
+%%     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
+%%                    & \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
   \\
 % Commenting out hastype for now
 %   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
