@@ -182,6 +182,7 @@
 \newcommand{\msemi}{\fatsemi}
 \newcommand{\mone}{\mathit{one}}
 \newcommand{\mall}{\mathit{all}}
+\newcommand{\msucceeds}{\mathit{succeeds}}
 \newcommand{\mtag}{\mathit{tag}}
 \newcommand{\mtage}[1]{([],#1)}
 \newcommand{\mlift}[1]{#1_{\bot}}
@@ -374,10 +375,11 @@
     \begin{array}{lr@@{\;}c@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
-       \vb  |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+       \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
+       &&& \vb |succeeds e| \\
 %       & & \vb & |hastype e_1 e_2| \\
 % SPJ Omitting for now
 \iffullverse
@@ -446,6 +448,7 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
+  \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
 % Commenting out hastype for now
 %   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
 %     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
@@ -510,6 +513,8 @@ $$
   & \mone(s) & = & ??? \\[1mm]
 \text{All}          &   \mall  & : & \mtype \rightarrow \tuple{\Value} \\
   & \mall(s) & = & ??? \\
+\text{Succeeds}          &   \msucceeds  & : & \mtype \rightarrow \tuple{\Value} \\
+  & \msucceeds(s) & = & ??? \\
 \end{array} \\ \\
 \text{All operations over $\mtype$ implicitly propagate $\bot$ and $\wrong$.  E.g.}\\
   \begin{array}{rcll}
@@ -706,6 +711,9 @@ $$
 & \mone(s) & = & \shead (\msort( s)) \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
  & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
+\text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
+& \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
+&               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
 \text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
              & \shead [] & = & empty \\
              & \shead (w \scons s) & = & \munits{w} \\[1mm]
