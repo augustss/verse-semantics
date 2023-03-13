@@ -13,7 +13,7 @@ module Language.Verse.Val
   ) where
 
 import Control.Applicative
-import Control.Monad.Ref.Backtrack qualified as Backtrack
+import Control.Monad.Ref
 import Control.Monad.Trans.Maybe
 import Control.Monad.Var
 import Control.Monad.Writer.CPS
@@ -36,16 +36,16 @@ import Prettyprinter
 
 data Val m a
   = Int !Integer
-  | Float !Double
+  | Float {-# UNPACK #-} !Double
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module !Label !(HashMap Name (Named m a))
-  | StructInst !Label !(HashMap Name (Named m a))
-  | ClassInst !Label (Maybe a) !(HashMap Name (Named m a))
+  | Module {-# UNPACK #-} !Label !(HashMap Name (Named m a))
+  | StructInst {-# UNPACK #-} !Label !(HashMap Name (Named m a))
+  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name (Named m a))
   | Overloads !(Overload m a) a deriving (Functor, Foldable, Traversable)
 
-instance EqRef (Backtrack.Ref m) => Unifiable (Val m) where
+instance EqRef (Ref m) => Unifiable (Val m) where
   zipMatchM = curry $ \ case
     (Truth x, Truth y) ->
       pure $ Just [(x, y)]
@@ -109,7 +109,7 @@ uncons xs = readVar xs >>= \ case
   Just _ -> empty
   _ -> pure Nothing
 
-instance ( Backtrack.MonadRef m
+instance ( MonadRef m
          , MonadVar m
          , MonadPretty a m
          ) => MonadPretty (Val m a) m where

@@ -96,11 +96,14 @@ data Expr
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
   | Where Expr Expr           -- e1 where e2
-  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}
+  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2
+                                 -- XXX?? Lambda x effs e1 e2 = Lam x $ If3 e1 (ApplyEff effs e2) Fail/Wrong
   | AnyT                      -- :any
   | EmptyT                    -- :false
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
+  | Lam Ident Expr            -- i => e
+  | DomainFail                -- either Wrong or try next overload
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -161,7 +164,7 @@ instance Pretty Expr where
             where (q, _, qr) = fixity ("pre" ++ unIdent o)
           PostfixOp e o -> maybeParens (p > q) $ ppr ql e <> ppOp o
             where (q, ql, _) = fixity ("post" ++ unIdent o)
-          InfixOp e1 o e2 -> maybeParens (p > q) $ ppr ql e1 <+> ppOp o <+> ppr qr e2
+          InfixOp e1 o e2 -> maybeParens (p > q) $ sep [ppr ql e1 <+> ppOp o, indent $ ppr qr e2]
             where (q, ql, qr) = fixity (unIdent o)
           If1 e1 -> maybeParens (p > 0) $ text "if" <+> ppB e1
           If2 e1 e2 -> maybeParens (p > 0) $ sep [text "if" <+> parens (ppr 0 e1) <+> text "then",
@@ -187,9 +190,10 @@ instance Pretty Expr where
           Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
           Lambda i rs e1 e2 -> maybeParens (p > 10) $
-            text "fn" <> parens (pPrintL l i <> text ":any" <+> ppw e1) <> ppEffs rs <> ppB e2
-            where ppw (Array []) = empty
-                  ppw e = text "where" <+> pPrintL l e
+            text "fn" <> sep [parens (pPrintL l e1') <> ppEffs rs, indent $ ppB e2]
+            where e1' | Array [] <- e1 = iany
+                      | otherwise = Where iany e1
+                  iany = InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))
           Block es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -210,7 +214,9 @@ instance Pretty Expr where
           AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
           EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
-          Exists is e -> maybeParens (p > 0) $ text "exists" <+> hsep (map (ppr 0) is) <+> text "." <+> ppr 0 e
+          Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
+          Lam i e -> pPrintPrec l p (Lambda i [] (Array []) e)
+          DomainFail -> text "DomainFail"
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -322,6 +328,8 @@ compos _ AnyT = pure AnyT
 compos _ EmptyT = pure EmptyT
 compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
+compos f (Lam i e) = Lam i <$> f e
+compos _ DomainFail = pure DomainFail
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)

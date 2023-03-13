@@ -20,9 +20,9 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Query (f (Exp f a))
-  | Module !Label !(HashMap a Bool) (f (Exp f a))
-  | Struct !Label !(HashMap a Bool) (f (Exp f a))
-  | Class !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
+  | Module {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
+  | Struct {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
+  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
   | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
   | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
@@ -33,8 +33,8 @@ data Exp f a
   | Invoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
-  | Int Integer
-  | Float Double
+  | Int !Integer
+  | Float {-# UNPACK #-} !Double
   | Name a
   | Default (f a) (f (Exp f a)) (f (Exp f a))
 

@@ -60,10 +60,7 @@ deriving instance MonadError e m => MonadError e (SupplyT s m)
 deriving instance MonadFix m => MonadFix (SupplyT s m)
 
 instance (Enum s, Monad m) => MonadSupply s (SupplyT s m) where
-  supply = SupplyT $ do
-    x <- get
-    put $ succ x
-    pure x
+  supply = SupplyT $ state $ \ s -> (s, succ s)
 
 runSupplyT :: (Bounded s, Monad m) => SupplyT s m a -> m a
 runSupplyT = flip Strict.evalStateT minBound . unSupplyT

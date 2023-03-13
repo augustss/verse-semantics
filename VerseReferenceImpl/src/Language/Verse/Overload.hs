@@ -16,10 +16,10 @@ import {-# SOURCE #-} Language.Verse.Named (Named)
 import Prettyprinter
 
 data Overload m a
-  = Function !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp Exp
-  | Struct !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp
-  | Class !Label !(IdentMap (Named m a)) (Maybe a) !(IdentMap Bool) Exp
-  | Intrinsic Intrinsic deriving (Functor, Foldable, Traversable)
+  = Function {-# UNPACK #-} !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp Exp
+  | Struct {-# UNPACK #-} !Label !(IdentMap (Named m a)) !(IdentMap Bool) Exp
+  | Class {-# UNPACK #-} !Label !(IdentMap (Named m a)) (Maybe a) !(IdentMap Bool) Exp
+  | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
 
