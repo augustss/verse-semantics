@@ -188,6 +188,7 @@
 \newcommand{\mtage}[1]{([],#1)}
 \newcommand{\mlift}[1]{#1_{\bot}}
 \newcommand{\mplus}{\oplus}
+\newcommand{\mcross}{\mathit{cross}}
 \newcommand{\powerset}[1]{{\mathcal P}(#1)}
 \newcommand{\wrong}{\mathrm{WRONG}}
 \newcommand{\apply}{\mathit{apply}}
@@ -381,6 +382,7 @@
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
        && \vb & |succeeds e| \vb |decides e| \\
+       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
 %       & & \vb & |hastype e_1 e_2| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
@@ -434,7 +436,7 @@ $
 \\[7mm]
 \text{\bf Semantics of expressions and values} \\
 
-  \begin{array}{rcll}
+  \begin{array}{r@@{\;}c@@{\;}ll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{|v|}{\rho}) \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
@@ -447,6 +449,14 @@ $
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
   \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
+  \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
+     & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
+     & = & \semapp{E}{e_3} & \text{otherwise} \\
+  \semapp{E}{|for e_1 do lam x e_2|}{\rho}
+     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_1}})}, \\
+     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
+                    \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
+  \\
 % Commenting out hastype for now
 %   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
 %     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
@@ -462,17 +472,17 @@ $
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
 \\
   \semapp{O}{|op|}{} & : & \Value \\
-  \semapp{O}{|add|} & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+  \semapp{O}{|add|} & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
       \,\text{\bf then}\, \munit(k_1+k_2)
-      \,\text{\bf else}\, \wrong \\
-  \semapp{O}{|gt|}  & = &  \lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+      \,\text{\bf else}\, \wrong} \\
+  \semapp{O}{|gt|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
       \,\text{\bf then (if}\, (k_1 > k_2)
                        \,\text{\bf then}\, \munit(k_1)
                        \,\text{\bf else}\, \mempty \,)
-      \,\text{\bf else}\, \wrong \\
-  \semapp{O}{|int|}  & = &  \lambda w.\, \text{\bf if}\, (w = k)
+      \,\text{\bf else}\, \wrong } \\
+  \semapp{O}{|int|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = k)
       \,\text{\bf then}\, \munit(k)
-      \,\text{\bf else}\, \mempty
+      \,\text{\bf else}\, \mempty}
   \end{array} \\ \\
   
 \begin{array}{rcll}
