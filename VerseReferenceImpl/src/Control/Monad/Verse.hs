@@ -459,19 +459,19 @@ findVar :: MonadRef m => Var m f -> VerseT m (FoundVar m f)
 findVar var = lift . findVar' var =<< getHeap
 
 findVar' :: MonadRef m => Var m f -> Heap -> m (FoundVar m f)
-findVar' var h = readLRef'' (unVar var) h >>= \ case
+findVar' var h = readSetState (unVar var) h >>= \ case
   Repr x -> pure (var, x)
   Link var' -> findVar'' var var' h
 
 findVar'' :: MonadRef m => Var m f -> Var m f -> Heap -> m (FoundVar m f)
-findVar'' var var' h = readLRef'' (unVar var') h >>= \ case
+findVar'' var var' h = readSetState (unVar var') h >>= \ case
   Repr x -> pure (var', x)
   Link var'' -> do
     writeLRef' (unVar var) (Link var'') h
     findVar'' var' var'' h
 
-readLRef'' :: MonadRef m => LRef m (SetState m f) -> Heap -> m (SetState m f)
-readLRef'' ref h = readRef (unLRef ref) <&> \ s -> find s h
+readSetState :: MonadRef m => LRef m (SetState m f) -> Heap -> m (SetState m f)
+readSetState ref h = readRef (unLRef ref) <&> \ s -> find s h
   where
     find (RefState xs x) = \ case
       Nil -> x
