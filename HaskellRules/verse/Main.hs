@@ -26,6 +26,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 import Verifier.Verify
 import Rules.ICFP(anf)
+import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -259,7 +260,8 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
     let flg = flags s
-    b <- verify [] (anf $ coreToTrs $ asCore flg e)
+        e' = coreToTrs $ asCore flg e
+    b <- verify (free e') (anf e')
     if b then
       putStrLn "Cannot fail"
      else
