@@ -237,10 +237,10 @@ coreIf (Exists is e1) e2 e3 = do
       one e = Macro1 (Ident noLoc "one") [] e
   core $ Exists [y] $
          Seq [
-    --Unify (Variable y)
-              (one $ Exists is (Seq [e1, Unify vy $ Array (map Variable is)])
+              Unify vy
+              (one $ Exists is (Seq [e1, Array (map Variable is)])
                      `Choice`
-                     Unify vy (LitInt 0)
+                     LitInt 0
               ),
               Exists is (Seq [Unify vy $ Array (map Variable is), e2])
               `Choice`
