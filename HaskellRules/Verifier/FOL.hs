@@ -257,6 +257,10 @@ z3term env (Ap a []) | all isDigit s && not (null s) =
  where
   s = showIdent a
 
+z3term env (Ap f ts) | showIdent f == "tup" =
+  do as <- sequence [ z3term env t | t <- ts ]
+     tuple env as
+
 z3term env (Ap f [s,t]) | showIdent f == "+" =
   do a <- z3term env s >>= selInt env
      b <- z3term env t >>= selInt env
