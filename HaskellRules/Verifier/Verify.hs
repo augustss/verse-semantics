@@ -19,6 +19,7 @@ results Fail               _t = []
 results (Op op :@: v)       t = [app op v t]
 results (e1 :|: e2)         t = results e1 t ++ results e2 t
 results ((v :=: e1) :>: e2) t = [q1 :&&: q2 | q1 <- results e1 (term v), q2 <- results e2 t]
+results (e1 :>: e2)         t = [q1 :&&: q2 | q1 <- success e1, q2 <- results e2 t]
 results (Exi (Bind x e))    t = [Exists (Bind x q) | q <- results e t]
 results (One e)             t = [ones (results e t) (fails e)]
  where
@@ -37,12 +38,13 @@ success Fail                = []
 success (Op op :@: v)       = [appSuccess op v]
 success (e1 :|: e2)         = success e1 ++ success e2
 success ((v :=: e1) :>: e2) = [q1 :&&: q2 | q1 <- results e1 (term v), q2 <- success e2]
+success (e1 :>: e2)         = [q1 :&&: q2 | q1 <- success e1, q2 <- success e2]
 success (Exi (Bind x e))    = [Exists (Bind x q) | q <- success e]
-success (One e)             = [ones (success e) (fails e)]
+success (One e)             = [bigOr (success e)]
  where
-  ones []     _      = FALSE
-  ones [q]    _      = q
-  ones (q:qs) (f:fs) = q :||: (f :&&: ones qs fs)
+  bigOr []     = FALSE
+  bigOr [q]    =  q
+  bigOr (q:qs) = q :||: bigOr qs
 
 success e = error ("success: unimplemented " ++ show e)
 
