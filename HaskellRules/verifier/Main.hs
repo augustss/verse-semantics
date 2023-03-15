@@ -19,6 +19,7 @@ results Fail                t = []
 results (Op op :@: v)       t = [app op v t]
 results (e1 :|: e2)         t = results e1 t ++ results e2 t
 results ((v :=: e1) :>: e2) t = [q1 :&&: q2 | q1 <- results e1 (term v), q2 <- results e2 t]
+results (e1 :>: e2)         t = [q1 :&&: q2 | q1 <- success e1, q2 <- results e2 t]
 results (Exi (Bind x e))    t = [Exists (Bind x q) | q <- results e t]
 results (One e)             t = [ones (results e t) (fails e)]
  where
@@ -37,12 +38,13 @@ success Fail                = []
 success (Op op :@: v)       = [appSuccess op v]
 success (e1 :|: e2)         = success e1 ++ success e2
 success ((v :=: e1) :>: e2) = [q1 :&&: q2 | q1 <- results e1 (term v), q2 <- success e2]
+success (e1 :>: e2)         = [q1 :&&: q2 | q1 <- success e1, q2 <- success e2]
 success (Exi (Bind x e))    = [Exists (Bind x q) | q <- success e]
-success (One e)             = [ones (success e) (fails e)]
+success (One e)             = [bigOr (success e)]
  where
-  ones []     _      = FALSE
-  ones [q]    _      = q
-  ones (q:qs) (f:fs) = q :||: (f :&&: ones qs fs)
+  bigOr []     = FALSE
+  bigOr [q]    =  q
+  bigOr (q:qs) = q :||: bigOr qs
 
 success e = error ("success: " ++ show e)
 
@@ -84,7 +86,7 @@ appSuccess Gt (Arr [a,b]) =
 appSuccess Lt (Arr [a,b]) =
   Not (Pred (ident "<=") [term b, term a])
 
-appSucces _ _ =
+appSuccess _ _ =
   TRUE
 
 --------------------------------------------------------------------------------
@@ -95,7 +97,7 @@ main =
   do putStrLn "-- PROGRAM --"
      print e2
      putStrLn "-- FORMULA --"
-     let [q] = success e1
+     let [q] = success (One e3)
          pr  = Forall $ Bind a $ q
      putStrLn (show pr)
      b <- prove pr
@@ -104,36 +106,50 @@ main =
       else
        putStrLn "==> program may fail"
  where
-  e0  = One (Exi $ Bind x $
+  e0  = Exi $ Bind x $
               (Var x :=: Var a)
-          :>: Var x)
+          :>: Var x
  
- 
-  e1  = One (Exi $ Bind x $ Exi $ Bind y $
+  e1  = Exi $ Bind x $ Exi $ Bind y $
               (Var x :=: One ( (Var y :=: Var a :>: Var y) :|: Int 2 ))
           :>: (Var y :=: Int 1)
           :>: (Var x :=: Int 2)
-          :>: Var x)
+          :>: Var x
 
-  e2  = One (Exi $ Bind x $
+  e2  = Exi $ Bind x $
               (Var x :=: One ( (Op Ge :@: Arr [Var a, Int 3]) :|: Int 2 ))
           :>: (Op Ge :@: Arr [Var x, Var a])
-        )
+  
+  e3  = ifThenElse (Op Ge :@: Arr [Var a, Int 3])
+          (Int 1 :|: Int 2)
+          (Int 3 :|: Int 3 :|: Int 4)
 
   x  = ident "x"
   y  = ident "y"
   a  = ident "input"
 
+{-
 ifThenElse :: [Ident] -> Expr -> Expr -> Expr -> Expr
 ifThenElse xs c p q =
   One ((foldr (\x -> Exi . Bind x) (c :>: Lam (Bind y p)) xs) :|: Lam (Bind y q)) :@: Arr []
  where
   y = identNotIn (free (p,q))
+-}
+
+ifThenElse :: Expr -> Expr -> Expr -> Expr
+ifThenElse c p q =
+  Exi $ Bind y $ 
+    (Var y :=: One ((c :>: Int 1) :|: Int 2))
+    :>:
+    (((Var y :=: Int 1 :>: p)) :|: (Var y :=: Int 2 :>: q))
+ where
+  y:_ = identsNotIn (free (p,q))
 
 isNat :: Expr -> Expr
 isNat e =
   Op Ge :@: Arr [e,Int 0]
 
+{-
 f :: (Expr -> Expr) -> Expr -> Expr
 f frec x = ifThenElse
             [x']
@@ -142,6 +158,7 @@ f frec x = ifThenElse
             (Int 1)
  where
   x' = identNotIn (free x)
+-}
 
 --------------------------------------------------------------------------------
 
