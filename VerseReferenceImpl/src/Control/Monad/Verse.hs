@@ -582,27 +582,33 @@ rollback = \ case
 pushSplit :: Monad m => VerseT m ()
 pushSplit = do
   i <- VerseT supply
-  modifyHeap $ Cons i Nil Split
+  h <- getHeap
+  putHeap $ Cons i Nil Split h
+  getCommit h >>= \ case
+    Nothing -> pure ()
+    Just f -> putCommit i f
 
 pushChoice :: Monad m => Heap -> VerseT m ()
 pushChoice h = do
   i <- VerseT supply
   let h' = Cons i Nil Choice h
   putHeap h'
-  let s = case h of
-            Cons i _ _ _ -> Copied (LabelMap.singleton i h') Nil
-            Nil -> Copied mempty h'
-  putListeners =<< flip runCopyT s . copyListeners =<< getListeners
+  getCommit h >>= \ case
+    Nothing -> pure ()
+    Just f -> putCommit i f
+  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners
 
 popChoice :: Monad m => Heap -> VerseT m ()
 popChoice h = do
   h' <- stateHeap $ \ case
     Cons _ _ Choice h' -> (h', h')
     _ -> error "popChoice"
-  let s = case h of
-            Cons i _ _ _ -> Copied (LabelMap.singleton i h') Nil
-            Nil -> Copied mempty h'
-  putListeners =<< flip runCopyT s . copyListeners =<< getListeners
+  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners
+
+toCopied :: Heap -> Heap -> Copied
+toCopied = \ case
+  Cons i _ _ _ -> flip Copied Nil . LabelMap.singleton i
+  Nil -> Copied mempty
 
 type CopyT m = StateT Copied (SupplyT Label m)
 
@@ -678,6 +684,14 @@ stateHeap :: Monad m => (Heap -> (a, Heap)) -> VerseT m a
 stateHeap f = VerseT . lift . state $ \ s ->
   f s.heap <&> \ heap -> s { heap }
 
+getCommit :: Monad m => Heap -> VerseT m (Maybe (Commit m))
+getCommit = \ case
+  Cons i _ _ _ -> VerseT . lift . lift . gets $ LabelMap.lookup i . commits
+  Nil -> pure Nothing
+
+putCommit :: Monad m => Label -> Commit m -> VerseT m ()
+putCommit i = modifyCommits . LabelMap.insert i
+
 addCommit :: Monad m => Commit m -> VerseT m ()
 addCommit f = VerseT . lift . lift . addCommit' f =<< getHeap
 
@@ -695,9 +709,6 @@ stateCommits' :: Monad m =>
                  StateT (Heaps m) (SupplyT Label m) a
 stateCommits' f = state $ \ s ->
   f s.commits <&> \ commits -> s { commits }
-
-modifyHeap :: Monad m => (Heap -> Heap) -> VerseT m ()
-modifyHeap f = modifyHeaps $ \ s -> s { heap = f s.heap }
 
 modifyHeaps :: Monad m => (Heaps m -> Heaps m) -> VerseT m ()
 modifyHeaps = VerseT . lift . modify

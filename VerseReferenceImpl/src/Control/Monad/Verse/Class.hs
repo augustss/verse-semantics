@@ -11,6 +11,7 @@ module Control.Monad.Verse.Class
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.RST
 import Control.Monad.Unify
 import Control.Monad.Var
 
@@ -59,3 +60,13 @@ instance MonadVerse m => MonadVerse (ReaderT r m) where
     whenBound x $ flip runReaderT r . f
   split m f = ReaderT $ \ r ->
     split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)
+
+instance MonadVerse m => MonadVerse (RST r s m) where
+  whenBound x f = RST $ \ r s -> do
+    whenBound x $ \ x -> evalRST (f x) r s
+    pure ((), s)
+  split m f = RST $ \ r s -> do
+    split (evalRST m r s) $ \ case
+      Nothing -> evalRST (f Nothing) r s
+      Just (x, m) -> evalRST (f $ Just (x, lift m)) r s
+    pure ((), s)

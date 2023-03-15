@@ -8,6 +8,7 @@ module Control.Monad.Var
   ( MonadVar (..)
   ) where
 
+import Control.Monad.RST
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
@@ -54,5 +55,7 @@ type MonadVarTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVar n)
 instance MonadVar m => MonadVar (MaybeT m)
 
 instance MonadVar m => MonadVar (ReaderT r m)
+
+instance MonadVar m => MonadVar (RST r s m)
 
 instance MonadVar m => MonadVar (CPS.WriterT w m)

@@ -8,6 +8,7 @@ module Control.Monad.Unify
   ) where
 
 import Control.Monad
+import Control.Monad.RST
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS qualified as CPS
@@ -30,5 +31,7 @@ type MonadUnifyTrans t n =
   )
 
 instance MonadUnify m => MonadUnify (ReaderT r m)
+
+instance MonadUnify m => MonadUnify (RST r s m)
 
 instance MonadUnify m => MonadUnify (CPS.WriterT w m)
