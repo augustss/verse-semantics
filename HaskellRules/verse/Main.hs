@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 module Main(main) where
-import Control.Exception
+import Control.Exception(SomeException, try, catch)
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -262,12 +262,16 @@ cVerify = do
     let flg = (flags s){ fNoLambdaIf = True }
         e' = anf $ coreToTrs $ asCore flg e
     putStrLn $ "Desugared: " ++ prettyShow e'
-    b <- verify (free e') e'
-    if b then
-      putStrLn "Cannot fail"
-     else
-      putStrLn "Can fail"
-    pure s
+    catch (do
+      b <- verify (free e') e'
+      if b then
+        putStrLn "Cannot fail"
+       else
+        putStrLn "Can fail"
+      pure s)
+      (\ (exn :: SomeException) -> do
+         print exn
+         pure s)
 
 {-
 cEval :: Run CState
