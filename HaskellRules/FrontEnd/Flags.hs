@@ -13,6 +13,7 @@ data Flags = Flags
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   , fNoFuelStop   :: !Bool
+  , fNoLambdaIf   :: !Bool
   }
   deriving (Show)
 
@@ -30,6 +31,7 @@ defaultFlags = Flags
   , fRewriteSteps = 25000
   , fEvalSteps    = 1000
   , fNoFuelStop   = False
+  , fNoLambdaIf   = False
   }
 
 showFlags :: Flags -> String

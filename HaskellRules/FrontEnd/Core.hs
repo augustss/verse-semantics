@@ -192,7 +192,10 @@ core (For2 e1 e2) = do
     pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
 core (If3 e1 e2 e3) = do
   c1 <- core e1
-  if isValue' c1 then
+  noLambdaIf <- asks fNoLambdaIf
+  if noLambdaIf then
+    coreIf e1 e2 e3
+   else if isValue' c1 then
     core e2
    else do
     e3' <- thunk e3
@@ -226,6 +229,24 @@ coreBind (Exists is e1) e2 = do
   e2' <- thunk e2
   core (Exists is (seqE [e1, e2']))
 coreBind e _ = error $ "coreBind: " ++ prettyShow e
+
+coreIf :: Expr -> Expr -> Expr -> C Core
+coreIf (Exists is e1) e2 e3 = do
+  y <- newTmp
+  let vy = Variable y
+      one e = Macro1 (Ident noLoc "one") [] e
+  core $ Exists [y] $
+         Seq [
+    --Unify (Variable y)
+              (one $ Exists is (Seq [e1, Unify vy $ Array (map Variable is)])
+                     `Choice`
+                     Unify vy (LitInt 0)
+              ),
+              Exists is (Seq [Unify vy $ Array (map Variable is), e2])
+              `Choice`
+              (Seq [Unify vy (LitInt 0), e3])
+         ]
+coreIf _ _ _ = undefined
 
 lambda :: Ident -> [Ident] -> Expr -> C Core
 lambda x fs b = CLam x . attr <$> core b

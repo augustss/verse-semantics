@@ -259,9 +259,10 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
-    let flg = flags s
-        e' = coreToTrs $ asCore flg e
-    b <- verify (free e') (anfK e')
+    let flg = (flags s){ fNoLambdaIf = True }
+        e' = anfK $ coreToTrs $ asCore flg e
+    putStrLn $ "Desugared: " ++ prettyShow e'
+    b <- verify (free e') e'
     if b then
       putStrLn "Cannot fail"
      else
