@@ -25,7 +25,7 @@ import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 import Verifier.Verify
-import Rules.ICFP(anfK)
+import Rules.ICFP(anf)
 import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -260,7 +260,7 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
     let flg = (flags s){ fNoLambdaIf = True }
-        e' = anfK $ coreToTrs $ asCore flg e
+        e' = anf $ coreToTrs $ asCore flg e
     putStrLn $ "Desugared: " ++ prettyShow e'
     b <- verify (free e') e'
     if b then
