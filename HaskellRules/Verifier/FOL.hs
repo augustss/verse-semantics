@@ -293,26 +293,26 @@ prove phi =
  where
   script phi =
     do env <- mkEnv
-       not_p <- z3form env (Not phi)
+       not_p <- z3form env not_phi
        --s <- astToString not_p
        --liftIO $ putStrLn s
        assert not_p
 
        withModel $ \m ->
-         let inputs (Forall (Bind x p)) = x : inputs p
-             inputs (Not p)             = inputs' p
-             inputs _                   = []
-             
-             inputs' (Exists (Bind x p)) = x : inputs' p
-             inputs' (Not p)             = inputs p
-             inputs' _                   = []
-          in do sequence [ do ma <- z3term env (Vr x) >>= eval m
-                              s  <- case ma of
-                                      Just a  -> astToString a
-                                      Nothing -> return "?"
-                              return (showIdent x ++ "= " ++ s)
-                         | x <- inputs phi
-                         ]
+         do sequence [ do ma <- z3term env (Vr x) >>= eval m
+                          s  <- case ma of
+                                  Just a  -> astToString a
+                                  Nothing -> return "?"
+                          return (showIdent x ++ "= " ++ s)
+                     | x <- inps
+                     ]
+   where
+    (inps,not_phi) = neg phi
+    
+    neg (Forall (Bind x p)) = (x:xs,phi') where (xs,phi') = neg p
+    neg p                   = ([],Not p)
+
+    
 
 --------------------------------------------------------------------------------
 
