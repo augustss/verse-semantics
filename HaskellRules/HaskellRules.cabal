@@ -117,6 +117,7 @@ executable verifier
                       optparse-applicative,
                       QuickCheck,
                       githash,
+                      z3
 
     main-is:          Main.hs
 
