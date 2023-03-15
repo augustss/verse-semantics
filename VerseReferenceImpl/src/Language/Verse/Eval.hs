@@ -672,8 +672,8 @@ unifyNamed = curry $ lift . \ case
   (Val var_x, Ref ref_y) ->
     readRef' ref_y $ unify var_x
   (Ref ref_x, Ref ref_y) ->
-    readRef' ref_x $ \ val_x ->
-    readRef' ref_y $ \ val_y ->
+    readRef' ref_x $ \ var_x ->
+    readRef' ref_y $ \ var_y ->
     unify val_x val_y
 
 freshNamed :: (MonadRef m, MonadVar m) => Bool -> EvalT m (Named m (Var m (Val m)))
