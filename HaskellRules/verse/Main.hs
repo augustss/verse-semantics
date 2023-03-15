@@ -25,7 +25,7 @@ import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 import Verifier.Verify
-import Rules.ICFP(anf)
+import Rules.ICFP(anfK)
 import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -261,7 +261,7 @@ cVerify = do
   withLastExpr $ \ e s -> do
     let flg = flags s
         e' = coreToTrs $ asCore flg e
-    b <- verify (free e') (anf e')
+    b <- verify (free e') (anfK e')
     if b then
       putStrLn "Cannot fail"
      else
