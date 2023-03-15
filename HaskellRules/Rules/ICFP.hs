@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP, isRecursive) where
+module Rules.ICFP(allSystemsICFP, isRecursive, anf) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe

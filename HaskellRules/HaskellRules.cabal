@@ -54,9 +54,9 @@ library all
                       FrontEnd.TRSAdapter
                       Verifier.Verify
                       Verifier.FOL
+                      Rules.ICFP
                       --DenSem.DenSem
-    other-modules:    Rules.ICFP
-                      Rules.PLDI
+    other-modules:    Rules.PLDI
                       Rules.POPL
                       Rules.KoenNaive
                       Rules.Block
