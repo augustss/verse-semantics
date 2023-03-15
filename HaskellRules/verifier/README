@@ -1,0 +1,29 @@
+In order to be able to compile the verifier (Main.hs), you have to
+install (the correct version of) Z3 first.
+
+Do this:
+
+1. Clone the Z3 repository from github somewhere appropriate:
+
+  > git clone git@github.com:Z3Prover/z3.git
+
+2. Make it go to the correct version (4.08) compatible with the Hackage Z3 library:
+
+  > cd z3
+  > git checkout d420706
+
+3. Make sure you have Python3 installed (and callable through the "python" command):
+   (this will depend on your OS!)
+
+  > sudo apt install python3
+  > sudo apt install python-is-python3
+
+4. Configure & make & install:
+   (this will depend on your OS!)
+
+  > ./configure
+  > cd build
+  > make
+  > make install
+
+5. Done!
