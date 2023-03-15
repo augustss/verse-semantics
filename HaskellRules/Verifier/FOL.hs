@@ -1,4 +1,4 @@
-module FOL where
+module Verifier.FOL where
 
 import Data.List( intercalate )
 import Data.Char( isDigit, isAlpha, toUpper )

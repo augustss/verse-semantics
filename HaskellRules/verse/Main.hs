@@ -24,6 +24,7 @@ import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
+import Verifier.Verify
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -138,6 +139,7 @@ command = Command
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
 --      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
+      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -251,6 +253,17 @@ cEval :: Run CState
 cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
   where flg = flags s
         flg' = flg -- if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
+
+cVerify :: Run CState
+cVerify = do
+  withLastExpr $ \ e s -> do
+    let flg = flags s
+    b <- verify [] (coreToTrs $ asCore flg e)
+    if b then
+      putStrLn "Cannot fail"
+     else
+      putStrLn "Can fail"
+    pure s
 
 {-
 cEval :: Run CState
