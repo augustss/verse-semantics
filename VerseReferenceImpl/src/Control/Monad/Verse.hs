@@ -59,15 +59,21 @@ newtype VerseT m a = VerseT
 
 deriving instance MonadError e m => MonadError e (VerseT m)
 
-deriving instance MonadRef m => MonadRef (VerseT m)
-
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m =
   runSupplyT .
   flip evalStateT emptyHeaps .
-  observeAllT $ do
+  observeAllT' $ do
     splitLabel <- supply
     evalRST (unVerseT m) Env { splitLabel } emptySusps
+
+observeAllT' :: Monad m =>
+                LogicT (StateT (Heaps m) (SupplyT Label m)) a ->
+                StateT (Heaps m) (SupplyT Label m) [a]
+observeAllT' m = unLogicT m sk fk
+  where
+    sk x fk = (commit' =<< gets heap) *> ((x:) <$> fk)
+    fk = pure []
 
 emptyHeaps :: Heaps m
 emptyHeaps = Heaps { heap = Nil, commits = mempty }
@@ -90,6 +96,30 @@ instance Monad m => Alternative (VerseT m) where
 instance Monad m => MonadPlus (VerseT m)
 
 instance MonadSupply s m => MonadSupply s (VerseT m)
+
+newtype TRef m a = TRef { unTRef :: Ref m (RefState a) }
+
+instance EqRef (Ref m) => EqRef (TRef m) where
+  eqRef = eqRef `on` unTRef
+
+instance MonadRef m => MonadRef (VerseT m) where
+  type Ref (VerseT m) = TRef m
+
+  newRef = fmap TRef . lift . newRef . RefState mempty
+
+  readRef ref = lift . readRefState (unTRef ref) =<< getHeap
+
+  writeRef ref x = do
+    lift . writeRefState (unTRef ref) x =<< getHeap
+    addCommit $ fix $ \ loop -> \ case
+      Nil -> pure ()
+      Cons _ _ Split h' -> do
+        lift . lift $ writeRefState (unTRef ref) x h'
+        addCommit' loop h'
+      Cons _ _ Choice h' -> do
+        lift . lift $ writeRefState (unTRef ref) x h'
+        addCommit' loop h'
+        loop h'
 
 newVar' :: MonadRef m => f (Var m f) -> SupplyT Label m (Var m f)
 newVar' x = lift . fmap Var . newLRef' . Repr . flip Bound x =<< supply
@@ -234,7 +264,9 @@ data Heaps m = Heaps
   , commits :: !(Commits m)
   }
 
-type Commits m = LabelMap (Heap -> VerseT m ())
+type Commits m = LabelMap (Commit m)
+
+type Commit m = Heap -> StateT (Heaps m) (SupplyT Label m) ()
 
 data Listener m a = Listener
   !Heap
@@ -427,19 +459,19 @@ findVar :: MonadRef m => Var m f -> VerseT m (FoundVar m f)
 findVar var = lift . findVar' var =<< getHeap
 
 findVar' :: MonadRef m => Var m f -> Heap -> m (FoundVar m f)
-findVar' var h = readLRef'' (unVar var) h >>= \ case
+findVar' var h = readSetState (unVar var) h >>= \ case
   Repr x -> pure (var, x)
   Link var' -> findVar'' var var' h
 
 findVar'' :: MonadRef m => Var m f -> Var m f -> Heap -> m (FoundVar m f)
-findVar'' var var' h = readLRef'' (unVar var') h >>= \ case
+findVar'' var var' h = readSetState (unVar var') h >>= \ case
   Repr x -> pure (var', x)
   Link var'' -> do
     writeLRef' (unVar var) (Link var'') h
     findVar'' var' var'' h
 
-readLRef'' :: MonadRef m => LRef m (SetState m f) -> Heap -> m (SetState m f)
-readLRef'' ref h = readRef (unLRef ref) <&> \ s -> find s h
+readSetState :: MonadRef m => LRef m (SetState m f) -> Heap -> m (SetState m f)
+readSetState ref h = readRef (unLRef ref) <&> \ s -> find s h
   where
     find (RefState xs x) = \ case
       Nil -> x
@@ -482,7 +514,24 @@ readLRef :: MonadRef m => LRef m a -> VerseT m a
 readLRef ref = lift . readLRef' ref =<< getHeap
 
 readLRef' :: MonadRef m => LRef m a -> Heap -> m a
-readLRef' ref h = readRef (unLRef ref) <&> \ s -> find s h
+readLRef' = readRefState . unLRef
+
+writeLRef :: MonadRef m => LRef m a -> a -> VerseT m ()
+writeLRef ref x = lift . writeLRef' ref x =<< getHeap
+
+writeLRef' :: MonadRef m => LRef m a -> a -> Heap -> m ()
+writeLRef' ref x = \ case
+  Nil -> modifyRef (unLRef ref) $ \ (RefState xs _) ->
+    RefState xs x
+  Cons i _ _ _ -> modifyRef (unLRef ref) $ \ (RefState xs y) ->
+    RefState (LabelMap.insert i x xs) y
+
+data RefState a = RefState
+  !(LabelMap a)
+  !a deriving Show
+
+readRefState :: MonadRef m => Ref m (RefState a) -> Heap -> m a
+readRefState ref h = readRef ref <&> \ s -> find s h
   where
     find (RefState xs x) = \ case
       Nil -> x
@@ -503,30 +552,26 @@ readLRef' ref h = readRef (unLRef ref) <&> \ s -> find s h
       Nil -> Nothing
       Cons i h _ _ -> LabelMap.lookup i xs <|> lookupCopied xs h
 
-writeLRef :: MonadRef m => LRef m a -> a -> VerseT m ()
-writeLRef ref x = lift . writeLRef' ref x =<< getHeap
-
-writeLRef' :: MonadRef m => LRef m a -> a -> Heap -> m ()
-writeLRef' ref x = \ case
-  Nil -> modifyRef (unLRef ref) $ \ (RefState xs _) ->
+writeRefState :: MonadRef m => Ref m (RefState a) -> a -> Heap -> m ()
+writeRefState ref x = \ case
+  Nil -> modifyRef ref $ \ (RefState xs _) ->
     RefState xs x
-  Cons i _ _ _ -> modifyRef (unLRef ref) $ \ (RefState xs y) ->
+  Cons i _ _ _ -> modifyRef ref $ \ (RefState xs y) ->
     RefState (LabelMap.insert i x xs) y
 
-data RefState a = RefState
-  !(LabelMap a)
-  !a deriving Show
-
 commit :: Monad m => Heap -> VerseT m ()
-commit h = commit' h h
+commit = VerseT . lift . lift . commit'
 
-commit' :: Monad m => Heap -> Heap -> VerseT m ()
-commit' h = \ case
+commit' :: Monad m => Heap -> StateT (Heaps m) (SupplyT Label m) ()
+commit' h = commit'' h h
+
+commit'' :: Monad m => Heap -> Heap -> StateT (Heaps m) (SupplyT Label m) ()
+commit'' h = \ case
   Cons i h' _ _ -> do
-    stateCommits (deleteLookup i) >>= \ case
+    stateCommits' (deleteLookup i) >>= \ case
       Just f -> f h
       Nothing -> pure ()
-    commit' h h'
+    commit'' h h'
   Nil -> pure ()
 
 rollback :: Monad m => Heap -> VerseT m ()
@@ -633,11 +678,22 @@ stateHeap :: Monad m => (Heap -> (a, Heap)) -> VerseT m a
 stateHeap f = VerseT . lift . state $ \ s ->
   f s.heap <&> \ heap -> s { heap }
 
+addCommit :: Monad m => Commit m -> VerseT m ()
+addCommit f = VerseT . lift . lift . addCommit' f =<< getHeap
+
+addCommit' :: Monad m => Commit m -> Heap -> StateT (Heaps m) (SupplyT Label m) ()
+addCommit' f = \ case
+  Nil -> pure ()
+  Cons i _ _ _ -> modify $ \ s ->
+    s { commits = LabelMap.insertWith (\ f f' h -> f' h *> f h) i f s.commits }
+
 modifyCommits :: Monad m => (Commits m -> Commits m) -> VerseT m ()
 modifyCommits f = modifyHeaps $ \ s -> s { commits = f s.commits }
 
-stateCommits :: Monad m => (Commits m -> (a, Commits m)) -> VerseT m a
-stateCommits f = VerseT . lift . state $ \ s ->
+stateCommits' :: Monad m =>
+                 (Commits m -> (a, Commits m)) ->
+                 StateT (Heaps m) (SupplyT Label m) a
+stateCommits' f = state $ \ s ->
   f s.commits <&> \ commits -> s { commits }
 
 modifyHeap :: Monad m => (Heap -> Heap) -> VerseT m ()

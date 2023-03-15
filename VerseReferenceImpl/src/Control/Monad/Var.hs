@@ -46,7 +46,6 @@ class Monad m => MonadVar m where
                      ) => Var m f -> m (Var m f)
   freshen = lift . freshen
 
-
 type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
   VarDefault (t n) = Var n
 
