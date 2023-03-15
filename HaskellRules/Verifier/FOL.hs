@@ -303,7 +303,7 @@ prove phi =
                           s  <- case ma of
                                   Just a  -> astToString a
                                   Nothing -> return "?"
-                          return (showIdent x ++ "= " ++ s)
+                          return (showIdent x ++ "=" ++ s)
                      | x <- inps
                      ]
    where
