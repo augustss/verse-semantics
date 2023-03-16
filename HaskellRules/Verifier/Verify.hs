@@ -24,6 +24,7 @@ results (Exi (Bind x e)) t = [Exists (Bind x q) | q <- results e t]
 results (One e)          t = [ones (results e t) (fails e)]
  where
   ones []     _      = FALSE
+  ones _      []     = error "ones _ []: cannot happen"
   ones [q]    _      = q
   ones (q:qs) (f:fs) = q :||: (f :&&: ones qs fs)
 
