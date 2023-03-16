@@ -30,12 +30,13 @@ import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
 import Control.Monad.Unify
-import Control.Monad.Var (MonadVar, freshen, readVar)
+import Control.Monad.Var (MonadVar, freshenVar, readVar)
 import Control.Monad.Var qualified
 import Control.Monad.Verse.Class
 
 import Data.Fix
 import Data.Foldable
+import Data.Freshenable
 import Data.Function
 import Data.Functor
 import Data.IntMap.Internal qualified as LabelMap.Internal
@@ -136,9 +137,9 @@ instance (MonadFix m, MonadRef m) => MonadVar (VerseT m) where
     (_, Unbound _ _) -> Nothing
     (_, Bound _ x) -> Just x
 
-  freeze = runFreezeT . freeze'
+  freezeVar = runFreezeT . freezeVar'
 
-  freshen = runFreshenT . freshen'
+  freshenVar = runFreshenT . freshenVar'
 
 type FreezeT f m = RST Heap (LabelMap (Fix f)) (MaybeT m)
 
@@ -147,18 +148,18 @@ runFreezeT m = do
   h <- getHeap
   lift . runMaybeT $ evalRST m h mempty
 
-freeze' :: ( MonadFix m
+freezeVar' :: ( MonadFix m
            , MonadRef m
            , Traversable f
            ) => Var m f -> FreezeT f m (Fix f)
-freeze' var = do
+freezeVar' var = do
   h <- ask
   lift (lift $ findVar' var h) >>= \ case
     (_, Unbound _ _) -> empty
     (_, Bound i x) -> mfix $ \ x' ->
       gets (lookupInsert i x') >>= \ case
         Left x -> pure x
-        Right s -> put s *> (Fix <$> traverse freeze' x)
+        Right s -> put s *> (Fix <$> traverse freezeVar' x)
 
 type FreshenT f m = RST Heap (LabelMap (Var m f)) (SupplyT Label m)
 
@@ -167,17 +168,17 @@ runFreshenT m = do
   h <- getHeap
   VerseT . lift . lift . lift $ evalRST m h mempty
 
-freshen' :: ( MonadFix m
+freshenVar' :: ( MonadFix m
             , MonadRef m
             , Traversable f
             ) => Var m f -> FreshenT f m (Var m f)
-freshen' var = do
+freshenVar' var = do
   h <- ask
   lift (lift $ findVar' var h) >>= \ case
     (_, Bound i x) -> mfix $ \ x' ->
       gets (lookupInsert i x') >>= \ case
         Left x -> pure x
-        Right s -> put s *> (lift . newVar' =<< traverse freshen' x)
+        Right s -> put s *> (lift . newVar' =<< traverse freshenVar' x)
     (var, Unbound _ _) -> pure var
 
 instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
@@ -290,9 +291,9 @@ type Label = Int
 
 type LabelMap = IntMap
 
-split' :: (MonadFix m, MonadRef m, Traversable t, Traversable f) =>
-          VerseT m (t (Var m f)) ->
-          (Maybe (t (Var m f), VerseT m (t (Var m f))) -> VerseT m ()) ->
+split' :: (MonadFix m, MonadRef m, Freshenable f) =>
+          VerseT m (f (Var m)) ->
+          (Maybe (f (Var m), VerseT m (f (Var m))) -> VerseT m ()) ->
           VerseT m ()
 split' m f = do
   h <- getHeap
@@ -306,7 +307,7 @@ split' m f = do
         True -> do
           h <- getHeap
           putHeap h'
-          x <- traverse freshen x
+          x <- freshen x
           commit h'
           putHeap h
           f $ Just (x, putHeap h' *> m)

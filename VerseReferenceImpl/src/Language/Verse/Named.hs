@@ -36,6 +36,6 @@ instance ( MonadRef m
          ) => MonadPretty (Named m a) m where
   prettyM = \ case
     Val x -> prettyM x
-    Ref ref -> readRef ref >>= freeze >>= \ case
+    Ref ref -> readRef ref >>= freezeVar >>= \ case
       Nothing -> pure "_"
       Just x -> prettyM x

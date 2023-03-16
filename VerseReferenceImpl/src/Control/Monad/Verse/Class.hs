@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Verse.Class
@@ -12,61 +13,64 @@ import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.RST
+import Control.Monad.Trans.Writer.CPS qualified as CPS
 import Control.Monad.Unify
 import Control.Monad.Var
 
-import Data.Functor.Identity
-import Data.Proxy
+import Data.Freshenable
 
 class (MonadUnify m, MonadRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
-  split :: (Traversable t, Traversable f) =>
-           m (t (Var m f)) ->
-           (Maybe (t (Var m f), m (t (Var m f))) -> m ()) ->
+  split :: Freshenable f =>
+           m (f (Var m)) ->
+           (Maybe (f (Var m), m (f (Var m))) -> m ()) ->
            m ()
 
-  ifte' :: (Traversable t, Traversable f) =>
-           m (t (Var m f)) ->
-           (t (Var m f) -> m ()) ->
-           m () ->
-           m ()
+  ifte' :: Freshenable f => m (f (Var m)) -> (f (Var m) -> m ()) -> m () -> m ()
   ifte' m f n = split m $ \ case
     Just (x, _) -> f x
     Nothing -> n
 
-  once' :: Traversable f => m (Var m f) -> (Var m f -> m ()) -> m ()
-  once' m f = ifte' (Identity <$> m) (f . runIdentity) empty
+  once' :: Freshenable f => m (f (Var m)) -> (f (Var m) -> m ()) -> m ()
+  once' m f = ifte' m f empty
 
   lnot' :: m a -> m ()
-  lnot' m = ifte' (proxy <$ m) (const empty) (pure ())
-    where
-      proxy = Proxy :: Proxy (Var m Proxy)
+  lnot' m = ifte' (VarUnit <$ m) (const empty) (pure ())
 
-  for' :: (Traversable t, Traversable f) =>
-          m (t (Var m f)) ->
-          (t (Var m f) -> m (Var m f)) ->
-          ([Var m f] -> m ()) ->
+  for' :: (Freshenable f, Freshenable g) =>
+          m (f (Var m)) ->
+          (f (Var m) -> m (g (Var m))) ->
+          ([g (Var m)] -> m ()) ->
           m ()
   for' m f g = split m $ \ case
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
 
-  all' :: Traversable f => m (Var m f) -> ([Var m f] -> m ()) -> m ()
-  all' m = for' (Identity <$> m) (pure . runIdentity)
+  all' :: Freshenable f => m (f (Var m)) -> ([f (Var m)] -> m ()) -> m ()
+  all' m f = split m $ \ case
+    Just (x, m) -> all' m $ \ xs -> f $ x : xs
+    Nothing -> f []
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
     whenBound x $ flip runReaderT r . f
   split m f = ReaderT $ \ r ->
-    split (runReaderT m r) $ flip runReaderT r . f . fmap (fmap lift)
+    split (runReaderT m r) $ \ x -> runReaderT (f $ fmap lift <$> x) r
 
 instance MonadVerse m => MonadVerse (RST r s m) where
   whenBound x f = RST $ \ r s -> do
     whenBound x $ \ x -> evalRST (f x) r s
     pure ((), s)
   split m f = RST $ \ r s -> do
-    split (evalRST m r s) $ \ case
-      Nothing -> evalRST (f Nothing) r s
-      Just (x, m) -> evalRST (f $ Just (x, lift m)) r s
+    split (evalRST m r s) $ \ x ->
+      evalRST (f $ fmap lift <$> x) r s
     pure ((), s)
+
+instance (Monoid w, MonadVerse m) => MonadVerse (CPS.WriterT w m) where
+  whenBound x f = lift $ whenBound x $ \ x ->
+    () <$ CPS.runWriterT (f x)
+  split m f = CPS.writerT $ do
+    split (fst <$> CPS.runWriterT m) $ \ x ->
+      fst <$> (CPS.runWriterT (f $ fmap lift <$> x))
+    pure ((), mempty)
