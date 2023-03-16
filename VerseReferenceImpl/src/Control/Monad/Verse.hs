@@ -552,24 +552,16 @@ commit' :: MonadRef m => Heap m -> m ()
 commit' = commit'' (const $ pure ())
 
 commit'' :: MonadRef m => Commit m -> Heap m -> m ()
-commit'' f'' = \ case
-  Cons _ h x ref_f h' -> do
-    f <- getCommit' h
-    f' <- readRef ref_f
-    let f''' x = f x *> f' x *> f'' x
-    f''' h'
+commit'' f' = \ case
+  Cons _ _ x ref_f h' -> do
+    f <- readRef ref_f
+    writeRef ref_f . const $ pure ()
+    let f'' x = f x *> f' x
+    f'' h'
     case x of
-      Split -> addCommit' f''' h'
-      Choice -> commit'' f''' h'
+      Split -> addCommit' f'' h'
+      Choice -> commit'' f'' h'
   Nil -> pure ()
-
-getCommit' :: MonadRef m => Heap m -> m (Commit m)
-getCommit' = \ case
-  Cons _ h _ ref_f _ -> do
-    f <- getCommit' h
-    f' <- readRef ref_f
-    pure $ \ x -> f x *> f' x
-  Nil -> pure . const $ pure ()
 
 pushSplit :: MonadRef m => VerseT m ()
 pushSplit = do
@@ -615,12 +607,12 @@ copyListener (Listener h h' p f) =
 copyHeap :: MonadRef m => Heap m -> CopyT m (Heap m)
 copyHeap = \ case
   Nil -> gets $ \ (Copied _ xs) -> xs
-  xs@(Cons i _ x _ ys) -> gets (lookupCopied i) >>= \ case
+  xs@(Cons i _ x ref_f ys) -> gets (lookupCopied i) >>= \ case
     Nothing -> do
-      ys <- copyHeap ys
+      ys' <- copyHeap ys
       i' <- supply
-      ref_f <- lift . lift . newRef . const $ pure ()
-      let xs' = Cons i' xs x ref_f ys
+      ref_f' <- lift . lift $ newRef =<< readRef ref_f
+      let xs' = Cons i' xs x ref_f' ys'
       modify $ insertCopied i xs'
       pure xs'
     Just xs -> pure xs
