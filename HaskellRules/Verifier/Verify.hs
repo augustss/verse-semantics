@@ -18,7 +18,7 @@ results (Val v)          t = [t .=. term v]
 results Fail            _t = []
 results (Op op :@: v)    t = [app op v t]
 results (e1 :|: e2)      t = results e1 t ++ results e2 t
-results (v :=: e)        t = [q :&&: (t' .=. t) | let t' = term v, q <- results e t']
+results (v :=: e)        t = [q :&&: (t .=. term v) | q <- results e t]
 results (e1 :>: e2)      t = [q1 :&&: q2 | q1 <- success e1, q2 <- results e2 t]
 results (Exi (Bind x e)) t = [Exists (Bind x q) | q <- results e t]
 results (One e)          t = [ones (results e t) (fails e)]
