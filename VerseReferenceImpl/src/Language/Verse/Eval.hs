@@ -133,12 +133,10 @@ eval' e = case extract e of
     put storeFree
     pure var
   Exp.Not e -> do
-    storeFree <- freshVar
-    ifte'
+    ifte''
       (VarUnit <$ eval' e)
       (const empty)
-      (unify storeFree =<< get)
-    put storeFree
+      (pure ())
     newVar $ Val.Tuple []
   Exp.Query e -> do
     var_e <- eval' e
@@ -160,19 +158,14 @@ eval' e = case extract e of
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    storeFree <- freshVar
-    ifte'
+    ifte''
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
           pure $ VarEnv xs)
-      (\ (VarEnv xs) -> do
-          unify var =<< localNames xs (eval' t)
-          unify storeFree =<< get)
-      (do
-          unify var =<< eval' e
-          unify storeFree =<< get)
-    put storeFree
+      (\ (VarEnv xs) ->
+          unify var =<< localNames xs (eval' t))
+      (unify var =<< eval' e)
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
@@ -200,7 +193,7 @@ eval' e = case extract e of
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      lift $ writeRef' ref =<< freshenVar var
+      writeRef' ref var
       pure var
   Exp.Function xs e1 e2 -> do
     i <- supply
@@ -233,7 +226,7 @@ evalDot :: MonadEval m =>
 evalDot loc e x = do
   var_e <- eval' e
   var <- freshVar
-  lift $ whenBound var_e $ \ case
+  whenBound var_e $ \ case
     Val.Module _ xs ->
       case HashMap.lookup x xs of
         Just (Ref ref_x) -> readRef' ref_x $ unify var
@@ -329,7 +322,7 @@ evalInvoke loc e1 e2 = do
     Val.Overloads overload var1 -> fix (\ recur overload var1 ->
       case overload of
         Overload.Function _ env xs e_domain e ->
-          ifte'
+          ifte''
           (do
               xs <- for xs freshNamed
               let env' = xs <> env
@@ -389,7 +382,7 @@ liftOrd :: (MonadVerse m, EqRef (Ref m)) =>
            (Maybe (Var m (Val m)) -> EvalT m ()) ->
            EvalT m ()
 liftOrd f var k =
-  ifte'
+  ifte''
   (do
       var_x <- freshVar
       var_y <- freshVar
@@ -423,7 +416,7 @@ liftNum :: (MonadVerse m, EqRef (Ref m)) =>
            (Maybe (Var m (Val m)) -> EvalT m ()) ->
            EvalT m ()
 liftNum f var k =
-  ifte'
+  ifte''
   (do
       var_x <- freshVar
       var_y <- freshVar
@@ -459,7 +452,7 @@ prefixPlus :: MonadVerse m =>
               (Maybe (Var m (Val f)) -> EvalT m ()) ->
               EvalT m ()
 prefixPlus var k =
-  ifte'
+  ifte''
   (do
       whenBound var $ \ case
         Val.Int _ -> pure ()
@@ -475,7 +468,7 @@ prefixMinus :: (MonadVerse m, EqRef (Ref m)) =>
                (Maybe (Var m (Val m)) -> EvalT m ()) ->
                EvalT m ()
 prefixMinus var k =
-  ifte'
+  ifte''
   (do
       var' <- freshVar
       whenBound var $ \ val -> unify var' =<< case val of
@@ -494,7 +487,7 @@ div' :: (MonadVerse m, EqRef (Ref m)) =>
         (Maybe (Var m (Val m)) -> EvalT m ()) ->
         EvalT m ()
 div' var k =
-  ifte'
+  ifte''
   (do
       var_x <- freshVar
       var_y <- freshVar
@@ -538,7 +531,7 @@ int :: MonadVerse m =>
        (Maybe (Var m (Val m)) -> EvalT m ()) ->
        EvalT m ()
 int var k =
-  ifte'
+  ifte''
   (do
       whenBound var $ \ case
         Val.Int _ -> pure ()
@@ -627,7 +620,7 @@ lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
     var <- freshVar
-    lift $ readRef' ref $ unify var
+    readRef' ref $ unify var
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
@@ -680,6 +673,19 @@ freshNamed = \ case
 
 freshRef :: (MonadRef m, MonadVar m) => m (Ref m (Var m f))
 freshRef = newRef =<< freshVar
+
+ifte'' :: (MonadVerse m, Freshenable f) =>
+          EvalT m (f (Var m)) ->
+          (f (Var m) -> EvalT m ()) ->
+          EvalT m () ->
+          EvalT m ()
+ifte'' p t e = do
+  storeFree <- freshVar
+  ifte'
+    p
+    (\ x -> t x *> (unify storeFree =<< get))
+    (e *> (unify storeFree =<< get))
+  put storeFree
 
 readRef' :: ( MonadRef m
             , MonadState (Var m StoreFree) m
