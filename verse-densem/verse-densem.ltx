@@ -869,9 +869,11 @@ $$
   \sfolapp{|fail|} & = & |[]| \\
   \sfolapp{|e_1 choice e_2|} & = &
     \sfolapp{|e_1|} |++| \sfolapp{|e_2|} \\
-  \sfolapp{|v = e_1 ; e_2|} & = &
+  \sfolapp{|v = e|} & = &
+    \folapp{|e|}(|term v|) \\
+  \sfolapp{|e_1 ; e_2|} & = &
     \lcompr{|phi && psi|}
-           {|phi| \in \folapp{|e_1|}{|(term v)|}, ~~ |psi| \in \sfolapp{|e_2|}} \\
+           {|phi| \in \sfolapp{|e_1|}, ~~ |psi| \in \sfolapp{|e_2|}} \\
   \sfolapp{|def x e|} & = &
     \lcompr{|def x phi|}
            {|phi| \in \sfolapp{|e|}} \\
@@ -882,9 +884,12 @@ $$
   \folapp{|fail|}{t} & = & |[]| \\
   \folapp{|e_1 choice e_2|}{t} & = &
     \folapp{|e_1|}{t} |++| \folapp{|e_2|}{t} \\
-  \folapp{|v = e_1 ; e_2|}{t} & = &
+  \folapp{|v = e|}{t} & = &
+    \lcompr{|phi && term v = t|}
+           {|phi| \in \folapp{|e|}{t}} \\
+  \folapp{|e_1 ; e_2|}{t} & = &
     \lcompr{|phi && psi|}
-           {|phi| \in \folapp{|e_1|}{|(term v)|}, ~~ |psi| \in \folapp{|e_2|}{t}} \\
+           {|phi| \in \sfolapp{|e_1|}, ~~ |psi| \in \folapp{|e_2|}{t}} \\
   \folapp{|def x e|}{t} & = &
     \lcompr{|def x phi|}
            {|phi| \in \folapp{|e|}{t}} \\
