@@ -193,7 +193,7 @@ eval' e = case extract e of
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      writeRef' ref var
+      writeRef' ref =<< freshenVar var
       pure var
   Exp.Function xs e1 e2 -> do
     i <- supply
