@@ -118,30 +118,27 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    storeFree <- get
-    storeFree' <- freshVar
+    storeFree <- freshVar
     once' (VarIdentity <$> eval' e) $ \ (VarIdentity var_e) -> do
-      unify storeFree storeFree'
       unify var var_e
-    put storeFree'
+      unify storeFree =<< get
+    put storeFree
     pure var
   Exp.All e -> do
     var <- freshVar
-    storeFree <- get
-    storeFree' <- freshVar
+    storeFree <- freshVar
     all' (VarIdentity <$> eval' e) $ \ vars_e -> do
       unify var =<< newVar (Val.Tuple $ runVarIdentity <$> vars_e)
-      unify storeFree storeFree'
-    put storeFree'
+      unify storeFree =<< get
+    put storeFree
     pure var
   Exp.Not e -> do
-    storeFree <- get
-    storeFree' <- freshVar
+    storeFree <- freshVar
     ifte'
       (VarUnit <$ eval' e)
       (const empty)
-      (unify storeFree storeFree')
-    put storeFree'
+      (unify storeFree =<< get)
+    put storeFree
     newVar $ Val.Tuple []
   Exp.Query e -> do
     var_e <- eval' e
@@ -163,8 +160,7 @@ eval' e = case extract e of
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e -> do
     var <- freshVar
-    storeFree <- get
-    storeFree' <- freshVar
+    storeFree <- freshVar
     ifte'
       (do
           xs <- for xs freshNamed
@@ -172,26 +168,26 @@ eval' e = case extract e of
           pure $ VarEnv xs)
       (\ (VarEnv xs) -> do
           unify var =<< localNames xs (eval' t)
-          unify storeFree storeFree')
+          unify storeFree =<< get)
       (do
           unify var =<< eval' e
-          unify storeFree storeFree')
-    put storeFree'
+          unify storeFree =<< get)
+    put storeFree
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
-    storeFree <- get
-    storeFree' <- freshVar
+    storeFree <- freshVar
     for'
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
           pure $ VarEnv xs)
-      (\ (VarEnv xs) -> fmap VarIdentity . localNames xs $ eval' e2)
+      (\ (VarEnv xs) ->
+          fmap VarIdentity . localNames xs $ eval' e2)
       (\ vars -> do
           unify var =<< newVar (Val.Tuple $ runVarIdentity <$> vars)
-          unify storeFree storeFree')
-    put storeFree'
+          unify storeFree =<< get)
+    put storeFree
     pure var
   Exp.Exists x e -> do
     var <- freshVar
@@ -692,7 +688,7 @@ readRef' :: ( MonadRef m
 readRef' ref f = do
   storeFree <- get
   storeFree' <- freshVar
-  whenBound storeFree $ \ StoreFree -> do
+  whenBound storeFree . const $ do
     f =<< readRef ref
     unify storeFree storeFree'
   put storeFree'
@@ -704,7 +700,7 @@ writeRef' :: ( MonadRef m
 writeRef' ref x = do
   storeFree <- get
   storeFree' <- freshVar
-  whenBound storeFree $ \ StoreFree -> do
+  whenBound storeFree . const $ do
     writeRef ref x
     unify storeFree storeFree'
   put storeFree'
