@@ -11,6 +11,7 @@ import Epic.Print
 import FrontEnd.Core(Core)
 import FrontEnd.CoreSimp(simpCore)
 import FrontEnd.Eval(eval, replacePrelude, EFlags(..))
+import FrontEnd.EvalBlock(runBlock)
 import FrontEnd.Flags
 --import FrontEnd.RefImpl(evalRI)
 import FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore)
@@ -47,6 +48,15 @@ evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL
     evaluate tflg = coreToTrs . eval flg . trsToCore
       where flg = EFlags { underLambda = tfUnderLambda tflg, traceEval = tfTrace tflg, steps = tfRewriteSteps tflg }
 
+blockSystem :: ESystem
+blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rules",
+  ruleEnv = defaultTRSFlags,
+  preProcess = evaluate, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
+  confluenceRules = noRules, validExpr = \ _ _ -> True }
+  where
+    noRules _ _ = []
+    evaluate _tflg = runBlock
+
 {-
 refiSystem :: ESystem
 refiSystem = TRSystem { sname = "refimpl", description = "Andy's reference implementation",
@@ -59,7 +69,7 @@ refiSystem = TRSystem { sname = "refimpl", description = "Andy's reference imple
 -}
 
 everySystem :: [ESystem]
-everySystem = allSystems ++ [evalSystem] -- , refiSystem]
+everySystem = allSystems ++ [evalSystem, blockSystem] -- , refiSystem]
 
 findSystem :: String -> Either String ESystem
 findSystem = lookupSystemEx everySystem
