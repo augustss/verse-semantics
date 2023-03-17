@@ -33,19 +33,19 @@ class Monad m => MonadVar m where
   default readVar :: (m ~ t n, MonadVarTrans t n) => Var m f -> m (Maybe (f (Var m f)))
   readVar = lift . readVar
 
-  freeze :: Traversable f => Var m f -> m (Maybe (Fix f))
-  default freeze :: ( m ~ t n
-                    , MonadVarTrans t n
-                    , Traversable f
-                    ) => Var m f -> m (Maybe (Fix f))
-  freeze = lift . freeze
+  freezeVar :: Traversable f => Var m f -> m (Maybe (Fix f))
+  default freezeVar :: ( m ~ t n
+                       , MonadVarTrans t n
+                       , Traversable f
+                       ) => Var m f -> m (Maybe (Fix f))
+  freezeVar = lift . freezeVar
 
-  freshen :: Traversable f => Var m f -> m (Var m f)
-  default freshen :: ( m ~ t n
-                     , MonadVarTrans t n
-                     , Traversable f
-                     ) => Var m f -> m (Var m f)
-  freshen = lift . freshen
+  freshenVar :: Traversable f => Var m f -> m (Var m f)
+  default freshenVar :: ( m ~ t n
+                        , MonadVarTrans t n
+                        , Traversable f
+                        ) => Var m f -> m (Var m f)
+  freshenVar = lift . freshenVar
 
 type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
   VarDefault (t n) = Var n

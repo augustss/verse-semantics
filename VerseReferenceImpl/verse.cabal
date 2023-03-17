@@ -29,6 +29,7 @@ library
     Control.Monad.Verse
     Control.Monad.Verse.Class
     Data.Fix
+    Data.Freshenable
     Data.Ref
     Data.Tuple.Duo
     Data.Unifiable
