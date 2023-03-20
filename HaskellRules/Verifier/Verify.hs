@@ -94,7 +94,9 @@ appSuccess _ _ =
 
 verify :: [Ident] -> Expr -> IO Bool
 verify is ee = do
-  let [q] = success (One ee)
+  let q = case success (One ee) of
+            [x] -> x
+            _ -> error "impossible: success (One ...) is not a singleton"
       pr = foldr (\ i e -> Forall $ Bind i e) q is
   putStrLn $ "Formula is " ++ show pr
   prove pr
