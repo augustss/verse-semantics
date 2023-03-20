@@ -856,7 +856,57 @@ $$
 \section{A first-order logic semantics}
 
 \begin{figure}
-\text{\bf First-order logic semantics of expressions}
+\text{\bf First-order logic semantics of expressions based on labelled semantics}
+$$
+  \begin{array}{rcll}
+  \termapp{|v|} & : & \Term \\
+  \termapp{|x|} & = & |x| \\
+  \termapp{|k|} & = & |k| \\
+  \termapp{|tup (v_1,..,v_n)|} & = & \mathbf{tuple}(\termapp{|v_1|},..,\termapp{|v_n|}) \\
+~ \\
+  \sfolapp{|e|} & : & [L] \rightarrow \Forml \\
+  \sfolapp{|v|}(|ell|) & = & |ell = ""| \\
+  \sfolapp{|fail|}(|ell|) & = & |false| \\
+  \sfolapp{|e_1 choice e_2|}(|ell|) & = &
+    |ell| \not= |"" && ((head ell = L &&| \sfolapp{|e_1|}(|tail ell|))
+    \vee (|head ell = R &&| \sfolapp{|e_2|}(|tail ell|))) \\
+  \sfolapp{|v = e|}(|ell|) & = &
+    \folapp{|e|}(|ell, term v|) \\
+  \sfolapp{|e_1 ; e_2|}(|ell|) & = &
+  \exists |ell_1, ell_2| . \; |ell = ell_1 ++ ell_2 &&| 
+    \sfolapp{|e_1|}(|ell_1|) |&&| \sfolapp{|e_2|}(|ell_2|) \\
+  \sfolapp{|def x e|}(|ell|) & = &
+    \exists |x| . \; \sfolapp{|e|}(|ell|) \\
+  \sfolapp{|one e|}(|ell|) & = & |ell = "" &&| \exists |ell_1| . \;  \sfolapp{|e|}(|ell_1|) \\
+  \sfolapp{|all e|}(|ell|) & = & |true| \\
+  \sfolapp{|a@i|}(|ell|) & = & |ell = "" &&| 0 \leq \termapp{i} < size(\termapp{a}) \\
+~ \\
+  \folapp{|e|} & : & [L] \times \Term \rightarrow \Forml \\
+  \folapp{|v|}(|ell,t|) & = & |ell = "" && term v = t| \\
+  \folapp{|fail|}(|ell,t|) & = & |false| \\
+  \folapp{|e_1 choice e_2|}(|ell,t|) & = &
+    |ell| \not= |"" && ((head ell = L &&| \folapp{|e_1|}(|tail ell,t|))
+    \vee (|head ell = R &&| \folapp{|e_2|}(|tail ell,t|))) \\
+  \folapp{|v = e|}(|ell,t|) & = &
+    \folapp{|e|}(|ell,t|) |&&| \termapp{|v|} = |t| \\
+  \folapp{|e_1 ; e_2|}(|ell,t|) & = &
+  \exists |ell_1, ell_2| . \; |ell = ell_1 ++ ell_2 &&| 
+    \sfolapp{|e_1|}(|ell_1|) |&&| \folapp{|e_2|}(|ell_2,t|) \\
+  \folapp{|def x e|}(|ell,t|) & = &
+    \exists |x| . \; \folapp{|e|}(|ell,t|) \\
+  \folapp{|one e|}(|ell,t|) & = & |ell = "" &&|
+  \exists |ell_1| . \; (\folapp{|e|}(|ell_1,t|) |&&| \forall |ell_2 < ell_1| . \; \neg{}\sfolapp{|e|}(|ell_2|) ) \\
+  \folapp{|all e|}(|ell,t|) & = & ... \\
+  \folapp{|a@i|}(|ell,t|) & = & |ell = "" &&| 0 \leq \termapp{i} < size(\termapp{a}) |&&| index(\termapp{a},\termapp{i}) = t\\
+  \end{array}
+$$
+\caption{First-order logic semantics of expressions based on labelled semantics}
+\end{figure}
+
+%%%
+
+\begin{figure}
+\text{\bf First-order logic semantics of expressions based on sequence semantics}
 $$
   \begin{array}{rcll}
   \termapp{|v|} & : & \Term \\
@@ -880,7 +930,7 @@ $$
   \sfolapp{|one e|} & = & [\bigvee{} \sfolapp{|e|}] \\
 ~ \\
   \folapp{|e|} & : & \Term \rightarrow [\Forml] \\
-  \folapp{|v|}{t} & = & |[t = term v]| \\
+  \folapp{|v|}{t} & = & |[term v = t]| \\
   \folapp{|fail|}{t} & = & |[]| \\
   \folapp{|e_1 choice e_2|}{t} & = &
     \folapp{|e_1|}{t} |++| \folapp{|e_2|}{t} \\
@@ -899,8 +949,8 @@ $$
   ONE(|phi : as|,|psi : bs|) & = & |phi| \vee (\neg{}|psi| |&&| ONE(|as|,|bs|)) \\
   \end{array}
 $$
+\caption{First-order logic semantics of expressions based on sequence semantics}
 \end{figure}
-
 
 % ------------------------------------------------------------
 \clearpage
