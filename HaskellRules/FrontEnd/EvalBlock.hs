@@ -7,7 +7,7 @@ import Data.List
 --import qualified Data.Map as M
 import Epic.Print
 import Rules.Core
-import TRS.Bind(Ident(Name), Subst, identNotIn)
+import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
 import Debug.Trace
 
@@ -314,6 +314,7 @@ choiceToCore (BCBlk b) = blockToCore b
 choiceToCore (BCFork c1 c2) = choiceToCore c1 :|: choiceToCore c2
 
 blockToCore :: BBlock -> Expr
+blockToCore (BBlock [v] [(BVar v', e)] (BVar v'')) | v == v' && v == v'' = exprToCore e
 blockToCore b = foldr EXI bs (map bIdentToIdent (vars b))
   where bs = foldr eqn (valueToCore (result b)) (binds b)
         eqn (v, e) r = (valueToCore v :=: exprToCore e) :>: r
@@ -328,10 +329,17 @@ bIdentToIdent (BIdent s) = Name s
 hnfToCore :: BHNF -> Expr
 hnfToCore (BInt i) = Int i
 hnfToCore (BArr vs) = Arr (map valueToCore vs)
-hnfToCore (BHLam i e) = LAM (bIdentToIdent i) (blockToCore e)
+hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
+  where lam ii (f :@: Var i') | ii == i', ii `notElem` free f = f
+        lam ii ee = LAM ii ee
 
 exprToCore :: BExpr -> Expr
-exprToCore _ = error "exprToCore not implemented"
+exprToCore (BPrimOp o [v]) = Op o :@: valueToCore v
+exprToCore (BPrimOp o vs) = Op o :@: Arr (map valueToCore vs)
+exprToCore (BApply f a) = valueToCore f :@: valueToCore a
+exprToCore (BSplit e f g) = Split (choiceToCore e) (valueToCore f) (valueToCore g)
+exprToCore (BChoice c) = choiceToCore c
+exprToCore (BVal v) = valueToCore v
 
 -----------------------------------
 
@@ -413,7 +421,7 @@ cBlockV vs e = do
 cValue :: Expr -> A BValue
 cValue (Var i) = pure $ BVar (cIdent i)
 cValue (Int i) = pure $ BHNF $ BInt i
-cValue Op{}  = undefined
+cValue (Op o) = cValue $ LAM i (Op o :@: Var i) where i = Name "a"
 cValue (Arr es) = BHNF . BArr <$> mapM cValue es
 cValue (LAM x e) = BHNF . BHLam (cIdent x) <$> cBlockV [x] e
 cValue (e1 :>: e2) = addExpr e1 *> cValue e2
@@ -423,7 +431,7 @@ cValue e = BVar <$> addExpr e
 cExpr :: Expr -> A BExpr
 cExpr e@Var{} = BVal <$> cValue e
 cExpr e@Int{} = BVal <$> cValue e
-cExpr Op{}  = undefined
+cExpr e@Op{}  = BVal <$> cValue e
 cExpr e@Arr{} = BVal <$> cValue e
 cExpr e@LAM{} = BVal <$> cValue e
 cExpr (e1 :=: e2) = do
@@ -516,7 +524,10 @@ evalBlock' blk = loop [] [] (binds blk)
         unify v (BVar x) = unify (BVar x) v
         unify (BVInt i) (BVInt j) | i == j = succeeds []
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
-        unify x@(BVLam _ _) y@(BVLam _ _) = wrongs $ "unify lambda: " ++ prettyShow (x, y)
+        unify _x@(BVLam _ _) _y@(BVLam _ _) =
+          -- According to the ICFP paper this fails.  Being WRONG would be better
+          fails
+          -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
         unify _ _ = fails
 
         fails | all (effCommutes Efails) effs = BCFail
@@ -605,11 +616,21 @@ evalPrimOp op vs | Just arith <- lookup op arithUnOps =
     [BVInt a] -> Just $ BVal $ BVInt $ arith a
     _ | any isBVar vs -> Nothing
       | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
+evalPrimOp op vs | op == IsInt =
+  case vs of
+    [a@(BVInt _)] -> Just $ BVal a
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
 evalPrimOp op vs | op == Cons =
   case vs of
     [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
     _ | any isBVar vs -> Nothing
       | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
+evalPrimOp op vs | op == DotDot =
+  case vs of
+    [BVInt a, BVInt b] -> Just $ BChoice $ choices [ BlockValue [] (BVInt i) | i <- [a .. b] ]
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
 evalPrimOp op vs = error $ "evalPrimOp: " ++ show (op, vs)
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
@@ -619,7 +640,7 @@ arithBinOps :: [(Op, Integer -> Integer -> Integer)]
 arithBinOps = [(Add, (+)), (Sub, (-)), (Mul, (*)), (Div, div)]
 
 arithUnOps :: [(Op, Integer -> Integer)]
-arithUnOps = [(Neg, negate)]
+arithUnOps = [(Neg, negate), (Plus, id)]
 
 -- Do the two effects commute?
 effCommutes :: Effect -> Effect -> Bool
