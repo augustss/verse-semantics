@@ -293,7 +293,16 @@ cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ descripti
 cRules line s =
   case findSystem line of
     Left msg -> do putStrLn msg; pure s
-    Right e -> do putStrLn $ "Selected: " ++ description e; pure s{ esystem = e }
+    Right e -> do
+      putStrLn $ "Selected: " ++ description e
+      pure s{ esystem = e,
+              flags = maybe id id (lookup (sname e) systemFlags) (flags s) }
+
+-- Modify flags for a particular system
+systemFlags :: [(String, Flags -> Flags)]
+systemFlags =
+  [ ("iblock", \ s -> s{ fSplit = True })
+  ]
 
 {-
 cDefEval :: Run CState
