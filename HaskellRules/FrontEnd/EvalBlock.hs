@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
-module FrontEnd.EvalBlock where
+module FrontEnd.EvalBlock(runBlock) where
 import Prelude hiding ((<>))
 import Control.Monad.State.Strict
 import Data.List
@@ -79,8 +79,8 @@ data BChoice
   | BCWrong String
   deriving (Show, Eq)
 
-pattern BEVar :: BIdent -> BExpr
-pattern BEVar i = BVal (BVar i)
+--pattern BEVar :: BIdent -> BExpr
+--pattern BEVar i = BVal (BVar i)
 
 pattern BFail :: BExpr
 pattern BFail = BChoice BCFail
@@ -91,6 +91,7 @@ pattern BWrong s = BChoice (BCWrong s)
 data BValue
   = BVar BIdent
   | BHNF BHNF
+  | BRec BHNF   -- The BHNF must be a BHLam i (BlockValue [] (BHNF h))
   deriving (Show, Eq)
 
 isBVar :: BValue -> Bool
@@ -165,12 +166,13 @@ instance Pretty BChoice where
 instance Pretty BValue where
   pPrintPrec l p (BVar v) = pPrintPrec l p v
   pPrintPrec l p (BHNF h) = pPrintPrec l p h
+  pPrintPrec l p (BRec h) = parens $ text "rec" <+> pPrintPrec l p h
 
 instance Pretty BHNF where
   pPrintPrec l p (BInt i) = pPrintPrec l p i
   pPrintPrec l _ (BArr [v]) = parens (pPrintPrec l 0 v <> text ",")
   pPrintPrec l _ (BArr vs) = parens $ fsep (punctuate comma (map (pPrintPrec l 0) vs))
-  pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <> pPrintPrec l 0 b
+  pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 b
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -280,11 +282,14 @@ instance Bound BChoice where
 instance Bound BValue where
   allBVars (BVar i) = [i]
   allBVars (BHNF h) = allBVars h
+  allBVars (BRec h) = allBVars h
   freeBVars (BVar i) = [i]
   freeBVars (BHNF h) = freeBVars h
+  freeBVars (BRec h) = freeBVars h
   bsubst' s v@(BVar i) | Just e <- lookup i s = e
                        | otherwise = v
   bsubst' s (BHNF h) = BHNF (bsubst' s h)
+  bsubst' s (BRec h) = BRec (bsubst' s h)
   
 instance Bound BHNF where
   allBVars (BInt _) = []
@@ -322,6 +327,9 @@ blockToCore b = foldr EXI bs (map bIdentToIdent (vars b))
 valueToCore :: BValue -> Expr
 valueToCore (BVar v) = Var (bIdentToIdent v)
 valueToCore (BHNF h) = hnfToCore h
+valueToCore (BRec h) = mu (hnfToCore h)
+  where mu (LAM i e) = EXI i $ Var i :=: e
+        mu _ = undefined
 
 bIdentToIdent :: BIdent -> Ident
 bIdentToIdent (BIdent s) = Name s
@@ -397,6 +405,7 @@ cChoice Fail = pure BCFail
 cChoice Wrong = pure $ BCWrong "??"
 cChoice e = BCBlk <$> cBlock e
 
+{-
 -- A returned BCFork is always of the form
 --  BCFork (BCBlk b) ...
 bCFork :: BChoice -> BChoice -> BChoice
@@ -404,6 +413,7 @@ bCFork BCFail c = c
 bCFork c@BCWrong{} _ = c
 bCFork c1@BCBlk{} c2 = BCFork c1 c2
 bCFork (BCFork c1 c2) c3 = bCFork c1 (BCFork c2 c3)
+-}
 
 cBlock :: Expr -> A BBlock
 cBlock = cBlockV []
@@ -515,7 +525,7 @@ evalBlock' blk = loop [] [] (binds blk)
               -- Leave x=x alone
               loop effs (eqn : rs) bs
             else
-              error "*** recursion not implemented"
+              succeeds [(BVar x, BVal $ BRec $ BHLam x $ BlockValue [] v)]
           else if x `elem` vars blk then
             evalBlock' blk{
               vars = vars blk \\ [x],
@@ -558,6 +568,8 @@ evalBlock' blk = loop [] [] (binds blk)
                        let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                                  | (i, v) <- zip [0..] vs ]
                        in  loop effs rs ((val, e) : bs)
+                     | BRec (BHLam i (BlockValue [] v@BHNF{})) <- f -> succeeds [(val, BApply (bsubst [(i, f)] v) a)]
+                     | BRec _  <- f -> undefined
                      | otherwise -> loop (funcEffs f `union` effs) (eqn : rs) bs
           BSplit c f g ->
             case evalChoice c of  -- XXX need to propagate blocked effects
