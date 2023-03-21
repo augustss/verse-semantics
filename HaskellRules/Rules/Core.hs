@@ -23,6 +23,7 @@ module Rules.Core(
   pattern EXI,
   pattern LAM,
   pattern Block, Eqn,
+  opArity,
   comp,
   subst,
   alphaRename,
@@ -244,6 +245,10 @@ data Op
 
 instance Pretty Op where
   pPrintPrec _ _ = text . map toLower . show
+
+opArity :: Op -> Int
+opArity o | o `elem` [Neg, Plus, IsInt, MapAp, Alloc, Read] = 1
+          | otherwise = 2
 
 --------------------------------------------------------------------------------
 -- patterns
