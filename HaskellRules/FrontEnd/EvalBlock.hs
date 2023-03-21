@@ -509,7 +509,14 @@ evalBlock' blk = loop [] [] (binds blk)
       let
         unify (BVar x) (BVar y) | x `notElem` vars blk && y `elem` vars blk = unify (BVar y) (BVar x)
         unify (BVar x) v =
-          if x `elem` vars blk then
+          if x `elem` freeBVars v then
+            -- Recursive
+            if v == BVar x then
+              -- Leave x=x alone
+              loop effs (eqn : rs) bs
+            else
+              error "*** recursion not implemented"
+          else if x `elem` vars blk then
             evalBlock' blk{
               vars = vars blk \\ [x],
               binds = bsubst [(x, v)] (reverse rs ++ bs),
