@@ -17,3 +17,4 @@
 :set -package hashable
 :set -package semigroupoids
 :set -package optparse-applicative
+:set -package z3
