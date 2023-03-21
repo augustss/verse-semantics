@@ -103,6 +103,9 @@ data BValue
   | BRec BHNF   -- The BHNF must be a BHLam i (BlockValue [] (BHNF h))
   deriving (Show, Eq)
 
+pattern BMu :: BIdent -> BHNF -> BValue
+pattern BMu i h = BRec (BHLam i (BlockValue [] (BHNF h)))
+
 isBVar :: BValue -> Bool
 isBVar BVar{} = True
 isBVar _ = False
@@ -535,7 +538,14 @@ evalBlock b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
 evalBlock b =
   let c = evalBlock' b
   in  dtrace ("evalBlock returns: " ++ prettyShow c) $
-      c
+      checkPostCond c
+
+checkPostCond :: BChoice -> BChoice
+checkPostCond c@(BCBlk b) | evalBlock' b == c = c
+                          | otherwise = error $ "checkPostCond: " ++ prettyShow c
+checkPostCond c@(BCFork c1@(BCBlk b) _) | evalBlock' b == c1 = c
+checkPostCond c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
+checkPostCond c = c
 
 evalBlock' :: BBlock -> BChoice
 evalBlock' BBlock{ binds = (_, BFail) : _ } = BCFail
@@ -551,11 +561,13 @@ evalBlock' blk = loop [] [] (binds blk)
         unify (BVar x) v =
           if x `elem` freeBVars v then
             -- Recursive
-            if v == BVar x then
-              -- Leave x=x alone
-              loop effs (eqn : rs) bs
-            else
-              succeeds [(BVar x, BVal $ BRec $ BHLam x $ BlockValue [] v)]
+            case v of
+              BVar _ ->
+                -- Leave x=x alone
+                -- (The variable must be x, since x is among the free variables of v)
+                loop effs (eqn : rs) bs
+              BHNF h -> succeeds [(BVar x, BVal $ BMu x h)]
+              BRec _ -> undefined
           else if x `elem` vars blk then
             evalBlock' blk{
               vars = vars blk \\ [x],
@@ -575,6 +587,8 @@ evalBlock' blk = loop [] [] (binds blk)
           -- According to the ICFP paper this fails.  Being WRONG would be better
           fails
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
+        unify BRec{} _ = undefined
+        unify _ BRec{} = undefined
         unify _ _ = fails
 
         fails | all (effCommutes Efails) effs = BCFail
@@ -598,7 +612,7 @@ evalBlock' blk = loop [] [] (binds blk)
                        let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                                  | (i, v) <- zip [0..] vs ]
                        in  loop effs rs ((val, e) : bs)
-                     | BRec (BHLam i (BlockValue [] v@BHNF{})) <- f -> succeeds [(val, BApply (bsubst [(i, f)] v) a)]
+                     | BMu i h <- f -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
                      | BRec _  <- f -> undefined
                      | otherwise -> loop (funcEffs f `union` effs) (eqn : rs) bs
           BSplit c f g ->
