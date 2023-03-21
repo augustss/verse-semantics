@@ -55,7 +55,7 @@ blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rul
   confluenceRules = noRules, validExpr = \ _ _ -> True }
   where
     noRules _ _ = []
-    evaluate _tflg = runBlock
+    evaluate = runBlock
 
 {-
 refiSystem :: ESystem
