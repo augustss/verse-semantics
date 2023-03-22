@@ -72,7 +72,7 @@ data Expr
   | One Expr                    -- ^ one { e }
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
-  | Wrong                       -- ^ wrong
+  | Wrong String                -- ^ wrong
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
   -- only used for updatable references
@@ -115,7 +115,7 @@ instance Pretty Expr where
   pPrintPrec l p (Exi (Bind x a)) = maybeParens (p > 0) $ text "ex" <+> pPrintPrec l 0 x P.<> text "." <+> pPrintPrec l 0 a
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
-  pPrintPrec _ _ Wrong            = text "wrong"
+  pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
                                                              pPrintPrec l 0 v2] P.<> text "}"
@@ -162,9 +162,9 @@ comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
 comp _xs _ys (Lam _) _       = LT
 comp _xs _ys _       (Lam _) = GT
 
-comp _xs _ys Wrong Wrong = EQ
-comp _xs _ys Wrong _     = LT
-comp _xs _ys _     Wrong = GT
+comp _xs _ys Wrong{} Wrong{} = EQ
+comp _xs _ys Wrong{} _       = LT
+comp _xs _ys _       Wrong{} = GT
 
 comp _xs _ys Fail Fail = EQ
 comp _xs _ys Fail _    = LT
@@ -428,7 +428,7 @@ instance Free Expr where
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
   free Fail      = []
-  free Wrong     = []
+  free Wrong{}   = []
   free (Store h e) = free h `union` free e
   free Ref{}     = []
 
@@ -458,7 +458,7 @@ instance Term Expr where
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst _sub Fail     = Fail
-  subst _sub Wrong    = Wrong
+  subst _sub e@Wrong{}= e
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
@@ -529,7 +529,7 @@ instance Arbitrary Expr where
   shrink (BlockC e)  = BlockC <$> shrink e
   shrink (Store _ _) = undefined
   shrink (Ref _)   = []
-  shrink Wrong     = []
+  shrink Wrong{}   = []
 
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
@@ -637,7 +637,7 @@ substExp from to = sub
     sub (a :|: b) = sub a :|: sub b
     sub (a :@: b) = sub a :@: sub b
     sub Fail      = Fail
-    sub Wrong     = Wrong
+    sub e@Wrong{} = e
     sub (EXI x e) | x `elem` fvs = EXI x e
                   | x `elem` tvs = error "unimplemented"
                   | otherwise = EXI x (sub e)

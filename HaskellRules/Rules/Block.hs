@@ -62,7 +62,7 @@ valid = block
     expr (One e) = block e
     expr (All e) = block e
     expr Fail = True
-    expr Wrong = True
+    expr Wrong{} = True
     expr (Split e v1 v2) = block e && value v1 && value v2
 --    expr (BlockC b) = block b
     expr _ = False
@@ -109,7 +109,7 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
     expr (One e) = One <$> block e
     expr (All e) = All <$> block e
     expr e@Fail = pure e
-    expr e@Wrong = pure e
+    expr e@Wrong{} = pure e
     expr (Split e e1 e2) = Split <$> expr e <*> value e1 <*> value e2
     expr e = error $ "anf: impossible: " ++ prettyShow e
 

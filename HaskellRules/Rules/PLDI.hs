@@ -90,7 +90,7 @@ validE = expr
     expr (One e) = expr e
     expr (All e) = expr e
     expr Fail = True
-    expr Wrong = True
+    expr Wrong{} = True
     expr (Split e v1 v2) = expr e && value v1 && value v2
     expr _ = undefined -- GHC bug
     expru (v :=: e) = value v && expr e
@@ -137,7 +137,7 @@ anf = expr
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
     expr e@Fail = e
-    expr e@Wrong = e
+    expr e@Wrong{} = e
     expr (Split e e1 e2) =
       let i1:i2:_ = identsNotIn (free (Split e e1 e2))
           (ds1, v1) = value i1 e1
@@ -198,7 +198,7 @@ isChoiceFree (All _)   = True
 isChoiceFree (EXI _ e) = isChoiceFree e  -- NOTE: new
 isChoiceFree (Op op :@: _) = isChoiceFreeOp op  -- NOTE: not in POPL submission
 isChoiceFree (Split _ _ _) = True
-isChoiceFree Wrong     = True
+isChoiceFree Wrong{}   = True
 isChoiceFree _         = False
 
 isChoiceFreeOp :: Op -> Bool

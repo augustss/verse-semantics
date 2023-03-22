@@ -371,7 +371,7 @@ freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
 
 choiceToCore :: BChoice -> Expr
 choiceToCore BCFail = Fail
-choiceToCore (BCWrong _) = Wrong
+choiceToCore (BCWrong s) = Wrong s
 choiceToCore (BCBlk b) = blockToCore b
 choiceToCore (BCFork c1 c2) = choiceToCore c1 :|: choiceToCore c2
 
@@ -451,7 +451,7 @@ cIdent = BIdent . prettyShow
 cChoice :: Expr -> A BChoice
 cChoice (e1 :|: e2) = BCFork <$> cChoice e1 <*> cChoice e2
 cChoice Fail = pure BCFail
-cChoice Wrong = pure $ BCWrong "??"
+cChoice (Wrong s) = pure $ BCWrong s
 cChoice e = BCBlk <$> cBlock e
 
 cBlock :: Expr -> A BBlock
@@ -495,7 +495,7 @@ cExpr (Op o :@: e) = BPrimOp o . (:[]) <$> cValue e
 cExpr (e1 :@: e2) = BApply <$> cValue e1 <*> cValue e2
 cExpr (EXI i e) = do s <- addExist i; cExpr (subst s e)
 cExpr Fail = pure BFail
-cExpr Wrong = pure $ BWrong "?"
+cExpr (Wrong s) = pure $ BWrong s
 cExpr (Split e e1 e2) = BSplit <$> cChoice e <*> cValue e1 <*> cValue e2
 cExpr (One e) = cExpr $ Split e (LAM u Fail) (LAM v $ LAM u $ LAM u $ Var v)
   where u = Name "_"; v = Name "v"

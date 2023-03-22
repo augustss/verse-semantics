@@ -155,7 +155,7 @@ valid' onlyEq = expr
     expr (One e) = expr e
     expr (All e) = expr e
     expr Fail = True
-    expr Wrong = True
+    expr Wrong{} = True
     expr (Split e (LAM _ e1) (LAM _ (LAM _ (LAM _ e2)))) =
       expr e && expr e1 && expr e2
     expr (Split e (LAM _ e1) Var{}) =
@@ -213,7 +213,7 @@ anf' onlyEq = expr
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
     expr e@Fail = e
-    expr e@Wrong = e
+    expr e@Wrong{} = e
     expr (Split e e1 e2) =
       let i1:i2:_ = identsNotIn (free (Split e e1 e2))
           (ds1, v1) = value i1 e1
@@ -363,7 +363,7 @@ isChoiceFree (Op op :@: _) = isChoiceFreeOp op
 isChoiceFree (Split _ (LAM _ f) (LAM _ (LAM _ (LAM _ g)))) = isChoiceFree f && isChoiceFree g
 isChoiceFree (Split _ (LAM _ f) (Var _)) = isChoiceFree f
 isChoiceFree e@Split{} = error $ "bad split: " ++ prettyShow e
-isChoiceFree Wrong     = True
+isChoiceFree Wrong{}   = True
 isChoiceFree (EXI _ e) = isChoiceFree e  -- necessary when using split
 isChoiceFree _         = False
 
@@ -934,7 +934,7 @@ isStoreFree (All e)   = isStoreFree e
 isStoreFree (Split e (LAM _ f) (LAM _ (LAM _ (LAM _ g)))) = isStoreFree e && isStoreFree f && isStoreFree g
 isStoreFree (Split (Var _ :@: Arr []) (LAM _ f) (Var _)) = isStoreFree f
 isStoreFree e@Split{} = error $ "bad split: " ++ prettyShow e
-isStoreFree Wrong     = True
+isStoreFree Wrong{}   = True
 isStoreFree (EXI _ e) = isStoreFree e
 isStoreFree _         = False
 
