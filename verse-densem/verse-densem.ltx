@@ -882,7 +882,7 @@ $$
     \exists |x| . \; \sfolapp{|e|}(|ell|) \\
   \sfolapp{|one e|}(|ell|) & = & |ell = [] &&| \exists |ell_1| . \;  \sfolapp{|e|}(|ell_1|) \\
   \sfolapp{|all e|}(|ell|) & = & |true| \\
-  \sfolapp{|a@i|}(|ell|) & = & |ell = label(\termapp{i}) &&| 0 \leq \termapp{i} < size(\termapp{a}) \\
+  \sfolapp{|a@i|}(|ell|) & = & |ell =| label(\termapp{i}) |&&| 0 \leq \termapp{i} < size(\termapp{a}) \\
 ~ \\
   \folapp{|e|} & : & \Labels \times \Term \rightarrow \Forml \\
   \folapp{|v|}(|ell,t|) & = & |ell = [] && term v = t| \\
@@ -900,7 +900,7 @@ $$
   \folapp{|one e|}(|ell,t|) & = & |ell = [] &&|
   \exists |ell_1| . \; (\folapp{|e|}(|ell_1,t|) |&&| \forall |ell_2 < ell_1| . \; \neg{}\sfolapp{|e|}(|ell_2|) ) \\
   \folapp{|all e|}(|ell,t|) & = & ... \\
-  \folapp{|a@i|}(|ell,t|) & = & |ell = label(\termapp{i}) &&| 0 \leq \termapp{i} < size(\termapp{a}) |&&| index(\termapp{a},\termapp{i}) = t\\
+  \folapp{|a@i|}(|ell,t|) & = & |ell =| label(\termapp{i}) |&&| 0 \leq \termapp{i} < size(\termapp{a}) |&&| index(\termapp{a},\termapp{i}) = t\\
   \end{array}
 $$
 \caption{First-order logic semantics of expressions based on labelled semantics}
