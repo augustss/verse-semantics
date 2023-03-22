@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Verifier.FOL where
 
 import Data.List( intercalate )
@@ -17,6 +18,7 @@ showVar :: Ident -> String
 showVar (Name (c:s))
   | isAlpha c    = toUpper c : s
   | otherwise    = "V" ++ (c:s)
+showVar (Name "") = undefined
 showVar (Prim p) = "PR_" ++ show p ++ "_"
 
 --------------------------------------------------------------------------------
@@ -71,23 +73,27 @@ instance Show Form where
   show (Forall b)  = "!" ++ showBind b
   show (Exists b)  = "?" ++ showBind b
 
-showAnd ps = intercalate " & " (map show1 (flat ps))
+showAnd :: [Form] -> String
+showAnd aps = intercalate " & " (map show1 (flat aps))
  where
   flat ((p :&&: q) : ps) = flat (p:q:ps)
   flat (p:ps)            = p : flat ps
   flat []                = []
   
-showOr ps = intercalate " | " (map show1 (flat ps))
+showOr :: [Form] -> String
+showOr aps = intercalate " | " (map show1 (flat aps))
  where
   flat ((p :||: q) : ps) = flat (p:q:ps)
   flat (p:ps)            = p : flat ps
   flat []                = []
-  
+
+showBind :: Bind Form -> String
 showBind (Bind x p) = "[" ++ showVar x ++ "]: " ++ show1 p  
 
-show1 p
-  | isAtom p  = show p
-  | otherwise = "(" ++ show p ++ ")"
+show1 :: Form -> String
+show1 ap
+  | isAtom ap  = show ap
+  | otherwise = "(" ++ show ap ++ ")"
  where
   isAtom FALSE      = True
   isAtom TRUE       = True
@@ -161,8 +167,8 @@ mkEnv =
      boolSort0 <- mkBoolSort
 
      ~[funInt,funTuple]             <- getDatatypeSortConstructors valueSort0
-     ~[funIsInt,funIsTuple]         <- getDatatypeSortRecognizers valueSort0
-     ~[~[funSelInt],~[funSelTuple]] <- getDatatypeSortConstructorAccessors valueSort0
+     ~[funIsInt,_funIsTuple]         <- getDatatypeSortRecognizers valueSort0
+     ~[~[funSelInt],~[_funSelTuple]] <- getDatatypeSortConstructorAccessors valueSort0
 
      ~[funNil,funCons]  <- getDatatypeSortConstructors tupleSort
 
@@ -193,10 +199,10 @@ mkEnv =
 -- Form --> Z3
 
 z3form :: MonadZ3 z3 => Env z3 -> Form -> z3 AST
-z3form env FALSE =
+z3form _env FALSE =
   do mkFalse
 
-z3form env TRUE =
+z3form _env TRUE =
   do mkTrue
 
 z3form env (Pred p [s,t]) | showIdent p == "=" =
@@ -217,7 +223,7 @@ z3form env (Pred p ts) =
   do liftIO (putStrLn ("(predicate '" ++ showIdent p ++ "/" ++ show (length ts)
                                       ++ "' not recognized)"))
      pr  <- mkStringSymbol (showIdent p)
-     b   <- mkBoolSort
+     _b  <- mkBoolSort
      pr' <- mkFuncDecl pr [valueSort env|_<-ts] (boolSort env)
      as  <- sequence [ z3term env t | t <- ts ]
      mkApp pr' as
@@ -278,9 +284,9 @@ z3term env (Ap f ts) =
 -- Prover driver
 
 prove :: Form -> IO Bool
-prove phi =
+prove aphi =
   do putStrLn "-- Proving..."
-     (res,msol) <- evalZ3 (script phi)
+     (res,msol) <- evalZ3 (script aphi)
      putStrLn ("-- Result: " ++ show res)
      case msol of
        Nothing ->
