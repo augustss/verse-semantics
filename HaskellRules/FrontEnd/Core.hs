@@ -123,10 +123,12 @@ getValue e = getHNF e
 isValue :: Core -> Bool
 isValue e = isJust (getValue e)
 
+{-
 isValue' :: Core -> Bool
 isValue' (CSeq [e]) = isValue' e
 isValue' (CSeq (e:es)) = isValue' e && isValue' (CSeq es)
 isValue' e = isValue e
+-}
 
 vEmpty :: Value
 vEmpty = CArray []
@@ -191,12 +193,12 @@ core (For2 e1 e2) = do
     xa <- newTmp
     pure $ CDef [xa] $ CSeq [cUnify (CVar xa) ea, CApply (CPrim "mapAp$") (CVar xa)]
 core (If3 e1 e2 e3) = do
-  c1 <- core e1
   noLambdaIf <- asks fNoLambdaIf
+  useSplit <- asks fSplit
   if noLambdaIf then
     coreIf e1 e2 e3
-   else if isValue' c1 then
-    core e2
+   else if useSplit then
+    ifSplit e1 e2 e3
    else do
     e3' <- thunk e3
     l <- coreBind e1 e2
@@ -267,6 +269,19 @@ coreEffs [] e = pure e
 coreEffs [Ident _ "decides"] e = cDecides e
 coreEffs [Ident _ "succeeds"] e = cSucceeds e
 coreEffs rs _ = unimplemented $ "effects: " ++ prettyShow rs
+
+ifSplit :: Expr -> Expr -> Expr -> C Core
+ifSplit (Exists vs e1) e2 e3 = do
+  e1' <- core (Exists vs $ Seq [e1, Array $ map Variable vs])
+  e2' <- core e2
+  e3' <- core e3
+  x <- newTmp
+  let f = CLam underscore e3'
+      g = CLam x $ CLam underscore $ CLam underscore $ cDef vs $ cSeq [
+             CUnify (CVar x) (CArray $ map CVar vs),
+             e2' ]
+  pure $ CSplit e1' f g
+ifSplit e1 e2 e3 = impossible (e1,e2,e3)
 
 forSplit :: Expr -> Expr -> C Core
 forSplit (Exists vs e1) e2 = do
