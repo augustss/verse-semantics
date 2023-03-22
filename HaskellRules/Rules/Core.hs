@@ -241,13 +241,14 @@ data Op
   | Write
   | AddTo
   | DotDot
+  | Print
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
   pPrintPrec _ _ = text . map toLower . show
 
 opArity :: Op -> Int
-opArity o | o `elem` [Neg, Plus, IsInt, MapAp, Alloc, Read] = 1
+opArity o | o `elem` [Neg, Plus, IsInt, MapAp, Alloc, Read, Print] = 1
           | otherwise = 2
 
 --------------------------------------------------------------------------------

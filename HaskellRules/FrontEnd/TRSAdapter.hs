@@ -203,7 +203,8 @@ allOps = [
   (T.Read,  "read$"),
   (T.Write, "write$"),
   (T.AddTo, "in'+='"),
-  (T.DotDot,"in'..'")
+  (T.DotDot,"in'..'"),
+  (T.Print, "print$")
   ]
 
 ----------------------------------------------

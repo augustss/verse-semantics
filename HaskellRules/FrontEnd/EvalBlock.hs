@@ -515,6 +515,7 @@ primOpEffs Read  = [Ereads]
 primOpEffs Write = [Ewrites]
 primOpEffs AddTo = [Ereads, Ewrites]
 primOpEffs DotDot = [Eiterates]
+primOpEffs Print = [Einteracts]
 primOpEffs _ = []
 
 -- XXX needs an environment
@@ -746,6 +747,15 @@ evalPrimOp op vs | op == DotDot =
     [BVInt a, BVInt b] -> Just $ BChoice $ choices [ BlockValue [] (BVInt i) | i <- [a .. b] ]
     _ | any isBVar vs -> Nothing
       | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
+evalPrimOp op vs | op == Print =
+  -- A temporary hack for printing.
+  case vs of
+    [BHNF h] ->
+      trace ("Print: " ++ prettyShow h) $
+      Just $ BVal $ BVArr []
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
+  
 evalPrimOp op vs = error $ "evalPrimOp: " ++ show (op, vs)
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
