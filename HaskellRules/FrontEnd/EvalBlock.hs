@@ -15,6 +15,12 @@ import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
 import Debug.Trace
 
+--
+-- TODO
+--  * propagate allowed effects
+--  * check if an effect is allowed
+--  * limit effects for lambda bodies
+
 doTrace :: Bool
 doTrace = False
 
@@ -62,7 +68,7 @@ data BBlock = BBlock
 --  , needEffs  :: !Effects                   -- must have these effects
 --  , vars      :: !(M.Map BIdent EffectType) -- existentially bound variables with effects
     vars      :: ![BIdent]
-  , binds     :: ![BEqn]                    -- variable bindings
+  , binds     :: [BEqn]                    -- variable bindings
   , result    :: !BValue                    -- final value of the block
   }
   deriving (Show, Eq, Data)
@@ -97,6 +103,9 @@ data BExpr
   | BChoice BChoice
   | BVal BValue
   deriving (Show, Eq, Data)
+
+pattern BEBlk :: BBlock -> BExpr
+pattern BEBlk b = BChoice (BCBlk b)
 
 data BChoice
   = BCFork BChoice BChoice
@@ -169,6 +178,9 @@ data EffectType = ETNone | ETUnknown | ETArrow EffectType Effects EffectType
 
 --type BSubst = [(BIdent, BValue)]
 
+type BlockedEffects = Effects
+--type AllowedEffects = Effects
+
 instance Pretty BIdent where
   pPrintPrec _ _ (BIdent s) = text s
 
@@ -239,15 +251,20 @@ class Bound a where
   freeBVars :: a -> [BIdent]
   bsubst' :: [BEqnV] -> a -> a
 
-instance (Bound a, Pretty a) => Bound [a] where
+instance (Bound a) => Bound [a] where
   allBVars = unionMap allBVars
   freeBVars = unionMap freeBVars
   bsubst' s = map (bsubst' s)
 
-instance (Bound a, Bound b, Pretty a, Pretty b) => Bound (a, b) where
+instance (Bound a, Bound b) => Bound (a, b) where
   allBVars (a, b) = union (allBVars a) (allBVars b)
   freeBVars (a, b) = union (freeBVars a) (freeBVars b)
   bsubst' s (a, b) = (bsubst' s a, bsubst' s b)
+
+instance (Bound a, Bound b, Bound c) => Bound (a, b, c) where
+  allBVars (a, b, c) = union (allBVars a) $ union (allBVars b) (allBVars c)
+  freeBVars (a, b, c) = union (freeBVars a) $ union (freeBVars b) (freeBVars c)
+  bsubst' s (a, b, c) = (bsubst' s a, bsubst' s b, bsubst' s c)
 
 instance Bound BBlock where
   allBVars b =
@@ -334,13 +351,16 @@ instance Bound BHNF where
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
     | null s' = h
-    | i `notElem` freeBVars vs = BHLam i (bsubst s' b)
-    | otherwise = 
-      let x = bIdentNotIn (allBVars (vs, h))
-      in  BHLam x (bsubst' ((i, BVar x) : s') b)
+    | otherwise = BHLam i' (bsubst s' b')
     where
       s' = filter ((/= i) . fst) s
-      vs = map snd s'
+      (i', b') = freshenLambda (freeBVars (map snd s')) (i, b)
+
+freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
+freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
+                         | otherwise =
+  let x = bIdentNotIn (bnd ++ allBVars b)
+  in  (x, bsubst' [(i, BVar x)] b)
 
 ---------------------------------------------
 
@@ -388,14 +408,6 @@ type A a = State (([Ident], [BEqn]), [Ident]) a
 
 coreToChoice :: Expr -> BChoice
 coreToChoice e = evalState (cChoice e) (undefined, allVars e)
-
-{-
-bIdentsNotIn :: [BIdent] -> [BIdent]
-bIdentsNotIn vs = [ BIdent ("$" ++ show i) | i <- [1::Integer ..] ] \\ vs
-
-bIdentNotIn :: [BIdent] -> BIdent
-bIdentNotIn = head . bIdentsNotIn
--}
 
 addEqn :: BEqn -> A ()
 addEqn q = do
@@ -538,7 +550,8 @@ blockEffs b = unionMap (exprEffs . snd) (binds b)
 domEffects :: Effects
 domEffects = [Efails, Eiterates, Eallocates, Ereads, Ewrites]
 
-type BlockedEffects = Effects
+--notBlocked :: Effect -> BlockedEffects -> Bool
+--notBlocked = all . effCommutes
 
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
@@ -573,82 +586,106 @@ checkPostCond _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
 checkPostCond _ c = c
 
 evalBlock' :: BlockedEffects -> BBlock -> BChoice
-evalBlock' _ BBlock{ binds = (_, BFail) : _ } = BCFail
-evalBlock' _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s
-evalBlock' _ b@BBlock{ binds = [] } = BCBlk (dropUnused b)
-evalBlock' beffs blk = loop beffs [] (binds blk)
+evalBlock' _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
+evalBlock' _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
+evalBlock' abeffs ablk = sweep abeffs [] (vars ablk) (binds ablk) (result ablk)
   where
-    loop effs rs bs | dtrace ("loop: " ++ prettyShow (effs, vars blk, rs, bs)) False = undefined
-    loop _ rs [] = BCBlk (dropUnused blk{ binds = reverse rs })   -- reached the end, no progress, so BCBlk is
-    loop effs rs (eqn@(val, expr) : bs) =
+    startSweep :: [BIdent] -> [BEqn] -> BValue -> BChoice
+    startSweep = sweep abeffs []
+
+    sweep :: BlockedEffects -> [BEqn] -> [BIdent] -> [BEqn] -> BValue -> BChoice
+    sweep effs done bvars bbinds _bresult | dtrace ("sweep: " ++ prettyShow (effs, bvars, done, bbinds)) False = undefined
+    sweep _    done bvars     [] bresult =
+      -- End of binds reached, no further progress possible
+      BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
+    sweep effs done bvars bbinds@(eqn@(val, expr) : bs) bresult =
       let
-        unify (BVar x) (BVar y) | x `notElem` vars blk && y `elem` vars blk = unify (BVar y) (BVar x)
+        -- Swap so local binding is first
+        unify :: BValue -> BValue -> BChoice
+        unify (BVar x) (BVar y) | x `notElem` bvars && y `elem` bvars =
+          unify (BVar y) (BVar x)
         unify (BVar x) v =
+          let sub a = bsubst [(x, v)] a
+              ueqn = (BVar x, BVal v)
+          in
           if x `elem` freeBVars v then
             -- Recursive
             case v of
               BVar _ ->
                 -- Leave x=x alone
                 -- (The variable must be x, since x is among the free variables of v)
-                loop effs (eqn : rs) bs
+                suspend ueqn
+              -- Change recursion to mu
               BHNF h -> succeeds [(BVar x, BVal $ BMu x h)]
+              -- XXX what is this supposed to do?
               BRec _ -> undefined
-          else if x `elem` vars blk then
-            evalBlock' beffs blk{
-              vars = vars blk \\ [x],
-              binds = bsubst [(x, v)] (reverse rs ++ bs),
-              result = bsubst [(x, v)] $ result blk }
-          else if x `elem` freeBVars ((rs, bs), result blk) then
-            evalBlock' beffs blk{
-              vars = vars blk,
-              binds = bsubst [(x, v)] (reverse rs) ++ [(BVar x, BVal v)] ++ bsubst [(x, v)] bs,
-              result = bsubst [(x, v)] $ result blk }
+          else if x `elem` bvars then
+            -- Locally bound, get rid of the variable entirely.
+            -- And restart sweep
+            startSweep (bvars \\ [x]) (sub (reverse done ++ bs)) (sub bresult)
+          else if x `elem` freeBVars ((done, bs), bresult) then
+            -- x occurs, so substitute.
+            -- Bound outside, keep equation.
+            -- And restart sweep
+            startSweep bvars (sub (reverse done) ++ [ueqn] ++ sub bs) (sub bresult)
           else
-            loop effs ((BVar x, BVal v) : rs) bs
+            -- x does not occur, just keep equation.
+            suspend ueqn
+        -- Swap so variable is first (v cannot be a variable, that's handled above)
         unify v (BVar x) = unify (BVar x) v
+        -- Equal integers are ok
         unify (BVInt i) (BVInt j) | i == j = succeeds []
+        -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
           -- According to the ICFP paper this fails.  Being WRONG would be better
           fails
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
-        unify BRec{} _ = undefined
-        unify _ BRec{} = undefined
-        unify _ _ = fails
+        unify BRec{} _ = undefined -- XXX dunno
+        unify _ BRec{} = undefined -- XXX dunno
+        unify _ _ = fails -- anything else fails
 
+        -- Fail if it is allowed, otherwise suspend
         fails | all (effCommutes Efails) effs = BCFail
-              | otherwise = loop ([Efails] `union` effs) ((BDummy, BFail) : rs) bs
+              | otherwise = suspend (BDummy, BFail)
+        -- Generate WRONG if allowed, otherwise suspend
         wrongs s | all (effCommutes Ewrong) effs = BCWrong s
-                 | otherwise = loop ([Ewrong] `union` effs) ((BDummy, BWrong s) : rs) bs
+                 | otherwise = suspend (BDummy, BWrong s)
 
-        succeeds es = loop effs rs (es ++ bs)
+        -- Put es on the unprocessed bindings and continue the sweep
+        succeeds :: [BEqn] -> BChoice
+        succeeds = succeeds' []
+        succeeds' is es = sweep effs done (is ++ bvars) (es ++ bs) bresult
+
+        -- Put eqn on the done list, block its effects, and continue the sweep
+        suspend :: BEqn -> BChoice
+        suspend ve@(_, e) = sweep (exprEffs e `union` effs) (ve : done) bvars bs bresult
       in
+        let blk = BBlock{ vars = bvars, binds = undefined, result = bresult }
+            allvars = bvars ++ allBVars (done, bbinds, bresult)
+        in
+        -- Examine the expression and evaluate if possible.
         case expr of
           BPrimOp op vs | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
-                        | otherwise -> loop (primOpEffs op `union` effs) (eqn : rs) bs
-          -- XXX evalBlock' is overkill.  Could keep vars in the loop and extend it.
+                        | otherwise -> suspend eqn
           BApply f a | BVLam i b <- f ->
-                       if i == BIdent "_" then
-                         evalBlock' beffs $ insertBlock blk (reverse rs) Nothing (val, b) bs
-                       else
-                         let b' = b{ vars = i : vars b }
-                         in  evalBlock' beffs $ insertBlock blk (reverse rs) (Just a) (val, b') bs
+                         -- Bind the argument and insert the lambda body
+                         let (i', b') = freshenLambda allvars (i, b)
+                         in  succeeds' [i'] [(BVar i', BVal a), (val, BEBlk b')]
                      | BVArr vs <- f ->
                        let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                                  | (i, v) <- zip [0..] vs ]
-                       in  loop effs rs ((val, e) : bs)
+                       in  succeeds [(val, e)]
                      | BMu i h <- f -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
                      | BRec _  <- f -> undefined
-                     | otherwise -> loop (funcEffs f `union` effs) (eqn : rs) bs
+                     | otherwise -> suspend eqn           -- not a hnf yet
           BSplit c f g ->
             case evalChoice (effs \\ domEffects) c of  -- XXX need to propagate blocked effects
-              BCFail ->
-                --trace ("loop: split: fail " ++ take 3000 (prettyShow c)) $
-                succeeds [(val, BApply f (BVArr []))]
+              BCFail -> succeeds [(val, BApply f (BVArr []))]
               BCWrong s -> wrongs s
               BCBlk b@BlockValue{} -> callG b BCFail
               BCFork (BCBlk b@BlockValue{}) r -> callG b r
-              c' -> loop (exprEffs e `union` effs) ((val, e) : rs) bs  where e = BSplit c' f g
+              c' -> suspend (val, BSplit c' f g)
             where callG b r =
                     let (vb: a1: a2: a3: dummy: _) = bIdentsNotIn (vars blk ++ freeBVars (b, c))
                         b0 = (BVar vb, BChoice (BCBlk b))
@@ -656,41 +693,24 @@ evalBlock' beffs blk = loop beffs [] (binds blk)
                         b2 = (BVar a2, BApply (BVar a1) (BVLam dummy (blkChoice r)))
                         b3 = (BVar a3, BApply (BVar a2) g)
                         bb = BBlock{ vars = [vb, a1, a2, a3], binds = [b0,b1,b2,b3], result = BVar a3 }
-                    in  evalBlock' beffs $ insertBlock blk (reverse rs) Nothing (val, bb) bs
+                    in  succeeds [(val, BEBlk bb)]
           BChoice BCFail -> fails
           BChoice (BCWrong s) -> wrongs s
-          -- XXX evalBlock' is overkill.  Could keep vars in the loop and extend it.
-          BChoice (BCBlk b) -> evalBlock' beffs $ insertBlock blk (reverse rs) Nothing (val, b) bs
-          BChoice (BCFork _x1 _x2) | all (effCommutes Eiterates) effs ->
-                                   --trace ("loop: fork " ++ take 2000 (prettyShow (x1, x2))) $
-                                   evalChoice beffs (BCFork c1 c2)
-                                 | otherwise -> loop ([Eiterates] `union` effs) (eqn : rs) bs
+          BChoice (BCBlk b) ->
+            let rhs = freshenBlock allvars b
+            in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
+          BChoice (BCFork x1 x2) | all (effCommutes Eiterates) effs -> evalChoice abeffs (BCFork c1 c2)
+                                 | otherwise -> suspend eqn
             where
-              x1 = evalChoice effs _x1  -- XXX why does this fix the bug?
-              x2 = _x2 -- evalChoice effs _x2
-              c1 = BCBlk $ blk{ binds = rrs ++ [(val, BChoice x1)] ++ bs }
-              c2 = BCBlk $ blk{ binds = rrs ++ [(val, BChoice x2)] ++ bs }
-              rrs = reverse rs
+              c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
+              c2 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x2)] ++ bs }
+              rdone = reverse done
           BVal v -> unify val v
 
 blkChoice :: BChoice -> BBlock
 blkChoice (BCBlk b) = b
 blkChoice c = BBlock { vars = [i], binds = [(BVar i, BChoice c)], result = BVar i }
   where i = bIdentNotIn (allBVars c)
-
-dropUnused :: BBlock -> BBlock
-dropUnused b = b{ vars = intersect (vars b) (freeBVars (binds b, result b)) }
-
--- Insert the block rhs into parent.  The equations are
--- before ++ [(lhs, rhs)] ++ after
--- XXX need to limit effects properly
-insertBlock :: BBlock -> [BEqn] -> Maybe BValue -> (BValue, BBlock) -> [BEqn] -> BBlock
-insertBlock parent before extra (lhs, rhs) after =
-  let rhs' = freshenBlock (vars parent) rhs
-      ex = maybe [] (\ v -> [(BVar (head (vars rhs')), BVal v)]) extra
-  in  parent{ vars = vars rhs' ++ vars parent
-            , binds = before ++ ex ++ binds rhs' ++ [(lhs, BVal $ result rhs')] ++ after
-            }
 
 choices :: [BBlock] -> BChoice
 choices [] = BCFail
