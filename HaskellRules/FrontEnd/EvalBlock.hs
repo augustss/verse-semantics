@@ -586,10 +586,10 @@ checkPostCond _ c = c
 evalBlock' :: BlockedEffects -> BBlock -> BChoice
 evalBlock' _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
 evalBlock' _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
-evalBlock' abeffs ablk = sweep abeffs [] (vars ablk) (binds ablk) (result ablk)
+evalBlock' beffs ablk = sweep beffs [] (vars ablk) (binds ablk) (result ablk)
   where
     startSweep :: [BIdent] -> [BEqn] -> BValue -> BChoice
-    startSweep = sweep abeffs []
+    startSweep = sweep beffs []
 
     sweep :: BlockedEffects -> [BEqn] -> [BIdent] -> [BEqn] -> BValue -> BChoice
     sweep effs done bvars bbinds _bresult | dtrace ("sweep: " ++ prettyShow (effs, bvars, done, bbinds)) False = undefined
@@ -697,7 +697,7 @@ evalBlock' abeffs ablk = sweep abeffs [] (vars ablk) (binds ablk) (result ablk)
           BChoice (BCBlk b) ->
             let rhs = freshenBlock allvars b
             in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
-          BChoice (BCFork x1 x2) | notBlocked Eiterates effs -> evalChoice abeffs (BCFork c1 c2)
+          BChoice (BCFork x1 x2) | notBlocked Eiterates effs -> evalChoice beffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
               c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
