@@ -15,6 +15,11 @@ import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
 import Debug.Trace
 
+subset :: (Eq a) => [a] -> [a] -> Bool
+subset xs ys = null (xs \\ ys)
+
+--------------------
+
 --
 -- TODO
 --  * propagate allowed effects
@@ -41,7 +46,7 @@ runBlock flg e =
 
 evalChoiceFull :: BChoice -> BChoice
 evalChoiceFull c =
-  case evalChoice [] c of
+  case evalChoice topEffects [] c of
     BCFork c1 c2 -> BCFork c1 (evalChoiceFull c2)
     c' -> c'
 
@@ -52,7 +57,7 @@ evalUnderLambda = transformBi ev
         ev (BArr vs) = BArr (map (transformBi ev) vs)
         ev (BHLam i b) = BHLam i $ transformBi ev $ evalB b
         evalB b =
-          case evalBlock [] b of
+          case evalBlock topEffects [] b of
             BCBlk b' -> b'
             BCFail -> BlockFail
             BCWrong s -> BlockWrong s
@@ -179,7 +184,7 @@ data EffectType = ETNone | ETUnknown | ETArrow EffectType Effects EffectType
 --type BSubst = [(BIdent, BValue)]
 
 type BlockedEffects = Effects
---type AllowedEffects = Effects
+type AllowedEffects = Effects
 
 instance Pretty BIdent where
   pPrintPrec _ _ (BIdent s) = text s
@@ -546,7 +551,16 @@ blockEffs b = unionMap (exprEffs . snd) (binds b)
 
 -- Effects that should not be blocked in the domain of an if/for
 domEffects :: Effects
-domEffects = [Efails, Eiterates, Eallocates, Ereads, Ewrites]
+domEffects = [Efails, Eiterates] ++ heapEffects
+
+-- Memory effects
+heapEffects :: Effects
+heapEffects = [Eallocates, Ereads, Ewrites]
+
+-- Effects allowed on the top level
+topEffects :: AllowedEffects
+topEffects = [Einteracts, Ewrong, Ediverges] ++ heapEffects
+             ++ [Efails, Eiterates]   -- These are not really allowed in MaxVerse
 
 notBlocked :: Effect -> BlockedEffects -> Bool
 notBlocked = all . effCommutes
@@ -554,49 +568,51 @@ notBlocked = all . effCommutes
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
-evalChoice :: BlockedEffects -> BChoice -> BChoice
-evalChoice _ c | dtrace ("evalChoice: " ++ prettyShow c) False = undefined
-evalChoice effs (BCFork c1 c2) =
-  case evalChoice effs c1 of
-    BCFail -> evalChoice effs c2
+evalChoice :: AllowedEffects -> BlockedEffects -> BChoice -> BChoice
+evalChoice _ _ c | dtrace ("evalChoice: " ++ prettyShow c) False = undefined
+evalChoice aeffs beffs (BCFork c1 c2) =
+  case evalChoice aeffs beffs c1 of
+    BCFail -> evalChoice aeffs beffs c2
     c@BCWrong{} -> c
     c@BCBlk{} -> BCFork c c2
     BCFork d1 d2 -> BCFork d1 (BCFork d2 c2)
-evalChoice effs (BCBlk b) = evalBlock effs b
-evalChoice _ BCFail = BCFail
-evalChoice _ c@(BCWrong _) = c
+evalChoice aeffs beffs (BCBlk b) = evalBlock aeffs beffs b
+evalChoice _ _ BCFail = BCFail
+evalChoice _ _ c@(BCWrong _) = c
 
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
-evalBlock :: BlockedEffects -> BBlock -> BChoice
-evalBlock _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
-evalBlock effs b =
-  let c = evalBlock' effs b
+evalBlock :: AllowedEffects -> BlockedEffects -> BBlock -> BChoice
+evalBlock _ _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
+evalBlock aeffs beffs b =
+  let c = evalBlock' aeffs beffs b
   in  dtrace ("evalBlock returns: " ++ prettyShow c) $
-      checkPostCond effs c
+      checkPostCond aeffs beffs c
 
-checkPostCond :: BlockedEffects -> BChoice -> BChoice
-checkPostCond effs c@(BCBlk b) | evalBlock' effs b == c = c
-                               | otherwise = error $ "checkPostCond: " ++ prettyShow c
-checkPostCond effs c@(BCFork c1@(BCBlk b) _) | evalBlock' effs b == c1 = c
-checkPostCond _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
-checkPostCond _ c = c
+checkPostCond :: AllowedEffects -> BlockedEffects -> BChoice -> BChoice
+checkPostCond aeffs beffs c@(BCBlk b) | evalBlock' aeffs beffs b == c = c
+                                      | otherwise = error $ "checkPostCond: " ++ prettyShow c
+checkPostCond aeffs beffs c@(BCFork c1@(BCBlk b) _) | evalBlock' aeffs beffs b == c1 = c
+checkPostCond _ _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
+checkPostCond _ _ c = c
 
-evalBlock' :: BlockedEffects -> BBlock -> BChoice
-evalBlock' _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
-evalBlock' _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
-evalBlock' beffs ablk = sweep beffs [] (vars ablk) (binds ablk) (result ablk)
+evalBlock' :: AllowedEffects -> BlockedEffects -> BBlock -> BChoice
+evalBlock' _ _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
+evalBlock' _ _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
+evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result ablk)
   where
+    notAllowed es = not (subset es aeffs)
+
     startSweep :: [BIdent] -> [BEqn] -> BValue -> BChoice
-    startSweep = sweep beffs []
+    startSweep = sweep bbeffs []
 
     sweep :: BlockedEffects -> [BEqn] -> [BIdent] -> [BEqn] -> BValue -> BChoice
-    sweep effs done bvars bbinds _bresult | dtrace ("sweep: " ++ prettyShow (effs, bvars, done, bbinds)) False = undefined
-    sweep _    done bvars     [] bresult =
+    sweep beffs done bvars bbinds _bresult | dtrace ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
+    sweep _     done bvars     [] bresult =
       -- End of binds reached, no further progress possible
       BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
-    sweep effs done bvars bbinds@(eqn@(val, expr) : bs) bresult =
+    sweep beffs done bvars bbinds@(eqn@(val, expr) : bs) bresult =
       let
         -- Swap so local binding is first
         unify :: BValue -> BValue -> BChoice
@@ -644,27 +660,28 @@ evalBlock' beffs ablk = sweep beffs [] (vars ablk) (binds ablk) (result ablk)
         unify _ _ = fails -- anything else fails
 
         -- Fail if it is allowed, otherwise suspend
-        fails | notBlocked Efails effs = BCFail
+        fails | notBlocked Efails beffs = BCFail
               | otherwise = suspend (BDummy, BFail)
         -- Generate WRONG if allowed, otherwise suspend
-        wrongs s | notBlocked Ewrong effs = BCWrong s
+        wrongs s | notBlocked Ewrong beffs = BCWrong s
                  | otherwise = suspend (BDummy, BWrong s)
 
         -- Put es on the unprocessed bindings and continue the sweep
         succeeds :: [BEqn] -> BChoice
         succeeds = succeeds' []
-        succeeds' is es = sweep effs done (is ++ bvars) (es ++ bs) bresult
+        succeeds' is es = sweep beffs done (is ++ bvars) (es ++ bs) bresult
 
         -- Put eqn on the done list, block its effects, and continue the sweep
         suspend :: BEqn -> BChoice
-        suspend ve@(_, e) = sweep (exprEffs e `union` effs) (ve : done) bvars bs bresult
+        suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) bvars bs bresult
       in
         let blk = BBlock{ vars = bvars, binds = undefined, result = bresult }
             allvars = bvars ++ allBVars (done, bbinds, bresult)
         in
         -- Examine the expression and evaluate if possible.
         case expr of
-          BPrimOp op vs | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
+          BPrimOp op vs | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
+                        | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
                         | otherwise -> suspend eqn
           BApply f a | BVLam i b <- f ->
                          -- Bind the argument and insert the lambda body
@@ -678,7 +695,7 @@ evalBlock' beffs ablk = sweep beffs [] (vars ablk) (binds ablk) (result ablk)
                      | BRec _  <- f -> undefined
                      | otherwise -> suspend eqn           -- not a hnf yet
           BSplit c f g ->
-            case evalChoice (effs \\ domEffects) c of  -- XXX need to propagate blocked effects
+            case evalChoice (aeffs `intersect` domEffects) (beffs \\ domEffects) c of  -- XXX need to propagate blocked effects
               BCFail -> succeeds [(val, BApply f (BVArr []))]
               BCWrong s -> wrongs s
               BCBlk b@BlockValue{} -> callG b BCFail
@@ -697,7 +714,8 @@ evalBlock' beffs ablk = sweep beffs [] (vars ablk) (binds ablk) (result ablk)
           BChoice (BCBlk b) ->
             let rhs = freshenBlock allvars b
             in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
-          BChoice (BCFork x1 x2) | notBlocked Eiterates effs -> evalChoice beffs (BCFork c1 c2)
+          BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
+                                 | notBlocked Eiterates beffs -> evalChoice aeffs bbeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
               c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
