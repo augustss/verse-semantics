@@ -449,16 +449,6 @@ cChoice Fail = pure BCFail
 cChoice Wrong = pure $ BCWrong "??"
 cChoice e = BCBlk <$> cBlock e
 
-{-
--- A returned BCFork is always of the form
---  BCFork (BCBlk b) ...
-bCFork :: BChoice -> BChoice -> BChoice
-bCFork BCFail c = c
-bCFork c@BCWrong{} _ = c
-bCFork c1@BCBlk{} c2 = BCFork c1 c2
-bCFork (BCFork c1 c2) c3 = bCFork c1 (BCFork c2 c3)
--}
-
 cBlock :: Expr -> A BBlock
 cBlock = cBlockV []
 
@@ -503,7 +493,14 @@ cExpr Fail = pure BFail
 cExpr Wrong = pure $ BWrong "?"
 cExpr (Split e e1 e2) = BSplit <$> cChoice e <*> cValue e1 <*> cValue e2
 cExpr (One e) = cExpr $ Split e (LAM u Fail) (LAM v $ LAM u $ LAM u $ Var v)
-  where u = Name "_"; v = Name "x"
+  where u = Name "_"; v = Name "v"
+cExpr (All e) =
+  let u = Name "_"; v = Name "v"; r = Name "r"; h = Name "h"
+      f = LAM u $ Arr []
+      g = LAM v $ LAM r $ LAM h $
+            let x = Split (Var r :@: Arr []) f (Var h)
+            in  Op Cons :@: Arr [Var v, x]
+  in  cExpr $ Split e f g
 cExpr e = error $ "cExpr: impossible: " ++ prettyShow e
 {-
 cExpr (One e) = One <$> cBlock e
