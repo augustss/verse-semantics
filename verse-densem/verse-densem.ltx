@@ -147,6 +147,7 @@
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\Value}{W}
 \newcommand{\Term}{Term}
+\newcommand{\Labels}{Labels}
 \newcommand{\Forml}{Form}
 \newcommand{\Env}{Env}
 \newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
@@ -864,7 +865,9 @@ $$
   \termapp{|k|} & = & |k| \\
   \termapp{|tup (v_1,..,v_n)|} & = & \mathbf{tuple}(\termapp{|v_1|},..,\termapp{|v_n|}) \\
 ~ \\
-  \sfolapp{|e|} & : & [L] \rightarrow \Forml \\
+  |type Labels| & |=| & |Term| \\
+~ \\
+  \sfolapp{|e|} & : & \Labels \rightarrow \Forml \\
   \sfolapp{|v|}(|ell|) & = & |ell = []| \\
   \sfolapp{|fail|}(|ell|) & = & |false| \\
   \sfolapp{|e_1 choice e_2|}(|ell|) & = &
@@ -879,9 +882,9 @@ $$
     \exists |x| . \; \sfolapp{|e|}(|ell|) \\
   \sfolapp{|one e|}(|ell|) & = & |ell = [] &&| \exists |ell_1| . \;  \sfolapp{|e|}(|ell_1|) \\
   \sfolapp{|all e|}(|ell|) & = & |true| \\
-  \sfolapp{|a@i|}(|ell|) & = & |ell = [] &&| 0 \leq \termapp{i} < size(\termapp{a}) \\
+  \sfolapp{|a@i|}(|ell|) & = & |ell =| label(\termapp{i}) |&&| 0 \leq \termapp{i} < size(\termapp{a}) \\
 ~ \\
-  \folapp{|e|} & : & [L] \times \Term \rightarrow \Forml \\
+  \folapp{|e|} & : & \Labels \times \Term \rightarrow \Forml \\
   \folapp{|v|}(|ell,t|) & = & |ell = [] && term v = t| \\
   \folapp{|fail|}(|ell,t|) & = & |false| \\
   \folapp{|e_1 choice e_2|}(|ell,t|) & = &
@@ -897,7 +900,7 @@ $$
   \folapp{|one e|}(|ell,t|) & = & |ell = [] &&|
   \exists |ell_1| . \; (\folapp{|e|}(|ell_1,t|) |&&| \forall |ell_2 < ell_1| . \; \neg{}\sfolapp{|e|}(|ell_2|) ) \\
   \folapp{|all e|}(|ell,t|) & = & ... \\
-  \folapp{|a@i|}(|ell,t|) & = & |ell = [] &&| 0 \leq \termapp{i} < size(\termapp{a}) |&&| index(\termapp{a},\termapp{i}) = t\\
+  \folapp{|a@i|}(|ell,t|) & = & |ell =| label(\termapp{i}) |&&| 0 \leq \termapp{i} < size(\termapp{a}) |&&| index(\termapp{a},\termapp{i}) = t\\
   \end{array}
 $$
 \caption{First-order logic semantics of expressions based on labelled semantics}
