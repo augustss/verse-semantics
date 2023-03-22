@@ -550,8 +550,8 @@ blockEffs b = unionMap (exprEffs . snd) (binds b)
 domEffects :: Effects
 domEffects = [Efails, Eiterates, Eallocates, Ereads, Ewrites]
 
---notBlocked :: Effect -> BlockedEffects -> Bool
---notBlocked = all . effCommutes
+notBlocked :: Effect -> BlockedEffects -> Bool
+notBlocked = all . effCommutes
 
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
@@ -646,10 +646,10 @@ evalBlock' abeffs ablk = sweep abeffs [] (vars ablk) (binds ablk) (result ablk)
         unify _ _ = fails -- anything else fails
 
         -- Fail if it is allowed, otherwise suspend
-        fails | all (effCommutes Efails) effs = BCFail
+        fails | notBlocked Efails effs = BCFail
               | otherwise = suspend (BDummy, BFail)
         -- Generate WRONG if allowed, otherwise suspend
-        wrongs s | all (effCommutes Ewrong) effs = BCWrong s
+        wrongs s | notBlocked Ewrong effs = BCWrong s
                  | otherwise = suspend (BDummy, BWrong s)
 
         -- Put es on the unprocessed bindings and continue the sweep
@@ -699,7 +699,7 @@ evalBlock' abeffs ablk = sweep abeffs [] (vars ablk) (binds ablk) (result ablk)
           BChoice (BCBlk b) ->
             let rhs = freshenBlock allvars b
             in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
-          BChoice (BCFork x1 x2) | all (effCommutes Eiterates) effs -> evalChoice abeffs (BCFork c1 c2)
+          BChoice (BCFork x1 x2) | notBlocked Eiterates effs -> evalChoice abeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
               c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
