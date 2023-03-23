@@ -630,11 +630,16 @@ evalChoice heap aeffs beffs (BCFork c1 c2) =
   case evalChoice heap aeffs beffs c1 of
     BCFail -> evalChoice heap aeffs beffs c2
     c@BCWrong{} -> c
-    c@BCBlk{} -> BCFork c c2
-    BCFork d1 d2 -> BCFork d1 (BCFork d2 c2)
+    c@BCBlk{} -> BCFork c c2  -- XXX
+    BCFork d1@(BCRBlk _ _) d2 -> BCFork d1 (BCFork d2 c2)
+    BCFork d1 d2 -> BCFork d1 (BCFork d2 c2) -- XXX
+    c@BCRBlk{} -> BCFork c c2
 evalChoice heap aeffs beffs (BCBlk b) = evalBlock heap aeffs beffs b
 evalChoice _ _ _ BCFail = BCFail
 evalChoice _ _ _ c@(BCWrong _) = c
+--evalChoice _ _ _ c@(BCRBlk BNoHeap _) = c
+evalChoice h _ _ c@(BCRBlk h' _) | h == h' = c
+evalChoice _ _ _ c@BCRBlk{} = error $ "evalChoice: " ++ prettyShow c
 
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
@@ -647,12 +652,14 @@ evalBlock heap aeffs beffs b =
       --checkPostCond aeffs beffs c
       c
 
+{-
 checkPostCond :: AllowedEffects -> BlockedEffects -> BChoice -> BChoice
-checkPostCond aeffs beffs c@(BCBlk b) | evalBlock' aeffs beffs b == c = c
+checkPostCond aeffs beffs c@(BCBlk b) | evalBlock' dummyHeap aeffs beffs b == c = c
                                       | otherwise = error $ "checkPostCond: " ++ prettyShow c
-checkPostCond aeffs beffs c@(BCFork c1@(BCBlk b) _) | evalBlock' aeffs beffs b == c1 = c
+checkPostCond aeffs beffs c@(BCFork c1@(BCBlk b) _) | evalBlock' dummyHeap aeffs beffs b == c1 = c
 checkPostCond _ _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
 checkPostCond _ _ c = c
+-}
 
 evalBlock' :: AllowedEffects -> BlockedEffects -> BBlock -> BChoice
 evalBlock' _ _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
