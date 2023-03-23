@@ -80,10 +80,10 @@ data BBlock = BBlock
   deriving (Show, Eq, Data)
 
 pattern BlockFail :: BBlock
-pattern BlockFail = BBlock{ vars = [], binds = [(BDummy, BFail)], result = BDummy }
+pattern BlockFail = BBlock{ vars = [], binds = [(BAVar, BFail)], result = BAVar }
 
 pattern BlockWrong :: String -> BBlock
-pattern BlockWrong s = BBlock{ vars = [], binds = [(BDummy, BWrong s)], result = BDummy }
+pattern BlockWrong s = BBlock{ vars = [], binds = [(BAVar, BWrong s)], result = BAVar }
 
 pattern BlockValue :: [BIdent] -> BValue -> BBlock
 pattern BlockValue vs v = BBlock { vars = vs, binds = [], result = v }
@@ -98,6 +98,9 @@ getBlockExpr _ = Nothing
 
 pattern BDummy :: BValue
 pattern BDummy = BVar (BIdent "_")
+
+pattern BAVar :: BValue
+pattern BAVar = BVar (BIdent "$$")
 
 type BEqn = (BValue, BExpr)
 type BEqnV = (BIdent, BValue)
