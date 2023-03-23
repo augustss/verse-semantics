@@ -174,3 +174,4 @@ testeq(SEq) { var a:any=0; for{for( 0 | (set a+=1) ) { y:=10|20; (a, y) } } }
 # Logical variables escaping via ref cells.
 testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[0]] } { 10 }
 testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[1]] } { x:any }
+testeq(SEq) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; r:=(read$[a[0]], read$[a[1]]); read$[a[1]] = 99; r } { (10,99) }
