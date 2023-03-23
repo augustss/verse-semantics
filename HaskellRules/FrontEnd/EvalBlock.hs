@@ -36,7 +36,7 @@ dtrace s a | doTrace = trace s a
 runBlock :: TRSFlags -> Expr -> Expr
 runBlock flg e =
   let b = coreToChoice e
-      b' = evalChoiceFull b
+      b' = evalChoiceFull topEffects b
       b'' = if tfUnderLambda flg then evalUnderLambda b' else b'
   in
       dtrace ("core: " ++ prettyShow e) $
@@ -44,10 +44,10 @@ runBlock flg e =
       dtrace ("output: " ++ prettyShow b') $
       choiceToCore b''
 
-evalChoiceFull :: BChoice -> BChoice
-evalChoiceFull c =
-  case evalChoice topEffects [] c of
-    BCFork c1 c2 -> BCFork c1 (evalChoiceFull c2)
+evalChoiceFull :: AllowedEffects -> BChoice -> BChoice
+evalChoiceFull aeffs c =
+  case evalChoice aeffs [] c of
+    BCFork c1 c2 -> BCFork c1 (evalChoiceFull aeffs c2)
     c' -> c'
 
 evalUnderLambda :: BChoice -> BChoice
@@ -61,7 +61,8 @@ evalUnderLambda = transformBi ev
             BCBlk b' -> b'
             BCFail -> BlockFail
             BCWrong s -> BlockWrong s
-            BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull c2))
+            BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull lambdaEffs c2))
+        lambdaEffs = [Efails, Eiterates, Ewrong]
 
 ---------------------------------------------
 
