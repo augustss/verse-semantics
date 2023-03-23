@@ -1,15 +1,18 @@
 {-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module FrontEnd.EvalBlock(runBlock) where
 import Prelude hiding ((<>))
 import Control.Monad.State.Strict
+import Data.Coerce
 import Data.Data(Data)
 import Data.List
 --import qualified Data.Map as M
 import Epic.Print
 import Epic.Uniplate
+import qualified Epic.SIntMap as IM
 import Rules.Core
 import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
@@ -36,7 +39,7 @@ dtrace s a | doTrace = trace s a
 runBlock :: TRSFlags -> Expr -> Expr
 runBlock flg e =
   let b = coreToChoice e
-      b' = evalChoiceFull topEffects b
+      b' = evalChoiceFull emptyHeap topEffects b
       b'' = if tfUnderLambda flg then evalUnderLambda b' else b'
   in
       dtrace ("core: " ++ prettyShow e) $
@@ -44,24 +47,28 @@ runBlock flg e =
       dtrace ("output: " ++ prettyShow b') $
       choiceToCore b''
 
-evalChoiceFull :: AllowedEffects -> BChoice -> BChoice
-evalChoiceFull aeffs c =
-  case evalChoice aeffs [] c of
-    BCFork c1 c2 -> BCFork c1 (evalChoiceFull aeffs c2)
+evalChoiceFull :: BHeap -> AllowedEffects -> BChoice -> BChoice
+evalChoiceFull h aeffs c =
+  case evalChoice h aeffs [] c of
+    BCFork (BCRBlk h' b) c2 -> BCFork (BCBlk b) (evalChoiceFull h' aeffs c2)
+    BCFork (BCBlk b) c2 -> BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
+    BCRBlk _ b -> BCBlk b  -- throw away the heap
     c' -> c'
 
 evalUnderLambda :: BChoice -> BChoice
 evalUnderLambda = transformBi ev
   where ev :: BHNF -> BHNF
         ev v@BInt{} = v
+        ev v@BRef{} = v
         ev (BArr vs) = BArr (map (transformBi ev) vs)
         ev (BHLam i b) = BHLam i $ transformBi ev $ evalB b
         evalB b =
-          case evalBlock topEffects [] b of
+          case evalBlock dummyHeap lambdaEffs [] b of
             BCBlk b' -> b'
             BCFail -> BlockFail
             BCWrong s -> BlockWrong s
-            BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull lambdaEffs c2))
+            BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull dummyHeap lambdaEffs c2))
+            BCRBlk _ b' -> b'   -- XXX
         lambdaEffs = [Efails, Eiterates, Ewrong]
 
 ---------------------------------------------
@@ -121,6 +128,7 @@ data BChoice
   | BCBlk BBlock
   | BCFail
   | BCWrong String
+  | BCRBlk BHeap BBlock    -- only in results
   deriving (Show, Eq, Data)
 
 --pattern BEVar :: BIdent -> BExpr
@@ -147,6 +155,7 @@ isBVar _ = False
 
 data BHNF
   = BInt Integer
+  | BRef BPtr
   | BArr [BValue]
   | BHLam BIdent BBlock  -- invariant: the bound BIdent will not be among the vars in the block
   deriving (Show, Eq, Data)
@@ -179,6 +188,21 @@ type Effects = [Effect]
 
 allEffects :: Effects
 allEffects = [minBound .. maxBound]
+
+data BHeap = BHeap (IM.SIntMap Ptr BValue) | BNoHeap
+  deriving (Show, Eq, Data)
+
+newtype BPtr = BPtr Int
+  deriving (Show, Eq, Ord, Data, Enum)
+
+emptyHeap :: BHeap
+emptyHeap = BHeap IM.empty
+
+-- Use this heap when no memory operations should happen
+dummyHeap :: BHeap
+dummyHeap = BNoHeap
+
+-----------------------------------------
 
 {-
 data EffectType = ETNone | ETUnknown | ETArrow EffectType Effects EffectType
@@ -215,6 +239,7 @@ instance Pretty BChoice where
   pPrintPrec l p (BCBlk b) = pPrintPrec l p b
   pPrintPrec _ _ BCFail = text "fail"
   pPrintPrec _ _ (BCWrong s) = text ("WRONG(" ++ s ++ ")")
+  pPrintPrec l _ (BCRBlk h b) = text "store" <+> parens (pPrintPrec l 0 h) <+> braces (pPrintPrec l 0 b)
 
 instance Pretty BValue where
   pPrintPrec l p (BVar v) = pPrintPrec l p v
@@ -223,6 +248,7 @@ instance Pretty BValue where
 
 instance Pretty BHNF where
   pPrintPrec l p (BInt i) = pPrintPrec l p i
+  pPrintPrec l p (BRef r) = pPrintPrec l p r
   pPrintPrec l _ (BArr [v]) = parens (pPrintPrec l 0 v <> text ",")
   pPrintPrec l _ (BArr vs) = parens $ fsep (punctuate comma (map (pPrintPrec l 0) vs))
   pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 b
@@ -239,6 +265,13 @@ instance Pretty EffectType where
             | [Ediverges,Eallocates,Ereads,Ewrites] <- rs = text "-<heap>"
             | otherwise = text "-<" <> commaSep l rs <> text ">"
 -}
+
+instance Pretty BHeap where
+  pPrintPrec l p (BHeap m) = pPrintPrec l p (IM.toList m)
+  pPrintPrec _ _ BNoHeap = text "NoHeap"
+
+instance Pretty BPtr where
+  pPrintPrec _ _ (BPtr i) = text ("r" ++ show i)
 
 -----------------------------------
 
@@ -328,14 +361,17 @@ instance Bound BChoice where
   allBVars (BCBlk b) = allBVars b
   allBVars BCFail = []
   allBVars (BCWrong _) = []
+  allBVars (BCRBlk h b) = allBVars h `union` allBVars b
   freeBVars (BCFork b1 b2) = freeBVars b1 `union` freeBVars b2
   freeBVars (BCBlk b) = freeBVars b
   freeBVars BCFail = []
   freeBVars (BCWrong _) = []
+  freeBVars (BCRBlk h b) = freeBVars h `union` freeBVars b
   bsubst' s (BCFork b1 b2) = BCFork (bsubst' s b1) (bsubst' s b2)
   bsubst' s (BCBlk b) = BCBlk (bsubst' s b)
   bsubst' _ BCFail = BCFail
   bsubst' _ e@(BCWrong _) = e
+  bsubst' s (BCRBlk h b) = BCRBlk (bsubst' s h) (bsubst' s b)
 
 instance Bound BValue where
   allBVars (BVar i) = [i]
@@ -351,12 +387,15 @@ instance Bound BValue where
   
 instance Bound BHNF where
   allBVars (BInt _) = []
+  allBVars (BRef _) = []
   allBVars (BArr vs) = unionMap allBVars vs
   allBVars (BHLam i b) = [i] `union` allBVars b
   freeBVars (BInt _) = []
+  freeBVars (BRef _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
   bsubst' _ h@(BInt _) = h
+  bsubst' _ h@(BRef _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
     | null s' = h
@@ -371,6 +410,14 @@ freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
   let x = bIdentNotIn (bnd ++ allBVars b)
   in  (x, bsubst' [(i, BVar x)] b)
 
+instance Bound BHeap where
+  allBVars (BHeap h) = unionMap allBVars (IM.elems h)
+  allBVars BNoHeap = []
+  freeBVars (BHeap h) = unionMap freeBVars (IM.elems h)
+  freeBVars BNoHeap = []
+  bsubst' s (BHeap h) = BHeap $ IM.map (bsubst' s) h
+  bsubst' _ BNoHeap = BNoHeap
+
 ---------------------------------------------
 
 choiceToCore :: BChoice -> Expr
@@ -378,6 +425,8 @@ choiceToCore BCFail = Fail
 choiceToCore (BCWrong s) = Wrong s
 choiceToCore (BCBlk b) = blockToCore b
 choiceToCore (BCFork c1 c2) = choiceToCore c1 :|: choiceToCore c2
+choiceToCore (BCRBlk _ b) = blockToCore b
+--choiceToCore (BCRBlk h b) = error $ "choiceToCore: " ++ prettyShow (h, b)
 
 blockToCore :: BBlock -> Expr
 blockToCore (BBlock [v] [(BVar v', e)] (BVar v'')) | v == v' && v == v'' = exprToCore e
@@ -397,6 +446,7 @@ bIdentToIdent (BIdent s) = Name s
 
 hnfToCore :: BHNF -> Expr
 hnfToCore (BInt i) = Int i
+hnfToCore (BRef r) = Ref (coerce r)
 hnfToCore (BArr vs) = Arr (map valueToCore vs)
 hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
   where lam ii (f :@: Var i') | ii == i', ii `notElem` free f = f
@@ -474,6 +524,7 @@ cBlockV vs e = do
 cValue :: Expr -> A BValue
 cValue (Var i) = pure $ BVar (cIdent i)
 cValue (Int i) = pure $ BHNF $ BInt i
+cValue (Ref i) = pure $ BHNF $ BRef $ coerce i
 cValue (Op o) = cValue $ LAM i (Op o :@: Var i) where i = Name "a"
 cValue (Arr es) = BHNF . BArr <$> mapM cValue es
 cValue (LAM x e) = BHNF . BHLam (cIdent x) <$> cBlockV [x] e
@@ -549,6 +600,7 @@ choiceEffs (BCFork c1 c2) = [Eiterates] `union` choiceEffs c1 `union` choiceEffs
 choiceEffs (BCBlk b) = blockEffs b
 choiceEffs BCFail = [Efails]
 choiceEffs (BCWrong _) = [Ewrong]
+choiceEffs (BCRBlk _ b) = blockEffs b
 
 blockEffs :: BBlock -> Effects
 blockEffs b = unionMap (exprEffs . snd) (binds b)
@@ -572,27 +624,28 @@ notBlocked = all . effCommutes
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
-evalChoice :: AllowedEffects -> BlockedEffects -> BChoice -> BChoice
-evalChoice _ _ c | dtrace ("evalChoice: " ++ prettyShow c) False = undefined
-evalChoice aeffs beffs (BCFork c1 c2) =
-  case evalChoice aeffs beffs c1 of
-    BCFail -> evalChoice aeffs beffs c2
+evalChoice :: BHeap -> AllowedEffects -> BlockedEffects -> BChoice -> BChoice
+evalChoice _ _ _ c | dtrace ("evalChoice: " ++ prettyShow c) False = undefined
+evalChoice heap aeffs beffs (BCFork c1 c2) =
+  case evalChoice heap aeffs beffs c1 of
+    BCFail -> evalChoice heap aeffs beffs c2
     c@BCWrong{} -> c
     c@BCBlk{} -> BCFork c c2
     BCFork d1 d2 -> BCFork d1 (BCFork d2 c2)
-evalChoice aeffs beffs (BCBlk b) = evalBlock aeffs beffs b
-evalChoice _ _ BCFail = BCFail
-evalChoice _ _ c@(BCWrong _) = c
+evalChoice heap aeffs beffs (BCBlk b) = evalBlock heap aeffs beffs b
+evalChoice _ _ _ BCFail = BCFail
+evalChoice _ _ _ c@(BCWrong _) = c
 
 -- If the returned choice is
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
-evalBlock :: AllowedEffects -> BlockedEffects -> BBlock -> BChoice
-evalBlock _ _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
-evalBlock aeffs beffs b =
+evalBlock :: BHeap -> AllowedEffects -> BlockedEffects -> BBlock -> BChoice
+evalBlock _ _ _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
+evalBlock heap aeffs beffs b =
   let c = evalBlock' aeffs beffs b
   in  dtrace ("evalBlock returns: " ++ prettyShow c) $
-      checkPostCond aeffs beffs c
+      --checkPostCond aeffs beffs c
+      c
 
 checkPostCond :: AllowedEffects -> BlockedEffects -> BChoice -> BChoice
 checkPostCond aeffs beffs c@(BCBlk b) | evalBlock' aeffs beffs b == c = c
@@ -699,7 +752,7 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
                      | BRec _  <- f -> undefined
                      | otherwise -> suspend eqn           -- not a hnf yet
           BSplit c f g ->
-            case evalChoice (aeffs `intersect` domEffects) (beffs \\ domEffects) c of  -- XXX need to propagate blocked effects
+            case evalChoice undefined (aeffs `intersect` domEffects) (beffs \\ domEffects) c of  -- XXX need to propagate blocked effects
               BCFail -> succeeds [(val, BApply f (BVArr []))]
               BCWrong s -> wrongs s
               BCBlk b@BlockValue{} -> callG b BCFail
@@ -719,7 +772,7 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
             let rhs = freshenBlock allvars b
             in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
           BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
-                                 | notBlocked Eiterates beffs -> evalChoice aeffs bbeffs (BCFork c1 c2)
+                                 | notBlocked Eiterates beffs -> evalChoice undefined aeffs bbeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
               c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
