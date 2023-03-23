@@ -647,7 +647,7 @@ evalChoice _ _ _ c@BCRBlk{} = error $ "evalChoice: " ++ prettyShow c
 evalBlock :: BHeap -> AllowedEffects -> BlockedEffects -> BBlock -> BChoice
 evalBlock _ _ _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
 evalBlock heap aeffs beffs b =
-  let c = evalBlock' aeffs beffs b
+  let c = evalBlock' heap aeffs beffs b
   in  dtrace ("evalBlock returns: " ++ prettyShow c) $
       --checkPostCond aeffs beffs c
       c
@@ -661,22 +661,23 @@ checkPostCond _ _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
 checkPostCond _ _ c = c
 -}
 
-evalBlock' :: AllowedEffects -> BlockedEffects -> BBlock -> BChoice
-evalBlock' _ _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
-evalBlock' _ _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
-evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result ablk)
+evalBlock' :: BHeap -> AllowedEffects -> BlockedEffects -> BBlock -> BChoice
+evalBlock' _ _ _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
+evalBlock' _ _ _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
+evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (result ablk)
   where
     notAllowed es = not (subset es aeffs)
 
-    startSweep :: [BIdent] -> [BEqn] -> BValue -> BChoice
+    startSweep :: BHeap -> [BIdent] -> [BEqn] -> BValue -> BChoice
     startSweep = sweep bbeffs []
 
-    sweep :: BlockedEffects -> [BEqn] -> [BIdent] -> [BEqn] -> BValue -> BChoice
-    sweep beffs done bvars bbinds _bresult | dtrace ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
-    sweep _     done bvars     [] bresult =
+    sweep :: BlockedEffects -> [BEqn] -> BHeap -> [BIdent] -> [BEqn] -> BValue -> BChoice
+    sweep beffs done _ bvars bbinds _bresult
+      | dtrace ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
+    sweep _     done h bvars     [] bresult =
       -- End of binds reached, no further progress possible
       BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
-    sweep beffs done bvars bbinds@(eqn@(val, expr) : bs) bresult =
+    sweep beffs done heap bvars bbinds@(eqn@(val, expr) : bs) bresult =
       let
         -- Swap so local binding is first
         unify :: BValue -> BValue -> BChoice
@@ -700,12 +701,12 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
           else if x `elem` bvars then
             -- Locally bound, get rid of the variable entirely.
             -- And restart sweep
-            startSweep (bvars \\ [x]) (sub (reverse done ++ bs)) (sub bresult)
+            startSweep heap (bvars \\ [x]) (sub (reverse done ++ bs)) (sub bresult)
           else if x `elem` freeBVars ((done, bs), bresult) then
             -- x occurs, so substitute.
             -- Bound outside, keep equation.
             -- And restart sweep
-            startSweep bvars (sub (reverse done) ++ [ueqn] ++ sub bs) (sub bresult)
+            startSweep heap bvars (sub (reverse done) ++ [ueqn] ++ sub bs) (sub bresult)
           else
             -- x does not occur, just keep equation.
             suspend ueqn
@@ -733,11 +734,11 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
         -- Put es on the unprocessed bindings and continue the sweep
         succeeds :: [BEqn] -> BChoice
         succeeds = succeeds' []
-        succeeds' is es = sweep beffs done (is ++ bvars) (es ++ bs) bresult
+        succeeds' is es = sweep beffs done dummyHeap (is ++ bvars) (es ++ bs) bresult
 
         -- Put eqn on the done list, block its effects, and continue the sweep
         suspend :: BEqn -> BChoice
-        suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) bvars bs bresult
+        suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) heap bvars bs bresult
       in
         let blk = BBlock{ vars = bvars, binds = undefined, result = bresult }
             allvars = bvars ++ allBVars (done, bbinds, bresult)
@@ -759,7 +760,7 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
                      | BRec _  <- f -> undefined
                      | otherwise -> suspend eqn           -- not a hnf yet
           BSplit c f g ->
-            case evalChoice undefined (aeffs `intersect` domEffects) (beffs \\ domEffects) c of  -- XXX need to propagate blocked effects
+            case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
               BCFail -> succeeds [(val, BApply f (BVArr []))]
               BCWrong s -> wrongs s
               BCBlk b@BlockValue{} -> callG b BCFail
@@ -779,12 +780,13 @@ evalBlock' aeffs bbeffs ablk = sweep bbeffs [] (vars ablk) (binds ablk) (result 
             let rhs = freshenBlock allvars b
             in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
           BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
-                                 | notBlocked Eiterates beffs -> evalChoice undefined aeffs bbeffs (BCFork c1 c2)
+                                 | notBlocked Eiterates beffs -> evalChoice heap aeffs bbeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
               c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
               c2 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x2)] ++ bs }
               rdone = reverse done
+          BChoice (BCRBlk _ _) -> error "impossible"
           BVal v -> unify val v
 
 blkChoice :: BChoice -> BBlock
