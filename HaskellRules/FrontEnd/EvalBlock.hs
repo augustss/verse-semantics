@@ -786,17 +786,20 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                         | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
                         | Just (h, e) <- evalPrimHeapOp heap op vs -> succeeds' h [(val, e)]
                         | otherwise -> suspend eqn
-          BApply f a | BVLam i b <- f ->
-                         -- Bind the argument and insert the lambda body
-                         let (i', b') = freshenLambda allvars (i, b)
-                         in  succeeds'' heap [i'] [(BVar i', BVal a), (val, BEBlk b')]
-                     | BVArr vs <- f ->
-                       let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
-                                                 | (i, v) <- zip [0..] vs ]
-                       in  succeeds [(val, e)]
-                     | BMu i h <- f -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
-                     | BRec _  <- f -> undefined
-                     | otherwise -> suspend eqn           -- not a hnf yet
+          BApply f a ->
+            case f of
+              BVar _ -> suspend eqn           -- not a hnf yet
+              BMu i h -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
+              BRec _ -> undefined
+              BVLam i b ->
+                -- Bind the argument and insert the lambda body
+                let (i', b') = freshenLambda allvars (i, b)
+                in  succeeds'' heap [i'] [(BVar i', BVal a), (val, BEBlk b')]
+              BVArr vs ->
+                let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
+                                          | (i, v) <- zip [0..] vs ]
+                in  succeeds [(val, e)]
+              BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
               BCFail -> succeeds [(val, BApply f (BVArr []))]
