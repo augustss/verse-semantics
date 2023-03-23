@@ -122,6 +122,9 @@ testeq(SEq) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 # Times out with ICFPK
 testeq(SEq,icfp=Skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
 
+# Simple indexing
+testeq(SEq) { a := (0,1); a[0] }                   {0}
+
 # Array expression splicing
 ### SPLICE testeq(SEq) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
 ### SPLICE testeq(SEq) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}

@@ -31,7 +31,7 @@ subset xs ys = null (xs \\ ys)
 --  * limit effects for lambda bodies
 
 doTrace :: Bool
-doTrace = True
+doTrace = False
 
 dtrace :: String -> a -> a
 dtrace s a | doTrace = trace s a
@@ -51,8 +51,11 @@ runBlock flg e =
 evalChoiceFull :: BHeap -> AllowedEffects -> BChoice -> BChoice
 evalChoiceFull h aeffs c =
   case evalChoice h aeffs [] c of
-    BCFork (BCRBlk h' b) c2 -> BCFork (BCBlk b) (evalChoiceFull h' aeffs c2)
-    BCFork (BCBlk b) c2 -> undefined -- BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
+    BCFork (BCRBlk h' b) c2 ->
+      case evalChoiceFull h' aeffs c2 of
+        BCFail -> BCBlk b
+        c2' -> BCFork (BCBlk b) c2'
+    BCFork (BCBlk _b) _c2 -> undefined -- BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
     BCRBlk _ b -> BCBlk b  -- throw away the heap
     c' -> c'
 
@@ -773,7 +776,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         let allvars = bvars ++ allBVars (done, bbinds, bresult)
         in
         -- Examine the expression and evaluate if possible.
-        trace ("sweep expr=" ++ take 10 (show expr)) $
+        dtrace ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
           BPrimOp op vs | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
                         | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
@@ -803,7 +806,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               BCFork BCBlk{} _ -> error "impossible"
               c' -> suspend (val, BSplit c' f g)
             where callG (is, h) b r =
-                    trace ("callG " ++ prettyShow (is, h, b, r, val)) $
+                    dtrace ("callG " ++ prettyShow (is, h, b, r, val)) $
                     let (vb: a1: a2: a3: dummy: _) = bIdentsNotIn (is ++ allvars ++ freeBVars (b, c))
                         b0 = (BVar vb, BEBlk b)
                         b1 = (BVar a1, BApply g (BVar vb))
