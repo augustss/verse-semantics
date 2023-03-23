@@ -53,10 +53,10 @@ evalChoiceFull h aeffs c =
   case evalChoice h aeffs [] c of
     BCFork (BCRBlk h' b) c2 ->
       case evalChoiceFull h' aeffs c2 of
-        BCFail -> BCBlk b
-        c2' -> BCFork (BCBlk b) c2'
+        BCFail -> BCBlk $ dropUnusedEx b
+        c2' -> BCFork (BCBlk $ dropUnusedEx b) c2'
     BCFork (BCBlk _b) _c2 -> undefined -- BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
-    BCRBlk _ b -> BCBlk b  -- throw away the heap
+    BCRBlk _ b -> BCBlk $ dropUnusedEx b  -- throw away the heap
     c' -> c'
 
 evalUnderLambda :: BChoice -> BChoice
@@ -72,8 +72,12 @@ evalUnderLambda = transformBi ev
             BCFail -> BlockFail
             BCWrong s -> BlockWrong s
             BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull dummyHeap lambdaEffs c2))
-            BCRBlk _ b' -> b'   -- XXX
+            BCRBlk _ b' -> dropUnusedEx b'   -- XXX
         lambdaEffs = [Efails, Eiterates, Ewrong]
+
+-- When throwing away the heap, we need to get rid of things only bound in the heap.
+dropUnusedEx :: BBlock -> BBlock
+dropUnusedEx b = b{ vars = vars b `intersect` freeBVars (binds b, result b) }
 
 ---------------------------------------------
 
