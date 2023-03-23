@@ -9,6 +9,7 @@ import Control.Monad.State.Strict
 import Data.Coerce
 import Data.Data(Data)
 import Data.List
+import Data.Maybe
 --import qualified Data.Map as M
 import Epic.Print
 import Epic.Uniplate
@@ -30,7 +31,7 @@ subset xs ys = null (xs \\ ys)
 --  * limit effects for lambda bodies
 
 doTrace :: Bool
-doTrace = False
+doTrace = True
 
 dtrace :: String -> a -> a
 dtrace s a | doTrace = trace s a
@@ -51,7 +52,7 @@ evalChoiceFull :: BHeap -> AllowedEffects -> BChoice -> BChoice
 evalChoiceFull h aeffs c =
   case evalChoice h aeffs [] c of
     BCFork (BCRBlk h' b) c2 -> BCFork (BCBlk b) (evalChoiceFull h' aeffs c2)
-    BCFork (BCBlk b) c2 -> BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
+    BCFork (BCBlk b) c2 -> undefined -- BCFork (BCBlk b) (evalChoiceFull h aeffs c2)  -- XXX
     BCRBlk _ b -> BCBlk b  -- throw away the heap
     c' -> c'
 
@@ -163,6 +164,9 @@ data BHNF
 pattern BVInt :: Integer -> BValue
 pattern BVInt i = BHNF (BInt i)
 
+pattern BVRef :: BPtr -> BValue
+pattern BVRef i = BHNF (BRef i)
+
 pattern BVArr :: [BValue] -> BValue
 pattern BVArr vs = BHNF (BArr vs)
 
@@ -189,7 +193,7 @@ type Effects = [Effect]
 allEffects :: Effects
 allEffects = [minBound .. maxBound]
 
-data BHeap = BHeap (IM.SIntMap Ptr BValue) | BNoHeap
+data BHeap = BHeap (IM.SIntMap BPtr BValue) | BNoHeap
   deriving (Show, Eq, Data)
 
 newtype BPtr = BPtr Int
@@ -201,6 +205,22 @@ emptyHeap = BHeap IM.empty
 -- Use this heap when no memory operations should happen
 dummyHeap :: BHeap
 dummyHeap = BNoHeap
+
+heapAlloc :: BHeap -> BValue -> (BHeap, BPtr)
+heapAlloc BNoHeap _ = error "heapAlloc: NoHeap"
+heapAlloc (BHeap h) v =
+  let p | IM.null h = BPtr 0
+        | otherwise = succ (fst (IM.findMax h))
+      h' = IM.insert p v h
+  in  (BHeap h', p)
+
+heapRead :: BHeap -> BPtr -> BValue
+heapRead BNoHeap _ = error "heapRead: NoHeap"
+heapRead (BHeap h) p = fromMaybe (error $ "heapRead: " ++ show p) $ IM.lookup p h
+
+heapWrite :: BHeap -> BPtr -> BValue -> BHeap
+heapWrite BNoHeap _ _ = error "heapWrite: NoHeap"
+heapWrite (BHeap h) p v = BHeap $ IM.insert p v h
 
 -----------------------------------------
 
@@ -630,15 +650,15 @@ evalChoice heap aeffs beffs (BCFork c1 c2) =
   case evalChoice heap aeffs beffs c1 of
     BCFail -> evalChoice heap aeffs beffs c2
     c@BCWrong{} -> c
-    c@BCBlk{} -> BCFork c c2  -- XXX
-    BCFork d1@(BCRBlk _ _) d2 -> BCFork d1 (BCFork d2 c2)
-    BCFork d1 d2 -> BCFork d1 (BCFork d2 c2) -- XXX
+--    c@BCBlk{} -> undefined -- BCFork c c2  -- XXX
+--    BCFork d1@(BCRBlk _ _) d2 -> BCFork d1 (BCFork d2 c2)
+    BCFork d1@BCRBlk{} d2 -> BCFork d1 (BCFork d2 c2) -- XXX
     c@BCRBlk{} -> BCFork c c2
+    _ -> error "impossible"
 evalChoice heap aeffs beffs (BCBlk b) = evalBlock heap aeffs beffs b
 evalChoice _ _ _ BCFail = BCFail
 evalChoice _ _ _ c@(BCWrong _) = c
---evalChoice _ _ _ c@(BCRBlk BNoHeap _) = c
-evalChoice h _ _ c@(BCRBlk h' _) | h == h' = c
+evalChoice heap aeffs beffs (BCRBlk h b) | heap == h = evalBlock heap aeffs beffs b
 evalChoice _ _ _ c@BCRBlk{} = error $ "evalChoice: " ++ prettyShow c
 
 -- If the returned choice is
@@ -661,6 +681,13 @@ checkPostCond _ _ c@BCFork{} = error $ "checkPostCond: " ++ prettyShow c
 checkPostCond _ _ c = c
 -}
 
+freshenHeap :: [BIdent] -> [BIdent] -> BHeap -> ([BIdent], BHeap)
+freshenHeap used bnd h =
+  let xs = intersect bnd (freeBVars h)
+      is = take (length xs) $ bIdentsNotIn used
+      s = zip xs $ map BVar is
+  in  (is, bsubst s h)
+
 evalBlock' :: BHeap -> AllowedEffects -> BlockedEffects -> BBlock -> BChoice
 evalBlock' _ _ _ BBlock{ binds = (_, BFail) : _ } = BCFail             -- XXX check effs?
 evalBlock' _ _ _ BBlock{ binds = (_, BWrong s) : _ } = BCWrong s       -- XXX check effs?
@@ -676,7 +703,8 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
       | dtrace ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
     sweep _     done h bvars     [] bresult =
       -- End of binds reached, no further progress possible
-      BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
+--      BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
+      BCRBlk h BBlock{ vars = bvars `intersect` freeBVars (h, done, bresult), binds = reverse done, result = bresult }
     sweep beffs done heap bvars bbinds@(eqn@(val, expr) : bs) bresult =
       let
         -- Swap so local binding is first
@@ -714,6 +742,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         unify v (BVar x) = unify (BVar x) v
         -- Equal integers are ok
         unify (BVInt i) (BVInt j) | i == j = succeeds []
+        unify (BVRef i) (BVRef j) | i == j = succeeds []
         -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
@@ -733,25 +762,27 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
 
         -- Put es on the unprocessed bindings and continue the sweep
         succeeds :: [BEqn] -> BChoice
-        succeeds = succeeds' []
-        succeeds' is es = sweep beffs done dummyHeap (is ++ bvars) (es ++ bs) bresult
+        succeeds = succeeds' heap
+        succeeds' h es = succeeds'' h [] es
+        succeeds'' h is es = sweep beffs done h (is ++ bvars) (es ++ bs) bresult
 
         -- Put eqn on the done list, block its effects, and continue the sweep
         suspend :: BEqn -> BChoice
         suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) heap bvars bs bresult
       in
-        let blk = BBlock{ vars = bvars, binds = undefined, result = bresult }
-            allvars = bvars ++ allBVars (done, bbinds, bresult)
+        let allvars = bvars ++ allBVars (done, bbinds, bresult)
         in
         -- Examine the expression and evaluate if possible.
+        trace ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
           BPrimOp op vs | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
                         | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
+                        | Just (h, e) <- evalPrimHeapOp heap op vs -> succeeds' h [(val, e)]
                         | otherwise -> suspend eqn
           BApply f a | BVLam i b <- f ->
                          -- Bind the argument and insert the lambda body
                          let (i', b') = freshenLambda allvars (i, b)
-                         in  succeeds' [i'] [(BVar i', BVal a), (val, BEBlk b')]
+                         in  succeeds'' heap [i'] [(BVar i', BVal a), (val, BEBlk b')]
                      | BVArr vs <- f ->
                        let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                                  | (i, v) <- zip [0..] vs ]
@@ -763,28 +794,34 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
               BCFail -> succeeds [(val, BApply f (BVArr []))]
               BCWrong s -> wrongs s
-              BCBlk b@BlockValue{} -> callG b BCFail
-              BCFork (BCBlk b@BlockValue{}) r -> callG b r
+--              BCBlk b@BlockValue{} -> callG dummyHeap b BCFail
+--              BCFork (BCBlk b@BlockValue{}) r -> callG dummyHeap b r
+              BCRBlk heap' b@BlockValue{} -> callG (freshenHeap allvars (vars b) heap') b BCFail
+              BCFork (BCRBlk heap' b@BlockValue{}) r -> callG (freshenHeap allvars (vars b) heap') b r
+--              _ -> suspend eqn  -- XXX Work done in c is lost.  Hard to do right with effects
+              BCBlk{} -> error "impossible"
+              BCFork BCBlk{} _ -> error "impossible"
               c' -> suspend (val, BSplit c' f g)
-            where callG b r =
-                    let (vb: a1: a2: a3: dummy: _) = bIdentsNotIn (vars blk ++ freeBVars (b, c))
-                        b0 = (BVar vb, BChoice (BCBlk b))
+            where callG (is, h) b r =
+                    trace ("callG " ++ prettyShow (is, h, b, r, val)) $
+                    let (vb: a1: a2: a3: dummy: _) = bIdentsNotIn (is ++ allvars ++ freeBVars (b, c))
+                        b0 = (BVar vb, BEBlk b)
                         b1 = (BVar a1, BApply g (BVar vb))
                         b2 = (BVar a2, BApply (BVar a1) (BVLam dummy (blkChoice r)))
                         b3 = (BVar a3, BApply (BVar a2) g)
                         bb = BBlock{ vars = [vb, a1, a2, a3], binds = [b0,b1,b2,b3], result = BVar a3 }
-                    in  succeeds [(val, BEBlk bb)]
+                    in  succeeds'' h is [(val, BEBlk bb)]
           BChoice BCFail -> fails
           BChoice (BCWrong s) -> wrongs s
           BChoice (BCBlk b) ->
             let rhs = freshenBlock allvars b
-            in  succeeds' (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
+            in  succeeds'' heap (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
           BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
                                  | notBlocked Eiterates beffs -> evalChoice heap aeffs bbeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
             where
-              c1 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x1)] ++ bs }
-              c2 = BCBlk $ blk{ binds = rdone ++ [(val, BChoice x2)] ++ bs }
+              c1 = BCBlk $ BBlock{ vars = bvars, binds = rdone ++ [(val, BChoice x1)] ++ bs, result = bresult }
+              c2 = BCBlk $ BBlock{ vars = bvars, binds = rdone ++ [(val, BChoice x2)] ++ bs, result = bresult }
               rdone = reverse done
           BChoice (BCRBlk _ _) -> error "impossible"
           BVal v -> unify val v
@@ -839,8 +876,30 @@ evalPrimOp op vs | op == Print =
       Just $ BVal $ BVArr []
     _ | any isBVar vs -> Nothing
       | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
-  
+evalPrimOp op _ | op `elem` [Alloc, Read, Write, AddTo] = Nothing
 evalPrimOp op vs = error $ "evalPrimOp: " ++ show (op, vs)
+
+evalPrimHeapOp :: BHeap -> Op -> [BValue] -> Maybe (BHeap, BExpr)
+evalPrimHeapOp h op@Alloc vs =
+  case vs of
+    [v] -> Just (h', BVal $ BVRef r) where (h', r) = heapAlloc h v
+    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
+evalPrimHeapOp h op@Read vs =
+  case vs of
+    [BVRef r] -> Just (h, BVal $ heapRead h r)
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
+evalPrimHeapOp h op@Write vs =
+  case vs of
+    [BVRef r, v] -> Just (heapWrite h r v, BVal $ BVArr [])
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
+evalPrimHeapOp h op@AddTo vs =
+  case vs of
+    [BVRef r, BVInt i] | BVInt j <- heapRead h r, let v = BVInt $ j + i -> Just (heapWrite h r v, BVal v)
+    _ | any isBVar vs -> Nothing
+      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
+evalPrimHeapOp _ _ _ = Nothing
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
 compareOps = [(Gt, (>)), (Ge, (>=)), (Lt, (<)), (Le, (<=)), (Ne, (/=))]
