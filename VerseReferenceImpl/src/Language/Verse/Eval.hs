@@ -167,7 +167,8 @@ eval' e = case extract e of
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     for'
       (do
           xs <- for xs freshNamed
@@ -177,8 +178,8 @@ eval' e = case extract e of
           fmap Identity1 . localNames xs $ eval' e2)
       (\ vars -> do
           unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars)
-          unify storeFree =<< get)
-    put storeFree
+          unify storeFree storeFree')
+    put storeFree'
     pure var
   Exp.Exists x e -> do
     var <- freshVar
@@ -320,7 +321,7 @@ evalInvoke loc e1 e2 = do
         empty
         (zip xs [0 ..])
       unify storeFree storeFree'
-    Val.Overloads overload var1 -> do
+    Val.Overloads overload var1 ->
       fix (\ recur overload var1 -> case overload of
         Overload.Function _ env xs e_domain e ->
           ifte''
@@ -331,7 +332,8 @@ evalInvoke loc e1 e2 = do
               pure $ Env1 xs)
           (\ (Env1 xs) -> do
               let env' = xs <> env
-              unify var =<< local (const env') (eval' e)) $
+              unify var =<< local (const env') (eval' e)
+              unify storeFree storeFree') $
           whenBound var1 $ \ case
             Val.Overloads overload var1 -> recur overload var1
             _ -> throwDomainError loc
@@ -340,6 +342,7 @@ evalInvoke loc e1 e2 = do
           xs <- for xs freshNamed
           _ <- local (const $ xs <> env) . lift . evalWriterT $ eval' e
           unify var2 =<< newVar (Val.StructInst i $ fromIdents xs)
+          unify storeFree storeFree'
         Overload.Class i env var_super xs e -> do
           unify var var2
           fix (\ recur var2 -> whenBound var2 $ \ case
@@ -350,13 +353,15 @@ evalInvoke loc e1 e2 = do
                 unify var2 =<< newVar (Val.ClassInst i var_super $ fromIdents xs)
             Val.ClassInst _ (Just var2) _ -> recur var2
             _ -> empty) var2
+          unify storeFree storeFree'
         Overload.Intrinsic intrinsic ->
           invokeIntrinsic intrinsic var2 $ \ case
-            Just var' -> unify var var'
+            Just var' -> do
+              unify var var'
+              unify storeFree storeFree'
             Nothing -> whenBound var1 $ \ case
               Val.Overloads overload var1 -> recur overload var1
               _ -> throwDomainError loc) overload var1
-      unify storeFree storeFree'
     _ -> throwDomainError loc
   put storeFree'
   pure var
@@ -683,11 +688,12 @@ ifte'' :: (MonadVerse m, Freshenable f) =>
           EvalT m () ->
           EvalT m ()
 ifte'' p t e = do
-  storeFree <- freshVar
+  storeFree <- get
+  storeFree' <- freshVar
   ifte'
     p
-    (\ x -> t x *> (unify storeFree =<< get))
-    (e *> (unify storeFree =<< get))
+    (\ x -> t x *> unify storeFree storeFree')
+    (e *> unify storeFree storeFree')
   put storeFree
 
 readVarRef' :: ( MonadState (Var m StoreFree) m
