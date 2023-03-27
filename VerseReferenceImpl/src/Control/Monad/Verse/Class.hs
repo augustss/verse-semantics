@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -11,7 +12,6 @@ module Control.Monad.Verse.Class
 
 import Control.Applicative
 import Control.Monad.Reader
-import Control.Monad.Ref
 import Control.Monad.RST
 import Control.Monad.Trans.Writer.CPS qualified as CPS
 import Control.Monad.Unify
@@ -19,7 +19,7 @@ import Control.Monad.Var
 
 import Data.Freshenable
 
-class (MonadUnify m, MonadRef m) => MonadVerse m where
+class (MonadUnify m, MonadVarRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
   split :: Freshenable f =>

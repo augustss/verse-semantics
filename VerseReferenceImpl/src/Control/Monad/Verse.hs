@@ -30,7 +30,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
 import Control.Monad.Unify
-import Control.Monad.Var (MonadVar, freshenVar, readVar)
+import Control.Monad.Var (EqVarRef, MonadVar, MonadVarRef, freshenVar, readVar)
 import Control.Monad.Var qualified
 import Control.Monad.Verse.Class
 
@@ -73,7 +73,7 @@ observeAllT' :: MonadRef m =>
                 StateT (Heaps m) (SupplyT Label m) [a]
 observeAllT' m = unLogicT m sk fk
   where
-    sk x fk = (lift . lift . commit' =<< gets heap) *> ((x:) <$> fk)
+    sk x fk = (lift . commit' =<< gets heap) *> ((x:) <$> fk)
     fk = pure []
 
 emptyHeaps :: Heaps m
@@ -95,22 +95,6 @@ instance MonadRef m => Alternative (VerseT m) where
 instance MonadRef m => MonadPlus (VerseT m)
 
 instance MonadSupply s m => MonadSupply s (VerseT m)
-
-newtype TRef m a = TRef { unTRef :: Ref m (RefState a) }
-
-instance EqRef (Ref m) => EqRef (TRef m) where
-  eqRef = eqRef `on` unTRef
-
-instance MonadRef m => MonadRef (VerseT m) where
-  type Ref (VerseT m) = TRef m
-
-  newRef = fmap TRef . lift . newRef . RefState mempty
-
-  readRef ref = lift . readRefState (unTRef ref) =<< getHeap
-
-  writeRef ref x = do
-    lift . writeRefState (unTRef ref) x =<< getHeap
-    addCommit $ writeRefState (unTRef ref) x
 
 newVar' :: MonadRef m => f (Var m f) -> SupplyT Label m (Var m f)
 newVar' x = lift . fmap Var . newLRef' . Repr . flip Bound x =<< supply
@@ -158,6 +142,9 @@ runFreshenT m = do
   h <- getHeap
   VerseT . lift . lift . lift $ evalRST m h mempty
 
+runFreshenT' :: Monad m => FreshenT f m a -> Heap m -> CommitT m a
+runFreshenT' m h = evalRST m h mempty
+
 freshenVar' :: ( MonadFix m
                , MonadRef m
                , Traversable f
@@ -170,6 +157,36 @@ freshenVar' var = do
         Left x -> pure x
         Right s -> put s *> (lift . newVar' =<< traverse freshenVar' x)
     (var, Unbound _ _) -> pure var
+
+newtype VarRef m f = VarRef { unVarRef :: Ref m (RefState (Var m f)) }
+
+instance EqRef (Ref m) => EqVarRef (VarRef m) where
+  eqVarRef = eqRef `on` unVarRef
+
+instance (MonadFix m, MonadRef m) => MonadVarRef (VerseT m) where
+  type VarRef (VerseT m) = VarRef m
+
+  newVarRef x = do
+    h <- getHeap
+    lift $ do
+      ref <- fmap VarRef . newRef $ RefState mempty x
+      addWriteCommit' ref h
+      pure ref
+
+  readVarRef ref = lift . readRefState (unVarRef ref) =<< getHeap
+
+  writeVarRef ref x = do
+    h <- getHeap
+    lift $ writeRefState (unVarRef ref) x h *> addWriteCommit' ref h
+
+addWriteCommit' :: ( MonadFix m
+                   , MonadRef m
+                   , Traversable f
+                   ) => VarRef m f -> Heap m -> m ()
+addWriteCommit' ref = addCommit' $ \ h h' -> do
+  x <- lift $ readRefState (unVarRef ref) h
+  x' <- runFreshenT' (freshenVar' x) h
+  lift $ writeRefState (unVarRef ref) x' h'
 
 instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
   unify var_x var_y = do
@@ -254,7 +271,15 @@ newtype Heaps m = Heaps
   { heap :: (Heap m)
   }
 
-type Commit m = Heap m -> m ()
+type Commit m = Heap m -> Heap m -> CommitT m ()
+
+emptyCommit :: Monad m => Commit m
+emptyCommit _ _ = pure ()
+
+type CommitT m = SupplyT Label m
+
+runCommitT :: Monad m => CommitT m a -> VerseT m a
+runCommitT = VerseT . lift . lift . lift
 
 data Listener m a = Listener
   !(Heap m)
@@ -546,20 +571,20 @@ writeRefState ref x = \ case
     RefState (LabelMap.insert i x xs) y
 
 commit :: MonadRef m => Heap m -> VerseT m ()
-commit = lift . commit'
+commit = runCommitT . commit'
 
-commit' :: MonadRef m => Heap m -> m ()
-commit' = commit'' (const $ pure ())
+commit' :: MonadRef m => Heap m -> CommitT m ()
+commit' = commit'' emptyCommit
 
-commit'' :: MonadRef m => Commit m -> Heap m -> m ()
+commit'' :: MonadRef m => Commit m -> Heap m -> CommitT m ()
 commit'' f' = \ case
-  Cons _ _ x ref_f h' -> do
+  h@(Cons _ _ x ref_f h') -> do
     f <- readRef ref_f
-    writeRef ref_f . const $ pure ()
-    let f'' x = f x *> f' x
-    f'' h'
+    writeRef ref_f emptyCommit
+    let f'' h h' = f h h' *> f' h h'
+    f'' h h'
     case x of
-      Split -> addCommit' f'' h'
+      Split -> lift $ addCommit' f'' h'
       Choice -> commit'' f'' h'
   Nil -> pure ()
 
@@ -567,13 +592,13 @@ pushSplit :: MonadRef m => VerseT m ()
 pushSplit = do
   i <- VerseT supply
   h <- getHeap
-  ref_f <- lift . newRef . const $ pure ()
+  ref_f <- lift $ newRef emptyCommit
   putHeap $ Cons i Nil Split ref_f h
 
 pushChoice :: MonadRef m => Heap m -> VerseT m ()
 pushChoice h = do
   i <- VerseT supply
-  ref_f <- lift . newRef . const $ pure ()
+  ref_f <- lift $ newRef emptyCommit
   let h' = Cons i Nil Choice ref_f h
   putHeap h'
   putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners
@@ -665,12 +690,9 @@ stateHeap :: Monad m => (Heap m -> (a, Heap m)) -> VerseT m a
 stateHeap f = VerseT . lift . state $ \ s ->
   f s.heap <&> \ heap -> s { heap }
 
-addCommit :: MonadRef m => Commit m -> VerseT m ()
-addCommit f = lift . addCommit' f =<< getHeap
-
 addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
 addCommit' f = \ case
-  Cons _ _ _ ref_f _ -> modifyRef ref_f $ \ f' h -> f' h *> f h
+  Cons _ _ _ ref_f _ -> modifyRef ref_f $ \ f' h h' -> f' h h *> f h h'
   Nil -> pure ()
 
 modifyHeaps :: Monad m => (Heaps m -> Heaps m) -> VerseT m ()
