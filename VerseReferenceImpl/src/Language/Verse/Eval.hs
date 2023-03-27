@@ -116,19 +116,21 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     once' (Identity1 <$> eval' e) $ \ (Identity1 var_e) -> do
       unify var var_e
-      unify storeFree =<< get
-    put storeFree
+      unify storeFree storeFree'
+    put storeFree'
     pure var
   Exp.All e -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     all' (Identity1 <$> eval' e) $ \ vars_e -> do
       unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars_e)
-      unify storeFree =<< get
-    put storeFree
+      unify storeFree storeFree'
+    put storeFree'
     pure var
   Exp.Not e -> do
     ifte''
