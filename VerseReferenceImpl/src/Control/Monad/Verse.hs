@@ -580,7 +580,6 @@ commit'' :: MonadRef m => Commit m -> Heap m -> CommitT m ()
 commit'' f' = \ case
   h@(Cons _ _ x ref_f h') -> do
     f <- readRef ref_f
-    writeRef ref_f emptyCommit
     let f'' h h' = f h h' *> f' h h'
     f'' h h'
     case x of
@@ -692,7 +691,7 @@ stateHeap f = VerseT . lift . state $ \ s ->
 
 addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
 addCommit' f = \ case
-  Cons _ _ _ ref_f _ -> modifyRef ref_f $ \ f' h h' -> f' h h *> f h h'
+  Cons _ _ _ ref_f _ -> modifyRef ref_f $ \ f' h h' -> f' h h' *> f h h'
   Nil -> pure ()
 
 modifyHeaps :: Monad m => (Heaps m -> Heaps m) -> VerseT m ()
