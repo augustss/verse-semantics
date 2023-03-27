@@ -36,7 +36,7 @@ class (MonadUnify m, MonadRef m) => MonadVerse m where
   once' m f = ifte' m f empty
 
   lnot' :: m a -> m ()
-  lnot' m = ifte' (VarUnit <$ m) (const empty) (pure ())
+  lnot' m = ifte' (Unit1 <$ m) (const empty) (pure ())
 
   for' :: (Freshenable f, Freshenable g) =>
           m (f (Var m)) ->

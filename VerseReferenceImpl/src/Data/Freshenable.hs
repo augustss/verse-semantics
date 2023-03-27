@@ -1,33 +1,32 @@
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Data.Freshenable
   ( Freshenable (..)
-  , VarUnit (..)
-  , VarIdentity (..)
-  , VarSum (..)
+  , Unit1 (..)
+  , Identity1 (..)
+  , Sum1 (..)
   ) where
-
-import Control.Monad.Var
 
 import Data.Kind
 
-class Freshenable f where
-  freshen :: MonadVar m => f (Var m) -> m (f (Var m))
+class Freshenable (t :: ((Type -> Type) -> Type) -> Type) where
+  freshen :: Applicative m => (forall f . Traversable f => g f -> m (h f)) -> t g -> m (t h)
 
-data VarUnit (var :: (Type -> Type) -> Type) = VarUnit
+data Unit1 (f :: (Type -> Type) -> Type) = Unit1
 
-instance Freshenable VarUnit where
-  freshen = pure
+instance Freshenable Unit1 where
+  freshen _ _ = pure Unit1
 
-newtype VarIdentity f (var :: (Type -> Type) -> Type) = VarIdentity
-  { runVarIdentity :: var f
+newtype Identity1 f (g :: (Type -> Type) -> Type) = Identity1
+  { runIdentity1 :: g f
   }
 
-instance Traversable f => Freshenable (VarIdentity f) where
-  freshen = fmap VarIdentity . freshenVar . runVarIdentity
+instance Traversable f => Freshenable (Identity1 f) where
+  freshen f = fmap Identity1 . f . runIdentity1
 
-data VarSum f g (var :: (Type -> Type) -> Type) = VarSum (f var) (g var)
+data Sum1 g h (f :: (Type -> Type) -> Type) = Sum1 (g f) (h f)
 
-instance (Freshenable f, Freshenable g) => Freshenable (VarSum f g) where
-  freshen (VarSum x y) = VarSum <$> freshen x <*> freshen y
+instance (Freshenable g, Freshenable h) => Freshenable (Sum1 g h) where
+  freshen f (Sum1 x y) = Sum1 <$> freshen f x <*> freshen f y
