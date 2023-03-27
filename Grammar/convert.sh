@@ -1,0 +1,2 @@
+sed -e '1,/%%/d' | sed -e "s/'{'/'%['/g" -e "s/'}'/'%]'/g"  | sed -e ':x /{[^}]*$/ { N; s/\n//g ; bx }' -e 's/{.*}//' -e 's/:://' -e 's/: /::= /' -e "s/\(block\|class\|do\|else\|false\|for\|function\|if\|module\|\not\|set\|struct\|sync\|then\|true\|truth\|var\)/'\1'/g" -e 's/%prec [a-zA-Z_]* //' | sed -e "s/%\[/{/g" -e "s/%]/}/g" -e '/one Block/d' -e '/all Block/d' -e '/fail/d' -e '/Exists/d' -e '/exists/d' -e 's/int/Int/g' -e 's/float/Float/g' -e 's/name/Name/g'
+cat non-term.ebnf
