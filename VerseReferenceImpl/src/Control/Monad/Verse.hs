@@ -294,7 +294,7 @@ split' m f = do
         True -> do
           h <- getHeap
           putHeap h'
-          x <- freshen x
+          x <- freshen freshenVar x
           commit h'
           putHeap h
           f $ Just (x, putHeap h' *> m)

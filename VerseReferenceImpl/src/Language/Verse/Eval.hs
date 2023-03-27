@@ -76,14 +76,14 @@ type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
 
 type Env m = HashMap Ident (Named m (Var m (Val m)))
 
-newtype VarEnv m var = VarEnv
-  { unVarEnv :: HashMap Ident (Named m (var (Val m)))
+newtype Env1 m f = Env1
+  { unEnv1 :: HashMap Ident (Named m (f (Val m)))
   }
 
-instance Freshenable (VarEnv m) where
-  freshen xs = fmap VarEnv . for (unVarEnv xs) $ \ case
-    Val x -> Val <$> freshenVar x
-    x@(Ref _) -> pure x
+instance Freshenable (Env1 m) where
+  freshen f xs = fmap Env1 . for (unEnv1 xs) $ \ case
+    Val x -> Val <$> f x
+    Ref x -> pure $ Ref x
 
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = do
@@ -119,7 +119,7 @@ eval' e = case extract e of
   Exp.One e -> do
     var <- freshVar
     storeFree <- freshVar
-    once' (VarIdentity <$> eval' e) $ \ (VarIdentity var_e) -> do
+    once' (Identity1 <$> eval' e) $ \ (Identity1 var_e) -> do
       unify var var_e
       unify storeFree =<< get
     put storeFree
@@ -127,14 +127,14 @@ eval' e = case extract e of
   Exp.All e -> do
     var <- freshVar
     storeFree <- freshVar
-    all' (VarIdentity <$> eval' e) $ \ vars_e -> do
-      unify var =<< newVar (Val.Tuple $ runVarIdentity <$> vars_e)
+    all' (Identity1 <$> eval' e) $ \ vars_e -> do
+      unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars_e)
       unify storeFree =<< get
     put storeFree
     pure var
   Exp.Not e -> do
     ifte''
-      (VarUnit <$ eval' e)
+      (Unit1 <$ eval' e)
       (const empty)
       (pure ())
     newVar $ Val.Tuple []
@@ -162,8 +162,8 @@ eval' e = case extract e of
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
-          pure $ VarEnv xs)
-      (\ (VarEnv xs) ->
+          pure $ Env1 xs)
+      (\ (Env1 xs) ->
           unify var =<< localNames xs (eval' t))
       (unify var =<< eval' e)
     pure var
@@ -174,11 +174,11 @@ eval' e = case extract e of
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
-          pure $ VarEnv xs)
-      (\ (VarEnv xs) ->
-          fmap VarIdentity . localNames xs $ eval' e2)
+          pure $ Env1 xs)
+      (\ (Env1 xs) ->
+          fmap Identity1 . localNames xs $ eval' e2)
       (\ vars -> do
-          unify var =<< newVar (Val.Tuple $ runVarIdentity <$> vars)
+          unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars)
           unify storeFree =<< get)
     put storeFree
     pure var
@@ -327,8 +327,8 @@ evalInvoke loc e1 e2 = do
               xs <- for xs freshNamed
               let env' = xs <> env
               unify var2 =<< local (const env') (eval' e_domain)
-              pure $ VarEnv xs)
-          (\ (VarEnv xs) -> do
+              pure $ Env1 xs)
+          (\ (Env1 xs) -> do
               let env' = xs <> env
               unify var =<< local (const env') (eval' e)) $
           whenBound var1 $ \ case
@@ -400,8 +400,8 @@ liftOrd f var k =
           (Val.Rational x, Val.Float y) -> newBool $ f x (toRational y)
           (Val.Rational x, Val.Rational y) -> newBool $ f x y
           _ -> empty
-      pure $ VarSum (VarIdentity var_p) (VarIdentity var_x))
-  (\ (VarSum (VarIdentity var_p) (VarIdentity var_x)) ->
+      pure $ Sum1 (Identity1 var_p) (Identity1 var_x))
+  (\ (Sum1 (Identity1 var_p) (Identity1 var_x)) ->
       whenBound var_p $ getConst >>> \ case
         True -> k $ Just var_x
         False -> empty)
@@ -443,8 +443,8 @@ liftNum f var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Val.Rational $ f x y
           _ -> empty
-      pure $ VarIdentity var')
-  (k . Just . runVarIdentity)
+      pure $ Identity1 var')
+  (k . Just . runIdentity1)
   (k Nothing)
 
 prefixPlus :: MonadVerse m =>
@@ -459,8 +459,8 @@ prefixPlus var k =
         Val.Float _ -> pure ()
         Val.Rational _ -> pure ()
         _ -> empty
-      pure $ VarIdentity var)
-  (k . Just . runVarIdentity)
+      pure $ Identity1 var)
+  (k . Just . runIdentity1)
   (k Nothing)
 
 prefixMinus :: (MonadVerse m, EqRef (Ref m)) =>
@@ -476,8 +476,8 @@ prefixMinus var k =
         Val.Float x -> newVar . Val.Float $ negate x
         Val.Rational x -> newVar . Val.Rational $ negate x
         _ -> empty
-      pure $ VarIdentity var')
-  (k . Just . runVarIdentity)
+      pure $ Identity1 var')
+  (k . Just . runIdentity1)
   (k Nothing)
 
 data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
@@ -518,8 +518,8 @@ div' var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Const . Just . Rational $ x / y
           _ -> empty
-      pure $ VarIdentity var')
-  (\ (VarIdentity var) -> whenBound var $ getConst >>> \ case
+      pure $ Identity1 var')
+  (\ (Identity1 var) -> whenBound var $ getConst >>> \ case
       Nothing -> empty
       Just (Int x) -> k . Just =<< newVar (Val.Int x)
       Just (Float x) -> k . Just =<< newVar (Val.Float x)
@@ -537,8 +537,8 @@ int var k =
         Val.Int _ -> pure ()
         Val.Rational x | denominator x == 1 -> pure ()
         _ -> empty
-      pure $ VarIdentity var)
-  (k . Just . runVarIdentity)
+      pure $ Identity1 var)
+  (k . Just . runIdentity1)
   (k Nothing)
 
 instSuper :: MonadEval m =>
