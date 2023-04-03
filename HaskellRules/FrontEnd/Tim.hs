@@ -203,6 +203,7 @@ dsExpr sc i x (InfixOp s0 (Op "where") s1) = do
 dsExpr sc i x (InfixOp s0 (Op ":") s1) = dsExpr sc i x (InfixOp s0 (Op ":=") (PrefixOp (Op ":") s1))
 dsExpr sc i x (InfixOp s0 (Op op) s1) | op `elem` binOps =
   dsExpr sc i x (ApplyD (Variable f) (Array [s0, s1])) where f = Ident noLoc $ toOperator op
+dsExpr sc i x (InfixOp s0 (Op "=>") s1) = dsExpr sc i x $ Function [(s0, [])] s1
 {-
 dsExpr _ _ _ (InfixOp _ _ _) = undefined
 dsExpr _ _ _ (If1 _) = undefined
@@ -514,10 +515,10 @@ Intrinsic Macro Reductions:
                                         Will fix. We mean to say: the domain has a new scope,
                                         and the range has a new scope seeing the domain scope.
         !!specifiers and scope for specifiers
-    V(sc,i,x,operator'=>'(s0){s1}) ---> V(sc,i,x,function(s0){s1})
+*    V(sc,i,x,operator'=>'(s0){s1}) ---> V(sc,i,x,function(s0){s1})
     V(sc,i,x,s0?}                  ---> exists j y. V(sc,j,y,s0); s0[_]
     V(sc,i,x,s0<>s1)               ---> V(sc,i,x,s0 where for(y:=s1). not x=y)
-    V(sc,i,x,type{s0})             ---> V(sc,i,x,function(y:=s0)<closed>. y)
+*    V(sc,i,x,type{s0})             ---> V(sc,i,x,function(y:=s0)<closed>. y)
 
 Macro Reductions For Testing
     V(sc,i,x,assume<fx>{s0})       ---> assume fx c j y. sc.fx{i=j}; sx.fx{x=y}; enter(c){V(sc.fx?!!,j,y,s0)}
