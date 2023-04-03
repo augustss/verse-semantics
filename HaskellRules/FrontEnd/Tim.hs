@@ -226,6 +226,8 @@ dsExpr sc i x (Block es) = dsExprs sc i x es
 dsExpr sc i x (Seq es) = dsExprs sc i x es
 --dsExpr _ _ _ (Option _) = undefined
 dsExpr sc i x (Parens e) = dsExpr sc i x e
+dsExpr sc i x (Typedef s0) = dsExpr sc i x $ Function [(InfixOp y (Op ":=") s0, [Ef "closed"])] y
+  where y = Variable (Ident noLoc "y$")
 {-
 dsExpr _ _ _ (Set _ _ _) = undefined
 dsExpr _ _ _ (MVar _ _ _) = undefined
