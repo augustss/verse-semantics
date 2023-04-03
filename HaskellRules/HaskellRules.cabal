@@ -53,6 +53,7 @@ library all
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
+                      FrontEnd.Tim
                       Verifier.Verify
                       Verifier.FOL
                       Rules.ICFP

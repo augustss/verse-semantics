@@ -15,6 +15,7 @@ module FrontEnd.Expr(
   Block,
   Eff,
   Op,
+  pattern Op,
   compos, composOp,
   seqE,
   ) where
@@ -119,6 +120,9 @@ pattern Typedef e <- Macro1 (Ident _ "type") [] e
 type Eff = Ident
 
 type Op = Ident
+pattern Op :: String -> Op
+pattern Op s <- Ident _ s
+  where Op s = Ident noLoc s
 
 type Block = Expr
 

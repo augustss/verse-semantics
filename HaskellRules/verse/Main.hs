@@ -21,6 +21,7 @@ import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
+import FrontEnd.Tim
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
@@ -81,14 +82,19 @@ data CState = CState
   }
 
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
+data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core] | Tim Prog
+
+asParsed :: SomeExpr -> Expr
+asParsed NoExpr = error "No current expression"
+asParsed (Parsed e) = e
+asParsed (Desugared _) = error "Current expression is desugared"
+asParsed (Cored _) = error "Current expression is Core"
+asParsed (Cores _) = error "Current expression is [Core]"
+asParsed (Tim _) = error "Current expression is Prog"
 
 asExpr :: SomeExpr -> Expr
-asExpr NoExpr = error "No current expression"
-asExpr (Parsed e) = e
 asExpr (Desugared e) = e
-asExpr (Cored _) = error "Current expression is Core"
-asExpr (Cores _) = error "Current expression is [Core]"
+asExpr e = asParsed e
 
 asDesugared :: SomeExpr -> Expr
 asDesugared (Parsed e) = desugar e
@@ -106,6 +112,7 @@ instance Show SomeExpr where
   show (Desugared e) = show e
   show (Cored e) = show e
   show (Cores e) = show e
+  show (Tim e) = show e
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr = text "No current expression"
@@ -116,6 +123,7 @@ instance Pretty SomeExpr where
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
                                      map (\ e -> pPrintPrec l 0 e $$ text "------------") es
+  pPrintPrec l p (Tim e) = pPrintPrec l p e
 
 command :: Command CState
 command = Command
@@ -142,6 +150,7 @@ command = Command
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
 --      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
+      , Cmd "tim [EXPR]"           "Tim desugaring of [last] expression"   cTim
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -343,6 +352,9 @@ cDisplay _ s = do
   mapM_ pp $ definitions s
   pure s
 -}
+
+cTim :: Run CState
+cTim = cTransform (Tim . dsProg . asParsed)
 
 cShow :: Run CState
 cShow =
