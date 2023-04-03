@@ -300,12 +300,13 @@ removeUnusedExists is ops =
       ops' = filter (not . useless) $ map f ops
       used = getUsed ops'
       is' = filter (`elem` used) is
+      ops'' = doInline is' ops'
   in
       (if False then trace ("***\n" ++ prettyShow (ExistsOp is ops, is, used)) else id) $
-      if is == is' && ops == ops' then
-          ExistsOp is' ops'
+      if is == is' && ops == ops'' then
+          ExistsOp is' ops''
       else
-          removeUnusedExists is' ops'
+          removeUnusedExists is' ops''
 
 useless :: Opc -> Bool
 useless (i :=: e) = i == unusedId && isValue e
@@ -316,6 +317,16 @@ isValue Int{} = True
 isValue Arr{} = True
 isValue Var{} = True
 isValue _ = False
+
+doInline :: [Id] -> Ops -> Ops
+doInline is ops =
+  case [ (i, i') | i :=: Var i' <- ops, i `elem` is ] of
+    (i, i') : _ -> filter (not . isRefl) $ substId i i' ops
+    _ -> ops
+
+isRefl :: Opc -> Bool
+isRefl (i :=: Var i') = i == i'
+isRefl _ = False
 
 simpExp :: Exp -> Exp
 simpExp (Lambd i1 i2 d i3 i4 r) = Lambd i1 i2 (map simpOpc d) i3 i4 (map simpOpc r)
@@ -343,6 +354,30 @@ instance GetUsed Exp where
 
 singleOcc :: (Ord a) => [a] -> [a]
 singleOcc = concat . filter ((== 1) . length) . group . sort
+
+class SubstId a where
+  substId :: Id -> Id -> a -> a
+
+instance (SubstId a) => SubstId [a] where
+  substId i i' = map (substId i i')
+
+instance SubstId Id where
+  substId i i' v | i == v = i'
+                 | otherwise = v
+
+instance SubstId Opc where
+  substId i i' (v :=: e) = substId i i' v :=: substId i i' e
+  substId i i' (ChoiceOp op1 op2) = ChoiceOp (substId i i' op1) (substId i i' op2)
+  substId i i' (ScopeOp ops) = ScopeOp (substId i i' ops)
+  substId i i' (ExistsOp is o) = ExistsOp is (substId i i' o)  -- all ids are unique
+  substId i i' (VerifyOp r o) = VerifyOp r (substId i i' o) 
+
+instance SubstId Exp where
+  substId _ _ e@Int{} = e
+  substId i i' (Var v) = Var (substId i i' v)
+  substId i i' (App i1 i2) = App (substId i i' i1) (substId i i' i2)
+  substId i i' (Arr is) = Arr (substId i i' is)
+  substId i i' (Lambd i1 i2 d i3 i4 r) = Lambd i1 i2 (substId i i' d) i3 i4 (substId i i' r)
 
 {-
 
