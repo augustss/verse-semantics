@@ -9,11 +9,9 @@ module Language.Verse.Named
   ( Named
   ) where
 
-import Control.Monad.Ref
 import Control.Monad.Var
 
 import Data.Kind
-import Data.Ref
 import Data.Unifiable
 
 import Language.Verse.Pretty
@@ -28,11 +26,10 @@ instance Foldable (Named m)
 
 instance Traversable (Named m)
 
-instance EqRef (Ref m) => Unifiable (Named m)
+instance EqVarRef (VarRef m) => Unifiable (Named m)
 
-instance EqRef (Ref m) => Zippable (Named m)
+instance EqVarRef (VarRef m) => Zippable (Named m)
 
-instance ( MonadRef m
-         , MonadPretty a m
-         , MonadVar m
+instance ( MonadPretty a m
+         , MonadVarRef m
          ) => MonadPretty (Named m a) m

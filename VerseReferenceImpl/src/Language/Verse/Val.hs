@@ -13,7 +13,6 @@ module Language.Verse.Val
   ) where
 
 import Control.Applicative
-import Control.Monad.Ref
 import Control.Monad.Trans.Maybe
 import Control.Monad.Var
 import Control.Monad.Writer.CPS
@@ -23,7 +22,6 @@ import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
-import Data.Ref
 import Data.Unifiable
 
 import Language.Verse.Label
@@ -45,7 +43,7 @@ data Val m a
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name (Named m a))
   | Overloads !(Overload m a) a deriving (Functor, Foldable, Traversable)
 
-instance EqRef (Ref m) => Unifiable (Val m) where
+instance EqVarRef (VarRef m) => Unifiable (Val m) where
   zipMatchM = curry $ \ case
     (Truth x, Truth y) ->
       pure $ Just [(x, y)]
@@ -109,8 +107,7 @@ uncons xs = readVar xs >>= \ case
   Just _ -> empty
   _ -> pure Nothing
 
-instance ( MonadRef m
-         , MonadVar m
+instance ( MonadVarRef m
          , MonadPretty a m
          ) => MonadPretty (Val m a) m where
   prettyM = \ case

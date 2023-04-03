@@ -21,7 +21,6 @@ import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader.Class
 import Control.Monad.RST
-import Control.Monad.Ref
 import Control.Monad.State.Class
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
@@ -37,7 +36,6 @@ import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
-import Data.Ref
 import Data.Traversable
 import Data.Unifiable
 
@@ -69,7 +67,7 @@ type MonadEval m =
   ( MonadError Error m
   , MonadSupply Label m
   , MonadVerse m
-  , EqRef (Ref m)
+  , EqVarRef (VarRef m)
   )
 
 type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
@@ -118,19 +116,21 @@ eval' e = case extract e of
     empty
   Exp.One e -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     once' (Identity1 <$> eval' e) $ \ (Identity1 var_e) -> do
       unify var var_e
-      unify storeFree =<< get
-    put storeFree
+      unify storeFree storeFree'
+    put storeFree'
     pure var
   Exp.All e -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     all' (Identity1 <$> eval' e) $ \ vars_e -> do
       unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars_e)
-      unify storeFree =<< get
-    put storeFree
+      unify storeFree storeFree'
+    put storeFree'
     pure var
   Exp.Not e -> do
     ifte''
@@ -169,7 +169,8 @@ eval' e = case extract e of
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
-    storeFree <- freshVar
+    storeFree <- get
+    storeFree' <- freshVar
     for'
       (do
           xs <- for xs freshNamed
@@ -179,21 +180,21 @@ eval' e = case extract e of
           fmap Identity1 . localNames xs $ eval' e2)
       (\ vars -> do
           unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars)
-          unify storeFree =<< get)
-    put storeFree
+          unify storeFree storeFree')
+    put storeFree'
     pure var
   Exp.Exists x e -> do
     var <- freshVar
     localName (extract x) (Val var) $ eval' e
   Exp.Var x e -> do
-    ref <- lift freshRef
+    ref <- lift freshVarRef
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupName' (extract x) >>= \ case
     Nothing -> throwIdentError (loc x) (extract x)
     Just (Val _) -> throwDomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
-      writeRef' ref =<< freshenVar var
+      writeVarRef' ref var
       pure var
   Exp.Function xs e1 e2 -> do
     i <- supply
@@ -229,17 +230,17 @@ evalDot loc e x = do
   whenBound var_e $ \ case
     Val.Module _ xs ->
       case HashMap.lookup x xs of
-        Just (Ref ref_x) -> readRef' ref_x $ unify var
+        Just (Ref ref_x) -> readVarRef' ref_x $ unify var
         Just (Val var_x) -> unify var var_x
         Nothing -> throwNameError loc x
     Val.StructInst _ xs ->
       case HashMap.lookup x xs of
-        Just (Ref ref_x) -> readRef' ref_x $ unify var
+        Just (Ref ref_x) -> readVarRef' ref_x $ unify var
         Just (Val var_x) -> unify var var_x
         Nothing -> throwNameError loc x
     Val.ClassInst _ _ xs ->
       case HashMap.lookup x xs of
-        Just (Ref ref_x) -> readRef' ref_x $ unify var
+        Just (Ref ref_x) -> readVarRef' ref_x $ unify var
         Just (Val var_x) -> unify var var_x
         Nothing -> throwNameError loc x
     _ -> throwDomainError loc
@@ -313,14 +314,17 @@ evalInvoke loc e1 e2 = do
   var1 <- eval' e1
   var2 <- eval' e2
   var <- freshVar
+  storeFree <- get
+  storeFree' <- freshVar
   whenBound var1 $ \ case
-    Val.Tuple xs ->
+    Val.Tuple xs -> do
       foldr
-      (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
-      empty
-      (zip xs [0 ..])
-    Val.Overloads overload var1 -> fix (\ recur overload var1 ->
-      case overload of
+        (\ (x, i) z -> ((unify var2 =<< newVar (Val.Int i)) *> unify var x) <|> z)
+        empty
+        (zip xs [0 ..])
+      unify storeFree storeFree'
+    Val.Overloads overload var1 ->
+      fix (\ recur overload var1 -> case overload of
         Overload.Function _ env xs e_domain e ->
           ifte''
           (do
@@ -330,7 +334,8 @@ evalInvoke loc e1 e2 = do
               pure $ Env1 xs)
           (\ (Env1 xs) -> do
               let env' = xs <> env
-              unify var =<< local (const env') (eval' e)) $
+              unify var =<< local (const env') (eval' e)
+              unify storeFree storeFree') $
           whenBound var1 $ \ case
             Val.Overloads overload var1 -> recur overload var1
             _ -> throwDomainError loc
@@ -339,6 +344,7 @@ evalInvoke loc e1 e2 = do
           xs <- for xs freshNamed
           _ <- local (const $ xs <> env) . lift . evalWriterT $ eval' e
           unify var2 =<< newVar (Val.StructInst i $ fromIdents xs)
+          unify storeFree storeFree'
         Overload.Class i env var_super xs e -> do
           unify var var2
           fix (\ recur var2 -> whenBound var2 $ \ case
@@ -349,16 +355,20 @@ evalInvoke loc e1 e2 = do
                 unify var2 =<< newVar (Val.ClassInst i var_super $ fromIdents xs)
             Val.ClassInst _ (Just var2) _ -> recur var2
             _ -> empty) var2
+          unify storeFree storeFree'
         Overload.Intrinsic intrinsic ->
           invokeIntrinsic intrinsic var2 $ \ case
-            Just var' -> unify var var'
+            Just var' -> do
+              unify var var'
+              unify storeFree storeFree'
             Nothing -> whenBound var1 $ \ case
               Val.Overloads overload var1 -> recur overload var1
               _ -> throwDomainError loc) overload var1
     _ -> throwDomainError loc
+  put storeFree'
   pure var
 
-invokeIntrinsic :: (MonadVerse m, EqRef (Ref m)) =>
+invokeIntrinsic :: (MonadVerse m, EqVarRef (VarRef m)) =>
                    Intrinsic ->
                    Var m (Val m) ->
                    (Maybe (Var m (Val m)) -> EvalT m ()) ->
@@ -376,7 +386,7 @@ invokeIntrinsic = \ case
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
-liftOrd :: (MonadVerse m, EqRef (Ref m)) =>
+liftOrd :: (MonadVerse m, EqVarRef (VarRef m)) =>
            (forall a . Ord a => a -> a -> Bool) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> EvalT m ()) ->
@@ -410,7 +420,7 @@ liftOrd f var k =
 newBool :: MonadVar m => Bool -> EvalT m (Var m (Const Bool))
 newBool = newVar . Const
 
-liftNum :: (MonadVerse m, EqRef (Ref m)) =>
+liftNum :: (MonadVerse m, EqVarRef (VarRef m)) =>
            (forall a . Num a => a -> a -> a) ->
            Var m (Val m) ->
            (Maybe (Var m (Val m)) -> EvalT m ()) ->
@@ -463,7 +473,7 @@ prefixPlus var k =
   (k . Just . runIdentity1)
   (k Nothing)
 
-prefixMinus :: (MonadVerse m, EqRef (Ref m)) =>
+prefixMinus :: (MonadVerse m, EqVarRef (VarRef m)) =>
                Var m (Val m) ->
                (Maybe (Var m (Val m)) -> EvalT m ()) ->
                EvalT m ()
@@ -482,7 +492,7 @@ prefixMinus var k =
 
 data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
 
-div' :: (MonadVerse m, EqRef (Ref m)) =>
+div' :: (MonadVerse m, EqVarRef (VarRef m)) =>
         Var m (Val m) ->
         (Maybe (Var m (Val m)) -> EvalT m ()) ->
         EvalT m ()
@@ -614,13 +624,13 @@ newEnv = execWriterT $ do
       freshVar
 
 lookupName :: ( MonadVerse m
-              , EqRef (Ref m)
+              , EqVarRef (VarRef m)
               ) => Ident -> EvalT m (Maybe (Var m (Val m)))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Ref ref) -> do
     var <- freshVar
-    readRef' ref $ unify var
+    readVarRef' ref $ unify var
     pure $ Just var
   Just (Val x) -> pure $ Just x
 
@@ -652,27 +662,27 @@ fromIdents =
   []
 
 unifyNamed :: ( MonadVerse m
-              , EqRef (Ref m)
+              , EqVarRef (VarRef m)
               ) => Named m (Var m (Val m)) -> Named m (Var m (Val m)) -> EvalT m ()
 unifyNamed = curry $ lift . \ case
   (Val var_x, Val var_y) ->
     unify var_x var_y
   (Ref ref_x, Val var_y) ->
-    readRef' ref_x $ unify var_y
+    readVarRef' ref_x $ unify var_y
   (Val var_x, Ref ref_y) ->
-    readRef' ref_y $ unify var_x
+    readVarRef' ref_y $ unify var_x
   (Ref ref_x, Ref ref_y) ->
-    readRef' ref_x $ \ var_x ->
-    readRef' ref_y $ \ var_y ->
+    readVarRef' ref_x $ \ var_x ->
+    readVarRef' ref_y $ \ var_y ->
     unify var_x var_y
 
-freshNamed :: (MonadRef m, MonadVar m) => Bool -> EvalT m (Named m (Var m (Val m)))
+freshNamed :: MonadVarRef m => Bool -> EvalT m (Named m (Var m (Val m)))
 freshNamed = \ case
   False -> Val <$> freshVar
-  True -> Ref <$> freshRef
+  True -> Ref <$> freshVarRef
 
-freshRef :: (MonadRef m, MonadVar m) => m (Ref m (Var m f))
-freshRef = newRef =<< freshVar
+freshVarRef :: (MonadVarRef m, Traversable f) => m (VarRef m f)
+freshVarRef = newVarRef =<< freshVar
 
 ifte'' :: (MonadVerse m, Freshenable f) =>
           EvalT m (f (Var m)) ->
@@ -680,34 +690,36 @@ ifte'' :: (MonadVerse m, Freshenable f) =>
           EvalT m () ->
           EvalT m ()
 ifte'' p t e = do
-  storeFree <- freshVar
+  storeFree <- get
+  storeFree' <- freshVar
   ifte'
     p
-    (\ x -> t x *> (unify storeFree =<< get))
-    (e *> (unify storeFree =<< get))
+    (\ x -> t x *> unify storeFree storeFree')
+    (e *> unify storeFree storeFree')
   put storeFree
 
-readRef' :: ( MonadRef m
-            , MonadState (Var m StoreFree) m
-            , MonadVerse m
-            ) => Ref m a -> (a -> m ()) -> m ()
-readRef' ref f = do
+readVarRef' :: ( MonadState (Var m StoreFree) m
+               , MonadVarRef m
+               , MonadVerse m
+               ) => VarRef m f -> (Var m f -> m ()) -> m ()
+readVarRef' ref f = do
   storeFree <- get
   storeFree' <- freshVar
   whenBound storeFree . const $ do
-    f =<< readRef ref
+    f =<< readVarRef ref
     unify storeFree storeFree'
   put storeFree'
 
-writeRef' :: ( MonadRef m
-             , MonadState (Var m StoreFree) m
-             , MonadVerse m
-             ) => Ref m a -> a -> m ()
-writeRef' ref x = do
+writeVarRef' :: ( Traversable f
+                , MonadState (Var m StoreFree) m
+                , MonadVarRef m
+                , MonadVerse m
+                ) => VarRef m f -> Var m f -> m ()
+writeVarRef' ref x = do
   storeFree <- get
   storeFree' <- freshVar
   whenBound storeFree . const $ do
-    writeRef ref x
+    writeVarRef ref x
     unify storeFree storeFree'
   put storeFree'
 
