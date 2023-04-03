@@ -124,13 +124,20 @@ prelude :: [String]
 prelude =
      ["int", "any", "false"]
   ++ map toOperator binOps
-  ++ ["postfix'^'"]
+  ++ map toPostfix ["^", "?"]
+  ++ map toPrefix ["-","+","^","?","[]"]
 
 binOps :: [String]
 binOps = ["+","-","*", "/", "<", "<=", ">", ">="]
 
 toOperator :: String -> String
-toOperator op = "operator'" ++ op ++ "'"
+toOperator op = "in'" ++ op ++ "'"
+
+toPostfix :: String -> String
+toPostfix op = "post'" ++ op ++ "'"
+
+toPrefix :: String -> String
+toPrefix op = "pre'" ++ op ++ "'"
 
 findPrim :: String -> Scope -> Id
 findPrim s sc =
@@ -160,7 +167,7 @@ dsExpr sc i x (Variable v) = do
         case M.lookup v (bound sc) of
           Nothing -> error $ "N00 " ++ prettyShow v
           Just [ScId a] -> (a, Var a)
-          Just [ScDerefId a] -> (a, App (findPrim "postfix'^'" sc) a)
+          Just [ScDerefId a] -> (a, App (findPrim (toPostfix "^") sc) a)
           Just _ -> error $ "N03 " ++ prettyShow v
   pure [ i :=: Var y, x :=: e ]
 dsExpr _ _ _ (QualVariable _ _) = notYet
