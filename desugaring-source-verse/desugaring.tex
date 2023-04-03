@@ -1,0 +1,806 @@
+\documentclass[acmsmall,screen]{acmart}\settopmatter{}
+
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+%
+%
+\makeatletter
+\@ifundefined{lhs2tex.lhs2tex.sty.read}%
+  {\@namedef{lhs2tex.lhs2tex.sty.read}{}%
+   \newcommand\SkipToFmtEnd{}%
+   \newcommand\EndFmtInput{}%
+   \long\def\SkipToFmtEnd#1\EndFmtInput{}%
+  }\SkipToFmtEnd
+
+\newcommand\ReadOnlyOnce[1]{\@ifundefined{#1}{\@namedef{#1}{}}\SkipToFmtEnd}
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\rbind}{\mathbin{=\mkern-6.7mu<\!\!\!<}}% suggested by Neil Mitchell
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\usepackage{polytable}
+
+%mathindent has to be defined
+\@ifundefined{mathindent}%
+  {\newdimen\mathindent\mathindent\leftmargini}%
+  {}%
+
+\def\resethooks{%
+  \global\let\SaveRestoreHook\empty
+  \global\let\ColumnHook\empty}
+\newcommand*{\savecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\savecolumns[#1]}}
+\newcommand*{\restorecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\restorecolumns[#1]}}
+\newcommand*{\aligncolumn}[2]%
+  {\g@addto@macro\ColumnHook{\column{#1}{#2}}}
+
+\resethooks
+
+\newcommand{\onelinecommentchars}{\quad-{}- }
+\newcommand{\commentbeginchars}{\enskip\{-}
+\newcommand{\commentendchars}{-\}\enskip}
+
+\newcommand{\visiblecomments}{%
+  \let\onelinecomment=\onelinecommentchars
+  \let\commentbegin=\commentbeginchars
+  \let\commentend=\commentendchars}
+
+\newcommand{\invisiblecomments}{%
+  \let\onelinecomment=\empty
+  \let\commentbegin=\empty
+  \let\commentend=\empty}
+
+\visiblecomments
+
+\newlength{\blanklineskip}
+\setlength{\blanklineskip}{0.66084ex}
+
+\newcommand{\hsindent}[1]{\quad}% default is fixed indentation
+\let\hspre\empty
+\let\hspost\empty
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\EndFmtInput
+\makeatother
+%
+%
+%
+%
+%
+%
+% This package provides two environments suitable to take the place
+% of hscode, called "plainhscode" and "arrayhscode". 
+%
+% The plain environment surrounds each code block by vertical space,
+% and it uses \abovedisplayskip and \belowdisplayskip to get spacing
+% similar to formulas. Note that if these dimensions are changed,
+% the spacing around displayed math formulas changes as well.
+% All code is indented using \leftskip.
+%
+% Changed 19.08.2004 to reflect changes in colorcode. Should work with
+% CodeGroup.sty.
+%
+\ReadOnlyOnce{polycode.fmt}%
+\makeatletter
+
+\newcommand{\hsnewpar}[1]%
+  {{\parskip=0pt\parindent=0pt\par\vskip #1\noindent}}
+
+% can be used, for instance, to redefine the code size, by setting the
+% command to \small or something alike
+\newcommand{\hscodestyle}{}
+
+% The command \sethscode can be used to switch the code formatting
+% behaviour by mapping the hscode environment in the subst directive
+% to a new LaTeX environment.
+
+\newcommand{\sethscode}[1]%
+  {\expandafter\let\expandafter\hscode\csname #1\endcsname
+   \expandafter\let\expandafter\endhscode\csname end#1\endcsname}
+
+% "compatibility" mode restores the non-polycode.fmt layout.
+
+\newenvironment{compathscode}%
+  {\par\noindent
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed\)%
+   \par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\compaths}{\sethscode{compathscode}}
+
+% "plain" mode is the proposed default.
+% It should now work with \centering.
+% This required some changes. The old version
+% is still available for reference as oldplainhscode.
+
+\newenvironment{plainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newenvironment{oldplainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+% Here, we make plainhscode the default environment.
+
+\newcommand{\plainhs}{\sethscode{plainhscode}}
+\newcommand{\oldplainhs}{\sethscode{oldplainhscode}}
+\plainhs
+
+% The arrayhscode is like plain, but makes use of polytable's
+% parray environment which disallows page breaks in code blocks.
+
+\newenvironment{arrayhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\parray}%
+  {\endparray\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newcommand{\arrayhs}{\sethscode{arrayhscode}}
+
+% The mathhscode environment also makes use of polytable's parray 
+% environment. It is supposed to be used only inside math mode 
+% (I used it to typeset the type rules in my thesis).
+
+\newenvironment{mathhscode}%
+  {\parray}{\endparray}
+
+\newcommand{\mathhs}{\sethscode{mathhscode}}
+
+% texths is similar to mathhs, but works in text mode.
+
+\newenvironment{texthscode}%
+  {\(\parray}{\endparray\)}
+
+\newcommand{\texths}{\sethscode{texthscode}}
+
+% The framed environment places code in a framed box.
+
+\def\codeframewidth{\arrayrulewidth}
+\RequirePackage{calc}
+
+\newenvironment{framedhscode}%
+  {\parskip=\abovedisplayskip\par\noindent
+   \hscodestyle
+   \arrayrulewidth=\codeframewidth
+   \tabular{@{}|p{\linewidth-2\arraycolsep-2\arrayrulewidth-2pt}|@{}}%
+   \hline\framedhslinecorrect\\{-1.5ex}%
+   \let\endoflinesave=\\
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \framedhslinecorrect\endoflinesave{.5ex}\hline
+   \endtabular
+   \parskip=\belowdisplayskip\par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\framedhslinecorrect}[2]%
+  {#1[#2]}
+
+\newcommand{\framedhs}{\sethscode{framedhscode}}
+
+% The inlinehscode environment is an experimental environment
+% that can be used to typeset displayed code inline.
+
+\newenvironment{inlinehscode}%
+  {\(\def\column##1##2{}%
+   \let\>\undefined\let\<\undefined\let\\\undefined
+   \newcommand\>[1][]{}\newcommand\<[1][]{}\newcommand\\[1][]{}%
+   \def\fromto##1##2##3{##3}%
+   \def\nextline{}}{\) }%
+
+\newcommand{\inlinehs}{\sethscode{inlinehscode}}
+
+% The joincode environment is a separate environment that
+% can be used to surround and thereby connect multiple code
+% blocks.
+
+\newenvironment{joincode}%
+  {\let\orighscode=\hscode
+   \let\origendhscode=\endhscode
+   \def\endhscode{\def\hscode{\endgroup\def\@currenvir{hscode}\\}\begingroup}
+   %\let\SaveRestoreHook=\empty
+   %\let\ColumnHook=\empty
+   %\let\resethooks=\empty
+   \orighscode\def\hscode{\endgroup\def\@currenvir{hscode}}}%
+  {\origendhscode
+   \global\let\hscode=\orighscode
+   \global\let\endhscode=\origendhscode}%
+
+\makeatother
+\EndFmtInput
+%
+%
+%
+% First, let's redefine the forall, and the dot.
+%
+%
+% This is made in such a way that after a forall, the next
+% dot will be printed as a period, otherwise the formatting
+% of `comp_` is used. By redefining `comp_`, as suitable
+% composition operator can be chosen. Similarly, period_
+% is used for the period.
+%
+\ReadOnlyOnce{forall.fmt}%
+\makeatletter
+
+% The HaskellResetHook is a list to which things can
+% be added that reset the Haskell state to the beginning.
+% This is to recover from states where the hacked intelligence
+% is not sufficient.
+
+\let\HaskellResetHook\empty
+\newcommand*{\AtHaskellReset}[1]{%
+  \g@addto@macro\HaskellResetHook{#1}}
+\newcommand*{\HaskellReset}{\HaskellResetHook}
+
+\global\let\hsforallread\empty
+
+\newcommand\hsforall{\global\let\hsdot=\hsperiodonce}
+\newcommand*\hsperiodonce[2]{#2\global\let\hsdot=\hscompose}
+\newcommand*\hscompose[2]{#1}
+
+\AtHaskellReset{\global\let\hsdot=\hscompose}
+
+% In the beginning, we should reset Haskell once.
+\HaskellReset
+
+\makeatother
+\EndFmtInput
+
+
+
+%% ----------- Applications --------------
+%% %format applyx a b = a "@" b
+%% %format applyx a b = a "\," b
+
+%% Function application with no arguments
+
+%% Function application with 1 argument
+
+%% Function application with 1 argument, without parenthesis
+
+%% Function application with many arguments
+
+%% ----------- End of Applications --------------
+
+
+%% Sequences e1; ...; en; v
+
+%% xs etc stole syntax used in examples.
+
+%% Old version: | for BNF, [] for choice
+%%%format choice = "[ \! ]"
+%%%format `choice` = "\mathop{[ \! ]}"
+%% 1mm is about 0.3em with the current font
+
+%% New version: tall | for BNF, fat | for choice
+%%format vbar = "\mathop{\bigm|}"
+%%format choice = "\boldsymbol{|}"
+%%format `choice` = "\mathop{\boldsymbol{|}}"
+
+
+
+
+%% Arrays and tuples
+%% %format array (x) = "\textbf{array}\{" x "\}"
+%% %format arrKW = "\textbf{arr}"
+%% %format arr (x) = arrKW "\{" x "\}"
+
+
+%% %format defKW = "\textbf{def}"
+
+% only used in comments, but still prettier this way:
+%%%%format map = "\textbf{map}"
+
+%% Effects checking, like succeeds{e}
+
+
+%% Unification
+%%%format == = "\!=\!"
+
+
+% format := = "\mapsto"
+%  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% ----------- Metatheory --------------
+
+
+\usepackage{framed}
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+\usepackage{ amssymb }
+\usepackage{cleveref}   % \Cref etc
+\usepackage{ stmaryrd }
+\usepackage{conteq}
+\usepackage{textgreek}
+
+
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\vb}{\; \ensuremath{\mathop{\mid}} \;}
+\newcommand{\textquote}{'}
+
+% Get rid of this lot -------------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+\newif\ifmatch
+\matchtrue
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
+\else
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
+% ---------------------------------------
+
+% Desugaring
+\newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
+\newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
+\newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
+\newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
+\newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
+\newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
+
+% Control if desugaring has named transformations or not
+\newif\ifdesugarops
+%\desugaropstrue
+\desugaropsfalse
+
+\ifdesugarops
+\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
+\else
+\newcommand{\De}[1]{#1}
+\newcommand{\Ld}[2]{#1 : #2}
+\newcommand{\Pd}[2]{#1 := #2}
+\fi
+
+% Names of rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Hole in context
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % Head normal form
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+\newcommand{\hexp}{h-expression}
+\newcommand{\Hexp}{H-expression}
+
+\newcommand{\coloredtext}[3]{\strut\ifmmode\text{\color{#1} [{#2}: #3]}\else{\color{#1} [{#2}: #3]}\fi}
+% \text in text mode implies a mbox and prevents wrapping, so only use \text in math mode
+% The strut is needed somehow, else \iffmode does not work in an \begin{array} cell?
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
+\newcommand{\simon}{\coloredtext{red}{SPJ}}
+\definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
+\newcommand{\joachim}{\coloredtext{dkblue}{JB}}
+
+\newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
+\newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
+
+% Example environment
+\newcounter{example}
+\newenvironment{example}[1][]{\refstepcounter{example}\par\medskip
+   \noindent\textbf{Example~\theexample. #1} \rmfamily}{\medskip}
+
+\begin{document}
+
+\title{Desugaring Source Verse}
+\author{Simon, Lennart, Koen, Ranjit \today}
+\maketitle
+
+\section{Source Verse}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\bf Expressions} \\
+  \ensuremath{\Varid{e},\Varid{t}} & ::= & \textit{Expressions: result of desugaring} \\
+      &     & \ensuremath{\Varid{x}}               & \text{Variable} \\
+      & \vb & \ensuremath{\Varid{k}}               & \text{Constant} \\
+      & \vb & \ensuremath{\Varid{array}\;(\Varid{e}_{\mathrm{1}},\!\ldots\!,\Varid{e}_{\Varid{n}})} & \text{Array}, n \geq 0 \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}       & \text{Sequencing} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]}       & \text{Function application} \\
+      & \vb & \ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}          & \text{Definition} \\
+      & \vb & \ensuremath{\exists\Varid{x}.\,\Varid{e}}         & \text{Existential} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}} & \text{Choice} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}       & \text{Unification} \\
+      & \vb & \ensuremath{\textbf{if}\;(\Varid{e})\;\textbf{then}\;\Varid{b}_{\mathrm{1}}\;\textbf{else}\;\Varid{b}_{\mathrm{2}}} & \text{Conditional expression} \\
+      & \vb & \ensuremath{\textbf{for}\;(\Varid{e})\;\textbf{in}\;\Varid{b}}     & \text{Finite loop} \\
+      & \vb & \ensuremath{\textbf{fun}\;(\Varid{x}\mathbin{:}\textbf{any})\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}    & \text{Anonymous function} \\
+      & \vb & \ensuremath{\Varid{r}\{\Varid{e}\}}     & \text{Effects check} \\
+  %%%%%
+  \\
+      & \multicolumn{2}{l}{\textit{Expressions: removed by desugaring}} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}},\!\ldots\!,\Varid{e}_{\Varid{n}}}  & \text{Array}, n \geq 2 \\
+      & \vb & \ensuremath{()}              & \text{Empty array} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\;=>\;\Varid{e}_{\mathrm{2}}}    & \text{Lambda expression} \\
+      & \vb & \ensuremath{\textbf{fun}\;\Varid{a}_{\mathrm{1}}\;\!\ldots\!\;\Varid{a}_{\Varid{n}}\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}    & \text{Anonymous function} \\
+      & \vb & \ensuremath{\Varid{p}\mathrel{\coloneqq}\Varid{e}}          & \text{General definition} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}} (\Varid{e}_{\mathrm{2}})}       & \text{Non-failing function application} \\
+      & \vb & \ensuremath{\Varid{op}_{\Varid{b}}\;\Varid{e}}          & \text{Prefix operator} \\
+      & \vb & \ensuremath{\Varid{e}\;\Varid{op}_{\Varid{a}}}          & \text{Postfix operator} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\;\Varid{op}_{\Varid{i}}\;\Varid{e}_{\mathrm{2}}}    & \text{Infix operator} \\
+      & \vb & \ensuremath{\mathbin{:}\Varid{t}}             & \text{Range} \\
+      & \vb & \ensuremath{\Varid{l}\mathbin{:}\Varid{t}}           & \text{Type ascription} \\
+      & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\;\mathbf{where}\;\Varid{e}_{\mathrm{2}}}   & \text{Reverse sequencing} \\
+      & \vb & \ensuremath{\textbf{if}\;(\Varid{e})\;\textbf{then}\;\Varid{b}}    & \text{Conditional expression} \\
+      & \vb & \ensuremath{\textbf{if}\;(\Varid{e})\;\textbf{else}\;\Varid{b}}    & \text{Conditional expression} \\
+      & \vb & \ensuremath{\textbf{if}\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}           & \text{Conditional expression} \\
+      & \vb & \ensuremath{\textbf{for}\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}          & \text{Finite loop} \\
+      & \vb & \ensuremath{\mathbf{let}\;(\Varid{e})\;\textbf{in}\;\Varid{b}}     & \text{Local binding} \\
+      & \vb & \ensuremath{\textbf{do}\;\Varid{b}}            & \text{Scope delimiter} \\
+      & \vb & \ensuremath{\textbf{case}\;(\Varid{e})\;\textbf{of}\;\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}}    & \text{Case expression} \\
+      & \vb & \ensuremath{\textbf{case}\;\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}} & \text{Case expression} \\
+      & \vb & \ensuremath{\textbf{type} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}         & \text{Type definition} \\
+      & \vb & \ensuremath{\textbf{option} \{\mskip1.5mu \mskip1.5mu\}}        & \text{Create an option} \\
+      & \vb & \ensuremath{\textbf{option} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}       & \text{Create an option} \\
+\end{array}
+$$
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \ensuremath{\Varid{x},\Varid{y},\Varid{f}} &     & \textit{Variable} \\
+  \ensuremath{\Varid{k}} &     & \textit{Integer constant} \\
+      \\
+\multicolumn{4}{l}{\text{\bf Blocks}} \\
+  \ensuremath{\Varid{b}} & ::= & \ensuremath{\Varid{e}}               & \text{single expression} \\
+      & \vb & \ensuremath{\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!;\,\Varid{e}_{\Varid{n}}\mskip1.5mu\}}  & \text{multiple expressions} \\
+      \\
+
+\multicolumn{4}{l}{\text{\bf Function arguments}} \\
+  \ensuremath{\Varid{a}} & ::= & \ensuremath{(\Varid{e})}  \\
+      & \vb & \ensuremath{()} \\
+      & \vb & \ensuremath{\Varid{a}\!\!<\!\!\Varid{r}\!\!>\!\!} \\
+
+\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition \ensuremath{(\Varid{p}\mathrel{\coloneqq}\Varid{e})}}. Subset of \ensuremath{\Varid{e}}.}} \\
+  \ensuremath{\Varid{p}} & ::= & x \vb \ensuremath{\Varid{p}\;\Varid{a}} \vb \ensuremath{\Varid{p} \hat{\hspace{0.8em}}}  \vb \ensuremath{\Varid{p}\mathbin{\char94 ?}}\vb  \ensuremath{\Varid{p}\;\!\leadsto\!\;\Varid{l}} \\
+     & \vb & \ensuremath{\mathbin{:}\Varid{t}} \vb \ensuremath{\Varid{p}\mathbin{:}\Varid{t}}  \vb \ensuremath{\Varid{p}_{\mathrm{1}},\!\ldots\!,\Varid{p}_{\Varid{n}}} \\
+  \\
+
+\multicolumn{4}{l}{\text{{\bf Left hand side of a type ascription \ensuremath{(\Varid{l}\mathbin{:}\Varid{t})}}. Subset of \ensuremath{\Varid{e}}.}} \\
+  \ensuremath{\Varid{l}} & ::= & x \vb \ensuremath{\Varid{l}\;\Varid{a}} \vb \ensuremath{\Varid{l} \hat{\hspace{0.8em}}} \vb \ensuremath{\Varid{l}\mathbin{\char94 ?}}  \vb  \ensuremath{\Varid{p}\;\!\leadsto\!\;\Varid{l}} \\
+  & \vb &  \ensuremath{\Varid{l} []}  \\
+  \\
+\multicolumn{4}{l}{\text{\bf Operators}} \\
+ \ensuremath{\Varid{op}_{\Varid{b}}} & ::= &  ! \vb - \vb + \vb \ensuremath{\hat{\hspace{0.8em}}} \vb ? \vb \ensuremath{[]}  & \text{Prefix}\\
+ \ensuremath{\Varid{op}_{\Varid{a}}} & ::= &  ? \vb \ensuremath{\hat{\hspace{0.8em}}} \vb ..  & \text{Postfix}\\
+ \ensuremath{\Varid{op}_{\Varid{i}}} & ::= &  + \vb - \vb * \vb / \vb \ensuremath{\&\&} \vb \ensuremath{||} \vb : \vb .. & \text{Infix} \\
+        & \vb & < \vb <= \vb > \vb >= \vb <> \vb \ensuremath{-\!\!>} \\
+  \\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+  \ensuremath{\Varid{r}} & ::= & \ensuremath{\textbf{succeeds}} \vb \ensuremath{\textbf{decides}} \vb \ensuremath{\textbf{iterates}}
+\end{array}
+$$
+\\
+Variables can be alphanumeric, but also \ensuremath{\textbf{prefix}\textquote \Varid{op}\textquote}, \ensuremath{\textbf{postfix}\textquote \Varid{op}\textquote}, and \ensuremath{\textbf{operator}\textquote \Varid{op}\textquote}.
+\caption{Source Verse} \label{fig:source-verse-misc}
+\end{figurebox}
+
+\section{Desugaring Source Verse}
+
+\begin{figurebox}
+$$
+\begin{array}{rclll}
+\multicolumn{5}{l}{\textbf{Desugar a definition \ensuremath{\Varid{p}\mathrel{\coloneqq}\Varid{e}} into simple definitions with just \ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}} \\
+\ifdesugarops
+  \ensuremath{\Pd{ \Varid{x}}{ \Varid{e}}} & = & \ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}} \\
+\fi
+  \ensuremath{\Pd{ \Varid{f}\;\Varid{a}}{ \Varid{e}}} & = & \ensuremath{\Pd{ \Varid{f}}{ (\De{ \textbf{fun}(\Varid{a})\{\mskip1.5mu \Varid{e}\mskip1.5mu\}})}} \\
+  \ensuremath{\Pd{ \mathbin{:}\Varid{t}}{ \Varid{e}}} & = & \ensuremath{\Pd{ \Varid{x}\mathbin{:}\Varid{t}}{ \Varid{e}}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \ensuremath{\Pd{ \Varid{p}\mathbin{:}\Varid{t}}{ \Varid{e}}} & = & \ensuremath{\Pd{ \Varid{p}}{ (\De{ \Varid{t}} [\mskip1.5mu \Varid{e}\mskip1.5mu])}} \\
+  \ensuremath{\Pd{ \Varid{p}\mathbin{?}}{ \Varid{e}}} & = & \ensuremath{\Pd{ \Varid{p}}{ \De{ (\textbf{option} \{\mskip1.5mu \Varid{e}\mskip1.5mu\})}}} \\
+  \ensuremath{\Pd{ \Varid{e}_{\mathrm{1}} \hat{\hspace{0.8em}}}{ \Varid{e}}} & = & \ensuremath{\textbf{assign} (\De{ \Varid{e}_{\mathrm{1}}},\Varid{e})} \\
+  \ensuremath{\Pd{ \Varid{p}_{\mathrm{0}},\!\ldots\!,\Varid{p}_{\Varid{n}}}{ \Varid{e}}} & = &
+    \multicolumn{2}{l}{\ensuremath{\Pd{ \Varid{p}_{\mathrm{0}}}{ \Varid{x}_{\mathrm{0}}};\,\!\ldots\!;\,\Pd{ \Varid{p}_{\Varid{n}}}{ \Varid{x}_{\Varid{n}}};\,\Varid{array}\;(\Varid{x}_{\mathrm{0}}\mathbin{:}\textbf{any},\!\ldots\!,\Varid{x}_{\Varid{n}}\mathbin{:}\textbf{any})\mathrel{=}\Varid{e}}} & \text{\ensuremath{\Varid{x}_{\Varid{i}}} fresh} \\
+  \ensuremath{\Pd{ \Varid{p}\;\!\leadsto\!\;\Varid{l}}{ \Varid{e}}} & = & \ensuremath{\Ld{ \Varid{p}\;\!\leadsto\!\;\Varid{l}}{ \De{ \textbf{type} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}}} \\
+  \\
+\multicolumn{5}{l}{\textbf{Desugar a type ascription \ensuremath{\Varid{l}\mathbin{:}\Varid{t}}}} \\
+  \ensuremath{\Ld{ \Varid{x}}{ \Varid{t}}} & = & \ensuremath{\Varid{x}\mathrel{\coloneqq}(\exists\Varid{y}.\,\Varid{t} [\mskip1.5mu \Varid{y}\mskip1.5mu];\,\Varid{y})} & \ensuremath{\Varid{y}} \not\in \ensuremath{\Varid{t}} \\
+  \ensuremath{\Ld{ \Varid{l}\;\Varid{a}}{ \Varid{t}}} & = & \ensuremath{\Ld{ \Varid{l}}{ \textbf{arrow}\;(\textbf{fun}(\Varid{a})\{\mskip1.5mu \Varid{t}\mskip1.5mu\})}} \\
+  \ensuremath{\Ld{ \Varid{l} \hat{\hspace{0.8em}}}{ \Varid{t}}} & = & \ensuremath{\Ld{ \Varid{l}}{ (\Varid{new} (\Varid{t}))}} \\
+  \ensuremath{\Ld{ \Varid{l}\mathbin{?}}{ \Varid{t}}} & = & \ensuremath{\Ld{ \Varid{l}}{ (\mathbin{?}\Varid{t})}} \\
+  \ensuremath{\Ld{ \Varid{l} []}{ \Varid{t}}} & = & \ensuremath{\Ld{ \Varid{l}}{ ([] \Varid{t})}} \\
+  \ensuremath{\Ld{ \Varid{p}\;\!\leadsto\!\;\Varid{l}}{ \Varid{t}}} & = & \ensuremath{\Pd{ \Varid{p}}{ (\Ld{ \Varid{l}}{ \Varid{t}})}} \\
+\end{array}
+$$
+\caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \multicolumn{4}{c}{ \text{Desugar Source Verse into a subset of Source Verse.} } \\[1mm]
+
+  \multicolumn{1}{l}{\textbf{Basic forms}} \\
+\ifdesugarops
+  \ensuremath{\De{ \Varid{k}}} & = & \ensuremath{\Varid{k}} \\
+  \ensuremath{\De{ \Varid{x}}} & = & \ensuremath{\Varid{x}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}}};\,\De{ \Varid{e}_{\mathrm{2}}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}}}\;[\mskip1.5mu \De{ \Varid{e}_{\mathrm{2}}}\mskip1.5mu]} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}} (\Varid{e}_{\mathrm{2}})}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}}}\;\De{ \Varid{e}_{\mathrm{2}}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}}}\mathrel{=}\De{ \Varid{e}_{\mathrm{2}}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\De{ \Varid{e}_{\mathrm{2}}}} \\
+\fi
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}},\!\ldots\!,\Varid{e}_{\Varid{n}}}} & = & \ensuremath{\Varid{array}\;(\De{ \Varid{e}_{\mathrm{1}}},\!\ldots\!,\De{ \Varid{e}_{\Varid{n}}})} \\
+  \ensuremath{\De{ ()}} & = & \ensuremath{\Varid{array}\;()} \\
+  \\
+\ifdesugarops
+  \multicolumn{1}{l}{\textbf{Bindings}} \\
+  \ensuremath{\De{ \Varid{l}\mathbin{:}\Varid{t}}} & = & \ensuremath{\Ld{ \Varid{l}}{ \De{ \Varid{t}}}} \\
+  \ensuremath{\De{ \Varid{p}\mathrel{\coloneqq}\Varid{e}}} & = & \ensuremath{\Pd{ \Varid{p}}{ \De{ \Varid{e}}}} \\
+  \\
+\fi
+  \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert all functions to \ensuremath{\textbf{fun}\;(\Varid{x}\mathbin{:}\textbf{any})\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;=>\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{fun}(\Varid{e}_{\mathrm{1}})\{\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu\}}} \\
+  \ensuremath{\De{ \textbf{fun}\;\Varid{a}_{\mathrm{1}}\;\Varid{a}_{\mathrm{2}}\;\!\ldots\!\;\Varid{a}_{\Varid{n}}\;\Varid{b}}} & = & \ensuremath{\De{ \textbf{fun}\;\Varid{a}_{\mathrm{1}}\;(\textbf{fun}\;\Varid{a}_{\mathrm{2}}\;\!\ldots\!\;\Varid{a}_{\Varid{n}}\;\Varid{b})}} & \\
+  \ensuremath{\De{ \textbf{fun}\;()\;\Varid{b}}} & = & \ensuremath{\De{ \textbf{fun}\;(())\;\Varid{b}}} & \\
+  \ensuremath{\De{ \textbf{fun}\;\Varid{a}\;\!\!<\!\!\Varid{r}\!\!>\;\Varid{b}}} & = & \ensuremath{\De{ \textbf{fun}\;\Varid{a}\;(\Varid{r}\{\Varid{b}\})}} & \\
+  \ensuremath{\De{ \textbf{fun}(\Varid{e})\Varid{b}}} & = & \ensuremath{\textbf{fun}(\Varid{x}\mathbin{:}\textbf{any})(\textbf{if}\;(\De{ \Varid{e}}\mathrel{=}\Varid{x})\;\textbf{then}\;\Varid{b}\;\textbf{else}\mathbin{:}\textbf{false})} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Types}} \\
+  \ensuremath{\De{ \mathbin{:}\Varid{t}}} & = & \ensuremath{\De{ \Varid{t}} [\mskip1.5mu \Varid{x}\mathbin{:}\textbf{any}\mskip1.5mu]} & \text{\ensuremath{\Varid{x}} fresh} \\
+  %%  |De (type^{e})| & = & |type^{De e}| \\
+  \ensuremath{\De{ \textbf{type} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}} & = & \ensuremath{\De{ \Varid{x}\mathbin{:}\textbf{any}\Rightarrow \Varid{x}\mathrel{=}\Varid{e}}} & \text{\ensuremath{\Varid{x}} fresh} \\  
+  \\
+  \multicolumn{1}{l}{\textbf{Conditionals}} \\
+  \ensuremath{\De{ \textbf{if}\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}} & = & \ensuremath{\De{ \textbf{if}\;(\Varid{e})\;\textbf{else}\;\textbf{false}}} \\
+  \ensuremath{\De{ \textbf{if}\;(\Varid{e}_{\mathrm{1}})\;\textbf{then}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{if}\;(\Varid{e}_{\mathrm{1}})\;\textbf{then}\;\Varid{e}_{\mathrm{2}}\;\textbf{else}\;\textbf{false}}} \\
+  \ensuremath{\De{ \textbf{if}\;(\Varid{e}_{\mathrm{1}})\;\textbf{else}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{if}\;(\Varid{x}\mathrel{\coloneqq}\Varid{e}_{\mathrm{1}})\;\textbf{then}\;\Varid{x}\;\textbf{else}\;\Varid{e}_{\mathrm{2}}}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \ensuremath{\De{ \textbf{if}\;(\Varid{e}_{\mathrm{1}})\;\textbf{then}\;\Varid{e}_{\mathrm{2}}\;\textbf{else}\;\Varid{e}_{\mathrm{3}}}} & = & \ensuremath{\textbf{if}\;\De{ \Varid{e}_{\mathrm{1}}}\;\textbf{then}\;\De{ \Varid{e}_{\mathrm{2}}}\;\textbf{else}\;\De{ \Varid{e}_{\mathrm{3}}}} \\
+  \\
+  \multicolumn{1}{l}{\textbf{For}} \\
+  \ensuremath{\De{ \textbf{for}\;\{\mskip1.5mu \Varid{e}\mskip1.5mu\}}} & = & \ensuremath{\De{ \textbf{for}\;(\Varid{x}\mathrel{\coloneqq}\Varid{e})\;\textbf{in}\;\{\mskip1.5mu \Varid{x}\mskip1.5mu\}}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \\
+\end{array}
+$$
+\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \multicolumn{1}{l}{\textbf{Operators}} \\
+  \ensuremath{\De{ \Varid{op}_{\Varid{b}}\;\Varid{e}}} & = & \ensuremath{\De{ \textbf{prefix}\textquote \Varid{op}_{\Varid{b}}\textquote\;[\mskip1.5mu \Varid{e}\mskip1.5mu]}} & \text{if \ensuremath{\Varid{op}_{\Varid{b}}} can fail}\\
+  \ensuremath{\De{ \Varid{op}_{\Varid{b}}\;\Varid{e}}} & = & \ensuremath{\De{ \textbf{prefix}\textquote \Varid{op}_{\Varid{b}}\textquote\;(\Varid{e})}} \\
+  \ensuremath{\De{ \Varid{e}\;\Varid{op}_{\Varid{a}}}} & = & \ensuremath{\De{ \textbf{postfix}\textquote \Varid{op}_{\Varid{a}}\textquote\;[\mskip1.5mu \Varid{e}\mskip1.5mu]}} & \text{if \ensuremath{\Varid{op}_{\Varid{a}}} can fail}\\
+  \ensuremath{\De{ \Varid{e}\;\Varid{op}_{\Varid{a}}}} & = & \ensuremath{\De{ \textbf{postfix}\textquote \Varid{op}_{\Varid{a}}\textquote\;(\Varid{e})}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;\&\&\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;||\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{if}\;(\Varid{e}_{\mathrm{1}})\;\textbf{else}\;\textbf{if}\;(\Varid{e}_{\mathrm{2}})\;\textbf{else}\mathbin{:}\textbf{false}}} \\
+  \ensuremath{\De{ \mathbin{!}\Varid{e}}} & = & \ensuremath{\De{ \textbf{if}\;\Varid{e}\;\textbf{then}\mathbin{:}\textbf{false}\;\textbf{else}\;\textbf{false}}} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;\mathbf{where}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \Varid{x}\mathrel{\coloneqq}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}};\,\Varid{x}}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;\Varid{op}_{\Varid{i}}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{operator}\textquote \Varid{op}_{\Varid{i}}\textquote\;[\mskip1.5mu \Varid{e}_{\mathrm{1}},\Varid{e}_{\mathrm{2}}\mskip1.5mu]}} & \text{if \ensuremath{\Varid{op}_{\Varid{i}}} can fail}\\
+  \ensuremath{\De{ \Varid{e}_{\mathrm{1}}\;\Varid{op}_{\Varid{i}}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\De{ \textbf{operator}\textquote \Varid{op}_{\Varid{i}}\textquote\;(\Varid{e}_{\mathrm{1}},\Varid{e}_{\mathrm{2}})}} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Let, do, case}} \\
+  \ensuremath{\De{ \mathbf{let}\;(\Varid{e})\;\textbf{in}\;\Varid{b}}} & = & \ensuremath{\De{ \Varid{e}};\,\De{ \Varid{b}}} & \textit{see note} \\
+  \ensuremath{\De{ \textbf{do}\;\Varid{b}}} & = & \ensuremath{\De{ \Varid{b}}} & \textit{see note}  \\
+  \ensuremath{\De{ \textbf{case}\;\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}}} & = & \ensuremath{\De{ (\Varid{x}\mathbin{:}\textbf{any})\Rightarrow \textbf{case}\;(\Varid{x})\;\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \ensuremath{\De{ \textbf{case}\;(\Varid{e})\;\{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}}} & = & \ensuremath{\De{ \Varid{x}\mathrel{\coloneqq}\Varid{e};\,\Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{x}\mskip1.5mu]\;||\;\!\ldots\!\;||\;\Varid{e}_{\Varid{n}} [\mskip1.5mu \Varid{x}\mskip1.5mu]}} & \text{\ensuremath{\Varid{x}} fresh} \\
+  \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued \ensuremath{\Varid{e}_{\Varid{i}}}.}} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Misc}} \\
+  \ensuremath{\De{ \{\mskip1.5mu \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}\mskip1.5mu\}}} & = & \ensuremath{\De{ \Varid{e}_{\mathrm{1}};\,\!\ldots\!\;\Varid{e}_{\Varid{n}}}} \\
+  \ensuremath{\De{ \textbf{option} \{\mskip1.5mu \mskip1.5mu\}}} & = & \ensuremath{\textbf{false}} \\
+  \ensuremath{\De{ \textbf{option} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}} & = & \ensuremath{\textbf{if}\;(\Varid{x}\mathrel{\coloneqq}\Varid{e})\;\textbf{then}\;\textbf{truth}\;(\Varid{x})\;\textbf{else}\;\textbf{false}} & \text{\ensuremath{\Varid{x}} fresh} \\
+\end{array}
+$$
+{\em Note}: The desugaring assumes a scope correct Verse program.
+This means that there can be no variable name clashes in \ensuremath{\mathbf{let}} and \ensuremath{\textbf{do}}.
+A more robust desugaring could \textalpha-convert such clashes.
+\caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
+\end{figurebox}
+
+
+\begin{figurebox}
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{8}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\textbf{any}{}\<[8]%
+\>[8]{}\mathrel{=}(\Varid{x}\Rightarrow \Varid{x}){}\<[E]%
+\\
+\>[B]{}\textbf{int}{}\<[8]%
+\>[8]{}\mathrel{=}(\Varid{x}\Rightarrow \textbf{isInt}(\Varid{x});\,\Varid{x}){}\<[E]%
+\\
+\>[B]{}\textbf{nat}{}\<[8]%
+\>[8]{}\mathrel{=}(\Varid{x}\Rightarrow \textbf{isInt}(\Varid{x});\,\Varid{x}\mathbin{>}(\mathbin{-}\mathrm{1});\,\Varid{x}){}\<[E]%
+\\
+\>[B]{}\textbf{false}{}\<[8]%
+\>[8]{}\mathrel{=}\Varid{array}\;(){}\<[E]%
+\\
+\>[B]{}\textbf{arrow}{}\<[8]%
+\>[8]{}\mathrel{=}(\Varid{ft}\Rightarrow \Varid{f}\Rightarrow \Varid{y}\Rightarrow (\Varid{ft}(\Varid{y}))((\Varid{f}(\Varid{y})))){}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+\caption{Core prelude} \label{fig:core-prelude}
+\end{figurebox}
+
+
+\begin{figurebox}
+
+$$
+  \begin{array}{rcll}
+    \ensuremath{\Cr{ \cdot }}   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
+    \ensuremath{\Cr{ \Varid{k}}} & = & \ensuremath{\Varid{k}} \\
+    \ensuremath{\Cr{ \Varid{x}}} & = & \ensuremath{\Varid{x}} \\
+    \ensuremath{\Cr{ \Varid{array}\;(\Varid{e}_{\mathrm{1}},\!\ldots\!,\Varid{e}_{\Varid{n}})}} & = &
+    \begin{array}[t]{@{}l}
+    \ensuremath{\textbf{def}\;\Varid{x}_{\mathrm{1}},\!\ldots\!,\Varid{x}_{\Varid{n}}\;\textbf{in}\\\{\Varid{x}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{1}};\,\!\ldots\!;\,\Varid{x}_{\Varid{n}}\mathrel{=}\Varid{e}_{\Varid{n}};\,\langle\Varid{v}_{\mathrm{1}},\!\ldots\!,\Varid{v}_{\Varid{n}}\rangle\}} \\
+    \end{array}
+	& \text{\ensuremath{\Varid{x}_{\Varid{i}}} fresh} \\
+    \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}}};\,\Cr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}}}\mathrel{=}\Cr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Cr{ \Varid{x}\mathrel{\coloneqq}\mathbin{:}\textbf{any}}} & = & \ensuremath{\Varid{x}} \\
+    \ensuremath{\Cr{ \Varid{x}\mathrel{\coloneqq}\Varid{e}}} & = & \ensuremath{\Varid{x}\mathrel{=}\Cr{ \Varid{e}}} \\
+    \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]}} & = & \ensuremath{\exists\Varid{x},\Varid{y}.\,\Varid{x}\mathrel{=}\Varid{e}_{\mathrm{1}};\,\Varid{y}\mathrel{=}\Varid{e}_{\mathrm{2}};\,\Cr{ \Varid{e}_{\mathrm{1}}}(\Cr{ \Varid{e}_{\mathrm{2}}})} & \text{\ensuremath{\Varid{x},\Varid{y}} fresh} \\
+    \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}} (\Varid{e}_{\mathrm{2}})}} & = & \ensuremath{\textbf{succeeds}\,\{\Cr{ \Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]}\}} \\
+    \ensuremath{\Cr{ \Varid{e}_{\mathrm{1}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\Bi{ \Varid{e}_{\mathrm{1}}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Bi{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Cr{ \textbf{if}\;\Varid{e}_{\mathrm{1}}\;\textbf{then}\;\Varid{e}_{\mathrm{2}}\;\textbf{else}\;\Varid{e}_{\mathrm{3}}}} & = &
+    \begin{array}[t]{@{}l}
+    \ensuremath{\textbf{def}\;\Varid{x}\;\textbf{in}\\\{\Varid{x}\mathrel{=}\textbf{one}\{\Bi{ \Varid{e}_{\mathrm{1}};\,\Th{ \Varid{e}_{\mathrm{2}}}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Bi{ \Th{ \Varid{e}_{\mathrm{3}}}}\};\,\Varid{x}(())\}}
+    \end{array}
+    & \text{\ensuremath{\Varid{x}} fresh} \\
+    \ensuremath{\Cr{ \textbf{for}\;\Varid{e}_{\mathrm{1}}\;\textbf{in}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\textbf{all}\{\Bi{ \Varid{e}_{\mathrm{1}};\,\Th{ \Varid{e}_{\mathrm{2}}}}\}} \\
+    \ensuremath{\Cr{ \textbf{fun}(\Varid{x}\mathbin{:}\textbf{any})\Varid{e}}} & = & \ensuremath{\Varid{x}\Rightarrow \Bi{ \Varid{e}}} \\
+%%    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
+    \\
+    \ensuremath{\Th{ \cdot }} & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
+    \ensuremath{\Th{ \Varid{e}}} & = & \ensuremath{\textbf{fun}(\Varid{x}\mathbin{:}\textbf{any})\Varid{e}} & \text{\ensuremath{\Varid{x}} fresh} \\
+    \\
+    \ensuremath{\Bi{ \cdot }} & \multicolumn{3}{l}{ \text{inserts \ensuremath{\exists{}} for all local bindings.} } \\
+    \ensuremath{\Bi{ \Varid{e}}} & = & \ensuremath{\exists\Vr{ \Varid{e}}.\,\Cr{ \Varid{e}}} \\
+    \\
+    \ensuremath{\Vr{ \cdot }} & \multicolumn{3}{l}{ \text{finds all locally defined variables.} } \\
+    \ensuremath{\Vr{ \Varid{k}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \Varid{x}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \Varid{array}\;(\Varid{e}_{\mathrm{1}},\!\ldots\!,\Varid{e}_{\Varid{n}})}} & = & \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}},\!\ldots\!,\Vr{ \Varid{e}_{\Varid{n}}}} \\
+    \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}},\Vr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}},\Vr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Vr{ \Varid{x}\mathrel{\coloneqq}\Varid{e}}} & = & \ensuremath{\Varid{x},\Vr{ \Varid{e}}} \\
+    \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]}} & = & \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}},\Vr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}} (\Varid{e}_{\mathrm{2}})}} & = & \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}},\Vr{ \Varid{e}_{\mathrm{2}}}} \\
+    \ensuremath{\Vr{ \Varid{e}_{\mathrm{1}}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \textbf{if}\;\Varid{e}_{\mathrm{1}}\;\textbf{then}\;\Varid{e}_{\mathrm{2}}\;\textbf{else}\;\Varid{e}_{\mathrm{3}}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \textbf{for}\;\Varid{e}_{\mathrm{1}}\;\textbf{in}\;\Varid{e}_{\mathrm{2}}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \textbf{fun}(\Varid{x}\mathbin{:}\textbf{any})\Varid{e}}} & = & \ensuremath{\epsilon} \\
+    \ensuremath{\Vr{ \textbf{type} \{\mskip1.5mu \Varid{e}\mskip1.5mu\}}} & = & \ensuremath{\epsilon} \\
+  \end{array}
+  $$
+\caption{Core conversion} \label{fig:core-conversion}
+\end{figurebox}
+
+
+\begin{figurebox}
+$$
+\begin{array}{l}
+\begin{array}{rclll}
+    \multicolumn{5}{l}{ \text{Reduction rules for \ensuremath{\textbf{split}} } } \\
+    \rulename{split-fail} & \ensuremath{\textbf{split}(\textbf{fail})\{\Varid{f},\Varid{g}\}} & \movesto & \ensuremath{\Varid{f}(())} \\
+    \rulename{split-value} & \ensuremath{\textbf{split}(\Varid{v})\{\Varid{f},\Varid{g}\}} & \movesto & \ensuremath{\exists\Varid{x}.\,\Varid{x}\mathrel{=}\Varid{g}(\Varid{v});\,\Varid{x}((\anonymous \Rightarrow \textbf{fail}))} & \text{\ensuremath{\Varid{x}} fresh} \\
+    \rulename{split-choice} & \ensuremath{\textbf{split}(\Varid{v}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e})\{\Varid{f},\Varid{g}\}} & \movesto & \ensuremath{\exists\Varid{x}.\,\Varid{x}\mathrel{=}\Varid{g}(\Varid{v});\,\Varid{x}((\anonymous \Rightarrow \Varid{e}))} & \text{\ensuremath{\Varid{x}} fresh} \\
+    \rulename{split-wrong} & \ensuremath{\textbf{split}(\textbf{wrong})\{\Varid{f},\Varid{g}\}} & \movesto & \ensuremath{\textbf{wrong}} \\
+    \rulename{split-wrong} & \ensuremath{\textbf{split}(\textbf{wrong}\hspace{0.2em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e})\{\Varid{f},\Varid{g}\}} & \movesto & \ensuremath{\textbf{wrong}} \\
+\end{array} \\
+\\
+\begin{array}{rclll}
+    \multicolumn{5}{l}{ \text{Definition of \ensuremath{\textbf{one}}, \ensuremath{\textbf{all}}, \ensuremath{\textbf{succeeds}}, and \ensuremath{\textbf{decides}} in terms of \ensuremath{\textbf{split}}. } } \\
+    \ensuremath{\textbf{one}\{\Varid{e}\}} & = & \ensuremath{\textbf{split}(\Varid{e})\{\anonymous \Rightarrow \textbf{fail},\Varid{x}\Rightarrow \anonymous \Rightarrow \Varid{x}\}} & \text{\ensuremath{\Varid{x}} fresh} \\
+    \ensuremath{\textbf{all}\{\Varid{e}\}} & = &
+    \begin{array}[t]{@{}l}
+      \ensuremath{\exists{}\;\Varid{f},\Varid{g}\;\textbf{in}\;\{\mskip1.5mu } \\
+      \quad \ensuremath{\Varid{f}\mathrel{\coloneqq}\anonymous \Rightarrow ();\,} \\
+      \quad \ensuremath{\Varid{g}\mathrel{\coloneqq}\Varid{x}\Rightarrow \Varid{y}\Rightarrow \textbf{cons}(\Varid{x}(()),\textbf{split}(\Varid{y}(()))\{\Varid{f},\Varid{g}\});\,} \\
+      \quad \ensuremath{\textbf{split}(\Varid{e})\{\Varid{f},\Varid{g}\}\mskip1.5mu\}}
+    \end{array}  & \text{\ensuremath{\Varid{x},\Varid{y}} fresh} \\
+    \ensuremath{\textbf{succeeds}\,\{\Varid{e}\}} & = & \ensuremath{\textbf{split} \{\mskip1.5mu \Varid{e},\anonymous \Rightarrow \textbf{wrong},} \\
+    \quad        &   & \quad \ensuremath{\Varid{x}\Rightarrow \Varid{y}\Rightarrow \textbf{split}(\Varid{y}(()))\{\anonymous \Rightarrow \Varid{x},\anonymous \Rightarrow \anonymous \Rightarrow \textbf{wrong}\}\mskip1.5mu\}} & \text{\ensuremath{\Varid{x},\Varid{y}} fresh}\\
+    \ensuremath{\textbf{decides}\,\{\Varid{e}\}} & = & \ensuremath{\textbf{split} \{\mskip1.5mu \Varid{e},\anonymous \Rightarrow \textbf{fail},} \\
+    \quad        &   & \quad \ensuremath{\Varid{x}\Rightarrow \Varid{y}\Rightarrow \textbf{split}(\Varid{y}(()))\{\anonymous \Rightarrow \Varid{x},\anonymous \Rightarrow \anonymous \Rightarrow \textbf{wrong}\}\mskip1.5mu\}} & \text{\ensuremath{\Varid{x},\Varid{y}} fresh}\\
+\end{array}
+\end{array}
+$$
+\lennart{Does \ensuremath{\Varid{f}} need to be a thunk?  Does second argument to \ensuremath{\Varid{g}} need to be a thunk? Yes, or it may \ensuremath{\textbf{fail}} in the wrong place.}
+\caption{Alternative: Use \ensuremath{\textbf{split}} instead of \ensuremath{\textbf{one}}, \ensuremath{\textbf{all}}, \ensuremath{\textbf{succeeds}}, and \ensuremath{\textbf{decides}}.} \label{fig:split}
+\end{figurebox}
+
+
+
+\end{document}

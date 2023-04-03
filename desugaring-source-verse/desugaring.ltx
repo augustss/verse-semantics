@@ -1,0 +1,416 @@
+\documentclass[acmsmall,screen]{acmart}\settopmatter{}
+
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../calculus.fmt
+%format cons (x) (y) = "\textbf{cons}(" x "," y ")"
+%format applyx a b = a "(" b ")"
+
+
+\usepackage{framed}
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+\usepackage{ amssymb }
+\usepackage{cleveref}   % \Cref etc
+\usepackage{ stmaryrd }
+\usepackage{conteq}
+\usepackage{textgreek}
+
+
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\vb}{\; |vbar| \;}
+\newcommand{\textquote}{'}
+
+% Get rid of this lot -------------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+\newif\ifmatch
+\matchtrue
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
+\else
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
+% ---------------------------------------
+
+% Desugaring
+\newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
+\newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
+\newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
+\newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
+\newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
+\newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
+
+% Control if desugaring has named transformations or not
+\newif\ifdesugarops
+%\desugaropstrue
+\desugaropsfalse
+
+\ifdesugarops
+\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
+\else
+\newcommand{\De}[1]{#1}
+\newcommand{\Ld}[2]{#1 : #2}
+\newcommand{\Pd}[2]{#1 := #2}
+\fi
+
+% Names of rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Hole in context
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % Head normal form
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+\newcommand{\hexp}{h-expression}
+\newcommand{\Hexp}{H-expression}
+
+\newcommand{\coloredtext}[3]{\strut\ifmmode\text{\color{#1} [{#2}: #3]}\else{\color{#1} [{#2}: #3]}\fi}
+% \text in text mode implies a mbox and prevents wrapping, so only use \text in math mode
+% The strut is needed somehow, else \iffmode does not work in an \begin{array} cell?
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
+\newcommand{\simon}{\coloredtext{red}{SPJ}}
+\definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
+\newcommand{\joachim}{\coloredtext{dkblue}{JB}}
+
+\newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
+\newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
+
+% Example environment
+\newcounter{example}
+\newenvironment{example}[1][]{\refstepcounter{example}\par\medskip
+   \noindent\textbf{Example~\theexample. #1} \rmfamily}{\medskip}
+
+\begin{document}
+
+\title{Desugaring Source Verse}
+\author{Simon, Lennart, Koen, Ranjit \today}
+\maketitle
+
+\section{Source Verse}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\bf Expressions} \\
+  |e,t| & ::= & \textit{Expressions: result of desugaring} \\
+      &     & |x|               & \text{Variable} \\
+      & \vb & |k|               & \text{Constant} \\
+      & \vb & |array (e_1, dots, e_n)| & \text{Array}, n \geq 0 \\
+      & \vb & |e_1 ; e_2|       & \text{Sequencing} \\
+      & \vb & |e_1^[e_2]|       & \text{Function application} \\
+      & \vb & |x := e|          & \text{Definition} \\
+      & \vb & |def x e|         & \text{Existential} \\
+      & \vb & |e_1 `choice` e_2| & \text{Choice} \\
+      & \vb & |e_1 = e_2|       & \text{Unification} \\
+      & \vb & |if(e) then b_1 else b_2| & \text{Conditional expression} \\
+      & \vb & |for(e) in b|     & \text{Finite loop} \\
+      & \vb & |functionKW(x:any){e}|    & \text{Anonymous function} \\
+      & \vb & |check r e|     & \text{Effects check} \\
+  %%%%%
+  \\
+      & \multicolumn{2}{l}{\textit{Expressions: removed by desugaring}} \\
+      & \vb & |e_1, dots, e_n|  & \text{Array}, n \geq 2 \\
+      & \vb & |()|              & \text{Empty array} \\
+      & \vb & |e_1 eqgt e_2|    & \text{Lambda expression} \\
+      & \vb & |functionKW a_1 dots a_n {e}|    & \text{Anonymous function} \\
+      & \vb & |p := e|          & \text{General definition} \\
+      & \vb & |e_1^(e_2)|       & \text{Non-failing function application} \\
+      & \vb & |op_b e|          & \text{Prefix operator} \\
+      & \vb & |e op_a|          & \text{Postfix operator} \\
+      & \vb & |e_1 op_i e_2|    & \text{Infix operator} \\
+      & \vb & |: t|             & \text{Range} \\
+      & \vb & |l : t|           & \text{Type ascription} \\
+      & \vb & |e_1 where e_2|   & \text{Reverse sequencing} \\
+      & \vb & |if(e) then b|    & \text{Conditional expression} \\
+      & \vb & |if(e) else b|    & \text{Conditional expression} \\
+      & \vb & |if{e}|           & \text{Conditional expression} \\
+      & \vb & |for{e}|          & \text{Finite loop} \\
+      & \vb & |let(e) in b|     & \text{Local binding} \\
+      & \vb & |do b|            & \text{Scope delimiter} \\
+      & \vb & |case(e) of {e_1; dots e_n}|    & \text{Case expression} \\
+      & \vb & |case{e_1; dots e_n}| & \text{Case expression} \\
+      & \vb & |type^{e}|         & \text{Type definition} \\
+      & \vb & |option^{}|        & \text{Create an option} \\
+      & \vb & |option^{e}|       & \text{Create an option} \\
+\end{array}
+$$
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  |x,y,f| &     & \textit{Variable} \\
+  |k| &     & \textit{Integer constant} \\
+      \\
+\multicolumn{4}{l}{\text{\bf Blocks}} \\
+  |b| & ::= & |e|               & \text{single expression} \\
+      & \vb & |{e_1; dots ; e_n}|  & \text{multiple expressions} \\
+      \\
+
+\multicolumn{4}{l}{\text{\bf Function arguments}} \\
+  |a| & ::= & |(e)|  \\
+      & \vb & |()| \\
+      & \vb & |apeff a r| \\
+
+\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := e)|}. Subset of |e|.}} \\
+  |p| & ::= & x \vb |p a| \vb |p^hat|  \vb |p^?|\vb  |p squiggt l| \\
+     & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
+  \\
+
+\multicolumn{4}{l}{\text{{\bf Left hand side of a type ascription |(l:t)|}. Subset of |e|.}} \\
+  |l| & ::= & x \vb |l a| \vb |l^hat| \vb |l^?|  \vb  |p squiggt l| \\
+  & \vb &  |l^arrayty|  \\
+  \\
+\multicolumn{4}{l}{\text{\bf Operators}} \\
+ |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty|  & \text{Prefix}\\
+ |op_a| & ::= &  ? \vb |hat| \vb ..  & \text{Postfix}\\
+ |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
+        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+  \\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+  |r| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
+\end{array}
+$$
+\\
+Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
+\caption{Source Verse} \label{fig:source-verse-misc}
+\end{figurebox}
+
+\section{Desugaring Source Verse}
+
+\begin{figurebox}
+$$
+\begin{array}{rclll}
+\multicolumn{5}{l}{\textbf{Desugar a definition |p := e| into simple definitions with just |x := e|}} \\
+\ifdesugarops
+  |Pd x e| & = & |x := e| \\
+\fi
+  |Pd (f a) e| & = & |Pd f ((De (function a () {e})))| \\
+  |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
+  |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
+  |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
+  |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
+  |Pd (p_0, dots, p_n) e| & = &
+    \multicolumn{2}{l}{|Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e|} & \text{|x_i| fresh} \\
+  |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
+  \\
+\multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
+  |Ld x t| & = & |x := (def y t^[y]; y)| & |y| \not\in |t| \\
+  |Ld (l a) t| & = & |Ld l (arrow (function a () {t}))| \\
+  |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
+  |Ld (l?) t| & = & |Ld l ((? t))| \\
+  |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
+  |Ld (p squiggt l) t| & = & |Pd p ((Ld l t))| \\
+\end{array}
+$$
+\caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \multicolumn{4}{c}{ \text{Desugar Source Verse into a subset of Source Verse.} } \\[1mm]
+
+  \multicolumn{1}{l}{\textbf{Basic forms}} \\
+\ifdesugarops
+  |De k| & = & |k| \\
+  |De x| & = & |x| \\
+  |De (e_1 ; e_2)| & = & |De e_1 ; De e_2| \\
+  |De (e_1^[e_2])| & = & |(De e_1)[De e_2]| \\
+  |De (e_1^(e_2))| & = & |(De e_1)(De e_2)| \\
+  |De (e_1 = e_2)| & = & |De e_1 = De e_2| \\
+  |De (e_1 `choice` e_2)| & = & |De e_1 `choice` De e_2| \\
+\fi
+  |De (e_1, dots, e_n)| & = & |array (De e_1 , dots, De e_n)| \\
+  |De (())| & = & |array ()| \\
+  \\
+\ifdesugarops
+  \multicolumn{1}{l}{\textbf{Bindings}} \\
+  |De (l : t)| & = & |Ld l (De t)| \\
+  |De (p := e)| & = & |Pd p (De e)| \\
+  \\
+\fi
+  \multicolumn{4}{l}{\textbf{Functions}\quad \text{convert all functions to |functionKW(x:any){e}|}} \\
+  |De (e_1 eqgt e_2)| & = & |De (function e_1 () {e_2})| \\
+  |De (functionKW a_1 a_2 dots a_n b)| & = & |De (functionKW a_1 (functionKW a_2 dots a_n b))| & \\
+  |De (functionKW () b)| & = & |De (functionKW (()) b)| & \\
+  |De (functionKW a (eff r) b)| & = & |De (functionKW a (check r b))| & \\
+  |De (function e () b)| & = & |function(x:any)()((if (De e = x) then b else :false)| & \text{|x| fresh} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Types}} \\
+  |De (:t)| & = & |De t^[x:any]| & \text{|x| fresh} \\
+  %%  |De (type^{e})| & = & |type^{De e}| \\
+  |De (type^{e})| & = & |De (x:any => x = e)| & \text{|x| fresh} \\  
+  \\
+  \multicolumn{1}{l}{\textbf{Conditionals}} \\
+  |De (if{e})| & = & |De (if(e) else false)| \\
+  |De (if(e_1) then e_2)| & = & |De (if(e_1) then e_2 else false)| \\
+  |De (if(e_1) else e_2)| & = & |De (if (x := e_1) then x else e_2)| & \text{|x| fresh} \\
+  |De (if(e_1) then e_2 else e_3)| & = & |if (De e_1) then De e_2 else De e_3| \\
+  \\
+  \multicolumn{1}{l}{\textbf{For}} \\
+  |De (for{e})| & = & |De (for (x := e) in { x })| & \text{|x| fresh} \\
+  \\
+\end{array}
+$$
+\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
+\end{figurebox}
+
+\begin{figurebox}
+$$
+\begin{array}{rcll}
+  \multicolumn{1}{l}{\textbf{Operators}} \\
+  |De (op_b e)| & = & |De (prefix op_b [e])| & \text{if |op_b| can fail}\\
+  |De (op_b e)| & = & |De (prefix op_b (e))| \\
+  |De (e op_a)| & = & |De (postfix op_a [e])| & \text{if |op_a| can fail}\\
+  |De (e op_a)| & = & |De (postfix op_a (e))| \\
+  |De (e_1 srcand e_2)| & = & |De (e_1; e_2)| \\
+  |De (e_1 srcor e_2)| & = & |De (if(e_1) else if (e_2) else :false)| \\
+  |De (!e)| & = & |De (if e then :false else false)| \\
+  |De (e_1 where e_2)| & = & |De (x := e_1; e_2; x)| & \text{|x| fresh} \\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i [e_1, e_2])| & \text{if |op_i| can fail}\\
+  |De (e_1 op_i e_2)| & = & |De (operator op_i (e_1, e_2))| \\
+  \\
+  \multicolumn{1}{l}{\textbf{Let, do, case}} \\
+  |De (let(e) in b)| & = & |De (e); De b| & \textit{see note} \\
+  |De (do b)| & = & |De b| & \textit{see note}  \\
+  |De (case{e_1; dots e_n})| & = & |De ((x:any) => case(x){e_1; dots e_n})| & \text{|x| fresh} \\
+  |De (case(e){e_1; dots e_n}| & = & |De (x:=e; e_1^[x] srcor dots srcor e_n^[x])| & \text{|x| fresh} \\
+  \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
+  \\
+  \multicolumn{1}{l}{\textbf{Misc}} \\
+  |De ({e_1; dots e_n})| & = & |De (e_1; dots e_n)| \\
+  |De (option^{})| & = & |false| \\
+  |De (option^{e}| & = & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
+\end{array}
+$$
+{\em Note}: The desugaring assumes a scope correct Verse program.
+This means that there can be no variable name clashes in |let| and |do|.
+A more robust desugaring could \textalpha-convert such clashes.
+\caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
+\end{figurebox}
+
+
+\begin{figurebox}
+\begin{code}
+any    = (x => x)
+int    = (x => applyx isInt x; x)
+nat    = (x => applyx isInt x; x > (-1); x)
+false  = array()
+arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
+\end{code}
+
+\caption{Core prelude} \label{fig:core-prelude}
+\end{figurebox}
+
+
+\begin{figurebox}
+
+$$
+  \begin{array}{rcll}
+    |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
+    |Cr k| & = & |k| \\
+    |Cr x| & = & |x| \\
+    |Cr (array (e_1, dots, e_n))| & = &
+    \begin{array}[t]{@@{}l}
+    |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; arr (v_1, dots, v_n)| \\
+    \end{array}
+	& \text{|x_i| fresh} \\
+    |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
+    |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
+    |Cr (x := :any)| & = & |x| \\
+    |Cr (x := e)| & = & |x = Cr e| \\
+    |Cr (e_1^[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
+    |Cr (e_1^(e_2))| & = & |succeeds (Cr (e_1^[e_2]))| \\
+    |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
+    |Cr (if e_1 then e_2 else e_3)| & = &
+    \begin{array}[t]{@@{}l}
+    |defTwoLines x (x = one(Bi (e_1; Th e_2) `choice` Bi (Th e_3));applyx x ())|
+    \end{array}
+    & \text{|x| fresh} \\
+    |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
+    |Cr (function(x:any)()e)| & = & |x => Bi e| \\
+%%    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
+    \\
+    |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
+    |Th e| & = & |function(x:any)()e| & \text{|x| fresh} \\
+    \\
+    |Bi| & \multicolumn{3}{l}{ \text{inserts |defKW| for all local bindings.} } \\
+    |Bi e| & = & |def (Vr e) (Cr e)| \\
+    \\
+    |Vr| & \multicolumn{3}{l}{ \text{finds all locally defined variables.} } \\
+    |Vr k| & = & |emp| \\
+    |Vr x| & = & |emp| \\
+    |Vr (array (e_1, dots, e_n))| & = & |Vr e_1, dots, Vr e_n| \\
+    |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (x := e)| & = & |x , Vr e| \\
+    |Vr (e_1^[e_2])| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1^(e_2))| & = & |Vr e_1 , Vr e_2| \\
+    |Vr (e_1 `choice` e_2)| & = & |emp| \\
+    |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
+    |Vr (for e_1 in e_2)| & = & |emp| \\
+    |Vr (function(x:any)()e)| & = & |emp| \\
+    |Vr (type^{e})| & = & |emp| \\
+  \end{array}
+  $$
+\caption{Core conversion} \label{fig:core-conversion}
+\end{figurebox}
+
+
+\begin{figurebox}
+$$
+\begin{array}{l}
+\begin{array}{rclll}
+    \multicolumn{5}{l}{ \text{Reduction rules for |splitKW| } } \\
+    \rulename{split-fail} & |split fail f g| & \movesto & |applyx f ()| \\
+    \rulename{split-value} & |split v f g| & \movesto & |def x (x = applyx g v; applyx x (_ => fail)| & \text{|x| fresh} \\
+    \rulename{split-choice} & |split (v `choice` e) f g| & \movesto & |def x (x = applyx g v; applyx x (_ => e)| & \text{|x| fresh} \\
+    \rulename{split-wrong} & |split wrong f g| & \movesto & |wrong| \\
+    \rulename{split-wrong} & |split (wrong `choice` e) f g| & \movesto & |wrong| \\
+\end{array} \\
+\\
+\begin{array}{rclll}
+    \multicolumn{5}{l}{ \text{Definition of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW| in terms of |splitKW|. } } \\
+    |one e| & = & |split e (_ => fail) (x => _ => x)| & \text{|x| fresh} \\
+    |all e| & = &
+    \begin{array}[t]{@@{}l}
+      |defKW f,g in {| \\
+      \quad |f := _ => ();| \\
+      \quad |g := x => y => cons (applyx x ()) (split (applyx y ()) f g);| \\
+      \quad |split e f g }|
+    \end{array}  & \text{|x,y| fresh} \\
+    |succeeds e| & = & |splitKW^{e, _ => wrong,| \\
+    \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
+    |decides e| & = & |splitKW^{e, _ => fail,| \\
+    \quad        &   & \quad |x => y => split (applyx y ()) (_ => x) (_ => _ => wrong)}| & \text{|x,y| fresh}\\
+\end{array}
+\end{array}
+$$
+\lennart{Does |f| need to be a thunk?  Does second argument to |g| need to be a thunk? Yes, or it may |fail| in the wrong place.}
+\caption{Alternative: Use |splitKW| instead of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW|.} \label{fig:split}
+\end{figurebox}
+
+
+
+\end{document}

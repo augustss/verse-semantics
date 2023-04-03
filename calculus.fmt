@@ -170,8 +170,8 @@
 %format nat = "\textbf{nat}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
-%format function (x)(r)(rhs) = "\textbf{function}(" x ")" r rhs
-%format functionKW = "\textbf{function}"
+%format function (x)(r)(rhs) = functionKW "(" x ")" r rhs
+%format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -191,6 +191,9 @@
 %format plus = "\oplus"
 %format hole = "\hole"
 %format lte = "\prec"
+
+%% Effects checking, like succeeds{e}
+%format check (r) (b) = r "\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
