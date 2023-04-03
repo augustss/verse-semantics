@@ -106,6 +106,11 @@ asCore _ (Cores [e]) = e
 asCore _ Cores{} = error "Not a singleton Core value"
 asCore s e = exprToCore s $ asDesugared e
 
+asTim :: SomeExpr -> Prog
+asTim (Parsed e) = dsProg e
+asTim (Tim e) = e
+asTim _ = error "Not a Tim program"
+
 instance Show SomeExpr where
   show NoExpr = "No current expression"
   show (Parsed e) = show e
@@ -151,6 +156,7 @@ command = Command
 --      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
       , Cmd "tim [EXPR]"           "Tim desugaring of [last] expression"   cTim
+      , Cmd "tsimp [EXPR]"         "Simplify Tim program of [last] expression"   cTimSimp
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -355,6 +361,9 @@ cDisplay _ s = do
 
 cTim :: Run CState
 cTim = cTransform (Tim . dsProg . asParsed)
+
+cTimSimp :: Run CState
+cTimSimp = cTransform (Tim . simpProg . asTim)
 
 cShow :: Run CState
 cShow =

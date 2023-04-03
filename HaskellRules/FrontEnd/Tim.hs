@@ -1,11 +1,12 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
-module FrontEnd.Tim(dsProg, Prog) where
+module FrontEnd.Tim(dsProg, simpProg, Prog) where
 import Prelude hiding ((<>))
 import Control.Monad.State.Strict
---import Data.List
+import Data.List
 import qualified Data.Map as M
 import GHC.Stack
+import Debug.Trace
 
 import Epic.List
 import Epic.Print
@@ -22,7 +23,15 @@ data Id = Id
   { idName :: !String
   , idNo   :: !Int
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
+
+{-
+instance Ord Id where
+  compare (Id _ k1) (Id _ k2) = compare k1 k2
+
+instance Eq Id where
+  Id _ k1 == Id _ k2  =  k1 == k2
+-}
 
 --type Set a = [a]
 
@@ -48,7 +57,11 @@ data Exp
 data Prog = Prog Id Opc
   deriving (Show, Eq)
 
+unusedId :: Id
+unusedId = Id "_" 0
+
 instance Pretty Id where
+  pPrintPrec _ _ i | i == unusedId = text "_"
   pPrintPrec _ _ (Id n k) = text $ n ++ "#" ++ show k
 
 instance Pretty Opc where
@@ -70,8 +83,8 @@ instance Pretty Exp where
   pPrintPrec l _ (Arr xs) = parens $ fsep $ punctuate (text ",") $ map (pPrintPrec l 0) xs
   pPrintPrec l p (Lambd x y d z w r) = maybeParens (p>0) $
     text "lambda" $$
-    indent (text "domain" <+> pPrintPrec l 0 x <+> pPrintPrec l 0 y <> text "." <+> pPrintPrec l 0 d) $$
-    indent (text "range " <+> pPrintPrec l 0 z <+> pPrintPrec l 0 w <> text "." <+> pPrintPrec l 0 r)
+    indent (text "domain" <+> pPrintPrec l 0 x <+> pPrintPrec l 0 y <> text "." <+> ppOps l d) $$
+    indent (text "range " <+> pPrintPrec l 0 z <+> pPrintPrec l 0 w <> text "." <+> ppOps l r)
 
 instance Pretty Prog where
   pPrintPrec l _ (Prog r o) = (pPrintPrec l 0 r <+> text "from") $$ pPrintPrec l 0 o
@@ -126,7 +139,7 @@ findPrim s sc =
     _ -> error $ "findPrim: " ++ s
 
 dsProg :: Expr -> Prog
-dsProg e = evalState ds DState{ uniq = 0, env = [] }
+dsProg e = evalState ds DState{ uniq = 1, env = [] }
   where
     ds = do
       ~[i, x] <- newIds ["i", "res"]
@@ -231,7 +244,7 @@ dsExprs sc i x (e:es) = do
   ~[ii, xx] <- newIds ["i", "x"]
   ops1 <- dsExpr sc ii xx e
   ops2 <- dsExprs sc i x es
-  pure $ [ExistsOp [ii, xx] ops1] ++ ops2
+  pure $ [ExistsOp [ii, xx] $ ops1 ++ ops2]
 
 
 apply :: Scope -> Id -> Id -> (Opc -> Opc) -> Expr -> Expr -> D Ops
@@ -239,8 +252,8 @@ apply sc i x aeff s0 s1 = do
   ~[h, g, j, y, z] <- newIds ["h", "g", "j", "y", "z"]
   ops1 <- dsExpr sc h g s0
   ops2 <- dsExpr sc j y s1
-  let op3 = ExistsOp [h,g,j,y,z] [aeff (z :=: App g y), i :=: Var z, x :=: Var z]
-  pure $ ops1 ++ ops2 ++ [op3]
+  let op3 = ExistsOp [h,g,j,y,z] $ ops1 ++ ops2 ++ [aeff (z :=: App g y), i :=: Var z, x :=: Var z]
+  pure [op3]
   
 scope :: Scope -> Id -> Id -> Expr -> D Opc
 scope sc i x e = snd <$> scope' sc i x e
@@ -257,7 +270,77 @@ scope' sc i x e = do
   pure (sc', ScopeOp ops)
 
 
+simpProg :: Prog -> Prog
+simpProg (Prog r o) = Prog r (simpOpc o)
 
+simpOpc :: Opc -> Opc
+simpOpc (i :=: e) = i :=: simpExp e
+simpOpc (ChoiceOp op1 op2) = ChoiceOp (simpOpc op1) (simpOpc op2)
+simpOpc (ScopeOp ops) = ScopeOp [simpExists [] ops]
+simpOpc (ExistsOp is ops) = simpExists is ops
+simpOpc (VerifyOp r op) = VerifyOp r (simpOpc op)
+
+simpExists :: [Id] -> [Opc] -> Opc
+simpExists is ops = removeUnusedExists (is ++ is') ops'
+  where
+    (is', ops') = findExists (map simpOpc ops)
+
+findExists :: Ops -> ([Id], Ops)
+findExists [] = ([], [])
+findExists (ExistsOp vs os : ops) = (vs ++ vs', os ++ ops') where (vs', ops') = findExists ops
+findExists (op : ops) = (vs, op : ops') where (vs, ops') = findExists ops
+
+removeUnusedExists :: [Id] -> [Opc] -> Opc
+removeUnusedExists is ops =
+  let unused = singleOcc (getUsed ops) `intersect` is
+      f (i :=: e) = (if i `notElem` unused then i else unusedId) :=: e
+      f op = op
+      ops' = filter (not . useless) $ map f ops
+      used = getUsed ops'
+      is' = filter (`elem` used) is
+  in
+      (if False then trace ("***\n" ++ prettyShow (ExistsOp is ops, is, used)) else id) $
+      if is == is' && ops == ops' then
+          ExistsOp is' ops'
+      else
+          removeUnusedExists is' ops'
+
+useless :: Opc -> Bool
+useless (i :=: e) = i == unusedId && isValue e
+useless _ = False
+
+isValue :: Exp -> Bool
+isValue Int{} = True
+isValue Arr{} = True
+isValue Var{} = True
+isValue _ = False
+
+simpExp :: Exp -> Exp
+simpExp (Lambd i1 i2 d i3 i4 r) = Lambd i1 i2 (map simpOpc d) i3 i4 (map simpOpc r)
+simpExp e = e
+
+class GetUsed a where
+  getUsed :: a -> [Id]
+
+instance (GetUsed a) => GetUsed [a] where
+  getUsed = concatMap getUsed
+
+instance GetUsed Opc where
+  getUsed (i :=: e) = i : getUsed e
+  getUsed (ChoiceOp o1 o2) = getUsed o1 ++ getUsed o2
+  getUsed (ScopeOp os) = getUsed os
+  getUsed (ExistsOp is o) = filter (`notElem` is) $ getUsed o
+  getUsed (VerifyOp _ o) = getUsed o
+
+instance GetUsed Exp where
+  getUsed Int{} = []
+  getUsed (Var i) = [i]
+  getUsed (App i1 i2) = [i1, i2]
+  getUsed (Arr is) = is
+  getUsed (Lambd i1 i2 d i3 i4 r) = filter (`notElem` [i1,i2]) (getUsed d) ++ filter (`notElem` [i3,i4]) (getUsed r)
+
+singleOcc :: (Ord a) => [a] -> [a]
+singleOcc = concat . filter ((== 1) . length) . group . sort
 
 {-
 
