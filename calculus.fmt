@@ -4,6 +4,7 @@
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
 %format (De (x)) = "\De{" ^ x "}"
+%format (Me (i) (e)) = "\Me{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"
 %format (Bi (x)) = "\Bi{" ^ x "}"
@@ -12,6 +13,9 @@
 %format (Th (x)) = "\Th{" ^ x "}"
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
+
+%format match (e) (b) = e "\blacktriangleright" b
+%format `match`       = "\blacktriangleright"
 
 %% ----------- Applications --------------
 %% %format applyx a b = a "@" b
@@ -104,7 +108,7 @@
 %format orElse = "\textbf{orElse}"
 
 %% Arrays and tuples
-%% %format array (x) = "\textbf{array}\{" x "\}"
+%format array (x) = "\textbf{array}\{" x "\}"
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
@@ -135,11 +139,11 @@
 %format storeTwoLines (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\\\{" y "\}"
 %format cell (k) (v) = k "\mapsto\!" v
 %format succeedsKW = "\textbf{succeeds}"
-%format succeeds (e) = "\textbf{succeeds}\,\{" e "\}"
+%format succeeds (e) = "\textbf{succeeds}\{" e "\}"
 %format decidesKW = "\textbf{decides}"
-%format decides (e) = "\textbf{decides}\,\{" e "\}"
+%format decides (e) = "\textbf{decides}\{" e "\}"
 %format iteratesKW = "\textbf{iterates}"
-%format iterates (e) = "\textbf{iterates}\,\{" e "\}"
+%format iterates (e) = "\textbf{iterates}\{" e "\}"
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
@@ -170,7 +174,7 @@
 %format nat = "\textbf{nat}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
-%format function (x)(r)(rhs) = functionKW "(" x ")" r rhs
+%format function (x)(rhs) = functionKW "(" x ")." rhs
 %format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
