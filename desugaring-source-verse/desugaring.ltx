@@ -215,7 +215,8 @@ $$
   |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
   \\
 \multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
-  |Ld x t| & = & |(def y x := t^[y]; y)| & |y| \not\in |t| \\
+  |Ld x t| & = & |def y x := t^[y]; y| & |y| \not\in |t| \\
+  OR: & = & |def y x := t^[y]| & |y| \not\in |t| \\
   |Ld (l a) t| & = & |Ld l (arrow (function a () {t}))| \\
   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
   |Ld (l?) t| & = & |Ld l ((? t))| \\
