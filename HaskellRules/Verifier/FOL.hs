@@ -38,6 +38,17 @@ instance Show Term where
   show (Ap c []) = showIdent c
   show (Ap f ts) = showIdent f ++ "(" ++ intercalate "," (map show ts) ++ ")"
 
+-- interpreted symbols
+(.+.), (.-.), (.*.), tdiv, tmod :: Term -> Term -> Term
+a  .-.   b = Ap (ident "-") [a,b]
+a  .+.   b = Ap (ident "+") [a,b]
+a  .*.   b = Ap (ident "*") [a,b]
+a `tdiv` b = Ap (ident "$div") [a,b]
+a `tmod` b = Ap (ident "$mod") [a,b]
+
+tint :: Integer -> Term
+tint k = Ap (ident (show k)) []
+
 --------------------------------------------------------------------------------
 -- Form
 
@@ -76,15 +87,15 @@ instance Show Form where
 showAnd :: [Form] -> String
 showAnd aps = intercalate " & " (map show1 (flat aps))
  where
-  flat ((p :&&: q) : ps) = flat (p:q:ps)
-  flat (p:ps)            = p : flat ps
+  flat ((p :&&: q) : qs) = flat (p:q:qs)
+  flat (p:qs)            = p : flat qs
   flat []                = []
   
 showOr :: [Form] -> String
 showOr aps = intercalate " | " (map show1 (flat aps))
  where
-  flat ((p :||: q) : ps) = flat (p:q:ps)
-  flat (p:ps)            = p : flat ps
+  flat ((p :||: q) : qs) = flat (p:q:qs)
+  flat (p:qs)            = p : flat qs
   flat []                = []
 
 showBind :: Bind Form -> String
@@ -95,11 +106,11 @@ show1 ap
   | isAtom ap  = show ap
   | otherwise = "(" ++ show ap ++ ")"
  where
-  isAtom FALSE      = True
-  isAtom TRUE       = True
-  isAtom (Not _)    = True
-  isAtom (Pred p _) = not (isOp p)
-  isAtom _          = False
+  isAtom FALSE       = True
+  isAtom TRUE        = True
+  isAtom (Not _)     = True
+  isAtom (Pred pr _) = not (isOp pr)
+  isAtom _           = False
   
   isOp v = showIdent v == "="
 
@@ -166,7 +177,7 @@ mkEnv =
 
      boolSort0 <- mkBoolSort
 
-     ~[funInt,funTuple]             <- getDatatypeSortConstructors valueSort0
+     ~[funInt,funTuple]              <- getDatatypeSortConstructors valueSort0
      ~[funIsInt,_funIsTuple]         <- getDatatypeSortRecognizers valueSort0
      ~[~[funSelInt],~[_funSelTuple]] <- getDatatypeSortConstructorAccessors valueSort0
 
@@ -223,7 +234,6 @@ z3form env (Pred p ts) =
   do liftIO (putStrLn ("(predicate '" ++ showIdent p ++ "/" ++ show (length ts)
                                       ++ "' not recognized)"))
      pr  <- mkStringSymbol (showIdent p)
-     _b  <- mkBoolSort
      pr' <- mkFuncDecl pr [valueSort env|_<-ts] (boolSort env)
      as  <- sequence [ z3term env t | t <- ts ]
      mkApp pr' as
@@ -284,20 +294,25 @@ z3term env (Ap f ts) =
 -- Prover driver
 
 prove :: Form -> IO Bool
-prove aphi =
+prove phi =
   do putStrLn "-- Proving..."
-     (res,msol) <- evalZ3 (script aphi)
+     (res,msol) <- evalZ3 script
      putStrLn ("-- Result: " ++ show res)
      case msol of
        Nothing ->
          do return ()
        
-       Just inps ->
-         do putStrLn ("-- Model: " ++ intercalate ", " inps)
+       Just ins ->
+         do putStrLn ("-- Model: " ++ intercalate ", " ins)
      
      return (res == Unsat)
  where
-  script phi =
+  (inps,not_phi) = neg phi
+  
+  neg (Forall (Bind x p)) = (x:xs,phi') where (xs,phi') = neg p
+  neg p                   = ([],Not p)
+
+  script =
     do env <- mkEnv
        not_p <- z3form env not_phi
        --s <- astToString not_p
@@ -312,13 +327,6 @@ prove aphi =
                           return (showIdent x ++ "=" ++ s)
                      | x <- inps
                      ]
-   where
-    (inps,not_phi) = neg phi
-    
-    neg (Forall (Bind x p)) = (x:xs,phi') where (xs,phi') = neg p
-    neg p                   = ([],Not p)
-
-    
 
 --------------------------------------------------------------------------------
 

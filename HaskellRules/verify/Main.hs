@@ -26,7 +26,7 @@ main =
   e1  = One (Exi $ Bind x $ Exi $ Bind y $
               (Var x :=: One ( (Var y :=: Var a :>: Var y) :|: Int 2 ))
           :>: (Var y :=: Int 1)
-          :>: (Var x :=: Int 2)
+          :>: (Var x :=: Op Add :@: Arr [Var y, Int 2])
           :>: Var x)
 
   e2  = One (Exi $ Bind x $
