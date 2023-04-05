@@ -814,8 +814,8 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                 in  succeeds [(val, e)]
               BVTable m | BHNF h <- a ->
                 case M.lookup h m of
-                  Just v -> succeeds [(val, BVal v)]
-                  Nothing -> error "unimplemented BTable"
+                  Just v -> unify val v
+                  Nothing -> succeeds [] --  WRONG error "unimplemented BTable"
                         | otherwise -> suspend eqn
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
