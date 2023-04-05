@@ -36,6 +36,7 @@
 \else
 \newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
 \fi
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
 % ---------------------------------------
 
 % Desugaring
@@ -112,6 +113,10 @@
 
 \Cref{fig:source-verse-expr} and \ref{fig:source-verse-misc}
 give the source language that we desugar.
+
+\begin{itemize}
+\item Question: why is $l$ a subset of $p$, not the same as $p$?
+\end{itemize}
 
 \begin{figurebox}
 $$
@@ -216,6 +221,10 @@ $$
 \Cref{fig:desugar-expr1} desugars Source Verse into Core Verse.
 \Cref{fig:desugar-expr2} rewrites Source Version into simpler Source Verse, ready for \Cref{fig:desugar-expr1}.
 
+\begin{description}
+\item[Note TypeAscription.]  In |(t_1 : t_2)| what can |t_1| be?  Does the order in the desugaring rule matter?
+\end{description}
+
 \begin{figurebox}
 $$
 \begin{array}{@@{}l}
@@ -226,21 +235,26 @@ $$
 \multicolumn{4}{l}{\textbf{The heavy lifting}} \\
   |Me i k| & = & |i=k| \\
   |Me i  x| & = & |i=x| \\
-  |Me i (t_1:t_2)| & = & |Me (De t_2^(i)) t_1|  & \text{Is this right?}\\
-  |Me i (:t)| & = & |(De t)(i)| & \text{Not sure here} \\
+  |Me i (:t)| & = & |(De t)^(i)| & \\
+  |Me i (x:=t)| & = & |x == Me i t| \\
   |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
   |Me i (t_1 where t_2)| & = & |Me i t_1 ; De t_2| & \text{or the other way round?}\\
   |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
   |Me i (t_1 == t_2)| & = & |(Me i t_1) ; (Me i t_2)|  & \text{I think this is right}\\
   |Me i (t_1^[t_2])| & = & |i = ((De t_1) (De t_2))| \\
-  |Me i (t_1^(t_2))| & = & |i = succeeds (((De t_1) (De t_2)))| \\
+  |Me i (t_1^(t_2))| & = & |def (f,x) (f == De t_1; x == De t_2; i == succeeds (f^(x))| \\
   |Me i (check r t)| & = & |check r (Me i t)|  & \text{Is this right?}\\
-  |Me i (function t_1 t_2)| & = & |i = (lam x (Me x t_1); De t_2|) \\
-  |Me i (array{t_1, dots, t_n})| & = &
-    \multicolumn{2}{l}{|def (x_1 dots x_n) (i = arr (x_1, dots, x_n);
-      Me x_1 t_1; dots; Me x_n t_n|} \\
+  |Me i (array(t_1, xdots, t_n))| & = &
+    \multicolumn{2}{l}{|def (x_1 xdots x_n)
+      (Me x_1 t_1; xdots; Me x_n t_n;  i = arr (x_1, xdots, x_n))|} \\
     |Me i (if(e_1) then e_2 else e_3)| & = &
-      \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+    \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
+  |Me i (function t_1 t_2)| & = & |i == (lam x (def (Vr t_1) (Me x t_1; De t_2)|) \\
+  |Me i (function t_1 t_2)| & = & |lam x (def (Vr t_1) (def (x',y) (x' == Me x t_1; y == i^(x'); Me y t_2))|
 \end{array}
 \end{array}
 $$
@@ -250,12 +264,15 @@ $$
 \begin{figurebox}
 $$
 \begin{array}{rcll}
-\\
+  |l : t| & \rightarrow & |l := (: t)| \\
+  |p^(a) := t| & \rightarrow & |p := function a t| \\
+  |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2) | \\
+  |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
   |type^{t}| & \rightarrow & |function (y:t) y| \\
   |()| & \rightarrow & |array ()| \\
   |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
   |e_1 eqgt e_2| & \rightarrow & |function e_1 () {e_2}| \\
-  |function (a_1 a_2 dots a_n) b| & \rightarrow & |functionKW a_1 (functionKW a_2 dots a_n b)| \\
+  |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
   |function () b| & \rightarrow & |functionKW (()) b)| & \\
   |function (a (eff r)) b| & \rightarrow & |function a (check r b)| & \\
   |if{e})| & \rightarrow & |if(e) else false| \\

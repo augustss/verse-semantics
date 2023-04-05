@@ -38,10 +38,13 @@ dsMatch (ApplyD f a) v = apply id f a v
 dsMatch (PrefixOp (Op ":") e) v = dsColon e v
 dsMatch (PrefixOp (Ident l op) e) v = dsMatch (call "pre" l op e) v
 dsMatch (PostfixOp e (Ident l op)) v = dsMatch (call "post" l op e) v
+
 dsMatch (InfixOp e1 (Op ":=") e2) v = dsDef e1 e2 v
 -- Rule: e1:e2 :- v  -->  (e1 := :e2) :- v
+
 dsMatch (InfixOp e1 o@(Op ":") e2) v = dsMatch (InfixOp e1 (Op ":=") (PrefixOp o e2)) v
 -- Rule: (e1 where e2) :- v  -->  exists x . (e1 :- v); (e2 :- x)
+
 dsMatch (InfixOp e1 (Op "where") e2) v = do
   x <- newIdent (getLoc e2) "x"
   d1 <- dsMatch e1 v
