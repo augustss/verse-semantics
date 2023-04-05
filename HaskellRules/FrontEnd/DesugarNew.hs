@@ -59,7 +59,7 @@ dsMatch (InfixOp e1 (Op "|") e2) v = do
   pure $ Choice d1 d2
 dsMatch (InfixOp e1 (Ident l op) e2) v = dsMatch (call "in" l op (Array [e1, e2])) v
 dsMatch (Seq []) v = dsMatch (Array []) v
--- Rule (e1; e2) :- v  -->  exists x . (e1 :- x); (e2 :- v)
+-- Rule: (e1; e2) :- v  -->  exists x . (e1 :- x); (e2 :- v)
 dsMatch (Seq (Snoc es r)) v = do
   xs <- mapM (\ e -> newIdent (getLoc e) "x") es
   ds <- zipWithM dsMatch es xs  
@@ -74,6 +74,13 @@ dsMatch (Function [(e1,rs)] e2) v = do
   d1 <- dsMatch e1 x
   d2 <- dsMatch e2 q
   pure $ Lambda x rs (Define y d1) $ Seq [Define q (ApplyD (Variable v) (Variable y)), d2]
+-- Rule: (if(e1)then e2 else e3) :- v  -->  if (exists x . e1 :- x) then (e2 :- v) else (e3 :- v)
+dsMatch (If3 e1 e2 e3) v = do
+  x <- newIdent (getLoc e1) "x"
+  d1 <- dsMatch e1 x
+  d2 <- dsMatch e2 v
+  d3 <- dsMatch e3 v
+  pure $ If3 (existsV [x] d1) d2 d3
 dsMatch e _ = error $ "dsMatch: " ++ prettyShow e
 
 apply :: (Expr -> Expr) -> Expr -> Expr -> Ident -> D Expr
