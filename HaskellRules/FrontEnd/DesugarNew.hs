@@ -17,8 +17,11 @@ dsTop e = do
   Exists [x] <$> dsMatch e x
 
 dsMatch :: Expr -> Ident -> D Expr
+-- Rule:  k :- v  -->  v = k
 dsMatch e v | isLiteral e = pure $ unifyV v e
+-- Rule:  x :- v  -->  v = x
 dsMatch e@Variable{} v = pure $ unifyV v e
+-- Rule: (e1,...,en) :- v  -->  exists x1 ... xn . e1 :- x1; ...; en :- xn; v = (x1, ..., xn)
 dsMatch (Array es) v = do
   let f e | isValue e = pure (id, e)    -- Easy special case.  Not really needed
           | otherwise = do
@@ -27,34 +30,43 @@ dsMatch (Array es) v = do
               pure (\a -> existsV [x] (Seq [d, a]), Variable x)
   (fs, xs) <- unzip <$> mapM f es
   pure $ foldr ($) (unifyV v (Array xs)) fs
+-- Rule: f[a] :- v  -->  exists g h x y . h = (f :- g); y = (a :- x); v = succeeds{h[y]}
 dsMatch (ApplyS f a) v = apply Succeeds f a v
+-- Rule: f[a] :- v  -->  exists g h x y . h = (f :- g); y = (a :- x); v = h[y]
 dsMatch (ApplyD f a) v = apply id f a v
+-- Rule: :e :- v  -->  exists h f . f = (e :- h); f[v]
 dsMatch (PrefixOp (Op ":") e) v = dsColon e v
 dsMatch (PrefixOp (Ident l op) e) v = dsMatch (call "pre" l op e) v
 dsMatch (PostfixOp e (Ident l op)) v = dsMatch (call "post" l op e) v
 dsMatch (InfixOp e1 (Op ":=") e2) v = dsDef e1 e2 v
+-- Rule: e1:e2 :- v  -->  (e1 := :e2) :- v
 dsMatch (InfixOp e1 o@(Op ":") e2) v = dsMatch (InfixOp e1 (Op ":=") (PrefixOp o e2)) v
+-- Rule: (e1 where e2) :- v  -->  exists x . (e1 :- v); (e2 :- x)
 dsMatch (InfixOp e1 (Op "where") e2) v = do
   x <- newIdent (getLoc e2) "x"
   d1 <- dsMatch e1 v
   d2 <- dsMatch e2 x
   pure $ existsV [x] $ Seq [d1, d2]
+-- Rule: (e1 = e2) :- v  -->  (e1 :- v); (e2 :- v)
 dsMatch (InfixOp e1 (Op "=") e2) v = do
   d1 <- dsMatch e1 v
   d2 <- dsMatch e2 v
   pure $ Seq [d1, d2]
+-- Rule: (e1 | e2) :-  -->  (e1 :- v) | (e2 :- v)
 dsMatch (InfixOp e1 (Op "|") e2) v = do
   d1 <- dsMatch e1 v
   d2 <- dsMatch e2 v
   pure $ Choice d1 d2
 dsMatch (InfixOp e1 (Ident l op) e2) v = dsMatch (call "in" l op (Array [e1, e2])) v
 dsMatch (Seq []) v = dsMatch (Array []) v
+-- Rule (e1; e2) :- v  -->  exists x . (e1 :- x); (e2 :- v)
 dsMatch (Seq (Snoc es r)) v = do
   xs <- mapM (\ e -> newIdent (getLoc e) "x") es
   ds <- zipWithM dsMatch es xs  
   dr <- dsMatch r v
   pure $ existsV xs $ Seq $ ds ++ [dr]
 dsMatch (Block es) v = dsMatch (Seq es) v
+-- Rule: function(e1){e2} :- v  -->  lambda x (exists y . y = (e1 :- x)) (exists q . q = v[y]; (e2 :- q))
 dsMatch (Function [(e1,rs)] e2) v = do
   x <- newIdent (getLoc e1) "x"
   y <- newIdent (getLoc e1) "y"
@@ -95,8 +107,11 @@ dsColon e v = do
 
 
 dsDef :: Expr -> Expr -> Ident -> D Expr
+-- Rule: (i := e) :- v  -->  exists i . i = (e :- v)
 dsDef (Variable i) e v = Define i <$> dsMatch e v
+-- Rule: (f(a) := e) :- v  -->  (f := function(a){e}) :- v
 dsDef (ApplyS f a) e v = dsDef f (Function [(a,[])] e) v
+-- Rule: (e1:e2 := e) :- v  -->  (e1 := e2(e)) :- v
 dsDef (InfixOp e1 (Op ":") e2) e v = dsDef e1 (ApplyS e2 e) v
 dsDef p _ _ = error $ "dsDef: " ++ prettyShow p
 
