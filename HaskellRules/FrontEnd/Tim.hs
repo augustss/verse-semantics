@@ -179,14 +179,14 @@ dsExpr sc i x (Array ss) = do
   pure [ExistsOp (j: y: js ++ ys) $ [j :=: Arr js, y :=: Arr ys, i :=: Var j, x :=: Var y] ++ concat opss]
 dsExpr sc i x (ApplyS s1 s2) = apply sc i x (VerifyOp "succeeds") s1 s2
 dsExpr sc i x (ApplyD s1 s2) = apply sc i x                    id s1 s2
-dsExpr _ _ _ (ApplyEff _ _) = undefined
-dsExpr _ _ _ (EffAttr _ _) = undefined
+--dsExpr _ _ _ (ApplyEff _ _) = undefined
+--dsExpr _ _ _ (EffAttr _ _) = undefined
 dsExpr sc i x (PrefixOp (Op ":") s0) = do
   ~[h, f] <- newIds ["h", "f"]
   ops0 <- dsExpr sc h f s0
   pure [ExistsOp [h, f] $ ops0 ++ [ x :=: App f i ]] -- XXX no effects?
-dsExpr _ _ _ (PrefixOp _ _) = undefined
-dsExpr _ _ _ (PostfixOp _ _) = undefined
+--dsExpr _ _ _ (PrefixOp _ _) = undefined
+--dsExpr _ _ _ (PostfixOp _ _) = undefined
 dsExpr sc i x (InfixOp s0 (Op "=") s1) = (++) <$> dsExpr sc i x s0 <*> dsExpr sc i x s1
 dsExpr sc i x (InfixOp s0 (Op "|") s1) = do
   op0 <- scope sc i x s0

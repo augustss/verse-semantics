@@ -11,6 +11,7 @@ module FrontEnd.Expr(
   pattern Fail,
   pattern Unit,
   pattern Typedef,
+  pattern Succeeds,
 --  pattern Range,
   Block,
   Eff,
@@ -116,6 +117,9 @@ pattern Unit = Array []
 pattern Typedef :: Block -> Expr
 pattern Typedef e <- Macro1 (Ident _ "type") [] e
   where Typedef e = Macro1 (Ident noLoc "type") [] e
+pattern Succeeds :: Block -> Expr
+pattern Succeeds e <- Macro1 (Ident _ "succeeds") [] e
+  where Succeeds e = Macro1 (Ident noLoc "succeeds") [] e
 
 type Eff = Ident
 

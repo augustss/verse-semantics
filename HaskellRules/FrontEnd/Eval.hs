@@ -226,7 +226,7 @@ evalDefFloat flg = evalTrace "evalDefFloat" f flg
 evalWrong :: EvalCore
 evalWrong = evalTrace "evalWrong" f
   where
-    f (CDef (_:_) CValue{}) = CWrong "def-wrong"
+    f (CDef (_:_) v@CValue{}) = v -- CWrong "def-wrong"
     f e | ws@(_:_) <- getWrongs e = cWrongs ws
     f e = composOp f e
 

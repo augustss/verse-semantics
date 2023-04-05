@@ -11,6 +11,7 @@ import Options.Applicative hiding (command)
 
 import Epic.Print hiding ((<>))
 import FrontEnd.Desugar
+import FrontEnd.DesugarNew
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
 import qualified FrontEnd.Parse as P
@@ -135,6 +136,7 @@ command = Command
   { c_commands =
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+      , Cmd "ndesugar [EXPR]"      "Desugar [last] expression"             cDesugarNew
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
       , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
@@ -246,6 +248,9 @@ cTransform tr =
 
 cDesugar :: Run CState
 cDesugar = cTransform (Desugared . desugar . asExpr)
+
+cDesugarNew :: Run CState
+cDesugarNew = cTransform (Desugared . desugarNew . asExpr)
 
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)

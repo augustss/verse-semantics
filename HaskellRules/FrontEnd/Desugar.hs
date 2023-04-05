@@ -1,5 +1,7 @@
 {-# LANGUAGE TupleSections #-}
-module FrontEnd.Desugar(desugar, simplify, primOps, getVisible, covariantId, dsScope) where
+module FrontEnd.Desugar(
+  desugar, simplify, primOps, getVisible, covariantId, dsScope,
+  D, newIdent, addScope, dropParens, getLoc, isLiteral, exists, call) where
 --import Control.Arrow(first, second)
 import Control.Monad
 import Control.Monad.State.Strict
@@ -211,18 +213,6 @@ dsD = expr
 
     expr e = impossible e
 
-    -- Pick the appropriate form of apply for operators
-    call p l s e = con (Variable (Ident l s')) e
-      where con | s' `elem` ["in'/'","pre'!'","post'?'",
-                             "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
-                             "pre'+'","pre'-'",  -- XXX not really right
-                             "in'+'","in'-'","in'*'",  -- XXX not really right
-                             "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
-                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
-                             "length","in'..'"] = ApplyD
-                | otherwise = ApplyS
-            s' = p ++ "'" ++ s ++ "'"
-
     -- Handle function(e){b}
     --function e r b | trace ("function " ++ show (e, r, b)) False = undefined
     function (InfixOp (Variable y) (Ident _ ":") (Variable (Ident _ "any"))) _ b =
@@ -247,6 +237,19 @@ unify :: Expr -> Expr -> Expr
 unify AnyT e = e
 unify e AnyT = e
 unify e1 e2 = Unify e1 e2
+
+-- Pick the appropriate form of apply for operators
+call :: String -> Loc -> String -> Expr -> Expr
+call p l s e = con (Variable (Ident l s')) e
+      where con | s' `elem` ["in'/'","pre'!'","post'?'",
+                             "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
+                             "pre'+'","pre'-'",  -- XXX not really right
+                             "in'+'","in'-'","in'*'",  -- XXX not really right
+                             "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
+                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
+                             "length","in'..'"] = ApplyD
+                | otherwise = ApplyS
+            s' = p ++ "'" ++ s ++ "'"
 
 --primFcn :: Ident -> SExpr -> SExpr
 --primFcn y e = Function [(tAny noLoc y, [])] e
@@ -831,7 +834,7 @@ scope sc = expr
       Lambda i r e1' <$> scope sc' (Do e2)
     expr e@AnyT = pure e
     expr e@EmptyT = pure e
-    expr (Exists is e) = Exists is . fst <$> defs (foldr S.insert sc is) e
+    expr (Exists is e) = exists is . fst <$> defs (foldr S.insert sc is) e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -846,7 +849,11 @@ scope sc = expr
       e' <- scope s' e
       errMultiple errM
       errShadow errS
-      pure (Exists is e', s')
+      pure (exists is e', s')
+
+exists :: [Ident] -> Expr -> Expr
+exists is (Exists is' e) = Exists (is ++ is') e
+exists is e = Exists is e
 
 addDeref :: Expr -> D Expr
 addDeref = pure . exprD S.empty

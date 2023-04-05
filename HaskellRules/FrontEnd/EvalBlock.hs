@@ -10,7 +10,7 @@ import Data.Coerce
 import Data.Data(Data)
 import Data.List
 import Data.Maybe
---import qualified Data.Map as M
+import qualified Data.Map as M
 import Epic.Print
 import Epic.Uniplate
 import qualified Epic.SIntMap as IM
@@ -66,6 +66,7 @@ evalUnderLambda = transformBi ev
         ev v@BRef{} = v
         ev (BArr vs) = BArr (map (transformBi ev) vs)
         ev (BHLam i b) = BHLam i $ transformBi ev $ evalB b
+        ev (BTable m) = BTable (M.map (transformBi ev) m)
         evalB b =
           case evalBlock dummyHeap lambdaEffs [] b of
             BCBlk b' -> b'
@@ -92,7 +93,7 @@ data BBlock = BBlock
   , binds     :: [BEqn]                    -- variable bindings
   , result    :: !BValue                    -- final value of the block
   }
-  deriving (Show, Eq, Data)
+  deriving (Show, Eq, Ord, Data)
 
 pattern BlockFail :: BBlock
 pattern BlockFail = BBlock{ vars = [], binds = [(BAVar, BFail)], result = BAVar }
@@ -126,7 +127,7 @@ data BExpr
   | BSplit BChoice BValue BValue
   | BChoice BChoice
   | BVal BValue
-  deriving (Show, Eq, Data)
+  deriving (Show, Eq, Ord, Data)
 
 pattern BEBlk :: BBlock -> BExpr
 pattern BEBlk b = BChoice (BCBlk b)
@@ -137,7 +138,7 @@ data BChoice
   | BCFail
   | BCWrong String
   | BCRBlk BHeap BBlock    -- only in results
-  deriving (Show, Eq, Data)
+  deriving (Show, Eq, Ord, Data)
 
 --pattern BEVar :: BIdent -> BExpr
 --pattern BEVar i = BVal (BVar i)
@@ -152,7 +153,7 @@ data BValue
   = BVar BIdent
   | BHNF BHNF
   | BRec BHNF   -- The BHNF must be a BHLam i (BlockValue [] (BHNF h))
-  deriving (Show, Eq, Data)
+  deriving (Show, Eq, Ord, Data)
 
 pattern BMu :: BIdent -> BHNF -> BValue
 pattern BMu i h = BRec (BHLam i (BlockValue [] (BHNF h)))
@@ -166,7 +167,8 @@ data BHNF
   | BRef BPtr
   | BArr [BValue]
   | BHLam BIdent BBlock  -- invariant: the bound BIdent will not be among the vars in the block
-  deriving (Show, Eq, Data)
+  | BTable (M.Map BHNF BValue)
+  deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
 pattern BVInt i = BHNF (BInt i)
@@ -179,6 +181,9 @@ pattern BVArr vs = BHNF (BArr vs)
 
 pattern BVLam :: BIdent -> BBlock -> BValue
 pattern BVLam i b = BHNF (BHLam i b)
+
+pattern BVTable :: M.Map BHNF BValue -> BValue
+pattern BVTable m = BHNF (BTable m)
 
 pattern BXLam :: BIdent -> BValue -> BValue
 pattern BXLam i v = BVLam i (BlockValue [] v)
@@ -201,7 +206,7 @@ allEffects :: Effects
 allEffects = [minBound .. maxBound]
 
 data BHeap = BHeap (IM.SIntMap BPtr BValue) | BNoHeap
-  deriving (Show, Eq, Data)
+  deriving (Show, Eq, Ord, Data)
 
 newtype BPtr = BPtr Int
   deriving (Show, Eq, Ord, Data, Enum)
@@ -279,6 +284,7 @@ instance Pretty BHNF where
   pPrintPrec l _ (BArr [v]) = parens (pPrintPrec l 0 v <> text ",")
   pPrintPrec l _ (BArr vs) = parens $ fsep (punctuate comma (map (pPrintPrec l 0) vs))
   pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 b
+  pPrintPrec l _ (BTable m) = text "TABLE" <> pPrintPrec l 0 (M.toList m)
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -417,10 +423,12 @@ instance Bound BHNF where
   allBVars (BRef _) = []
   allBVars (BArr vs) = unionMap allBVars vs
   allBVars (BHLam i b) = [i] `union` allBVars b
+  allBVars (BTable m) = allBVars $ M.toList m
   freeBVars (BInt _) = []
   freeBVars (BRef _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
+  freeBVars (BTable m) = freeBVars $ M.toList m
   bsubst' _ h@(BInt _) = h
   bsubst' _ h@(BRef _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
@@ -430,6 +438,7 @@ instance Bound BHNF where
     where
       s' = filter ((/= i) . fst) s
       (i', b') = freshenLambda (freeBVars (map snd s')) (i, b)
+  bsubst' s (BTable m) = BTable (M.fromList $ map (bsubst' s) $ M.toList m)
 
 freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
 freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
@@ -478,6 +487,7 @@ hnfToCore (BArr vs) = Arr (map valueToCore vs)
 hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
   where lam ii (f :@: Var i') | ii == i', ii `notElem` free f = f
         lam ii ee = LAM ii ee
+hnfToCore (BTable m) = LAM (Name "_") (Var (Name $ "TABLE" ++ prettyShow (M.toList m)))
 
 exprToCore :: BExpr -> Expr
 exprToCore (BPrimOp o [v]) = Op o :@: valueToCore v
@@ -758,6 +768,8 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
         unify BRec{} _ = undefined -- XXX dunno
         unify _ BRec{} = undefined -- XXX dunno
+        unify v1@BVTable{} v2 = error $ "unify BTable: " ++ prettyShow (v1, v2)
+        unify v1 v2@BVTable{} = error $ "unify BTable: " ++ prettyShow (v1, v2)
         unify _ _ = fails -- anything else fails
 
         -- Fail if it is allowed, otherwise suspend
@@ -788,6 +800,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                         | otherwise -> suspend eqn
           BApply f a ->
             case f of
+              BVar _ | BHNF h <- a -> unify f (BVTable $ M.singleton h val)
               BVar _ -> suspend eqn           -- not a hnf yet
               BMu i h -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
               BRec _ -> undefined
@@ -799,6 +812,11 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                 let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                           | (i, v) <- zip [0..] vs ]
                 in  succeeds [(val, e)]
+              BVTable m | BHNF h <- a ->
+                case M.lookup h m of
+                  Just v -> succeeds [(val, BVal v)]
+                  Nothing -> error "unimplemented BTable"
+                        | otherwise -> suspend eqn
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
