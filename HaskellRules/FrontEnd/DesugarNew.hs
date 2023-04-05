@@ -70,7 +70,7 @@ dsMatch (Seq (Snoc es r)) v = do
   dr <- dsMatch r v
   pure $ existsV xs $ Seq $ ds ++ [dr]
 dsMatch (Block es) v = dsMatch (Seq es) v
--- Rule: function(e1){e2} :- v  -->  lambda x (exists y . y = (e1 :- x)) (exists q . q = v[y]; (e2 :- q))
+-- Rule: function(e1)<rs>{e2} :- v  -->  lambda x rs (exists y . y = (e1 :- x)) (exists q . q = v[y]; (e2 :- q))
 dsMatch (Function [(e1,rs)] e2) v = do
   x <- newIdent (getLoc e1) "x"
   y <- newIdent (getLoc e1) "y"
@@ -78,6 +78,7 @@ dsMatch (Function [(e1,rs)] e2) v = do
   d1 <- dsMatch e1 x
   d2 <- dsMatch e2 q
   pure $ Lambda x rs (Define y d1) $ Seq [Define q (ApplyD (Variable v) (Variable y)), d2]
+dsMatch (Function (a:as) e) v = dsMatch (Function [a] (Function as e)) v
 -- Rule: (if(e1)then e2 else e3) :- v  -->  if (exists x . e1 :- x) then (e2 :- v) else (e3 :- v)
 dsMatch (If3 e1 e2 e3) v = do
   x <- newIdent (getLoc e1) "x"
@@ -85,6 +86,8 @@ dsMatch (If3 e1 e2 e3) v = do
   d2 <- dsMatch e2 v
   d3 <- dsMatch e3 v
   pure $ If3 (existsV [x] d1) d2 d3
+dsMatch (ApplyEff rs e) v = ApplyEff rs <$> dsMatch e v
+dsMatch (Succeeds e) v = ApplyEff [Ident noLoc "succeeds"] <$> dsMatch e v
 dsMatch e _ = error $ "dsMatch: " ++ prettyShow e
 
 apply :: (Expr -> Expr) -> Expr -> Expr -> Ident -> D Expr
@@ -124,12 +127,17 @@ dsDef (Variable i) e v = Define i <$> dsMatch e v
 dsDef (ApplyS f a) e v = dsDef f (Function [(a,[])] e) v
 -- Rule: (e1:e2 := e) :- v  -->  (e1 := e2(e)) :- v
 dsDef (InfixOp e1 (Op ":") e2) e v = dsDef e1 (ApplyS e2 e) v
+dsDef (EffAttr e1 r) e v = dsDef e1 (applyEff [r] e) v
 dsDef p _ _ = error $ "dsDef: " ++ prettyShow p
 
 isValue :: Expr -> Bool
 isValue Variable{} = True
 isValue (Array es) = all isValue es
 isValue e = isLiteral e
+
+applyEff :: [Eff] -> Expr -> Expr
+applyEff rs (ApplyEff rs' e) = ApplyEff (rs ++ rs') e
+applyEff rs e = ApplyEff rs e
 
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e

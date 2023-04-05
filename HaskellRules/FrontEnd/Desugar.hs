@@ -803,7 +803,7 @@ scope sc = expr
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr (ApplyEff is e) = do
       errUndefined (is \\ knownEffects)
-      expr e
+      ApplyEff is <$> expr e
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
       If3 e1' <$> scopeD sc' e2 <*> exprD e3
