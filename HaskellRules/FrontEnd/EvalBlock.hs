@@ -769,8 +769,12 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
         unify BRec{} _ = undefined -- XXX dunno
         unify _ BRec{} = undefined -- XXX dunno
-        unify v1@BVExt{} v2 = error $ "unify BExt: " ++ prettyShow (v1, v2)
-        unify v1 v2@BVExt{} = error $ "unify BExt: " ++ prettyShow (v1, v2)
+        unify (BVExt a1 r1 x1) (BVExt a2 r2 x2) | a1 == a2 = succeeds [(r1, BVal r2), (x1, BVal x2)]
+        -- These are dubious
+        unify (BVExt a r x) v = succeeds [(r, BApply v (BHNF a)), (x, BVal v)]
+        unify v (BVExt a r x) = succeeds [(r, BApply v (BHNF a)), (x, BVal v)]
+--        unify v1@BVExt{} v2 = error $ "unify BExt: " ++ prettyShow (v1, v2)
+--        unify v1 v2@BVExt{} = error $ "unify BExt: " ++ prettyShow (v1, v2)
         unify _ _ = fails -- anything else fails
 
         -- Fail if it is allowed, otherwise suspend
