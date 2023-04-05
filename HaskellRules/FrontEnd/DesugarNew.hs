@@ -47,9 +47,10 @@ dsMatch (InfixOp e1 o@(Op ":") e2) v = dsMatch (InfixOp e1 (Op ":=") (PrefixOp o
 
 dsMatch (InfixOp e1 (Op "where") e2) v = do
   x <- newIdent (getLoc e2) "x"
+  y <- newIdent (getLoc e2) "y"
   d1 <- dsMatch e1 v
   d2 <- dsMatch e2 x
-  pure $ existsV [x] $ Seq [d1, d2]
+  pure $ existsV [x] $ Seq [unifyV x d1, d2, Variable x]
 -- Rule: (e1 = e2) :- v  -->  (e1 :- v); (e2 :- v)
 dsMatch (InfixOp e1 (Op "=") e2) v = do
   d1 <- dsMatch e1 v
