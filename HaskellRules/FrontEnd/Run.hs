@@ -3,6 +3,7 @@ module FrontEnd.Run(
   Flags(..),
   defaultFlags,
   evalSystem,
+  blockSystem,
   findSystem,
   everySystem,
   ) where

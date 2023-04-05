@@ -21,7 +21,7 @@ import FrontEnd.CoreSimp
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
-import FrontEnd.Run(run, findSystem, evalSystem, everySystem)
+import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
 import FrontEnd.Tim
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
@@ -167,7 +167,7 @@ command = Command
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
                      , prelude = Nothing, flags = defaultFlags{fSplit=False, fNoFuelStop=True}
-                     , esystem = evalSystem }
+                     , esystem = blockSystem }
   , c_history = Just ".versei"
   }
 
