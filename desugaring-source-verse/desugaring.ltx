@@ -267,15 +267,15 @@ $$
   |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2) | \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
   |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
-  |Me i (t_1^[t_2])| & = & |f := De t_1; x := De t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
-  |Me i (t_1^(t_2))| & = & |f := De t_1; x := De t_2; succeeds (f^[x])| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |t_1^[t_2]| & \rightarrow & |f := De t_1; x := De t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |t_1^(t_2)| & \rightarrow & |f := De t_1; x := De t_2; succeeds (f^[x])| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
   |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
   |type^{t}| & \rightarrow & |function (y:t) y| \\
   |()| & \rightarrow & |array ()| \\
   |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
   |e_1 eqgt e_2| & \rightarrow & |function e_1 () {e_2}| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function () b| & \rightarrow & |functionKW (()) b)| & \\
+  |function () b| & \rightarrow & |functionKW (()) b| & \\
   |function (a (eff r)) b| & \rightarrow & |function a (check r b)| & \\
   |if{e})| & \rightarrow & |if(e) else false| \\
   |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
