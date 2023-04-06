@@ -234,15 +234,13 @@ $$
 \\
 \multicolumn{4}{l}{\textbf{The heavy lifting}} \\
   |Me i k| & = & |i=k| \\
-  |Me i  x| & = & |i=x| \\
+  |Me i x| & = & |i=x| \\
+  |Me i (f^[x])| & = & |i=f^[x]| \\
+  |Me i (x=t)| & = & |x = Me i t| \\
+  |Me i (x:=t)| & = & |x := Me i t| \\
   |Me i (:t)| & = & |(De t)^(i)| & \\
-  |Me i (x:=t)| & = & |x == Me i t| \\
   |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
-  |Me i (t_1 where t_2)| & = & |Me i t_1 ; De t_2| & \text{or the other way round?}\\
   |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-  |Me i (t_1 == t_2)| & = & |(Me i t_1) ; (Me i t_2)|  & \text{I think this is right}\\
-  |Me i (t_1^[t_2])| & = & |i = ((De t_1) (De t_2))| \\
-  |Me i (t_1^(t_2))| & = & |def (f,x) (f == De t_1; x == De t_2; i == succeeds (f^(x))| \\
   |Me i (check r t)| & = & |check r (Me i t)|  & \text{Is this right?}\\
   |Me i (array(t_1, xdots, t_n))| & = &
     \multicolumn{2}{l}{|def (x_1 xdots x_n)
@@ -254,7 +252,7 @@ $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
   |Me i (function t_1 t_2)| & = & |i == (lam x (def (Vr t_1) (Me x t_1; De t_2)|) \\
-  |Me i (function t_1 t_2)| & = & |lam x (def (Vr t_1) (def (x',y) (x' == Me x t_1; y == i^(x'); Me y t_2))|
+  |Me i (function t_1 t_2)| & = & |lam x (def (Vr t_1) (def (x',y) (x' == Me x t_1; y == i^[x']; Me y t_2))|
 \end{array}
 \end{array}
 $$
@@ -267,6 +265,10 @@ $$
   |l : t| & \rightarrow & |l := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
   |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2) | \\
+  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
+  |Me i (t_1^[t_2])| & = & |f := De t_1; x := De t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |Me i (t_1^(t_2))| & = & |f := De t_1; x := De t_2; succeeds (f^[x])| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
   |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
   |type^{t}| & \rightarrow & |function (y:t) y| \\
   |()| & \rightarrow & |array ()| \\
