@@ -175,7 +175,7 @@
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format function (x)(rhs) = functionKW "(" x ")." rhs
-%format functionKW = "\textbf{fun}"
+%format functionKW = "\textbf{function}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -197,7 +197,7 @@
 %format lte = "\prec"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = r "\{" b "\}"
+%format check (r) (b) = "{\bf verify}\langle" r "\rangle\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
