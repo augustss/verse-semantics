@@ -112,7 +112,7 @@
 
 Our plan is
 \begin{enumerate}
-\item Rewrite Source Verse (\Cref{source-verse-expr}) to Small Source Verse (\Cref{fig:small-source-verse}).
+\item Rewrite Source Verse (\Cref{fig:source-verse-expr}) to Small Source Verse (\Cref{fig:small-source-verse}).
   Small Source Verse is simply a proper subset of Source Verse.
 \item Desugar Small Source Verse into Big Core Verse (\Cref{fig:desugar-expr1}).
 \item Simplify Big Core Verse into Core Verse (the ICFP 23 paper).
@@ -466,29 +466,73 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{figurebox}
 
 % --------------------------------------
+\clearpage
 \section{Tim's Core language}
 
 \begin{figurebox}
 $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\text{\bf Expressions}} \\
-|v| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \\
-    & \vb & lambda \\
+|v,w| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]|\\
+    & \vb & |timlam h fx i x s_0 j y s_1| \\
+\\
+|s| & ::= & |scope (x_1, xdots, x_n) G e| \\
 \\
 |e| & ::= & |x=v|  \\
-    & \vb & |y=f^[x]| \\
     & \vb & |y=length^[x]| \\
     & \vb & |x = fail| \\
-    & \vb & |e_1 `choice` e_2| \\
+    & \vb & |s_1 `choice` s_2| \\
     & \vb & |e_1 ; e_2| \\
-    & \vb & |def x e| & \\
     & \vb & |check fx e|           & \text{Effects check} \\
-    \\
+\multicolumn{4}{l}{\text{Omitting for now: cast, error, in, iterate, next}} \\
+\\
+|G| & ::= & |emp| \vb |G, g| \\
+|g| & ::= & |edge v w|  & \text{Data flow from |w| to |v|} \\
+    & \vb & |fails S v|   & \text{|v| is unified with failure}\\
+   & \vb & |equals S v w| & \\
+   & \vb & |lengthis S y z| &  \\
+   & \vb & |dominates v w| & \text{|v| dominates |w|} \\
+|S,T| & ::= &  |succeedsKW| \vb |decidesKW| \vb |resolvesKW|
+
+\\
+\\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW| \vb |xdots|
 \end{array}
 $$
 \caption{Tim Core Verse} \label{fig:tim-core-verse}
+\end{figurebox}
+
+Things to note:
+\begin{itemize}
+\item In a TimLambda |timlam h fx cx_0 i x e_0 cx_1 j y e_1|:
+  \begin{itemize}
+  \item |h| is a (bound) occurrence of a variable, presumably already in scope.
+  \item |e_0| is called the \emph{domain expression} and |e_1| is the \emph{range expression}.
+  \item |i| and |x| are binders, and scope over |e_0| and |e_1|.
+  \item |j| and |y| are binders, and scope over |e_1|.
+  \end{itemize}    
+\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
+\end{itemize}  
+
+
+\begin{figurebox}
+$$
+\begin{array}{l}
+\begin{array}{rcl}
+X & ::= & |hole| \vb |X ; e| \vb |e ; X|
+\end{array}\\
+\\
+\begin{array}{rcll}
+|scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolvesKW x k,edge x k) (X^[x=k])| \\
+|scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,equals resolvesKW x y,edge x y,edge y x) (X^[x=y])|  \\
+     && \text{if $x,y \in |xs|$} \\
+|scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,equals resolvesKW x y,edge x y) (X^[x=y])|  \\
+     && \text{if $x \in |xs|, y \not\in |xs|$}
+\end{array}
+\end{array}
+$$
+\caption{Saturation} \label{fig:tim-saturation}
 \end{figurebox}
 
 \end{document}
