@@ -10,7 +10,7 @@
 %format fails s v  = s "\{" v==fail "\}"
 %format equals s v w  = s "\{" v==w "\}"
 %format lengthis s y z = s "\{" length^[y]==z "\}"
-%format dominates v s = v "\twoheadrightarrow" w
+%format dominates s v w = s "\{" v "\twoheadrightarrow" w "\}"
 
 %% ----------------------
 %format ^ = " "
@@ -160,6 +160,7 @@
 %format iteratesKW = "\textbf{iterates}"
 %format iterates (e) = "\textbf{iterates}\{" e "\}"
 %format resolvesKW = "\textbf{resolves}"
+%format failsKW = "\textbf{fails}"
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"

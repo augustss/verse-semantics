@@ -469,35 +469,58 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \clearpage
 \section{Tim's Core language}
 
+Tim's verifier works like this.
+\begin{itemize}
+\item \textbf{Desugaring} (\Cref{sec:tim-core-syntax}) transforms Source Verse into TimCore.
+\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the term, keeping its
+  structure but:
+  \begin{itemize}
+  \item Augmenting the inferences |G| that are attached to each scope node.
+  \item Performing beta reductions
+  \end{itemize}
+  Only when ingestion has reached a fixpoint do we move on to the next step.
+\item \textbf{Inference saturation} (\Cref{sec:inf-sat}) does dominator analysis on each
+  inference set |G| separately, and successively rewrites the |G| to reflect the result of this analysis.
+
+\item \textbf{Effect analysis} (\Cref{sec:effect-anal}) checks each sub-term |check fx e| to ensure
+  that the effects of |e| are indeed covered by |fx|.
+\end{itemize}
+\subsection{Syntax} \label{sec:tim-core-syntax}
 \begin{figurebox}
 $$
 \begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Expressions}} \\
-|v,w| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]|\\
-    & \vb & |timlam h fx i x s_0 j y s_1| \\
+\multicolumn{4}{l}{\text{\bf Vertices}} \\
+|v,w| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]| \vb |lam x e|\\
 \\
+\multicolumn{4}{l}{\text{\bf Scopes}} \\
 |s| & ::= & |scope (x_1, xdots, x_n) G e| \\
 \\
-|e| & ::= & |x=v|  \\
-    & \vb & |y=length^[x]| \\
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x = y| \\
+    & \vb & |x = k| \\
+    & \vb & |x = tup (y_1,xdots,y_n)| \\
+    & \vb & |x = f^[x]| \\
+    & \vb & |x = timlam h fx i x s_0 j y s_1| \\
+%    & \vb & |y=length^[x]| \\
     & \vb & |x = fail| \\
     & \vb & |s_1 `choice` s_2| \\
     & \vb & |e_1 ; e_2| \\
     & \vb & |check fx e|           & \text{Effects check} \\
 \multicolumn{4}{l}{\text{Omitting for now: cast, error, in, iterate, next}} \\
 \\
+\multicolumn{4}{l}{\text{\bf Inferences}} \\
 |G| & ::= & |emp| \vb |G, g| \\
 |g| & ::= & |edge v w|  & \text{Data flow from |w| to |v|} \\
     & \vb & |fails S v|   & \text{|v| is unified with failure}\\
    & \vb & |equals S v w| & \\
-   & \vb & |lengthis S y z| &  \\
-   & \vb & |dominates v w| & \text{|v| dominates |w|} \\
-|S,T| & ::= &  |succeedsKW| \vb |decidesKW| \vb |resolvesKW|
-
+%   & \vb & |lengthis S y z| &  \\
+   & \vb & |dominates S v w| & \text{|v| dominates |w|} \\
 \\
+\multicolumn{4}{l}{\text{\bf Strengths}} \\
+|S,T| & ::= &  |succeedsKW| \vb |decidesKW| \vb |resolvesKW| \\
 \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW| \vb |xdots|
+|fx| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW| \vb |failsKW| \vb |xdots|
 \end{array}
 $$
 \caption{Tim Core Verse} \label{fig:tim-core-verse}
@@ -505,16 +528,19 @@ $$
 
 Things to note:
 \begin{itemize}
-\item In a TimLambda |timlam h fx cx_0 i x e_0 cx_1 j y e_1|:
+\item A \emph{scope} |scope xs G e| binds some existentials |xs|, has a collection of inferences |G| (initially empty), and wraps an expression |e|.
+\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
+\item In a vertex we have an ordinary (POPL) lambda |lam x e|.  Only in an expression do we have a TimLambda.
+\item In a TimLambda |timlam h fx i x s_0 j y s_1|:
   \begin{itemize}
   \item |h| is a (bound) occurrence of a variable, presumably already in scope.
-  \item |e_0| is called the \emph{domain expression} and |e_1| is the \emph{range expression}.
-  \item |i| and |x| are binders, and scope over |e_0| and |e_1|.
-  \item |j| and |y| are binders, and scope over |e_1|.
-  \end{itemize}    
-\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
-\end{itemize}  
+  \item |s_0| is called the \emph{domain scope} and |s_1| is the \emph{range scope}.
+  \item |i| and |x| are binders, and scope over |s_0| and |s_1|.
+  \item |j| and |y| are binders, and scope over |s_1|.
+  \end{itemize}
+\end{itemize}
 
+\subsection{Ingestion} \label{sec:ingestion}
 
 \begin{figurebox}
 $$
@@ -523,17 +549,36 @@ $$
 X & ::= & |hole| \vb |X ; e| \vb |e ; X|
 \end{array}\\
 \\
-\begin{array}{rcll}
-|scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolvesKW x k,edge x k) (X^[x=k])| \\
-|scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,equals resolvesKW x y,edge x y,edge y x) (X^[x=y])|  \\
-     && \text{if $x,y \in |xs|$} \\
-|scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,equals resolvesKW x y,edge x y) (X^[x=y])|  \\
-     && \text{if $x \in |xs|, y \not\in |xs|$}
+\begin{array}{lrcll}
+\rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolvesKW x k) (X^[x=k])| \\
+\rulename{lflex} & |scope xs G (X^[x=v])| & \rightarrow & |scope xs (G,edge x v) (X^[x=v])|  \\
+     &&& \text{if $x \in |xs|$} \\
+\rulename{rflex} & |scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,edge y x) (X^[x=y])|  \\
+     &&& \text{if $y \in |xs|$} \\
 \end{array}
 \end{array}
 $$
-\caption{Saturation} \label{fig:tim-saturation}
+\caption{Ingestion rules} \label{fig:tim-ingestion}
 \end{figurebox}
+
+\Cref{fig:tim-ingestion} gives the ``ingestion'' rules.  Generally they simply augment the inferences |G|
+in (any of) the scope-expression |s| in the program.  Points to note:
+\begin{itemize}
+\item The context |X| looks inside a nested tree of ``|;|'' compositions; but it does not look inside
+  nested scopes or choices.  So only the innermost |G| is affected.
+\end{itemize}
+\noindent
+Questions:
+\begin{itemize}
+\item To avoid lots of duplication, I used vertices |v| in \rulename{lflex}. But that does not
+  account for the POPL-lambda vs Tim-lambda difference between expresions |e| and inferences |g|.
+  Maybe \rulename{lflex} would be better written as a G-to-G rewrite
+  $$ |xs; equals resolvesKW x v| \; \rightarrow \; |xs; equals resolvesKW x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
+ \end{itemize}
+
+\subsection{Inference saturation} \label{sec:inf-sat}
+
+\subsection{Effect analysis} \label{sec:effect-anal}
 
 \end{document}
 
