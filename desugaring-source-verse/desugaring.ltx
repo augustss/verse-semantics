@@ -10,6 +10,9 @@
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
 
+% Boxed figures
+\floatstyle{boxed}
+\restylefloat{figure}
 
 \usepackage{framed}
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
@@ -127,7 +130,7 @@ Our plan is
 Source Verse, ready for \Cref{fig:desugar-expr1}.
 
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
   |t| & ::= & |x|               & \text{Variable} \\
@@ -167,9 +170,9 @@ $$
 \end{array}
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
-\end{figurebox}
+\end{figure}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
   |x,y,f| &     & \textit{Variable} \\
@@ -211,9 +214,9 @@ $$
 \\
 Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
 \caption{Small Source Verse} \label{fig:small-source-verse}
-\end{figurebox}
+\end{figure}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{@@{}l}
 \begin{array}{rcll}
@@ -252,9 +255,9 @@ $$
 \end{array}
 $$
 \caption{Source Verse to Source Verse rewriting (1)} \label{fig:sv-to-sv-1}
-\end{figurebox}
+\end{figure}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
   \multicolumn{1}{l}{\textbf{Operators}} \\
@@ -284,7 +287,7 @@ $$
 This means that there can be no variable name clashes in |let| and |do|.
 A more robust desugaring could \textalpha-convert such clashes.
 \caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
-\end{figurebox}
+\end{figure}
 
 
 % ----------------------------------------------------------------
@@ -298,7 +301,7 @@ can very easily be desugared into it.  Specifically:
   top of the enclosing scope.
 \end{itemize}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\text{\bf Expressions}} \\
@@ -316,11 +319,11 @@ $$
     & \vb & |for(e) in b|     & \text{Finite loop} \\
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
+|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
 \end{array}
 $$
 \caption{BigCore Verse expressions} \label{fig:core-verse}
-\end{figurebox}
+\end{figure}
 
 % ----------------------------------------------------------------
 \section{Desugaring Source Verse}
@@ -328,7 +331,7 @@ $$
 \Cref{fig:desugar-expr1} desugars Small Source Verse into Core Verse.
 
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{@@{}l}
 \begin{array}{r@@{\;}c@@{\;}ll}
@@ -366,10 +369,10 @@ and |e| is a BigCore expression}} \\
 \end{array}
 $$
 \caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
-\end{figurebox}
+\end{figure}
 
 
-% \begin{figurebox}
+% \begin{figure}
 % 
 % $$
 %   \begin{array}{rcll}
@@ -420,11 +423,11 @@ $$
 %   \end{array}
 %   $$
 % \caption{Core conversion} \label{fig:core-conversion}
-% \end{figurebox}
+% \end{figure}
 % 
 % 
 % 
-% \begin{figurebox}
+% \begin{figure}
 % $$
 % \begin{array}{rclll}
 % \multicolumn{5}{l}{\textbf{Desugar a definition |p := e| into simple definitions with just |x := e|}} \\
@@ -451,9 +454,9 @@ $$
 % \end{array}
 % $$
 % \caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
-% \end{figurebox}
+% \end{figure}
 
-\begin{figurebox}
+\begin{figure}
 \begin{code}
 any    = (x => x)
 int    = (x => applyx isInt x; x)
@@ -463,7 +466,7 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
 \caption{Core prelude} \label{fig:core-prelude}
-\end{figurebox}
+\end{figure}
 
 % --------------------------------------
 \clearpage
@@ -486,7 +489,7 @@ Tim's verifier works like this.
   that the effects of |e| are indeed covered by |fx|.
 \end{itemize}
 \subsection{Syntax} \label{sec:tim-core-syntax}
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\text{\bf Vertices}} \\
@@ -517,14 +520,14 @@ $$
    & \vb & |dominates S v w| & \text{|v| dominates |w|} \\
 \\
 \multicolumn{4}{l}{\text{\bf Strengths}} \\
-|S,T| & ::= &  |succeedsKW| \vb |decidesKW| \vb |resolvesKW| \\
+|S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
 \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW| \vb |failsKW| \vb |xdots|
+|fx| & ::= & S \vb |iterates| \vb |fails| \vb |contradicts| \vb |abstracts|
 \end{array}
 $$
 \caption{Tim Core Verse} \label{fig:tim-core-verse}
-\end{figurebox}
+\end{figure}
 
 Things to note:
 \begin{itemize}
@@ -542,12 +545,16 @@ Things to note:
 
 \subsection{Ingestion} \label{sec:ingestion}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{l}
 \begin{array}{rcl}
 X & ::= & |hole| \vb |X ; e| \vb |e ; X|
 \end{array}\\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
+}} \\
 \\
 \begin{array}{lrcll}
 \rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolvesKW x k) (X^[x=k])| \\
@@ -559,7 +566,7 @@ X & ::= & |hole| \vb |X ; e| \vb |e ; X|
 \end{array}
 $$
 \caption{Ingestion rules} \label{fig:tim-ingestion}
-\end{figurebox}
+\end{figure}
 
 \Cref{fig:tim-ingestion} gives the ``ingestion'' rules.  Generally they simply augment the inferences |G|
 in (any of) the scope-expression |s| in the program.  Points to note:
@@ -579,6 +586,60 @@ Questions:
 \subsection{Inference saturation} \label{sec:inf-sat}
 
 \subsection{Effect analysis} \label{sec:effect-anal}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|effects G e| = |fx|$
+}} \\
+\\
+\begin{array}{rcll}
+  |effects G_1 (scope xs G_2 e)| & = & |effects ((G_1,G_2)) e| \\
+  |effects G (e_1 ; e_2)| & = & |andeffects (effects G e_1) (effects G e_2)| \\
+  |effects G (x=v)| & = & S & \text{if $|equals S x v| \in |G|$} \\
+  |effects G (x=k)| & = & |failsKW| & \text{if $|equals resolvesKW x k'| \in |G|$ and $k \not= k'$}
+\end{array} \\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|andeffects fx_1 fx_2| = |fx|$
+}} \\
+\\
+\begin{array}{lrcl}
+\multicolumn{4}{c}{\text{All equations also apply with arguments swapped, and apply top-to-bottom}} \\
+(E1) & |andeffects contradicts fx| & = & |contradicts| \\
+(E2) & |andeffects fails fx|       & = & |fails| \\
+(E3) & |andeffects succeeds fx|     & = & |fx| \\
+(E4) & |andeffects abstracts fx|  & = & |abstracts| \\
+(E5) & |andeffects iterates fx|   & = & |iterates| \\
+(E6) & |andeffects resolves iterates| & = & |abstracts| \\
+(E7) & |andeffects resolves fx|  & = & |resolves| \\
+(E8) & |andeffects decides fx|   & = &  |decides|
+\end{array}
+\end{array}
+$$
+\caption{Effect analysis} \label{fig:effect-analysis}
+\end{figure}
+
+\begin{figure}
+\begin{verbatim}
+                          abstracts
+                           /    |
+                     evaluates  |
+                         /      |     UNDECIDABLE
+                  resolves      |
+              ========|=========|================
+                      |    iterates
+                      |   /     |       DECIDABLE
+                     decides    |
+                      |     \   |
+              ========|======\==|================
+                  succeeds   fails        DECIDED
+                      \        /
+                       diverges
+\end{verbatim}
+\caption{Multiplicity effects} \label{fig:mult-effects}
+\end{figure}
 
 \end{document}
 
