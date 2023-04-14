@@ -500,8 +500,9 @@ Questions:
 $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\text{\bf Vertices}} \\
-|vv| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]| \\
-|v|    & ::= & |vv| \vb |lam x e| \\
+|vt|  & ::= & |x| \vb |tup (x_1, xdots, x_n)| \\
+|vv|  & ::= & |vt| \vb |k| \vb |f^[x]| \\
+|v|   & ::= & |vv| \vb |lam x e| \\
 \\
 \multicolumn{4}{l}{\text{\bf Scopes}} \\
 |s| & ::= & |scope (x_1, xdots, x_n) G e| \\
@@ -518,11 +519,11 @@ $$
 \\
 \multicolumn{4}{l}{\text{\bf Inferences}} \\
 |G| & ::= & |emp| \vb |G, g| \\
-|g| & ::= & |edge v w|  & \text{Data flow from |w| to |v|} \\
-    & \vb & |equals S v fail|   & \text{|v| is unified with failure}\\
-    & \vb & |equals S v w| & \\
+|g| & ::= & |edge vt w|  & \text{Data flow from |w| to |v|} \\
+    & \vb & |equals S x fail|   & \text{|v| is unified with failure}\\
+    & \vb & |equals S x w| & \\
 %   & \vb & |lengthis S y z| &  \\
-   & \vb & |dominates S v w| & \text{|w| dominates |v|} \\
+   & \vb & |dominates S vt w| & \text{|w| dominates |v|} \\
 \\
 \multicolumn{4}{l}{\text{\bf Strengths}} \\
 |S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
@@ -569,11 +570,7 @@ $|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
 }} \\
 \\
 \begin{array}{lrcll}
-\rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolves x k) (X^[x=k])| \\
-\rulename{lflex} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,edge x vv) (X^[x=vv])|  \\
-     &&& \text{if $x \in |xs|$} \\
-\rulename{rflex} & |scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,edge y x) (X^[x=y])|  \\
-     &&& \text{if $y \in |xs|$} \\
+\rulename{res} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,equals resolves x vv) (X^[x=vv])| \\
 \end{array}
 \end{array}
 $$
@@ -605,12 +602,16 @@ Questions:
 $$
 \begin{array}{l}
 \multicolumn{1}{c}{\large \fbox{
-$|G_1| \satarrow |G_2|$
+$|xs; G_1| \satarrow |G_2|$
 }} \\
 \multicolumn{1}{c}{\text{Extend |G_1| with new (implied) inferences |G_2|}}
 \\ \\
-\begin{array}{lrcl}
-\rulename{trans} & |equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
+\begin{array}{lrcll}
+\rulename{trans} & |xs; G, equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
+\rulename{lflex} & |xs; G, equals resolves x vv| & \satarrow & |edge x vv| 
+     & \text{if $x \in |xs|$} \\
+\rulename{rflex} & |xs; G, equals resolves x y| & \satarrow & |edge y x| 
+     & \text{if $|y| \in |xs|$} \\
 \end{array}
 \end{array}
 $$
