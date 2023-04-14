@@ -14,6 +14,7 @@
 \floatstyle{boxed}
 \restylefloat{figure}
 
+\usepackage{quiver}
 \usepackage{framed}
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 \usepackage{ amssymb }
@@ -657,6 +658,33 @@ Quesions:
 \item E5 wins over E6?
 \item Where does |contradicts| come from?
 \end{itemize}
+
+
+\begin{figure}
+% https://q.uiver.app/?q=WzAsMTUsWzQsMCwiXFxtYXRoc2Z7QWJzdHJhY3RzfSJdLFszLDEsIlxcbWF0aHNme0V2YWx1YXRlc30iXSxbMiwyLCJcXG1hdGhzZntSZXNvbHZlc30iXSxbNCw0LCJcXG1hdGhzZntJdGVyYXRlc30iXSxbNCw3LCJcXG1hdGhzZntGYWlsc30iXSxbMiw3LCJcXG1hdGhzZntTdWNjZWVkc30iXSxbMyw4LCJcXG1hdGhzZntEaXZlcmdlc30iXSxbMCwzXSxbNywzXSxbMCw2XSxbNyw2XSxbMiw1LCJcXG1hdGhzZntEZWNpZGVzfSJdLFs2LDIsIlxcbWF0aGJme1VuZGVjaWRhYmxlfSJdLFs2LDQsIlxcbWF0aGJme0RlY2lkYWJsZX0iXSxbNiw3LCJcXG1hdGhiZntEZWNpZGVkfSJdLFswLDEsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSwyLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMywiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDYsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNCw2LCIiLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzcsOCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbOSwxMCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMywxMSwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDExLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzExLDUsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMTEsNCwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&&&& {\mathsf{Abstracts}} \\
+	&&& {\mathsf{Evaluates}} \\
+	&& {\mathsf{Resolves}} &&&& {\mathbf{Undecidable}} \\
+	{} &&&&&&& {} \\
+	&&&& {\mathsf{Iterates}} && {\mathbf{Decidable}} \\
+	&& {\mathsf{Decides}} \\
+	{} &&&&&&& {} \\
+	&& {\mathsf{Succeeds}} && {\mathsf{Fails}} && {\mathbf{Decided}} \\
+	&&& {\mathsf{Diverges}}
+	\arrow[no head, from=1-5, to=2-4]
+	\arrow[no head, from=2-4, to=3-3]
+	\arrow[no head, from=1-5, to=5-5]
+	\arrow[no head, from=8-3, to=9-4]
+	\arrow[no head, from=8-5, to=9-4]
+	\arrow[dashed, no head, from=4-1, to=4-8]
+	\arrow[dashed, no head, from=7-1, to=7-8]
+	\arrow[no head, from=5-5, to=6-3]
+	\arrow[no head, from=3-3, to=6-3]
+	\arrow[no head, from=6-3, to=8-3]
+	\arrow[no head, from=6-3, to=8-5]
+\end{tikzcd}\]
+\end{figure}
 
 \begin{figure}
 \begin{verbatim}
