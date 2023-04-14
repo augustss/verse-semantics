@@ -10,7 +10,7 @@
 %format fails s v  = s "\{" v==fail "\}"
 %format equals s v w  = s "\{" v==w "\}"
 %format lengthis s y z = s "\{" length^[y]==z "\}"
-%format dominates s v w = s "\{" v "\twoheadrightarrow" w "\}"
+%format dominates s v w = s "\{" v "\twoheadleftarrow" w "\}"
 
 %format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
 

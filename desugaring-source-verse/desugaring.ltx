@@ -500,16 +500,14 @@ Questions:
 $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\text{\bf Vertices}} \\
-|v,w| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]| \vb |lam x e|\\
+|vv| & ::= & |x| \vb |k| \vb |tup (x_1, xdots, x_n)| \vb |f^[x]| \\
+|v|    & ::= & |vv| \vb |lam x e| \\
 \\
 \multicolumn{4}{l}{\text{\bf Scopes}} \\
 |s| & ::= & |scope (x_1, xdots, x_n) G e| \\
 \\
 \multicolumn{4}{l}{\text{\bf Expressions}} \\
-|e| & ::= & |x = y| \\
-    & \vb & |x = k| \\
-    & \vb & |x = tup (y_1,xdots,y_n)| \\
-    & \vb & |x = f^[x]| \\
+|e| & ::= & |x = vv| \\
     & \vb & |x = timlam h fx i x s_0 j y s_1| \\
 %    & \vb & |y=length^[x]| \\
     & \vb & |x = fail| \\
@@ -521,10 +519,10 @@ $$
 \multicolumn{4}{l}{\text{\bf Inferences}} \\
 |G| & ::= & |emp| \vb |G, g| \\
 |g| & ::= & |edge v w|  & \text{Data flow from |w| to |v|} \\
-    & \vb & |fails S v|   & \text{|v| is unified with failure}\\
-   & \vb & |equals S v w| & \\
+    & \vb & |equals S v fail|   & \text{|v| is unified with failure}\\
+    & \vb & |equals S v w| & \\
 %   & \vb & |lengthis S y z| &  \\
-   & \vb & |dominates S v w| & \text{|v| dominates |w|} \\
+   & \vb & |dominates S v w| & \text{|w| dominates |v|} \\
 \\
 \multicolumn{4}{l}{\text{\bf Strengths}} \\
 |S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
@@ -572,7 +570,7 @@ $|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
 \\
 \begin{array}{lrcll}
 \rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolves x k) (X^[x=k])| \\
-\rulename{lflex} & |scope xs G (X^[x=v])| & \rightarrow & |scope xs (G,edge x v) (X^[x=v])|  \\
+\rulename{lflex} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,edge x vv) (X^[x=vv])|  \\
      &&& \text{if $x \in |xs|$} \\
 \rulename{rflex} & |scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,edge y x) (X^[x=y])|  \\
      &&& \text{if $y \in |xs|$} \\
