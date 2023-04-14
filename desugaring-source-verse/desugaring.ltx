@@ -475,7 +475,7 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 Tim's verifier works like this.
 \begin{itemize}
 \item \textbf{Desugaring} (\Cref{sec:tim-core-syntax}) transforms Source Verse into TimCore.
-\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the term, keeping its
+\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the TimCore term, keeping its
   structure but:
   \begin{itemize}
   \item Augmenting the inferences |G| that are attached to each scope node.
@@ -488,7 +488,14 @@ Tim's verifier works like this.
 \item \textbf{Effect analysis} (\Cref{sec:effect-anal}) checks each sub-term |check fx e| to ensure
   that the effects of |e| are indeed covered by |fx|.
 \end{itemize}
+
+Questions:
+\begin{itemize}
+\item Could inference saturation give rise to new ingestion opportunities?  We think no.
+\end{itemize}
+
 \subsection{Syntax} \label{sec:tim-core-syntax}
+
 \begin{figure}
 $$
 \begin{array}{rcll}
@@ -543,6 +550,13 @@ Things to note:
   \end{itemize}
 \end{itemize}
 
+Questions:
+\begin{itemize}
+\item In the edge |(edge v w)| isn't the LHS, |v|, always a (flexible) variable?
+\item Why |x=fail|?
+\item Does |dominates S v w| have a strength? Why?
+\end{itemize}
+
 \subsection{Ingestion} \label{sec:ingestion}
 
 \begin{figure}
@@ -557,7 +571,7 @@ $|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
 }} \\
 \\
 \begin{array}{lrcll}
-\rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolvesKW x k) (X^[x=k])| \\
+\rulename{res} & |scope xs G (X^[x=k])| & \rightarrow & |scope xs (G,equals resolves x k) (X^[x=k])| \\
 \rulename{lflex} & |scope xs G (X^[x=v])| & \rightarrow & |scope xs (G,edge x v) (X^[x=v])|  \\
      &&& \text{if $x \in |xs|$} \\
 \rulename{rflex} & |scope xs G (X^[x=y])| & \rightarrow & |scope xs (G,edge y x) (X^[x=y])|  \\
@@ -580,10 +594,30 @@ Questions:
 \item To avoid lots of duplication, I used vertices |v| in \rulename{lflex}. But that does not
   account for the POPL-lambda vs Tim-lambda difference between expresions |e| and inferences |g|.
   Maybe \rulename{lflex} would be better written as a G-to-G rewrite
-  $$ |xs; equals resolvesKW x v| \; \rightarrow \; |xs; equals resolvesKW x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
+  $$ |xs; equals resolves x v| \; \rightarrow \; |xs; equals resolves x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
+\item Beta reduction may not reach a fixpoint.  Ditto iteration?
+\item Can \rulename{res} be generalised  |x=v|?
  \end{itemize}
 
 \subsection{Inference saturation} \label{sec:inf-sat}
+
+\newcommand{\satarrow}{\rightarrow^{+}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|G_1| \satarrow |G_2|$
+}} \\
+\multicolumn{1}{c}{\text{Extend |G_1| with new (implied) inferences |G_2|}}
+\\ \\
+\begin{array}{lrcl}
+\rulename{trans} & |equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
+\end{array}
+\end{array}
+$$
+\caption{Inference saturation} \label{fig:infernce-saturation}
+\end{figure}
 
 \subsection{Effect analysis} \label{sec:effect-anal}
 
@@ -598,7 +632,7 @@ $|effects G e| = |fx|$
   |effects G_1 (scope xs G_2 e)| & = & |effects ((G_1,G_2)) e| \\
   |effects G (e_1 ; e_2)| & = & |andeffects (effects G e_1) (effects G e_2)| \\
   |effects G (x=v)| & = & S & \text{if $|equals S x v| \in |G|$} \\
-  |effects G (x=k)| & = & |failsKW| & \text{if $|equals resolvesKW x k'| \in |G|$ and $k \not= k'$}
+  |effects G (x=k)| & = & |fails| & \text{if $|equals resolves x k'| \in |G|$ and $k \not= k'$}
 \end{array} \\
 \\
 \multicolumn{1}{c}{\large \fbox{
@@ -620,6 +654,11 @@ $|andeffects fx_1 fx_2| = |fx|$
 $$
 \caption{Effect analysis} \label{fig:effect-analysis}
 \end{figure}
+Quesions:
+\begin{itemize}
+\item E5 wins over E6?
+\item Where does |contradicts| come from?
+\end{itemize}
 
 \begin{figure}
 \begin{verbatim}
