@@ -372,6 +372,51 @@
 
 \section{Introduction}
 
+This paper is a first attempt at a denotational semantics for \versecalc{}.
+
+\section{Background}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Syntax} \\
+\begin{array}{rcl}
+  e & ::= & |x| \vb |k| \vb op \vb |e_1 e_2| \vb |lam x e| \\
+  op & ::= & |add| \vb \ldots
+\end{array}\\
+\\
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\Value \rightarrow \mlift{\Value}) + \wrong \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\[7mm]
+\text{\bf Semantics of expressions} \\
+
+  \begin{array}{rcll}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mlift{\Value} \\
+  \semapp{E}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{E}{|k|}{\rho} & = & |k| \\
+  \semapp{E}{op}{\rho} & = & \semapp{O}{op} \\
+  \semapp{E}{|e_1 e_2|}{\rho} & = &  \apply(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
+  \semapp{E}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]} \\
+  \\
+  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \vee y=k_2)$ then $k_1 + k_2$ else $\wrong$}\\
+  \\
+  \apply( f, \bot) & = & \bot \\
+  \apply( f, \wrong) & = & \wrong \\
+  \apply( f, \mlift{w}) & = & f w
+  \end{array} \\ \\
+\end{array}
+$
+\caption{Expression semantics}
+\label{fig:lambda-sem}
+\end{figure}
+
+\Cref{fig:lambda-sem} gives the conventional denotational semantics for lambda calculus.
+
+\section{Syntax of Core Verse}
+
 \begin{figure}
   $$
   \begin{array}{l}
@@ -379,12 +424,12 @@
     \begin{array}{lr@@{\;}r@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
+%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
-       && \vb & |succeeds e| \vb |decides e| \\
-       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
+%       && \vb & |succeeds e| \vb |decides e| \\
+%       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
 %       & & \vb & |hastype e_1 e_2| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
@@ -413,9 +458,6 @@
   $$
 \caption{The Verse calculus: syntax} \label{fig:syntax}
 \end{figure}
-
-This paper is a first attempt at a denotational semantics for \versecalc{}.
-I'm using the syntax of the POPL paper, plus |hastypeKW|.
 
 As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
 
@@ -449,12 +491,12 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
-  \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
-  \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
-  \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
-     & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
-     & = & \semapp{E}{e_3}{\rho} & \text{otherwise} \\
-  \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
+%   \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
+%   \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
+%  \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
+%      & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
+%      & = & \semapp{E}{e_3}{\rho} & \text{otherwise} \\
+%   \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
 %%     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_i}})})
 %%     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
 %%                    & \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
