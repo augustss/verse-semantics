@@ -776,12 +776,11 @@ There is probably more than one possible choice here.
 \section{An order-sensitive denotational semantics} \label{sec:order-sensitive}
 
 \newcommand{\LblValue}{LW}
-\newcommand{\LblSeq}{[ \Lbl ]}
-\newcommand{\Lbl}{L}
-\newcommand{\lblleft}{{\bf L}}
-\newcommand{\lblright}{{\bf R}}
-\newcommand{\lblsemi}[2]{#1 \sconcat #2}
-\newcommand{\lblunit}{\bullet}
+\newcommand{\Lbl}{LB}
+\newcommand{\lblemp}{\epsilon}
+\newcommand{\lbll}[1]{{\bf L}\,#1}
+\newcommand{\lblr}[1]{{\bf R}\,#1}
+\newcommand{\lblseq}[2]{#1 \sconcat #2}
 \newcommand{\domplus}{\, + \,}
 \newcommand{\msort}{\mathit{sort}}
 
@@ -790,10 +789,9 @@ $$
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\mtype & = & \mlift{(\wrong + \powerset{\LblValue})} \\
-\mtyped & = & \setform{\Value} & \text{Set with 0 or 1 elements} \\
-\LblValue & = & \LblSeq \times \Value & \text{Sequence of $\Lbl$ and a value} \\
-\Lbl & = & \lblleft \domplus \lblright \\
+\mtype & = & \wrong + \powerset{\LblValue} \\
+\LblValue & = & \Lbl \times \Value & \text{Lable $\Lbl$ and value $\Value$} \\
+\textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
 \\
 \text{\bf Operations} \\
@@ -801,42 +799,43 @@ $$
 \text{Empty}        & \mempty & : &  \mtype \\
     & \mempty & = & \varnothing \\[1mm]
 \text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
-     & \munits{w} & = & \setform{ ([], w) } \\[1mm]
+     & \munits{w} & = & \setform{ (\lblemp, w) } \\[1mm]
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
-                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
+ &  s_1 \munion s_2 & = & \scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
+ &  s_1 \mintersect s_2 & = & \scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
 \text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-&  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
+&  s_1 \msemi s_2 & = & \scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
 % \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
 % & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
 & \mone(s) & = & \shead (\msort( s)) \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
  & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
-\text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
-& \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
-&               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
-\text{Decides}  & \mdecides & : & \mtype \rightarrow \mtype \\
-& \mdecides(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
-&               & = & \mempty \hspace{8.1em} \text{if } \msort( s) = [] \\
-&               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
-\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
-             & \shead [] & = & empty \\
-             & \shead (w \scons s) & = & \munits{w} \\[1mm]
+% \text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
+% & \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
+% &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
+% \text{Decides}  & \mdecides & : & \mtype \rightarrow \mtype \\
+% & \mdecides(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
+% &               & = & \mempty \hspace{8.1em} \text{if } \msort( s) = [] \\
+% &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
+\text{Head}  & \shead & : & [\Value] \rightarrow \mtype \\
+             & \shead\, [] & = & \mempty \\
+             & \shead\, (w \scons s) & = & \munits{w} \\[1mm]
 \text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
+     & \stuple [w_1, \cdots, w_n] & = & \munits{\tuple{w_1,\cdots,w_n}} \\
      & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
   \end{array} \\
 \\
 \begin{array}{rrcll}
-\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \mlift{([\Value] + \wrong)}\\
+\text{Sort} & \msort & : & \mtype \rightarrow [\Value] \\
+& \msort(\wrong) & = & \wrong \\
 & \msort(s) & = & []  & \text{if $s$ is empty} \\
 &  & = & \wrong & \text{if $ws$ has more than one element} \\
 && = & ws & \text{otherwise} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lbll:l,w)}{s}} \\
+  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblr:l,w)}{s}} \\
 && \multicolumn{3}{l}{\text{where $ws = \mcompr{w}{\sbind{([],w)}{s}}$}}
 \end{array}
 
@@ -860,36 +859,37 @@ before exposing it to the programmer.
 We do not change the equations for $\semfun{E}$, $\semfun{V}$, and $\semfun{O}$ at all; they remain
 precisely as they are in \Cref{fig:den-sem1}.
 However the semantics of a collection of values, $\mtype$, does change, and is given in \Cref{fig:labelled-sem}:
-\begin{itemize}
-\item
-A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
-a \emph{set of labelled values}, each of type $\LblValue$.
-\item A labelled value (of type $\LblValue$)
-is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
-\item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
-\item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
-adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
-and a $\lblright$ tag to those coming from the right.
-So the labels specify where in the tree the value comes from.
-\item Sequencing $\msemi$ and $\mintersect$ both concatenate the labels from the values they combine.
-\item Finally $\msort$ puts everything in the ``right'' order: first the values with
-an empty label, then the values whose label starts with $\lblleft$ (notice the
-recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
-Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
-\item Note that if $\msort$ encounters a set with more than one unlabelled element then this
-considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
-\end{itemize}
-Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
-|defKW| binds |x| to |3| and then |4|. The meaning of
-this expression will be
-$$
-\semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
-$$
-Now if we take |allKW| of that expression we will get a singleton sequence
-containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
-$$
-\semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
-$$
+% \begin{itemize}
+% \item
+% A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
+% a \emph{set of labelled values}, each of type $\LblValue$.
+% \item A labelled value (of type $\LblValue$)
+% is just a pair $(\Lbl \times \Value)$ of a \emph{label} and a value.
+% \item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
+% \item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
+% adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
+% and a $\lblright$ tag to those coming from the right.
+% So the labels specify where in the tree the value comes from.
+% \item Sequencing $\msemi$ and $\mintersect$ both concatenate the labels from the values they combine.
+% \item Finally $\msort$ puts everything in the ``right'' order: first the values with
+% an empty label, then the values whose label starts with $\lblleft$ (notice the
+% recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
+% Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
+% \item Note that if $\msort$ encounters a set with more than one unlabelled element then this
+% considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
+% \end{itemize}
+% Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
+% |defKW| binds |x| to |3| and then |4|. The meaning of
+% this expression will be
+% $$
+% \semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
+% $$
+% Now if we take |allKW| of that expression we will get a singleton sequence
+% containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
+% $$
+% \semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
+% $$
+
 
 
 % -------------------------------------
