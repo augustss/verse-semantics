@@ -2,7 +2,7 @@
 %% Stuff for TimCore
 
 %format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
-
+%format lam2 x y e = "\lambda" x "\rightarrow" y ".\," e
 %format scope (vs) (stuff) (e) = "\textbf{scope}(" vs ";" stuff ").\," e
 
 %% 'g' inferences

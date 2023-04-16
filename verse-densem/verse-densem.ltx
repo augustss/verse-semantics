@@ -154,6 +154,7 @@
 \newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
 \newcommand{\malt}{\diamond}
+\newcommand{\append}{+\!\!+\,}
 
 \newcommand{\setform}[1]{\left\{ #1 \right\}}
 \newcommand{\lcompr}[2]{[ #1 \vb #2 ]}
@@ -383,29 +384,35 @@ $
 \begin{array}{rcl}
   e & ::= & |x| \vb |k| \vb op \vb |e_1 e_2| \vb |lam x e| \\
   op & ::= & |add| \vb \ldots
-\end{array}\\
-\\
+\end{array}
+\\[4mm]
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \mathbb{Z} + (\Value \rightarrow \mlift{\Value}) + \wrong \\
+\Value & = & \mathbb{Z} + (\Value \rightarrow \mtype) \\
+\mtype & = & \bot + \wrong + \Value \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
-\\[7mm]
+\\[4mm]
 \text{\bf Semantics of expressions} \\
 
   \begin{array}{rcll}
-  \semapp{E}{|e|}{} & : & \Env \rightarrow \mlift{\Value} \\
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|x|}{\rho} & = & \rho(x) \\
   \semapp{E}{|k|}{\rho} & = & |k| \\
   \semapp{E}{op}{\rho} & = & \semapp{O}{op} \\
   \semapp{E}{|e_1 e_2|}{\rho} & = &  \apply(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
-  \semapp{E}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]} \\
-  \\
-  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \vee y=k_2)$ then $k_1 + k_2$ else $\wrong$}\\
-  \\
-  \apply( f, \bot) & = & \bot \\
-  \apply( f, \wrong) & = & \wrong \\
-  \apply( f, \mlift{w}) & = & f w
+  \semapp{E}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]}
+  \\[2mm]
+  \semapp{O}{op} & : & \Value \\
+  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \vee y=k_2)$ then $k_1 + k_2$ else $\wrong$}
+  \\[2mm]
+  \apply & : & (\mtype \times \mtype) \rightarrow \mtype \\
+  \apply( \bot, w) & = & \bot \\
+  \apply( w, \bot) & = & \bot \\
+  \apply( \wrong, w) & = & \wrong \\
+  \apply( w, \wrong) & = & \wrong \\
+  \apply( k, w) & = & \wrong \\
+  \apply( f, w) & = & f(w) & f \in \Value \rightarrow \mtype
   \end{array} \\ \\
 \end{array}
 $
@@ -480,7 +487,7 @@ $
 \\[7mm]
 \text{\bf Semantics of expressions and values} \\
 
-  \begin{array}{r@@{\;}c@@{\;}ll}
+  \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{|v|}{\rho}) \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
@@ -500,7 +507,7 @@ $
 %%     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_i}})})
 %%     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
 %%                    & \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
-  \\
+
 % Commenting out hastype for now
 %   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
 %     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
@@ -516,17 +523,20 @@ $
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
 \\
   \semapp{O}{|op|}{} & : & \Value \\
-  \semapp{O}{|add|} & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
-      \,\text{\bf then}\, \munit(k_1+k_2)
-      \,\text{\bf else}\, \wrong} \\
-  \semapp{O}{|gt|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
-      \,\text{\bf then (if}\, (k_1 > k_2)
-                       \,\text{\bf then}\, \munit(k_1)
-                       \,\text{\bf else}\, \mempty \,)
-      \,\text{\bf else}\, \wrong } \\
-  \semapp{O}{|int|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = k)
-      \,\text{\bf then}\, \munit(k)
-      \,\text{\bf else}\, \mempty}
+  \semapp{O}{|add|} & = &  \multicolumn{2}{l}{\lambda w.
+    \begin{array}[t]{l}
+       \text{\bf if}\, (w = |tup(k_1,k_2)|) \\
+       \text{\bf then}\, \munit(k_1+k_2) \\
+       \text{\bf else}\, \wrong
+  \end{array}}\\
+%  \semapp{O}{|gt|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+%      \,\text{\bf then (if}\, (k_1 > k_2)
+%                       \,\text{\bf then}\, \munit(k_1)
+%                       \,\text{\bf else}\, \mempty \,)
+%      \,\text{\bf else}\, \wrong } \\
+%  \semapp{O}{|int|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = k)
+%      \,\text{\bf then}\, \munit(k)
+%      \,\text{\bf else}\, \mempty}
   \end{array} \\ \\
   
 \begin{array}{rcll}
@@ -581,6 +591,46 @@ $$
 $$
 \caption{Set semantics for $\mtype$}
 \label{fig:set-sem}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Domains} \\
+\mtype  =  \bot + \wrong + [W] \\[2mm]
+\text{\bf Operations} \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+                    & \mempty & = & [ \, ] \\[1mm]
+\text{Unit}    & \munit & : & \Value \rightarrow \mtype \\
+               & \munit(w) & = & [ w ] \\[1mm]
+\text{Union}   & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+               &  s_1 \munion s_2 & = & s_1 \append s_2 \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \mintersect s_2 & = & [ w_1 \vb w_1 \in s_1, w_2 \in s_2, w_1 = w_2] \\[1mm]
+\text{Sequencing}   & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \msemi s_2 & = & [ w_2 \vb w_1 \in s_1, w_2 \in s_2 ] \\[1mm]
+\text{One}          &   \mone  & : & \mtype \rightarrow \mtype \\
+  & \mone\,[] & = & [] \\
+  & \mone\,(w:ws) & = & [w] \\[1mm]
+\text{All}          &   \mall  & : & \mtype \rightarrow \tuple{\Value} \\
+  & \mall\,[w_1,\ldots,w_n] & = & [|tup (w_1, xdots, w_n)|] \\
+% \text{Succeeds}          &   \msucceeds  & : & \mtype \rightarrow \tuple{\Value} \\
+%  & \msucceeds(s) & = & ??? \\
+% \text{Decides}          &   \mdecides  & : & \mtype \rightarrow \tuple{\Value} \\
+%   & \mdecides(s) & = & ??? \\
+\end{array} \\ \\
+\text{All operations over $\mtype$ implicitly propagate $\bot$ and $\wrong$.  E.g.}\\
+  \begin{array}{rcll}
+    s_1 \munion s_2 & = & \bot & \text{if $s_1=\bot$ or $s_2=\bot$} \\
+                    & = & \wrong & \text{if $(s_1=\wrong$ and $s_2 \neq \bot)$ or
+                    $(s_2=\wrong$ and $s_1 \neq \bot)$} \\
+                    & = & s_1 \cup s_2 & \text{otherwise}
+  \end{array}
+\end{array}
+$$
+\caption{Sequence semantics for $\mtype$}
+\label{fig:seq-sem}
 \end{figure}
 
 The denotational semantics is given in \cref{fig:den-sem1}.
