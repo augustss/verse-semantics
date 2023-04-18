@@ -193,7 +193,7 @@
 \newcommand{\mplus}{\oplus}
 \newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
 \newcommand{\powerset}[1]{{\mathcal P}(#1)}
-\newcommand{\wrong}{\mathrm{WRONG}}
+\newcommand{\wrong}{\mathbf{wrong}}
 \newcommand{\apply}{\mathit{apply}}
 
 % ----------------- Author comments ---------------------
@@ -779,7 +779,7 @@ There is probably more than one possible choice here.
 \section{An order-sensitive denotational semantics} \label{sec:order-sensitive}
 
 \newcommand{\LblValue}{LW}
-\newcommand{\Lbl}{LB}
+\newcommand{\Lbl}{\mathbf{Lbl}}
 \newcommand{\lblemp}{\epsilon}
 \newcommand{\lbll}[1]{{\bf L}\,#1}
 \newcommand{\lblr}[1]{{\bf R}\,#1}
@@ -792,8 +792,7 @@ $$
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\mtype & = & \wrong + \powerset{\LblValue} \\
-\LblValue & = & \Lbl \times \Value & \text{Lable $\Lbl$ and value $\Value$} \\
+\mtype & = & \wrong + \powerset{\Lbl \times \Value} \\
 \textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
 \\
@@ -833,13 +832,16 @@ $$
 \\
 \begin{array}{rrcll}
 \text{Sort} & \msort & : & \mtype \rightarrow [\Value] \\
-& \msort(\wrong) & = & \wrong \\
-& \msort(s) & = & []  & \text{if $s$ is empty} \\
-&  & = & \wrong & \text{if $ws$ has more than one element} \\
-&& = & ws & \text{otherwise} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lbll:l,w)}{s}} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblr:l,w)}{s}} \\
-&& \multicolumn{3}{l}{\text{where $ws = \mcompr{w}{\sbind{([],w)}{s}}$}}
+& \msort\;\wrong & = & \wrong \\
+& \msort\;s & = & \wrong  & \text{if $(l_1,w_1), (l_2,w_2) \in s, w_1 = w_2, l_1 \not= l_2$} \\
+& &=& sortBy( (<), s ) \\[2mm]
+& (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+& (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
+& (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
+& (\lbll l_1) < (\lblr l_2) & = & True \\
+& (\lblr l_1) < (\lbll l_2) & = & False \\
+& (\lblseq{l_1}{l_2}) < (\lblseq{l_3}{l_4}) & = &
+\multicolumn{2}{l}{(l_1 < l_3) \vee (l_1 = l_3 \wedge l_2 < l_4)}\\
 \end{array}
 
 \end{array}
