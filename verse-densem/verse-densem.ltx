@@ -382,14 +382,15 @@ $
 \begin{array}{l}
 \text{\bf Syntax} \\
 \begin{array}{rcl}
-  e & ::= & |x| \vb |k| \vb op \vb |e_1 e_2| \vb |lam x e| \\
+  e & ::= & |v| \vb op \vb |e_1 e_2| \\
+  v & ::= & |x| \vb |k| \vb op \vb |lam x e| \\
   op & ::= & |add| \vb \ldots
 \end{array}
 \\[4mm]
 \text{\bf Domains} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + (\Value \rightarrow \mtype) \\
-\mtype & = & \bot + \wrong + \Value \\
+\mtype & = & \mlift{(\wrong + \Value)} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
 \\[4mm]
@@ -397,22 +398,24 @@ $
 
   \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{E}{|x|}{\rho} & = & \rho(x) \\
-  \semapp{E}{|k|}{\rho} & = & |k| \\
-  \semapp{E}{op}{\rho} & = & \semapp{O}{op} \\
-  \semapp{E}{|e_1 e_2|}{\rho} & = &  \apply(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\
-  \semapp{E}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]}
+  \semapp{E}{|v|}{\rho} & = & \mlift{(\semapp{V}{|v|} \rho)} \\
+  \semapp{E}{|e_1 e_2|}{\rho} & = &  \apply(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\[2mm]
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & |k| \\
+  \semapp{V}{op}{\rho} & = & \semapp{O}{op} \\
+  \semapp{V}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]}
   \\[2mm]
   \semapp{O}{op} & : & \Value \\
-  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \vee y=k_2)$ then $k_1 + k_2$ else $\wrong$}
+  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \wedge y=k_2)$ then $k_1 + k_2$ else $\wrong$}
   \\[2mm]
   \apply & : & (\mtype \times \mtype) \rightarrow \mtype \\
   \apply( \bot, w) & = & \bot \\
   \apply( w, \bot) & = & \bot \\
-  \apply( \wrong, w) & = & \wrong \\
-  \apply( w, \wrong) & = & \wrong \\
-  \apply( k, w) & = & \wrong \\
-  \apply( f, w) & = & f(w) & f \in \Value \rightarrow \mtype
+  \apply( \mlift{\wrong}, w) & = & \mlift{\wrong} \\
+  \apply( \mlift{w}, \mlift{\wrong}) & = & \mlift{\wrong} \\
+  \apply( \mlift{k}, \mlift{w}) & = & \mlift{\wrong} \\
+  \apply( \mlift{f}, \mlift{w}) & = & f(w) & f \in \Value \rightarrow \mtype
   \end{array} \\ \\
 \end{array}
 $
