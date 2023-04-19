@@ -389,8 +389,8 @@ $
 \\[4mm]
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \mathbb{Z} + (\Value \rightarrow \mtype) \\
-\mtype & = & \mlift{(\wrong + \Value)} \\
+\Value & = & \wrong + \mathbb{Z} + (\Value \rightarrow \mtype) \\
+\mtype & = & \mlift{\Value} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
 \\[4mm]
@@ -419,7 +419,7 @@ $
   \end{array} \\ \\
 \end{array}
 $
-\caption{Expression semantics}
+\caption{Familiar lambda calculus semantics}
 \label{fig:lambda-sem}
 \end{figure}
 
@@ -483,7 +483,7 @@ $
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\Value & = & \wrong + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
 \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
@@ -792,7 +792,9 @@ $$
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\mtype & = & \wrong + \powerset{\Lbl \times \Value} \\
+\Value & = & \wrong + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\mtype & = & \powerset{\LblValue} \\
+\LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
 \textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
 \\
