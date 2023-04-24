@@ -897,7 +897,15 @@ However the semantics of a collection of values, $\mtype$, does change, and is g
 % \semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
 % $$
 
-
+The reason we use trees ($\LblValue$) instead of sequences of labels, and concatenation when doing sequential composition, is that it sometimes can arbitrarily mix up labels belonging to one choice operator with labels from another choice operator. Look at the following example:
+$$
+|def x ((if x=1 then 11 choice 22 else 33) ; x=(1 choice 2) ; (if x=1 then 44 else 55 choice 66))|
+$$
+If we used sequences of labels, the labelled semantics of this expression would be:
+$$
+\{ (LL, 44), (RL, 44), (RL, 55), (RR, 66) \} 
+$$
+The label $RL$ occurs in two completely unrelated places.
 
 % -------------------------------------
 \section{A simpler order-sensitive denotational semantics} \label{sec:simple-order-sensitive}
