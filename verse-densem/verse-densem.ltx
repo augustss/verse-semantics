@@ -375,7 +375,7 @@
 
 This paper is a first attempt at a denotational semantics for \versecalc{}.
 
-\section{Background}
+\section{Background: the lambda calculus}
 
 \begin{figure}
 $
@@ -419,11 +419,22 @@ $
   \end{array} \\ \\
 \end{array}
 $
-\caption{Familiar lambda calculus semantics}
+\caption{Familiar untyped call-by-value lambda calculus semantics}
 \label{fig:lambda-sem}
 \end{figure}
 
-\Cref{fig:lambda-sem} gives the conventional denotational semantics for lambda calculus.
+To establish notation and approach, \Cref{fig:lambda-sem} gives a
+conventional denotational semantics for call-by-value lambda calculus.
+Note that:
+\begin{itemize}
+\item The environment $\rho : \Env$ binds an identifier to a \emph{value} $W$ (that is, an
+  integer or a function), never to $\bot$ or $\wrong$.  It's a call by value language!
+\item The denotation of an expression is in $\mtype$: it can be $\bot$ (evaluation diverges)
+  or $\wrong$.
+\item $\wrong$ is kept distinct from $\bot$.  It is used to signal that something bad
+  has happened, like adding two functions, or applying an integer to a function.
+  In the end we want to prove that well-typed programs never go $\wrong$.
+\end{itemize}
 
 \section{Syntax of Core Verse}
 
@@ -792,8 +803,8 @@ $$
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \wrong + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
-\mtype & = & \powerset{\LblValue} \\
+\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\mtype & = & \mlift{\wrong + \powerset{\LblValue}} \\
 \LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
 \textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
@@ -805,18 +816,36 @@ $$
 \text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
      & \munits{w} & = & \setform{ (\lblemp, w) } \\[1mm]
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \munion s_2 & = & \scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
-                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
+&  s_1 \munion s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}}} \\[1mm]
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \mintersect s_2 & = & \scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
+&  s_1 \mintersect s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2}} \\[1mm]
 \text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-&  s_1 \msemi s_2 & = & \scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
+&  s_1 \msemi s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}}} \\[1mm]
 % \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
 % & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
-& \mone(s) & = & \shead (\msort( s)) \\[1mm]
+& \mone(\bot) & = & \bot \\
+& \mone(\mlift{\wrong}) & = & \mlift{\wrong} \\
+% & \mone(\mlift{s}) & = & \bot & \text{if |s| is infinite} \\
+% & \mone(\mlift{s}) & = & \munits{w} & \text{if $(l,w)\in s$ and $\forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w') $} \\
+& \mone(\mlift{s}) & = & \left\{ \begin{array}{ll}
+      \bot       & \text{if |s| is infinite} \\
+      \mempty    & \text{if $s = \emptyset$} \\
+      \munits{w} & \text{if $(l,w)\in s$ and} \\
+      & \forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w')
+      \end{array} \right. \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
- & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
+& \mall(\bot) & = & \bot \\
+& \mall(\mlift{\wrong}) & = & \mlift{\wrong} \\
+& \mall(\mlift{s})      & = &
+\left\{ \begin{array}{ll} \bot &\text{if |s| is infinite} \\
+     \munits{\tuple{w_1,\cdots,w_n}} &
+     \text{if $sortBy( (<), s ) = |[w_1,xdots,w_n]|$}
+     \end{array} \right. \\ [1mm]
 % \text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
 % & \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
 % &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
@@ -824,20 +853,10 @@ $$
 % & \mdecides(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
 % &               & = & \mempty \hspace{8.1em} \text{if } \msort( s) = [] \\
 % &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
-\text{Head}  & \shead & : & [\Value] \rightarrow \mtype \\
-             & \shead\, [] & = & \mempty \\
-             & \shead\, (w \scons s) & = & \munits{w} \\[1mm]
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
-     & \stuple [w_1, \cdots, w_n] & = & \munits{\tuple{w_1,\cdots,w_n}} \\
-     & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
-  \end{array} \\
+\end{array} \\
 \\
 \begin{array}{rrcll}
-\text{Sort} & \msort & : & \mtype \rightarrow [\Value] \\
-& \msort\;\wrong & = & \wrong \\
-& \msort\;s & = & \wrong  & \text{if $(l_1,w_1), (l_2,w_2) \in s, w_1 = w_2, l_1 \not= l_2$} \\
-& &=& sortBy( (<), s ) \\[2mm]
-& (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+\text{Comparison} & (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
 & (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
 & (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
 & (\lbll l_1) < (\lblr l_2) & = & True \\
