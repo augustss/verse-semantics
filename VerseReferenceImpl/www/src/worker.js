@@ -6,8 +6,6 @@ const imports = { wasi_snapshot_preview1: wasi.wasiImport };
 
 const wasm = await WebAssembly.instantiateStreaming(fetch('./versewasm.wizer.wasm'), imports);
 
-wasi.inst = wasm.instance;
-
 const exports = wasm.instance.exports;
 
 const memory = exports.memory;
@@ -16,7 +14,7 @@ const encoder = new TextEncoder();
 
 const decoder = new TextDecoder();
 
-const outPtrPtr = exports.malloc_ptr();
+const outPtrPtr = exports.calloc_ptr();
 
 self.onmessage = ({ data: { stdinString } }) => {
     const stdinLength = Buffer.byteLength(stdinString);

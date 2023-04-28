@@ -55,7 +55,7 @@ layoutOptions = defaultLayoutOptions
   { layoutPageWidth = AvailablePerLine 60 1.0
   }
 
-foreign export ccall "malloc_ptr" mallocPtr :: IO (Ptr (Ptr a))
+foreign export ccall "calloc_ptr" callocPtr :: IO (Ptr (Ptr a))
 
-mallocPtr :: IO (Ptr (Ptr a))
-mallocPtr = malloc
+callocPtr :: IO (Ptr (Ptr a))
+callocPtr = calloc
