@@ -9,25 +9,53 @@ import Control.Monad.Supply
 import Control.Monad.Trans.Except
 import Control.Monad.Verse
 
-import Data.ByteString qualified as ByteString
-import Data.Foldable (for_)
+import Data.ByteString (ByteString)
+import Data.ByteString.Unsafe (unsafePackCStringLen)
+import Data.Functor
+import Data.Text (Text)
+import Data.Text.Foreign as Text
 
-import Language.Verse
+import Foreign.C
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Utils
+import Foreign.Ptr
+import Foreign.Storable
+
+import Language.Verse qualified as Verse
+import Language.Verse.Error
 import Language.Verse.Pretty
 
 import Prettyprinter
 import Prettyprinter.Render.Text
 
-import System.IO
-
 main :: IO ()
-main = ByteString.readFile "in" >>= runExceptT . runSupplyT . runVerseT . (prettyM <=< eval) >>= \ case
-  Left e -> withFile "err" WriteMode $ \ err ->
-    renderIO err . layoutSmart layoutOptions . (<> line) $ pretty e
-  Right xs -> withFile "out" WriteMode $ \ out ->
-    for_ xs $ renderIO out . layoutSmart layoutOptions . (<> line)
+main = pure ()
+
+foreign export ccall "verse_eval" eval :: Ptr CChar -> Int -> Ptr (Ptr CChar) -> IO Int
+
+eval :: Ptr CChar -> Int -> Ptr (Ptr CChar) -> IO Int
+eval inPtr n outPtrPtr =
+  unsafePackCStringLen (inPtr, n) >>= eval' >>= \ xs ->
+  Text.withCStringLen xs $ \ (ptr, n) -> do
+    outPtr <- flip reallocBytes n =<< peek outPtrPtr
+    poke outPtrPtr outPtr
+    copyBytes outPtr ptr n
+    pure n
+
+eval' :: ByteString -> IO Text
+eval' xs = eval'' xs <&> \ case
+  Left e -> renderStrict . layoutSmart layoutOptions $ pretty e <> line
+  Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs <> line
+
+eval'' :: ByteString -> IO (Either Error [Doc a])
+eval'' = runExceptT . runSupplyT . runVerseT . (prettyM <=< Verse.eval)
 
 layoutOptions :: LayoutOptions
 layoutOptions = defaultLayoutOptions
   { layoutPageWidth = AvailablePerLine 60 1.0
   }
+
+foreign export ccall "malloc_ptr" mallocPtr :: IO (Ptr (Ptr a))
+
+mallocPtr :: IO (Ptr (Ptr a))
+mallocPtr = malloc

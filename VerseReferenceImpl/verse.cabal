@@ -100,16 +100,21 @@ executable versei
   ghc-options: -Wall -Wno-name-shadowing
   default-language: Haskell2010
 
-executable verse.wasm
+executable versewasm
   main-is: Main.hs
+  c-sources: wasm/init.c
   build-depends:
     base >= 4.16.0.0,
     bytestring,
     prettyprinter,
+    text,
     transformers,
     verse
   hs-source-dirs: wasm
-  ghc-options: -Wall
+  ghc-options:
+    -Wall -Wno-name-shadowing
+    -no-hs-main -optl-mexec-model=reactor
+    "-optl-Wl,--export=malloc,--export=malloc_ptr,--export=free,--export=verse_eval"
   default-language: Haskell2010
 
 executable verselex

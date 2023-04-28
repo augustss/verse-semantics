@@ -15,10 +15,7 @@ window.addEventListener('DOMContentLoaded', event => {
     }
 });
 
-worker.onmessage = ({ data: { exitCode, stdoutString, stderrString } }) => {
-    localStorage.setItem('stdout', stdoutString);
-    localStorage.setItem('stderr', stderrString);
-    const outString = stderrString? stderrString : stdoutString;
+worker.onmessage = ({ data: { outString } }) => {
     localStorage.setItem('out', outString);
     out.textContent = outString;
 };
