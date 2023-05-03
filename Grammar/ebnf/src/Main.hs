@@ -1,10 +1,9 @@
 --module Main where
 import Control.Monad
-import qualified Control.Monad.State.Strict as S
+--import qualified Control.Monad.State.Strict as S
 import Data.Void
 import System.Environment
-import Text.Megaparsec hiding(try)
-import qualified Text.Megaparsec as M
+import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -16,37 +15,13 @@ main = do
   let r = parseDie pFile n f
   print r
 
-data LexState = LexState
-  { nest :: Bool
-  , blockInd :: String
-  , lineInd :: String
-  }
-  deriving (Show)
-
-initLexState :: LexState
-initLexState = LexState { nest = True, blockInd = "", lineInd = "" }
-
-
-type P = ParsecT Void String (S.State [LexState])
-
-runP :: P a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
-runP pa fn s = S.evalState (runParserT pa fn s) [initLexState]
+type P = Parsec Void String
 
 parseDie :: P a -> FilePath -> String -> a
 parseDie p fn file =
-  case runP p fn file of
+  case runParser p fn file of
     Left err -> error $ errorBundlePretty err
     Right x -> x
-
--- The regular try combinator does not backtrack the LexState.
--- This version has an error handler that resets the LexState.
-try :: P a -> P a
-try p = do
-  ls <- S.get -- Get initial state.
-  let err e = do
-        S.put ls -- Reset state,
-        parseError e -- and signal error.
-  M.try (withRecovery err p) -- Use 'try' with special error handler.
 
 ---------------------------------------------------------
 
@@ -94,7 +69,7 @@ data Expr
   deriving (Show)
 
 skip :: P ()
-skip = S.void $ many spaceChar
+skip = void $ many spaceChar
 
 lexeme :: P a -> P a
 lexeme = L.lexeme skip
@@ -108,7 +83,7 @@ keyword s = void $ lexeme (string s <* notFollowedBy alphaNumChar)
 -----------------------------------------
 
 sep :: P ()
-sep = S.void $ symbol ";;"
+sep = void $ symbol ";;"
 
 pFile :: P [Rule]
 pFile = skip *> sep *> sepBy pRule sep <* eof
