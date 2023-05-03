@@ -34,9 +34,9 @@ Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o
 Space     := {0o09 | 0o20 | Comment}
 NewLine   := 0o0D [0o0A] | 0o0A
 Ending    := &(NewLine | end)
-Ind       := Ending; push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
-Ded       := Ending; pop
-Line      := NewLine; parse i:={0o09|0o20} (Ending | !(0o09|0o20) Space;
+Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
+Ded       := Ending pop
+Line      := NewLine; parse i:={0o09|0o20}; (Ending | !(0o09|0o20) Space
              if     (i>BlockInd or Nest and i=BlockInd) then set LineInd=ThisInd
              else if(not i<=BlockInd                 ) then error)
 Scan      := Space {Line}
@@ -48,7 +48,7 @@ IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
 Comment   := LineCmt   | BlockCmt | IndCmt
 Text      := Printable | BlockCmt | "<#>"
 
-Exp       := [('e'|'E') ['+'|'-'] Digits] !('e' ('+'|'-'|Digit))
+Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digit))
 Units     := [Alpha {Alpha}] !Alpha
 Num       := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !'.' !Alnum
 
@@ -64,7 +64,7 @@ Path      := '/' Label [('@' Label | !'@')] {'/' ['(' Path ":)"] Ident} !'/'
 Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
 
 Interp    := '{' List '}'
-Ampersand := ; push; parse LinePrefix:='&' Space Def (';'|Ending); pop
+Ampersand := push; parse LinePrefix:='&'; Space Def (';'|Ending); pop
 String    := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
 Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
 Contents  := Content | '~' Content {'~' Content}
@@ -131,8 +131,8 @@ StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next") Key) | StopFun)
 
 Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
-List      := ; push; set LinePrefix="" Scan [Commas {Separator Commas} [Separator]]; pop
-File      := [0oEF 0oBB 0oBF]; set Nest=true; set BlockInd=""; set LineInd="" List end
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
+File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional
 {e}  means zero or more

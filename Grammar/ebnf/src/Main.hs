@@ -161,7 +161,7 @@ pElem = choice
   , Not  <$> (symbol "!" *> pElem)
   , Look <$> (symbol "&" *> pElem)
   , Str  <$> pStr
-  , Code <$> (semi *> pCode)
+  , Code <$> (optional semi *> pCode <* optional semi)
   ]
   where semi = try (char ';' <* notFollowedBy (char ';')) <* skip
 
