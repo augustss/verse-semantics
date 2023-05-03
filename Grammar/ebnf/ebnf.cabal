@@ -24,6 +24,8 @@ maintainer:         lennart.augustsson@epicgames.com
 executable ebnf
     main-is:          Main.hs
 
+    other-modules:    ParseEBNF
+
     -- Modules included in this executable, other than Main.
     -- other-modules:
 
