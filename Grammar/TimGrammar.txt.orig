@@ -1,0 +1,141 @@
+------------------------------------------------------------------------------------------------------------------------
+Verse Grammar in unambiguous EBNF grammar, given input UTF-8 or ASCII.
+This is a context-free LL(k) language with the exception of significant indentation context.
+We provide two equivalent Unicode definitions of Printable, for UTF8 and for UCS32.
+
+Legend: 
+	&s        - looks ahead for s without consuming
+	!s        - looks ahead for absence of s
+	end       - recognizes end of file
+	push, pop - save and restore parser state
+	set a=b   - sets context value a to value b
+	parse a=b - sets context value a to the text parsed by b
+	0oX       - ASCII or Unicode UTF8 Code Unit octet
+	0uX       - Unicode UTF32 Code Point; note that 0o0..0o7F and 0u0..0u7F are equivalent
+	a..b      - recognizes a range of characters
+	if(e) then s else t - parse based on context dependent condition
+
+------------------------------------------------------------------------------------------------------------------------
+
+Alpha     := 'A'..'Z' | 'a'..'z' | '_'
+Alnum     := 'A'..'Z' | 'a'..'z' | '_' | '0'..'9'
+Hex       := 'A'..'F' | 'a'..'f' |       '0'..'9'
+Digits    := '0'..'9' {'0'..'9'}
+
+U8        := 0o80..0oBF
+UTF8      :=                                      0o00..0o7F
+          |                                       0oC2..0oDF U8
+          |  !(0oE0 0o80..0o9F | 0oED 0oA0..0oBF) 0oE0..0oEF U8 U8
+          |  !(0oF0 0o80..0o8F | 0oF4 0o90..0oBF) 0oF0..0oF4 U8 U8 U8
+UTF32     := !(0uD800..0uDFFF) 0u0..0u10FFFF
+Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o80 0oA8..0oA9 ) UTF8
+          |  0u09 | !("<#" | "#>" | 0u0..0u1F | 0o7F..0o9F             | 0u2028 | 0u2029      ) UTF32
+
+Space     := {0o09 | 0o20 | Comment}
+NewLine   := 0o0D [0o0A] | 0o0A
+Ending    := &(NewLine | end)
+Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
+Ded       := Ending pop
+Line      := NewLine; parse i:={0o09|0o20}; (Ending | !(0o09|0o20) Space
+             if     (i>BlockInd | Nest and i=BlockInd) then set LineInd=ThisInd
+             else if(not i<=BlockInd                 ) then error)
+Scan      := Space {Line}
+ScanKey   := Space (&NewLine Scan LinePrefix Space | !NewLine)
+
+LineCmt   :=  "#" !'>' {Text        } Ending
+BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
+IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
+Comment   := LineCmt   | BlockCmt | IndCmt
+Text      := Printable | BlockCmt | "<#>"
+
+Exp       := ['e' ['+'|'-'] Digits] !('e' ('+'|'-'|Digit))
+Units     := [Alpha {Alpha}] !Alpha
+Num       := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !'.' !Alnum
+
+Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
+CharEsc   := '\' ('r'|'n'|'t'|'''|'"'|Special)
+CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
+Char8     := "0o" (       Hex) [Hex]                    !Alnum
+Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex]) !Alnum
+Char      := CharLit | Char8 | Char32
+
+Ident     := Alpha {Alnum} !Alnum ["'" {!('<#'|'#>'|'\'|'{'|'}'|'"'|''') 0o20-0o7E} "'"]
+Path      := '/' Label ('@' Label | !'@')] {'/' ['(' Path ":)"] Ident} !'/'
+Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
+
+Interp    := '{' List '}'
+Ampersand := push; parse LinePrefix='&'; Space Def (';'|Ending); pop
+String    := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
+Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
+Contents  := Content | '~' Content {'~' Content}
+Markup    := '<' Scan Tags Scan ":>" Space Ind Contents Ded 
+          |  '<' Scan Tags Scan ';'  Scan      Contents '>'
+          |  '<' Scan Tags Scan '>'  Scan      Contents '</' Ident Space {'/' Ident Space} '>'
+
+Key       := !Alnum Space !":="
+Return    := ("return"|"yield"|"break"|"continue") Key
+Reserved  := ("catch"|"do"|"else"|"if"|"in"|"is"|"not"|"then"|"until"|"where"|"with"
+             |"alias"|"const"|"live"|"mutable"|"ref"|"set"|"var") Key | Return
+
+DotSpace  := '.' &(0o09 | 0o20 | Ending)
+Brace     := Scan '{' List '}' Space
+Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
+BraceInd  := Brace | Ind List Ded
+KeyBlock  := Block
+Defs      := Def {Space ',' Scan Def}
+Paren     :=  '(' List  ')' Space
+QualIdent := ['(' List ":)" Space] Ident
+Specs     := [ScanKey "with" Key] '<' Scan Choose Space '>' Space (Specs | !Specs)
+Tags      := Space (!'/' Call ScanKey '.' | !Reserved) QualIdent Space {Invoke} [',' Scan Tags]
+
+Do        := ScanKey "do"    Key (KeyBlock | Def)
+Until     := ScanKey "until" Key (KeyBlock | Def) | ScanKey "catch" Key Invoke
+Then      := ScanKey "then"  Key (KeyBlock | Def)
+Else      := ScanKey "else"  Key (ScanKey If | !(ScanKey If) (KeyBlock | Def))
+
+Invoke    :=          [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
+If        := "if" Key [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
+In        := ("in" Key | ':') Space (In | &Choose NotEq [Space Specs])
+Var       := ("var"|"set"|"ref"|"alias") Key Space Choose
+
+Base      := '(' List ')' | Num | Char | Path | String | Markup | If | !Reserved QualIdent
+Call      := Base    {Space Postfix}
+Postfix   := Invoke  | !Invoke (Paren | Specs) | ("at"|"of") Key (KeyBlock | Fun)
+                     | ('^' | '?' | '[' List ']' | ScanKey '.' QualIdent)
+Prefix    := Call    | ('^' | '?' | '[' List ']' | '+' | '-' | '*') Space (Brace | Prefix)
+Mul       := Prefix  { Space ('*' | '/' | '&'       ) Scan  Prefix  }
+Add       := Mul     { Space ('+' | '-'             ) Scan  Mul     }
+To        := Add     [ Space ("to" Key | ".." | "->") Scan  To      ]
+Choose    := To      [ Space ('|'                   ) Scan  Choose  ]
+Greater   := Choose  [ Space ('>'  | ">="           ) Scan  Greater ]
+Less      := Greater [ Space ('<'  | "<="           ) Scan  &(Choose Space !'>' !'>=') Less]
+NotEq     := Less    { Space ("<>"                  ) Scan  Choose  }
+Eq        := NotEq   { Space ('='                   ) Scan  NotEq   }
+Not       := Eq      |       ("not" Key             ) Space Not
+And       := Not     { Space ("and" Key             ) Scan  And     }
+Or        := And     { Space ("or"  Key             ) Scan  Or      }
+Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !':='))
+             { &In Def
+             | Space   ":="    Space (BraceInd | Def )
+             | Space   "where" Key   (KeyBlock | Defs)
+             | ScanKey "is"    Key   (KeyBlock | Def ) } StopDef
+          |  ('&'|"..") Space Def | Return [Block | Def] StopDef
+Fun       := Def { Space ("over" | "when" | "while") Key (KeyBlock | Defs)
+                 | Space ("=>" Space | "next" Key) (BraceInd | Fun) } StopFun
+Expr      := Fun {Space '@' Space Call} StopExpr
+          |  '@' Space Call Scan &('@' | QualIdent) Expr
+
+StopExpr  := &(Space (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKey "is" Key)))
+StopFun   := &(Space ("@")) | StopExpr
+StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next") Key | StopFun
+
+Commas    := Expr {',' Scan Expr}
+Separator := (';' | Ending) Scan
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
+File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
+
+[e]  means optional
+{e}  means zero or more
+(e)  is just grouping
+!s   ensure s does not occur
+&s   checks that s does occur but does not consume it (like a PEG)
