@@ -1,5 +1,6 @@
 # Temporary Makefile to run tests
 TESTFILE=versetests/tests.versetest
+TESTSTOREFILE=versetests/storetests.versetest
 TRICKY=versetests/tricky.versetest
 TESTPARSEFILE=versetests/test1.verse
 .PHONY: all test testfast clean
@@ -40,6 +41,10 @@ testfast:
 
 testnorec:
 	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
+
+testiblock:
+	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTSTOREFILE)
 
 testblock:
 	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=1000     $(TESTFILE)
