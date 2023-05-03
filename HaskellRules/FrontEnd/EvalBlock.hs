@@ -793,8 +793,12 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Put eqn on the done list, block its effects, and continue the sweep
         suspend :: BEqn -> BChoice
         suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) heap bvars bs bresult
+
       in
         let allvars = bvars ++ allBVars (done, bbinds, bresult)
+            succBlock b =
+              let rhs = freshenBlock allvars b
+              in  succeeds'' heap (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
         in
         -- Examine the expression and evaluate if possible.
         dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
@@ -845,9 +849,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                     in  succeeds'' h is [(val, BEBlk bb)]
           BChoice BCFail -> fails
           BChoice (BCWrong s) -> wrongs s
-          BChoice (BCBlk b) ->
-            let rhs = freshenBlock allvars b
-            in  succeeds'' heap (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
+          BChoice (BCBlk b) -> succBlock b
           BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
                                  | notBlocked Eiterates beffs -> evalChoice heap aeffs bbeffs (BCFork c1 c2)
                                  | otherwise -> suspend eqn
@@ -855,6 +857,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               c1 = BCBlk $ BBlock{ vars = bvars, binds = rdone ++ [(val, BChoice x1)] ++ bs, result = bresult }
               c2 = BCBlk $ BBlock{ vars = bvars, binds = rdone ++ [(val, BChoice x2)] ++ bs, result = bresult }
               rdone = reverse done
+          BChoice (BCRBlk heap' b) | heap == heap' -> succBlock b
           BChoice (BCRBlk _ _) -> error "impossible"
           BVal v -> unify val v
 
