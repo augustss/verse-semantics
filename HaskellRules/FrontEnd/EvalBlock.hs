@@ -18,6 +18,7 @@ import Rules.Core
 import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
 import Debug.Trace
+import System.IO
 import System.IO.Unsafe(unsafePerformIO)
 
 subset :: (Eq a) => [a] -> [a] -> Bool
@@ -32,13 +33,16 @@ subset xs ys = null (xs \\ ys)
 --  * limit effects for lambda bodies
 
 doStep :: Bool
-doStep = False
+doStep = True
 
 dtrace :: AllowedEffects -> String -> a -> a
 dtrace effs s a | Etrace `notElem` effs = a
                 | otherwise = unsafePerformIO $ do
                     putStrLn s
-                    when doStep $ void getLine
+                    when doStep $ do
+                      putStr "step> "
+                      hFlush stdout
+                      void getLine
                     pure a
 
 runBlock :: TRSFlags -> Expr -> Expr
