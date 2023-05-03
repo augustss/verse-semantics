@@ -261,7 +261,11 @@ lamFunc cov i (Exists is e1) e2 =
     if null is && e1 == Array [] then
       e2
     else
-      If3 (Exists is e1) e2 (if cov then Fail else Wrong "outside domain")
+      if cov then
+        Exists is (Seq [e1, e2])
+      else
+        If3 (Exists is e1) e2 (Wrong "outside domain")
+      
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
