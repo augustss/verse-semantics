@@ -150,11 +150,7 @@ pattern BWrong s = BChoice (BCWrong s)
 data BValue
   = BVar BIdent
   | BHNF BHNF
-  | BRec BHNF   -- The BHNF must be a BHLam i (BlockValue [] (BHNF h))
   deriving (Show, Eq, Ord, Data)
-
-pattern BMu :: BIdent -> BHNF -> BValue
-pattern BMu i h = BRec (BHLam i (BlockValue [] (BHNF h)))
 
 isBVar :: BValue -> Bool
 isBVar BVar{} = True
@@ -276,7 +272,6 @@ instance Pretty BChoice where
 instance Pretty BValue where
   pPrintPrec l p (BVar v) = pPrintPrec l p v
   pPrintPrec l p (BHNF h) = pPrintPrec l p h
-  pPrintPrec l p (BRec h) = parens $ text "rec" <+> pPrintPrec l p h
 
 instance Pretty BHNF where
   pPrintPrec l p (BInt i) = pPrintPrec l p i
@@ -410,14 +405,11 @@ instance Bound BChoice where
 instance Bound BValue where
   allBVars (BVar i) = [i]
   allBVars (BHNF h) = allBVars h
-  allBVars (BRec h) = allBVars h
   freeBVars (BVar i) = [i]
   freeBVars (BHNF h) = freeBVars h
-  freeBVars (BRec h) = freeBVars h
   bsubst' s v@(BVar i) | Just e <- lookup i s = e
                        | otherwise = v
   bsubst' s (BHNF h) = BHNF (bsubst' s h)
-  bsubst' s (BRec h) = BRec (bsubst' s h)
   
 instance Bound BHNF where
   allBVars (BInt _) = []
@@ -474,9 +466,6 @@ blockToCore b = foldr EXI bs (map bIdentToIdent (vars b))
 valueToCore :: BValue -> Expr
 valueToCore (BVar v) = Var (bIdentToIdent v)
 valueToCore (BHNF h) = hnfToCore h
-valueToCore (BRec h) = mu (hnfToCore h)
-  where mu (LAM i e) = EXI i $ Var i :=: e
-        mu _ = undefined
 
 bIdentToIdent :: BIdent -> Ident
 bIdentToIdent (BIdent s) = Name s
@@ -741,9 +730,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                 -- (The variable must be x, since x is among the free variables of v)
                 suspend ueqn
               -- Change recursion to mu
-              BHNF h -> succeeds [(BVar x, BVal $ BMu x h)]
-              -- XXX what is this supposed to do?
-              BRec _ -> undefined
+              BHNF _ -> substRec x v
           else if x `elem` bvars then
             -- Locally bound, get rid of the variable entirely.
             -- And restart sweep
@@ -767,8 +754,6 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
           -- According to the ICFP paper this fails.  Being WRONG would be better
           fails
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
-        unify BRec{} _ = undefined -- XXX dunno
-        unify _ BRec{} = undefined -- XXX dunno
         unify (BVExt a1 r1 x1) (BVExt a2 r2 x2) | a1 == a2 = succeeds [(r1, BVal r2), (x1, BVal x2)]
         -- These are dubious
         unify (BVExt a r x) v = succeeds [(r, BApply v (BHNF a)), (x, BVal v)]
@@ -794,6 +779,16 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         suspend :: BEqn -> BChoice
         suspend ve@(_, e) = sweep (exprEffs e `union` beffs) (ve : done) heap bvars bs bresult
 
+        substRec :: BIdent -> BValue -> BChoice
+        substRec ax av = maybe fails (\ v' -> succeeds [(BVar ax, BVal v')]) $ sub ax av
+          where sub :: BIdent -> BValue -> Maybe BValue
+                sub x (BVar x') | x == x' = Nothing
+                sub x (BVArr vs) = BVArr <$> mapM (sub x) vs
+                sub x (BVLam y b) =
+                  if x == y || x `elem` vars b then undefined else -- not implemented
+                  pure $ BVLam y $ b{ vars = x:vars b, binds = (BVar x, BVal av) : binds b }
+                sub _ v = pure v
+
       in
         let allvars = bvars ++ allBVars (done, bbinds, bresult)
             succBlock b =
@@ -813,8 +808,6 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                     let x = bIdentNotIn (allvars ++ freeBVars (h, val))
                     in  succeeds'' heap [x] [(f, BVal $ BVExt h val (BVar x))]
               BVar _ -> suspend eqn           -- not a hnf yet
-              BMu i h -> succeeds [(val, BApply (bsubst [(i, f)] (BHNF h)) a)]
-              BRec _ -> undefined
               BVLam i b ->
                 -- Bind the argument and insert the lambda body
                 let (i', b') = freshenLambda allvars (i, b)
