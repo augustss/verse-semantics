@@ -30,22 +30,20 @@ subset xs ys = null (xs \\ ys)
 --  * check if an effect is allowed
 --  * limit effects for lambda bodies
 
-doTrace :: Bool
-doTrace = False
-
-dtrace :: String -> a -> a
-dtrace s a | doTrace = trace s a
-           | otherwise = a
+dtrace :: AllowedEffects -> String -> a -> a
+dtrace effs s a | Etrace `elem` effs = trace s a
+                | otherwise = a
 
 runBlock :: TRSFlags -> Expr -> Expr
 runBlock flg e =
   let b = coreToChoice e
-      b' = evalChoiceFull emptyHeap topEffects b
+      b' = evalChoiceFull emptyHeap effs b
       b'' = if tfUnderLambda flg then evalUnderLambda b' else b'
+      effs = [Etrace | tfTrace flg] ++ topEffects
   in
-      dtrace ("core: " ++ prettyShow e) $
-      dtrace ("input: " ++ prettyShow b) $
-      dtrace ("output: " ++ prettyShow b') $
+      dtrace effs ("core: " ++ prettyShow e) $
+      dtrace effs ("input: " ++ prettyShow b) $
+      dtrace effs ("output: " ++ prettyShow b') $
       choiceToCore b''
 
 evalChoiceFull :: BHeap -> AllowedEffects -> BChoice -> BChoice
@@ -198,6 +196,8 @@ data Effect
   | Einteracts
   ---- 
   | Ecovariant
+  ---- 
+  | Etrace         -- not really an effect, used for debugging
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 type Effects = [Effect]
@@ -663,7 +663,7 @@ notBlocked = all . effCommutes
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
 evalChoice :: BHeap -> AllowedEffects -> BlockedEffects -> BChoice -> BChoice
-evalChoice _ _ _ c | dtrace ("evalChoice: " ++ prettyShow c) False = undefined
+evalChoice _ aeffs _ c | dtrace aeffs ("evalChoice: " ++ prettyShow c) False = undefined
 evalChoice heap aeffs beffs (BCFork c1 c2) =
   case evalChoice heap aeffs beffs c1 of
     BCFail -> evalChoice heap aeffs beffs c2
@@ -683,10 +683,10 @@ evalChoice _ _ _ c@BCRBlk{} = error $ "evalChoice: " ++ prettyShow c
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
 evalBlock :: BHeap -> AllowedEffects -> BlockedEffects -> BBlock -> BChoice
-evalBlock _ _ _ b | dtrace ("evalBlock: " ++ prettyShow b) False = undefined
+evalBlock _ aeffs _ b | dtrace aeffs ("evalBlock: " ++ prettyShow b) False = undefined
 evalBlock heap aeffs beffs b =
   let c = evalBlock' heap aeffs beffs b
-  in  dtrace ("evalBlock returns: " ++ prettyShow c) $
+  in  dtrace aeffs ("evalBlock returns: " ++ prettyShow c) $
       --checkPostCond aeffs beffs c
       c
 
@@ -718,7 +718,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
 
     sweep :: BlockedEffects -> [BEqn] -> BHeap -> [BIdent] -> [BEqn] -> BValue -> BChoice
     sweep beffs done _ bvars bbinds _bresult
-      | dtrace ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
+      | dtrace aeffs ("sweep: " ++ prettyShow (beffs, bvars, done, bbinds)) False = undefined
     sweep _     done h bvars     [] bresult =
       -- End of binds reached, no further progress possible
 --      BCBlk BBlock{ vars = bvars `intersect` freeBVars (done, bresult), binds = reverse done, result = bresult }
@@ -797,7 +797,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         let allvars = bvars ++ allBVars (done, bbinds, bresult)
         in
         -- Examine the expression and evaluate if possible.
-        dtrace ("sweep expr=" ++ take 10 (show expr)) $
+        dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
           BPrimOp op vs | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
                         | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
@@ -835,7 +835,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               BCFork BCBlk{} _ -> error "impossible"
               c' -> suspend (val, BSplit c' f g)
             where callG (is, h) b r =
-                    dtrace ("callG " ++ prettyShow (is, h, b, r, val)) $
+                    dtrace aeffs ("callG " ++ prettyShow (is, h, b, r, val)) $
                     let (vb: a1: a2: a3: dummy: _) = bIdentsNotIn (is ++ allvars ++ freeBVars (b, c))
                         b0 = (BVar vb, BEBlk b)
                         b1 = (BVar a1, BApply g (BVar vb))
@@ -954,3 +954,4 @@ effCommutes Ewrites e = e `elem` [Efails, Eallocates]
 effCommutes Ethrows e = e `elem` [Eallocates]
 effCommutes Einteracts e = e `elem` [Eallocates]
 effCommutes Ecovariant _ = undefined
+effCommutes Etrace _ = True
