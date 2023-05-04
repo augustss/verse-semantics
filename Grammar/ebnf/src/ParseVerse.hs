@@ -12,14 +12,16 @@ import Text.Megaparsec.Char
 import ParseEBNF
 
 data LexState = LexState
-  { nest     :: !Bool
-  , blockInd :: !String
-  , lineInd  :: !String
+  { nest       :: Bool
+  , blockInd   :: String
+  , lineInd    :: String
+  , linePrefix :: String
+  , thisInd    :: String -- just temporary storage
   }
   deriving (Show)
 
 initLexState :: LexState
-initLexState = LexState { nest = True, blockInd = "", lineInd = "" }
+initLexState = LexState { nest = undefined, blockInd = undefined, lineInd = undefined, linePrefix = undefined, thisInd = undefined }
 
 type P = ParsecT Void String (S.State [LexState])
 
@@ -103,6 +105,7 @@ mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r
 mkElemParse r (Code c) = SUnit <$ mkCode r c
+mkElemParse _ (Deref v) = do l <- S.gets head; SStr <$> string (read (expr l (EVar v)))
 
 mkCode :: RuleEnv -> Code -> P ()
 mkCode _ Push = S.modify $ \ st -> head st : st
@@ -120,7 +123,9 @@ xset :: String -> String -> LexState -> LexState
 xset "Nest" e l = l { nest = read e }
 xset "BlockInd" e l = l { blockInd = read e }
 xset "LineInd" e l = l { lineInd = read e }
-xset _ _ _ = undefined
+xset "LinePrefix" e l = l { linePrefix = read e }
+xset "ThisInd" e l = l { thisInd = read e }
+xset s _ _ = error $ "xset: undefined " ++ s
 
 expr :: LexState -> Expr -> String
 expr _ (EVar "true") = show True
@@ -128,7 +133,9 @@ expr _ (EVar "false") = show False
 expr l (EVar "Nest") = show (nest l)
 expr l (EVar "BlockInd") = show (blockInd l)
 expr l (EVar "LineInd") = show (lineInd l)
-expr _ (EVar _s) = undefined
+expr l (EVar "LinePrefix") = show (linePrefix l)
+expr l (EVar "ThisInd") = show (thisInd l)
+expr _ (EVar s) = error $ "expr: undefined " ++ s
 expr _ (EStr s) = show s
 expr l (EGT e1 e2) = show (expr l e1 >  expr l e2)
 expr l (ELE e1 e2) = show (expr l e1 <= expr l e2)

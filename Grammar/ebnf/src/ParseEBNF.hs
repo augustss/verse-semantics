@@ -22,7 +22,7 @@ data Rule = Rule
   { name :: String
   , rhs  :: Elem
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Elem
   = Seq [Elem]
@@ -36,7 +36,8 @@ data Elem
   | Opt Elem
   | NonTerm String
   | Code Code
-  deriving (Show)
+  | Deref String
+  deriving (Show, Eq)
 
 -- Whar the difference between 'xy' and "xy"?
 
@@ -48,7 +49,7 @@ data Code
   | Parse String Elem
   | If Expr Code (Maybe Code)
   | Error
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Expr
   = EVar String
@@ -59,7 +60,7 @@ data Expr
   | Enot Expr
   | Eand Expr Expr
   | Eor Expr Expr
-  deriving (Show)
+  deriving (Show, Eq)
 
 skip :: P ()
 skip = void $ many spaceChar
@@ -130,6 +131,7 @@ pElem = choice
   , Look <$> (symbol "&" *> pElem)
   , Str  <$> pStr
   , Code <$> (optional semi *> pCode <* optional semi)
+  , Deref <$> (symbol "^" *> pIdent)
   ]
   where semi = try (char ';' <* notFollowedBy (char ';')) <* skip
 
