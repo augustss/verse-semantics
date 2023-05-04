@@ -16,7 +16,8 @@ main = do
         putStrLn $ "===== " ++ v ++ " ====="
         fv <- readFile v
         let x = parseDie pVerse v fv
-        print x
+            x' = trimParseTree x
+        print x'
         when (flattenParseTree x /= fv) undefined
   mapM_ doFile vs
 

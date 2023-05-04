@@ -55,6 +55,10 @@ data ParseTree
   | SOpt (Maybe ParseTree)
   | SName String ParseTree
   | SUnit
+  -- Compound nodes during translation
+  | SNum String
+  | SIdent String
+  | SPath String
   deriving (Show, Eq)
 
 sSeq :: [ParseTree] -> ParseTree
@@ -62,6 +66,13 @@ sSeq axs =
   case filter (/= SUnit) axs of
     [x] -> x
     xs -> SSeq xs
+
+sMany :: [ParseTree] -> ParseTree
+sMany axs = SMany $ filter (/= SUnit) axs
+
+sOpt :: Maybe ParseTree -> ParseTree
+sOpt (Just SUnit) = SUnit
+sOpt mx = SOpt mx
 
 {-
 dropUnit :: ParseTree -> ParseTree
@@ -84,6 +95,9 @@ flattenParseTree (SMany ss) = concatMap flattenParseTree ss
 flattenParseTree (SOpt ms) = maybe "" flattenParseTree ms
 flattenParseTree (SName _ s) = flattenParseTree s
 flattenParseTree SUnit = ""
+flattenParseTree (SNum s) = s
+flattenParseTree (SIdent s) = s
+flattenParseTree (SPath s) = s
 
 mkRulesParse :: String -> [Rule] -> P ParseTree
 mkRulesParse t rs =
@@ -104,19 +118,18 @@ mkElemParse r (Many x) = SMany <$> many (mkElemParse r x)
 mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r
-mkElemParse r (Code c) = SUnit <$ mkCode r c
+mkElemParse r (Code c) = mkCode r c
 mkElemParse _ (Deref v) = do l <- S.gets head; SStr <$> string (read (expr l (EVar v)))
 
-mkCode :: RuleEnv -> Code -> P ()
-mkCode _ Push = S.modify $ \ st -> head st : st
-mkCode _ Pop  = S.modify tail
-mkCode _ (Set s e) = S.modify $ \ st -> xset s (expr (head st) e) (head st) : tail st
-mkCode r (CSeq cs) = mapM_ (mkCode r) cs
-mkCode r (Parse s x) = do p <- mkElemParse r x; S.modify $ \ st -> xset s (show (flattenParseTree p)) (head st) : tail st
+mkCode :: RuleEnv -> Code -> P ParseTree
+mkCode _ Push = SUnit <$ S.modify (\ st -> head st : st)
+mkCode _ Pop  = SUnit <$ S.modify tail
+mkCode _ (Set s e) = SUnit <$ S.modify (\ st -> xset s (expr (head st) e) (head st) : tail st)
+mkCode r (CSeq cs) = sSeq <$> mapM (mkCode r) cs
+mkCode r (Parse s x) = do p <- mkElemParse r x; S.modify (\ st -> xset s (show (flattenParseTree p)) (head st) : tail st); pure p
 mkCode r (If e c mc) = do
   l <- S.gets head
-  if read (expr l e) then mkCode r c else maybe (pure ()) (mkCode r) mc
-  pure ()
+  if read (expr l e) then mkCode r c else maybe (pure SUnit) (mkCode r) mc
 mkCode _ Error = fail "Error"
 
 xset :: String -> String -> LexState -> LexState
@@ -143,3 +156,20 @@ expr l (EEQ e1 e2) = show (expr l e1 == expr l e2)
 expr l (Enot e) = show $ not $ read $ expr l e
 expr l (Eand e1 e2) = show $ read (expr l e1) && read (expr l e2)
 expr l (Eor  e1 e2) = show $ read (expr l e1) || read (expr l e2)
+
+-------------------------
+
+trimParseTree :: ParseTree -> ParseTree
+trimParseTree (SSeq xs) = sSeq $ map trimParseTree xs
+trimParseTree (SAlt i x) = SAlt i $ trimParseTree x
+trimParseTree (SMany xs) = sMany $ map trimParseTree xs
+trimParseTree (SOpt mx) = sOpt $ fmap trimParseTree mx
+trimParseTree (SName "Scan" _) = SUnit
+trimParseTree (SName "ScanKey" _) = SUnit
+trimParseTree (SName "Space" _) = SUnit
+trimParseTree (SName "NewLine" _) = SUnit
+trimParseTree (SName "Num" x) = SNum $ flattenParseTree x
+trimParseTree (SName "Ident" x) = SIdent $ flattenParseTree x
+trimParseTree (SName "Path" x) = SPath $ flattenParseTree x
+trimParseTree (SName n x) = SName n $ trimParseTree x
+trimParseTree x = x
