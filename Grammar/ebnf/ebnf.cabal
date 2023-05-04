@@ -25,7 +25,9 @@ executable ebnf
     main-is:          Main.hs
 
     other-modules:    ParseEBNF
+                      ParseVerse
 
+    ghc-options:      -Wall -O
     -- Modules included in this executable, other than Main.
     -- other-modules:
 
@@ -34,5 +36,6 @@ executable ebnf
     build-depends:    base,
                       mtl,
                       megaparsec,
+                      containers,
     hs-source-dirs:   src
     default-language: Haskell2010

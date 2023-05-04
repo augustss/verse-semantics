@@ -1,6 +1,6 @@
 module ParseEBNF(
   Rule(..), Elem(..), Code(..), Expr(..),
-  parseDie, pFile) where
+  parseEBNF) where
 import Control.Monad
 --import qualified Control.Monad.State.Strict as S
 import Data.Void
@@ -10,9 +10,9 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 type P = Parsec Void String
 
-parseDie :: P a -> FilePath -> String -> a
-parseDie p fn file =
-  case runParser p fn file of
+parseEBNF :: FilePath -> String -> [Rule]
+parseEBNF fn file =
+  case runParser pFile fn file of
     Left err -> error $ errorBundlePretty err
     Right x -> x
 
@@ -113,9 +113,9 @@ pCharRange = do
 
 pStr :: P String
 pStr = do
-  char '"'
+  void $ char '"'
   cs <- takeWhileP (Just "string") (/= '"')
-  char '"'
+  void $ char '"'
   skip
   pure cs
 
