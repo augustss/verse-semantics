@@ -10,6 +10,7 @@ Legend:
 	push, pop - save and restore parser state
 	set a=b   - sets context value a to value b
 	parse a=b - sets context value a to the text parsed by b
+        ^a        - parse exactly the context value a
 	0oX       - ASCII or Unicode UTF8 Code Unit octet
 	0uX       - Unicode UTF32 Code Point; note that 0o0..0o7F and 0u0..0u7F are equivalent
 	a..b      - recognizes a range of characters
@@ -36,11 +37,11 @@ NewLine   := 0o0D [0o0A] | 0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse i:={0o09|0o20}; (Ending | !(0o09|0o20) Space
-             if     (i>BlockInd or Nest and i=BlockInd) then set LineInd=ThisInd
-             else if(not i<=BlockInd                 ) then error)
+Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(0o09|0o20) Space
+             if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
+             else if(not ThisInd<=BlockInd                        ) then error)
 Scan      := Space {Line}
-ScanKey   := Space (&NewLine Scan LinePrefix Space | !NewLine)
+ScanKey   := Space (&NewLine Scan ^LinePrefix Space | !NewLine)
 
 LineCmt   :=  "#" !'>' {Text        } Ending
 BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
