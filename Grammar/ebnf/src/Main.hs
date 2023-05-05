@@ -18,11 +18,16 @@ main = do
         let x = parseDie pVerse v fv
             x' = trimParseTree x
         print x'
-        when (flattenParseTree x /= fv) undefined
+        when (flattenParseTree x /= fv) $ do
+          putStrLn "Roundtrip fail"
+          putStrLn fv
+          putStrLn "-----"
+          putStrLn $ flattenParseTree x
+          error "bad"
   mapM_ doFile vs
 
 trim :: String -> String
-trim = unlines . map addSemi . cutBottom . cutTop . lines
+trim = unlines . map addSemi . map stripComment . cutBottom . cutTop . lines
   where
     cutTop :: [String] -> [String]
     cutTop = dropWhile (\ l -> take 1 (words l) /= ["Alpha"])
@@ -31,3 +36,7 @@ trim = unlines . map addSemi . cutBottom . cutTop . lines
     addSemi :: String -> String
     addSemi l | isInfixOf " := " l = ";;" ++ l
               | otherwise = l
+    stripComment ('-':'-':_) = ""
+    stripComment "" = ""
+    stripComment (c:cs) = c : stripComment cs
+    
