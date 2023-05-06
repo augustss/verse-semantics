@@ -67,8 +67,7 @@ library
     semigroupoids,
     text,
     transformers,
-    unordered-containers >= 0.2.6.0,
-    void
+    unordered-containers >= 0.2.6.0
   hs-source-dirs: src
   ghc-options: -Wall -Wno-name-shadowing
   default-language: Haskell2010
@@ -103,8 +102,7 @@ executable versei
 
 executable versewasm
   main-is: Main.hs
-  if os(wasm32-wasi)
-    c-sources: wasm/init.c
+  c-sources: wasm/init.c
   build-depends:
     base >= 4.16.0.0,
     bytestring,
@@ -115,10 +113,8 @@ executable versewasm
   hs-source-dirs: wasm
   ghc-options:
     -Wall -Wno-name-shadowing
-  if os(wasm32-wasi)
-    ghc-options:
-      -no-hs-main -optl-mexec-model=reactor
-      "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
+    -no-hs-main -optl-mexec-model=reactor
+    "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
   default-language: Haskell2010
 
 executable verselex
