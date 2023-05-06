@@ -6,7 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Var
   ( MonadVar (..)
+  , MonadVarTrans
   , MonadVarRef (..)
+  , MonadVarRefTrans
   , EqVarRef (..)
   ) where
 
@@ -52,7 +54,11 @@ class Monad m => MonadVar m where
 type family VarDefault (m :: Type -> Type) :: (Type -> Type) -> Type where
   VarDefault (t n) = Var n
 
-type MonadVarTrans t n = (Var (t n) ~ Var n, MonadTrans t, MonadVar n)
+type MonadVarTrans t n =
+  ( Var (t n) ~ Var n
+  , MonadTrans t
+  , MonadVar n
+  )
 
 instance MonadVar m => MonadVar (MaybeT m)
 

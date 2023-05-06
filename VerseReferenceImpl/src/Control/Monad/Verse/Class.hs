@@ -17,39 +17,57 @@ import Control.Monad.Unify
 import Control.Monad.Var
 
 import Data.Freshenable
+import Data.Kind
+import Data.Proxy
 
 class (MonadUnify m, MonadVarRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
-  split :: Freshenable f =>
-           m (f (Var m)) ->
-           (Maybe (f (Var m), m (f (Var m))) -> m ()) ->
-           m ()
+  split :: ( Freshenable a
+           , Elem a ~ Var m f
+           , Traversable f
+           ) => m a -> (Maybe (a, m a) -> m ()) -> m ()
 
-  ifte' :: Freshenable f => m (f (Var m)) -> (f (Var m) -> m ()) -> m () -> m ()
+  ifte' :: ( Freshenable a
+           , Elem a ~ Var m f
+           , Traversable f
+           ) => m a -> (a -> m ()) -> m () -> m ()
   ifte' m f n = split m $ \ case
     Just (x, _) -> f x
     Nothing -> n
 
-  once' :: Freshenable f => m (f (Var m)) -> (f (Var m) -> m ()) -> m ()
+  once' :: ( Freshenable a
+           , Elem a ~ Var m f
+           , Traversable f
+           ) => m a -> (a -> m ()) -> m ()
   once' m f = ifte' m f empty
 
   lnot' :: m a -> m ()
-  lnot' m = ifte' (Unit1 <$ m) (const empty) (pure ())
+  lnot' m = ifte' ((Unit :: Unit m Proxy) <$ m) (const empty) (pure ())
 
-  for' :: (Freshenable f, Freshenable g) =>
-          m (f (Var m)) ->
-          (f (Var m) -> m (g (Var m))) ->
-          ([g (Var m)] -> m ()) ->
-          m ()
+  for' :: ( Freshenable a
+          , Elem a ~ Var m f
+          , Freshenable b
+          , Elem b ~ Var m f
+          , Traversable f
+          ) => m a -> (a -> m b) -> ([b] -> m ()) -> m ()
   for' m f g = split m $ \ case
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
 
-  all' :: Freshenable f => m (f (Var m)) -> ([f (Var m)] -> m ()) -> m ()
+  all' :: ( Freshenable a
+          , Elem a ~ Var m f
+          , Traversable f
+          ) => m a -> ([a] -> m ()) -> m ()
   all' m f = split m $ \ case
     Just (x, m) -> all' m $ \ xs -> f $ x : xs
     Nothing -> f []
+
+data Unit (m :: Type -> Type) (f :: Type -> Type) = Unit
+
+instance Freshenable (Unit m f) where
+  type Elem (Unit m f) = Var m f
+  freshen _ = pure
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
   whenBound x f = ReaderT $ \ r ->
@@ -62,8 +80,7 @@ instance MonadVerse m => MonadVerse (RST r s m) where
     whenBound x $ \ x -> evalRST (f x) r s
     pure ((), s)
   split m f = RST $ \ r s -> do
-    split (evalRST m r s) $ \ x ->
-      evalRST (f $ fmap lift <$> x) r s
+    split (evalRST m r s) $ \ x -> evalRST (f $ fmap lift <$> x) r s
     pure ((), s)
 
 instance (Monoid w, MonadVerse m) => MonadVerse (CPS.WriterT w m) where
