@@ -63,8 +63,6 @@ import GHC.Exts (Any)
 
 import Prelude (Num (..), ($!), error)
 
-import Text.Show
-
 import Unsafe.Coerce qualified
 
 newtype VerseT m a = VerseT
@@ -115,10 +113,10 @@ popListeners' :: MonadRef m => Label -> Heap m -> VerseT m (Maybe [Listener m An
 popListeners' i = \ case
   Cons { listenersRef } -> do
     VerseT . modify $ LabelMap.delete i
-    lift (readRef listenersRef) <&> deleteLookup i >>= \ case
+    lift (readRef listenersRef) <&> lookupDelete i >>= \ case
       Just (xs, s) -> Just xs <$ lift (writeRef listenersRef s)
       Nothing -> pure Nothing
-  Nil -> VerseT . state $ \ s -> case deleteLookup i s of
+  Nil -> VerseT . state $ \ s -> case lookupDelete i s of
     Just (xs, s) -> (Just xs, s)
     Nothing -> (Nothing, s)
 
@@ -174,7 +172,7 @@ moveListenersAt' i j = \ case
   Nil -> VerseT . modify $ insertDeleteListeners i j
 
 insertDeleteListeners :: Label -> Label -> Listeners m -> Listeners m
-insertDeleteListeners i j s = case deleteLookup j s of
+insertDeleteListeners i j s = case lookupDelete j s of
   Just (xs, s) -> insertListeners i xs s
   Nothing -> s
 
@@ -201,7 +199,7 @@ putHeapListener = \ case
     lift . writeRef heapListenerRef $ Just (h, f')
   Nil -> const $ pure ()
 
-data HeapKind = Split | Choice deriving Show
+data HeapKind = Split | Choice
 
 type Label = Int
 
@@ -595,7 +593,7 @@ notifyHeap h = \ case
       case n of
         0 -> pure ()
         _ -> do
-          putListenerLength h $ n - 1
+          putListenerLength h 0
           empty
 
 msplit' :: Monad m =>
@@ -660,13 +658,13 @@ commit'' f' = \ case
 
 pushSplit :: MonadRef m => VerseT m ()
 pushSplit = do
-  i <- VerseT supply
+  label <- VerseT supply
   h <- getHeap
-  r_commit <- lift $ newRef emptyCommit
-  r_length <- lift $ newRef 0
-  r_listeners <- lift $ newRef mempty
-  r_listener <- lift $ newRef Nothing
-  putHeap $ Cons i Nil Split r_commit r_length r_listeners r_listener h
+  commitRef <- lift $ newRef emptyCommit
+  listenerLengthRef <- lift $ newRef 0
+  listenersRef <- lift $ newRef mempty
+  heapListenerRef <- lift $ newRef Nothing
+  putHeap $ Cons { copied = Nil, kind = Split, tail = h, .. }
 
 pushChoice :: (MonadFix m, MonadRef m) => Heap m -> VerseT m ()
 pushChoice h = do
@@ -682,7 +680,7 @@ pushChoice h = do
 popChoice :: (MonadFix m, MonadRef m) => Heap m -> VerseT m ()
 popChoice h = do
   h' <- stateHeap $ \ case
-    Cons _ _ Choice _ _ _ _ h' -> (h', h')
+    Cons { kind = Choice, tail } -> (tail, tail)
     _ -> error "popChoice"
   putListeners' h' =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h'
 
@@ -716,7 +714,7 @@ copyHeap = \ case
       tail <- copyHeap tail
       pure $ Cons { copied = xs, .. }
     Just xs' -> pure xs'
-  Nil -> gets $ \ (Copied _ xs) -> xs
+  Nil -> gets $ \ (Copied _ xs') -> xs'
 
 lookupInsertCopied :: Label -> Heap m -> Copied m -> Either (Heap m) (Copied m)
 lookupInsertCopied i x (Copied xss xs) = flip Copied xs <$> lookupInsert i x xss
@@ -784,8 +782,8 @@ lookupInsert !k0 x0 t0 = loop k0 x0 t0
           Right $! LabelMap.Internal.link k (LabelMap.Lazy.singleton k x) k' t
       LabelMap.Internal.Nil -> Right $! LabelMap.Lazy.singleton k x
 
-deleteLookup :: Label -> LabelMap a -> Maybe (a, LabelMap a)
-deleteLookup !k0 t0 = toMaybe $ loop k0 t0
+lookupDelete :: Label -> LabelMap a -> Maybe (a, LabelMap a)
+lookupDelete !k0 t0 = toMaybe $ loop k0 t0
   where
     loop k = \ case
       LabelMap.Internal.Bin p m l r
@@ -801,12 +799,12 @@ deleteLookup !k0 t0 = toMaybe $ loop k0 t0
         | otherwise -> Lacks
       LabelMap.Internal.Nil -> Lacks
 
-toMaybe :: DeleteLookup a -> Maybe (a, LabelMap a)
+toMaybe :: LookupDelete a -> Maybe (a, LabelMap a)
 toMaybe = \ case
   Lacks -> Nothing
   Had x y -> Just (x, y)
 
-data DeleteLookup a
+data LookupDelete a
   = Lacks
   | Had !a !(LabelMap a)
 
