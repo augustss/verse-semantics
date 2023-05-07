@@ -480,7 +480,8 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
         when (splitLabel_y /= splitLabel) $
           addNewListener var_y i_y $ \ val_y ->
             check val_x val_y
-      (Bound _ val_x, Bound _ val_y) -> check val_x val_y
+      (Bound _ val_x, Bound _ val_y) ->
+        check val_x val_y
 
 check :: ( MonadFix m
          , MonadRef m
@@ -519,8 +520,8 @@ split' m f = do
           putHeap h
           f $ Just (x, putHeap h' *> m)
         False -> do
-          incrListenerLength h
           putHeap h
+          incrListenerLength h
           putHeapListener h' $ \ h' -> \ case
             True -> do
               h <- getHeap
@@ -548,15 +549,15 @@ notifyListeners i x = popListeners i >>= \ case
         msplit' (putHeap h *> f x) mempty >>= \ case
           Just ((), s, _) -> do
             h <- getHeap
-            putHeap h'
             addListenersFromTo h h' s
+            putHeap h'
             notifyHeap h True
           Nothing -> do
             putHeap h'
             notifyHeap h False
     Nil -> do
       s <- VerseT get
-      msplit' (putHeap h *> f x) s >>= \ case
+      msplit' (f x) s >>= \ case
         Just ((), s, _) -> VerseT $ put s
         Nothing -> empty
   Nothing -> pure ()
@@ -657,6 +658,11 @@ commit'' f' = \ case
       Choice -> commit'' f'' h'
   Nil -> pure ()
 
+addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
+addCommit' f = \ case
+  Cons { commitRef } -> modifyRef' commitRef $ \ f' h h' -> f' h h' *> f h h'
+  Nil -> pure ()
+
 pushSplit :: MonadRef m => VerseT m ()
 pushSplit = do
   label <- VerseT supply
@@ -742,11 +748,6 @@ localHeap :: Monad m => (Heap m -> Heap m) -> VerseT m a -> VerseT m a
 localHeap f m = do
   h <- getHeap
   putHeap (f h) *> m <* putHeap h
-
-addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
-addCommit' f = \ case
-  Cons { commitRef } -> modifyRef' commitRef $ \ f' h h' -> f' h h' *> f h h'
-  Nil -> pure ()
 
 insert' :: LabelMap.Key -> a -> LabelMap a -> Maybe (LabelMap a)
 insert' !k0 x0 t0 = loop k0 x0 t0
