@@ -87,23 +87,25 @@ data Heap m = Nil | Cons
   , commitRef :: !(Ref m (Commit m))
   , listenerLengthRef :: !(Ref m Word)
   , listenersRef :: !(Ref m (IntMap [Listener m Any]))
-  , heapListenerRef :: !(Ref m (Maybe (Heap m, Heap m -> Bool -> VerseT m ())))
+  , heapListenerRef :: !(Ref m (Maybe (HeapListener m)))
   , tail :: !(Heap m)
   }
 
-incrListenerLength :: MonadRef m => Heap m -> VerseT m ()
-incrListenerLength = \ case
-  Cons { listenerLengthRef } -> lift $ incr listenerLengthRef
-  Nil -> pure ()
+data HeapKind = Split | Choice
+
+isResolved :: MonadRef m => Heap m -> VerseT m Bool
+isResolved = \ case
+  Cons { listenerLengthRef } -> lift $ (== 0) <$> readRef listenerLengthRef
+  Nil -> pure False
 
 getListenerLength :: MonadRef m => Heap m -> VerseT m Word
 getListenerLength = \ case
   Cons { listenerLengthRef } -> lift $ readRef listenerLengthRef
   Nil -> pure 0
 
-putListenerLength :: MonadRef m => Heap m -> Word -> VerseT m ()
-putListenerLength h n = case h of
-  Cons { listenerLengthRef } -> lift $ writeRef listenerLengthRef n
+incrListenerLength :: MonadRef m => Heap m -> VerseT m ()
+incrListenerLength = \ case
+  Cons { listenerLengthRef } -> lift $ incr listenerLengthRef
   Nil -> pure ()
 
 popListeners :: MonadRef m => Label -> VerseT m (Maybe [Listener m Any])
@@ -120,6 +122,41 @@ popListeners' i = \ case
     Just (xs, s) -> (Just xs, s)
     Nothing -> (Nothing, s)
 
+addNewListener' :: MonadRef m => Label -> Listener m Any -> Heap m -> VerseT m ()
+addNewListener' i s h = do
+  incrListenerLength h
+  modifyListeners' (insertListener i s) h
+
+addListeners' :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
+addListeners' h s = modifyListeners' (appendListeners s) h
+
+addListenersFromTo :: MonadRef m => Heap m -> Heap m -> Listeners m -> VerseT m ()
+addListenersFromTo h = \ case
+  Cons { label } -> addListenersFromTo' h label
+  Nil -> addListenersFrom h
+
+addListenersFromTo' :: MonadRef m => Heap m -> Label -> Listeners m -> VerseT m ()
+addListenersFromTo' h i = case h of
+  Cons { label, kind, tail } -> case label == i of
+    False -> case kind of
+      Split -> \ s -> addListeners' tail s *> addListenersFromTo' tail i s
+      Choice -> addListenersFromTo' tail i
+    True -> const $ pure ()
+  Nil -> const $ pure ()
+
+addListenersFrom :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
+addListenersFrom h = case h of
+  Cons { kind, tail = h } -> case kind of
+    Split -> \ s -> addListeners' h s *> addListenersFrom h s
+    Choice -> addListenersFrom h
+  Nil -> const $ pure ()
+
+moveListenersAt :: MonadRef m => Label -> Label -> VerseT m ()
+moveListenersAt i j = modifyListeners $ insertDeleteListeners i j
+
+modifyListeners :: MonadRef m => (Listeners m -> Listeners m) -> VerseT m ()
+modifyListeners f = modifyListeners' f =<< getHeap
+
 getListeners' :: MonadRef m => Heap m -> VerseT m (Listeners m)
 getListeners' = \ case
   Cons { listenersRef } -> lift $ readRef listenersRef
@@ -132,63 +169,21 @@ putListeners' = \ case
     VerseT $ put s
   Nil -> VerseT . put
 
-addNewListener' :: MonadRef m => Label -> Listener m Any -> Heap m -> VerseT m ()
-addNewListener' i s = \ case
-  Cons { listenerLengthRef, listenersRef } -> do
-    lift $ incr listenerLengthRef
-    lift . modifyRef' listenersRef $ insertListener i s
-    VerseT . modify $ insertListener i s
-  Nil -> VerseT . modify $ insertListener i s
-
-addListeners' :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
-addListeners' = \ case
-  Cons { listenersRef } -> \ s -> do
-    lift . modifyRef' listenersRef $ flip appendListeners s
-    VerseT . modify $ flip appendListeners s
-  Nil -> VerseT . modify . flip appendListeners
-
-addListenersFromTo :: MonadRef m => Heap m -> Heap m -> Listeners m -> VerseT m ()
-addListenersFromTo h = \ case
-  Cons { label } -> addListenersFromTo' h label
-  Nil -> addListenersFrom h
-
-addListenersFromTo' :: MonadRef m => Heap m -> Label -> Listeners m -> VerseT m ()
-addListenersFromTo' h i = case h of
-  Cons { label, kind, tail } -> case label == i of
-    False -> case kind of
-      Split -> addListeners' tail *> addListenersFromTo' tail i
-      Choice -> addListenersFromTo' tail i
-    True -> VerseT . modify . flip appendListeners
-  Nil -> VerseT . modify . flip appendListeners
-
-moveListenersAt :: MonadRef m => Label -> Label -> VerseT m ()
-moveListenersAt i j = moveListenersAt' i j =<< getHeap
-
-moveListenersAt' :: MonadRef m => Label -> Label -> Heap m -> VerseT m ()
-moveListenersAt' i j = \ case
+modifyListeners' :: MonadRef m => (Listeners m -> Listeners m) -> Heap m -> VerseT m ()
+modifyListeners' f = \ case
   Cons { listenersRef } -> do
-    VerseT . modify $ insertDeleteListeners i j
-    lift . modifyRef' listenersRef $ insertDeleteListeners i j
-  Nil -> VerseT . modify $ insertDeleteListeners i j
+    VerseT $ modify' f
+    lift $ modifyRef listenersRef f
+  Nil -> VerseT $ modify' f
 
 insertDeleteListeners :: Label -> Label -> Listeners m -> Listeners m
 insertDeleteListeners i j s = case lookupDelete j s of
   Just (xs, s) -> insertListeners i xs s
   Nothing -> s
 
-addListenersFrom :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
-addListenersFrom h = case h of
-  Cons { kind, tail = h } -> case kind of
-    Split -> addListeners' h *> addListenersFrom h
-    Choice -> addListenersFrom h
-  Nil -> VerseT . modify . flip appendListeners
-
-getHeapListener :: MonadRef m => Heap m -> VerseT m (Maybe (Heap m -> Bool -> VerseT m ()))
-getHeapListener = \ case
-  Cons { heapListenerRef } -> lift (readRef heapListenerRef) <&> \ case
-    Just (h, f) -> Just $ \ h' -> localHeap (const h) . f h'
-    Nothing -> Nothing
-  Nil -> pure Nothing
+data HeapListener m = HeapListener
+  !(Heap m)
+  !(Heap m -> Bool -> VerseT m ())
 
 putHeapListener :: MonadRef m => Heap m -> (Heap m -> Bool -> VerseT m ()) -> VerseT m ()
 putHeapListener = \ case
@@ -196,10 +191,11 @@ putHeapListener = \ case
     splitLabel <- askSplitLabel
     h <- getHeap
     let f' h = localSplitLabel (const splitLabel) . f h
-    lift . writeRef heapListenerRef $ Just (h, f')
+    lift . writeRef heapListenerRef $ Just $ HeapListener h f'
   Nil -> const $ pure ()
 
-data HeapKind = Split | Choice
+apHeapListener :: Monad m => HeapListener m -> Heap m -> Bool -> VerseT m ()
+apHeapListener (HeapListener h f) = \ h' -> localHeap (const h) . f h'
 
 type Label = Int
 
@@ -484,8 +480,7 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
         when (splitLabel_y /= splitLabel) $
           addNewListener var_y i_y $ \ val_y ->
             check val_x val_y
-      (Bound _ val_x, Bound _ val_y) ->
-        check val_x val_y
+      (Bound _ val_x, Bound _ val_y) -> check val_x val_y
 
 check :: ( MonadFix m
          , MonadRef m
@@ -517,13 +512,13 @@ split' m f = do
     Just (x, s, m) -> do
       h' <- getHeap
       addListeners' h s
-      getListenerLength h' >>= \ case
-        0 -> do
+      isResolved h' >>= \ case
+        True -> do
           x <- freshen freshenVar x
           commit h'
           putHeap h
           f $ Just (x, putHeap h' *> m)
-        _ -> do
+        False -> do
           incrListenerLength h
           putHeap h
           putHeapListener h' $ \ h' -> \ case
@@ -545,56 +540,62 @@ split' m f = do
 
 notifyListeners :: (MonadFix m, MonadRef m) => Label -> f (Var m f) -> VerseT m ()
 notifyListeners i x = popListeners i >>= \ case
-  Just xs -> for_ xs $ toListener >>> \ (Listener h f) -> do
-    h' <- getHeap
-    s <- getEmptyListeners' h'
-    msplit' (putHeap h *> f x) s >>= \ case
-      Just ((), s, _) -> do
-        h <- getHeap
-        putHeap h'
-        addListenersFromTo h h' s
-        notifyHeap h True
-      Nothing -> do
-        putHeap h'
-        notifyHeap h False
+  Just xs -> for_ xs $ toListener >>> \ (Listener h f) -> case h of
+    Cons { listenerLengthRef } -> lift (readRef listenerLengthRef) >>= \ case
+      0 -> pure ()
+      _ -> do
+        h' <- getHeap
+        msplit' (putHeap h *> f x) mempty >>= \ case
+          Just ((), s, _) -> do
+            h <- getHeap
+            putHeap h'
+            addListenersFromTo h h' s
+            notifyHeap h True
+          Nothing -> do
+            putHeap h'
+            notifyHeap h False
+    Nil -> do
+      s <- VerseT get
+      msplit' (putHeap h *> f x) s >>= \ case
+        Just ((), s, _) -> VerseT $ put s
+        Nothing -> empty
   Nothing -> pure ()
 
-getEmptyListeners' :: Heap m -> VerseT m (Listeners m)
-getEmptyListeners' = \ case
-  Cons {} -> pure mempty
-  Nil -> VerseT get
-
 notifyHeap :: (MonadFix m, MonadRef m) => Heap m -> Bool -> VerseT m ()
-notifyHeap h = \ case
-  True -> getHeapListener h >>= \ case
-    Just f -> do
-      n <- getListenerLength h
-      case n of
-        0 -> pure ()
-        1 -> do
-          putListenerLength h 0
-          f h True
-        _ -> putListenerLength h $ n - 1
-    Nothing -> do
-      n <- getListenerLength h
-      case n of
-        0 -> pure ()
-        _ -> putListenerLength h $ n - 1
-  False -> getHeapListener h >>= \ case
-    Just f -> do
-      n <- getListenerLength h
-      case n of
-        0 -> pure ()
-        _ -> do
-          putListenerLength h 0
-          f h False
-    Nothing -> do
-      n <- getListenerLength h
-      case n of
-        0 -> pure ()
-        _ -> do
-          putListenerLength h 0
-          empty
+notifyHeap = \ case
+  h@Cons { listenerLengthRef, heapListenerRef } -> \ case
+    True -> lift (readRef heapListenerRef) >>= \ case
+      Just f -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          1 -> do
+            lift $ writeRef listenerLengthRef 0
+            apHeapListener f h True
+          _ -> lift . writeRef listenerLengthRef $ n - 1
+      Nothing -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          _ -> lift . writeRef listenerLengthRef $ n - 1
+    False -> lift (readRef heapListenerRef) >>= \ case
+      Just f -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          _ -> do
+            lift $ writeRef listenerLengthRef 0
+            apHeapListener f h False
+      Nothing -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          _ -> do
+            lift $ writeRef listenerLengthRef 0
+            empty
+  Nil -> \ case
+    True -> pure ()
+    False -> empty
 
 msplit' :: Monad m =>
            VerseT m a ->
@@ -702,6 +703,9 @@ copyListeners = traverse (traverse copyListener)
 copyListener :: (MonadFix m, MonadRef m) => Listener m a -> CopyT m (Listener m a)
 copyListener (Listener h f) = flip Listener f <$> copyHeap h
 
+copyHeapListener :: (MonadFix m, MonadRef m) => HeapListener m -> CopyT m (HeapListener m)
+copyHeapListener (HeapListener h f) = flip HeapListener f <$> copyHeap h
+
 copyHeap :: (MonadFix m, MonadRef m) => Heap m -> CopyT m (Heap m)
 copyHeap = \ case
   xs@Cons {..} -> mfix $ \ xs' -> state' (lookupInsertCopied label xs') >>= \ case
@@ -710,7 +714,7 @@ copyHeap = \ case
       commitRef <- newRef =<< readRef commitRef
       listenerLengthRef <- newRef =<< readRef listenerLengthRef
       listenersRef <- newRef =<< copyListeners =<< readRef listenersRef
-      heapListenerRef <- newRef =<< traverse (firstM copyHeap) =<< readRef heapListenerRef
+      heapListenerRef <- newRef =<< traverse copyHeapListener =<< readRef heapListenerRef
       tail <- copyHeap tail
       pure $ Cons { copied = xs, .. }
     Just xs' -> pure xs'
@@ -816,9 +820,6 @@ state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of
   Left x -> (Just x, s)
   Right s -> (Nothing, s)
-
-firstM :: Functor f => (a -> f c) -> (a, b) -> f (c, b)
-firstM f (x, y) = f x <&> (, y)
 
 incr :: (MonadRef m, Num a) => Ref m a -> m ()
 incr = flip modifyRef' (+ 1)
