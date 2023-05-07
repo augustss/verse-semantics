@@ -93,8 +93,8 @@ data Heap m = Nil | Cons
 
 data HeapKind = Split | Choice
 
-isResolved :: MonadRef m => Heap m -> VerseT m Bool
-isResolved = \ case
+isSettled :: MonadRef m => Heap m -> VerseT m Bool
+isSettled = \ case
   Cons { listenerLengthRef } -> lift $ (== 0) <$> readRef listenerLengthRef
   Nil -> pure False
 
@@ -513,7 +513,7 @@ split' m f = do
     Just (x, s, m) -> do
       h' <- getHeap
       addListeners' h s
-      isResolved h' >>= \ case
+      isSettled h' >>= \ case
         True -> do
           x <- freshen freshenVar x
           commit h'
