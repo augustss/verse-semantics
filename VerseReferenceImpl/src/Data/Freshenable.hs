@@ -1,28 +1,25 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
 module Data.Freshenable
   ( Freshenable (..)
   ) where
 
-import Data.HashMap.Strict (HashMap)
 import Data.Functor.Identity
-import Data.Void
+import Data.HashMap.Strict (HashMap)
+import Data.Kind
 
 class Freshenable a where
-  type Elem a
-  freshen :: Applicative m => (Elem a -> m (Elem a)) -> a -> m a
+  type Elem a :: (Type -> Type) -> Type
+  freshen :: Applicative m => (forall f . Traversable f => Elem a f -> m (Elem a f)) -> a -> m a
 
-instance Freshenable (Identity a) where
-  type Elem (Identity a) = a
-  freshen f = fmap Identity . f . runIdentity
+instance Freshenable a => Freshenable (Identity a) where
+  type Elem (Identity a) = Elem a
+  freshen f = fmap Identity . freshen f . runIdentity
 
 instance Freshenable a => Freshenable [a] where
   type Elem [a] = Elem a
-  freshen = traverse . freshen
-
-instance Freshenable () where
-  type Elem () = Void
-  freshen _ = pure
+  freshen f = traverse $ freshen f
 
 instance (Freshenable a, Freshenable b, Elem a ~ Elem b) => Freshenable (a, b) where
   type Elem (a, b) = Elem a
@@ -36,4 +33,4 @@ instance (Freshenable a, Freshenable b, Elem a ~ Elem b) => Freshenable (Either 
 
 instance Freshenable v => Freshenable (HashMap k v) where
   type Elem (HashMap k v) = Elem v
-  freshen = traverse . freshen
+  freshen f = traverse $ freshen f

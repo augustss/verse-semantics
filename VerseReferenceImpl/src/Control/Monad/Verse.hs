@@ -119,7 +119,6 @@ popListeners i = getHeap >>= \ case
     Just (xs, s) -> (Just xs, s)
     Nothing -> (Nothing, s)
 
-
 addNewListener :: MonadRef m =>
                   Var m f ->
                   Label ->
@@ -514,7 +513,7 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadVerse (VerseT m) where
       pushSplit
       m
 
-split' :: (MonadFix m, MonadRef m, Freshenable a, Elem a ~ Var m f, Traversable f) =>
+split' :: (MonadFix m, MonadRef m, Freshenable a, Elem a ~ Var m) =>
           VerseT m a ->
           (Maybe (a, VerseT m a) -> VerseT m ()) ->
           VerseT m ()

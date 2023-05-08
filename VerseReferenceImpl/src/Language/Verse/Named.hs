@@ -30,10 +30,10 @@ instance EqVarRef (VarRef m) => Zippable (Named m) where
     (Ref x, Ref y) | eqVarRef x y -> Just []
     _ -> Nothing
 
-instance Freshenable (Named m a) where
-  type Elem (Named m a) = a
+instance Freshenable a => Freshenable (Named m a) where
+  type Elem (Named m a) = Elem a
   freshen f = \ case
-    Val x -> Val <$> f x
+    Val x -> Val <$> freshen f x
     x@Ref {} -> pure x
 
 instance (MonadPretty a m, MonadVarRef m) => MonadPretty (Named m a) m where

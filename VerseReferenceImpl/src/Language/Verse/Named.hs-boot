@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -32,7 +31,7 @@ instance EqVarRef (VarRef m) => Unifiable (Named m)
 
 instance EqVarRef (VarRef m) => Zippable (Named m)
 
-instance Freshenable (Named m a)
+instance Freshenable a => Freshenable (Named m a)
 
 instance ( MonadPretty a m
          , MonadVarRef m

@@ -18,55 +18,49 @@ import Control.Monad.Var
 
 import Data.Freshenable
 import Data.Kind
-import Data.Proxy
 
 class (MonadUnify m, MonadVarRef m) => MonadVerse m where
   whenBound :: Var m f -> (f (Var m f) -> m ()) -> m ()
 
   split :: ( Freshenable a
-           , Elem a ~ Var m f
-           , Traversable f
+           , Elem a ~ Var m
            ) => m a -> (Maybe (a, m a) -> m ()) -> m ()
 
   ifte' :: ( Freshenable a
-           , Elem a ~ Var m f
-           , Traversable f
+           , Elem a ~ Var m
            ) => m a -> (a -> m ()) -> m () -> m ()
   ifte' m f n = split m $ \ case
     Just (x, _) -> f x
     Nothing -> n
 
   once' :: ( Freshenable a
-           , Elem a ~ Var m f
-           , Traversable f
+           , Elem a ~ Var m
            ) => m a -> (a -> m ()) -> m ()
   once' m f = ifte' m f empty
 
   lnot' :: m a -> m ()
-  lnot' m = ifte' ((Unit :: Unit m Proxy) <$ m) (const empty) (pure ())
+  lnot' m = ifte' ((Unit :: Unit m) <$ m) (const empty) (pure ())
 
   for' :: ( Freshenable a
-          , Elem a ~ Var m f
+          , Elem a ~ Var m
           , Freshenable b
-          , Elem b ~ Var m f
-          , Traversable f
+          , Elem b ~ Var m
           ) => m a -> (a -> m b) -> ([b] -> m ()) -> m ()
   for' m f g = split m $ \ case
     Just (x, m) -> f x >>= \ y -> for' m f $ \ ys -> g $ y : ys
     Nothing -> g []
 
   all' :: ( Freshenable a
-          , Elem a ~ Var m f
-          , Traversable f
+          , Elem a ~ Var m
           ) => m a -> ([a] -> m ()) -> m ()
   all' m f = split m $ \ case
     Just (x, m) -> all' m $ \ xs -> f $ x : xs
     Nothing -> f []
 
-data Unit (m :: Type -> Type) (f :: Type -> Type) = Unit
+data Unit (m :: Type -> Type) = Unit
 
-instance Freshenable (Unit m f) where
-  type Elem (Unit m f) = Var m f
+instance Freshenable (Unit m) where
+  type Elem (Unit m) = Var m
   freshen _ = pure
 
 instance MonadVerse m => MonadVerse (ReaderT r m) where
