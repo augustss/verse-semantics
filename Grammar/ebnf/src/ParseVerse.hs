@@ -1,15 +1,10 @@
 module ParseVerse where
 --import Control.Monad
-import qualified Control.Monad.State.Strict as S
 import qualified Data.Map as M
 import Data.Maybe
-import Data.Void
-import Text.Megaparsec hiding(try)
-import qualified Text.Megaparsec as M
-import Text.Megaparsec.Char
---import qualified Text.Megaparsec.Char.Lexer as L
 
 import ParseEBNF
+import ParserComb
 
 data LexState = LexState
   { nest       :: Bool
@@ -21,27 +16,17 @@ data LexState = LexState
   deriving (Show)
 
 initLexState :: LexState
-initLexState = LexState { nest = undefined, blockInd = undefined, lineInd = undefined, linePrefix = undefined, thisInd = undefined }
+initLexState = LexState { nest = True, blockInd = "", lineInd = "", linePrefix = "", thisInd = "" }
 
-type P = ParsecT Void String (S.State [LexState])
+type P a = Prsr [LexState] a
 
--- The regular try combinator does not backtrack the LexState.
--- This version has an error handler that resets the LexState.
-try :: P a -> P a
-try p = do
-  ls <- S.get -- Get initial state.
-  let err e = do
-        S.put ls -- Reset state,
-        parseError e -- and signal error.
-  M.try (withRecovery err p) -- Use 'try' with special error handler.
-
-runP :: P a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
-runP pa fn s = S.evalState (runParserT pa fn s) [initLexState]
+runP :: P a -> FilePath -> String -> Either String a
+runP p fn f = fst $ runPrsr [initLexState] p fn f
 
 parseDie :: P a -> FilePath -> String -> a
 parseDie p fn file =
   case runP p fn file of
-    Left err -> error $ errorBundlePretty err
+    Left err -> error err
     Right x -> x
 
 ---------------------------------------------------------
@@ -101,7 +86,7 @@ flattenParseTree (SPath s) = s
 
 mkRulesParse :: String -> [Rule] -> P ParseTree
 mkRulesParse t rs =
-  let r = M.fromList $  [ (n, SName n <$> mkElemParse r x) | Rule{name=n, rhs=x} <- rs ]
+  let r = M.fromList $  [ (n, SName n <$> (mkElemParse r x <?> n)) | Rule{name=n, rhs=x} <- rs ]
                      ++ [ ("end", SUnit <$ eof) ]
   in  fromMaybe undefined $ M.lookup t r
 
@@ -119,16 +104,16 @@ mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r
 mkElemParse r (Code c) = mkCode r c
-mkElemParse _ (Deref v) = do l <- S.gets head; SStr <$> string (read (expr l (EVar v)))
+mkElemParse _ (Deref v) = do l <- gets head; SStr <$> string (read (expr l (EVar v)))
 
 mkCode :: RuleEnv -> Code -> P ParseTree
-mkCode _ Push = SUnit <$ S.modify (\ st -> head st : st)
-mkCode _ Pop  = SUnit <$ S.modify tail
-mkCode _ (Set s e) = SUnit <$ S.modify (\ st -> xset s (expr (head st) e) (head st) : tail st)
+mkCode _ Push = SUnit <$ modify (\ st -> head st : st)
+mkCode _ Pop  = SUnit <$ modify tail
+mkCode _ (Set s e) = SUnit <$ modify (\ st -> xset s (expr (head st) e) (head st) : tail st)
 mkCode r (CSeq cs) = sSeq <$> mapM (mkCode r) cs
-mkCode r (Parse s x) = do p <- mkElemParse r x; S.modify (\ st -> xset s (show (flattenParseTree p)) (head st) : tail st); pure p
+mkCode r (Parse s x) = do p <- mkElemParse r x; modify (\ st -> xset s (show (flattenParseTree p)) (head st) : tail st); pure p
 mkCode r (If e c mc) = do
-  l <- S.gets head
+  l <- gets head
   if read (expr l e) then mkCode r c else maybe (pure SUnit) (mkCode r) mc
 mkCode _ Error = fail "Error"
 

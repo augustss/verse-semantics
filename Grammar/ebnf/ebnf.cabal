@@ -26,6 +26,7 @@ executable ebnf
 
     other-modules:    ParseEBNF
                       ParseVerse
+                      ParserComb
 
     ghc-options:      -Wall -O
     -- Modules included in this executable, other than Main.
