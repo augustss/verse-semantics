@@ -109,10 +109,7 @@ incrListenerLength = \ case
   _ -> pure ()
 
 popListeners :: MonadRef m => Label -> VerseT m (Maybe [Listener m Any])
-popListeners i = popListeners' i =<< getHeap
-
-popListeners' :: MonadRef m => Label -> Heap m -> VerseT m (Maybe [Listener m Any])
-popListeners' i = \ case
+popListeners i = getHeap >>= \ case
   Cons { listenersRef } -> do
     VerseT . modify $ LabelMap.delete i
     lift (readRef listenersRef) <&> lookupDelete i >>= \ case
@@ -122,13 +119,29 @@ popListeners' i = \ case
     Just (xs, s) -> (Just xs, s)
     Nothing -> (Nothing, s)
 
-addNewListener' :: MonadRef m => Label -> Listener m Any -> Heap m -> VerseT m ()
-addNewListener' i s h = do
+
+addNewListener :: MonadRef m =>
+                  Var m f ->
+                  Label ->
+                  (f (Var m f) -> VerseT m ()) ->
+                  VerseT m ()
+addNewListener _ i f = do
+  h <- getHeap
+  splitLabel <- askSplitLabel
+  let f' = toAnyListener $ Listener h $ localSplitLabel (const splitLabel) . f
+  addNewListener' h i f'
+  VerseT . modify' $ insertListener i f'
+
+addNewListener' :: MonadRef m => Heap m -> Label -> Listener m Any -> VerseT m ()
+addNewListener' h i f = do
   incrListenerLength h
-  modifyListeners' (insertListener i s) h
+  modifyListeners' h $ insertListener i f
+
+addListeners :: MonadRef m => Listeners m -> VerseT m ()
+addListeners s = modifyListeners (flip appendListeners s)
 
 addListeners' :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
-addListeners' h s = modifyListeners' (appendListeners s) h
+addListeners' h s = modifyListeners' h (flip appendListeners s)
 
 addListenersFromTo :: MonadRef m => Heap m -> Heap m -> Listeners m -> VerseT m ()
 addListenersFromTo h = \ case
@@ -145,7 +158,7 @@ addListenersFromTo' h i = case h of
   Nil -> const $ pure ()
 
 addListenersFrom :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
-addListenersFrom h = case h of
+addListenersFrom = \ case
   Cons { kind, tail = h } -> case kind of
     Split -> \ s -> addListeners' h s *> addListenersFrom h s
     Choice -> addListenersFrom h
@@ -154,27 +167,27 @@ addListenersFrom h = case h of
 moveListenersAt :: MonadRef m => Label -> Label -> VerseT m ()
 moveListenersAt i j = modifyListeners $ insertDeleteListeners i j
 
-modifyListeners :: MonadRef m => (Listeners m -> Listeners m) -> VerseT m ()
-modifyListeners f = modifyListeners' f =<< getHeap
-
 getListeners' :: MonadRef m => Heap m -> VerseT m (Listeners m)
 getListeners' = \ case
   Cons { listenersRef } -> lift $ readRef listenersRef
   Nil -> VerseT get
 
-putListeners' :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
-putListeners' = \ case
-  Cons { listenersRef } -> \ s -> do
+putListeners :: MonadRef m => Listeners m -> VerseT m ()
+putListeners s = getHeap >>= \ case
+  Cons { listenersRef } -> do
     lift $ writeRef listenersRef s
     VerseT $ put s
-  Nil -> VerseT . put
+  Nil -> VerseT $ put s
 
-modifyListeners' :: MonadRef m => (Listeners m -> Listeners m) -> Heap m -> VerseT m ()
-modifyListeners' f = \ case
-  Cons { listenersRef } -> do
-    VerseT $ modify' f
-    lift $ modifyRef listenersRef f
-  Nil -> VerseT $ modify' f
+modifyListeners :: MonadRef m => (Listeners m -> Listeners m) -> VerseT m ()
+modifyListeners f = do
+  getHeap >>= flip modifyListeners' f
+  VerseT $ modify' f
+
+modifyListeners' :: MonadRef m => Heap m -> (Listeners m -> Listeners m) -> VerseT m ()
+modifyListeners' h f = case h of
+  Cons { listenersRef } -> lift $ modifyRef' listenersRef f
+  Nil -> pure ()
 
 insertDeleteListeners :: Label -> Label -> Listeners m -> Listeners m
 insertDeleteListeners i j s = case lookupDelete j s of
@@ -510,15 +523,16 @@ split' m f = do
   msplit' m mempty >>= \ case
     Just (x, s, m) -> do
       h' <- getHeap
-      addListeners' h s
       isSettled h' >>= \ case
         True -> do
           x <- freshen freshenVar x
           commit h'
           putHeap h
+          addListeners s
           f $ Just (x, putHeap h' *> m)
         False -> do
           putHeap h
+          addListeners s
           putHeapListener h' $ \ h' -> \ case
             True -> do
               h <- getHeap
@@ -579,6 +593,7 @@ apListener (Listener h f) x = case h of
         Just ((), s, _) -> do
           h <- getHeap
           addListenersFromTo h h' s
+          VerseT $ modify $ flip appendListeners s
           putHeap h'
           notifyHeap h True
         Nothing -> do
@@ -602,6 +617,7 @@ apHeapListener (HeapListener h f) h' x = case h of
         Just ((), s, _) -> do
           h <- getHeap
           addListenersFromTo h h'' s
+          VerseT $ modify $ flip appendListeners s
           putHeap h''
           notifyHeap h True
         Nothing -> do
@@ -621,17 +637,6 @@ msplit' m s = VerseT . RST $ \ r s' ->
   runRST (msplit $ unVerseT m) r s <&> \ case
     (Nothing, _) -> (Nothing, s')
     (Just (x, m), s) -> (Just (x, s, VerseT m), s')
-
-addNewListener :: MonadRef m =>
-                  Var m f ->
-                  Label ->
-                  (f (Var m f) -> VerseT m ()) ->
-                  VerseT m ()
-addNewListener _ i f = do
-  h <- getHeap
-  splitLabel <- askSplitLabel
-  let f' = toAnyListener $ Listener h $ localSplitLabel (const splitLabel) . f
-  addNewListener' i f' h
 
 appendListeners :: Listeners m -> Listeners m -> Listeners m
 appendListeners = LabelMap.unionWith (<>)
@@ -696,15 +701,15 @@ pushChoice h = do
   listenersRef <- lift $ newRef mempty
   heapListenerRef <- lift $ newRef Nothing
   let h' = Cons { copied = Nil, kind = Choice, tail = h, .. }
-  putListeners' h' =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h
   putHeap h'
+  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h
 
 popChoice :: (MonadFix m, MonadRef m) => Heap m -> VerseT m ()
 popChoice h = do
   h' <- stateHeap $ \ case
     Cons { kind = Choice, tail } -> (tail, tail)
     _ -> error "popChoice"
-  putListeners' h' =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h'
+  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h'
 
 toCopied :: Heap m -> Heap m -> Copied m
 toCopied = \ case
