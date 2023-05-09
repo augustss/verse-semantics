@@ -22,11 +22,21 @@ pattern AList as = AOp "list" as
 pattern ACommas :: [AST] -> AST
 pattern ACommas as = AOp "commas" as
 
-pattern AOp1 :: String -> AST -> AST
-pattern AOp1 op a1 = AOp op [a1]
+--pattern AOp1 :: String -> AST -> AST
+--pattern AOp1 op a1 = AOp op [a1]
 
-pattern AOp2 :: String -> AST -> AST -> AST
-pattern AOp2 op a1 a2 = AOp op [a1, a2]
+--pattern AOp2 :: String -> AST -> AST -> AST
+--pattern AOp2 op a1 a2 = AOp op [a1, a2]
+
+pattern AInfix :: String -> AST -> AST -> AST
+pattern AInfix op a1 a2 = AOp "infix" [AString op, a1, a2]
+
+pattern APrefix :: String -> AST -> AST
+pattern APrefix op a1 = AOp "prefix" [AString op, a1]
+
+--pattern APostfix :: String -> AST -> AST
+--pattern APostfix op a1 = AOp "postfix" [AString op, a1]
+
 instance Pretty AST where
   pPrintPrec _ _ (AIdent s) = text s
   pPrintPrec l _ (APath s) = text "P" <> pPrintPrec l 0 s
@@ -41,6 +51,7 @@ err s x = error $ "unexpeced: " ++ s ++ "\n" ++ show x
 
 parseTreeToAST :: ParseTree -> AST
 parseTreeToAST (SName "File" (SSeq [_, SUnit, SUnit, SUnit, x, _])) = toExpr x
+parseTreeToAST (SName "File" x) = toExpr x   -- hack for testing
 parseTreeToAST x = err "parseTreeToAST" x
 
 toExpr :: HasCallStack => ParseTree -> AST
@@ -66,36 +77,36 @@ toExpr (SName "Def" (SAlt 0 (SSeq [o, SMany xs, _]))) = foldl f (toDef1 o) xs
         toDef1 x = err "toDef1" x
 toExpr (SName "Def" (SAlt 1 _)) = error "unimplemented"
 toExpr (SName "Def" (SAlt 2 _)) = error "unimplemented"
-toExpr (SName "Or" (SSeq [e, SMany xs])) = foldr1 (AOp2 "or") (toExpr e : map f xs)
+toExpr (SName "Or" (SSeq [e, SMany xs])) = foldr1 (AInfix "or") (toExpr e : map f xs)
   where f (SSeq [_, SSeq [SStr "or", _], _, x]) = toExpr x
         f x = err "toExpr" x
-toExpr (SName "And" (SSeq [e, SMany xs])) = foldr1 (AOp2 "and") (toExpr e : map f xs)
+toExpr (SName "And" (SSeq [e, SMany xs])) = foldr1 (AInfix "and") (toExpr e : map f xs)
   where f (SSeq [_, SSeq [SStr "and", _], _, x]) = toExpr x
         f x = err "toExpr" x
 toExpr (SName "Not" (SAlt 0 c)) = toExpr c
-toExpr (SName "Not" (SAlt 1 (SSeq [SSeq [SStr "not", _], _, x]))) = AOp1 "not" (toExpr x)
-toExpr (SName "Eq" (SSeq [e, SMany xs])) = foldr1 (AOp2 "=") (toExpr e : map f xs)
+toExpr (SName "Not" (SAlt 1 (SSeq [SSeq [SStr "not", _], _, x]))) = APrefix "not" (toExpr x)
+toExpr (SName "Eq" (SSeq [e, SMany xs])) = foldr1 (AInfix "=") (toExpr e : map f xs)
   where f (SSeq [_, SStr "=", _, x]) = toExpr x
         f x = err "toExpr" x
-toExpr (SName "NotEq" (SSeq [e, SMany xs])) = foldr1 (AOp2 "<>") (toExpr e : map f xs)
+toExpr (SName "NotEq" (SSeq [e, SMany xs])) = foldr1 (AInfix "<>") (toExpr e : map f xs)
   where f (SSeq [_, SStr "<>", _, x]) = toExpr x
         f x = err "toExpr" x
 toExpr (SName "Less" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Less" (SSeq [e, SOpt (Just (SSeq [_, op, _, _, f]))])) = AOp2 (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "Less" (SSeq [e, SOpt (Just (SSeq [_, op, _, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Greater" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Greater" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AOp2 (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "Greater" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Choose" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Choose" (SSeq [e, SOpt (Just (SSeq [_, SStr "|", _, f]))])) = AOp2 "|" (toExpr e) (toExpr f)
+toExpr (SName "Choose" (SSeq [e, SOpt (Just (SSeq [_, SStr "|", _, f]))])) = AInfix "|" (toExpr e) (toExpr f)
 toExpr (SName "To" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "To" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AOp2 (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "To" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Add" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [_, op, _, x]) = AOp2 (flattenParseTree op) r (toExpr x)
+  where f r (SSeq [_, op, _, x]) = AInfix (flattenParseTree op) r (toExpr x)
         f _ x = err "toExpr" x
 toExpr (SName "Mul" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [_, op, _, x]) = AOp2 (flattenParseTree op) r (toExpr x)
+  where f r (SSeq [_, op, _, x]) = AInfix (flattenParseTree op) r (toExpr x)
         f _ x = err "toExpr" x
 toExpr (SName "Prefix" (SAlt 0 x)) = toExpr x
-toExpr (SName "Prefix" (SAlt 1 (SSeq [op, _, (SAlt _ x)]))) = AOp1 ("prefix-" ++ flattenParseTree op) (toExpr x)
+toExpr (SName "Prefix" (SAlt 1 (SSeq [op, _, (SAlt _ x)]))) = APrefix (flattenParseTree op) (toExpr x)
 toExpr (SName "Call" (SSeq [x, SMany xs])) = foldl f (toExpr x) xs
   where f _r _x = error "unimplemented"
 toExpr (SName "Base" (SAlt 0 (SSeq [_, x, _]))) = toExpr x
@@ -104,9 +115,43 @@ toExpr (SName "Base" (SAlt 2 (SName "Char" x))) = AChar $ flattenParseTree x
 toExpr (SName "Base" (SAlt 3 (SName "Path" x))) = APath $ flattenParseTree x
 toExpr (SName "Base" (SAlt 4 (SName "String" x))) = AString $ flattenParseTree x
 toExpr (SName "Base" (SAlt 5 _)) = error "unimplemented"
-toExpr (SName "Base" (SAlt 6 _)) = error "unimplemented"
+toExpr (SName "Base" (SAlt 6 x)) = toExpr x
 toExpr (SName "Base" (SAlt 7 (SSeq [_, x]))) = toExpr x
 toExpr (SName "QualIdent" (SSeq [SOpt Nothing, i])) = toExpr i
-toExpr (SName "QualIdent" (SSeq [SOpt (Just x), i])) = AOp2 "qual" (toExpr x) (toExpr i)
+toExpr (SName "QualIdent" (SSeq [SOpt (Just (SSeq [SChar '(', x, SStr ":)", _])), i])) = AOp "qual" [toExpr x, toExpr i]
 toExpr (SName "Ident" x) = AIdent $ flattenParseTree x
+toExpr (SName "If" (SSeq [SStr "if", _, sp, ct, el])) = AOp "if" [toOptSpecs sp, cnd, thn, els]
+  where
+    els =
+      case el of
+        SAlt 0 (SName "Else" (SSeq [_, SStr "else", _, xe])) ->
+          case xe of
+            SAlt 0 (SSeq [_, x]) -> toExpr x
+            SAlt 1 (SSeq [_, SAlt 0 x]) -> toExpr x
+            SAlt 1 (SSeq [_, SAlt 1 x]) -> toExpr x
+            _ -> err "toExpr" xe
+        SAlt 1 _ -> aNil
+        _ -> err "toExpr" el
+    (cnd, thn) =
+      case ct of
+        SAlt 0 (SSeq [c, SAlt 0 t]) -> (toExpr c, toExpr t)
+        SAlt 0 (SSeq [c, SAlt 1 t]) -> (toExpr c, toThen t)
+        SAlt 1 (SSeq [c, SOpt Nothing]) -> (toExpr c, aNil)
+        SAlt 1 (SSeq [c, SOpt (Just t)]) -> (toExpr c, toThen t)
+        _ -> err "toExpr" ct
+    toThen (SName "Then" (SSeq [_, SStr "then", _, SAlt 0 b])) = toExpr b
+    toThen (SName "Then" (SSeq [_, SStr "then", _, SAlt 1 b])) = toExpr b
+    toThen x = err "toThen" x
+toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')', _])) = toExpr x
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
+
+toOptSpecs :: ParseTree -> AST
+toOptSpecs (SOpt Nothing) = aNil
+toOptSpecs (SOpt (Just x)) = toSpecs x
+toOptSpecs x = err "toOptSpecs" x
+
+toSpecs :: ParseTree -> AST
+toSpecs = error "unimplemented"
+
+aNil :: AST
+aNil = AIdent "#nil"
