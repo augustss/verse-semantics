@@ -27,6 +27,7 @@ executable ebnf
     other-modules:    ParseEBNF
                       ParseVerse
                       ParserComb
+                      AST
 
     ghc-options:      -Wall -O
     -- Modules included in this executable, other than Main.
@@ -38,5 +39,6 @@ executable ebnf
                       mtl,
                       megaparsec,
                       containers,
+                      uniplate,
     hs-source-dirs:   src
     default-language: Haskell2010

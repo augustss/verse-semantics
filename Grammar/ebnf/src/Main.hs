@@ -4,6 +4,7 @@ import Data.List
 import System.Environment
 import ParseEBNF
 import ParseVerse
+import AST
 
 main :: IO ()
 main = do
@@ -15,15 +16,21 @@ main = do
       doFile v = do
         putStrLn $ "===== " ++ v ++ " ====="
         fv <- readFile v
-        let x = parseDie pVerse v fv
-            x' = trimParseTree x
-        print x'
-        when (flattenParseTree x /= fv) $ do
-          putStrLn "Roundtrip fail"
-          putStrLn fv
-          putStrLn "-----"
-          putStrLn $ flattenParseTree x
-          error "bad"
+        let xs = parsesDie pVerse v fv
+            asts = map parseTreeToAST xs
+        -- print (head xs)
+        when (length xs > 1) $ do
+          putStrLn $ "Ambig " ++ show (length xs)
+        case nub asts of
+          [ast] -> do
+            print ast
+            when (flattenParseTree (head xs) /= fv) $ do
+              putStrLn "Roundtrip fail"
+              putStrLn fv
+              putStrLn "-----"
+              putStrLn $ flattenParseTree (head xs)
+              error "bad"
+          asts' -> error $ "Ambiguous:\n" ++ unlines (map show asts')
   mapM_ doFile vs
 
 trim :: String -> String

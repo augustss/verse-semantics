@@ -1,5 +1,14 @@
-module ParseVerse where
+{-# LANGUAGE DeriveDataTypeable #-}
+module ParseVerse(
+  mkRulesParse,
+  parseDie, parsesDie,
+  ParseTree(..),
+  flattenParseTree,
+  ) where
 --import Control.Monad
+import Data.Data (Data)
+import Data.Generics.Uniplate.Data
+import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 
@@ -20,14 +29,23 @@ initLexState = LexState { nest = True, blockInd = "", lineInd = "", linePrefix =
 
 type P a = Prsr [LexState] a
 
-runP :: P a -> FilePath -> String -> Either String a
-runP p fn f = fst $ runPrsr [initLexState] p fn f
+runP :: (Show a) => P a -> FilePath -> String -> Either String [a]
+runP p fn f = either Left (Right . map fst) $ runPrsr [initLexState] p fn f
 
-parseDie :: P a -> FilePath -> String -> a
+parseDie :: P ParseTree -> FilePath -> String -> ParseTree
 parseDie p fn file =
   case runP p fn file of
     Left err -> error err
-    Right x -> x
+    Right xs ->
+      case nub (map hackAmbig xs) of
+        [a] -> a
+        as -> error $ "Ambiguous:\n" ++ unlines (map show as)
+
+parsesDie :: P ParseTree -> FilePath -> String -> [ParseTree]
+parsesDie p fn file =
+  case runP p fn file of
+    Left err -> error err
+    Right xs -> nub (map hackAmbig xs)
 
 ---------------------------------------------------------
 
@@ -40,36 +58,7 @@ data ParseTree
   | SOpt (Maybe ParseTree)
   | SName String ParseTree
   | SUnit
-  -- Compound nodes during translation
-  | SNum String
-  | SIdent String
-  | SPath String
-  deriving (Show, Eq)
-
-sSeq :: [ParseTree] -> ParseTree
-sSeq axs =
-  case filter (/= SUnit) axs of
-    [x] -> x
-    xs -> SSeq xs
-
-sMany :: [ParseTree] -> ParseTree
-sMany axs = SMany $ filter (/= SUnit) axs
-
-sOpt :: Maybe ParseTree -> ParseTree
-sOpt (Just SUnit) = SUnit
-sOpt mx = SOpt mx
-
-{-
-dropUnit :: ParseTree -> ParseTree
-dropUnit (SSeq ss) = SSeq $ filter (/= SUnit) $ map dropUnit ss
-dropUnit (SAlt i s) = SAlt i $ dropUnit s
-dropUnit s@SChar{} = s
-dropUnit s@SStr{} = s
-dropUnit (SMany ss) = SMany $ map dropUnit ss
-dropUnit (SOpt ms) = SOpt $ fmap dropUnit ms
-dropUnit (SName n s) = SName n $ dropUnit s
-dropUnit s@SUnit = s
--}
+  deriving (Show, Eq, Data)
 
 flattenParseTree :: ParseTree -> String
 flattenParseTree (SSeq ss) = concatMap flattenParseTree ss
@@ -80,9 +69,6 @@ flattenParseTree (SMany ss) = concatMap flattenParseTree ss
 flattenParseTree (SOpt ms) = maybe "" flattenParseTree ms
 flattenParseTree (SName _ s) = flattenParseTree s
 flattenParseTree SUnit = ""
-flattenParseTree (SNum s) = s
-flattenParseTree (SIdent s) = s
-flattenParseTree (SPath s) = s
 
 mkRulesParse :: String -> [Rule] -> P ParseTree
 mkRulesParse t rs =
@@ -93,7 +79,7 @@ mkRulesParse t rs =
 type RuleEnv = M.Map String (P ParseTree)
 
 mkElemParse :: RuleEnv -> Elem -> P ParseTree
-mkElemParse r (Seq xs) = sSeq <$> mapM (mkElemParse r) xs
+mkElemParse r (Seq xs) = SSeq <$> mapM (mkElemParse r) xs
 mkElemParse r (Alt xs) = choice $ zipWith (\ i p -> SAlt i <$> mkElemParse r p) [0..] xs
 mkElemParse _ (Chr c)  = SChar <$> char c
 mkElemParse _ (ChrRange l h) = SChar <$> satisfy (\ c -> l <= c && c <= h)
@@ -110,7 +96,7 @@ mkCode :: RuleEnv -> Code -> P ParseTree
 mkCode _ Push = SUnit <$ modify (\ st -> head st : st)
 mkCode _ Pop  = SUnit <$ modify tail
 mkCode _ (Set s e) = SUnit <$ modify (\ st -> xset s (expr (head st) e) (head st) : tail st)
-mkCode r (CSeq cs) = sSeq <$> mapM (mkCode r) cs
+mkCode r (CSeq cs) = SSeq <$> mapM (mkCode r) cs
 mkCode r (Parse s x) = do p <- mkElemParse r x; modify (\ st -> xset s (show (flattenParseTree p)) (head st) : tail st); pure p
 mkCode r (If e c mc) = do
   l <- gets head
@@ -142,19 +128,10 @@ expr l (Enot e) = show $ not $ read $ expr l e
 expr l (Eand e1 e2) = show $ read (expr l e1) && read (expr l e2)
 expr l (Eor  e1 e2) = show $ read (expr l e1) || read (expr l e2)
 
--------------------------
+-----------------------------
 
-trimParseTree :: ParseTree -> ParseTree
-trimParseTree (SSeq xs) = sSeq $ map trimParseTree xs
-trimParseTree (SAlt i x) = SAlt i $ trimParseTree x
-trimParseTree (SMany xs) = sMany $ map trimParseTree xs
-trimParseTree (SOpt mx) = sOpt $ fmap trimParseTree mx
-trimParseTree (SName "Scan" _) = SUnit
-trimParseTree (SName "ScanKey" _) = SUnit
-trimParseTree (SName "Space" _) = SUnit
-trimParseTree (SName "NewLine" _) = SUnit
-trimParseTree (SName "Num" x) = SNum $ flattenParseTree x
-trimParseTree (SName "Ident" x) = SIdent $ flattenParseTree x
-trimParseTree (SName "Path" x) = SPath $ flattenParseTree x
-trimParseTree (SName n x) = SName n $ trimParseTree x
-trimParseTree x = x
+-- Fix some silly grammar ambiguities.
+hackAmbig :: ParseTree -> ParseTree
+hackAmbig = transformBi f
+  where f (SOpt (Just t)) | flattenParseTree t == "" = SOpt Nothing
+        f x = x
