@@ -61,7 +61,7 @@ Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex]  !Alnum
 Char      := CharLit | Char8 | Char32
 
 Ident     := Alpha {Alnum} !Alnum ["'" {!("<#"|"#>"|'\'|'{'|'}'|'"'|''') 0o20..0o7E} "'"]
-Path      := '/' Label [('@' Label | !'@')] {'/' ['(' Path ":)"] Ident} !'/'
+Path      := '/' Label ('@' Label | !'@') {'/' ['(' Path ":)"] Ident} !'/'
 Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
 
 Interp    := '{' List '}'
