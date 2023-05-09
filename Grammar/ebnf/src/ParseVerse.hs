@@ -45,7 +45,7 @@ parsesDie :: P ParseTree -> FilePath -> String -> [ParseTree]
 parsesDie p fn file =
   case runP p fn file of
     Left err -> error err
-    Right xs -> nub (map hackAmbig xs)
+    Right xs -> xs
 
 ---------------------------------------------------------
 
