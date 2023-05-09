@@ -5,6 +5,7 @@ module AST(
   ) where
 import GHC.Stack
 import ParseVerse
+import Text.PrettyPrint.HughesPJClass(Pretty(..), text, nest, sep, parens)
 
 data AST
   = AIdent String
@@ -26,6 +27,14 @@ pattern AOp1 op a1 = AOp op [a1]
 
 pattern AOp2 :: String -> AST -> AST -> AST
 pattern AOp2 op a1 a2 = AOp op [a1, a2]
+instance Pretty AST where
+  pPrintPrec _ _ (AIdent s) = text s
+  pPrintPrec l _ (APath s) = text "P" <> pPrintPrec l 0 s
+  pPrintPrec _ _ (ANum s) = text s
+  pPrintPrec _ _ (AChar s) = text s
+  pPrintPrec _ _ (AString s) = text s
+--  pPrintPrec l p (AOp "list" [a]) = pPrintPrec l p a
+  pPrintPrec l _ (AOp s as) = parens $ sep $ [text s] ++ map (nest 2 . pPrintPrec l 0) as
 
 err :: String -> ParseTree -> a
 err s x = error $ "unexpeced: " ++ s ++ "\n" ++ show x

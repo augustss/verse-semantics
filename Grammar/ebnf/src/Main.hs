@@ -1,6 +1,7 @@
 module Main where
 import Control.Monad
 import Data.List
+import Text.PrettyPrint.HughesPJClass(prettyShow)
 import System.Environment
 import ParseEBNF
 import ParseVerse
@@ -21,9 +22,10 @@ main = do
         -- print (head xs)
         when (length xs > 1) $ do
           putStrLn $ "Ambig " ++ show (length xs)
+          mapM_ print xs
         case nub asts of
           [ast] -> do
-            print ast
+            putStrLn $ prettyShow ast
             when (flattenParseTree (head xs) /= fv) $ do
               putStrLn "Roundtrip fail"
               putStrLn fv
