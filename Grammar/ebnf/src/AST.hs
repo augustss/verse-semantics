@@ -143,6 +143,13 @@ toExpr (SName "If" (SSeq [SStr "if", _, sp, ct, el])) = AOp "if" [toOptSpecs sp,
     toThen (SName "Then" (SSeq [_, SStr "then", _, SAlt 1 b])) = toExpr b
     toThen x = err "toThen" x
 toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')', _])) = toExpr x
+toExpr (SName "Block" (SAlt 0 x)) = toExpr x
+toExpr (SName "Block" (SAlt 1 (SSeq [_, _, x, _]))) = toExpr x
+toExpr (SName "Block" (SAlt 2 (SSeq [SChar ':', _, x, _]))) = toExpr x
+--toExpr (SName "Brace" (SSeq [_, SChar '{', x, SChar '}', _])) = toExpr x
+toExpr (SName "Brace" (SSeq [_, SChar '{', x, SChar '}'])) = toExpr x
+toExpr (SName "KeyBlock" x) = toExpr x
+toExpr (SName "SDef" (SSeq [_, x])) = toExpr x
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
 
 toOptSpecs :: ParseTree -> AST
