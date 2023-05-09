@@ -132,7 +132,8 @@ StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next"|"else") Key) | StopFu
 
 Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
-List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
+--List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [';' Scan]]; pop
 File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional
