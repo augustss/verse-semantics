@@ -1,8 +1,11 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 module AST(
   AST(..),
   parseTreeToAST
   ) where
+import Data.Data (Data)
+import Data.Generics.Uniplate.Data
 import GHC.Stack
 import ParseVerse
 import Text.PrettyPrint.HughesPJClass(Pretty(..), text, nest, sep, parens)
@@ -14,7 +17,7 @@ data AST
   | AChar String
   | AString String
   | AOp String [AST]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data)
 
 pattern AList :: [AST] -> AST
 pattern AList as = AOp "list" as
@@ -37,6 +40,9 @@ pattern APrefix op a1 = AOp "prefix" [AString op, a1]
 --pattern APostfix :: String -> AST -> AST
 --pattern APostfix op a1 = AOp "postfix" [AString op, a1]
 
+pattern SNameT :: String -> ParseTree -> ParseTree
+pattern SNameT s x <- SName s (SSeq [SName _ x])
+
 instance Pretty AST where
   pPrintPrec _ _ (AIdent s) = text s
   pPrintPrec l _ (APath s) = text "P" <> pPrintPrec l 0 s
@@ -46,17 +52,17 @@ instance Pretty AST where
 --  pPrintPrec l p (AOp "list" [a]) = pPrintPrec l p a
   pPrintPrec l _ (AOp s as) = parens $ sep $ [text s] ++ map (nest 2 . pPrintPrec l 0) as
 
-err :: String -> ParseTree -> a
+err :: HasCallStack => String -> ParseTree -> a
 err s x = error $ "unexpeced: " ++ s ++ "\n" ++ show x
 
 parseTreeToAST :: ParseTree -> AST
-parseTreeToAST (SName "File" (SSeq [_, SUnit, SUnit, SUnit, x, _])) = toExpr x
-parseTreeToAST (SName "File" x) = toExpr x   -- hack for testing
+parseTreeToAST (SName "File" (SSeq [_, SUnit, SUnit, SUnit, x, _, _])) = toExpr $ dropUnit $ dropSpace x
+--parseTreeToAST (SName "File" x) = toExpr $ dropUnit $ dropSpace x
 parseTreeToAST x = err "parseTreeToAST" x
 
 toExpr :: HasCallStack => ParseTree -> AST
-toExpr (SName "List" (SSeq [SUnit, SUnit, _, SOpt Nothing, SUnit])) = AList []
-toExpr (SName "List" (SSeq [SUnit, SUnit, _, SOpt (Just (SSeq [cs, SMany scs, _])), SUnit])) = AList $ map toExpr (cs : map f scs)
+toExpr (SName "List" (SSeq [SOpt Nothing, _])) = AList []
+toExpr (SName "List" (SSeq [SOpt (Just (SSeq [cs, SMany scs, _]))])) = AList $ map toExpr (cs : map f scs)
   where f (SSeq [_, x]) = x
         f x = err "toList-1" x
 toExpr (SName "Commas" (SSeq [e, SMany []])) = toExpr e
@@ -110,25 +116,25 @@ toExpr (SName "Prefix" (SAlt 1 (SSeq [op, _, (SAlt _ x)]))) = APrefix (flattenPa
 toExpr (SName "Call" (SSeq [x, SMany xs])) = foldl f (toExpr x) xs
   where f _r _x = error "unimplemented"
 toExpr (SName "Base" (SAlt 0 (SSeq [_, x, _]))) = toExpr x
-toExpr (SName "Base" (SAlt 1 (SName "Num" x))) = ANum $ flattenParseTree x
-toExpr (SName "Base" (SAlt 2 (SName "Char" x))) = AChar $ flattenParseTree x
-toExpr (SName "Base" (SAlt 3 (SName "Path" x))) = APath $ flattenParseTree x
-toExpr (SName "Base" (SAlt 4 (SName "String" x))) = AString $ flattenParseTree x
+toExpr (SName "Base" (SAlt 1 (SNameT "Num" x))) = ANum $ flattenParseTree x
+toExpr (SName "Base" (SAlt 2 (SNameT "Char" x))) = AChar $ flattenParseTree x
+toExpr (SName "Base" (SAlt 3 (SNameT "Path" x))) = APath $ flattenParseTree x
+toExpr (SName "Base" (SAlt 4 (SNameT "String" x))) = AString $ flattenParseTree x
 toExpr (SName "Base" (SAlt 5 _)) = error "unimplemented"
 toExpr (SName "Base" (SAlt 6 x)) = toExpr x
-toExpr (SName "Base" (SAlt 7 (SSeq [_, x]))) = toExpr x
+toExpr (SName "Base" (SAlt 7 (SSeq [x]))) = toExpr x
 toExpr (SName "QualIdent" (SSeq [SOpt Nothing, i])) = toExpr i
-toExpr (SName "QualIdent" (SSeq [SOpt (Just (SSeq [SChar '(', x, SStr ":)", _])), i])) = AOp "qual" [toExpr x, toExpr i]
-toExpr (SName "Ident" x) = AIdent $ flattenParseTree x
+toExpr (SName "QualIdent" (SSeq [SOpt (Just (SSeq [SChar '(', x, SStr ":)"])), i])) = AOp "qual" [toExpr x, toExpr i]
+toExpr (SNameT "Ident" x) = AIdent $ flattenParseTree x
 toExpr (SName "If" (SSeq [SStr "if", _, sp, ct, el])) = AOp "if" [toOptSpecs sp, cnd, thn, els]
   where
     els =
       case el of
-        SAlt 0 (SName "Else" (SSeq [_, SStr "else", _, xe])) ->
+        SAlt 0 (SName "Else" (SSeq [SStr "else", _, xe])) ->
           case xe of
-            SAlt 0 (SSeq [_, x]) -> toExpr x
-            SAlt 1 (SSeq [_, SAlt 0 x]) -> toExpr x
-            SAlt 1 (SSeq [_, SAlt 1 x]) -> toExpr x
+            SAlt 0 (SSeq [x]) -> toExpr x
+            SAlt 1 (SSeq [SAlt 0 x]) -> toExpr x
+            SAlt 1 (SSeq [SAlt 1 x]) -> toExpr x
             _ -> err "toExpr" xe
         SAlt 1 _ -> aNil
         _ -> err "toExpr" el
@@ -139,15 +145,14 @@ toExpr (SName "If" (SSeq [SStr "if", _, sp, ct, el])) = AOp "if" [toOptSpecs sp,
         SAlt 1 (SSeq [c, SOpt Nothing]) -> (toExpr c, aNil)
         SAlt 1 (SSeq [c, SOpt (Just t)]) -> (toExpr c, toThen t)
         _ -> err "toExpr" ct
-    toThen (SName "Then" (SSeq [_, SStr "then", _, SAlt 0 b])) = toExpr b
-    toThen (SName "Then" (SSeq [_, SStr "then", _, SAlt 1 b])) = toExpr b
+    toThen (SName "Then" (SSeq [SStr "then", _, SAlt 0 b])) = toExpr b
+    toThen (SName "Then" (SSeq [SStr "then", _, SAlt 1 b])) = toExpr b
     toThen x = err "toThen" x
-toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')', _])) = toExpr x
+toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')'])) = toExpr x
 toExpr (SName "Block" (SAlt 0 x)) = toExpr x
-toExpr (SName "Block" (SAlt 1 (SSeq [_, _, x, _]))) = toExpr x
+toExpr (SName "Block" (SAlt 1 (SSeq [_, x]))) = toExpr x
 toExpr (SName "Block" (SAlt 2 (SSeq [SChar ':', _, x, _]))) = toExpr x
---toExpr (SName "Brace" (SSeq [_, SChar '{', x, SChar '}', _])) = toExpr x
-toExpr (SName "Brace" (SSeq [_, SChar '{', x, SChar '}'])) = toExpr x
+toExpr (SName "Brace" (SSeq [SChar '{', x, SChar '}'])) = toExpr x
 toExpr (SName "KeyBlock" x) = toExpr x
 toExpr (SName "SDef" (SSeq [_, x])) = toExpr x
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
@@ -162,3 +167,16 @@ toSpecs = error "unimplemented"
 
 aNil :: AST
 aNil = AIdent "#nil"
+
+-- Remove all SUnit in sequences.
+dropUnit :: ParseTree -> ParseTree
+dropUnit = transformBi f
+  where f (SSeq xs) = SSeq $ filter (/= SUnit) xs
+        f x = x
+
+-- Turn all whitespace only productions into SUnit
+dropSpace :: ParseTree -> ParseTree
+dropSpace = transformBi f
+  where f (SName s _) | s `elem` spaces = SUnit
+        f x = x
+        spaces = ["Space", "NewLine", "Ending", "Scan", "ScanNS", "ScanKey", "ScanKeyNS"]

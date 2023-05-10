@@ -22,7 +22,7 @@ main = do
         -- print (head xs)
         when (length xs > 1) $ do
           putStrLn $ "Ambig " ++ show (length xs)
-          mapM_ print xs
+          --mapM_ print xs
         case nub asts of
           [ast] -> do
             putStrLn $ prettyShow ast
