@@ -87,35 +87,43 @@ toExpr (SName "Def" (SAlt 0 (SSeq [o, SMany xs, _]))) = foldl f (toDef1 o) xs
 toExpr (SName "Def" (SAlt 1 _)) = error "unimplemented"
 toExpr (SName "Def" (SAlt 2 _)) = error "unimplemented"
 toExpr (SName "Or" (SSeq [e, SMany xs])) = foldr1 (AInfix "or") (toExpr e : map f xs)
-  where f (SSeq [_, SSeq [SStr "or", _], _, x]) = toExpr x
-        f x = err "toExpr" x
-toExpr (SName "And" (SSeq [e, SMany xs])) = foldr1 (AInfix "and") (toExpr e : map f xs)
-  where f (SSeq [_, SSeq [SStr "and", _], _, x]) = toExpr x
-        f x = err "toExpr" x
+  where f (SSeq [SSeq [SStr "or", _], x]) = toExpr x
+        f x = err "toExpr-Or" x
+toExpr (SName "And" (SSeq [e, SMany xs])) = foldl1 (AInfix "and") (toExpr e : map f xs)
+  where f (SSeq [SSeq [SStr "and", _], x]) = toExpr x
+        f x = err "toExpr-And" x
 toExpr (SName "Not" (SAlt 0 c)) = toExpr c
-toExpr (SName "Not" (SAlt 1 (SSeq [SSeq [SStr "not", _], _, x]))) = APrefix "not" (toExpr x)
-toExpr (SName "Eq" (SSeq [e, SMany xs])) = foldr1 (AInfix "=") (toExpr e : map f xs)
-  where f (SSeq [_, SStr "=", _, x]) = toExpr x
+toExpr (SName "Not" (SAlt 1 (SSeq [SSeq [SStr "not", _], x]))) = APrefix "not" (toExpr x)
+toExpr (SName "Eq" (SSeq [e, SMany xs])) = foldl1 (AInfix "=") (toExpr e : map f xs)
+  where f (SSeq [SChar '=', x]) = toExpr x
         f x = err "toExpr" x
-toExpr (SName "NotEq" (SSeq [e, SMany xs])) = foldr1 (AInfix "<>") (toExpr e : map f xs)
-  where f (SSeq [_, SStr "<>", _, x]) = toExpr x
+toExpr (SName "NotEq" (SSeq [e, SMany xs])) = foldl1 (AInfix "<>") (toExpr e : map f xs)
+  where f (SSeq [SStr "<>", x]) = toExpr x
         f x = err "toExpr" x
 toExpr (SName "Less" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Less" (SSeq [e, SOpt (Just (SSeq [_, op, _, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "Less" (SSeq [e, SOpt (Just (SSeq [op, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Greater" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Greater" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "Greater" (SSeq [e, SOpt (Just (SSeq [op, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Choose" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Choose" (SSeq [e, SOpt (Just (SSeq [_, SStr "|", _, f]))])) = AInfix "|" (toExpr e) (toExpr f)
+toExpr (SName "Choose" (SSeq [e, SOpt (Just (SSeq [SChar '|', f]))])) = AInfix "|" (toExpr e) (toExpr f)
 toExpr (SName "To" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "To" (SSeq [e, SOpt (Just (SSeq [_, op, _, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
+toExpr (SName "To" (SSeq [e, SOpt (Just (SSeq [op, f]))])) =
+  AInfix (flattenParseTree op) (toExpr e) (toExpr f)
 toExpr (SName "Add" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [_, op, _, x]) = AInfix (flattenParseTree op) r (toExpr x)
-        f _ x = err "toExpr" x
+  where f r (SSeq [op, x]) = AInfix (flattenParseTree op) r (toExpr x)
+        f _ x = err "toExpr-Add" x
 toExpr (SName "Mul" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [_, op, _, x]) = AInfix (flattenParseTree op) r (toExpr x)
-        f _ x = err "toExpr" x
+  where f r (SSeq [op, x]) = AInfix (flattenParseTree op) r (toExpr x)
+        f _ x = err "toExpr-Mul" x
 toExpr (SName "Prefix" (SAlt 0 x)) = toExpr x
-toExpr (SName "Prefix" (SAlt 1 (SSeq [op, _, (SAlt _ x)]))) = APrefix (flattenParseTree op) (toExpr x)
+toExpr (SName "Prefix" (SAlt 1 (SSeq [op, x]))) =
+  let a = case x of
+            SAlt 0 b -> AOp "brace" [toExpr b]
+            SAlt 1 p -> toExpr p
+            _ -> error "toExpr-Prefix" x
+  in  case op of
+        SAlt 2 (SSeq [SChar '[', i, SChar ']']) -> AOp "pre[]" [toExpr i, a]
+        _ -> APrefix (flattenParseTree op) a
 toExpr (SName "Call" (SSeq [ax, SMany xs])) = foldl f (toExpr ax) xs
   where
     f r (SName "Postfix" px) =
@@ -129,7 +137,7 @@ toExpr (SName "Call" (SSeq [ax, SMany xs])) = foldl f (toExpr ax) xs
           case sx of
             SAlt 0 (SChar '^') -> APostfix "^" r
             SAlt 1 (SChar '?') -> APostfix "?" r
-            SAlt 2 (SSeq [SChar '[', x, SChar ']']) -> AInfix "[]" r (toExpr x)
+            SAlt 2 (SSeq [SChar '[', x, SChar ']']) -> AInfix "post[]" r (toExpr x)
             _ -> err "Call-1" sx
         SAlt 4 (SSeq [SChar '.', x]) -> AInfix "." r (toExpr x)
         _ -> err "Call-2" px

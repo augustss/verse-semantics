@@ -125,14 +125,15 @@ Less      := Greater [ ('<'  | "<="           ) Scan  &(Choose Space !'>' !">=")
 NotEq     := Less    { ("<>"                  ) Scan  Choose  }
 Eq        := NotEq   { ('='                   ) Scan  NotEq   }
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
-And       := Not     { ("and" KeyEndNS        ) Scan  And     }
-Or        := And     { ("or"  KeyEndNS        ) Scan  Or      }
+And       := Not     { ("and" KeyEndNS        ) Scan  Not     }
+Or        := And     { ("or"  KeyEndNS        ) Scan  And     }
 Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !":="))
-             { &In Def
-             | Space   ":="    Space    (BraceInd | Def )
-             | Space   "where" KeyEnd   (KeyBlock | Defs)
-             | ScanKeyNS "is"    KeyEnd   (KeyBlock | Def ) } StopDef
-          |  ('&'|"..") Space Def | Return [Block | Def] StopDef
+                  { &In Def
+                    | Space     ":="    Space    (BraceInd | Def )
+                    | Space     "where" KeyEnd   (KeyBlock | Defs)
+                    | ScanKeyNS "is"    KeyEnd   (KeyBlock | Def ) } StopDef
+          |  ('&'|"..") Space Def
+          |  Return [Block | Def] StopDef
 Fun       := Def { ("over" | "when" | "while") KeyEnd (KeyBlock | Defs)
                  | ("=>" Space | "next" KeyEnd) (BraceInd | Fun) } StopFun
 Expr      := Fun {'@' Space Call} StopExpr
