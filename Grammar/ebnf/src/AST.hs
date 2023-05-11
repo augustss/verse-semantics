@@ -207,8 +207,8 @@ toInvoke r (SName "Invoke" (SSeq [xos1, xx, xu])) =
 toInvoke _ x = err "toInvoke" x
 
 toString :: ParseTree -> AST
-toString (SSeq [SChar '"', SMany xs, SChar '"']) = AOp "string" $ merge [] $ map f xs
-  where f (SAlt 0 (SName "Interp" ((SSeq [SChar '{', x, SChar '}']))) = AOp "interp" [toExpr x]
+toString (SSeq [SChar '"', SMany xs, SChar '"']) = AOp "string" $ merge' $ merge [] $ map f xs
+  where f (SAlt 0 (SName "Interp" (SSeq [SChar '{', x, SChar '}']))) = toExpr x
         f (SAlt 1 x) = AString [toCharEsc x]
         f (SAlt 2 (SSeq [x])) = AString $ flattenParseTree x
         f x = err "toString" x
@@ -216,6 +216,8 @@ toString (SSeq [SChar '"', SMany xs, SChar '"']) = AOp "string" $ merge [] $ map
         merge r [] = [AString $ concat $ reverse r]
         merge r (AString s : as) = merge (s : r) as
         merge r (a : as) = [AString $ concat $ reverse r, a] ++ merge [] as
+        merge' [] = [AString ""]
+        merge' ss = ss
 toString x = err "toString" x
 
 toChar :: ParseTree -> Char
