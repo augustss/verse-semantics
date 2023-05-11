@@ -106,7 +106,7 @@ Else      := ScanKeyNS "else"  KeyEnd (ScanKeyNS If | !(ScanKeyNS If) (KeyBlock 
 
 Invoke    :=             [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
 If        := "if" KeyEnd [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
-In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Space Specs])
+In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Specs])
 Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
 
 Base      := '(' Space List ')' Space | Num | Char | Path | String | Markup | If | !Reserved QualIdent
@@ -127,7 +127,7 @@ Eq        := NotEq   { ('='                   ) Scan  NotEq   }
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
 And       := Not     { ("and" KeyEndNS        ) Scan  Not     }
 Or        := And     { ("or"  KeyEndNS        ) Scan  And     }
-Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !":="))
+Def       := (Or | (In | Var) (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !":="))
                   { &In Def
                     | ":="    Space    (BraceInd | Def )
                     | "where" KeyEnd   (KeyBlock | Defs)

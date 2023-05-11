@@ -2,6 +2,11 @@
 x;
 (y:)x
 
+## Specs
+x<a>;
+x<a><b>;
+a with <a>;
+
 ## If
 if(0){0}else x;
 if(0){0};
@@ -106,7 +111,21 @@ x and y and z;
 x or y;
 x or y or z;
 ## Def 1
-#x in ??? = y
+### In
+in x;
+:x;
+### Var
+var x;
+set x;
+ref x;
+alias x;
+var x = 1;
+var x := 1;
+var x += 1;
+var x *= 1;
+var x /= 1;
+var x = {1};
+###
 x:=y;
 x:=y:=z;
 x:={y};
@@ -141,3 +160,9 @@ x @f() @g();
 @f() @g() x;
 ## Commas
 1,2,3;
+##
+## various :, =
+x:int;
+x:int=1;
+x:int:=1;
+(x:int)=1;

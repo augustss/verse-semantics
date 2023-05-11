@@ -89,15 +89,26 @@ toExpr (SName "Fun" (SSeq [t, SMany ts, _])) = foldl f (toExpr t) ts
         f _ x = err "toExpr-Def" x
 toExpr (SName "Def" (SAlt 0 (SSeq [o, SMany xs, _]))) = foldl f (toDef1 o) xs
   where
-    f _r (SAlt 0 _) = error "unimplemented"
+    f r (SAlt 0 (SSeq [x])) =
+      case toExpr x of
+        AOp "In" (AOp "V:" [t, s] : as) | [] <- as -> c
+                                        | [AString op, e] <- as -> AOp op [c, e]
+          where c = AOp "V:" [r, t, s]
+        e -> AOp "def-in" [r, e]
     f r (SAlt 1 (SSeq [SStr ":=", x])) = AOp ":=" [r, toAlt2 toExpr toExpr x]
     f r (SAlt 2 (SSeq [SStr "where", _, x])) = AOp "where" [r, toAlt2 toExpr toDefs x]
     f r (SAlt 3 (SSeq [SStr "is", _, x])) = AOp "is" [r, toAlt2 toExpr toExpr x]
     f _ x = err "toExpr-Def" x
     toDef1 (SAlt 0 e) = toExpr e
-    toDef1 (SAlt 1 (SSeq [_iv, SAlt 0 (SSeq [_op, _def])])) = error "unimplemented"
-    toDef1 (SAlt 1 (SSeq [_iv, SAlt 1 (SSeq [_, _])])) = error "unimplemented"
+    toDef1 (SAlt 1 (SSeq [iv, SAlt 0 (SSeq [op, d])])) = toInVar [AString $ 'V':flattenParseTree op, toAlt2 toExpr toExpr d] iv
+    toDef1 (SAlt 1 (SSeq [iv, SAlt 1 (SSeq [])]))  = toInVar [] iv
     toDef1 x = err "toDef1" x
+    toInVar as (SAlt 0 (SName "In" x)) = AOp "In" (toIn x : as)
+    toInVar as (SAlt 1 (SName "Var" (SSeq [op, _, x]))) = AOp (flattenParseTree op) (toExpr x : as)
+    toInVar _ x = err "toInVar" x
+    toIn (SSeq [op, SAlt 0 (SName "In" x)]) = AOp ('V':flattenParseTree op) [toIn x]
+    toIn (SSeq [op, SAlt 1 (SSeq [x, os])]) = AOp ('V':flattenParseTree op) [toExpr x, toOptSpecs os]
+    toIn x = err "toIn" x
 toExpr (SName "Def" (SAlt 1 (SSeq [op, x]))) = APrefix (flattenParseTree op) (toExpr x)
 toExpr (SName "Def" (SAlt 2 (SSeq [t, SOpt m, _]))) = AOp (flattenParseTree t) (maybe [] f m)
   where f (SAlt 0 b) = [toExpr b]
@@ -223,7 +234,13 @@ toOptSpecs (SOpt (Just x)) = toSpecs x
 toOptSpecs x = err "toOptSpecs" x
 
 toSpecs :: ParseTree -> AST
-toSpecs = error "unimplemented"
+toSpecs (SName "Specs" (SSeq [SOpt ow, SChar '<', xx, SChar '>', ss])) =
+  let e = case ow of Nothing -> toExpr xx; Just _ -> AOp "with" [toExpr xx]
+  in  case ss of
+        SAlt 0 x -> AOp "spec" [e, toSpecs x]
+        SAlt 1 _ -> AOp "spec" [e, aNil]
+        _ -> err "toSpecs-1" ss
+toSpecs x = err "toSpecs" x
 
 toInvoke :: AST -> ParseTree -> AST
 toInvoke r (SName "Invoke" (SSeq [xos1, xx, xu])) =
