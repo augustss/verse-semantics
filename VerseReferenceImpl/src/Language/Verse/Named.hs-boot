@@ -11,6 +11,7 @@ module Language.Verse.Named
 
 import Control.Monad.Var
 
+import Data.Freshenable
 import Data.Kind
 import Data.Unifiable
 
@@ -29,6 +30,8 @@ instance Traversable (Named m)
 instance EqVarRef (VarRef m) => Unifiable (Named m)
 
 instance EqVarRef (VarRef m) => Zippable (Named m)
+
+instance Freshenable a => Freshenable (Named m a)
 
 instance ( MonadPretty a m
          , MonadVarRef m

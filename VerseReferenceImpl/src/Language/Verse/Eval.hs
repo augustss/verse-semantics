@@ -35,6 +35,7 @@ import Data.Freshenable
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Kind
 import Data.Ratio
 import Data.Traversable
 import Data.Unifiable
@@ -74,15 +75,6 @@ type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
 
 type Env m = HashMap Ident (Named m (Var m (Val m)))
 
-newtype Env1 m f = Env1
-  { unEnv1 :: HashMap Ident (Named m (f (Val m)))
-  }
-
-instance Freshenable (Env1 m) where
-  freshen f xs = fmap Env1 . for (unEnv1 xs) $ \ case
-    Val x -> Val <$> f x
-    Ref x -> pure $ Ref x
-
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = do
   storeFree <- newVar StoreFree
@@ -118,7 +110,7 @@ eval' e = case extract e of
     var <- freshVar
     storeFree <- get
     storeFree' <- freshVar
-    once' (Identity1 <$> eval' e) $ \ (Identity1 var_e) -> do
+    once' (One <$> eval' e) $ \ (One var_e) -> do
       unify var var_e
       unify storeFree storeFree'
     put storeFree'
@@ -127,14 +119,14 @@ eval' e = case extract e of
     var <- freshVar
     storeFree <- get
     storeFree' <- freshVar
-    all' (Identity1 <$> eval' e) $ \ vars_e -> do
-      unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars_e)
+    all' (One <$> eval' e) $ \ vars_e -> do
+      unify var =<< newVar (Val.Tuple $ getOne <$> vars_e)
       unify storeFree storeFree'
     put storeFree'
     pure var
   Exp.Not e -> do
     ifte''
-      (Unit1 <$ eval' e)
+      ((Unit :: Unit m) <$ eval' e)
       (const empty)
       (pure ())
     newVar $ Val.Tuple []
@@ -162,9 +154,8 @@ eval' e = case extract e of
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' p
-          pure $ Env1 xs)
-      (\ (Env1 xs) ->
-          unify var =<< localNames xs (eval' t))
+          pure $ Many xs)
+      (\ (Many xs) -> unify var =<< localNames xs (eval' t))
       (unify var =<< eval' e)
     pure var
   Exp.ForDo xs e1 e2 -> do
@@ -175,11 +166,11 @@ eval' e = case extract e of
       (do
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
-          pure $ Env1 xs)
-      (\ (Env1 xs) ->
-          fmap Identity1 . localNames xs $ eval' e2)
+          pure $ Many xs)
+      (\ (Many xs) ->
+          localNames xs $ One <$> eval' e2)
       (\ vars -> do
-          unify var =<< newVar (Val.Tuple $ runIdentity1 <$> vars)
+          unify var =<< newVar (Val.Tuple $ getOne <$> vars)
           unify storeFree storeFree')
     put storeFree'
     pure var
@@ -331,8 +322,8 @@ evalInvoke loc e1 e2 = do
               xs <- for xs freshNamed
               let env' = xs <> env
               unify var2 =<< local (const env') (eval' e_domain)
-              pure $ Env1 xs)
-          (\ (Env1 xs) -> do
+              pure $ Many xs)
+          (\ (Many xs) -> do
               let env' = xs <> env
               unify var =<< local (const env') (eval' e)
               unify storeFree storeFree') $
@@ -410,8 +401,8 @@ liftOrd f var k =
           (Val.Rational x, Val.Float y) -> newBool $ f x (toRational y)
           (Val.Rational x, Val.Rational y) -> newBool $ f x y
           _ -> empty
-      pure $ Sum1 (Identity1 var_p) (Identity1 var_x))
-  (\ (Sum1 (Identity1 var_p) (Identity1 var_x)) ->
+      pure (One var_p, One var_x))
+  (\ (One var_p, One var_x) ->
       whenBound var_p $ getConst >>> \ case
         True -> k $ Just var_x
         False -> empty)
@@ -453,8 +444,8 @@ liftNum f var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Val.Rational $ f x y
           _ -> empty
-      pure $ Identity1 var')
-  (k . Just . runIdentity1)
+      pure $ One var')
+  (k . Just . getOne)
   (k Nothing)
 
 prefixPlus :: MonadVerse m =>
@@ -469,8 +460,8 @@ prefixPlus var k =
         Val.Float _ -> pure ()
         Val.Rational _ -> pure ()
         _ -> empty
-      pure $ Identity1 var)
-  (k . Just . runIdentity1)
+      pure $ One var)
+  (k . Just . getOne)
   (k Nothing)
 
 prefixMinus :: (MonadVerse m, EqVarRef (VarRef m)) =>
@@ -486,8 +477,8 @@ prefixMinus var k =
         Val.Float x -> newVar . Val.Float $ negate x
         Val.Rational x -> newVar . Val.Rational $ negate x
         _ -> empty
-      pure $ Identity1 var')
-  (k . Just . runIdentity1)
+      pure $ One var')
+  (k . Just . getOne)
   (k Nothing)
 
 data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
@@ -528,8 +519,8 @@ div' var k =
           (Val.Rational x, Val.Rational y) ->
             newVar . Const . Just . Rational $ x / y
           _ -> empty
-      pure $ Identity1 var')
-  (\ (Identity1 var) -> whenBound var $ getConst >>> \ case
+      pure $ One var')
+  (\ (One var) -> whenBound var $ getConst >>> \ case
       Nothing -> empty
       Just (Int x) -> k . Just =<< newVar (Val.Int x)
       Just (Float x) -> k . Just =<< newVar (Val.Float x)
@@ -547,8 +538,8 @@ int var k =
         Val.Int _ -> pure ()
         Val.Rational x | denominator x == 1 -> pure ()
         _ -> empty
-      pure $ Identity1 var)
-  (k . Just . runIdentity1)
+      pure $ One var)
+  (k . Just . getOne)
   (k Nothing)
 
 instSuper :: MonadEval m =>
@@ -684,9 +675,9 @@ freshNamed = \ case
 freshVarRef :: (MonadVarRef m, Traversable f) => m (VarRef m f)
 freshVarRef = newVarRef =<< freshVar
 
-ifte'' :: (MonadVerse m, Freshenable f) =>
-          EvalT m (f (Var m)) ->
-          (f (Var m) -> EvalT m ()) ->
+ifte'' :: (MonadVerse m, Freshenable a, Elem a ~ Var m) =>
+          EvalT m a ->
+          (a -> EvalT m ()) ->
           EvalT m () ->
           EvalT m ()
 ifte'' p t e = do
@@ -722,6 +713,24 @@ writeVarRef' ref x = do
     writeVarRef ref x
     unify storeFree storeFree'
   put storeFree'
+
+data Unit (m :: Type -> Type) = Unit
+
+instance Freshenable (Unit m) where
+  type Elem (Unit m) = Var m
+  freshen _ = pure
+
+newtype One e (f :: Type -> Type) = One { getOne :: e f }
+
+instance Traversable f => Freshenable (One e f) where
+  type Elem (One e f) = e
+  freshen f = fmap One . f . getOne
+
+newtype Many a b e (f :: Type -> Type) = Many { getMany :: a (b (e f)) }
+
+instance (Traversable a, Traversable b, Traversable f) => Freshenable (Many a b e f) where
+  type Elem (Many a b e f) = e
+  freshen f = fmap Many . traverse (traverse f) . getMany
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference

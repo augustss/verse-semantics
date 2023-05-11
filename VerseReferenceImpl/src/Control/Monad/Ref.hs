@@ -7,6 +7,7 @@
 module Control.Monad.Ref
   ( MonadRef (..)
   , modifyRef
+  , modifyRef'
   ) where
 
 import Control.Monad.Logic
@@ -45,6 +46,11 @@ type MonadRefTrans t n = (Ref (t n) ~ Ref n, MonadTrans t, MonadRef n)
 
 modifyRef :: MonadRef m => Ref m a -> (a -> a) -> m ()
 modifyRef ref f = writeRef ref . f =<< readRef ref
+
+modifyRef' :: MonadRef m => Ref m a -> (a -> a) -> m ()
+modifyRef' ref f = do
+  x <- f <$> readRef ref
+  x `seq` writeRef ref x
 
 instance MonadRef IO where
   type Ref IO = IORef

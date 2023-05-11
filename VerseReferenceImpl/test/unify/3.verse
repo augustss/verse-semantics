@@ -1,4 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-exists X
-all{X = false} = ()
-X = true
+Y := if (X = 1):
+  1|2
+else:
+  3|4
+X := 2
+Y

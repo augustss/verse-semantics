@@ -49,6 +49,10 @@ instance EqVarRef (VarRef m) => Unifiable (Val m) where
       pure $ Just [(x, y)]
     (Int x, Int y) | x == y ->
       pure $ Just []
+    (Int x, Rational y) | 1 == denominator y && x == numerator y->
+      pure $ Just []
+    (Rational x, Int y) | denominator x == 1 && numerator x == y ->
+      pure $ Just []
     (Rational x, Rational y) | x == y ->
       pure $ Just []
     (Float x, Float y) | if isNaN x then isNaN y else x == y ->

@@ -154,6 +154,7 @@
 \newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
 \newcommand{\malt}{\diamond}
+\newcommand{\append}{+\!\!+\,}
 
 \newcommand{\setform}[1]{\left\{ #1 \right\}}
 \newcommand{\lcompr}[2]{[ #1 \vb #2 ]}
@@ -192,7 +193,7 @@
 \newcommand{\mplus}{\oplus}
 \newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
 \newcommand{\powerset}[1]{{\mathcal P}(#1)}
-\newcommand{\wrong}{\mathrm{WRONG}}
+\newcommand{\wrong}{\mathbf{wrong}}
 \newcommand{\apply}{\mathit{apply}}
 
 % ----------------- Author comments ---------------------
@@ -372,6 +373,71 @@
 
 \section{Introduction}
 
+This paper is a first attempt at a denotational semantics for \versecalc{}.
+
+\section{Background: the lambda calculus}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Syntax} \\
+\begin{array}{rcl}
+  e & ::= & |v| \vb op \vb |e_1 e_2| \\
+  v & ::= & |x| \vb |k| \vb op \vb |lam x e| \\
+  op & ::= & |add| \vb \ldots
+\end{array}
+\\[4mm]
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\Value \rightarrow \mtype) \\
+\mtype & = & \mlift{(\wrong + \Value)} \\
+\Env & = & Ident \rightarrow \Value \\
+\end{array}
+\\[4mm]
+\text{\bf Semantics of expressions} \\
+
+  \begin{array}{rcll}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|v|}{\rho} & = & \mlift{(\semapp{V}{|v|} \rho)} \\
+  \semapp{E}{|e_1 e_2|}{\rho} & = &  \apply(\semapp{E}{|e_1|}{\rho}, \semapp{E}{|e_2|}{\rho}) \\[2mm]
+  \semapp{V}{|v|}{} & : & \Env \rightarrow \Value \\
+  \semapp{V}{|x|}{\rho} & = & \rho(x) \\
+  \semapp{V}{|k|}{\rho} & = & |k| \\
+  \semapp{V}{op}{\rho} & = & \semapp{O}{op} \\
+  \semapp{V}{|lam x e|}{\rho} & = & \lambda v. \semapp{E}{e}{\rho[ x \mapsto v ]}
+  \\[2mm]
+  \semapp{O}{op} & : & \Value \\
+  \semapp{O}{|add|} & = & \lambda x y. \text{if $(x=k_1 \wedge y=k_2)$ then $k_1 + k_2$ else $\wrong$}
+  \\[2mm]
+  \apply & : & (\mtype \times \mtype) \rightarrow \mtype \\
+  \apply( \bot, w) & = & \bot \\
+  \apply( \mlift{\wrong}, w) & = & \mlift{\wrong} \\
+  \apply( \mlift{w}, \bot) & = & \bot \\
+  \apply( \mlift{w}, \mlift{\wrong}) & = & \mlift{\wrong} \\
+  \apply( \mlift{k}, \mlift{w}) & = & \mlift{\wrong} \\
+  \apply( \mlift{f}, \mlift{w}) & = & f(w) & f \in \Value \rightarrow \mtype
+  \end{array} \\ \\
+\end{array}
+$
+\caption{Familiar untyped call-by-value lambda calculus semantics}
+\label{fig:lambda-sem}
+\end{figure}
+
+To establish notation and approach, \Cref{fig:lambda-sem} gives a
+conventional denotational semantics for call-by-value lambda calculus.
+Note that:
+\begin{itemize}
+\item The environment $\rho : \Env$ binds an identifier to a \emph{value} $W$ (that is, an
+  integer or a function), never to $\bot$ or $\wrong$.  It's a call by value language!
+\item The denotation of an expression is in $\mtype$: it can be $\bot$ (evaluation diverges)
+  or $\wrong$.
+\item $\wrong$ is kept distinct from $\bot$.  It is used to signal that something bad
+  has happened, like adding two functions, or applying an integer to a function.
+  In the end we want to prove that well-typed programs never go $\wrong$.
+\end{itemize}
+
+\section{Syntax of Core Verse}
+
 \begin{figure}
   $$
   \begin{array}{l}
@@ -379,12 +445,12 @@
     \begin{array}{lr@@{\;}r@@{\;}l}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-    \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
+%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
     \text{Expressions} & e  & ::=  & |v| \vb |apply1N v_1 v_2|
        \vb |e_1 == e_2| \vb |e_1 ; e_2| \vb  |def x e|
        \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e| \\
-       && \vb & |succeeds e| \vb |decides e| \\
-       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
+%       && \vb & |succeeds e| \vb |decides e| \\
+%       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
 %       & & \vb & |hastype e_1 e_2| \\
     \text{Values} & v & ::= & x  \vb \hnf \\
     \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, dots, v_n)| \vb |lam x e| \\
@@ -414,9 +480,6 @@
 \caption{The Verse calculus: syntax} \label{fig:syntax}
 \end{figure}
 
-This paper is a first attempt at a denotational semantics for \versecalc{}.
-I'm using the syntax of the POPL paper, plus |hastypeKW|.
-
 As a reminder, the syntax of \versecalc{} is given in \cref{fig:syntax}.
 
 \section{A denotational semantics}
@@ -431,14 +494,14 @@ $
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\Value & = & \wrong + \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
 \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & Ident \rightarrow \Value \\
 \end{array}
 \\[7mm]
 \text{\bf Semantics of expressions and values} \\
 
-  \begin{array}{r@@{\;}c@@{\;}ll}
+  \begin{array}{rcll}
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|v|}{\rho} & = & \munit(\semapp{V}{|v|}{\rho}) \\
   \semapp{E}{|fail|}{\rho} & = & \mempty \\
@@ -449,16 +512,16 @@ $
   \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
   \semapp{E}{|one e|}{\rho} & = & \mone (\semapp{E}{e}{\rho}) \\
   \semapp{E}{|all e|}{\rho} & = & \munit(\mall (\semapp{E}{e}{\rho})) \\
-  \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
-  \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
-  \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
-     & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
-     & = & \semapp{E}{e_3}{\rho} & \text{otherwise} \\
-  \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
+%   \semapp{E}{|succeeds e|}{\rho} & = & \msucceeds (\semapp{E}{e}{\rho}) \\
+%   \semapp{E}{|decides e|}{\rho} & = & \mdecides (\semapp{E}{e}{\rho}) \\
+%  \semapp{E}{|if e_1 then lam x e_2 else e_3|}{\rho}
+%      & = & \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto w})} & \text{if } \mone(\semapp{E}{e_1}{\rho}) = \{ w \} \\
+%      & = & \semapp{E}{e_3}{\rho} & \text{otherwise} \\
+%   \semapp{E}{|for e_1 do lam x e_2|}{\rho} & = & \text{not yet}
 %%     & = & \mcross (\semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_i}})})
 %%     &   & \hspace{0.5em}  \cdots, \semapp{E}{e_2}{(\extendrho{\rho}{x \mapsto \munits{v_n}})}) &
 %%                    & \text{where } \mall(\semapp{E}{e_1}{\rho}) = |tup (v_1, dots, v_n)|
-  \\
+
 % Commenting out hastype for now
 %   \semapp{E}{|hastype e_1 e_2|}{\rho} & = & \begin{array}[t]{ll}
 %     r & \text{if $\semapp{E}{|def (x t) (x=e_1; t=e_2; t x|}{\rho} = r$} \\
@@ -474,17 +537,20 @@ $
   \semapp{V}{|tup (v_1,dots,v_n)|}{\rho} & = & \tuple{\semapp{V}{v_1}{\rho}, \cdots, \semapp{V}{v_n}{\rho}} \\
 \\
   \semapp{O}{|op|}{} & : & \Value \\
-  \semapp{O}{|add|} & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
-      \,\text{\bf then}\, \munit(k_1+k_2)
-      \,\text{\bf else}\, \wrong} \\
-  \semapp{O}{|gt|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
-      \,\text{\bf then (if}\, (k_1 > k_2)
-                       \,\text{\bf then}\, \munit(k_1)
-                       \,\text{\bf else}\, \mempty \,)
-      \,\text{\bf else}\, \wrong } \\
-  \semapp{O}{|int|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = k)
-      \,\text{\bf then}\, \munit(k)
-      \,\text{\bf else}\, \mempty}
+  \semapp{O}{|add|} & = &  \multicolumn{2}{l}{\lambda w.
+    \begin{array}[t]{l}
+       \text{\bf if}\, (w = |tup(k_1,k_2)|) \\
+       \text{\bf then}\, \munit(k_1+k_2) \\
+       \text{\bf else}\, \wrong
+  \end{array}}\\
+%  \semapp{O}{|gt|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = |tup(k_1,k_2)|)
+%      \,\text{\bf then (if}\, (k_1 > k_2)
+%                       \,\text{\bf then}\, \munit(k_1)
+%                       \,\text{\bf else}\, \mempty \,)
+%      \,\text{\bf else}\, \wrong } \\
+%  \semapp{O}{|int|}  & = &  \multicolumn{2}{l}{\lambda w.\, \text{\bf if}\, (w = k)
+%      \,\text{\bf then}\, \munit(k)
+%      \,\text{\bf else}\, \mempty}
   \end{array} \\ \\
   
 \begin{array}{rcll}
@@ -539,6 +605,46 @@ $$
 $$
 \caption{Set semantics for $\mtype$}
 \label{fig:set-sem}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\text{\bf Domains} \\
+\mtype  =  \bot + \wrong + [W] \\[2mm]
+\text{\bf Operations} \\
+\begin{array}{rrcll}
+\text{Empty}        & \mempty & : &  \mtype \\
+                    & \mempty & = & [ \, ] \\[1mm]
+\text{Unit}    & \munit & : & \Value \rightarrow \mtype \\
+               & \munit(w) & = & [ w ] \\[1mm]
+\text{Union}   & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+               &  s_1 \munion s_2 & = & s_1 \append s_2 \\[1mm]
+\text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \mintersect s_2 & = & [ w_1 \vb w_1 \in s_1, w_2 \in s_2, w_1 = w_2] \\[1mm]
+\text{Sequencing}   & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+                    &  s_1 \msemi s_2 & = & [ w_2 \vb w_1 \in s_1, w_2 \in s_2 ] \\[1mm]
+\text{One}          &   \mone  & : & \mtype \rightarrow \mtype \\
+  & \mone\,[] & = & [] \\
+  & \mone\,(w:ws) & = & [w] \\[1mm]
+\text{All}          &   \mall  & : & \mtype \rightarrow \tuple{\Value} \\
+  & \mall\,[w_1,\ldots,w_n] & = & [|tup (w_1, xdots, w_n)|] \\
+% \text{Succeeds}          &   \msucceeds  & : & \mtype \rightarrow \tuple{\Value} \\
+%  & \msucceeds(s) & = & ??? \\
+% \text{Decides}          &   \mdecides  & : & \mtype \rightarrow \tuple{\Value} \\
+%   & \mdecides(s) & = & ??? \\
+\end{array} \\ \\
+\text{All operations over $\mtype$ implicitly propagate $\bot$ and $\wrong$.  E.g.}\\
+  \begin{array}{rcll}
+    s_1 \munion s_2 & = & \bot & \text{if $s_1=\bot$ or $s_2=\bot$} \\
+                    & = & \wrong & \text{if $(s_1=\wrong$ and $s_2 \neq \bot)$ or
+                    $(s_2=\wrong$ and $s_1 \neq \bot)$} \\
+                    & = & s_1 \cup s_2 & \text{otherwise}
+  \end{array}
+\end{array}
+$$
+\caption{Sequence semantics for $\mtype$}
+\label{fig:seq-sem}
 \end{figure}
 
 The denotational semantics is given in \cref{fig:den-sem1}.
@@ -684,12 +790,11 @@ There is probably more than one possible choice here.
 \section{An order-sensitive denotational semantics} \label{sec:order-sensitive}
 
 \newcommand{\LblValue}{LW}
-\newcommand{\LblSeq}{[ \Lbl ]}
-\newcommand{\Lbl}{L}
-\newcommand{\lblleft}{{\bf L}}
-\newcommand{\lblright}{{\bf R}}
-\newcommand{\lblsemi}[2]{#1 \sconcat #2}
-\newcommand{\lblunit}{\bullet}
+\newcommand{\Lbl}{\mathbf{Lbl}}
+\newcommand{\lblemp}{\epsilon}
+\newcommand{\lbll}[1]{{\bf L}\;#1}
+\newcommand{\lblr}[1]{{\bf R}\;#1}
+\newcommand{\lblseq}[2]{#1 \sconcat #2}
 \newcommand{\domplus}{\, + \,}
 \newcommand{\msort}{\mathit{sort}}
 
@@ -698,10 +803,10 @@ $$
 \begin{array}{l}
 \text{\bf Domains} \\
 \begin{array}{rcll}
-\mtype & = & \mlift{(\wrong + \powerset{\LblValue})} \\
-\mtyped & = & \setform{\Value} & \text{Set with 0 or 1 elements} \\
-\LblValue & = & \LblSeq \times \Value & \text{Sequence of $\Lbl$ and a value} \\
-\Lbl & = & \lblleft \domplus \lblright \\
+\Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
+\mtype & = & \mlift{\wrong + \powerset{\LblValue}} \\
+\LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
+\textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
 \\
 \text{\bf Operations} \\
@@ -709,43 +814,55 @@ $$
 \text{Empty}        & \mempty & : &  \mtype \\
     & \mempty & = & \varnothing \\[1mm]
 \text{Singleton}    & \munits{.} & : & \Value \rightarrow \mtype \\
-     & \munits{w} & = & \setform{ ([], w) } \\[1mm]
+     & \munits{w} & = & \setform{ (\lblemp, w) } \\[1mm]
 \text{Union}        & \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \munion s_2 & = & \scompr{(\lblleft \scons l,w)}{\sbind{(l,w)}{s_1}} \cup
-                                              \scompr{(\lblright \scons l, w)}{\sbind{(l,w)}{s_2}} \\[1mm]
+&  s_1 \munion s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}}} \\[1mm]
 \text{Intersection} & \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
- &  s_1 \mintersect s_2 & = & \scompr{(\lblsemi{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2} \\[1mm]
+&  s_1 \mintersect s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2}} \\[1mm]
 \text{Sequencing} & \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
-&  s_1 \msemi s_2 & = & \scompr{(\lblsemi{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}} \\[1mm]
+&  s_1 \msemi s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}}} \\[1mm]
 % \text{Tagging} & \mtag & : & [L] \times \mtype \rightarrow \mtype \\
 % & \mtag(t, s) & = & \setform{(\lblsemi{t}{l}, w) \mid (l, w) \in s} \\[1mm]
 \text{One}  & \mone & : & \mtype \rightarrow \mtype \\
-& \mone(s) & = & \shead (\msort( s)) \\[1mm]
+& \mone(\bot) & = & \bot \\
+& \mone(\mlift{\wrong}) & = & \mlift{\wrong} \\
+% & \mone(\mlift{s}) & = & \bot & \text{if |s| is infinite} \\
+% & \mone(\mlift{s}) & = & \munits{w} & \text{if $(l,w)\in s$ and $\forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w') $} \\
+& \mone(\mlift{s}) & = & \left\{ \begin{array}{ll}
+      \bot       & \text{if |s| is infinite} \\
+      \mempty    & \text{if $s = \emptyset$} \\
+      \munits{w} & \text{if $(l,w)\in s$ and} \\
+      & \forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w')
+      \end{array} \right. \\[1mm]
 \text{All}  & \mall & : & \mtype \rightarrow \mtype \\
- & \mall(s) & = & \stuple (\msort( s) ) \\[1mm]
-\text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
-& \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
-&               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
-\text{Decides}  & \mdecides & : & \mtype \rightarrow \mtype \\
-& \mdecides(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
-&               & = & \mempty \hspace{8.1em} \text{if } \msort( s) = [] \\
-&               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
-\text{Head}  & \shead & : & [\Value] \rightarrow \mtyped \\
-             & \shead [] & = & empty \\
-             & \shead (w \scons s) & = & \munits{w} \\[1mm]
-\text{To tuple} & \stuple & : & [\Value] \rightarrow \mtype \\
-     & \stuple [w_1, \cdots, w_n] & = & \tuple{w_1,\cdots,w_n} \\
-     & \stuple \, ws & = & \bot \;\; \text{if |ws| is infinite} \\
-  \end{array} \\
+& \mall(\bot) & = & \bot \\
+& \mall(\mlift{\wrong}) & = & \mlift{\wrong} \\
+& \mall(\mlift{s})      & = &
+\left\{ \begin{array}{ll} \bot &\text{if |s| is infinite} \\
+     \munits{\tuple{w_1,\cdots,w_n}} &
+     \text{if $sortBy( (<), s ) = |[w_1,xdots,w_n]|$}
+     \end{array} \right. \\ [1mm]
+% \text{Succeeds}  & \msucceeds & : & \mtype \rightarrow \mtype \\
+% & \msucceeds(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
+% &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
+% \text{Decides}  & \mdecides & : & \mtype \rightarrow \mtype \\
+% & \mdecides(s) & = & \munits{w} \hspace{7.5em} \text{if } \msort( s) = [w] \\
+% &               & = & \mempty \hspace{8.1em} \text{if } \msort( s) = [] \\
+% &               & = & \wrong \hspace{7em} \text{otherwise} \\[1mm]
+\end{array} \\
 \\
 \begin{array}{rrcll}
-\text{Sort} & \msort & : & \LblValue^{*} \rightarrow \mlift{([\Value] + \wrong)}\\
-& \msort(s) & = & []  & \text{if $s$ is empty} \\
-&  & = & \wrong & \text{if $ws$ has more than one element} \\
-&& = & ws & \text{otherwise} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblleft:l,w)}{s}} \\
-  &&& \sconcat \msort \scompr{(l,w)}{\sbind{(\lblright:l,w)}{s}} \\
-&& \multicolumn{3}{l}{\text{where $ws = \mcompr{w}{\sbind{([],w)}{s}}$}}
+\text{Comparison} & (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+& (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
+& (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
+& (\lbll l_1) < (\lblr l_2) & = & True \\
+& (\lblr l_1) < (\lbll l_2) & = & False \\
+& (\lblseq{l_1}{l_2}) < (\lblseq{l_3}{l_4}) & = &
+\multicolumn{2}{l}{(l_1 < l_3) \vee (l_1 = l_3 \wedge l_2 < l_4)}\\
 \end{array}
 
 \end{array}
@@ -768,37 +885,46 @@ before exposing it to the programmer.
 We do not change the equations for $\semfun{E}$, $\semfun{V}$, and $\semfun{O}$ at all; they remain
 precisely as they are in \Cref{fig:den-sem1}.
 However the semantics of a collection of values, $\mtype$, does change, and is given in \Cref{fig:labelled-sem}:
-\begin{itemize}
-\item
-A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
-a \emph{set of labelled values}, each of type $\LblValue$.
-\item A labelled value (of type $\LblValue$)
-is just a pair $(\LblSeq \times \Value)$ of a \emph{label} and a value.
-\item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
-\item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
-adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
-and a $\lblright$ tag to those coming from the right.
-So the labels specify where in the tree the value comes from.
-\item Sequencing $\msemi$ and $\mintersect$ both concatenate the labels from the values they combine.
-\item Finally $\msort$ puts everything in the ``right'' order: first the values with
-an empty label, then the values whose label starts with $\lblleft$ (notice the
-recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
-Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
-\item Note that if $\msort$ encounters a set with more than one unlabelled element then this
-considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
-\end{itemize}
-Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
-|defKW| binds |x| to |3| and then |4|. The meaning of
-this expression will be
-$$
-\semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
-$$
-Now if we take |allKW| of that expression we will get a singleton sequence
-containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
-$$
-\semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
-$$
+% \begin{itemize}
+% \item
+% A collection of values $\mtype$ is now $\bot$ or $\wrong$ (as before), or
+% a \emph{set of labelled values}, each of type $\LblValue$.
+% \item A labelled value (of type $\LblValue$)
+% is just a pair $(\Lbl \times \Value)$ of a \emph{label} and a value.
+% \item A label is a sequence of tags $\Lbl$, where a tag is just $\lblleft$ or $\lblright$.
+% \item The union (or concatention) operation $\munion$, defined in \cref{fig:labelled-sem},
+% adds a $\lblleft$ tag to the labels of the values in the left branch of the choice,
+% and a $\lblright$ tag to those coming from the right.
+% So the labels specify where in the tree the value comes from.
+% \item Sequencing $\msemi$ and $\mintersect$ both concatenate the labels from the values they combine.
+% \item Finally $\msort$ puts everything in the ``right'' order: first the values with
+% an empty label, then the values whose label starts with $\lblleft$ (notice the
+% recursive sort of the trimmed-down sequence), and then those that start with $\lblright$.
+% Notice that $\msort$ removes all the labels, leaving just a bare sequence of values $\mtype$.
+% \item Note that if $\msort$ encounters a set with more than one unlabelled element then this
+% considered $\wrong$.  This makes ambiguous expressions, like |one (def x x)|, $\wrong$.
+% \end{itemize}
+% Let us look at our troublesome example |def x (x= (4 choice 3))|, and assume that
+% |defKW| binds |x| to |3| and then |4|. The meaning of
+% this expression will be
+% $$
+% \semapp{E}{|def x (x= (4 choice 3))|}{\epsilon} \quad = \quad [ (\lblright,3), (\lblleft,4) ]
+% $$
+% Now if we take |allKW| of that expression we will get a singleton sequence
+% containing |tup (4,3)|, because |allKW| does a sort, stripping off all the tags.
+% $$
+% \semapp{E}{|all (def x (x= (4 choice 3)))|}{\epsilon} \quad = \quad [ ([], |tup (4,3)|) ]
+% $$
 
+The reason we use trees ($\LblValue$) instead of sequences of labels, and concatenation when doing sequential composition, is that it sometimes can arbitrarily mix up labels belonging to one choice operator with labels from another choice operator. Look at the following example:
+$$
+|def x ((if x=1 then 11 choice 22 else 33) ; x=(1 choice 2) ; (if x=1 then 44 else 55 choice 66))|
+$$
+If we used sequences of labels, the labelled semantics of this expression would be:
+$$
+\{ (LL, 44), (RL, 44), (RL, 55), (RR, 66) \} 
+$$
+The label $RL$ occurs in two completely unrelated places.
 
 % -------------------------------------
 \section{A simpler order-sensitive denotational semantics} \label{sec:simple-order-sensitive}

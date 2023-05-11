@@ -1,75 +1,39 @@
-import { init, WASI } from '@wasmer/wasi';
+import { WASI } from "@bjorn3/browser_wasi_shim";
 
-await init();
+const wasi = new WASI([], [], []);
 
-const compileStreaming = () => WebAssembly.compileStreaming(fetch('./verse.wasm'));
+const imports = { wasi_snapshot_preview1: wasi.wasiImport };
 
-const moveFileToString = (fs, path) => {
-    let file;
-    try {
-        file = fs.open(path, {
-            read: true
-        });
-    } catch (e) {
-        return '';
-    }
-    try {
-        return file.readString();
-    } finally {
-        fs.removeFile(path);
-    }
-};
+const wasm = await WebAssembly.instantiateStreaming(fetch('./versewasm.wizer.wasm'), imports);
 
-const writeFile = (fs, path, string) => {
-    const file = fs.open(path, {
-        create: true,
-        write: true,
-        truncate: true
-    });
-    file.writeString(string);
-};
+const instance = wasm.instance;
 
-const module = await compileStreaming();
+wasi.inst = instance;
 
-let wasi;
-let instance;
-let memory;
+const exports = instance.exports;
 
-const instantiate = () => {
-    wasi  = new WASI({
-        env: {},
-        args: []
-    });
-    instance = wasi.instantiate(module, {});
-    memory = instance.exports.memory;
-};
+const memory = exports.memory;
 
-instantiate();
+const encoder = new TextEncoder();
 
-const initialArray = new Uint8Array(new ArrayBuffer(memory.buffer.byteLength));
-initialArray.set(new Uint8Array(memory.buffer));
+const decoder = new TextDecoder();
 
-const start = (stdinString) => {
-    writeFile(wasi.fs, '/in', stdinString);
-    try {
-        return wasi.start(instance);
-    } catch (e) {
-        instantiate();
-        writeFile(wasi.fs, '/in', stdinString);
-        return wasi.start(instance);
-    } finally {
-        const array = new Uint8Array(memory.buffer);
-        array.set(initialArray);
-    }
-};
+const outPtrPtr = exports.calloc_ptr();
 
 self.onmessage = ({ data: { stdinString } }) => {
-    const exitCode = start(stdinString);
-    const stdoutString = moveFileToString(wasi.fs, '/out');
-    const stderrString = moveFileToString(wasi.fs, '/err');
-    self.postMessage({
-        exitCode,
-        stdoutString,
-        stderrString
-    });
+    const stdinLength = Buffer.byteLength(stdinString);
+    const stdinPtr = exports.malloc(stdinLength);
+    let outLength;
+    try {
+        const stdinArray = new Uint8Array(memory.buffer, stdinPtr, stdinLength);
+        encoder.encodeInto(stdinString, stdinArray);
+        outLength = exports.verse_eval(stdinPtr, stdinLength, outPtrPtr);
+    } finally {
+        exports.free(stdinPtr);
+    }
+    const outPtrArray = new Uint32Array(memory.buffer, outPtrPtr, 1);
+    const outPtr = outPtrArray[0];
+    const outArray = new Uint8Array(memory.buffer, outPtr, outLength);
+    const outString = decoder.decode(outArray);
+    self.postMessage({ outString });
 };

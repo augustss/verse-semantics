@@ -10,7 +10,11 @@
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
 
+% Boxed figures
+\floatstyle{boxed}
+\restylefloat{figure}
 
+\usepackage{quiver}
 \usepackage{framed}
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 \usepackage{ amssymb }
@@ -108,17 +112,26 @@
 \author{Simon, Lennart, Koen, Ranjit \today}
 \maketitle
 
+\section{Overview}
+
+Our plan is
+\begin{enumerate}
+\item Rewrite Source Verse (\Cref{fig:source-verse-expr}) to Small Source Verse (\Cref{fig:small-source-verse}).
+  Small Source Verse is simply a proper subset of Source Verse.
+\item Desugar Small Source Verse into Big Core Verse (\Cref{fig:desugar-expr1}).
+\item Simplify Big Core Verse into Core Verse (the ICFP 23 paper).
+\end{enumerate}
+
 % ----------------------------------------------------------------
 \section{Source Verse}
 
-\Cref{fig:source-verse-expr} and \ref{fig:source-verse-misc}
-give the source language that we desugar.
+\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
 
-\begin{itemize}
-\item Question: why is $l$ a subset of $p$, not the same as $p$?
-\end{itemize}
+\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version into simpler
+Source Verse, ready for \Cref{fig:desugar-expr1}.
 
-\begin{figurebox}
+
+\begin{figure}
 $$
 \begin{array}{rcll}
   |t| & ::= & |x|               & \text{Variable} \\
@@ -126,23 +139,22 @@ $$
       & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
       & \vb & |t_1^[t_2]|       & \text{Function application} \\
       & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
-      & \vb & |x := t|          & \text{Definition} \\
       & \vb & |def x t|         & \text{Existential} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |t_1 = t_2|       & \text{Unification} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) in b|     & \text{Finite loop} \\
-      & \vb & |check r t|     & \text{Effects check} \\
+      & \vb & |check fx t|     & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
       & \vb & |()|              & \text{Empty array} \\
       & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
       & \vb & |p := t|          & \text{General definition} \\
+      & \vb & |p : t|           & \text{Type ascription} \\
       & \vb & |op_b t|          & \text{Prefix operator} \\
       & \vb & |t op_a|          & \text{Postfix operator} \\
       & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
       & \vb & |: t|             & \text{Range} \\
-      & \vb & |l : t|           & \text{Type ascription} \\
       & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
       & \vb & |function (a_1 dots a_n) t|    & \text{Function} \\
       & \vb & |if(t) then b|    & \text{Conditional expression} \\
@@ -159,28 +171,40 @@ $$
 \end{array}
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
-\end{figurebox}
+\end{figure}
 
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{rcll}
   |x,y,f| &     & \textit{Variable} \\
   |k| &     & \textit{Integer constant} \\
       \\
+
+\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
+  |t| & ::= & |x|               & \text{Variable} \\
+      & \vb & |k|               & \text{Constant} \\
+      & \vb & |f^[x]|       & \text{Function application} \\
+      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
+      & \vb & |x = t|       & \text{Unification} \\
+      & \vb & |x := t|          & \text{Definition} \\
+      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
+      & \vb & |for(t) in b|     & \text{Finite loop} \\
+      & \vb & |check fx t|     & \text{Effects check} \\
+      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
+      & \vb & |function a t|    & \text{Function} \\
+\\
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
   |b| & ::= & |t| \vb |{t_1; dots ; t_n}|  \\
 \\
 \multicolumn{4}{l}{\text{\bf Function arguments}} \\
-  |a| & ::= & |(t)|  \vb |()| \vb |apeff a r| \\
+  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx| \\
 \\
-\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)|}. Subset of |t|.}} \\
+\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)| or |(p:t)|}. Subset of |t|.}} \\
   |p| & ::= & x \vb |p a| \vb |p^hat|  \vb |p^?|\vb  |p squiggt l| \\
      & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
   \\
 
-\multicolumn{4}{l}{\text{{\bf Left hand side of a type ascription |(l:t)|}. Subset of |t|.}} \\
-  |l| & ::= & x \vb |l a| \vb |l^hat| \vb |l^?|  \vb  |p squiggt l| \vb |l^arrayty|  \\
-  \\
 \multicolumn{4}{l}{\text{\bf Operators}} \\
  |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty|  & \text{Prefix}\\
  |op_a| & ::= &  ? \vb |hat| \vb ..  & \text{Postfix}\\
@@ -190,96 +214,53 @@ $$
 $$
 \\
 Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
-\caption{Source Verse} \label{fig:source-verse-misc}
-\end{figurebox}
+\caption{Small Source Verse} \label{fig:small-source-verse}
+\end{figure}
 
-% ----------------------------------------------------------------
-\section{Core Verse}
-
-\Cref{fig:core-verse} gives the language into which we desugar.
-
-\begin{figurebox}
-$$
-\begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Expressions}} \\
-|e| & ::= & |x| \vb |k| \vb |e_1 ; e_2| \vb |e_1 e_2| \vb  |e_1 = e_2|
-    \vb |e_1 `choice` e_2| \vb |def x e| \vb |lam x e| \\
-      & \vb & |check r e|                 & \text{Effects check} \\
-      & \vb & |if e_1 then e_2 else e_3| & \text{Conditional expression} \\
-    & \vb & |for(e) in b|     & \text{Finite loop} \\
-    \\
-\multicolumn{4}{l}{\text{\bf Effects}} \\
-|r| & ::= & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
-\end{array}
-$$
-\caption{Core Verse expressions} \label{fig:core-verse}
-\end{figurebox}
-
-% ----------------------------------------------------------------
-\section{Desugaring Source Verse}
-
-\Cref{fig:desugar-expr1} desugars Source Verse into Core Verse.
-\Cref{fig:desugar-expr2} rewrites Source Version into simpler Source Verse, ready for \Cref{fig:desugar-expr1}.
-
-\begin{description}
-\item[Note TypeAscription.]  In |(t_1 : t_2)| what can |t_1| be?  Does the order in the desugaring rule matter?
-\end{description}
-
-\begin{figurebox}
+\begin{figure}
 $$
 \begin{array}{@@{}l}
-\begin{array}{r@@{\;}c@@{\;}ll}
-\multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
-  |De e| & = & |def x (Me x e)| \quad \quad |x| \not\in |e|\\
-\\
-\multicolumn{4}{l}{\textbf{The heavy lifting}} \\
-  |Me i k| & = & |i=k| \\
-  |Me i  x| & = & |i=x| \\
-  |Me i (:t)| & = & |(De t)^(i)| & \\
-  |Me i (x:=t)| & = & |x == Me i t| \\
-  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
-  |Me i (t_1 where t_2)| & = & |Me i t_1 ; De t_2| & \text{or the other way round?}\\
-  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-  |Me i (t_1 == t_2)| & = & |(Me i t_1) ; (Me i t_2)|  & \text{I think this is right}\\
-  |Me i (t_1^[t_2])| & = & |i = ((De t_1) (De t_2))| \\
-  |Me i (t_1^(t_2))| & = & |def (f,x) (f == De t_1; x == De t_2; i == succeeds (f^(x))| \\
-  |Me i (check r t)| & = & |check r (Me i t)|  & \text{Is this right?}\\
-  |Me i (array(t_1, xdots, t_n))| & = &
-    \multicolumn{2}{l}{|def (x_1 xdots x_n)
-      (Me x_1 t_1; xdots; Me x_n t_n;  i = arr (x_1, xdots, x_n))|} \\
-    |Me i (if(e_1) then e_2 else e_3)| & = &
-    \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+\begin{array}{rcll}
+\multicolumn{4}{l}{\textbf{Application and unification}} \\
+  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
+  |t_1^[t_2]| & \rightarrow & |f := t_1; x := t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds (f^[x])| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
 \end{array} \\
 \\
-\begin{array}{r@@{\;\;}c@@{\;\;}ll}
-\multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
-  |Me i (function t_1 t_2)| & = & |i == (lam x (def (Vr t_1) (Me x t_1; De t_2)|) \\
-  |Me i (function t_1 t_2)| & = & |lam x (def (Vr t_1) (def (x',y) (x' == Me x t_1; y == i^(x'); Me y t_2))|
-\end{array}
-\end{array}
-$$
-\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
-\end{figurebox}
-
-\begin{figurebox}
-$$
 \begin{array}{rcll}
-  |l : t| & \rightarrow & |l := (: t)| \\
+\multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
+  |p : t| & \rightarrow & |p := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
   |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2) | \\
+  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
   |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
-  |type^{t}| & \rightarrow & |function (y:t) y| \\
+\\
+\multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
   |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
+\\
+\multicolumn{4}{l}{\textbf{Function notation}} \\
+  |type^{t}| & \rightarrow & |function (y:t) y| \\
   |e_1 eqgt e_2| & \rightarrow & |function e_1 () {e_2}| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function () b| & \rightarrow & |functionKW (()) b)| & \\
-  |function (a (eff r)) b| & \rightarrow & |function a (check r b)| & \\
+  |function () b| & \rightarrow & |functionKW (()) b| & \\
+  |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
+\\
+\multicolumn{4}{l}{\textbf{Conditionals and for-loops}} \\
   |if{e})| & \rightarrow & |if(e) else false| \\
   |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
   |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
   |for{e}| & \rightarrow & |for (x := e) in { x }| & \text{|x| fresh} \\
-\\
+\end{array}
+\end{array}
+$$
+\caption{Source Verse to Source Verse rewriting (1)} \label{fig:sv-to-sv-1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
   \multicolumn{1}{l}{\textbf{Operators}} \\
   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
   |op_b e| & \rightarrow & |prefix op_b (e)| \\
@@ -306,95 +287,177 @@ $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
 This means that there can be no variable name clashes in |let| and |do|.
 A more robust desugaring could \textalpha-convert such clashes.
-\caption{Desugaring of expressions (2)} \label{fig:desugar-expr2}
-\end{figurebox}
+\caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
+\end{figure}
 
 
-\begin{figurebox}
+% ----------------------------------------------------------------
+\section{Big Core Verse}
 
+\Cref{fig:core-verse} gives the BigCore language into which we desugar.
+It's slightly larger than the core language of the ICFP 23 paper, but
+can very easily be desugared into it.  Specifically:
+\begin{itemize}
+\item It includes |x := e|.  This means |x=e|, plus an existential for |x | added at the
+  top of the enclosing scope.
+\end{itemize}
+
+\begin{figure}
 $$
-  \begin{array}{rcll}
-    |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
-    |Cr k| & = & |k| \\
-    |Cr x| & = & |x| \\
-    |Cr (array (e_1, dots, e_n))| & = &
-    \begin{array}[t]{@@{}l}
-    |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; arr (v_1, dots, v_n)| \\
-    \end{array}
-	& \text{|x_i| fresh} \\
-    |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
-    |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
-    |Cr (x := :any)| & = & |x| \\
-    |Cr (x := e)| & = & |x = Cr e| \\
-    |Cr (e_1^[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
-    |Cr (e_1^(e_2))| & = & |succeeds (Cr (e_1^[e_2]))| \\
-    |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
-    |Cr (if e_1 then e_2 else e_3)| & = &
-    \begin{array}[t]{@@{}l}
-    |defTwoLines x (x = one(Bi (e_1; Th e_2) `choice` Bi (Th e_3));applyx x ())|
-    \end{array}
-    & \text{|x| fresh} \\
-    |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
-    |Cr (function(x:any)e)| & = & |x => Bi e| \\
-%%    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
-    \\
-    |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
-    |Th e| & = & |function(x:any)e| & \text{|x| fresh} \\
-    \\
-    |Bi| & \multicolumn{3}{l}{ \text{inserts |defKW| for all local bindings.} } \\
-    |Bi e| & = & |def (Vr e) (Cr e)| \\
-    \\
-    |Vr| & \multicolumn{3}{l}{ \text{finds all locally defined variables.} } \\
-    |Vr k| & = & |emp| \\
-    |Vr x| & = & |emp| \\
-    |Vr (array (e_1, dots, e_n))| & = & |Vr e_1, dots, Vr e_n| \\
-    |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
-    |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
-    |Vr (x := e)| & = & |x , Vr e| \\
-    |Vr (e_1^[e_2])| & = & |Vr e_1 , Vr e_2| \\
-    |Vr (e_1^(e_2))| & = & |Vr e_1 , Vr e_2| \\
-    |Vr (e_1 `choice` e_2)| & = & |emp| \\
-    |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
-    |Vr (for e_1 in e_2)| & = & |emp| \\
-    |Vr (function(x:any)e)| & = & |emp| \\
-    |Vr (type^{e})| & = & |emp| \\
-  \end{array}
-  $$
-\caption{Core conversion} \label{fig:core-conversion}
-\end{figurebox}
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x| \vb |k|
+    \vb |e_1 `choice` e_2| \vb |def x e| & \text{Just as in Core} \\
+      & \vb & |lam x e| \\
+      & \vb & |tup (e_1, xdots, e_n)| \\
+      & \vb & |e_1 ; e_2| \\
+      & \vb & |e_1 = e_2|                 & \text{Not only on lhs of ``|;|''} \\
+      & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
 
-
-
-\begin{figurebox}
-$$
-\begin{array}{rclll}
-\multicolumn{5}{l}{\textbf{Desugar a definition |p := e| into simple definitions with just |x := e|}} \\
-\ifdesugarops
-  |Pd x e| & = & |x := e| \\
-\fi
-  |Pd (f a) e| & = & |Pd f ((De (function a () {e})))| \\
-  |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
-  |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
-  |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
-  |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
-  |Pd (p_0, dots, p_n) e| & = &
-    \multicolumn{2}{l}{|Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e|} & \text{|x_i| fresh} \\
-  |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
-  \\
-\multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
-  |Ld x t| & = & |def y x := t^[y]; y| & |y| \not\in |t| \;\;\;\; \text{``domain-oriented''}\\
-  ~ & (or:) & |def y x := t^[y]| & |y| \not\in |t| \;\;\;\; \text{``range-oriented''} \\
-  |Ld (l a) t| & = & |Ld l (arrow (function a () {t}))| \\
-  |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
-  |Ld (l?) t| & = & |Ld l ((? t))| \\
-  |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
-  |Ld (p squiggt l) t| & = & |Pd p ((Ld l t))| \\
+      & \vb & |check fx e|                 & \text{Effects check} \\
+      & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
+      & \vb & |if e_1 then e_2 else e_3| & \text{Conditional expression} \\
+    & \vb & |for(e) in b|     & \text{Finite loop} \\
+    \\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
 \end{array}
 $$
-\caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
-\end{figurebox}
+\caption{BigCore Verse expressions} \label{fig:core-verse}
+\end{figure}
 
-\begin{figurebox}
+% ----------------------------------------------------------------
+\section{Desugaring Source Verse}
+
+\Cref{fig:desugar-expr1} desugars Small Source Verse into Core Verse.
+
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\begin{array}{r@@{\;}c@@{\;}ll}
+\multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
+  |De e| & = & |def x (Me x e)| \quad \quad |x| \not\in |e|\\
+\multicolumn{4}{l}{\quad Optional (derived) rules} \\
+|De k| & = & |k| \\
+|De x| & = & |x| \\
+
+\\
+\multicolumn{4}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
+\multicolumn{4}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
+and |e| is a BigCore expression}} \\
+  |Me i k| & = & |i=k| \\
+  |Me i x| & = & |i=x| \\
+  |Me i (f^[x])| & = & |i=f^[x]| \\
+  |Me i (x=t)| & = & |x = Me i t| \\
+  |Me i (x:=t)| & = & |x := Me i t| \\
+  |Me i (:t)| & = & |(De t)^(i)| & \\
+  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
+  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
+  |Me i (array(t_1, xdots, t_n))| & = &
+    \multicolumn{2}{l}{|def (x_1 xdots x_n)
+      (Me x_1 t_1; xdots; Me x_n t_n;  i = arr (x_1, xdots, x_n))|} \\
+    |Me i (if(e_1) then e_2 else e_3)| & = &
+    \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
+  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
+  |Me i (function t_1 t_2)| & = & |lam x (def (x',y) (x' == Me x t_1; y == i^[x']; Me y t_2))|
+\end{array}
+\end{array}
+$$
+\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
+\end{figure}
+
+
+% \begin{figure}
+% 
+% $$
+%   \begin{array}{rcll}
+%     |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
+%     |Cr k| & = & |k| \\
+%     |Cr x| & = & |x| \\
+%     |Cr (array (e_1, dots, e_n))| & = &
+%     \begin{array}[t]{@@{}l}
+%     |defTwoLines (x_1,dots,x_n) (x_1=e_1; dots; x_n=e_n; arr (v_1, dots, v_n)| \\
+%     \end{array}
+% 	& \text{|x_i| fresh} \\
+%     |Cr (e_1 ; e_2)| & = & |Cr e_1 ; Cr e_2| \\
+%     |Cr (e_1 = e_2)| & = & |Cr e_1 = Cr e_2| \\
+%     |Cr (x := :any)| & = & |x| \\
+%     |Cr (x := e)| & = & |x = Cr e| \\
+%     |Cr (e_1^[e_2])| & = & |def (x,y) (x = e_1; y = e_2; applyx (Cr e_1) (Cr e_2)| & \text{|x,y| fresh} \\
+%     |Cr (e_1^(e_2))| & = & |succeeds (Cr (e_1^[e_2]))| \\
+%     |Cr (e_1 `choice` e_2)| & = & |Bi e_1 `choice` Bi e_2| \\
+%     |Cr (if e_1 then e_2 else e_3)| & = &
+%     \begin{array}[t]{@@{}l}
+%     |defTwoLines x (x = one(Bi (e_1; Th e_2) `choice` Bi (Th e_3));applyx x ())|
+%     \end{array}
+%     & \text{|x| fresh} \\
+%     |Cr (for e_1 in e_2)| & = & |all(Bi(e_1 ; Th e_2))| \\
+%     |Cr (function(x:any)e)| & = & |x => Bi e| \\
+% %%    |Cr (type^{e})| & = & |x => Bi (x = e; x)| & \text{|x| fresh} \\
+%     \\
+%     |Th| & \multicolumn{3}{l}{ \text{creates a thunk, i.e., dummy function.} } \\
+%     |Th e| & = & |function(x:any)e| & \text{|x| fresh} \\
+%     \\
+%     |Bi| & \multicolumn{3}{l}{ \text{inserts |defKW| for all local bindings.} } \\
+%     |Bi e| & = & |def (Vr e) (Cr e)| \\
+%     \\
+%     |Vr| & \multicolumn{3}{l}{ \text{finds all locally defined variables.} } \\
+%     |Vr k| & = & |emp| \\
+%     |Vr x| & = & |emp| \\
+%     |Vr (array (e_1, dots, e_n))| & = & |Vr e_1, dots, Vr e_n| \\
+%     |Vr (e_1 ; e_2)| & = & |Vr e_1 , Vr e_2| \\
+%     |Vr (e_1 = e_2)| & = & |Vr e_1 , Vr e_2| \\
+%     |Vr (x := e)| & = & |x , Vr e| \\
+%     |Vr (e_1^[e_2])| & = & |Vr e_1 , Vr e_2| \\
+%     |Vr (e_1^(e_2))| & = & |Vr e_1 , Vr e_2| \\
+%     |Vr (e_1 `choice` e_2)| & = & |emp| \\
+%     |Vr (if e_1 then e_2 else e_3)| & = & |emp| \\
+%     |Vr (for e_1 in e_2)| & = & |emp| \\
+%     |Vr (function(x:any)e)| & = & |emp| \\
+%     |Vr (type^{e})| & = & |emp| \\
+%   \end{array}
+%   $$
+% \caption{Core conversion} \label{fig:core-conversion}
+% \end{figure}
+% 
+% 
+% 
+% \begin{figure}
+% $$
+% \begin{array}{rclll}
+% \multicolumn{5}{l}{\textbf{Desugar a definition |p := e| into simple definitions with just |x := e|}} \\
+% \ifdesugarops
+%   |Pd x e| & = & |x := e| \\
+% \fi
+%   |Pd (f a) e| & = & |Pd f ((De (function a () {e})))| \\
+%   |Pd (: t) e| & = & |Pd (x:t) e| & \text{|x| fresh} \\
+%   |Pd (p : t) e| & = & |Pd p ((De t^[e]))| \\
+%   |Pd (p ?) e| & = & |Pd p (De ((option^{e}))| \\
+%   |Pd (e_1^hat) e| & = & |assign^(De e_1,e)| \\
+%   |Pd (p_0, dots, p_n) e| & = &
+%     \multicolumn{2}{l}{|Pd p_0 x_0; dots; Pd p_n x_n; array (x_0:any,dots,x_n:any) = e|} & \text{|x_i| fresh} \\
+%   |Pd (p squiggt l) e| & = & |Ld (p squiggt l) (De (type^{e}))| \\
+%   \\
+% \multicolumn{5}{l}{\textbf{Desugar a type ascription |l : t|}} \\
+%   |Ld x t| & = & |def y x := t^[y]; y| & |y| \not\in |t| \;\;\;\; \text{``domain-oriented''}\\
+%   ~ & (or:) & |def y x := t^[y]| & |y| \not\in |t| \;\;\;\; \text{``range-oriented''} \\
+%   |Ld (l a) t| & = & |Ld l (arrow (function a () {t}))| \\
+%   |Ld (l^hat) t| & = & |Ld l ((new^(t)))| \\
+%   |Ld (l?) t| & = & |Ld l ((? t))| \\
+%   |Ld (l^arrayty) t| & = & |Ld l ((arrayty^t))| \\
+%   |Ld (p squiggt l) t| & = & |Pd p ((Ld l t))| \\
+% \end{array}
+% $$
+% \caption{Desugaring of expressions (3)} \label{fig:desugar-expr}
+% \end{figure}
+
+\begin{figure}
 \begin{code}
 any    = (x => x)
 int    = (x => applyx isInt x; x)
@@ -404,9 +467,265 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
 \caption{Core prelude} \label{fig:core-prelude}
-\end{figurebox}
+\end{figure}
+
+% --------------------------------------
+\clearpage
+\section{Tim's Core language}
+
+Tim's verifier works like this.
+\begin{itemize}
+\item \textbf{Desugaring} (\Cref{sec:tim-core-syntax}) transforms Source Verse into TimCore.
+\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the TimCore term, keeping its
+  structure but:
+  \begin{itemize}
+  \item Augmenting the inferences |G| that are attached to each scope node.
+  \item Performing beta reductions
+  \end{itemize}
+  Only when ingestion has reached a fixpoint do we move on to the next step.
+\item \textbf{Inference saturation} (\Cref{sec:inf-sat}) does dominator analysis on each
+  inference set |G| separately, and successively rewrites the |G| to reflect the result of this analysis.
+
+\item \textbf{Effect analysis} (\Cref{sec:effect-anal}) checks each sub-term |check fx e| to ensure
+  that the effects of |e| are indeed covered by |fx|.
+\end{itemize}
+
+Questions:
+\begin{itemize}
+\item Could inference saturation give rise to new ingestion opportunities?  We think no.
+\end{itemize}
+
+\subsection{Syntax} \label{sec:tim-core-syntax}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Vertices}} \\
+|vt|  & ::= & |x| \vb |tup (x_1, xdots, x_n)| \\
+|vv|  & ::= & |vt| \vb |k| \vb |f^[x]| \\
+|v|   & ::= & |vv| \vb |lam x e| \\
+\\
+\multicolumn{4}{l}{\text{\bf Scopes}} \\
+|s| & ::= & |scope (x_1, xdots, x_n) G e| \\
+\\
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x = vv| \\
+    & \vb & |x = timlam h fx i x s_0 j y s_1| \\
+%    & \vb & |y=length^[x]| \\
+    & \vb & |x = fail| \\
+    & \vb & |s_1 `choice` s_2| \\
+    & \vb & |e_1 ; e_2| \\
+    & \vb & |check fx e|           & \text{Effects check} \\
+\multicolumn{4}{l}{\text{Omitting for now: cast, error, in, iterate, next}} \\
+\\
+\multicolumn{4}{l}{\text{\bf Inferences}} \\
+|G| & ::= & |emp| \vb |G, g| \\
+|g| & ::= & |edge vt w|  & \text{Data flow from |w| to |v|} \\
+    & \vb & |equals S x fail|   & \text{|v| is unified with failure}\\
+    & \vb & |equals S x w| & \\
+%   & \vb & |lengthis S y z| &  \\
+   & \vb & |dominates S vt w| & \text{|w| dominates |v|} \\
+\\
+\multicolumn{4}{l}{\text{\bf Strengths}} \\
+|S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
+\\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+|fx| & ::= & S \vb |iterates| \vb |fails| \vb |contradicts| \vb |abstracts|
+\end{array}
+$$
+\caption{Tim Core Verse} \label{fig:tim-core-verse}
+\end{figure}
+
+Things to note:
+\begin{itemize}
+\item A \emph{scope} |scope xs G e| binds some existentials |xs|, has a collection of inferences |G| (initially empty), and wraps an expression |e|.
+\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
+\item In a vertex we have an ordinary (POPL) lambda |lam x e|.  Only in an expression do we have a TimLambda.
+\item In a TimLambda |timlam h fx i x s_0 j y s_1|:
+  \begin{itemize}
+  \item |h| is a (bound) occurrence of a variable, presumably already in scope.
+  \item |s_0| is called the \emph{domain scope} and |s_1| is the \emph{range scope}.
+  \item |i| and |x| are binders, and scope over |s_0| and |s_1|.
+  \item |j| and |y| are binders, and scope over |s_1|.
+  \end{itemize}
+\end{itemize}
+
+Questions:
+\begin{itemize}
+\item In the edge |(edge v w)| isn't the LHS, |v|, always a (flexible) variable?
+\item Why |x=fail|?
+\item Does |dominates S v w| have a strength? Why?
+\end{itemize}
+
+\subsection{Ingestion} \label{sec:ingestion}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{rcl}
+X & ::= & |hole| \vb |X ; e| \vb |e ; X|
+\end{array}\\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
+}} \\
+\\
+\begin{array}{lrcll}
+\rulename{res} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,equals resolves x vv) (X^[x=vv])| \\
+\end{array}
+\end{array}
+$$
+\caption{Ingestion rules} \label{fig:tim-ingestion}
+\end{figure}
+
+\Cref{fig:tim-ingestion} gives the ``ingestion'' rules.  Generally they simply augment the inferences |G|
+in (any of) the scope-expression |s| in the program.  Points to note:
+\begin{itemize}
+\item The context |X| looks inside a nested tree of ``|;|'' compositions; but it does not look inside
+  nested scopes or choices.  So only the innermost |G| is affected.
+\end{itemize}
+\noindent
+Questions:
+\begin{itemize}
+\item To avoid lots of duplication, I used vertices |v| in \rulename{lflex}. But that does not
+  account for the POPL-lambda vs Tim-lambda difference between expresions |e| and inferences |g|.
+  Maybe \rulename{lflex} would be better written as a G-to-G rewrite
+  $$ |xs; equals resolves x v| \; \rightarrow \; |xs; equals resolves x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
+\item Beta reduction may not reach a fixpoint.  Ditto iteration?
+\item Can \rulename{res} be generalised  |x=v|?
+ \end{itemize}
+
+\subsection{Inference saturation} \label{sec:inf-sat}
+
+\newcommand{\satarrow}{\rightarrow^{+}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|xs; G_1| \satarrow |G_2|$
+}} \\
+\multicolumn{1}{c}{\text{Extend |G_1| with new (implied) inferences |G_2|}}
+\\ \\
+\begin{array}{lrcll}
+\rulename{trans} & |xs; G, equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
+\rulename{lflex} & |xs; G, equals resolves x vv| & \satarrow & |edge x vv| 
+     & \text{if $x \in |xs|$} \\
+\rulename{rflex} & |xs; G, equals resolves x y| & \satarrow & |edge y x| 
+     & \text{if $|y| \in |xs|$} \\
+\end{array}
+\end{array}
+$$
+\caption{Inference saturation} \label{fig:infernce-saturation}
+\end{figure}
+
+\subsection{Effect analysis} \label{sec:effect-anal}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|effects G e| = |fx|$
+}} \\
+\\
+\begin{array}{rcll}
+  |effects G_1 (scope xs G_2 e)| & = & |effects ((G_1,G_2)) e| \\
+  |effects G (e_1 ; e_2)| & = & |andeffects (effects G e_1) (effects G e_2)| \\
+  |effects G (x=v)| & = & S & \text{if $|equals S x v| \in |G|$} \\
+  |effects G (x=k)| & = & |fails| & \text{if $|equals resolves x k'| \in |G|$ and $k \not= k'$}
+\end{array} \\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|andeffects fx_1 fx_2| = |fx|$
+}} \\
+\\
+\begin{array}{lrcl}
+\multicolumn{4}{c}{\text{All equations also apply with arguments swapped, and apply top-to-bottom}} \\
+(E1) & |andeffects contradicts fx| & = & |contradicts| \\
+(E2) & |andeffects fails fx|       & = & |fails| \\
+(E3) & |andeffects succeeds fx|     & = & |fx| \\
+(E4) & |andeffects abstracts fx|  & = & |abstracts| \\
+(E5) & |andeffects iterates fx|   & = & |iterates| \\
+(E6) & |andeffects resolves iterates| & = & |abstracts| \\
+(E7) & |andeffects resolves fx|  & = & |resolves| \\
+(E8) & |andeffects decides fx|   & = &  |decides|
+\end{array}
+\end{array}
+$$
+\caption{Effect analysis} \label{fig:effect-analysis}
+\end{figure}
+Quesions:
+\begin{itemize}
+\item E5 wins over E6?
+\item Where does |contradicts| come from?
+\end{itemize}
 
 
+\begin{figure}
+% https://q.uiver.app/?q=WzAsMTUsWzQsMCwiXFxtYXRoc2Z7QWJzdHJhY3RzfSJdLFszLDEsIlxcbWF0aHNme0V2YWx1YXRlc30iXSxbMiwyLCJcXG1hdGhzZntSZXNvbHZlc30iXSxbNCw0LCJcXG1hdGhzZntJdGVyYXRlc30iXSxbNCw3LCJcXG1hdGhzZntGYWlsc30iXSxbMiw3LCJcXG1hdGhzZntTdWNjZWVkc30iXSxbMyw4LCJcXG1hdGhzZntEaXZlcmdlc30iXSxbMCwzXSxbNywzXSxbMCw2XSxbNyw2XSxbMiw1LCJcXG1hdGhzZntEZWNpZGVzfSJdLFs2LDIsIlxcbWF0aGJme1VuZGVjaWRhYmxlfSJdLFs2LDQsIlxcbWF0aGJme0RlY2lkYWJsZX0iXSxbNiw3LCJcXG1hdGhiZntEZWNpZGVkfSJdLFswLDEsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSwyLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMywiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDYsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNCw2LCIiLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzcsOCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbOSwxMCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMywxMSwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDExLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzExLDUsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMTEsNCwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&&&& {\mathsf{Abstracts}} \\
+	&&& {\mathsf{Evaluates}} \\
+	&& {\mathsf{Resolves}} &&&& {\mathbf{Undecidable}} \\
+	{} &&&&&&& {} \\
+	&&&& {\mathsf{Iterates}} && {\mathbf{Decidable}} \\
+	&& {\mathsf{Decides}} \\
+	{} &&&&&&& {} \\
+	&& {\mathsf{Succeeds}} && {\mathsf{Fails}} && {\mathbf{Decided}} \\
+	&&& {\mathsf{Diverges}}
+	\arrow[no head, from=1-5, to=2-4]
+	\arrow[no head, from=2-4, to=3-3]
+	\arrow[no head, from=1-5, to=5-5]
+	\arrow[no head, from=8-3, to=9-4]
+	\arrow[no head, from=8-5, to=9-4]
+	\arrow[dashed, no head, from=4-1, to=4-8]
+	\arrow[dashed, no head, from=7-1, to=7-8]
+	\arrow[no head, from=5-5, to=6-3]
+	\arrow[no head, from=3-3, to=6-3]
+	\arrow[no head, from=6-3, to=8-3]
+	\arrow[no head, from=6-3, to=8-5]
+\end{tikzcd}\]
+\end{figure}
 
+\begin{figure}
+\begin{verbatim}
+                          abstracts
+                           /    |
+                     evaluates  |
+                         /      |     UNDECIDABLE
+                  resolves      |
+              ========|=========|================
+                      |    iterates
+                      |   /     |       DECIDABLE
+                     decides    |
+                      |     \   |
+              ========|======\==|================
+                  succeeds   fails        DECIDED
+                      \        /
+                       diverges
+\end{verbatim}
+\caption{Multiplicity effects} \label{fig:mult-effects}
+\end{figure}
 
 \end{document}
+
+    Expressions e      ::== x=n
+                       |    x=y
+                       |    y=f[x]
+                       |    x=<y,..> -- an n-tuple
+
+                       |    x=length[y] -- says y is a tuple of length x
+                       |    x=fail
+
+                       |    e0; e1
+                       |    f=lambda(fx,h) c i x. e0; range d j y. e1
+                       |    e0 | e1
+                       |    exists xs. e0
+                       |    cast(err,x) {h0=>e0; ...; otherwise=>e1}
+                       |    scope c. e0
+                       |    error(err). e0
+                       |    in(abs,i,x) d j y. e0 [value e z. e1 [upon. e2]]
+                       |    iterate(x) c. e0 {succeeds d y. e1} {fails d y. e2}
+                       |    next(c,y)
+                       |    S(c,i,x,s)
+                       |    err

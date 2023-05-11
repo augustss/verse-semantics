@@ -1,0 +1,403 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+
+
+%% Complicated subscript tweak so that a subscript is the same height whether or not a superscript is present.
+%% See Knuth, "The TeXBook", page 179, second "double-dangerous-turn" paragraph.
+%% The implementation here affects only subscripts in the \mathcal font.
+\newif\ifalignsubscripts
+
+\global\alignsubscriptstrue
+
+\newcommand{\setsubscriptalignparameters}{
+\ifalignsubscripts
+{\setbox0=\hbox{$\mathcal{A
+\global\fontdimen16\textfont2=\fontdimen17\textfont2
+}$}}
+\fi
+}
+
+\setsubscriptalignparameters
+
+\newcommand{\alignsubscript}[1]{\ifalignsubscripts\smash{#1}\else#1\fi}
+%\newcommand{\alignsubscript}[1]{\ifalignsubscripts\vbox to 0pt{\vss$#1$}\else#1\fi}
+
+
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+\newcommand{\op}{\mathit{op}}
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+\newcommand{\calcname}{\versecalc\xspace}
+%%\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}  ACMART gives warning about use of \\smallskip for some reason
+\newcommand{\mypara}[1]{\vskip\smallskipamount\noindent\textbf{#1}\xspace}
+
+% \newcommand{\calcname}{Fresh Calculus\xspace}
+% \newcommand{\lcalcname}{Lenient Calculus\xspace}
+% \newcommand{\calcshort}{FC\xspace}
+\newcommand{\vcname}{Verse Calculus\xspace}
+\newcommand{\vcshort}{VC\xspace}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Arrows with explanation, including the common cases of one, two or a repeated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+
+\newcommand{\rightarrowdbl}{\rightarrow\mathrel{\mkern-14mu}\rightarrow}
+\newcommand{\xrightarrowdbl}[2][]{%
+  \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+}
+\newcommand{\leftarrowdbl}{\leftarrow\mathrel{\mkern-14mu}\leftarrow}
+\newcommand{\xleftarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\xleftarrow[#1]{#2}%
+}
+
+\newcommand{\xleftrightarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow}
+
+
+\newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
+\newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
+\newcommand{\rt}{\ensuremath{\mathcal{T}}\xspace}
+\newcommand{\rrhat}{\trel{\rr}}
+\newcommand{\rshat}{\trel{\rs}}
+\newcommand{\rthat}{\trel{\rt}}
+\newcommand{\goone}[1]{\xrightarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\go}[1]{\xrightarrow{}_{\alignsubscript{#1}}}
+\newcommand{\gos}[1]{\xrightarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\lgos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\gok}[2]{\xrightarrowdbl{#2}_{\alignsubscript{#1}}}
+
+\newcommand{\trel}[1]{\ensuremath{\widehat{#1}}}
+\newcommand{\tstep}[3]{\ensuremath{#2 \go{\trel{#1}} #3}}
+
+\newcommand{\rstepo}[3]{\ensuremath{#2 \goone{#1} #3}}
+\newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
+\newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
+\newcommand{\lsteps}[3]{\ensuremath{#2 \lgos{#1} #3}}
+\newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+\newcommand{\ungoone}[1]{\xleftarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\ungo}[1]{\xleftarrow{}_{\alignsubscript{#1}}}
+\newcommand{\ungos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\ungok}[2]{\xleftarrowdbl{#2}_{\alignsubscript{#1}}}
+\newcommand{\unrstepo}[3]{\ensuremath{#2 \ungoone{#1} #3}}
+\newcommand{\unrstep}[3]{\ensuremath{#2 \ungo{#1} #3}}
+\newcommand{\unrsteps}[3]{\ensuremath{#2 \ungos{#1} #3}}
+\newcommand{\unrstepk}[4]{\ensuremath{#3 \ungok{#1}{#2} #4}}
+\newcommand{\univ}{\ensuremath{\mathcal{E}}}
+\newcommand{\join}[3]{{#2} \downarrow_{\alignsubscript{#1}} {#3}}
+\newcommand{\dia}{\ensuremath{\diamond}}
+
+\newcommand{\rnk}{\ensuremath{\rho}}
+\newcommand{\rord}{\ensuremath{\mathcal{O}}}
+\newcommand{\runi}{\ensuremath{\mathcal{U}}}
+\newcommand{\runihat}{\ensuremath{\trel{\mathcal{U}}}}
+\newcommand{\rstr}{\ensuremath{\mathcal{S}}}
+\newcommand{\rapp}{\ensuremath{\mathcal{A}}}
+\newcommand{\rapphat}{\ensuremath{\trel{\mathcal{A}}}}
+\newcommand{\rcon}{\ensuremath{\mathcal{N}}}
+\newcommand{\rconhat}{\ensuremath{\trel{\mathcal{N}}}}
+\newcommand{\rconm}{\ensuremath{\rcon'}}
+\newcommand{\rss}{\ensuremath{\mathcal{SS}}}
+
+\newcommand{\rgc}{\ensuremath{\mathcal{G}}}
+\newcommand{\rgchat}{\ensuremath{\trel{\mathcal{G}}}}
+\newcommand{\rfail}{\ensuremath{\mathcal{F}}}
+\newcommand{\rspc}{\ensuremath{\mathcal{C}}}
+\newcommand{\rspchat}{\ensuremath{\trel{\mathcal{C}}}}
+\newcommand{\norecursion}{no recursion\xspace}
+\newcommand{\noHYPHENrecursion}{no-recursion\xspace}
+\newcommand{\rdx}[1]{\ensuremath{\Delta_{\alignsubscript{#1}}}}
+\newcommand{\txr}[2]{\ensuremath{\rstep{#1}{\rdx{#2}}{\rdx{#2}'}}}
+\newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
+\newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
+
+
+\newcommand{\wf}[1]{\ensuremath{\vdash #1}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+\newcommand{\wffv}[4]{\ensuremath{\vdash_|v| #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wffmany}[4]{\ensuremath{\vdash_{\!*} #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\lvc}[1]{#1}
+\newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
+\newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
+\newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
+
+
+%% Definitions for explaining skew confluence
+\newcommand{\inccon}[2]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#2$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle#1$}}}\vss}}}}}
+\newcommand{\leqomega}{\mathrel{\leq_\omega}} 
+\newcommand{\omegarr}{\omega_{\rr}}
+\newcommand{\leqomegarr}{\mathrel{\leq_{\omegarr}}} 
+\newcommand{\preceqomegarr}{\mathrel{\preceq_{\omega_{\rr}}}}
+\newcommand{\downclose}{\mathord{\Downarrow_{\leqomega}\!}}
+
+
+%% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3
+%% \newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{@@{}l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+
+
+
+%  -------------------------- Syntax -----------------------
+\newcommand{\figureSyntax}{
+\begin{figure}[t]
+    $$
+%%  \begin{array}{l}
+  \begin{array}{l@@{}}
+      \textbf{Syntax} \\
+      \begin{array}{@@{}lrcl@@{}}
+      \text{Integers} & k \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+      \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+      \text{Expressions}   & e     & ::= & |e_1 ; e_2| \vb |def x e| \vb |fail|
+                                           \vb |e_1 choice e_2| \vb |v == r|  \vb |one e| \vb |all e| \\
+      \text{Values} & |v| & ::= & x  \vb \hnf \\
+      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam2 x y e| \\
+      \text{Right hand sides} & |r| & ::= & v \vb |apply1N v_1 v_2| \\
+      \text{Primops} & op  & ::= & |gt| \vb |add|
+  \iffullverse
+      \vb |isInt|
+  \fi
+      \end{array} \\
+      \\[-0.9em]
+      \text{\emph{Concrete syntax}:} \;\;
+      \begin{array}[t]{l}
+            \text{``|choice|'' and ``;'' are right-associative} \\
+            \text{``|choice|'' and ``|==|'' bind more tightly than ``;''} \\
+            \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
+            \hspace{1.2em} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
+      \end{array} \\
+      \text{Parentheses may be used freely to aid readability and override default precedence.}\\
+  \\[-0.6em]
+      \textbf{Desugaring (todo: update} \\
+%%    \begin{array}{rcl@@{\hspace{4em}}l}
+    \begin{array}{rcl@@{\hspace{3.5em}}l}
+%%      |emptytup| & \text{means} & |arr ()|\\
+%%      |tup (v_1, dots, v_n)| & \text{means} & |arr (v_1,dots, v_n)| \quad n \geq 2 \\
+\iffalse
+% Do not use := when defining sugar
+      |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | & \\
+      |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
+      |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
+      |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means} &
+          |def (x_1 ^^ x_2 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1,xdots, x_n))| & \text{|x_i| fresh} \\
+      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
+%      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
+
+%       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+      |x :== e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
+      |lamhdr emptytup^^ e| & \text{means} & |lam p (p == emptytup; e)| & \text{|p| fresh} \\
+      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p == tup (x,y); e))| & \text{|p| fresh} \\
+      |if e_1 then e_2 else e_3| & \text{means}
+      & |def y (y == one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y)| & \text{|y| fresh} \\
+\else
+% Use := when defining sugar
+      |e_1 + e_2| & \text{means} & |applyN add ( e_1, e_2 ) | & \\
+      |e_1 > e_2| & \text{means} & |applyN gt ( e_1, e_2 ) | & \\
+      |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
+      |x :== e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
+      |e_1 e_2| & \text{means} & |f :== e_1 ; x :== e_2; apply1N f x|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means} &
+          |x_1:==e_1; xdots; x_n:==e_n; tup (x_1,xdots, x_n)| & \text{|x_i| fresh} \\
+      |e_1 == e_2|      & \text{means} & |x :== e_1 ; x == e_2; x|       & |x|\ \text{fresh} \\
+
+%       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+%      |lamhdr emptytup^^ e| & \text{means} & |lam p (p == emptytup; e)| & \text{|p| fresh} \\
+%      |lamhdr (tup(x,y))^^ e| & \text{means} & |lam p (def (x ^^ y) (p == tup (x,y); e))| & \text{|p| fresh} \\
+      |lamhdr (tup(x_1, xdots, x_n))^^ e| & \text{means} & |lam p (def (x_1 xdots x_n) (p == tup(x_1, xdots, x_n); e))| & \text{|p| fresh, $|n| \geq 0$} \\
+%      |if e_1 then e_2 else e_3| & \text{means}
+%         & |y :== one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y| & \text{|y| fresh} \\
+      |if (def (x_1^^xdots^^x_n) e_1) then e_2 else e_3| & \text{means}
+         & \multicolumn{2}{@@{}l}{|apply0(one( (def (x_1^^xdots^^x_n) e_1; thunk e_2) choice (thunk e_3)))|} \\
+\fi
+    \end{array} \\
+  \\[-0.6em]
+  \text{$\freevars{|e|}$ means the free variables of |e|; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
+  \end{array}
+  $$
+  \caption{\textbf{\calcname: Syntax}} \label{fig:syntax}
+  \Description{A table that exhibits a BNF grammar for the syntax of the Verse Calculus, some rules about resolving parsing ambiguity,
+      and a list of rules for desugaring constructs that are notationally convenient but not part of the Verse Calculus proper}
+\end{figure}
+}
+
+%  -------------------------- Contexts -----------------------
+\newcommand{\figureContexts}{
+\begin{figure}
+    $$
+\begin{array}{l}
+      \begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |eq; X| \\
+%       \text{Equation contexts (hole is |eq|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
+      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+      \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
+                            & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+
+  \iffullverse
+      && \vb & |succeeds hole| \vb |decides hole| \\
+  \fi
+      \text{Choice contexts} & CX & ::= & \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX| \\
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceq ; ce|
+                                     \vb |one e| \vb |all e| \vb |def x ce|
+                                     \vb |apply1 op v| \\
+                               & ceq & ::= & |ce| \vb |v == ce| \\
+    \end{array}\\
+\\[-0.6em]
+\text{\textit{Note}: The |hole| in |X| can only be an expression, not an equation.}
+\end{array}
+\vspace{-0.5em}
+     $$
+    \caption{The syntax of contexts}
+    \Description{A table that exhibits a BNF grammar that defines execution contexts, value contexts., scope contexts, choice contexts, and chouce-free expressions}
+      \label{fig:contexts} \label{fig:choice-free-syntax}
+\end{figure}
+}
+
+\newcommand{\alphamark}{use $\alpha$}
+
+% ------------------ ICFP rewrite rules -------------------
+
+\newcommand{\figureRewriteRules}{
+  %% BE SURE TO KEEP THE BULLET ITEMS IN \cref{sec:confluence} IN FILE ../confluence/04-confluence.ltx SYNCHRONIZED WITH THE RULE NAMES IN THIS FIGURE!
+  \begin{figure}
+%% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3 
+%%    $\begin{array}{l}
+
+         %%          $\begin{array}{@@{}l@@{}}
+    $\begin{array}{@@{}l}
+
+    % \rulegroupname{Primitive operations}
+
+    \iffullverse
+        \rulename{p-isInt} & |apply1 isInt hnf| & \movesto &
+        $\left\{\begin{array}{@@{}ll}
+          |()| & \text{if |hnf| is an integer} \\
+          |fail| & \text{otherwise}
+          \end{array}\right.$
+    \fi
+
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Application:}
+\rulename{app-add}          & |v == applyN add (k_1 ,k_2)| & \movesto & |v == k_3| & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & |v == applyN gt (k_1,k_2)|   & \movesto & |v == k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |v == applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-beta}^{\alpha} & |v_1 == apply1 (lam2 x y e) v_2| & \movesto & |def (x,y) (x==v_2; e; v_1=y)|
+                                                  & \text{if $x \not\in \freevars{|v_2|}$} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
+                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
+                              \hspace{0.7em}\text{$|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
+\\[-0.6em]
+
+\rulegroupname{Unification:}
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+  & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$}, \\
+  &&&& \text{\hskip 0.7em and ($|v| = |y| \implies |x| \prec |y|$)} \\
+  \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
+  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
+  \rulename{seq-swap} & |e; x==v| & \movesto & |x==v; e| &
+                      \text{unless (|e| is |y==v'| and |y| $\preceq$ |x|)} \\
+
+    \\[-0.6em]
+
+\rulegroupname{Elimination:}
+\rulename{val-elim} & |v ; e| & \movesto & |e| \\
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
+
+    \\[-0.6em]
+
+\rulegroupname{Normalization:}
+\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
+\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+
+    \\[-0.6em]
+
+\rulegroupname{Choice:}
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one v| & \movesto & |v| \\
+\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
+\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
+
+
+\end{array} \\
+\\[-0.3em]
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\end{array}$
+\iffullverse
+$$\begin{array}{l}
+  \textit{Effects} \\
+    \begin{array}{lr@@{\;}c@@{\;}l}
+      \rulename{succ-value} & |succeeds v| & \movesto & |v| \\
+      \rulename{dec-fail} & |decides fail| & \movesto & |fail| \\
+      \rulename{dec-value} & |decides v| & \movesto & |v| \\
+    \end{array} \\
+  \end{array}$$
+\fi
+\caption{\textbf{The \vcname: Rewrite rules}} \label{fig:rules}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+}
+
+\newcommand{\figureStructuralRules}{
+  \begin{figure}
+    $$
+    \begin{array}{l}
+      \textit{Structural rules} \\
+      \begin{array}{lr@@{\;}c@@{\;}ll}
+      \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+      \rulename{val-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| \\
+      \text{\lennart{Plan D:}}\\
+      \rulename{var-swap-subst} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+      % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+      \end{array} \\
+
+     \end{array}
+     $$
+    \caption{The Verse calculus: Structural Rules}
+    \Description{The Verse calculus: Structural Rules}
+      \label{fig:rules-structural}  \label{fig:structural}
+   \end{figure}
+}
+

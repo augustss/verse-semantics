@@ -1,4 +1,5 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-exists X
-all{X = false} = ()
-X = true
+X = 1
+Loop()
+X := 2
+Loop() := Loop()

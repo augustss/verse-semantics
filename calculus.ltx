@@ -491,7 +491,7 @@ of |e_2|.  The choice operator is associative.
 
 The choices returned from an expression may be collected into an array using the |allKW| construct. The |oneKW| construct returns the first value produced by an expression, and is used to implement conditionals.
 
-The effect annotations |succeedsKW| and |decidesKW| restrict how many results an expression may return. An expression wrapped by |succeedsKW| must return exactly one value; an expression wrapped by |decidesKW| must return zero or one value, but not a choice of values. 
+The effect annotations |succeeds| and |decides| restrict how many results an expression may return. An expression wrapped by |succeeds| must return exactly one value; an expression wrapped by |decides| must return zero or one value, but not a choice of values. 
 
 \subsection{Evaluation strategy}
 The axioms given in figures \ref{fig:general-axioms} and \ref{fig:unification-axioms}
@@ -657,7 +657,7 @@ To clearly identify wrong terms, we introduce the special construct |wrong| to t
 \item Use numbers as functions
 \item Unify lambdas
 \item Fail the occurs check, as in |x = (1,x)|
-\item Fail effect annotations (|succeedsKW|, |decidesKW|)
+\item Fail effect annotations (|succeeds|, |decides|)
 \end{itemize}
 
 The introduction of |wrong| is crucial to give a specification to a \emph{verifier}, which is a static analysis that rules out the existence of a wrong reduction; according to the motto “verified programs don’t go wrong”.
@@ -942,7 +942,7 @@ $$
         & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
   \\
   |r| & ::= & \textit{Effects} \\
-      &     & |succeedsKW| \vb |decidesKW| \vb |iteratesKW|
+      &     & |succeeds| \vb |decides| \vb |iterates|
 \end{array}
 $$
 \\
@@ -1144,7 +1144,7 @@ $$
 \end{array} \\
 \\
 \begin{array}{rclll}
-    \multicolumn{5}{l}{ \text{Definition of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW| in terms of |splitKW|. } } \\
+    \multicolumn{5}{l}{ \text{Definition of |oneKW|, |allKW|, |succeeds|, and |decides| in terms of |splitKW|. } } \\
     |one e| & = & |split e (_ => fail) (x => _ => x)| & \text{|x| fresh} \\
     |all e| & = &
     \begin{array}[t]{@@{}l}
@@ -1161,7 +1161,7 @@ $$
 \end{array}
 $$
 \lennart{Does |f| need to be a thunk?  Does second argument to |g| need to be a thunk? Yes, or it may |fail| in the wrong place.}
-\caption{Alternative: Use |splitKW| instead of |oneKW|, |allKW|, |succeedsKW|, and |decidesKW|.} \label{fig:split}
+\caption{Alternative: Use |splitKW| instead of |oneKW|, |allKW|, |succeeds|, and |decides|.} \label{fig:split}
 \end{figurebox}
 
 \clearpage

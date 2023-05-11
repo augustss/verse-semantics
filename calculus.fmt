@@ -1,3 +1,37 @@
+%% ----------------------
+%% Stuff for TimCore
+
+%format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
+%format lam2 x y e = "\lambda" x "\rightarrow" y ".\," e
+%format scope (vs) (stuff) (e) = "\textbf{scope}(" vs ";" stuff ").\," e
+
+%% 'g' inferences
+%format edge v w = v "\leftarrow" w
+%format fails s v  = s "\{" v==fail "\}"
+%format equals s v w  = s "\{" v==w "\}"
+%format lengthis s y z = s "\{" length^[y]==z "\}"
+%format dominates s v w = s "\{" v "\twoheadleftarrow" w "\}"
+
+%format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
+
+%format fx_1
+%format fx_2
+%format andeffects (fx1) (fx2) = fx1 "\ast" fx2
+
+%% --------- Effects ------------
+%format succeeds = "\textbf{succeeds}"
+%format succeedsE (e) = "\textbf{succeeds}\{" e "\}"
+%format decides = "\textbf{decides}"
+%format decidesE (e) = "\textbf{decides}\{" e "\}"
+%format iterates = "\textbf{iterates}"
+%format iteratesE (e) = "\textbf{iterates}\{" e "\}"
+%format resolves = "\textbf{resolves}"
+%format fails = "\textbf{fails}"
+%format abstracts = "\textbf{abstracts}"
+%format contradicts = "\textbf{contradicts}"
+
+
+%% ----------------------
 %format ^ = " "
 %format ^^ = "\hspace{0.1em}"
 
@@ -138,12 +172,6 @@
 %format store (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\,\{" y "\}"
 %format storeTwoLines (x) (y) = "\textbf{store}\;" x "\;\textbf{in}\\\{" y "\}"
 %format cell (k) (v) = k "\mapsto\!" v
-%format succeedsKW = "\textbf{succeeds}"
-%format succeeds (e) = "\textbf{succeeds}\{" e "\}"
-%format decidesKW = "\textbf{decides}"
-%format decides (e) = "\textbf{decides}\{" e "\}"
-%format iteratesKW = "\textbf{iterates}"
-%format iterates (e) = "\textbf{iterates}\{" e "\}"
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
@@ -175,7 +203,7 @@
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format function (x)(rhs) = functionKW "(" x ")." rhs
-%format functionKW = "\textbf{fun}"
+%format functionKW = "\textbf{function}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -197,7 +225,7 @@
 %format lte = "\prec"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = r "\{" b "\}"
+%format check (r) (b) = "{\bf verify}\langle" r "\rangle\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -227,6 +255,11 @@
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
+
+%format cx_0
+%format cx_1
+%format cx_2
+%format cx_3
 
 %format x_0
 %format x_1
@@ -268,6 +301,10 @@
 %format w_2
 %format w_i
 %format w_n
+
+%format G_0
+%format G_1
+%format G_2
 
 %format e_0
 %format e_1

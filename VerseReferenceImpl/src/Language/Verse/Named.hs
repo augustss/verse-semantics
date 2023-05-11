@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,6 +12,7 @@ module Language.Verse.Named
 
 import Control.Monad.Var
 
+import Data.Freshenable
 import Data.Unifiable
 
 import Language.Verse.Pretty
@@ -28,9 +30,15 @@ instance EqVarRef (VarRef m) => Zippable (Named m) where
     (Ref x, Ref y) | eqVarRef x y -> Just []
     _ -> Nothing
 
+instance Freshenable a => Freshenable (Named m a) where
+  type Elem (Named m a) = Elem a
+  freshen f = \ case
+    Val x -> Val <$> freshen f x
+    x@Ref {} -> pure x
+
 instance (MonadPretty a m, MonadVarRef m) => MonadPretty (Named m a) m where
   prettyM = \ case
     Val x -> prettyM x
-    Ref ref -> readVarRef ref >>= freezeVar >>= \ case
+    Ref x -> readVarRef x >>= freezeVar >>= \ case
       Nothing -> pure "_"
       Just x -> prettyM x

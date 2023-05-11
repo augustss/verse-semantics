@@ -1,10 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -34,86 +37,346 @@ import Control.Monad.Var (EqVarRef, MonadVar, MonadVarRef, freshenVar, readVar)
 import Control.Monad.Var qualified
 import Control.Monad.Verse.Class
 
+import Data.Bool
+import Data.Either
+import Data.Eq
 import Data.Fix
 import Data.Foldable
+import Data.Traversable
 import Data.Freshenable
 import Data.Function
 import Data.Functor
+import Data.Int
 import Data.IntMap.Internal qualified as LabelMap.Internal
-import Data.IntMap.Lazy qualified as LabelMap.Lazy
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as LabelMap
+import Data.IntMap.Lazy (IntMap)
+import Data.IntMap.Lazy qualified as LabelMap
 import Data.Maybe
+import Data.Monoid (mempty)
 import Data.Ref
+import Data.Tuple
+import Data.Semigroup ((<>))
 import Data.Unifiable
+import Data.Word
 
 import GHC.Exts (Any)
+
+import Prelude (Num (..), ($!), error)
 
 import Unsafe.Coerce qualified
 
 newtype VerseT m a = VerseT
-  { unVerseT :: RST Env (Susps m) (LogicT (StateT (Heaps m) (SupplyT Label m))) a
+  { unVerseT :: RST SplitLabel (Listeners m) (LogicT (StateT (Heap m) (SupplyT Label m))) a
   } deriving ( Functor
              , Applicative
              , Monad
              )
+
+type SplitLabel = Label
+
+type Listeners m = LabelMap [Listener m Any]
+
+data Listener m a = Listener
+  !(Heap m)
+  !(a -> VerseT m ())
+
+data Heap m = Nil | Cons
+  { label :: {-# UNPACK #-} !Label
+  , listeners :: !(HeapListeners m)
+  , copied :: !(Heap m)
+  , commitRef :: !(Ref m (Commit m))
+  , tail :: !(Heap m)
+  }
+
+data HeapListeners m = Empty | Listeners
+  { kind :: !HeapKind
+  , listenerLengthRef :: !(Ref m Word)
+  , listenersRef :: !(Ref m (IntMap [Listener m Any]))
+  , heapListenerRef :: !(Ref m (Maybe (HeapListener m)))
+  }
+
+data HeapKind = Split | Choice
+
+isSettled :: MonadRef m => Heap m -> VerseT m Bool
+isSettled = \ case
+  Cons { listeners = Listeners { listenerLengthRef } } ->
+    lift $ (== 0) <$> readRef listenerLengthRef
+  _ -> pure False
+
+incrListenerLength :: MonadRef m => Heap m -> VerseT m ()
+incrListenerLength = \ case
+  Cons { listeners = Listeners { listenerLengthRef } } ->
+    lift $ incr listenerLengthRef
+  _ -> pure ()
+
+popListeners :: MonadRef m => Label -> VerseT m (Maybe [Listener m Any])
+popListeners i = getHeap >>= \ case
+  Cons { listeners = Listeners { listenersRef } } -> do
+    VerseT . modify $ LabelMap.delete i
+    lift (readRef listenersRef) <&> lookupDelete i >>= \ case
+      Just (xs, s) -> Just xs <$ lift (writeRef listenersRef s)
+      Nothing -> pure Nothing
+  _ -> VerseT . state $ \ s -> case lookupDelete i s of
+    Just (xs, s) -> (Just xs, s)
+    Nothing -> (Nothing, s)
+
+addNewListener :: MonadRef m =>
+                  Var m f ->
+                  Label ->
+                  (f (Var m f) -> VerseT m ()) ->
+                  VerseT m ()
+addNewListener _ i f = do
+  h <- getHeap
+  splitLabel <- askSplitLabel
+  let f' = toAnyListener $ Listener h $ localSplitLabel (const splitLabel) . f
+  addNewListener' h i f'
+  VerseT . modify' $ insertListener i f'
+
+addNewListener' :: MonadRef m => Heap m -> Label -> Listener m Any -> VerseT m ()
+addNewListener' h i f = do
+  incrListenerLength h
+  modifyListeners' h $ insertListener i f
+
+addListeners :: MonadRef m => Listeners m -> VerseT m ()
+addListeners s = modifyListeners (flip appendListeners s)
+
+addListeners' :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
+addListeners' h s = modifyListeners' h (flip appendListeners s)
+
+addListenersFromTo :: MonadRef m => Heap m -> Heap m -> Listeners m -> VerseT m ()
+addListenersFromTo h = \ case
+  Cons { label } -> addListenersFromTo' h label
+  _ -> addListenersFrom h
+
+addListenersFromTo' :: MonadRef m => Heap m -> Label -> Listeners m -> VerseT m ()
+addListenersFromTo' h i = case h of
+  Cons { label, listeners = Listeners { kind }, tail } -> case label == i of
+    False -> case kind of
+      Split -> \ s -> addListeners' tail s *> addListenersFromTo' tail i s
+      Choice -> addListenersFromTo' tail i
+    True -> const $ pure ()
+  _ -> const $ pure ()
+
+addListenersFrom :: MonadRef m => Heap m -> Listeners m -> VerseT m ()
+addListenersFrom = \ case
+  Cons { listeners = Listeners { kind }, tail = h } -> case kind of
+    Split -> \ s -> addListeners' h s *> addListenersFrom h s
+    Choice -> addListenersFrom h
+  _ -> const $ pure ()
+
+moveListenersAt :: MonadRef m => Label -> Label -> VerseT m ()
+moveListenersAt i j = modifyListeners $ insertDeleteListeners i j
+
+getListeners' :: MonadRef m => Heap m -> VerseT m (Listeners m)
+getListeners' = \ case
+  Cons { listeners = Listeners { listenersRef } } -> lift $ readRef listenersRef
+  _ -> VerseT get
+
+putListeners :: MonadRef m => Listeners m -> VerseT m ()
+putListeners s = getHeap >>= \ case
+  Cons { listeners = Listeners { listenersRef } } -> do
+    lift $ writeRef listenersRef s
+    VerseT $ put s
+  _ -> VerseT $ put s
+
+modifyListeners :: MonadRef m => (Listeners m -> Listeners m) -> VerseT m ()
+modifyListeners f = do
+  getHeap >>= flip modifyListeners' f
+  VerseT $ modify' f
+
+modifyListeners' :: MonadRef m => Heap m -> (Listeners m -> Listeners m) -> VerseT m ()
+modifyListeners' h f = case h of
+  Cons { listeners = Listeners { listenersRef } } -> lift $ modifyRef' listenersRef f
+  _ -> pure ()
+
+insertDeleteListeners :: Label -> Label -> Listeners m -> Listeners m
+insertDeleteListeners i j s = case lookupDelete j s of
+  Just (xs, s) -> insertListeners i xs s
+  Nothing -> s
+
+data HeapListener m = HeapListener
+  !(Heap m)
+  !(Heap m -> Bool -> VerseT m ())
+
+putHeapListener :: MonadRef m => Heap m -> (Heap m -> Bool -> VerseT m ()) -> VerseT m ()
+putHeapListener = \ case
+  Cons { listeners = Listeners { heapListenerRef } } -> \ f -> do
+    splitLabel <- askSplitLabel
+    h <- getHeap
+    incrListenerLength h
+    let f' h = localSplitLabel (const splitLabel) . f h
+    lift . writeRef heapListenerRef $ Just $ HeapListener h f'
+  _ -> error "putHeapListener"
+
+type Label = Int
+
+type LabelMap = IntMap
+
+type Commit m = Heap m -> Heap m -> CommitT m ()
+
+emptyCommit :: Monad m => Commit m
+emptyCommit _ _ = pure ()
 
 deriving instance MonadError e m => MonadError e (VerseT m)
 
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m =
   runSupplyT .
-  flip evalStateT emptyHeaps .
+  flip evalStateT Nil .
   observeAllT' $ do
     splitLabel <- supply
-    evalRST (unVerseT m) Env { splitLabel } emptySusps
+    evalRST (unVerseT m) splitLabel mempty
 
 observeAllT' :: MonadRef m =>
-                LogicT (StateT (Heaps m) (SupplyT Label m)) a ->
-                StateT (Heaps m) (SupplyT Label m) [a]
+                LogicT (StateT (Heap m) (SupplyT Label m)) a ->
+                StateT (Heap m) (SupplyT Label m) [a]
 observeAllT' m = unLogicT m sk fk
   where
-    sk x fk = (lift . commit' =<< gets heap) *> ((x:) <$> fk)
+    sk x fk = (lift . commit' =<< get) *> ((x:) <$> fk)
     fk = pure []
-
-emptyHeaps :: Heaps m
-emptyHeaps = Heaps { heap = Nil }
-
-emptySusps :: Susps m
-emptySusps = Susps { promises = mempty, listeners = mempty }
 
 instance MonadTrans VerseT where
   lift = VerseT . lift . lift . lift . lift
 
-instance MonadRef m => Alternative (VerseT m) where
+instance (MonadFix m, MonadRef m) => Alternative (VerseT m) where
   empty = VerseT empty
 
   x <|> y = do
     h <- getHeap
     VerseT $ unVerseT (pushChoice h *> x) <|> unVerseT (popChoice h *> y)
 
-instance MonadRef m => MonadPlus (VerseT m)
+instance (MonadFix m, MonadRef m) => MonadPlus (VerseT m)
 
 instance MonadSupply s m => MonadSupply s (VerseT m)
-
-newVar' :: MonadRef m => f (Var m f) -> SupplyT Label m (Var m f)
-newVar' x = lift . fmap Var . newLRef' . Repr . flip Bound x =<< supply
 
 instance (MonadFix m, MonadRef m) => MonadVar (VerseT m) where
   type Var (VerseT m) = Var m
 
-  freshVar =
-    fmap Var . newLRef . Repr =<< Unbound <$> VerseT supply <*> askSplitLabel
+  freshVar = lift . newVar'' =<< Unbound <$> VerseT supply <*> askSplitLabel
 
   newVar = VerseT . lift . lift . lift . newVar'
 
   readVar var = findVar var <&> \ case
-    (_, Unbound _ _) -> Nothing
+    (_, Unbound {}) -> Nothing
     (_, Bound _ x) -> Just x
 
   freezeVar = runFreezeT . freezeVar'
 
   freshenVar = runFreshenT . freshenVar'
+
+newtype Var m f = Var
+  { unVar :: Ref m (RefState (SetState m f))
+  }
+
+data RefState a = RefState
+  !(LabelMap a)
+  !a
+
+data SetState m f
+  = Repr !(VarState m f)
+  | Link (Var m f)
+
+data VarState m f
+  = Unbound {-# UNPACK #-} !Label {-# UNPACK #-} !SplitLabel
+  | Bound {-# UNPACK #-} !Label !(f (Var m f))
+
+newVar' :: MonadRef m => f (Var m f) -> SupplyT Label m (Var m f)
+newVar' x = lift . newVar'' . flip Bound x =<< supply
+
+newVar'' :: MonadRef m => VarState m f -> m (Var m f)
+newVar'' = newVar''' . Repr
+
+newVar''' :: MonadRef m => SetState m f -> m (Var m f)
+newVar''' = fmap Var . newRef . RefState mempty
+
+eqVar :: EqRef (Ref m) => Var m f -> Var m f -> Bool
+eqVar = eqRef `on` unVar
+
+type FoundVar m f = (Var m f, VarState m f)
+
+findVar :: MonadRef m => Var m f -> VerseT m (FoundVar m f)
+findVar var = lift . findVar' var =<< getHeap
+
+findVar' :: MonadRef m => Var m f -> Heap m -> m (FoundVar m f)
+findVar' var h = readSetState var h >>= \ case
+  Repr x -> pure (var, x)
+  Link var' -> findVar'' var var' h
+
+findVar'' :: MonadRef m => Var m f -> Var m f -> Heap m -> m (FoundVar m f)
+findVar'' var var' h = readSetState var' h >>= \ case
+  Repr x -> pure (var', x)
+  Link var'' -> do
+    writeVar' var (Link var'') h
+    findVar'' var' var'' h
+
+readSetState :: MonadRef m => Var m f -> Heap m -> m (SetState m f)
+readSetState var h = readRef (unVar var) <&> \ s -> find s h
+  where
+    find (RefState xs x) = \ case
+      Nil -> x
+      Cons { label, copied, tail } ->
+        lookup' label xs `or'`
+        lookupCopied xs copied `or'`
+        lookup xs tail `or'`
+        x
+
+    lookup xs = \ case
+      Nil -> Nothing
+      Cons { label, copied, tail } ->
+        lookup' label xs <|>
+        lookupCopied xs copied <|>
+        lookup xs tail
+
+    lookup' i xs = case LabelMap.lookup i xs of
+      x@(Just (Repr (Bound {}))) -> x
+      x@(Just (Link _)) -> x
+      _ -> Nothing
+
+    lookupCopied xs = \ case
+      Nil -> Nothing
+      Cons { label, copied } ->
+        lookup' label xs <|>
+        lookupCopied xs copied
+
+writeVar :: MonadRef m => Var m f -> SetState m f -> VerseT m ()
+writeVar var x = lift . writeVar' var x =<< getHeap
+
+writeVar' :: MonadRef m => Var m f -> SetState m f -> Heap m -> m ()
+writeVar' var x = \ case
+  Nil -> modifyRef' (unVar var) $ \ (RefState xs _) ->
+    RefState xs x
+  Cons { label } -> modifyRef' (unVar var) $ \ (RefState xs y) ->
+    RefState (LabelMap.insert label x xs) y
+
+readRefState :: MonadRef m => Ref m (RefState a) -> Heap m -> m a
+readRefState ref h = readRef ref <&> \ s -> find s h
+  where
+    find (RefState xs x) = \ case
+      Nil -> x
+      Cons { label, copied, tail } ->
+        LabelMap.lookup label xs `or'`
+        lookupCopied xs copied `or'`
+        lookup xs tail `or'`
+        x
+
+    lookup xs = \ case
+      Nil -> Nothing
+      Cons { label, copied, tail } ->
+        LabelMap.lookup label xs <|>
+        lookupCopied xs copied <|>
+        lookup xs tail
+
+    lookupCopied xs = \ case
+      Nil -> Nothing
+      Cons { label, copied } ->
+        LabelMap.lookup label xs <|>
+        lookupCopied xs copied
+
+writeRefState :: MonadRef m => Ref m (RefState a) -> a -> Heap m -> m ()
+writeRefState ref x = \ case
+  Nil -> modifyRef' ref $ \ (RefState xs _) ->
+    RefState xs x
+  Cons { label } -> modifyRef' ref $ \ (RefState xs y) ->
+    RefState (LabelMap.insert label x xs) y
 
 type FreezeT f m = RST (Heap m) (LabelMap (Fix f)) (MaybeT m)
 
@@ -129,11 +392,11 @@ freezeVar' :: ( MonadFix m
 freezeVar' var = do
   h <- ask
   lift (lift $ findVar' var h) >>= \ case
-    (_, Unbound _ _) -> empty
+    (_, Unbound {}) -> empty
     (_, Bound i x) -> mfix $ \ x' ->
-      gets (lookupInsert i x') >>= \ case
-        Left x -> pure x
-        Right s -> put s *> (Fix <$> traverse freezeVar' x)
+      state' (lookupInsert i x') >>= \ case
+        Just x -> pure x
+        Nothing -> Fix <$> traverse freezeVar' x
 
 type FreshenT f m = RST (Heap m) (LabelMap (Var m f)) (SupplyT Label m)
 
@@ -149,14 +412,12 @@ freshenVar' :: ( MonadFix m
                , MonadRef m
                , Traversable f
                ) => Var m f -> FreshenT f m (Var m f)
-freshenVar' var = do
-  h <- ask
-  lift (lift $ findVar' var h) >>= \ case
-    (_, Bound i x) -> mfix $ \ x' ->
-      gets (lookupInsert i x') >>= \ case
-        Left x -> pure x
-        Right s -> put s *> (lift . newVar' =<< traverse freshenVar' x)
-    (var, Unbound _ _) -> pure var
+freshenVar' var = ask >>= lift . lift . findVar' var >>= \ case
+  (_, Bound i x) -> mfix $ \ x' ->
+    state' (lookupInsert i x') >>= \ case
+      Just x -> pure x
+      Nothing -> lift . newVar' =<< traverse freshenVar' x
+  (var, Unbound {}) -> pure var
 
 newtype VarRef m f = VarRef { unVarRef :: Ref m (RefState (Var m f)) }
 
@@ -177,7 +438,9 @@ instance (MonadFix m, MonadRef m) => MonadVarRef (VerseT m) where
 
   writeVarRef ref x = do
     h <- getHeap
-    lift $ writeRefState (unVarRef ref) x h *> addWriteCommit' ref h
+    lift $ do
+      writeRefState (unVarRef ref) x h
+      addWriteCommit' ref h
 
 addWriteCommit' :: ( MonadFix m
                    , MonadRef m
@@ -197,37 +460,37 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadUnify (VerseT m) where
         splitLabel <- askSplitLabel
         case (splitLabel_x == splitLabel, splitLabel_y == splitLabel) of
           (False, False) -> do
-            addBoundListener var_x i_x $ \ val_x ->
+            addNewListener var_x i_x $ \ val_x ->
               readVar var_y >>= \ case
                 Just val_y -> check val_x val_y
                 Nothing -> pure ()
-            addBoundListener var_y i_y $ \ val_y ->
+            addNewListener var_y i_y $ \ val_y ->
               readVar var_x >>= \ case
                 Just val_x -> check val_x val_y
                 Nothing -> pure ()
             unionVars var_x var_y
           (False, True) -> do
-            addListenersAt i_x =<< getListenersAt i_y
+            moveListenersAt i_x i_y
             unionVars var_x var_y
           (True, False) -> do
-            addListenersAt i_y =<< getListenersAt i_x
+            moveListenersAt i_y i_x
             unionVars var_y var_x
           (True, True) -> do
-            addListenersAt i_x =<< getListenersAt i_y
+            moveListenersAt i_x i_y
             unionVars var_x var_y
       (Unbound i_x splitLabel_x, Bound _ val_y) -> do
         unionVars var_y var_x
-        notifyBoundListeners i_x val_y
+        notifyListeners i_x val_y
         splitLabel <- askSplitLabel
         when (splitLabel_x /= splitLabel) $
-          addBoundListener var_x i_x $ \ val_x ->
+          addNewListener var_x i_x $ \ val_x ->
             check val_x val_y
       (Bound _ val_x, Unbound i_y splitLabel_y) -> do
         unionVars var_x var_y
-        notifyBoundListeners i_y val_x
+        notifyListeners i_y val_x
         splitLabel <- askSplitLabel
         when (splitLabel_y /= splitLabel) $
-          addBoundListener var_y i_y $ \ val_y ->
+          addNewListener var_y i_y $ \ val_y ->
             check val_x val_y
       (Bound _ val_x, Bound _ val_y) ->
         check val_x val_y
@@ -243,7 +506,7 @@ check val_x val_y = zipMatchM val_x val_y >>= \ case
 
 instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadVerse (VerseT m) where
   whenBound var f = findVar var >>= \ case
-    (_, Unbound i _) -> addBoundListener var i f
+    (_, Unbound i _) -> addNewListener var i f
     (_, Bound _ x) -> f x
 
   split m = split' $ do
@@ -252,181 +515,117 @@ instance (MonadFix m, MonadRef m, EqRef (Ref m)) => MonadVerse (VerseT m) where
       pushSplit
       m
 
-newtype Env = Env
-  { splitLabel :: SplitLabel
-  }
-
-type SplitLabel = Label
-
-data Susps m = Susps
-  { promises :: !(Promises m)
-  , listeners :: !(Listeners m)
-  }
-
-type Promises m = [Promise m]
-
-type Listeners m = LabelMap [Listener m Any]
-
-newtype Heaps m = Heaps
-  { heap :: (Heap m)
-  }
-
-type Commit m = Heap m -> Heap m -> CommitT m ()
-
-emptyCommit :: Monad m => Commit m
-emptyCommit _ _ = pure ()
-
-type CommitT m = SupplyT Label m
-
-runCommitT :: Monad m => CommitT m a -> VerseT m a
-runCommitT = VerseT . lift . lift . lift
-
-data Listener m a = Listener
-  !(Heap m)
-  !(Heap m)
-  !(Promise m)
-  !(Callback m a)
-
-type Callback m a = Heap m -> a -> VerseT m ()
-
-data Promise m = Promise
-  {-# UNPACK #-} !Label
-  !(LRef m (Maybe Bool))
-
-data Heap m
-  = Nil
-  | Cons {-# UNPACK #-} !Label !(Heap m) !HeapKind !(Ref m (Commit m)) !(Heap m)
-
-data HeapKind = Split | Choice deriving Show
-
-type Label = Int
-
-type LabelMap = IntMap
-
-split' :: (MonadFix m, MonadRef m, Freshenable f) =>
-          VerseT m (f (Var m)) ->
-          (Maybe (f (Var m), VerseT m (f (Var m))) -> VerseT m ()) ->
+split' :: (MonadFix m, MonadRef m, Freshenable a, Elem a ~ Var m) =>
+          VerseT m a ->
+          (Maybe (a, VerseT m a) -> VerseT m ()) ->
           VerseT m ()
 split' m f = do
   h <- getHeap
-  msplit' m >>= \ case
+  msplit' m mempty >>= \ case
     Just (x, s, m) -> do
       h' <- getHeap
-      putHeap h
-      for_ s.promises addListenable
-      addListeners s.listeners
-      splitPromises s.promises h' $ \ h' -> \ case
+      isSettled h' >>= \ case
         True -> do
-          h <- getHeap
-          putHeap h'
           x <- freshen freshenVar x
           commit h'
           putHeap h
+          addListeners s
           f $ Just (x, putHeap h' *> m)
-        False -> split' (putHeap h' *> m) f
+        False -> do
+          putHeap h
+          addListeners s
+          putHeapListener h' $ \ h' -> \ case
+            True -> do
+              h <- getHeap
+              putHeap h'
+              x <- freshen freshenVar x
+              commit h'
+              putHeap h
+              f $ Just (x, putHeap h' *> m)
+            False -> split' (putHeap h' *> m) f
     Nothing -> do
       putHeap h
       f Nothing
 
-msplit' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
-msplit' m = VerseT . RST $ \ r s ->
-  runRST (msplit $ unVerseT m) r emptySusps <&> \ case
-    (Nothing, _) -> (Nothing, s)
-    (Just (x, m), s') -> (Just (x, s', VerseT m), s)
-
-split'' :: MonadRef m =>
-           VerseT m a ->
-           (Maybe (a, VerseT m a) -> VerseT m ()) ->
-           VerseT m ()
-split'' m f = do
-  h <- getHeap
-  msplit'' m >>= \ case
-    Just (x, s, m) -> do
-      h' <- getHeap
-      putHeap h
-      for_ s.promises addListenable
-      putListeners s.listeners
-      splitPromises s.promises h' $ \ h' -> \ case
-        True -> f $ Just (x, putHeap h' *> m)
-        False -> split'' (putHeap h' *> m) f
-    Nothing -> putHeap h *> f Nothing
-
-msplit'' :: Monad m => VerseT m a -> VerseT m (Maybe (a, Susps m, VerseT m a))
-msplit'' m = VerseT . RST $ \ r s ->
-  runRST (msplit $ unVerseT m) r s { promises = mempty } <&> \ case
-    (Nothing, _) -> (Nothing, s)
-    (Just (x, m), s') -> (Just (x, s', VerseT m), s)
-
-splitPromises :: MonadRef m => Promises m -> Heap m -> Callback m Bool -> VerseT m ()
-splitPromises = splitPromises' . reverse
-
-splitPromises' :: MonadRef m => Promises m -> Heap m -> Callback m Bool -> VerseT m ()
-splitPromises' xs h f = case xs of
-  [] -> f h True
-  x:xs -> whenResolved x h $ \ h -> \ case
-    True -> splitPromises' xs h f
-    False -> f h False
-
-freshPromise :: MonadRef m => VerseT m (Promise m)
-freshPromise = do
-  p <- Promise <$> VerseT supply <*> newLRef Nothing
-  modifyPromises (p:)
-  pure p
-
-whenResolved :: MonadRef m => Promise m -> Heap m -> Callback m Bool -> VerseT m ()
-whenResolved (Promise i ref) h f = lift (readLRef' ref h) >>= \ case
-  Nothing -> addResolveListener i h f
-  Just x -> f h x
-
-resolve :: MonadRef m => Promise m -> Bool -> VerseT m ()
-resolve (Promise i ref) x = readLRef ref >>= \ case
-  Nothing -> do
-    writeLRef ref $ Just x
-    notifyResolveListeners i x
-  Just _ -> error "resolve"
-
-addListenable :: Monad m => Promise m -> VerseT m ()
-addListenable (Promise i _) = modifyListeners $ LabelMap.insert i []
-
-notifyResolveListeners :: MonadRef m => Label -> Bool -> VerseT m ()
-notifyResolveListeners i x = stateListeners (deleteLookup i) >>= \ case
-  Nothing -> guard x
-  Just xs -> for_ xs $ toResolveListener >>> \ (Listener h h' p f) ->
-    split'' (putHeap h *> f h' x) $ \ case
-      Nothing -> resolve p False
-      Just ((), _) -> resolve p True
-
-notifyBoundListeners :: MonadRef m => Label -> f (Var m f) -> VerseT m ()
-notifyBoundListeners i x = stateListeners (deleteLookup i) >>= \ case
-  Just xs -> for_ xs $ toBoundListener >>> \ (Listener h h' p f) ->
-    split'' (putHeap h *> f h' x) $ \ case
-      Nothing -> resolve p False
-      Just ((), _) -> resolve p True
+notifyListeners :: (MonadFix m, MonadRef m) => Label -> f (Var m f) -> VerseT m ()
+notifyListeners i x = popListeners i >>= \ case
+  Just xs -> for_ xs $ toListener >>> flip apListener x
   Nothing -> pure ()
 
-addResolveListener :: MonadRef m =>
-                      Label ->
-                      Heap m ->
-                      Callback m Bool ->
-                      VerseT m ()
-addResolveListener = addListener
+notifyHeap :: (MonadFix m, MonadRef m) => Heap m -> Bool -> VerseT m ()
+notifyHeap = \ case
+  h@Cons { listeners = Listeners { listenerLengthRef, heapListenerRef } } -> \ case
+    True -> lift (readRef heapListenerRef) >>= \ case
+      Just f -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          1 -> do
+            lift $ writeRef listenerLengthRef 0
+            apHeapListener f h True
+          _ -> lift . writeRef listenerLengthRef $ n - 1
+      Nothing -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          _ -> lift . writeRef listenerLengthRef $ n - 1
+    False -> lift (readRef heapListenerRef) >>= \ case
+      Just f -> do
+        n <- lift $ readRef listenerLengthRef
+        case n of
+          0 -> pure ()
+          _ -> do
+            lift $ writeRef listenerLengthRef 0
+            apHeapListener f h False
+      Nothing -> empty
+  _ -> \ case
+    True -> pure ()
+    False -> empty
 
-addBoundListener :: MonadRef m =>
-                    Var m f ->
-                    Label ->
-                    (f (Var m f) -> VerseT m ()) ->
-                    VerseT m ()
-addBoundListener _ i f = do
-  h <- getHeap
-  addListener i h $ \ _ x -> f x
+apListener :: ( MonadFix m
+              , MonadRef m
+              ) => Listener m a -> a -> VerseT m ()
+apListener (Listener h f) = resume h . f
 
-addListener :: MonadRef m => Label -> Heap m -> Callback m a -> VerseT m ()
-addListener i h f = do
-  h' <- getHeap
-  p <- freshPromise
-  splitLabel <- askSplitLabel
-  modifyListeners . insertListener i $ Listener h' h p $ \ h x ->
-    localSplitLabel (const splitLabel) $ f h x
+apHeapListener :: ( MonadFix m
+                  , MonadRef m
+                  ) => HeapListener m -> Heap m -> Bool -> VerseT m ()
+apHeapListener (HeapListener h f) h' = resume h . f h'
+
+resume :: ( MonadFix m
+          , MonadRef m
+          ) => Heap m -> VerseT m () -> VerseT m ()
+resume h m = case h of
+  Cons { listeners = Listeners { listenerLengthRef } } ->
+    lift (readRef listenerLengthRef) >>= \ case
+      0 -> pure ()
+      _ -> do
+        h'' <- getHeap
+        msplit' (putHeap h *> m) mempty >>= \ case
+          Just ((), s, _) -> do
+            h <- getHeap
+            addListenersFromTo h h'' s
+            VerseT $ modify $ flip appendListeners s
+            putHeap h''
+            notifyHeap h True
+          Nothing -> do
+            putHeap h''
+            notifyHeap h False
+  _ -> do
+    s <- VerseT get
+    msplit' m s >>= \ case
+      Just ((), s, _) -> VerseT $ put s
+      Nothing -> empty
+
+
+msplit' :: Monad m =>
+           VerseT m a ->
+           Listeners m ->
+           VerseT m (Maybe (a, Listeners m, VerseT m a))
+msplit' m s = VerseT . RST $ \ r s' ->
+  runRST (msplit $ unVerseT m) r s <&> \ case
+    (Nothing, _) -> (Nothing, s')
+    (Just (x, m), s) -> (Just (x, s, VerseT m), s')
 
 appendListeners :: Listeners m -> Listeners m -> Listeners m
 appendListeners = LabelMap.unionWith (<>)
@@ -440,262 +639,143 @@ insertListeners = LabelMap.insertWith (flip (<>))
 toAnyListener :: Listener m a -> Listener m Any
 toAnyListener = Unsafe.Coerce.unsafeCoerce
 
-toResolveListener :: Listener m Any -> Listener m Bool
-toResolveListener = Unsafe.Coerce.unsafeCoerce
-
-toBoundListener :: Listener m Any -> Listener m (f (Var m f))
-toBoundListener = Unsafe.Coerce.unsafeCoerce
-
-newtype Var m f = Var
-  { unVar :: LRef m (SetState m f)
-  }
-
-data SetState m f
-  = Repr !(VarState m f)
-  | Link (Var m f)
-
-data VarState m f
-  = Unbound {-# UNPACK #-} !Label {-# UNPACK #-} !SplitLabel
-  | Bound {-# UNPACK #-} !Label !(f (Var m f))
-
-eqVar :: EqRef (Ref m) => Var m f -> Var m f -> Bool
-eqVar = eqRef `on` unVar
+toListener :: Listener m Any -> Listener m (f (Var m f))
+toListener = Unsafe.Coerce.unsafeCoerce
 
 unionVars :: MonadRef m => Var m f -> Var m f -> VerseT m ()
-unionVars var_x var_y = writeLRef (unVar var_y) $ Link var_x
-
-type FoundVar m f = (Var m f, VarState m f)
-
-findVar :: MonadRef m => Var m f -> VerseT m (FoundVar m f)
-findVar var = lift . findVar' var =<< getHeap
-
-findVar' :: MonadRef m => Var m f -> Heap m -> m (FoundVar m f)
-findVar' var h = readSetState (unVar var) h >>= \ case
-  Repr x -> pure (var, x)
-  Link var' -> findVar'' var var' h
-
-findVar'' :: MonadRef m => Var m f -> Var m f -> Heap m -> m (FoundVar m f)
-findVar'' var var' h = readSetState (unVar var') h >>= \ case
-  Repr x -> pure (var', x)
-  Link var'' -> do
-    writeLRef' (unVar var) (Link var'') h
-    findVar'' var' var'' h
-
-readSetState :: MonadRef m => LRef m (SetState m f) -> Heap m -> m (SetState m f)
-readSetState ref h = readRef (unLRef ref) <&> \ s -> find s h
-  where
-    find (RefState xs x) = \ case
-      Nil -> x
-      Cons i h _ _ h' ->
-        lookup' i xs `or'`
-        lookupCopied xs h `or'`
-        lookup xs h' `or'`
-        x
-
-    lookup xs = \ case
-      Nil -> Nothing
-      Cons i h _ _ h' ->
-        lookup' i xs <|>
-        lookupCopied xs h <|>
-        lookup xs h'
-
-    lookupCopied xs = \ case
-      Nil -> Nothing
-      Cons i h _ _ _ -> lookup' i xs <|> lookupCopied xs h
-
-    lookup' i xs = case LabelMap.lookup i xs of
-      x@(Just (Repr (Bound _ _))) -> x
-      x@(Just (Link _)) -> x
-      _ -> Nothing
-
-newtype LRef m a = LRef
-  { unLRef :: Ref m (RefState a)
-  }
-
-instance EqRef (Ref m) => EqRef (LRef m) where
-  eqRef = eqRef `on` unLRef
-
-newLRef :: MonadRef m => a -> VerseT m (LRef m a)
-newLRef = lift . newLRef'
-
-newLRef' :: MonadRef m => a -> m (LRef m a)
-newLRef' = fmap LRef . newRef . RefState mempty
-
-readLRef :: MonadRef m => LRef m a -> VerseT m a
-readLRef ref = lift . readLRef' ref =<< getHeap
-
-readLRef' :: MonadRef m => LRef m a -> Heap m -> m a
-readLRef' = readRefState . unLRef
-
-writeLRef :: MonadRef m => LRef m a -> a -> VerseT m ()
-writeLRef ref x = lift . writeLRef' ref x =<< getHeap
-
-writeLRef' :: MonadRef m => LRef m a -> a -> Heap m -> m ()
-writeLRef' ref x = \ case
-  Nil -> modifyRef (unLRef ref) $ \ (RefState xs _) ->
-    RefState xs x
-  Cons i _ _ _ _ -> modifyRef (unLRef ref) $ \ (RefState xs y) ->
-    RefState (LabelMap.insert i x xs) y
-
-data RefState a = RefState
-  !(LabelMap a)
-  !a deriving Show
-
-readRefState :: MonadRef m => Ref m (RefState a) -> Heap m -> m a
-readRefState ref h = readRef ref <&> \ s -> find s h
-  where
-    find (RefState xs x) = \ case
-      Nil -> x
-      Cons i h _ _ h' ->
-        LabelMap.lookup i xs `or'`
-        lookupCopied xs h `or'`
-        lookup xs h' `or'`
-        x
-
-    lookup xs = \ case
-      Nil -> Nothing
-      Cons i h _ _ h' ->
-        LabelMap.lookup i xs <|>
-        lookupCopied xs h <|>
-        lookup xs h'
-
-    lookupCopied xs = \ case
-      Nil -> Nothing
-      Cons i h _ _ _ -> LabelMap.lookup i xs <|> lookupCopied xs h
-
-writeRefState :: MonadRef m => Ref m (RefState a) -> a -> Heap m -> m ()
-writeRefState ref x = \ case
-  Nil -> modifyRef ref $ \ (RefState xs _) ->
-    RefState xs x
-  Cons i _ _ _ _ -> modifyRef ref $ \ (RefState xs y) ->
-    RefState (LabelMap.insert i x xs) y
+unionVars var_x var_y = writeVar var_y $ Link var_x
 
 commit :: MonadRef m => Heap m -> VerseT m ()
 commit = runCommitT . commit'
+
+type CommitT m = SupplyT Label m
+
+runCommitT :: Monad m => CommitT m a -> VerseT m a
+runCommitT = VerseT . lift . lift . lift
 
 commit' :: MonadRef m => Heap m -> CommitT m ()
 commit' = commit'' emptyCommit
 
 commit'' :: MonadRef m => Commit m -> Heap m -> CommitT m ()
 commit'' f' = \ case
-  h@(Cons _ _ x ref_f h') -> do
-    f <- readRef ref_f
+  h@Cons { listeners, commitRef, tail = h' } -> do
+    f <- readRef commitRef
     let f'' h h' = f h h' *> f' h h'
     f'' h h'
-    case x of
-      Split -> lift $ addCommit' f'' h'
-      Choice -> commit'' f'' h'
-  Nil -> pure ()
+    case listeners of
+      Listeners { kind = Split } -> lift $ addCommit' f'' h'
+      _ -> commit'' f'' h'
+  _ -> pure ()
+
+addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
+addCommit' f = \ case
+  Cons { commitRef } -> modifyRef' commitRef $ \ f' h h' -> f' h h' *> f h h'
+  _ -> pure ()
 
 pushSplit :: MonadRef m => VerseT m ()
 pushSplit = do
-  i <- VerseT supply
+  label <- VerseT supply
   h <- getHeap
-  ref_f <- lift $ newRef emptyCommit
-  putHeap $ Cons i Nil Split ref_f h
+  commitRef <- lift $ newRef emptyCommit
+  listenerLengthRef <- lift $ newRef 0
+  listenersRef <- lift $ newRef mempty
+  heapListenerRef <- lift $ newRef Nothing
+  putHeap Cons { listeners = Listeners { kind = Split, .. }, copied = Nil, tail = h, .. }
 
-pushChoice :: MonadRef m => Heap m -> VerseT m ()
+pushChoice :: (MonadFix m, MonadRef m) => Heap m -> VerseT m ()
 pushChoice h = do
-  i <- VerseT supply
-  ref_f <- lift $ newRef emptyCommit
-  let h' = Cons i Nil Choice ref_f h
+  s <- VerseT get
+  (h', s') <- VerseT . lift . lift . lift . mfix $ \ ~(h', _) ->
+    runCopyT' ((,) <$> pushChoice' h <*> copyListeners s) $ toCopied h h'
   putHeap h'
-  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners
+  VerseT $ put s'
 
-popChoice :: MonadRef m => Heap m -> VerseT m ()
+pushChoice' :: (MonadFix m, MonadRef m) => Heap m -> CopyT m (Heap m)
+pushChoice' h = case h of
+  Cons { listeners = Listeners { listenerLengthRef, listenersRef } } -> do
+    label <- supply
+    commitRef <- newRef emptyCommit
+    listenerLengthRef <- newRef =<< readRef listenerLengthRef
+    listenersRef <- newRef =<< copyListeners =<< readRef listenersRef
+    heapListenerRef <- newRef Nothing
+    pure Cons { listeners = Listeners { kind = Choice, .. }, copied = Nil, tail = h, .. }
+  _ -> do
+    label <- supply
+    commitRef <- newRef emptyCommit
+    pure Cons { listeners = Empty, copied = Nil, tail = h, .. }
+
+popChoice :: (MonadFix m, MonadRef m) => Heap m -> VerseT m ()
 popChoice h = do
   h' <- stateHeap $ \ case
-    Cons _ _ Choice _ h' -> (h', h')
+    Cons { listeners = Listeners { kind = Choice}, tail } -> (tail, tail)
+    Cons { listeners = Empty, tail } -> (tail, tail)
     _ -> error "popChoice"
-  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners
+  putListeners =<< flip runCopyT (toCopied h h') . copyListeners =<< getListeners' h'
 
 toCopied :: Heap m -> Heap m -> Copied m
 toCopied = \ case
-  Cons i _ _ _ _ -> flip Copied Nil . LabelMap.singleton i
+  Cons { label } -> flip Copied Nil . LabelMap.singleton label
   Nil -> Copied mempty
 
 type CopyT m = StateT (Copied m) (SupplyT Label m)
 
-data Copied m = Copied !(LabelMap (Heap m)) !(Heap m)
+data Copied m = Copied !(LabelMap (Heap m)) (Heap m)
 
 runCopyT :: Monad m => CopyT m a -> Copied m -> VerseT m a
-runCopyT m = VerseT . lift . lift . lift . evalStateT m
+runCopyT m = VerseT . lift . lift . lift . runCopyT' m
 
-copyListeners :: MonadRef m => Listeners m -> CopyT m (Listeners m)
+runCopyT' :: Monad m => CopyT m a -> Copied m -> SupplyT Label m a
+runCopyT' = evalStateT
+
+copyListeners :: (MonadFix m, MonadRef m) => Listeners m -> CopyT m (Listeners m)
 copyListeners = traverse (traverse copyListener)
 
-copyListener :: MonadRef m => Listener m a -> CopyT m (Listener m a)
-copyListener (Listener h h' p f) =
-  (\ h h' -> Listener h h' p f) <$> copyHeap h <*> copyHeap h'
+copyListener :: (MonadFix m, MonadRef m) => Listener m a -> CopyT m (Listener m a)
+copyListener (Listener h f) = flip Listener f <$> copyHeap h
 
-copyHeap :: MonadRef m => Heap m -> CopyT m (Heap m)
+copyHeapListener :: (MonadFix m, MonadRef m) => HeapListener m -> CopyT m (HeapListener m)
+copyHeapListener (HeapListener h f) = flip HeapListener f <$> copyHeap h
+
+copyHeap :: (MonadFix m, MonadRef m) => Heap m -> CopyT m (Heap m)
 copyHeap = \ case
-  Nil -> gets $ \ (Copied _ xs) -> xs
-  xs@(Cons i _ x ref_f ys) -> gets (lookupCopied i) >>= \ case
+  xs@Cons {..} -> mfix $ \ xs' -> state' (lookupInsertCopied label xs') >>= \ case
     Nothing -> do
-      ys' <- copyHeap ys
-      i' <- supply
-      ref_f' <- lift . lift $ newRef =<< readRef ref_f
-      let xs' = Cons i' xs x ref_f' ys'
-      modify $ insertCopied i xs'
-      pure xs'
-    Just xs -> pure xs
+      label <- supply
+      listeners <- copyHeapListeners listeners
+      commitRef <- newRef =<< readRef commitRef
+      tail <- copyHeap tail
+      pure Cons { copied = xs, ..}
+    Just xs' -> pure xs'
+  Nil -> gets $ \ (Copied _ xs') -> xs'
 
-lookupCopied :: Label -> Copied m -> Maybe (Heap m)
-lookupCopied i (Copied xss _) = LabelMap.lookup i xss
+copyHeapListeners :: ( MonadFix m
+                     , MonadRef m
+                     ) => HeapListeners m -> CopyT m (HeapListeners m)
+copyHeapListeners = \ case
+  Listeners {..} -> do
+    listenerLengthRef <- newRef =<< readRef listenerLengthRef
+    listenersRef <- newRef =<< copyListeners =<< readRef listenersRef
+    heapListenerRef <- newRef =<< traverse copyHeapListener =<< readRef heapListenerRef
+    pure $ Listeners {..}
+  Empty -> pure Empty
 
-insertCopied :: Label -> Heap m -> Copied m -> Copied m
-insertCopied i xs (Copied xss ys) = Copied (LabelMap.insert i xs xss) ys
+lookupInsertCopied :: Label -> Heap m -> Copied m -> Either (Heap m) (Copied m)
+lookupInsertCopied i x (Copied xss xs) = flip Copied xs <$> lookupInsert i x xss
 
 askSplitLabel :: VerseT m SplitLabel
-askSplitLabel = VerseT $ asks splitLabel
+askSplitLabel = VerseT ask
 
 localSplitLabel :: (SplitLabel -> SplitLabel) -> VerseT m a -> VerseT m a
-localSplitLabel f =
-  VerseT . local (\ r -> r { splitLabel = f r.splitLabel }) . unVerseT
-
-modifyPromises :: (Promises m -> Promises m) -> VerseT m ()
-modifyPromises f = VerseT . modify $ \ s -> s { promises = f s.promises }
-
-getListenersAt :: Monad m => Label -> VerseT m [Listener m Any]
-getListenersAt i = VerseT . gets $ fromMaybe [] . LabelMap.lookup i . listeners
-
-addListeners :: Monad m => Listeners m -> VerseT m ()
-addListeners = modifyListeners . flip appendListeners
-
-addListenersAt :: Monad m => Label -> [Listener m Any] -> VerseT m ()
-addListenersAt i xs = modifyListeners $ insertListeners i xs
-
-getListeners :: Monad m => VerseT m (Listeners m)
-getListeners = VerseT $ gets listeners
-
-putListeners :: Monad m => Listeners m -> VerseT m ()
-putListeners listeners = VerseT . modify $ \ s -> s { listeners }
-
-modifyListeners :: Monad m => (Listeners m -> Listeners m) -> VerseT m ()
-modifyListeners f = VerseT . modify $ \ s -> s { listeners = f s.listeners }
-
-stateListeners :: Monad m => (Listeners m -> (a, Listeners m)) -> VerseT m a
-stateListeners f = VerseT . state $ \ s ->
-  f s.listeners <&> \ listeners -> s { listeners }
+localSplitLabel f = VerseT . local f . unVerseT
 
 getHeap :: Monad m => VerseT m (Heap m)
-getHeap = VerseT . lift $ gets heap
+getHeap = VerseT . lift $ get
 
 putHeap :: Monad m => Heap m -> VerseT m ()
-putHeap heap = modifyHeaps $ \ s -> s { heap }
+putHeap = VerseT . lift . put
 
 stateHeap :: Monad m => (Heap m -> (a, Heap m)) -> VerseT m a
-stateHeap f = VerseT . lift . state $ \ s ->
-  f s.heap <&> \ heap -> s { heap }
-
-addCommit' :: MonadRef m => Commit m -> Heap m -> m ()
-addCommit' f = \ case
-  Cons _ _ _ ref_f _ -> modifyRef ref_f $ \ f' h h' -> f' h h' *> f h h'
-  Nil -> pure ()
-
-modifyHeaps :: Monad m => (Heaps m -> Heaps m) -> VerseT m ()
-modifyHeaps = VerseT . lift . modify
+stateHeap = VerseT . lift . state
 
 insert' :: LabelMap.Key -> a -> LabelMap a -> Maybe (LabelMap a)
 insert' !k0 x0 t0 = loop k0 x0 t0
@@ -722,7 +802,7 @@ lookupInsert !k0 x0 t0 = loop k0 x0 t0
     loop k x = \ case
       t@(LabelMap.Internal.Bin p m l r)
         | LabelMap.Internal.nomatch k p m ->
-          Right $! LabelMap.Internal.link k (LabelMap.Lazy.singleton k x) p t
+          Right $! LabelMap.Internal.link k (LabelMap.singleton k x) p t
         | LabelMap.Internal.zero k m -> case loop k x l of
           Right l -> Right $! LabelMap.Internal.Bin p m l r
           l@(Left _) -> l
@@ -732,30 +812,43 @@ lookupInsert !k0 x0 t0 = loop k0 x0 t0
       t@(LabelMap.Internal.Tip k' y)
         | k == k' -> Left y
         | otherwise ->
-          Right $! LabelMap.Internal.link k (LabelMap.Lazy.singleton k x) k' t
-      LabelMap.Internal.Nil -> Right $! LabelMap.Lazy.singleton k x
+          Right $! LabelMap.Internal.link k (LabelMap.singleton k x) k' t
+      LabelMap.Internal.Nil -> Right $! LabelMap.singleton k x
 
-deleteLookup :: Label -> LabelMap a -> (Maybe a, LabelMap a)
-deleteLookup !k0 t0 = toTuple $ loop k0 t0
+lookupDelete :: Label -> LabelMap a -> Maybe (a, LabelMap a)
+lookupDelete !k0 t0 = toMaybe $ loop k0 t0
   where
     loop k = \ case
-      t@(LabelMap.Internal.Bin p m l r)
-        | LabelMap.Internal.nomatch k p m ->
-          Nothing :*: t
-        | LabelMap.Internal.zero k m ->
-          let x :*: l' = loop k l in x :*: LabelMap.Internal.binCheckLeft p m l' r
-        | otherwise ->
-          let x :*: r' = loop k r in x :*: LabelMap.Internal.binCheckRight p m l r'
-      t@(LabelMap.Internal.Tip k' x)
-        | k == k' -> Just x :*: LabelMap.Internal.Nil
-        | otherwise -> Nothing :*: t
-      LabelMap.Internal.Nil -> Nothing :*: LabelMap.Internal.Nil
+      LabelMap.Internal.Bin p m l r
+        | LabelMap.Internal.nomatch k p m -> Lacks
+        | LabelMap.Internal.zero k m -> case loop k l of
+            Lacks -> Lacks
+            Had x l' -> Had x $ LabelMap.Internal.binCheckLeft p m l' r
+        | otherwise -> case loop k r of
+            Lacks -> Lacks
+            Had x r' -> Had x $ LabelMap.Internal.binCheckRight p m l r'
+      LabelMap.Internal.Tip k' x
+        | k == k' -> Had x LabelMap.Internal.Nil
+        | otherwise -> Lacks
+      LabelMap.Internal.Nil -> Lacks
 
-data Sum a b = !a :*: !b
+toMaybe :: LookupDelete a -> Maybe (a, LabelMap a)
+toMaybe = \ case
+  Lacks -> Nothing
+  Had x y -> Just (x, y)
 
-toTuple :: Sum a b -> (a, b)
-toTuple (x :*: y) = (x, y)
+data LookupDelete a
+  = Lacks
+  | Had !a !(LabelMap a)
 
 or' :: Maybe a -> a -> a
 or' = flip fromMaybe
 infixr 3 `or'`
+
+state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
+state' f = state $ \ s -> case f s of
+  Left x -> (Just x, s)
+  Right s -> (Nothing, s)
+
+incr :: (MonadRef m, Num a) => Ref m a -> m ()
+incr = flip modifyRef' (+ 1)

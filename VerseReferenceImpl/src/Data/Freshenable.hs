@@ -1,32 +1,36 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 module Data.Freshenable
   ( Freshenable (..)
-  , Unit1 (..)
-  , Identity1 (..)
-  , Sum1 (..)
   ) where
 
+import Data.Functor.Identity
+import Data.HashMap.Strict (HashMap)
 import Data.Kind
 
-class Freshenable (t :: ((Type -> Type) -> Type) -> Type) where
-  freshen :: Applicative m => (forall f . Traversable f => g f -> m (h f)) -> t g -> m (t h)
+class Freshenable a where
+  type Elem a :: (Type -> Type) -> Type
+  freshen :: Applicative m => (forall f . Traversable f => Elem a f -> m (Elem a f)) -> a -> m a
 
-data Unit1 (f :: (Type -> Type) -> Type) = Unit1
+instance Freshenable a => Freshenable (Identity a) where
+  type Elem (Identity a) = Elem a
+  freshen f = fmap Identity . freshen f . runIdentity
 
-instance Freshenable Unit1 where
-  freshen _ _ = pure Unit1
+instance Freshenable a => Freshenable [a] where
+  type Elem [a] = Elem a
+  freshen f = traverse $ freshen f
 
-newtype Identity1 f (g :: (Type -> Type) -> Type) = Identity1
-  { runIdentity1 :: g f
-  }
+instance (Freshenable a, Freshenable b, Elem a ~ Elem b) => Freshenable (a, b) where
+  type Elem (a, b) = Elem a
+  freshen f (a, b) = (,) <$> freshen f a <*> freshen f b
 
-instance Traversable f => Freshenable (Identity1 f) where
-  freshen f = fmap Identity1 . f . runIdentity1
+instance (Freshenable a, Freshenable b, Elem a ~ Elem b) => Freshenable (Either a b) where
+  type Elem (Either a b) = Elem a
+  freshen f = \ case
+    Left a -> Left <$> freshen f a
+    Right b -> Right <$> freshen f b
 
-data Sum1 g h (f :: (Type -> Type) -> Type) = Sum1 (g f) (h f)
-
-instance (Freshenable g, Freshenable h) => Freshenable (Sum1 g h) where
-  freshen f (Sum1 x y) = Sum1 <$> freshen f x <*> freshen f y
+instance Freshenable v => Freshenable (HashMap k v) where
+  type Elem (HashMap k v) = Elem v
+  freshen f = traverse $ freshen f
