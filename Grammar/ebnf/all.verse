@@ -105,3 +105,39 @@ x and y and z;
 ## Or
 x or y;
 x or y or z;
+## Def 1
+#x in ??? = y
+x:=y;
+x:=y:=z;
+x:={y};
+x where {y};
+x where y;
+# x where y,z;  AMB
+x is {y};
+x is y;
+## Def 2
+..x;
+&x;
+## Def 3
+return;
+yield;
+break;
+continue;
+return x;
+return {x;y};
+## Fun
+x over {y};
+x when {y};
+x while {y};
+x over y;
+# x over y, z;  AMB
+x => y;
+x => {y};
+x next y;
+## Expr
+x @f();
+x @f() @g();
+@f() x;
+@f() @g() x;
+## Commas
+1,2,3;

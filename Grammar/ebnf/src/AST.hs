@@ -45,6 +45,13 @@ pattern APostfix op a1 = AOp "postfix" [AString op, a1]
 pattern SNameT :: String -> ParseTree -> ParseTree
 pattern SNameT s x <- SName s (SSeq [SName _ x])
 
+aBlock :: [AST] -> AST
+aBlock as = AOp "block" as
+
+unList :: HasCallStack => AST -> [AST]
+unList (AOp "list" as) = as
+unList x = error $ "unList: " ++ show x
+
 instance Pretty AST where
   pPrintPrec _ _ (AIdent s) = text s
   pPrintPrec l _ (APath s) = text "P" <> pPrintPrec l 0 s
@@ -70,22 +77,32 @@ toExpr (SName "List" (SSeq [SOpt (Just (SSeq [cs, SMany scs, _]))])) = AList $ m
         f x = err "toList-1" x
 toExpr (SName "Commas" (SSeq [e, SMany []])) = toExpr e
 toExpr (SName "Commas" (SSeq [e, SMany ses])) = ACommas $ map toExpr (e : map f ses)
-  where f (SSeq [SChar ',', _, x]) = x
+  where f (SSeq [SChar ',', x]) = x
         f x = err "toCommas-1" x
 toExpr (SName "Expr" (SAlt 0 (SSeq [t, SMany ts, _]))) = foldl f (toExpr t) ts
-  where f e (SSeq [_, _, _, x]) = AOp "post-@" [e, toExpr x]
+  where f r (SSeq [SChar '@', x]) = AOp "post@" [r, toExpr x]
         f _ x = err "toExpr-1" x
-toExpr (SName "Expr" (SAlt 1 (SSeq [_, _, c, _, e]))) = AOp "pre-@" [toExpr c, toExpr e]
+toExpr (SName "Expr" (SAlt 1 (SSeq [SChar '@', c, e]))) = AOp "pre@" [toExpr c, toExpr e]
 toExpr (SName "Fun" (SSeq [t, SMany ts, _])) = foldl f (toExpr t) ts
-  where f _e _x = error "unimplemented"
+  where f r (SAlt 0 (SSeq [kw, _, x])) = AOp (flattenParseTree kw) [r, toAlt2 toExpr toDefs x]
+        f r (SAlt 1 (SSeq [kw, x])) = AOp (flattenParseTree kw) [r, toAlt2 toExpr toExpr x]
+        f _ x = err "toExpr-Def" x
 toExpr (SName "Def" (SAlt 0 (SSeq [o, SMany xs, _]))) = foldl f (toDef1 o) xs
-  where f _e _x = error "unimplemented"
-        toDef1 (SAlt 0 e) = toExpr e
-        toDef1 (SAlt 1 (SSeq [_iv, _, SAlt 0 (SSeq [_op, _, _def])])) = error "unimplemented"
-        toDef1 (SAlt 1 (SSeq [_iv, _, SAlt 1 (SSeq [_, _])])) = error "unimplemented"
-        toDef1 x = err "toDef1" x
-toExpr (SName "Def" (SAlt 1 _)) = error "unimplemented"
-toExpr (SName "Def" (SAlt 2 _)) = error "unimplemented"
+  where
+    f _r (SAlt 0 _) = error "unimplemented"
+    f r (SAlt 1 (SSeq [SStr ":=", x])) = AOp ":=" [r, toAlt2 toExpr toExpr x]
+    f r (SAlt 2 (SSeq [SStr "where", _, x])) = AOp "where" [r, toAlt2 toExpr toDefs x]
+    f r (SAlt 3 (SSeq [SStr "is", _, x])) = AOp "is" [r, toAlt2 toExpr toExpr x]
+    f _ x = err "toExpr-Def" x
+    toDef1 (SAlt 0 e) = toExpr e
+    toDef1 (SAlt 1 (SSeq [_iv, SAlt 0 (SSeq [_op, _def])])) = error "unimplemented"
+    toDef1 (SAlt 1 (SSeq [_iv, SAlt 1 (SSeq [_, _])])) = error "unimplemented"
+    toDef1 x = err "toDef1" x
+toExpr (SName "Def" (SAlt 1 (SSeq [op, x]))) = APrefix (flattenParseTree op) (toExpr x)
+toExpr (SName "Def" (SAlt 2 (SSeq [t, SOpt m, _]))) = AOp (flattenParseTree t) (maybe [] f m)
+  where f (SAlt 0 b) = [toExpr b]
+        f (SAlt 1 d) = [toExpr d]
+        f x = err "toExpr" x
 toExpr (SName "Or" (SSeq [e, SMany xs])) = foldr1 (AInfix "or") (toExpr e : map f xs)
   where f (SSeq [SSeq [SStr "or", _], x]) = toExpr x
         f x = err "toExpr-Or" x
@@ -180,12 +197,25 @@ toExpr (SName "If" (SSeq [SStr "if", _, sp, ct, el])) = AOp "if" [toOptSpecs sp,
     toThen x = err "toThen" x
 toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')'])) = toExpr x
 toExpr (SName "Block" (SAlt 0 x)) = toExpr x
-toExpr (SName "Block" (SAlt 1 (SSeq [_, x]))) = toExpr x
-toExpr (SName "Block" (SAlt 2 (SSeq [SChar ':', _, x, _]))) = toExpr x
-toExpr (SName "Brace" (SSeq [SChar '{', x, SChar '}'])) = toExpr x
+toExpr (SName "Block" (SAlt 1 (SSeq [_, x]))) = aBlock [toExpr x]
+toExpr (SName "Block" (SAlt 2 (SSeq [SChar ':', _, x, _]))) = aBlock $ unList $ toExpr x
+toExpr (SName "Brace" (SSeq [SChar '{', x, SChar '}'])) = aBlock $ unList $ toExpr x
+toExpr (SName "BraceInd" (SAlt 0 x)) = toExpr x
+toExpr (SName "BraceInd" (SAlt 1 (SSeq [_,x,_]))) = aBlock $ unList $ toExpr x
 toExpr (SName "KeyBlock" x) = toExpr x
-toExpr (SName "SDef" (SSeq [_, x])) = toExpr x
+--toExpr (SName "SDef" (SSeq [_, x])) = toExpr x
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
+
+toAlt2 :: HasCallStack => (ParseTree -> AST) -> (ParseTree -> AST) -> ParseTree -> AST
+toAlt2 f _ (SAlt 0 x) = f x
+toAlt2 _ f (SAlt 1 x) = f x
+toAlt2 _ _ x = error "toAlt2" x
+
+toDefs :: HasCallStack => ParseTree -> AST
+toDefs (SName "Defs" (SSeq [d, SMany ds])) = AOp "defs" $ map toExpr $ d : map f ds
+  where f (SSeq [SChar ',', x]) = x
+        f x = err "toDefs-1" x
+toDefs x = err "toDefs-2" x
 
 toOptSpecs :: ParseTree -> AST
 toOptSpecs (SOpt Nothing) = aNil

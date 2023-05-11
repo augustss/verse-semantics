@@ -129,8 +129,8 @@ And       := Not     { ("and" KeyEndNS        ) Scan  Not     }
 Or        := And     { ("or"  KeyEndNS        ) Scan  And     }
 Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !":="))
                   { &In Def
-                    | Space     ":="    Space    (BraceInd | Def )
-                    | Space     "where" KeyEnd   (KeyBlock | Defs)
+                    | ":="    Space    (BraceInd | Def )
+                    | "where" KeyEnd   (KeyBlock | Defs)
                     | ScanKeyNS "is"    KeyEnd   (KeyBlock | Def ) } StopDef
           |  ('&'|"..") Space Def
           |  Return [Block | Def] StopDef
