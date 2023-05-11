@@ -90,7 +90,7 @@ data Heap m = Nil | Cons
 data HeapListeners m = Empty | Listeners
   { kind :: !HeapKind
   , listenerLengthRef :: !(Ref m Word)
-  , listenersRef :: !(Ref m (IntMap [Listener m Any]))
+  , listenersRef :: !(Ref m (Listeners m))
   , heapListenerRef :: !(Ref m (Maybe (HeapListener m)))
   }
 
@@ -744,7 +744,7 @@ copyHeap = \ case
       listeners <- copyHeapListeners listeners
       commitRef <- newRef =<< readRef commitRef
       tail <- copyHeap tail
-      pure Cons { copied = xs, ..}
+      pure Cons { copied = xs, .. }
     Just xs' -> pure xs'
   Nil -> gets $ \ (Copied _ xs') -> xs'
 

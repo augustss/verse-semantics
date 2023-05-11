@@ -31,7 +31,6 @@ library
     Data.Fix
     Data.Freshenable
     Data.Ref
-    Data.Tuple.Duo
     Data.Unifiable
     Language.Verse
     Language.Verse.Desugar
