@@ -86,6 +86,7 @@ KeyEnd    := KeyEndNS Space
 Return    := ("return"|"yield"|"break"|"continue") KeyEnd
 Reserved  := ("catch"|"do"|"else"|"if"|"in"|"is"|"not"|"then"|"until"|"where"|"with"
              |"alias"|"const"|"live"|"mutable"|"ref"|"set"|"var") KeyEnd | Return
+          -- More reserved words?  block?  async stuff?
 
 DotSpace  := '.' &(0o09 | 0o20 | Ending)
 Brace     := ScanNS '{' Space List '}' Space
@@ -109,9 +110,11 @@ In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Space Specs])
 Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
 
 Base      := '(' Space List ')' Space | Num | Char | Path | String | Markup | If | !Reserved QualIdent
-Call      := Base    {Space Postfix}
-Postfix   := Invoke  | !Invoke (Paren | Specs) | ("at"|"of") KeyEnd (KeyBlock | Fun)
-                     | (('^' | '?' | '[' Space List ']') Space | ScanKeyNS '.' QualIdent)
+Call      := Base    {Postfix}
+Postfix   := Invoke  | !Invoke (Paren | Specs)
+                     | ("at"|"of") KeyEnd (KeyBlock | Fun)
+                     | ('^' | '?' | '[' Space List ']') Space
+                     | ScanKeyNS '.' QualIdent
 Prefix    := Call    | ('^' | '?' | '[' Space List ']' | '+' | '-' | '*') Space (Brace | Prefix)
 Mul       := Prefix  { ('*' | '/' | '&'       ) Scan  Prefix  }
 Add       := Mul     { ('+' | '-'             ) Scan  Mul     }
@@ -143,7 +146,7 @@ Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
 --List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
 List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [';' Scan]]; pop
-File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List {NewLine} end
+File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional
 {e}  means zero or more

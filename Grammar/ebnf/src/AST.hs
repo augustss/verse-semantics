@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 module AST(
@@ -6,6 +7,7 @@ module AST(
   ) where
 import Data.Data (Data)
 import Data.Generics.Uniplate.Data
+import Data.Maybe
 import GHC.Stack
 import ParseVerse
 import Text.PrettyPrint.HughesPJClass(Pretty(..), text, nest, sep, parens)
@@ -14,7 +16,7 @@ data AST
   = AIdent String
   | APath String
   | ANum String
-  | AChar String
+  | AChar Char
   | AString String
   | AOp String [AST]
   deriving (Show, Eq, Data)
@@ -37,8 +39,8 @@ pattern AInfix op a1 a2 = AOp "infix" [AString op, a1, a2]
 pattern APrefix :: String -> AST -> AST
 pattern APrefix op a1 = AOp "prefix" [AString op, a1]
 
---pattern APostfix :: String -> AST -> AST
---pattern APostfix op a1 = AOp "postfix" [AString op, a1]
+pattern APostfix :: String -> AST -> AST
+pattern APostfix op a1 = AOp "postfix" [AString op, a1]
 
 pattern SNameT :: String -> ParseTree -> ParseTree
 pattern SNameT s x <- SName s (SSeq [SName _ x])
@@ -47,8 +49,8 @@ instance Pretty AST where
   pPrintPrec _ _ (AIdent s) = text s
   pPrintPrec l _ (APath s) = text "P" <> pPrintPrec l 0 s
   pPrintPrec _ _ (ANum s) = text s
-  pPrintPrec _ _ (AChar s) = text s
-  pPrintPrec _ _ (AString s) = text s
+  pPrintPrec _ _ (AChar c) = text $ show c
+  pPrintPrec _ _ (AString s) = text $ show s
 --  pPrintPrec l p (AOp "list" [a]) = pPrintPrec l p a
   pPrintPrec l _ (AOp s as) = parens $ sep $ [text s] ++ map (nest 2 . pPrintPrec l 0) as
 
@@ -57,11 +59,12 @@ err s x = error $ "unexpeced: " ++ s ++ "\n" ++ show x
 
 parseTreeToAST :: ParseTree -> AST
 parseTreeToAST (SName "File" (SSeq [_, SUnit, SUnit, SUnit, x, _, _])) = toExpr $ dropUnit $ dropSpace x
+parseTreeToAST (SName "File" (SSeq [_, SUnit, SUnit, SUnit, x, _])) = toExpr $ dropUnit $ dropSpace x
 --parseTreeToAST (SName "File" x) = toExpr $ dropUnit $ dropSpace x
 parseTreeToAST x = err "parseTreeToAST" x
 
 toExpr :: HasCallStack => ParseTree -> AST
-toExpr (SName "List" (SSeq [SOpt Nothing, _])) = AList []
+toExpr (SName "List" (SSeq [SOpt Nothing])) = AList []
 toExpr (SName "List" (SSeq [SOpt (Just (SSeq [cs, SMany scs, _]))])) = AList $ map toExpr (cs : map f scs)
   where f (SSeq [_, x]) = x
         f x = err "toList-1" x
@@ -113,13 +116,32 @@ toExpr (SName "Mul" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
         f _ x = err "toExpr" x
 toExpr (SName "Prefix" (SAlt 0 x)) = toExpr x
 toExpr (SName "Prefix" (SAlt 1 (SSeq [op, _, (SAlt _ x)]))) = APrefix (flattenParseTree op) (toExpr x)
-toExpr (SName "Call" (SSeq [x, SMany xs])) = foldl f (toExpr x) xs
-  where f _r _x = error "unimplemented"
+toExpr (SName "Call" (SSeq [ax, SMany xs])) = foldl f (toExpr ax) xs
+  where
+    f r (SName "Postfix" px) =
+      case px of
+        SAlt 0 x -> toInvoke r x
+        SAlt 1 (SSeq [SAlt 0 x]) -> AOp "call" [r, toExpr x]
+        SAlt 1 (SSeq [SAlt 1 x]) -> AOp "specs" [r, toSpecs x]
+        SAlt 2 (SSeq [SAlt 0 _, _, x]) -> AOp "at" [r, to x]
+        SAlt 2 (SSeq [SAlt 1 _, _, x]) -> AOp "of" [r, to x]
+        SAlt 3 (SSeq [sx]) ->
+          case sx of
+            SAlt 0 (SChar '^') -> APostfix "^" r
+            SAlt 1 (SChar '?') -> APostfix "?" r
+            SAlt 2 (SSeq [SChar '[', x, SChar ']']) -> AInfix "[]" r (toExpr x)
+            _ -> err "Call-1" sx
+        SAlt 4 (SSeq [SChar '.', x]) -> AInfix "." r (toExpr x)
+        _ -> err "Call-2" px
+    f _ x = err "Call-3" x
+    to (SAlt 0 x) = toExpr x
+    to (SAlt 1 x) = toExpr x
+    to x = err "Call-to" x
 toExpr (SName "Base" (SAlt 0 (SSeq [_, x, _]))) = toExpr x
 toExpr (SName "Base" (SAlt 1 (SNameT "Num" x))) = ANum $ flattenParseTree x
-toExpr (SName "Base" (SAlt 2 (SNameT "Char" x))) = AChar $ flattenParseTree x
+toExpr (SName "Base" (SAlt 2 (SNameT "Char" x))) = AChar $ toChar x
 toExpr (SName "Base" (SAlt 3 (SNameT "Path" x))) = APath $ flattenParseTree x
-toExpr (SName "Base" (SAlt 4 (SNameT "String" x))) = AString $ flattenParseTree x
+toExpr (SName "Base" (SAlt 4 (SNameT "String" x))) = toString x
 toExpr (SName "Base" (SAlt 5 _)) = error "unimplemented"
 toExpr (SName "Base" (SAlt 6 x)) = toExpr x
 toExpr (SName "Base" (SAlt 7 (SSeq [x]))) = toExpr x
@@ -164,6 +186,50 @@ toOptSpecs x = err "toOptSpecs" x
 
 toSpecs :: ParseTree -> AST
 toSpecs = error "unimplemented"
+
+toInvoke :: AST -> ParseTree -> AST
+toInvoke r (SName "Invoke" (SSeq [xos1, xx, xu])) =
+  let os1 = toOptSpecs xos1
+      mu  = case xu of SAlt 0 u -> toUntil u; SAlt 1 _ -> aNil; _ -> err "postfix" xu
+      toDo (SName "Do" (SSeq [SStr "do", _, SAlt 0 b])) = toExpr b
+      toDo (SName "Do" (SSeq [SStr "do", _, SAlt 1 b])) = toExpr b
+      toDo xxx = err "toDo" xxx
+      toUntil (SName "Until" (SAlt 0 (SSeq [SStr "until", _, SAlt 0 b]))) = AOp "until" [toExpr b]
+      toUntil (SName "Until" (SAlt 0 (SSeq [SStr "until", _, SAlt 1 b]))) = AOp "until" [toExpr b]
+      toUntil (SName "Until" (SAlt 1 (SSeq [SStr "catch", _, x]))) = toInvoke (AIdent "catch") x
+      toUntil x = err "toUntil" x
+  in  case xx of
+        SAlt 0 (SSeq [p, os2, SAlt 0 b]) -> AOp "invoke1" [r, os1, toExpr p, toOptSpecs os2, toExpr b, mu]
+        SAlt 0 (SSeq [p, os2, SAlt 1 d]) -> AOp "invoke1" [r, os1, toExpr p, toOptSpecs os2, toDo   d, mu]
+        SAlt 1 (SSeq [b, SOpt Nothing])  -> AOp "invoke2" [r, os1, toExpr b, mu]
+        SAlt 1 (SSeq [b, SOpt (Just (SSeq [os2, d]))]) -> AOp "invoke3" [r, os1, toExpr b, toOptSpecs os2, toDo d]
+        _ -> err "Invoke" xx            
+toInvoke _ x = err "toInvoke" x
+
+toString :: ParseTree -> AST
+toString (SSeq [SChar '"', SMany xs, SChar '"']) = AOp "string" $ merge [] $ map f xs
+  where f (SAlt 0 (SName "Interp" ((SSeq [SChar '{', x, SChar '}']))) = AOp "interp" [toExpr x]
+        f (SAlt 1 x) = AString [toCharEsc x]
+        f (SAlt 2 (SSeq [x])) = AString $ flattenParseTree x
+        f x = err "toString" x
+        merge [] [] = []
+        merge r [] = [AString $ concat $ reverse r]
+        merge r (AString s : as) = merge (s : r) as
+        merge r (a : as) = [AString $ concat $ reverse r, a] ++ merge [] as
+toString x = err "toString" x
+
+toChar :: ParseTree -> Char
+toChar (SAlt 0 (SName "CharLit" (SAlt 0 (SSeq [SChar '\'', x, SChar '\''])))) = c where [c] = flattenParseTree x
+toChar (SAlt 0 (SName "CharLit" (SAlt 1 (SSeq [SChar '\'', x, SChar '\''])))) = toCharEsc x
+toChar (SAlt 1 (SName "Char8"  (SSeq (SStr "0o" : xs)))) = toEnum $ read $ "0x" ++ flattenParseTree (SSeq xs)
+toChar (SAlt 2 (SName "Char32" (SSeq (SStr "0u" : xs)))) = toEnum $ read $ "0x" ++ flattenParseTree (SSeq xs)
+toChar x = err "toChar" x
+
+toCharEsc :: ParseTree -> Char
+toCharEsc (SName "CharEsc" (SSeq [SChar '\\', x])) = fromMaybe c $ lookup c escs
+  where [c] = flattenParseTree x
+        escs = [ ('r', '\r'), ('n', '\n'), ('t', '\t')]
+toCharEsc x = err "toCharEsc" x
 
 aNil :: AST
 aNil = AIdent "#nil"
