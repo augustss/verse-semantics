@@ -4,9 +4,6 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
     mode: 'production',
-    externals: {
-        'wasmer_wasi_js_bg.wasm': true
-    },
     experiments: {
         asyncWebAssembly: true,
         topLevelAwait: true
