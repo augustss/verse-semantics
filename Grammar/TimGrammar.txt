@@ -33,11 +33,11 @@ Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o
 -- NO UTF32          |  0u09 | !("<#" | "#>" | 0u0..0u1F | 0o7F..0o9F             | 0u2028 | 0u2029      ) UTF32
 
 Space     := {0o09 | 0o20 | Comment}
-NewLine   := 0o0D [0o0A] | 0o0A
+NewLine   := 0o0D 0o0A | 0o0A    -- Maybe add | 0o0D !0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(0o09|0o20) Space
+Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(Ending|0o09|0o20) Space
              if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
              else if(not ThisInd<=BlockInd                        ) then error)
 Scan      := Space ScanNS
@@ -93,7 +93,7 @@ Brace     := ScanNS '{' Space List '}' Space
 Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
 BraceInd  := Brace | Ind List Ded
 KeyBlock  := Block
-Defs      := Def {',' Scan Def}
+Defs      := Def {',' Scan Def} !','
 Paren     := '(' Space List ')' Space
 QualIdent := ['(' Space List ":)" Space] Ident
 Specs     := [ScanKeyNS "with" KeyEnd] '<' Scan Choose '>' Space (Specs | !Specs)
@@ -145,8 +145,7 @@ StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else") KeyEnd) | StopFun)
 
 Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
---List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
-List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [';' Scan]]; pop
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} (Separator | !Separator)]; pop
 File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional

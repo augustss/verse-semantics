@@ -131,7 +131,7 @@ x:=y:=z;
 x:={y};
 x where {y};
 x where y;
-# x where y,z;  AMB
+x where y,z;
 x is {y};
 x is y;
 ## Def 2
@@ -149,7 +149,7 @@ x over {y};
 x when {y};
 x while {y};
 x over y;
-# x over y, z;  AMB
+x over y, z;
 x => y;
 x => {y};
 x next y;
