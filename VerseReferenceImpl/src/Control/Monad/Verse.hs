@@ -598,21 +598,25 @@ resume :: ( MonadFix m
           , MonadRef m
           ) => Heap m -> VerseT m () -> VerseT m ()
 resume h m = case h of
-  Cons { listeners = Listeners { listenerLengthRef } } ->
+  Cons { listeners = Listeners { listenerLengthRef, heapListenerRef } } ->
     lift (readRef listenerLengthRef) >>= \ case
       0 -> pure ()
-      _ -> do
-        h'' <- getHeap
-        msplit' (putHeap h *> m) mempty >>= \ case
-          Just ((), s, _) -> do
-            h <- getHeap
-            addListenersFromTo h h'' s
-            VerseT . modify $ flip appendListeners s
-            putHeap h''
-            notifyHeap h True
-          Nothing -> do
-            putHeap h''
-            notifyHeap h False
+      _ -> lift (readRef heapListenerRef) >>= \ case
+        Nothing -> do
+          notifyHeap h True
+          m
+        Just _ -> do
+          h' <- getHeap
+          msplit' (putHeap h *> m) mempty >>= \ case
+            Just ((), s, _) -> do
+              h <- getHeap
+              addListenersFromTo h h' s
+              VerseT . modify $ flip appendListeners s
+              putHeap h'
+              notifyHeap h True
+            Nothing -> do
+              putHeap h'
+              notifyHeap h False
   _ -> m
 
 
