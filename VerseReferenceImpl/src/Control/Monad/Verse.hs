@@ -207,8 +207,19 @@ putHeapListener = \ case
     h <- getHeap
     incrListenerLength h
     let f' h m = localSplitLabel (const splitLabel) . f h m
-    lift . writeRef heapListenerRef $ Just $ HeapListener h empty f'
+    lift . writeRef heapListenerRef . Just $ HeapListener h empty f'
   _ -> error "putHeapListener"
+
+modifyHeapListener :: ( MonadFix m
+                      , MonadRef m
+                      ) => Heap m -> VerseT m () -> VerseT m ()
+modifyHeapListener = \ case
+  Cons { listeners = Listeners { heapListenerRef } } -> \ m -> lift $
+    readRef heapListenerRef >>= \ case
+      Just (HeapListener h m' f) ->
+        writeRef heapListenerRef . Just $ HeapListener h (plus m m') f
+      Nothing -> error "modifyHeapListener"
+  _ -> error "modifyHeapListener"
 
 type Label = Int
 
@@ -541,11 +552,11 @@ split' m f = do
             True -> do
               h <- getHeap
               putHeap h'
-              x <- freshen freshenVar x
+              x' <- freshen freshenVar x
               commit h'
               putHeap h
-              f $ Just (x, putHeap h' *> (m' $> x <|> m))
-            False -> split' (putHeap h' *> (m' $> x <|> m)) f
+              f $ Just (x', putHeap h' *> (plus (m' $> x) m))
+            False -> split' (putHeap h' *> (plus (m' $> x) m)) f
     Nothing -> do
       putHeap h
       f Nothing
@@ -606,18 +617,18 @@ resume h m = case h of
         Nothing -> do
           notifyHeap h True
           m
-        Just (HeapListener h' m' f) -> do
-          h'' <- getHeap
+        Just _ -> do
+          h' <- getHeap
           msplit' (putHeap h *> m) mempty >>= \ case
             Just ((), s, m) -> do
               h <- getHeap
-              addListenersFromTo h h'' s
+              addListenersFromTo h h' s
               VerseT . modify $ flip appendListeners s
-              lift . writeRef heapListenerRef . Just $ HeapListener h' (m <|> m') f
-              putHeap h''
+              modifyHeapListener h m
+              putHeap h'
               notifyHeap h True
             Nothing -> do
-              putHeap h''
+              putHeap h'
               notifyHeap h False
   _ -> m
 
@@ -696,12 +707,12 @@ pushChoice h = do
 
 pushChoice' :: (MonadFix m, MonadRef m) => Heap m -> CopyT m (Heap m)
 pushChoice' h = case h of
-  Cons { listeners = Listeners { listenerLengthRef, listenersRef } } -> do
+  Cons { listeners = Listeners {..} } -> do
     label <- supply
     commitRef <- newRef emptyCommit
     listenerLengthRef <- newRef =<< readRef listenerLengthRef
     listenersRef <- newRef =<< copyListeners =<< readRef listenersRef
-    heapListenerRef <- newRef Nothing
+    heapListenerRef <- newRef =<< traverse copyHeapListener =<< readRef heapListenerRef
     pure Cons { listeners = Listeners { kind = Choice, .. }, copied = Nil, tail = h, .. }
   _ -> do
     label <- supply
@@ -765,6 +776,9 @@ copyHeapListeners = \ case
 
 lookupInsertCopied :: Label -> Heap m -> Copied m -> Either (Heap m) (Copied m)
 lookupInsertCopied i x (Copied xss xs) = flip Copied xs <$> lookupInsert i x xss
+
+plus :: VerseT m a -> VerseT m a -> VerseT m a
+plus x y = VerseT $ unVerseT x <|> unVerseT y
 
 askSplitLabel :: VerseT m SplitLabel
 askSplitLabel = VerseT ask
