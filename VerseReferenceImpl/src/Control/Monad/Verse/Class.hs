@@ -17,6 +17,7 @@ import Control.Monad.Unify
 import Control.Monad.Var
 
 import Data.Freshenable
+import Data.Functor
 import Data.Kind
 
 class (MonadUnify m, MonadVarRef m) => MonadVerse m where
@@ -79,8 +80,8 @@ instance MonadVerse m => MonadVerse (RST r s m) where
 
 instance (Monoid w, MonadVerse m) => MonadVerse (CPS.WriterT w m) where
   whenBound x f = lift $ whenBound x $ \ x ->
-    () <$ CPS.runWriterT (f x)
+    void $ CPS.runWriterT (f x)
   split m f = CPS.writerT $ do
     split (fst <$> CPS.runWriterT m) $ \ x ->
-      fst <$> (CPS.runWriterT (f $ fmap lift <$> x))
+      fst <$> CPS.runWriterT (f $ fmap lift <$> x)
     pure ((), mempty)
