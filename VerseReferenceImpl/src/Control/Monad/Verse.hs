@@ -197,7 +197,10 @@ data HeapListener m = HeapListener
   !(Heap m)
   !(Heap m -> Bool -> VerseT m ())
 
-putHeapListener :: MonadRef m => Heap m -> (Heap m -> Bool -> VerseT m ()) -> VerseT m ()
+putHeapListener :: MonadRef m =>
+                   Heap m ->
+                   (Heap m -> Bool -> VerseT m ()) ->
+                   VerseT m ()
 putHeapListener = \ case
   Cons { listeners = Listeners { heapListenerRef } } -> \ f -> do
     splitLabel <- askSplitLabel
@@ -605,17 +608,13 @@ resume h m = case h of
           Just ((), s, _) -> do
             h <- getHeap
             addListenersFromTo h h'' s
-            VerseT $ modify $ flip appendListeners s
+            VerseT . modify $ flip appendListeners s
             putHeap h''
             notifyHeap h True
           Nothing -> do
             putHeap h''
             notifyHeap h False
-  _ -> do
-    s <- VerseT get
-    msplit' m s >>= \ case
-      Just ((), s, _) -> VerseT $ put s
-      Nothing -> empty
+  _ -> m
 
 
 msplit' :: Monad m =>
@@ -731,10 +730,10 @@ copyListeners :: (MonadFix m, MonadRef m) => Listeners m -> CopyT m (Listeners m
 copyListeners = traverse (traverse copyListener)
 
 copyListener :: (MonadFix m, MonadRef m) => Listener m a -> CopyT m (Listener m a)
-copyListener (Listener h f) = flip Listener f <$> copyHeap h
+copyListener (Listener h f) = copyHeap h <&> \ h -> Listener h f
 
 copyHeapListener :: (MonadFix m, MonadRef m) => HeapListener m -> CopyT m (HeapListener m)
-copyHeapListener (HeapListener h f) = flip HeapListener f <$> copyHeap h
+copyHeapListener (HeapListener h f) = copyHeap h <&> \ h -> HeapListener h f
 
 copyHeap :: (MonadFix m, MonadRef m) => Heap m -> CopyT m (Heap m)
 copyHeap = \ case

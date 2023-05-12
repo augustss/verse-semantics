@@ -2,7 +2,9 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,7 +58,19 @@ import Language.Verse.Overload qualified as Overload
 import Language.Verse.Val (Val)
 import Language.Verse.Val qualified as Val
 
-type EvalT m = WriterT (Defaults m) (RST (Env m) (Var m StoreFree) m)
+type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) m)
+
+data S m = S
+  { choiceFree :: Var m ChoiceFree
+  , storeFree :: Var m StoreFree
+  }
+
+data ChoiceFree a = ChoiceFree deriving (Functor, Foldable, Traversable)
+
+instance Unifiable ChoiceFree
+
+instance Zippable ChoiceFree where
+  zipMatch _ _ = Just []
 
 data StoreFree a = StoreFree deriving (Functor, Foldable, Traversable)
 
@@ -78,9 +92,10 @@ type Env m = HashMap Ident (Named m (Var m (Val m)))
 
 runEvalT :: MonadVar m => EvalT m a -> m a
 runEvalT m = do
+  choiceFree <- newVar ChoiceFree
   storeFree <- newVar StoreFree
   env <- newEnv
-  evalRST (evalWriterT m) env storeFree
+  evalRST (evalWriterT m) env S {..}
 
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
@@ -103,27 +118,34 @@ eval' e = case extract e of
     evalDot (loc e) e1 x
   e1 :..: e2 ->
     evalDotDot e1 e2
-  e1 :|: e2 ->
-    eval' e1 <|> eval' e2
+  e1 :|: e2 -> do
+    var <- freshVar
+    choiceFree <- getChoiceFree
+    choiceFree' <- freshVar
+    whenBound choiceFree . const $ do
+      unify var =<< eval' e1 <|> eval' e2
+      unify choiceFree choiceFree'
+    putChoiceFree choiceFree'
+    pure var
   Exp.Fail ->
     empty
   Exp.One e -> do
     var <- freshVar
-    storeFree <- get
+    storeFree <- getStoreFree
     storeFree' <- freshVar
     once' (One <$> eval' e) $ \ (One var_e) -> do
       unify var var_e
       unify storeFree storeFree'
-    put storeFree'
+    putStoreFree storeFree'
     pure var
   Exp.All e -> do
     var <- freshVar
-    storeFree <- get
+    storeFree <- getStoreFree
     storeFree' <- freshVar
     all' (One <$> eval' e) $ \ vars_e -> do
       unify var =<< newVar (Val.Tuple $ getOne <$> vars_e)
       unify storeFree storeFree'
-    put storeFree'
+    putStoreFree storeFree'
     pure var
   Exp.Not e -> do
     ifte''
@@ -161,7 +183,9 @@ eval' e = case extract e of
     pure var
   Exp.ForDo xs e1 e2 -> do
     var <- freshVar
-    storeFree <- get
+    choiceFree <- getChoiceFree
+    choiceFree' <- freshVar
+    storeFree <- getStoreFree
     storeFree' <- freshVar
     for'
       (do
@@ -172,8 +196,10 @@ eval' e = case extract e of
           localNames xs $ One <$> eval' e2)
       (\ vars -> do
           unify var =<< newVar (Val.Tuple $ getOne <$> vars)
+          unify choiceFree choiceFree'
           unify storeFree storeFree')
-    put storeFree'
+    putChoiceFree choiceFree'
+    putStoreFree storeFree'
     pure var
   Exp.Exists x e -> do
     var <- freshVar
@@ -245,16 +271,19 @@ evalDotDot :: MonadEval m =>
               L (Exp L Ident) ->
               EvalT m (Var m (Val m))
 evalDotDot e1 e2 = do
+  choiceFree <- getChoiceFree
+  choiceFree' <- freshVar
   var1 <- eval' e1
   var2 <- eval' e2
   var <- freshVar
   lift $ whenBound var1 $ \ case
     Val.Int val1 -> whenBound var2 $ \ case
-      Val.Int val2 ->
-        unify var =<<
-        foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+      Val.Int val2 -> do
+        unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+        unify choiceFree choiceFree'
       _ -> throwDomainError $ loc e2
     _ -> throwDomainError $ loc e1
+  putChoiceFree choiceFree'
   pure var
 
 evalInst :: MonadEval m =>
@@ -308,11 +337,14 @@ evalInvoke loc e1 e2 = do
   var1 <- eval' e1
   var2 <- eval' e2
   var <- freshVar
-  storeFree <- get
+  choiceFree <- getChoiceFree
+  choiceFree' <- freshVar
+  storeFree <- getStoreFree
   storeFree' <- freshVar
   whenBound var1 $ \ case
     Val.Tuple xs -> do
       unify var =<< invokeTuple xs var2
+      unify choiceFree choiceFree'
       unify storeFree storeFree'
     Val.Overloads overload var1 ->
       fix (\ recur overload var1 -> case overload of
@@ -320,6 +352,7 @@ evalInvoke loc e1 e2 = do
           invokeFunction env xs e_domain e var2 $ \ case
             Just var' -> do
               unify var var'
+              unify choiceFree choiceFree'
               unify storeFree storeFree'
             Nothing -> whenBound var1 $ \ case
               Val.Overloads overload var1 -> recur overload var1
@@ -327,21 +360,25 @@ evalInvoke loc e1 e2 = do
         Overload.Struct i env xs e -> do
           unify var var2
           invokeStruct i env xs e var2
+          unify choiceFree choiceFree'
           unify storeFree storeFree'
         Overload.Class i env var_super xs e -> do
           unify var var2
           invokeClass loc i env var_super xs e var2
+          unify choiceFree choiceFree'
           unify storeFree storeFree'
         Overload.Intrinsic intrinsic ->
           invokeIntrinsic intrinsic var2 $ \ case
             Just var' -> do
               unify var var'
+              unify choiceFree choiceFree'
               unify storeFree storeFree'
             Nothing -> whenBound var1 $ \ case
               Val.Overloads overload var1 -> recur overload var1
               _ -> throwDomainError loc) overload var1
     _ -> throwDomainError loc
-  put storeFree'
+  putChoiceFree choiceFree'
+  putStoreFree storeFree'
   pure var
 
 invokeTuple :: ( MonadUnify m
@@ -698,7 +735,7 @@ fromIdents =
 unifyNamed :: ( MonadVerse m
               , EqVarRef (VarRef m)
               ) => Named m (Var m (Val m)) -> Named m (Var m (Val m)) -> EvalT m ()
-unifyNamed = curry $ lift . \ case
+unifyNamed = curry $ \ case
   (Val var_x, Val var_y) ->
     unify var_x var_y
   (Ref ref_x, Val var_y) ->
@@ -724,38 +761,48 @@ ifte'' :: (MonadVerse m, Freshenable a, Elem a ~ Var m) =>
           EvalT m () ->
           EvalT m ()
 ifte'' p t e = do
-  storeFree <- get
+  storeFree <- getStoreFree
   storeFree' <- freshVar
   ifte'
     p
     (\ x -> t x *> unify storeFree storeFree')
     (e *> unify storeFree storeFree')
-  put storeFree
+  putStoreFree storeFree
 
-readVarRef' :: ( MonadState (Var m StoreFree) m
-               , MonadVarRef m
+readVarRef' :: ( MonadVarRef m
                , MonadVerse m
-               ) => VarRef m f -> (Var m f -> m ()) -> m ()
+               ) => VarRef m f -> (Var m f -> EvalT m ()) -> EvalT m ()
 readVarRef' ref f = do
-  storeFree <- get
+  storeFree <- getStoreFree
   storeFree' <- freshVar
   whenBound storeFree . const $ do
     f =<< readVarRef ref
     unify storeFree storeFree'
-  put storeFree'
+  putStoreFree storeFree'
 
 writeVarRef' :: ( Traversable f
-                , MonadState (Var m StoreFree) m
                 , MonadVarRef m
                 , MonadVerse m
-                ) => VarRef m f -> Var m f -> m ()
+                ) => VarRef m f -> Var m f -> EvalT m ()
 writeVarRef' ref x = do
-  storeFree <- get
+  storeFree <- getStoreFree
   storeFree' <- freshVar
   whenBound storeFree . const $ do
     writeVarRef ref x
     unify storeFree storeFree'
-  put storeFree'
+  putStoreFree storeFree'
+
+getChoiceFree :: Monad m => EvalT m (Var m ChoiceFree)
+getChoiceFree = gets choiceFree
+
+putChoiceFree :: Monad m => Var m ChoiceFree -> EvalT m ()
+putChoiceFree choiceFree = modify $ \ s -> s { choiceFree }
+
+getStoreFree :: Monad m => EvalT m (Var m StoreFree)
+getStoreFree = gets storeFree
+
+putStoreFree :: Monad m => Var m StoreFree -> EvalT m ()
+putStoreFree storeFree = modify $ \ s -> s { storeFree }
 
 data Unit (m :: Type -> Type) = Unit
 
