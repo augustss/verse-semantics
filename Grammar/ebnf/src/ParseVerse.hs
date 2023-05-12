@@ -82,7 +82,7 @@ mkElemParse :: RuleEnv -> Elem -> P ParseTree
 mkElemParse r (Seq xs) = SSeq <$> mapM (mkElemParse r) xs
 mkElemParse r (Alt xs) = choice $ zipWith (\ i p -> SAlt i <$> mkElemParse r p) [0..] xs
 mkElemParse _ (Chr c)  = SChar <$> char c
-mkElemParse _ (ChrRange l h) = SChar <$> satisfy (\ c -> l <= c && c <= h)
+mkElemParse _ (ChrRange l h) = SChar <$> satisfy (show l ++ ".." ++ show h) (\ c -> l <= c && c <= h)
 mkElemParse _ (Str s) = SStr <$> string s
 mkElemParse r (Not x) = SUnit <$ notFollowedBy (mkElemParse r x)
 mkElemParse r (Many x) = SMany <$> many (mkElemParse r x)
