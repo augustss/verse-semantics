@@ -133,7 +133,7 @@ eval' e = case extract e of
     var <- freshVar
     storeFree <- getStoreFree
     storeFree' <- freshVar
-    once' (One <$> eval' e) $ \ (One var_e) -> do
+    once' (newVar ChoiceFree >>= putChoiceFree >> One <$> eval' e) $ \ (One var_e) -> do
       unify var var_e
       unify storeFree storeFree'
     putStoreFree storeFree'
@@ -142,7 +142,7 @@ eval' e = case extract e of
     var <- freshVar
     storeFree <- getStoreFree
     storeFree' <- freshVar
-    all' (One <$> eval' e) $ \ vars_e -> do
+    all' (newVar ChoiceFree >>= putChoiceFree >> One <$> eval' e) $ \ vars_e -> do
       unify var =<< newVar (Val.Tuple $ getOne <$> vars_e)
       unify storeFree storeFree'
     putStoreFree storeFree'
@@ -189,6 +189,7 @@ eval' e = case extract e of
     storeFree' <- freshVar
     for'
       (do
+          putChoiceFree =<< newVar ChoiceFree
           xs <- for xs freshNamed
           _ <- localNames xs $ eval' e1
           pure $ Many xs)
@@ -764,7 +765,7 @@ ifte'' p t e = do
   storeFree <- getStoreFree
   storeFree' <- freshVar
   ifte'
-    p
+    (newVar ChoiceFree >>= putChoiceFree >> p)
     (\ x -> t x *> unify storeFree storeFree')
     (e *> unify storeFree storeFree')
   putStoreFree storeFree
