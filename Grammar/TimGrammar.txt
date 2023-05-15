@@ -126,8 +126,8 @@ Less      := Greater [ ('<'  | "<="           ) Scan  &(Choose Space !'>' !">=")
 NotEq     := Less    {: ("<>"                  ) Scan  Choose  :}
 Eq        := NotEq   {: ('='                   ) Scan  NotEq   :}
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
-And       := Not     {: ("and" KeyEndNS        ) Scan  Not     :}
-Or        := And     {: ("or"  KeyEndNS        ) Scan  And     :}
+And       := Not     [ ("and" KeyEndNS        ) Scan  And     ]
+Or        := And     [ ("or"  KeyEndNS        ) Scan  Or      ]
 Def       := (Or | (In | Var) (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
                   {: &In Def
                     | ":="    Space    (BraceInd | Def )

@@ -114,35 +114,18 @@ toExpr (SName "Def" (SAlt 2 (SSeq [t, SOpt m, _]))) = AOp (flattenParseTree t) (
   where f (SAlt 0 b) = [toExpr b]
         f (SAlt 1 d) = [toExpr d]
         f x = err "toExpr" x
-toExpr (SName "Or" (SSeq [e, SMany xs])) = foldr1 (AInfix "or") (toExpr e : map f xs)
-  where f (SSeq [SSeq [SStr "or", _], x]) = toExpr x
-        f x = err "toExpr-Or" x
-toExpr (SName "And" (SSeq [e, SMany xs])) = foldl1 (AInfix "and") (toExpr e : map f xs)
-  where f (SSeq [SSeq [SStr "and", _], x]) = toExpr x
-        f x = err "toExpr-And" x
+toExpr (SName "Or" (SSeq [e, xs])) = rightAssoc e xs
+toExpr (SName "And" (SSeq [e, xs])) = rightAssoc e xs
 toExpr (SName "Not" (SAlt 0 c)) = toExpr c
 toExpr (SName "Not" (SAlt 1 (SSeq [SSeq [SStr "not", _], x]))) = APrefix "not" (toExpr x)
-toExpr (SName "Eq" (SSeq [e, SMany xs])) = foldl1 (AInfix "=") (toExpr e : map f xs)
-  where f (SSeq [SChar '=', x]) = toExpr x
-        f x = err "toExpr" x
-toExpr (SName "NotEq" (SSeq [e, SMany xs])) = foldl1 (AInfix "<>") (toExpr e : map f xs)
-  where f (SSeq [SStr "<>", x]) = toExpr x
-        f x = err "toExpr" x
-toExpr (SName "Less" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Less" (SSeq [e, SOpt (Just (SSeq [op, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
-toExpr (SName "Greater" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Greater" (SSeq [e, SOpt (Just (SSeq [op, f]))])) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
-toExpr (SName "Choose" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "Choose" (SSeq [e, SOpt (Just (SSeq [SChar '|', f]))])) = AInfix "|" (toExpr e) (toExpr f)
-toExpr (SName "To" (SSeq [e, SOpt Nothing])) = toExpr e
-toExpr (SName "To" (SSeq [e, SOpt (Just (SSeq [op, f]))])) =
-  AInfix (flattenParseTree op) (toExpr e) (toExpr f)
-toExpr (SName "Add" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [op, x]) = AInfix (flattenParseTree op) r (toExpr x)
-        f _ x = err "toExpr-Add" x
-toExpr (SName "Mul" (SSeq [e, SMany xs])) = foldl f (toExpr e) xs
-  where f r (SSeq [op, x]) = AInfix (flattenParseTree op) r (toExpr x)
-        f _ x = err "toExpr-Mul" x
+toExpr (SName "Eq" (SSeq [e, xs])) = leftAssoc e xs
+toExpr (SName "NotEq" (SSeq [e, xs])) = leftAssoc e xs
+toExpr (SName "Less" (SSeq [e, xs])) = rightAssoc e xs
+toExpr (SName "Greater" (SSeq [e, xs])) = rightAssoc e xs
+toExpr (SName "Choose" (SSeq [e, xs])) = rightAssoc e xs
+toExpr (SName "To" (SSeq [e, xs])) = rightAssoc e xs
+toExpr (SName "Add" (SSeq [e, xs])) = leftAssoc e xs
+toExpr (SName "Mul" (SSeq [e, xs])) = leftAssoc e xs
 toExpr (SName "Prefix" (SAlt 0 x)) = toExpr x
 toExpr (SName "Prefix" (SAlt 1 (SSeq [op, x]))) =
   let a = case x of
@@ -216,6 +199,17 @@ toExpr (SName "BraceInd" (SAlt 1 (SSeq [_,x,_]))) = aBlock $ unList $ toExpr x
 toExpr (SName "KeyBlock" x) = toExpr x
 
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
+
+leftAssoc :: HasCallStack => ParseTree -> ParseTree -> AST
+leftAssoc e (SMany xs) = foldl f (toExpr e) xs
+  where f r (SSeq [op, x]) = AInfix (flattenParseTree op) r (toExpr x)
+        f _ x = err "leftAssoc-1" x
+leftAssoc _ x = err "leftAssoc-2" x
+
+rightAssoc :: HasCallStack => ParseTree -> ParseTree -> AST
+rightAssoc e (SOpt Nothing) = toExpr e
+rightAssoc e (SOpt (Just (SSeq [op, f]))) = AInfix (flattenParseTree op) (toExpr e) (toExpr f)
+rightAssoc e x = err "rightAssoc" (SSeq [e, x])
 
 toAlt2 :: HasCallStack => (ParseTree -> AST) -> (ParseTree -> AST) -> ParseTree -> AST
 toAlt2 f _ (SAlt 0 x) = f x
