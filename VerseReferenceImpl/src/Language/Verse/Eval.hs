@@ -762,12 +762,21 @@ ifte'' :: (MonadVerse m, Freshenable a, Elem a ~ Var m) =>
           EvalT m () ->
           EvalT m ()
 ifte'' p t e = do
+  choiceFree <- getChoiceFree
+  choiceFree' <- freshVar
   storeFree <- getStoreFree
   storeFree' <- freshVar
   ifte'
     (newVar ChoiceFree >>= putChoiceFree >> p)
-    (\ x -> t x *> unify storeFree storeFree')
-    (e *> unify storeFree storeFree')
+    (\ x -> do
+        t x
+        unify choiceFree choiceFree'
+        unify storeFree storeFree')
+    (do
+        e
+        unify choiceFree choiceFree'
+        unify storeFree storeFree')
+  putChoiceFree choiceFree'
   putStoreFree storeFree
 
 readVarRef' :: ( MonadVarRef m
