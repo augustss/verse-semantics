@@ -11,6 +11,8 @@ import Data.Generics.Uniplate.Data
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import GHC.Stack
+import Text.Read(readMaybe)
 
 import ParseEBNF
 import ParserComb

@@ -55,6 +55,8 @@ data Expr
   = EVar String
   | EStr String
   | EGT Expr Expr
+  | ELT Expr Expr
+  | EGE Expr Expr
   | ELE Expr Expr
   | EEQ Expr Expr
   | Enot Expr
@@ -166,8 +168,10 @@ pNot = (Enot <$> (keyword "not" *> pCmp)) <|> pCmp
 pCmp :: P Expr
 pCmp = do
   e <- pAtom
-  choice [ EGT e <$> (symbol ">"  *> pAtom)
-         , ELE e <$> (symbol "<=" *> pAtom)
+  choice [ ELE e <$> (symbol "<=" *> pAtom)
+         , EGE e <$> (symbol ">=" *> pAtom)
+         , EGT e <$> (symbol ">"  *> pAtom)
+         , ELT e <$> (symbol "<"  *> pAtom)
          , EEQ e <$> (symbol "="  *> pAtom)
          , pure e]
 
