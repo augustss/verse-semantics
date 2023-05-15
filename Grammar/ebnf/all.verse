@@ -166,6 +166,8 @@ x:int;
 x:int=1;
 x:int:=1;
 (x:int)=1;
+## Possible ambiguity
+x:y<z>;
 ## Markup
 <M; {x}\n<#x#>foo>;
 <M; a<B;b>>;
@@ -181,4 +183,5 @@ x:int:=1;
  c
 <M;>
 <M;a
-b>
+b>;
+

@@ -97,7 +97,7 @@ Defs      := Def {: ',' Scan Def :}
 Paren     := '(' Space List ')' Space
 QualIdent := ['(' Space List ":)" Space] Ident
 Specs     := [ScanKeyNS "with" KeyEnd] '<' Scan Choose '>' Space (Specs | !Specs)
-Tags      := (!'/' Call ScanKeyNS '.' Space | !Reserved) QualIdent {:Invoke:} [',' Scan Tags]
+Tags      := (!'/' CallL ScanKeyNS '.' Space | !Reserved) QualIdent {:Invoke:} [',' Scan Tags]
 
 Do        := ScanKeyNS "do"    KeyEnd (KeyBlock | Def)
 Until     := ScanKeyNS "until" KeyEnd (KeyBlock | Def) | ScanKeyNS "catch" KeyEnd Invoke
@@ -110,7 +110,8 @@ In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Specs])
 Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
 
 Base      := '(' Space List ')' Space | Num | Char | Path | String | Markup | If | !Reserved QualIdent
-Call      := Base    {Postfix}
+Call      := Base    {:Postfix:}
+CallL     := Base    {Postfix}
 Postfix   := Invoke  | !Invoke (Paren | Specs)
                      | ("at"|"of") KeyEnd (KeyBlock | Fun)
                      | ('^' | '?' | '[' Space List ']') Space

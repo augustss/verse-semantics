@@ -152,7 +152,7 @@ toExpr (SName "Prefix" (SAlt 1 (SSeq [op, x]))) =
   in  case op of
         SAlt 2 (SSeq [SChar '[', i, SChar ']']) -> AOp "pre[]" [toExpr i, a]
         _ -> APrefix (flattenParseTree op) a
-toExpr (SName "Call" (SSeq [ax, SMany xs])) = foldl f (toExpr ax) xs
+toExpr (SName call (SSeq [ax, SMany xs])) | call == "Call" || call == "CallL" = foldl f (toExpr ax) xs
   where
     f r (SName "Postfix" px) =
       case px of
@@ -332,7 +332,7 @@ toContent (SName "Content" (SMany axs)) = AOp "content" $ cont [] axs
 
     cont [] (SAlt 0 (SName "Interp" (SSeq [SChar '{', x, SChar '}'])) : xs) = AOp "interp" [toExpr x] : cont [] xs
     cont [] (SAlt 2 x : xs) = toMarkup x : cont [] xs
-    cont [] (SAlt 3 (SName "Ampersand" (SSeq [x, _])) : xs) = AOp "ampersand" [toExpr x] : cont [] xs
+    cont [] (SAlt 3 (SName "Ampersand" (SSeq [_, x, _])) : xs) = AOp "ampersand" [toExpr x] : cont [] xs
     cont _  (x : _) = err "toContent-1" x
     cont [] [] = []
 toContent x = err "toContent" x
