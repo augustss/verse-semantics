@@ -35,11 +35,11 @@ Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o
 Space     := {0o09 | 0o20 | Comment}
 NewLine   := 0o0D 0o0A | 0o0A    -- Maybe add | 0o0D !0o0A
 Ending    := &(NewLine | end)
-Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
+Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
 Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(Ending|0o09|0o20) Space
              if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
-             else if(not ThisInd<=BlockInd                        ) then error)
+             else if(ThisInd<BlockInd                             ) then error)
 Scan      := Space ScanNS
 ScanNS    := {Line}
 ScanKey   := Space ScanKeyNS
@@ -145,11 +145,11 @@ StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else") KeyEnd) | StopFun)
 
 Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
-List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} (Separator | !Separator)]; pop
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} !(Separator Commas) (Separator | !Separator)]; pop
 File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional
-{e}  means zero or more
+{e}  means zero or more; with eager parsing
 (e)  is just grouping
 !s   ensure s does not occur
 &s   checks that s does occur but does not consume it (like a PEG)
