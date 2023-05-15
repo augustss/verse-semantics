@@ -60,7 +60,7 @@ notFollowedBy = M.notFollowedBy
 
 lookAhead = pure () <$ M.lookAhead
 #else
-import Control.Applicative
+import Control.Applicative hiding (many, some)
 
 data LastFail
   = LastFail Int [(String, [String])]
@@ -84,6 +84,7 @@ data Res s a = Many [(a, (String, s))] LastFail
   deriving (Show)
 
 newtype Prsr s a = P { runP :: (String, s) -> Res s a}
+instance Show (Prsr s a) where show _ = "<<Prsr>>"
 
 instance Functor (Prsr s) where
   fmap f p = P $ \ t ->
@@ -115,6 +116,21 @@ instance Alternative (Prsr s) where
   p <|> q = P $ \ t ->
     case (runP p t, runP q t) of
       (Many a lfa, Many b lfb) -> Many (a ++ b) (longest lfa lfb)
+
+-- Left biased choice
+(<|<) :: Prsr s a -> Prsr s a -> Prsr s a
+p <|< q = P $ \ t ->
+  case runP p t of
+    Many [] lfa ->
+      case runP q t of
+        Many b lfb -> Many b (longest lfa lfb)
+    r -> r
+
+many :: Prsr s a -> Prsr s [a]
+many p = some p <|< pure []
+
+some :: Prsr s a -> Prsr s [a]
+some p = (:) <$> p <*> many p
 
 runPrsr s (P p) _ f =
   case p (f, s) of
