@@ -166,3 +166,19 @@ x:int;
 x:int=1;
 x:int:=1;
 (x:int)=1;
+## Markup
+<M; {x}\n<#x#>foo>;
+<M; a<B;b>>;
+<M>foo</M>;
+<M,N;a>;
+<M(){};a>;
+<M(){}(a){b};a>;
+<M.N; a>;
+<M(0).N; a>;
+<M; ~a ~b ~c d>;
+<M:>
+ a b
+ c
+<M;>
+<M;a
+b>
