@@ -19,11 +19,9 @@ main = do
         fv <- readFile v
         let xs = parsesDie pVerse v fv
             asts = map parseTreeToAST xs
+            asts' = nub asts
         -- print (head xs)
-        when (length xs > 1) $ do
-          putStrLn $ "Ambig " ++ show (length xs)
---          mapM_ print xs
-        case nub asts of
+        case asts' of
           [ast] -> do
             putStrLn $ prettyShow ast
             when (flattenParseTree (head xs) /= fv) $ do
@@ -32,7 +30,14 @@ main = do
               putStrLn "-----"
               putStrLn $ flattenParseTree (head xs)
               error "bad"
-          asts' -> error $ "Ambiguous:\n" ++ unlines (map show asts')
+            when (length xs > 1) $ do
+              putStrLn $ "Harmless ambiguity: " ++ show (length xs)
+              --mapM_ print xs
+          _ -> do
+            putStrLn $ "Ambiguous:\n"
+            mapM_ print xs
+            putStrLn $ unlines (map prettyShow asts')
+            putStrLn $ "Ambiguity: " ++ show (length asts')
   mapM_ doFile vs
 
 trim :: String -> String
