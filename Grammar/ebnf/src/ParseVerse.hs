@@ -88,6 +88,7 @@ mkElemParse _ (ChrRange l h) = SChar <$> satisfy (show l ++ ".." ++ show h) (\ c
 mkElemParse _ (Str s) = SStr <$> string s
 mkElemParse r (Not x) = SUnit <$ notFollowedBy (mkElemParse r x)
 mkElemParse r (Many x) = SMany <$> many (mkElemParse r x)
+mkElemParse r (EMany x) = SMany <$> emany (mkElemParse r x)
 mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r

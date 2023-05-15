@@ -31,6 +31,7 @@ data Elem
   | ChrRange Char Char
   | Str String
   | Not Elem
+  | EMany Elem
   | Many Elem
   | Look Elem
   | Opt Elem
@@ -126,6 +127,7 @@ pElem :: P Elem
 pElem = choice
   [ pCharRange
   , NonTerm <$> pIdent
+  , EMany <$> between (symbol "{:") (symbol ":}") pAlts
   , Many <$> between (symbol "{") (symbol "}") pAlts
   , Opt  <$> between (symbol "[") (symbol "]") pAlts
   ,          between (symbol "(") (symbol ")") pAlts

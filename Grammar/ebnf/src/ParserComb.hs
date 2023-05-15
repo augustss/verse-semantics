@@ -6,7 +6,7 @@ module ParserComb(
   Prsr, runPrsr,
   satisfy, char, string, eof,
   choice,
-  many, optional,
+  many, emany, optional,
   (<?>),
   notFollowedBy, lookAhead,
   )where
@@ -60,7 +60,7 @@ notFollowedBy = M.notFollowedBy
 
 lookAhead = pure () <$ M.lookAhead
 #else
-import Control.Applicative hiding (many, some)
+import Control.Applicative --hiding (many, some)
 
 data LastFail
   = LastFail Int [(String, [String])]
@@ -126,11 +126,11 @@ p <|< q = P $ \ t ->
         Many b lfb -> Many b (longest lfa lfb)
     r -> r
 
-many :: Prsr s a -> Prsr s [a]
-many p = some p <|< pure []
+emany :: Prsr s a -> Prsr s [a]
+emany p = esome p <|< pure []
 
-some :: Prsr s a -> Prsr s [a]
-some p = (:) <$> p <*> many p
+esome :: Prsr s a -> Prsr s [a]
+esome p = (:) <$> p <*> emany p
 
 runPrsr s (P p) _ f =
   case p (f, s) of

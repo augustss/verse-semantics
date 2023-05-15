@@ -21,7 +21,7 @@ Legend:
 Alpha     := 'A'..'Z' | 'a'..'z' | '_'
 Alnum     := 'A'..'Z' | 'a'..'z' | '_' | '0'..'9'
 Hex       := 'A'..'F' | 'a'..'f' |       '0'..'9'
-Digits    := '0'..'9' {'0'..'9'}
+Digits    := '0'..'9' {:'0'..'9':}
 
 U8        := 0o80..0oBF
 UTF8      :=                                      0o00..0o7F
@@ -32,28 +32,28 @@ UTF8      :=                                      0o00..0o7F
 Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o80 0oA8..0oA9 ) UTF8
 -- NO UTF32          |  0u09 | !("<#" | "#>" | 0u0..0u1F | 0o7F..0o9F             | 0u2028 | 0u2029      ) UTF32
 
-Space     := {0o09 | 0o20 | Comment}
+Space     := {:0o09 | 0o20 | Comment:}
 NewLine   := 0o0D 0o0A | 0o0A    -- Maybe add | 0o0D !0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(Ending|0o09|0o20) Space
+Line      := NewLine; parse ThisInd:={:0o09|0o20:}; (Ending | !(Ending|0o09|0o20) Space
              if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
              else if(ThisInd<BlockInd                             ) then error)
 Scan      := Space ScanNS
-ScanNS    := {Line}
+ScanNS    := {:Line:}
 ScanKey   := Space ScanKeyNS
 ScanKeyNS := &NewLine Scan ^LinePrefix Space | !NewLine
 
-LineCmt   :=  "#" !'>' {Text        } Ending
-BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
-IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
+LineCmt   :=  "#" !'>' {:Text        :} Ending
+BlockCmt  := "<#" !'>' {:Text|NewLine:} !'<' "#>"
+IndCmt    := "<#>"     {:Text        :} Ind {:Text|Line:} Ded
 Comment   := LineCmt   | BlockCmt | IndCmt
 Text      := Printable | BlockCmt | "<#>"
 
 Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digits))
-Units     := [Alpha {Alpha}] !Alpha
-NumT      := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !('.' !'.') !Alnum
+Units     := [Alpha {:Alpha:}] !Alpha
+NumT      := ("0x" Hex {:Hex:} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !('.' !'.') !Alnum
 Num       := NumT Space
 
 Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
@@ -64,20 +64,20 @@ Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex]  !Alnum
 CharT     := CharLit | Char8 | Char32
 Char      := CharT Space
 
-IdentT    := Alpha {Alnum} !Alnum ["'" {!("<#"|"#>"|'\'|'{'|'}'|'"'|''') 0o20..0o7E} "'"]
-PathT     := '/' Label ('@' Label | !'@') {'/' ['(' Path ":)"] Ident} !'/'
-Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
+IdentT    := Alpha {:Alnum:} ["'" {: !("<#"|"#>"|'\'|'{'|'}'|'"'|''') 0o20..0o7E :} "'"]
+PathT     := '/' Label ('@' Label | !'@') {: '/' ['(' Path ":)"] Ident :} !'/'
+Label     := Alnum {: Alnum|'-'|'.' :}
 Ident     := IdentT Space
 Path      := PathT Space
 
 Interp    := '{' Space List '}'
 Ampersand := push; parse LinePrefix:='&'; Space Def (';'|Ending); pop
-StringT   := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
-Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
-Contents  := Content | '~' Content {'~' Content}
+StringT   := '"' {: Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text :} '"'
+Content   :=     {: Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text :}
+Contents  := Content | '~' Content {: '~' Content :}
 MarkupT   := '<' Scan Tags ScanNS ":>" Space Ind Contents Ded 
           |  '<' Scan Tags ScanNS ';'  Scan      Contents '>'
-          |  '<' Scan Tags ScanNS '>'  Scan      Contents "</" Ident Space {'/' Ident Space} '>'
+          |  '<' Scan Tags ScanNS '>'  Scan      Contents "</" Ident Space {: '/' Ident Space :} '>'
 String    := StringT Space
 Markup    := MarkupT Space
 
@@ -93,11 +93,11 @@ Brace     := ScanNS '{' Space List '}' Space
 Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
 BraceInd  := Brace | Ind List Ded
 KeyBlock  := Block
-Defs      := Def {',' Scan Def} !','
+Defs      := Def {: ',' Scan Def :}
 Paren     := '(' Space List ')' Space
 QualIdent := ['(' Space List ":)" Space] Ident
 Specs     := [ScanKeyNS "with" KeyEnd] '<' Scan Choose '>' Space (Specs | !Specs)
-Tags      := (!'/' Call ScanKeyNS '.' Space | !Reserved) QualIdent Space {Invoke} [',' Scan Tags]
+Tags      := (!'/' Call ScanKeyNS '.' Space | !Reserved) QualIdent {:Invoke:} [',' Scan Tags]
 
 Do        := ScanKeyNS "do"    KeyEnd (KeyBlock | Def)
 Until     := ScanKeyNS "until" KeyEnd (KeyBlock | Def) | ScanKeyNS "catch" KeyEnd Invoke
@@ -116,40 +116,41 @@ Postfix   := Invoke  | !Invoke (Paren | Specs)
                      | ('^' | '?' | '[' Space List ']') Space
                      | ScanKeyNS '.' QualIdent
 Prefix    := Call    | ('^' | '?' | '[' Space List ']' | '+' | '-' | '*') Space (Brace | Prefix)
-Mul       := Prefix  { ('*' | '/' | '&'       ) Scan  Prefix  }
-Add       := Mul     { ('+' | '-'             ) Scan  Mul     }
+Mul       := Prefix  {: ('*' | '/' | '&'       ) Scan  Prefix  :}
+Add       := Mul     {: ('+' | '-'             ) Scan  Mul     :}
 To        := Add     [ ("to" KeyEndNS | ".." | "->") Scan  To      ]
 Choose    := To      [ ('|'                   ) Scan  Choose  ]
 Greater   := Choose  [ ('>'  | ">="           ) Scan  Greater ]
 Less      := Greater [ ('<'  | "<="           ) Scan  &(Choose Space !'>' !">=") Less]
-NotEq     := Less    { ("<>"                  ) Scan  Choose  }
-Eq        := NotEq   { ('='                   ) Scan  NotEq   }
+NotEq     := Less    {: ("<>"                  ) Scan  Choose  :}
+Eq        := NotEq   {: ('='                   ) Scan  NotEq   :}
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
-And       := Not     { ("and" KeyEndNS        ) Scan  Not     }
-Or        := And     { ("or"  KeyEndNS        ) Scan  And     }
+And       := Not     {: ("and" KeyEndNS        ) Scan  Not     :}
+Or        := And     {: ("or"  KeyEndNS        ) Scan  And     :}
 Def       := (Or | (In | Var) (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
-                  { &In Def
+                  {: &In Def
                     | ":="    Space    (BraceInd | Def )
                     | "where" KeyEnd   (KeyBlock | Defs)
-                    | ScanKeyNS "is"    KeyEnd   (KeyBlock | Def ) } StopDef
+                    | ScanKeyNS "is"    KeyEnd   (KeyBlock | Def ) :} StopDef
           |  ('&'|"..") Space Def
           |  Return [Block | Def] StopDef
-Fun       := Def { ("over" | "when" | "while") KeyEnd (KeyBlock | Defs)
-                 | ("=>" Space | "next" KeyEnd) (BraceInd | Fun) } StopFun
-Expr      := Fun {'@' Space Call} StopExpr
+Fun       := Def {: ("over" | "when" | "while") KeyEnd (KeyBlock | Defs)
+                 | ("=>" Space | "next" KeyEnd) (BraceInd | Fun) :} StopFun
+Expr      := Fun {: '@' Space Call :} StopExpr
           |  '@' Space Call ScanNS &('@' | QualIdent) Expr
 
 StopExpr  := &( (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKeyNS "is" KeyEnd)))
 StopFun   := &( ("@")) | StopExpr
 StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else") KeyEnd) | StopFun)
 
-Commas    := Expr {',' Scan Expr}
+Commas    := Expr {: ',' Scan Expr :}
 Separator := (';' | Ending) Scan
-List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} !(Separator Commas) (Separator | !Separator)]; pop
+List      := push; set LinePrefix=""; Scan [Commas {: Separator Commas :} !(Separator Commas) (Separator | !Separator)]; pop
 File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 
 [e]  means optional
-{e}  means zero or more; with eager parsing
+{e}  means zero or more
+{:e:} means eager zero or more, i.e., {e} !e
 (e)  is just grouping
 !s   ensure s does not occur
 &s   checks that s does occur but does not consume it (like a PEG)
