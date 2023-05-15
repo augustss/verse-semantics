@@ -214,7 +214,7 @@ toExpr (SName "Brace" (SSeq [SChar '{', x, SChar '}'])) = aBlock $ unList $ toEx
 toExpr (SName "BraceInd" (SAlt 0 x)) = toExpr x
 toExpr (SName "BraceInd" (SAlt 1 (SSeq [_,x,_]))) = aBlock $ unList $ toExpr x
 toExpr (SName "KeyBlock" x) = toExpr x
---toExpr (SName "SDef" (SSeq [_, x])) = toExpr x
+
 toExpr x = error $ "toExpr: unimplemented\n" ++ show x
 
 toAlt2 :: HasCallStack => (ParseTree -> AST) -> (ParseTree -> AST) -> ParseTree -> AST
