@@ -31,6 +31,7 @@ data Elem
   | ChrRange Char Char
   | Str String
   | Not Elem
+  | EMany Elem
   | Many Elem
   | Look Elem
   | Opt Elem
@@ -55,6 +56,8 @@ data Expr
   = EVar String
   | EStr String
   | EGT Expr Expr
+  | ELT Expr Expr
+  | EGE Expr Expr
   | ELE Expr Expr
   | EEQ Expr Expr
   | Enot Expr
@@ -124,6 +127,7 @@ pElem :: P Elem
 pElem = choice
   [ pCharRange
   , NonTerm <$> pIdent
+  , EMany <$> between (symbol "{:") (symbol ":}") pAlts
   , Many <$> between (symbol "{") (symbol "}") pAlts
   , Opt  <$> between (symbol "[") (symbol "]") pAlts
   ,          between (symbol "(") (symbol ")") pAlts
@@ -166,8 +170,10 @@ pNot = (Enot <$> (keyword "not" *> pCmp)) <|> pCmp
 pCmp :: P Expr
 pCmp = do
   e <- pAtom
-  choice [ EGT e <$> (symbol ">"  *> pAtom)
-         , ELE e <$> (symbol "<=" *> pAtom)
+  choice [ ELE e <$> (symbol "<=" *> pAtom)
+         , EGE e <$> (symbol ">=" *> pAtom)
+         , EGT e <$> (symbol ">"  *> pAtom)
+         , ELT e <$> (symbol "<"  *> pAtom)
          , EEQ e <$> (symbol "="  *> pAtom)
          , pure e]
 

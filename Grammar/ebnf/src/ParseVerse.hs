@@ -11,6 +11,8 @@ import Data.Generics.Uniplate.Data
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import GHC.Stack
+import Text.Read(readMaybe)
 
 import ParseEBNF
 import ParserComb
@@ -82,51 +84,57 @@ mkElemParse :: RuleEnv -> Elem -> P ParseTree
 mkElemParse r (Seq xs) = SSeq <$> mapM (mkElemParse r) xs
 mkElemParse r (Alt xs) = choice $ zipWith (\ i p -> SAlt i <$> mkElemParse r p) [0..] xs
 mkElemParse _ (Chr c)  = SChar <$> char c
-mkElemParse _ (ChrRange l h) = SChar <$> satisfy (\ c -> l <= c && c <= h)
+mkElemParse _ (ChrRange l h) = SChar <$> satisfy (show l ++ ".." ++ show h) (\ c -> l <= c && c <= h)
 mkElemParse _ (Str s) = SStr <$> string s
 mkElemParse r (Not x) = SUnit <$ notFollowedBy (mkElemParse r x)
 mkElemParse r (Many x) = SMany <$> many (mkElemParse r x)
+mkElemParse r (EMany x) = SMany <$> emany (mkElemParse r x)
 mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r
 mkElemParse r (Code c) = mkCode r c
-mkElemParse _ (Deref v) = do l <- gets head; SStr <$> string (read (expr l (EVar v)))
+mkElemParse _ (Deref v) = do l <- gets head; SStr <$> string (expr l (EVar v))
 
 mkCode :: RuleEnv -> Code -> P ParseTree
 mkCode _ Push = SUnit <$ modify (\ st -> head st : st)
 mkCode _ Pop  = SUnit <$ modify tail
 mkCode _ (Set s e) = SUnit <$ modify (\ st -> xset s (expr (head st) e) (head st) : tail st)
 mkCode r (CSeq cs) = SSeq <$> mapM (mkCode r) cs
-mkCode r (Parse s x) = do p <- mkElemParse r x; modify (\ st -> xset s (show (flattenParseTree p)) (head st) : tail st); pure p
+mkCode r (Parse s x) = do p <- mkElemParse r x; modify (\ st -> xset s (flattenParseTree p) (head st) : tail st); pure p
 mkCode r (If e c mc) = do
   l <- gets head
-  if read (expr l e) then mkCode r c else maybe (pure SUnit) (mkCode r) mc
+  if xread (expr l e) then mkCode r c else maybe (pure SUnit) (mkCode r) mc
 mkCode _ Error = fail "Error"
 
 xset :: String -> String -> LexState -> LexState
-xset "Nest" e l = l { nest = read e }
-xset "BlockInd" e l = l { blockInd = read e }
-xset "LineInd" e l = l { lineInd = read e }
-xset "LinePrefix" e l = l { linePrefix = read e }
-xset "ThisInd" e l = l { thisInd = read e }
+xset "Nest" e l = l { nest = xread e }
+xset "BlockInd" e l = l { blockInd = e }
+xset "LineInd" e l = l { lineInd = e }
+xset "LinePrefix" e l = l { linePrefix = e }
+xset "ThisInd" e l = l { thisInd = e }
 xset s _ _ = error $ "xset: undefined " ++ s
 
 expr :: LexState -> Expr -> String
 expr _ (EVar "true") = show True
 expr _ (EVar "false") = show False
 expr l (EVar "Nest") = show (nest l)
-expr l (EVar "BlockInd") = show (blockInd l)
-expr l (EVar "LineInd") = show (lineInd l)
-expr l (EVar "LinePrefix") = show (linePrefix l)
-expr l (EVar "ThisInd") = show (thisInd l)
+expr l (EVar "BlockInd") =  (blockInd l)
+expr l (EVar "LineInd") =  (lineInd l)
+expr l (EVar "LinePrefix") =  (linePrefix l)
+expr l (EVar "ThisInd") =  (thisInd l)
 expr _ (EVar s) = error $ "expr: undefined " ++ s
-expr _ (EStr s) = show s
+expr _ (EStr s) =  s
 expr l (EGT e1 e2) = show (expr l e1 >  expr l e2)
+expr l (ELT e1 e2) = show (expr l e1 <  expr l e2)
+expr l (EGE e1 e2) = show (expr l e1 >= expr l e2)
 expr l (ELE e1 e2) = show (expr l e1 <= expr l e2)
 expr l (EEQ e1 e2) = show (expr l e1 == expr l e2)
-expr l (Enot e) = show $ not $ read $ expr l e
-expr l (Eand e1 e2) = show $ read (expr l e1) && read (expr l e2)
-expr l (Eor  e1 e2) = show $ read (expr l e1) || read (expr l e2)
+expr l (Enot e) = show $ not $ xread $ expr l e
+expr l (Eand e1 e2) = show $ xread (expr l e1) && xread (expr l e2)
+expr l (Eor  e1 e2) = show $ xread (expr l e1) || xread (expr l e2)
+
+xread :: (HasCallStack, Read a) => String -> a
+xread s = fromMaybe (error s) $ readMaybe s
 
 -----------------------------
 

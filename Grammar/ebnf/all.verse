@@ -2,6 +2,11 @@
 x;
 (y:)x
 
+## Specs
+x<a>;
+x<a><b>;
+a with <a>;
+
 ## If
 if(0){0}else x;
 if(0){0};
@@ -106,13 +111,27 @@ x and y and z;
 x or y;
 x or y or z;
 ## Def 1
-#x in ??? = y
+### In
+in x;
+:x;
+### Var
+var x;
+set x;
+ref x;
+alias x;
+var x = 1;
+var x := 1;
+var x += 1;
+var x *= 1;
+var x /= 1;
+var x = {1};
+###
 x:=y;
 x:=y:=z;
 x:={y};
 x where {y};
 x where y;
-# x where y,z;  AMB
+x where y,z;
 x is {y};
 x is y;
 ## Def 2
@@ -130,7 +149,7 @@ x over {y};
 x when {y};
 x while {y};
 x over y;
-# x over y, z;  AMB
+x over y, z;
 x => y;
 x => {y};
 x next y;
@@ -141,3 +160,28 @@ x @f() @g();
 @f() @g() x;
 ## Commas
 1,2,3;
+##
+## various :, =
+x:int;
+x:int=1;
+x:int:=1;
+(x:int)=1;
+## Possible ambiguity
+x:y<z>;
+## Markup
+<M; {x}\n<#x#>foo>;
+<M; a<B;b>>;
+<M>foo</M>;
+<M,N;a>;
+<M(){};a>;
+<M(){}(a){b};a>;
+<M.N; a>;
+<M(0).N; a>;
+<M; ~a ~b ~c d>;
+<M:>
+ a b
+ c
+<M;>
+<M;a
+b>;
+

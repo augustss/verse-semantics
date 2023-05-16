@@ -989,7 +989,7 @@ for(x:=1..10,y:as,z[x],w:y,Factorial[q:qs],q<x). Print(x)
 for(xs:xss,x:xs). Print(x)
 
 for(a:=as[i:int]). Print("Element {i} is {a}")
-for(a@ii:as). Print("Element {i} is {a}")
+for(i->a:as). Print("Element {i} is {a}")
 
 # Are all elements x in xs where x is less than 10, all prime numbers"
 if(for(x:xs,x<10). IsPrime[x]) then todo else todo
