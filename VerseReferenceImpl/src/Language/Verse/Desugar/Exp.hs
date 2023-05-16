@@ -30,7 +30,8 @@ data Exp f a
   | Var (f a) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Function !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
-  | Invoke (f (Exp f a)) (f (Exp f a))
+  | ParenInvoke (f (Exp f a)) (f (Exp f a))
+  | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Int !Integer

@@ -151,9 +151,9 @@ desugar' e = for e $ \ case
       False -> (Name <$> x') :=: e
       True -> Default x' (Name <$> x') e
   Parse.ParenInvoke e1 e2 ->
-    Invoke <$> desugar' e1 <*> desugar' e2
+    ParenInvoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
-    Invoke <$> desugar' e1 <*> desugar' e2
+    BracketInvoke <$> desugar' e1 <*> desugar' e2
   Parse.Tuple es ->
     Tuple <$> traverse desugar' es
   Parse.Truth e ->
@@ -172,14 +172,14 @@ desugar' e = for e $ \ case
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
     ask <&> \ case
-      False -> Invoke e e_i
-      True -> (Invoke <$> duplicate e <.> duplicate e_i) :*>: e_i
+      False -> BracketInvoke e e_i
+      True -> (BracketInvoke <$> duplicate e <.> duplicate e_i) :*>: e_i
   Parse.InfixColon x e -> do
     tellName x False
     let e1 = Name . Ident.Name <$> x
     e <- desugar' e
     e_i <- (e $>) . Name <$> freshIdent (loc e) False
-    let e2 = Invoke <$> duplicate e <.> duplicate e_i
+    let e2 = BracketInvoke <$> duplicate e <.> duplicate e_i
     pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e_i
   Parse.ArrowInfixColon x y e -> do
     tellName x False
@@ -187,7 +187,7 @@ desugar' e = for e $ \ case
     tellName y False
     let e1 = Name . Ident.Name <$> y
     e <- desugar' e
-    let e2 = Invoke <$> duplicate e <.> duplicate e3
+    let e2 = BracketInvoke <$> duplicate e <.> duplicate e3
     pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e3
   Parse.InfixColonEqual x e -> do
     tellName x False
@@ -201,7 +201,7 @@ desugarOperator1 :: Name ->
                     Desugar (Exp L Ident)
 desugarOperator1 x e =
   desugar' e <&> \ e ->
-  Invoke (Name (Ident.Name x) <$ e) e
+  BracketInvoke (Name (Ident.Name x) <$ e) e
 
 desugarOperator2 :: Name ->
                     L (Parse.Exp L Name) ->
@@ -209,7 +209,7 @@ desugarOperator2 :: Name ->
                     Desugar (Exp L Ident)
 desugarOperator2 x e1 e2 =
   (,) <$> desugar' e1 <*> desugar' e2 <&> \ (e1, e2) ->
-  Invoke (Name (Ident.Name x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
+  BracketInvoke (Name (Ident.Name x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
 
 getIdent :: L (Parse.Exp L Name) -> Desugar (L Ident)
 getIdent e = case extract e of
