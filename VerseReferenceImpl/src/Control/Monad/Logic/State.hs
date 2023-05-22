@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Control.Monad.Logic.State
   ( module Control.Monad.Logic.State.Class
@@ -10,6 +11,7 @@ module Control.Monad.Logic.State
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Error.Class
 import Control.Monad.Logic.State.Class
 import Control.Monad.State.Class
 import Control.Monad.Trans.Class
@@ -20,12 +22,11 @@ newtype LogicStateT s m a = LogicStateT
     m r -> (s -> m r) -> s -> m r
   }
 
-evalLogicStateT :: Applicative m => LogicStateT s m a -> s -> m [a]
-evalLogicStateT m s = unLogicStateT m sk fk fk' s
+evalLogicStateT :: Applicative m =>
+                   LogicStateT s m a -> (a -> m r -> m r) -> m r -> s -> m r
+evalLogicStateT m sk fk s = unLogicStateT m sk' fk (const fk) s
   where
-    sk x _ fk' _ = (x:) <$> fk' s
-    fk = pure []
-    fk' = const fk
+    sk' x fk _ _ = sk x fk
 
 instance Functor (LogicStateT s m) where
   fmap f m = LogicStateT $ \ sk ->
@@ -78,3 +79,9 @@ lift' f = LogicStateT $ \ sk fk fk' s -> f s >>= \ case
   Just (x, s', m) ->
     let f = unLogicStateT m sk fk fk'
     in sk x (f s) f s'
+
+instance MonadError e m => MonadError e (LogicStateT s m) where
+  throwError = lift . throwError
+  catchError m f = LogicStateT $ \ sk fk fk' s ->
+    let handle m = m `catchError` \ e -> unLogicStateT (f e) sk fk fk' s
+    in handle $ unLogicStateT m (\ x fk fk' -> sk x (handle fk) (handle . fk')) fk fk' s
