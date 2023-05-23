@@ -151,7 +151,7 @@ File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; Li
 
 [e]  means optional
 {e}  means zero or more
-{:e:} means eager zero or more, i.e., {e} !e
+{:e:} means greedy zero or more, i.e., {e} !e
 (e)  is just grouping
 !s   ensure s does not occur
 &s   checks that s does occur but does not consume it (like a PEG)
