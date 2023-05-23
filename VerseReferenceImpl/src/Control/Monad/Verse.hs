@@ -24,7 +24,7 @@ import Control.Category ((>>>))
 import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.Fix
-import Control.Monad.Logic
+import Control.Monad.Logic.State
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.RST
@@ -64,7 +64,7 @@ import Prelude (Num (..), ($!), error)
 import Unsafe.Coerce qualified
 
 newtype VerseT m a = VerseT
-  { unVerseT :: RST SplitLabel (Listeners m) (LogicT (StateT (Heap m) (SupplyT Label m))) a
+  { unVerseT :: ReaderT SplitLabel (LogicStateT (Listeners m) (StateT (Heap m) (SupplyT Label m))) a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -235,17 +235,12 @@ deriving instance MonadError e m => MonadError e (VerseT m)
 runVerseT :: MonadRef m => VerseT m a -> m [a]
 runVerseT m =
   runSupplyT .
-  flip evalStateT Nil .
-  observeAllT' $ do
-    splitLabel <- supply
-    evalRST (unVerseT m) splitLabel mempty
-
-observeAllT' :: MonadRef m =>
-                LogicT (StateT (Heap m) (SupplyT Label m)) a ->
-                StateT (Heap m) (SupplyT Label m) [a]
-observeAllT' m = unLogicT m sk fk
+  flip evalStateT Nil $
+  evalLogicStateT (runReaderT (unVerseT m) =<< supply) sk fk mempty
   where
-    sk x fk = (lift . commit' =<< get) *> ((x:) <$> fk)
+    sk x fk = do
+      lift . commit' =<< get
+      (x:) <$> fk
     fk = pure []
 
 instance MonadTrans VerseT where
@@ -535,7 +530,7 @@ split' :: (MonadFix m, MonadRef m, Freshenable a, Elem a ~ Var m) =>
           VerseT m ()
 split' m f = do
   h <- getHeap
-  msplit' m mempty >>= \ case
+  msplit'' m mempty >>= \ case
     Just (x, s, m) -> do
       h' <- getHeap
       isSettled h' >>= \ case
@@ -619,7 +614,7 @@ resume h m = case h of
           m
         Just _ -> do
           h' <- getHeap
-          msplit' (putHeap h *> m) mempty >>= \ case
+          msplit'' (putHeap h *> m) mempty >>= \ case
             Just ((), s, m) -> do
               h <- getHeap
               addListenersFromTo h h' s
@@ -631,16 +626,6 @@ resume h m = case h of
               putHeap h'
               notifyHeap h False
   _ -> m
-
-
-msplit' :: Monad m =>
-           VerseT m a ->
-           Listeners m ->
-           VerseT m (Maybe (a, Listeners m, VerseT m a))
-msplit' m s = VerseT . RST $ \ r s' ->
-  runRST (msplit $ unVerseT m) r s <&> \ case
-    (Nothing, _) -> (Nothing, s')
-    (Just (x, m), s) -> (Just (x, s, VerseT m), s')
 
 appendListeners :: Listeners m -> Listeners m -> Listeners m
 appendListeners = LabelMap.unionWith (<>)
@@ -780,6 +765,12 @@ lookupInsertCopied i x (Copied xss xs) = flip Copied xs <$> lookupInsert i x xss
 plus :: VerseT m a -> VerseT m a -> VerseT m a
 plus x y = VerseT $ unVerseT x <|> unVerseT y
 
+msplit'' :: Monad m =>
+            VerseT m a -> Listeners m -> VerseT m (Maybe (a, Listeners m, VerseT m a))
+msplit'' m s = VerseT $ msplit' (unVerseT m) s >>= \ case
+  Nothing -> pure Nothing
+  Just (x, s, m) -> pure $ Just (x, s, VerseT m)
+
 askSplitLabel :: VerseT m SplitLabel
 askSplitLabel = VerseT ask
 
@@ -787,13 +778,13 @@ localSplitLabel :: (SplitLabel -> SplitLabel) -> VerseT m a -> VerseT m a
 localSplitLabel f = VerseT . local f . unVerseT
 
 getHeap :: Monad m => VerseT m (Heap m)
-getHeap = VerseT . lift $ get
+getHeap = VerseT . lift . lift $ get
 
 putHeap :: Monad m => Heap m -> VerseT m ()
-putHeap = VerseT . lift . put
+putHeap = VerseT . lift . lift . put
 
 stateHeap :: Monad m => (Heap m -> (a, Heap m)) -> VerseT m a
-stateHeap = VerseT . lift . state
+stateHeap = VerseT . lift . lift . state
 
 insert' :: LabelMap.Key -> a -> LabelMap a -> Maybe (LabelMap a)
 insert' !k0 x0 t0 = loop k0 x0 t0

@@ -18,6 +18,7 @@ module Control.Monad.Supply
 import Control.Monad.Except
 import Control.Monad.Fix
 import Control.Monad.Logic
+import Control.Monad.Logic.State
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State.Class
@@ -33,6 +34,8 @@ class Monad m => MonadSupply s m | m -> s where
   supply = lift supply
 
 instance MonadSupply s m => MonadSupply s (LogicT m)
+
+instance MonadSupply s m => MonadSupply s (LogicStateT s' m)
 
 instance MonadSupply s m => MonadSupply s (ReaderT r m)
 
