@@ -83,9 +83,6 @@ data Expr
   -- only used for updatable references
   | Store Heap Expr
   | Ref Ptr
-  -- TRSVerifier
-  | Assume Expr                 -- ^ assume{ e }
-  | Succeeds Expr               -- ^ succeeds{ e }
   deriving (Show, Data)
 
 instance CoArbitrary Expr where

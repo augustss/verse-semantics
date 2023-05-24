@@ -13,7 +13,7 @@ import TRS.Bind
 import qualified TRS.TRSS as TRSS
 import qualified TRS.TRS as TRS
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (allSystemsICFP, rulesIf)
+import Rules.ICFP (allSystemsICFP)
 import Epic.Print
 import qualified Verifier.Verify as V
 import Control.Monad (guard, filterM)
@@ -21,13 +21,11 @@ import Data.List (intersect)
 import qualified Rules.ICFP as ICFP
 import qualified Verifier.FOL as FOL
 import Data.Maybe (maybeToList)
---import Debug.Trace (traceShow, trace)
---import Debug.Trace
 
 trivVerifier :: TRSS.TRSystem VC Expr
 trivVerifier = icfpVerifier
   {
-    TRSS.rules  = TRSS.rules icfpVerifier {- TRSS.-= "EXI-SWAP" -} Prelude.<> contextFreeRules,
+    TRSS.rules  = TRSS.rules icfpVerifier Prelude.<> contextFreeRules,
     TRSS.rules2 = contextSensitiveRules
   }
 
@@ -35,62 +33,24 @@ icfpVerifier :: TRSS.TRSystem VC Expr
 icfpVerifier = liftSystem base'
   where
     base     = head allSystemsICFP
-    base'    = base { TRS.rules = TRS.rules base Prelude.<> rulesIf }
-
---------------------------------------------------------------------------------
--- | Verification Conditions ---------------------------------------------------
---------------------------------------------------------------------------------
-
--- | The "Context" in which a subsumption must hold.
-
-data QContext
-  = QDef Ident QContext   -- ^ x; G
-  | QAsm Form  QContext   -- ^ p; G
-  | QEmp                  -- ^ EMPTY
-  deriving (Show)
-
--- newtype Query = Query String deriving (Eq, Ord, Show)
-data Query
-  =  Subsumes QContext AVal AVal
-  deriving (Show)
-
-newtype VC = VC [Query] deriving (Show)
-
-instance Semigroup VC where
-  (<>) :: VC -> VC -> VC
-  (VC n) <> (VC m) = VC (n ++ m)
-
-instance Monoid VC where
-  mempty :: VC
-  mempty = VC []
-
-instance Pretty Query where
-  pPrint (Subsumes g t1 t2) = pPrint g <+> text "|-" <+> pPrint t1 <+> text "<:" <+> pPrint t2
-
-instance Pretty VC where
-  pPrint (VC qs) = pPrint qs
-
-instance Pretty QContext where
-  pPrint QEmp       = text "."
-  pPrint (QDef x g) =  pPrint x <+> text ";" <+> pPrint g
-  pPrint (QAsm p g) =  pPrint p <+> text ";" <+> pPrint g
-
-subsumes :: QContext -> AVal -> AVal -> VC
-subsumes g t t' = VC [Subsumes g t t']
+    base'    = base { TRS.rules = TRS.rules base }
 
 --------------------------------------------------------------------------------
 -- | Abstract Rules
 --------------------------------------------------------------------------------
-type VRule    = TRSS.Rule VC Expr
+type VC    = ()
+type VRule = TRSS.Rule VC Expr
 
 contextFreeRules :: VRule
-contextFreeRules _ lhs =
+contextFreeRules _ lhs = undefined
+{-
   "A-EQN-ELIM" `TRSS.name`  -- duplicate of EQN-ELIM to go under EXI
   do EXI x a <- [lhs]
      (ctx, _, (Var x' :=: Vval _) :>: e) <- ICFP.execBX a
      guard (x == x')
      guard (x `notElem` free (ctx e))
      pure (ctx e, mempty)
+
   ++
   "A-LIT" `TRSS.name`
   do Int k <- [lhs]
@@ -155,12 +115,15 @@ contextFreeRules _ lhs =
 
 -}
 
+-}
 -- NOTE: APP-RULE THIS IS FOR "round-bracket" application (which MUST succeed)
 
 -- e is T ---> Te is T
 
 contextSensitiveRules :: VRule
-contextSensitiveRules _env lhs =
+contextSensitiveRules _env lhs = undefined
+
+{-
  "A-APP" `TRSS.name`
   do (ctx, g, (AFUN x t1 p t2) :@: AVAL t) <- execEX lhs
      let freeT = free t
@@ -178,30 +141,11 @@ contextSensitiveRules _env lhs =
   do (ctx, g, (Vval t) `Vis` t') <- execEX lhs
      pure (ctx (aval t'), subsumes g (ABase t) t')
 
-  -- "A-CONSEQ-L" `TRSS.name`
-  -- do (ctx, Vif p' (Vasm p :>: e)) <- execEX lhs
-  --    pure (ctx (Vasm p' :>: e), implies ctx p' p)
-  -- ++
-  -- "A-SUBST" `TRSS.name` -- duplicate of SUBST to allow "singleton-strengthening"
-  -- do (ctx, (Var x :=: Vval v) :>: e) <- ICFP.execX lhs
-  --    let freeX = free (ctx, e)
-  --        freeV = free v
-  --    let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
-  --        vx    = case v of { ABase _ _ -> sng v x; _ -> v }
-  --        sub   = [(x, Vval vx),(x0, Var x)]
-  --    guard (x `elem` freeX)
-  --    guard (x `notElem` freeV)
-  --    -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-  --    pure (subst sub (ctx ((Var x0 :=: Vval v) :>: e)), mempty)
-  -- ++
-  -- "A-INHABITS" `TRSS.name`
-  -- do (ctx, Vis (Int k) t@(ABase bf)) <- execEX lhs
-  --    pure (ctx (Vval t), inhabits ctx k bf)
+-}
 
+{-
 absBeta :: Ident -> AVal -> Form -> AVal -> Expr
 absBeta x t p t2 = EXI x ((Var x :=: aval t) :>: (Vasm p :>: aval t2))
-
--- elim (exists x. x = S; asm p; T) -->
 
 join :: (Form, AVal) -> (Form, AVal) -> Expr
 join (p1, t1)   (p2, t2)   = Vasm (joinForm p1 p2) :>: aval (joinAVal t1 t2)
@@ -231,7 +175,7 @@ tLam :: Ident -> Expr -> Form -> Expr -> Expr
 tLam x e1 TRUE e2 = TLam (Bind x (e1, e2))
 tLam x e1 p    e2 = TLam (Bind x (e1, Vasm p :>: e2))
 
-
+-}
 
 
 ----------------------------------------------------------------------
@@ -264,10 +208,6 @@ execEX1 lhs =
   do Vif p x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure (Vif p . ctx, g, hole)
---  ++
---   do Vasm p x <- [lhs]
---      (ctx, hole) <- execEX x
---      pure (Vasm p . ctx, hole)
  ++
   do Vis x t <- [lhs]
      (ctx, g, hole) <- execEX x
@@ -323,16 +263,6 @@ execEX1 lhs =
      pure (\e3 ->If e1 e2 (ctx e3), g, hole)
 
 
--- TODO replace qAsm with qAsm' in the above?
--- qAsm' :: Expr -> QContext -> [QContext]
--- qAsm' (Vasm TRUE)        g = [g]
--- qAsm' (Vasm p)           g = [QAsm p g]
--- qAsm' (Vval _)           g = [g]
--- qAsm' (Var x :=: Vval b) g = [qAsmVal x (ABase b) g]  -- TODO: should ONLY be a "flexible" / "local" variable?
--- qAsm' (e1 :>: e2)        g = qAsm' e1 =<< qAsm' e2 g
--- qAsm' (EXI x e)          g = QDef x <$> qAsm' e g
--- qAsm' _                  _ = []
-
 qAsm' :: QContext -> Expr -> [(QContext, AVal)]
 qAsm' = go []
   where
@@ -373,19 +303,6 @@ getAbsVal' e = do
   (_, v) <- qAsm' QEmp e
   guard (null (free v))
   pure (TRUE, v)
- --  >>= \(g, v) -> pure (avalAsm (getBase v), v)
-
--- >>> qAsm' exSilly QEmp
-
-
-
--- ex x. (x = {a:true}); asm decides$; {a:isInt$(A)}[X]
-exSilly :: Expr
-exSilly = If (EXI x ((Var x :=: aval aANY) :>: Vasm decides :>: aval (sng aINT x)))
-              (Int 1)
-              (Int 2)
-  where x = ident "xxx"
-
 
 ---------------------------------------------------------------------------------------
 -- | Substitution with just Idents
