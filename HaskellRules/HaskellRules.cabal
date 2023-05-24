@@ -36,7 +36,6 @@ library all
                       TRS.System
                       TRS.Tarjan
                       TRS.TRS
-                      TRS.TRSS
                       TRS.TRSGraph
                       TRS.Traced
                       Rules.Core

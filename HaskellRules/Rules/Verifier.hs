@@ -10,30 +10,29 @@
 
 module Rules.Verifier  where
 import TRS.Bind
-import qualified TRS.TRSS as TRSS
-import qualified TRS.TRS as TRS
+import TRS.TRS
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP)
-import Epic.Print
-import qualified Verifier.Verify as V
-import Control.Monad (guard, filterM)
-import Data.List (intersect)
-import qualified Rules.ICFP as ICFP
-import qualified Verifier.FOL as FOL
-import Data.Maybe (maybeToList)
+-- import Epic.Print
+-- import qualified Verifier.Verify as V
+-- import Control.Monad (guard, filterM)
+-- import Data.List (intersect)
+-- import qualified Rules.ICFP as ICFP
+-- import qualified Verifier.FOL as FOL
+-- import Data.Maybe (maybeToList)
 
-trivVerifier :: TRSS.TRSystem VC Expr
+trivVerifier :: TRSystem Expr
 trivVerifier = icfpVerifier
   {
-    TRSS.rules  = TRSS.rules icfpVerifier Prelude.<> contextFreeRules,
-    TRSS.rules2 = contextSensitiveRules
+    rules  = rules icfpVerifier Prelude.<> contextFreeRules,
+    rules2 = contextSensitiveRules
   }
 
-icfpVerifier :: TRSS.TRSystem VC Expr
-icfpVerifier = liftSystem base'
+icfpVerifier :: TRSystem Expr
+icfpVerifier = base'
   where
     base     = head allSystemsICFP
-    base'    = base { TRS.rules = TRS.rules base }
+    base'    = base { rules = rules base }
 
 
 --------------------------------------------------------------------------------------
@@ -49,8 +48,7 @@ data QContext
 --------------------------------------------------------------------------------
 -- | Abstract Rules
 --------------------------------------------------------------------------------
-type VC    = ()
-type VRule = TRSS.Rule VC Expr
+type VRule = Rule Expr
 
 contextFreeRules :: VRule
 contextFreeRules _ lhs = undefined

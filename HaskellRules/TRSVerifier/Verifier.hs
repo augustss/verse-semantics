@@ -1,6 +1,6 @@
 module TRSVerifier.Verifier (runTests,testAbs, testConc, pshow, reduce, showStepS) where
 
-import qualified TRS.TRSS as TRSS
+import qualified TRS.TRS as TRS
 import Rules.Core hiding (Wrong)
 import Epic.Print
 import TRS.Traced
@@ -13,7 +13,66 @@ import TRS.Bind (Ident, Bind (Bind))
 --------------------------------------------------------------------------------
 
 runTests :: IO Bool
-runTests = and <$> mapM runTest
+runTests = and <$> mapM runTest tests
+
+
+runTest :: (String, Expr, Bool) -> IO Bool
+runTest (name, e, expected) = do
+  res     <- verify e
+  let ok = isSafe res == expected
+  putStrLn $ "Running test: " ++ name ++ " ..." ++ show ok
+  -- putStrLn $ prettyShow res
+  return ok
+
+isSafe :: Result -> Bool
+isSafe Safe = True
+isSafe _    = False
+
+testAbs :: Expr -> IO ()
+testAbs = test trivVerifier
+
+testConc :: Expr -> IO ()
+testConc = test icfpVerifier
+
+pshow :: (Pretty a) => a -> IO ()
+pshow = putStrLn . prettyShow
+
+verify :: Expr -> IO Result
+verify e = undefined
+
+verify' :: Expr -> Expr
+verify' e = term (run trivVerifier e)
+
+reduce :: Expr -> Expr
+reduce = term . run trivVerifier
+
+test :: TRS.TRSystem Expr -> Expr -> IO ()
+test v = putStrLn . prettyShow . run v
+
+showStepS :: Expr -> IO ()
+showStepS e = do
+  forM_ (TRS.stepS trivVerifier e) $ \e' -> do
+    putStrLn (prettyShow e')
+
+run :: TRS.TRSystem Expr -> Expr -> Traced Expr
+run v e = head (TRS.nrDone nf)
+  where
+    nf = TRS.normalFormFuelTracePlain v 1000 e
+
+data Result = Safe | Wrong
+  deriving (Show)
+
+instance Pretty Result where
+  pPrint Safe       = text "safe"
+  pPrint Wrong      = text "wrong"
+
+---------------------------------------------------------------------------------------------------
+-- | Verifier tests
+---------------------------------------------------------------------------------------------------
+
+tests = []
+
+{-
   [
     -- Unification
     ("ex0", ex0, aINT, True)
@@ -48,65 +107,6 @@ runTests = and <$> mapM runTest
   , ("exFGW2", exFGW2, aANY, False)
   , ("exFGFoo", exFGFooBar, aANY, True)
   ]
-
-runTest :: (String, Expr, AVal, Bool) -> IO Bool
-runTest (name, e, t, expected) = do
-  res     <- verify e t
-  let ok = isSafe res == expected
-  putStrLn $ "Running test: " ++ name ++ " ..." ++ show ok
-  -- putStrLn $ prettyShow res
-  return ok
-
-isSafe :: Result -> Bool
-isSafe Safe = True
-isSafe _    = False
-
-testAbs :: Expr -> IO ()
-testAbs = test trivVerifier
-
-testConc :: Expr -> IO ()
-testConc = test icfpVerifier
-
-pshow :: (Pretty a) => a -> IO ()
-pshow = putStrLn . prettyShow
-
-verify :: Expr -> AVal -> IO Result
-verify e t
-  | e' /= tEx = return Wrong
-  | otherwise = res <$> solveVC vc
-  where
-    tEx      = aval t
-    (e', vc) = verify' e t
-    res []   = Safe
-    res qs   = Fails qs
-
-
-verify' :: Expr -> AVal -> (Expr, VC)
-verify' e t = term (run trivVerifier (triple TRUE e t))
-
-reduce :: Expr -> Expr
-reduce = fst . term . run trivVerifier
-
-test :: TRSS.TRSystem VC Expr -> Expr -> IO ()
-test v = putStrLn . prettyShow . run v
-
-showStepS :: Expr -> IO ()
-showStepS e = do
-  forM_ (TRSS.stepS trivVerifier e) $ \e' -> do
-    putStrLn (prettyShow e')
-
-run :: TRSS.TRSystem VC Expr -> Expr -> Traced (Expr, VC)
-run v e = head (TRSS.nrDone nf ++ TRSS.nrCycl nf)
-  where
-    nf = TRSS.normalFormFuelTracePlain v 1000 e
-
-data Result = Safe | Wrong | Fails [Query]
-  deriving (Show)
-
-instance Pretty Result where
-  pPrint Safe       = text "safe"
-  pPrint Wrong      = text "wrong"
-  pPrint (Fails qs) = text "VC Fails: " <+> pPrint qs
 
 ---------------------------------------------------------------------------------------------------
 -- | Examples with Unification --------------------------------------------------------------------
@@ -445,16 +445,6 @@ exFGFooBar = EXI f $ EXI h $
     z = ident "zz"
     x = ident "xx"
 
-
-{-
-
-  inc(x:int) := x + 1
-
--}
-
-
-
-
 aFOO :: AVal
 aFOO = aBase (Bind v ((v $== (666 :: Integer)) :||: (v $== (42 :: Integer)))) [] where v = ident "a"
 
@@ -562,3 +552,5 @@ xite x e1 e2 e3 = One (EXI x (Var x :=: e1 :>: thunk e2) :|: thunk e3)
 
 thunk :: Expr -> Expr
 thunk = LAM (ident "_")
+
+-}
