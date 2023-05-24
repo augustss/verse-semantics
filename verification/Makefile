@@ -6,9 +6,10 @@ PAPER=verification
 # Top-level target
 all: verification.pdf
 
+
 LATEX=pdflatex -halt-on-error
 
-PAPERTEX = $(PAPER).tex rewrites.tex
+PAPERTEX = $(PAPER).tex rewrites.tex rewriting.tex
 PAPERSRC = $(PAPERTEX) ../verse.bib ../calculus.fmt
 
 rewrites.tex: ../verse-pldi23/rewrites.ltx

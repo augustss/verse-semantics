@@ -1,0 +1,643 @@
+Below is an attempted spec containing three things:
+
+1) The Verse EBNF grammar, which is quite solid thanks to the shipping VerseGrammar.h implementation and to Lennart's analyses.
+2) Rough draft of the desugaring rules, which follow my verifier implementation's logic reasonably well.
+3) A yet-unsuccessful attempt to write down some of the Verse verifier inference rules in some sequent form. Hopefully with further discussions, we can figure out how to get started writing this properly.
+
+Enjoy!
+
+-Tim
+
+========================================================================================================================
+Verse Language Specification
+========================================================================================================================
+
+- Verse Source Code is ASCII, UTF8, or UTF32 text accepted by the Verse Grammar rules.
+- Verse Source Code is verified and compiled by simultaneously desugaring the syntax into Expressions
+  according to the Syntax Desugaring Rules, and verifying that Expressions' effects are allowed
+  according to the Expression Verification Rules. This process may import code in other modules,
+  which may be stored as Expressions or may be simultaneously verified from Verse Source Code.
+- Verified Verse Expressions serve as runtime object code and are run according to Verse Runtime.
+
+------------------------------------------------------------------------------------------------------------------------
+Grammar Conventions
+------------------------------------------------------------------------------------------------------------------------
+
+We provide an unambiguous EBNF grammar on top of given input UTF-8, UTF-32, or ASCII.
+This is a context-free LL(k) language with the exception of significant indentation context.
+We provide two equivalent Unicode definitions of Printable, for UTF8 and for UCS32.
+
+Legend:
+    &s        - looks ahead for s without consuming
+    !s        - looks ahead for absence of s
+    end       - recognizes end of file
+    push, pop - save and restore parser state
+    set a=b   - sets context value a to value b
+    parse a=b - sets context value a to the text parsed by b
+    ^a        - parse exactly the context value a
+    0oX       - ASCII or Unicode UTF8 Code Unit octet
+    0uX       - Unicode UTF32 Code Point; note that 0o0..0o7F and 0u0..0u7F are equivalent
+    a..b      - recognizes a range of characters
+    if(e) then s else t - parse based on context dependent condition
+
+------------------------------------------------------------------------------------------------------------------------
+Verse Grammar
+------------------------------------------------------------------------------------------------------------------------
+
+Alpha     := 'A'..'Z' | 'a'..'z' | '_'
+Alnum     := 'A'..'Z' | 'a'..'z' | '_' | '0'..'9'
+Hex       := 'A'..'F' | 'a'..'f' |       '0'..'9'
+Digits    := '0'..'9' {'0'..'9'}
+
+U8        := 0o80..0oBF
+UTF8      :=                                      0o00..0o7F
+          |                                       0oC2..0oDF U8
+          |  !(0oE0 0o80..0o9F | 0oED 0oA0..0oBF) 0oE0..0oEF U8 U8
+          |  !(0oF0 0o80..0o8F | 0oF4 0o90..0oBF) 0oF0..0oF4 U8 U8 U8
+UTF32     := !(0uD800..0uDFFF) 0u0..0u10FFFF
+Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o80 0oA8..0oA9 ) UTF8
+          |  0u09 | !("<#" | "#>" | 0u0..0u1F | 0o7F..0o9F             | 0u2028 | 0u2029      ) UTF32
+
+Space     := {0o09 | 0o20 | Comment}
+NewLine   := 0o0D [0o0A] | 0o0A
+Ending    := &(NewLine | end)
+Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
+Ded       := Ending pop
+Line      := NewLine; parse i:={0o09|0o20}; (Ending | !(0o09|0o20) Space
+             if     (i>BlockInd | Nest and i=BlockInd) then set LineInd=i
+             else if(not i<=BlockInd                 ) then error)
+Scan      := Space {Line}
+ScanKey   := Space (&NewLine Scan ^LinePrefix Space | !NewLine)
+
+LineCmt   :=  "#" !'>' {Text        } Ending
+BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
+IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
+Comment   := LineCmt   | BlockCmt | IndCmt
+Text      := Printable | BlockCmt | "<#>"
+
+Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digit))
+Units     := [Alpha {Alpha}] !Alpha
+Num       := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !'.' !Alnum
+    TODO: allow dot alnum for extension methods
+
+Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
+CharEsc   := '\' ('r'|'n'|'t'|'''|'"'|Special)
+CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
+Char8     := "0o" (       Hex) [Hex]                   !Alnum
+Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex] !Alnum
+Char      := CharLit | Char8 | Char32
+
+Ident     := Alpha {Alnum} !Alnum ["'" {!("<#"|"#>"|'\'|'{'|'}'|'"'|''') 0o20..0o7E} "'"]
+Path      := '/' Label ('@' Label | !'@') {'/' ['(' Path ":)"] Ident} !'/'
+Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
+
+Interp    := '{' List '}'
+Ampersand := push; parse LinePrefix:='&'; Space Def (';'|Ending); pop
+String    := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
+Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
+Contents  := Content | '~' Content {'~' Content}
+Markup    := '<' Scan Tags Scan ":>" Space Ind Contents Ded
+          |  '<' Scan Tags Scan ';'  Scan      Contents '>'
+          |  '<' Scan Tags Scan '>'  Scan      Contents "</" Ident Space {'/' Ident Space} '>'
+
+Key       := !Alnum Space !":="
+Return    := ("return"|"yield"|"break"|"continue") Key
+Reserved  := ("catch"|"do"|"else"|"if"|"in"|"is"|"not"|"then"|"until"|"where"|"with"
+             |"alias"|"const"|"live"|"mutable"|"ref"|"set"|"var") Key | Return
+
+DotSpace  := '.' &(0o09 | 0o20 | Ending)
+Brace     := Scan '{' List '}' Space
+Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
+BraceInd  := Brace | Ind List Ded
+KeyBlock  := Block
+Defs      := Def {Space ',' Scan Def}
+Paren     :=  '(' List  ')' Space
+QualIdent := ['(' List ":)" Space] Ident
+Specs     := [ScanKey "with" Key] '<' Scan Choose Space '>' Space (Specs | !Specs)
+Tags      := Space (!'/' Call ScanKey '.' | !Reserved) QualIdent Space {Invoke} [',' Scan Tags]
+
+Do        := ScanKey "do"    Key (KeyBlock | Def)
+Until     := ScanKey "until" Key (KeyBlock | Def) | ScanKey "catch" Key Invoke
+Then      := ScanKey "then"  Key (KeyBlock | Def)
+Else      := ScanKey "else"  Key (ScanKey If | !(ScanKey If) (KeyBlock | Def))
+
+Invoke    :=          [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
+If        := "if" Key [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
+In        := ("in" Key | ':') Space (In | &Choose NotEq [Space Specs])
+Var       := ("var"|"set"|"ref"|"alias") Key Space Choose
+
+Base      := '(' List ')' | Num | Char | Path | String | Markup | If | !Reserved QualIdent
+Call      := Base    {Space Postfix}
+Postfix   := Invoke  | !Invoke (Paren | Specs) | ("at"|"of") Key (KeyBlock | Fun)
+                     | ('^' | '?' | '[' List ']' | ScanKey '.' QualIdent)
+Prefix    := Call    | ('^' | '?' | '[' List ']' | '+' | '-' | '*') Space (Brace | Prefix)
+Mul       := Prefix  { Space ('*' | '/' | '&'       ) Scan  Prefix  }
+Add       := Mul     { Space ('+' | '-'             ) Scan  Mul     }
+To        := Add     [ Space ("to" Key | ".." | "->") Scan  To      ]
+Choose    := To      [ Space ('|'                   ) Scan  Choose  ]
+Greater   := Choose  [ Space ('>'  | ">="           ) Scan  Greater ]
+Less      := Greater [ Space ('<'  | "<="           ) Scan  &(Choose Space !'>' !">=") Less]
+NotEq     := Less    { Space ("<>"                  ) Scan  Choose  }
+Eq        := NotEq   { Space ('='                   ) Scan  NotEq   }
+Not       := Eq      |       ("not" Key             ) Space Not
+And       := Not     { Space ("and" Key             ) Scan  And     }
+Or        := And     { Space ("or"  Key             ) Scan  Or      }
+Def       := (Or | (In | Var) Space (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !'=' !":="))
+             { &In Def
+             | Space   ":="    Space (BraceInd | Def )
+             | Space   "where" Key   (KeyBlock | Defs)
+             | ScanKey "is"    Key   (KeyBlock | Def ) } StopDef
+          |  ('&'|"..") Space Def | Return [Block | Def] StopDef
+Fun       := Def { Space ("over" | "when" | "while") Key (KeyBlock | Defs)
+                 | Space ("=>" Space | "next" Key) (BraceInd | Fun) } StopFun
+Expr      := Fun {Space '@' Space Call} StopExpr
+          |  '@' Space Call Scan &('@' | QualIdent) Expr
+
+StopExpr  := &(Space (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKey "is" Key)))
+StopFun   := &(Space ("@")) | StopExpr
+StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next") Key) | StopFun)
+
+Commas    := Expr {',' Scan Expr}
+Separator := (';' | Ending) Scan
+List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} (Separator | !Separator)]; pop
+File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
+
+------------------------------------------------------------------------------------------------------------------------
+Grammar Disambiguation
+------------------------------------------------------------------------------------------------------------------------
+
+If the Specs production is recognizable by both the Postfix and In productions, In prevails.
+
+------------------------------------------------------------------------------------------------------------------------
+Syntax Desugaring Rules
+------------------------------------------------------------------------------------------------------------------------
+
+Symbols used
+------------
+    Natural numbers         n ::== 0 | 1 | ...
+    Variables                 ::== i,j,k,w,x,y,z,f,g,w,x,y,z
+    Variable list          xs ::== empty | xs x
+    Strength Variable      sv ::== sv0 | sv1 | ...
+    Grammar Productions s0,s1 ::== List | Expr | Num | Ident | ...
+    Effects                fx ::== succeeds | decides | resolves | fails | contradicts | iterates | abstracts | ...
+    Variance               vx ::== contravariant|invariant
+    Expressions             e ::== x=n
+                              |    x=y
+                              |    y=f[x]
+                              |    x=<y,..>
+                              |    x=[y]{_}
+                              |    x=fail
+                              |    f=lambda(vx,fx,h,sv) i x. e0; range j y. e1
+                              |    e0|e1
+                              |    e0; e1
+                              |    exists xs. e0
+                              |    scope. e0
+                              |    in(abs,i,x) j y. e0 [value(sv) z. e1 [upon. e2]]
+                              |    iterate(x) c. e0 {succeeds d y. e1} {fails d y. e2}
+                              |    next(c,y)
+                              |    cast x err {head normal form pattern ---> e; ...}
+                              |    verify fx x y ?err. e0
+                              |    err
+                              |    S(i,x,s)
+                              |    R(Ident,r,rs)
+                              |    D(Ident,r,rs)
+    Scope Context      sc[eh] ::== eh; e
+                              |    e; eh
+                              |    exists xs. eh
+                              |    cast x err {head normal form pattern ---> eh; ...}
+    Resolved Identifier     r ::== x | x^
+    r-List                 rs ::== empty | r rs (a set that is insensitive to order and multiplicity)
+    err                       ::== F00 | S00 | D00 | D01 | D02 | A00 | X00
+                              |    N00 | N01 | N03 | N04 | N05 | N10
+                              |    P00 | X30 | C00 | V10
+
+Syntax Equivalences (canonical form is on the right)
+----------------------------------------------------
+
+    Num Units     <--> units'Units'[Num]
+    s0(s1). e2    <--> s0(s1){e2} <--> s0(s1) do e2
+    s0:s1         <--> s0 := :s1
+    s0:s1=s2      <--> s0 := (:s1 := s2)
+    s0:s1<fx>=s2  <--> s0 := (:s1<fx> := s2)
+    s0=>s1        <--> function(s0){s1}
+    s0^           <--> operator'^'[s0]     # Same for postfix ^ ?
+    s0&s1         <--> operator'&'{s0,s1}  # Same for infix & -> to | <> = and or += -= *= /=
+    s0+s1         <--> operator'+'[s0,s1]  # Same for infix * / + - >= > <= < ..
+    :s0           <--> prefix'-'{s0}       # Same for prefix : not
+    -s0           <--> prefix'-'[s0]       # Same for prefix ^ ? + - * []
+    -{s0}         <--> :-type{s0}          # Same for prefix ^ ? + - * []
+    [s0]s1        <--> operator'[]'[s0,s1]
+    [s0]{s1}      <--> :[s0]type{s1}
+    s0=>cl0       <--> operator'=>'(s0){cl0}
+    s0 where cl0  <--> operator'where'(s0){cl0}
+    s0            <--> (s0)
+
+Syntax Reductions
+-----------------
+
+Syntax Reductions "S(c,i,x,s0) ---> e0" define our reductions from syntax s0 to expresions e0
+in a context c with an input variable i and output variable x.
+
+Constant Syntax:
+
+    S(c,i,x,Num) ---> i=Num; x=Num (for Num sans units)
+
+Basic Syntax:
+
+    S(c,i,x,_)      ---> S(c,i,x,:any)
+
+    S(c,i,x,s0=s1)  ---> S(c,i,x,s0); S(c,i,x,s1)
+    S(c,i,x,s0|s1)  ---> (scope. S(d,i,x,s0)) | (scope. S(e,i,x,s1))
+
+    S(c,i,x,s0[s1]) ---> exists h g j y. S(c,h,g,s0); S(c,j,y,s1); z=g[y]; i=z; x=z
+    S(c,i,x,s0(s1)) ---> exists h g j y. S(c,h,g,s0); S(c,j,y,s1); verify succeeds^c.fx x z P00. scope. z=g[y]
+    S(c,i,x,s0?)    ---> exists j k y z. S(c,j,y,s0); z=y[k]; i=z; x=z
+
+    S(c,i,x,(s0,..,sn)) ---> S(c,i,x,array{s0,..,sn})
+
+Identifier Reference Syntax:
+
+    S(c,i,x,Ident) ---> R(Ident,{})
+
+    S(c,i,x,e0.Ident) ---> exists j y. S(c,j,y,e0); cast y N05:
+        nominal type instance containing field named Ident with path p ---> exists z. z=y[p]; i=z; x=z
+
+Identifier Definition Syntax:
+
+    S(c,i,x,Ident:=s0)              ---> S(c,i,x,s0);     D(Ident,x,{})
+    S(c,i,x,Ident<var>:=s0)         ---> S(c,i,x,s0);     D(Ident,x^,{})
+    S(c,i,x,Ident<ref>:=s0)         ---> S(c,i,x,ref s0); D(Ident,x^,{})
+    S(c,i,x,Ident<s0>:=s1           ---> exists j y. S(c,j,y,s0); cast y X31:
+                                            var or ref ---> S(c,i,x,Ident<y>:=S1)
+
+    S(c,i,x,s0.Ident:=s1)         ---> S(c,i,x,operator'.Ident'(s0):=s1)
+
+Identifier Resolution Expression Reductions:
+
+    These rules say: Given a scope-creating expression on the left, which has a same-scoped
+    definition subexpression D(Ident,r,rs), which we identify through the sc[D(Ident,r,rs)] pattern,
+    reduce the left expression pattern to the right expression pattern where the {new/old}
+    notation means: replace all occurrences of the expression "old" with the expression "new".
+
+    scope. sc[D(Ident,r,rs)] --->
+        scope. sc{R(Ident,rs r)/R(Ident,rs)}{D(Ident,r,rs r)/D(Ident,r,rs)}[D(Ident,r,rs r)]
+
+    f=lambda(vx,fx,h,sv) i x. sc[D(Ident,r,rs)]; range j y. e1 --->
+        f=lambda(vx,fx,h,sv) i x:
+            sc{R(Ident,rs r)/R(Ident,rs)}{D(Ident,r,rs r)/D(Ident,r,rs)}[D(Ident,r,rs r)]
+            range j y. e1{R(Ident,rs r)/R(Ident,rs)}{D(Ident,r,rs r)/D(Ident,r,rs)}
+
+    iterate(x) c. e0 {succeeds d y. e1} {fails d y. e2} --->
+        iterate(x) c. sc[D(Ident,r,rs)]:
+            succeeds d y. e1{R(Ident,rs r)/R(Ident,rs)}{D(Ident,r,rs r)/D(Ident,r,rs)}
+            fails    d y. e2{R(Ident,rs r)/R(Ident,rs)}{D(Ident,r,rs r)/D(Ident,r,rs)}
+
+Destructuring Definition Syntax:
+
+    S(c,i,x,s0(s1)<s3>:=s2)       ---> S(c,i,x,s0:=function(s1)<s3>{s2})
+    S(c,i,x,s0(s1):=s2)           ---> S(c,i,x,s0:=function(s1)<succeeds><transacts>{s2})
+
+    S(c,i,x,s0[s1]:=s2)           ---> ...
+        NOTE: This syntax was originally used for defining arrays and maps as lambdas, but its future disposition
+        depends on whether we make arrays nominally disjoint from maps despite same element mappings.
+   
+    S(c,i,x,(s0,..):=s2)          ---> cast i D02
+                                           [n]{_} ---> x=[n]{_}
+                                       cast x D02
+                                           [n]{_} ---> i=[n]{_}; exists i0..in-1 x0..xn-1:
+                                               i=<i0,..in-1>; x=<x0,..xn-1>; S(i0,x0,s0:=_); ..S(in-1,xn-1,sn-1:=_)
+   
+    S(c,i,x,s0&..:=sn)            ---> S(c,i,x,s0:=expect<pure>{sn}); ..
+
+    S(c,i,x,s0?:=s1)              ---> S(c,i,x,s0:=option{s1})
+    S(c,i,x,?s0:=s1)              ---> ...
+    S(c,i,x,s0^:s1)               ---> S(c,i,x,s0:new(s1))
+    S(c,i,x,s0^:s1=s2)            ---> S(c,i,x,s0:new(s1)=s2)
+    S(c,i,x,var s0:s1)            ---> S(c,i,x,s0<var>:new(s1))
+    S(c,i,x,var s0:s1=s2)         ---> S(c,i,x,s0<var>:new(s1)=s2)
+    S(c,i,x,ref s0)               ---> S(c,i,x,ref{s0})
+    S(c,i,x,ref s0:s1)            ---> S(c,i,x,s0<var>:^s1)
+    S(c,i,x,ref s0:s1=s2)         ---> S(c,i,x,s0<var>:^s1=s2)
+    S(c,i,x,alias s0:=s1)         ---> S(c,i,x,s0<var>:=s1 ref)
+    S(c,i,x,alias s0)             ---> S(c,i,x,s0<alias>)
+
+    S(c,i,x,(s0,..)<spec>:=s1)    ---> S(s0<spec>,..:=s1)
+    S(c,i,x,(s0&..)<spec>:=s1)    ---> S(s0<spec>&..:=s1)
+    S(c,i,x,(s0->s1)<spec>:...s2) ---> S(c,i,x,s0->s1<spec>:...s2)
+
+    NOTE: Definition left-hand-side's topmost expression determines whether it captures or propagates failure.
+    So (a,b)?:int captures failure, (a?,b?) propagates failure
+
+Set Syntax
+
+    S(c,i,x,set s0=s1)            ---> ...
+
+Abstraction Syntax:
+
+    TODO: Explain contexts c, d, e. Explain how they contain allowed fx, flexibility details, and abstraction information.    TODO: Explain what abstractions are and how they propagate them.
+    This is a bit complex because it nests so you can write x:xs, i->x:xs, i->j->x::xs, etc.
+    Here, left-hand :...s0 stands for greedy :s0 or ::s0 or ....
+    Right-hand ...s1 stands for s1 prefixed by the number of ':' the left-hand matched.
+
+    S(c,i,x,       : ...s0)       ---> exists h f. S(c,h,f,s0);                 exists j y. y=f[i]; S(c,j,x,    ...y) (if no c.abs)
+    S(c,i,x,    s2 : ...s0)       ---> exists h f. S(c,h,f,s0);                 exists j y. y=f[i]; S(c,j,x,s2:=...y) (if no c.abs)
+    S(c,i,x,s1->s2 : ...s0)       ---> exists h f. S(c,h,f,s0); S(c,i,i,s1:=i); exists j y. y=f[i]; S(c,j,x,s2:=...y) (if no c.abs)
+
+    S(c,i,x,       : ...s0)       ---> exists h f. S(c,h,f,s0);                 in(c.abs,i,x) x1. exists j y i1 f1. f1=f; i1=i; y=f1[i1]; S(d,j,x1,    ...y)
+    S(c,i,x,    s2 : ...s0)       ---> exists h f. S(c,h,f,s0);                 in(c.abs,i,x) x1. exists j y i1 f1. f1=f; i1=i; y=f1[i1]; S(d,j,x1,s2:=...y)
+    S(c,i,x,s1->s2 : ...s0)       ---> exists h f. S(c,h,f,s0); S(c,i,i,s1:=i); in(c.abs,i,x) x1. exists j y i1 f1. f1=f; i1=i; y=f1[i1]; S(d,j,x1,s2:=...y)
+
+    S(c,i,x,:s0<fx> = s1)         ---> exists h f. S(c,h,f,s0); in(c.abs+fx,i,x) j y.
+                                           exists f1. f1=f; y=f1[j]
+                                           value sv z. scope. exists k f2. S(e,k,z,s1); f2=f; z=f2[j]
+    S(c,i,x,:s0<s2> = s1)         ---> exists j y. (scope. S(d,j,y,s0)); cast(X30,y):
+                                           valid effects fx => S(c,i,x,:s0<fx>=s1)
+    S(c,i,x,:s0=s1)               ---> S(c,i,x,:s0<c.fx>=s1)
+
+Intrinsic Macro Syntax:
+
+    S(c,i,x,array{s0, ..})        ---> exists j y j0.. y0.. . j=<j0,..>; y=<y0,..>; i=j; x=y; S(c,j0,y0,s0); ...
+    S(c,i,x,array{s0; ..})        ---> S(c,i,x,array{s0,..})
+
+    S(c,i,x,let(s0){s1})          ---> exists j y. scope. S(d,j,y,s0); scope. S(e,i,x,s1)
+
+    S(c,i,x,s0 where s1)          ---> exists j y. S(c,i,x,s0); S(c,j,y,s1)
+
+    S(c,h,f,function(s0)<vx><fx>{s1})
+                                  ---> f=lambda(vx,fx,h,sv) i x.
+                                            S(d,i,x,s0)
+                                            range j y. scope. exists q. j=h[x]; S(e,j,y,s1)
+    S(c,h,f,function(s0)<s1>{s2}) ---> exists j y. (scope. S(d,j,y,s1)); cast y X30:
+                                           valid effects specifiers fx and variance specifiers vx => S(c,h,f,function(s0)<vx><fx>{s2})
+    S(c,h,f,function(s0){s1})     ---> S(c,h,f,function(s0)<succeeds><transacts>{s1})
+    S(c,i,x,operator'=>'(s0){s1}) ---> S(c,i,x,function(s0)<succeeds><transacts>{s1})
+
+    S(c,i,x,if(s0){s1}else{e2})   ---> iterate() d.
+                                            exists   j z.        S(d,j,z,s0)
+                                            succeeds e z. scope. S(e,i,x,s1)
+                                            fails    e z. scope. S(e,i,x,s2)
+    S(c,i,x,if(s0){s1})           ---> S(c,i,x,if(s0){s1}else{})
+    S(c,i,x,if{s0})               ---> S(c,i,x,if(y:=s0){y}else{})
+
+    S(c,i,x,first(s0){s1})        ---> S(c,i,x,if(s0){s1}else{i=fail; x=fail})
+    S(c,i,x,first{s0})            ---> S(c,i,x,first(y:=s0){y})
+
+    S(c,i,x,last(s0){s0})         ---> iterate(<>) d.
+                                            exists   j y.        S(d,j,y,s0)
+                                            succeeds e z. scope. exists j y. S(e,j,y,s1); next(d,<y>)
+                                            fails    e z. i=y[0]; x=y[0]
+    S(c,i,x,last{s0})             ---> S(c,i,x,last(y:=s0){y})
+
+    S(c,i,x,for(s0){s1})          ---> exists w. i=[w]{_}; x=[w]{_}
+                                       iterate(0) d:
+                                            exists   j y. S(d,j,y,s0)
+                                            succeeds e k. scope. exists j y. j=i[k]; y=x[k]; S(d,j,y,s1); next(d,k+1)
+                                            fails    e k. scope. w=k
+    S(c,i,x,for{s0})              ---> S(c,i,x,for(y:=s0){y}else{})
+
+    S(c,i,x,s0<>s1)               ---> S(c,i,x,s0 where for(y:=s1). not x=y)
+
+    S(c,i,x,reject{s0})           ---> scope. exists j y. S(d,j,y,s0); V02
+
+    S(c,i,x,verify<fx>{s0})       ---> verify fx x y. exists j. scope. S(d,j,y,s0)
+    S(c,i,x,verify<s1>{s0})       ---> exists j y. (scope. S(d,j,y,s1)); cast y X30:
+                                           valid effects specifiers fx => S(c,i,x,verify<fx>{s0})
+    S(c,i,x,verify{s0})           ---> verify<succeeds>{s0}
+
+    S(c,i,x,assert{s0})           ---> S(c,i,x,if(s0) then () else Err("Assertion Failed"))
+
+    S(c,i,x,case{s1; ..})         ---> ...
+    S(c,i,x,case(s0){s1; ..})     ---> ...
+
+    S(c,i,x,type<fx>{s1})         ---> S(c,i,x,function(y:=s0)<invariant><fx>. y)
+    S(c,i,x,type{s0})             ---> S(c,i,x,function(y:=s0)<invariant><succeeds>. y)
+
+    S(c,i,x,not s0)               ---> S(c,i,x,if(s0){i=fail; x=fail; ()}else{})
+
+    S(c,i,x,s0 or  s1)            ---> if{s0}else{s1} (could be first{s0|s1}, but that nests strangely)
+    S(c,i,x,s0 and s1)            ---> exists j y. (scope. S(d,j,y,s0)); (scope. S(d,i,x,s1))
+
+Intrinsic Macro Syntax For Testing Only:
+    S(c,i,x,assume{s0})           ---> S(c,i,x,assume<succeeds>{s0})
+    S(c,i,x,assume<fx>{s0})       ---> in(fx,i,x) j y. S(j,y,s0)
+    S(c,i,x,assume<s1>{s0})       ---> exists j y. (scope. S(d,j,y,s1)); cast y X30:
+                                           valid effects specifiers fx and variance specifiers vx => assume<fx>{s0}
+
+    S(c,i,x,test(err){s0})        ---> ...
+
+    S(c,i,x,allow...) --->
+    S(c,i,x,allow{s0}) --->
+
+    S(c,i,x,expect...) --->
+
+User Macro Syntax:
+    S(c,i,x,m{s})                ----> exists j y. S(c,j,y,m); cast y M01:
+                                          native macro with invocation function f ---> f(Q(s))
+                                          else ---> M00
+    S(c,i,x,m(a){s})             ----> same.
+
+Macro Quoting Transformations:
+    Here, the right-hand sides refer to native syntax datatype constructors.
+    Q(&s0)   ---> s0
+    Q(Num)   ---> syntax.number[Num]
+    Q(Ident) ---> syntax.ident[Ident]
+    Q(a[b])  ---> syntax.at[Q(a),Q(b)]
+    Q(a(b))  ---> syntax.call[Q(a),Q(b)]
+    Q(m{a})  ---> syntax.invoke[Q(m),Q(a)]
+    ...
+
+Desugaring Error Production
+
+    Syntax desugaring proceeds confluently in arbitrary order interleaved with verification,
+    as is necessary to resolve and expand user macros. When verification can make no more
+    progress but is left holding the <rejects> effect, we perform the following error reductions
+    on the program expression:
+
+    - cast x err .. where stuck           ---> err
+    - S(c,i,x,s0:=s1)                     ---> D01 if no other rule above matches
+    - S(c,i,x,s) where no other matches   ---> V00 (generic verifier stalled error)
+    - R(Ident,xs) where Length(xs)=0      ---> N00 (identifier not found error)
+    - R(Ident,xs) where Length(xs)>1      ---> N03 (identifier ambiguous error)
+    - D(Ident,xs) where Length(xs)>1      ---> N04 (duplicate identifier defined here)
+    - e0 where <fails> but disallowed     ---> F00
+    - e0 where <abstracts> but disallowed ---> A00
+    - e0 where <iterates> but disallowed  ---> I00
+    - e0 where <resolves> but disallowed  ---> U00
+    - e0 where <decides> but disallowed   ---> D00
+    - e0 with disallowed imperative fx    ---> X00
+
+TODO: Write desugaring rules for the following syntax forms.
+
+    "Hi"            String     String          invoke     (/Verse.org/Verse:)array{'H','i'}, containing UTF-8 code units
+    "Hi, {name}."   String     String          invoke     (/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToString(name),".")
+    <b;Hello>       Markup     InvokeMarkup    invoke     (something:)b{(/Verse.org/Markup:)Content:=(/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")}.
+    <b;Hi, {name}.> Markup     InvokeMarkup    invoke     (something:)b{(/Verse.org/Markup:)Content:=(/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")}.
+    <b;Hi, &name;.> Markup     InvokeMarkup    invoke     (/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")
+    <b{a=b};Hello>  Markup     InvokeMarkup    invoke     B{a=b,(/Verse.org/Markup:)Content="Hello"}.
+    <b,i;Hello>     Markup     InvokeMarkup    invoke     B{(/Verse.org/Markup:)Content=I{(/Verse.org/Markup:)Content="Hello"}}.
+    e<a>            Postfix    Call            call-with  expression e and single specifier a.
+    return 123      Def        PrefixBlock     invoke     return{123}
+    return          Def        PrefixBlock     invoke     return{}
+    ..b             Def        InfixToken      invoke     prefix'..'{b}
+    @attr; a        Expr       PrefixAttribute attribute  TODO!!
+    a @attr         Expr       PrefixAttribute attribute  TODO!!
+
+------------------------------------------------------------------------------------------------------------------------
+Expression Verification Rules
+------------------------------------------------------------------------------------------------------------------------
+
+For an overview of inference, see:
+    https://homepages.inf.ed.ac.uk/wadler/papers/frege/frege.pdf
+    https://homepage.cs.uiowa.edu/~astump/papers/cdle.pdf
+    https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
+
+Symbols used:
+    Vertices            v,w  ::== n | x | f[x] | <x,..> | [n]{_} | lambda x. e
+    Strengths           S,T  ::== succeeds | decides | resolves
+
+    Propositions      A,B,C  ::== Ident:=v        "Syntactic identifier Ident resolves to expression r"
+    (inferences)                  v               "v is a vertex that is flexible here"
+                                  v,v<-w          "v is flexible here and has a dataflow edge incoming from w"
+                                  v,v<-fail       "v is flexible here and is unified with the result of a failing operation"
+                                  S{v=w}          "vertices v and w cohabitate an equation, and we've inferred v=w with strength S"
+                                  y,z,S{y=[z]{_}} "vertex y is a tuple with the number of elements specified by z"
+                                  S{v>>w}         "vertex v dominates w in the flow graph formed solely from edges weaker than strength S"
+                                                 (requires that G be S-finished: that no further unifications of strength S can be introduced).
+    Contexts            G,D   ::== empty | G,A (G stands for Greek letter gamma)
+
+    Stage                id
+    Abstractions        abs   ::== Solve
+                              |    Assume(s)
+                              |    Domain(c,abs)
+                              |    Stage(id,abs)
+
+Verifier Expression Ingestion
+-----------------------------
+
+TODO: Say how we ingest expressions, expand them into suspensions, infer effects,
+and solve for whether their effects are allowed.
+
+Verifier Inference Rules
+------------------------
+
+TODO: Figure out what form these should take. I'm just guessing here, probably incorrectly.
+
+Simple Expressions - attempt to write in sequent notation:
+
+A <: G
+------ Lookup
+G |- A
+
+(G |- e0), (D |- e1)
+-------------------- Sequence
+(G,D) |- (e0; e1)
+
+Simple Expressions - attempt to write horizontally:
+
+    G,x                         |- x=n           ---> G,x=n                 |- x=n
+    G,x                         |- x=y,x<-y      ---> G,x=y                 |- x=y [x flexible, y inflexible]
+    G,x,y                       |- x=y,x<-y,y<-x ---> G,x=y                 |- x=y [x and y flexible]
+    G,y                         |- y=fail        ---> G,y=fail              |- y=fail
+    G,y,z                       |- y=<z,...>     ---> G,y=<z,...>,y[0]=z,.. |- y=<z,...>
+    G,y,z                       |- y=[z]{_}      ---> G,y=[z]{_}            |- t=[z]{_}
+    G                           |- exists x. e0  ---> G,x                   |- e0
+    G                           |- C[e0|e1]      ---> ... handle like choice context logic from ICFP?
+
+Beta Reduction Expressions:
+    G,y,f,S{g=f},g=lambda z. e0 |- y=f[x]        ---> G,y=f[x]              |- y=f[x]; z=x; e0
+    G,y,f,S{g=f},g=<z0,..zn-1>  |- y=f[x]        ---> G,y=f[x]              |- (x=0; z0) | ..(x=n-1; zn-1) [if <iterates> allowed]
+                                                      G,y=f[x]              |- y=z_x                       [otherwise if 0<=x<n]
+                                                      G,y=f[x]              |- y=fail                      [otherwise]
+
+                                   
+Lambda Expressions:
+    G                           |- f=lambda(contravariant,fx,h,sv) i x. e0 {range j y. e1}        ---> ...
+        Note: Lambda inference relates f to h, holds effects describing this relation.
+
+
+Iteration Expressions:
+    G                           |- iterate(c) x. e0 {succeeds y. e1} {fails y. e2} ---> ...
+    G                           |- next c y                                        ---> ...
+        Note: These iteration rules (generalizing for/if) consider the effects of e0.
+        When we don't know if e0 decides, we hold effects rejecting the iteration.
+        When we know e0 decides, we simultaneously consider e1 and e2.
+        When we know e0 succeeds, we need only consider e1.
+        When we know e0 fails, we need only consider e2.
+
+    G                           |- in(abs,i,x) d j y. e0 [value e z. e1 [upon e2]] ---> ...
+        Note: This is the expression form of ":t" and ":t=v", where much of our heavy lifting occurs.
+        When ":t In a simple top-level program like "x:int,x=3", it works exactly as we've discussed.
+        When it occurs in an assumption (like the domain of a lambda), it describes an unknown value of
+        the specified type whose strength S depends on the series of modus ponens applications
+        we used to get to it.
+
+Equality Inference (independent of expressions):
+
+    # Equality weakening.
+    G,succeeds{v0=v1}   ---> G,decides{v0=v1}
+    G,decides{v0=v1}    ---> G,resolves{v0=v1}
+    G,resolves{v0=v1}   ---> G,abstracts{v0=v1}
+
+    # Transitive Equality.
+    G,S{v0=v1},S{v1=v2} ---> G,S{v0=v2}
+
+    # Vertex S-domination implies vertex S-equality.
+    G,S{v0>>v1}         ---> G,S{v0=v1}
+
+    # Application equality.
+    G,S{f=g},S{x=y}     ---> G,S{f[x]=g[y]} if f&g are <computes> under x
+
+Data Flow Inference (independent of expressions):
+
+    G,f,g,f[x],f<-g     ----> G,g[x],f[x]<-g[x]
+
+Effects Inference Rules:
+
+    We run the rules above to saturation to figure out the strengths of unifications.
+    We then make a recursive pass over the expressions and derive the effects.
+    Here we'll extend G with effects inferences G,fx{e0} saying "In context G, expression
+    e0 has effects of at most e0".
+
+    When G,fx0{e0},fx1{e1}, we can infer G,(fx0*fx1){e0; e1} where fx0*fx1 is the
+    sequential combination of effects defined by the following ordered reflexive rules:
+
+        contradicts * fx1      = contradicts
+        succeeds    * fx1      = fx1
+        fails       * fx1      = fails
+        fx0         * fx1      = join(fx0,fx1) according to the lattice above
+
+    We determine the effects of an expression x=y by looking in context G for S{x=y}.
+
+    We determine the effects of "lambda..." recursively by asking what happens, under all values i of
+    the declared domain e0 to a formula involving h and the range.
+
+    We determine the effects of "iterate..." recursively by looking at the strength of the domain
+    and handling, succeeds, fails, and decides cases accordingly.
+
+    Our multiplicity effects are information-ordered by the following lattice.
+
+                abstracts+iterates
+                        /     |
+                  abstracts   |
+                      /       |     UNDECIDABLE
+                 resolves     |
+            ========|=========|================
+                    |    iterates
+                    |   /     |       DECIDABLE
+                 decides      |
+            ========|=========|================
+                succeeds   fails        DECIDED
+                    \        /
+                     diverges
+
+    VITAL THEOREM: Evaluating S(w,x,s0) with a value w produces 0-1 values for x, never more.
+
+Verifier Completion
+-------------------
+
+Ultimately, verification of the program either succeeds with all of its effects allowed at the top level,
+or verification gets stuck with nested set of inferences, all sequenced. When verification is stuck,
+we identify all errors held in these inferences, prioritize them, and among the highest priority of errors
+that are found, produce the earliest among them.
+
+

@@ -157,6 +157,11 @@
 %format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
 %format one (x) = "\textbf{one}\{" x "\}"
+
+%format assumeKW = "\textbf{assume}"
+%format assertKW = "\textbf{assert}"
+%format assume (x) = "\textbf{assume}\{" x "\}"
+%format assert (x) = "\textbf{assert}\{" x "\}"
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
 %format splitKW = "\textbf{split}"
