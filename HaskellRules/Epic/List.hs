@@ -4,7 +4,7 @@ module Epic.List(
   anySame, revTake, revDrop,
   pick, pickLR,
   pattern Snoc,
-  nub,
+  nub, nubKey,
   takeUntil, dropUntil,
   ) where
 import qualified Data.Set as S
@@ -52,6 +52,15 @@ nub = go S.empty
     | x `S.member` seen = go seen xs
     | otherwise         = x : go (S.insert x seen) xs
 
+nubKey :: (Ord k) => (a -> k) -> [a] -> [a]
+nubKey = go S.empty
+ where
+  go _seen _key []            = []
+  go seen key (x:xs)
+    | k `S.member` seen = go seen key xs
+    | otherwise         = x : go (S.insert k seen) key xs
+   where
+    k = key x
 ---------
 
 takeUntil :: (a -> Bool) -> [a] -> [a]
@@ -63,4 +72,3 @@ dropUntil :: (a -> Bool) -> [a] -> [a]
 dropUntil _ []                 = []
 dropUntil p (x:xs) | p x       = xs
                    | otherwise = dropUntil p xs
-
