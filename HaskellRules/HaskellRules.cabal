@@ -36,6 +36,7 @@ library all
                       TRS.System
                       TRS.Tarjan
                       TRS.TRS
+                      TRS.TRSS
                       TRS.TRSGraph
                       TRS.Traced
                       Rules.Core
@@ -58,6 +59,8 @@ library all
                       Verifier.Verify
                       Verifier.FOL
                       Rules.ICFP
+                      Rules.Verifier
+                      TRSVerifier.Verifier
                       --DenSem.DenSem
     other-modules:    Rules.PLDI
                       Rules.POPL
