@@ -73,16 +73,19 @@ data Expr
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
   | Wrong String                -- ^ wrong
-  
+
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
-  
+
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
   -- only used for updatable references
   | Store Heap Expr
   | Ref Ptr
+  -- TRSVerifier
+  | Assume Expr                 -- ^ assume{ e }
+  | Succeeds Expr               -- ^ succeeds{ e }
   deriving (Show, Data)
 
 instance CoArbitrary Expr where
@@ -689,4 +692,3 @@ substExp from to = sub
     sub (Store h e) = Store (IM.map sub h) (sub e)
     sub e@Ref{}   = e
     sub _         = undefined
-    
