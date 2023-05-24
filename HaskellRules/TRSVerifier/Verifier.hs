@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 module TRSVerifier.Verifier (runTests,testAbs, testConc, pshow, reduce, showStepS) where
 
 import qualified TRS.TRS as TRS
@@ -6,7 +7,7 @@ import Epic.Print
 import TRS.Traced
 import Control.Monad (forM_)
 import Rules.Verifier
-import TRS.Bind (Ident, Bind (Bind))
+import TRS.Bind (Ident, Bind (Bind), ident)
 
 --------------------------------------------------------------------------------
 -- | Top-level function for running the verifier.
@@ -14,7 +15,6 @@ import TRS.Bind (Ident, Bind (Bind))
 
 runTests :: IO Bool
 runTests = and <$> mapM runTest tests
-
 
 runTest :: (String, Expr, Bool) -> IO Bool
 runTest (name, e, expected) = do
@@ -25,7 +25,7 @@ runTest (name, e, expected) = do
   return ok
 
 isSafe :: Result -> Bool
-isSafe Safe = True
+isSafe Accept = True
 isSafe _    = False
 
 testAbs :: Expr -> IO ()
@@ -38,10 +38,10 @@ pshow :: (Pretty a) => a -> IO ()
 pshow = putStrLn . prettyShow
 
 verify :: Expr -> IO Result
-verify e = error "TODO:TRSVerifier.verify"
-
-verify' :: Expr -> Expr
-verify' e = term (run trivVerifier e)
+verify e = return (if has then Reject else Accept)
+  where
+    e'   = term (run trivVerifier e)
+    has  = hasAssert e'
 
 reduce :: Expr -> Expr
 reduce = term . run trivVerifier
@@ -59,18 +59,59 @@ run v e = head (TRS.nrDone nf)
   where
     nf = TRS.normalFormFuelTracePlain v 1000 e
 
-data Result = Safe | Wrong
+data Result = Accept | Reject
   deriving (Show)
 
 instance Pretty Result where
-  pPrint Safe       = text "safe"
-  pPrint Wrong      = text "wrong"
+  pPrint Accept = text "accept"
+  pPrint Reject = text "reject"
+
+hasAssert :: Expr -> Bool
+hasAssert = go
+  where
+    go (Assert _) = True
+    go (Lam (Bind _ e))  = go e
+    go (Exi (Bind _ e))  = go e
+    go (e1 :=: e2) = go e1 || go e2
+    go (e1 :>: e2) = go e1 || go e2
+    go (e1 :|: e2) = go e1 || go e2
+    go (e1 :@: e2) = go e1 || go e2
+    go (One e) = go e
+    go (All e) = go e
+    go (Assume e) = go e
+    go (Arr es) = any go es
+    go (Split e1 e2 e3) = any go [e1,e2,e3]
+    go (BlockC e) = go e
+    go (Store _ e) = go e
+    go _ = False
 
 ---------------------------------------------------------------------------------------------------
 -- | Verifier tests
 ---------------------------------------------------------------------------------------------------
 
-tests = []
+tests :: [(String, Expr, Bool)]
+tests = [("ex0", ex0, True)]
+
+--  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
+ex0 :: Expr
+ex0 = LAM x (LAM y (LAM z (
+        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z))
+        :>:
+        Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y)
+      )))
+  where
+    x = ident "x"
+    y = ident "y"
+    z = ident "z"
+    a = ident "a"
+    b = ident "b"
+
+
+pattern INT :: Expr -> Expr
+pattern INT e = Op IsInt :@: e
+
+--  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=z => succeeds{ exists a b. a=x; b=a; b=y}
+
 
 {-
   [
