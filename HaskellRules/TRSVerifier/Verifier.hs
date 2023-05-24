@@ -38,7 +38,7 @@ pshow :: (Pretty a) => a -> IO ()
 pshow = putStrLn . prettyShow
 
 verify :: Expr -> IO Result
-verify e = undefined
+verify e = error "TODO:TRSVerifier.verify"
 
 verify' :: Expr -> Expr
 verify' e = term (run trivVerifier e)
