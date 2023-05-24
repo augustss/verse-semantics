@@ -7,7 +7,7 @@ module TRS.TRS(
   name,
   (-=),
   Rec(..),
-  step,
+  step, stepS,
   NormResult(..),
   normalFormsFuelTracePlain,
   normalFormFuelTracePlain,
@@ -142,4 +142,3 @@ data TRSystem t = TRSystem
 
 instance Show (TRSystem t) where
   show _ = "<<TRSystem>>"
-
