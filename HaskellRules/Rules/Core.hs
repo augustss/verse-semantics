@@ -645,7 +645,7 @@ check p a | p a = a
 --------------------------------------------------------------------------------
 
 -- Substiture one expressions for another.
--- XXX Does not avoid accidental capture in the 'to' expression.
+-- (Does now indeed avoid accidental capture in the 'to' expression.)
 substExp :: Expr -> Expr -> Expr -> Expr
 substExp from to = sub
   where
@@ -656,18 +656,30 @@ substExp from to = sub
     sub e@Int{}   = e
     sub e@Op{}    = e
     sub (Arr vs)  = Arr (map sub vs)
+{-
     sub (LAM x e) | x `elem` fvs = LAM x e
                   | x `elem` tvs = error "unimplemented"
                   | otherwise = LAM x (sub e)
+-}
+    sub (Lam bnd)
+      | x `elem` fvs = Lam bnd
+      | otherwise    = Lam (Bind x (sub e))
+     where Bind x e = alphaRename tvs bnd
     sub (a :=: b) = sub a :=: sub b
     sub (a :>: b) = sub a :>: sub b
     sub (a :|: b) = sub a :|: sub b
     sub (a :@: b) = sub a :@: sub b
     sub Fail      = Fail
     sub e@Wrong{} = e
+{-
     sub (EXI x e) | x `elem` fvs = EXI x e
                   | x `elem` tvs = error "unimplemented"
                   | otherwise = EXI x (sub e)
+-}
+    sub (Exi bnd)
+      | x `elem` fvs = Exi bnd
+      | otherwise    = Exi (Bind x (sub e))
+     where Bind x e = alphaRename tvs bnd
     sub (One a)   = One (sub a)
     sub (All a)   = All (sub a)
     sub (Assume a) = Assume (sub a)
