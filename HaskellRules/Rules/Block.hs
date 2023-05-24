@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{- # LANGUAGE FlexibleInstances # -}
+{- LANGUAGE FlexibleInstances  -}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Block(allSystemsBlock, anf, valid) where
@@ -165,7 +165,7 @@ anf ee = foo $ evalState (block ee) (undefined, allVars ee)
       let y = identNotIn vs
       put ((y:is, (Var y, e') : qs), y : vs)
       pure y
-      
+
 --------------------------------------------------------------------------------
 
 -- sub-categories of expressions
@@ -343,7 +343,7 @@ opArgTC op =
     MapAp -> arr lam              -- Used internally: takes an array of thunks
     Cons -> pair any_ (arr any_)  -- Must be anything, array
     _ -> pair (hnf int) (hnf int) -- Must be Int, Int
-  where int Int{} = True          
+  where int Int{} = True
         int _ = False
         any_ _ = True
         arr p (Arr vs) = all p vs
