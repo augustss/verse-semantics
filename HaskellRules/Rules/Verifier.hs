@@ -13,6 +13,7 @@ import TRS.Bind
 import TRS.TRS
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP)
+import Control.Monad (guard)
 -- import Epic.Print
 -- import qualified Verifier.Verify as V
 -- import Control.Monad (guard, filterM)
@@ -51,86 +52,51 @@ data QContext
 type VRule = Rule Expr
 
 contextFreeRules :: VRule
-contextFreeRules _ lhs = undefined
-{-
-  "A-EQN-ELIM" `TRSS.name`  -- duplicate of EQN-ELIM to go under EXI
-  do EXI x a <- [lhs]
-     (ctx, _, (Var x' :=: Vval _) :>: e) <- ICFP.execBX a
-     guard (x == x')
-     guard (x `notElem` free (ctx e))
-     pure (ctx e, mempty)
-
+contextFreeRules _ lhs =
+--   "Assert-Exi" `name`
+--   do Assert (EXI x e) <- [lhs]
+--      pure (EXI x (Assert e))
+--   ++
+--   "Assume-Exi" `name`
+--   do Assert (EXI x e) <- [lhs]
+--      pure (EXI x (Assert e))
+--   ++
+--   "Assert-Seq" `name`
+--   do Assert (e1 :>: e2) <- [lhs]
+--      pure (Assert e1 :>: Assert e2)
+--  ++
+  "Assume-Seq" `name`
+  do Assume (e1 :>: e2) <- [lhs]
+     pure (Assume e1 :>: Assume e2)
   ++
-  "A-LIT" `TRSS.name`
-  do Int k <- [lhs]
-     pure (aval (sngINT k), mempty)
+  "Assert-Val" `name`
+  do Assert (Val v) <- [lhs]
+     pure (Val v)
   ++
-  "A-LAM" `TRSS.name`
-  do LAM x v@(AVAL _) <- [lhs]
-     pure (TLAM x (aval aANY) v, mempty)
+  "Assert-Assert" `name`
+  do Assert (Assert e) <- [lhs]
+     pure (Assert e)
   ++
-  "A-UNIFY" `TRSS.name`
-  do (Vval (Base _p1 ixs1) :=: Vval (Base _p2 ixs2)) :>: e <- [lhs]
-     let unifies = not (null (ixs1 `intersect` ixs2))
-     let grd = case (ixs1, ixs2) of
-                _ | unifies  -> TRUE
-                (i1:_, i2:_) -> i1 .=. i2
-                (_, _)       -> decides
-     -- let grd | unifies  = TRUE
-     --         | i1 <- i
-     --         | otherwise = decides
-     pure (Vasm grd :>: e, mempty)
+  "Assert-Assume" `name`
+  do Assert (Assume e) <- [lhs]
+     pure (Assume e)
   ++
-  "A-ASM-TRUE" `TRSS.name`
-  do Vasm TRUE :>: e <- [lhs]
-     pure (e, mempty)
-  ++
-  "A-IF-TRUE" `TRSS.name`
-  do Vif TRUE e <- [lhs]
-     pure (e, mempty)
-  ++
-  -- "A-ASM-DEC" `TRSS.name`
-  -- do Vasm p :>: Vval t <- [lhs]
-  --    -- guard (p /= TRUE && p /= decides)
-  --    guard (null (free p `intersect` free t))
-  --    pure (Vasm decides :>: Vval t, mempty)
-  -- ++
-  "A-CHOOSE" `TRSS.name`
-  do (AbsVal p1 t1 :|: AbsVal p2 t2) <- [lhs]
-     pure (join (p1, t1) (p2, t2), mempty)
-  ++
-  "A-ITE" `TRSS.name`
-  do If _ (AbsVal p1 t1) (AbsVal p2 t2) <- [lhs]
-     pure (join (p1, t1) (p2, t2), mempty)
-  ++
-  "A-SUBST-TLAM" `TRSS.name`
-  do TLAM x v@(AVAL _) e <- [lhs]
-     let freeX = free e
-         freeV = free v
-     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
-         sub   = [(x, v),(x0, Var x)]
-     guard (x `elem` freeX)
-     guard (x `notElem` freeV)
-     pure (TLAM x v $ subst sub e, mempty)
-
-{-
-    [APP]   (\x. e) v   --> ex x. x = v; e
-
-            (\(x:Pre). asm{p}; Post)
-
-            1. CHECK v : Pre
-
-            2. exist x. x = v; asm{p}; Post
-
--}
-
--}
--- NOTE: APP-RULE THIS IS FOR "round-bracket" application (which MUST succeed)
-
--- e is T ---> Te is T
+  "Assume-Assert" `name`
+  do Assume (Assert e) <- [lhs]
+     pure (Assume e)
 
 contextSensitiveRules :: VRule
-contextSensitiveRules _env lhs = undefined
+contextSensitiveRules _env lhs =
+   "Prove" `name`
+   do (ctx, g, Assert (e :>: e')) <- execEX lhs
+      guard (g `proves` e)
+      pure (ctx (e :>: Assert e'))
+
+
+proves :: QContext -> Expr -> Bool
+proves QEmp _       = False
+proves (QDef _ g) e = proves g e
+proves (QAsm p g) e = p == e || proves g e
 
 {-
  "A-APP" `TRSS.name`
@@ -149,7 +115,6 @@ contextSensitiveRules _env lhs = undefined
   "A-CONSEQ-R" `TRSS.name`
   do (ctx, g, (Vval t) `Vis` t') <- execEX lhs
      pure (ctx (aval t'), subsumes g (ABase t) t')
-
 -}
 
 {-

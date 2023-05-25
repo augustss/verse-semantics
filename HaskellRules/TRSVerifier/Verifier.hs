@@ -7,7 +7,7 @@ import Epic.Print
 import TRS.Traced
 import Control.Monad (forM_)
 import Rules.Verifier
-import TRS.Bind (Ident, Bind (Bind), ident)
+import TRS.Bind (Bind (Bind), ident)
 
 --------------------------------------------------------------------------------
 -- | Top-level function for running the verifier.
@@ -90,14 +90,21 @@ hasAssert = go
 ---------------------------------------------------------------------------------------------------
 
 tests :: [(String, Expr, Bool)]
-tests = [("ex0", ex0, True)]
+tests =
+  [ ("ex00", ex00, True)
+  , ("ex0", ex0, True)
+  , ("ex0'", ex0', False)
+  ]
+
+ex00 :: Expr
+ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)
 
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
 ex0 :: Expr
 ex0 = LAM x (LAM y (LAM z (
-        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z))
+        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: Var x :=: Var y)
         :>:
-        Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y)
+        Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y :>: Int 0)
       )))
   where
     x = ident "x"
@@ -105,6 +112,21 @@ ex0 = LAM x (LAM y (LAM z (
     z = ident "z"
     a = ident "a"
     b = ident "b"
+
+--  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=z => succeeds{ exists a b. a=x; b=a; b=y}
+ex0' :: Expr
+ex0' = LAM x (LAM y (LAM z (
+        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: Var x :=: Var z)
+        :>:
+        Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y :>: Int 0)
+      )))
+  where
+    x = ident "x"
+    y = ident "y"
+    z = ident "z"
+    a = ident "a"
+    b = ident "b"
+
 
 
 pattern INT :: Expr -> Expr
