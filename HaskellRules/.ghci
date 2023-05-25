@@ -1,0 +1,2 @@
+:set -i..
+:load TRSVerifier/Verifier.hs

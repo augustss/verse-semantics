@@ -45,10 +45,7 @@ contextFreeRules _ lhs =
 --   do Assert (EXI x e) <- [lhs]
 --      pure (EXI x (Assert e))
 --   ++
---   "Assume-Exi" `name`
---   do Assert (EXI x e) <- [lhs]
---      pure (EXI x (Assert e))
---   ++
+
 --   "Assert-Seq" `name`
 --   do Assert (e1 :>: e2) <- [lhs]
 --      pure (Assert e1 :>: Assert e2)
@@ -61,14 +58,23 @@ contextFreeRules _ lhs =
   do Assert (Val v) <- [lhs]
      pure (Val v)
   ++
+  "Assume-Val" `name`
+  do Assume (Val v) <- [lhs]
+     pure (Val v)
+  ++
   "Assert-Assert" `name`
   do Assert (Assert e) <- [lhs]
      pure (Assert e)
+--   ++
+--   "Assert-Assume" `name`
+--   do Assert (Assume e) <- [lhs]
+--      pure (Assume e)
   ++
   "Assert-Assume" `name`
-  do Assert (Assume e) <- [lhs]
-     pure (Assume e)
+  do Assert (Assume e1 :>: e2) <- [lhs]
+     pure (Assume e1 :>: Assert e2)
   ++
+
   "Assume-Assert" `name`
   do Assume (Assert e) <- [lhs]
      pure (Assume e)
@@ -79,6 +85,11 @@ contextSensitiveRules _env lhs =
    do (ctx, g, Assert (e :>: e')) <- execEX lhs
       guard (g `proves` e)
       pure (ctx (e :>: Assert e'))
+   ++
+   "Assume-Exi" `name`
+   do (ctx, g, Assume (EXI x e)) <- execEX lhs
+      let x' = fresh g e
+      pure (ctx (Assume (subst [(x, Var x')] e)))
 
 
 proves :: QContext -> Expr -> Bool
@@ -156,4 +167,14 @@ execEX1 lhs =
 qAsm :: Expr -> QContext -> QContext
 qAsm (Assume e)  g = QAsm e g
 qAsm (e1 :>: e2) g = qAsm e1 (qAsm e2 g)
+qAsm (EXI x e)   g = QDef x  (qAsm e  g)
+qAsm (LAM x e)   g = QDef x  (qAsm e  g)
 qAsm _           g = g
+
+fresh :: QContext -> Expr -> Ident
+fresh g e = identNotIn (free e ++ bound g)
+
+bound :: QContext -> [Ident]
+bound QEmp       = []
+bound (QDef x g) = x : bound g
+bound (QAsm _ g) =     bound g

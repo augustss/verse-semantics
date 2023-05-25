@@ -58,6 +58,7 @@ STUCK. cannot prove succeeds { x=y } from the assumptions.
 
     # a "primitive" successor function for `int` values
     succ = \v. assert{int[v]}; exi r. assume{int(s)}; r
+    succ = \v. int[v]; assume{exi s. int(s); s}
 
     # call `succ` on `x`
     incr(x:int):int := x + 1
@@ -466,3 +467,38 @@ Bar(Y:int):int =
   for (Z:int = Y; next Z = Z + 1):
     if (Z = 666):
       return Y + Z
+
+
+
+-----
+
+\x.assume {isint(x)};
+   assume {x};
+   assert {ex r. isint(x);
+                 (r = assume {ex b. isint(b); b});
+                 isint(r);
+                 r}
+
+-->
+
+\x.assume {isint(x)};
+   assume {x};
+   assert {isint(x);
+           assume{isint(b')};
+           isint(b');
+           b'}
+
+assert{assume{e1}; e2}  --> assume{e1}; assert{e2}
+
+
+
+
+
+
+assume {ex x. e}  --> assume {e{x'/x}}    x' is "fresh"
+
+   assume {x};
+   assert {ex b. isint(x);
+                 assume{isint(b)}
+                 isint(b);
+                 b}
