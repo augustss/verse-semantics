@@ -22,6 +22,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
+                   systemICFPSX,
                    systemICFPK,
                    systemICFPE,
                    systemICFPF,
@@ -46,6 +47,13 @@ systemICFP = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = noRules
   , validExpr           = const valid
+  }
+
+systemICFPSX :: TRSystem Expr
+systemICFPSX = systemICFP
+  { sname               = "ICFPSX"
+  , description         = "ICFP with a simplified substitution rule and context"
+  , rules               = (rules systemICFP -= "SUBST") <> rulesSubstX
   }
 
 systemICFPK :: TRSystem Expr
@@ -285,6 +293,15 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
+
+substX :: Expr -> [(Context, Expr)]
+-- X context
+substX lhs = 
+  [(id,lhs)]
+ ++
+  do (v :=: e) :>: ex <- [lhs]
+     (ctx, hole) <- substX ex
+     pure (((v :=: e) :>:) . ctx, hole)
 
 -- X context additionally descending under EXI and returning boundVars at hole
 execBX, execBX1 :: Expr -> [(Context, [Ident], Expr)]
@@ -577,6 +594,19 @@ rulesUnification env lhs =
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+
+rulesSubstX :: ERule
+rulesSubstX env lhs =
+  "SUBST-X" `name`
+  do (ctx, (Var x :=: Val v) :>: e) <- substX lhs
+     let freeX = free (ctx, e)
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 rulesSubstBX :: ERule
 rulesSubstBX env lhs =
