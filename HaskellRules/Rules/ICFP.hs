@@ -53,7 +53,7 @@ systemICFPSX :: TRSystem Expr
 systemICFPSX = systemICFP
   { sname               = "ICFPSX"
   , description         = "ICFP with a simplified substitution rule and context"
-  , rules               = (rules systemICFP -= "SUBST") <> rulesSubstX
+  , rules               = (rules systemICFP -= "SUBST" -= "EQN-ELIM") <> rulesSubstX
   }
 
 systemICFPK :: TRSystem Expr
@@ -607,6 +607,13 @@ rulesSubstX env lhs =
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+ ++
+ "EQN-ELIM-S" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- substX a
+     guard (x == x')
+     guard (x `notElem` free (ctx (v :>: e)))
+     pure (ctx e)
 
 rulesSubstBX :: ERule
 rulesSubstBX env lhs =
