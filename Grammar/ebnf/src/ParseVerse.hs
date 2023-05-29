@@ -91,6 +91,7 @@ mkElemParse r (Many x) = SMany <$> many (mkElemParse r x)
 mkElemParse r (EMany x) = SMany <$> emany (mkElemParse r x)
 mkElemParse r (Look x) = SUnit <$ lookAhead (mkElemParse r x)
 mkElemParse r (Opt x) = SOpt <$> optional (mkElemParse r x)
+mkElemParse r (EOpt x) = SOpt <$> eoptional (mkElemParse r x)
 mkElemParse r (NonTerm n) = fromMaybe (error $ "undefined " ++ n) $ M.lookup n r
 mkElemParse r (Code c) = mkCode r c
 mkElemParse _ (Deref v) = do l <- gets head; SStr <$> string (expr l (EVar v))

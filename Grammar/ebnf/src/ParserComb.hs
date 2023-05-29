@@ -6,7 +6,7 @@ module ParserComb(
   Prsr, runPrsr,
   satisfy, char, string, eof,
   choice,
-  many, emany, optional,
+  many, emany, optional, eoptional,
   (<?>),
   notFollowedBy, lookAhead,
   )where
@@ -131,6 +131,9 @@ emany p = esome p <|< pure []
 
 esome :: Prsr s a -> Prsr s [a]
 esome p = (:) <$> p <*> emany p
+
+eoptional :: Prsr s a -> Prsr s (Maybe a)
+eoptional p = (Just <$> p) <|< pure Nothing
 
 runPrsr s (P p) _ f =
   case p (f, s) of

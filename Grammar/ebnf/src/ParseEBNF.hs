@@ -35,6 +35,7 @@ data Elem
   | Many Elem
   | Look Elem
   | Opt Elem
+  | EOpt Elem
   | NonTerm String
   | Code Code
   | Deref String
@@ -128,13 +129,14 @@ pElem = choice
   [ pCharRange
   , NonTerm <$> pIdent
   , EMany <$> between (symbol "{:") (symbol ":}") pAlts
-  , Many <$> between (symbol "{") (symbol "}") pAlts
-  , Opt  <$> between (symbol "[") (symbol "]") pAlts
-  ,          between (symbol "(") (symbol ")") pAlts
-  , Not  <$> (symbol "!" *> pElem)
-  , Look <$> (symbol "&" *> pElem)
-  , Str  <$> pStr
-  , Code <$> (optional semi *> pCode <* optional semi)
+  , Many  <$> between (symbol "{")  (symbol "}")  pAlts
+  , EOpt  <$> between (symbol "[:") (symbol ":]") pAlts
+  , Opt   <$> between (symbol "[")  (symbol "]")  pAlts
+  ,           between (symbol "(")  (symbol ")")  pAlts
+  , Not   <$> (symbol "!" *> pElem)
+  , Look  <$> (symbol "&" *> pElem)
+  , Str   <$> pStr
+  , Code  <$> (optional semi *> pCode <* optional semi)
   , Deref <$> (symbol "^" *> pIdent)
   ]
   where semi = try (char ';' <* notFollowedBy (char ';')) <* skip
