@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Main where
 import Control.Monad
 import Data.List
@@ -9,21 +10,25 @@ import AST
 
 main :: IO ()
 main = do
-  n : vs <- getArgs
+  args <- getArgs
+  let (showAst, n : vs) = if take 1 args == ["-"] then (False, drop 1 args) else (True, args)
   fn <- readFile n
   let rs = parseEBNF n (trim fn)
   when (rs /= rs) undefined  -- Just force evaluation
   let pVerse = mkRulesParse "File" rs
       doFile v = do
-        putStrLn $ "===== " ++ v ++ " ====="
-        fv <- readFile v
+        fv <- trimFile <$> readFile v
+        putStrLn $ "===== " ++ v ++ " " ++ show (length (lines fv)) ++ " lines ====="
         let xs = parsesDie pVerse v fv
             asts = map parseTreeToAST xs
             asts' = nub asts
         -- print (head xs)
         case asts' of
           [ast] -> do
-            putStrLn $ prettyShow ast
+            if showAst then
+              putStrLn $ prettyShow ast
+             else
+              when (ast /= ast) undefined
             when (flattenParseTree (head xs) /= fv) $ do
               putStrLn "Roundtrip fail"
               putStrLn fv
@@ -54,3 +59,6 @@ trim = unlines . map addSemi . map stripComment . cutBottom . cutTop . lines
     stripComment "" = ""
     stripComment (c:cs) = c : stripComment cs
     
+trimFile :: String -> String
+trimFile ('\65279':cs) = cs
+trimFile cs = cs
