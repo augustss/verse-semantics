@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK) where
+module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -285,6 +285,10 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
+ ++ -- extra rule for verifier
+  do (Assume x) :>: e <- [lhs]
+     (ctx, hole) <- execX x
+     pure ( \ a -> Assume (ctx a) :>: e, hole)
 
 -- X context additionally descending under EXI and returning boundVars at hole
 execBX, execBX1 :: Expr -> [(Context, [Ident], Expr)]

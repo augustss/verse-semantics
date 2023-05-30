@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 module TRSVerifier.Verifier (runTests,testAbs, testConc, pshow, reduce, showStepS) where
 
 import qualified TRS.TRS as TRS
@@ -69,21 +68,21 @@ instance Pretty Result where
 hasAssert :: Expr -> Bool
 hasAssert = go
   where
-    go (Assert _) = True
+    go (Assert _)        = True
     go (Lam (Bind _ e))  = go e
     go (Exi (Bind _ e))  = go e
-    go (e1 :=: e2) = go e1 || go e2
-    go (e1 :>: e2) = go e1 || go e2
-    go (e1 :|: e2) = go e1 || go e2
-    go (e1 :@: e2) = go e1 || go e2
-    go (One e) = go e
-    go (All e) = go e
-    go (Assume e) = go e
-    go (Arr es) = any go es
-    go (Split e1 e2 e3) = any go [e1,e2,e3]
-    go (BlockC e) = go e
-    go (Store _ e) = go e
-    go _ = False
+    go (e1 :=: e2)       = go e1 || go e2
+    go (e1 :>: e2)       = go e1 || go e2
+    go (e1 :|: e2)       = go e1 || go e2
+    go (e1 :@: e2)       = go e1 || go e2
+    go (One e)           = go e
+    go (All e)           = go e
+    go (Assume e)        = go e
+    go (Arr es)          = any go es
+    go (Split e1 e2 e3)  = any go [e1,e2,e3]
+    go (BlockC e)        = go e
+    go (Store _ e)       = go e
+    go _                 = False
 
 ---------------------------------------------------------------------------------------------------
 -- | Verifier tests
@@ -97,12 +96,10 @@ tests =
   , ("ex1", ex1, True)
   , ("ex2", ex2, True)
   , ("ex2'", ex2', False)
+  , ("ex3", ex3, True)
   ]
 
 -------------------------------------------------------------------------------------------
-pattern INT :: Expr -> Expr
-pattern INT e = Op IsInt :@: e
-
 iNT :: Expr -> Expr
 iNT e = INT e :>: e
 
@@ -159,6 +156,7 @@ ex1 = lET suc (LAM a (iNT (Var a) :>: Assume (EXI b (iNT (Var b)))))
 
 -------------------------------------------------------------------------------------------
 -- f = \x. assume{x = 3}; assert{ exi r. r = (x = 3; 3); r }
+
 ex2 :: Expr
 ex2 = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: Int 3 :>: Int 3) :>: Var r)))
   where
@@ -171,3 +169,32 @@ ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: I
   where
     x = ident "x"
     r = ident "r"
+
+-------------------------------------------------------------------------------------------
+-- FOO = \x. (x = 666 | x = 42); x
+-- f(x:FOO):FOO = 708 - x
+-- f = \v. exi x. assume{x = FOO(v)}; assert{exi r. r = 708 - x; FOO(r)}
+
+ex3 :: Expr
+ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
+        LAM v (One (EXI x $ Assume ((Var x :=: Var foo :@: Var v) :>: Var x) :>:
+                       Assert (EXI r (Var r :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var r)))))
+  where
+    foo = ident "foo"
+    x = ident "x"
+    v = ident "v"
+    r = ident "r"
+    y = ident "y"
+
+sub :: Expr -> Expr -> Expr
+sub e1 e2 = Op Sub :@: Arr [e1, e2]
+
+
+bob :: Expr
+bob = Assert ( ((Int 10 :=: Int 10) :|: (Int 10 :=: Int 20)) :>: Int 56)
+{-
+
+assume {(x = (((v = 666) | (v = 42)); v))};
+
+assume {(x = (((v = 666) | (v = 42)); v))};
+-}

@@ -3,18 +3,21 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module Rules.Verifier  where
 import TRS.Bind
 import TRS.TRS
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (allSystemsICFP)
+import Rules.ICFP (allSystemsICFP, execX, ltExpr)
 import Control.Monad (guard)
 
 trivVerifier :: TRSystem Expr
 trivVerifier = icfpVerifier
   {
-    rules  = rules icfpVerifier Prelude.<> contextFreeRules,
+    rules  = (rules icfpVerifier -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+               Prelude.<> generalizedIcfpRules
+               Prelude.<> contextFreeRules,
     rules2 = contextSensitiveRules
   }
 
@@ -38,6 +41,38 @@ data QContext
 -- | Abstract Rules
 --------------------------------------------------------------------------------
 type VRule = Rule Expr
+
+generalizedIcfpRules :: VRule
+generalizedIcfpRules env lhs =
+  "EQN-FLOAT-GEN" `name`
+  do Val v :=: (eq :>: e1) <- [lhs]
+     pure (eq :>: (Val v :=: e1))
+  ++
+  "U-LIT-GEN" `name`
+  do (Int k1 :=: Int k2) <- [lhs]
+     guard (k1 == k2)
+     pure (Int k1)
+  ++
+  "U-FAIL-GEN" `name`
+  do HNF e1 :=: HNF e2 <- [lhs]
+     -- Avoid the cases handled above
+     guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
+                            (Ref k1,Ref k2) -> k1 /= k2
+                            (Arr a1,Arr a2) -> length a1 /= length a2
+                            _               -> True)
+     pure Fail
+  ++
+  "SUBST-GEN" `name`
+  do (ctx, Var x :=: Val v) <- execX lhs
+     let freeX = free ctx
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (subst sub (ctx (Var x0 :=: Val v)))
+
 
 contextFreeRules :: VRule
 contextFreeRules _ lhs =
@@ -74,10 +109,13 @@ contextFreeRules _ lhs =
   do Assert (Assume e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assert e2)
   ++
-
   "Assume-Assert" `name`
   do Assume (Assert e) <- [lhs]
      pure (Assume e)
+  ++
+  "Assume-Choice" `name`
+  do Assume (e1 :|: e2) <- [lhs]
+     pure (Assume e1 :|: Assume e2)
 
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
@@ -91,15 +129,31 @@ contextSensitiveRules _env lhs =
       let x' = fresh g e
       pure (ctx (Assume (subst [(x, Var x')] e)))
 
+-- | A trivial "decision procedure"
 
 proves :: QContext -> Expr -> Bool
 proves QEmp _       = False
 proves (QDef _ g) e = proves g e
-proves (QAsm p g) e = p == e || proves g e
+proves (QAsm p g) e = proves1 p e || proves g e
+
+proves1 :: Expr -> Expr -> Bool
+proves1 (INT (Var x)) (Var y :=: Var z)
+  | x == y && x == z = True
+proves1 p e          = p == e
+
+pattern INT :: Expr -> Expr
+pattern INT e = Op IsInt :@: e
+
 
 ----------------------------------------------------------------------
 -- | Expression Contexts
 -----------------------------------------------------------------------
+
+-- choiceRules env lhs =
+--   "ASSUME-CHOOSE" `name`
+--   do Assume e <- [lhs]
+--      (cx, e1 :|: e2) <- choiceX1 e
+--      pure (cx (Assume e1) :|: cx (Assume e2))
 
 -- scope contexts
 
