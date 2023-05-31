@@ -188,8 +188,10 @@ ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: I
     r = ident "r"
 
 -------------------------------------------------------------------------------------------
--- FOO = \x. (x = 666 | x = 42); x
--- f(x:FOO):FOO = 708 - x
+{- f(x:FOO):FOO = 708 - x
+     where
+      FOO(x) = (x = 666 | x = 42); x
+-}
 -- f = \v. exi x. assume{x = FOO(v)}; assert{exi r. r = 708 - x; FOO(r)}
 
 ex3 :: Expr
@@ -207,29 +209,19 @@ ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42))
 
 -------------------------------------------------------------------------------------------
 
-
-ex4_min :: Expr
-ex4_min = lETs
-            [ (dec, LAM y (iNT (Var y) :>: EXI r (iNT (Var r))))
-            , (foo, LAM x (Int 99))
-            ]
-            (LAM x (Var foo :@: (Var dec :@: Var x)))
+{-
+sum(x:any):int := if nat(x) then add(x, sum(dec(x))) else 0
   where
-    dec = ident "dec"
-    foo = ident "foo"
-    x   = ident "x"
-    r   = ident "r"
-    y   = ident "y"
-
-
-
+    nat(x:any) := int(x); 0<=x; x
+    dec(x:int):int
+    add(x:int, y:int):int
+-}
 ex4 :: Expr
 ex4 =  lETs
           [ (nat, LAM x (iNT (Var x) :>: leq (Int 0) (Var x) :>: Var x) )
           , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Assume (EXI r (iNT (Var r))))))
-          , (sum, LAM x (Assume (EXI r (iNT (Var r)))))
-          , (foo, LAM x (Int 99))
           , (dec, LAM x (iNT (Var x) :>: Assume (EXI r (iNT (Var r)))))
+          , (sum, LAM x (Assume (EXI r (iNT (Var r)))))
           ]
           (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
                                               (Assert (lETs
@@ -245,7 +237,6 @@ ex4 =  lETs
     dec = ident "dec"
     add = ident "add"
     sum = ident "sum"
-    foo = ident "foo"
     x   = ident "x"
     r   = ident "r"
     y   = ident "y"
