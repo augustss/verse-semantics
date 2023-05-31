@@ -7,7 +7,7 @@ import TRS.Traced
 import Control.Monad (forM_)
 import Rules.Verifier
 import TRS.Bind (Bind (Bind), ident, Ident)
-
+import Prelude hiding (sum)
 --------------------------------------------------------------------------------
 -- | Top-level function for running the verifier.
 --------------------------------------------------------------------------------
@@ -40,7 +40,7 @@ verify :: Expr -> IO Result
 verify e = return (if has then Reject else Accept)
   where
     e'   = term (run trivVerifier e)
-    has  = hasAssert e'
+    has  = hasAssertOrFail e'
 
 reduce :: Expr -> Expr
 reduce = term . run trivVerifier
@@ -65,10 +65,11 @@ instance Pretty Result where
   pPrint Accept = text "accept"
   pPrint Reject = text "reject"
 
-hasAssert :: Expr -> Bool
-hasAssert = go
+hasAssertOrFail :: Expr -> Bool
+hasAssertOrFail = go
   where
     go (Assert _)        = True
+    go Fail              = True
     go (Lam (Bind _ e))  = go e
     go (Exi (Bind _ e))  = go e
     go (e1 :=: e2)       = go e1 || go e2
@@ -97,6 +98,8 @@ tests =
   , ("ex2", ex2, True)
   , ("ex2'", ex2', False)
   , ("ex3", ex3, True)
+  , ("ex4", ex4, True)
+
   ]
 
 -------------------------------------------------------------------------------------------
@@ -105,6 +108,20 @@ iNT e = INT e :>: e
 
 lET :: Ident -> Expr -> Expr -> Expr
 lET x e1 e2 = EXI x ((Var x :=: e1) :>: e2)
+
+lETs :: [(Ident, Expr)] -> Expr -> Expr
+lETs xes e = foldr (\(x, e1) e2 -> lET x e1 e2) e xes
+
+sub :: Expr -> Expr -> Expr
+sub e1 e2 = Op Sub :@: Arr [e1, e2]
+
+leq :: Expr -> Expr -> Expr
+leq e1 e2 = Op Le :@: Arr [e1, e2]
+
+ite :: Expr -> Expr -> Expr -> Expr
+ite e1 e2 e3 = (Assume e1 :>: e2) :|: e3
+
+
 -------------------------------------------------------------------------------------------
 
 ex00 :: Expr
@@ -177,8 +194,9 @@ ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: I
 
 ex3 :: Expr
 ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
-        LAM v (One (EXI x $ Assume ((Var x :=: Var foo :@: Var v) :>: Var x) :>:
-                       Assert (EXI r (Var r :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var r)))))
+        LAM v (One {- to force SX/CX -}
+                (EXI x $ Assume ((Var x :=: Var foo :@: Var v) :>: Var x) :>:
+                        Assert (EXI r (Var r :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var r)))))
   where
     foo = ident "foo"
     x = ident "x"
@@ -186,15 +204,101 @@ ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42))
     r = ident "r"
     y = ident "y"
 
-sub :: Expr -> Expr -> Expr
-sub e1 e2 = Op Sub :@: Arr [e1, e2]
+
+-------------------------------------------------------------------------------------------
 
 
-bob :: Expr
-bob = Assert ( ((Int 10 :=: Int 10) :|: (Int 10 :=: Int 20)) :>: Int 56)
+ex4_min :: Expr
+ex4_min = lETs
+            [ (dec, LAM y (iNT (Var y) :>: EXI r (iNT (Var r))))
+            , (foo, LAM x (Int 99))
+            ]
+            (LAM x (Var foo :@: (Var dec :@: Var x)))
+  where
+    dec = ident "dec"
+    foo = ident "foo"
+    x   = ident "x"
+    r   = ident "r"
+    y   = ident "y"
+
+
+
+ex4 :: Expr
+ex4 =  lETs
+          [ (nat, LAM x (iNT (Var x) :>: leq (Int 0) (Var x) :>: Var x) )
+          , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Assume (EXI r (iNT (Var r))))))
+          , (sum, LAM x (Assume (EXI r (iNT (Var r)))))
+          , (foo, LAM x (Int 99))
+          , (dec, LAM x (iNT (Var x) :>: Assume (EXI r (iNT (Var r)))))
+          ]
+          (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
+                                              (Assert (lETs
+                                                        [ (t0, Var dec :@: Var x)
+                                                        , (t1, Var sum :@: Var t0)
+                                                        ]
+                                                        (Var t1)
+                                                        -- ((Var add :@: Var x) :@: Var t1)
+                                                      ))
+                                              (Int 0))
+                                  :>: iNT (Var r)))))
+  where
+    nat = ident "nat"
+    dec = ident "dec"
+    add = ident "add"
+    sum = ident "sum"
+    foo = ident "foo"
+    x   = ident "x"
+    r   = ident "r"
+    y   = ident "y"
+    t0  = ident "t0"
+    t1  = ident "t1"
+
+
+{-
+add x (sum (dec x))
+
+let
+  t0 = dec x
+  t1 = sum t0
+in
+  add x t1
+
+-}
+
+
 {-
 
-assume {(x = (((v = 666) | (v = 42)); v))};
-
-assume {(x = (((v = 666) | (v = 42)); v))};
+assert {ex r. assume {isint(x)};
+              assume {le(<0, x>)};
+              (r = assert {ex t0. ex t1.
+                            isint(x);
+                            (t0 = assume {ex r. isint(r); r});
+                            (t1 = assume {ex r. isint(r); r});
+                            t1});
+              isint(r);
+        }
 -}
+
+bob = EXI t0 $ EXI t1 $
+        INT (Var x) :>:
+        (Var t0 :=: Assume (EXI r (INT (Var r) :>: Var r))) :>:
+        (Var t1 :=: Assume (EXI r (INT (Var r) :>: Var r))) :>:
+        (Var t1)
+  where
+    x = ident "x"
+    r = ident "r"
+    t0 = ident "t0"
+    t1 = ident "t1"
+
+bo0 = Assert $
+        EXI t0 $ EXI t1 $
+          INT (Var x) :>:
+          (Var t0 :=: Assume (EXI r (INT (Var r) :>: Var r))) :>:
+          (Var t1 :=: Assume (EXI s (INT (Var s) :>: Var s))) :>:
+          (Var t1)
+  where
+    x = ident "x"
+    r = ident "r"
+    s = ident "s"
+    t0 = ident "t0"
+    t1 = ident "t1"

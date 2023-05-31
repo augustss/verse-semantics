@@ -282,7 +282,7 @@ pattern LAM x e = Lam (Bind x e)
 pattern Val :: Expr -> Expr
 pattern Val e <- (getVal -> Just e)
   where Val e | Just _ <- getVal e = e
-              | otherwise = error "pattern Val"
+              | otherwise = error ("pattern Val " ++ prettyShow e)
 
 getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
@@ -297,7 +297,7 @@ pattern HNF e <- (getHNF -> Just e)
 
 getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
-getHNF e@Op{} = Just e
+getHNF e@Op{}  = Just e
 getHNF e@Arr{} = Just e
 getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e

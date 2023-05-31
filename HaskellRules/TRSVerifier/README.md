@@ -235,7 +235,7 @@ Given
 
 Verify
 
-    sum(x:any): int:= if nat(x) then add x (sum (sub x 1)) else 0
+    sum(x:any): int := if nat(x) then add x (sum (sub x 1)) else 0
 
 Desugar env
 
@@ -245,6 +245,8 @@ Desugar env
     sum = \x. assume{exi r. int(s)}
 
 Verify
+
+    \x. assert{exi r. r = if nat(x) then add x (sum (dec x)) else 0; int(s) }
 
     \x. assert{exi r. r = if nat(x) then add x (sum (dec x)) else 0; int(s) }
 

@@ -42,6 +42,8 @@ data QContext
 --------------------------------------------------------------------------------
 type VRule = Rule Expr
 
+-- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
+
 generalizedIcfpRules :: VRule
 generalizedIcfpRules env lhs =
   "EQN-FLOAT-GEN" `name`
@@ -76,15 +78,6 @@ generalizedIcfpRules env lhs =
 
 contextFreeRules :: VRule
 contextFreeRules _ lhs =
---   "Assert-Exi" `name`
---   do Assert (EXI x e) <- [lhs]
---      pure (EXI x (Assert e))
---   ++
-
---   "Assert-Seq" `name`
---   do Assert (e1 :>: e2) <- [lhs]
---      pure (Assert e1 :>: Assert e2)
---  ++
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
@@ -100,10 +93,6 @@ contextFreeRules _ lhs =
   "Assert-Assert" `name`
   do Assert (Assert e) <- [lhs]
      pure (Assert e)
---   ++
---   "Assert-Assume" `name`
---   do Assert (Assume e) <- [lhs]
---      pure (Assume e)
   ++
   "Assert-Assume" `name`
   do Assert (Assume e1 :>: e2) <- [lhs]
@@ -116,6 +105,18 @@ contextFreeRules _ lhs =
   "Assume-Choice" `name`
   do Assume (e1 :|: e2) <- [lhs]
      pure (Assume e1 :|: Assume e2)
+  ++
+  "Assert-Choice" `name`      -- seems TOO strong?
+  do Assert (e1 :|: e2) <- [lhs]
+     pure (Assert e1 :|: Assert e2)
+  ++
+  "Assert-Fail" `name`
+  do Assert Fail <- [lhs]
+     pure Fail
+--   ++
+--   "Assert-Seq-Assume" `name`
+--   do Assert (Assume e1 :>: e2) <- [lhs]
+--      pure (Assume e1 :>: Assert e2)
 
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
@@ -144,16 +145,9 @@ proves1 p e          = p == e
 pattern INT :: Expr -> Expr
 pattern INT e = Op IsInt :@: e
 
-
 ----------------------------------------------------------------------
 -- | Expression Contexts
 -----------------------------------------------------------------------
-
--- choiceRules env lhs =
---   "ASSUME-CHOOSE" `name`
---   do Assume e <- [lhs]
---      (cx, e1 :|: e2) <- choiceX1 e
---      pure (cx (Assume e1) :|: cx (Assume e2))
 
 -- scope contexts
 
@@ -178,14 +172,6 @@ execEX1 lhs =
      (ctx, g, hole) <- execEX x
      pure (EXI y . ctx, QDef y g, hole)
  ++
---   do Vif p x <- [lhs]
---      (ctx, g, hole) <- execEX x
---      pure (Vif p . ctx, g, hole)
---  ++
---   do Vis x t <- [lhs]
---      (ctx, g, hole) <- execEX x
---      pure ((`Vis` t) . ctx, g, hole)
---  ++
   do x :@: e <- [lhs]
      (ctx, g, hole) <- execEX x
      pure ((:@: e) . ctx, g, hole)
@@ -217,6 +203,11 @@ execEX1 lhs =
   do e :@: x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure ((e :@:) . ctx, g, hole)
+ ++
+  do Assert x <- [lhs]
+     (ctx, g, hole) <- execEX x
+     pure (Assert . ctx, g, hole)
+
 
 qAsm :: Expr -> QContext -> QContext
 qAsm (Assume e)  g = QAsm e g

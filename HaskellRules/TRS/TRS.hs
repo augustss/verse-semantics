@@ -7,7 +7,7 @@ module TRS.TRS(
   name,
   (-=),
   Rec(..),
-  step, stepS,
+  step, stepS, stepSS,
   NormResult(..),
   normalFormsFuelTracePlain,
   normalFormFuelTracePlain,
@@ -15,7 +15,7 @@ module TRS.TRS(
   noRules,
   ) where
 
-import Epic.List( nub )
+import Epic.List( nub, nubKey )
 import Epic.Print(Pretty, prettyShow)
 import TRS.Traced
 import qualified Data.Set as S
@@ -112,14 +112,21 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
     | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
     | null ts''  = -- error "normalFormFuelTracePlain: no children (maybe there are structural rules?)"  -- a loop
                    error ("NFTP-crash! \n t = " ++ prettyShow t ++ "\n ts' = " ++ prettyShow ts' ++ "\n ts'' = " ++ prettyShow ts'' ++ "\n ttr = " ++ prettyShow ttr ++ "\n seen = " ++ prettyShow seen )
+                   -- error ("NFTP-crash! \n t = " ++ prettyShow t)
     | otherwise  =
       stepper "STEP" ttr $
       go (n-1) seen' (t' :<-- ((s, t) : tr))
     where
       seen' = S.insert t seen
-      ts'   = stepS sys t
+      ts'   = stepSS sys t
       ts''  = filter ((`S.notMember` seen) . snd) ts'
       (s, t') = head ts''
+
+stepSS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
+stepSS sys tt = t1s ++ t2s
+  where
+    t1s = nubKey snd $ rec (rules  sys) (ruleEnv sys) tt
+    t2s = nubKey snd $ {- rec -} (rules2 sys) (ruleEnv sys) tt
 
 --------------------------------------------------------------------------------------------------------
 

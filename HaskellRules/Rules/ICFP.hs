@@ -328,6 +328,10 @@ scopeX lhs =
  ++
   do Split hole f g <- [lhs]
      choices (\ e -> Split e f g) hole
+ ++
+  do Assert hole <- [lhs]
+     choices Assert hole
+
  where
   choices ctx e =
     (ctx,e) : case e of
@@ -500,7 +504,7 @@ seqs = foldl1 (:>:)
 rulesApplication :: ERule
 rulesApplication env lhs =
   "APP-BETA" `name`
-  do LAM x e :@: v <- [lhs]
+  do LAM x e :@: Val v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
      -- A small shortcut for dummy variables.
