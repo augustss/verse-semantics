@@ -236,8 +236,7 @@ ex4 =  lETs
                                                         [ (t0, Var dec :@: Var x)
                                                         , (t1, Var sum :@: Var t0)
                                                         ]
-                                                        (Var t1)
-                                                        -- ((Var add :@: Var x) :@: Var t1)
+                                                        ((Var add :@: Var x) :@: Var t1)
                                                       ))
                                               (Int 0))
                                   :>: iNT (Var r)))))
