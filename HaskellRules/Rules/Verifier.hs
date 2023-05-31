@@ -75,49 +75,56 @@ generalizedIcfpRules env lhs =
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx (Var x0 :=: Val v)))
 
+-- | Rules to "push" `Assume` and `Assert` into sub-terms -----------------------
 
 contextFreeRules :: VRule
 contextFreeRules _ lhs =
+  -- Assume {e1; e2} ---> Assume e1; Assume e2
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
   ++
+  -- Assert {v} ----> v
   "Assert-Val" `name`
   do Assert (Val v) <- [lhs]
      pure (Val v)
   ++
+  -- Assume {v} ----> v
   "Assume-Val" `name`
   do Assume (Val v) <- [lhs]
      pure (Val v)
   ++
+  -- Assert {Assert {e}} ----> Assert {e}
   "Assert-Assert" `name`
   do Assert (Assert e) <- [lhs]
      pure (Assert e)
   ++
+  -- Assert { Assume {e1}; e2 } ----> Assume {e1} ; Assert {e2}
   "Assert-Assume" `name`
   do Assert (Assume e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assert e2)
   ++
+  -- Assume { Assert {e} } ----> Assume {e}
   "Assume-Assert" `name`
   do Assume (Assert e) <- [lhs]
      pure (Assume e)
   ++
+  -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
   "Assume-Choice" `name`
   do Assume (e1 :|: e2) <- [lhs]
      pure (Assume e1 :|: Assume e2)
   ++
+  -- Assert { e1 | e2 } ----> Assume {e1} | Assume {e2}
   "Assert-Choice" `name`      -- seems TOO strong?
   do Assert (e1 :|: e2) <- [lhs]
      pure (Assert e1 :|: Assert e2)
   ++
+  -- Assert { Fail } ---> Fail
   "Assert-Fail" `name`
   do Assert Fail <- [lhs]
      pure Fail
---   ++
---   "Assert-Seq-Assume" `name`
---   do Assert (Assume e1 :>: e2) <- [lhs]
---      pure (Assume e1 :>: Assert e2)
 
+-- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
    "Prove" `name`
@@ -130,8 +137,9 @@ contextSensitiveRules _env lhs =
       let x' = fresh g e
       pure (ctx (Assume (subst [(x, Var x')] e)))
 
--- | A trivial "decision procedure"
-
+--------------------------------------------------------------------------------
+-- | A simple "decision procedure"
+--------------------------------------------------------------------------------
 proves :: QContext -> Expr -> Bool
 proves QEmp _       = False
 proves (QDef _ g) e = proves g e
