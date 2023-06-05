@@ -44,6 +44,7 @@ type VRule = Rule Expr
 
 -- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
 
+
 generalizedIcfpRules :: VRule
 generalizedIcfpRules env lhs =
   "EQN-FLOAT-GEN" `name`
@@ -76,6 +77,10 @@ generalizedIcfpRules env lhs =
      pure (subst sub (ctx (Var x0 :=: Val v)))
 
 -- | Rules to "push" `Assume` and `Assert` into sub-terms -----------------------
+
+
+-- assume {x = 2}; assert { x = y ; y = 2; 0}
+
 
 contextFreeRules :: VRule
 contextFreeRules _ lhs =
@@ -114,7 +119,7 @@ contextFreeRules _ lhs =
   do Assume (e1 :|: e2) <- [lhs]
      pure (Assume e1 :|: Assume e2)
   ++
-  -- Assert { e1 | e2 } ----> Assume {e1} | Assume {e2}
+  -- Assert { e1 | e2 } ----> Assert {e1} | Assert {e2}
   "Assert-Choice" `name`      -- seems TOO strong?
   do Assert (e1 :|: e2) <- [lhs]
      pure (Assert e1 :|: Assert e2)
@@ -128,6 +133,7 @@ contextFreeRules _ lhs =
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
    "Prove" `name`
+   -- | E[Assert (e; e')] ---> E[e; Assert{e'}]    IF ctx(E) |- e
    do (ctx, g, Assert (e :>: e')) <- execEX lhs
       guard (g `proves` e)
       pure (ctx (e :>: Assert e'))
@@ -157,8 +163,10 @@ pattern INT e = Op IsInt :@: e
 -- | Expression Contexts
 -----------------------------------------------------------------------
 
--- scope contexts
+-- (forall x. assume {x=3}) ;  assert {x=3}
 
+-- scope contexts
+-- E ::= v = HOLE | HOLE; e
 execEX, execEX1 :: Expr -> [(EContext, QContext, Expr)]
 -- E context
 execEX lhs = execEX1 lhs ++ [(id, QEmp, lhs)]
@@ -168,22 +176,27 @@ execEX1 lhs =
      (ctx, g, hole) <- execEX x
      pure (\ a -> v :=: ctx a, g, hole)
  ++
+   -- HOLE; e
   do x :>: e <- [lhs]
      (ctx, g, hole) <- execEX x
      pure ((:>: e) . ctx, qAsm e g, hole)
  ++
+   -- e; HOLE
   do e :>: x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure ((e :>:) . ctx, qAsm e g, hole)
  ++
+   -- Exi y HOLE
   do EXI y x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure (EXI y . ctx, QDef y g, hole)
  ++
+   -- HOLE e
   do x :@: e <- [lhs]
      (ctx, g, hole) <- execEX x
      pure ((:@: e) . ctx, g, hole)
  ++
+   -- ONE HOLE
   do One x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure (One . ctx, g, hole)
@@ -221,8 +234,9 @@ qAsm :: Expr -> QContext -> QContext
 qAsm (Assume e)  g = QAsm e g
 qAsm (e1 :>: e2) g = qAsm e1 (qAsm e2 g)
 qAsm (EXI x e)   g = QDef x  (qAsm e  g)
-qAsm (LAM x e)   g = QDef x  (qAsm e  g)
+--  qAsm (LAM x e)   g = QDef x  (qAsm e  g)
 qAsm _           g = g
+
 
 fresh :: QContext -> Expr -> Ident
 fresh g e = identNotIn (free e ++ bound g)

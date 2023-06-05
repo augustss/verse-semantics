@@ -99,6 +99,7 @@ tests =
   , ("ex2'", ex2', False)
   , ("ex3", ex3, True)
   , ("ex4", ex4, True)
+  , ("ex5", ex5, True)
 
   ]
 
@@ -292,3 +293,11 @@ bo0 = Assert $
     s = ident "s"
     t0 = ident "t0"
     t1 = ident "t1"
+
+----
+
+ex5 :: Expr
+ex5 = LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: INT (Var r))))
+  where
+    x = ident "x"
+    r = ident "r"
