@@ -124,8 +124,8 @@ instance Pretty Expr where
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
-  pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
-  pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Assert a)       = text "ASSERT {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Verify a)       = text "VERIFY {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",

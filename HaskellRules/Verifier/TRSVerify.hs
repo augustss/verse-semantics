@@ -7,6 +7,8 @@ import TRS.Traced
 import Rules.Core
 import qualified Epic.Print as P
 
+import qualified TRSVerifier.Verifier as R
+
 --------------------------------------------------------------------------------
 
 sys = trivVerifier
@@ -29,15 +31,25 @@ tlamAbs x ys e1 e2 =
 --------------------------------------------------------------------------------
 
 verify :: Expr -> IO ()
-verify e = trace (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
+verify e =
+  do x <- trace (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
+     if collect done (&&) x
+       then putStrLn "+++ done; no ASSERT or VERIFY left +++"
+       else putStrLn "*** NOT done; some ASSERT or VERIFY left! ***"
  where
+  done (Assert _) = False
+  done (Verify _) = False
+  done _          = True
+  
   trace (x :<-- []) =
     do P.pp x
+       return x
   
   trace (x :<-- ((r,y):rys)) =
     do trace (y :<-- rys)
-       putStrLn ("--" ++ show r ++ "-->")
+       putStrLn ("--[" ++ r ++ "]-->")
        P.pp x
+       return x
 
 --------------------------------------------------------------------------------
 
@@ -74,7 +86,7 @@ e = Exi (Bind vg (Exi (Bind vs (g :=: f :>: s :=: suc :>: g :@: s))))
   s  = Var vs
   
 main :: IO ()
-main = verify e
+main = sequence_ [ verify e | ("ex4",e,_) <- R.tests ]
 
 --------------------------------------------------------------------------------
 

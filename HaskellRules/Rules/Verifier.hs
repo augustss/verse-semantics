@@ -125,6 +125,12 @@ contextFreeRules _ lhs =
   do Assume (e1 :|: e2) <- [lhs]
      pure (Assume e1 :|: Assume e2)
   ++
+  -- Assert { e } ----> e   if   e is crash-free
+  "Assert-CrashFree" `name`
+  do Assert e <- [lhs]
+     guard (crashFree e)
+     pure e
+  ++
 {- -- these rules seem wrong? --Koen
   -- Assert { e1 | e2 } ----> Assert {e1} | Assert {e2}
   "Assert-Choice" `name`      -- seems TOO strong?
@@ -142,16 +148,26 @@ contextFreeRules _ lhs =
      let verified (Assert _) = False
          verified _          = True 
      guard (collect verified (&&) e)
-     pure (Val (Arr [])) -- or something
+     pure e
+  ++
+  "Assume-Verify" `name`
+  do Assume (Verify e) <- [lhs]
+     pure (Assume e)
+
+crashFree :: Expr -> Bool
+crashFree (Val _) = True
+crashFree (Assume _ :>: e) = crashFree e
+crashFree (e1 :|: e2) = crashFree e1 && crashFree e2
+crashFree _ = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
    "Prove" `name`
    -- | E[Assert (e; e')] ---> E[e; Assert{e'}]    IF ctx(E) |- e
-   do (ctx, g, Assert (e :>: e')) <- execEX lhs
+   do (ctx, g, e) <- execEX lhs
       guard (g `proves` e)
-      pure (ctx (e :>: Assert e'))
+      pure (ctx (Assume e))
    ++
    "Assume-Exi" `name`
    do (ctx, g, Assume (EXI x e)) <- execEX lhs

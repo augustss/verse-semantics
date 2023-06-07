@@ -1,4 +1,4 @@
-module TRSVerifier.Verifier (runTests,testAbs, testConc, pshow, reduce, showStepS) where
+module TRSVerifier.Verifier (runTests,testAbs, testConc, pshow, reduce, showStepS, tests) where
 
 import qualified TRS.TRS as TRS
 import Rules.Core hiding (Wrong)
@@ -207,7 +207,6 @@ ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42))
     v = ident "v"
     r = ident "r"
     y = ident "y"
-
 
 -------------------------------------------------------------------------------------------
 
