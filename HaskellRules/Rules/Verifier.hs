@@ -12,6 +12,8 @@ import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP, execX, ltExpr)
 import Control.Monad (guard)
 
+-- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
+
 trivVerifier :: TRSystem Expr
 trivVerifier = icfpVerifier
   { sname = "Verifier rules based on ICFP (trivial)",
@@ -44,7 +46,6 @@ data QContext
 type VRule = Rule Expr
 
 -- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
-
 
 generalizedIcfpRules :: VRule
 generalizedIcfpRules env lhs =
@@ -146,7 +147,7 @@ contextFreeRules _ lhs =
   "Verify" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
-         verified _          = True 
+         verified _          = True
      guard (collect verified (&&) e)
      pure e
   ++
@@ -155,16 +156,17 @@ contextFreeRules _ lhs =
      pure (Assume e)
 
 crashFree :: Expr -> Bool
-crashFree (Val _) = True
+crashFree (Val _)          = True
 crashFree (Assume _ :>: e) = crashFree e
-crashFree (e1 :|: e2) = crashFree e1 && crashFree e2
-crashFree _ = False
+crashFree (e1 :|: e2)      = crashFree e1 && crashFree e2
+crashFree _                = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 contextSensitiveRules :: VRule
 contextSensitiveRules _env lhs =
    "Prove" `name`
    -- | E[Assert (e; e')] ---> E[e; Assert{e'}]    IF ctx(E) |- e
+   --   CTX[e] ---> CTX{assume{e}}        CTX |- e
    do (ctx, g, e) <- execEX lhs
       guard (g `proves` e)
       pure (ctx (Assume e))
