@@ -14,15 +14,16 @@ import Control.Monad (guard)
 
 trivVerifier :: TRSystem Expr
 trivVerifier = icfpVerifier
-  {
+  { sname = "Verifier rules based on ICFP (trivial)",
     rules  = (rules icfpVerifier -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
-               Prelude.<> generalizedIcfpRules
-               Prelude.<> contextFreeRules,
-    rules2 = contextSensitiveRules
+               <> generalizedIcfpRules
+               <> contextFreeRules
+               <> contextSensitiveRules
+--    rules2 = contextSensitiveRules
   }
 
 icfpVerifier :: TRSystem Expr
-icfpVerifier = base'
+icfpVerifier = base'{ sname = "Verifier rules based on ICFP" }
   where
     base     = head allSystemsICFP
     base'    = base { rules = rules base }

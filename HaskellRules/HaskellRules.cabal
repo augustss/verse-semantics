@@ -129,6 +129,18 @@ executable verifier
     hs-source-dirs:   verify
     default-language: Haskell2010
 
+executable trsverifier
+    import:           shared-properties
+    build-depends:    all,
+                      optparse-applicative,
+                      QuickCheck,
+                      githash
+
+    main-is:          TRSVerify.hs
+
+    hs-source-dirs:   Verifier
+    default-language: Haskell2010
+
 executable timtest
     import:           shared-properties
     build-depends:    all,
