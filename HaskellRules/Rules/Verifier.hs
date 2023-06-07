@@ -128,6 +128,13 @@ contextFreeRules _ lhs =
   "Assert-Fail" `name`
   do Assert Fail <- [lhs]
      pure Fail
+  ++
+  "Verify" `name`
+  do Verify e <- [lhs]
+     let verified (Assert _) = False
+         verified _          = True 
+     guard (collect verified (&&) e)
+     pure (Val (Arr [])) -- or something
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 contextSensitiveRules :: VRule
