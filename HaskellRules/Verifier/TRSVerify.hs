@@ -7,6 +7,8 @@ import TRS.Traced
 import Rules.Core
 import qualified Epic.Print as P
 
+import qualified TRSVerifier.Verifier as R
+
 --------------------------------------------------------------------------------
 
 sys = trivVerifier
@@ -84,7 +86,7 @@ e = Exi (Bind vg (Exi (Bind vs (g :=: f :>: s :=: suc :>: g :@: s))))
   s  = Var vs
   
 main :: IO ()
-main = verify e
+main = sequence_ [ verify e | ("ex4",e,_) <- R.tests ]
 
 --------------------------------------------------------------------------------
 
