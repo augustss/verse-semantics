@@ -100,6 +100,11 @@ contextFreeRules _ lhs =
   do Assume (Val v) <- [lhs]
      pure (Val v)
   ++
+  -- Assume {Assume{e}} ----> Assume{e}
+  "Assume-Assume" `name`
+  do Assume (Assume e) <- [lhs]
+     pure e
+  ++
   -- Assert {Assert {e}} ----> Assert {e}
   "Assert-Assert" `name`
   do Assert (Assert e) <- [lhs]
@@ -120,6 +125,7 @@ contextFreeRules _ lhs =
   do Assume (e1 :|: e2) <- [lhs]
      pure (Assume e1 :|: Assume e2)
   ++
+{- -- these rules seem wrong? --Koen
   -- Assert { e1 | e2 } ----> Assert {e1} | Assert {e2}
   "Assert-Choice" `name`      -- seems TOO strong?
   do Assert (e1 :|: e2) <- [lhs]
@@ -130,6 +136,7 @@ contextFreeRules _ lhs =
   do Assert Fail <- [lhs]
      pure Fail
   ++
+-}
   "Verify" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
