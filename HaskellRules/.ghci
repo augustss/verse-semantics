@@ -1,2 +1,20 @@
 :set -i..
-:load TRSVerifier/Verifier.hs
+:set -iverse
+:set -Wall
+:set -package megaparsec
+:set -package parser-combinators
+:set -package haskeline
+:set -package QuickCheck
+:set -package uniplate
+:set -package mtl
+:set -package scientific
+:set -package unordered-containers
+--
+:set -i../VerseReferenceImpl/src
+:set -package logict
+:set -package prettyprinter
+:set -package comonad
+:set -package hashable
+:set -package semigroupoids
+:set -package optparse-applicative
+:set -package z3

@@ -1,6 +1,1 @@
 packages: HaskellRules.cabal
-
-package z3
-   extra-lib-dirs: /Users/rjhala/.pyenv/versions/3.11.2/lib
-   extra-include-dirs: /Users/rjhala/.pyenv/versions/3.11.2/include
-
