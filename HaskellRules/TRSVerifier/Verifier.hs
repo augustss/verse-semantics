@@ -157,6 +157,7 @@ ex0' = LAM x (LAM y (LAM z (
     b = ident "b"
 
 -------------------------------------------------------------------------------------------
+-- ex1' (andy's variant with x = suc x)
 {-
 exi suc.
   suc = \a. INT[a]; assume { EXI b. INT[b]; b }
@@ -164,7 +165,7 @@ exi suc.
 -}
 ex1 ::Expr
 ex1 = lET suc (LAM a (iNT (Var a) :>: Assume (EXI b (iNT (Var b)))))
-      (LAM x (Assume (iNT (Var x)) :>: Assert (EXI r (Var r :=: Var suc :@: Var x :>: iNT (Var r) ))))
+        (LAM x (Assume (iNT (Var x)) :>: Assert (EXI r (Var r :=: Var suc :@: Var x :>: iNT (Var r) ))))
   where
     suc = ident "succ"
     a    = ident "a"
