@@ -142,7 +142,11 @@ contextFreeRules _ lhs =
      let verified (Assert _) = False
          verified _          = True 
      guard (collect verified (&&) e)
-     pure (Val (Arr [])) -- or something
+     pure e
+  ++
+  "Assume-Verify" `name`
+  do Assume (Verify e) <- [lhs]
+     pure (Assume e)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 contextSensitiveRules :: VRule

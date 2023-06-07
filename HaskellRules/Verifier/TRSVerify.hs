@@ -29,15 +29,25 @@ tlamAbs x ys e1 e2 =
 --------------------------------------------------------------------------------
 
 verify :: Expr -> IO ()
-verify e = trace (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
+verify e =
+  do x <- trace (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
+     if collect done (&&) x
+       then putStrLn "+++ done; no ASSERT or VERIFY left +++"
+       else putStrLn "*** NOT done; some ASSERT or VERIFY left! ***"
  where
+  done (Assert _) = False
+  done (Verify _) = False
+  done _          = True
+  
   trace (x :<-- []) =
     do P.pp x
+       return x
   
   trace (x :<-- ((r,y):rys)) =
     do trace (y :<-- rys)
-       putStrLn ("--" ++ show r ++ "-->")
+       putStrLn ("--[" ++ r ++ "]-->")
        P.pp x
+       return x
 
 --------------------------------------------------------------------------------
 
