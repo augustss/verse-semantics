@@ -79,6 +79,7 @@ data Expr
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
+  | Verify Expr                 -- ^ verify{ e }
 
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
@@ -124,6 +125,7 @@ instance Pretty Expr where
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
@@ -214,6 +216,10 @@ comp _xs _ys _          (Assume _) = GT
 comp  xs  ys (Assert a) (Assert b) = comp xs ys a b
 comp _xs _ys (Assert _) _          = LT
 comp _xs _ys _          (Assert _) = GT
+
+comp  xs  ys (Verify a) (Verify b) = comp xs ys a b
+comp _xs _ys (Verify _) _          = LT
+comp _xs _ys _          (Verify _) = GT
 
 comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
 comp _xs _ys Split {} _ = LT
@@ -395,6 +401,7 @@ instance Rec Expr where
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Verify a -> [ (n, Verify a') | (n,a') <- rec r (addBound BBlk s) a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
@@ -446,6 +453,7 @@ instance Free Expr where
   free (All a)   = free a
   free (Assume a) = free a
   free (Assert a) = free a
+  free (Verify a) = free a
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
   free Fail      = []
@@ -485,6 +493,7 @@ instance Term Expr where
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
   subst sub (Assert a) = Assert (subst sub a)
+  subst sub (Verify a) = Verify (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
@@ -544,6 +553,7 @@ instance Arbitrary Expr where
   shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
   shrink (Assume a) = [a] ++ [Assume a'| a'<-shrink a]
   shrink (Assert a) = [a] ++ [Assert a'| a'<-shrink a]
+  shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
   shrink (Exi (Bind x a)) = [a |x `notElem` ys]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
@@ -613,6 +623,7 @@ collect here (\/) = col
   recr a (All e)          = a \/ col e
   recr a (Assume e)       = a \/ col e
   recr a (Assert e)       = a \/ col e
+  recr a (Verify e)       = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
@@ -633,6 +644,7 @@ allVars = nub . expr
     expr (All e) = expr e
     expr (Assume e) = expr e
     expr (Assert e) = expr e
+    expr (Verify e) = expr e
     expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
     expr (BlockC e) = expr e
     expr _ = []
@@ -686,6 +698,7 @@ substExp from to = sub
     sub (All a)   = All (sub a)
     sub (Assume a) = Assume (sub a)
     sub (Assert a) = Assert (sub a)
+    sub (Verify a) = Verify (sub a)
     sub (Split e f g) = Split (sub e) (sub f) (sub g)
     sub (BlockC e) = BlockC (sub e)
     sub (Store h e) = Store (IM.map sub h) (sub e)
