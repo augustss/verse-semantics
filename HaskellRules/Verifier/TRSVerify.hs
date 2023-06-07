@@ -55,9 +55,6 @@ runTests = and <$> mapM runTest tests
 
 runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) = do
-  -- let e'  = term (run trivVerifier e)
-  -- let has = hasAssertOrFail e'
-  -- let res = (if has then Reject else Accept)
   res <- verify False e
   let ok  = res == expected
   putStrLn $ "Running test: " ++ testName ++ " ..." ++ show ok
@@ -99,26 +96,6 @@ data Result = Accept | Reject
 instance P.Pretty Result where
   pPrint Accept = P.text "accept"
   pPrint Reject = P.text "reject"
-
-hasAssertOrFail :: Expr -> Bool
-hasAssertOrFail = go
-  where
-    go (Assert _)        = True
-    go Fail              = True
-    go (Lam (Bind _ e))  = go e
-    go (Exi (Bind _ e))  = go e
-    go (e1 :=: e2)       = go e1 || go e2
-    go (e1 :>: e2)       = go e1 || go e2
-    go (e1 :|: e2)       = go e1 || go e2
-    go (e1 :@: e2)       = go e1 || go e2
-    go (One e)           = go e
-    go (All e)           = go e
-    go (Assume e)        = go e
-    go (Arr es)          = any go es
-    go (Split e1 e2 e3)  = any go [e1,e2,e3]
-    go (BlockC e)        = go e
-    go (Store _ e)       = go e
-    go _                 = False
 
 ---------------------------------------------------------------------------------------------------
 -- | Verifier tests
