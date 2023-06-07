@@ -158,7 +158,7 @@ contextFreeRules _ lhs =
 crashFree :: Expr -> Bool
 crashFree (Val _)          = True
 crashFree (Assume _ :>: e) = crashFree e
-crashFree (e1 :|: e2)      = crashFree e1 && crashFree e2
+crashFree (e1 :|: e2)      = crashFree e1 || crashFree e2
 crashFree _                = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
