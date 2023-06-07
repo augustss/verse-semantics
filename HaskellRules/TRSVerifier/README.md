@@ -58,6 +58,7 @@ STUCK. cannot prove succeeds { x=y } from the assumptions.
 
     # a "primitive" successor function for `int` values
     succ = \v. assert{int[v]}; exi r. assume{int(s)}; r
+    succ = \v. int[v]; assume{exi s. int(s); s}
 
     # call `succ` on `x`
     incr(x:int):int := x + 1
@@ -234,7 +235,7 @@ Given
 
 Verify
 
-    sum(x:any): int:= if nat(x) then add x (sum (sub x 1)) else 0
+    sum(x:any): int := if nat(x) then add x (sum (sub x 1)) else 0
 
 Desugar env
 
@@ -244,6 +245,8 @@ Desugar env
     sum = \x. assume{exi r. int(s)}
 
 Verify
+
+    \x. assert{exi r. r = if nat(x) then add x (sum (dec x)) else 0; int(s) }
 
     \x. assert{exi r. r = if nat(x) then add x (sum (dec x)) else 0; int(s) }
 
@@ -445,6 +448,9 @@ X ::= ...
     | assume { X }      // allow substitutions using equalities under `assume` (but NOT `assert`)
 
 
+```
+x:int => int[if(x=3) then 4 else 5] # actually
+```
 
 
 
@@ -466,3 +472,84 @@ Bar(Y:int):int =
   for (Z:int = Y; next Z = Z + 1):
     if (Z = 666):
       return Y + Z
+
+### Koen HOF example
+
+given f = \x . e1 => e2
+
+1. First, we have to verify:
+
+  \x . assume{e1}; assert{e2}
+
+2. We can then replace the equation with:
+
+  f = \x . e1; assume{e2}
+
+What if x is a function itself?
+
+E.g. f = \h. (h' := \x . int[x] => y:=h[x]; int[y]) => h'[2]
+
+1. First, we verify
+
+  \h. assume{ h' := \x . int[x] => y:=h[x]; int[y] }; assert{ h'[2] }
+⟶
+  \h. assume{ h' := \x . int[x]; assume{ y:=h[x]; int[y] } }; assert{ h'[2] }
+⟶
+  \h. assume{ h' := \x . int[x]; assume{ y:=h[x]; int[y] } }; assert{ exists x . x=2; int[x]; assume{ y:=h[x]; int[y] } }
+⟶
+  \h. assume{ h' := \x . int[x]; assume{ y:=h[x]; int[y] } }; assert{ int[2]; assume{ y:=h[2]; int[y] } }
+⟶
+  \h. assume{ h' := \x . int[x]; assume{ y:=h[x]; int[y] } }; assert{ assume{ y:=h[2]; int[y] } }
+⟶
+  \h. assume{ h' := \x . int[x]; assume{ y:=h[x]; int[y] } }; assume{ y:=h[2]; int[y] }
+
+2. Then we use
+
+f = \h. (h' := \x . int[x] => y:=h[x]; int[y]); assume{ h'[2] }
+
+Suppose we have succ = \x . int[x]; assume{ exists y . int[y] }
+
+  f(succ)
+⟶
+  assert{ exists h . h=succ; (h' := \x . int[x] => y:=h[x]; int[y]); assume{ h'[2] } }
+⟶
+  assert{ (h' := \x . int[x] => y:=succ[x]; int[y]); assume{ h'[2] } }
+⟶
+  assert{ (h' := \x . int[x] => y:=(int[x]; assume{ exists z . int[z] }); int[y]); assume{ h'[2] } }
+⟶
+  assert{ (h' := \x . int[x] => int[x]; y:=assume{ exists z . int[z] }; int[y]); assume{ h'[2] } }
+⟶
+  assert{ (h' := \x . int[x] => int[x]; y:=assume{ exists z . int[z] }; int[y]); assume{ h'[2] } }
+
+1. First we verify
+
+  \x . assume{ int[x] }; assert{ int[x]; y:=assume{ exists z . int[z] }; int[y] }
+⟶
+  \x . assume{ int[x] }; assert{ (); y:=assume{ exists z . int[z] }; int[y] }
+⟶
+  \x . assume{ int[x] }; assert{ y:=assume{ exists z . int[z] }; int[y] }
+⟶
+  \x . assume{ int[x] }; assert{ y:=assume{ int[Z] }; int[y] }     -- new rigid Z
+⟶
+  \x . assume{ int[x] }; assert{ y:=assume{ isint[Z]; Z }; int[y] }
+⟶
+  \x . assume{ int[x] }; assert{ assume{ isint[Z] }; y:=Z ; int[y] }
+⟶
+  \x . assume{ int[x] }; assert{ assume{ isint[Z] }; int[Z] }
+⟶
+  \x . assume{ int[x] }; assume{ isint[Z] }; assert{ int[Z] }
+⟶
+  \x . assume{ int[x] }; assume{ isint[Z] }; assert{ isint[Z]; Z }
+⟶
+  \x . assume{ int[x] }; assume{ isint[Z] }; assert{ Z }
+⟶
+  \x . assume{ int[x] }; assume{ isint[Z] }; Z
+
+2. Then we use
+
+⟶
+  assert{ (h' := \x . int[x]; assume{ int[x]; y:=assume{ exists z . int[z] }; int[y] }); assume{ h'[2] } }
+⟶
+  assert{ assume{ exists x . x=2; int[x]; assume{ int[x]; y:=assume{ exists z . int[z] }; int[y] } }
+⟶
+  assume{ exists x . x=2; int[x]; assume{ int[x]; y:=assume{ exists z . int[z] }; int[y] }

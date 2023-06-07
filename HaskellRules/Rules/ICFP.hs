@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK) where
+module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -293,6 +293,10 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
+ ++ -- extra rule for verifier
+  do (Assume x) :>: e <- [lhs]
+     (ctx, hole) <- execX x
+     pure ( \ a -> Assume (ctx a) :>: e, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context
@@ -341,6 +345,10 @@ scopeX lhs =
  ++
   do Split hole f g <- [lhs]
      choices (\ e -> Split e f g) hole
+ ++
+  do Assert hole <- [lhs]
+     choices Assert hole
+
  where
   choices ctx e =
     (ctx,e) : case e of
@@ -513,7 +521,7 @@ seqs = foldl1 (:>:)
 rulesApplication :: ERule
 rulesApplication env lhs =
   "APP-BETA" `name`
-  do LAM x e :@: v <- [lhs]
+  do LAM x e :@: Val v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
      -- A small shortcut for dummy variables.
