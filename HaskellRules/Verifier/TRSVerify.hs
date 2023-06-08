@@ -4,6 +4,7 @@ import Rules.Verifier
 import TRS.Bind
 import TRS.TRS
 import TRS.Traced
+import TRS.Tarjan
 import Rules.Core
 import qualified Epic.Print as P
 import Control.Monad (forM_, when)
@@ -71,9 +72,12 @@ runTest (testName, e, expected) =
 verify :: Expr -> (Bool, Traced Expr)
 verify e = (isDone x, tr)
  where
-  norms           = normalFormFuelTracePlain sys (-1) e
-  tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
-  done            = isDone x
+  Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- [])
+  arrow (x :<-- tr)      = [ y :<-- ((r,x):tr) | (r,y) <- stepS sys x ]
+  done                   = isDone x
+
+  --norms           = normalFormsFuelTracePlain sys (-1) e
+  --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
 
 isDone :: Expr -> Bool
 isDone = collect done (&&)
