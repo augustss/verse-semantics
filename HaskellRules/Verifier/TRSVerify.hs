@@ -20,30 +20,24 @@ main = do
 sys :: TRSystem Expr
 sys = icfpVerifier
 
+verify :: Bool -> Expr -> IO Bool
+verify b e =
+  do when b $
+       do putStr (unlines (showTrace tr))
+          if done
+            then putStrLn "+++ done; no ASSERT left +++"
+            else putStrLn "*** NOT done; some ASSERT left! ***"
+     return done
+ where
+  norms           = normalFormFuelTracePlain sys (-1) e
+  tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
+  done            = isDone x
+
 isDone :: Expr -> Bool
 isDone = collect done (&&)
  where
   done (Assert _) = False
   done _          = True
-
-verify :: Bool -> Expr -> IO Bool
-verify b e =
-  do x <- traceIf (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
-     let res = isDone x
-     if res
-       then putStrLn "+++ done; no ASSERT left +++"
-       else putStrLn "*** NOT done; some ASSERT left! ***"
-     return res
- where
-  traceIf (x :<-- []) =
-    do when b (P.pp x)
-       return x
-
-  traceIf (x :<-- ((r,y):rys)) =
-    do _ <- traceIf (y :<-- rys)
-       when b $ putStrLn ("--[" ++ r ++ "]-->")
-       when b $ P.pp x
-       return x
 
 --------------------------------------------------------------------------------
 -- | Top-level function for running the verifier.
@@ -54,10 +48,10 @@ runTests = and <$> mapM runTest tests
 
 runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) = do
+  putStr $ "Running test: " ++ testName ++ " ..."
   res <- verify False e
-  let ok  = res == expected
-  putStrLn $ "Running test: " ++ testName ++ " ..." ++ show ok
-  -- putStrLn $ prettyShow res
+  let ok = res == expected
+  putStrLn $ if ok then show ok else "***FALSE***"
   return ok
 
 isSafe :: Result -> Bool
