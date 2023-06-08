@@ -614,6 +614,7 @@ collect here (\/) = col
   recr a (Lam (Bind _ e)) = a \/ col e
   recr a (Exi (Bind _ e)) = a \/ col e
   recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :|: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
   recr a (One e)          = a \/ col e
