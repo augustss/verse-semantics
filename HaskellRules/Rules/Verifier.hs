@@ -15,19 +15,16 @@ import Control.Monad (guard)
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
 icfpVerifier :: TRSystem Expr
-icfpVerifier = icfp
+icfpVerifier = icfpActual
   { sname = "ICFP + extra verifier rules"
-  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+  , rules = (rules icfpActual -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
               <> generalizedIcfpRules
               <> assumeAssertRules
               <> verifierRules
   }
 
-icfp :: TRSystem Expr
-icfp = base'{ sname = "ICFP" }
-  where
-    base     = head allSystemsICFP
-    base'    = base { rules = rules base }
+icfpActual :: TRSystem Expr
+icfpActual = head allSystemsICFP
     
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"

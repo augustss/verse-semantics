@@ -68,16 +68,10 @@ testAbs :: Expr -> IO ()
 testAbs = test icfpVerifier
 
 testConc :: Expr -> IO ()
-testConc = test icfp
-
-pshow :: (P.Pretty a) => a -> IO ()
-pshow = putStrLn . P.prettyShow
-
-reduce :: Expr -> Expr
-reduce = term . run icfpVerifier
+testConc = test icfpActual
 
 test :: TRSystem Expr -> Expr -> IO ()
-test v = putStrLn . P.prettyShow . run v
+test v = P.pp . run v
 
 showStepS :: Expr -> IO ()
 showStepS e = do
