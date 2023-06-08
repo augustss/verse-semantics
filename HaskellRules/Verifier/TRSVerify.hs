@@ -10,79 +10,11 @@ import Control.Monad (forM_, when)
 import Prelude hiding (succ, sum)
 
 --------------------------------------------------------------------------------
+
 main :: IO ()
-main = do
-  --sequence_ [ verify True e | ("ex4",e,_) <- tests ]
-  _ <- runTests
-  return ()
---------------------------------------------------------------------------------
-
-sys :: TRSystem Expr
-sys = icfpVerifier
-
-verify :: Bool -> Expr -> IO Bool
-verify b e =
-  do when b $
-       do putStr (unlines (showTrace tr))
-          if done
-            then putStrLn "+++ done; no ASSERT left +++"
-            else putStrLn "*** NOT done; some ASSERT left! ***"
-     return done
- where
-  norms           = normalFormFuelTracePlain sys (-1) e
-  tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
-  done            = isDone x
-
-isDone :: Expr -> Bool
-isDone = collect done (&&)
- where
-  done (Assert _) = False
-  done _          = True
-
---------------------------------------------------------------------------------
--- | Top-level function for running the verifier.
---------------------------------------------------------------------------------
-
-runTests :: IO Bool
-runTests = and <$> mapM runTest tests
-
-runTest :: (String, Expr, Bool) -> IO Bool
-runTest (testName, e, expected) = do
-  putStr $ "Running test: " ++ testName ++ " ..."
-  res <- verify False e
-  let ok = res == expected
-  putStrLn $ if ok then show ok else "***FALSE***"
-  return ok
-
-isSafe :: Result -> Bool
-isSafe Accept = True
-isSafe _    = False
-
-testAbs :: Expr -> IO ()
-testAbs = test icfpVerifier
-
-testConc :: Expr -> IO ()
-testConc = test icfpActual
-
-test :: TRSystem Expr -> Expr -> IO ()
-test v = P.pp . run v
-
-showStepS :: Expr -> IO ()
-showStepS e = do
-  forM_ (stepS icfpVerifier e) $ \e' -> do
-    putStrLn (P.prettyShow e')
-
-run :: TRSystem Expr -> Expr -> Traced Expr
-run v e = head (nrDone nf)
-  where
-    nf = normalFormFuelTracePlain v 1000 e
-
-data Result = Accept | Reject
-  deriving (Show)
-
-instance P.Pretty Result where
-  pPrint Accept = P.text "accept"
-  pPrint Reject = P.text "reject"
+main =
+  do _ <- runTests
+     return ()
 
 ---------------------------------------------------------------------------------------------------
 -- | Verifier tests
@@ -101,6 +33,53 @@ tests =
   , ("ex5", ex5, True)
   , ("ex6", ex6, True)
   ]
+
+--------------------------------------------------------------------------------
+-- | Top-level function for running the verifier.
+--------------------------------------------------------------------------------
+
+sys :: TRSystem Expr
+sys = icfpVerifier
+
+runTests :: IO Bool
+runTests = and <$> mapM runTest tests
+
+runTest :: (String, Expr, Bool) -> IO Bool
+runTest (testName, e, expected) =
+  do putStr $ "Running test: " ++ testName ++ " ..."
+     case verify e of
+       (True, _) | expected ->
+         do putStrLn " OK (verified)"
+            return True
+
+       (False, _) | not expected ->
+         do putStrLn " OK (failed)"
+            return True
+
+       (True, tr@(x :<-- _)) ->
+         do putStrLn " *** VERIFIED, but expected FAILED:"
+            --putStr (unlines (showTrace tr))
+            P.pp x
+            return False
+
+       (False, tr@(x :<-- _)) ->       
+         do putStrLn " *** FAILED, but expected VERIFIED:"
+            --putStr (unlines (showTrace tr))
+            P.pp x
+            return False
+
+verify :: Expr -> (Bool, Traced Expr)
+verify e = (isDone x, tr)
+ where
+  norms           = normalFormFuelTracePlain sys (-1) e
+  tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
+  done            = isDone x
+
+isDone :: Expr -> Bool
+isDone = collect done (&&)
+ where
+  done (Assert _) = False
+  done _          = True
 
 -------------------------------------------------------------------------------------------
 iNT :: Expr -> Expr
