@@ -109,9 +109,7 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
     | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
-    | null ts''  = -- error "normalFormFuelTracePlain: no children (maybe there are structural rules?)"  -- a loop
-                   error ("NFTP-crash! \n t = " ++ prettyShow t ++ "\n ts' = " ++ prettyShow ts' ++ "\n ts'' = " ++ prettyShow ts'' ++ "\n ttr = " ++ prettyShow ttr ++ "\n seen = " ++ prettyShow seen )
-                   -- error ("NFTP-crash! \n t = " ++ prettyShow t)
+    | null ts''  = NormResult { nrDone = [], nrLeft = [t0 :<-- ((s0, t) : tr)] }
     | otherwise  =
       stepper "STEP" ttr $
       go (n-1) seen' (t' :<-- ((s, t) : tr))
@@ -120,6 +118,7 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
       ts'   = stepSS sys t
       ts''  = filter ((`S.notMember` seen) . snd) ts'
       (s, t') = head ts''
+      (s0,t0) = head ts'
 
 stepSS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
 stepSS sys tt = t1s ++ t2s
