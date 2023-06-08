@@ -7,7 +7,6 @@ import TRS.Traced
 import TRS.Tarjan
 import Rules.Core
 import qualified Epic.Print as P
-import Control.Monad (forM_, when)
 import Prelude hiding (succ, sum)
 
 --------------------------------------------------------------------------------
@@ -57,13 +56,13 @@ runTest (testName, e, expected) =
          do putStrLn " OK (failed)"
             return True
 
-       (True, tr@(x :<-- _)) ->
+       (True, _tr@(x :<-- _)) ->
          do putStrLn " *** VERIFIED, but expected FAILED:"
             --putStr (unlines (showTrace tr))
             P.pp x
             return False
 
-       (False, tr@(x :<-- _)) ->       
+       (False, _tr@(x :<-- _)) ->       
          do putStrLn " *** FAILED, but expected VERIFIED:"
             --putStr (unlines (showTrace tr))
             P.pp x
@@ -73,8 +72,7 @@ verify :: Expr -> (Bool, Traced Expr)
 verify e = (isDone x, tr)
  where
   Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- [])
-  arrow (x :<-- tr)      = [ y :<-- ((r,x):tr) | (r,y) <- stepS sys x ]
-  done                   = isDone x
+  arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
   --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
@@ -280,6 +278,7 @@ ex5 = LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: 
 
 ---
 
+suc :: Expr
 suc = tlamAbs vx [] (iNT x) (Exi (Bind vy (iNT y)))
  where
   vx = ident "x"
@@ -287,6 +286,7 @@ suc = tlamAbs vx [] (iNT x) (Exi (Bind vy (iNT y)))
   vy = ident "y"
   y  = Var vy
 
+f :: Expr
 f = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :@: x) :>: iNT y))))
                   (Exi (Bind vy (y :=: (h :@: Val (Int 3)) :>: iNT y)))
  where
@@ -301,6 +301,7 @@ f = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :
   vy  = ident "y"
   y   = Var vy
 
+ex6 :: Expr
 ex6 = Exi (Bind vg (Exi (Bind vs (g :=: f :>: s :=: suc :>: g :@: s))))
  where
   vg = ident "g"
