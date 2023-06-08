@@ -22,7 +22,6 @@
       + `assert` that output does not fail
 
   - **use-site**
-      + verify `assert` that actual input does not fail and
       + `assume` that output does not fail
 
 
