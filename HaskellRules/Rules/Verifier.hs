@@ -96,15 +96,15 @@ assumeAssertRules _ lhs =
      pure (Assume e1 :|: Assume e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
-  --"Assume-Exi" `name`
-  --do Assume (Exi (Bind x e)) <- [lhs]
-  --   pure (Exi (Bind x (Assume e)))
-  -- ++
+  "Assume-Exi" `name`
+  do Assume (Exi (Bind x e)) <- [lhs]
+     pure (Exi (Bind x (Assume e)))
+  ++
   -- Assume {Assume{e}} ----> Assume{e}
-  --"Assume-Assume" `name`
-  --do Assume (Assume e) <- [lhs]
-  --   pure (Assume e)
-  -- ++
+  "Assume-Assume" `name`
+  do Assume (Assume e) <- [lhs]
+     pure (Assume e)
+  ++
   -- Assume { Assert {e} } ----> Assume {e}
   "Assume-Assert" `name`
   do Assume (Assert e) <- [lhs]
@@ -161,12 +161,12 @@ failFree _                = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
-verifierRules _env lhs = []
-   -- "Prove" `name`
-   --   CTX[e] ---> CTX[assume{e}]    if    CTX |- e
-   --do (ctx, g, e) <- execEX lhs
-   --   guard (g `proves` e)
-   --   pure (ctx (Assume e))
+verifierRules _env lhs =
+   -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
+   "Prove" `name`
+   do (ctx, g, e) <- execEX lhs
+      guard (g `proves` e)
+      pure (ctx (Assume e))
 {-
    ++
    "Assume-Exi" `name`
