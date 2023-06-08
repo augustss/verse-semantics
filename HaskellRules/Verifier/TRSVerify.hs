@@ -12,19 +12,18 @@ import Prelude hiding (succ, sum)
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
-  sequence_ [ verify True e | ("ex4",e,_) <- tests ]
+  --sequence_ [ verify True e | ("ex4",e,_) <- tests ]
   _ <- runTests
   return ()
 --------------------------------------------------------------------------------
 
 sys :: TRSystem Expr
-sys = trivVerifier
+sys = icfpVerifier
 
 isDone :: Expr -> Bool
 isDone = collect done (&&)
  where
   done (Assert _) = False
-  done (Verify _) = False
   done _          = True
 
 verify :: Bool -> Expr -> IO Bool
@@ -32,8 +31,8 @@ verify b e =
   do x <- traceIf (head (nrDone (normalFormFuelTracePlain sys (-1) e)))
      let res = isDone x
      if res
-       then putStrLn "+++ done; no ASSERT or VERIFY left +++"
-       else putStrLn "*** NOT done; some ASSERT or VERIFY left! ***"
+       then putStrLn "+++ done; no ASSERT left +++"
+       else putStrLn "*** NOT done; some ASSERT left! ***"
      return res
  where
   traceIf (x :<-- []) =
@@ -66,23 +65,23 @@ isSafe Accept = True
 isSafe _    = False
 
 testAbs :: Expr -> IO ()
-testAbs = test trivVerifier
+testAbs = test icfpVerifier
 
 testConc :: Expr -> IO ()
-testConc = test icfpVerifier
+testConc = test icfp
 
 pshow :: (P.Pretty a) => a -> IO ()
 pshow = putStrLn . P.prettyShow
 
 reduce :: Expr -> Expr
-reduce = term . run trivVerifier
+reduce = term . run icfpVerifier
 
 test :: TRSystem Expr -> Expr -> IO ()
 test v = putStrLn . P.prettyShow . run v
 
 showStepS :: Expr -> IO ()
 showStepS e = do
-  forM_ (stepS trivVerifier e) $ \e' -> do
+  forM_ (stepS icfpVerifier e) $ \e' -> do
     putStrLn (P.prettyShow e')
 
 run :: TRSystem Expr -> Expr -> Traced Expr

@@ -14,22 +14,21 @@ import Control.Monad (guard)
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
-trivVerifier :: TRSystem Expr
-trivVerifier = icfpVerifier
-  { sname = "Verifier rules based on ICFP (trivial)",
-    rules  = (rules icfpVerifier -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
-               <> generalizedIcfpRules
-               <> contextFreeRules
-               <> contextSensitiveRules
---    rules2 = contextSensitiveRules
+icfpVerifier :: TRSystem Expr
+icfpVerifier = icfp
+  { sname = "ICFP + extra verifier rules"
+  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+              <> generalizedIcfpRules
+              <> assumeAssertRules
+              <> verifierRules
   }
 
-icfpVerifier :: TRSystem Expr
-icfpVerifier = base'{ sname = "Verifier rules based on ICFP" }
+icfp :: TRSystem Expr
+icfp = base'{ sname = "ICFP" }
   where
     base     = head allSystemsICFP
     base'    = base { rules = rules base }
-
+    
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
 --------------------------------------------------------------------------------------
@@ -78,33 +77,56 @@ generalizedIcfpRules env lhs =
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx (Var x0 :=: Val v)))
 
--- | Rules to "push" `Assume` and `Assert` into sub-terms -----------------------
+-- | Rules for `Assume` and `Assert` -------------------------------------------
 
-
--- assume {x = 2}; assert { x = y ; y = 2; 0}
-
-
-contextFreeRules :: VRule
-contextFreeRules _ lhs =
-  -- Assume {e1; e2} ---> Assume e1; Assume e2
-  "Assume-Seq" `name`
-  do Assume (e1 :>: e2) <- [lhs]
-     pure (Assume e1 :>: Assume e2)
-  ++
-  -- Assert {v} ----> v
-  "Assert-Val" `name`
-  do Assert (Val v) <- [lhs]
-     pure (Val v)
-  ++
+assumeAssertRules :: VRule
+assumeAssertRules _ lhs =
+  -- ASSUME --  
+  
   -- Assume {v} ----> v
   "Assume-Val" `name`
   do Assume (Val v) <- [lhs]
      pure (Val v)
   ++
+  -- Assume {e1; e2} ---> Assume e1; Assume e2
+  "Assume-Seq" `name`
+  do Assume (e1 :>: e2) <- [lhs]
+     pure (Assume e1 :>: Assume e2)
+  ++
+  -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
+  "Assume-Choice" `name`
+  do Assume (e1 :|: e2) <- [lhs]
+     pure (Assume e1 :|: Assume e2)
+  ++
+  -- Assume { exi x . e } ----> exi x . Assume {e}
+  --"Assume-Exi" `name`
+  --do Assume (Exi (Bind x e)) <- [lhs]
+  --   pure (Exi (Bind x (Assume e)))
+  -- ++
   -- Assume {Assume{e}} ----> Assume{e}
-  "Assume-Assume" `name`
-  do Assume (Assume e) <- [lhs]
+  --"Assume-Assume" `name`
+  --do Assume (Assume e) <- [lhs]
+  --   pure (Assume e)
+  -- ++
+  -- Assume { Assert {e} } ----> Assume {e}
+  "Assume-Assert" `name`
+  do Assume (Assert e) <- [lhs]
+     pure (Assume e)
+  ++
+
+  -- ASSERT --  
+
+  -- Assert { e } ----> e   if   e is fail-free
+  "Assert-FailFree" `name`
+  do Assert e <- [lhs]
+     guard (failFree e)
      pure e
+  ++
+{- (these are all subsumed by the above rule)
+  -- Assert {v} ----> v
+  "Assert-Val" `name`
+  do Assert (Val v) <- [lhs]
+     pure (Val v)
   ++
   -- Assert {Assert {e}} ----> Assert {e}
   "Assert-Assert" `name`
@@ -116,34 +138,10 @@ contextFreeRules _ lhs =
   do Assert (Assume e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assert e2)
   ++
-  -- Assume { Assert {e} } ----> Assume {e}
-  "Assume-Assert" `name`
-  do Assume (Assert e) <- [lhs]
-     pure (Assume e)
-  ++
-  -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
-  "Assume-Choice" `name`
-  do Assume (e1 :|: e2) <- [lhs]
-     pure (Assume e1 :|: Assume e2)
-  ++
-  -- Assert { e } ----> e   if   e is crash-free
-  "Assert-CrashFree" `name`
-  do Assert e <- [lhs]
-     guard (crashFree e)
-     pure e
-  ++
-{- -- these rules seem wrong? --Koen
-  -- Assert { e1 | e2 } ----> Assert {e1} | Assert {e2}
-  "Assert-Choice" `name`      -- seems TOO strong?
-  do Assert (e1 :|: e2) <- [lhs]
-     pure (Assert e1 :|: Assert e2)
-  ++
-  -- Assert { Fail } ---> Fail
-  "Assert-Fail" `name`
-  do Assert Fail <- [lhs]
-     pure Fail
-  ++
 -}
+  
+  -- VERIFY --
+  
   "Verify" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
@@ -155,26 +153,30 @@ contextFreeRules _ lhs =
   do Assume (Verify e) <- [lhs]
      pure (Assume e)
 
-crashFree :: Expr -> Bool
-crashFree (Val _)          = True
-crashFree (Assume _ :>: e) = crashFree e
-crashFree (e1 :|: e2)      = crashFree e1 || crashFree e2
-crashFree _                = False
+failFree :: Expr -> Bool
+failFree (Val _)          = True
+failFree (Assume _)       = True
+failFree (Assert _)       = True
+failFree (e1 :>: e2)      = failFree e1 && failFree e2
+failFree (e1 :|: e2)      = failFree e1 || failFree e2
+failFree (Exi (Bind _ e)) = failFree e
+failFree _                = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
-contextSensitiveRules :: VRule
-contextSensitiveRules _env lhs =
-   "Prove" `name`
-   -- | E[Assert (e; e')] ---> E[e; Assert{e'}]    IF ctx(E) |- e
-   --   CTX[e] ---> CTX{assume{e}}        CTX |- e
-   do (ctx, g, e) <- execEX lhs
-      guard (g `proves` e)
-      pure (ctx (Assume e))
+verifierRules :: VRule
+verifierRules _env lhs = []
+   -- "Prove" `name`
+   --   CTX[e] ---> CTX[assume{e}]    if    CTX |- e
+   --do (ctx, g, e) <- execEX lhs
+   --   guard (g `proves` e)
+   --   pure (ctx (Assume e))
+{-
    ++
    "Assume-Exi" `name`
    do (ctx, g, Assume (EXI x e)) <- execEX lhs
       let x' = fresh g e
       pure (ctx (Assume (subst [(x, Var x')] e)))
+-}
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
