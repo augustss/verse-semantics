@@ -1,5 +1,5 @@
 module TRS.Traced(
-  Traced(..), term, trace, start, (++>), toList,
+  Traced(..), term, trace, start, (++>), toList, loop,
   showTrace, showRevTrace,
   ) where
 import Epic.Print
@@ -38,6 +38,14 @@ instance Pretty a => Pretty (Traced a) where
   pPrint (x :<-- tr) = foldr1 ($+$) $ trDocs ++ [pPrint x]
     where
       trDocs = concat [ [pPrint e, text ("---" ++ msg ++ "--->")] | (msg, e) <- reverse tr ]
+
+loop :: Eq a => Traced a -> Traced a
+loop (x :<-- tr) = x :<-- find x tr
+ where
+  find _x []     = []
+  find  x ((s,y):sys)
+    | y == x    = [(s,y)]
+    | otherwise = (s,y) : find x sys
 
 showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace (x :<-- tr) =
