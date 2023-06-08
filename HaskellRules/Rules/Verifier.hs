@@ -144,16 +144,17 @@ assumeAssertRules _ lhs =
      let verified (Assert _) = False
          verified _          = True
      guard (collect verified (&&) e)
-     pure e
+     pure (Val (Arr []))
   ++
   "Assume-Verify" `name`
-  do Assume (Verify e) <- [lhs]
-     pure (Assume e)
+  do Assume (Verify _) <- [lhs]
+     pure (Val (Arr []))
 
 failFree :: Expr -> Bool
 failFree (Val _)          = True
 failFree (Assume _)       = True
 failFree (Assert _)       = True
+failFree (One e)          = failFree e
 failFree (e1 :>: e2)      = failFree e1 && failFree e2
 failFree (e1 :|: e2)      = failFree e1 || failFree e2
 failFree (Exi (Bind _ e)) = failFree e
