@@ -32,6 +32,9 @@ tests =
   , ("ex4", ex4, True)
   , ("ex5", ex5, True)
   , ("ex6", ex6, True)
+  , ("ex_rigid2flex", ex_rigid2flex, True)
+  , ("ex_flex2rigid1", ex_flex2rigid1, False)
+  , ("ex_flex2rigid2", ex_flex2rigid2, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -62,10 +65,10 @@ runTest (testName, e, expected) =
             P.pp x
             return False
 
-       (False, _tr@(x :<-- _)) ->       
+       (False, tr@(x :<-- _)) ->       
          do putStrLn " *** FAILED, but expected VERIFIED:"
-            --putStr (unlines (showTrace tr))
-            P.pp x
+            putStr (unlines (showTrace tr))
+            --P.pp x
             return False
 
 verify :: Expr -> (Bool, Traced Expr)
@@ -101,18 +104,26 @@ leq e1 e2 = Op Le :@: Arr [e1, e2]
 
 ite :: Expr -> Expr -> Expr -> Expr
 ite e1 e2 e3 = (Assume e1 :>: e2) :|: e3
+--ite e1 e2 e3 = One( (e1 :>: Lam (Bind x e2)) :|: Lam (Bind x e3) ) :@: Arr []
+-- where
+--  x = identNotIn (free (e2,e3))
+--ite e1 e2 e3 = Exi (Bind x ( Var x :=: One( (e1 :>: Arr []) :|: Int 0 )
+--                         :>: (((Var x :=: Arr []) :>: e2) :|: ((Var x :=: Int 0) :>: e3))
+--                           ))
+-- where
+--  x = identNotIn (free (e2,e3))
 
 exis :: [Ident] -> Expr -> Expr
 exis ys e = foldr ((Exi .) . Bind) e ys
 
 tlam :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlam x ys e1 e2 =
-      Verify (Val $ Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
-  :>: (Val $ Lam $ Bind x $ exis ys (e1 :>: Assume e2))
+      Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
+  :>: (Lam $ Bind x $ exis ys (e1 :>: Assume e2))
 
 tlamAbs :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlamAbs x ys e1 e2 =
-      (Val $ Lam $ Bind x $ exis ys (e1 :>: Assume e2))
+      (Lam $ Bind x $ exis ys (e1 :>: Assume e2))
 
 
 -------------------------------------------------------------------------------------------
@@ -308,3 +319,30 @@ ex6 = Exi (Bind vg (Exi (Bind vs (g :=: f :>: s :=: suc :>: g :@: s))))
   g  = Var vg
   vs = ident "suc"
   s  = Var vs
+  
+---
+
+ex_rigid2flex :: Expr
+ex_rigid2flex =
+  tlam vx [] (Int 0) (Exi (Bind vy ((x :=: y) :>: y)))
+ where
+  vx = ident "x"
+  x  = Var vx
+  vy = ident "y"
+  y  = Var vy
+  
+ex_flex2rigid1 :: Expr
+ex_flex2rigid1 =
+  tlam vx [] (Int 0) ((Int 3 :=: x) :>: x)
+ where
+  vx = ident "x"
+  x  = Var vx
+  
+ex_flex2rigid2 :: Expr
+ex_flex2rigid2 =
+  tlam vx [] ((Int 3 :=: x) :>: x) ((Int 3 :=: x) :>: x)
+ where
+  vx = ident "x"
+  x  = Var vx
+
+
