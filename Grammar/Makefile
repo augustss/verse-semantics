@@ -11,3 +11,6 @@ tim.xbnf:	TimGrammar.txt Makefile
 	sed < TimGrammar.txt -n -e '/^Alpha/,/^File/p' | sed -e '/ := /s/^/;;/' > tim.xbnf
 
 # Use https://bottlecaps.de/rr/ui to convert to SVG
+
+clean:
+	rm -f *~
