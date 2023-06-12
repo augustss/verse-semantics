@@ -4,9 +4,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveGeneric #-}
+
 module Rules.Core(
   Expr(..), Op(..),
   Heap, Ptr(..),
@@ -73,6 +72,12 @@ data Expr
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
   | Wrong String                -- ^ wrong
+
+  -- used for verification (experimental)
+  | Assert Expr                 -- ^ assert{ e }
+  | Assume Expr                 -- ^ assume{ e }
+  | Verify Expr                 -- ^ verify{ e }
+
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
   -- only used for updatable references
@@ -115,6 +120,9 @@ instance Pretty Expr where
   pPrintPrec l p (Exi (Bind x a)) = maybeParens (p > 0) $ text "ex" <+> pPrintPrec l 0 x P.<> text "." <+> pPrintPrec l 0 a
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Assert a)       = text "ASSERT {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Verify a)       = text "VERIFY {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
@@ -198,6 +206,18 @@ comp  xs  ys (All a) (All b) = comp xs ys a b
 comp _xs _ys (All _) _       = LT
 comp _xs _ys _       (All _) = GT
 
+comp  xs  ys (Assume a) (Assume b) = comp xs ys a b
+comp _xs _ys (Assume _) _          = LT
+comp _xs _ys _          (Assume _) = GT
+
+comp  xs  ys (Assert a) (Assert b) = comp xs ys a b
+comp _xs _ys (Assert _) _          = LT
+comp _xs _ys _          (Assert _) = GT
+
+comp  xs  ys (Verify a) (Verify b) = comp xs ys a b
+comp _xs _ys (Verify _) _          = LT
+comp _xs _ys _          (Verify _) = GT
+
 comp  xs  ys (Split e f g) (Split e' f' g') = comp xs ys e e' <> comp xs ys f f' <> comp xs ys g g'
 comp _xs _ys Split {} _ = LT
 comp _xs _ys _ Split {} = GT
@@ -265,7 +285,7 @@ pattern LAM x e = Lam (Bind x e)
 pattern Val :: Expr -> Expr
 pattern Val e <- (getVal -> Just e)
   where Val e | Just _ <- getVal e = e
-              | otherwise = error "pattern Val"
+              | otherwise = error ("pattern Val " ++ prettyShow e)
 
 getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
@@ -280,7 +300,7 @@ pattern HNF e <- (getHNF -> Just e)
 
 getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
-getHNF e@Op{} = Just e
+getHNF e@Op{}  = Just e
 getHNF e@Arr{} = Just e
 getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
@@ -376,6 +396,9 @@ instance Rec Expr where
 
       One a -> [ (n, One a') | (n,a') <- rec r (addBound BBlk s) a ]
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Verify a -> [ (n, Verify a') | (n,a') <- rec r (addBound BBlk s) a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
@@ -425,6 +448,9 @@ instance Free Expr where
   free (Exi bnd) = free bnd
   free (One a)   = free a
   free (All a)   = free a
+  free (Assume a) = free a
+  free (Assert a) = free a
+  free (Verify a) = free a
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
   free Fail      = []
@@ -462,6 +488,9 @@ instance Term Expr where
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
+  subst sub (Assume a) = Assume (subst sub a)
+  subst sub (Assert a) = Assert (subst sub a)
+  subst sub (Verify a) = Verify (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
@@ -519,6 +548,9 @@ instance Arbitrary Expr where
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
   shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
+  shrink (Assume a) = [a] ++ [Assume a'| a'<-shrink a]
+  shrink (Assert a) = [a] ++ [Assert a'| a'<-shrink a]
+  shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
   shrink (Exi (Bind x a)) = [a |x `notElem` ys]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
@@ -582,10 +614,14 @@ collect here (\/) = col
   recr a (Lam (Bind _ e)) = a \/ col e
   recr a (Exi (Bind _ e)) = a \/ col e
   recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :|: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
+  recr a (Assume e)       = a \/ col e
+  recr a (Assert e)       = a \/ col e
+  recr a (Verify e)       = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a _                = a
@@ -604,6 +640,9 @@ allVars = nub . expr
     expr (e1 :>: e2) = expr e1 ++ expr e2
     expr (One e) = expr e
     expr (All e) = expr e
+    expr (Assume e) = expr e
+    expr (Assert e) = expr e
+    expr (Verify e) = expr e
     expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
     expr (BlockC e) = expr e
     expr _ = []
@@ -618,7 +657,7 @@ check p a | p a = a
 --------------------------------------------------------------------------------
 
 -- Substiture one expressions for another.
--- XXX Does not avoid accidental capture in the 'to' expression.
+-- (Does now indeed avoid accidental capture in the 'to' expression.)
 substExp :: Expr -> Expr -> Expr -> Expr
 substExp from to = sub
   where
@@ -629,20 +668,35 @@ substExp from to = sub
     sub e@Int{}   = e
     sub e@Op{}    = e
     sub (Arr vs)  = Arr (map sub vs)
+{-
     sub (LAM x e) | x `elem` fvs = LAM x e
                   | x `elem` tvs = error "unimplemented"
                   | otherwise = LAM x (sub e)
+-}
+    sub (Lam bnd)
+      | x `elem` fvs = Lam bnd
+      | otherwise    = Lam (Bind x (sub e))
+     where Bind x e = alphaRename tvs bnd
     sub (a :=: b) = sub a :=: sub b
     sub (a :>: b) = sub a :>: sub b
     sub (a :|: b) = sub a :|: sub b
     sub (a :@: b) = sub a :@: sub b
     sub Fail      = Fail
     sub e@Wrong{} = e
+{-
     sub (EXI x e) | x `elem` fvs = EXI x e
                   | x `elem` tvs = error "unimplemented"
                   | otherwise = EXI x (sub e)
+-}
+    sub (Exi bnd)
+      | x `elem` fvs = Exi bnd
+      | otherwise    = Exi (Bind x (sub e))
+     where Bind x e = alphaRename tvs bnd
     sub (One a)   = One (sub a)
     sub (All a)   = All (sub a)
+    sub (Assume a) = Assume (sub a)
+    sub (Assert a) = Assert (sub a)
+    sub (Verify a) = Verify (sub a)
     sub (Split e f g) = Split (sub e) (sub f) (sub g)
     sub (BlockC e) = BlockC (sub e)
     sub (Store h e) = Store (IM.map sub h) (sub e)

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK) where
+module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -22,6 +22,7 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
+                   systemICFPSX,
                    systemICFPK,
                    systemICFPE,
                    systemICFPF,
@@ -46,6 +47,13 @@ systemICFP = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = noRules
   , validExpr           = const valid
+  }
+
+systemICFPSX :: TRSystem Expr
+systemICFPSX = systemICFP
+  { sname               = "ICFPSX"
+  , description         = "ICFP with a simplified substitution rule and context"
+  , rules               = (rules systemICFP -= "SUBST" -= "EQN-ELIM") <> rulesSubstX
   }
 
 systemICFPK :: TRSystem Expr
@@ -154,6 +162,8 @@ valid' onlyEq = expr
     expr (EXI _ e) = expr e
     expr (One e) = expr e
     expr (All e) = expr e
+    expr (Assume e) = expr e
+    expr (Assert e) = expr e
     expr Fail = True
     expr Wrong{} = True
     expr (Split e (LAM _ e1) (LAM _ (LAM _ (LAM _ e2)))) =
@@ -212,6 +222,8 @@ anf' onlyEq = expr
     expr (EXI i e) = EXI i (expr e)
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
+    expr (Assume e) = Assume $ expr e
+    expr (Assert e) = Assert $ expr e
     expr e@Fail = e
     expr e@Wrong{} = e
     expr (Split e e1 e2) =
@@ -281,6 +293,19 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
+ ++ -- extra rule for verifier
+  do (Assume x) :>: e <- [lhs]
+     (ctx, hole) <- execX x
+     pure ( \ a -> Assume (ctx a) :>: e, hole)
+
+substX :: Expr -> [(Context, Expr)]
+-- X context
+substX lhs = 
+  [(id,lhs)]
+ ++
+  do (v :=: e) :>: ex <- [lhs]
+     (ctx, hole) <- substX ex
+     pure (((v :=: e) :>:) . ctx, hole)
 
 -- X context additionally descending under EXI and returning boundVars at hole
 execBX, execBX1 :: Expr -> [(Context, [Ident], Expr)]
@@ -320,6 +345,10 @@ scopeX lhs =
  ++
   do Split hole f g <- [lhs]
      choices (\ e -> Split e f g) hole
+ ++
+  do Assert hole <- [lhs]
+     choices Assert hole
+
  where
   choices ctx e =
     (ctx,e) : case e of
@@ -492,7 +521,7 @@ seqs = foldl1 (:>:)
 rulesApplication :: ERule
 rulesApplication env lhs =
   "APP-BETA" `name`
-  do LAM x e :@: v <- [lhs]
+  do LAM x e :@: Val v <- [lhs]
      let freeV = free v
          beta y b = EXI y ((Var y :=: Val v) :>: b)
      -- A small shortcut for dummy variables.
@@ -573,6 +602,26 @@ rulesUnification env lhs =
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+
+rulesSubstX :: ERule
+rulesSubstX env lhs =
+  "SUBST-X" `name`
+  do (ctx, (Var x :=: Val v) :>: e) <- substX lhs
+     let freeX = free (ctx, e)
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+ ++
+ "EQN-ELIM-S" `name`
+  do EXI x a <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- substX a
+     guard (x == x')
+     guard (x `notElem` free (ctx (v :>: e)))
+     pure (ctx e)
 
 rulesSubstBX :: ERule
 rulesSubstBX env lhs =

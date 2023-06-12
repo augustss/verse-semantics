@@ -144,7 +144,7 @@
 
 %% Title information
 % \title{The essence of functional logic programming}
-\title{The Verse Calculus: a Core Calculus for Functional Logic Programming}
+\title{The Verse Calculus: a Core Calculus for Deterministic Functional Logic Programming}
 
                                         %% [Short Title] is optional;
                                         %% when present, will be used in
@@ -295,7 +295,7 @@
 \begin{abstract}
   Functional logic languages have a rich literature, but it is tricky
   to give them a satisfying semantics.  In this paper we describe the
-  Verse calculus, \versecalc{}, a new core calculus for functional
+  Verse calculus, \versecalc{}, a new core calculus for deterministic functional
   logic programming. Our main contribution is to equip \versecalc{} with a
   small-step rewrite semantics, so that we can reason
   about a \versecalc{} program in the same way as one does with lambda
@@ -386,40 +386,30 @@ a term-rewriting system}, to give us both a formal semantics (via small-step red
 and a powerful set of equivalences that programmers can use to reason about their programs,
 and that compilers can use to optimize them.
 
-We make the following contributions in this paper.
-First, we describe a new core calculus for functional logic programming,
+We make two main contributions.
+{\bf Our first contribution} is a new core calculus for functional logic programming,
 the Verse calculus or \versecalc{} for short
 (\cref{sec:informal}).
-As in any functional logic language,
+Like any functional logic language,
 \versecalc{} supports logical variables, equalities, and choice, but it is distinctive in several ways:
 \begin{itemize}
-\item \versecalc{} natively supports \emph{higher-order functions}, just like the lambda calculus.
+\item \emph{Natively higher order.} \versecalc{} directly supports higher-order functions, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
-\item All functional logic languages have some notion of ``flexible'' {\vs} ``rigid'' variables.
-  \versecalc{} offers a new
-  way to address these notions, through the operators |oneKW| (\cref{sec:one})
-  and |allKW| (\cref{sec:all}).  This enables an elegant economy of concepts: for example,
+\item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value (as is often the case in functional logic programs), those values are returned in a well-specified order.  This makes it easy to solve the notoriously tricky issue of how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (\cref{sec:all}).
+  It opens up a new approach to dealing with so-called ``flexible'' {\vs} ``rigid'' variables
+  (\cref{sec:one}).  It supports an elegant economy of concepts: for example,
   there is just one equality (other languages may have a suspending equality and a narrowing equality),
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
-\item \emph{Choice and determinism.} Choice is a fundamental feature of all functional logic languages.
-  In \versecalc{}, choice is expressed in the syntax of the term (``laid out in space'')
-  rather than, as is more typical, handled by non-deterministic rewrites and backtracking (``laid out in time'').
-  This makes \versecalc{} completely \emph{deterministic}, unlike most
-  functional logic languages which are non-deterministic by design (\cref{sec:deterministic}).
-\end{itemize}
-As always with a calculus, the idea is that \versecalc{} distills the essence of functional logic programming.
-Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
-We believe that it is possible to use \versecalc{} as the compilation target for a variety of
-functional logic languages such as Curry~\cite{hanus:curry-report}.
-We are ourselves working on Verse, a new general purpose programming language, built directly on \versecalc{}; indeed,
-our motivation for developing \versecalc{} is practical rather than theoretical.
-No single aspect of \versecalc{} is unique, but we believe that their combination
-is particularly harmonious and orthogonal.
-We discuss the related work in \cref{sec:related}, and design alternatives in \cref{sec:variations}.
+  On the other hand, it pretty much rules out \emph{laziness} (\cref{sec:laziness})
+  and parallel first-come first-returned search strategies.
 
-Our second contribution is to equip \versecalc{} with a
+  Most other functional-logic languages (Curry is the brand leader~\cite{hanus:curry-report})
+  are non-deterministic by design; \versecalc{}
+  explores a different (and less well-examined) part of the design space.
+\end{itemize}
+{\bf Our second contribution} is to equip \versecalc{} with a
 \emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
 We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
 semantics using rewrite rules, just as for the lambda calculus.  That seems challenging, however, because
@@ -433,12 +423,12 @@ was an operational semantics that sequentially threads a global heap through exe
 But then Ariola {\etal}, in a seminal paper, showed how to \emph{reify the heap into the term itself},
 and thereby build a rewrite system that is completely faithful to lazy evaluation~\cite{ariola:call-by-need}.
 Inspired by their idea, we present a new rewrite system for functional logic programs that reifies
-logical variables and unification into the term itself,
+logical variables, unification, and choice into the term itself,
 and replaces non-deterministic search with a (deterministic) tree of successful results.
-% Just like rewriting for the lambda calculus, this semantics
-% gives programmers a set of equivalences with which
-% they can reason equationally about their programs.
-For example, the expression above can be rewritten
+In \versecalc{} the choices are ``laid out in space'' (in the syntax of the term)
+rather than, as is more typical, ``laid out in time'' (via non-deterministic rewrites and backtracking).
+
+As an example of rewriting in action, the expression above can be rewritten
 as follows\footnote{The rule names come from \cref{fig:rules}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
 $$
@@ -458,6 +448,18 @@ Rules may be applied anywhere they match, again just like the lambda calculus.
 This freedom only makes sense, however, if each term ultimately reduces to a unique value,
 regardless of its reduction path,
 so we show that \versecalc{} is \emph{confluent}, in \cref{sec:metatheory}.
+
+As always with a calculus, the idea is that \versecalc{} distills the essence of
+(deterministic) functional logic programming.
+Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
+% We believe that it is possible to use \versecalc{} as the compilation target for a variety of
+% functional logic languages such as Curry~\cite{hanus:curry-report}.
+We are ourselves working on Verse, a new general purpose programming language, built directly on \versecalc{}; indeed,
+our motivation for developing \versecalc{} is practical rather than theoretical.
+No single aspect of \versecalc{} is unique, but we believe that their combination
+is particularly harmonious and orthogonal.
+We discuss the related work in \cref{sec:related}, and design alternatives in \cref{sec:variations}.
+
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
 

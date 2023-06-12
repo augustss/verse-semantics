@@ -1,13 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 module TRS.TRS(
   Rule,
   name,
   (-=),
   Rec(..),
-  step,
+  step, stepS, stepSS,
   NormResult(..),
   normalFormsFuelTracePlain,
   normalFormFuelTracePlain,
@@ -15,7 +14,7 @@ module TRS.TRS(
   noRules,
   ) where
 
-import Epic.List( nub )
+import Epic.List( nub, nubKey )
 import Epic.Print(Pretty, prettyShow)
 import TRS.Traced
 import qualified Data.Set as S
@@ -110,15 +109,22 @@ normalFormFuelTracePlain sys an at = go an S.empty (start at)
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
     | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
-    | null ts''  = error "normalFormFuelTracePlain: no children (maybe there are structural rules?)"  -- a loop
+    | null ts''  = NormResult { nrDone = [], nrLeft = [t0 :<-- ((s0, t) : tr)] }
     | otherwise  =
       stepper "STEP" ttr $
       go (n-1) seen' (t' :<-- ((s, t) : tr))
     where
       seen' = S.insert t seen
-      ts'   = stepS sys t
+      ts'   = stepSS sys t
       ts''  = filter ((`S.notMember` seen) . snd) ts'
       (s, t') = head ts''
+      (s0,t0) = head ts'
+
+stepSS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
+stepSS sys tt = t1s ++ t2s
+  where
+    t1s = nubKey snd $ rec (rules  sys) (ruleEnv sys) tt
+    t2s = nubKey snd $ {- rec -} (rules2 sys) (ruleEnv sys) tt
 
 --------------------------------------------------------------------------------------------------------
 
@@ -142,4 +148,3 @@ data TRSystem t = TRSystem
 
 instance Show (TRSystem t) where
   show _ = "<<TRSystem>>"
-
