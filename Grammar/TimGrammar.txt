@@ -37,9 +37,9 @@ NewLine   := 0o0D 0o0A | 0o0A    -- Maybe add | 0o0D !0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse ThisInd:={:0o09|0o20:}; (Ending | !(Ending|0o09|0o20) Space
-             if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
-             else if(ThisInd<BlockInd                             ) then error)
+Line      := NewLine; parse i:={:0o09|0o20:}; (Ending | !(Ending|0o09|0o20) Space
+             if     (i>BlockInd or Nest and i=BlockInd) then set LineInd=i
+             else if(i<BlockInd                       ) then error)
 Scan      := Space ScanNS
 ScanNS    := {:Line:}
 ScanKey   := Space ScanKeyNS
