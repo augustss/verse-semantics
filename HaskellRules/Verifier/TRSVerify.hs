@@ -6,6 +6,7 @@ import TRS.TRS
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core
+import Rules.CoreEDSL
 import qualified Epic.Print as P
 import Prelude hiding (succ, sum)
 
@@ -289,16 +290,16 @@ ex5 = LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: 
 
 ---
 
+{-
 suc :: Expr
-suc = tlamAbs vx [] (iNT x) (Exi (Bind vy (iNT y)))
- where
-  vx = ident "x"
-  x  = Var vx
-  vy = ident "y"
-  y  = Var vy
+suc = verse $
+  lam "x" $ \x ->
+    do int x
+       assume $ do y <- exists "y"
+                   int y
 
-f :: Expr
-f = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :@: x) :>: iNT y))))
+ff :: Expr
+ff = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :@: x) :>: iNT y))))
                   (Exi (Bind vy (y :=: (h :@: Val (Int 3)) :>: iNT y)))
  where
   vh0 = ident "h0"
@@ -311,38 +312,45 @@ f = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :
   x0  = Var vx0
   vy  = ident "y"
   y   = Var vy
+-}
 
 ex6 :: Expr
-ex6 = Exi (Bind vg (Exi (Bind vs (g :=: f :>: s :=: suc :>: g :@: s))))
- where
-  vg = ident "g"
-  g  = Var vg
-  vs = ident "suc"
-  s  = Var vs
+ex6 = verse $
+  do suc <- def (lam (\x -> do _ <- int x
+                               assume $ do y <- exists <? "y"
+                                           int y) <? "x") <? "suc"
+     g   <- def (timlam (\h ->
+                  do h' <- timlam (\x ->
+                             do x' <- int x
+                                return $ do y <- def (h :@: x') <? "y"
+                                            int y)
+                     return $
+                       do y <- def (h' :@: Int 3) <? "y"
+                          int y) <? "h") <? "g"
+     return (g :@: suc)
   
 ---
 
 ex_rigid2flex :: Expr
-ex_rigid2flex =
-  tlam vx [] (Int 0) (Exi (Bind vy ((x :=: y) :>: y)))
- where
-  vx = ident "x"
-  x  = Var vx
-  vy = ident "y"
-  y  = Var vy
+ex_rigid2flex = verse $
+  timlam $ \x ->
+    do x' <- int x
+       return $
+         do y <- exists
+            x' .=. y
   
 ex_flex2rigid1 :: Expr
-ex_flex2rigid1 =
-  tlam vx [] (Int 0) ((Int 3 :=: x) :>: x)
- where
-  vx = ident "x"
-  x  = Var vx
+ex_flex2rigid1 = verse $
+  timlam $ \x ->
+    do x' <- int x
+       return $
+         do x' .=. Int 3
   
 ex_flex2rigid2 :: Expr
-ex_flex2rigid2 =
-  tlam vx [] ((Int 3 :=: x) :>: x) ((Int 3 :=: x) :>: x)
- where
-  vx = ident "x"
-  x  = Var vx
-
+ex_flex2rigid2 = verse $
+  timlam $ \x ->
+    do x' <- int x
+       x' .=. Int 3
+       return $
+         do x' .=. Int 3
 
