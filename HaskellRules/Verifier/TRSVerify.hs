@@ -51,7 +51,8 @@ runTests = and <$> mapM runTest tests
 runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) =
   do putStr $ "Running test: " ++ testName ++ " ..."
-     case verify e of
+     --P.pp e
+     case simplify e of
        (True, _) | expected ->
          do putStrLn " OK (verified)"
             return True
@@ -66,16 +67,16 @@ runTest (testName, e, expected) =
             P.pp x
             return False
 
-       (False, tr@(x :<-- _)) ->       
+       (False, _tr@(x :<-- _)) ->       
          do putStrLn " *** FAILED, but expected VERIFIED:"
-            putStr (unlines (showTrace tr))
-            --P.pp x
+            --putStr (unlines (showTrace tr))
+            P.pp x
             return False
 
-verify :: Expr -> (Bool, Traced Expr)
-verify e = (isDone x, tr)
+simplify :: Expr -> (Bool, Traced Expr)
+simplify e = (isDone x, tr)
  where
-  Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- [])
+  Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- []) -- (preProcess sys (ruleEnv sys) e :<-- [])
   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
