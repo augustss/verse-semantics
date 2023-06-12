@@ -109,7 +109,7 @@ Else      := ScanKeyNS "else"  KeyEnd (ScanKeyNS If | !(ScanKeyNS If) (KeyBlock 
 Invoke    :=             [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
 If        := "if" KeyEnd [Specs] (Paren         (BlockMT | Then) | Block [        Then]) (Else  | !Else )
 In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Specs])
-Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
+Var       := ("var"|"set"|"ref"|"alias") KeyEnd [:Specs:] Choose
 
 Base      := '(' Space List ')' Space | Num | Char | Path | String | Markup | If | !Reserved QualIdent
 Call      := Base    {:Postfix:}
