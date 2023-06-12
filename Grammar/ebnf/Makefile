@@ -6,3 +6,4 @@ test: ../TimGrammar.txt ../TimAbout.verse all.verse
 
 clean:
 	cabal clean
+	rm -f *~
