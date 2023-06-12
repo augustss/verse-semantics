@@ -193,6 +193,11 @@ toExpr (SName "Paren" (SSeq [SChar '(', x, SChar ')'])) = toExpr x
 toExpr (SName "Block" (SAlt 0 x)) = toExpr x
 toExpr (SName "Block" (SAlt 1 (SSeq [_, x]))) = aBlock [toExpr x]
 toExpr (SName "Block" (SAlt 2 (SSeq [SChar ':', _, x, _]))) = aBlock $ unList $ toExpr x
+toExpr (SName "BlockMT" (SAlt 0 x)) = toExpr x
+toExpr (SName "BlockMT" (SAlt 1 (SSeq [_, x]))) = aBlock [toExpr x]
+toExpr (SName "BlockMT" (SAlt 2 (SSeq [SChar ':', mx])))
+  | SOpt (Just (SSeq [_, x, _])) <- mx = aBlock $ unList $ toExpr x
+  | SOpt Nothing                 <- mx = AList []
 toExpr (SName "Brace" (SSeq [SChar '{', x, SChar '}'])) = aBlock $ unList $ toExpr x
 toExpr (SName "BraceInd" (SAlt 0 x)) = toExpr x
 toExpr (SName "BraceInd" (SAlt 1 (SSeq [_,x,_]))) = aBlock $ unList $ toExpr x

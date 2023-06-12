@@ -91,6 +91,7 @@ Reserved  := ("catch"|"do"|"else"|"if"|"in"|"is"|"not"|"then"|"until"|"where"|"w
 DotSpace  := '.' &(0o09 | 0o20 | Ending)
 Brace     := ScanNS '{' Space List '}' Space
 Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
+BlockMT     := Brace | DotSpace Space Def Space | ':' [: Space Ind List Ded :]
 BraceInd  := Brace | Ind List Ded
 KeyBlock  := Block
 Defs      := Def {: ',' Scan Def :}
@@ -101,11 +102,12 @@ Tags      := (!'/' CallL ScanKeyNS '.' Space | !Reserved) QualIdent {:Invoke:} [
 
 Do        := ScanKeyNS "do"    KeyEnd (KeyBlock | Def)
 Until     := ScanKeyNS "until" KeyEnd (KeyBlock | Def) | ScanKeyNS "catch" KeyEnd Invoke
-Then      := ScanKeyNS "then"  KeyEnd (KeyBlock | Def)
+--Then      := ScanKeyNS "then"  KeyEnd (KeyBlock | Def)
+Then      := ScanKeyNS "then"  KeyEnd (BlockMT | Def)
 Else      := ScanKeyNS "else"  KeyEnd (ScanKeyNS If | !(ScanKeyNS If) (KeyBlock | Def))
 
 Invoke    :=             [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
-If        := "if" KeyEnd [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
+If        := "if" KeyEnd [Specs] (Paren         (BlockMT | Then) | Block [        Then]) (Else  | !Else )
 In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Specs])
 Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
 
