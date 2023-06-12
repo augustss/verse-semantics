@@ -39,6 +39,7 @@ library all
                       TRS.TRSGraph
                       TRS.Traced
                       Rules.Core
+                      Rules.CoreEDSL
                       Rules.Equiv
                       Rules.Systems
                       FrontEnd.Core
