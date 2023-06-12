@@ -112,7 +112,7 @@ xset "Nest" e l = l { nest = xread e }
 xset "BlockInd" e l = l { blockInd = e }
 xset "LineInd" e l = l { lineInd = e }
 xset "LinePrefix" e l = l { linePrefix = e }
-xset "ThisInd" e l = l { thisInd = e }
+xset "i" e l = l { thisInd = e }
 xset s _ _ = error $ "xset: undefined " ++ s
 
 expr :: LexState -> Expr -> String
@@ -122,7 +122,7 @@ expr l (EVar "Nest") = show (nest l)
 expr l (EVar "BlockInd") =  (blockInd l)
 expr l (EVar "LineInd") =  (lineInd l)
 expr l (EVar "LinePrefix") =  (linePrefix l)
-expr l (EVar "ThisInd") =  (thisInd l)
+expr l (EVar "i") =  (thisInd l)
 expr _ (EVar s) = error $ "expr: undefined " ++ s
 expr _ (EStr s) =  s
 expr l (EGT e1 e2) = show (expr l e1 >  expr l e2)
