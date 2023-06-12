@@ -36,6 +36,9 @@ tests =
   , ("ex_rigid2flex", ex_rigid2flex, True)
   , ("ex_flex2rigid1", ex_flex2rigid1, False)
   , ("ex_flex2rigid2", ex_flex2rigid2, True)
+  , ("ex_stuck1", ex_stuck1, False)
+  , ("ex_stuck2", ex_stuck2, False)
+  , ("ex_stuck3", ex_stuck3, False)
   ]
 
 --------------------------------------------------------------------------------
@@ -330,7 +333,7 @@ ex6 = verse $
                           int y) <? "h") <? "g"
      return (g :@: suc)
   
----
+--- examples testing rigid/flexible ---
 
 ex_rigid2flex :: Expr
 ex_rigid2flex = verse $
@@ -354,4 +357,24 @@ ex_flex2rigid2 = verse $
        x' .=. Int 3
        return $
          do x' .=. Int 3
+
+--- examples testing getting stuck ---
+
+ex_stuck1 :: Expr
+ex_stuck1 = verse $
+  timlam $ \_x ->
+    do return (exists <? "y")
+
+ex_stuck2 :: Expr
+ex_stuck2 = verse $
+  timlam $ \x ->
+    do return (do y <- exists <? "y"
+                  z <- def (Arr [x,y]) <? "z"
+                  y .=. Arr [x,z])
+
+ex_stuck3 :: Expr
+ex_stuck3 = verse $
+  timlam $ \_x ->
+    do return (do y <- exists <? "y"
+                  def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
 
