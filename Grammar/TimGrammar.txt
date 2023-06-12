@@ -60,7 +60,7 @@ Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
 CharEsc   := '\' ('r'|'n'|'t'|'''|'"'|Special)
 CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
 Char8     := "0o" (       Hex) [Hex]                    !Alnum
-Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex]  !Alnum
+Char32    := "0u" ("10" | (!"10" Hex)) [Hex [Hex [Hex [Hex]]]]  !Alnum
 CharT     := CharLit | Char8 | Char32
 Char      := CharT Space
 
