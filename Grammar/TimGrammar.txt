@@ -144,7 +144,7 @@ Expr      := Fun {: '@' Space Call :} StopExpr
 
 StopExpr  := &( (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKeyNS "is" KeyEnd)))
 StopFun   := &( ("@")) | StopExpr
-StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else") KeyEnd) | StopFun)
+StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else"|"then") KeyEnd) | StopFun)
 
 Commas    := Expr {: ',' Scan Expr :}
 Separator := (';' | Ending) Scan
