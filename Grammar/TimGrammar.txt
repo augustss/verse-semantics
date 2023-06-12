@@ -130,7 +130,7 @@ Eq        := NotEq   {: ('='                   ) Scan  NotEq   :}
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
 And       := Not     [ ("and" KeyEndNS        ) Scan  And     ]
 Or        := And     [ ("or"  KeyEndNS        ) Scan  Or      ]
-Def       := (Or | (In | Var) (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
+Def       := (Or | (In | Var) (('='|":="|"+="|"-="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
                   {: &In Def
                     | ":="    Space    (BraceInd | Def )
                     | "where" KeyEnd   (KeyBlock | Defs)
