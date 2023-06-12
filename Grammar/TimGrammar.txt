@@ -52,7 +52,7 @@ Comment   := LineCmt   | BlockCmt | IndCmt
 Text      := Printable | BlockCmt | "<#>"
 
 Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digits))
-Units     := [Alpha {:Alpha:}] !Alpha
+Units     := [Alpha {:Alnum:}] !Alpha
 NumT      := ("0x" Hex {:Hex:} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !('.' !'.') !Alnum
 Num       := NumT Space
 
