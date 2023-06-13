@@ -289,6 +289,7 @@ pattern Val e <- (getVal -> Just e)
 
 getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
+getVal (Assume (getVal -> Just v)) = Just (Assume v)
 getVal e = getHNF e
 
 isVal :: Expr -> Bool
