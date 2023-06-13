@@ -10,6 +10,7 @@ import TRS.TRS
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP, execX, ltExpr)
 import Control.Monad (guard)
+import Data.List( intersect )
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
@@ -29,11 +30,7 @@ icfpActual = head allSystemsICFP
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
 --------------------------------------------------------------------------------------
 
-data QContext
-  = QDef Ident QContext   -- ^ x; G
-  | QAsm Expr  QContext   -- ^ e; G
-  | QEmp                  -- ^ EMPTY
-  deriving (Show)
+type QContext = Expr
 
 --------------------------------------------------------------------------------
 -- | Abstract Rules
@@ -78,12 +75,12 @@ generalizedIcfpRules env lhs =
 assumeAssertRules :: VRule
 assumeAssertRules _ lhs =
   -- ASSUME --  
-  
+
   -- Assume {v} ----> v
-  "Assume-Val" `name`
-  do Assume (Val v) <- [lhs]
-     pure (Val v)
-  ++
+  --"Assume-Val" `name`
+  --do Assume (Val v) <- [lhs]
+  --   pure (Val v)
+  -- ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
@@ -112,10 +109,10 @@ assumeAssertRules _ lhs =
 
   -- ASSERT --  
 
-  -- Assert { e } ----> e   if   e is fail-free
-  "Assert-FailFree" `name`
+  -- Assert { e } ----> e   if   e must succeed
+  "Assert-mustSucceed" `name`
   do Assert e <- [lhs]
-     guard (failFree e)
+     guard (mustSucceed e)
      pure e
   ++
 {- (these are all subsumed by the above rule)
@@ -149,15 +146,17 @@ assumeAssertRules _ lhs =
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
 
-failFree :: Expr -> Bool
-failFree (Val _)          = True
-failFree (Assume _)       = True
-failFree (Assert _)       = True
-failFree (One e)          = failFree e
-failFree (e1 :>: e2)      = failFree e1 && failFree e2
-failFree (e1 :|: e2)      = failFree e1 || failFree e2
-failFree (Exi (Bind _ e)) = failFree e
-failFree _                = False
+mustSucceed :: Expr -> Bool
+mustSucceed (Int _)          = True
+mustSucceed (Arr as)         = all mustSucceed as
+mustSucceed (Lam _)          = True
+mustSucceed (Assume _)       = True
+mustSucceed (Assert _)       = True
+mustSucceed (One e)          = mustSucceed e
+mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
+mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
+mustSucceed (Exi (Bind _ e)) = mustSucceed e
+mustSucceed _                = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
@@ -165,31 +164,37 @@ verifierRules _env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
    do (ctx, g, e) <- execEX lhs
+      guard (case e of Assume _ -> False; _ -> True)
       guard (g `proves` e)
       pure (ctx (Assume e))
-{-
-   ++
-   "Assume-Exi" `name`
-   do (ctx, g, Assume (EXI x e)) <- execEX lhs
-      let x' = fresh g e
-      pure (ctx (Assume (subst [(x, Var x')] e)))
--}
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
 --------------------------------------------------------------------------------
+
 proves :: QContext -> Expr -> Bool
-proves QEmp _       = False
-proves (QDef _ g) e = proves g e
-proves (QAsm p g) e = proves1 p e || proves g e
-
-proves1 :: Expr -> Expr -> Bool
-proves1 (INT (Var x)) (Var y :=: Var z)
-  | x == y && x == z = True
-proves1 p e          = p == e
-
-pattern INT :: Expr -> Expr
-pattern INT e = Op IsInt :@: e
+g `proves` e = unAssume e `elem` facts g
+ where
+  unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
+  unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
+  unAssume (f :@: x)   = unAssume f :@: unAssume x
+  unAssume (Assume a)  = unAssume a
+  unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
+  unAssume a           = a
+  
+  vs = free e
+ 
+  facts (g1 :>: g2) = facts g1 ++ facts g2
+  facts (g1 :|: g2) = facts g1 `intersect` facts g2
+  facts (Exi bnd)   = facts g' where Bind _ g' = alphaRename vs bnd
+  facts (Assume a)  = assumes a
+  facts _           = []
+  
+  assumes a = [ a ] ++ derives a
+  
+  -- special rules
+  derives (Op IsInt :@: a) = [ a :=: a ] ++ assumes a 
+  derives _                = []
 
 ----------------------------------------------------------------------
 -- | Expression Contexts
@@ -201,7 +206,7 @@ pattern INT e = Op IsInt :@: e
 -- E ::= v = HOLE | HOLE; e
 execEX, execEX1 :: Expr -> [(EContext, QContext, Expr)]
 -- E context
-execEX lhs = execEX1 lhs ++ [(id, QEmp, lhs)]
+execEX lhs = execEX1 lhs ++ [(id, Arr [], lhs)]
 -- X context, X /= hole
 execEX1 lhs =
   do v :=: x     <- [lhs]
@@ -211,17 +216,17 @@ execEX1 lhs =
    -- HOLE; e
   do x :>: e <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure ((:>: e) . ctx, qAsm e g, hole)
+     pure ((:>: e) . ctx, g :>: e, hole)
  ++
    -- e; HOLE
   do e :>: x <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure ((e :>:) . ctx, qAsm e g, hole)
+     pure ((e :>:) . ctx, e :>: g, hole)
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure (EXI y . ctx, QDef y g, hole)
+     pure (EXI y . ctx, g, hole)   -- y should be visible to e in g |- e
  ++
    -- HOLE e
   do x :@: e <- [lhs]
@@ -247,7 +252,7 @@ execEX1 lhs =
  ++
   do Lam (Bind y x) <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure (Lam . Bind y . ctx, QDef y g, hole)
+     pure (Lam . Bind y . ctx, g, hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
      (ctx, g, hole) <- execEX x
@@ -261,19 +266,3 @@ execEX1 lhs =
      (ctx, g, hole) <- execEX x
      pure (Assert . ctx, g, hole)
 
-
-qAsm :: Expr -> QContext -> QContext
-qAsm (Assume e)  g = QAsm e g
-qAsm (e1 :>: e2) g = qAsm e1 (qAsm e2 g)
-qAsm (EXI x e)   g = QDef x  (qAsm e  g)
---  qAsm (LAM x e)   g = QDef x  (qAsm e  g)
-qAsm _           g = g
-
-
-fresh :: QContext -> Expr -> Ident
-fresh g e = identNotIn (free e ++ bound g)
-
-bound :: QContext -> [Ident]
-bound QEmp       = []
-bound (QDef x g) = x : bound g
-bound (QAsm _ g) =     bound g
