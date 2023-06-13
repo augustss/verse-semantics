@@ -465,7 +465,7 @@ class Term a where
   subst :: Subst Expr -> a -> a
 
 -- rename the binder so that it is not the same as the first argument
-alphaRename :: [Ident] -> Bind Expr -> Bind Expr
+alphaRename :: (Term a, Free a) => [Ident] -> Bind a -> Bind a
 alphaRename xs bnd@(Bind x e)
   | x `notElem` xs = bnd
   | otherwise      = Bind y (subst [(x,Var y)] e)
