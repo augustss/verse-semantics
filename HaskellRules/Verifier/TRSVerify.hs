@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 module Main where
 
 import Rules.Verifier
@@ -92,6 +93,10 @@ isDone = collect done (&&)
   done _          = True
 
 -------------------------------------------------------------------------------------------
+
+pattern INT :: Expr -> Expr
+pattern INT e = Op IsInt :@: e
+
 iNT :: Expr -> Expr
 iNT e = INT e :>: e
 
