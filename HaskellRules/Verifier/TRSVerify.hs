@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Main where
 
@@ -80,10 +81,13 @@ runTest (testName, e, expected) =
             return False
 
 simplify :: Expr -> (Bool, Traced Expr)
-simplify e = (isDone x, tr)
+simplify e = res
  where
-  Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- []) -- (preProcess sys (ruleEnv sys) e :<-- [])
-  arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+   res =
+     case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
+       Just (tr@(x :<-- _):_) -> (isDone x, tr)
+       _ -> undefined
+   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
   --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms

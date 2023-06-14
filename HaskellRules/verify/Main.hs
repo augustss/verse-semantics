@@ -9,8 +9,8 @@ main =
   do putStrLn "-- PROGRAM --"
      print e2
      putStrLn "-- FORMULA --"
-     let [q] = success e1
-         pr  = Forall $ Bind a $ q
+     let q  = case success e1 of [qq] -> qq; _ -> undefined
+         pr = Forall $ Bind a $ q
      putStrLn (show pr)
      b <- prove pr
      if b then
@@ -18,7 +18,7 @@ main =
       else
        putStrLn "==> program may fail"
  where
-  e0  = One (Exi $ Bind x $
+  _e0  = One (Exi $ Bind x $
               (Var x :=: Var a)
           :>: Var x)
  

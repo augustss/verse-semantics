@@ -576,6 +576,7 @@ instance Arbitrary Expr where
   shrink (Store _ _) = undefined
   shrink (Ref _)   = []
   shrink Wrong{}   = []
+  shrink If{} = undefined
 
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
