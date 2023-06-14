@@ -982,7 +982,7 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| w
 apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
-|v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
@@ -1201,7 +1201,8 @@ suffice to express the necessary sharing.
   the binding: see \cref{sec:gc}.
 \item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
   while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
-  The other side condition will be explained next, when we discuss \rulename{var-swap}.
+
+\item The other side condition, involving $|x| \prec |y|$, is explained next, in \Cref{sec:swapping}.
 \end{itemize}
 
 \subsection{Swapping and binding order} \label{sec:swapping}
@@ -1209,7 +1210,6 @@ suffice to express the necessary sharing.
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
-
 $$
 \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
