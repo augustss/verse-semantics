@@ -804,7 +804,7 @@ $$
 \text{\bf Domains} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + \tuple{\Value} + (\Value \rightarrow \mtype) \\
-\mtype & = & \mlift{\wrong + \powerset{\LblValue}} \\
+\mtype & = & \mlift{(\wrong + \powerset{\LblValue})} \\
 \LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
 \textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
 \end{array} \\
@@ -833,7 +833,6 @@ $$
 % & \mone(\mlift{s}) & = & \bot & \text{if |s| is infinite} \\
 % & \mone(\mlift{s}) & = & \munits{w} & \text{if $(l,w)\in s$ and $\forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w') $} \\
 & \mone(\mlift{s}) & = & \left\{ \begin{array}{ll}
-      \bot       & \text{if |s| is infinite} \\
       \mempty    & \text{if $s = \emptyset$} \\
       \munits{w} & \text{if $(l,w)\in s$ and} \\
       & \forall (l',w')\in s.\, l < l' \vee (l=l' \wedge w=w')
