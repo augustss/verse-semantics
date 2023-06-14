@@ -1,0 +1,264 @@
+Inference in a lenient functional logic language can be specified in the same sequent calculus framework as inference in a traditional type checker, but it requires a different style of inference rules because the effects of an operation in one place (such as unification and choice) may affect the inferred success or failure of operations elsewhere in the program, either prior or subsequent.
+
+Traditional type checking inference starts with the top-level program, and builds a tree above it checking its subexpressions in isolation, with each branch accumulating its own local assumptions, terminating in leaves representing inference axioms.
+
+For functional logic inference, we still start with the program at the bottom, but then we build an ever-growing vertical list of inferences above it, each line accumulating more assumptions than the line below, and each line's |- right hand side notionally containing the whole program - but inspecting one operation within that program using a one-hole expression context to  say "in a program that contains this specific operation somewhere in it". This way, every inference has access to assumptions about the whole program, and can apply those assumptions to inference about a particular operation anywhere in the program.
+
+We start inference by asking something like "empty |- succeeds{program}", and finish when we reach an assumption set "G, succeeds{program}" that proves "succeeds{program}" axiomatically. We are stuck when all available inference rules have saturated our assumption set and no further inference can make progress.
+
+What does it actually look like? To attempt to answer this, here is a sketch of inference rules defining a Verse runtime. The runtime is a nice place to start, because we all have a common understanding of it from the ICFP paper, and Verse runtime inference actually touches on most of the structural challenges of Verse verifier inference, but in a simpler setting. If we use these inference rules, we can define our evaluation order by saying that we always run the applicable, not-yet-saturated inference rule whose one-hold context references the sequentially earliest operation in the program.
+
+We can even structure our effects lattice to track prior pending effects per operation, and use inference to sequence effects. To understand effects sequencing, see (program-intro), (sequence-intro), (sequence-refine-fx), and then (iterate-refine-fx) where it plumbs effects readiness into a nested iteration operation. Essentially, we tenatively assume each new operation is blocked with pending effects like pending_reads, and then we clear these pending effects according to sequencing rules.
+
+We say that the top-level program and the domain of each if/for are a "decision context" which we identify with a unique "decision variable" d. The trickiest part of what's below are the one-hole context expressions, Decision Starts ds[D,OP] and Decision Contexts dc[D,OP]. When we see a turnstile with ... |- fx{dc[d,op]}, what we mean is: "The entire program represented by dc[d,op] has (at most) effects fx". And dc[d,op] matches any program that contains a decision context (beginning with a 'program' or 'iterate' operation) which contains the operation "op" within it either at the top level, or nested in (op1; op2) sequences. So, we match those operations anywhere in the program, and based on the assumption conditions, we can replace "op" with a new operation, and we can add assumptions.
+
+This works rather fantastically for dealing with nested if/for (implemented using the more general "iterate" operation, which folds over choices), and it precisely matches how my runtime implementation works, ignoring optimizations to unification. The rule (choice-elim) is especially interesting. It uses a big renaming to do what my implementation refers to as "forking", making a clone of everything in the current decision context (if/for domain) and capturing it so it's available for the next iteration. What this does is key to Lennart's questions about effects in if/for domains (and I've written it incorrectly as it doesn't undo writes upon failure).
+
+Here we specify how to run Operations with an evaluation order including effects sequencing.
+Given a program op, we start inference with:
+
+    empty |- (succeeds\/transacts\/interacts){op}
+
+Runtime Definitions
+    Number                  n ::== 0 | 1 | ..
+    Atom                    a ::== n | () | Path | ..
+    Tuple                     ::== t | u
+    Variable                  ::== i | j | k | f | g | h | w | x | y | z | t[n]
+    Variables                 ::== *Variable
+    Decision Variable         ::== d | e
+    Pointer                   ::== p | q
+    Effect Specifier       fx ::== succeeds | satisfies | abstracts
+                              |    imperatives | interacts | throws | reads | writes
+                              |    pendings | interacts_pending | throws_pending | reads_pending | writes_pending
+    Head                    h ::== a
+                              |    tuple(x) z
+                              |    lambda i z. op
+    Operation              op ::== x=h
+                              |    x=y
+                              |    x=fail
+                              |    x=y[z]
+                              |    x=y^
+                              |    set x=y
+                              |    op0|op1
+                              |    op0; op1
+                              |    exists xs
+                              |    iterate(v) d. op0 then w1 w2. op1 else w3. op2
+                              |    nop
+                              |    print(x)
+    Program                 P ::== program d. op
+    Scope Context      sc[OP] ::== OP
+                              |    sc[OP]; op
+                              |    op;     sc[OP]
+    Decision Start   ds[D,OP] ::== program    D opv. OP
+                              |    iterate(v) D.     OP then w1 w2. op1 else w3. op2
+    Decision Context dc[D,OP] ::== ds[D,sc[OP]] | ds[e,sc[dc[D,OP]]]
+    Assumption              A ::== fx{op}  # operation op has effects fx here
+                              |    x@d     # variable x is flexible in decision context identified by d
+                              |    x<-h    # variable x is flexibly unified with h
+                              |    x<-y    # variable x is flexibly unified with y
+                              |    p:=x    # reading pointer p yields value x
+                              |    d:=done # no more iterations of decision context
+                              |    d:=op   # next iteration of decision context identified by d runs op
+    Assumption Set          G ::== empty | G, A
+    G.IsKnown[x]              ::== G, x<-a or
+                                   G, x<-tuple(i) t, i<-n1] and for all 0<=n0<n1, G.IsKnown[t[n0]].
+
+Runtime Effects Lattice
+
+    Runtime cardinality effects are:
+
+          abstracts
+              |
+          satisfies
+           /    \
+        fails  succeeds
+
+        fails{op}     means "op definitely fails given what we've inferred"
+        succeeds{op}  means "op definitely succeeds and need never be reconsidered"
+        satisfies{op} means "op does no further unification and will succeed unless contradictory unifies arise".
+        abstracts{op} means "op may succeed or fail and may introduce new unifies".
+
+    Runtime imperative effects are:
+        imperatives <= interacts | throws | reads | writes
+
+    Runtime pending effects are:
+        pendings <= iterates_pending | reads_pending | writes_pending | interacts_pending | throws_pending
+
+    AllowAfter(fx)  = if(iterates <=fx) {iterates_pending } else {none} \/
+                      if(reads    <=fx) {reads_pending    } else {none} \/
+                      if(writes   <=fx) {writes_pending   } else {none} \/
+                      if(throws   <=fx) {throws_pending   } else {none} \/ # throws&interacts can't run where fails allowed,
+                      if(interacts<=fx) {interacts_pending} else {none} \/ # so we needn't relatively sequence them.
+                      fx
+
+Bound Variables
+
+    BVS(x=tuple(i) t)                                   ---> {t}
+    BVS(op0|op1)                                        ---> BVS(op0)+BVS(op1)
+    BVS(op0; op1)                                       ---> BVS(op0)+BVS(op1)
+    BVS(exists xs)                                      ---> {xs}
+    BVS(iterate(v) d. op0 then w1 w2. op1 else w1. op2) ---> {d}+BVS(op0)
+    BVS(cond(x) y. op0)                                 ---> {y}+BVS(op0)
+    BVS(any other operation op)                         ---> {}
+
+Runtime Inference Rules
+
+              (axiom)  ------------------
+                       G, fx{op} |- fx{P}
+
+       (no operation)  -------------------------
+                       G, succeeds{nop} |- fx{P}
+
+                       G, (fx0\/~pendings){op} |- (succeeds\/transacts\/interacts){program d. op}
+      (program-intro)  --------------------------------------------------------------------------
+                       G, fx0{op}              |- (succeeds\/transacts\/interacts){program d. op}
+
+                       fx0<=fx1
+          (fx-weaken)  ------------------------------------
+                       G, fx0{op}], fx1{op} |- fx{dc[d,op]}
+
+                       G, (fx0*fx1){op0; op1} |- fx{dc[d,(op0; op1)]}
+     (sequence-intro)  ------------------------------------------------
+                       G, fx0{op0}, fx1{op1}  |- fx{dc[d,(op0; op1)]}
+
+                       G, (succeeds\/fx){op0}, (succeeds\/AllowAfter(fx)){op1} |- fx{dc[d,op]}
+ (sequence-refine-fx)  -----------------------------------------------------------------------
+                       G, fx{op0; op1}                                         |- fx{dc[d,op]}
+
+                       We ask if op0 has fx.
+                       We ask if op1 has the intersection of fx and effects allowed after inferred effects of op0.
+                       As op0 effects assumptions narrow, op1 allowed effects widen.
+
+                       G, x@d |- fx{dc[d,nop     ]}
+       (exists-intro)  ----------------------------
+                       G      |- fx{dc[d,exists x]}
+
+                       G, x<-a, satisfies{x=h} |- fx{dc[d,x=a]}
+         (atom-intro)  ----------------------------------------
+                       G, x@d                  |- fx{dc[d,x=a]}
+
+                       G, x<-tuple(i) t, t@d, satisfies{x=tuple(i) t} |- fx{dc[d,x=tuple(i) t]}
+        (tuple-intro)  ------------------------------------------------------------------------
+                       G, x@d, i@d                                    |- fx{dc[d,x=tuple(i) t]}
+
+                       G, x<-h, satisfies{x=y} |- fx{dc[d,x=y]}
+    (unify-head-left)  ----------------------------------------
+                       G, x@d, y<-h            |- fx{dc[d,x=y]}
+
+                       G, y<-h, satisfies{y=x} |- fx{dc[d,x=y]}
+   (unify-head-right)  ----------------------------------------
+                       G, y@d, x<-h            |- fx{dc[d,x=y]}
+
+                       h0 and h1 are nominally disjoint heads
+                       G, fails{x=v}   |- fx{dc[d,x=v]}
+     (unify-disjoint)  --------------------------------------
+                       G, x<-h0, x<-h1 |- fx{dc[d,x=v]}
+
+                       G, u[n]@d  |- fx{dc[d,op]}
+         (tuple-flex)  --------------------------
+                       G, u@d     |- fx{dc[d,op]}
+
+                       G                               |- fx{dc[d,(x=v; i=j)]}
+ (tuple-unify-length)  -------------------------------------------------------
+                       G, x<-tuple(i) t, x<-tuple(j) u |- fx{dc[d,x=v]}
+
+                       G                                        |- fx{dc[d,(x=v; t[n]=u[n])]}
+(tuple-unify-element)  ----------------------------------------------------------------------
+                       G, x<-tuple(i) t, x<-tuple(j) u, z<-t[n] |- fx{dc[d,x=v]}
+
+                       G, t[0], ..., t[n-1]         |- fx{dc[d,x=v]}
+       (tuple-expand)  ---------------------------------------------
+                       G, x<-tuple(i) t, i<-n, j<-n |- fx{dc[d,x=v]}
+
+                       0<=n0<n1
+                       G                                        |- fx{dc[d,x=t[n0]]}
+ (tuple-elim-succeed)  --------------------------------------------------------------------
+                       G, x@d, i@d, i<-n0, j<-n1, y<-tuple(j) t |- fx{dc[d,x=y[i ]]}
+
+                       not 0<=n0<n1
+                       G                                        |- fx{dc[d,x=fail]}
+    (tuple-elim-fail)  --------------------------------------------------------------------
+                       G, x@d, i@d, i<-n0, j<-n1, y<-tuple(j) t |- fx{dc[d,x=y[i]]}
+
+                       0<=n
+                       G                                |- fx{dc[d,x=t[0] | ... | x=t[n-1]]}
+  (tuple-elim-choose)  ---------------------------------------------------------------------
+                       G, x@d, i@d, j<-n, y<-tuple(j) t |- fx{dc[d,x=y[i]]}
+
+                       G, f<-lambda i x. op0 |- dc[d,fx{f=lambda i x. op0}]
+       (lambda-intro)  ----------------------------------------------------
+                       G, f@d                |- dc[d,fx{f=lambda i x. op0}]
+
+                       G                   |- fx{dc[d,exists i1 z1. i1=x; z1=y; op[i1/i][z1/z][zi/z | z<-BVS(op)]]}
+        (lambda-elim)  --------------------------------------------------------------------------------------------
+                       G, f=lambda i z. op |- fx{dc[d,y=f[x]]}
+
+                       G, (abstracts|imperatives|pendings){op0|op1} |- fx{dc[d,op0|op1]]}
+       (choice-intro)  ------------------------------------------------------------------
+                       G                                            |- fx{dc[d,op0|op1]]}
+
+                       G[e:=ds[e1,sc[op1][e1/e][zi/z | z<-BVS(sc[op1])]]/e:=E] |- fx{dc[d,ds[e,sc[op0    ]]]} (e1,zi fresh)
+        (choice-elim)  ----------------------------------------------------------------------------------------------------
+                       G, e:=E, ~iterates_pending{op0|op1}                     |- fx{dc[d,ds[e,sc[op0|op1]]]}
+
+                       op3 is defined as iterate(v) e. op0 then w1 w2. op1 else w3. op2
+                       G, (abstracts|imperatives|pendings) {op3} |- fx{dc[d,op3]}
+      (iterate-intro)  ----------------------------------------------------------
+                       G                                         |- fx{dc[d,op3]}
+
+                       op3 is defined as iterate(v) e. op0 then w1 w2. op1 else w3. op2
+                       fx1 is defined as fx/\~iterates_pending\/abstracts\/interacts_pending\/throws_pending
+                       (Meaning op1 can iterate in e independent of d, but can't interact or throw)
+                       G, fx1{op1} |- fx{dc[d,op3]}
+  (iterate-refine-fx)  ----------------------------
+                       G, fx{op3}  |- fx{dc[d,op3]}
+
+                       G                      |- fx{dc[d,op2[v/w3][xi/x | x<-BVS(op2)]]} (xi fresh)
+  (iterate-elim-done)  ----------------------------------------------------------------------------------
+                       G, e:=done, fails{op0} |- fx{dc[d,iterate(v) e. op0 then w1 w2. op1 else w3. op2]}
+
+                       G                      |- fx{dc[d,op3]}
+  (iterate-elim-skip)  ----------------------------------------------------------------------------------
+                       G, e:=op3,  fails{op0} |- fx{dc[d,iterate(v) e. op0 then w1 w2. op1 else w3. op2]}
+
+                       op4 is defined as cond(w4) w5. iterate(w5) e. op3 then w1 w2. op1 else w3. op2 (e,BVS(op3) already renamed)
+                       fx1 is defined as satisfies\/reads\/reads_pending\/writes\/writes_pending
+                       G                      |- fx{dc[d,(op0[d/e]; op1[v/w1][w4/w2][xi/x | x<-BVS(op0)+BVS(op1)]; op4)]} (w4,xi fresh)
+   (iterate-elim-sat)  ----------------------------------------------------------------------------------------------------------------
+                       G, e:=op3, fx1{op0}    |- fx{dc[d,iterate(v) e. op0 then w1 w2. op1 else w3. op2]}
+
+                       G                      |- fx{dc[d,nop           ]}
+         (cond-false)  --------------------------------------------------
+                       G, x<-()               |- fx{dc[d,cond(x) y. op0]}
+
+                       G                      |- fx{dc[d,op0[t[0]/y]   ]}
+          (cond-true)  --------------------------------------------------
+                       G, x<-tuple(i) t, i<-1 |- fx{dc[d,cond(x) y. op0]}
+
+                       G, (abstracts\/reads\/reads_pending){x=y^} |- fx{dc[d,x=y^]}
+         (read-intro)  ------------------------------------------------------------
+                       G, x@d, y<-p                               |- fx{dc[d,x=y^]}
+
+                       G                                         |- fx{dc[d,x=z ]}
+          (read-elim)  -----------------------------------------------------------
+                       G, x@d, y<-p, p:=z, ~writes_pending{x=y^} |- fx{dc[d,x=y^]}
+
+                       G, (abstracts\/writes\/writes_pending){set x^=y} |- fx{dc[d,set x^=y]}
+        (write-intro)  ----------------------------------------------------------------------
+                       G, x<-p                                          |- fx{dc[d,set x^=y]}
+
+                       G.IsKnown[y]
+                       G[p:=y/p:=x]                                 |- fx{dc[d,nop     ]}
+         (write-elim)  ------------------------------------------------------------------
+                       G, ~writes_pending/\~reads_pending{set x^=y} |- fx{dc[d,set x^=y]}
+
+                       succeeds<=fx
+                       G, (succeeds\/interacts_pending\/interacts){print(x)}  |- fx{dc[d,print(x)]}
+     (interact-intro)  ----------------------------------------------------------------------------
+                       G, x<-n                                                |- fx{dc[d,print(x)]}
+
+                       (Here we physically print n)
+                       G                                                      |- fx{dc[d,nop     ]}
+      (interact-elim)  ----------------------------------------------------------------------------
+                       G, x<-n, ~interacts_pending{print(x)}/\~throws_pending |- fx{dc[d,print(x)]}
+
