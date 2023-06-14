@@ -163,8 +163,8 @@ mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
 mustSucceed (Exi (Bind _ e)) = mustSucceed e
 mustSucceed _                = False
 
-mustDecide :: Binders -> Expr -> Bool
-mustDecide bs = go
+mustDecide :: Expr -> Bool
+mustDecide = go
   where
     go (Arr as)    = all go as
     go (One e)     = go e
@@ -174,36 +174,22 @@ mustDecide bs = go
     go (Assume _)  = True
     go (Int _)     = True
     go (Op _)      = True
-    go (Var x)     = x `elem` lamBinds bs
     go _           = False
-
-
-
-
-
-{-
-
-if (e1)
-  { e2 }
-else
-  { e3 }
-
--}
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules _env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
-   do (ctx, g, _, e) <- eX lhs
+   do (ctx, g, e) <- eX lhs
       guard (case e of Assume _ -> False; _ -> True)
       guard (g `proves` e)
       pure (ctx (Assume e))
    ++
    -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
    "Unfold-If" `name`
-   do (ctx, _, bs, If e1 e2 e3) <- eX lhs
-      guard (mustDecide mempty e1)
+   do (ctx, _, If e1 e2 e3) <- eX lhs
+      guard (mustDecide e1)
       pure (ctx (unfoldIte e1 e2 e3))
 
 unfoldIte :: Expr -> Expr -> Expr -> Expr
@@ -237,100 +223,79 @@ g `proves` e = unAssume e `elem` facts g
   derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
   derives _                = []
 
------------------------------------------------------------------------
--- | Binders of an Execution Context
------------------------------------------------------------------------
-
-data Binders = MkBinders { lamBinds :: [Ident], exiBinds :: [Ident] }
-   deriving (Eq, Ord, Show)
-
-instance Semigroup Binders where
-  (<>) :: Binders -> Binders -> Binders
-  (<>) b1 b2 = MkBinders { lamBinds = lamBinds b1 ++ lamBinds b2
-                         , exiBinds = exiBinds b1 ++ exiBinds b2 }
-
-instance Monoid Binders where
-   mempty :: Binders
-   mempty = MkBinders { lamBinds = [], exiBinds = [] }
-
-pushLam :: Ident -> Binders -> Binders
-pushLam x bs = bs { lamBinds = x : lamBinds bs }
-
-pushExi :: Ident -> Binders -> Binders
-pushExi x bs = bs { exiBinds = x : exiBinds bs }
 ----------------------------------------------------------------------
 -- | Expression Contexts
 -----------------------------------------------------------------------
 
-eX :: Expr -> [(EContext, QContext, Binders, Expr)]
-eX = execEX mempty
+eX :: Expr -> [(EContext, QContext, Expr)]
+eX = execEX
 
-execEX :: Binders -> Expr -> [(EContext, QContext, Binders, Expr)]
-execEX bs lhs = execEX1 bs lhs ++ [(id, Arr [], bs, lhs)]
+execEX :: Expr -> [(EContext, QContext, Expr)]
+execEX lhs = execEX1 lhs ++ [(id, Arr [], lhs)]
 
-execEX1 :: Binders -> Expr -> [(EContext, QContext, Binders, Expr)]
-execEX1 bs lhs =
+execEX1 :: Expr -> [(EContext, QContext, Expr)]
+execEX1 lhs =
   do v :=: x     <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (\ a -> v :=: ctx a, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure (\ a -> v :=: ctx a, g, hole)
  ++
    -- HOLE; e
   do x :>: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:>: e) . ctx, g :>: e, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((:>: e) . ctx, g :>: e, hole)
  ++
    -- e; HOLE
   do e :>: x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((e :>:) . ctx, e :>: g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((e :>:) . ctx, e :>: g, hole)
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
-     (ctx, g, bs', hole) <- execEX (pushExi y bs) x
-     pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
+     (ctx, g, hole) <- execEX x
+     pure (EXI y . ctx, g, hole)   -- y should be visible to e in g |- e
  ++
    -- HOLE e
   do x :@: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:@: e) . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((:@: e) . ctx, g, hole)
  ++
    -- ONE HOLE
   do One x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (One . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure (One . ctx, g, hole)
  ++
   do All x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (All . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure (All . ctx, g, hole)
  ++
   do x :|: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:|: e) . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((:|: e) . ctx, g, hole)
  ++
   do e :|: x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((e :|:) . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((e :|:) . ctx, g, hole)
  ++
   do Lam (Bind y x) <- [lhs]
-     (ctx, g, bs', hole) <- execEX (pushLam y bs) x
-     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
+     (ctx, g, hole) <- execEX x
+     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:@: e) . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((:@: e) . ctx, g, hole)
  ++
   do e :@: x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((e :@:) . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure ((e :@:) . ctx, g, hole)
  ++
   do If x e1 e2 <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (\a -> If (ctx a) e1 e2, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure (\a -> If (ctx a) e1 e2, g, hole)
  ++
   do Assert x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (Assert . ctx, g, bs', hole)
+     (ctx, g, hole) <- execEX x
+     pure (Assert . ctx, g, hole)
  ++
   do Verify x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (Verify . ctx, g, bs', hole)     
+     (ctx, g, hole) <- execEX x
+     pure (Verify . ctx, g, hole)     
