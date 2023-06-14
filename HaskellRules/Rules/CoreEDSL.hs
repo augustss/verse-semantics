@@ -22,7 +22,7 @@ instance Functor Verse where
 
 instance Applicative Verse where
   pure x =
-    return x
+    V (\i _ -> ([], [], x, i))
 
   V mf <*> V mx =
     V (\i vs -> let (ws1, es1, f, j1) = mf i vs
@@ -30,8 +30,7 @@ instance Applicative Verse where
                  in (ws1++ws2, es1++es2, f x, j2))
 
 instance Monad Verse where
-  return x =
-    V (\i _ -> ([], [], x, i))
+  return = pure
   
   V m >>= k =
     V (\i vs -> let (ws1, es1, x, j1) = m i vs
