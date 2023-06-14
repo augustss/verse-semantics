@@ -164,17 +164,20 @@ mustSucceed (Exi (Bind _ e)) = mustSucceed e
 mustSucceed _                = False
 
 mustDecide :: Expr -> Bool
-mustDecide = go
-  where
-    go (Arr as)    = all go as
-    go (One e)     = go e
-    go (e1 :=: e2) = go e1 && go e2
-    go (e1 :>: e2) = go e1 && go e2
-    go (e1 :@: e2) = go e1 && go e2
-    go (Assume _)  = True
-    go (Int _)     = True
-    go (Op _)      = True
-    go _           = False
+mustDecide (Arr as)    = all mustDecide as
+mustDecide (One e)     = mustDecide e
+mustDecide (e1 :=: e2) = mustDecide e1 && mustDecide e2
+mustDecide (e1 :>: e2) = mustDecide e1 && mustDecide e2
+mustDecide (e1 :@: e2) = mustDecide e1 && mustDecide e2 && isDecideOp e1
+mustDecide (Assume _)  = True
+mustDecide (Int _)     = True
+mustDecide (Op _)      = True
+mustDecide _           = False
+
+isDecideOp :: Expr -> Bool
+isDecideOp (Op IsInt) = True
+isDecideOp (Op Le)    = True
+isDecideOp _          = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
