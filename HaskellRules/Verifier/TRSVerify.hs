@@ -25,6 +25,7 @@ main =
 tests :: [(String, Expr, Bool)]
 tests =
   [ ("ex00", ex00, True)
+  , ("ex01", ex01, True)
   , ("ex0", ex0, True)
   , ("ex0'", ex0', False)
   , ("ex1", ex1, True)
@@ -144,6 +145,11 @@ tlamAbs x ys e1 e2 =
 
 ex00 :: Expr
 ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)
+
+-------------------------------------------------------------------------------------------
+
+ex01 :: Expr
+ex01 = verse $ lam (\x -> Assert x)
 
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
 ex0 :: Expr
