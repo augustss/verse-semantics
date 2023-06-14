@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Rules.Verifier  where
 import TRS.Bind
@@ -11,6 +11,7 @@ import TRS.TRS
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP, execX, ltExpr)
 import Control.Monad (guard)
+import Data.List( intersect )
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
@@ -25,16 +26,12 @@ icfpVerifier = icfpActual
 
 icfpActual :: TRSystem Expr
 icfpActual = head allSystemsICFP
-    
+
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
 --------------------------------------------------------------------------------------
 
-data QContext
-  = QDef Ident QContext   -- ^ x; G
-  | QAsm Expr  QContext   -- ^ e; G
-  | QEmp                  -- ^ EMPTY
-  deriving (Show)
+type QContext = Expr
 
 --------------------------------------------------------------------------------
 -- | Abstract Rules
@@ -78,13 +75,13 @@ generalizedIcfpRules env lhs =
 
 assumeAssertRules :: VRule
 assumeAssertRules _ lhs =
-  -- ASSUME --  
-  
+  -- ASSUME --
+
   -- Assume {v} ----> v
-  "Assume-Val" `name`
-  do Assume (Val v) <- [lhs]
-     pure (Val v)
-  ++
+  --"Assume-Val" `name`
+  --do Assume (Val v) <- [lhs]
+  --   pure (Val v)
+  -- ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
@@ -111,12 +108,12 @@ assumeAssertRules _ lhs =
      pure (Assume e)
   ++
 
-  -- ASSERT --  
+  -- ASSERT --
 
-  -- Assert { e } ----> e   if   e is fail-free
-  "Assert-FailFree" `name`
+  -- Assert { e } ----> e   if   e must succeed
+  "Assert-mustSucceed" `name`
   do Assert e <- [lhs]
-     guard (failFree e)
+     guard (mustSucceed e)
      pure e
   ++
 {- (these are all subsumed by the above rule)
@@ -136,9 +133,9 @@ assumeAssertRules _ lhs =
      pure (Assume e1 :>: Assert e2)
   ++
 -}
-  
+
   -- VERIFY --
-  
+
   "Verify" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
@@ -150,131 +147,178 @@ assumeAssertRules _ lhs =
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
 
-failFree :: Expr -> Bool
-failFree (Val _)          = True
-failFree (Assume _)       = True
-failFree (Assert _)       = True
-failFree (One e)          = failFree e
-failFree (e1 :>: e2)      = failFree e1 && failFree e2
-failFree (e1 :|: e2)      = failFree e1 || failFree e2
-failFree (Exi (Bind _ e)) = failFree e
-failFree _                = False
+mustSucceed :: Expr -> Bool
+mustSucceed (Int _)          = True
+mustSucceed (Arr as)         = all mustSucceed as
+mustSucceed (Lam _)          = True
+mustSucceed (Assume _)       = True
+mustSucceed (Assert _)       = True
+mustSucceed (One e)          = mustSucceed e
+mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
+mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
+mustSucceed (Exi (Bind _ e)) = mustSucceed e
+mustSucceed _                = False
+
+mustDecide :: Binders -> Expr -> Bool
+mustDecide bs = go
+  where
+    go (Arr as)    = all go as
+    go (One e)     = go e
+    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :>: e2) = go e1 && go e2
+    go (e1 :@: e2) = go e1 && go e2
+    go (Assume _)  = True
+    go (Int _)     = True
+    go (Op _)      = True
+    go (Var x)     = x `elem` lamBinds bs
+    go _           = False
+
+
+
+
+
+{-
+
+if (e1)
+  { e2 }
+else
+  { e3 }
+
+-}
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules _env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
-   do (ctx, g, e) <- execEX lhs
+   do (ctx, g, _, e) <- eX lhs
+      guard (case e of Assume _ -> False; _ -> True)
       guard (g `proves` e)
       pure (ctx (Assume e))
-{-
    ++
-   "Assume-Exi" `name`
-   do (ctx, g, Assume (EXI x e)) <- execEX lhs
-      let x' = fresh g e
-      pure (ctx (Assume (subst [(x, Var x')] e)))
--}
+   -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
+   "Unfold-If" `name`
+   do (ctx, _, bs, If e1 e2 e3) <- eX lhs
+      guard (mustDecide bs e1)
+      pure (ctx (unfoldIte e1 e2 e3))
+
+unfoldIte :: Expr -> Expr -> Expr -> Expr
+unfoldIte e1 e2 e3 = (Assume e1 :>: e2) :|: {- assume-fail{e1} :>: -} e3
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
 --------------------------------------------------------------------------------
+
 proves :: QContext -> Expr -> Bool
-proves QEmp _       = False
-proves (QDef _ g) e = proves g e
-proves (QAsm p g) e = proves1 p e || proves g e
+g `proves` e = unAssume e `elem` facts g
+ where
+  unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
+  unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
+  unAssume (f :@: x)   = unAssume f :@: unAssume x
+  unAssume (Assume a)  = unAssume a
+  unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
+  unAssume a           = a
 
-proves1 :: Expr -> Expr -> Bool
-proves1 (INT (Var x)) (Var y :=: Var z)
-  | x == y && x == z = True
-proves1 p e          = p == e
+  vs = free e
 
-pattern INT :: Expr -> Expr
-pattern INT e = Op IsInt :@: e
+  facts (g1 :>: g2) = facts g1 ++ facts g2
+  facts (g1 :|: g2) = facts g1 `intersect` facts g2
+  facts (Exi bnd)   = facts g' where Bind _ g' = alphaRename vs bnd
+  facts (Assume a)  = assumes a
+  facts _           = []
 
+  assumes a = a : derives a
+
+  -- special rules
+  derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  derives _                = []
+
+-----------------------------------------------------------------------
+-- | Binders of an Execution Context
+-----------------------------------------------------------------------
+
+data Binders = MkBinders { lamBinds :: [Ident], exiBinds :: [Ident] }
+   deriving (Eq, Ord, Show)
+
+instance Semigroup Binders where
+  (<>) :: Binders -> Binders -> Binders
+  (<>) b1 b2 = MkBinders { lamBinds = lamBinds b1 ++ lamBinds b2
+                         , exiBinds = exiBinds b1 ++ exiBinds b2 }
+
+instance Monoid Binders where
+   mempty :: Binders
+   mempty = MkBinders { lamBinds = [], exiBinds = [] }
+
+pushLam :: Ident -> Binders -> Binders
+pushLam x bs = bs { lamBinds = x : lamBinds bs }
+
+pushExi :: Ident -> Binders -> Binders
+pushExi x bs = bs { exiBinds = x : exiBinds bs }
 ----------------------------------------------------------------------
 -- | Expression Contexts
 -----------------------------------------------------------------------
 
--- (forall x. assume {x=3}) ;  assert {x=3}
+eX :: Expr -> [(EContext, QContext, Binders, Expr)]
+eX = execEX mempty
 
--- scope contexts
--- E ::= v = HOLE | HOLE; e
-execEX, execEX1 :: Expr -> [(EContext, QContext, Expr)]
--- E context
-execEX lhs = execEX1 lhs ++ [(id, QEmp, lhs)]
--- X context, X /= hole
-execEX1 lhs =
+execEX :: Binders -> Expr -> [(EContext, QContext, Binders, Expr)]
+execEX bs lhs = execEX1 bs lhs ++ [(id, Arr [], bs, lhs)]
+
+execEX1 :: Binders -> Expr -> [(EContext, QContext, Binders, Expr)]
+execEX1 bs lhs =
   do v :=: x     <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (\ a -> v :=: ctx a, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (\ a -> v :=: ctx a, g, bs', hole)
  ++
    -- HOLE; e
   do x :>: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:>: e) . ctx, qAsm e g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:>: e) . ctx, g :>: e, bs', hole)
  ++
    -- e; HOLE
   do e :>: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :>:) . ctx, qAsm e g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :>:) . ctx, e :>: g, bs', hole)
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (EXI y . ctx, QDef y g, hole)
+     (ctx, g, bs', hole) <- execEX (pushExi y bs) x
+     pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
  ++
    -- HOLE e
   do x :@: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:@: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:@: e) . ctx, g, bs', hole)
  ++
    -- ONE HOLE
   do One x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (One . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (One . ctx, g, bs', hole)
  ++
   do All x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (All . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (All . ctx, g, bs', hole)
  ++
   do x :|: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:|: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:|: e) . ctx, g, bs', hole)
  ++
   do e :|: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :|:) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :|:) . ctx, g, bs', hole)
  ++
   do Lam (Bind y x) <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (Lam . Bind y . ctx, QDef y g, hole)
+     (ctx, g, bs', hole) <- execEX (pushLam y bs) x
+     pure (Lam . Bind y . ctx, g, bs', hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:@: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:@: e) . ctx, g, bs', hole)
  ++
   do e :@: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :@:) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :@:) . ctx, g, bs', hole)
  ++
   do Assert x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (Assert . ctx, g, hole)
-
-
-qAsm :: Expr -> QContext -> QContext
-qAsm (Assume e)  g = QAsm e g
-qAsm (e1 :>: e2) g = qAsm e1 (qAsm e2 g)
-qAsm (EXI x e)   g = QDef x  (qAsm e  g)
---  qAsm (LAM x e)   g = QDef x  (qAsm e  g)
-qAsm _           g = g
-
-
-fresh :: QContext -> Expr -> Ident
-fresh g e = identNotIn (free e ++ bound g)
-
-bound :: QContext -> [Ident]
-bound QEmp       = []
-bound (QDef x g) = x : bound g
-bound (QAsm _ g) =     bound g
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (Assert . ctx, g, bs', hole)

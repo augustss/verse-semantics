@@ -72,6 +72,7 @@ data Expr
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
   | Wrong String                -- ^ wrong
+  | If Expr Expr Expr           -- ^ if e1 e2 e3
 
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
@@ -123,6 +124,7 @@ instance Pretty Expr where
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assert a)       = text "ASSERT {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Verify a)       = text "VERIFY {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (If a b c)       = text "if" <+> parens (pPrintPrec l 0 a) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
@@ -235,6 +237,10 @@ comp _xs _ys (Ref p) (Ref q) = compare p q
 comp _xs _ys Ref {} _        = LT
 comp _xs _ys _ Ref {}        = GT
 
+comp  xs  ys (If a1 a2 a3) (If b1 b2 b3) = comp xs ys a1 b1 <> comp xs ys a2 b2 <> comp xs ys a3 b3
+comp  _   _  If{}           _            = LT
+comp  _   _  _              If{}         = GT
+
 comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
 
 comp _ _ _ _ = undefined -- GHC bug
@@ -289,6 +295,7 @@ pattern Val e <- (getVal -> Just e)
 
 getVal :: Expr -> Maybe Expr
 getVal e@Var{} = Just e
+getVal (Assume (getVal -> Just v)) = Just (Assume v)
 getVal e = getHNF e
 
 isVal :: Expr -> Bool
@@ -380,6 +387,11 @@ instance Rec Expr where
            [ (n, a' :>: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
 
+      If a b c ->
+            [ (n, If a' b c) | (n,a') <- rec r s a ]
+          ++ [ (n, If a b' c) | (n,b') <- rec r s b ]
+          ++ [ (n, If a b c') | (n,c') <- rec r s c ]
+
       Exi (Bind x a) ->
            [ (n, Exi (Bind x a')) | (n,a') <- rec r (addBound (BExi x) s) a ]
 
@@ -451,6 +463,7 @@ instance Free Expr where
   free (Assume a) = free a
   free (Assert a) = free a
   free (Verify a) = free a
+  free (If a b c) = free a `union` free b `union` free c
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
   free Fail      = []
@@ -464,7 +477,7 @@ class Term a where
   subst :: Subst Expr -> a -> a
 
 -- rename the binder so that it is not the same as the first argument
-alphaRename :: [Ident] -> Bind Expr -> Bind Expr
+alphaRename :: (Term a, Free a) => [Ident] -> Bind a -> Bind a
 alphaRename xs bnd@(Bind x e)
   | x `notElem` xs = bnd
   | otherwise      = Bind y (subst [(x,Var y)] e)
@@ -483,6 +496,7 @@ instance Term Expr where
   subst sub (a :>: b) = subst sub a :>: subst sub b
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
+  subst sub (If a b c) = If (subst sub a) (subst sub b) (subst sub c)
   subst _sub Fail     = Fail
   subst _sub e@Wrong{}= e
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
