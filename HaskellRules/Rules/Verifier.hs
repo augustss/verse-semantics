@@ -82,6 +82,10 @@ assumeAssertRules _ lhs =
   --do Assume (Val v) <- [lhs]
   --   pure (Val v)
   -- ++
+  "Assume-HNF" `name`
+  do Assume (HNF v) <- [lhs]
+     pure v
+  ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
@@ -199,7 +203,7 @@ verifierRules _env lhs =
    -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
    "Unfold-If" `name`
    do (ctx, _, bs, If e1 e2 e3) <- eX lhs
-      guard (mustDecide bs e1)
+      guard (mustDecide mempty e1)
       pure (ctx (unfoldIte e1 e2 e3))
 
 unfoldIte :: Expr -> Expr -> Expr -> Expr
@@ -224,7 +228,7 @@ g `proves` e = unAssume e `elem` facts g
   facts (g1 :>: g2) = facts g1 ++ facts g2
   facts (g1 :|: g2) = facts g1 `intersect` facts g2
   facts (Exi bnd)   = facts g' where Bind _ g' = alphaRename vs bnd
-  facts (Assume a)  = assumes a
+  facts (Assume a)  = assumes (unAssume a)
   facts _           = []
 
   assumes a = a : derives a
@@ -309,7 +313,7 @@ execEX1 bs lhs =
  ++
   do Lam (Bind y x) <- [lhs]
      (ctx, g, bs', hole) <- execEX (pushLam y bs) x
-     pure (Lam . Bind y . ctx, g, bs', hole)  -- y should be visible to e in g |- e
+     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
@@ -319,6 +323,14 @@ execEX1 bs lhs =
      (ctx, g, bs', hole) <- execEX bs x
      pure ((e :@:) . ctx, g, bs', hole)
  ++
+  do If x e1 e2 <- [lhs]
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (\a -> If (ctx a) e1 e2, g, bs', hole)
+ ++
   do Assert x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
      pure (Assert . ctx, g, bs', hole)
+ ++
+  do Verify x <- [lhs]
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (Verify . ctx, g, bs', hole)     
