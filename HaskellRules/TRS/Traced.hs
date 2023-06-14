@@ -40,7 +40,7 @@ instance Pretty a => Pretty (Traced a) where
       trDocs = concat [ [pPrint e, text ("---" ++ msg ++ "--->")] | (msg, e) <- reverse tr ]
 
 loop :: Eq a => Traced a -> Traced a
-loop (x :<-- tr) = x :<-- find x tr
+loop (xx :<-- tr) = xx :<-- find xx tr
  where
   find _x []     = []
   find  x ((s,y):sys)

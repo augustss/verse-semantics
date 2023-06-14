@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Main where
 
@@ -25,6 +26,7 @@ main =
 tests :: [(String, Expr, Bool)]
 tests =
   [ ("ex00", ex00, True)
+  , ("ex01", ex01, True)
   , ("ex0", ex0, True)
   , ("ex0'", ex0', False)
   , ("ex1", ex1, True)
@@ -40,6 +42,8 @@ tests =
   , ("ex_stuck1", ex_stuck1, False)
   , ("ex_stuck2", ex_stuck2, False)
   , ("ex_stuck3", ex_stuck3, False)
+  , ("ex_if0", ex_if0, True)
+  , ("ex_if1", ex_if1, False)
   ]
 
 --------------------------------------------------------------------------------
@@ -71,17 +75,20 @@ runTest (testName, e, expected) =
             P.pp x
             return False
 
-       (False, _tr@(x :<-- _)) ->       
+       (False, _tr@(x :<-- _)) ->
          do putStrLn " *** FAILED, but expected VERIFIED:"
             --putStr (unlines (showTrace tr))
             P.pp x
             return False
 
 simplify :: Expr -> (Bool, Traced Expr)
-simplify e = (isDone x, tr)
+simplify e = res
  where
-  Just (tr@(x :<-- _):_) = tarjan1 (-1) arrow (e :<-- []) -- (preProcess sys (ruleEnv sys) e :<-- [])
-  arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+   res =
+     case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
+       Just (tr@(x :<-- _):_) -> (isDone x, tr)
+       _ -> undefined
+   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
   --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
@@ -113,7 +120,9 @@ leq :: Expr -> Expr -> Expr
 leq e1 e2 = Op Le :@: Arr [e1, e2]
 
 ite :: Expr -> Expr -> Expr -> Expr
-ite e1 e2 e3 = (Assume e1 :>: e2) :|: e3
+ite = If
+-- ite e1 e2 e3 = (Assume e1 :>: e2) :|: e3
+
 --ite e1 e2 e3 = One( (e1 :>: Lam (Bind x e2)) :|: Lam (Bind x e3) ) :@: Arr []
 -- where
 --  x = identNotIn (free (e2,e3))
@@ -140,6 +149,11 @@ tlamAbs x ys e1 e2 =
 
 ex00 :: Expr
 ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)
+
+-------------------------------------------------------------------------------------------
+
+ex01 :: Expr
+ex01 = verse $ lam (\x -> Assert x)
 
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
 ex0 :: Expr
@@ -337,7 +351,7 @@ ex6 = verse $
                        do y <- def (h' :@: Int 3) <? "y"
                           int y) <? "h") <? "g"
      return (g :@: suc)
-  
+
 --- examples testing rigid/flexible ---
 
 ex_rigid2flex :: Expr
@@ -347,14 +361,14 @@ ex_rigid2flex = verse $
        return $
          do y <- exists
             x' .=. y
-  
+
 ex_flex2rigid1 :: Expr
 ex_flex2rigid1 = verse $
   timlam $ \x ->
     do x' <- int x
        return $
          do x' .=. Int 3
-  
+
 ex_flex2rigid2 :: Expr
 ex_flex2rigid2 = verse $
   timlam $ \x ->
@@ -383,3 +397,16 @@ ex_stuck3 = verse $
     do return (do y <- exists <? "y"
                   def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
 
+--- examples testing If with `mustDecide` ---
+
+-- this *should* VERIFY
+ex_if0 :: Expr
+ex_if0 = verse $
+  timlam $ \b -> return (ite b (Int 3) (Int 4))
+
+-- this *should not* VERIFY
+ex_if1 :: Expr
+ex_if1 = verse $
+  timlam $ \_x ->
+    do return (do b <- exists <? "b"
+                  def (ite b (Int 3) (Int 4)))

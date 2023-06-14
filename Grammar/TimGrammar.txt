@@ -37,9 +37,9 @@ NewLine   := 0o0D 0o0A | 0o0A    -- Maybe add | 0o0D !0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse ThisInd:={:0o09|0o20:}; (Ending | !(Ending|0o09|0o20) Space
-             if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
-             else if(ThisInd<BlockInd                             ) then error)
+Line      := NewLine; parse i:={:0o09|0o20:}; (Ending | !(Ending|0o09|0o20) Space
+             if     (i>BlockInd or Nest and i=BlockInd) then set LineInd=i
+             else if(i<BlockInd                       ) then error)
 Scan      := Space ScanNS
 ScanNS    := {:Line:}
 ScanKey   := Space ScanKeyNS
@@ -52,7 +52,7 @@ Comment   := LineCmt   | BlockCmt | IndCmt
 Text      := Printable | BlockCmt | "<#>"
 
 Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digits))
-Units     := [Alpha {:Alpha:}] !Alpha
+Units     := [Alpha {:Alnum:}] !Alpha
 NumT      := ("0x" Hex {:Hex:} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !('.' !'.') !Alnum
 Num       := NumT Space
 
@@ -60,7 +60,7 @@ Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
 CharEsc   := '\' ('r'|'n'|'t'|'''|'"'|Special)
 CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
 Char8     := "0o" (       Hex) [Hex]                    !Alnum
-Char32    := "0u" ("10" | Hex) [Hex] [Hex] [Hex] [Hex]  !Alnum
+Char32    := "0u" ("10" | (!"10" Hex)) [Hex [Hex [Hex [Hex]]]]  !Alnum
 CharT     := CharLit | Char8 | Char32
 Char      := CharT Space
 
@@ -91,6 +91,7 @@ Reserved  := ("catch"|"do"|"else"|"if"|"in"|"is"|"not"|"then"|"until"|"where"|"w
 DotSpace  := '.' &(0o09 | 0o20 | Ending)
 Brace     := ScanNS '{' Space List '}' Space
 Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
+BlockMT     := Brace | DotSpace Space Def Space | ':' [: Space Ind List Ded :]
 BraceInd  := Brace | Ind List Ded
 KeyBlock  := Block
 Defs      := Def {: ',' Scan Def :}
@@ -101,13 +102,14 @@ Tags      := (!'/' CallL ScanKeyNS '.' Space | !Reserved) QualIdent {:Invoke:} [
 
 Do        := ScanKeyNS "do"    KeyEnd (KeyBlock | Def)
 Until     := ScanKeyNS "until" KeyEnd (KeyBlock | Def) | ScanKeyNS "catch" KeyEnd Invoke
-Then      := ScanKeyNS "then"  KeyEnd (KeyBlock | Def)
+--Then      := ScanKeyNS "then"  KeyEnd (KeyBlock | Def)
+Then      := ScanKeyNS "then"  KeyEnd (BlockMT | Def)
 Else      := ScanKeyNS "else"  KeyEnd (ScanKeyNS If | !(ScanKeyNS If) (KeyBlock | Def))
 
 Invoke    :=             [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
-If        := "if" KeyEnd [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
+If        := "if" KeyEnd [Specs] (Paren         (BlockMT | Then) | Block [        Then]) (Else  | !Else )
 In        := ("in" KeyEnd | ':' Space) (In | &Choose NotEq [Specs])
-Var       := ("var"|"set"|"ref"|"alias") KeyEnd Choose
+Var       := ("var"|"set"|"ref"|"alias") KeyEnd [:Specs:] Choose
 
 Base      := '(' Space List ')' Space | Num | Char | Path | String | Markup | If | !Reserved QualIdent
 Call      := Base    {:Postfix:}
@@ -128,7 +130,7 @@ Eq        := NotEq   {: ('='                   ) Scan  NotEq   :}
 Not       := Eq      | ("not" KeyEndNS        ) Space Not
 And       := Not     [ ("and" KeyEndNS        ) Scan  And     ]
 Or        := And     [ ("or"  KeyEndNS        ) Scan  Or      ]
-Def       := (Or | (In | Var) (('='|":="|"+="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
+Def       := (Or | (In | Var) (('='|":="|"+="|"-="|"*="|"/=") Space (BraceInd | Def) | !('=' !'>') !":="))
                   {: &In Def
                     | ":="    Space    (BraceInd | Def )
                     | "where" KeyEnd   (KeyBlock | Defs)
@@ -142,7 +144,7 @@ Expr      := Fun {: '@' Space Call :} StopExpr
 
 StopExpr  := &( (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKeyNS "is" KeyEnd)))
 StopFun   := &( ("@")) | StopExpr
-StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else") KeyEnd) | StopFun)
+StopDef   := &( ("=>" | ("over"|"when"|"while"|"next"|"else"|"then") KeyEnd) | StopFun)
 
 Commas    := Expr {: ',' Scan Expr :}
 Separator := (';' | Ending) Scan

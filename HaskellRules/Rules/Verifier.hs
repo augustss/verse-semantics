@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Rules.Verifier  where
 import TRS.Bind
@@ -25,7 +26,7 @@ icfpVerifier = icfpActual
 
 icfpActual :: TRSystem Expr
 icfpActual = head allSystemsICFP
-    
+
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
 --------------------------------------------------------------------------------------
@@ -74,13 +75,17 @@ generalizedIcfpRules env lhs =
 
 assumeAssertRules :: VRule
 assumeAssertRules _ lhs =
-  -- ASSUME --  
+  -- ASSUME --
 
   -- Assume {v} ----> v
   --"Assume-Val" `name`
   --do Assume (Val v) <- [lhs]
   --   pure (Val v)
   -- ++
+  "Assume-HNF" `name`
+  do Assume (HNF v) <- [lhs]
+     pure v
+  ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
@@ -107,7 +112,7 @@ assumeAssertRules _ lhs =
      pure (Assume e)
   ++
 
-  -- ASSERT --  
+  -- ASSERT --
 
   -- Assert { e } ----> e   if   e must succeed
   "Assert-mustSucceed" `name`
@@ -132,9 +137,9 @@ assumeAssertRules _ lhs =
      pure (Assume e1 :>: Assert e2)
   ++
 -}
-  
+
   -- VERIFY --
-  
+
   "Verify" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
@@ -158,15 +163,40 @@ mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
 mustSucceed (Exi (Bind _ e)) = mustSucceed e
 mustSucceed _                = False
 
+mustDecide :: Expr -> Bool
+mustDecide (Arr as)    = all mustDecide as
+mustDecide (One e)     = mustDecide e
+mustDecide (e1 :=: e2) = mustDecide e1 && mustDecide e2
+mustDecide (e1 :>: e2) = mustDecide e1 && mustDecide e2
+mustDecide (e1 :@: e2) = mustDecide e1 && mustDecide e2 && isDecideOp e1
+mustDecide (Assume _)  = True
+mustDecide (Int _)     = True
+mustDecide (Op _)      = True
+mustDecide _           = False
+
+isDecideOp :: Expr -> Bool
+isDecideOp (Op IsInt) = True
+isDecideOp (Op Le)    = True
+isDecideOp _          = False
+
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules _env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
-   do (ctx, g, e) <- execEX lhs
+   do (ctx, g, e) <- eX lhs
       guard (case e of Assume _ -> False; _ -> True)
       guard (g `proves` e)
       pure (ctx (Assume e))
+   ++
+   -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
+   "Unfold-If" `name`
+   do (ctx, _, If e1 e2 e3) <- eX lhs
+      guard (mustDecide e1)
+      pure (ctx (unfoldIte e1 e2 e3))
+
+unfoldIte :: Expr -> Expr -> Expr -> Expr
+unfoldIte e1 e2 e3 = (Assume e1 :>: e2) :|: {- assume-fail{e1} :>: -} e3
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
@@ -181,33 +211,32 @@ g `proves` e = unAssume e `elem` facts g
   unAssume (Assume a)  = unAssume a
   unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
   unAssume a           = a
-  
+
   vs = free e
- 
+
   facts (g1 :>: g2) = facts g1 ++ facts g2
   facts (g1 :|: g2) = facts g1 `intersect` facts g2
   facts (Exi bnd)   = facts g' where Bind _ g' = alphaRename vs bnd
-  facts (Assume a)  = assumes a
+  facts (Assume a)  = assumes (unAssume a)
   facts _           = []
-  
-  assumes a = [ a ] ++ derives a
-  
+
+  assumes a = a : derives a
+
   -- special rules
-  derives (Op IsInt :@: a) = [ a :=: a ] ++ assumes a 
+  derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
   derives _                = []
 
 ----------------------------------------------------------------------
 -- | Expression Contexts
 -----------------------------------------------------------------------
 
--- (forall x. assume {x=3}) ;  assert {x=3}
+eX :: Expr -> [(EContext, QContext, Expr)]
+eX = execEX
 
--- scope contexts
--- E ::= v = HOLE | HOLE; e
-execEX, execEX1 :: Expr -> [(EContext, QContext, Expr)]
--- E context
+execEX :: Expr -> [(EContext, QContext, Expr)]
 execEX lhs = execEX1 lhs ++ [(id, Arr [], lhs)]
--- X context, X /= hole
+
+execEX1 :: Expr -> [(EContext, QContext, Expr)]
 execEX1 lhs =
   do v :=: x     <- [lhs]
      (ctx, g, hole) <- execEX x
@@ -252,7 +281,7 @@ execEX1 lhs =
  ++
   do Lam (Bind y x) <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure (Lam . Bind y . ctx, g, hole)  -- y should be visible to e in g |- e
+     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
      (ctx, g, hole) <- execEX x
@@ -262,7 +291,14 @@ execEX1 lhs =
      (ctx, g, hole) <- execEX x
      pure ((e :@:) . ctx, g, hole)
  ++
+  do If x e1 e2 <- [lhs]
+     (ctx, g, hole) <- execEX x
+     pure (\a -> If (ctx a) e1 e2, g, hole)
+ ++
   do Assert x <- [lhs]
      (ctx, g, hole) <- execEX x
      pure (Assert . ctx, g, hole)
-
+ ++
+  do Verify x <- [lhs]
+     (ctx, g, hole) <- execEX x
+     pure (Verify . ctx, g, hole)     

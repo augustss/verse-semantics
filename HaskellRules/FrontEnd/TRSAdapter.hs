@@ -178,6 +178,7 @@ trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
 trsToCore (T.Store h e) = CStore s (trsToCore e)
   where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
 trsToCore (T.Ref (T.Ptr i)) = CPtr i
+trsToCore e = error $ "trsToCore: unimplemented: " ++ show e
 
 trsToCoreI :: T.Ident -> Ident
 trsToCoreI (T.Name s) = Ident noLoc s
