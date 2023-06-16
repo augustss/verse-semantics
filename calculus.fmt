@@ -186,6 +186,7 @@
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
+%format block = "\textbf{block}"
 %format orElse = "\textbf{orElse}"
 %format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"

@@ -143,7 +143,7 @@ $$
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |t_1 = t_2|       & \text{Unification} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-      & \vb & |for(t) in b|     & \text{Finite loop} \\
+      & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|     & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
@@ -162,7 +162,7 @@ $$
       & \vb & |if{t}|           & \text{Conditional expression} \\
       & \vb & |for{t}|          & \text{Finite loop} \\
       & \vb & |let(t) in b|     & \text{Local binding} \\
-      & \vb & |do b|            & \text{Scope delimiter} \\
+      & \vb & |block b|         & \text{Scope delimiter} \\
       & \vb & |case(t) of {t_1; dots t_n}|    & \text{Case expression} \\
       & \vb & |case{t_1; dots t_n}| & \text{Case expression} \\
       & \vb & |type^{t}|         & \text{Type definition} \\
@@ -189,7 +189,7 @@ $$
       & \vb & |x := t|          & \text{Definition} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-      & \vb & |for(t) in b|     & \text{Finite loop} \\
+      & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|     & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |function a t|    & \text{Function} \\
@@ -232,8 +232,8 @@ $$
 \multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
   |p : t| & \rightarrow & |p := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
-  |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2) | \\
-  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
+  |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2)| & \text{NOT QUITE RIGHT} \\
+%%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
   |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
@@ -241,7 +241,7 @@ $$
   |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
 \\
 \multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |function (y:t) y| \\
+  |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
   |e_1 eqgt e_2| & \rightarrow & |function e_1 () {e_2}| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
   |function () b| & \rightarrow & |functionKW (()) b| & \\
@@ -274,7 +274,7 @@ $$
   \\
   \multicolumn{1}{l}{\textbf{Let, do, case}} \\
   |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
-  |do b| & \rightarrow & |b| & \textit{see note}  \\
+  |block b| & \rightarrow & |b| & \textit{see note}  \\
   |case{e_1; dots e_n}| & \rightarrow & |(x:any) => case(x){e_1; dots e_n}| & \text{|x| fresh} \\
   |case(e){e_1; dots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor dots srcor e_n^[x]| & \text{|x| fresh} \\
   \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
@@ -285,7 +285,7 @@ $$
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
-This means that there can be no variable name clashes in |let| and |do|.
+This means that there can be no variable name clashes in |let| and |block|.
 A more robust desugaring could \textalpha-convert such clashes.
 \caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
 \end{figure}
@@ -314,10 +314,10 @@ $$
       & \vb & |e_1 = e_2|                 & \text{Not only on lhs of ``|;|''} \\
       & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
 
-      & \vb & |check fx e|                 & \text{Effects check} \\
+      & \vb & |check fx e|                & \text{Effects check} \\
       & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
-      & \vb & |if e_1 then e_2 else e_3| & \text{Conditional expression} \\
-    & \vb & |for(e) in b|     & \text{Finite loop} \\
+      & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
+      & \vb & |for(e) do b|               & \text{Finite loop} \\
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
