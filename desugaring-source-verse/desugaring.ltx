@@ -365,7 +365,7 @@ and |e| is a BigCore expression}} \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
   |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
-  |Me i (function t_1 t_2)| & = & |lam x (def (x',y) (x' == Me x t_1; y == i^[x']; Me y t_2))|
+  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
 \end{array}
 \end{array}
 $$
