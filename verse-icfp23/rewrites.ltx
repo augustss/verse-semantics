@@ -215,10 +215,10 @@
       |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
-      |e_1 e_2| & \text{means} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
-      |tup (e_1, xdots, e_n)| & \text{means} &
+      |e_1 e_2| & \text{means}^* & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means}^* &
           |def (x_1 ^^ x_2 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1,xdots, x_n))| & \text{|x_i| fresh} \\
-      |e_1 == e_2|      & \text{means} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means}^* & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
 
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
@@ -233,10 +233,10 @@
       |e_1 > e_2| & \text{means} & |applyN gt ( e_1, e_2 ) | & \\
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
       |x :== e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |e_1 e_2| & \text{means} & |f :== e_1 ; x :== e_2; apply1N f x|  & |f,x|\ \text{fresh} \\
-      |tup (e_1, xdots, e_n)| & \text{means} &
+      |e_1 e_2| & \text{means}^* & |f :== e_1 ; x :== e_2; apply1N f x|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means}^* &
           |x_1:==e_1; xdots; x_n:==e_n; tup (x_1,xdots, x_n)| & \text{|x_i| fresh} \\
-      |e_1 == e_2|      & \text{means} & |x :== e_1 ; x == e_2; x|       & |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means}^* & |x :== e_1 ; x == e_2; x|       & |x|\ \text{fresh} \\
 
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 %      |lamhdr emptytup^^ e| & \text{means} & |lam p (p == emptytup; e)| & \text{|p| fresh} \\
@@ -249,6 +249,7 @@
 \fi
     \end{array} \\
   \\[-0.6em]
+  (*)\; \text{Apply this rule only if at least one of the |e_i| is not a value |v|} \\
   \text{$\freevars{|e|}$ means the free variables of |e|; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
@@ -265,6 +266,7 @@
     $$
 \begin{array}{l}
       \begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Substitution contexts} & S & ::= & \hole \vb |eq; S| \\
       \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |eq; X| \\
 %       \text{Equation contexts (hole is |eq|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
@@ -348,9 +350,9 @@
   \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-  & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$}, \\
-  &&&& \text{\hskip 0.7em and ($|v| = |y| \implies |x| \prec |y|$)} \\
+  \rulename{subst} & |S^[x==v;e]| & \movesto & |(subst S x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+  & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$}, \\
+  &&&& \text{\hskip 0.7em and ($(|v| = |y| \implies |x| \prec |y|)$)} \\
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
