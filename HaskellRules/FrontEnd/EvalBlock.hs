@@ -131,7 +131,7 @@ type BEqn = (BValue, BExpr)
 type BEqnV = (BIdent, BValue)
 
 data BExpr
-  = BPrimOp Op [BValue]
+  = BPrimOp Op BValue
   | BApply BValue BValue
   | BSplit BChoice BValue BValue
   | BChoice BChoice
@@ -267,7 +267,7 @@ instance Pretty BBlock where
             pResult = [pPrintPrec l 0 (result b)]
 
 instance Pretty BExpr where
-  pPrintPrec l _ (BPrimOp op vs) = pPrintPrec l 10 op <> parens (hsep (punctuate (text ",") (map (pPrintPrec l 0) vs)))
+  pPrintPrec l _ (BPrimOp op v) = pPrintPrec l 10 op <> parens (pPrintPrec l 0 v)
   pPrintPrec l _ (BApply f a) = pPrintPrec l 10 f <> parens (pPrintPrec l 0 a)
   pPrintPrec l _ (BSplit b f g) = text "split" <> parens (pPrintPrec l 0 b) <> braces (pPrintPrec l 1 f <> text ";" <+> pPrintPrec l 1 g)
   pPrintPrec l p (BChoice c) = pPrintPrec l p c
@@ -380,17 +380,17 @@ freshenBlock vs b | null bad = b
             unVar _ = undefined
 
 instance Bound BExpr where
-  allBVars (BPrimOp _ vs) = unionMap allBVars vs
+  allBVars (BPrimOp _ v) = allBVars v
   allBVars (BApply v1 v2) = allBVars v1 `union` allBVars v2
   allBVars (BSplit b v1 v2) = allBVars b `union` allBVars v1 `union` allBVars v2
   allBVars (BChoice c) = allBVars c
   allBVars (BVal v) = allBVars v
-  freeBVars (BPrimOp _ vs) = unionMap freeBVars vs
+  freeBVars (BPrimOp _ v) = freeBVars v
   freeBVars (BApply v1 v2) = freeBVars v1 `union` freeBVars v2
   freeBVars (BSplit b v1 v2) = freeBVars b `union` freeBVars v1 `union` freeBVars v2
   freeBVars (BChoice c) = freeBVars c
   freeBVars (BVal v) = freeBVars v
-  bsubst' s (BPrimOp op vs) = BPrimOp op (map (bsubst' s) vs)
+  bsubst' s (BPrimOp op v) = BPrimOp op (bsubst' s v)
   bsubst' s (BApply v1 v2) = BApply (bsubst' s v1) (bsubst' s v2)
   bsubst' s (BSplit b v1 v2) = BSplit (bsubst' s b) (bsubst' s v1) (bsubst' s v2)
   bsubst' s (BChoice c) = BChoice (bsubst' s c)
@@ -491,8 +491,7 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 hnfToCore (BExt a r x) = LAM (Name "_") (Var (Name $ "EXT" ++ prettyShow (a, r, x)))
 
 exprToCore :: BExpr -> Expr
-exprToCore (BPrimOp o [v]) = Op o :@: valueToCore v
-exprToCore (BPrimOp o vs) = Op o :@: Arr (map valueToCore vs)
+exprToCore (BPrimOp o v) = Op o :@: valueToCore v
 exprToCore (BApply f a) = valueToCore f :@: valueToCore a
 exprToCore (BSplit e f g) = Split (choiceToCore e) (valueToCore f) (valueToCore g)
 exprToCore (BChoice c) = choiceToCore c
@@ -583,8 +582,7 @@ cExpr (e1 :=: e2) = do
   pure $ BVal v
 cExpr (e1 :>: e2) = addExpr e1 *> cExpr e2
 cExpr e@(_ :|: _) = BChoice <$> cChoice e
-cExpr (Op o :@: Arr es) = BPrimOp o <$> mapM cValue es
-cExpr (Op o :@: e) = BPrimOp o . (:[]) <$> cValue e
+cExpr (Op o :@: e) = BPrimOp o <$> cValue e
 cExpr (e1 :@: e2) = BApply <$> cValue e1 <*> cValue e2
 cExpr (EXI i e) = do s <- addExist i; cExpr (subst s e)
 cExpr Fail = pure BFail
@@ -809,9 +807,9 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Examine the expression and evaluate if possible.
         dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
-          BPrimOp op vs | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
-                        | Just e <- evalPrimOp op vs -> succeeds [(val, e)]
-                        | Just (h, e) <- evalPrimHeapOp heap op vs -> succeeds' h [(val, e)]
+          BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
+                        | Just e <- evalPrimOp op v -> succeeds [(val, e)]
+                        | Just (h, e) <- evalPrimHeapOp heap op v -> succeeds' h [(val, e)]
                         | otherwise -> suspend eqn
           BApply f a ->
             case f of
@@ -874,70 +872,70 @@ choices :: [BBlock] -> BChoice
 choices [] = BCFail
 choices bs = foldr1 BCFork (map BCBlk bs)
 
-evalPrimOp :: Op -> [BValue] -> Maybe BExpr
-evalPrimOp op vs | Just cmp <- lookup op compareOps =
-  case vs of
-    [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
-evalPrimOp op vs | Just arith <- lookup op arithBinOps =
-  case vs of
-    [BVInt _, BVInt 0] | op == Div -> Just BFail
-    [BVInt a, BVInt b] -> Just $ BVal $ BVInt $ a `arith` b
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
-evalPrimOp op vs | Just arith <- lookup op arithUnOps =
-  case vs of
-    [BVInt a] -> Just $ BVal $ BVInt $ arith a
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
-evalPrimOp op vs | op == IsInt =
-  case vs of
-    [a@(BVInt _)] -> Just $ BVal a
-    [BHNF _] -> Just BFail
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
-evalPrimOp op vs | op == Cons =
-  case vs of
-    [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
-evalPrimOp op vs | op == DotDot =
-  case vs of
-    [BVInt a, BVInt b] -> Just $ BChoice $ choices [ BlockValue [] (BVInt i) | i <- [a .. b] ]
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)
-evalPrimOp op vs | op == Print =
+evalPrimOp :: Op -> BValue -> Maybe BExpr
+evalPrimOp _ (BVar _) = Nothing
+evalPrimOp op v | Just cmp <- lookup op compareOps =
+  case v of
+    BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithBinOps =
+  case v of
+    BVArr [BVInt _, BVInt 0] | op == Div -> Just BFail
+    BVArr [BVInt a, BVInt b] -> Just $ BVal $ BVInt $ a `arith` b
+    BVArr vs  | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithUnOps =
+  case v of
+    BVInt a -> Just $ BVal $ BVInt $ arith a
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | op == IsInt =
+  case v of
+    a@(BVInt _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == Cons =
+  case v of
+    BVArr [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == DotDot =
+  case v of
+    BVArr [BVInt a, BVInt b] -> Just $ BChoice $ choices [ BlockValue [] (BVInt i) | i <- [a .. b] ]
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | op == Print =
   -- A temporary hack for printing.
-  case vs of
-    [BHNF h] ->
+  case v of
+    BHNF h ->
       trace ("Print: " ++ prettyShow h) $
       Just $ BVal $ BVArr []
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs)      
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op _ | op `elem` [Alloc, Read, Write, AddTo] = Nothing
-evalPrimOp op vs = error $ "evalPrimOp: " ++ show (op, vs)
+evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 
-evalPrimHeapOp :: BHeap -> Op -> [BValue] -> Maybe (BHeap, BExpr)
-evalPrimHeapOp h op@Alloc vs =
-  case vs of
-    [v] -> Just (h', BVal $ BVRef r) where (h', r) = heapAlloc h v
-    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
-evalPrimHeapOp h op@Read vs =
-  case vs of
-    [BVRef r] -> Just (h, BVal $ heapRead h r)
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
-evalPrimHeapOp h op@Write vs =
-  case vs of
-    [BVRef r, v] -> Just (heapWrite h r v, BVal $ BVArr [])
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
-evalPrimHeapOp h op@AddTo vs =
-  case vs of
-    [BVRef r, BVInt i] | BVInt j <- heapRead h r, let v = BVInt $ j + i -> Just (heapWrite h r v, BVal v)
-    _ | any isBVar vs -> Nothing
-      | otherwise -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op vs))
+evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
+evalPrimHeapOp h Alloc v =
+  case v of
+    vv -> Just (h', BVal $ BVRef r) where (h', r) = heapAlloc h vv
+--    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
+evalPrimHeapOp h op@Read v =
+  case v of
+    BVar _ -> Nothing
+    BVRef r -> Just (h, BVal $ heapRead h r)
+    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
+evalPrimHeapOp h op@Write v =
+  case v of
+    BVar _ -> Nothing
+    BVArr [BVRef r, vv] -> Just (heapWrite h r vv, BVal $ BVArr [])
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
+evalPrimHeapOp h op@AddTo v =
+  case v of
+    BVar _ -> Nothing
+    BVArr [BVRef r, BVInt i] | BVInt j <- heapRead h r, let vv = BVInt $ j + i -> Just (heapWrite h r vv, BVal vv)
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
 evalPrimHeapOp _ _ _ = Nothing
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
