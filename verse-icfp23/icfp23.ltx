@@ -375,8 +375,8 @@ whole expression is |2|.
 Functional logic programming has a long history and a rich literature \cite{antoy-hanus:survey}.
 But it is somewhat tricky for programmers to \emph{reason} about
 functional logic programs: they must think about logical variables,
-narrowing, backtracking, Horn clauses, resolution, and the like.  This
-contrasts with functional programming, where one can say ``just apply
+needed narrowing, unification, and the like.
+This contrasts with functional programming, where one can say ``just apply
 rewrite rules, such as \textbeta-reduction, let-inlining, and
 case-of-known-constructor.''
 % Moreover, these rewrite rules apply even
@@ -478,7 +478,7 @@ some built-in operations and tuples as data constructors:
   may evaluate to an as-yet-unknown logical variable.
   A head-normal form is a conventional value: a built-in constant |k|, an operator |op|, a tuple, or
   a lambda.  Our tiny calculus offers only integer constants |k| and two illustrative integer operators |op|, namely |gt| and |add|.
-\item \emph{Expressions} |e| includes values |v|, and applications |apply1N v_1 v_2|; we will
+\item \emph{Expressions} |e| include values |v|, and applications |apply1N v_1 v_2|; we will
   introduce the other constructs as we go.
 For clarity, we often write |apply1 v_1 v_2| rather than |apply1N v_1 v_2| when |v_2| is not a tuple.
 \item A term |eq| is either an ordinary expression |e|, or
@@ -488,8 +488,10 @@ an \emph{equation} |v==e|; this syntax ensures that equations can only occur to 
 %%  \lennart{It's not really supposed top be |OneKW|, but |succeeds|.  But we don't have |succeeds|.}
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values}, |(v_1 v_2)|, but the desugaring
-rules in \cref{fig:syntax} show how to desugar more applications |(e_1 e_2)|. This ANF-like
-normalization is not fundamental; it simply reduces the number of rewrite rules we need.
+rules in \cref{fig:syntax} show how to desugar more applications |(e_1 e_2)|. This restriction
+not fundamental; it simply reduces the number of rewrite rules we need\footnote{
+This is a common pattern, often called
+  ``administrative normal form'', or ANF \cite{felleisen:anf}}.
 The desugaring rules are more suggestive than precise; we aim to be precise about \versecalc{} but
 less so about the source language.
 
@@ -527,7 +529,7 @@ unifies |y| with |2| and |z| with |3|.  Finally, |2| is returned as the result.
 Note carefully that, as in any declarative language,
 \emph{logical variables are not mutable}; a logical variable stands for a single, immutable value.
 We use ``|defKW|'' to bring a fresh logical variable into scope, because we really
-mean ``there exists an |x| such that |xdots|.''
+mean ``there exists an |x| such that\ldots''.
 %% Logical variables \emph{are} existential variables.
 
 High-level functional languages usually provide some kind of
@@ -591,13 +593,13 @@ What if the choice was not at the top level of an expression?  For example,
 what does |tup (3, (7 choice 5))| mean?
 In \versecalc{}, it does \emph{not} mean a pair with some kind of multi-value in its second component.
 Indeed, as you can see from \cref{fig:syntax}, this expression is syntactically ill-formed.
-We must instead give a name to that choice, and then we can put it in the pair, thus: |def x (x == (7 choice 5); tup (3,x))|.
+We must use the desugaring rules of \cref{fig:syntax}, which give a name to that choice, thus: |def x (x == (7 choice 5); tup (3,x))|.
 Now the expression is syntactically legal, but what does it mean?  In \versecalc{}, a variable is never bound to a multi-value.
 Instead, |x| is successively bound to |7|, and then to |5|, like this:
 $$
 |def x (x == (7 choice 5); tup (3,x))| \quad \movesto \quad |(def x (x==7; tup (3,x))) choice (def x (x==5; tup (3,x)))|
 $$
-We duplicate the context surrounding the choice, and ``float the choice outwards.''
+We duplicate the context surrounding the choice, and ``float the choice outwards''.
 The same thing happens when there are multiple choices.  For example:
 $$
 |def (x ^^ y) (x == (7 choice 22); y == (31 choice 5); tup (x,y))|
@@ -958,7 +960,7 @@ $$
 $$
 so that the pattern depends on the value of |a|.
 
-\subsection{\texorpdfstring{|for|}{``for''} loops} \label{sec:for}
+\subsection{For loops} \label{sec:for}
 
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
@@ -982,7 +984,7 @@ simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| w
 apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
 \[
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
-|v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
+|v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
 \]
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
@@ -1173,16 +1175,16 @@ of logical variables are propagated.
 The key rule is:
 $$
 \begin{array}{rrcll}
-  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
-  &&&& \text{and $|v| = |y| \implies |x| \prec |y|$} \\
+  \rulename{subst} & |S^[x==v;e]| & \movesto & |(subst S x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+    & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$} \\
+  &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
-This rule uses context~|X| (\cref{fig:contexts}), and
+This rule uses context~|S| (\cref{fig:contexts}), and
 uses the notation |subst e x v| to mean ``capture-avoiding substitution of |v| for |x| in~|e|''
-(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
+(and similarly |subst S x v|, but |S| will have no bindings to be avoided).
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
@@ -1192,16 +1194,17 @@ restriction is precisely the same as the \rulename{let-v} rule of \citet{ariola:
 and, by not duplicating choices, it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
-\item \rulename{subst} replaces all occurrences of |x| in |X| and |e|, but
-  \emph{it leaves the original |(x==v)| undisturbed}, because |X| might not be
+\item \rulename{subst} replaces all occurrences of |x| in |S| and |e|, but
+  \emph{it leaves the original |(x==v)| undisturbed}, because |S| might not be
   big enough to encompass all occurrences of |x|.
   For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
-  |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
+  |S == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
 \item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
-  while $x \in \freevars{X,e}$ ensures that there is at least one occurrence to substitute.
-  The other side condition will be explained next, when we discuss \rulename{var-swap}.
+  while $x \in \freevars{S,e}$ ensures that there is at least one occurrence to substitute.
+
+\item The other side condition, involving $|x| \prec |y|$, is explained next, in \Cref{sec:swapping}.
 \end{itemize}
 
 \subsection{Swapping and binding order} \label{sec:swapping}
@@ -1209,7 +1212,6 @@ suffice to express the necessary sharing.
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
-
 $$
 \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
@@ -1258,7 +1260,7 @@ In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).
 To achieve this, \rulename{var-swap} fires on |y==x| \emph{only if
-|x| is bound inside |y|}, written $|x| \prec |y|$, so that the innermost-bound variable
+|x|'s binding occurs in the scope of |y|'s binding}, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
 Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely;
 and the side condition $(|v| = |y| \implies |x| \prec |y|)$ on \rulename{subst}
@@ -1275,8 +1277,8 @@ Consider this (extremely) tricky term:
 |def x (x = if (x==0; x>1; x) then 33 else 55)|.
 What should this do? At first you might think it was stuck---how can we simplify the |if|
 when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
-us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
-thusly:\footnote{
+us to substitute \emph{locally} in any |S|-context surrounding the equation |(x==0)|
+thus:\footnote{
   Here and elsewhere we rewrite terms that have not
   been fully desugared, but that is just an expository aid;
   formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
@@ -1401,8 +1403,8 @@ The most interesting rule is \rulename{choose}, which, just as described in \cre
 ``floats the choice outwards,'' duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
 defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like an
-execution context |X|, \emph{but with no possible
-  choices to the left of the hole}:
+substitution context |S|, \emph{but with no possible
+choices to the left of the hole}:
 $$
 CX ::= \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX|
 $$
@@ -1444,8 +1446,12 @@ the choice tree (context |SC|) immediately under a |oneKW| or |allKW| construct 
 Rule \rulename{choose} moves choices around; only \rulename{one-choice} and \rulename{all-choice}
 \emph{decompose} choices.
 So choice behaves a bit like a data constructor, or normal form, of the language.
-This contrasts with other approaches that eliminate choice by non-deterministically
-picking one branch or the other, which immediately gives up confluence.
+This contrasts with other semantic approaches that eliminate choice by non-deterministically
+picking one branch or the other, which immediately gives up confluence.  However, in implementation
+terms, treating choice a bit like a data constructor is the basis for \emph{pull-tabbing}
+in logically-complete implementations of non-deterministic functional logic
+languages like Curry \cite{antoy:pull-tabbing}.
+
 % For this reason we call
 % this approach \emph{spatial choice}, in contrast to approaches that eliminate choice by non-deterministically
 % picking one branch or the other, which immediately gives up confluence.
@@ -1540,16 +1546,16 @@ lambda calculus.  Similarly, the elimination rules never discard a term that cou
 In any term there may of course be many redexes---that is good.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
 out of the many possible redexes, should be rewritten next to make progress toward the result?
-Let us call an evaluation strategy \emph{good} if it guarantees to terminate if there
+Let us call an evaluation strategy \emph{normalising} if it guarantees to terminate if there
 is \emph{any} terminating sequence of reductions; \ie, if any path terminates with a value,
-then a good evaluation strategy will terminate with that same value\footnote{
+then a normalising evaluation strategy will terminate with that same value\footnote{
 It would be even better if the strategy could (c) guarantee to find the
 result in the minimal number of rewrite steps---so-called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
-sometimes called \emph{leftmost-outermost reduction}, is a \emph{good} evaluation strategy.
+sometimes called \emph{leftmost-outermost reduction}, is a normalising strategy.
 
-We believe that the same leftmost-outermost strategy is close to being \emph{good} for
+We believe that the same leftmost-outermost strategy is close to being normalising for
 \versecalc{}\footnote{
   We say ``close to'' being good because we do not yet have a proof; indeed
   rule \rulename{fail-elim} may be a bit too powerful.
@@ -1661,8 +1667,8 @@ We write $\rr^{*}$ for the reflexive transitive closure of $\rr$.
 % for the reflexive and transitive closure of $\rr$, \ie $\rr^{*} \equiv \cup_{0 \leq k} \rr^k$.
 %\lennart{We don't see $\rr^k$ being used anywhere below, so we dropped it here.}\guy{And now dropping Lennart's comment.}
 %
-We write $\rstep{\rr}{e}{e'}$ ($a$ \emph{steps to} $b$) if $(e, e') \in \rr$ and
-$\rsteps{\rr}{e}{e'}$ ($a$ \emph{reduces to} $b$) if $(e, e') \in \rr^{*}$.
+We write $\rstep{\rr}{e}{e'}$ ($e$ \emph{steps to} $e'$) if $(e, e') \in \rr$ and
+$\rsteps{\rr}{e}{e'}$ ($e$ \emph{reduces to} $e'$) if $(e, e') \in \rr^{*}$.
 %
 A reduction relation $\rr$ is \emph{confluent} if whenever $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$,
 there exists an $e'$ such that $\rsteps{\rr}{e_1}{e'}$ and $\rsteps{\rr}{e_2}{e'}$.

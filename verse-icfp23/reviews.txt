@@ -1,0 +1,347 @@
+ToDo list for camera ready copy
+
+* Ranjit: fix athe typos Guy discovered
+* Guy: revise skew confluence section with any changes you want to make
+* Simon: add citation for the Argentian work.
+a
+
+==============================
+Reviewer A
+==============================
+
+First, it seems that while they prove some safety of the semantics (confluence – two evaluations of the same term cannot reduce to different terms) it seems that no liveness property (good evaluation - evaluation eventually terminates). The authors mention that a proof is not there yet and conjecture FAIL-ELIM may be too strong (page 16). The issue of finding a good strategy and the fact that computation may get stuck should be more explicitly discussed in the paper.
+
+As to confluence, presence and comparison of the three approaches, two of which found space in the paper, should be better discussed.
+
+Minor comments:
+
+    page 12, line 563: the \prec ordering relation is not explained
+    until later (line 610) so the reader naturally assumes that the
+    \prec is a lexicographical ordering on the variables (mirroring
+    the location address that is used in classical unification
+    algorithms). But it is not: \prec characterises where a variable a
+    bound. Some standalone examples are needed to illustrate this as
+    it is a novel idea, which as it is super-critical for
+    understanding var-swap and seq-swap.
+
+I have added a clearer forward reference to 3.3.
+
+Questions for authors’ response
+
+    What is the status as to completeness? Do you have counter-examples, conjectures but have no proves yet?
+    Could you please elaborate more on why do you propose three alternative approaches to proving confluence and how they relate to practical scenarios?
+
+
+
+==============================
+Reviewer B
+
+Firstly, there is almost no motivation, which is odd given where the language is coming from. Verse is an important part of UEFN, it wouldn't hurt to put some of the motivation in this paper. It's not a GDC presentation, but a bit of context for the language would be nice.
+
+Secondly, as with all core calculi, there is choice about what to leave on the cutting-room floor. In this case, the calculus in the main body of the paper contains an untyped lambda-calculus with first-order unification of equality constraints on first-order open values (that is, values that may contain variables).
+
+This is a technically interesting calculus, and the development is a good one, but it does whet my appetite for the follow-up papers about the features that were not included. In particular, I would love to see a follow-up paper discussing STM, which is currently relegated to an appendix. It would be nice to have a discussion about the cost model for some of these features, for example does STM have the "obvious" O(n^2) implementation where all conflicting transactions are replayed, or is there scope for alternatives?
+
+Thirdly, it would be nice to have a cheat-sheet showing how the features of ShipVerse map to those in VC. I think one{M} maps to if(x := M) x else false? but that is something of a guess (and shouldn't really be necessary).
+
+The rest is details...
+
+  line 57: Using the word "time" here is possibly confusing, as this isn't a model with explicit timestamps (a la FRP).
+Hmm.  I don't propose to make a change here.
+
+  line 458: reduction everywhere should be called out more explicitly, preferably
+  in Fig 3. I spent a lot of time being confused about why introducing thunks
+  didn't destroy confluence until I found this line tucked away.
+
+I'm not sure what to do about this.  The "reduce anywhere" point is called out in
+a bullet all to itself, *immediatlyI we first mention Fig 3.  How can we make it
+clearer?
+
+  Fig 3: you are only doing first-order unification, which is perfectly sensible,
+  but does have some unexpected consequences, since x=F unifies but F=F (for F a
+  lambda term) does not. In particular, in this untyped language it looks like
+  equality is not reflexive (x=F is not the same as x=F; x=x) or transitive (x=F;
+  x=y; y=z is not the same as x=F; x=y; y=z; x=z). This may be surprising,
+  especially since higher-order unification does succeed in cases where one of the
+  terms is a variable. ShipVerse bans this using the comparable subtype
+  constraint, so it is not an issue in practice, but is worth discussing at least.
+
+Not sure what to say here
+
+  Sec 3.2: Somewhere in this section you might want to discuss inequality, and how
+  negated inequality isn't the same as equality. This is old hat for logic
+  programmers, but may need pointed out for a general ICFP audience.
+
+Maybe the reviewer means that
+* (not (x /= y)) is not the same as (x=y)
+* or maybe: not (not (x=y)) is not the same as (x=y)
+
+where
+    not(e)    ==={macro}   if x:=e then fail else x
+
+Unlike Haskell we need macro-expansion because Verse is not lazy.
+Note that `not (x=y)` is stuck until x and y get values.
+
+  line 580: you are hitting issues due to syntax being viewed inductively rather
+  than coinductively. It's not so bad here but is killing you in the confluence
+  section. You should at least discuss why coinductive ASTs aren't being used.
+  e.g. Sec 4.1: this is where inductive syntax is killing you. Why not coinductive
+  syntax up to bisimulation?
+
+I don't know what coinductive sy
+
+  Sec 3.7: mention relevance logic?
+
+I don't know what relevance logic is.
+
+  Sec 3.8: discuss the interplay of "reduce everywhere" with divergence? e.g. if (false) loop().
+
+TODO
+
+  Sec 5.2: since STM needs split it does seem that one and all are not as canonical as they appear.
+
+Maybe so.  But again that seems to be too big a can of worms to open.
+
+  Sec. 7: It would be nice to flesh this out a bit with a discussion of other
+  features of ShipVerse that aren't in VC, e.g. types, effects, type inference, STM,
+  etc.
+
+I don't think we can sensibly do this.
+
+==============================
+Reviewer C
+==============================
+
+The main problem I have with the current presentation of the paper is that the
+authors promise more than the paper contains. They argue at various places about
+existing approaches to functional logic programming and why their approach is
+simpler than other approaches. At this point I have to say that they are cheating
+a bit: by ignoring the objectives of existing approaches to functional logic
+programming, they present another approach which does not achieve these objectives
+and argue that their approach is simpler and more elegant. Of course, if one drops
+some objectives, one can present simpler solutions. Let me elaborate a bit on
+this.
+
+Logic programming is based on the idea to think and specify problems in an
+abstract high-level manner (e.g., predicate logic) so that the detailed
+computation steps to find a solution to a problem can be ignored. Soundness and
+completeness of the operational semantics is an important objective to support
+this idea. Since a truly functional logic language should support the same
+properties (and, due to functions, in a more elegant and efficient manner), most
+of the existing literature try to develop calculi ensuring these properties. In
+particular, it has been shown that lazy evaluation is a key to achieve this goal:
+without lazy evaluation, there is no advantage to add functions to logic programs
+[1], and with a needed evaluation strategy [2], one can achieve completeness as
+well as optimal evaluation. Since the combination of non-determinism and laziness
+causes non-trivial problems (call-time vs. run-time choice, strong/rigid/weak
+encapsulation,...), the existing approaches are sometimes complex.
+
+In this sense, the current paper just gives up completeness and presents a new
+calculus which looks simpler (e.g., elegant inclusion of encapsulation) but has
+the problem that computations might get stuck, i.e., no result is computed (a
+behavior avoided by an operationally complete strategy). It should be noted that
+this approach to functional logic programming is not new, e.g., it is the basis of
+the languages Goffin [3] or Escher [4] (where the computational model of Escher is
+also based on applying simple rewrite steps). On the positive side, the current
+paper provides a new calculus covering also encapsulation of choices (a
+notoriously difficult problem in logic programming) and presents a (restricted)
+confluence result. By being not lazy, optimality and completeness is not
+supported, but this could be a matter of taste.
+
+Another matter of taste is the kind of desired semantics. The authors argue
+several times that their small-step calculus is more easy for programmers,
+compared to big-step or heap-based semantics. However, their semantics could have
+the same problem. Since the heap contents is encoded in VC as a collection of
+equations (aka let bindings), the expressions to be manipulated become
+big. Actually, it was not easy for me to perform some example evaluations in VC in
+order to understand its behavior on concrete examples. BTW, this is the motivation
+for more abstract views, e.g., equational logic reasoning, of functional logic
+programming.
+
+Due to the matter of taste of these views, I would not argue against this
+paper. Actually, I think it is an interesting contribution to extend programming
+paradigms and might initiate discussions at ICFP. However, I strongly encourage
+the authors to calm down and be honest in their statements. As I discussed above,
+there are different approaches to functional logic programming, like
+narrowing-based where completeness is important (SLOG, K-Leaf, Babel, Toy,
+Curry,...) and residuation-based which give up completeness for a more
+deterministic behavior (Goffin, Escher,...) where computations might get
+stuck. This approach falls into the latter category (but has new aspects compared
+to the existing approaches). For instance, it is not clear how an operationally
+complete strategy, where non-determinism or fair scheduling is important [5], can
+be compiled into the deterministic VC, as it is mentioned in the paper. Thus, it
+is a calculus for a specific class of functionla logic languages. If the paper is
+accepted, the title should be changed to reflect the limits of this
+calculus. Since the calculus does not support completeness as other calculi but
+emphasize confluence and deterministic order of results (if results are obtained),
+a title like "...a Calculus for Deterministic/Confluent Functional Logic
+Programming" would be more adequate.
+
+Altogether, the paper is very-well written and is an interesting contribution to functional logic programming. If accepted, it should be better related to existing works (see also my comments below) and the title must be adapted in this sense.
+Comments for authors
+
+In addition to my general comments above, the following detailed remarks are listed by the line numbers of the paper.
+
+   L.32: The listing "logical variables, narrowing, backtracking, Horn clauses,
+   resolution" is artificial. Resolution is a specific case of narrowing, Horn
+   clauses are not relevant, and backtracking is a feature of Prolog. Actually,
+   these terms are not mentioned in the paper you cite. So please calm down.
+
+I narrowed this sentence a bit.
+
+   L.58/59: To be honest, you should mention here that VC gives up completeness in
+   contrast to the "non-deterministic" functional logic languages.
+
+TODO
+
+   L62: For this reason, it is unclear how one can compile a language with an
+   operationally complete and optimal evaluation such as Curry into VC. Of course,
+   one can do it at a very low level by simulating an assembler in VC but I guess
+   this is not the way you intend. Note that Curry is not based on a backtracking
+   semantics.
+
+This claim has gone.
+
+   L.170: Since the equations to be solved might contain evaluable operations, the
+   process is not simply "unification" but "E-unification" (where E is the set of
+   equations defining the semantics of the operations).
+
+I don't propose to say this.
+
+   L.399: This is the idea of "functional patterns" in Curry, where a functional
+   pattern can also abstract (due to laziness) an infinite set of concrete
+   patterns.
+
+TODO: What is a good citation here?  The term "functional pattern" does not appear in the Curry language Report.
+
+   L.633: So what is the problem in solving a quadratic equation? Solving is possible by enumerating numbers.
+
+TODO: it could be arbitrarily hard.  Does Curry enumerate all?
+
+   L.705ff: The fact that choice behaves like a data constructor is the idea of
+   pull-tabbing and also the basis of operationally complete implementations of
+   functional logic languages.
+
+TODO. I have added a sentence; check.
+
+L.759: Note that this major challenge is solved in Prolog systems with coroutining by attributed variables which initiate other computations when they are bound.
+
+   L.770: Please give a reference to the library you used, otherwise Fig. 5 is useless.
+
+TODO: can we release? Probly not.
+
+   L.780: Note that optimal evaluation is possible in functional logic programs
+   with the needed narrowing strategy [2]
+
+TODO: wow, really?
+
+    L.918ff: The requirement that variable equations are eliminated only after
+    having values for the variables is called "strict equality" in the FLP
+    literature.
+
+TODO: What would be a good citation?  This is great.
+
+    L.1046: Be more honest: your formulation is simpler than pull-tabbing since
+    your evaluation is lenient (and not lazy), which is less powerful
+    w.r.t. computed results. The complication with choice identifiers are only
+    caused by supporting lazy evaluation.
+    L.1068: The same applies here: your straightforward solution is due to the
+    omission of laziness. The concept about inside/outside in set functions is
+    caused by supporting laziness.
+
+L.1141: Do you have any advantage for the programmer by natively dealing with the full lambda calculus? Since you consider equation between lambdas as failures, it looks more restricted than defunctionalization where you might support intensional equality of functions by simply comparing the function identifiers. Proper higher-order logic languages (e.g., lambda-Prolog) deal with higher-order unfication (of lambda terms).
+
+L.1153: Let expressions are not equivalent to unification since let expressions
+are non-strict bindings whereas VC unification is strict.
+
+L.1166/1200: Since you mention "in Verse", it would be good to provide a reference
+to Verse in order to judge it.
+
+References:
+
+[1] M. Hanus: From Logic to Functional Logic Programs Theory and Practice of Logic Programming, 2022
+
+[2] S. Antoy, R. Echahed, M. Hanus: A Needed Narrowing Strategy Journal of the ACM, 2000
+
+[3] M.M.T. Chakravarty, Y. Guo, M. Koehler, H.C.R. Lock: Goffin - Higher-Order
+Functions Meet Concurrent Constraints Science of Computer Programming, 1998
+
+[4] J. Lloyd: Programming in an Integrated Functional and Logic Language Journal
+of Functional and Logic Programming, 1999
+
+[5] S. Antoy, A. Jost: A New Functional-Logic Compiler for Curry: Sprite Proc. of LOPSTR 2016
+
+Questions for authors’ response
+
+
+   You believe that it is possible to use VC as a target to compile Curry. Since
+   Curry is not backtracking-based (e.g., see paper [5]), how would you compile a
+   fair search strategy?
+
+Claim removed
+
+   For instance, I'd like to see whether the evaluation of
+      \exists xs,ys,zs . append<append<xs,ys>,zs> = <>; <xs,ys,zs>
+   is always finite (e.g., in logic programming, it is infinite, whereas with lazy
+   functional logic programming, it is finite). If the inner "append" and its
+   recursive calls are evaluated (as stated for lenient evaluation), it has the
+   risk of non-termination or not?
+
+Let's try.  Start with:
+  app<xs,ys> = (xs=[]; ys) | (exists p ps. xs = (p:ps); p : app<ps,ys>)
+
+Now
+  exists xs ys zs as. as = app<xs,ys>; app<as,zs> = []; <xs,ys,zs>
+--> {beta-reduce the second call to app}
+  exists xs ys zs as.
+        as = app<xs,ys>;
+        ((as=[]; zs) | (exists p ps. as = (p:ps); p : app<ps,zs>)) = [];
+        <xs,ys,zs>
+
+ALAS we can't expand that choice because the CHOOSE rule goes out to a scope
+limiting construct (the SX context).  So all we can do is expand the first call to
+`app`, which indeed goes on for ever.
+
+
+==============================
+Reviewer D
+==============================
+I welcome that the paper first introduces the calculus informally by discussing
+various example programs instead of directly introducing the rewrite
+semantics. This helped me greatly to get a feel for the calculus before diving
+into the details.
+
+It seems to me that the authors have a clear target use-case in mind which guide
+some design decisions of the calculus. For example: why does the calculus have to
+be deterministic, or why not define built-in booleans and instead design
+conditionals based on the existence of a value? Without understanding the target
+use-case, the design decisions seem somewhat arbitrary and it is hard to follow
+and assess them.
+
+In the same vein, the paper does not provide any justification for the need of
+this calculus. In particular, the paper does not present any significant case
+studies highlighting the strengths of VC. I believe this paper can be stronger if
+the authors highlight specific problems that can be elegantly solved when using
+the Verse language justifying the need for the language, and therefore the
+calculus.
+
+The paper does not discuss a line of related work that combines Datalog with
+functional programming. How does this calculus compare to approaches such as
+Datafun [1], Flix [2], Formulog [3], and functional IncA [4]?
+
+Subsection 3.4 feels out of place. I don't understand why the program with x = 100
+gets stuck. The reader needs more guidance to understand what the exact problem
+is. Maybe then it becomes clear what the point of the subsection is, but I don't
+know what this section is trying to convey.
+
+[1]: Michael Arntzenius, Neelakantan R. Krishnaswami. Datafun: a functional Datalog. ICFP 2016: 214-227.
+
+[2]: Magnus Madsen, Ming-Ho Yee, Ondrej Lhoták. From Datalog to flix: a declarative language for fixed points on lattices. PLDI 2016: 194-208.
+
+[3]: Aaron Bembenek, Michael Greenberg, Stephen Chong. Formulog: Datalog for SMT-based static analysis. Proc. ACM Program. Lang. 4(OOPSLA): 141:1-141:31 (2020).
+
+[4]: André Pacak, Sebastian Erdweg. Functional Programming with Datalog. ECOOP 2022: 7:1-7:28.
+
+Questions for authors’ response
+
+Why does a VC program (Line 103) derive at most one value? Is this restriction required for the semantics? What would happen if we allow arbitrary an expression as a program? Would the calculus completely break or is it possible to adjust the calculus?
