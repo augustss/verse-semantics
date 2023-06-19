@@ -76,6 +76,8 @@
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
+%format tlam (x) (e1) (e2) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}"
+%format tlamKW = "\textbf{tlam}"
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -208,7 +210,7 @@
 %format nat = "\textbf{nat}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
-%format function (x)(rhs) = functionKW "(" x ")." rhs
+%format function (x)(rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionKW = "\textbf{function}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
@@ -231,7 +233,7 @@
 %format lte = "\prec"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = "{\bf verify}\langle" r "\rangle\{" b "\}"
+%format check (r) (b) = "{\bf check}(" r ")\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"

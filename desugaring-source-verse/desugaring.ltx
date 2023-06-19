@@ -183,14 +183,14 @@ $$
 \multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
   |t| & ::= & |x|               & \text{Variable} \\
       & \vb & |k|               & \text{Constant} \\
-      & \vb & |f^[x]|       & \text{Function application} \\
+      & \vb & |f^[x]|           & \text{Function application} \\
       & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |x = t|       & \text{Unification} \\
+      & \vb & |x = t|           & \text{Unification} \\
       & \vb & |x := t|          & \text{Definition} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) do b|     & \text{Finite loop} \\
-      & \vb & |check fx t|     & \text{Effects check} \\
+      & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |function a t|    & \text{Function} \\
 \\
@@ -225,7 +225,7 @@ $$
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
   |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
   |t_1^[t_2]| & \rightarrow & |f := t_1; x := t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
-  |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds (f^[x])| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds^{f^[x]}| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -235,7 +235,7 @@ $$
   |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2)| & \text{NOT QUITE RIGHT} \\
   %%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
   |(p?) := t| & \rightarrow & |p := option^{t}| \\
-  |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
+  |array (p_1 xdots p_n) := t| & \rightarrow & |array(x_1:any,xdots,x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
@@ -243,16 +243,16 @@ $$
 \\
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
-  |e_1 eqgt e_2| & \rightarrow & |function e_1 () {e_2}| \\
+  |e_1 eqgt e_2| & \rightarrow & |function e_1 e_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
   |function () b| & \rightarrow & |functionKW (()) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditionals and for-loops}} \\
-  |if{e})| & \rightarrow & |if(e) else false| \\
+  |if{e}| & \rightarrow & |if(e) else false| \\
   |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
   |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
-  |for{e}| & \rightarrow & |for (x := e) in { x }| & \text{|x| fresh} \\
+  |for{e}| & \rightarrow & |for (x := e) { x }| & \text{|x| fresh} \\
 \end{array}
 \end{array}
 $$
@@ -273,7 +273,7 @@ $$
   |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
   |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
   \\
-  \multicolumn{1}{l}{\textbf{Let, do, case}} \\
+  \multicolumn{1}{l}{\textbf{Let, block, case}} \\
   |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
   |block b| & \rightarrow & |b| & \textit{see note}  \\
   |case{e_1; dots e_n}| & \rightarrow & |(x:any) => case(x){e_1; dots e_n}| & \text{|x| fresh} \\
@@ -318,7 +318,7 @@ $$
       & \vb & |check fx e|                & \text{Effects check} \\
       & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
       & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
-      & \vb & |for(e) do b|               & \text{Finite loop} \\
+      & \vb & |for(e){b}|               & \text{Finite loop} \\
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
@@ -347,9 +347,9 @@ $$
 \multicolumn{4}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
 \multicolumn{4}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
 and |e| is a BigCore expression}} \\
-  |Me i k| & = & |i=k| \\
-  |Me i x| & = & |i=x| \\
-  |Me i (f^[x])| & = & |i=f^[x]| \\
+  |Me i k| & = & |i==k| \\
+  |Me i x| & = & |i==x| \\
+  |Me i (f^[x])| & = & |i==f^[x]| \\
   |Me i (x=t)| & = & |x = Me i t| \\
   |Me i (x:=t)| & = & |x := Me i t| \\
   |Me i (:t)| & = & |(De t)^(i)| & \\
@@ -358,15 +358,20 @@ and |e| is a BigCore expression}} \\
   |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
   |Me i (array(t_1, xdots, t_n))| & = &
     \multicolumn{2}{l}{|def (x_1 xdots x_n)
-      (Me x_1 t_1; xdots; Me x_n t_n;  i = arr (x_1, xdots, x_n))|} \\
-    |Me i (if(e_1) then e_2 else e_3)| & = &
+      (Me x_1 t_1; xdots; Me x_n t_n;  i == arr (x_1, xdots, x_n))|} \\
+  |Me i (if(e_1) then e_2 else e_3)| & = &
     \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e2}| \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
-  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
-  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
+%%  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
+%%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
+|Me i (function t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
+& \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
+& \multicolumn{3}{l}{\text{Perhaps this works?}} \\
+|Me i (function t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
 $$
@@ -468,6 +473,18 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
 \caption{Core prelude} \label{fig:core-prelude}
+\end{figure}
+
+\begin{figure}
+  We need a description of scope handling.
+  \begin{itemize}
+  \item turning |:=| into |defKW|
+  \item handle |let|
+  \item handle |block|
+  \item insert |defKW| in |for|,|if|,|tlamKW|
+  \end{itemize}
+
+\caption{Scope} \label{fig:scope}
 \end{figure}
 
 % --------------------------------------
