@@ -475,7 +475,7 @@ evalApp flg = evalTrace "evalApp" f flg
 evalSeq :: EvalCore
 evalSeq flg = evalTrace "evalSeq" f flg
   where
-    f (CSeq es) = cSeq $ Snoc (filter (not . isValue) es') e'
+    f (CSeq es) = cSeq $ Snoc (filter (not . isCValue) es') e'
       where Snoc es' e' = concatMap (flat . f) es
     f (CUnify (CSeq (Snoc es e)) e2) = CSeq $ es ++ [CUnify e e2]
     f (CUnify e1@CValue{} (CSeq (Snoc es e))) = CSeq $ es ++ [CUnify e1 e]

@@ -233,7 +233,8 @@ $$
   |p : t| & \rightarrow & |p := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
   |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2)| & \text{NOT QUITE RIGHT} \\
-%%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
+  %%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
+  |(p?) := t| & \rightarrow & |p := option^{t}| \\
   |array (p_1 xdots p_n) := t| & \rightarrow & | p_1 := x_1; xdots; p_n := x_n; t = array(x_1,xdots,x_n) | \\[2mm]
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
@@ -280,7 +281,7 @@ $$
   \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
   \multicolumn{1}{l}{\textbf{Misc}} \\
-  |option^{})| & \rightarrow & |false| \\
+  |option^{}| & \rightarrow & |false| \\
   |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
 \end{array}
 $$

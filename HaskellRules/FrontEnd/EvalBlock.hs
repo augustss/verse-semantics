@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+#define EXT 0
 module FrontEnd.EvalBlock(runBlock) where
 import Prelude hiding ((<>))
 import Control.Monad.State.Strict
@@ -75,7 +77,9 @@ evalUnderLambda = transformBi ev
         ev v@BRef{} = v
         ev (BArr vs) = BArr (map (transformBi ev) vs)
         ev (BHLam i b) = BHLam i $ transformBi ev $ evalB b
+#if EXT
         ev (BExt a r x) = BExt (ev a) (transformBi ev r) (transformBi ev x)
+#endif
         evalB b =
           case evalBlock dummyHeap lambdaEffs [] b of
             BCBlk b' -> b'
@@ -172,7 +176,9 @@ data BHNF
   | BRef BPtr
   | BArr [BValue]
   | BHLam BIdent BBlock  -- invariant: the bound BIdent will not be among the vars in the block
+#if EXT
   | BExt BHNF BValue BValue
+#endif
   deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
@@ -187,8 +193,10 @@ pattern BVArr vs = BHNF (BArr vs)
 pattern BVLam :: BIdent -> BBlock -> BValue
 pattern BVLam i b = BHNF (BHLam i b)
 
+#if EXT
 pattern BVExt :: BHNF -> BValue -> BValue -> BValue
 pattern BVExt a r x = BHNF (BExt a r x)
+#endif
 
 pattern BXLam :: BIdent -> BValue -> BValue
 pattern BXLam i v = BVLam i (BlockValue [] v)
@@ -290,8 +298,10 @@ instance Pretty BHNF where
   pPrintPrec l _ (BArr [v]) = parens (pPrintPrec l 0 v <> text ",")
   pPrintPrec l _ (BArr vs) = parens $ fsep (punctuate comma (map (pPrintPrec l 0) vs))
   pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 b
+#if EXT
   pPrintPrec l _ (BExt a r x) = parens $
     text "\\ arg . IF arg=" <> pPrintPrec l 0 a <+> text "THEN" <+> pPrintPrec l 0 r <+> text "ELSE" <+> pPrintPrec l 0 x
+#endif
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -427,12 +437,16 @@ instance Bound BHNF where
   allBVars (BRef _) = []
   allBVars (BArr vs) = unionMap allBVars vs
   allBVars (BHLam i b) = [i] `union` allBVars b
+#if EXT
   allBVars (BExt a r x) = allBVars (a, r, x)
+#endif
   freeBVars (BInt _) = []
   freeBVars (BRef _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
+#if EXT
   freeBVars (BExt a r x) = freeBVars (a, r, x)
+#endif
   bsubst' _ h@(BInt _) = h
   bsubst' _ h@(BRef _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
@@ -442,7 +456,9 @@ instance Bound BHNF where
     where
       s' = filter ((/= i) . fst) s
       (i', b') = freshenLambda (freeBVars (map snd s')) (i, b)
+#if EXT
   bsubst' s (BExt a r x) = BExt (bsubst' s a) (bsubst' s r) (bsubst' s x)
+#endif
 
 freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
 freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
@@ -488,7 +504,9 @@ hnfToCore (BArr vs) = Arr (map valueToCore vs)
 hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
   where lam ii (f :@: Var i') | ii == i', ii `notElem` free f = f
         lam ii ee = LAM ii ee
+#if EXT
 hnfToCore (BExt a r x) = LAM (Name "_") (Var (Name $ "EXT" ++ prettyShow (a, r, x)))
+#endif
 
 exprToCore :: BExpr -> Expr
 exprToCore (BPrimOp o v) = Op o :@: valueToCore v
@@ -763,12 +781,14 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
           -- According to the ICFP paper this fails.  Being WRONG would be better
           fails
           -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
+#if EXT
         unify (BVExt a1 r1 x1) (BVExt a2 r2 x2) | a1 == a2 = succeeds [(r1, BVal r2), (x1, BVal x2)]
         -- These are dubious
         unify (BVExt a r x) v = succeeds [(r, BApply v (BHNF a)), (x, BVal v)]
         unify v (BVExt a r x) = succeeds [(r, BApply v (BHNF a)), (x, BVal v)]
 --        unify v1@BVExt{} v2 = error $ "unify BExt: " ++ prettyShow (v1, v2)
 --        unify v1 v2@BVExt{} = error $ "unify BExt: " ++ prettyShow (v1, v2)
+#endif
         unify _ _ = fails -- anything else fails
 
         -- Fail if it is allowed, otherwise suspend
@@ -813,9 +833,11 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                         | otherwise -> suspend eqn
           BApply f a ->
             case f of
+#if EXT
               BVar _ | BHNF h <- a ->
                     let x = bIdentNotIn (allvars ++ freeBVars (h, val))
                     in  succeeds'' heap [x] [(f, BVal $ BVExt h val (BVar x))]
+#endif
               BVar _ -> suspend eqn           -- not a hnf yet
               BVLam i b ->
                 -- Bind the argument and insert the lambda body
@@ -825,8 +847,10 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                 let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BVInt i)], result = v }
                                           | (i, v) <- zip [0..] vs ]
                 in  succeeds [(val, e)]
+#if EXT
               BVExt i o x | BHNF h <- a -> if i == h then unify val o else succeeds [(val, BApply x a)]
                           | otherwise -> suspend eqn
+#endif
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of

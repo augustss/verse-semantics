@@ -50,12 +50,10 @@ library all
                       FrontEnd.Expr
                       FrontEnd.Flags
                       FrontEnd.Desugar
-                      FrontEnd.DesugarNew
                       FrontEnd.Parse
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
-                      FrontEnd.Tim
                       Verifier.Verify
                       Verifier.FOL
                       Rules.ICFP

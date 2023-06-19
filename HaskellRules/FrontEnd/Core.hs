@@ -13,7 +13,7 @@ module FrontEnd.Core(
   compos, composOp,
   exprToCore,
   cSeq, cDef, cBar,
-  isValue,
+  isCValue,
   fvs, cfvs, fvsS,
   subst,
   alphaConvert,
@@ -120,8 +120,8 @@ getValue :: Core -> Maybe Core
 getValue e@CVar{} = Just e
 getValue e = getHNF e
 
-isValue :: Core -> Bool
-isValue e = isJust (getValue e)
+isCValue :: Core -> Bool
+isCValue e = isJust (getValue e)
 
 {-
 isValue' :: Core -> Bool
@@ -224,6 +224,11 @@ core (Lambda i rs e1 e2) = do
 core EmptyT = pure CFail
 core (Exists is e) = cDef is <$> core e
 core (Lam i e) = CLam i <$> core e
+core (TLam i rs e1 e2) = do
+  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
+  let covariant = covariantId `elem` rs  || True -- XXX
+  lamFunc covariant i e1 e2
+core (HasType e t) = core $ ApplyS t e
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
@@ -265,7 +270,6 @@ lamFunc cov i (Exists is e1) e2 =
         Exists is (Seq [e1, e2])
       else
         If3 (Exists is e1) e2 (Wrong "outside domain")
-      
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core

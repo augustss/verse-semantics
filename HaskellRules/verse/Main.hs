@@ -11,7 +11,6 @@ import Options.Applicative hiding (command)
 
 import Epic.Print hiding ((<>))
 import FrontEnd.Desugar
-import FrontEnd.DesugarNew
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
 import qualified FrontEnd.Parse as P
@@ -22,7 +21,6 @@ import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
-import FrontEnd.Tim
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
@@ -83,7 +81,7 @@ data CState = CState
   }
 
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core] | Tim Prog
+data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
 
 asParsed :: SomeExpr -> Expr
 asParsed NoExpr = error "No current expression"
@@ -91,14 +89,13 @@ asParsed (Parsed e) = e
 asParsed (Desugared _) = error "Current expression is desugared"
 asParsed (Cored _) = error "Current expression is Core"
 asParsed (Cores _) = error "Current expression is [Core]"
-asParsed (Tim _) = error "Current expression is Prog"
 
 asExpr :: SomeExpr -> Expr
 asExpr (Desugared e) = e
 asExpr e = asParsed e
 
 asDesugared :: SomeExpr -> Expr
-asDesugared (Parsed e) = desugar e
+asDesugared (Parsed e) = desugar DRun e
 asDesugared e = asExpr e
 
 asCore :: Flags -> SomeExpr -> Core
@@ -107,18 +104,12 @@ asCore _ (Cores [e]) = e
 asCore _ Cores{} = error "Not a singleton Core value"
 asCore s e = exprToCore s $ asDesugared e
 
-asTim :: SomeExpr -> Prog
-asTim (Parsed e) = dsProg e
-asTim (Tim e) = e
-asTim _ = error "Not a Tim program"
-
 instance Show SomeExpr where
   show NoExpr = "No current expression"
   show (Parsed e) = show e
   show (Desugared e) = show e
   show (Cored e) = show e
   show (Cores e) = show e
-  show (Tim e) = show e
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr = text "No current expression"
@@ -129,14 +120,12 @@ instance Pretty SomeExpr where
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
                                      map (\ e -> pPrintPrec l 0 e $$ text "------------") es
-  pPrintPrec l p (Tim e) = pPrintPrec l p e
 
 command :: Command CState
 command = Command
   { c_commands =
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
-      , Cmd "ndesugar [EXPR]"      "Desugar [last] expression"             cDesugarNew
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
       , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
@@ -157,8 +146,7 @@ command = Command
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
 --      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
-      , Cmd "tim [EXPR]"           "Tim desugaring of [last] expression"   cTim
-      , Cmd "tsimp [EXPR]"         "Simplify Tim program of [last] expression"   cTimSimp
+      , Cmd "smalldesugar"         "Desugar in SmallVerse"                 cSmallDesugar
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -247,10 +235,7 @@ cTransform tr =
       pure e'
 
 cDesugar :: Run CState
-cDesugar = cTransform (Desugared . desugar . asExpr)
-
-cDesugarNew :: Run CState
-cDesugarNew = cTransform (Desugared . desugarNew . asExpr)
+cDesugar = cTransform (Desugared . desugar DRun . asExpr)
 
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
@@ -364,11 +349,11 @@ cDisplay _ s = do
   pure s
 -}
 
-cTim :: Run CState
-cTim = cTransform (Tim . dsProg . asParsed)
-
-cTimSimp :: Run CState
-cTimSimp = cTransform (Tim . simpProg . asTim)
+cSmallDesugar :: Run CState
+cSmallDesugar =
+  withLastExpr $ \ e s -> do
+    pp $ desugarSmall DRun $ asParsed e
+    pure s
 
 cShow :: Run CState
 cShow =
