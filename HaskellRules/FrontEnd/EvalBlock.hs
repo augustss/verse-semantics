@@ -827,7 +827,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Examine the expression and evaluate if possible.
         dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
-          BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs "effect not allowed"
+          BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs $ "effect not allowed: " ++ show (op, primOpEffs op)
                         | Just e <- evalPrimOp op v -> succeeds [(val, e)]
                         | Just (h, e) <- evalPrimHeapOp heap op v -> succeeds' h [(val, e)]
                         | otherwise -> suspend eqn
