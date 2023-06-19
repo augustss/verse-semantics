@@ -101,13 +101,9 @@ data Expr
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
-  | Where Expr Expr           -- e1 where e2
-  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2
-  | EmptyT                    -- :false
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
   | HasType Expr Expr         -- e:t, but only type known to verifier
-  | Lam Ident Expr            -- i => e
   | TLam Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2
   | DomainFail                -- either Wrong or try next overload
   deriving (Eq, Ord, Show, Data)
@@ -201,11 +197,6 @@ instance Pretty Expr where
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
-          Lambda i rs e1 e2 -> maybeParens (p > 10) $
-            text "fn" <> sep [parens (pPrintL l e1') <> ppEffs rs, indent $ ppB e2]
-            where e1' | Array [] <- e1 = iany
-                      | otherwise = Where iany e1
-                  iany = InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))
           Block es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -224,14 +215,10 @@ instance Pretty Expr where
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
           Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                      text "range" <> braces (ppr 0 e)
-          Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
-          EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":FALSE"))
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           HasType e t -> --ppNormal (InfixOp e (Op ":") t)
                          text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
-          Lam i e -> --pPrintPrec l p (Lambda i [] (Array []) e)
-            maybeParens (p>0) $ text "\\" <> pPrintPrec l 0 i <> text "." <> pPrintPrec l 10 e
           TLam i rs e1 e2 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2)
           DomainFail -> text "DomainFail"
       ppVRA _ _ Nothing  Nothing  = undefined
@@ -339,14 +326,10 @@ compos f (Define i e) = Define i <$> f e
 compos f (Define2 i x e) = Define2 i x <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
-compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
-compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
-compos _ EmptyT = pure EmptyT
 compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
 compos f (HasType e1 e2) = HasType <$> f e1 <*> f e2
-compos f (Lam i e) = Lam i <$> f e
 compos f (TLam i rs e1 e2) = TLam i rs <$> f e1 <*> f e2
 compos _ DomainFail = pure DomainFail
 

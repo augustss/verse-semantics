@@ -95,7 +95,7 @@ asExpr (Desugared e) = e
 asExpr e = asParsed e
 
 asDesugared :: SomeExpr -> Expr
-asDesugared (Parsed e) = desugar DRun e
+asDesugared (Parsed e) = desugar e
 asDesugared e = asExpr e
 
 asCore :: Flags -> SomeExpr -> Core
@@ -182,7 +182,6 @@ flagTable =
   ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
-  ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
 --  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
 --  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
@@ -235,7 +234,7 @@ cTransform tr =
       pure e'
 
 cDesugar :: Run CState
-cDesugar = cTransform (Desugared . desugar DRun . asExpr)
+cDesugar = cTransform (Desugared . desugar . asExpr)
 
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
@@ -352,7 +351,7 @@ cDisplay _ s = do
 cSmallDesugar :: Run CState
 cSmallDesugar =
   withLastExpr $ \ e s -> do
-    pp $ desugarSmall DRun $ asParsed e
+    pp $ desugarSmall $ asParsed e
     pure s
 
 cShow :: Run CState

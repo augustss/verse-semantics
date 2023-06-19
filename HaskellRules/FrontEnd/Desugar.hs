@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module FrontEnd.Desugar(
-  DHow(..), desugarSmall, desugar,
+  desugarSmall, desugar,
   primOps, covariantId, dsScope,
   simplify,
   ) where
@@ -16,11 +16,11 @@ import Epic.Print
 import FrontEnd.Error
 import FrontEnd.Expr
 
-desugarSmall :: DHow -> Expr -> Expr
-desugarSmall h = eval h . (dsSmall <=< dropParens)
+desugarSmall :: Expr -> Expr
+desugarSmall = eval . (dsSmall <=< dropParens)
 
-desugar :: DHow -> Expr -> Expr
-desugar h = eval h .
+desugar :: Expr -> Expr
+desugar = eval .
             (simp <=<
              traceDS "addScope" <=< addScope <=<
              traceDS "dsD" <=< dsD <=<
@@ -41,9 +41,7 @@ type D = State DState
 -- Right now it is used to guide desugaring to avoid an uninstantiated exist
 -- in the function desugaring.
 
-data DState = DState { nextNo :: !Int, how :: !DHow, context :: DContext }
-  deriving (Show)
-data DHow = DRun | DVerify
+data DState = DState { nextNo :: !Int, context :: DContext }
   deriving (Show)
 data DContext = DAbstract | DEval
   deriving (Show)
@@ -79,8 +77,8 @@ dropParens = f
 
 ---------------------
 
-eval :: DHow -> D Expr -> Expr
-eval h = flip evalState DState{ nextNo = 1, how = h, context = DEval }
+eval :: D Expr -> Expr
+eval = flip evalState DState{ nextNo = 1, context = DEval }
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -265,22 +263,20 @@ dsM i (Array ts) = do
 dsM i (If3 e1 e2 e3) = If3 <$> dsD e1 <*> dsM i e2 <*> dsM i e3
 dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
-  h <- gets how
   c <- gets context
-  dsFunction h c i t1 r t2
+  dsFunction c i t1 r t2
 dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM _ e = impossible e
 
-dsFunction :: DHow -> DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
---dsFunction DVerify _ _ _ _ _ = error "function desugaring for verification no implemented"
-dsFunction _ DEval i t1 effs t2 = do
+dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
+dsFunction DEval i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   t1' <- withContext DAbstract $ dsM x t1
   t2' <- dsD t2
   pure $ unifyV i $  -- Do the unification?
          TLam x effs t1' t2'
-dsFunction _ DAbstract i t1 effs t2 = do
+dsFunction DAbstract i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   y <- newIdent (getLoc t1) "y"
   z <- newIdent (getLoc t1) "z"
@@ -288,60 +284,12 @@ dsFunction _ DAbstract i t1 effs t2 = do
   t2' <- withContext DEval $ dsM y t2
   pure $ TLam x effs (Define z t1') (Seq [Define y (ApplyD (Variable i) (Variable z)), t2'])
 
-{-
-dsMatch (Block es) v = dsMatch (Seq es) v
--- Rule: function(e1)<rs>{e2} :- v  -->  lambda x rs (exists y . y = (e1 :- x)) (exists q . q = v[y]; (e2 :- q))
-dsMatch (Function [(e1,rs)] e2) v = do
-  x <- newIdent (getLoc e1) "x"
-  y <- newIdent (getLoc e1) "y"
-  q <- newIdent (getLoc e1) "q"
-  d1 <- dsMatch e1 x
-  d2 <- dsMatch e2 q
-  pure $ Lambda x rs (Define y d1) $ Seq [Define q (ApplyD (Variable v) (Variable y)), d2]
-dsMatch (Function (a:as) e) v = dsMatch (Function [a] (Function as e)) v
-dsMatch (ApplyEff rs e) v = ApplyEff rs <$> dsMatch e v
-dsMatch (Succeeds e) v = ApplyEff [Ident noLoc "succeeds"] <$> dsMatch e v
-dsMatch e _ = error $ "dsMatch: " ++ prettyShow e
--}
-
-
-{-
-applyEff :: [Eff] -> Expr -> Expr
-applyEff rs (ApplyEff rs' e) = ApplyEff (rs ++ rs') e
-applyEff rs e = ApplyEff rs e
--}
-
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e
 
 existsV :: [Ident] -> Expr -> Expr
 existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
                Exists is e
-
-{-
-unifyV :: Ident -> Expr -> Expr
-unifyV = Define
-
-existsV :: [Ident] -> Expr -> Expr
-existsV _is e = e
--}
-
-{-
--- Hackily move exists in a lambda domain to the top
-existsHack :: Expr -> D Expr
-existsHack = pure . f
-  where f (Lambda i rs d r) = Lambda i rs (pullExists d) (f r)
-        f e = composOp f e
-        pullExists (Exists is e) = Exists (is ++ is') e' where (is', e') = pull e
-        pullExists _ = undefined
-        pull (Exists is e) = (is ++ is', e') where (is', e') = pull e
-        pull (Seq []) = ([], Seq [])
-        pull (Seq (e:es)) = (is ++ is', Seq (e' : es'))
-          where (is, e') = pull e
-                (is', Seq es') = pull (Seq es)
-        pull (Unify v e) = (is, Unify v e') where (is, e') = pull e
-        pull e = ([], e)
--}
 
 -- Pick the appropriate form of apply for operators
 call :: String -> Loc -> String -> Expr -> Expr
@@ -359,7 +307,7 @@ call p l s e = con (Variable (Ident l s')) e
 ----------------------------------------------
 
 dsScope :: Expr -> Expr
-dsScope = eval DRun . addScope
+dsScope = eval . addScope
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -422,12 +370,7 @@ scope sc = expr
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
-    expr (Lambda i r e1 e2) = do
-      (e1', sc') <- defs (S.insert i sc) e1
-      Lambda i r e1' <$> scope sc' (Do e2)
-    expr e@EmptyT = pure e
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
-    expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2
@@ -464,18 +407,14 @@ getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
 getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (Where e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible Macro1 {} = []
 getVisible (Define i e) = i : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
-getVisible EmptyT = []
 getVisible Function{} = []
-getVisible Lambda{} = []
 getVisible (Exists is e) = is ++ getVisible e
 getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
-getVisible Lam{} = []
 getVisible TLam{} = []
 getVisible e = impossible e
 
@@ -493,8 +432,6 @@ getVar For2{} = []
 getVar (Let _ e) = getVar e
 getVar Do{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
-getVar (Where e1 e2) = getVar e1 ++ getVar e2
---getVar (Typedef _) = []
 getVar Macro1 {} = []
 getVar (Define _ e) = getVar e
 getVar (Define2 _ _ e) = getVar e
@@ -502,9 +439,7 @@ getVar Choice{} = []
 getVar (Set _ _ e) = getVar e
 getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
 getVar (Range e) = getVar e
-getVar EmptyT = []
 getVar Function{} = []
-getVar Lambda{} = []
 getVar TLam{} = []
 getVar (Exists _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
@@ -574,7 +509,6 @@ addDeref = pure . exprD S.empty
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
-    expr s (Where e1 e2) = Where (expr s e1) (expr s e2)
     expr s (Define i e) = Define i (expr s e)
     expr s (Define2 i j e) = Define2 i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
@@ -584,8 +518,6 @@ addDeref = pure . exprD S.empty
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
-    expr s (Lambda i rs e1 e2) = Lambda i rs (expr s' e1) (expr s' e2)
-      where s' = defs s e1
     expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)

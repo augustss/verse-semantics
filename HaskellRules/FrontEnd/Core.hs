@@ -209,20 +209,7 @@ core (Macro1 (Ident _ "all") [] e) = cAll =<< core e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
-core (Lambda i rs e1 e2) = do
-  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
-  timLam <- asks fTimLambda
-  let covariant = covariantId `elem` rs || True -- XXX
-  if timLam then do
-    let Exists is e1a = e1
-    e1' <- core e1a
-    e2' <- core e2
-    pure $ CLambda i is covariant e1' e2'
-  else
-    lamFunc covariant i e1 e2
-core EmptyT = pure CFail
 core (Exists is e) = cDef is <$> core e
-core (Lam i e) = CLam i <$> core e
 core (TLam i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   let covariant = covariantId `elem` rs  || True -- XXX
@@ -384,7 +371,7 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ Lambda i [] (Exists [] $ Array []) e
+  pure $ TLam i [] (Exists [] $ Array []) e
 
 ------
 
@@ -603,7 +590,7 @@ pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
-    lam is e = foldr (\ i r -> Lambda i [] (Array []) r) e is
+    lam is e = foldr (\ i r -> TLam i [] (Array []) r) e is
     pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
       -- <|> pKeyword "λ"
 
