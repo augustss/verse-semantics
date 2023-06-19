@@ -16,6 +16,24 @@ import Epic.Print
 import FrontEnd.Error
 import FrontEnd.Expr
 
+desugarSmall :: DHow -> Expr -> Expr
+desugarSmall h = eval h . (dsSmall <=< dropParens)
+
+desugar :: DHow -> Expr -> Expr
+desugar h = eval h .
+            (simp <=<
+             traceDS "addScope" <=< addScope <=<
+             traceDS "dsD" <=< dsD <=<
+             traceDS "addDeref" <=< addDeref <=<
+             traceDS "dsSmall" <=< dsSmall <=<
+             traceDS "dropParens" <=< dropParens)
+
+traceDS :: String -> Expr -> D Expr
+traceDS _msg e = --trace ("---- " ++ _msg ++ "\n" ++ prettyShow e) $
+                pure e
+
+------
+
 type D = State DState
 
 -- XXX Do we really need the distinction between abstracttion and evaluation
@@ -61,16 +79,6 @@ dropParens = f
 
 ---------------------
 
-desugarSmall :: DHow -> Expr -> Expr
-desugarSmall h = eval h . (dsSmall <=< dropParens)
-
-desugar :: DHow -> Expr -> Expr
-desugar h = eval h . (addScope <=< foo <=< dsD <=< foo <=< dsSmall <=< dropParens)
-
-foo :: Expr -> D Expr
-foo e = -- trace (prettyShow e) $
-        pure e
-
 eval :: DHow -> D Expr -> Expr
 eval h = flip evalState DState{ nextNo = 1, how = h, context = DEval }
 
@@ -108,6 +116,7 @@ dsSmall = ds
     ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' eFail eFalse
     ds (PrefixOp (Op ":") e) = Range <$> ds e
     ds (PrefixOp (Ident l op) e) = ds (call "pre" l op e)
+    ds (PostfixOp e (Op "?")) = Range <$> ds e
     ds (PostfixOp e (Ident l op)) = ds (call "post" l op e)
     ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
@@ -119,12 +128,23 @@ dsSmall = ds
     ds (Case1 b) = do
       let l = getLoc b
       x <- Variable <$> newIdent l "x"
-      ds $ Function [(InfixOp x (Op ":=") AnyT, [])] $ Case2 x b
+      ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
     ds (Case2 _ _) = undefined
     ds (Block es) = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
     ds (HasType e1 e2) = join (apply HasType <$> ds e1 <*> ds e2)
+
+    -- Misc
+    ds (Option Nothing) = pure eFalse
+    -- option{e}  -->  if(x:=e)then truth(e)
+    ds (Option (Just e)) = do
+      t <- newIdent (getLoc e) "t"
+      ds $ If2 (Define t e) (Array [Variable t])
+
+    -- one, all
+    ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e eFail
+    ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
     ds x = compos ds x
 
@@ -156,17 +176,43 @@ defn :: Expr -> Expr -> D Expr
 -- Rule: (i := e) -->  (i := e)
 defn (Variable i) e = pure $ Define i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
-defn (ApplyS f a) e = defn f (Function [(a,[])] e)
+-- Rule: (p<a> := e)  -->  ...
+defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
 -- Rule: (e1:e2 := e)  -->  (e1 := e:e2)
 defn (InfixOp e1 (Op ":") e2) e = defn e1 (HasType e e2)
 -- Rule: (:e1) := e2  XXX Allowed?
---defn (PrefixOp (Op ":") e1) e2 = pure $ ApplyS e1 e2
+defn (PrefixOp (Op ":") e1) e2 = pure $ ApplyD e1 e2   -- ApplyD or ApplyS?
 --defn (EffAttr e1 r) e v = defn e1 (applyEff [r] e) v
+-- Rule: (p?) := e  -->  p := option{e}
+--defn (PostfixOp p (Ident _ "?")) e = defn p (Option $ Just e)
+-- Rule: (p1,...) := e  -->  (x1:any,...) = e; p1 := x1; ...
 defn (Array ps) e = do
-  xs <- mapM (\ p -> Variable <$> newIdent (getLoc p) "x") ps
-  bs <- zipWithM defn ps xs
-  pure $ Seq $ bs ++ [Unify (Array xs) e]
-defn p _ = impossible p
+  xs <- mapM (\ p -> newIdent (getLoc p) "x") ps
+  bs <- zipWithM defn ps (map Variable xs)
+  let es = map (\ x -> InfixOp (Variable x) (Op ":") eAny) xs
+  pure $ Seq $ [InfixOp (Array es) (Op "=") e] ++ bs
+-- Rule (p1 -> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
+defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e = pure $ Define2 x1 x2 e
+defn (InfixOp x1@Variable{} op@(Op "->") p2) e = do
+  x2 <- Variable <$> newIdent (getLoc p2) "x"
+  r2 <- defn p2 x2
+  r  <- defn (InfixOp x1 op x2) e
+  pure $ seqE [r2, r]
+defn (InfixOp p1 op@(Op "->") p2) e = do
+  x1 <- Variable <$> newIdent (getLoc p2) "x"
+  r1 <- defn p1 x1
+  r  <- defn (InfixOp x1 op p2) e
+  pure $ seqE [r1, r]
+defn p _ = error $ "Bad LHS to := " ++ prettyShow p
+--defn p _ = impossible p
+
+-- Return function, argument, and attributes
+getFun :: Expr -> Maybe (Expr, Expr, [Ident])
+getFun = gf []
+  where
+    gf rs (EffAttr e r) = gf (r:rs) e
+    gf rs (ApplyS f a) = Just (f, a, reverse rs)
+    gf _ _ = Nothing
 
 eFalse :: Expr
 eFalse = Array []
@@ -174,11 +220,14 @@ eFalse = Array []
 eFail :: Expr
 eFail = Range eFalse
 
+eAny :: Expr
+eAny = Variable (Ident noLoc "any")
+
 ---------------------------------------------------------------------------------
 
 dsD :: Expr -> D Expr
 dsD e | isValue e = pure e
-dsD e@(ApplyD f a) | isValue f && isValue a = pure e
+dsD e@(ApplyD _ _) = pure e
 dsD e = do
   x <- newIdent (getLoc e) "i"
   existsV [x] <$> dsM x e
@@ -189,11 +238,16 @@ dsM i k | isLiteral k = pure $ unifyV i k
 -- Rule:  i |> x       -->  i = x
 dsM i x@Variable{} = pure $ unifyV i x
 -- Rule:  i |> f[x]    -->  i = f[x]
-dsM i fa@(ApplyD f a) | isValue f && isValue a = pure $ unifyV i fa
+--dsM i fa@(ApplyD f a) | isValue f && isValue a = pure $ unifyV i fa
+dsM i e@(ApplyD _ _) = pure $ unifyV i e
 -- Rule:  i |> x = t   -->  x = (i |> t)
-dsM i (Unify x@Variable{} t) = Unify x <$> dsM i t
+dsM i (Unify x t) | isValue x = Unify x <$> dsM i t
 -- Rule:  i |> x := t  -->  x := (i |> t)
 dsM i (Define x t) = Define x <$> dsM i t
+-- Rule:  i |> (j->x) := t  -->  j := i; x := (i |> t)
+dsM i (Define2 j x t) = do
+  t' <- dsM i t
+  pure $ seqE [Define j (Variable i), Define x t']
 -- Rule:  i |> :t      -->  D(t)[i]
 dsM i (Range t) = ApplyD <$> dsD t <*> pure (Variable i)
 -- Rule:  i |> t1; t2  -->  D(t1); i |> t2
@@ -209,20 +263,22 @@ dsM i (Array ts) = do
   bs <- zipWithM dsM xs ts
   pure $ existsV xs $ seqE $ bs ++ [unifyV i $ Array $ map Variable xs]
 dsM i (If3 e1 e2 e3) = If3 <$> dsD e1 <*> dsM i e2 <*> dsM i e3
+dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   h <- gets how
   c <- gets context
   dsFunction h c i t1 r t2
 dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM _ e = impossible e
 
 dsFunction :: DHow -> DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
 --dsFunction DVerify _ _ _ _ _ = error "function desugaring for verification no implemented"
-dsFunction _ DEval _i t1 effs t2 = do
+dsFunction _ DEval i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   t1' <- withContext DAbstract $ dsM x t1
   t2' <- dsD t2
-  pure $ -- unifyV i $  Do the unification?
+  pure $ unifyV i $  -- Do the unification?
          TLam x effs t1' t2'
 dsFunction _ DAbstract i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
@@ -259,8 +315,8 @@ unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e
 
 existsV :: [Ident] -> Expr -> Expr
-existsV is e = seqE $ map (\ i -> Define i AnyT) is ++ [e]
---existsV = exists
+existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
+               Exists is e
 
 {-
 unifyV :: Ident -> Expr -> Expr
@@ -343,7 +399,7 @@ scope sc = expr
     expr e@(Variable i) | i `S.member` sc = pure e
                         | otherwise = do errUndefined [i]; pure e
     expr (Array es) = Array <$> mapM expr es
-    expr (Seq es) = sseq <$> mapM expr es
+    expr (Seq es) = seqE <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
 {-
     expr (ApplyEff is e) = do
@@ -360,23 +416,22 @@ scope sc = expr
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
       e2' <- scopeD sc' e2      
-      pure $ sseq [e1', e2']
+      pure $ seqE [e1', e2']
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (Define i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
---    expr (Range e1) = Range <$> expr e1
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (Lambda i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
       Lambda i r e1' <$> scope sc' (Do e2)
-    expr e@AnyT = pure e
     expr e@EmptyT = pure e
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2
+    expr (Exists _ e) = expr e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -393,22 +448,6 @@ scope sc = expr
       errShadow errS
       pure (Exists is e', s')
 
-    sseq = Seq . stupidUnify
-
-    -- Fresh variables are introduced earlier by x := :any
-    -- Get rid of those.
-    stupidUnify [] = []
-    stupidUnify [x] = [x]
-    stupidUnify (Unify _ AnyT : xs) = stupidUnify xs
-    stupidUnify (x : xs) = x : stupidUnify xs
-
-{-
-    -- Small simplification
-    unify :: Expr -> Expr -> Expr
-    unify AnyT e = e
-    unify e AnyT = e
-    unify e1 e2 = Unify e1 e2
--}
 
 -- Get all visible identifiers from i := e
 getVisible :: HasCallStack => Expr -> [Ident]
@@ -431,20 +470,50 @@ getVisible Macro1 {} = []
 getVisible (Define i e) = i : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
-getVisible AnyT = []
 getVisible EmptyT = []
 getVisible Function{} = []
 getVisible Lambda{} = []
-getVisible Exists{} = []
+getVisible (Exists is e) = is ++ getVisible e
 getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible Lam{} = []
 getVisible TLam{} = []
 getVisible e = impossible e
 
+getVar :: HasCallStack => Expr -> [Ident]
+getVar LitInt{} = []
+getVar LitRat{} = []
+getVar Variable{} = []
+getVar (Array es) = concatMap getVar es
+getVar (Seq es) = concatMap getVar es
+getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
+getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
+getVar (ApplyEff _ _e) = [] -- getVar e
+getVar If3{} = []
+getVar For2{} = []
+getVar (Let _ e) = getVar e
+getVar Do{} = []
+getVar (Unify e1 e2) = getVar e1 ++ getVar e2
+getVar (Where e1 e2) = getVar e1 ++ getVar e2
+--getVar (Typedef _) = []
+getVar Macro1 {} = []
+getVar (Define _ e) = getVar e
+getVar (Define2 _ _ e) = getVar e
+getVar Choice{} = []
+getVar (Set _ _ e) = getVar e
+getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
+getVar (Range e) = getVar e
+getVar EmptyT = []
+getVar Function{} = []
+getVar Lambda{} = []
+getVar TLam{} = []
+getVar (Exists _ e) = getVar e
+getVar (HasType e t) = getVar e ++ getVar t
+getVar e = impossible e
+
 -- Definitions that should go in a Prelude
 prelude :: [Ident]
 prelude = map (Ident noLoc)
-  [ "int", "float", "string", "any", "nat", "false"
+  [ "int", "float", "string", "any", "nat", "false", "rational"
   , "in'->'"
   , "in'<'", "in'<='", "in'>'", "in'>='"
   , "in'.='", "new"
@@ -473,5 +542,69 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
+simp :: Expr -> D Expr
+simp = f
+  where f (ApplyD (Variable (Ident _ "any")) e) = f e
+        f e = compos f e
+
 simplify :: Expr -> Expr
 simplify e = e
+
+-------------------------
+
+addDeref :: Expr -> D Expr
+addDeref = pure . exprD S.empty
+  where
+    expr _ e@LitInt{} = e
+    expr _ e@LitRat{} = e
+    expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
+                          | otherwise = e
+    expr s (Array es) = Array $ map (expr s) es
+    expr s (Seq es) = Seq $ map (expr s) es
+    expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
+    expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
+    expr s (ApplyEff is e) = ApplyEff is (expr s e)
+    expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
+      where s' = defs s e1
+    expr s (For2 e1 e2) = For2 (expr s' e1) (exprD s' e2)
+      where s' = defs s e1
+    expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
+      where s' = defs s e1
+    expr s (Do e) = Do (exprD s e)
+    expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
+      where s' = defs s a
+    expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
+    expr s (Where e1 e2) = Where (expr s e1) (expr s e2)
+    expr s (Define i e) = Define i (expr s e)
+    expr s (Define2 i j e) = Define2 i j (expr s e)
+    expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
+    expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
+      where op = Ident l ("in'" ++ sop ++ "'")
+    expr s (MVar i (Just t) (Just e)) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
+    expr s (Range e1) = Range (expr s e1)
+--    expr s (Typedef e1) = Typedef (exprD s e1)
+    expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
+    expr s (Lambda i rs e1 e2) = Lambda i rs (expr s' e1) (expr s' e2)
+      where s' = defs s e1
+    expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
+      where s' = defs s e1
+    expr s (Exists is e) = Exists is (expr s e)
+    expr s (HasType e t) = HasType (expr s e) (expr s t)
+    expr _ e = impossible e
+
+    exprD s e = expr (defs s e) e
+
+    set s e1 (Ident l "in'='") e2 = set s e1 (Ident l "write$") e2
+    set s e1@(Variable i) op@(Ident l _) e2
+      | i `S.member` s = ApplyD (Variable op) $ Array [e1, e2]
+      | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
+    set s (ApplyD e1@(Variable i) ei) (Ident l sop) e2
+      | i `S.member` s = ApplyD (Variable (Ident l (sop++"[]"))) $ Array [e1, ei, e2]
+      | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
+    set _ e1 _ _ = syntaxError (getLoc e1) $ "set LHS not valid: " ++ prettyShow e1
+
+    defs :: S.Set Ident -> Expr -> S.Set Ident
+    defs s e = S.union s (S.fromList (getVar e))
+
+    applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
+

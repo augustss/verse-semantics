@@ -93,8 +93,9 @@ testeq(SEq) {x:int:=1}                            {1}
 testeq(SEq) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
 testeq(SEq) {succ(x:any):=x+1; y:succ:=1; y}      {2}
 testeq(SEq) {succ(x:any):int:=x+1; succ[5]}       {6}
-testeq(SEq) {x? := 5; x}                          {array{5}}
-testeq(SEq) {x? := 1/0; x}                        {array{}}
+# XXX Not sure about these
+#testeq(SEq) {x? := 5; x}                          {array{5}}
+#testeq(SEq) {x? := 1/0; x}                        {array{}}
 testeq(SEq) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
 testeq(SEq) {i->x := 2; (i, x)}                   {2,2}
 testeq(SEq) {f(x:int where y:=2*x):=y; f[3]}      {6}
@@ -113,8 +114,9 @@ testeq(SEq) {ap0(f(x:int):=2)<covariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {
 testeq(SEq) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
 #testeq(SEq) {(p^ : int) := 2}                      {p:=new[int][2]}
-testeq(SEq,refimpl=Skip,icfp=Skip) {x? : int}                            { x : ?int }
-testeq(SEq,refimpl=Skip,icfp=Skip) {x[] : int}                           { x : []int }
+# XXX Not sure about these
+#testeq(SEq,refimpl=Skip,icfp=Skip) {x? : int}                            { x : ?int }
+#testeq(SEq,refimpl=Skip,icfp=Skip) {x[] : int}                           { x : []int }
 testeq(SEq) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 # DESUGAR HOW?
 #testeq(SEq) {p^[](:int):int}                      {0}

@@ -97,12 +97,12 @@ data Expr
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
+  | Define2 Ident Ident Expr  -- (i->x) := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
   | Where Expr Expr           -- e1 where e2
   | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2
-  | AnyT                      -- :any
   | EmptyT                    -- :false
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
@@ -219,12 +219,13 @@ instance Pretty Expr where
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
-          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
-          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+          Define2 i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
+          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
+          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
+          Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+                     text "range" <> braces (ppr 0 e)
           Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
-          AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
-          EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
+          EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":FALSE"))
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           HasType e t -> --ppNormal (InfixOp e (Op ":") t)
@@ -335,12 +336,12 @@ compos f (Macro1 m as b) = Macro1 m as <$> f b
 compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Return e) = Return <$> f e
 compos f (Define i e) = Define i <$> f e
+compos f (Define2 i x e) = Define2 i x <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
 compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
-compos _ AnyT = pure AnyT
 compos _ EmptyT = pure EmptyT
 compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e

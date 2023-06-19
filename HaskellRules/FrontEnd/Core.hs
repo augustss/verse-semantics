@@ -164,7 +164,6 @@ core (LitRat i _) = pure (CRat $ toRational i)
 core (Variable i@(Ident _ s)) | i `elem` primOps = pure (CPrim s)
                               | otherwise = pure (CVar i)
 core (Array es) = CArray <$> mapM core es
-core AnyT = pure (CPrim ":any")
 core (Wrong s) = pure $ CWrong s
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
@@ -385,8 +384,7 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ -- Function [(Define i AnyT, [])] e
-         Lambda i [] (Exists [] $ Array []) e
+  pure $ Lambda i [] (Exists [] $ Array []) e
 
 ------
 
@@ -597,7 +595,7 @@ pExists :: P Expr
 pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
-    exists is e = Exists is e -- foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
+    exists is e = Exists is e
     pQuant = pKeyword "exists" <|> pKeyword "exi" <|> pKeyword "ex" <|> pKeyword "E"
       -- <|> void (pOp "∃")
 
