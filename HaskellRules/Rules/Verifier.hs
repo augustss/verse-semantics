@@ -202,6 +202,9 @@ mustDecide _           = False
 isDecideOp :: Expr -> Bool
 isDecideOp (Op IsInt) = True
 isDecideOp (Op Le)    = True
+isDecideOp (Op Lt)    = True
+isDecideOp (Op Ge)    = True
+isDecideOp (Op Gt)    = True
 isDecideOp _          = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
