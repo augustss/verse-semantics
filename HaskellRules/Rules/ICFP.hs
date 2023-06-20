@@ -224,6 +224,7 @@ anf' onlyEq = expr
     expr (All e) = All $ expr e
     expr (Assume e) = Assume $ expr e
     expr (Assert e) = Assert $ expr e
+    expr (Verify e) = Verify $ expr e
     expr e@Fail = e
     expr e@Wrong{} = e
     expr (Split e e1 e2) =

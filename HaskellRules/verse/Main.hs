@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 module Main(main) where
-import Control.Exception(SomeException, try, catch)
+import Control.Exception(SomeException, try)
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -24,9 +24,9 @@ import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
-import Verifier.Verify
+--import Verifier.Verify
 import Rules.ICFP(anf)
-import TRS.Bind(free)
+--import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -263,9 +263,12 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
-    let flg = (flags s){ fNoLambdaIf = True }
+    let flg = (flags s){ fNoLambdaIf = True, fVerify = True }
         e' = anf $ coreToTrs $ asCore flg e
     putStrLn $ "Desugared: " ++ prettyShow e'
+    putStrLn "Verification not implemented!"
+    pure s
+{-
     catch (do
       b <- verify (free e') e'
       if b then
@@ -276,6 +279,7 @@ cVerify = do
       (\ (exn :: SomeException) -> do
          print exn
          pure s)
+-}
 
 {-
 cEval :: Run CState

@@ -212,9 +212,24 @@ core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
 core (Exists is e) = cDef is <$> core e
 core (TLam i rs e1 e2) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
+  verif <- asks fVerify
   let covariant = covariantId `elem` rs  || True -- XXX
-  lamFunc covariant i e1 e2
-core (HasType e t) = core $ ApplyS t e
+  if verif then
+    lamFuncVerify covariant i e1 e2
+   else
+    lamFunc covariant i e1 e2
+core (HasType e t) = do
+  verif <- asks fVerify
+  e' <- core e
+  t' <- core t
+  if verif then do
+    x <- newTmp
+    pure $ CSeq [
+      cVerify $ cAssert $ CApply t' e',
+      CDef [x] $ CApply t' (CVar x)
+      ]
+   else do
+      cSucceeds (CApply t' e')
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
@@ -241,14 +256,10 @@ coreIf (Exists is e1) e2 e3 = do
          ]
 coreIf _ _ _ = undefined
 
-lambda :: Ident -> [Ident] -> Expr -> C Core
-lambda x fs b = CLam x . attr <$> core b
-  where attr ae = foldr CMacro ae fs
-
 lamFunc :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
 --lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
-lamFunc cov i (Exists is e1) e2 =
-  lambda i [] $
+lamFunc cov i (Exists is e1) e2 = do
+  b <- core $
     if null is && e1 == Array [] then
       e2
     else
@@ -256,7 +267,19 @@ lamFunc cov i (Exists is e1) e2 =
         Exists is (Seq [e1, e2])
       else
         If3 (Exists is e1) e2 (Wrong "outside domain")
+  pure $ CLam i b
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
+
+lamFuncVerify :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
+--lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
+lamFuncVerify _cov i (Exists is e1) e2 = do
+  e1' <- core e1
+  e2' <- core e2
+  pure $ CSeq [
+    cVerify $ CLam i $ CDef is $ CSeq [cAssume e1', cAssert e2'],
+              CLam i $ CDef is $ CSeq [        e1',         e2']
+    ]
+lamFuncVerify _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -361,6 +384,13 @@ cDecides e = do
                                           (CLam u2 (CVar x))
                                           (CLam u3 $ CLam u4 $ CLam underscore $ CWrong "succeed-many")
                 )
+
+cVerify :: Core -> Core
+cVerify e = CMacro (Ident noLoc "verify") e
+cAssert :: Core -> Core
+cAssert e = CMacro (Ident noLoc "assert") e
+cAssume :: Core -> Core
+cAssume e = CMacro (Ident noLoc "assume") e
 
 -- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core
