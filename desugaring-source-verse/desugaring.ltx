@@ -193,6 +193,7 @@ $$
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |function a t|    & \text{Function} \\
+      & \vb & |oftype a t|      & \text{Type annotation}
 \\
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
   |b| & ::= & |t| \vb |{t_1; dots ; t_n}|  \\
@@ -201,7 +202,8 @@ $$
   |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx| \\
 \\
 \multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)| or |(p:t)|}. Subset of |t|.}} \\
-  |p| & ::= & x \vb |p a| \vb |p^hat|  \vb |p^?|\vb  |p squiggt l| \\
+     |p| & ::= & x \vb |p a| %% \vb |p^hat|  \vb |p^?|
+     \vb  |p_1 squiggt p_2| \\
      & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
   \\
 
@@ -232,9 +234,10 @@ $$
 \multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
   |p : t| & \rightarrow & |p := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
-  |(p : t_1) := t_2| & \rightarrow & |p := t_1^(t_2)| & \text{NOT QUITE RIGHT} \\
+  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
   %%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
-  |(p?) := t| & \rightarrow & |p := option^{t}| \\
+  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
+  |(p_1 squiggt p_2) := t| & \rightarrow & |p_1 := (x_1:any); p_2 := (x_2:any); (x_1 squiggt x_2) := t| & \text{if |p_1| or |p_2| not a variable} \\
   |array (p_1 xdots p_n) := t| & \rightarrow & |array(x_1:any,xdots,x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
@@ -318,7 +321,9 @@ $$
       & \vb & |check fx e|                & \text{Effects check} \\
       & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
       & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
-      & \vb & |for(e){b}|               & \text{Finite loop} \\
+      & \vb & |for(e){b}|                 & \text{Finite loop} \\
+      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda, without type} \\
+      & \vb & |tlamt x e_1 e_2 e_3|        & \text{Tim lambda, with type} \\
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
@@ -342,6 +347,7 @@ $$
 \multicolumn{4}{l}{\quad Optional (derived) rules} \\
 |De k| & = & |k| \\
 |De x| & = & |x| \\
+|De (f^[x])| & = & |f^[x]| \\
 
 \\
 \multicolumn{4}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
@@ -352,6 +358,7 @@ and |e| is a BigCore expression}} \\
   |Me i (f^[x])| & = & |i==f^[x]| \\
   |Me i (x=t)| & = & |x = Me i t| \\
   |Me i (x:=t)| & = & |x := Me i t| \\
+  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\
   |Me i (:t)| & = & |(De t)^(i)| & \\
   |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
   |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
@@ -365,12 +372,14 @@ and |e| is a BigCore expression}} \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
-\multicolumn{4}{l}{\text{\bf Alternative function translations}} \\    
+\multicolumn{4}{l}{\text{\bf Function translations}} \\    
 %%  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
 %%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
+|Me i (function t_1 (oftype t_2 t_3))| & = & |tlamt x (z := Me x t_1) (y := i^[z]; Me y t_2) (De t_3)| \\
 |Me i (function t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
 & \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
-& \multicolumn{3}{l}{\text{Perhaps this works?}} \\
+& \multicolumn{3}{l}{\text{Perhaps these work?}} \\
+|Me i (function t_1 (oftype t_2 t_3)| & = & |i == tlamt x (Me x t_1) (De t_2) (De t_3)| \\
 |Me i (function t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
@@ -485,6 +494,32 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
   \end{itemize}
 
 \caption{Scope} \label{fig:scope}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
+|oftype e t| & = & |succeeds^{t^[e]}| \\
+|tlam x e_1 e_2| & = & |lam x (e_1; e_2)| \\
+|tlamt x e_1 e_2 t| & = & |lam x (e_1; succeeds^{t^[e_2]})| \\
+|if(e_1) then e_2 else e_3| & = & ... \\
+|for(e_1){e_2}| & = & ... \\
+\end{array} \\
+\\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugaring for verification}} \\
+|oftype e t| & = & |def x t^[x]| & \text{fresh |x|} \\
+|tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
+|tlamt x e_1 e_2 t| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (def y (t^[y])))| & \text{fresh |y|} \\
+|if(e_1) then e_2 else e_3| & = & ... \\
+|for(e_1){e_2}| & = & ... \\
+\end{array}
+
+\end{array}
+$$
+\caption{Translation of BigCore to Core}
 \end{figure}
 
 % --------------------------------------
