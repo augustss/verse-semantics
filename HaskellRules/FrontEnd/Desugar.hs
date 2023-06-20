@@ -21,7 +21,7 @@ import FrontEnd.Flags
 
 desugar :: Flags -> Expr -> Expr
 desugar flgs = eval .
-            (simp <=<
+            (-- traceDS "simp"       <=< simp <=<
              traceDS "addScope"   <=< addScope <=<
              traceDS "dsD"        <=< dsD      <=<
              traceDS "addDeref"   <=< addDeref <=<
@@ -492,8 +492,8 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
-simp :: Expr -> D Expr
-simp = simpUnify <=< simpUnused <=< simpAny
+_simp :: Expr -> D Expr
+_simp = simpUnify <=< simpUnused <=< simpAny
 
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
@@ -510,7 +510,7 @@ simpUnify = pure . f
 -- XXX assumes no name shadowing
 simpUnused :: Expr -> D Expr
 simpUnused e = pure $ removeUnused unused e
-  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e ]
+  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e, i `notElem` prelude, i `notElem` primOps ]
 
 data Use = Uni | Other deriving (Show)
 
