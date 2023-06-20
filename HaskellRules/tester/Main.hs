@@ -136,7 +136,7 @@ data TestRes = Good | Bad | Many | None | Excn | Skip
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
 assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
-  where toCore = exprToCore (testFlagsToFlags flg) . desugar
+  where toCore = exprToCore (testFlagsToFlags flg) . desugar defaultFlags
 
 assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO TestRes
 assertEquivC ti flg e1 e2  = assertEquiv ti flg (e1, e1) (e2, e2)
