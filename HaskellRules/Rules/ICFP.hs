@@ -22,7 +22,9 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
+                   systemICFPC,
                    systemICFPSX,
+                   systemICFPSXC,
                    systemICFPK,
                    systemICFPE,
                    systemICFPF,
@@ -47,6 +49,20 @@ systemICFP = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = noRules
   , validExpr           = const valid
+  }
+
+systemICFPC :: TRSystem Expr
+systemICFPC = systemICFP
+  { sname               = "ICFPC"
+  , description         = "ICFP with and Simon's extra choice rule"
+  , rules               = rules systemICFP <> rulesValEqualsChoice
+  }
+
+systemICFPSXC :: TRSystem Expr
+systemICFPSXC = systemICFP
+  { sname               = "ICFPSXC"
+  , description         = "ICFP with a simplified substitution rule and context, and Simon's choice rule"
+  , rules               = (rules systemICFP -= "SUBST" -= "EQN-ELIM") <> rulesSubstX <> rulesValEqualsChoice
   }
 
 systemICFPSX :: TRSystem Expr
@@ -879,6 +895,12 @@ rulesChoice _ lhs =
   "ALL-VALUE" `name`
   do All (Val v) <- [lhs]
      pure (Arr [v])
+
+rulesValEqualsChoice :: ERule
+rulesValEqualsChoice _ lhs =
+  "VAL-EQU-CHOICE" `name`
+  do Val v :=: (e1 :|: e2) <- [lhs]
+     pure (((v :=: e1) :>: v) :|: ((v :=: e2) :>: v))
 
 --------------------------------------------------------------------------------
 
