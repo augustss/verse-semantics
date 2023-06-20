@@ -5,7 +5,6 @@ data Flags = Flags
   , fSplit        :: !Bool
   , fSimplify     :: !Bool
   , fUnderLambda  :: !Bool
-  , fTimLambda    :: !Bool
 --  , fDenSem       :: !Bool
   , fDfs          :: !Bool
   , fLatex        :: !Bool
@@ -14,6 +13,8 @@ data Flags = Flags
   , fEvalSteps    :: !Int
   , fNoFuelStop   :: !Bool
   , fNoLambdaIf   :: !Bool
+  , fVerify       :: !Bool
+  , fTraceDesugar :: !Bool
   }
   deriving (Show)
 
@@ -23,7 +24,6 @@ defaultFlags = Flags
   , fSplit        = False
   , fSimplify     = False
   , fUnderLambda  = True
-  , fTimLambda    = False
 --  , fDenSem       = False
   , fDfs          = False
   , fLatex        = False
@@ -32,6 +32,8 @@ defaultFlags = Flags
   , fEvalSteps    = 1000
   , fNoFuelStop   = False
   , fNoLambdaIf   = False
+  , fVerify       = False
+  , fTraceDesugar = False
   }
 
 showFlags :: Flags -> String

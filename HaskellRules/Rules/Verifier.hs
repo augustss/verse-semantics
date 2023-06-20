@@ -5,13 +5,38 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module Rules.Verifier  where
+module Rules.Verifier(
+  icfpVerifier,
+  verify,
+  ) where
 import TRS.Bind
 import TRS.TRS
+import TRS.Traced
+import TRS.Tarjan
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (allSystemsICFP, execX, ltExpr)
 import Control.Monad (guard)
 import Data.List( intersect )
+
+-- | Run verification rules.
+
+verify :: TRSystem Expr -> Expr -> (Bool, Expr)
+verify sys e = res
+ where
+   res =
+     case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
+       Just ((x :<-- _):_) -> (isDone x, x)
+       _ -> undefined
+   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+
+  --norms           = normalFormsFuelTracePlain sys (-1) e
+  --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
+
+isDone :: Expr -> Bool
+isDone = collect done (&&)
+ where
+  done (Assert _) = False
+  done _          = True
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 

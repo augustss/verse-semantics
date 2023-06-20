@@ -13,7 +13,7 @@ module FrontEnd.Core(
   compos, composOp,
   exprToCore,
   cSeq, cDef, cBar,
-  isValue,
+  isCValue,
   fvs, cfvs, fvsS,
   subst,
   alphaConvert,
@@ -120,8 +120,8 @@ getValue :: Core -> Maybe Core
 getValue e@CVar{} = Just e
 getValue e = getHNF e
 
-isValue :: Core -> Bool
-isValue e = isJust (getValue e)
+isCValue :: Core -> Bool
+isCValue e = isJust (getValue e)
 
 {-
 isValue' :: Core -> Bool
@@ -164,7 +164,6 @@ core (LitRat i _) = pure (CRat $ toRational i)
 core (Variable i@(Ident _ s)) | i `elem` primOps = pure (CPrim s)
                               | otherwise = pure (CVar i)
 core (Array es) = CArray <$> mapM core es
-core AnyT = pure (CPrim ":any")
 core (Wrong s) = pure $ CWrong s
 core (Seq es) = seqC <$> mapM core es
 core (ApplyS e1 e2) = cSucceeds =<< core (ApplyD e1 e2)
@@ -210,20 +209,27 @@ core (Macro1 (Ident _ "all") [] e) = cAll =<< core e
 core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
-core (Lambda i rs e1 e2) = do
-  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
-  timLam <- asks fTimLambda
-  let covariant = covariantId `elem` rs || True -- XXX
-  if timLam then do
-    let Exists is e1a = e1
-    e1' <- core e1a
-    e2' <- core e2
-    pure $ CLambda i is covariant e1' e2'
-  else
-    lamFunc covariant i e1 e2
-core EmptyT = pure CFail
 core (Exists is e) = cDef is <$> core e
-core (Lam i e) = CLam i <$> core e
+core (TLam i rs e1 e2 me3) = do
+  --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
+  verif <- asks fVerify
+  let covariant = covariantId `elem` rs  || True -- XXX
+  if verif then
+    lamFuncVerify covariant i e1 e2 me3
+   else
+    lamFunc covariant i e1 (maybe e2 (HasType e2) me3)
+core (HasType e t) = do
+  verif <- asks fVerify
+  e' <- core e
+  t' <- core t
+  if verif then do
+    x <- newTmp
+    pure $ CSeq [
+      cVerify $ cAssert $ CApply t' e',
+      CDef [x] $ CApply t' (CVar x)
+      ]
+   else do
+      cSucceeds (CApply t' e')
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
@@ -250,14 +256,10 @@ coreIf (Exists is e1) e2 e3 = do
          ]
 coreIf _ _ _ = undefined
 
-lambda :: Ident -> [Ident] -> Expr -> C Core
-lambda x fs b = CLam x . attr <$> core b
-  where attr ae = foldr CMacro ae fs
-
 lamFunc :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
 --lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
-lamFunc cov i (Exists is e1) e2 =
-  lambda i [] $
+lamFunc cov i (Exists is e1) e2 = do
+  b <- core $
     if null is && e1 == Array [] then
       e2
     else
@@ -265,8 +267,30 @@ lamFunc cov i (Exists is e1) e2 =
         Exists is (Seq [e1, e2])
       else
         If3 (Exists is e1) e2 (Wrong "outside domain")
-      
+  pure $ CLam i b
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
+
+lamFuncVerify :: HasCallStack => Bool -> Ident -> Expr -> Expr -> Maybe Expr -> C Core
+--lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
+lamFuncVerify _cov i (Exists is e1) e2 me3 = do
+  e1' <- core e1
+  (e2', e2'') <-
+    case me3 of
+      -- No return type
+      Nothing -> do
+        e' <- core e2
+        pure (e', e')
+      -- Return type t: verify it and use an existential for uses
+      Just t -> do
+        e' <- core $ ApplyD t e2
+        e'' <- do x <- newTmp
+                  core $ Exists [x] $ ApplyD t (Variable x)
+        pure (e', e'')
+  pure $ CSeq [
+    cVerify $ CLam i $ CDef is $ CSeq [cAssume e1', cAssert e2'],
+              CLam i $ CDef is $ CSeq [        e1', cAssume e2'']
+    ]
+lamFuncVerify _ _ e _ _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -338,7 +362,10 @@ cAll e = do
 cSucceeds :: Core -> C Core
 cSucceeds e = do
  useSplit <- asks fSplit
- if not useSplit then pure $ CSucceeds e
+ if not useSplit then do
+   verif <- asks fVerify
+   if verif then pure $ cVerify $ cAssert e
+   else pure $ CSucceeds e
  else do
   u1 <- newTmp
   u2 <- newTmp
@@ -372,6 +399,13 @@ cDecides e = do
                                           (CLam u3 $ CLam u4 $ CLam underscore $ CWrong "succeed-many")
                 )
 
+cVerify :: Core -> Core
+cVerify e = CMacro (Ident noLoc "verify") e
+cAssert :: Core -> Core
+cAssert e = CMacro (Ident noLoc "assert") e
+cAssume :: Core -> Core
+cAssume e = CMacro (Ident noLoc "assume") e
+
 -- A small optimization to get smaller examples.
 cUnify :: Core -> Core -> Core
 cUnify e (CPrim ":any") = e
@@ -381,8 +415,7 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ -- Function [(Define i AnyT, [])] e
-         Lambda i [] (Exists [] $ Array []) e
+  pure $ TLam i [] (Exists [] $ Array []) e Nothing
 
 ------
 
@@ -593,7 +626,7 @@ pExists :: P Expr
 pExists = exists <$> (pQuant *> some pIdent <* pOp ".") <*> pSeq
   where
     exists :: [Ident] -> Expr -> Expr
-    exists is e = Exists is e -- foldr (\ i r -> Do $ Seq [Define i AnyT, r]) e is
+    exists is e = Exists is e
     pQuant = pKeyword "exists" <|> pKeyword "exi" <|> pKeyword "ex" <|> pKeyword "E"
       -- <|> void (pOp "∃")
 
@@ -601,7 +634,7 @@ pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
-    lam is e = foldr (\ i r -> Lambda i [] (Array []) r) e is
+    lam is e = foldr (\ i r -> TLam i [] (Array []) r Nothing) e is
     pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
       -- <|> pKeyword "λ"
 

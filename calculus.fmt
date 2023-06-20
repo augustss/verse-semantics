@@ -76,6 +76,11 @@
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
+%format tlam (x) (e1) (e2) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}"
+%format tlamt (x) (e1) (e2) (e3) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}\{" e3 "\}"
+%format tlamKW = "\textbf{tlam}"
+%format oftype (e) (t) = oftypeKW "(" e ")\{" t "\}"
+%format oftypeKW = "\textbf{ofType}"
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -160,8 +165,10 @@
 
 %format assumeKW = "\textbf{assume}"
 %format assertKW = "\textbf{assert}"
+%format verifyKW = "\textbf{verify}"
 %format assume (x) = "\textbf{assume}\{" x "\}"
 %format assert (x) = "\textbf{assert}\{" x "\}"
+%format verify (x) = "\textbf{verify}\{" x "\}"
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
 %format splitKW = "\textbf{split}"
@@ -186,6 +193,7 @@
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
 %format for = "\textbf{for}"
+%format block = "\textbf{block}"
 %format orElse = "\textbf{orElse}"
 %format collect = "\textbf{collect}"
 %format apply = "\textbf{apply}"
@@ -207,7 +215,7 @@
 %format nat = "\textbf{nat}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
-%format function (x)(rhs) = functionKW "(" x ")." rhs
+%format function (x)(rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionKW = "\textbf{function}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
@@ -230,7 +238,7 @@
 %format lte = "\prec"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = "{\bf verify}\langle" r "\rangle\{" b "\}"
+%format check (r) (b) = "{\bf check}(" r ")\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -253,7 +261,8 @@
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "=>"
-%format squiggt = "\!\leadsto\!"
+%% %format squiggt = "\!\leadsto\!"
+%format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format (eff x) = "\!\!<\!\!" x "\!\!>"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>\!\!"
@@ -383,6 +392,7 @@
 %format t_0
 %format t_1
 %format t_2
+%format t_3
 %format t_k
 %format t_n
 

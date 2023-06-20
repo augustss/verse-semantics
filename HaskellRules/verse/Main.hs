@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 module Main(main) where
-import Control.Exception(SomeException, try, catch)
+import Control.Exception(SomeException, try)
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -11,7 +11,6 @@ import Options.Applicative hiding (command)
 
 import Epic.Print hiding ((<>))
 import FrontEnd.Desugar
-import FrontEnd.DesugarNew
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
 import qualified FrontEnd.Parse as P
@@ -22,13 +21,13 @@ import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
-import FrontEnd.Tim
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
-import Verifier.Verify
+--import Verifier.Verify
 import Rules.ICFP(anf)
-import TRS.Bind(free)
+import Rules.Verifier(icfpVerifier, verify)
+--import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -83,7 +82,7 @@ data CState = CState
   }
 
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core] | Tim Prog
+data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
 
 asParsed :: SomeExpr -> Expr
 asParsed NoExpr = error "No current expression"
@@ -91,26 +90,20 @@ asParsed (Parsed e) = e
 asParsed (Desugared _) = error "Current expression is desugared"
 asParsed (Cored _) = error "Current expression is Core"
 asParsed (Cores _) = error "Current expression is [Core]"
-asParsed (Tim _) = error "Current expression is Prog"
 
 asExpr :: SomeExpr -> Expr
 asExpr (Desugared e) = e
 asExpr e = asParsed e
 
-asDesugared :: SomeExpr -> Expr
-asDesugared (Parsed e) = desugar e
-asDesugared e = asExpr e
+asDesugared :: Flags -> SomeExpr -> Expr
+asDesugared f (Parsed e) = desugar f e
+asDesugared _ e = asExpr e
 
 asCore :: Flags -> SomeExpr -> Core
 asCore _ (Cored e) = e
 asCore _ (Cores [e]) = e
 asCore _ Cores{} = error "Not a singleton Core value"
-asCore s e = exprToCore s $ asDesugared e
-
-asTim :: SomeExpr -> Prog
-asTim (Parsed e) = dsProg e
-asTim (Tim e) = e
-asTim _ = error "Not a Tim program"
+asCore s e = exprToCore s $ asDesugared s e
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
@@ -118,7 +111,6 @@ instance Show SomeExpr where
   show (Desugared e) = show e
   show (Cored e) = show e
   show (Cores e) = show e
-  show (Tim e) = show e
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr = text "No current expression"
@@ -129,23 +121,19 @@ instance Pretty SomeExpr where
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
                                      map (\ e -> pPrintPrec l 0 e $$ text "------------") es
-  pPrintPrec l p (Tim e) = pPrintPrec l p e
 
 command :: Command CState
 command = Command
   { c_commands =
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
-      , Cmd "ndesugar [EXPR]"      "Desugar [last] expression"             cDesugarNew
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
       , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
---      , Cmd "compile [EXPR]"       "Generate core for [last] expression"   cCompile
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
 --      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
---      , Cmd "run [EXPR]"           "Eval/rewrite [last] expression"        cRun
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
 --      , Cmd "clear"                "Clear global defs"                     cClear
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
@@ -155,10 +143,7 @@ command = Command
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
---      , Cmd "parsecore EXPR"       "Enter a Core expression"               cParseCore
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
-      , Cmd "tim [EXPR]"           "Tim desugaring of [last] expression"   cTim
-      , Cmd "tsimp [EXPR]"         "Simplify Tim program of [last] expression"   cTimSimp
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -166,7 +151,7 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags{fSplit=False, fNoFuelStop=True}
+                     , prelude = Nothing, flags = defaultFlags{fSplit=True, fNoFuelStop=True}
                      , esystem = blockSystem }
   , c_history = Just ".versei"
   }
@@ -194,14 +179,11 @@ flagTable =
   ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
   ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
   ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
-  ,("timLambda",   (fTimLambda,    \ b s -> s{fTimLambda=b}))
 --  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
---  ,("fresh",       (fFresh,        \ b s -> s{fFresh=b}))
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
---  ,("alias",       (fAlias,        \ b s -> s{fAlias=b}))
---  ,("unify-equal", (fUnifyEq,      \ b s -> s{fUnifyEq=b}))
+  ,("traceDesugar",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ]
 
 cRead :: Run CState
@@ -247,10 +229,7 @@ cTransform tr =
       pure e'
 
 cDesugar :: Run CState
-cDesugar = cTransform (Desugared . desugar . asExpr)
-
-cDesugarNew :: Run CState
-cDesugarNew = cTransform (Desugared . desugarNew . asExpr)
+cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
 
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
@@ -266,11 +245,6 @@ cPreprocess c s = cTransform (Cored . pre . asCore (flags s)) c s
 cCore :: Run CState
 cCore c s = cTransform (Cored . asCore (flags s)) c s
 
-{-
-cCompile :: Run CState
-cCompile c s = cTransform (Cored . compile (flags s)) c s
--}
-
 cEval :: Run CState
 cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
   where flg = flags s
@@ -279,9 +253,17 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
-    let flg = (flags s){ fNoLambdaIf = True }
-        e' = anf $ coreToTrs $ asCore flg e
-    putStrLn $ "Desugared: " ++ prettyShow e'
+    let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
+        e' = anf $ coreToTrs $ simpCore $ asCore flg e
+    putStrLn $ "Desugared:\n" ++ prettyShow e'
+    let (done, rest) = verify icfpVerifier e'
+    if done then
+      putStrLn "Verified"
+     else do
+      putStrLn "Not verified, residual term:"
+      pp rest
+    pure s
+{-
     catch (do
       b <- verify (free e') e'
       if b then
@@ -292,20 +274,6 @@ cVerify = do
       (\ (exn :: SomeException) -> do
          print exn
          pure s)
-
-{-
-cEval :: Run CState
-cEval c s =
-  cTransform (Cored . eval flg . compile (flags s)) c s
-  where flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
--}
-{-
-cParseCore :: Run CState
-cParseCore line s =
-  tryIt (pure s) (updateLastExpr s . Cored) $ do
-    let prog = parseDie pCoreFile "<interactive>" line
-    pp prog
-    pure prog
 -}
 
 cRules :: Run CState
@@ -363,12 +331,6 @@ cDisplay _ s = do
   mapM_ pp $ definitions s
   pure s
 -}
-
-cTim :: Run CState
-cTim = cTransform (Tim . dsProg . asParsed)
-
-cTimSimp :: Run CState
-cTimSimp = cTransform (Tim . simpProg . asTim)
 
 cShow :: Run CState
 cShow =

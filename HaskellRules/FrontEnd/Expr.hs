@@ -19,6 +19,9 @@ module FrontEnd.Expr(
   pattern Op,
   compos, composOp,
   seqE,
+  getLoc,
+  isLiteral,
+  isValue,
   ) where
 import Control.Monad.Identity
 import Data.Data (Data)
@@ -94,17 +97,16 @@ data Expr
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | Define Ident Expr         -- i := e
+  | Define2 Ident Ident Expr  -- (i->x) := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
-  | Where Expr Expr           -- e1 where e2
-  | Lambda Ident [Eff] Expr Expr -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2
-                                 -- XXX?? Lambda x effs e1 e2 = Lam x $ If3 e1 (ApplyEff effs e2) Fail/Wrong
-  | AnyT                      -- :any
-  | EmptyT                    -- :false
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
-  | Lam Ident Expr            -- i => e
+  | HasType Expr Expr         -- e:t, but only type known to verifier
+  | TLam Ident [Eff] Expr Expr (Maybe Expr)
+                              -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
+                              -- The last argument is a possible type, (e2:t)  
   | DomainFail                -- either Wrong or try next overload
   deriving (Eq, Ord, Show, Data)
 
@@ -197,11 +199,6 @@ instance Pretty Expr where
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
-          Lambda i rs e1 e2 -> maybeParens (p > 10) $
-            text "fn" <> sep [parens (pPrintL l e1') <> ppEffs rs, indent $ ppB e2]
-            where e1' | Array [] <- e1 = iany
-                      | otherwise = Where iany e1
-                  iany = InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))
           Block es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -215,15 +212,17 @@ instance Pretty Expr where
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
           ----
           Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "|") e2)
-          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "=") e2)
-          Range e -> pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-          Where e1 e2 -> pPrintPrec l p (InfixOp e1 (Ident noLoc "where") e2)
-          AnyT -> pPrintPrec l p (Variable (Ident noLoc ":any"))
-          EmptyT -> pPrintPrec l p (Variable (Ident noLoc ":false"))
+          Define2 i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
+          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
+          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
+          Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+                     text "range" <> braces (ppr 0 e)
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
-          Lam i e -> pPrintPrec l p (Lambda i [] (Array []) e)
+          HasType e t -> --ppNormal (InfixOp e (Op ":") t)
+                         text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
+          TLam i rs e1 e2 me3 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2) <>
+            maybe empty (braces . ppr 0) me3
           DomainFail -> text "DomainFail"
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
@@ -327,16 +326,14 @@ compos f (Macro1 m as b) = Macro1 m as <$> f b
 compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Return e) = Return <$> f e
 compos f (Define i e) = Define i <$> f e
+compos f (Define2 i x e) = Define2 i x <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
-compos f (Where e1 e2) = Where <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e
-compos f (Lambda i rs e1 e2) = Lambda i rs <$> f e1 <*> f e2
-compos _ AnyT = pure AnyT
-compos _ EmptyT = pure EmptyT
 compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
-compos f (Lam i e) = Lam i <$> f e
+compos f (HasType e1 e2) = HasType <$> f e1 <*> f e2
+compos f (TLam i rs e1 e2 e3) = TLam i rs <$> f e1 <*> f e2 <*> traverse f e3
 compos _ DomainFail = pure DomainFail
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
@@ -348,3 +345,17 @@ seqE = mk . concatMap flat
         flat e = [e]
         mk [e] = e
         mk es = Seq es
+
+getLoc :: Expr -> Loc
+getLoc _ = noLoc
+
+isLiteral :: Expr -> Bool
+isLiteral LitInt{} = True
+isLiteral LitRat{} = True
+isLiteral _ = False
+
+isValue :: Expr -> Bool
+isValue Variable{} = True
+isValue (Array es) = all isValue es
+isValue e = isLiteral e
+
