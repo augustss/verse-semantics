@@ -14,6 +14,7 @@ data Flags = Flags
   , fNoFuelStop   :: !Bool
   , fNoLambdaIf   :: !Bool
   , fVerify       :: !Bool
+  , fTraceDesugar :: !Bool
   }
   deriving (Show)
 
@@ -32,6 +33,7 @@ defaultFlags = Flags
   , fNoFuelStop   = False
   , fNoLambdaIf   = False
   , fVerify       = False
+  , fTraceDesugar = False
   }
 
 showFlags :: Flags -> String

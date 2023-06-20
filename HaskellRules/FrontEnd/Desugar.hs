@@ -1,36 +1,38 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
-  desugarSmall, desugar,
+  desugar,
   primOps, covariantId, dsScope,
   simplify,
   ) where
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.List
+import qualified Data.Map as M
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
---import Epic.List
+import Epic.List
 import Epic.Print
 --import FrontEnd.Desugar
 import FrontEnd.Error
 import FrontEnd.Expr
+import FrontEnd.Flags
 
-desugarSmall :: Expr -> Expr
-desugarSmall = eval . (dsSmall <=< dropParens)
-
-desugar :: Expr -> Expr
-desugar = eval .
+desugar :: Flags -> Expr -> Expr
+desugar flgs = eval .
             (simp <=<
-             traceDS "addScope" <=< addScope <=<
-             traceDS "dsD" <=< dsD <=<
-             traceDS "addDeref" <=< addDeref <=<
-             traceDS "dsSmall" <=< dsSmall <=<
+             traceDS "addScope"   <=< addScope <=<
+             traceDS "dsD"        <=< dsD      <=<
+             traceDS "addDeref"   <=< addDeref <=<
+             traceDS "dsSmall"    <=< dsSmall  <=<
              traceDS "dropParens" <=< dropParens)
-
-traceDS :: String -> Expr -> D Expr
-traceDS _msg e = --trace ("---- " ++ _msg ++ "\n" ++ prettyShow e) $
-                 pure e
+  where
+    tr = fTraceDesugar flgs
+    traceDS :: String -> Expr -> D Expr
+    traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
+                         pure e
+                  | otherwise = pure e
 
 ------
 
@@ -131,7 +133,7 @@ dsSmall = ds
     ds (Block es) = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
-    ds (HasType e1 e2) = join (apply HasType <$> ds e1 <*> ds e2)
+    ds (HasType e1 e2) = HasType <$> ds e1 <*> ds e2
 
     -- Misc
     ds (Option Nothing) = pure eFalse
@@ -280,16 +282,22 @@ dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
 dsFunction DEval i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   t1' <- withContext DAbstract $ dsM x t1
-  t2' <- dsD t2
+  (t2', mt3) <-
+    case t2 of
+      HasType e t -> (,) <$> dsD e  <*> (Just <$> dsD t)
+      _           -> (,) <$> dsD t2 <*> pure Nothing
   pure $ unifyV i $  -- Do the unification?
-         TLam x effs t1' t2'
+         TLam x effs t1' t2' mt3
 dsFunction DAbstract i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   y <- newIdent (getLoc t1) "y"
   z <- newIdent (getLoc t1) "z"
   t1' <- dsM x t1
-  t2' <- withContext DEval $ dsM y t2
-  pure $ TLam x effs (Define z t1') (Seq [Define y (ApplyD (Variable i) (Variable z)), t2'])
+  (t2', mt3) <- withContext DEval $
+    case t2 of
+      HasType e t -> (,) <$> dsM y e  <*> (Just <$> dsD t)
+      _           -> (,) <$> dsM y t2 <*> pure Nothing
+  pure $ TLam x effs (Define z t1') (Seq [Define y (ApplyD (Variable i) (Variable z)), t2']) mt3
 
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e
@@ -378,9 +386,9 @@ scope sc = expr
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
-    expr (TLam i r e1 e2) = do
+    expr (TLam i r e1 e2 me3) = do
       (e1', sc') <- defs (S.insert i sc) e1
-      TLam i r e1' <$> scopeD sc' e2
+      TLam i r e1' <$> scopeD sc' e2 <*> traverse expr me3
     expr (Exists _ e) = expr e
     expr e = impossible e
 
@@ -485,9 +493,41 @@ primOps = map (Ident noLoc)
 ------------------------
 
 simp :: Expr -> D Expr
-simp = f
+simp = simpUnify <=< simpUnused <=< simpAny
+
+-- Simplify any[e]  -->  e
+simpAny :: Expr -> D Expr
+simpAny = pure . f
   where f (ApplyD (Variable (Ident _ "any")) e) = f e
+        f e = composOp f e
+
+-- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
+simpUnify :: Expr -> D Expr
+simpUnify = pure . f
+  where f (Unify v (Seq (Snoc xs x))) | isValue v = Seq $ xs ++ [Unify v x]
+        f e = composOp f e
+
+-- XXX assumes no name shadowing
+simpUnused :: Expr -> D Expr
+simpUnused e = pure $ removeUnused unused e
+  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e ]
+
+data Use = Uni | Other deriving (Show)
+
+-- Find out how variables are used.
+-- A variable can be used on either side of a unification, or somewhere else.
+-- Existentials that are only used once in a unification, can be removed.
+findUses :: Expr -> M.Map Ident [Use]
+findUses = flip execState M.empty . f
+  where f e@(Variable i) = do modify (M.insertWith (++) i [Other]); pure e
+        f (Unify ei@(Variable i) e) = do modify (M.insertWith (++) i [Uni]); Unify ei <$> f e
         f e = compos f e
+
+removeUnused :: [Ident] -> Expr -> Expr
+removeUnused unused = f
+  where f (Unify (Variable i) e) | i `elem` unused = f e
+        f (Exists is e) = Exists (filter (`notElem` unused) is) (f e)
+        f e = composOp f e
 
 simplify :: Expr -> Expr
 simplify e = e
@@ -525,7 +565,7 @@ addDeref = pure . exprD S.empty
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
-    expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
+    expr s (TLam i rs e1 e2 me3) = TLam i rs (expr s' e1) (expr s' e2) (expr s' <$> me3)
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)
     expr s (HasType e t) = HasType (expr s e) (expr s t)

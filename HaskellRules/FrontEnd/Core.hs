@@ -210,14 +210,14 @@ core (Macro1 (Ident _ "one") [] e) = cOne =<< core e
 core (Macro1 (Ident _ "succeeds") [] e) = cSucceeds =<< core e
 core (Macro1 (Ident _ "decides") [] e) = cDecides =<< core e
 core (Exists is e) = cDef is <$> core e
-core (TLam i rs e1 e2) = do
+core (TLam i rs e1 e2 me3) = do
   --traceM $ "Lambda:\n" ++ prettyShow eee ++ "\n+++++\n"
   verif <- asks fVerify
   let covariant = covariantId `elem` rs  || True -- XXX
   if verif then
-    lamFuncVerify covariant i e1 e2
+    lamFuncVerify covariant i e1 e2 me3
    else
-    lamFunc covariant i e1 e2
+    lamFunc covariant i e1 (maybe e2 (HasType e2) me3)
 core (HasType e t) = do
   verif <- asks fVerify
   e' <- core e
@@ -270,16 +270,27 @@ lamFunc cov i (Exists is e1) e2 = do
   pure $ CLam i b
 lamFunc _ _ e _ = error $ "lamFunc: " ++ prettyShow e
 
-lamFuncVerify :: HasCallStack => Bool -> Ident -> Expr -> Expr -> C Core
+lamFuncVerify :: HasCallStack => Bool -> Ident -> Expr -> Expr -> Maybe Expr -> C Core
 --lamFunc _ _ e _ | trace ("lamFunc: " ++ prettyShow e) False = undefined
-lamFuncVerify _cov i (Exists is e1) e2 = do
+lamFuncVerify _cov i (Exists is e1) e2 me3 = do
   e1' <- core e1
-  e2' <- core e2
+  (e2', e2'') <-
+    case me3 of
+      -- No return type
+      Nothing -> do
+        e' <- core e2
+        pure (e', e')
+      -- Return type t: verify it and use an existential for uses
+      Just t -> do
+        e' <- core $ ApplyD t e2
+        e'' <- do x <- newTmp
+                  core $ Exists [x] $ ApplyD t (Variable x)
+        pure (e', e'')
   pure $ CSeq [
     cVerify $ CLam i $ CDef is $ CSeq [cAssume e1', cAssert e2'],
-              CLam i $ CDef is $ CSeq [        e1',         e2']
+              CLam i $ CDef is $ CSeq [        e1', cAssume e2'']
     ]
-lamFuncVerify _ _ e _ = error $ "lamFunc: " ++ prettyShow e
+lamFuncVerify _ _ e _ _ = error $ "lamFunc: " ++ prettyShow e
 
 coreEffs :: [Ident] -> Core -> C Core
 coreEffs [] e = pure e
@@ -401,7 +412,7 @@ thunk :: Expr -> C Expr
 thunk e = do
 --  i <- newTmp
   i <- pure $ Ident noLoc "_"
-  pure $ TLam i [] (Exists [] $ Array []) e
+  pure $ TLam i [] (Exists [] $ Array []) e Nothing
 
 ------
 
@@ -620,7 +631,7 @@ pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
-    lam is e = foldr (\ i r -> TLam i [] (Array []) r) e is
+    lam is e = foldr (\ i r -> TLam i [] (Array []) r Nothing) e is
     pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
       -- <|> pKeyword "λ"
 
