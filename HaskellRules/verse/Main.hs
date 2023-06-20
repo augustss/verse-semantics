@@ -183,7 +183,7 @@ flagTable =
   ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
-  ,("traceDesugar",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
+  ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ]
 
 cRead :: Run CState
