@@ -17,6 +17,7 @@ import qualified FrontEnd.Parse as P
 import VerseRepl.Command
 import FrontEnd.Core
 import FrontEnd.CoreSimp
+import FrontEnd.Eval(replacePrelude)
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
@@ -254,7 +255,7 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
     let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-        e' = anf $ coreToTrs $ simpCore $ asCore flg e
+        e' = anf $ coreToTrs $ simpCore $ replacePrelude $ simpCore $ asCore flg e
     putStrLn $ "Desugared:\n" ++ prettyShow e'
     let (done, rest) = verify icfpVerifier e'
     if done then
