@@ -101,6 +101,12 @@ a .|. b =
      e2 <- block b
      def (e1 :|: e2) <? "p"
 
+(.@.) :: (Program a, Program b) => a -> b -> Verse Expr
+f .@. x =
+  do ff <- def f <? "f"
+     xx <- def x <? "x"
+     def (ff :@: xx)
+
 -- equality
 
 (.=.) :: (Program a, Program b) => a -> b -> Verse Expr
