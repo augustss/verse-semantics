@@ -26,6 +26,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 --import Verifier.Verify
 import Rules.ICFP(anf)
+import Rules.Verifier(icfpVerifier, verify)
 --import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -252,10 +253,15 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
-    let flg = (flags s){ fNoLambdaIf = True, fVerify = True }
+    let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
         e' = anf $ coreToTrs $ simpCore $ asCore flg e
     putStrLn $ "Desugared:\n" ++ prettyShow e'
-    putStrLn "Verification not implemented!"
+    let (done, rest) = verify icfpVerifier e'
+    if done then
+      putStrLn "Verified"
+     else do
+      putStrLn "Not verified, residual term:"
+      pp rest
     pure s
 {-
     catch (do

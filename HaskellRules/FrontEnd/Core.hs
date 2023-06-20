@@ -362,7 +362,10 @@ cAll e = do
 cSucceeds :: Core -> C Core
 cSucceeds e = do
  useSplit <- asks fSplit
- if not useSplit then pure $ CSucceeds e
+ if not useSplit then do
+   verif <- asks fVerify
+   if verif then pure $ cVerify $ cAssert e
+   else pure $ CSucceeds e
  else do
   u1 <- newTmp
   u2 <- newTmp
