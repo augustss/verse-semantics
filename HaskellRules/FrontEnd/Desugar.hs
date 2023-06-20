@@ -30,7 +30,7 @@ desugar = eval .
 
 traceDS :: String -> Expr -> D Expr
 traceDS _msg e = --trace ("---- " ++ _msg ++ "\n" ++ prettyShow e) $
-                pure e
+                 pure e
 
 ------
 
@@ -223,9 +223,16 @@ eAny = Variable (Ident noLoc "any")
 
 ---------------------------------------------------------------------------------
 
+-- All cases, but the last, can be removed.
+-- They are just there to avoid introducing unused existentials.
 dsD :: Expr -> D Expr
 dsD e | isValue e = pure e
 dsD e@(ApplyD _ _) = pure e
+dsD e@(HasType _ _) = pure e
+dsD (Unify x e) | isValue x = Unify x <$> dsD e
+dsD (Define x e) = Define x <$> dsD e
+dsD (For2 e1 e2) = For2 <$> dsD e1 <*> dsD e2
+dsD (Macro1 m rs e) = Macro1 m rs <$> dsD e
 dsD e = do
   x <- newIdent (getLoc e) "i"
   existsV [x] <$> dsM x e
