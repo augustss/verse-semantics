@@ -94,7 +94,6 @@ coreToExp' = nl . expl
       ]
 --    expl (C.CWrong _) = undefined
 --    expl (C.CSplit _ _ _) = undefined
---    expl (C.CLambda _ _ _ _ _) = undefined
     expl e = error $ "expl: " ++ show e
 
 valsToCore :: [Fix V.Val] -> C.Core

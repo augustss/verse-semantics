@@ -144,7 +144,6 @@ coreToTrs (CMacro (Ident _ "verify") e) = T.Verify $ coreToTrs e
 coreToTrs (CMacro (Ident _ "assert") e) = T.Assert $ coreToTrs e
 coreToTrs (CMacro (Ident _ "assume") e) = T.Assume $ coreToTrs e
 coreToTrs e@CMacro{} = impossible e
-coreToTrs e@CLambda{} = impossible e
 coreToTrs (CStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
 coreToTrs (CPtr p) = T.Ref (T.Ptr p)
 --coreToTrs _ = undefined

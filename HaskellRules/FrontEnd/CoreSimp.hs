@@ -6,7 +6,6 @@ import Data.List
 import Data.Maybe
 import FrontEnd.Core
 import FrontEnd.Eval
-import Epic.Print
 --import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.
@@ -45,11 +44,6 @@ simpAlias :: Core -> Core
 simpAlias = fc . g
   where
     fc (CDef h e) | Just d <- bind h e = fc d
-    fc (CLambda i is cov e1 e2) =  -- CLambda has weird scoping, temporarily change it
-      case fc (CLam i (CDef is (CSeq [e1, e2]))) of
-        CLam i' (CDef is' (CSeq [e1', e2'])) -> CLambda i' is' cov e1' e2'
-        CLam i' (CSeq [e1', e2']) -> CLambda i' [] cov e1' e2'
-        e -> error $ "simpAlias: CLambda " ++ prettyShow e
     fc (CLam x (CDef h e)) | Just d <- lam x h e = fc d
     fc e = composOp fc e
 

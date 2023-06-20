@@ -58,7 +58,6 @@ data Core
   | CDef Heap Core
   | CWrong String
   | CSplit Core Value Value
-  | CLambda Ident [Ident] Bool Core Core
   -- Store primitives
   | CStore Store Core
   deriving (Show, Eq, Data)
@@ -472,10 +471,6 @@ instance Pretty Core where
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
                                  pPrintPrec l 0 f <> text ",",
                                  pPrintPrec l 0 g <> text ","])
-  pPrintPrec l _ (CLambda x ys cov e1 e2) =
-    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
-             (if cov then text "<covariant> " else text "") <>
-             text "." <+> pPrintPrec l 0 e2
   pPrintPrec l p (CStore s e) =
     maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
 
@@ -501,7 +496,6 @@ compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
-compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
 compos f (CStore s e) = CStore <$> storeMapA f s <*> f e
 
 composOp :: (Core -> Core) -> Core -> Core
@@ -532,7 +526,6 @@ cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
-cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
 cfvs (CStore s e) = cfvsS s ++ cfvs e
 
 cfvsS :: Store -> [Ident]
@@ -568,10 +561,6 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (sub f) (sub g)
-    sub e@(CLambda i is cov e1 e2)
-      | x `elem` (i:is) = e
-      | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
-      | otherwise = sub $ alphaConvert bs e
     sub (CStore s e) = CStore (storeMap sub s) (sub e)
 
 -- Alpha convert a term, avoiding vs as the names for bound
@@ -597,10 +586,6 @@ alphaConvert vs = alpha []
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
     alpha m (CSplit e f g) = CSplit (alpha m e) (alpha m f) (alpha m g)
-    alpha m (CLambda i is cov e1 e2) = CLambda i' is' cov (alpha m' e1) (alpha m' e2)
-      where i' = fresh i
-            is' = map fresh is'
-            m' = foldr add m (zip (i:is) (i':is'))
     alpha m (CStore s e) = CStore (storeMap (alpha m) s) (alpha m e)
 
     add ii@(i, i') m | i == i' = m
