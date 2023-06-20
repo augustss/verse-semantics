@@ -197,7 +197,8 @@ core (If3 e1 e2 e3) = do
   useSplit <- asks fSplit
   verif <- asks fVerify
   if verif then
-    CIf <$> core e1 <*> core e2 <*> core e3
+    let Exists is e = e1
+    in  CIf <$> (CDef is <$> core e) <*> core e2 <*> core e3
    else if noLambdaIf then
     coreIf e1 e2 e3
    else if useSplit then
@@ -570,7 +571,10 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (sub f) (sub g)
-    sub (CIf _ _ _) = error "unimplemented"
+    sub (CIf (CDef is e1) e2 e3) =
+      let CDef is' (CSeq [e1',e2']) = sub (CDef is (CSeq [e1, e2]))
+      in  CIf (CDef is' e1') e2' (sub e3)
+    sub CIf{} = undefined
     sub (CStore s e) = CStore (storeMap sub s) (sub e)
 
 -- Alpha convert a term, avoiding vs as the names for bound
@@ -596,7 +600,10 @@ alphaConvert vs = alpha []
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
     alpha m (CSplit e f g) = CSplit (alpha m e) (alpha m f) (alpha m g)
-    alpha _ (CIf _ _ _) = error "unimplemented"
+    alpha m (CIf (CDef h e1) e2 e3) =
+      let CDef h' (CSeq [e1', e2']) = alpha m (CDef h (CSeq [e1, e2]))
+      in  CIf (CDef h' e1') e2' (alpha m e3)
+    alpha _ CIf{} = undefined
     alpha m (CStore s e) = CStore (storeMap (alpha m) s) (alpha m e)
 
     add ii@(i, i') m | i == i' = m
