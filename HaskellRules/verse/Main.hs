@@ -255,7 +255,7 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s -> do
     let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-        e' = anf $ coreToTrs $ simpCore $ replacePrelude $ simpCore $ asCore flg e
+        e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
     putStrLn $ "Desugared:\n" ++ prettyShow e'
     let (done, rest) = verify icfpVerifier e'
     if done then
@@ -264,18 +264,39 @@ cVerify = do
       putStrLn "Not verified, residual term:"
       pp rest
     pure s
+
+replacePrim :: Core -> Core
+replacePrim = f
+  where
+    f (CApply (CPrim i) v) | Just p <- lookup i verifyPrelude = CApply p (f v)
+    f (CPrim i) | Just p <- lookup i verifyPrelude = CValue p
+    f e = FrontEnd.Core.composOp f e
+
+verifyPrelude :: [(String, Value)]
+verifyPrelude =
+  [ binOpInt "in'+'"
+  , binOpInt "in'-'"
+  , binOpInt "in'*'"
 {-
-    catch (do
-      b <- verify (free e') e'
-      if b then
-        putStrLn "Cannot fail"
-       else
-        putStrLn "Can fail"
-      pure s)
-      (\ (exn :: SomeException) -> do
-         print exn
-         pure s)
+  , binOpInt "in'<'"
+  , binOpInt "in'<='"
+  , binOpInt "in'>'"
+  , binOpInt "in'>='"
 -}
+  ]
+  where
+    binOpInt p = (p, binOpInt' p)
+    binOpInt' p = CLam xy $ CDef [x,y] $ CSeq
+      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy, cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
+    cInt e = CApply (CPrim "isInt$") e
+    xy = Ident noLoc "xy"
+    x = Ident noLoc "x"
+    y = Ident noLoc "y"
+    z = Ident noLoc "z"
+    vxy = CVar xy
+    vx = CVar x
+    vy = CVar y
+    vz = CVar z
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s

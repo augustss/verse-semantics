@@ -145,6 +145,7 @@ coreToTrs (CMacro (Ident _ "assert") e) = T.Assert $ coreToTrs e
 coreToTrs (CMacro (Ident _ "assume") e) = T.Assume $ coreToTrs e
 coreToTrs e@CMacro{} = impossible e
 coreToTrs (CStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
+coreToTrs (CIf e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
 coreToTrs (CPtr p) = T.Ref (T.Ptr p)
 --coreToTrs _ = undefined
 
@@ -180,6 +181,7 @@ trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
 trsToCore (T.Store h e) = CStore s (trsToCore e)
   where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
 trsToCore (T.Ref (T.Ptr i)) = CPtr i
+trsToCore (T.If e1 e2 e3) = CIf (trsToCore e1) (trsToCore e2) (trsToCore e3)
 trsToCore e = error $ "trsToCore: unimplemented: " ++ show e
 
 trsToCoreI :: T.Ident -> Ident
