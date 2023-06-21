@@ -171,8 +171,8 @@
   $$
   \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
-      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-      \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
+      \text{Programs} & p  & ::=  & |one2 r b| \quad \text{where} \; \freevars{b} = \{ r \} \\
       \text{Bodies} & b & ::= & |v==e| \vb |b_1 ; b_2| \vb |def x b| \vb |b_1 choice b_2| \vb |fail| \vb |succeed| \\
       \text{Expressions}   & e     & ::= & |v| \vb |apply1N v_1 v_2| \vb |one2 r b| \vb |all2 r b| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
@@ -230,12 +230,10 @@
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail}      & |v = applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
-\rulename{app-beta}^{\alpha} & |v_1 = apply1 (lam2 x r e) v_2| & \movesto & |def (r x) (x==v_2; e; v_1=r)|
-                                                  & \text{if $r,x \not\in \freevars{|v_1|}$} \\
+\rulename{app-beta}^{\alpha} & |v_1 = apply1 (lam2 x r b) v_2| & \movesto & |def x (x==v_2; def r (b; v_1==r))|
+                                                  & \text{if $x,r \not\in \freevars{|v_1,v_2|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
-%%                              \hspace{1em} \text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \\
-                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+                              |(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 %%\end{array}
 %%\\
@@ -251,11 +249,12 @@
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2| & \movesto & |succeed| & \text{if $k_1=k_2$} \\
 %%  \rulename{u-tup} & \hspace{-1.8em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & |v_1==v1';xdots;v_n==v_n'| \\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_0,xdots,v_n) == tup (v0',xdots,v_n')| & \movesto & |v_0==v0';xdots;v_n==v_n'| \\
+  \rulename{u-tup-0} & \hspace{-2.0em} |emptytup == emptytup| & \movesto & |succeed| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-tup-0} do not match} \\
   \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |S^[x==v]| & \movesto & |(subst S x v)^[x==v]| \hspace*{-0.3em}
-  & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$}, \\
+  & \text{if $|x| \in \freevars{|S|}$, $|x| \notin \freevars{|v|}$ or $|v|$ is a lambda}, \\
   &&&& \text{\hskip 0.7em and ($(|v| = |y| \implies |x| \prec |y|)$)} \\
   \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
   \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
@@ -267,11 +266,11 @@
     \\[-0.6em]
 
 \rulegroupname{Elimination:}
-\rulename{succ-elim1} & |succeed ; e| & \movesto & |e| \\
-\rulename{succ-elim2} & |e ; succeed| & \movesto & |e| \\
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (S^[x==v;e])| & \movesto & |S^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
-\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
+\rulename{succ-elim1} & |succeed ; b| & \movesto & |b| \\
+\rulename{succ-elim2} & |b ; succeed| & \movesto & |b| \\
+\rulename{exi-elim} & |def x b| & \movesto & |b| & \text{if $|x| \notin \freevars{|b|}$}\\
+\rulename{eqn-elim} & |def x (S^[x==v;b])| & \movesto & |S^[b]| & \text{if $|x| \notin \freevars{|S^[v;b]|}$} \\
+\rulename{fail-elim} & |S^[fail]| & \movesto & |fail| & \text{if $|S| \ne \hole$} \\
 
     \\[-0.6em]
 
@@ -287,15 +286,14 @@
 
 \rulegroupname{Choice:}
 \rulename{one-fail}   & |v == one2 r fail| & \movesto & |fail| \\
-\rulename{one-value}  & |v_1 == one2 r (r==v_2)| & \movesto & |v_1 == v_2| \\
-\rulename{one-choice}  & |v_1 == one2 r (r==v_2 `choice` b)| & \movesto & |v_1 == v_2| \\
-\rulename{all-fail}   & |v == all2 r fail| & \movesto & |v == tup ()| \\
-\rulename{all-value}  & |v = all2 r v| & \movesto & |tup v| \\
-\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
-\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
-\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
-\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
-\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
+\rulename{one-value}  & |one2 r (r==v)| & \movesto & |v| \\
+\rulename{one-choice}  & |one2 r (r==v `choice` b)| & \movesto & |v| \\
+\rulename{all-fail}   & |all2 r fail| & \movesto & |tup ()| \\
+\rulename{all-choice} & |all2 r (r==v_1 choice xdots choice r==v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+\rulename{choose-r} & |fail choice b| & \movesto & |b| \\
+\rulename{choose-l} & |b choice fail| & \movesto & |b| \\
+\rulename{choose-assoc} & |(b_1 choice b_2) choice b_3| & \movesto & |b_1 choice (b_2 choice b_3)| \\
+\rulename{choose} & |SX^[CX^[b_1 choice b_2]]| & \movesto & |SX^[CX^[b_1] choice CX^[b_2]]| & \text{if}~|CX| \ne \hole \\
 
 
 \end{array} \\
