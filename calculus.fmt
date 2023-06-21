@@ -2,7 +2,7 @@
 %% Stuff for TimCore
 
 %format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
-%format lam2 x y e = "\lambda" x "\rightarrow" y ".\," e
+%format lam2 x r e = "\lambda" x "\shortrightarrow{}" r ".\," e
 %format scope (vs) (stuff) (e) = "\textbf{scope}(" vs ";" stuff ").\," e
 
 %% 'g' inferences
@@ -71,6 +71,7 @@
 
 %format space = "\hspace{0.3em}"
 %format lam x (e) = "\lambda" x".\," e
+%format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr x = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
 %format thunk (e) = "\lambda \langle\rangle.\," e
@@ -140,6 +141,7 @@
 %format he = "he"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
+%format succeed = "\textbf{succeed}"
 %format wront = "\wrong"
 %format do = "\textbf{do}"
 %format if = "\textbf{if}"
@@ -162,6 +164,7 @@
 %format typex (x) = "\textbf{type}\{" x "\}"
 %format oneKW = "\textbf{one}"
 %format one (x) = "\textbf{one}\{" x "\}"
+%format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 
 %format assumeKW = "\textbf{assume}"
 %format assertKW = "\textbf{assert}"
@@ -171,6 +174,7 @@
 %format verify (x) = "\textbf{verify}\{" x "\}"
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
+%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
 %format splitKW = "\textbf{split}"
 %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %% %format defKW = "\textbf{def}"
@@ -352,6 +356,7 @@
 
 %format b_1
 %format b_2
+%format b_3
 
 %format u_1
 %format u_n
