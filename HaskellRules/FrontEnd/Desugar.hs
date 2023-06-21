@@ -90,9 +90,9 @@ dsSmall = ds
     -- Application and unification
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
-      ds $ seqE [Define x e1, e2, Variable x]
+      ds $ seqE [DefineE x e1, e2, Variable x]
     ds (InfixOp e1@Variable{} (Op "=") e2) = ds $ Unify e1 e2
-    ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [Define x e1, Unify (Variable x) e2]
+    ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [DefineE x e1, Unify (Variable x) e2]
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
@@ -102,15 +102,15 @@ dsSmall = ds
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do y <- newIdent (getLoc e) "y"; ds $ Function [(Define y e, [])] (Variable y)
+    ds (Typedef e) = do y <- newIdent (getLoc e) "y"; ds $ Function [(DefineE y e, [])] (Variable y)
     ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
     -- ds Function [] ...
     -- XXX effects
     ds (If1 e) = ds $ If2E e eFalse
     ds (If2 e1 e2) = ds $ If3 e1 e2 eFalse
-    ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (Define x e1) (Variable x) e2
-    ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (Define x e) (Variable x)
+    ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (DefineE x e1) (Variable x) e2
+    ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (DefineE x e) (Variable x)
 
     -- Operators
     ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' eFail eFalse
@@ -140,7 +140,7 @@ dsSmall = ds
     -- option{e}  -->  if(x:=e)then truth(e)
     ds (Option (Just e)) = do
       t <- newIdent (getLoc e) "t"
-      ds $ If2 (Define t e) (Array [Variable t])
+      ds $ If2 (DefineE t e) (Array [Variable t])
 
     -- one, all
     ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e eFail
@@ -157,7 +157,7 @@ apply con e1 e2 | isValue e1 = apply1 con e1 e2   -- Easy special case.  Not rea
 apply con e1 e2 = do
   f <- newIdent (getLoc e1) "f"
   r <- apply1 con (Variable f) e2
-  pure $ seqE [Define f e1, r]
+  pure $ seqE [DefineE f e1, r]
 
 apply1 :: (Value -> Value -> Expr) -> Value -> Expr -> D Expr
 -- val1[val2] 
@@ -166,7 +166,7 @@ apply1 con x1 e2 | isValue e2 = apply2 con x1 e2   -- Easy special case.  Not re
 apply1 con x1 e2 = do
   a <- newIdent (getLoc e2) "a"
   r <- apply2 con x1 (Variable a)
-  pure $ seqE [Define a e2, r]
+  pure $ seqE [DefineE a e2, r]
 
 -- val1[val2]  --> 
 apply2 :: (Value -> Value -> Expr) -> Value -> Value -> D Expr
@@ -174,7 +174,7 @@ apply2 con x1 x2 = pure $ con x1 x2
 
 defn :: Expr -> Expr -> D Expr
 -- Rule: (i := e) -->  (i := e)
-defn (Variable i) e = pure $ Define i e
+defn (Variable i) e = pure $ DefineE i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
 defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
@@ -192,7 +192,7 @@ defn (Array ps) e = do
   let es = map (\ x -> InfixOp (Variable x) (Op ":") eAny) xs
   pure $ Seq $ [InfixOp (Array es) (Op "=") e] ++ bs
 -- Rule (p1 -> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
-defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e = pure $ Define2 x1 x2 e
+defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e = pure $ DefineIE x1 x2 e
 defn (InfixOp x1@Variable{} op@(Op "->") p2) e = do
   x2 <- Variable <$> newIdent (getLoc p2) "x"
   r2 <- defn p2 x2
@@ -232,7 +232,7 @@ dsD e | isValue e = pure e
 dsD e@(ApplyD _ _) = pure e
 dsD e@(HasType _ _) = pure e
 dsD (Unify x e) | isValue x = Unify x <$> dsD e
-dsD (Define x e) = Define x <$> dsD e
+dsD (DefineE x e) = DefineE x <$> dsD e
 dsD (For2 e1 e2) = For2 <$> dsD e1 <*> dsD e2
 dsD (Macro1 m rs e) = Macro1 m rs <$> dsD e
 dsD e = do
@@ -249,12 +249,14 @@ dsM i x@Variable{} = pure $ unifyV i x
 dsM i e@(ApplyD _ _) = pure $ unifyV i e
 -- Rule:  i |> x = t   -->  x = (i |> t)
 dsM i (Unify x t) | isValue x = Unify x <$> dsM i t
+-- Rule:  i |> x:any  --> x := i
+dsM i (DefineV x) = pure $ DefineE x (Variable i)
 -- Rule:  i |> x := t  -->  x := (i |> t)
-dsM i (Define x t) = Define x <$> dsM i t
+dsM i (DefineE x t) = DefineE x <$> dsM i t
 -- Rule:  i |> (j->x) := t  -->  j := i; x := (i |> t)
-dsM i (Define2 j x t) = do
+dsM i (DefineIE j x t) = do
   t' <- dsM i t
-  pure $ seqE [Define j (Variable i), Define x t']
+  pure $ seqE [DefineE j (Variable i), DefineE x t']
 -- Rule:  i |> :t      -->  D(t)[i]
 dsM i (Range t) = ApplyD <$> dsD t <*> pure (Variable i)
 -- Rule:  i |> t1; t2  -->  D(t1); i |> t2
@@ -297,7 +299,7 @@ dsFunction DAbstract i t1 effs t2 = do
     case t2 of
       HasType e t -> (,) <$> dsM y e  <*> (Just <$> dsD t)
       _           -> (,) <$> dsM y t2 <*> pure Nothing
-  pure $ TLam x effs (Define z t1') (Seq [Define y (ApplyD (Variable i) (Variable z)), t2']) mt3
+  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2']) mt3
 
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e
@@ -386,7 +388,7 @@ scope sc = expr
       e2' <- scopeD sc' e2      
       pure $ seqE [e1', e2']
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-    expr (Define i e) = Unify (Variable i) <$> expr e
+    expr (DefineE i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
@@ -429,7 +431,8 @@ getVisible Do{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible Macro1 {} = []
-getVisible (Define i e) = i : getVisible e
+getVisible (DefineV i) = [i]
+getVisible (DefineE i e) = i : getVisible e
 getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible Function{} = []
@@ -453,8 +456,9 @@ getVar (Let _ e) = getVar e
 getVar Do{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar Macro1 {} = []
-getVar (Define _ e) = getVar e
-getVar (Define2 _ _ e) = getVar e
+getVar (DefineV _) = []
+getVar (DefineE _ e) = getVar e
+getVar (DefineIE _ _ e) = getVar e
 getVar Choice{} = []
 getVar (Set _ _ e) = getVar e
 getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
@@ -561,12 +565,13 @@ addDeref = pure . exprD S.empty
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
-    expr s (Define i e) = Define i (expr s e)
-    expr s (Define2 i j e) = Define2 i j (expr s e)
+    expr _ (DefineV i) = DefineV i
+    expr s (DefineE i e) = DefineE i (expr s e)
+    expr s (DefineIE i j e) = DefineIE i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
       where op = Ident l ("in'" ++ sop ++ "'")
-    expr s (MVar i (Just t) (Just e)) = Define i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
+    expr s (MVar i (Just t) (Just e)) = DefineE i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)

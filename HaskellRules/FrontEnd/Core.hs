@@ -648,7 +648,7 @@ pSeq = choice [ pLam, pExists, cons <$> pEqu <*> optional (pOp ";" *> pSeq) ]
     cons e (Just e') = Seq [e, e']
 
 pEqu :: P Expr
-pEqu = try (Define <$> (pIdent <* pOp ":=") <*> pChoice)
+pEqu = try (DefineE <$> (pIdent <* pOp ":=") <*> pChoice)
        <|>
        foldr1 Unify <$> sepBy1 pChoice (pOp "=")
 
