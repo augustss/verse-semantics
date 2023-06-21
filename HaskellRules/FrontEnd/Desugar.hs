@@ -21,7 +21,7 @@ import FrontEnd.Flags
 
 desugar :: Flags -> Expr -> Expr
 desugar flgs = eval (fVerify flgs) .
-            (-- traceDS "simp"       <=< simp <=<
+            (traceDS "simp"       <=< simp <=<
              traceDS "addScope"   <=< addScope <=<
              traceDS "dsD"        <=< dsD      <=<
              traceDS "addDeref"   <=< addDeref <=<
