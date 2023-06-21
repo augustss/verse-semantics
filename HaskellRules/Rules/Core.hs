@@ -273,6 +273,7 @@ data Op
   | AddTo
   | DotDot
   | Print
+  | Append
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
