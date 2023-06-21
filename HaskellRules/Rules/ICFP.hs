@@ -187,6 +187,7 @@ valid' onlyEq = expr
     expr (Split e (LAM _ e1) Var{}) =
       expr e && expr e1
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
+    expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
     expr _ = undefined -- GHC bug
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
@@ -249,6 +250,7 @@ anf' onlyEq = expr
           (ds2, v2) = value i2 e2
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
+    expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
     expr e = error $ "anf: " ++ prettyShow e
 
     expru (e1 :=: e2) =

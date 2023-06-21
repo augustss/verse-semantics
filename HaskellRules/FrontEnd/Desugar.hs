@@ -20,8 +20,8 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 
 desugar :: Flags -> Expr -> Expr
-desugar flgs = eval .
-            (simp <=<
+desugar flgs = eval (fVerify flgs) .
+            (-- traceDS "simp"       <=< simp <=<
              traceDS "addScope"   <=< addScope <=<
              traceDS "dsD"        <=< dsD      <=<
              traceDS "addDeref"   <=< addDeref <=<
@@ -43,7 +43,7 @@ type D = State DState
 -- Right now it is used to guide desugaring to avoid an uninstantiated exist
 -- in the function desugaring.
 
-data DState = DState { nextNo :: !Int, context :: DContext }
+data DState = DState { nextNo :: !Int, context :: !DContext, verifying :: !Bool }
   deriving (Show)
 data DContext = DAbstract | DEval
   deriving (Show)
@@ -79,8 +79,8 @@ dropParens = f
 
 ---------------------
 
-eval :: D Expr -> Expr
-eval = flip evalState DState{ nextNo = 1, context = DEval }
+eval :: Bool -> D Expr -> Expr
+eval v = flip evalState DState{ nextNo = 1, context = DEval, verifying = v }
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -115,14 +115,14 @@ dsSmall = ds
     -- Operators
     ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' eFail eFalse
     ds (PrefixOp (Op ":") e) = Range <$> ds e
-    ds (PrefixOp (Ident l op) e) = ds (call "pre" l op e)
+    ds (PrefixOp (Ident l op) e) = gets verifying >>= \v -> ds (call v "pre" l op e)
     ds (PostfixOp e (Op "?")) = Range <$> ds e
-    ds (PostfixOp e (Ident l op)) = ds (call "post" l op e)
+    ds (PostfixOp e (Ident l op)) = gets verifying >>= \v -> ds (call v "post" l op e)
     ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 eFail) eFail    -- XXX binding
     ds (InfixOp e1 (Op "or") e2) = ds $ If2E e1 $ If2E e2 eFail
-    ds (InfixOp e1 (Ident l op) e2) = ds (call "in" l op (Array [e1, e2]))
+    ds (InfixOp e1 (Ident l op) e2) = gets verifying >>= \v -> ds (call v "in" l op (Array [e1, e2]))
 
     -- Let do case
     ds (Case1 b) = do
@@ -307,22 +307,27 @@ existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
                Exists is e
 
 -- Pick the appropriate form of apply for operators
-call :: String -> Loc -> String -> Expr -> Expr
-call p l s e = con (Variable (Ident l s')) e
-      where con | s' `elem` ["in'/'","pre'!'","post'?'",
-                             "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
-                             "pre'+'","pre'-'",  -- XXX not really right
-                             "in'+'","in'-'","in'*'",  -- XXX not really right
-                             "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
-                             "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
-                             "length","in'..'"] = ApplyD
-                | otherwise = ApplyS
-            s' = p ++ "'" ++ s ++ "'"
+call :: Bool -> String -> Loc -> String -> Expr -> Expr
+call ver p l s e = con (Variable (Ident l s')) e
+  where
+    -- For verification, use ApplyS.  At runtime, skip the test.
+    con | ver && s' `elem` [
+                     "pre'+'","pre'-'",
+                     "in'+'","in'-'","in'*'"] = ApplyS
+        | s' `elem` ["in'/'","pre'!'","post'?'",
+                     "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
+                     "pre'+'","pre'-'",  -- XXX not really right
+                     "in'+'","in'-'","in'*'",  -- XXX not really right
+                     "in'+='", "in'-='", "in'*='", "in'/='", "in'.='",
+                     "in'='","in'<>'","in'<'","in'>'","in'<='","in'>='",
+                     "length","in'..'"] = ApplyD
+        | otherwise = ApplyS
+    s' = p ++ "'" ++ s ++ "'"
 
 ----------------------------------------------
 
 dsScope :: Expr -> Expr
-dsScope = eval . addScope
+dsScope = eval False . addScope
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -492,8 +497,8 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
-simp :: Expr -> D Expr
-simp = simpUnify <=< simpUnused <=< simpAny
+_simp :: Expr -> D Expr
+_simp = simpUnify <=< simpUnused <=< simpAny
 
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
@@ -510,7 +515,7 @@ simpUnify = pure . f
 -- XXX assumes no name shadowing
 simpUnused :: Expr -> D Expr
 simpUnused e = pure $ removeUnused unused e
-  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e ]
+  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e, i `notElem` prelude, i `notElem` primOps ]
 
 data Use = Uni | Other deriving (Show)
 

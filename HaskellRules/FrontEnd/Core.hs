@@ -20,6 +20,7 @@ module FrontEnd.Core(
   pCore, pCoreFile,
   Ident(..), noLoc,
   storeAlloc, storeRead, storeWrite, storeEmpty, storePrint,
+  cAssume,
   ) where
 import Prelude hiding ((<>))
 import Control.Monad
@@ -58,7 +59,7 @@ data Core
   | CDef Heap Core
   | CWrong String
   | CSplit Core Value Value
-  | CLambda Ident [Ident] Bool Core Core
+  | CIf Core Core Core  -- Only for verification
   -- Store primitives
   | CStore Store Core
   deriving (Show, Eq, Data)
@@ -194,7 +195,11 @@ core (For2 e1 e2) = do
 core (If3 e1 e2 e3) = do
   noLambdaIf <- asks fNoLambdaIf
   useSplit <- asks fSplit
-  if noLambdaIf then
+  verif <- asks fVerify
+  if verif then
+    let Exists is e = e1
+    in  CIf <$> (CDef is <$> core e) <*> core e2 <*> core e3
+   else if noLambdaIf then
     coreIf e1 e2 e3
    else if useSplit then
     ifSplit e1 e2 e3
@@ -364,7 +369,7 @@ cSucceeds e = do
  useSplit <- asks fSplit
  if not useSplit then do
    verif <- asks fVerify
-   if verif then pure $ cVerify $ cAssert e
+   if verif then pure $ cAssert e
    else pure $ CSucceeds e
  else do
   u1 <- newTmp
@@ -472,10 +477,7 @@ instance Pretty Core where
     text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
                                  pPrintPrec l 0 f <> text ",",
                                  pPrintPrec l 0 g <> text ","])
-  pPrintPrec l _ (CLambda x ys cov e1 e2) =
-    parens $ text "\\" <+> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 (CDef ys e1) <+>
-             (if cov then text "<covariant> " else text "") <>
-             text "." <+> pPrintPrec l 0 e2
+  pPrintPrec l p (CIf e1 e2 e3) = maybeParens (p > 0) $ text "if" <+> pPrintPrec l 11 e1 <+> pPrintPrec l 11 e2 <+> pPrintPrec l 11 e3
   pPrintPrec l p (CStore s e) =
     maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
 
@@ -501,7 +503,7 @@ compos f (CMacro i e) = CMacro i <$> f e
 compos f (CDef h e) = CDef h <$> f e
 compos _ e@CWrong{} = pure e
 compos f (CSplit e n g) = CSplit <$> f e <*> f n <*> f g
-compos f (CLambda i is cov e1 e2) = CLambda i is cov <$> f e1 <*> f e2
+compos f (CIf e1 e2 e3) = CIf <$> f e1 <*> f e2 <*> f e3
 compos f (CStore s e) = CStore <$> storeMapA f s <*> f e
 
 composOp :: (Core -> Core) -> Core -> Core
@@ -532,7 +534,8 @@ cfvs (CMacro _ e) = cfvs e
 cfvs (CDef is e) = filter (`notElem` is) $ cfvs e
 cfvs (CSplit e f g) = cfvs e ++ cfvs f ++ cfvs g
 cfvs CWrong{} = []
-cfvs (CLambda i is _ e1 e2) = filter (`notElem` (i:is)) $ cfvs e1 ++ cfvs e2
+cfvs (CIf e1@(CDef is _) e2 e3) = cfvs e1 ++ cfvs (CDef is e2) ++ cfvs e3
+cfvs CIf{} = undefined
 cfvs (CStore s e) = cfvsS s ++ cfvs e
 
 cfvsS :: Store -> [Ident]
@@ -568,10 +571,10 @@ subst x b ae | x `elem` bs = impossible "subst occur check"
                      | otherwise = sub $ alphaConvert bs a
     sub e@CWrong{} = e
     sub (CSplit e f g) = CSplit (sub e) (sub f) (sub g)
-    sub e@(CLambda i is cov e1 e2)
-      | x `elem` (i:is) = e
-      | null (intersect (i:is) bs) = CLambda i is cov (sub e1) (sub e2)
-      | otherwise = sub $ alphaConvert bs e
+    sub (CIf (CDef is e1) e2 e3) =
+      let CDef is' (CSeq [e1',e2']) = sub (CDef is (CSeq [e1, e2]))
+      in  CIf (CDef is' e1') e2' (sub e3)
+    sub CIf{} = undefined
     sub (CStore s e) = CStore (storeMap sub s) (sub e)
 
 -- Alpha convert a term, avoiding vs as the names for bound
@@ -597,10 +600,10 @@ alphaConvert vs = alpha []
             m' = foldr add m $ zip h h'
     alpha _ e@CWrong{} = e
     alpha m (CSplit e f g) = CSplit (alpha m e) (alpha m f) (alpha m g)
-    alpha m (CLambda i is cov e1 e2) = CLambda i' is' cov (alpha m' e1) (alpha m' e2)
-      where i' = fresh i
-            is' = map fresh is'
-            m' = foldr add m (zip (i:is) (i':is'))
+    alpha m (CIf (CDef h e1) e2 e3) =
+      let CDef h' (CSeq [e1', e2']) = alpha m (CDef h (CSeq [e1, e2]))
+      in  CIf (CDef h' e1') e2' (alpha m e3)
+    alpha _ CIf{} = undefined
     alpha m (CStore s e) = CStore (storeMap (alpha m) s) (alpha m e)
 
     add ii@(i, i') m | i == i' = m

@@ -110,15 +110,19 @@ instance Pretty Expr where
   pPrintPrec l p (Int k)          = pPrintPrec l p k
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
-  pPrintPrec l p (Lam (Bind x e)) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <> pPrintPrec l 0 e
-  pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ pPrintPrec l 4 a <+> text "|" <+> pPrintPrec l 4 b
+  pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
+  pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
   pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
   pPrintPrec l p (a :~: b)        = maybeParens (p > 5) $ pPrintPrec l 6 a <+> text "~" <+> pPrintPrec l 6 b
   pPrintPrec l p (a :@: b)        = maybeParens (p > 4) $ pPrintPrec l 4 a <> text "(" <> pPrintPrec l 0 b <> text ")"
   pPrintPrec _ _ Fail             = text "fail"
-  pPrintPrec l p (Exi (Bind x a)) = maybeParens (p > 0) $ text "ex" <+> pPrintPrec l 0 x P.<> text "." <+> pPrintPrec l 0 a
+  pPrintPrec l p e@(EXI{})        = maybeParens (p > 0) $ text "ex" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
+                                                                             pPrintPrec l 0 a]
+                                    where (xs, a) = getExi [] e
+                                          getExi vs (EXI v b) = getExi (v:vs) b
+                                          getExi vs b = (reverse vs, b)
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
@@ -133,6 +137,7 @@ instance Pretty Expr where
   pPrintPrec l _ (Store h e)      = text "store {" P.<> sep [pPrintPrec l 0 (IM.toList h) P.<> text ",",
                                                              pPrintPrec l 0 e] P.<> text "}"
   pPrintPrec l p (Ref r)          = pPrintPrec l p r
+  pPrintPrec _ _ _                = undefined -- GHC bug
 
 instance Eq Expr where
   a == b = a `compare` b == EQ

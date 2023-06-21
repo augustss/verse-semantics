@@ -353,7 +353,7 @@ pIf = pKeyword "if" *> (
   where
     mkIf l _  Nothing   Nothing   = syntaxError l "if(e) must have a 'then' and/or 'else'"
     mkIf _ e1 (Just e2) Nothing   = If2  e1 e2
-    mkIf _ _e1 Nothing   (Just _e3) = unimplemented "if()else" -- If2E e1 e3 -- XXX is this correct?
+    mkIf _ e1 Nothing   (Just e3) = If2E e1 e3
     mkIf _ e1 (Just e2) (Just e3) = If3  e1 e2 e3
     mkIfC e1 Nothing            = If1  e1
     mkIfC e1 (Just e2)          = If2E e1 e2
