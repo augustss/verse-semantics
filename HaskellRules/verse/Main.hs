@@ -274,20 +274,31 @@ replacePrim = f
 
 verifyPrelude :: [(String, Value)]
 verifyPrelude =
-  [ binOpInt "in'+'"
-  , binOpInt "in'-'"
-  , binOpInt "in'*'"
-{-
-  , binOpInt "in'<'"
-  , binOpInt "in'<='"
-  , binOpInt "in'>'"
-  , binOpInt "in'>='"
--}
+  [ arithBinOpInt  "in'+'"
+  , arithBinOpInt  "in'-'"
+  , arithBinOpInt  "in'*'"
+  , arithBinOpIntC "in'/'" yNe0
+  , cmpBinOpInt    "in'<'"
+  , cmpBinOpInt    "in'<='"
+  , cmpBinOpInt    "in'>'"
+  , cmpBinOpInt    "in'>='"
+  , cmpBinOpInt    "in'<>'"
   ]
   where
-    binOpInt p = (p, binOpInt' p)
-    binOpInt' p = CLam xy $ CDef [x,y] $ CSeq
-      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy, cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
+    arithBinOpInt  p = (p, arithBinOpInt' [] p)
+    arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
+    arithBinOpInt' c p = CLam xy $ CDef [x,y] $ CSeq $
+      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy] ++ c ++
+      [ cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
+
+    cmpBinOpInt  p = (p, cmpBinOpInt' p)
+    cmpBinOpInt' p = CLam xy $ CDef [x,y] $ CSeq
+      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy, CApply (CPrim p) vxy
+--      , cAssume (CDef [z] $ CSeq [CUnify vz vx, cInt vz, vz]) ]
+      , cAssume (CSeq [cInt vx, vx]) ]
+
+    yNe0 = CApply (CPrim "in'<>'") (CArray [vy, CInt 0])
+
     cInt e = CApply (CPrim "isInt$") e
     xy = Ident noLoc "xy"
     x = Ident noLoc "x"
