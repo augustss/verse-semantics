@@ -230,7 +230,7 @@
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail}      & |v = applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
-\rulename{app-beta}^{\alpha} & |v_1 = apply1 (lam2 x r e) v_2| & \movesto & |def (x r) (x==v_2; e; r=v_1)|
+\rulename{app-beta}^{\alpha} & |v_1 = apply1 (lam2 x r b) v_2| & \movesto & |def (x r) (x==v_2; b; v_1==r)|
                                                   & \text{if $r,x \not\in \freevars{|v_1|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
                               |(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
