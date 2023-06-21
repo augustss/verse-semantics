@@ -418,6 +418,7 @@ isChoiceFree _         = False
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
 isChoiceFreeOp DotDot = False
+isChoiceFreeOp Append = False   -- An approximation
 isChoiceFreeOp _ = True
 
 valueX, valueX1 :: Value -> [(Value->Value, Value)]

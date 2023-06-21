@@ -235,6 +235,7 @@ core (HasType e t) = do
       ]
    else do
       cSucceeds (CApply t' e')
+core (Macro1 (Ident _ "assume") [] e) = cAssume <$> core e
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core

@@ -253,17 +253,18 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 
 cVerify :: Run CState
 cVerify = do
-  withLastExpr $ \ e s -> do
-    let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-        e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
-    putStrLn $ "Desugared:\n" ++ prettyShow e'
-    let (done, rest) = verify icfpVerifier e'
-    if done then
-      putStrLn "Verified"
-     else do
-      putStrLn "Not verified, residual term:"
-      pp rest
-    pure s
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (\ _ -> pure s) $ do
+      let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
+          e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
+      putStrLn $ "Desugared:\n" ++ prettyShow e'
+      let (done, rest) = verify icfpVerifier e'
+      if done then
+        putStrLn "Verified"
+       else do
+        putStrLn "Not verified, residual term:"
+        pp rest
+      pure ()
 
 replacePrim :: Core -> Core
 replacePrim = f
@@ -287,9 +288,9 @@ verifyPrelude =
   where
     arithBinOpInt  p = (p, arithBinOpInt' [] p)
     arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
-    arithBinOpInt' c p = CLam xy $ CDef [x,y] $ CSeq $
+    arithBinOpInt' c _p = CLam xy $ CDef [x,y] $ CSeq $
       [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy] ++ c ++
-      [ cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
+      [ cAssume (CDef [z] $ CSeq [{-CUnify vz (CApply (CPrim p) vxy),-} cInt vz, vz]) ]
 
     cmpBinOpInt  p = (p, cmpBinOpInt' p)
     cmpBinOpInt' p = CLam xy $ CDef [x,y] $ CSeq
