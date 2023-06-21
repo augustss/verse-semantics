@@ -232,6 +232,7 @@ dsD e | isValue e = pure e
 dsD e@(ApplyD _ _) = pure e
 dsD e@(HasType _ _) = pure e
 dsD (Unify x e) | isValue x = Unify x <$> dsD e
+dsD (DefineV x) = pure (DefineV x)
 dsD (DefineE x e) = DefineE x <$> dsD e
 dsD (For2 e1 e2) = For2 <$> dsD e1 <*> dsD e2
 dsD (Macro1 m rs e) = Macro1 m rs <$> dsD e
@@ -388,6 +389,7 @@ scope sc = expr
       e2' <- scopeD sc' e2      
       pure $ seqE [e1', e2']
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
+    expr (DefineV i) = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
