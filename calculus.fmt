@@ -363,6 +363,9 @@
 %format v_0
 %format v_1
 %format v1'
+%format v_1'
+%format v0'
+%format v_0'
 %format v_i
 %format v_im1 = "v_{i-1}"
 %format v_ip1 = "v_{i+1}"
