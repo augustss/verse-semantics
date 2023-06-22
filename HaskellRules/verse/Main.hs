@@ -28,6 +28,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Verifier.Verify
 import Rules.ICFP(anf)
 import Rules.Verifier(icfpVerifier, verify)
+import TRS.Traced(toList, showRevTrace)
 --import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -185,6 +186,7 @@ flagTable =
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
+  ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
   ]
 
 cRead :: Run CState
@@ -258,12 +260,14 @@ cVerify = do
       let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
           e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
       putStrLn $ "Desugared:\n" ++ prettyShow e'
-      let (done, rest) = verify icfpVerifier e'
+      let (done, trc) = verify icfpVerifier e'
+      when (fTraceVerify flg) $
+        putStrLn $ unlines $ showRevTrace trc
       if done then
         putStrLn "Verified"
        else do
         putStrLn "Not verified, residual term:"
-        pp rest
+        pp $ snd $ head $ toList trc
       pure ()
 
 replacePrim :: Core -> Core

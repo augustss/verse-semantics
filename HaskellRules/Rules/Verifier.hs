@@ -20,12 +20,12 @@ import Data.List( intersect )
 
 -- | Run verification rules.
 
-verify :: TRSystem Expr -> Expr -> (Bool, Expr)
+verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e = res
  where
    res =
      case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
-       Just ((x :<-- _):_) -> (isDone x, x)
+       Just (tr@(x :<-- _):_) -> (isDone x, tr)
        _ -> undefined
    arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
@@ -207,6 +207,8 @@ isDecideOp (Op Gt)    = True
 isDecideOp (Op Ne)    = True
 isDecideOp (Op Div)   = True
 isDecideOp (Op IsInt) = True
+isDecideOp (Op DotDot)= True
+isDecideOp (Op Append)= True
 isDecideOp _          = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
