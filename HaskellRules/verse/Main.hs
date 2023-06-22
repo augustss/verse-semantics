@@ -28,7 +28,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Verifier.Verify
 import Rules.ICFP(anf)
 import Rules.Verifier(icfpVerifier, verify)
-import TRS.Traced(toList, showRevTrace)
+import TRS.Traced(toList, showTrace)
 --import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -261,8 +261,9 @@ cVerify = do
           e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
       putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify icfpVerifier e'
-      when (fTraceVerify flg) $
-        putStrLn $ unlines $ showRevTrace trc
+      when (fTraceVerify flg) $ do
+        putStrLn "Verification trace:"
+        putStrLn $ unlines $ showTrace trc
       if done then
         putStrLn "Verified"
        else do
