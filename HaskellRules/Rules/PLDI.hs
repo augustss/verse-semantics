@@ -500,7 +500,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: Arr [])) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr EXI e vs
+defs = exis
 
 seqs :: [Expr] -> Expr
 seqs = foldr1 (:>:)
@@ -1190,7 +1190,7 @@ wfResE ss = wf []
       pure ([], [], e)
 
 mkRes :: [Ident] -> [Expr] -> Expr -> Expr
-mkRes is es r = foldr (\ i e -> EXI i e) r' is
+mkRes is es r = exis is r'
   where r' = foldr (:>:) r es
 
 mkRess :: [([Ident], [BindV], Value)] -> ([Ident], [Expr], [Value])
