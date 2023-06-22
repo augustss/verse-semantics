@@ -279,6 +279,8 @@ verifyPrelude =
   , arithBinOpInt  "in'-'"
   , arithBinOpInt  "in'*'"
   , arithBinOpIntC "in'/'" yNe0
+  , arithUnOpInt   "pre'-'"
+  , arithUnOpInt   "pre'+'"
   , cmpBinOpInt    "in'<'"
   , cmpBinOpInt    "in'<='"
   , cmpBinOpInt    "in'>'"
@@ -288,17 +290,19 @@ verifyPrelude =
   where
     arithBinOpInt  p = (p, arithBinOpInt' [] p)
     arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
-    arithBinOpInt' c _p = CLam xy $ CDef [x,y] $ CSeq $
+    arithBinOpInt' c p = CLam xy $ CDef [x,y] $ CSeq $
       [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy] ++ c ++
-      [ cAssume (CDef [z] $ CSeq [{-CUnify vz (CApply (CPrim p) vxy),-} cInt vz, vz]) ]
+      [ cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
 
     cmpBinOpInt  p = (p, cmpBinOpInt' p)
     cmpBinOpInt' p = CLam xy $ CDef [x,y] $ CSeq
       [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy, CApply (CPrim p) vxy
---      , cAssume (CDef [z] $ CSeq [CUnify vz vx, cInt vz, vz]) ]
       , cAssume (CSeq [cInt vx, vx]) ]
 
     yNe0 = CApply (CPrim "in'<>'") (CArray [vy, CInt 0])
+
+    arithUnOpInt p = (p, CLam x $ CSeq $
+      [ cInt vx, cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vx), cInt vz, vz]) ])
 
     cInt e = CApply (CPrim "isInt$") e
     xy = Ident noLoc "xy"
