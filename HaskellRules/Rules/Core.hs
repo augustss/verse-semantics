@@ -22,6 +22,8 @@ module Rules.Core(
   pattern EXI,
   pattern LAM,
   pattern Block, Eqn,
+  getExis,
+  exis,
   opArity,
   comp,
   subst,
@@ -120,9 +122,7 @@ instance Pretty Expr where
   pPrintPrec _ _ Fail             = text "fail"
   pPrintPrec l p e@(EXI{})        = maybeParens (p > 0) $ text "ex" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
                                                                              pPrintPrec l 0 a]
-                                    where (xs, a) = getExi [] e
-                                          getExi vs (EXI v b) = getExi (v:vs) b
-                                          getExi vs b = (reverse vs, b)
+                                    where (xs, a) = getExis e
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
@@ -273,6 +273,7 @@ data Op
   | AddTo
   | DotDot
   | Print
+  | Append
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
@@ -280,7 +281,16 @@ instance Pretty Op where
 
 opArity :: Op -> Int
 opArity o | o `elem` [Neg, Plus, IsInt, MapAp, Alloc, Read, Print] = 1
+          | o == Append = 3
           | otherwise = 2
+
+getExis :: Expr -> ([Ident], Expr)
+getExis = get []
+  where get vs (EXI v b) = get (v:vs) b
+        get vs b = (reverse vs, b)
+
+exis :: [Ident] -> Expr -> Expr
+exis is e = foldr EXI e is
 
 --------------------------------------------------------------------------------
 -- patterns
@@ -334,7 +344,7 @@ type Eqn = (Value, Expr)
 
 pattern Block :: [Ident] -> [(Value, Expr)] -> Value -> Expr
 pattern Block xs bs v <- (BlockC (getBlock -> Just (xs, bs, v)))
-  where Block xs bs v = BlockC (foldr EXI (foldr eqn v bs) xs)
+  where Block xs bs v = BlockC (exis xs (foldr eqn v bs))
           where eqn (a, b) r = (a :=: b) :>: r
 
 getBlock :: Expr -> Maybe ([Ident], [Eqn], Value)

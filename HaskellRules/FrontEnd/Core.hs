@@ -235,6 +235,7 @@ core (HasType e t) = do
       ]
    else do
       cSucceeds (CApply t' e')
+core (Macro1 (Ident _ "assume") [] e) = cAssume <$> core e
 core e = impossible e
 
 coreBind :: Expr -> Expr -> C Core
@@ -648,7 +649,7 @@ pSeq = choice [ pLam, pExists, cons <$> pEqu <*> optional (pOp ";" *> pSeq) ]
     cons e (Just e') = Seq [e, e']
 
 pEqu :: P Expr
-pEqu = try (Define <$> (pIdent <* pOp ":=") <*> pChoice)
+pEqu = try (DefineE <$> (pIdent <* pOp ":=") <*> pChoice)
        <|>
        foldr1 Unify <$> sepBy1 pChoice (pOp "=")
 

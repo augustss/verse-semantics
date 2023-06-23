@@ -418,6 +418,7 @@ isChoiceFree _         = False
 isChoiceFreeOp :: Op -> Bool
 isChoiceFreeOp MapAp = False
 isChoiceFreeOp DotDot = False
+isChoiceFreeOp Append = False   -- An approximation
 isChoiceFreeOp _ = True
 
 valueX, valueX1 :: Value -> [(Value->Value, Value)]
@@ -527,7 +528,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: unit)) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr EXI e vs
+defs = exis
 
 unit :: Value
 unit = Arr []

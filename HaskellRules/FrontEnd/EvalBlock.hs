@@ -818,6 +818,23 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                   pure $ BVLam y $ b{ vars = x:vars b, binds = (BVar x, BVal av) : binds b }
                 sub _ v = pure v
 
+        -- AAA, AAV, AVA, VAA, VVA
+        -- AVV? VAV?
+        -- VVV
+        append (BVArr a) (BVArr b)        c  = unify (BVArr (a ++ b)) c
+        append (BVArr a)        b  (BVArr c) | length a > length c = fails
+                                             | otherwise =
+          succeeds $ zipWith (\ v w -> (v, BVal w)) a c ++ [(b, BVal $ BVArr (drop (length a) c))]
+        append        a  (BVArr b) (BVArr c) | length b > length c = fails
+                                             | otherwise =
+          let (c', c'') = splitAt (length c - length b) c in
+          succeeds $ zipWith (\ v w -> (v, BVal w)) b c'' ++ [(a, BVal $ BVArr c')]
+        append        a         b  (BVArr c) =
+          bChoices [ succeeds [(a, BVal $ BVArr a'), (b, BVal $ BVArr b')] | n <- [0 .. length c], let (a', b') = splitAt n c ]
+        append        a         b         c  | bad a || bad b || bad c = fails
+                                               where bad BVArr{} = False; bad BVar{} = False; bad _ = True
+        append _ _ _ = suspend eqn
+
       in
         let allvars = bvars ++ allBVars (done, bbinds, bresult)
             succBlock b =
@@ -827,6 +844,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Examine the expression and evaluate if possible.
         dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
+          BPrimOp Append (BVArr [a, b, c]) -> append a b c
           BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs $ "effect not allowed: " ++ show (op, primOpEffs op)
                         | Just e <- evalPrimOp op v -> succeeds [(val, e)]
                         | Just (h, e) <- evalPrimHeapOp heap op v -> succeeds' h [(val, e)]
@@ -893,8 +911,11 @@ blkChoice c = BBlock { vars = [i], binds = [(BVar i, BChoice c)], result = BVar 
   where i = bIdentNotIn (allBVars c)
 
 choices :: [BBlock] -> BChoice
-choices [] = BCFail
-choices bs = foldr1 BCFork (map BCBlk bs)
+choices = bChoices . map BCBlk
+
+bChoices :: [BChoice] -> BChoice
+bChoices [] = BCFail
+bChoices cs = foldr1 BCFork cs
 
 evalPrimOp :: Op -> BValue -> Maybe BExpr
 evalPrimOp _ (BVar _) = Nothing
@@ -935,6 +956,7 @@ evalPrimOp op v | op == Print =
       trace ("Print: " ++ prettyShow h) $
       Just $ BVal $ BVArr []
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op _ | op == Append = Nothing
 evalPrimOp op _ | op `elem` [Alloc, Read, Write, AddTo] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 

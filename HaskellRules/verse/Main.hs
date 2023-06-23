@@ -28,6 +28,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Verifier.Verify
 import Rules.ICFP(anf)
 import Rules.Verifier(icfpVerifier, verify)
+import TRS.Traced(toList, showTrace)
 --import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -185,6 +186,7 @@ flagTable =
   ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
+  ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
   ]
 
 cRead :: Run CState
@@ -253,31 +255,47 @@ cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
 
 cVerify :: Run CState
 cVerify = do
-  withLastExpr $ \ e s -> do
-    let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-        e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
-    putStrLn $ "Desugared:\n" ++ prettyShow e'
-    let (done, rest) = verify icfpVerifier e'
-    if done then
-      putStrLn "Verified"
-     else do
-      putStrLn "Not verified, residual term:"
-      pp rest
-    pure s
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (\ _ -> pure s) $ do
+      let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
+          e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
+      putStrLn $ "Desugared:\n" ++ prettyShow e'
+      let (done, trc) = verify icfpVerifier e'
+      when (fTraceVerify flg) $ do
+        putStrLn "Verification trace:"
+        putStrLn $ unlines $ showTrace trc
+      if done then
+        putStrLn "Verified"
+       else do
+        putStrLn "Not verified, residual term:"
+        pp $ snd $ head $ toList trc
+      pure ()
 
 replacePrim :: Core -> Core
 replacePrim = f
   where
-    f (CApply (CPrim i) v) | Just p <- lookup i verifyPrelude = CApply p (f v)
-    f (CPrim i) | Just p <- lookup i verifyPrelude = CValue p
+    f (CApply (CPrim i) v) | Just p <- lookup i verifyPrelude = cApply p (f v)
+    f (CApply (CLam a e) v) = cApply ([a], [e]) v
+    f (CPrim i) | Just p <- lookup i verifyPrelude = CValue $ toLam p
     f e = FrontEnd.Core.composOp f e
 
-verifyPrelude :: [(String, Value)]
+    arg = Ident noLoc "arg"
+    toLam (   [a],   es) = CLam a   $ CSeq es
+    toLam (as@[_,_], es) = CLam arg $ CDef as $ CSeq $ CUnify (CArray $ map CVar as) (CVar arg) : es
+    toLam _ = undefined  -- shouldn't happen
+
+    cApply ([a], e) v = subst a v $ CSeq e
+    cApply ([a1,a2], e) (CArray [v1,v2]) = subst a1 v1 $ subst a2 v2 $ CSeq e
+    cApply p v = CApply (toLam p) v
+
+verifyPrelude :: [(String, ([Ident], [Core]))]
 verifyPrelude =
   [ arithBinOpInt  "in'+'"
   , arithBinOpInt  "in'-'"
   , arithBinOpInt  "in'*'"
   , arithBinOpIntC "in'/'" yNe0
+  , arithUnOpInt   "pre'-'"
+  , arithUnOpInt   "pre'+'"
   , cmpBinOpInt    "in'<'"
   , cmpBinOpInt    "in'<='"
   , cmpBinOpInt    "in'>'"
@@ -287,27 +305,27 @@ verifyPrelude =
   where
     arithBinOpInt  p = (p, arithBinOpInt' [] p)
     arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
-    arithBinOpInt' c p = CLam xy $ CDef [x,y] $ CSeq $
-      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy] ++ c ++
-      [ cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vxy), cInt vz, vz]) ]
+    arithBinOpInt' c p = ([x, y],
+      [ cInt vx, cInt vy] ++ c ++
+      [ cAssume $ CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) (CArray [vx, vy])), cInt vz, vz] ])
 
     cmpBinOpInt  p = (p, cmpBinOpInt' p)
-    cmpBinOpInt' p = CLam xy $ CDef [x,y] $ CSeq
-      [ CUnify (CArray [vx, vy]) (CVar xy), cInt vx, cInt vy, CApply (CPrim p) vxy
---      , cAssume (CDef [z] $ CSeq [CUnify vz vx, cInt vz, vz]) ]
-      , cAssume (CSeq [cInt vx, vx]) ]
+    cmpBinOpInt' p = ([x, y], 
+      [ cInt vx, cInt vy, CApply (CPrim p) (CArray [vx, vy]), cAssume (CSeq [cInt vx, vx]) ])
 
     yNe0 = CApply (CPrim "in'<>'") (CArray [vy, CInt 0])
 
+    arithUnOpInt p =
+      (p, ([x], [ cInt vx, cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vx), cInt vz, vz]) ]))
+
     cInt e = CApply (CPrim "isInt$") e
-    xy = Ident noLoc "xy"
-    x = Ident noLoc "x"
-    y = Ident noLoc "y"
-    z = Ident noLoc "z"
-    vxy = CVar xy
+    x = Ident noLoc "$$x"
+    y = Ident noLoc "$$y"
+    z = Ident noLoc "$$z"
     vx = CVar x
     vy = CVar y
     vz = CVar z
+      
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s

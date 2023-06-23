@@ -132,9 +132,6 @@ ite = If
 -- where
 --  x = identNotIn (free (e2,e3))
 
-exis :: [Ident] -> Expr -> Expr
-exis ys e = foldr ((Exi .) . Bind) e ys
-
 tlam :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlam x ys e1 e2 =
       Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))

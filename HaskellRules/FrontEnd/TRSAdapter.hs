@@ -209,7 +209,8 @@ allOps = [
   (T.Write, "write$"),
   (T.AddTo, "in'+='"),
   (T.DotDot,"in'..'"),
-  (T.Print, "print$")
+  (T.Print, "print$"),
+  (T.Append,"append$")
   ]
 
 ----------------------------------------------

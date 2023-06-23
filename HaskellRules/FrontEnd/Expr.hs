@@ -96,8 +96,9 @@ data Expr
   | Return Expr               -- return e
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
-  | Define Ident Expr         -- i := e
-  | Define2 Ident Ident Expr  -- (i->x) := e
+  | DefineV Ident             -- i:any
+  | DefineE Ident Expr        -- i := e
+  | DefineIE Ident Ident Expr -- (i->x) := e
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
@@ -211,8 +212,9 @@ instance Pretty Expr where
           Macro2 (Ident _ m) e1 e2 -> text m <> parens (ppr 0 e1) <> ppB e2
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
           ----
-          Define i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          Define2 i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
+          DefineV i -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any")))
+          DefineE i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
+          DefineIE i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
           Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
@@ -325,8 +327,9 @@ compos f (MAlias i e1 e2) = MVar i <$> traverse f e1 <*> traverse f e2
 compos f (Macro1 m as b) = Macro1 m as <$> f b
 compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
 compos f (Return e) = Return <$> f e
-compos f (Define i e) = Define i <$> f e
-compos f (Define2 i x e) = Define2 i x <$> f e
+compos _ (DefineV i) = pure $ DefineV i
+compos f (DefineE i e) = DefineE i <$> f e
+compos f (DefineIE i x e) = DefineIE i x <$> f e
 compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
 compos f (Range e) = Range <$> f e

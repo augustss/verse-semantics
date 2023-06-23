@@ -15,6 +15,7 @@ data Flags = Flags
   , fNoLambdaIf   :: !Bool
   , fVerify       :: !Bool
   , fTraceDesugar :: !Bool
+  , fTraceVerify  :: !Bool
   }
   deriving (Show)
 
@@ -34,6 +35,7 @@ defaultFlags = Flags
   , fNoLambdaIf   = False
   , fVerify       = False
   , fTraceDesugar = False
+  , fTraceVerify  = False
   }
 
 showFlags :: Flags -> String

@@ -681,7 +681,7 @@ mapAp vs =
   in  defs xs $ seqs $ zipWith (\ x v -> Var x :=: (v :@: unit)) xs vs ++ [Arr $ map Var xs]
 
 defs :: [Ident] -> Expr -> Expr
-defs vs e = foldr (\ x -> Exi . Bind x) e vs
+defs = exis
 
 unit :: Value
 unit = Arr []

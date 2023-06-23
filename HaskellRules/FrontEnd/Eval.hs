@@ -688,7 +688,7 @@ prelude =
                   ]
               ]
         [st, s, t, g, y, sy, gsy, x, _xy] =
-           map (Ident noLoc) ["st","s","t","g","y","sy","gsy","x", "xy"]
+           map (Ident noLoc . ("$$" ++)) ["st","s","t","g","y","sy","gsy","x", "xy"]
 
 {-
         cmpV op =
