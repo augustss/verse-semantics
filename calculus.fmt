@@ -359,6 +359,7 @@
 %format b_3
 
 %format u_1
+%format u_k
 %format u_n
 %format v_0
 %format v_1
