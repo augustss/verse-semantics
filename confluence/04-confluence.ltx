@@ -939,7 +939,8 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 that our rewrite rules encode classical unification algorithms.
 
 \begin{lemma}[Unify] \label{lem:eq-join}
-If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$ then
+If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$, and $e,e'$
+are sequences of value-value equations then
 $$\join{\runi}
 	{ \subst{X}{\overline{z}}{\overline{u}}[ \subst{e}{\overline{z}}{\overline{u}}; e'; \overline{u = v}]}
 	{ \subst{X}{\overline{z}}{\overline{v}}[ e' ; \overline{u = v}; \subst{e}{\overline{z}}{\overline{v}}]}$$
@@ -957,7 +958,13 @@ The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}
 	\sz{\text{size}} & \doteq\ \Sigma_{i=1}^{n} \mathit{size}(u_i) + \mathit{size}(v_i) \\
 	\sz{n}   	     & \doteq\ \mbox{the cardinality of}\ \overline{u}, \overline{v} \\
 \end{align*}
-Split cases on the \emph{first} equation $u_1 = v_1$.
+%
+In the base case, the sequences $\overline{u}, \overline{v}$ are empty, and so we trivially have
+$\join{\runi}{X[e'; e]}{X[e'; e]}$ by repeated applications of \rulename{seq-swap} as $e, e'$
+are sequences of value-value equations.
+%
+In the inductive case, assume that the sequences are non-empty, and
+split cases on the \emph{first} equation $u_1 = v_1$.
 \begin{description}
 \item[Case $\hnf_1 = \hnf_2$] with \emph{incompatible} values:
 	Here,
@@ -998,18 +1005,7 @@ after which we can join at |fail| via \rulename{fail-elim}.
 	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
 \end{tikzcd}\]
 
-% % https://q.uiver.app/?q=WzAsNixbMCwwLCJYX3tcXG92ZXJsaW5le3V9fVtcXGxhbmdsZSB1XzEsLi4uLHVfa1xccmFuZ2xlID0gXFxsYW5nbGUgdl8xLC4uLix2X2tcXHJhbmdsZTsgXFxvdmVybGluZXt1Jz12J31dIl0sWzIsMCwiWF97XFxvdmVybGluZXt1fX1bdV8xPXZfMSwuLi4sdV9rPXZfazsgXFxvdmVybGluZXt1Jz12J31dIl0sWzAsMiwiWF97XFxvdmVybGluZXt2fX1bXFxsYW5nbGUgdV8xLC4uLix1X2tcXHJhbmdsZSA9IFxcbGFuZ2xlIHZfMSwuLi4sdl9rXFxyYW5nbGU7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsyLDIsIlhfe1xcb3ZlcmxpbmV7dn19W3VfMT12XzEsLi4uLHVfaz12X2s7IFxcb3ZlcmxpbmV7dSc9did9XSJdLFsxLDFdLFsyLDEsIlxcYnVsbGV0Il0sWzAsMSwiXFxydWxlbmFtZXt1LXR1cH0iXSxbMiwzLCJcXHJ1bGVuYW1le3UtdHVwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFsxLDUsIiIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiSUgiLDEseyJsYWJlbF9wb3NpdGlvbiI6ODAsInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-% \[\begin{tikzcd}
-% 	{X_{\overline{u}}[\langle u_1,...,u_k\rangle = \langle v_1,...,v_k\rangle; \overline{u'=v'}]} && {X_{\overline{u}}[u_1=v_1,...,u_k=v_k; \overline{u'=v'}]} \\
-% 	& {} & \bullet \\
-% 	{X_{\overline{v}}[\langle u_1,...,u_k\rangle = \langle v_1,...,v_k\rangle; \overline{u'=v'}]} && {X_{\overline{v}}[u_1=v_1,...,u_k=v_k; \overline{u'=v'}]}
-% 	\arrow["{\rulename{u-tup}}", from=1-1, to=1-3]
-% 	\arrow["{\rulename{u-tup}}"', dotted, from=3-1, to=3-3]
-% 	\arrow[dotted, two heads, from=1-3, to=2-3]
-% 	\arrow[dotted, two heads, from=3-3, to=2-3]
-% 	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
-% \end{tikzcd}\]
-\item[Case $|x = y|$] use \rulename{subst} to replace all occurrences of $x$ with $y$, and then apply the
+\item[Case $|x = y|$] (where wlog $x < y$ as else use \rulename{var-swap} to make it so) use \rulename{subst} to replace all occurrences of $x$ with $y$, and then apply the
 IH on the \emph{remaining} $n-1$ equations $\overline{u' = v'}$. Note that the induction is well-founded as
 in this case $\sz{\text{free}}$ and $\sz{\text{size}}$ are unchanged but the number of equations decreases
 by one. In the below, $\overline{u''} \equiv \overline{u'}\{y/x\}$ and $\overline{v''} \equiv \overline{v'}\{y/x\}$.
@@ -1045,6 +1041,10 @@ In the below, $\overline{u''} \equiv \overline{u'}\{h/x\}$ and $\overline{v''} \
 	\arrow[dotted, two heads, from=3-3, to=2-3]
 	\arrow["IH"{description, pos=0.8}, draw=none, from=2-2, to=2-3]
 \end{tikzcd}\]
+
+\item[Case $|h = x|$] where $h$ is an HNF value and $x \not \in \freevars{h}$:
+we use \rulename{hnf-swap} on both sides after which the proof follows as in
+the previous case.
 
 \item[Case $|x = v|$] where $x \in \freevars{v}$: either join at |fail|
 via \rulename{u-occurs} or violates the \norecursion assumption.
