@@ -937,10 +937,16 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 
 \mypara{Unification Lemmas} The next two \emph{unification} lemmas state
 that our rewrite rules encode classical unification algorithms.
+%
+A \emph{value-equation} is an equation of the form $v_1 = v_2$ \ie
+where both sides are values.
+%
+A \emph{block} is a sequence of value-equations.
 
 \begin{lemma}[Unify] \label{lem:eq-join}
 If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$, and $e,e'$
-are sequences of value-value equations then
+are blocks then
+%
 $$\join{\runi}
 	{ \subst{X}{\overline{z}}{\overline{u}}[ \subst{e}{\overline{z}}{\overline{u}}; e'; \overline{u = v}]}
 	{ \subst{X}{\overline{z}}{\overline{v}}[ e' ; \overline{u = v}; \subst{e}{\overline{z}}{\overline{v}}]}$$
@@ -961,7 +967,7 @@ The proof follows by induction on the triple $(\sz{\text{free}}, \sz{\text{size}
 %
 In the base case, the sequences $\overline{u}, \overline{v}$ are empty, and so we trivially have
 $\join{\runi}{X[e'; e]}{X[e'; e]}$ by repeated applications of \rulename{seq-swap} as $e, e'$
-are sequences of value-value equations.
+are blocks.
 %
 In the inductive case, assume that the sequences are non-empty, and
 split cases on the \emph{first} equation $u_1 = v_1$.
