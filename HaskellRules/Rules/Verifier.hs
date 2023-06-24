@@ -99,7 +99,7 @@ generalizedIcfpRules env lhs =
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules _ lhs =
+assumeAssertRules _foo lhs =
   -- ASSUME --
 
   -- Assume {v} ----> v
@@ -188,16 +188,30 @@ mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
 mustSucceed (Exi (Bind _ e)) = mustSucceed e
 mustSucceed _                = False
 
-mustDecide :: Expr -> Bool
-mustDecide (Arr as)    = all mustDecide as
-mustDecide (One e)     = mustDecide e
-mustDecide (e1 :=: e2) = mustDecide e1 && mustDecide e2
-mustDecide (e1 :>: e2) = mustDecide e1 && mustDecide e2
-mustDecide (e1 :@: e2) = mustDecide e1 && mustDecide e2 && isDecideOp e1
-mustDecide (Assume _)  = True
-mustDecide (Int _)     = True
-mustDecide (Op _)      = True
-mustDecide _           = False
+mustDecide :: [BndVar] -> Expr -> Bool
+mustDecide bs = go
+  where
+    lamBinds       = [x | BLam x <- bs]
+    go (Arr as)    = all go as
+    go (One e)     = go e
+    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :>: e2) = go e1 && go e2
+    go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
+    go (Assume _)  = True
+    go (Int _)     = True
+    go (Op _)      = True
+    go (Var x)     = x `elem` lamBinds
+    go _           = False
+
+-- mustDecide (Arr as)    = all mustDecide as
+-- mustDecide (One e)     = mustDecide e
+-- mustDecide (e1 :=: e2) = mustDecide e1 && mustDecide e2
+-- mustDecide (e1 :>: e2) = mustDecide e1 && mustDecide e2
+-- mustDecide (e1 :@: e2) = mustDecide e1 && mustDecide e2 && isDecideOp e1
+-- mustDecide (Assume _)  = True
+-- mustDecide (Int _)     = True
+-- mustDecide (Op _)      = True
+-- mustDecide _           = False
 
 isDecideOp :: Expr -> Bool
 isDecideOp (Op Le)    = True
@@ -213,7 +227,7 @@ isDecideOp _          = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
-verifierRules _env lhs =
+verifierRules env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
    do (ctx, g, e) <- eX lhs
@@ -224,7 +238,8 @@ verifierRules _env lhs =
    -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
    "Unfold-If" `name`
    do (ctx, _, If e1 e2 e3) <- eX lhs
-      guard (mustDecide e1)
+      let bs = bndVars env
+      guard (mustDecide bs e1)
       pure (ctx (unfoldIte e1 e2 e3))
 
 unfoldIte :: Expr -> Expr -> Expr -> Expr
@@ -333,4 +348,4 @@ execEX1 lhs =
  ++
   do Verify x <- [lhs]
      (ctx, g, hole) <- execEX x
-     pure (Verify . ctx, g, hole)     
+     pure (Verify . ctx, g, hole)

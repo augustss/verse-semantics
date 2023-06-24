@@ -8,18 +8,16 @@ Three more things I spotted the proof of Lemma C.17:
 
 (3) In there analysis for cases “x = y” and “x = h”, I think that it is necessary to note that after SUBST is applied to each expression, it is necessary to rewrite each expression into an equivalent expression before applying the IH:
 
-X_{\bar{u}}[x=y; \bar{u’{y/x} = v’{y/x}}    can be rewritten as    X'_{\bar{u'}}[\bar{u’{y/x} = v’{y/x}}     where     X’ = X[x=y; hole]
+X_{\bar{u}}[x=y; \bar{u’{y/x} = v’{y/x}}    
+
+can be rewritten as    
+
+X'_{\bar{u'}}[\bar{u’{y/x} = v’{y/x}}     where     X’ = X[x=y; hole]
 
 so that the number of equations decreases by 1.
 
 —Guy
 
-> On May 25, 2023, at 6:18 PM, Ranjit Jhala <ranjit.jhala@epicgames.com> wrote:
->
-> Guy, Wow, this is great -- thanks very much for spotting these errors (and the fixes!); I'll go ahead and update the text asap! Ranjit.
->
-> On Thu, May 25, 2023 at 11:56 AM Guy Steele <guy.steele@oracle.com> wrote:
->
 >     Once again I have been studying the proof of confluence in Appendix C of our ICFP submission. Ranjit, the amount of detail is just jaw-droppingly impressive.
 >
 >     I believe that I have found two minor problems, both easily corrected, in the proof of Lemma C.15.

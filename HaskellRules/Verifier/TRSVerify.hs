@@ -44,6 +44,7 @@ tests =
   , ("ex_stuck3", ex_stuck3, False)
   , ("ex_if0", ex_if0, True)
   , ("ex_if1", ex_if1, False)
+  , ("ex_if2", ex_if2, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -407,3 +408,8 @@ ex_if1 = verse $
   timlam $ \_x ->
     do return (do b <- exists <? "b"
                   def (ite b (Int 3) (Int 4)))
+
+ex_if2 :: Expr
+ex_if2 = LAM x $ (Assume (iNT (Var x))) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
+  where
+    x = ident "x"
