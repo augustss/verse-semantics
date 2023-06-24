@@ -397,7 +397,8 @@ Like any functional logic language,
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{hanus:survey}.
-\item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value (as is often the case in functional logic programs), those values are returned in a well-specified order.  This makes it easy to solve the notoriously tricky issue of how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (\cref{sec:all}).
+\item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value (as is often the case in functional logic programs), those values are returned in a well-specified order.  This makes it easy to solve the notoriously tricky issue \cite{bernd-hanus:encapsulating} of
+  how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (\cref{sec:all}).
   It opens up a new approach to dealing with so-called ``flexible'' {\vs} ``rigid'' variables
   (\cref{sec:one}).  It supports an elegant economy of concepts: for example,
   there is just one equality (other languages may have a suspending equality and a narrowing equality),
@@ -1494,16 +1495,56 @@ languages like Curry \cite{antoy:pull-tabbing}.
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
-Under lenient
-evaluation, everything is eventually evaluated, but functions can run
-before their arguments have a value.
-Consider a function
-call |apply1 f e|, where |e| is not a value.  In \versecalc{}, applications are in administrative normal form (ANF),
-so we must actually write |def x (x==e; apply1 f x)|. This expression will not return a value until
-|e| reduces to a value: that is, everything is eventually evaluated.  But even so, |apply1 f x| can proceed
-to \textbeta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
+Under lenient evaluation, functions can run before their arguments have a ground value
+(like a lazy language), but (almost) everything is eventually evaluated (like a strict language).
 
-Lenience supports \emph{abstraction}.  For example, we can replace an expression |(x==tup(y,3); y>7)| by
+\versecalc{} cannot be lazy, because
+of \versecalc{}'s commitment to determinism and, particularly, its first-class |allKW| operator.  Consider:
+$$
+|all (def x (x=e; 3)|
+$$
+In a lazy language like Curry, the expression |def x (x=e; 3)| would return one result, |3|, regardless of |e|,
+because |x| is unused, and so |x=e| is simply dead code. But in \versecalc{} we must evaluate |e|, and yield an array with one element
+for each result yielded by |e|.  If |e| fails (returns zero results), then the result array is empty.  Since |allKW|
+reifies these results into an array, the multiplicity of results is visible to context, via
+the length of the returned array.
+Moreover, consider
+$$
+|all (def (x, y) (x = (y=3;1 `choice` y=4;2); y))|
+$$
+In \versecalc{}, |x|'s right hand side is evaluated, yielding two values, |1| and |2|, which are discarded since
+|x| is unused.  However, each of these
+values is accompanied with a distinct binding for |y|, so the result of the whole expression is the array |tup (3,4)|.
+In short, we must eventually evaluate |x|'s right hand side not only to get the \emph{size} of the array, but also the \emph{values
+of its elements}, via the bindings of |y|.
+
+% However, a function can proceed een before its argument is a ground value.
+% Consider the call |apply1 f e|, where |e| is not a value.  In \versecalc{}, applications are in administrative normal form (ANF),
+% so we must actually write |def x (x==e; apply1 f x)|. This expression will not return a value until
+% |e| reduces to a value: that is, everything is eventually evaluated.  But even so, |apply1 f x| can proceed
+% to \textbeta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
+
+So it seem hard to reconcile laziness with a deterministic |allKW|.  But \versecalc{} is not strict either;
+that is, a function can be called without its argument having a ground value.  For example:
+$$
+|def f (f = (lam x (x=3;x)); def y (apply1 f y)|
+$$
+Here we can call |f| on an uninstantiated existential |y|;
+we do not have to wait until |y| gets a ground value from the calling context.
+Rather, in this example it is the body of |f| that then constrains |y| to be |3|.
+This is part of the essence of functional logic programming, and indeed a variable \emph{is} a value in
+\versecalc{} (\Cref{fig:syntax}).
+
+So \versecalc{} is lenient: functions can be called on as-yet-evaluated arguments,
+but almost everything gets evaluated eventually.   You can see this
+enforced in the rule for |oneKW| in \Cref{fig:rules}, which only fire when the first choice
+in the body is value $v$, and similarly |allKW|.
+Why ``almost''? The |oneKW| operator returns the value of its first choice, and abandons all other choices.
+For example |one (1 `choice` apply0 loop)| returns |1|, discarding the infinite |apply0 loop|.
+And, of course, we do not evaluate under a lambda, so |one (def f (f = lam x (apply0 loop); 3))|
+returns |3| despite the loop hidden inside |f|.
+
+Note that lenience supports \emph{abstraction}.  For example, we can replace an expression |(x==tup(y,3); y>7)| by
 $$
 |def f (f == (lam (tup (p,q)) (p==tup(q,3); q>7)); applyN f (x,y)|
 $$
@@ -1511,21 +1552,21 @@ Here, we abstract over the free variables of the expression, and define a named 
 Calling the function is just the same as writing the original expression.
 This transformation would not be valid under call-by-value.
 
-This is not just a way to get \emph{parallelism}, which was the original motivation for introducing
-lenience in the data-flow language Id~\cite{lenience}; it affects
-\emph{semantics}. Consider:
+When lenience was introduced in the data-flow language Id~\cite{lenience}, it was a way
+to get \emph{parallelism}, and it can certainly support parallelism in an implementation of \versecalc{}.
+But for \versecalc{} it has \emph{semantic} significance too.
+Consider:
 $$
 |def (f ^^ x ^^ y) (f == (lam p (x==7;p)); y == (if (x>0) then 7 else 8); apply1 f y|
 $$
 Here, |y| does not get a value until |x| is known; but |x| does not get its
 value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
-
-However, moving to \emph{laziness} seems problematic.
-For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy language this expression would
-yield |3|, but in \versecalc{}, everything is evaluated, and
-the expression will not return a value until |apply0 wombat| converges.
-There is a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
-we know there is no failure.  With laziness, we could easily lose confluence.
+% However, moving to \emph{laziness} seems problematic.
+% For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy language this expression would
+% yield |3|, but in \versecalc{}, everything is evaluated, and
+% the expression will not return a value until |apply0 wombat| converges.
+% There is a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
+% we know there is no failure.  With laziness, we could easily lose confluence.
 
 \subsection{Evaluation strategy} \label{sec:eval-strategy}
 
@@ -1555,20 +1596,24 @@ invariably involves reducing under lambdas, so for practical purposes it is well
 For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost-outermost reduction}, is a normalising strategy.
 
-We believe that the same leftmost-outermost strategy is close to being normalising for
+We believe that a fair outermost strategy is normalising for
 \versecalc{}\footnote{
   We say ``close to'' being good because we do not yet have a proof; indeed
   rule \rulename{fail-elim} may be a bit too powerful.
 }: just repeatedly reduce the leftmost-outermost
 redex, with some tweaks to avoid infinite application of \rulename{exi-swap}.
-That is easy in theory, but it is tricky in practice.  For
+That is easy in theory, but it is tricky in practice because of residuation.  For
 example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
 substitution to rewrite the |(x+y)| to |(2+3)|; and
 \emph{now} the |(2+3)| is a redex.  So a reduction may ``unlock'' a
 redex far to its left.  A major challenge of an implementation is to
-find the next redex efficiently.
+find the next redex efficiently. Moreover, like other functional-logic languages such as Curry, a normalising
+strategy must be able to pursue multiple redexes in parallel, hence ``fair''.  For example |(apply0 loop; fail)|
+and |(fail; apply0 loop)| should both fail, so a normalising strategy must, in both cases, avoid getting stuck
+in the |loop|.
 
+We have not yet, however, formalised such a strategy or proved it normalising.
 We have several prototype implementations of \versecalc{}, each involving an abstract
 machine with a stack, a heap, a bunch of blocked computations, and so on. Exploring this
 design space is, however, beyond the scope of this paper.
@@ -2224,8 +2269,15 @@ it is common in calculi with choice,
 see {\eg}, ~\citet[Section 6.1]{liguoro:non-det} and \citet[Section 3]{lago:probabilistic},
 and, more recently, has been used to describe functional logic languages, where it is variously
 called \emph{bubbling} \cite{antoy:bubbling} or \emph{pull-tabbing} \cite{antoy:pull-tabbing}.
-However, our formulation appears simpler because we avoid the need for attaching
-an identifier to each choice with its attendant complications.
+However, laziness imposes significant additional complications, including the need to attach
+an identifier to each choice.
+
+A recent paper by Barenbaum \emph{et al} describes a functional logic calculus that, like \versecalc{},
+is just an extension of lambda calculus \cite{barenbaum:relational}.
+They deal with lambda, existentials, choice, and equations
+in a similar way to \versecalc{}, but lack the |allKW| and |oneKW| operators which are central to \versecalc{}.
+As a result they can always float choice up to the top level of the whole program, and
+indeed they do so in the very structure of their terms.
 
 \subsection{One and all}
 
@@ -2316,7 +2368,7 @@ CRWL framework.  Their key insight (like us, inspired by
 \citet{ariola:call-by-need}'s formalization of the call-by-need lambda calculus)
 is to use |let| to make sharing explicit.
 
-However, both CRWL and L\'opez-Fraguas {\etal} suffer from a major problem:
+However, both CRWL and L\'opez-Fraguas {\etal} are in some ways \emph{too} high level:
 they require something we call \emph{magical rewriting}. A key rewrite rule is this:
 $$
 \begin{array}{l}
@@ -2545,7 +2597,9 @@ see \cref{sec:store}.
   Niklas R\"ojemo,
   Jaime S\'anches-Hern\'andez,
   Andrew Scheidecker,
-  and Stephanie Weirich.
+  Stephanie Weirich, and the anonymous ICFP reviewers.
+  We are particularly grateful to Michael Hanus, who helped us a great deal to position
+  \versecalc{} more accurately in the rich space of functional logic languages.
 \end{acks}
 
 % -------------------- Bibliography ----------------
