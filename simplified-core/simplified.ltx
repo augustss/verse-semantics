@@ -1,0 +1,394 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+% \documentclass[acmsmall,review,anonymous,dvipsnames]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+% \documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false,authorsperrow=2}
+
+\let\Bbbk\relax % polycode defines that again?
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+
+\newcommand{\ie}{\emph{i.e.}\xspace}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}\xspace}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}\xspace}
+\newcommand{\Eg}{\emph{E.g.}\xspace}
+\newcommand{\etc}{\emph{etc.}\xspace}
+\newcommand{\etal}{\emph{et al.}\xspace}
+\newcommand{\vs}{\emph{vs.}\xspace}
+
+\RequirePackage[utf8]{inputenc}
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmConference{In submission}{March 2023}
+% \acmJournal{PACMPL}
+% \acmVolume{1}
+% \acmNumber{ICFP} % CONF = POPL or ICFP or OOPSLA
+% \acmArticle{1}
+% \acmYear{2023}
+% \acmMonth{1}
+% \acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+% \startPage{1}
+
+%% -------------- Copyright information ------------------
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
+\usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
+
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\usepackage{xspace}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
+\newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
+\newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
+\newcommand{\guy}[1]{{\color{red} [{GS}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\newcommand{\joachim}[1]{}
+\newcommand{\koen}[1]{}
+\newcommand{\olin}[1]{}
+\newcommand{\ranjit}[1]{}
+\newcommand{\guy}[1]{}
+\fi
+
+% ---------------- End of comments -----------------
+
+% Loads the rewrite figures.
+% They still need to be placed using \figureGeneralAxioms etc.
+\input{rewrites}
+
+
+\begin{document}
+
+%% Title information
+% \title{The essence of functional logic programming}
+\title{Simplified verse calculus}
+
+                                        %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+% \titlenote{with title note}             %% \titlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+% \subtitle{Subtitle}                     %% \subtitle is optional
+% \subtitlenote{with subtitle note}       %% \subtitlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Lennart Augustsson}
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%   \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{lennart.augustsson@@epicgames.com}          %% \email is recommended
+
+\author{Joachim Breitner}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+\orcid{0000-0003-3753-6821}             %% \orcid is optional
+\affiliation{}
+%  \position{Position1}
+%   \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+%  \country{Germany}                    %% \country is recommended
+% }
+\email{mail@@joachim-breitner.de}          %% \email is recommended
+
+\author{Koen Claessen}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{koen.claessen@@epicgames.com}          %% \email is recommended
+
+\author{Ranjit Jhala}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{ranjit.jhala@@epicgames.com}          %% \email is recommended
+
+\author{Simon Peyton Jones}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{United Kingdom}                    %% \country is recommended
+}
+\email{simonpj@@epicgames.com}          %% \email is recommended
+
+\author{Olin Shivers}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{olin.shivers@@epicgames.com}          %% \email is recommended
+
+\author{Guy Steele}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+%  \position{Position1}
+  \institution{Oracle Labs}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{guy.steele@@oracle.com}          %% \email is recommended
+
+\author{Tim Sweeney}
+% \authornote{with author1 note}          %% \authornote is optional;
+%                                         %% can be repeated if necessary
+%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{CEO}
+  \institution{Epic Games}            %% \institution is required
+%  \streetaddress{Street1 Address1}
+%  \city{City1}
+%  \state{State1}
+%  \postcode{Post-Code1}
+  \country{USA}                    %% \country is recommended
+}
+\email{tim.sweeney@@epicgames.com}          %% \email is recommended
+
+
+
+%% ---------------- Abstract ---------------------
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+  Functional logic languages have a rich literature, but it is tricky
+  to give them a satisfying semantics.  In this paper we describe the
+  Verse calculus, \versecalc{}, a new core calculus for functional
+  logic programming. Our main contribution is to equip \versecalc{} with a
+  small-step rewrite semantics, so that we can reason
+  about a \versecalc{} program in the same way as one does with lambda
+  calculus; that is, by applying successive rewrites to it.
+  We also show that the rewrite system is confluent.
+%   This semantics elegantly fills the gap between very high level
+%  ``magical'' semantics, and very low-level operational semantics.
+  \par
+  \vspace{1em}
+\end{abstract}
+
+
+%% ---------------- Classification ---------------------
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011008</concept_id>
+<concept_desc>Software and its engineering~General programming languages</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003456.10003457.10003521.10003525</concept_id>
+<concept_desc>Social and professional topics~History of programming languages</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~General programming languages}
+\ccsdesc[300]{Social and professional topics~History of programming languages}
+%% End of generated code
+
+
+%% Keywords
+%% comma separated list
+% \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
+\keywords{%
+  confluence,
+  declarative programming,
+  functional programming,
+  lambda calculus,
+  logic programming,
+  rewrite rules,
+  skew confluence,
+  unification,
+  Verse calculus,
+  Verse language
+}
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+\renewcommand{\shortauthors}{Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, Steele, Sweeney}
+
+
+% \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
+%   a work in progress.  So please don't share it; if there is anyone you think would be
+%   interested/helpful, do suggest them to us.}
+
+\section{Syntax}
+
+
+\figureSyntax
+
+
+\section{Rewrite rules} \label{sec:rewrite-rules}
+
+\figureRewriteRules
+\figureContexts
+
+\end{document}
+
+% LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
+% LocalWords:  desc tup optimise defunctionalization oneKW allKW lll
+% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
+% LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
+% LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
+% LocalWords:  boolean un rcll ANF flatMap cartesian behavior fromTo
+% LocalWords:  featureful multivalued mapFlat powerset denotational
+% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
+% LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
+% LocalWords:  ReWrite CRWL fraguas formalization rhs dom fvs hanus
+% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
+% LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
+% LocalWords:  subexpression Claessen equationally eliml fcn elimr
+% LocalWords:  rll redex Formalising equational stepX compositionally
+% LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
+% LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
+% LocalWords:  Smolka flavor FLC urefl onec obfuscatory opez Rodr
+% LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
+% LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
+% LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
+% LocalWords:  Eqns ohlebusch
