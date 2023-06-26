@@ -860,7 +860,7 @@ where $b \equiv x_1 = w_1; \ldots ; x_k = w_k$. Let us split cases on whether $x
 		\item[Case \emph{either} $u$ or $v$ are HNF]
 			Join at |fail| if \rulename{u-occurs}, else impossible due to \norecursion.
 		\item[Case \emph{neither} $u$ nor $v$ are HNF]
-			In this case, we have $x \equiv v$ and $y \equiv u$, so we can join $e_1$ and $e_2$ using the following diagram.
+			In this case, we have $x \equiv v$ and $y \equiv u$. WLOG assume that $x \prec y$ (the other case is symmetric) so we can join $e_1$ and $e_2$ using the following diagram.
 % https://q.uiver.app/#q=WzAsNixbMCwwLCJYW3ggPSB5O1xcIGI7XFwgeSA9IHhdIl0sWzIsMCwiWFxce3gveVxcfVt4ID0geDtcXCBiXFx7eC95XFx9O1xcIHkgPSB4XSJdLFswLDIsIlhcXHt5L3hcXH1beCA9IHk7XFwgYlxce3kveFxcfTtcXCB5ID0geV0iXSxbMiwxLCJYXFx7eC95XFx9W3ggPSB4O1xcIGJcXHt4L3lcXH07XFwgeCA9IHldIl0sWzIsMiwiWFxce3kveFxcfVt5ID0geTtcXCBiXFx7eS94XFx9O1xcIHggPSB5XSJdLFsxLDMsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMiAoeSA9IHgpIl0sWzAsMiwiZXFfMSAoeCA9IHkpIiwyXSxbMSwzLCJcXHJ1bGVuYW1le3Zhci1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIlxccnVsZW5hbWV7c3Vic3R9ICh4ID0geSkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X[x = y;\ b;\ y = x]} && {X\{x/y\}[x = x;\ b\{x/y\};\ y = x]} \\
