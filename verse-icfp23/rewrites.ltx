@@ -266,7 +266,7 @@
     $$
 \begin{array}{l}
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Substitution contexts} & S & ::= & \hole \vb |eq; S| \\
+%      \text{Substitution contexts} & S & ::= & \hole \vb |eq; S| \\
       \text{Execution contexts} & X & ::= & \hole \vb |v == X; e| \vb |X ; e| \vb |eq; X| \\
 %       \text{Equation contexts (hole is |eq|)} & U & ::= & |hole ; e| \vb |v == U ; e| \vb |U ; e| \vb |e; U| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
@@ -350,9 +350,8 @@
   \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |S^[x==v;e]| & \movesto & |(subst S x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-  & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$}, \\
-  &&&& \text{\hskip 0.7em and ($(|v| = |y| \implies |x| \prec |y|)$)} \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+  & \text{if $v \not= |V^[x]|$}, \\
   \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
   \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| & \text{if |x| $\prec$ |y| } \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
@@ -365,13 +364,13 @@
 \rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (S^[x==v;e])| & \movesto & |S^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
-\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \text{if $|X| \ne \hole$} \\
+\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \\
 
     \\[-0.6em]
 
 \rulegroupname{Normalization:}
-\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $|X| \ne \hole,\,  x \notin \freevars{|X|}$} \\
+\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $x \notin \freevars{|X|}$} \\
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
@@ -391,7 +390,7 @@
 \rulename{choose-r} & |fail choice e| & \movesto & |e| \\
 \rulename{choose-l} & |e choice fail| & \movesto & |e| \\
 \rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
-\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| & \text{if}~|CX| \ne \hole \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| &  \\
 
 
 \end{array} \\

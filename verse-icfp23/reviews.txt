@@ -2,7 +2,6 @@ ToDo list for camera ready copy
 
 * Ranjit: fix athe typos Guy discovered
 * Guy: revise skew confluence section with any changes you want to make
-* Simon: add citation for the Argentian work.
 
 
 ==============================
@@ -24,12 +23,15 @@ Minor comments:
     it is a novel idea, which as it is super-critical for
     understanding var-swap and seq-swap.
 
-I have added a clearer forward reference to 3.3.
+SPJ: I have added a clearer forward reference to 3.3.
 
 Questions for authors’ response
 
-    What is the status as to completeness? Do you have counter-examples, conjectures but have no proves yet?
-    Could you please elaborate more on why do you propose three alternative approaches to proving confluence and how they relate to practical scenarios?
+    What is the status as to completeness? Do you have
+    counter-examples, conjectures but have no proves yet?  Could you
+    please elaborate more on why do you propose three alternative
+    approaches to proving confluence and how they relate to practical
+    scenarios?
 
 
 
@@ -47,14 +49,15 @@ Thirdly, it would be nice to have a cheat-sheet showing how the features of Ship
 The rest is details...
 
   line 57: Using the word "time" here is possibly confusing, as this isn't a model with explicit timestamps (a la FRP).
-Hmm.  I don't propose to make a change here.
+
+SPJ: Hmm.  I don't propose to make a change here.
 
   line 458: reduction everywhere should be called out more explicitly, preferably
   in Fig 3. I spent a lot of time being confused about why introducing thunks
   didn't destroy confluence until I found this line tucked away.
 
-I'm not sure what to do about this.  The "reduce anywhere" point is called out in
-a bullet all to itself, *immediatlyI we first mention Fig 3.  How can we make it
+SPJ: I'm not sure what to do about this.  The "reduce anywhere" point is called out in
+a bullet all to itself, *immediatelyI we first mention Fig 3.  How can we make it
 clearer?
 
   Fig 3: you are only doing first-order unification, which is perfectly sensible,
@@ -66,21 +69,13 @@ clearer?
   terms is a variable. ShipVerse bans this using the comparable subtype
   constraint, so it is not an issue in practice, but is worth discussing at least.
 
-Not sure what to say here
+SPJ: Not sure what to say here
 
   Sec 3.2: Somewhere in this section you might want to discuss inequality, and how
   negated inequality isn't the same as equality. This is old hat for logic
   programmers, but may need pointed out for a general ICFP audience.
 
-Maybe the reviewer means that
-* (not (x /= y)) is not the same as (x=y)
-* or maybe: not (not (x=y)) is not the same as (x=y)
-
-where
-    not(e)    ==={macro}   if x:=e then fail else x
-
-Unlike Haskell we need macro-expansion because Verse is not lazy.
-Note that `not (x=y)` is stuck until x and y get values.
+SPJ: I have added a new para in 3.1
 
   line 580: you are hitting issues due to syntax being viewed inductively rather
   than coinductively. It's not so bad here but is killing you in the confluence
@@ -88,25 +83,25 @@ Note that `not (x=y)` is stuck until x and y get values.
   e.g. Sec 4.1: this is where inductive syntax is killing you. Why not coinductive
   syntax up to bisimulation?
 
-I don't know what coinductive sy
+SPJ: I don't know what coinductive syntax is
 
   Sec 3.7: mention relevance logic?
 
-I don't know what relevance logic is.
+SPJ: I don't know what relevance logic is.
 
   Sec 3.8: discuss the interplay of "reduce everywhere" with divergence? e.g. if (false) loop().
 
-TODO
+SPJ: I have elaborated 3.8 a bit.
 
   Sec 5.2: since STM needs split it does seem that one and all are not as canonical as they appear.
 
-Maybe so.  But again that seems to be too big a can of worms to open.
+SPJ: Maybe so.  But again that seems to be too big a can of worms to open.
 
   Sec. 7: It would be nice to flesh this out a bit with a discussion of other
   features of ShipVerse that aren't in VC, e.g. types, effects, type inference, STM,
   etc.
 
-I don't think we can sensibly do this.
+SPJ: I don't think we can sensibly do this.
 
 ==============================
 Reviewer C
@@ -187,12 +182,12 @@ In addition to my general comments above, the following detailed remarks are lis
    clauses are not relevant, and backtracking is a feature of Prolog. Actually,
    these terms are not mentioned in the paper you cite. So please calm down.
 
-I narrowed this sentence a bit.
+SPJ: I narrowed this sentence a bit.
 
    L.58/59: To be honest, you should mention here that VC gives up completeness in
    contrast to the "non-deterministic" functional logic languages.
 
-TODO
+SPJ: I have rewritten the introduction.
 
    L62: For this reason, it is unclear how one can compile a language with an
    operationally complete and optimal evaluation such as Curry into VC. Of course,
@@ -200,46 +195,46 @@ TODO
    this is not the way you intend. Note that Curry is not based on a backtracking
    semantics.
 
-This claim has gone.
+SPJ: This claim has gone.
 
    L.170: Since the equations to be solved might contain evaluable operations, the
    process is not simply "unification" but "E-unification" (where E is the set of
    equations defining the semantics of the operations).
 
-I don't propose to say this.
+SPJ: I don't propose to say this.
 
    L.399: This is the idea of "functional patterns" in Curry, where a functional
    pattern can also abstract (due to laziness) an infinite set of concrete
    patterns.
 
-TODO: What is a good citation here?  The term "functional pattern" does not appear in the Curry language Report.
+SPJ: TODO: What is a good citation here?  The term "functional pattern" does not appear in the Curry language Report.
 
    L.633: So what is the problem in solving a quadratic equation? Solving is possible by enumerating numbers.
 
-TODO: it could be arbitrarily hard.  Does Curry enumerate all?
+SPJ: TODO: it could be arbitrarily hard.  Does Curry enumerate all?
 
    L.705ff: The fact that choice behaves like a data constructor is the idea of
    pull-tabbing and also the basis of operationally complete implementations of
    functional logic languages.
 
-TODO. I have added a sentence; check.
+SPJ: TODO. I have added a sentence; check.
 
 L.759: Note that this major challenge is solved in Prolog systems with coroutining by attributed variables which initiate other computations when they are bound.
 
    L.770: Please give a reference to the library you used, otherwise Fig. 5 is useless.
 
-TODO: can we release? Probly not.
+SPJ: TODO: can we release? Probably not.
 
    L.780: Note that optimal evaluation is possible in functional logic programs
    with the needed narrowing strategy [2]
 
-TODO: wow, really?
+SPJ: TODO: wow, really?
 
     L.918ff: The requirement that variable equations are eliminated only after
     having values for the variables is called "strict equality" in the FLP
     literature.
 
-TODO: What would be a good citation?  This is great.
+SPJ: TODO: What would be a good citation?  This is great.
 
     L.1046: Be more honest: your formulation is simpler than pull-tabbing since
     your evaluation is lenient (and not lazy), which is less powerful
@@ -249,13 +244,21 @@ TODO: What would be a good citation?  This is great.
     omission of laziness. The concept about inside/outside in set functions is
     caused by supporting laziness.
 
-L.1141: Do you have any advantage for the programmer by natively dealing with the full lambda calculus? Since you consider equation between lambdas as failures, it looks more restricted than defunctionalization where you might support intensional equality of functions by simply comparing the function identifiers. Proper higher-order logic languages (e.g., lambda-Prolog) deal with higher-order unfication (of lambda terms).
+SPJ: I have pointed this out.
 
-L.1153: Let expressions are not equivalent to unification since let expressions
-are non-strict bindings whereas VC unification is strict.
+    L.1141: Do you have any advantage for the programmer by natively
+    dealing with the full lambda calculus? Since you consider equation
+    between lambdas as failures, it looks more restricted than
+    defunctionalization where you might support intensional equality
+    of functions by simply comparing the function identifiers. Proper
+    higher-order logic languages (e.g., lambda-Prolog) deal with
+    higher-order unfication (of lambda terms).
 
-L.1166/1200: Since you mention "in Verse", it would be good to provide a reference
-to Verse in order to judge it.
+   L.1153: Let expressions are not equivalent to unification since let
+   expressions are non-strict bindings whereas VC unification is strict.
+
+   L.1166/1200: Since you mention "in Verse", it would be good to provide a reference
+   to Verse in order to judge it.
 
 References:
 
@@ -278,7 +281,7 @@ Questions for authors’ response
    Curry is not backtracking-based (e.g., see paper [5]), how would you compile a
    fair search strategy?
 
-Claim removed
+SPJ: Claim removed
 
    For instance, I'd like to see whether the evaluation of
       \exists xs,ys,zs . append<append<xs,ys>,zs> = <>; <xs,ys,zs>
@@ -329,10 +332,12 @@ The paper does not discuss a line of related work that combines Datalog with
 functional programming. How does this calculus compare to approaches such as
 Datafun [1], Flix [2], Formulog [3], and functional IncA [4]?
 
-Subsection 3.4 feels out of place. I don't understand why the program with x = 100
-gets stuck. The reader needs more guidance to understand what the exact problem
-is. Maybe then it becomes clear what the point of the subsection is, but I don't
-know what this section is trying to convey.
+    Subsection 3.4 feels out of place. I don't understand why the program with x = 100
+    gets stuck. The reader needs more guidance to understand what the exact problem
+    is. Maybe then it becomes clear what the point of the subsection is, but I don't
+    know what this section is trying to convey.
+
+TODO: I have soome sympathy with this!
 
 [1]: Michael Arntzenius, Neelakantan R. Krishnaswami. Datafun: a functional Datalog. ICFP 2016: 214-227.
 
