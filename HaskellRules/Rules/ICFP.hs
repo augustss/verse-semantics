@@ -319,7 +319,7 @@ execX1 lhs =
 
 substX :: Expr -> [(Context, Expr)]
 -- X context
-substX lhs = 
+substX lhs =
   [(id,lhs)]
  ++
   do (v :=: e) :>: ex <- [lhs]
@@ -611,7 +611,7 @@ rulesUnification env lhs =
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
-     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
   "HNF-SWAP" `name`

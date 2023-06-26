@@ -812,14 +812,14 @@ where $b \equiv x_1 = w_1; \ldots ; x_k = w_k$. Let us split cases on whether $x
   if $x_i < x$ or $x_i > x$ respectively).
   We join $e_1$ and $e_2$ using \cref{lem:eq-join-flip}
   via the context $X' \equiv |subst X x z|[x = z; \hole]$ and $b' \equiv |subst b x z|$ where $z$ is a fresh variable.
-% https://q.uiver.app/#q=WzAsNixbMSwwLCJYW3ggPSB1OyBiOyB4ID0gdl0iXSxbMCwxLCJYXFx7dS94XFx9W3ggPSB1O1xcIGJcXHt1L3hcXH07XFwgdSA9IHZdIl0sWzIsMSwiWFxce3YveFxcfVt2ID0gdTtcXCBiXFx7di94XFx9O1xcIHggPSB2XSJdLFsyLDMsIlgnXFx7di96XFx9W3YgPSB1O1xcIGInXFx7di96XFx9XSJdLFswLDMsIlgnXFx7dS96XFx9W2InXFx7dS96XFx9O1xcIHUgPSB2XSJdLFsxLDQsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMiIsMl0sWzAsMiwiZXFfMiJdLFsyLDMsIlxcbWJveHtzd2FwfSB4PXYgXFxtYm94e292ZXJ9XFwgdj13X2kiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsNCwiXFxlcXVpdiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDUsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2luLWZsaXB9IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+  % https://q.uiver.app/#q=WzAsNixbMSwwLCJYW3ggPSB1OyBiOyB4ID0gdl0iXSxbMCwxLCJYXFx7dS94XFx9W3ggPSB1O1xcIGJcXHt1L3hcXH07XFwgdSA9IHZdIl0sWzIsMSwiWFxce3YveFxcfVt2ID0gdTtcXCBiXFx7di94XFx9O1xcIHggPSB2XSJdLFsyLDMsIlgnXFx7di96XFx9W3YgPSB1O1xcIGInXFx7di96XFx9XSJdLFswLDMsIlgnXFx7dS96XFx9W2InXFx7dS96XFx9O1xcIHUgPSB2XSJdLFsxLDQsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMSIsMl0sWzAsMiwiZXFfMiJdLFsyLDMsIlxcbWJveHtzd2FwfSB4PXYgXFxtYm94e292ZXJ9XFwgdj13X2kiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsNCwiXFxlcXVpdiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDUsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2luLWZsaXB9IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	& {X[x = u; b; x = v]} \\
 	{X\{u/x\}[x = u;\ b\{u/x\};\ u = v]} && {X\{v/x\}[v = u;\ b\{v/x\};\ x = v]} \\
 	\\
 	{X'\{u/z\}[b'\{u/z\};\ u = v]} && {X'\{v/z\}[v = u;\ b'\{v/z\}]} \\
 	& \bullet
-	\arrow["{eq_2}"', from=1-2, to=2-1]
+	\arrow["{eq_1}"', from=1-2, to=2-1]
 	\arrow["{eq_2}", from=1-2, to=2-3]
 	\arrow["{\mbox{swap} x=v \mbox{over}\ v=w_i}"', dotted, two heads, from=2-3, to=4-3]
 	\arrow["\equiv"', dotted, from=2-1, to=4-1]
@@ -854,8 +854,28 @@ where $b \equiv x_1 = w_1; \ldots ; x_k = w_k$. Let us split cases on whether $x
 
 	\item[Case $x \in \freevars{v}, y \not \in \freevars{u}$]: Symmetric to previous case.
 
-	\item[Case $x \in \freevars{v}, y \in \freevars{u}$]: Join at |fail| if \rulename{u-occurs}, else
-	impossible due to \norecursion.
+	\item[Case $x \in \freevars{v}, y \in \freevars{u}$]:
+	Split cases on whether $u$ and $v$ are HNF values or not.
+	\begin{description}
+		\item[Case \emph{either} $u$ or $v$ are HNF]
+			Join at |fail| if \rulename{u-occurs}, else impossible due to \norecursion.
+		\item[Case \emph{neither} $u$ nor $v$ are HNF]
+			In this case, we have $x \equiv v$ and $y \equiv u$, so we can join $e_1$ and $e_2$ using the following diagram.
+% https://q.uiver.app/#q=WzAsNixbMCwwLCJYW3ggPSB5O1xcIGI7XFwgeSA9IHhdIl0sWzIsMCwiWFxce3gveVxcfVt4ID0geDtcXCBiXFx7eC95XFx9O1xcIHkgPSB4XSJdLFswLDIsIlhcXHt5L3hcXH1beCA9IHk7XFwgYlxce3kveFxcfTtcXCB5ID0geV0iXSxbMiwxLCJYXFx7eC95XFx9W3ggPSB4O1xcIGJcXHt4L3lcXH07XFwgeCA9IHldIl0sWzIsMiwiWFxce3kveFxcfVt5ID0geTtcXCBiXFx7eS94XFx9O1xcIHggPSB5XSJdLFsxLDMsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMiAoeSA9IHgpIl0sWzAsMiwiZXFfMSAoeCA9IHkpIiwyXSxbMSwzLCJcXHJ1bGVuYW1le3Zhci1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIlxccnVsZW5hbWV7c3Vic3R9ICh4ID0geSkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X[x = y;\ b;\ y = x]} && {X\{x/y\}[x = x;\ b\{x/y\};\ y = x]} \\
+	&& {X\{x/y\}[x = x;\ b\{x/y\};\ x = y]} \\
+	{X\{y/x\}[x = y;\ b\{y/x\};\ y = y]} && {X\{y/x\}[y = y;\ b\{y/x\};\ x = y]} \\
+	& \bullet
+	\arrow["{eq_2 (y = x)}", from=1-1, to=1-3]
+	\arrow["{eq_1 (x = y)}"', from=1-1, to=3-1]
+	\arrow["{\rulename{var-swap}}", dotted, from=1-3, to=2-3]
+	\arrow["{\rulename{subst} (x = y)}", dotted, from=2-3, to=3-3]
+	\arrow["{\rulename{seq-swap}}"', dotted, two heads, from=3-1, to=4-2]
+	\arrow["{\rulename{seq-swap}}", dotted, two heads, from=3-3, to=4-2]
+\end{tikzcd}\]
+	\end{description}
+
 	\end{description}
 \end{description}
 \end{proof}
@@ -893,8 +913,8 @@ $\subst{X_2}{x}{v_1}[v_1=v_2]$ and $\subst{X_2}{x}{v_2}[v_1=v_2]$.
 
 \item[Case $x_1 \not \equiv x_2$]:
 Let
-	$|v_1'| \equiv \subst{v_1}{x_2}{v_2}$ and
-	$|v_2'| \equiv \subst{v_2}{x_1}{v_1}$.
+	$v_1' \equiv \subst{v_1}{x_2}{v_2}$ and
+	$v_2' \equiv \subst{v_2}{x_1}{v_1}$.
 Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 \begin{description}
 	\item[Case $x_2 \not \in \freevars{v_1}$]
@@ -920,7 +940,10 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 	\arrow["{eq_2}"', dotted, from=2-1, to=3-2]
 	\arrow["{eq_2}", dotted, from=2-2, to=3-2]
 \end{tikzcd}\]
-	\item[Case $x_2 \in \freevars{v_1}, x_1 \in \freevars{v_2}$] In this case, we get the below diagram
+	\item[Case $x_2 \in \freevars{v_1}, x_1 \in \freevars{v_2}$]
+	Split cases on whether $v_1, v_2$ are HNF values or not.
+	\begin{description}
+    \item[Case \emph{either} $v_1$ or $v_2$ are HNF] In this case, we get the below diagram
 	where, since $x_2 \in \freevars{v_2'}$, the term $x_2 = v_2'$ either steps to |fail| (and so we can
 	join at |fail|) or the term violates the \norecursion assumption.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XzFcXH1beF8yID0gdl8yJ10gXFxsZG90c11beF8xID0gdl8xXSJdLFsxLDEsIlhfMVxce3ZfMS94XzFcXH1bXFxsZG90cyBYXzJcXHt2XzEveF8xLCB2XzInL3hfMlxcfVt4XzIgPSB2XzInXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzEsMCwiWF8xW1xcbGRvdHMgWF8yXFx7dl8yL3hfMlxcfVt4XzIgPSB2XzJdIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMCwxLCJldV8xIiwyXSxbMCwzLCJldV8yIl0sWzMsMiwiZXVfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
@@ -931,7 +954,17 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 	\arrow["{eq_2}", from=1-1, to=1-2]
 	\arrow["{eq_1}", dotted, from=1-2, to=2-2]
 \end{tikzcd}\]
-\end{description}
+	\item[Case \emph{neither} $v_1$ nor $v_2$ are HNF] In this case $v_1 \equiv x_2$ and $v_2 \equiv x_1$, and we can join $e_1$ and $e_2$ as shown in the below diagram.
+	% https://q.uiver.app/#q=WzAsMyxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0geF8xXSBcXGxkb3RzXVt4XzEgPSB4XzJdIl0sWzAsMSwiWF8xXFx7eF8yL3hfMVxcfVtcXGxkb3RzIFhfMlxce3hfMi94XzFcXH1beF8yID0geF8yXSBcXGxkb3RzXVt4XzEgPSB4XzJdIl0sWzEsMCwiWF8xW1xcbGRvdHMgWF8yXFx7eF8xL3hfMlxcfVt4XzIgPSB4XzFdIFxcbGRvdHNdW3hfMSA9IHhfMl0iXSxbMCwxLCJldV8xICh4XzEgPSB4XzIpIiwyXSxbMCwyLCJldV8yICh4XzIgPSB4XzEpIl0sWzIsMSwiZXVfMSAoeF8xID0geF8yKSIsMCx7ImxhYmVsX3Bvc2l0aW9uIjozMCwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn19fV1d&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	{X_1[\ldots X_2[x_2 = x_1] \ldots][x_1 = x_2]} & {X_1[\ldots X_2\{x_1/x_2\}[x_2 = x_1] \ldots][x_1 = x_2]} \\
+	{X_1\{x_2/x_1\}[\ldots X_2\{x_2/x_1\}[x_2 = x_2] \ldots][x_1 = x_2]}
+	\arrow["{eu_1 (x_1 = x_2)}"', from=1-1, to=2-1]
+	\arrow["{eu_2 (x_2 = x_1)}", from=1-1, to=1-2]
+	\arrow["{eu_1 (x_1 = x_2)}"{pos=0.3}, dotted, from=1-2, to=2-1]
+\end{tikzcd}\]
+	\end{description}
+	\end{description}
 \end{description}
 \end{proof}
 
@@ -1351,14 +1384,15 @@ We say a reduction \emph{eliminates} a variable $x$ from a block $b$ if the redu
 %
 (1)~a \rulename{subst} reduction spanning $b$ or an enclosing block
 %
-(2)~using an equation $|x = v|$ where
+(2)~using an equation $|x = v|$ % where
 %
-(3) $|v|$ is either an HNF or a variable $y$ such that $x \prec y$.
+% (3) $|v|$ is either an HNF or a variable $y$ such that $x \prec y$.
 %
 A reduction sequence \emph{eliminates} a variable $x$ from a block $b$
 if there is some reduction in the sequence that eliminates $x$ from
 $b$, and the sequence contains no subsequent \rulename{subst} reductions
 spanning any block strictly enclosing $b$.
+%
 \end{definition}
 
 % \begin{definition}[Early Substitution Redex]
@@ -1409,7 +1443,7 @@ Next, we show neither case is possible.
 	%
 	\mathsf{choose}(b_i) 		  & \doteq\ \mbox{\rulename{choose} redexes in}\ b_i \\
 	\mathsf{semi}(b_i)   		  & \doteq\ \mbox{\rulename{seq-assoc} or \rulename{eqn-float} redexes in}\ b_i \\
-	\mathsf{cands}(\sigma_i, e_i) & \doteq\ [\ldots \ell \mapsto (\sz{\mathsf{cand}(\sigma_i, b_i, \ell)} \ldots \mid \ell \in b_i ] \\
+	\mathsf{cands}(\sigma_i, e_i) & \doteq\ [\ldots \ell \mapsto \sz{\mathsf{cand}(\sigma_i, b_i, \ell)} \ldots \mid \ell \in b_i ] \\
 								  & \quad \quad \mbox{where labels are ordered by}\ \prec_{b_i} \\
 	\mathsf{size}(b_i) 	    	  & \doteq\ \mbox{size of the block}\ b_i \\
 	\mathsf{swaps}(b_i)			  & \doteq\ \mbox{\rulename{var-swap} redexes in}\ b_i \\
@@ -1424,9 +1458,10 @@ Next, we show neither case is possible.
 \end{align*}
 %
 The unification reductions preserve the following invariant: once a variable $x$ has been eliminated from a block,
-it appears at most once in the block as an LHS of an equation $|x = v|$, and that equation can \emph{never} again be used
-to perform a substitution in that block \emph{unless} new occurrences of $x$ are injected into the block by a substitution
-performed in an \emph{enclosing} block, in which case, the $\mathsf{block}$ metric for the outer block will be strictly smaller.
+it appears at most once in the block as an LHS of an equation $|x = v|$ or \rulename{var-swap}ped as $|v = x|$,
+and in either case that equation can \emph{never} again be used to perform a substitution in that block \emph{unless}
+new occurrences of $x$ are injected into the block by a substitution performed in an \emph{enclosing} block,
+in which case, the $\mathsf{block}$ metric for the outer block will be \emph{strictly reduced}.
 %
 % Intuitively, $\mathsf{cand}(\ell)$ is the number of ``substitution candidates'' for the block $\ell$,
 % \ie the number of variables that could possibly be used as the LHS of a \rulename{subst} spanning the block $\ell$.
@@ -1439,7 +1474,7 @@ Specifically, each application of
 \item \rulename{choose} strictly reduces $\sz{\mathsf{choose}}$;
 \item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\mathsf{semi}}$ (leaving $\sz{\mathsf{choose}}$ unchanged);
 \item \rulename{subst} strictly reduces $\sz{\mathsf{cands}}$ (leaving $\sz{\mathsf{semi}}$, $\sz{\mathsf{choose}}$ unchanged),
-	  as it \emph{eliminates} a variable from the block $\ell$ that the substitution spans;
+	  as it \emph{eliminates} a variable from the block $\ell$ that the substitution spans, leaving enclosing blocks unchanged;
 	  % \ranjit{CHECK: this requires ordered \rulename{subst-var}}
 	  % \emph{or} it is an \emph{early} substitution that preserves size, but reduces the number of early substitution redexes for $\ell$;
 \item \rulename{u-tup} strictly reduces $\mathsf{size}$ (leaving $\mathsf{cands}$, $\sz{\mathsf{semi}}$, $\sz{\mathsf{choose}}$ unchanged), as it
