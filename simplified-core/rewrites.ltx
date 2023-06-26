@@ -188,7 +188,7 @@
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Substitution contexts} & S & ::= & \hole \vb |e; S| \vb \vb |S ; e| \\
+      \text{Substitution contexts} & S & ::= & \hole \vb |v == S| \vb |e; S| \vb |S ; e| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
