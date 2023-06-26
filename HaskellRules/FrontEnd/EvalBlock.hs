@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns -Wno-incomplete-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
