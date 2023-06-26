@@ -1354,8 +1354,8 @@ The rules for choice are given in \cref{fig:rules}:
 The most interesting rule is \rulename{choose}, which, just as described in \cref{sec:choice},
 ``floats the choice outwards,'' duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
-defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like an
-substitution context |S|, \emph{but with no possible
+defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like a
+execution context |X|, \emph{but with no possible
 choices to the left of the hole}:
 $$
 CX ::= \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX|
