@@ -1475,8 +1475,6 @@ Specifically, each application of
 \item \rulename{seq-assoc} or \rulename{eqn-float} strictly reduces $\sz{\mathsf{semi}}$ (leaving $\sz{\mathsf{choose}}$ unchanged);
 \item \rulename{subst} strictly reduces $\sz{\mathsf{cands}}$ (leaving $\sz{\mathsf{semi}}$, $\sz{\mathsf{choose}}$ unchanged),
 	  as it \emph{eliminates} a variable from the block $\ell$ that the substitution spans, leaving enclosing blocks unchanged;
-	  % \ranjit{CHECK: this requires ordered \rulename{subst-var}}
-	  % \emph{or} it is an \emph{early} substitution that preserves size, but reduces the number of early substitution redexes for $\ell$;
 \item \rulename{u-tup} strictly reduces $\mathsf{size}$ (leaving $\mathsf{cands}$, $\sz{\mathsf{semi}}$, $\sz{\mathsf{choose}}$ unchanged), as it
 	  preserves $\mathsf{elim}$ and hence $\mathsf{cand}$, but reduces the $\mathsf{size}$ of $\ell$;
 \item \rulename{u-lit}, \rulename{u-fail}, \rulename{u-occurs} strictly reduces $\mathsf{size}$ (leaving $\mathsf{cands}$, $\sz{\mathsf{semi}}$, $\sz{\mathsf{choose}}$ unchanged);
