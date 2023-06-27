@@ -8,11 +8,13 @@ module FrontEnd.Expr(
   Loc, noLoc,
   Ident(..),
   Expr(..),
+  Core,
   pattern Fail,
   pattern Unit,
   pattern Typedef,
   pattern Succeeds,
 --  pattern Range,
+  Store(..), Ptr,
   Block,
   Eff,
   Op,
@@ -25,6 +27,7 @@ module FrontEnd.Expr(
   ) where
 import Control.Monad.Identity
 import Data.Data (Data)
+import qualified Data.IntMap as IM
 import Data.Maybe
 import Data.Ratio
 import Data.Scientific(Scientific)
@@ -44,6 +47,7 @@ instance Pretty Loc where
 data Ident = Ident Loc String
   deriving ({-Eq, Ord, Show,-} Data)
 
+-- Ignore location for comparison
 instance Eq Ident where x == y  =  compare x y == EQ
 instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 
@@ -109,7 +113,22 @@ data Expr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)  
   | DomainFail                -- either Wrong or try next overload
+  | EPrim String              -- primop
+  | Lam Ident Expr            -- \ x . e
+  | Split Expr Expr Expr      -- split(e1){e2}{e3}
+  -- These are used when translating back from Rules.Core.Expr
+  | LitPtr Ptr
+  | EStore Store Expr
   deriving (Eq, Ord, Show, Data)
+
+-- This synonym is used for the very reduced subset of Expr that
+-- can be directly translated to Rules.Core.Expr
+type Core = Expr
+type Value = Expr
+
+data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
+  deriving (Show, Eq, Ord, Data)
+type Ptr = Int
 
 --pattern Range :: Expr -> Expr
 --pattern Range e = ApplyD e AnyT
@@ -192,7 +211,7 @@ instance Pretty Expr where
           Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1),
                                                    text "do",
                                                      indent $ ppr 0 e2]
-          Do e1 -> maybeParens (p > 0) $ sep [text "do" <+> indent (ppr 0 e1)]
+          Do e1 -> maybeParens (p > 0) $ sep [text "block" <+> indent (ppr 0 e1)]
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
           Case2 e bs ->
@@ -217,6 +236,7 @@ instance Pretty Expr where
           DefineIE i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
+          Fail -> text "fail"
           Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                      text "range" <> braces (ppr 0 e)
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
@@ -226,10 +246,19 @@ instance Pretty Expr where
           TLam i rs e1 e2 me3 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2) <>
             maybe empty (braces . ppr 0) me3
           DomainFail -> text "DomainFail"
+          EPrim s -> ppNormal (Variable (Ident noLoc s))
+          Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
+          Split e1 e2 e3 -> text "split" <> parens (ppr 0 e1) <> braces (ppr 0 e2) <> braces (ppr 0 e3)
+          LitPtr ptr -> text ("R#" ++ show ptr)
+          EStore s e ->
+            maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
       ppVRA s i (Just t) (Just e) = text s <+> ppr 0 (InfixOp (InfixOp (Variable i) (Ident noLoc ":") t) (Ident noLoc "=") e)
+
+instance Pretty Store where
+  pPrintPrec l _ (Store m _) = fsep . punctuate comma . map (pPrintPrec l 0) . IM.toList $ m -- XXX
 
 ppSeq :: PrettyLevel -> [Expr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
@@ -337,7 +366,15 @@ compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
 compos f (HasType e1 e2) = HasType <$> f e1 <*> f e2
 compos f (TLam i rs e1 e2 e3) = TLam i rs <$> f e1 <*> f e2 <*> traverse f e3
-compos _ DomainFail = pure DomainFail
+compos _ e@DomainFail = pure e
+compos _ e@EPrim{} = pure e
+compos f (Lam i e) = Lam i <$> f e
+compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
+compos _ e@LitPtr{} = pure e
+compos f (EStore s e) = EStore <$> storeMapA f s <*> f e
+
+storeMapA :: (Applicative a) => (Value -> a Value) -> Store -> a Store
+storeMapA f s = Store <$> sequenceA (IM.map f (refMap s)) <*> pure (outputs s)
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)

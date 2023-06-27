@@ -15,13 +15,14 @@ import System.IO(hFlush, stdout)
 import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
 import FrontEnd.Expr
+import FrontEnd.Desugar(exprToCore)
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
-import FrontEnd.Core
+import FrontEnd.ParseCore
 import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
-import FrontEnd.Run(run, runM, everySystem, evalSystem, findSystem)
+import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem)
 import Rules.Core(RuleEnv(..))
 import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
@@ -136,7 +137,8 @@ data TestRes = Good | Bad | Many | None | Excn | Skip
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
 assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
-  where toCore = exprToCore (testFlagsToFlags flg) . desugar defaultFlags
+  where toCore = exprToCore flags . desugar flags
+        flags = testFlagsToFlags flg
 
 assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO TestRes
 assertEquivC ti flg e1 e2  = assertEquiv ti flg (e1, e1) (e2, e2)
@@ -359,7 +361,7 @@ testFlags = TestFlags
          ( long "rules"
         <> short 'r'
         <> metavar "NAME"
-        <> value evalSystem
+        <> value blockSystem
         <> help "Use rule system NAME" )
   <*> switch
       (  long "summary"

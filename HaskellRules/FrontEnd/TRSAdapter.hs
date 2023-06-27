@@ -10,11 +10,11 @@ import qualified Rules.Core as T
 import Rules.Equiv(normalForm)
 import Rules.Systems(ESystem)
 import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
-import TRS.System(preProcess, postProcess, ruleEnv, sname)
+import TRS.System(preProcess, postProcess, ruleEnv)
 import TRS.Traced(Traced, term, toList)
-import FrontEnd.Core
+import FrontEnd.Expr
 import FrontEnd.Error
-import FrontEnd.Eval
+--import FrontEnd.Eval
 import FrontEnd.Flags
 import GHC.Stack
 
@@ -26,12 +26,14 @@ asTRS f = trsToCore . f . coreToTrs
 
 -- XXX use graph normal form when needed
 
+{-
 evaluate :: T.RuleEnv T.Expr -> Core -> [Core]
 evaluate tflg e = [eval flg e]
   where flg = EFlags { underLambda = T.tfUnderLambda tflg, traceEval = T.tfTrace tflg, steps = T.tfRewriteSteps tflg }
+-}
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
+rewrite flg asys --x | sname sys == "eval" = evaluate (ruleEnv sys)
                  | otherwise = force . map (trsToCore . sub flg sys . rtrace)
                 . map toList
                 . nrToList
@@ -118,36 +120,36 @@ subsT :: ESystem -> [Traced T.Expr] -> [Traced T.Expr]
 subsT sys = nubTraced (postProcess sys (ruleEnv sys))
 
 coreToTrs :: HasCallStack => Core -> T.Expr
-coreToTrs (CVar i) = T.Var $ coreToTrsI i
-coreToTrs (CInt i) = T.Int i
-coreToTrs CRat{} = undefined
-coreToTrs (CPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
+coreToTrs (Variable i) = T.Var $ coreToTrsI i
+coreToTrs (LitInt i) = T.Int i
+coreToTrs LitRat{} = undefined
+coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
-coreToTrs (CArray vs) = T.Arr $ map coreToTrs vs
-coreToTrs (CLam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
-coreToTrs (CUnify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
-coreToTrs (CSeq []) = undefined
-coreToTrs (CSeq [e]) = coreToTrs e
-coreToTrs (CSeq (e:es)) = coreToTrs e T.:>: coreToTrs (CSeq es)
-coreToTrs (CApply v1 v2) = coreToTrs v1 T.:@: coreToTrs v2
-coreToTrs (CBar e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
-coreToTrs CFail = T.Fail
-coreToTrs (COne e) = T.One $ coreToTrs e
-coreToTrs (CAll e) = T.All $ coreToTrs e
-coreToTrs (CDef [] e) = coreToTrs e
-coreToTrs (CDef (i:is) e) = T.Exi $ T.Bind (coreToTrsI i) (coreToTrs $ CDef is e)
-coreToTrs (CSucceeds e) = coreToTrs e  -- XXX temporarily
-coreToTrs (CWrong s) = T.Wrong s
-coreToTrs (CSplit e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
-coreToTrs (CMacro (Ident _ "block") e) = coreToTrs e
-coreToTrs (CMacro (Ident _ "verify") e) = T.Verify $ coreToTrs e
-coreToTrs (CMacro (Ident _ "assert") e) = T.Assert $ coreToTrs e
-coreToTrs (CMacro (Ident _ "assume") e) = T.Assume $ coreToTrs e
-coreToTrs e@CMacro{} = impossible e
-coreToTrs (CStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
-coreToTrs (CIf e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
-coreToTrs (CPtr p) = T.Ref (T.Ptr p)
---coreToTrs _ = undefined
+coreToTrs (Array vs) = T.Arr $ map coreToTrs vs
+coreToTrs (Lam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
+coreToTrs (Unify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
+coreToTrs (Seq []) = undefined
+coreToTrs (Seq [e]) = coreToTrs e
+coreToTrs (Seq (e:es)) = coreToTrs e T.:>: coreToTrs (Seq es)
+coreToTrs (ApplyD (Array []) _) = T.Fail
+coreToTrs (ApplyD v1 v2) = coreToTrs v1 T.:@: coreToTrs v2
+coreToTrs (Choice e1 e2) = coreToTrs e1 T.:|: coreToTrs e2
+coreToTrs Fail = T.Fail
+coreToTrs (Exists [] e) = coreToTrs e
+coreToTrs (Exists (i:is) e) = T.Exi $ T.Bind (coreToTrsI i) (coreToTrs $ Exists is e)
+coreToTrs (Succeeds e) = coreToTrs e  -- XXX temporarily
+coreToTrs (Wrong s) = T.Wrong s
+coreToTrs (Split e f g) = T.Split (coreToTrs e) (coreToTrsV f) (coreToTrsV g)
+coreToTrs (Macro1 (Ident _ "one")    [] e) = T.One    $ coreToTrs e
+coreToTrs (Macro1 (Ident _ "all")    [] e) = T.All    $ coreToTrs e
+coreToTrs (Macro1 (Ident _ "verify") [] e) = T.Verify $ coreToTrs e
+coreToTrs (Macro1 (Ident _ "assert") [] e) = T.Assert $ coreToTrs e
+coreToTrs (Macro1 (Ident _ "assume") [] e) = T.Assume $ coreToTrs e
+coreToTrs e@Macro1{} = impossible e
+coreToTrs (If3 e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
+coreToTrs (EStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
+coreToTrs (LitPtr p) = T.Ref (T.Ptr p)
+coreToTrs e = error $ "coreToTrs: " ++ prettyShow e
 
 coreToTrsV :: Core -> T.Value
 coreToTrsV e = case coreToTrs e of T.Val v -> v; _ -> undefined
@@ -156,32 +158,30 @@ coreToTrsI :: Ident -> T.Ident
 coreToTrsI (Ident _ s) = T.Name s
 
 trsToCore :: T.Expr -> Core
-trsToCore (T.Var i) = CVar (trsToCoreI i)
-trsToCore (T.Int i) = CInt i
-trsToCore (T.Op op) = CPrim $ fromMaybe undefined $ lookup op allOps
-trsToCore (T.Arr vs) = CArray $ map trsToCore vs
-trsToCore (T.Lam (T.Bind x e)) = CLam (trsToCoreI x) (trsToCore e)
-trsToCore (e1 T.:=: e2) = CUnify (trsToCore e1) (trsToCore e2)
-trsToCore (i1 T.:~: i2) = CApply (CVar (Ident noLoc "~")) (CArray [trsToCore (T.Var i1), trsToCore (T.Var i2)])
-trsToCore ee@(_ T.:>: _) = CSeq $ map trsToCore $ flat ee
+trsToCore (T.Var i) = Variable (trsToCoreI i)
+trsToCore (T.Int i) = LitInt i
+trsToCore (T.Op op) = EPrim $ fromMaybe undefined $ lookup op allOps
+trsToCore (T.Arr vs) = Array $ map trsToCore vs
+trsToCore (T.Lam (T.Bind x e)) = Lam (trsToCoreI x) (trsToCore e)
+trsToCore (e1 T.:=: e2) = Unify (trsToCore e1) (trsToCore e2)
+trsToCore ee@(_ T.:>: _) = Seq $ map trsToCore $ flat ee
   where flat (e1 T.:>: e2) = flat e1 ++ flat e2
         flat e = [e]
-trsToCore (e1 T.:|: e2) = CBar (trsToCore e1) (trsToCore e2)
-trsToCore (e1 T.:@: e2) = CApply (trsToCore e1) (trsToCore e2)
-trsToCore T.Fail = CFail
+trsToCore (e1 T.:|: e2) = Choice (trsToCore e1) (trsToCore e2)
+trsToCore (e1 T.:@: e2) = ApplyD (trsToCore e1) (trsToCore e2)
+trsToCore T.Fail = Fail
 trsToCore ee@T.Exi{} = flat [] ee
   where flat vs (T.Exi (T.Bind x e)) = flat (vs ++ [x]) e
-        flat vs e = CDef (map trsToCoreI vs) (trsToCore e)
-trsToCore (T.One e) = COne $ trsToCore e
-trsToCore (T.All e) = CAll $ trsToCore e
-trsToCore (T.Wrong s) = CWrong s
-trsToCore (T.Split e f g) = CSplit (trsToCore e) (trsToCore f) (trsToCore g)
-trsToCore (T.BlockC e) = CMacro (Ident noLoc "block") $ trsToCore e
+        flat vs e = Exists (map trsToCoreI vs) (trsToCore e)
+trsToCore (T.One e) = Macro1 (Ident noLoc "one") [] $ trsToCore e
+trsToCore (T.All e) = Macro1 (Ident noLoc "all") []  $ trsToCore e
+trsToCore (T.Wrong s) = Wrong s
+trsToCore (T.Split e f g) = Split (trsToCore e) (trsToCore f) (trsToCore g)
 --trsToCore (T.BlockC e) = trsToCore e
-trsToCore (T.Store h e) = CStore s (trsToCore e)
+trsToCore (T.If e1 e2 e3) = If3 (trsToCore e1) (trsToCore e2) (trsToCore e3)
+trsToCore (T.Store h e) = EStore s (trsToCore e)
   where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
-trsToCore (T.Ref (T.Ptr i)) = CPtr i
-trsToCore (T.If e1 e2 e3) = CIf (trsToCore e1) (trsToCore e2) (trsToCore e3)
+trsToCore (T.Ref (T.Ptr i)) = LitPtr i
 trsToCore e = error $ "trsToCore: unimplemented: " ++ show e
 
 trsToCoreI :: T.Ident -> Ident

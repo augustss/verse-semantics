@@ -5,6 +5,125 @@
 {-# LANGUAGE ViewPatterns #-}
 module FrontEnd.Core(
   Core(..),
+  pattern COne, pattern CAll, pattern CSucceeds, pattern CDecides,
+  Store(..),
+  Ident(..), noLoc,
+  exprToCore,
+  pCoreFile, pCore,
+  ) where
+import Prelude hiding ((<>))
+import Control.Monad(void)
+import Data.Data(Data)
+import qualified Data.IntMap as IM
+import Data.Maybe
+import Epic.Print
+import FrontEnd.Expr hiding (compos, composOp)
+import FrontEnd.Flags
+
+import Text.Megaparsec(sepBy, sepBy1, many, eof, choice, some, optional, (<|>))
+import FrontEnd.Parse(P, pOp, pParens, skip, pLiteral, pIdent, pMacroName, pBraces, try, pKeyword, lexeme, string)
+import FrontEnd.Desugar(dsScope)
+
+data Core
+  = CVar Ident
+  | CInt Integer
+  | CRat Rational
+  | CPrim String
+  | CPtr Ptr
+  | CArray [Value]
+  | CLam Ident Core
+  | CUnify Core Core
+  | CSeq [Core]
+  | CApply Core Core
+  | CBar Core Core
+  | CFail
+  | CMacro Ident Core
+  | CDef Heap Core
+  | CWrong String
+  | CSplit Core Value Value
+  | CIf Core Core Core  -- Only for verification
+  -- Store primitives
+  | CStore Store Core
+  deriving (Show, Eq, Data)
+
+pattern COne :: Core -> Core
+pattern COne c <- CMacro (Ident _ "one") c
+  where COne e = CMacro (Ident noLoc "one") e
+pattern CAll :: Core -> Core
+pattern CAll c <- CMacro (Ident _ "all") c
+  where CAll e = CMacro (Ident noLoc "all") e
+pattern CSucceeds :: Core -> Core
+pattern CSucceeds c <- CMacro (Ident _ "succeeds") c
+  where CSucceeds e = CMacro (Ident noLoc "succeeds") e
+pattern CDecides :: Core -> Core
+pattern CDecides c <- CMacro (Ident _ "decides") c
+  where CDecides e = CMacro (Ident noLoc "decides") e
+
+type Value = Core
+
+type Heap = [Ident]
+
+data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
+  deriving (Show, Eq, Data)
+type Ptr = Int
+
+instance Pretty Core where
+  pPrintPrec l p (CVar i) = pPrintPrec l p i
+  pPrintPrec l p (CInt i) = pPrintPrec l p i
+  pPrintPrec _ _ (CRat _) = undefined -- pPrintPrec l p r
+  pPrintPrec _ _ (CPrim s) = text s
+  pPrintPrec _ _ (CPtr p) = text ("R#" ++ show p)
+  pPrintPrec l _ (CArray [v]) = text "array" <> braces (pPrintPrec l 0 v)
+  pPrintPrec l _ (CArray vs) = parens $ commaSep l vs
+  pPrintPrec l p (CLam i c) = maybeParens (p > 2) $ pPrintPrec l 0 i <+> text "=>" <+> pPrintPrec l 0 c
+  pPrintPrec l p (CUnify c1 c2) = maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "=" <+> pPrintPrec l 6 c2
+  pPrintPrec l p (CSeq cs) = maybeParens (p > 0) $ vcat $ punctuate (text ";") $ map (pPrintPrec l 1) cs
+  pPrintPrec l p (CApply (CVar (Ident _ "~")) (CArray [c1, c2])) =
+                  maybeParens (p > 6) $ pPrintPrec l 6 c1 <+> text "~" <+> pPrintPrec l 6 c2
+  pPrintPrec l _ (CApply c1 c2) = pPrintPrec l 10 c1 <> brackets (pPrintPrec l 0 c2)
+  pPrintPrec _ _ CFail = text "fail"
+  pPrintPrec l p (CBar c1 c2) = maybeParens (p > 7) $ pPrintPrec l 7 c1 <+> text "|" <+> pPrintPrec l 7 c2
+  pPrintPrec l _ (CMacro (Ident _ s) e) = text s <> braces (pPrintPrec l 0 e)
+  pPrintPrec l p (CDef is e) =
+    maybeParens (p > 0) $ fsep [text "ex" <+> hsep (map (pPrintPrec l 0) is) <> text ".", pPrintPrec l 0 e]
+  pPrintPrec _ _ (CWrong s) = text $ "wrong(" ++ show s ++ ")"
+  pPrintPrec l _ (CSplit e f g) =
+    text "split" <> braces (sep [pPrintPrec l 0 e <> text ",",
+                                 pPrintPrec l 0 f <> text ",",
+                                 pPrintPrec l 0 g <> text ","])
+  pPrintPrec l p (CIf e1 e2 e3) = maybeParens (p > 0) $ text "if" <+> pPrintPrec l 11 e1 <+> pPrintPrec l 11 e2 <+> pPrintPrec l 11 e3
+  pPrintPrec l p (CStore s e) =
+    maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+
+instance Pretty Store where
+  pPrintPrec l _ (Store m _) = commaSep l (IM.toList m) -- XXX
+
+exprToCore :: Flags -> Expr -> Core
+--exprToCore _ e | trace ("exprToCore: " ++ prettyShow e) False = undefined
+exprToCore _flg = core
+  where core ee =
+          case ee of
+            Variable i -> CVar i
+            LitInt i -> CInt i
+            --LitRat i -> CRat i
+            EPrim p -> CPrim p
+            Array es -> CArray (map core es)
+            Lam i e -> CLam i (core e)
+            Unify e1 e2 -> CUnify (core e1) (core e2)
+            Seq es -> CSeq (map core es)
+            ApplyD e1 e2 -> CApply (core e1) (core e2)
+            Choice e1 e2 -> CBar (core e1) (core e2)
+            Fail -> CFail
+            Macro1 m [] e -> CMacro m (core e)
+            Exists is e -> CDef is (core e)
+            Wrong s -> CWrong s
+            Split e1 e2 e3 -> CSplit (core e1) (core e2) (core e3)
+            If3 e1 e2 e3 -> CIf (core e1) (core e2) (core e3)
+            e -> error $ "exprToCore: " ++ prettyShow e
+
+{-
+module FrontEnd.Core(
+  Core(..),
   Store(..),
   pattern HNF, pattern CValue,
   pattern COne, pattern CAll, pattern CSucceeds, pattern CDecides,
@@ -614,6 +733,7 @@ alphaConvert vs = alpha []
                         | otherwise = fresh $ Ident l (s ++ "'")
 
 -----------------------------------
+-}
 
 -- Parse Core
 pCoreFile :: P Core
@@ -638,7 +758,7 @@ pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
-    lam is e = foldr (\ i r -> TLam i [] (Array []) r Nothing) e is
+    lam is e = foldr Lam e is
     pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
       -- <|> pKeyword "λ"
 
@@ -687,7 +807,7 @@ pAtom = choice [pTuple, pLiteral, pName, pMacro, pArray]
 pName :: P Expr
 pName = do
   i@(Ident l s) <- pIdent
-  let ops = [ ("fail", Fail)
+  let ops = [ ("fail", xFail)
             , ("gt", vi "in'>'")
             , ("lt", vi "in'<'")
             , ("add", vi "in'+'")
@@ -695,6 +815,7 @@ pName = do
             , ("isInt", vi "isInt$")
             ]
       vi = Variable . Ident l
+      xFail = ApplyD (Array []) (LitInt 0)
   pure $ fromMaybe (Variable i) $ lookup s ops
 
 pArray :: P Expr

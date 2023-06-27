@@ -15,13 +15,11 @@ import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
 import qualified FrontEnd.Parse as P
 import VerseRepl.Command
-import FrontEnd.Core
-import FrontEnd.CoreSimp
-import FrontEnd.Eval(replacePrelude)
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
-import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
+import FrontEnd.ParseCore
 import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
+import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
@@ -131,7 +129,7 @@ command = Command
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
-      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
+--      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
@@ -237,8 +235,10 @@ cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
 cSimplify :: Run CState
 cSimplify = cTransform (Desugared . simplify . asExpr)
 
+{-
 cCoreSimplify :: Run CState
 cCoreSimplify c s = cTransform (Cored . simpCore . asCore (flags s)) c s
+-}
 
 cPreprocess :: Run CState
 cPreprocess c s = cTransform (Cored . pre . asCore (flags s)) c s
@@ -258,8 +258,8 @@ cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
       let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-          e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
-      putStrLn $ "Desugared:\n" ++ prettyShow e'
+          e' = anf $ coreToTrs $ asCore flg e
+      --putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify icfpVerifier e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
@@ -271,6 +271,7 @@ cVerify = do
         pp $ snd $ head $ toList trc
       pure ()
 
+{-
 replacePrim :: Core -> Core
 replacePrim = f
   where
@@ -325,7 +326,7 @@ verifyPrelude =
     vx = CVar x
     vy = CVar y
     vz = CVar z
-      
+-}    
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s

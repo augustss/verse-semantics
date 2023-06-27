@@ -1,16 +1,17 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.CoreSimp(simpCore) where
-import Control.Monad.State.Strict
-import Data.List
-import Data.Maybe
+--import Control.Monad.State.Strict
+--import Data.List
+--import Data.Maybe
 import FrontEnd.Core
-import FrontEnd.Eval
+--import FrontEnd.Eval
 --import Debug.Trace
 
 -- Do some Core simplifications to enhance readability.
 simpCore :: Core -> Core
-simpCore =
+simpCore = id
+{-
   simpFail .
   simpSeq . simpAlias .
   simpSeq . simpAlias .
@@ -19,8 +20,8 @@ simpCore =
 
 -- Get rid of values in Seq
 simpSeq :: Core -> Core
-simpSeq = evalSeq flg
-  where flg = EFlags { underLambda = True, traceEval = False, steps = 1000 }
+simpSeq = id {-evalSeq flg
+  where flg = EFlags { underLambda = True, traceEval = False, steps = 1000 }-}
 
 -- This is a version of APP-LAM for inlined 'any'.
 -- I.e., any[e] = e
@@ -41,7 +42,7 @@ simpFail = f
 -- Favor getting rid of temporaries.
 -- This is a version of the BIND rule.
 simpAlias :: Core -> Core
-simpAlias = fc . g
+simpAlias = id {-fc . g
   where
     fc (CDef h e) | Just d <- bind h e = fc d
     fc (CLam x (CDef h e)) | Just d <- lam x h e = fc d
@@ -84,3 +85,5 @@ simpAlias = fc . g
 isTempIdent :: Ident -> Bool
 isTempIdent (Ident _ ('$':_)) = True
 isTempIdent _ = False
+-}
+-}
