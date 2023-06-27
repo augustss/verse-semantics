@@ -2157,7 +2157,7 @@ we believe is equally expressive, and is still confluent:
 $$
 \begin{array}{@@{\hskip0.5em} l  r @@{\;\;}c@@{\;\;} l l@@{}}
   \rulename{subst'} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
-  & \text{if $v \not= |V^[x]|$}, \\
+  & \text{if $|v| \not= |V^[x]|$}, \\
   \rulename{var-swap'} & |y==x; e|    & \movesto & |x==y; e| & \text{(unconditionally)} \\
   \rulename{seq-swap'} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
                       \text{(unconditionally)} \\
