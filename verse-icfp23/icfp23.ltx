@@ -1216,10 +1216,10 @@ suffice to express the necessary sharing.
 
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
-bound further out, perhaps by lambdas.  It can rewrite in two different ways:
-\ranjit{number steps to make clear you read left-to-right?}
+bound further out, perhaps by lambdas.  It can rewrite in two different ways, where
+each column is a reduction sequence starting from the same initial term:
 $$
-\vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
+% \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
   \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
@@ -1232,17 +1232,17 @@ $$
       \movestoR{subst} & |b == a; tup a| \\
 
 \end{array}
-$}
+% $}
 $$
-Each column is a reduction sequence starting from the same common term at the top;
-the two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
-in the first step. As you can see, they conclude with two terms that are ``obviously''
+The two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
+in the first step of each column. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are syntactically confluent.
 Rule \rulename{seq-swap} is needed for a similar reason. Consider
 this example:
 % where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
 $$
+\vbox{\vskip-12pt$$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{\quad|c==a; c==b; c|} \\
   \movestoR{subst} & |c==a; a==b; a| &
@@ -1250,6 +1250,7 @@ $$
   \movestoR{var-swap} & |c==a; b==a; a| &
      \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
+$$}
 $$
 Again, the concluding terms of the two columns are ``obviously'' the same,
 because they differ only in the order of the equations |(b==a)| and |(c==a)|;
@@ -1504,7 +1505,8 @@ in the body is a value $v$, and similarly |allKW|.
 Why ``almost'' all redexes? Because the |oneKW| operator returns the value of its first choice, and abandons all other choices.
 For example |one (1 `choice` apply0 loop)| returns |1|, discarding the infinite |apply0 loop|.
 
-Note that lenience supports \emph{abstraction}.  For example, we can replace an expression |(x==tup(y,3); y>7)| by
+Note that lenience, like laziness, supports \emph{abstraction}.
+For example, we can replace an expression |(x==tup(y,3); y>7)| by
 $$
 |def f (f == (lam (tup (p,q)) (p==tup(q,3); q>7)); applyN f (x,y)|
 $$
@@ -1600,11 +1602,13 @@ Alas, in practice logical completeness is well out of reach.
 For example, consider |def x ((x*x*x + 3*x - 8) = 0)|.
 To solve this would require solving a cubic
 equation, and it is equally easy to express intractable problems like Fermat's last (unproven) theorem.
-So instead we satisfy ourselves with a computable approximation
+Moreover, remembering that \versecalc{} is deterministic, in what order would the (infinite sequence of)
+results of, say, |def x (x+1)| be returned?
+So instead we satisfy ourselves with a computable and deterministic approximation
 to this Platonic ideal, an approximation that is described precisely by our rewrite rules, using unification as the
 mechanism.  Expressions that unification cannot solve, like the one above, are stuck; no
-rewrite rule applies.  All functional logic languages share this sort of incompleteness\footnote{For countable
-domains, like the integers, we could in theory simply try all values of |x| one by one; but that is hardly practical.}.
+rewrite rule applies.  All functional logic languages share this challenge to logical completeness\footnote{For countable
+domains, like the integers, we could theoretically try all values of |x| one by one; but that is hardly practical.}.
 
 The boundary between ``stuck'' and ``soluble'' can be quite subtle.
 Consider this tricky term:
