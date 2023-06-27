@@ -142,14 +142,42 @@ tlamAbs :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlamAbs x ys e1 e2 =
       (Lam $ Bind x $ exis ys (e1 :>: Assume e2))
 
+{-
 
+ex00 / True
+g() := (2 = 2; 2)
+
+ex01 / True
+g(x:int) := x
+
+ex02 / True
+g(x:int):int := x
+
+ex0 / True
+:verify g(x:int, y:int where x = y) := { a := x; b := a; b = y }
+
+ex0' / True
+:verify g(x:int, y:int) := { a := x; b := a; b = y }
+
+ex0 / True (ideally but this hangs!)
+:verify g(x:int, y:int, z:int where x = y) := { a := x; b := a; b = y }
+
+ex0' / False (ideally but this hangs!)
+:verify g(x:int, y:int, z:int where x = z) := { a := x; b := a; b = y }
+
+ex5 /True
+:verify g(x:any):int := { if int[x] then 10 else 20 }
+
+ex5' / False (note: int(x) means call should succeed which, in this case, may not happen!)
+:verify g(x:any):int := { if int(x) then 10 else 20 }
+
+-}
 -------------------------------------------------------------------------------------------
-
 ex00 :: Expr
 ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)
 
 -------------------------------------------------------------------------------------------
-
+-- :verify g(x:int) := x
 ex01 :: Expr
 ex01 = verse $ lam (\x -> Assert x)
 
@@ -218,7 +246,6 @@ ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: I
 {-
 
 f(x:FOO):FOO = 708 - x
-
 FOO(x) = (x = 666 | x = 42); x
 -}
 -- f = \v. exi x. assume{x = FOO(v)}; assert{exi r. r = 708 - x; FOO(r)}

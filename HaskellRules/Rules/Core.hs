@@ -517,7 +517,7 @@ instance Term Expr where
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
-  subst _sub (Assume a) = Assume ({- subst sub -} a)
+  subst sub (Assume a) = Assume (subst sub a)
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify a) = Verify (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
