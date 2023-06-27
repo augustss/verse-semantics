@@ -17,7 +17,6 @@ import qualified FrontEnd.Parse as P
 import VerseRepl.Command
 import FrontEnd.Core
 import FrontEnd.CoreSimp
-import FrontEnd.Eval(replacePrelude)
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
@@ -258,7 +257,7 @@ cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
       let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-          e' = anf $ coreToTrs $ simpCore $ replacePrim $ replacePrelude $ simpCore $ asCore flg e
+          e' = anf $ coreToTrs $ simpCore $ asCore flg e
       putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify icfpVerifier e'
       when (fTraceVerify flg) $ do
@@ -271,6 +270,7 @@ cVerify = do
         pp $ snd $ head $ toList trc
       pure ()
 
+{-
 replacePrim :: Core -> Core
 replacePrim = f
   where
@@ -325,7 +325,7 @@ verifyPrelude =
     vx = CVar x
     vy = CVar y
     vz = CVar z
-      
+-}    
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s

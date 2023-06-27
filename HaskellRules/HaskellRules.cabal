@@ -45,7 +45,6 @@ library all
                       FrontEnd.Core
                       FrontEnd.CoreSimp
                       FrontEnd.Error
-                      FrontEnd.Eval
                       FrontEnd.EvalBlock
                       FrontEnd.Expr
                       FrontEnd.Flags

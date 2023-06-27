@@ -109,6 +109,9 @@ data Expr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)  
   | DomainFail                -- either Wrong or try next overload
+  | EPrim String              -- primop
+  | Lam Ident Expr            -- \ x . e
+  | Split Expr Expr Expr      -- split(e1){e2}{e3}
   deriving (Eq, Ord, Show, Data)
 
 --pattern Range :: Expr -> Expr
@@ -192,7 +195,7 @@ instance Pretty Expr where
           Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1),
                                                    text "do",
                                                      indent $ ppr 0 e2]
-          Do e1 -> maybeParens (p > 0) $ sep [text "do" <+> indent (ppr 0 e1)]
+          Do e1 -> maybeParens (p > 0) $ sep [text "block" <+> indent (ppr 0 e1)]
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
           Case2 e bs ->
@@ -226,6 +229,9 @@ instance Pretty Expr where
           TLam i rs e1 e2 me3 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2) <>
             maybe empty (braces . ppr 0) me3
           DomainFail -> text "DomainFail"
+          EPrim s -> ppNormal (Variable (Ident noLoc s))
+          Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
+          Split e1 e2 e3 -> text "split" <> parens (ppr 0 e1) <> braces (ppr 0 e2) <> braces (ppr 0 e3)
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -337,7 +343,10 @@ compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
 compos f (HasType e1 e2) = HasType <$> f e1 <*> f e2
 compos f (TLam i rs e1 e2 e3) = TLam i rs <$> f e1 <*> f e2 <*> traverse f e3
-compos _ DomainFail = pure DomainFail
+compos _ e@DomainFail = pure e
+compos _ e@EPrim{} = pure e
+compos f (Lam i e) = Lam i <$> f e
+compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
 
 composOp :: (Expr -> Expr) -> Expr -> Expr
 composOp f = runIdentity . compos (pure . f)

@@ -2,7 +2,6 @@ module FrontEnd.Run(
   run, runM,
   Flags(..),
   defaultFlags,
-  evalSystem,
   blockSystem,
   findSystem,
   everySystem,
@@ -11,13 +10,12 @@ import Data.List
 import Epic.Print
 import FrontEnd.Core(Core)
 import FrontEnd.CoreSimp(simpCore)
-import FrontEnd.Eval(eval, replacePrelude, EFlags(..))
 import FrontEnd.EvalBlock(runBlock)
 import FrontEnd.Flags
 --import FrontEnd.RefImpl(evalRI)
-import FrontEnd.TRSAdapter(rewrite, coreToTrs, trsToCore)
+import FrontEnd.TRSAdapter(rewrite)
 import Rules.Systems(TRSystem(..), ESystem, lookupSystemEx, allSystems)
-import Rules.Core(RuleEnv(..), defaultTRSFlags)
+import Rules.Core(defaultTRSFlags)
 --import DenSem.DenSem(denSem)
 --import Debug.Trace
 
@@ -30,7 +28,7 @@ run f s = one . runM f s
 runM :: Flags -> ESystem -> Core -> [Core]
 runM f s e = rewrite f s e'
   where 
-        e' = (if fSimplify f then simpCore else id) . replacePrelude . (if fSimplify f then simpCore else id) $ e
+        e' = if fSimplify f then simpCore e else e
 
 --------------------
 
@@ -39,6 +37,7 @@ runM f s e = rewrite f s e'
 -- so it's easier to reuse that framework.
 -- There are no rewrite rules, instead everything happens in the preprocessing stage.
 
+{-
 evalSystem :: ESystem
 evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
   ruleEnv = defaultTRSFlags,
@@ -48,6 +47,7 @@ evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL
     noRules _ _ = []
     evaluate tflg = coreToTrs . eval flg . trsToCore
       where flg = EFlags { underLambda = tfUnderLambda tflg, traceEval = tfTrace tflg, steps = tfRewriteSteps tflg }
+-}
 
 blockSystem :: ESystem
 blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rules",
@@ -70,7 +70,7 @@ refiSystem = TRSystem { sname = "refimpl", description = "Andy's reference imple
 -}
 
 everySystem :: [ESystem]
-everySystem = allSystems ++ [evalSystem, blockSystem] -- , refiSystem]
+everySystem = allSystems ++ [blockSystem] -- , refiSystem]
 
 findSystem :: String -> Either String ESystem
 findSystem = lookupSystemEx everySystem

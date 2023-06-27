@@ -21,9 +21,15 @@ import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
 
+-- TODO:
+--  reduce variables passed to body in if/for
+--  do beta reduction for inlined primitives
+
 desugar :: Flags -> Expr -> Expr
-desugar flgs = eval (fVerify flgs) .
-            (traceDS "simp"       <=< simp <=<
+--desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
+desugar flgs = eval flgs .
+            (traceDS "lower"      <=< lower    <=<
+             traceDS "simp"       <=< simp     <=<
              traceDS "addScope"   <=< addScope <=<
              traceDS "dsD"        <=< dsD      <=<
              traceDS "addDeref"   <=< addDeref <=<
@@ -45,7 +51,7 @@ type D = State DState
 -- Right now it is used to guide desugaring to avoid an uninstantiated exist
 -- in the function desugaring.
 
-data DState = DState { nextNo :: !Int, context :: !DContext, verifying :: !Bool }
+data DState = DState { nextNo :: !Int, context :: !DContext, dflags :: !Flags }
   deriving (Show)
 data DContext = DAbstract | DEval
   deriving (Show)
@@ -81,8 +87,8 @@ dropParens = f
 
 ---------------------
 
-eval :: Bool -> D Expr -> Expr
-eval v = flip evalState DState{ nextNo = 1, context = DEval, verifying = v }
+eval :: Flags -> D Expr -> Expr
+eval flgs = flip evalState DState{ nextNo = 1, context = DEval, dflags = flgs }
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -117,14 +123,14 @@ dsSmall = ds
     -- Operators
     ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' eFail eFalse
     ds (PrefixOp (Op ":") e) = Range <$> ds e
-    ds (PrefixOp (Ident l op) e) = gets verifying >>= \v -> ds (call v "pre" l op e)
+    ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
     ds (PostfixOp e (Op "?")) = Range <$> ds e
-    ds (PostfixOp e (Ident l op)) = gets verifying >>= \v -> ds (call v "post" l op e)
+    ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
     ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 eFail) eFail    -- XXX binding
     ds (InfixOp e1 (Op "or") e2) = ds $ If2E e1 $ If2E e2 eFail
-    ds (InfixOp e1 (Ident l op) e2) = gets verifying >>= \v -> ds (call v "in" l op (Array [e1, e2]))
+    ds (InfixOp e1 (Ident l op) e2) = ds =<< call "in" l op (Array [e1, e2])
 
     -- Array
     ds (Array es) = arraySplice =<< mapM elm es
@@ -374,9 +380,10 @@ existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
                Exists is e
 
 -- Pick the appropriate form of apply for operators
-call :: Bool -> String -> Loc -> String -> Expr -> Expr
-call ver p l s e = con (Variable (Ident l s')) e
-  where
+call :: String -> Loc -> String -> Expr -> D Expr
+call p l s e = do
+  ver <- gets (fVerify . dflags)
+  let
     -- For verification, use ApplyS.  At runtime, skip the test.
     con | ver && s' `elem` [
                      "pre'+'","pre'-'",
@@ -390,15 +397,16 @@ call ver p l s e = con (Variable (Ident l s')) e
                      "length","in'..'"] = ApplyD
         | otherwise = ApplyS
     s' = p ++ "'" ++ s ++ "'"
+  pure $ con (Variable (Ident l s')) e
 
 ----------------------------------------------
 
 dsScope :: Expr -> Expr
-dsScope = eval False . addScope
+dsScope = eval defaultFlags . addScope
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
- where prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else prelude
+ where prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else preludeIds
 
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
@@ -536,14 +544,8 @@ getVar (HasType e t) = getVar e ++ getVar t
 getVar e = impossible e
 
 -- Definitions that should go in a Prelude
-prelude :: [Ident]
-prelude = map (Ident noLoc)
-  [ "int", "float", "string", "any", "nat", "false", "rational"
-  , "in'->'"
-  , "in'<'", "in'<='", "in'>'", "in'>='"
-  , "in'.='", "new"
-  , "pre'?'", "pre'[]'", "post'^'"
-  ]
+preludeIds :: [Ident]
+preludeIds = map (Ident noLoc . fst) preludeFuncs
 
 -- Primitives
 primOps :: [Ident]
@@ -559,7 +561,6 @@ primOps = map (Ident noLoc)
   , "length"
   , "known$"  -- This is a horrible hack
   , "alloc$", "read$", "write$"
---  , "intGT$", "intGE$", "intLT$", "intLE$"
   , "in'..'"
   , "in'+='", "in'-='", "in'*='", "in'/='"
   , "print$"
@@ -586,7 +587,7 @@ simpUnify = pure . f
 -- XXX assumes no name shadowing
 _simpUnused :: Expr -> D Expr
 _simpUnused e = pure $ removeUnused unused e
-  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e, i `notElem` prelude, i `notElem` primOps ]
+  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e, i `notElem` preludeIds, i `notElem` primOps ]
 
 data Use = Uni | Other deriving (Show)
 
@@ -664,3 +665,390 @@ addDeref = pure . exprD S.empty
 
     applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
 
+---------------------------------
+
+-- Convert Big Core to Core
+lower :: Expr -> D Expr
+lower e@LitInt{} = pure e
+lower e@LitRat{} = pure e
+lower e@(Variable (Ident _ s)) = do
+  mexp <- lowerPrimOp s
+  pure $ fromMaybe e mexp
+lower (Array es) = Array <$> mapM lower es
+lower e@Wrong{} = pure e
+lower (Seq es) = seqE <$> mapM lower es
+lower (ApplyS e1 e2) = lowerSucceeds =<< lower (ApplyD e1 e2)
+lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
+lower (ApplyEff _rs _e) = undefined
+lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
+lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
+lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
+lower (If3 (Exists is e1) e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
+lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
+lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
+lower (Macro1 (Ident _ "succeeds") [] e) = lowerSucceeds =<< lower e
+lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
+lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
+lower (Exists is e) = lExists is <$> lower e
+lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
+lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
+lower e = impossible e
+
+-- Lower a for loop
+lowerFor :: [Ident] -> Expr -> Expr -> D Expr
+lowerFor is e1 e2 = do
+  useSplit <- gets (fSplit . dflags)
+  if useSplit then
+    lowerForSplit is e1 e2
+   else
+    lowerForAll is e1 e2
+
+-- Lower for loop using split
+-- TODO: special case 'for{e}'
+lowerForSplit :: [Ident] -> Expr -> Expr -> D Expr
+lowerForSplit vs e1 e2 = do
+  let l = getLoc e1
+  x <- newIdent l "x"   -- array of free variables
+  y <- newIdent l "y"   -- thunked result
+  h <- newIdent l "h"   -- h = ge, but passed to split to avoid recursion
+  let evs = Array (map Variable vs)
+      e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables
+      be  = Split (eForce (Variable y)) fe (Variable h)
+      fe = eThunk $ Array []
+      ge = Lam x $ Lam y $ Lam h $ lExists vs $ Seq
+             [ Unify (Variable x) evs
+             , ApplyD (EPrim "cons$") (Array [e2, be])
+             ]
+  pure $ Split e1' fe ge
+
+-- Lower for loop using all
+lowerForAll :: [Ident] -> Expr -> Expr -> D Expr
+lowerForAll (i:is) (Unify (Variable i') e) (Variable i'') | i == i' && i == i'' =
+  -- Simple special case: for{e} = all{e}
+  pure $ eAll (lExists is e)
+lowerForAll is e1 e2 = do
+  vv <- newIdent (getLoc e1) "v"
+  let ev = Variable vv
+      ea = eAll $ lExists is $ Seq [e1, eThunk e2]
+  pure $ Exists [vv] $ Seq [Unify ev ea, ApplyD (EPrim "mapAp$") ev]
+
+lowerIf :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIf is e1 e2 e3 = do
+  noLambdaIf <- gets (fNoLambdaIf . dflags)
+  useSplit <- gets (fSplit . dflags)
+  verif <- gets (fVerify . dflags)
+  if verif then
+    lowerIfVerify is e1 e2 e3
+   else if noLambdaIf then
+    lowerIfNoLambda is e1 e2 e3
+   else if useSplit then
+    lowerIfSplit is e1 e2 e3
+   else
+    lowerIfOne is e1 e2 e3
+
+lowerIfVerify :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfVerify is e1 e2 e3 = pure $ If3 (Exists is e1) e2 e3
+
+lowerIfNoLambda :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfNoLambda vs e1 e2 e3 = do
+  y <- newIdent (getLoc e1) "y"
+  let vy = Variable y
+      evs = Array $ map Variable vs
+  pure $ Exists [y] $ Seq
+           [ Unify vy (eOne $ lExists vs (Seq [e1, evs])
+                              `Choice`
+                              LitInt 0)
+           , lExists vs (Seq [Unify vy evs, e2])
+             `Choice`
+             Seq [Unify vy (LitInt 0), e3]
+           ]
+
+-- TODO: special case 'if{}'
+lowerIfSplit :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfSplit vs e1 e2 e3 = do
+  x <- newIdent (getLoc e1) "x"
+  let evs = Array (map Variable vs)
+      e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables      
+      fe = eThunk e3
+      ge = Lam x $ Lam underscore $ Lam underscore $ lExists vs $ Seq
+             [ Unify (Variable x) evs
+             , e2
+             ]
+  pure $ Split e1' fe ge
+
+lowerIfOne :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfOne is e1 e2 e3 = do
+  let e1e2 = lExists is $ Seq [e1, eThunk e2]
+  pure $ eForce $ eOne $ Choice e1e2 (eThunk e3)
+
+lowerTLam :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
+lowerTLam i rs is e1 e2 me3 = do
+  verif <- gets (fVerify . dflags)
+  if verif then
+    lowerTLamVerify i rs is e1 e2 me3
+   else
+    lowerTLamRun i rs is e1 e2 me3
+
+-- XXX what about _rs
+lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
+lowerTLamVerify i _rs is e1 e2 me3 = do
+  (e2', e2'') <-
+    case me3 of
+      Nothing -> pure (e2, e2)
+      Just t -> do
+        x <- newIdent (getLoc t) "x"
+        pure (e2, Exists [x] $ ApplyD t (Variable x))
+  pure $ Seq
+    [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eAssert e2']
+    ,           Lam i $ lExists is $ Seq [        e1, eAssume e2'']
+    ]
+
+-- XXX use all of rs
+lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
+lowerTLamRun i rs is e1 e2 me3 = do
+  e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
+  let covariant = covariantId `elem` rs  || True -- XXX
+  if null is && e1 == Array [] then
+    pure $ Lam i e2'   -- Simple special case
+   else
+    if covariant then
+      pure $ Lam i $ lExists is (seqE [e1, e2])
+    else
+      Lam i <$> lowerIf is e1 e2 DomainFail
+
+lowerHasType :: Expr -> Expr -> D Expr
+lowerHasType e t = do
+  verif <- gets (fVerify . dflags)
+  if verif then
+    lowerHasTypeVerify e t
+   else
+    lowerSucceeds (ApplyD t e)
+
+lowerHasTypeVerify :: Expr -> Expr -> D Expr
+lowerHasTypeVerify e t = do
+  x <- newIdent (getLoc t) "x"
+  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, Exists [x] $ ApplyD t (Variable x) ]
+
+lowerAll :: Expr -> D Expr
+lowerAll e = do
+  useSplit <- gets (fSplit . dflags)
+  if useSplit then
+    lowerAllSplit e
+   else
+    pure $ eAll e
+
+lowerAllSplit :: Expr -> D Expr
+lowerAllSplit e = do
+  let l = getLoc e
+  x <- newIdent l "x"   -- array of free variables
+  y <- newIdent l "y"   -- thunked result
+  h <- newIdent l "h"   -- h = ge, but passed to split to avoid recursion
+  let xs = Split (eForce $ Variable y) fe (Variable h)
+      fe = eThunk $ Array []
+      ge = Lam x $ Lam y $ Lam h $
+             ApplyD (EPrim "cons$") (Array [Variable x, xs])
+  pure $ Split e fe ge
+
+lowerOne :: Expr -> D Expr
+lowerOne e = do
+  useSplit <- gets (fSplit . dflags)
+  if useSplit then
+    lowerOneSplit e
+   else
+    pure $ eOne e
+
+lowerOneSplit :: Expr -> D Expr
+lowerOneSplit e = do
+  v <- newIdent (getLoc e) "v"
+  pure $ Split e (eThunk Fail) (Lam v $ Lam underscore $ Lam underscore $ Variable v)
+
+lowerSucceeds :: Expr -> D Expr
+lowerSucceeds e = do
+  useSplit <- gets (fSplit . dflags)
+  verif <- gets (fVerify . dflags)
+  if verif then
+    pure $ eAssert e
+   else if useSplit then
+    lowerSucceedsSplit e
+   else
+    pure $ Macro1 (Ident noLoc "succeeds") [] e
+
+lowerSucceedsSplit :: Expr -> D Expr
+lowerSucceedsSplit e = do
+  let l = getLoc e
+  x <- newIdent l "x"   -- array of free variables
+  y <- newIdent l "y"   -- thunked result
+  pure $ Split e
+               (eThunk $ Wrong "succeeds-fail") $
+               Lam x $ Lam y $ Lam underscore $
+                   Split (eForce (Variable y))
+                         (eThunk (Variable x))
+                         (Lam underscore $ Lam underscore $ Lam underscore $ Wrong "succeed-many")
+
+lowerDecides :: Expr -> D Expr
+lowerDecides e = do
+  useSplit <- gets (fSplit . dflags)
+  verif <- gets (fVerify . dflags)
+  if verif then
+    unimplemented "verify-decides"
+   else if useSplit then
+    lowerDecidesSplit e
+   else
+    pure $ Macro1 (Ident noLoc "succeeds") [] e
+
+lowerDecidesSplit :: Expr -> D Expr
+lowerDecidesSplit e = do
+  let l = getLoc e
+  x <- newIdent l "x"   -- array of free variables
+  y <- newIdent l "y"   -- thunked result
+  pure $ Split e
+               (eThunk Fail) $
+               Lam x $ Lam y $ Lam underscore $
+                   Split (eForce (Variable y))
+                         (eThunk (Variable x))
+                         (Lam underscore $ Lam underscore $ Lam underscore $ Wrong "decides-many")
+
+lowerAssume :: Expr -> D Expr
+lowerAssume e = pure $ eAssume e
+
+-- Some "primops" will be expanded into code.
+-- This should really be part of the prelude.
+-- For verification, we need a different expansion.
+lowerPrimOp :: String -> D (Maybe Expr)
+lowerPrimOp s = do
+  verif <- gets (fVerify . dflags)
+  if verif then
+    lowerPrimOpVerif s
+   else
+    lowerPrimOpRun s
+
+lowerPrimOpVerif :: String -> D (Maybe Expr)
+lowerPrimOpVerif s = do
+  me <- lowerPrimOpRun s
+  case me of
+    Just (EPrim p) | Just ises <- lookup p verifyPrelude -> pure $ Just $ toLam ises
+    r -> pure r
+ where
+    arg = Ident noLoc "arg"
+    toLam (   [a],   es) = Lam a   $ Seq es
+    toLam (as@[_,_], es) = Lam arg $ lExists as $ Seq $ Unify (Array $ map Variable as) (Variable arg) : es
+    toLam _ = undefined  -- shouldn't happen
+
+lowerPrimOpRun :: String -> D (Maybe Expr)
+lowerPrimOpRun s =
+  case lookup s preludeFuncs of
+    r@Just{} -> pure r
+    Nothing  ->
+      if Ident noLoc s `elem` primOps then
+        pure $ Just $ EPrim s
+      else
+        pure $ Nothing
+
+preludeFuncs :: [(String, Expr)]
+preludeFuncs =
+  [("any", typ [])                                             -- x => x
+  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (LitInt 0)]) -- x => int#[x]; x>=0; x
+  ,("int", typ [app "isInt$" vx])                              -- x => int#[x]; x
+  ,("in'->'", arrowV)
+  ,("false", Array [])                                      -- ()
+  ,("new", newV)
+  ,("post'^'", EPrim "read$")
+  ,("in'.='", EPrim "write$")
+  ]
+  where typ es = Lam x $ seqE $ es ++ [Variable x]
+        vx = Variable x
+        app f v = ApplyD (EPrim f) v
+        app2 f v1 v2 = ApplyD (EPrim f) (Array [v1, v2])
+
+        arrowV =
+          Lam st $
+            Exists [s, t] $
+            Seq [
+              Unify (Array [Variable s, Variable t]) (Variable st),
+              Lam g $ Lam y $
+                Exists [sy, gsy] $
+                Seq [
+                  app "isFcn$" (Variable g),
+                  Unify (Variable  sy) (ApplyD (Variable s) (Variable y)),
+                  Unify (Variable gsy) (ApplyD (Variable g) (Variable sy)),
+                  ApplyD (Variable t) (Variable gsy)
+                  ]
+              ]
+        [st, s, t, g, y, sy, gsy, x, _xy] =
+           map (Ident noLoc . ("$$" ++)) ["st","s","t","g","y","sy","gsy","x", "xy"]
+
+        newV =
+          Lam t $ Lam x $
+            Exists [y] $
+            Seq [
+              Unify (Variable y) (ApplyD (Variable t) (Variable x)),
+              app "alloc$" (Variable y)
+              ]
+
+verifyPrelude :: [(String, ([Ident], [Expr]))]
+verifyPrelude =
+  [ arithBinOpInt  "in'+'"
+  , arithBinOpInt  "in'-'"
+  , arithBinOpInt  "in'*'"
+  , arithBinOpIntC "in'/'" yNe0
+  , arithUnOpInt   "pre'-'"
+  , arithUnOpInt   "pre'+'"
+  , cmpBinOpInt    "in'<'"
+  , cmpBinOpInt    "in'<='"
+  , cmpBinOpInt    "in'>'"
+  , cmpBinOpInt    "in'>='"
+  , cmpBinOpInt    "in'<>'"
+  ]
+  where
+    arithBinOpInt  p = (p, arithBinOpInt' [] p)
+    arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
+    arithBinOpInt' c p = ([x, y],
+      [ cInt vx, cInt vy] ++ c ++
+      [ eAssume $ Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) (Array [vx, vy])), cInt vz, vz] ])
+
+    cmpBinOpInt  p = (p, cmpBinOpInt' p)
+    cmpBinOpInt' p = ([x, y], 
+      [ cInt vx, cInt vy, ApplyD (EPrim p) (Array [vx, vy]), eAssume (Seq [cInt vx, vx]) ])
+
+    yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, LitInt 0])
+
+    arithUnOpInt p =
+      (p, ([x], [ cInt vx, eAssume (Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) vx), cInt vz, vz]) ]))
+
+    cInt e = ApplyD (EPrim "isInt$") e
+    x = Ident noLoc "$$x"
+    y = Ident noLoc "$$y"
+    z = Ident noLoc "$$z"
+    vx = Variable x
+    vy = Variable y
+    vz = Variable z
+
+-- After lowering there are no funny scopes, so empty existential
+-- are no longer necessary.
+lExists :: [Ident] -> Expr -> Expr
+lExists [] e = e
+lExists is e = Exists is e
+
+underscore :: Ident
+underscore = Ident noLoc "_"
+
+eThunk :: Expr -> Expr
+eThunk = Lam (Ident noLoc "_")
+
+eForce :: Expr -> Expr
+eForce e = ApplyD e (Array [])
+
+eAll :: Expr -> Expr
+eAll = Macro1 (Ident noLoc "all") []
+
+eOne :: Expr -> Expr
+eOne = Macro1 (Ident noLoc "one") []
+
+eAssert :: Expr -> Expr
+eAssert = Macro1 (Ident noLoc "assert") []
+
+eAssume :: Expr -> Expr
+eAssume = Macro1 (Ident noLoc "assume") []
+
+eVerify :: Expr -> Expr
+eVerify = Macro1 (Ident noLoc "verify") []

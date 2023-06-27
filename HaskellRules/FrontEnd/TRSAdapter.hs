@@ -10,11 +10,11 @@ import qualified Rules.Core as T
 import Rules.Equiv(normalForm)
 import Rules.Systems(ESystem)
 import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
-import TRS.System(preProcess, postProcess, ruleEnv, sname)
+import TRS.System(preProcess, postProcess, ruleEnv)
 import TRS.Traced(Traced, term, toList)
 import FrontEnd.Core
 import FrontEnd.Error
-import FrontEnd.Eval
+--import FrontEnd.Eval
 import FrontEnd.Flags
 import GHC.Stack
 
@@ -26,12 +26,14 @@ asTRS f = trsToCore . f . coreToTrs
 
 -- XXX use graph normal form when needed
 
+{-
 evaluate :: T.RuleEnv T.Expr -> Core -> [Core]
 evaluate tflg e = [eval flg e]
   where flg = EFlags { underLambda = T.tfUnderLambda tflg, traceEval = T.tfTrace tflg, steps = T.tfRewriteSteps tflg }
+-}
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg asys | sname sys == "eval" = evaluate (ruleEnv sys)
+rewrite flg asys --x | sname sys == "eval" = evaluate (ruleEnv sys)
                  | otherwise = force . map (trsToCore . sub flg sys . rtrace)
                 . map toList
                 . nrToList
