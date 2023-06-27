@@ -27,6 +27,9 @@
 \newcommand{\etc}{\emph{etc.}\xspace}
 \newcommand{\etal}{\emph{et al.}\xspace}
 \newcommand{\vs}{\emph{vs.}\xspace}
+\newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
+\newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
+
 
 \RequirePackage[utf8]{inputenc}
 
@@ -475,7 +478,7 @@ Like any functional logic language,
   and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
   On the other hand, it pretty much rules out \emph{laziness} (\cref{sec:laziness})
   and parallel first-come first-returned search strategies.
-
+  %
   Most other functional-logic languages (Curry is the brand leader~\cite{hanus:curry-report})
   are non-deterministic by design; \versecalc{}
   explores a different (and less well-examined) part of the design space.
@@ -502,6 +505,7 @@ rather than, as is more typical, ``laid out in time'' (via non-deterministic rew
 As an example of rewriting in action, the expression above can be rewritten
 as follows\footnote{The rule names after each arrow come from \cref{fig:rules}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
+% ORIGINAL
 % $$
 % \begin{array}{ll@@{\quad}ll}
 % \multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
@@ -514,16 +518,31 @@ as follows\footnote{The rule names after each arrow come from \cref{fig:rules}, 
 % \movestoR{eqn-elim}      & |2| \\
 % \end{array}
 % $$
-\begin{quote}
-|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \unskip\quad
-$\movestoR{subst}$         \unskip\quad |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \unskip\quad \par\quad
-$\movestoR{eqn-elim}$      \unskip\quad |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \unskip\quad
-$\movestoR{u-tup}$         \unskip\quad |def (y ^^ z) (2==y; z==3; y)| \unskip\quad \par\quad
-$\movestoR{eqn-elim}$      \unskip\quad |def y (2==y; y)| \unskip\quad 
-$\movestoR{hnf-swap}$      \unskip\quad |def y (y==2; y)| \unskip\quad \par\quad
-$\movestoR{subst}$         \unskip\quad |def y (y==2; 2)| \unskip\quad
-$\movestoR{eqn-elim}$      \unskip\quad |2| 
-\end{quote}
+% Ranjit version
+$$
+\begin{array}{ll@@{\quad}ll}
+% \multicolumn{2}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} &
+                         & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| &
+\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
+\movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| &
+\movestoR{u-tup}         & |def (y ^^ z) (2==y; z==3; y)| \\
+\movestoR{eqn-elim}      & |def y (2==y; y)| &
+\movestoR{hnf-swap}      & |def y (y==2; y)| \\
+\movestoR{subst}         & |def y (y==2; 2)| &
+\movestoR{eqn-elim}      & |2| \\
+\end{array}
+$$
+% Guy's Version
+% \begin{quote}
+% |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \unskip\quad
+% $\movestoR{subst}$         \unskip\quad |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \unskip\quad \par\quad
+% $\movestoR{eqn-elim}$      \unskip\quad |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \unskip\quad
+% $\movestoR{u-tup}$         \unskip\quad |def (y ^^ z) (2==y; z==3; y)| \unskip\quad \par\quad
+% $\movestoR{eqn-elim}$      \unskip\quad |def y (2==y; y)| \unskip\quad
+% $\movestoR{hnf-swap}$      \unskip\quad |def y (y==2; y)| \unskip\quad \par\quad
+% $\movestoR{subst}$         \unskip\quad |def y (y==2; 2)| \unskip\quad
+% $\movestoR{eqn-elim}$      \unskip\quad |2|
+% \end{quote}
 %
 Rules may be applied anywhere they match, again just like the lambda calculus.
 This freedom only makes sense, however, if each term ultimately reduces to a unique value,
@@ -535,7 +554,7 @@ As always with a calculus, the idea is that \versecalc{} distills the essence of
 Each construct does just one thing, and \versecalc{} cannot be made smaller without losing key features.
 % We believe that it is possible to use \versecalc{} as the compilation target for a variety of
 % functional logic languages such as Curry~\cite{hanus:curry-report}.
-We are ourselves working on Verse, a new general purpose programming language, built directly on \versecalc{}; indeed,
+We are working on Verse, a new general purpose programming language, built directly on \versecalc{}; indeed,
 our motivation for developing \versecalc{} is practical rather than theoretical.
 No single aspect of \versecalc{} is unique, but we believe that their combination
 is particularly harmonious and orthogonal.
@@ -1269,8 +1288,8 @@ The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
 This rule uses context~|X| (\cref{fig:contexts}), and
 uses the notation |subst e x v| to mean ``capture-avoiding substitution of~|v| for~|x| in~|e|''
-%(and similarly |subst X x v|, but |X| will have no bindings to be avoided).  
-(and similarly |subst X x v| to mean ``capture-avoiding substitution of~|v| for~|x| in~|X|'').  
+%(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
+(and similarly |subst X x v| to mean ``capture-avoiding substitution of~|v| for~|x| in~|X|'').
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
@@ -1782,9 +1801,6 @@ QuickCheck turned out to be invaluable at finding counterexamples to
 otherwise reasonable-looking rules;
 it has run on the order of 100~million tests on the current rule set.
 
-\newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
-\newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
-
 
 \section{Metatheory} \label{sec:metatheory}
 
@@ -2031,7 +2047,7 @@ normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
 % $$
 % Here, each step makes one substitution for |x|.
 % An exactly analogous example can be made for a lambda value.
-% 
+%
 % Similarly, as we discussed in \cref{sec:unification-rules},
 % rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
 % to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
