@@ -715,7 +715,8 @@ In \versecalc{}, \emph{there is just one equality operator}, written ``='' just 
 the |if| returns |e_2|; otherwise it returns |e_3|.  There are no data constructors |True| and |False|; instead
 failure (returning zero values) plays the role of falsity.
 
-But something is terribly wrong here.  Consider |def (x ^^ y) (y == (if (x==0) then 3 else 4); x==7)|.  Presumably this is meant
+But something is terribly wrong here.  Consider |def (x ^^ y) (y == (if (x==0) then 3 else 4); x==7;y)|.
+Presumably this is meant
 to set |x| to |7|, test whether it is equal to |0| (it is not), and unify |y| with 4.
 But what is to stop us instead unifying |x| with |0| (via |(x==0)|), unifying |y| with |3|, and then
 failing when we try to unify |x| with |7|?  Not only is that not what we intended, but it also looks very
@@ -1075,6 +1076,7 @@ has the following properties:
 
 \lennart{We should have a paragraph saying that all the rewrite rules are rewrites of expressions.
   And that some of the rules (\rulename{subst}, \rulename{*-swap}, \rulename{u-*}) could be simpler if we also allowed rewrites of equations.}
+\simon{Hmm.  I'm not sure it's worth saying anything.}
 
 \figureRewriteRules
 \figureContexts
@@ -1187,7 +1189,7 @@ The key rule is:
 $$
 \begin{array}{rrcll}
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
+    & \text{if $|x| \in \freevars{|X,e|}$} \\
   % &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
 \end{array}
 $$
@@ -1448,7 +1450,7 @@ languages like Curry \cite{antoy:pull-tabbing}.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{The Verse calculus is lenient} \label{sec:lenient}
+\subsection{The Verse calculus is lenient} \label{sec:lenient}  \label{sec:laziness}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1604,7 +1606,7 @@ logical variables exists that satisfies the equations, we will find it: this is 
 Alas, in practice logical completeness is well out of reach.
 For example, consider |def x ((x*x*x + 3*x - 8) = 0)|.
 To solve this would require solving a cubic
-equation, and it is equally easy to express intractable problems like Fermat's last (unproven) theorem.
+equation, and it is equally easy to express intractable problems like Fermat's last theorem.
 Moreover, remembering that \versecalc{} is deterministic, in what order would the (infinite sequence of)
 results of, say, |def x (x+1)| be returned?
 So instead we satisfy ourselves with a computable and deterministic approximation
@@ -1939,26 +1941,29 @@ normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
 % the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
 % application or unification.  These restrictions matter for at least three different reasons.
 
-\mypara{Ensuring that unification terminates.}
-%
-Our proof strategy for the confluence of the unification rules requires that they terminate.
-%
-The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
-substitution.
-If instead we dropped that condition, the following sequence of \rulename{subst}
-reductions would not terminate:
-$$
-|def x (x == tup (1,x); x)|
-\; \rightarrow \; |def x (x == tup (1,x); tup (1,x))|
-\; \rightarrow \; |def x (x == tup (1,x); tup (1,tup (1,x)))|
-\; \rightarrow \; \cdots
-$$
-Here, each step makes one substitution for |x|.
-An exactly analogous example can be made for a lambda value.
-
-Similarly, as we discussed in \cref{sec:unification-rules},
-rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
-to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
+% \mypara{Ensuring that unification terminates.}
+% %
+% \simon{I think we could drop this entire para.  We have already discussed termination
+%   of unification in 3.3, and just above under ``the unification problem''.  Talking about it
+%   again here is not helpful.}
+% Our proof strategy for the confluence of the unification rules requires that they terminate.
+% %
+% The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
+% substitution. \lennart{But the side condition is no longer there!}
+% If instead we dropped that condition, the following sequence of \rulename{subst}
+% reductions would not terminate:
+% $$
+% |def x (x == tup (1,x); x)|
+% \; \rightarrow \; |def x (x == tup (1,x); tup (1,x))|
+% \; \rightarrow \; |def x (x == tup (1,x); tup (1,tup (1,x)))|
+% \; \rightarrow \; \cdots
+% $$
+% Here, each step makes one substitution for |x|.
+% An exactly analogous example can be made for a lambda value.
+% 
+% Similarly, as we discussed in \cref{sec:unification-rules},
+% rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
+% to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
 
 \mypara{Unifying lambdas.} In \versecalc{}, an attempt to unify two
 lambdas fails even if the lambdas are semantically identical (rule
