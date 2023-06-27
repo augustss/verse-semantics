@@ -16,6 +16,7 @@ common shared-properties
                       mtl,
                       pretty,
 
+
 -- Various utilities.
 -- Should really have its own cabal project
 library all
@@ -61,6 +62,7 @@ library all
                       Rules.POPL
                       Rules.KoenNaive
                       Rules.Block
+
     build-depends:
                       parser-combinators,
 --                      lens,
