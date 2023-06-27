@@ -402,7 +402,7 @@ call p l s e = do
 ----------------------------------------------
 
 dsScope :: Expr -> Expr
-dsScope = eval defaultFlags . addScope
+dsScope = eval defaultFlags . (lower <=< addScope)
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -471,6 +471,7 @@ scope sc = expr
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2 <*> traverse expr me3
     expr (Exists _ e) = expr e
+    expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -513,6 +514,7 @@ getVisible Function{} = []
 getVisible (Exists is e) = is ++ getVisible e
 getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible TLam{} = []
+getVisible Lam{} = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -541,6 +543,7 @@ getVar Function{} = []
 getVar TLam{} = []
 getVar (Exists _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
+getVar Lam{} = []
 getVar e = impossible e
 
 -- Definitions that should go in a Prelude
@@ -692,6 +695,7 @@ lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
 lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
+lower (Lam i e) = Lam i <$> lower e
 lower e = impossible e
 
 -- Lower a for loop

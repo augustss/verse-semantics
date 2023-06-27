@@ -44,6 +44,7 @@ instance Pretty Loc where
 data Ident = Ident Loc String
   deriving ({-Eq, Ord, Show,-} Data)
 
+-- Ignore location for comparison
 instance Eq Ident where x == y  =  compare x y == EQ
 instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 

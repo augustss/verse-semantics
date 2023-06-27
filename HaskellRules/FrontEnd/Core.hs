@@ -758,7 +758,7 @@ pLam :: P Expr
 pLam = lam <$> (pLambda *> some pIdent <* pOp ".") <*> pSeq
   where
     lam :: [Ident] -> Expr -> Expr
-    lam is e = foldr (\ i r -> TLam i [] (Array []) r Nothing) e is
+    lam is e = foldr Lam e is
     pLambda = pKeyword "lam" <|> pKeyword "lambda" <|> void (pOp "\\")
       -- <|> pKeyword "λ"
 
@@ -807,7 +807,7 @@ pAtom = choice [pTuple, pLiteral, pName, pMacro, pArray]
 pName :: P Expr
 pName = do
   i@(Ident l s) <- pIdent
-  let ops = [ ("fail", Fail)
+  let ops = [ ("fail", xFail)
             , ("gt", vi "in'>'")
             , ("lt", vi "in'<'")
             , ("add", vi "in'+'")
@@ -815,6 +815,7 @@ pName = do
             , ("isInt", vi "isInt$")
             ]
       vi = Variable . Ident l
+      xFail = ApplyD (Array []) (LitInt 0)
   pure $ fromMaybe (Variable i) $ lookup s ops
 
 pArray :: P Expr
