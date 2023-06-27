@@ -1183,16 +1183,16 @@ of logical variables are propagated.
 The key rule is:
 $$
 \begin{array}{rrcll}
-  \rulename{subst} & |S^[x==v;e]| & \movesto & |(subst S x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$} \\
-  &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
+  % &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
-This rule uses context~|S| (\cref{fig:contexts}), and
+This rule uses context~|X| (\cref{fig:contexts}), and
 uses the notation |subst e x v| to mean ``capture-avoiding substitution of |v| for |x| in~|e|''
-(and similarly |subst S x v|, but |S| will have no bindings to be avoided).
+(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
@@ -1202,14 +1202,14 @@ restriction is precisely the same as the \rulename{let-v} rule of \citet{ariola:
 and, by not duplicating choices, it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
-\item \rulename{subst} replaces all occurrences of |x| in |S| and |e|, but
-  \emph{it leaves the original |(x==v)| undisturbed}, because |S| might not be
+\item \rulename{subst} replaces all occurrences of |x| in |X| and |e|, but
+  \emph{it leaves the original |(x==v)| undisturbed}, because |X| might not be
   big enough to encompass all occurrences of |x|.
   For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
-  |S == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
+  |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
-\item The side condition $v \not= |V^x[]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
+\item The side condition $|v| \not= |V^[x]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
 \end{itemize}
 
 \subsection{Swapping and binding order} \label{sec:swapping}
@@ -1217,6 +1217,7 @@ suffice to express the necessary sharing.
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
 bound further out, perhaps by lambdas.  It can rewrite in two different ways:
+\ranjit{number steps to make clear you read left-to-right?}
 $$
 \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
@@ -1260,7 +1261,8 @@ our intuition that order of equations |(x=v)| does not matter.
 % \lennart{We also don't need \rulename{exi-swap} if we a stronger \rulename{eqn-elim}.}
 
 Next we study the mysterious $x \prec y$ side condition in \rulename{var-swap},
-and similar ones in \rulename{subst} and \rulename{seq-swap}.
+and similar ones in % \rulename{subst}
+and \rulename{seq-swap}.
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).
@@ -1609,7 +1611,7 @@ Consider this tricky term:
 |def x (x = if (x==0; x>1) then 33 else 55; x)|.
 At first you might think it was stuck---how can we simplify the |if|
 when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
-us to substitute \emph{locally} in any |S|-context surrounding the equation |(x==0)|
+us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
 thus:\footnote{
   Here and elsewhere we rewrite terms that have not
   been fully desugared, but that is just an expository aid;
@@ -2395,7 +2397,7 @@ at the heart of the ``logic'' part of functional logic programming.
 Constructor-based ReWrite Logic (CRWL) \cite{crwl} is the brand leader for
 high-level semantics for non-strict, non-deterministic functional logic languages.
 %
-CRLW is a ``big-step'' rewrite semantics that rewrites a term to a value in a single
+CRWL is a ``big-step'' rewrite semantics that rewrites a term to a value in a single
 step.
 %
 \Citet{fraguas:rewriting} make a powerful case for instead giving the semantics
@@ -2452,6 +2454,24 @@ account of logical variables and choice, directly as small-step
 rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
+
+The Escher language \cite{Escher} extends a Haskell-like functional base with
+logical (existentially quantified) variables and constraints to yield an integration
+of functional and logical constructs, and informally describes a rewriting based
+evaluation mechanism. However, the language does not have the equivalent
+of |one| and |all| which reify choice as data, the rules are not precisely
+formalized and no confluence result is established for them.
+
+Goffin \cite{Goffin} also presents a way to extend a higher-order functional
+language with existentially quantified logical variables. However, Goffin is
+rather different from \versecalc{} in that it falls in the tradition of
+Concurrent Constraint Programming \cite{Saraswat90} where the constraints
+over logical variables are used to declare data dependencies as a means to
+co-ordinate efficient concurrent execution of sub-computations, rather
+than in logic programming (and \versecalc) where we seek to declare the properties
+of solutions. Consequently, in Goffin, the logical variables are never ``unified''
+but instead are ``updated'' as values are computed in parallel yielding a completely
+different model of computation.
 
 \subsection{Flat {\vs} higher order}
 
