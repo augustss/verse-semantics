@@ -1094,12 +1094,19 @@ has the following properties:
 
 \subsection{Functions and function application rules} \label{sec:beta}
 
-Looking at \cref{fig:rules}, rule \rulename{app-add}
+Looking at \cref{fig:rules}, the rule for a primitive operator like addition, \rulename{app-add},
 should be familiar: it simply rewrites an application of |add| to integer
 constants.  For example $|applyN add (3,4)| \movesto |7|$.  Rules \rulename{app-gt} and
-\rulename{app-gt-fail} are more interesting: |applyN gt (k_1,k_2)| fails if $k_1 \leq k_2$ (rather than returning |False| as is more conventional), and returns |k_1| otherwise (rather than returning |True|).
+\rulename{app-gt-fail} are more interesting: |applyN gt (k_1,k_2)| fails if $k_1 \leq k_2$
+(rather than returning |False| as is more conventional), and returns |k_1| otherwise (rather than returning |True|).
 An amusing consequence is that |(10 > x > 0)| succeeds
 iff |x| is between |10| and |0| (comparison is right-associative).
+
+An application of a primitive operator can only rewrite when its
+arguments are ground values; an application like |applyN gt (x,3)| or |applyN add (7,x)| is \emph{stuck} awaiting a value for |x|,
+which may arrive later, by substitution (\Cref{sec:unification-rules}).
+However equality, written |v=e|, is special: it is a language construct, not a primitive operator, and enjoys
+a rich set of rules of built-in rules (\Cref{sec:unification-rules}).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -1130,7 +1137,7 @@ tuples, while \rulename{app-tup-0} deals with empty tuples.
 Notice that \rulename{app-tup} does not require the argument to be evaluated to an integer $k$; instead
 the rule works by narrowing.  So the expression |def x (apply1 (tup(2,3,2,7,9)) x == 2; x)|
 does not suspend awaiting a value for |x|; instead it explores all the
-alternatives, returning |(0 choice 2)|.  This is a free design decision:
+alternatives (a form of narrowing), returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
 
 \subsection{Unification rules} \label{sec:unification-rules}
@@ -1176,16 +1183,16 @@ of logical variables are propagated.
 The key rule is:
 $$
 \begin{array}{rrcll}
-  \rulename{subst} & |S^[x==v;e]| & \movesto & |(subst S x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|S,e|}$, $|x| \notin \freevars{|v|}$} \\
-  &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
+  \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
+    & \text{if $|x| \in \freevars{|X,e|}$, $|x| \notin \freevars{|v|}$} \\
+  % &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
-This rule uses context~|S| (\cref{fig:contexts}), and
+This rule uses context~|X| (\cref{fig:contexts}), and
 uses the notation |subst e x v| to mean ``capture-avoiding substitution of |v| for |x| in~|e|''
-(and similarly |subst S x v|, but |S| will have no bindings to be avoided).
+(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
@@ -1195,26 +1202,24 @@ restriction is precisely the same as the \rulename{let-v} rule of \citet{ariola:
 and, by not duplicating choices, it neatly implements so-called \emph{call-time choice}~\cite{hanus:survey}.
 We do not need a heap, or thunks, or updates; the equalities of the program elegantly
 suffice to express the necessary sharing.
-\item \rulename{subst} replaces all occurrences of |x| in |S| and |e|, but
-  \emph{it leaves the original |(x==v)| undisturbed}, because |S| might not be
+\item \rulename{subst} replaces all occurrences of |x| in |X| and |e|, but
+  \emph{it leaves the original |(x==v)| undisturbed}, because |X| might not be
   big enough to encompass all occurrences of |x|.
   For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
-  |S == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
+  |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x| we may eliminate
   the binding: see \cref{sec:gc}.
-\item The side condition $x \not\in \freevars{|v|}$ in \rulename{subst} prevents infinite substitution,
-  while $x \in \freevars{S,e}$ ensures that there is at least one occurrence to substitute.
-
-\item The other side condition, involving $|x| \prec |y|$, is explained next, in \Cref{sec:swapping}.
+\item The side condition $|v| \not= |V^[x]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
 \end{itemize}
 
 \subsection{Swapping and binding order} \label{sec:swapping}
 
 Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
 Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
-bound further out, perhaps by lambdas.  It can rewrite in two different ways:
+bound further out, perhaps by lambdas.  It can rewrite in two different ways, where
+each column is a reduction sequence starting from the same initial term:
 $$
-\vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
+% \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
   \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
@@ -1227,17 +1232,17 @@ $$
       \movestoR{subst} & |b == a; tup a| \\
 
 \end{array}
-$}
+% $}
 $$
-Each column is a reduction sequence starting from the same common term at the top;
-the two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
-in the first step. As you can see, they conclude with two terms that are ``obviously''
+The two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
+in the first step of each column. As you can see, they conclude with two terms that are ``obviously''
 the same, but which are syntactically different.  Rule \rulename{var-swap} allows
 them to be brought together, so that the unification rules are syntactically confluent.
 Rule \rulename{seq-swap} is needed for a similar reason. Consider
 this example:
 % where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
 $$
+\vbox{\vskip-12pt$$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{\quad|c==a; c==b; c|} \\
   \movestoR{subst} & |c==a; a==b; a| &
@@ -1245,6 +1250,7 @@ $$
   \movestoR{var-swap} & |c==a; b==a; a| &
      \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
+$$}
 $$
 Again, the concluding terms of the two columns are ``obviously'' the same,
 because they differ only in the order of the equations |(b==a)| and |(c==a)|;
@@ -1256,72 +1262,20 @@ our intuition that order of equations |(x=v)| does not matter.
 % \lennart{We also don't need \rulename{exi-swap} if we a stronger \rulename{eqn-elim}.}
 
 Next we study the mysterious $x \prec y$ side condition in \rulename{var-swap},
-and similar ones in \rulename{subst} and \rulename{seq-swap}.
+and similar ones in % \rulename{subst}
+and \rulename{seq-swap}.
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).
 To achieve this, \rulename{var-swap} fires on |y==x| \emph{only if
 |x|'s binding occurs in the scope of |y|'s binding}, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
-Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely;
-and the side condition $(|v| = |y| \implies |x| \prec |y|)$ on \rulename{subst}
-prevents the rule from firing until \rulename{var-swap} has done its work.
+Similarly, the side condition on \rulename{seq-swap} prevents it firing infinitely.
 
 Other rules, notably \rulename{exi-swap}, may change this binding order
 and thereby re-enable \rulename{var-swap} or \rulename{seq-swap},
 but the unification rules \emph{considered in isolation} are terminating and confluent,
-and that is what we need for the proof.
-
-\subsection{Local substitution} \label{sec:local-subst}
-
-Consider this (extremely) tricky term:
-|def x (x = if (x==0; x>1; x) then 33 else 55)|.
-What should this do? At first you might think it was stuck---how can we simplify the |if|
-when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
-us to substitute \emph{locally} in any |S|-context surrounding the equation |(x==0)|
-thus:\footnote{
-  Here and elsewhere we rewrite terms that have not
-  been fully desugared, but that is just an expository aid;
-  formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
-$$
-\begin{array}{l@@{\;}l}
-\multicolumn{2}{l}{|def x (x = if (x==0; x>1) then 33 else 55; x)|} \\
-\movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
-\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
-\multicolumn{2}{l}{\movestoC{\text{simplify |if|}} \; |def x (x = 55; x)| \quad
-\movestoR{subst} \; |def x (x = 55; 55)| \quad
-\movestoR{eqn-elim}  \; |55|}
-\end{array}
-$$
-Minor variants of the same example get stuck instead of reducing. For example, if you replace
-the |(x==0)| with |(x==100)| then rewriting gets stuck, as the reader may verify; and yet there
-is a solution to the equations, namely |x==55|.
-And if you replace |(x==0)| with |(x==55)|, then rewriting again
-gets stuck, and reasonably so, since in this case there are \emph{no} valid solutions to the equations.
-Perhaps this is not surprising: we cannot reasonably expect a program to solve arbitrary equations.
-For example, |def x (x*x = x)| has two solutions but discovering that involves solving a quadratic equation.
-
-% It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
-% substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
-% $$
-% \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
-%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{|v|}$} \\
-% $$
-% Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
-% $$
-% |def x (x == if (def y (y==x; y==0; y>1)) then 33 else 55)|
-% $$
-% In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
-% Suppose we use \rulename{global-subst} instead of \rulename{subst}.  Then we can rewrite this term in two
-% different ways:
-% \begin{itemize}
-% \item Use \rulename{global-subst} on |(y==x)|; doing so recovers the original tricky term, which is
-% stuck, because \rulename{global-subst} cannot rewrite it.
-% \item Use \rulename{global-subst} on |(y==0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
-% \end{itemize}
-% We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
-% This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
-% the simpler \rulename{global-subst}: to establish confluence.
+and that is what we need for the proof (but see \Cref{sec:simpler}).
 
 \subsection{Elimination and normalization rules} \label{sec:gc} \label{sec:normalization}
 
@@ -1403,8 +1357,8 @@ The rules for choice are given in \cref{fig:rules}:
 The most interesting rule is \rulename{choose}, which, just as described in \cref{sec:choice},
 ``floats the choice outwards,'' duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
-defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like an
-substitution context |S|, \emph{but with no possible
+defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like a
+execution context |X|, \emph{but with no possible
 choices to the left of the hole}:
 $$
 CX ::= \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX|
@@ -1525,26 +1479,34 @@ of its elements}, via the bindings of |y|.
 % to \textbeta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 
 So it seem hard to reconcile laziness with a deterministic |allKW|.  But \versecalc{} is not strict either;
-that is, a function can be called without its argument having a ground value.  For example:
+in \versecalc{} a function can be called without its argument having a ground value.  For example:
 $$
 |def f (f = (lam x (x=3;x)); def y (apply1 f y)|
 $$
 Here we can call |f| on an uninstantiated existential |y|;
 we do not have to wait until |y| gets a ground value from the calling context.
 Rather, in this example it is the body of |f| that then constrains |y| to be |3|.
-This is part of the essence of functional logic programming, and indeed a variable \emph{is} a value in
-\versecalc{} (\Cref{fig:syntax}).
+This is part of the essence of functional logic programming, and indeed in \versecalc{} a variable \emph{is} a value
+(\Cref{fig:syntax}).
+When lenience was introduced in the data-flow language Id~\cite{lenience}, it was a way
+to get \emph{parallelism}, and it certainly justifies parallelism in an implementation of \versecalc{}.
+But for \versecalc{} lenience has \emph{semantic} significance too, as we see in this example.
+% Consider:
+% $$
+% |def (f ^^ x ^^ y) (f == (lam p (x==7;p)); y == (if (x>0) then 7 else 8); apply1 f y|
+% $$
+% Here, |y| does not get a value until |x| is known; but |x| does not get its
+% value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
-So \versecalc{} is lenient: functions can be called on as-yet-evaluated arguments,
-but almost everything gets evaluated eventually.   You can see this
-enforced in the rule for |oneKW| in \Cref{fig:rules}, which only fire when the first choice
-in the body is value $v$, and similarly |allKW|.
-Why ``almost''? The |oneKW| operator returns the value of its first choice, and abandons all other choices.
+So in \versecalc{} functions can be called on as-yet-evaluated arguments,
+but almost all redexes that are not under a lambda get evaluated eventually.   You can see this
+enforced in the rule for |oneKW| in \Cref{fig:rules}, which only fires when the first choice
+in the body is a value $v$, and similarly |allKW|.
+Why ``almost'' all redexes? Because the |oneKW| operator returns the value of its first choice, and abandons all other choices.
 For example |one (1 `choice` apply0 loop)| returns |1|, discarding the infinite |apply0 loop|.
-And, of course, we do not evaluate under a lambda, so |one (def f (f = lam x (apply0 loop); 3))|
-returns |3| despite the loop hidden inside |f|.
 
-Note that lenience supports \emph{abstraction}.  For example, we can replace an expression |(x==tup(y,3); y>7)| by
+Note that lenience, like laziness, supports \emph{abstraction}.
+For example, we can replace an expression |(x==tup(y,3); y>7)| by
 $$
 |def f (f == (lam (tup (p,q)) (p==tup(q,3); q>7)); applyN f (x,y)|
 $$
@@ -1552,15 +1514,6 @@ Here, we abstract over the free variables of the expression, and define a named 
 Calling the function is just the same as writing the original expression.
 This transformation would not be valid under call-by-value.
 
-When lenience was introduced in the data-flow language Id~\cite{lenience}, it was a way
-to get \emph{parallelism}, and it can certainly support parallelism in an implementation of \versecalc{}.
-But for \versecalc{} it has \emph{semantic} significance too.
-Consider:
-$$
-|def (f ^^ x ^^ y) (f == (lam p (x==7;p)); y == (if (x>0) then 7 else 8); apply1 f y|
-$$
-Here, |y| does not get a value until |x| is known; but |x| does not get its
-value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 % However, moving to \emph{laziness} seems problematic.
 % For example, consider: |def x (x == apply0 wombat; 3)|.  In a lazy language this expression would
 % yield |3|, but in \versecalc{}, everything is evaluated, and
@@ -1596,19 +1549,22 @@ invariably involves reducing under lambdas, so for practical purposes it is well
 For example, in the pure lambda calculus, \emph{normal-order reduction},
 sometimes called \emph{leftmost-outermost reduction}, is a normalising strategy.
 
-We believe that a fair outermost strategy is normalising for
-\versecalc{}\footnote{
-  We say ``close to'' being good because we do not yet have a proof; indeed
-  rule \rulename{fail-elim} may be a bit too powerful.
-}: just repeatedly reduce the leftmost-outermost
-redex, with some tweaks to avoid infinite application of \rulename{exi-swap}.
-That is easy in theory, but it is tricky in practice because of residuation.  For
-example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
+For \versecalc{}, a first step towards a normalising strategy is to avoid no-ops.
+For example, there is no point in applying rule \rulename{subst} if $|x| \not\in \freevars{e}$;
+nor in applying \rulename{fail-elim} if |X = hole|.  Next, a normalising strategy
+must be careful with \rulename{exi-swap}, because it can easily apply infinitely;
+it's role is to make it possible to use \rulename{exi-float}.  Dealing with these
+no-ops and flip-flops is not hard.
+
+With that done, we believe that a fair outermost strategy is normalising for
+\versecalc{}: just repeatedly reduce any outermost (not under a lambda) redexes.
+That sounds easy, but is tricky in practice for two reasons.
+First, a reduction may ``unlock'' a redex far to its left.
+For example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
 substitution to rewrite the |(x+y)| to |(2+3)|; and
-\emph{now} the |(2+3)| is a redex.  So a reduction may ``unlock'' a
-redex far to its left.  A major challenge of an implementation is to
-find the next redex efficiently. Moreover, like other functional-logic languages such as Curry, a normalising
+\emph{now} the |(2+3)| is a redex. Hence, a challenge for an implementation is to
+find the next redex efficiently. Secondly, like other functional-logic languages such as Curry, a normalising
 strategy must be able to pursue multiple redexes in parallel, hence ``fair''.  For example |(apply0 loop; fail)|
 and |(fail; apply0 loop)| should both fail, so a normalising strategy must, in both cases, avoid getting stuck
 in the |loop|.
@@ -1636,8 +1592,75 @@ design space is, however, beyond the scope of this paper.
 % is (especially, whether it fails) before the right-hand one can be used.
 % So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
 
+\subsection{Logical completeness} \label{sec:local-subst}
 
-\subsection{Developing and debugging rules}
+Our rewrite rules seek to implement the idea articulated in \Cref{sec:unify} that
+a program executes by solving its equations, specifically by finding values for the logical variables
+that satisfy the equations.  Ideally, we would like to promise that if any substitution for the
+logical variables exists that satisfies the equations, we will find it: this is \emph{logical completeness}.
+Alas, in practice logical completeness is well out of reach.
+For example, consider |def x ((x*x*x + 3*x - 8) = 0)|.
+To solve this would require solving a cubic
+equation, and it is equally easy to express intractable problems like Fermat's last (unproven) theorem.
+Moreover, remembering that \versecalc{} is deterministic, in what order would the (infinite sequence of)
+results of, say, |def x (x+1)| be returned?
+So instead we satisfy ourselves with a computable and deterministic approximation
+to this Platonic ideal, an approximation that is described precisely by our rewrite rules, using unification as the
+mechanism.  Expressions that unification cannot solve, like the one above, are stuck; no
+rewrite rule applies.  All functional logic languages share this challenge to logical completeness\footnote{For countable
+domains, like the integers, we could theoretically try all values of |x| one by one; but that is hardly practical.}.
+
+The boundary between ``stuck'' and ``soluble'' can be quite subtle.
+Consider this tricky term:
+|def x (x = if (x==0; x>1) then 33 else 55; x)|.
+At first you might think it was stuck---how can we simplify the |if|
+when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
+us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
+thus:\footnote{
+  Here and elsewhere we rewrite terms that have not
+  been fully desugared, but that is just an expository aid;
+  formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
+$$
+\begin{array}{l@@{\;}l}
+\multicolumn{2}{l}{|def x (x = if (x==0; x>1) then 33 else 55; x)|} \\
+\movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
+\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
+\multicolumn{2}{l}{\movestoC{\text{simplify |if|}} \; |def x (x = 55; x)| \quad
+\movestoR{subst} \; |def x (x = 55; 55)| \quad
+\movestoR{eqn-elim}  \; |55|}
+\end{array}
+$$
+Minor variants of the same example get stuck instead of reducing. For example, if you replace
+the |(x==0)| with |(x==100)| then rewriting gets stuck, as the reader may verify; and yet there
+is a solution to the equations, namely |x==55|.
+And if you replace |(x==0)| with |(x==55)|, then rewriting again
+gets stuck; this time there are \emph{no} valid solutions to the equations, and yet
+the expression gets stuck rather than failing.
+
+% It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
+% substitution over the entire scope of the |defKW|, and combining it with \rulename{def-elim} thus:
+% $$
+% \rulename{global-subst} \quad |def x (X^[x==v])|  \movesto  |(subst X x v)^[v]|
+%         \quad \text{if $|x| \in \freevars{X}$, $|x| \notin \freevars{|v|}$} \\
+% $$
+% Now all three variants get stuck.  But alas, we lose confluence.  Consider this term:
+% $$
+% |def x (x == if (def y (y==x; y==0; y>1)) then 33 else 55)|
+% $$
+% In the condition of the |if| we have introduced a local variable |y|, and set it equal to |x|.
+% Suppose we use \rulename{global-subst} instead of \rulename{subst}.  Then we can rewrite this term in two
+% different ways:
+% \begin{itemize}
+% \item Use \rulename{global-subst} on |(y==x)|; doing so recovers the original tricky term, which is
+% stuck, because \rulename{global-subst} cannot rewrite it.
+% \item Use \rulename{global-subst} on |(y==0)|; then we can simplify the |if|, and reduce the entire thing to |55|.
+% \end{itemize}
+% We have lost confluence: two different rewrites starting from the same term lead to non-joinable terms.
+% This is what drives us to adopt the tricky local-substitution rule \rulename{subst} rather than
+% the simpler \rulename{global-subst}: to establish confluence.
+
+
+\subsection{Developing and debugging rules}\label{sec:testing}
 The rules we describe here should both be able to transform a program to its value,
 and also be confluent.
 To aid in the development of the rules, we have used several mechanized tools to automate
@@ -2117,9 +2140,29 @@ At this time steps (iii) and (iv) are incomplete, so we emphasize that we do not
 In a calculus like \versecalc{}, there is room for many design variations.
 We discuss some of them here.
 
+\subsection{Simplifying the rules} \label{sec:simpler}
+
+The rules of \Cref{fig:rules} are more complicated than we would like, because our
+confluence proof requires that the unification rules form a terminating
+rewrite system (\Cref{sec:design-confluence}).  Tantalisingly, here is a much simpler set of rules that
+we believe is equally expressive, and is still confluent:
+$$
+\begin{array}{@@{\hskip0.5em} l  r @@{\;\;}c@@{\;\;} l l@@{}}
+  \rulename{subst'} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
+  & \text{if $v \not= |V^[x]|$}, \\
+  \rulename{var-swap'} & |y==x; e|    & \movesto & |x==y; e| & \text{(unconditionally)} \\
+  \rulename{seq-swap'} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
+                      \text{(unconditionally)} \\
+\rulename{eqn-elim'} & |def x (x==v;e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\end{array}
+$$
+Each of these rules is simpler than its counterpart in \Cref{fig:rules}. In particular \rulename{subst'}
+needs no context |X|: it simply substitutes to the right, relying on other rules (e.g. \rulename{eqn-float}
+and \rulename{seq-swap}) to float the equation to the left of its target.  Our testing framework (\Cref{sec:testing})
+gives us strong confidence that these simpler rules are confluent; actually \emph{proving} them confluent
+is work in progress.
 
 % JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
-
 % \subsection{Choice and failure} \label{sec:choice-and-failure}
 %
 % In \versecalc{} an expression delivers a \emph{sequence} of results, not a bag,
@@ -2312,7 +2355,9 @@ list, via an operator called \verb!bagof!, or a mechanism called
 implemented in the Kiel Curry System interpreter \cite{brassel:encapsulated,kics,hanus:set-functions}.
 But in Curry, this is regarded as a somewhat sophisticated feature,
 whereas it is part of the foundational fabric of \versecalc{}.
-Curry's set-functions need careful explanation about sharing across non-deterministic choices,
+Curry's set-functions need careful explanation about sharing across non-deterministic choices\footnote{
+Again, this complexity in Curry
+appears to be a consequence of laziness.},
 or what is ``inside'' and ``outside'' the set function, something that appears as a straightforward
 consequence of \versecalc{}'s single rule \rulename{choose}.
 
@@ -2356,7 +2401,7 @@ at the heart of the ``logic'' part of functional logic programming.
 Constructor-based ReWrite Logic (CRWL) \cite{crwl} is the brand leader for
 high-level semantics for non-strict, non-deterministic functional logic languages.
 %
-CRLW is a ``big-step'' rewrite semantics that rewrites a term to a value in a single
+CRWL is a ``big-step'' rewrite semantics that rewrites a term to a value in a single
 step.
 %
 \Citet{fraguas:rewriting} make a powerful case for instead giving the semantics
@@ -2413,6 +2458,24 @@ account of logical variables and choice, directly as small-step
 rewrites on the original program, rather than as the evolution of a
 (heap, control, stack) configuration. Moreover, we have no problem with
 residuation.
+
+The Escher language \cite{Escher} extends a Haskell-like functional base with
+logical (existentially quantified) variables and constraints to yield an integration
+of functional and logical constructs, and informally describes a rewriting based
+evaluation mechanism. However, the language does not have the equivalent
+of |oneKW| and |allKW| which reify choice as data, the rules are not precisely
+formalized and no confluence result is established for them.
+
+Goffin \cite{Goffin} also presents a way to extend a higher-order functional
+language with existentially quantified logical variables. However, Goffin is
+rather different from \versecalc{} in that it falls in the tradition of
+Concurrent Constraint Programming \cite{Saraswat90} where the constraints
+over logical variables are used to declare data dependencies as a means to
+co-ordinate efficient concurrent execution of sub-computations, rather
+than in logic programming (and \versecalc) where we seek to declare the properties
+of solutions. Consequently, in Goffin, the logical variables are never ``unified''
+but instead are ``updated'' as values are computed in parallel yielding a completely
+different model of computation.
 
 \subsection{Flat {\vs} higher order}
 
