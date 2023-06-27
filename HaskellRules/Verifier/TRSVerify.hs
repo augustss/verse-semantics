@@ -72,13 +72,13 @@ runTest (testName, e, expected) =
 
        (True, _tr@(x :<-- _)) ->
          do putStrLn " *** VERIFIED, but expected FAILED:"
-            --putStr (unlines (showTrace tr))
+            -- putStr (unlines (showTrace _tr))
             P.pp x
             return False
 
        (False, _tr@(x :<-- _)) ->
          do putStrLn " *** FAILED, but expected VERIFIED:"
-            --putStr (unlines (showTrace tr))
+            putStr (unlines (showTrace _tr))
             P.pp x
             return False
 
