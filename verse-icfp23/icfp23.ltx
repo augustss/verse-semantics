@@ -1292,12 +1292,13 @@ suffice to express the necessary sharing.
 
 \subsection{Swapping and binding order} \label{sec:swapping}
 
-Rules \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
-Rule \rulename{var-swap} is trickier.  Consider this example where |a| and |b| are
-bound further out, perhaps by lambdas.  It can rewrite in two different ways, where
+Two rules allow the two sides of an equation to be swapped.
+Rule \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
+Rule \rulename{var-swap}, which swaps two variables, is needed for a more subtle reason.  Consider the following example expression, where |a| and |b| are
+bound within some containing context, perhaps by lambdas.  It can be rewritten in two different ways, where
 each column is a reduction sequence starting from the same initial term:
-$$
-% \vbox{\vskip-12pt$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
+\begin{center}                         % USING \begin{center} RATHER THAN $$ GIVES BETTER PAGE BREAK
+$
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{|def x (x == tup a ; x == tup b; x)|} \\
   \movestoR{subst} & |def x (x == tup a ; tup a == tup b; tup a)| &
@@ -1310,17 +1311,19 @@ $$
       \movestoR{subst} & |b == a; tup a| \\
 
 \end{array}
-% $}
-$$
+$
+\end{center}
 The two sequences differ when it comes to which equation for |x| is chosen for \rulename{subst}
 in the first step of each column. As you can see, they conclude with two terms that are ``obviously''
-the same, but which are syntactically different.  Rule \rulename{var-swap} allows
-them to be brought together, so that the unification rules are syntactically confluent.
-Rule \rulename{seq-swap} is needed for a similar reason. Consider
+the same semantically, but which are syntactically different.  Rule \rulename{var-swap} allows
+them to be brought together (for example, $|a == b; tup b| \; \movestoR{var-swap} \; |b == a; tup b| \; \movestoR{subst} \;  |b == a; tup a|$),
+so that the unification rules can be syntactically confluent.
+
+Rule \rulename{seq-swap}, which swaps adjacent equations within a sequence under certain conditions, is needed for a similar reason. Consider
 this example:
 % where |a,b,c| are bound in that order; \ie, $|c| \prec |b| \prec |a|$:
-$$
-\vbox{\vskip-12pt$$                %% THIS IS A VERTICAL TWEAK TO HELP A SPECIFIC PAGE BREAK
+\begin{center}                         % USING \begin{center} RATHER THAN $$ GIVES BETTER PAGE BREAK
+$
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
   \multicolumn{4}{c}{\quad|c==a; c==b; c|} \\
   \movestoR{subst} & |c==a; a==b; a| &
@@ -1328,20 +1331,20 @@ $$
   \movestoR{var-swap} & |c==a; b==a; a| &
      \movestoR{subst}   & |b==a; c==a; a| \\
 \end{array}
-$$}
-$$
-Again, the concluding terms of the two columns are ``obviously'' the same,
-because they differ only in the order of the equations |(b==a)| and |(c==a)|;
-\rulename{seq-swap} allows them to be brought together, and makes explicit
-our intuition that order of equations |(x=v)| does not matter.
+$
+\end{center}
+Again, the concluding terms of the two columns are ``obviously'' the same
+(they differ only in the order of the equations |b==a| and |c==a|);
+\rulename{seq-swap} allows one term to be rewritten to match the other, making explicit
+our intuition that the order of equations of the form |x=v| should not matter.
 % Both \rulename{var-swap} and \rulename{seq-swap} are needed only for \emph{confluence},
 % not for \emph{progress}. \simon{I think this is true of both, isn't it?}
 % \lennart{Without \rulename{var-swap} I think we need another \rulename{eqn-elim} rule for the |y==x| case.}
 % \lennart{We also don't need \rulename{exi-swap} if we a stronger \rulename{eqn-elim}.}
 
-Next we study the mysterious $x \prec y$ side condition in \rulename{var-swap},
-and similar ones in % \rulename{subst}
-and \rulename{seq-swap}.
+Observe the mysterious side condition $|x| \prec |y|$  in rule \rulename{var-swap},
+and a similar one in % \rulename{subst} and
+\rulename{seq-swap}.
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
 are \emph{terminating} (see \cref{sec:design-confluence}).
