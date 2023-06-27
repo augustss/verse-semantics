@@ -1262,15 +1262,15 @@ The key rule is:
 $$
 \begin{array}{rrcll}
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
-    & \text{if $|x| \in \freevars{|X,e|}$} \\
-  % &&&& \text{and $(|v| = |y| \implies |x| \prec |y|)$} \\
+  & \text{if $|v| \not= |V^[x]|$} \\
 \end{array}
 $$
 The rule says that if we have an equation |(x==v)|,
 we can replace the occurrences of |x| by |v| within the following expression and also within a surrounding context.
 This rule uses context~|X| (\cref{fig:contexts}), and
-uses the notation |subst e x v| to mean ``capture-avoiding substitution of |v| for |x| in~|e|''
-(and similarly |subst X x v|, but |X| will have no bindings to be avoided).
+uses the notation |subst e x v| to mean ``capture-avoiding substitution of~|v| for~|x| in~|e|''
+%(and similarly |subst X x v|, but |X| will have no bindings to be avoided).  
+(and similarly |subst X x v| to mean ``capture-avoiding substitution of~|v| for~|x| in~|X|'').  
 There are several things to notice:
 \begin{itemize}
 \item \rulename{subst} fires only when the right-hand side of the equation
