@@ -1628,7 +1628,7 @@ Any rewrite rule can apply anywhere in the term, at any time.  For example, in t
 the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |4+2| $\rightarrow$ |6|,
 or the other way around.
 The rules do, however, require us to reduce |3+4| $\rightarrow$ |7| before substituting for |x| in |x+y|, because
-rule \rulename{subst} only fires when the RHS is a value.
+rule \rulename{subst} fires only when the RHS is a value.
 The rewrite rules thereby express \emph{semantics}.
 
 For example, in the lambda calculus, by changing the rewrite
@@ -1644,7 +1644,7 @@ out of the many possible redexes, should be rewritten next to make progress towa
 Let us call an evaluation strategy \emph{normalising} if it guarantees to terminate if there
 is \emph{any} terminating sequence of reductions; \ie, if any path terminates with a value,
 then a normalising evaluation strategy will terminate with that same value\footnote{
-It would be even better if the strategy could (c) guarantee to find the
+It would be even better if the strategy could guarantee to find the
 result in the minimal number of rewrite steps---so-called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
@@ -1654,25 +1654,25 @@ For \versecalc{}, a first step towards a normalising strategy is to avoid no-ops
 For example, there is no point in applying rule \rulename{subst} if $|x| \not\in \freevars{e}$;
 nor in applying \rulename{fail-elim} if |X = hole|.  Next, a normalising strategy
 must be careful with \rulename{exi-swap}, because it can easily apply infinitely;
-it's role is to make it possible to use \rulename{exi-float}.  Dealing with these
+its role is to make it possible to use \rulename{exi-float}.  Dealing with these
 no-ops and flip-flops is not hard.
 
 With that done, we believe that a fair outermost strategy is normalising for
-\versecalc{}: just repeatedly reduce any outermost (not under a lambda) redexes.
+\versecalc{}: at each step, just select any redex that is not within a lambda or another redex.
 That sounds easy, but is tricky in practice for two reasons.
 First, a reduction may ``unlock'' a redex far to its left.
 For example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
-substitution to rewrite the |(x+y)| to |(2+3)|; and
+use substitution to rewrite the |(x+y)| to |(2+3)|; and
 \emph{now} the |(2+3)| is a redex. Hence, a challenge for an implementation is to
-find the next redex efficiently. Secondly, like other functional-logic languages such as Curry, a normalising
-strategy must be able to pursue multiple redexes in parallel, hence ``fair''.  For example |(apply0 loop; fail)|
+find the next redex efficiently. Secondly, as with other functional-logic languages such as Curry, a normalising
+strategy must be able to pursue redexes within multiple subterms in parallel (or alternately), without starving any of them, hence ``fair''.  For example |(apply0 loop; fail)|
 and |(fail; apply0 loop)| should both fail, so a normalising strategy must, in both cases, avoid getting stuck
 in the |loop|.
 
-We have not yet, however, formalised such a strategy or proved it normalising.
+We have not yet, however, formalised such a strategy for \versecalc{} or proved it normalising.
 We have several prototype implementations of \versecalc{}, each involving an abstract
-machine with a stack, a heap, a bunch of blocked computations, and so on. Exploring this
+machine with a stack, a heap, a bunch of previously blocked computations, and so on. Exploring this
 design space is, however, beyond the scope of this paper.
 
 % The trouble is that it is hard to say what the ``leftmost'' redex is.  For example in |(e; tup(x,3)==tup(2,y))|,
