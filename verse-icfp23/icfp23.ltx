@@ -500,20 +500,30 @@ In \versecalc{} the choices are ``laid out in space'' (in the syntax of the term
 rather than, as is more typical, ``laid out in time'' (via non-deterministic rewrites and backtracking).
 
 As an example of rewriting in action, the expression above can be rewritten
-as follows\footnote{The rule names come from \cref{fig:rules}, to be discussed in \cref{sec:rewrite-rules}; they
+as follows\footnote{The rule names after each arrow come from \cref{fig:rules}, to be discussed in \cref{sec:rewrite-rules}; they
   are given here just for reference.}:
-$$
-\begin{array}{ll@@{\quad}ll}
-\multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
-\movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| &
-\movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
-\movestoR{u-tup}         & |def (y ^^ z) (2==y; z==3; y)| &
-\movestoR{eqn-elim}      & |def y (2==y; y)| \\
-\movestoR{hnf-swap}      & |def y (y==2; y)| &
-\movestoR{subst}         & |def y (y==2; 2)| \\
-\movestoR{eqn-elim}      & |2| \\
-\end{array}
-$$
+% $$
+% \begin{array}{ll@@{\quad}ll}
+% \multicolumn{4}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} \\
+% \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| &
+% \movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \\
+% \movestoR{u-tup}         & |def (y ^^ z) (2==y; z==3; y)| &
+% \movestoR{eqn-elim}      & |def y (2==y; y)| \\
+% \movestoR{hnf-swap}      & |def y (y==2; y)| &
+% \movestoR{subst}         & |def y (y==2; 2)| \\
+% \movestoR{eqn-elim}      & |2| \\
+% \end{array}
+% $$
+\begin{quote}
+|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \unskip\quad
+$\movestoR{subst}$         \unskip\quad |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \unskip\quad \par\quad
+$\movestoR{eqn-elim}$      \unskip\quad |def (y ^^ z) (tup(2,z) == tup(y,3); y)| \unskip\quad
+$\movestoR{u-tup}$         \unskip\quad |def (y ^^ z) (2==y; z==3; y)| \unskip\quad \par\quad
+$\movestoR{eqn-elim}$      \unskip\quad |def y (2==y; y)| \unskip\quad 
+$\movestoR{hnf-swap}$      \unskip\quad |def y (y==2; y)| \unskip\quad \par\quad
+$\movestoR{subst}$         \unskip\quad |def y (y==2; 2)| \unskip\quad
+$\movestoR{eqn-elim}$      \unskip\quad |2| 
+\end{quote}
 %
 Rules may be applied anywhere they match, again just like the lambda calculus.
 This freedom only makes sense, however, if each term ultimately reduces to a unique value,
