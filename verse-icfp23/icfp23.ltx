@@ -1551,7 +1551,7 @@ languages like Curry \cite{antoy:pull-tabbing}.
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
 Under lenient evaluation, functions can run before their arguments have a ground value
-(like a lazy language), but (almost) everything is eventually evaluated (like a strict language).
+(as in a lazy language), but (almost) everything is eventually evaluated (as in a strict language).
 
 \versecalc{} cannot be lazy, because
 of \versecalc{}'s commitment to determinism and, particularly, its first-class |allKW| operator.  Consider:
@@ -1559,39 +1559,39 @@ $$
 |all (def x (x=e; 3)|
 $$
 In a lazy language like Curry, the expression |def x (x=e; 3)| would return one result, |3|, regardless of |e|,
-because |x| is unused, and so |x=e| is simply dead code. But in \versecalc{} we must evaluate |e|, and yield an array with one element
+because |x| is unused, and so |x=e| is simply dead code. But in \versecalc{} we must evaluate |e|, and the |allKW| expression will yield an array with one element
 for each result yielded by |e|.  If |e| fails (returns zero results), then the result array is empty.  Since |allKW|
-reifies these results into an array, the multiplicity of results is visible to context, via
+reifies these results into an array, the multiplicity of results is visible to the context of the |allKW| expression, via
 the length of the returned array.
 Moreover, consider
 $$
 |all (def (x, y) (x = (y=3;1 `choice` y=4;2); y))|
 $$
-In \versecalc{}, |x|'s right hand side is evaluated, yielding two values, |1| and |2|, which are discarded since
+In \versecalc{}, the expression to which |x| is equated must be evaluated, yielding two values, |1| and |2|, which are then discarded since
 |x| is unused.  However, each of these
-values is accompanied with a distinct binding for |y|, so the result of the whole expression is the array |tup (3,4)|.
-In short, we must eventually evaluate |x|'s right hand side not only to get the \emph{size} of the array, but also the \emph{values
-of its elements}, via the bindings of |y|.
+values is accompanied by a distinct binding for |y|, so the result of the whole expression is the array |tup (3,4)|.
+In short, we must eventually evaluate the expression to which |x| is equated not only to get the \emph{size} of the array,
+but also the \emph{values of its elements}, via the bindings of |y|.
 
-% However, a function can proceed een before its argument is a ground value.
+% However, a function can proceed even before its argument is a ground value.
 % Consider the call |apply1 f e|, where |e| is not a value.  In \versecalc{}, applications are in administrative normal form (ANF),
 % so we must actually write |def x (x==e; apply1 f x)|. This expression will not return a value until
 % |e| reduces to a value: that is, everything is eventually evaluated.  But even so, |apply1 f x| can proceed
 % to \textbeta-reduce (\cref{sec:beta}), assuming we know the definition of |f|.
 
-So it seem hard to reconcile laziness with a deterministic |allKW|.  But \versecalc{} is not strict either;
+So it seems hard to reconcile laziness with a deterministic |allKW|.  But \versecalc{} is not strict, either;
 in \versecalc{} a function can be called without its argument having a ground value.  For example:
 $$
 |def f (f = (lam x (x=3;x)); def y (apply1 f y)|
 $$
-Here we can call |f| on an uninstantiated existential |y|;
+Here we can call |f| on an uninstantiated existential variable |y|;
 we do not have to wait until |y| gets a ground value from the calling context.
 Rather, in this example it is the body of |f| that then constrains |y| to be |3|.
 This is part of the essence of functional logic programming, and indeed in \versecalc{} a variable \emph{is} a value
-(\Cref{fig:syntax}).
+(\cref{fig:syntax}).
 When lenience was introduced in the data-flow language Id~\cite{lenience}, it was a way
 to get \emph{parallelism}, and it certainly justifies parallelism in an implementation of \versecalc{}.
-But for \versecalc{} lenience has \emph{semantic} significance too, as we see in this example.
+But for \versecalc{} lenience has \emph{semantic} significance, too, as we see in this example.
 % Consider:
 % $$
 % |def (f ^^ x ^^ y) (f == (lam p (x==7;p)); y == (if (x>0) then 7 else 8); apply1 f y|
@@ -1601,17 +1601,17 @@ But for \versecalc{} lenience has \emph{semantic} significance too, as we see in
 
 So in \versecalc{} functions can be called on as-yet-evaluated arguments,
 but almost all redexes that are not under a lambda get evaluated eventually.   You can see this
-enforced in the rule for |oneKW| in \Cref{fig:rules}, which only fires when the first choice
-in the body is a value $v$, and similarly |allKW|.
-Why ``almost'' all redexes? Because the |oneKW| operator returns the value of its first choice, and abandons all other choices.
+enforced in the rule for |oneKW| in \Cref{fig:rules}, which fires only when the first choice
+in the body is a value $|v|$, and similarly for |allKW|.
+Why ``almost'' all redexes? Because the |oneKW| operator returns the value of its first choice and abandons all other choices.
 For example |one (1 `choice` apply0 loop)| returns |1|, discarding the infinite |apply0 loop|.
 
-Note that lenience, like laziness, supports \emph{abstraction}.
+Note that lenience, like laziness, supports \emph{abstraction} in the presence of unification.
 For example, we can replace an expression |(x==tup(y,3); y>7)| by
 $$
 |def f (f == (lam (tup (p,q)) (p==tup(q,3); q>7)); applyN f (x,y)|
 $$
-Here, we abstract over the free variables of the expression, and define a named function |f|.
+Here, we abstract over the free variables of the expression and define a named function |f|.
 Calling the function is just the same as writing the original expression.
 This transformation would not be valid under call-by-value.
 
