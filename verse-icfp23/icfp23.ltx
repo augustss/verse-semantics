@@ -1461,9 +1461,9 @@ But what ``surrounding context'' precisely? We use two new contexts, |SX| and |C
 defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like a
 execution context |X|, \emph{but with no possible
 choices to the left of the hole}:
-$$
+\begin{center}$
 CX ::= \hole \vb |v == CX| \vb |CX ; e| \vb |ce; CX| \vb |def x CX|
-$$
+$\end{center}
 Here, |ce| is a guaranteed-choice-free expression (syntax in \cref{fig:choice-free-syntax}).
 This syntactic condition is necessarily conservative; for example, a call |apply1 f x|
 is considered not guaranteed-choice-free because it depends on what function |f| does.
@@ -1474,14 +1474,17 @@ This is a very subtle point:
 without this restriction we lose confluence.  To see this, consider\footnote{Remember, |if| is syntactic sugar for
   a use of |oneKW| (see \cref{sec:one}), but using |if| makes the example easier to understand.}:
 $$
-\begin{array}{l@@{\;}l}
+\begin{array}{l@@{\;\;}l}
                                  & |def x ((if (x>0) then 55 else (44 `choice` 2)); x==1; (77 choice 99))|\\
  \movestoR{subst}                & |def x ((if (1>0) then 55 else (44 `choice` 2)); x==1; (77 choice 99))|\\
- \movestoC{\text{simplify |if|}} & |def x (55; x==1; (77 choice 99))|\\
- \movestoR{val-elim, eqn-elim}   & |77 choice 99|\\
+ \movestoC{\text{simplify |if|}} & |def x (55; x==1; (77 choice 99))| \;\;    % Tweaks to save a line
+ \movestoR{val-elim, eqn-elim}   \;\;  |77 choice 99|\\
 \end{array}
 $$
-But suppose instead we floated the choice out, \emph{partway}, like this:
+But suppose instead we floated the choice out, \emph{partway}, like this\footnote{
+  As in the previous example, here and elsewhere we freely rewrite terms that have not
+  been fully desugared, but that is just an expository aid;
+  formally, the rewrite rules of \cref{fig:rules} apply only to programs in the basic ``Syntax'' language of \cref{fig:syntax}.}:
 $$
 \begin{array}{ll}
 \multicolumn{2}{l}{|def x ((if (x>0) then 55 else (44 `choice` 2)); x==1; (77 choice 99))|}\\
@@ -1700,7 +1703,8 @@ a program executes by solving its equations, specifically by finding values for 
 that satisfy the equations.  Ideally, we would like to promise that if any substitution for the
 logical variables exists that satisfies the equations, we will find it: this is \emph{logical completeness}.
 Alas, in practice logical completeness is well out of reach.
-For example, consider |def x ((x*x*x + 3*x - 8) = 0)|.
+For example, consider |def x ((x*x*x + 3*x - 8) = 0)| (assuming a version of \versecalc{} extended to have
+a multiplication operator $*$).
 To solve this would require solving a cubic
 equation, and it is equally easy to express intractable problems like Fermat's last theorem.
 Moreover, remembering that \versecalc{} is deterministic, in what order would the (infinite sequence of)
@@ -1708,34 +1712,34 @@ results of, say, |def x (x+1)| be returned?
 So instead we satisfy ourselves with a computable and deterministic approximation
 to this Platonic ideal, an approximation that is described precisely by our rewrite rules, using unification as the
 mechanism.  Expressions that unification cannot solve, like the one above, are stuck; no
-rewrite rule applies.  All functional logic languages share this challenge to logical completeness\footnote{For countable
-domains, like the integers, we could theoretically try all values of |x| one by one; but that is hardly practical.}.
+rewrite rule applies.  All functional logic languages share this challenge to logical completeness.\footnote{For countable
+domains, like the integers, or even the algebraic numbers---which would be adequate to solve our cubic equation example---we could
+in theory simply try all possible values of |x| one by one; but that is hardly practical.}
 
 The boundary between ``stuck'' and ``soluble'' can be quite subtle.
 Consider this tricky term:
 |def x (x = if (x==0; x>1) then 33 else 55; x)|.
-At first you might think it was stuck---how can we simplify the |if|
+At first we might think it was stuck---how can we simplify the |if|
 when its condition mentions~|x|, which is not yet defined?  But in fact, rule \rulename{subst} allows
 us to substitute \emph{locally} in any |X|-context surrounding the equation |(x==0)|
-thus:\footnote{
-  Here and elsewhere we rewrite terms that have not
-  been fully desugared, but that is just an expository aid;
-  formally, the rules apply only to programs in the language of \cref{fig:syntax}.}
+thus:
 $$
 \begin{array}{l@@{\;}l}
 \multicolumn{2}{l}{|def x (x = if (x==0; x>1) then 33 else 55; x)|} \\
 \movestoR{subst}                & |def x (x = if (x==0; 0>1) then 33 else 55; x)| \\
-\movestoR{app-gt-fail,fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
+\movestoR{app-gt-fail}     & |def x (x = if (x==0; fail) then 33 else 55; x)| \\
+\movestoR{fail-elim}     & |def x (x = if fail then 33 else 55; x)| \\
 \multicolumn{2}{l}{\movestoC{\text{simplify |if|}} \; |def x (x = 55; x)| \quad
 \movestoR{subst} \; |def x (x = 55; 55)| \quad
 \movestoR{eqn-elim}  \; |55|}
 \end{array}
 $$
-Minor variants of the same example get stuck instead of reducing. For example, if you replace
-the |(x==0)| with |(x==100)| then rewriting gets stuck, as the reader may verify; and yet there
-is a solution to the equations, namely |x==55|.
-And if you replace |(x==0)| with |(x==55)|, then rewriting again
-gets stuck; this time there are \emph{no} valid solutions to the equations, and yet
+Minor variants of the same example get stuck instead of reducing. For example, if we replace
+the |x==0| with |x==100| then rewriting gets stuck, as the reader may verify
+(we cannot eliminate the equation |x==100|); and yet there
+is a substitution that will satisfy the equations, namely $\{55/x\}$.
+And if we replace |x==0| with |x==55|, then rewriting again
+gets stuck; this time there is \emph{no} substitution that will satisfy the equations, and yet
 the expression gets stuck rather than failing.
 
 % It would be nicer if all three variants got stuck. Perhaps we can simplify the system, by only allowing
@@ -1825,7 +1829,7 @@ A \emph{binary relation} is a set of pairs of related items.
 A \emph{reduction relation} \rr is the \emph{compatible closure}\footnote{
 ``Compatible closure'' means that, for any context $E$ and any two terms $M$ and $N$,
 if $(M,N)\in\rr$ then $(E[M],E[N])\in\rr$.}
-of any binary relation on a set of tree-structured  \emph{terms},
+of any binary relation on a set of tree-structured  \emph{terms,}
 such as the terms generated by some BNF grammar.
 %
 We write $\rr^{*}$ for the reflexive transitive closure of $\rr$.
