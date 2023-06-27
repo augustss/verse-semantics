@@ -259,7 +259,7 @@ cVerify = do
     tryIt (pure s) (\ _ -> pure s) $ do
       let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
           e' = anf $ coreToTrs $ asCore flg e
-      putStrLn $ "Desugared:\n" ++ prettyShow e'
+      --putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify icfpVerifier e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
