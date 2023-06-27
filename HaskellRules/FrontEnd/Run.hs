@@ -8,9 +8,9 @@ module FrontEnd.Run(
   ) where
 import Data.List
 import Epic.Print
-import FrontEnd.Core(Core)
-import FrontEnd.CoreSimp(simpCore)
+import FrontEnd.Desugar(simpCore)
 import FrontEnd.EvalBlock(runBlock)
+import FrontEnd.Expr(Core)
 import FrontEnd.Flags
 --import FrontEnd.RefImpl(evalRI)
 import FrontEnd.TRSAdapter(rewrite)

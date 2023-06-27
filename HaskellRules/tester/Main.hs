@@ -15,9 +15,10 @@ import System.IO(hFlush, stdout)
 import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
 import FrontEnd.Expr
+import FrontEnd.Desugar(exprToCore)
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
-import FrontEnd.Core
+import FrontEnd.ParseCore
 import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)

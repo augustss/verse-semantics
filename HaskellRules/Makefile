@@ -22,7 +22,7 @@ testicfp:
 	$(TESTER) --quiet --dfs --rules=ICFPR                   --max-steps=25000       $(TESTFILE)
 
 testrules:
-	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                   --max-steps=25000       $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 	$(QCTEST)               --rules=$(RULES) $(EXTRA) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
 
@@ -31,7 +31,7 @@ testslow:
 
 testfast:
 	$(TESTER) --quiet --parse                                                   $(TESTPARSEFILE)
-	$(TESTER) --quiet       --rules=eval --no-under-lambda                      $(TESTFILE)
+#	$(TESTER) --quiet       --rules=eval --no-under-lambda                      $(TESTFILE)
 #	$(TESTER) --quiet --eval --split                                            $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)

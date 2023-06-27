@@ -42,14 +42,13 @@ library all
                       Rules.CoreEDSL
                       Rules.Equiv
                       Rules.Systems
-                      FrontEnd.Core
-                      FrontEnd.CoreSimp
                       FrontEnd.Error
                       FrontEnd.EvalBlock
                       FrontEnd.Expr
                       FrontEnd.Flags
                       FrontEnd.Desugar
                       FrontEnd.Parse
+                      FrontEnd.ParseCore
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter

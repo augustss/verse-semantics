@@ -4,6 +4,8 @@ module FrontEnd.Desugar(
   desugar,
   primOps, covariantId, dsScope,
   simplify,
+  exprToCore,
+  simpCore,
   ) where
 import Control.Monad
 import Control.Monad.State.Strict
@@ -401,8 +403,8 @@ call p l s e = do
 
 ----------------------------------------------
 
-dsScope :: Expr -> Expr
-dsScope = eval defaultFlags . (lower <=< addScope)
+dsScope :: Flags -> Expr -> Expr
+dsScope flgs = eval flgs . (lower <=< addScope)
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -1056,3 +1058,12 @@ eAssume = Macro1 (Ident noLoc "assume") []
 
 eVerify :: Expr -> Expr
 eVerify = Macro1 (Ident noLoc "verify") []
+
+-----------
+
+-- TODO? Add checks
+exprToCore :: Flags -> Expr -> Core
+exprToCore _ = id
+
+simpCore :: Core -> Core
+simpCore = id
