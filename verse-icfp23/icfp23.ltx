@@ -1941,29 +1941,29 @@ normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
 % the |A| context only permits substitution in a place where the value |h| can be \emph{used immediately}, by
 % application or unification.  These restrictions matter for at least three different reasons.
 
-\mypara{Ensuring that unification terminates.}
-%
-\simon{I think we could drop this entire para.  We have already discussed termination
-  of unification in 3.3, and just above under ``the unification problem''.  Talking about it
-  again here is not helpful.}
-Our proof strategy for the confluence of the unification rules requires that they terminate.
-%
-The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
-substitution. \lennart{But the side condition is no longer there!}
-If instead we dropped that condition, the following sequence of \rulename{subst}
-reductions would not terminate:
-$$
-|def x (x == tup (1,x); x)|
-\; \rightarrow \; |def x (x == tup (1,x); tup (1,x))|
-\; \rightarrow \; |def x (x == tup (1,x); tup (1,tup (1,x)))|
-\; \rightarrow \; \cdots
-$$
-Here, each step makes one substitution for |x|.
-An exactly analogous example can be made for a lambda value.
-
-Similarly, as we discussed in \cref{sec:unification-rules},
-rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
-to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
+% \mypara{Ensuring that unification terminates.}
+% %
+% \simon{I think we could drop this entire para.  We have already discussed termination
+%   of unification in 3.3, and just above under ``the unification problem''.  Talking about it
+%   again here is not helpful.}
+% Our proof strategy for the confluence of the unification rules requires that they terminate.
+% %
+% The side condition $|x| \not\in \freevars{|v|}$ in \rulename{subst} avoids infinite
+% substitution. \lennart{But the side condition is no longer there!}
+% If instead we dropped that condition, the following sequence of \rulename{subst}
+% reductions would not terminate:
+% $$
+% |def x (x == tup (1,x); x)|
+% \; \rightarrow \; |def x (x == tup (1,x); tup (1,x))|
+% \; \rightarrow \; |def x (x == tup (1,x); tup (1,tup (1,x)))|
+% \; \rightarrow \; \cdots
+% $$
+% Here, each step makes one substitution for |x|.
+% An exactly analogous example can be made for a lambda value.
+% 
+% Similarly, as we discussed in \cref{sec:unification-rules},
+% rule \rulename{var-swap} uses the variable-ordering side condition $|x| \prec |y|$
+% to put the equation in a canonical orientation, and thus ensure that the unification rules terminate.
 
 \mypara{Unifying lambdas.} In \versecalc{}, an attempt to unify two
 lambdas fails even if the lambdas are semantically identical (rule
