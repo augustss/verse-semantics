@@ -518,10 +518,10 @@ as follows\footnote{The rule names after each arrow come from \cref{fig:rules}, 
 % \movestoR{eqn-elim}      & |2| \\
 % \end{array}
 % $$
-% Ranjit version
-$$
-\begin{array}{ll@@{\quad}ll}
-% \multicolumn{2}{l}{|def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)|} &
+% Ranjit version, spacing tweaked by Guy
+\begin{center}
+$
+\begin{array}{@@{}l@@{\;\;}l@@{\;\;}l@@{\;\;}l@@{}}
                          & |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| &
 \movestoR{subst}         & |def (x ^^ y ^^ z) (tup(2,z) == tup(y,3); x == tup(2,z); y)| \\
 \movestoR{eqn-elim}      & |def (y ^^ z) (tup(2,z) == tup(y,3); y)| &
@@ -531,7 +531,8 @@ $$
 \movestoR{subst}         & |def y (y==2; 2)| &
 \movestoR{eqn-elim}      & |2| \\
 \end{array}
-$$
+$
+\end{center}
 % Guy's Version
 % \begin{quote}
 % |def (x ^^ y ^^ z) (x == tup(y,3); x == tup(2,z); y)| \unskip\quad
