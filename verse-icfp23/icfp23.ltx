@@ -2220,6 +2220,12 @@ column are contextually equivalent to those in the right-hand column, because th
 inspect only the permanent structure. This contextual equivalence is the real reason
 for seeking confluence in the first place.
 
+In \versecalc{}, the notion of permanent structure must be generalized from an outer shell of \hbox{tuples}, lambdas, and constants
+to a \emph{sequence} (right-associative tree) of \emph{choices} of such outer shells.
+For example, however far we reduce the term |tup (68, lam x e_1) `choice` tup (lam y e_2, 57, lam z e_3) `choice` e_4|,
+the result will always look like |tup (68, lam x e1')  `choice` tup (lam y e2', 57, lam z e3') `choice` e4'|,
+where $\rsteps{\rr}{e_k}{e_k'}$ for $1 \leq k \leq 4$.
+
 In \cref{sec:skew-confluence} we show how to adapt the proof strategy
 of \cref{sec:confluence-sketch} and \cref{sec:confluence} for skew confluence.
 To do this we need a new result: if two relations are skew confluent
