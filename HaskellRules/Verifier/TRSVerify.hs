@@ -141,7 +141,7 @@ ex02 / True
 g(x:int):int := x
 
 ex0 / True
-:verify g(x:int, y:int where x = y) := { a := x; b := a; b = y }
+g(x:int, y:int where x = y) := { a := x; b := a; b = y }
 
 ex0' / True
 :verify g(x:int, y:int) := { a := x; b := a; b = y }
@@ -230,9 +230,35 @@ ex g $i2.
    g
 Verified
 
-
-
 -}
+
+exNotValid :: Expr
+exNotValid = eXIs [g, i1] $ (Var g :=: (blob1 :>: blob2) :>: Var i1) :>: Var g
+    where
+     g = ident "g"
+     i1 = ident "i1"
+--     x2 = ident "x2"
+--     x = ident "x"
+
+
+blob1 :: Expr
+blob1 = Var i1 :=: (Verify (LAM x2 ( EXI x ((Assume ((Var x :=: iNT(Var x2)) :>: Var x) :>: Assert (Var x))))))
+  where
+ --    g = ident "g"
+     i1 = ident "i1"
+     x2 = ident "x2"
+     x = ident "x"
+
+
+
+blob2 :: Expr
+blob2 = LAM x2 (EXI x ((Var x :=: iNT(Var x2)) :>: Assume (Var x)))
+  where
+--       g = ident "g"
+--       i1 = ident "i1"
+      x2 = ident "x2"
+      x = ident "x"
+
 -------------------------------------------------------------------------------------------
 ex00 :: Expr
 ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)

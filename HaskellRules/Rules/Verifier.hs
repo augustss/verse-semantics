@@ -8,6 +8,7 @@
 module Rules.Verifier(
   allSystemsVerify,
   icfpVerifier,
+  icfpeVerifier,
   verify,
   verifyM,
   ) where
