@@ -4,7 +4,6 @@ module Rules.ICFP(
   allSystemsICFP,
   systemICFP,
   systemICFPE,
-  valid,
   isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
