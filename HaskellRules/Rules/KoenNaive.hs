@@ -12,13 +12,13 @@ import Control.Monad( guard )
 --------------------------------------------------------------------------------
 
 allSystemsKoen :: [TRSystem Expr]
-allSystemsKoen = -- take 0 -- XXX
+allSystemsKoen =
   [ systemKoen ]
 
 systemKoen :: TRSystem Expr
 systemKoen = TRSystem
   { sname               = "Koen"
-  , description         = "Koen's very naive rules"
+  , description         = "Koen's simple rules"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check validE . expr)
   , postProcess         = const id
@@ -31,31 +31,20 @@ systemKoen = TRSystem
 
 -- Turn an expression into the subset of the Koen grammar
 expr :: Expr -> Expr
-expr e@(Var _)        = e
-expr e@(Int _)        = e
-expr e@(Op _)         = e
-expr e@(Arr es) | all isVar es = e
+expr (Arr es)         = letExprs (map expr es) Arr
+expr (fe :@: xe)      = letExprs (map expr [fe,xe]) $ \[f,x] -> f :@: x
 expr (Lam (Bind x e)) = Lam (Bind x (expr e))
+expr (e1 :=: e2)      = letExpr (expr e1) (:=: expr e2)
 expr (e1 :|: e2)      = expr e1 :|: expr e2
+expr (e1 :>: e2)      = expr e1 :>: expr e2
 expr (Exi (Bind x e)) = Exi (Bind x (expr e))
 expr (One e)          = One (expr e)
 expr (All e)          = All (expr e)
-expr (Split a b c)    = Split (expr a) (expr b) (expr c)
-expr e                = defseq e
-
-defseq :: Expr -> Expr
-defseq (Var x)          = Var x
-defseq (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
-defseq (e1 :>: e2)      = letExpr (expr e1) (\_ -> defseq e2)
-defseq (Exi (Bind x e)) = Exi (Bind x (defseq e))
-defseq Fail             = Fail
-defseq (Arr es)         = letExprs (map expr es) (\xs -> letExpr (Arr xs) id)
-defseq (fe :@: e)       = letExprs [expr fe,expr e] (\[f,x] -> letExpr (f :@: x) id)
-defseq e                = letExpr (expr e) id
+expr e                = e
 
 letExpr :: Expr -> (Expr -> Expr) -> Expr
-letExpr e@(Var _)     f = f e
-letExpr (Var x :=: e) f = (Var x :=: e) :>: f (Var x)
+letExpr e@(Val _)     f = f e
+letExpr (Val v :=: e) f = (v :=: e) :>: f v
 letExpr e             f = Exi (Bind x ((Var x :=: e) :>: f (Var x)))
  where
   fx0 = f (Var (ident ""))
@@ -69,299 +58,303 @@ letExprs (e:es) f = letExpr e (\x -> letExprs es (\xs -> f (x:xs)))
 validE :: Expr -> Bool
 validE = ok
  where
-  ok (Arr xs)         = all isVar xs
+  ok (Arr xs)         = all isVal xs
   ok (Lam (Bind _ e)) = ok e
   ok (Exi (Bind _ e)) = ok e
-  ok (_ :=: _)        = False
-  ok (e1 :>: e2)      = eq e1 && sequ e2
-  ok (f :@: x)        = isVar f && isVar x
+  ok (v :=: e)        = isVal v && ok e
+  ok (e1 :>: e2)      = ok e1 && ok e2
+  ok (e1 :|: e2)      = ok e1 && ok e2
+  ok (f :@: x)        = isVal f && isVal x
   ok (One e)          = ok e
   ok (All e)          = ok e
-  ok (Split x y z)    = ok x && ok y && ok z  
   ok _                = True
-
-  eq (x :=: e) = isVar x && ok e
-  eq _         = False
-  
-  sequ (e1 :>: e2)      = eq e1 && sequ e2
-  sequ (Exi (Bind _ e)) = sequ e
-  sequ (Var _)          = True
-  sequ Fail             = True
-  sequ _                = False
-
-isVar :: Expr -> Bool
-isVar (Var _) = True
-isVar _       = False
 
 --------------------------------------------------------------------------------
 
 allRules :: ERule
 allRules =
-     rulesStructural
-  <> rulesUnification
-  <> rulesEquality
-  <> rulesChoice
-  <> rulesApplication
-  <> rulesGarbageCollect
+     rulesFail
+  <> rulesSubst
+  <> rulesUni
+  <> rulesEqn
+  <> rulesExi
+  <> rulesAssoc
+  <> rulesElim
+  <> rulesApp
   <> rulesOne
   <> rulesAll
+  <> rulesChoice
 
 --------------------------------------------------------------------------------
 
-{-
-type Know = [([Ident], [Expr])]
-
-(+=) :: Know -> (Ident, Expr) -> Know
-[]             += (x,v) = [([x],[v])]
-((xs,vs):know) += (x,v)
-  | x `elem` xs          = (xs,v:vs) : know
-  | otherwise            = (xs,vs) : (know += (x,v))
-
-(+~) :: Know -> (Ident, Ident) -> Know
-[]             +~ (x,y) = [([x,y],[])]
-((xs,vs):know) +~ (x,y)
-  | x `elem` xs          = ([y] `union` xs,vs) : know
-  | y `elem` xs          = ([x] `union` xs,vs) : know
-  | otherwise            = (xs,vs) : (know +~ (x,v))
-
-matchCtx :: Expr -> [(Expr -> Expr, Expr)]
-matchCtx = undefined
--}
+rulesFail :: ERule
+rulesFail _ lhs =
+  "FAIL-EQN" `name`
+  do _ :=: Fail <- [lhs]
+     pure Fail
+ ++
+  "FAIL-SEQ-R" `name`
+  do _ :>: Fail <- [lhs]
+     pure Fail
+ ++
+  "FAIL-SEQ-L" `name`
+  do Fail :>: _ <- [lhs]
+     pure Fail
+ ++
+  "FAIL-CHOICE-R" `name`
+  do e :|: Fail <- [lhs]
+     pure e
+ ++
+  "FAIL-CHOICE-L" `name`
+  do Fail :|: e <- [lhs]
+     pure e
 
 --------------------------------------------------------------------------------
 
-rulesStructural :: ERule
-rulesStructural _ lhs =
-  "STRUCT-DEF-MOVE" `name`
-  do (x :=: e1) :>: (y :=: Val v) :>: r <- [lhs]
-     pure ((y :=: v) :>: (x :=: e1) :>: r)
+rulesSubst :: ERule
+rulesSubst _ lhs =
+  "SUBST" `name`
+  do (Var x :=: Val v) :>: e <- [lhs]
+     guard (not (isVctx x v))
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
  ++
-  "STRUCT-DEF-VAR-SWAP" `name`
-  do Var x :=: Var y <- [lhs]
-     pure (Var y :=: Var x)
+  "EQN-MOVE" `name`
+  do e :>: (Var x :=: Val v) <- [lhs]
+     pure ((Var x :=: v) :>: (e :>: Var x))
  ++
-  "STRUCT-DEF-BORROW" `name`
-  do (Var x :=: Var y) :>: (Var x' :=: e) :>: r <- [lhs]
-     guard (x == x')
-     pure ((Var x :=: Var y) :>: (Var y :=: e) :>: r)
+--  "EQN-COMPRESS" `name`
+--  do (Var x :=: Val v) :>: Val v' <- [lhs]
+--     guard (v == v')
+--     pure (Var x :=: v)
+-- ++
+  "EQN-SWAP" `name`
+  do (Val v :=: Var x) <- [lhs]
+     pure (Var x :=: v)
+
+isVctx :: Ident -> Expr -> Bool
+isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
+isVctx _ _        = False
+
+--------------------------------------------------------------------------------
+
+rulesUni :: ERule
+rulesUni _ lhs =
+  "UNI-ARR" `name`
+  do Arr as :=: Arr bs <- [lhs]
+     guard (length as == length bs)
+     pure (foldr (:>:) (Arr as) [ a :=: b | (a,b) <- as `zip` bs ])
  ++
-  "STRUCT-VAR-VAR-SWAP" `name`
+  "UNI-INT" `name`
+  do Int k :=: Int k' <- [lhs]
+     guard (k == k')
+     pure (Int k)
+ ++
+  "UNI-OCCURS" `name`
+  do Var x :=: Val v <- [lhs]
+     guard (isVctx x v)
+     pure Fail
+ ++
+  "UNI-FAIL" `name`
+  do HNF a :=: HNF b <- [lhs]
+     guard (a =/= b)
+     pure Fail
+
+(=/=) :: Expr -> Expr -> Bool
+Int k  =/= Int k' = k /= k'
+Arr as =/= Arr bs = length as /= length bs
+_      =/= _      = True
+
+--------------------------------------------------------------------------------
+
+rulesEqn :: ERule
+rulesEqn _ lhs =
+  "EQN-EQN" `name`
+  do v1 :=: (v2 :=: e) <- [lhs]
+     pure ((v1 :=: v2) :>: (v1 :=: e))
+ ++
+  "EQN-CHOICE" `name`
+  do v :=: (e1 :|: e2) <- [lhs]
+     pure ((v :=: e1) :|: (v :=: e2))
+ ++
+  "EQN-SEQ" `name`
+  do v :=: (e1 :>: e2) <- [lhs]
+     pure (e1 :>: (v :=: e2))
+
+--------------------------------------------------------------------------------
+
+rulesExi :: ERule
+rulesExi _ lhs =
+  "EXI-EQN-FLOAT" `name`
+  do v :=: Exi bnd <- [lhs]
+     let Bind x e = alphaRename (free v) bnd
+     pure (Exi (Bind x (v :=: e)))
+ ++
+  "EXI-SEQ-L-FLOAT" `name`
+  do Exi bnd :>: e2 <- [lhs]
+     let Bind x e1 = alphaRename (free e2) bnd
+     pure (Exi (Bind x (e1 :>: e2)))
+ ++
+  "EXI-SEQ-R-FLOAT" `name`
+  do e1 :>: Exi bnd <- [lhs]
+     let Bind x e2 = alphaRename (free e1) bnd
+     pure (Exi (Bind x (e1 :>: e2)))
+-- ++
+--  "EXI-CHOICE" `name`
+--  do Exi (Bind x (e1 :|: e2)) <- [lhs]
+--     pure (Exi (Bind x e1) :|: Exi (Bind x e2))
+ ++
+  "EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]
      pure (Exi (Bind y (Exi (Bind x e))))
 
 --------------------------------------------------------------------------------
 
-rulesUnification :: ERule
-rulesUnification = rulesUnificationProductive
-                <> rulesUnificationFail
-
-rulesUnificationProductive :: ERule
-rulesUnificationProductive _ lhs =
-  "UNIF-SAME" `name`
-  do (x :=: Val v) :>: (x' :=: Val v') :>: r <- [lhs]
-     guard (x == x' && v == v' && not (isLambda v))
-     pure ((x :=: v) :>: r)
+rulesAssoc :: ERule
+rulesAssoc _ lhs =
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
  ++
-  "UNIF-ARR" `name`
-  do (x :=: Arr xs) :>: (x' :=: Arr ys) :>: r <- [lhs]
-     guard (x == x' && length xs == length ys)
-     pure (foldr (:>:) ((x :=: Arr xs) :>: r) (zipWith (:=:) xs ys))
- ++
-  "UNIF-X-X" `name`
-  do (x :=: x') :>: r <- [lhs]
-     guard (x == x')
-     pure r
- where
-  isLambda (Lam _) = True
-  isLambda _       = False
-
-rulesUnificationFail :: ERule
-rulesUnificationFail _ lhs =
-  "UNIF-DIFF-CONST" `name`
-  do (x :=: Int k1) :>: (x' :=: Int k2) :>: _ <- [lhs]
-     guard (x == x' && k1 /= k2)
-     pure Fail
- ++
-  "UNIF-DIFF-ARR" `name`
-  do (x :=: Arr xs) :>: (x' :=: Arr ys) :>: _ <- [lhs]
-     guard (x == x' && length xs /= length ys)
-     pure Fail
- ++
-  "UNIF-LAMBDA" `name`
-  do (x :=: Lam _) :>: (x' :=: Lam _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-LAMBDA-CONST" `name`
-  do (x :=: Lam _) :>: (x' :=: Int _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-CONST-LAMBDA" `name`
-  do (x :=: Int _) :>: (x' :=: Lam _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-LAMBDA-ARR" `name`
-  do (x :=: Lam _) :>: (x' :=: Arr _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-ARR-LAMBDA" `name`
-  do (x :=: Arr _) :>: (x' :=: Lam _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-CONST-ARR" `name`
-  do (x :=: Int _) :>: (x' :=: Arr _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
- ++
-  "UNIF-DIFF-ARR-CONST" `name`
-  do (x :=: Arr _) :>: (x' :=: Int _) :>: _ <- [lhs]
-     guard (x == x')
-     pure Fail
-
---------------------------------------------------------------------------------
-
-rulesEquality :: ERule
-rulesEquality _ lhs =
-  "EQ-EQ" `name`
-  do (x :=: ((y :=: e) :>: r1)) :>: r2 <- [lhs]
-     pure ((y :=: e) :>: (x :=: r1) :>: r2)
- ++
-  "EQ-EXISTS" `name`
-  do (Var x :=: Exi bnd) :>: r <- [lhs]
-     let Bind y e = alphaRename (x:free r) bnd
-     pure (Exi (Bind y ((Var x :=: e) :>: r)))
- ++
-  "SEQ-EXISTS" `name`
-  do x_eq_e1 :>: Exi bnd <- [lhs]
-     let Bind y e2 = alphaRename (free x_eq_e1) bnd
-     pure (Exi (Bind y (x_eq_e1 :>: e2)))
- ++
-  "EQ-FAIL" `name`
-  do (_ :=: Fail) :>: r <- [lhs]
-     pure Fail
- ++
-  "SEQ-VAR-INTRO" `name`
-  do x_eq_e1 :>: e2 <- [lhs]
-     guard (isRelevant e2)
-     let y = identNotIn (free e2)
-     pure (x_eq_e1 :>: Exi (Bind y ((Var y :=: e2) :>: Var y)))
- where
-  isRelevant (Var _)   = False
-  isRelevant (Exi _)   = False
-  isRelevant (_ :=: _) = False
-  isRelevant _         = True
-
---------------------------------------------------------------------------------
-
-rulesChoice :: ERule
-rulesChoice _ lhs =
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
- ++
-  "CHOICE-FAIL-L" `name`
-  do Fail :|: e <- [lhs]
-     pure e
- ++
-  "CHOICE-FAIL-R" `name`
-  do e :|: Fail <- [lhs]
-     pure e
- ++
-  "EXISTS-CHOICE" `name`
-  do Exi (Bind x (e1 :|: e2)) <- [lhs]
-     pure (Exi (Bind x e1) :|: Exi (Bind x e2))
- ++
-  "CHOICE-MOVE" `name`
-  do (Var x :=: e) :>: (Var y :=: (e1 :|: e2)) :>: e3 <- [lhs]
-     guard (isChoiceFree e)
-     pure ((Var y :=: (e1 :|: e2)) :>: (Var x :=: e) :>: e3)
- ++
-  "CHOICE-EXPAND" `name`
-  do (ctx, (x :=: (e1 :|: e2)) :>: e3) <- choiceContext lhs
-     pure (ctx (((x :=: e1) :>: e3) :|: ((x :=: e2) :>: e3)))
-
-isChoiceFree :: Expr -> Bool
-isChoiceFree (One _)     = True
-isChoiceFree (All _)     = True
-isChoiceFree (Val _)     = True
-isChoiceFree Fail        = True
-isChoiceFree (e1 :>: e2) = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree (e1 :=: e2) = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree _           = False
-
-choiceContext :: Expr -> [(Expr -> Expr, Expr)]
-choiceContext lhs =
-  do One e <- [lhs]
-     defns One e
- ++
-  do All e <- [lhs]
-     defns All e
- ++
-  do e1 :|: e2 <- [lhs]
-     defns (:|: e2) e1 ++ defns (e1 :|:) e2
- where
-  defns ctx e = (ctx, e) : case e of
-                             Exi (Bind x e) -> defns (ctx . Exi . Bind x) e
-                             _              -> []
 
 --------------------------------------------------------------------------------
 
-rulesApplication :: ERule
-rulesApplication _ lhs =
-  "APP-LAMBDA" `name`
-  do (f :=: Lam bnd) :>: (y :=: (f' :@: v)) :>: r <- [lhs]
-     guard (f == f')
-     let Bind x e = alphaRename (free (y, (f, (v, r)))) bnd
-     pure ((f :=: Lam bnd) :>: Exi (Bind x ((Var x :=: v) :>: (y :=: e) :>: r)))
+rulesElim :: ERule
+rulesElim _ lhs =
+  "VAL-ELIM" `name`
+  do Val _ :>: e <- [lhs]
+     pure e
  ++
-  "APP-ARRAY" `name`
-  do (a :=: Arr xs) :>: (y :=: (a' :@: v)) :>: r <- [lhs]
-     guard (a == a')
-     let i = identNotIn (free (a, (xs, (y, (v, r)))))
-     pure ( (a :=: Arr xs)
-        :>: Exi (Bind i ( (Var i :=: v)
-                      :>: (y :=: foldr
-                                 (\(x,j) e -> ((Var i :=: Int j) :>: x) :|: e)
-                                 Fail
-                                 (xs `zip` [0..]))
-                      :>: r
-                        ))
-          )
-
---------------------------------------------------------------------------------
-
-rulesGarbageCollect :: ERule
-rulesGarbageCollect _ lhs =
-  "VAR-UNUSED" `name`
+  "EXI-ELIM" `name`
   do Exi (Bind x e) <- [lhs]
      guard (x `notElem` free e)
      pure e
  ++
-  "VAR-DEF-UNUSED" `name`
-  do Exi (Bind x ((Var x' :=: Val v) :>: r)) <- [lhs]
-     guard (x == x' && x `notElem` free v)
-     let (ys,r') = takeXEqs x r
-     guard (x `notElem` free r')
-     pure (foldr (:>:) r' (zipWith (:=:) (map Var ys) (v : repeat (Var (head ys)))))
- where
-  takeXEqs x ((Var x' :=: Var y) :>: r) | x == x' = (y:ys,r') where (ys,r') = takeXEqs x r
-  takeXEqs x r                                    = ([],r)
+  "EQN-ELIM" `name`
+  do Exi (Bind x (Var x' :=: Val v)) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free v)
+     pure v
+ ++
+  "EQN-SEQ-ELIM" `name`
+  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free (v,e))
+     pure e
 
 --------------------------------------------------------------------------------
 
-
+rulesApp :: ERule
+rulesApp _ lhs =
+  "APP-LAM" `name`
+  do Lam bnd :@: Val v <- [lhs]
+     let Bind x e = alphaRename (free v) bnd
+     pure (Exi (Bind x ((Var x :=: v) :>: e)))
+ ++
+  "APP-ARR" `name`
+  do Arr as :@: Val v <- [lhs]
+     pure (foldr (:|:) Fail [ (v :=: Int i) :>: a | (i,a) <- [0..] `zip` as ])
+ ++
+  "APP-ADD" `name`
+  do Op Add :@: Arr [Int i, Int j] <- [lhs]
+     pure (Int (i+j))
+ ++
+  "APP-GT" `name`
+  do Op Gt :@: Arr [Int i, Int j] <- [lhs]
+     pure (if i > j then Int i else Fail)
 
 --------------------------------------------------------------------------------
 
 rulesOne :: ERule
-rulesOne _ lhs = []
+rulesOne _ lhs =
+  "ONE-FAIL" `name`
+  do One Fail <- [lhs]
+     pure Fail
+ ++
+  "ONE-VAL" `name`
+  do One (Val v) <- [lhs]
+     pure v
+ ++
+  "ONE-CHOICE" `name`
+  do One (Val v :|: _) <- [lhs]
+     pure v
 
 rulesAll :: ERule
-rulesAll _ lhs = []
+rulesAll _ lhs =
+  "ALL-FAIL" `name`
+  do All Fail <- [lhs]
+     pure (Arr [])
+ ++
+  "ALL-CHOICE" `name`
+  do All e <- [lhs]
+     let as = choices e
+     guard (all isVal as)
+     pure (Arr as)
+ where
+  choices (e1 :|: e2) = choices e1 ++ choices e2
+  choices e           = [e]
+
+--------------------------------------------------------------------------------
+
+scopeX :: Expr -> [(Expr->Expr, Expr)]
+scopeX lhs =
+  do One xe <- [lhs]
+     (ctx, e) <- choicesX xe
+     pure (One . ctx, e)
+ ++
+  do All xe <- [lhs]
+     (ctx, e) <- choicesX xe
+     pure (All . ctx, e)
+ where
+  choicesX lhs =
+    do pure (id, lhs)
+   ++
+    do xe :|: e2 <- [lhs]
+       (ctx, e) <- choicesX xe
+       pure ((:|: e2) . ctx, e)
+   ++
+    do e1 :|: xe <- [lhs]
+       (ctx, e) <- choicesX xe
+       pure ((e1 :|:) . ctx, e)
+
+choiceX :: Expr -> [(Expr->Expr, Expr)]
+choiceX lhs =
+  do pure (id, lhs)
+ ++
+  do Val v :=: xe <- [lhs]
+     (ctx, e) <- choiceX xe
+     pure ((v :=:) . ctx, e)
+ ++
+  do xe :>: e2 <- [lhs]
+     (ctx, e) <- choiceX xe
+     pure ((:>: e2) . ctx, e)
+ ++
+  do ce :>: xe <- [lhs]
+     guard (isChoiceFree ce)
+     (ctx, e) <- choiceX xe
+     pure ((ce :>:) . ctx, e)
+ ++
+  do Exi (Bind x xe) <- [lhs]
+     (ctx, e) <- choiceX xe
+     pure ((Exi . Bind x) . ctx, e)
+
+isChoiceFree :: Expr -> Bool
+isChoiceFree (One _)       = True
+isChoiceFree (All _)       = True
+isChoiceFree (Val _)       = True
+isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
+isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
+isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
+isChoiceFree _             = False
+
+rulesChoice :: ERule
+rulesChoice _ lhs =
+  "CHOICE" `name`
+  do (ctx1, e) <- scopeX lhs
+     (ctx2, e1 :|: e2) <- choiceX e
+     pure (ctx1 (ctx2 e1 :|: ctx2 e2))
 
 --------------------------------------------------------------------------------
 
