@@ -102,20 +102,15 @@ isVctx _ _        = False
 -- CX
 choiceX :: Expr -> [(Expr->Expr, Expr)]
 choiceX lhs =
-  do pure (id, lhs)
+  do (Val v :=: h) :>: e2 <- [lhs]
+     pure (\h' -> (Val v :=: h') :>: e2, h)
  ++
-  do (Val v :=: xe) :>: e2 <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((:>: e2) . (v :=:) . ctx, e)
- ++
-  do (Val v :=: ce) :>: xe <- [lhs]
+  do (Val v :=: ce) :>: h <- [lhs]
      guard (isChoiceFree ce)
-     (ctx, e) <- choiceX xe
-     pure (((v :=: ce) :>:) . ctx, e)
+     pure (\h' -> (Val v :=: ce) :>: h', h)
  ++
-  do Exi (Bind x xe) <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((Exi . Bind x) . ctx, e)
+  do Exi (Bind x h) <- [lhs]
+     pure (\h' -> Exi (Bind x h'), h)
 
 -- ce
 isChoiceFree :: Expr -> Bool
