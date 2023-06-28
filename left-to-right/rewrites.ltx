@@ -189,7 +189,6 @@
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-      \text{Execution contexts} & X & ::= & \hole \vb |v==X; e| \vb |v==e; X| \\
       \text{Choice contexts} & CX & ::= & \hole \vb |v==CX; e| \vb |v==ce; CX| \vb |def x CX| \\
       \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v==ce_1; ce_2|
                                       \vb |def x ce| \vb |apply1 op v| \vb |one e| \vb |all e|
@@ -219,7 +218,7 @@
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
-\rulename{app-beta}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+\rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
                               |(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
@@ -240,14 +239,15 @@
   \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
   & \text{if $|v|$ is not $|V^[x]|$} \\
   \rulename{val-swap} & |v==x; e|    & \movesto & |x==v; e| \\
-  \rulename{eqn-float} & |ce; x==v; e| & \movesto & |x==v; ce; e| & \\
+  \rulename{eqn-float} & |v==ce; v_1==v_2; e| & \movesto & |v_1==v_2; v==ce; e| \\
 
     \\[-0.6em]
 
 \rulegroupname{Normalization:}
-\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $x \notin \freevars{|X|}$} \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (X^[x==v; e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v==v;e]|}$} \\
+\rulename{eqn-elim} & |def x (x==v; e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|X,v,e|}$} \\
+\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
+\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
 \rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
 
