@@ -189,7 +189,6 @@
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-      \text{Execution contexts} & X & ::= & \hole \vb |v==X; e| \vb |v==e; X| \\
       \text{Choice contexts} & CX & ::= & \hole \vb |v==CX; e| \vb |v==ce; CX| \vb |def x CX| \\
       \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v==ce_1; ce_2|
                                       \vb |def x ce| \vb |apply1 op v| \vb |one e| \vb |all e|
@@ -246,8 +245,9 @@
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (X^[x==v; e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v==v;e]|}$} \\
-\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $x \notin \freevars{|X|}$} \\
+\rulename{eqn-elim} & |def x (x==v; e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|X,v,e|}$} \\
+\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
+\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
 \rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
 
