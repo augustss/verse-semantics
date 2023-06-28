@@ -2335,7 +2335,7 @@ labeled expressions, something in the spirit of:
 $$
 \rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
 $$
-We believe this can be made to work and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea inspired our denotational
+We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
 \subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
@@ -2391,7 +2391,7 @@ to avoid confusing the presentation with these higher-order encodings, but there
 \section{\texorpdfstring{\versecalc{}}{The Verse calculus} in context: reflections and related work} \label{sec:related}
 
 Functional logic programming has a rich literature; excellent
-starting points are Antoy and Hanus's CACM review article \cite{antoy-hanus:survey} and
+starting points are the CACM review article by \citet{antoy-hanus:survey} and
 Hanus's longer survey~\cite{hanus:survey}.  Now that we
 know what \versecalc{} is, we can identify its distinctive features,
 and compare them to other approaches.
