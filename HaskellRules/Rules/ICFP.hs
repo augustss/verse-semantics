@@ -22,7 +22,6 @@ isRecursive = not . null . step rulesSubstRec defaultTRSFlags
 
 allSystemsICFP :: [TRSystem Expr]
 allSystemsICFP = [ systemICFP,
-                   systemICFPS0,
                    systemICFPC,
                    systemICFPSX,
                    systemICFPSXC,
@@ -71,13 +70,6 @@ systemICFPSX = systemICFP
   { sname               = "ICFPSX"
   , description         = "ICFP with a simplified substitution rule and context"
   , rules               = (rules systemICFP -= "SUBST" -= "EQN-ELIM") <> rulesSubstX
-  }
-
-systemICFPS0 :: TRSystem Expr
-systemICFPS0 = systemICFP
-  { sname               = "ICFPS0"
-  , description         = "ICFP with substitution without ordering side condition"
-  , rules               = (rules systemICFP -= "SUBST") <> rulesSubstLiberal <> rulesValEqualsChoice
   }
 
 systemICFPK :: TRSystem Expr
@@ -581,7 +573,7 @@ rulesApplication env lhs =
 --------------------------------------------------------------------------------
 
 rulesUnification :: ERule
-rulesUnification _env lhs =
+rulesUnification env lhs =
   "U-LIT" `name`
   do (Int k1 :=: Int k2) :>: e <- [lhs]
      guard (k1 == k2)
@@ -627,25 +619,10 @@ rulesUnification _env lhs =
   do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
      pure ((x :=: hnf) :>: e)
  ++
-  "VAR-SWAP-LIBERAL" `name`
+  "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
-     --guard (ltExpr env x y)
+     guard (ltExpr env x y)
      pure (x :=: y)
-
-rulesSubstLiberal :: ERule
-rulesSubstLiberal _env lhs =
-  "SUBST-LIBERAL" `name`
-  do --(ctx, (Var x :=: Val v) :>: e) <- execX lhs
-     (Var x :=: Val v) :>: e <- [lhs]
-     let ctx a = a :: Expr
-     let freeX = free (ctx, e)
-         freeV = free v
-     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
-         sub   = [(x, v),(x0, Var x)]
-     guard (x `elem` freeX)
-     guard (x `notElem` freeV)
-     --guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
 
 rulesSubstX :: ERule
 rulesSubstX env lhs =
@@ -693,10 +670,10 @@ rulesSeqSwap1 env lhs =
      pure $ e2 :>: (e1 :>: e3)
 
 rulesSimonSwap :: ERule
-rulesSimonSwap _env lhs =
-  "SEQ-SWAP-LIBERAL" `name`
-  do e1 :>: (e2@(Var _x :=: Val _) :>: e3) <- [lhs]
-     --guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)) && x /= y; _ -> True)
+rulesSimonSwap env lhs =
+  "SEQ-SWAP-SIMON" `name`
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     guard (case e1 of Var y :=: Val _ -> not (ltExpr env (Var y) (Var x)) && x /= y; _ -> True)
 
 {-
      -- This side condition is not confluent, see tricky:QC11
@@ -791,9 +768,7 @@ rulesElimination _ lhs =
  ++
   "EQN-ELIM" `name`
   do EXI x a <- [lhs]
-     --(ctx, (Var x' :=: Val v) :>: e) <- execX a
-     (Var x' :=: Val v) :>: e <- [a]
-     let ctx t = t :: Expr
+     (ctx, (Var x' :=: Val v) :>: e) <- execX a
      guard (x == x')
      guard (x `notElem` free (ctx (v :>: e)))
      pure (ctx e)
@@ -929,23 +904,8 @@ rulesChoice _ lhs =
 rulesValEqualsChoice :: ERule
 rulesValEqualsChoice _ lhs =
   "VAL-EQU-CHOICE" `name`
---  do (Val v :=: (e1 :|: e2)) <- [lhs]
---     pure (((v :=: e1) :>: v) :|: ((v :=: e2) :>: v))
---  do (Val v :=: (e1 :|: e2)) :>: Val w <- [lhs]
---     pure (((v :=: e1) :>: w) :|: ((v :=: e2) :>: w))
---  do (Val v :=: (e1 :|: e2)) :>: r <- [lhs]
---     pure (((v :=: e1) :|: (v :=: e2)) :>: r)
-  do (Val v :=: (e1 :|: e2)) :>: r <- [lhs]
-     pure ((((v :=: e1):>:v) :|: ((v :=: e2):>:v)) :>: r)
-  "EQU-COMPRESS" `name`
---  do (Val v :=: (e1 :|: e2)) <- [lhs]
---     pure (((v :=: e1) :>: v) :|: ((v :=: e2) :>: v))
---  do (Val v :=: (e1 :|: e2)) :>: Val w <- [lhs]
---     pure (((v :=: e1) :>: w) :|: ((v :=: e2) :>: w))
---  do (Val v :=: (e1 :|: e2)) :>: r <- [lhs]
---     pure (((v :=: e1) :|: (v :=: e2)) :>: r)
-  do (Val v :=: (e1 :|: e2)) :>: r <- [lhs]
-     pure ((((v :=: e1):>:v) :|: ((v :=: e2):>:v)) :>: r)
+  do Val v :=: (e1 :|: e2) <- [lhs]
+     pure (((v :=: e1) :>: v) :|: ((v :=: e2) :>: v))
 
 --------------------------------------------------------------------------------
 
