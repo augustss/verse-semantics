@@ -325,14 +325,20 @@
 %format G_2
 
 %format e_0
+%format e_0'
+%format e0'
 %format e_1
 %format e_1'
 %format e1'
-%format e2'
 %format e_2
 %format e_2'
+%format e2'
 %format e_3
+%format e_3'
+%format e3'
 %format e_4
+%format e_4'
+%format e4'
 %format e_5
 %format e_6
 %format e_n
