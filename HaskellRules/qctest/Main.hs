@@ -11,6 +11,7 @@ import TRS.TRS( step )
 import TRS.NormalForm( normalFormsFuelTrace, NormResult(..) )
 import TRS.Tarjan
 import TRS.Traced
+--import TRS.Bind( Bind(..), ident )
 import Test.QuickCheck as QC
 import Options.Applicative
 import qualified Data.Set as S
@@ -121,10 +122,10 @@ prop_Confluence2 flags sys =
 
 prop_Confluence3 :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence3 flags sys =
-  forAllBlind (arbPermute sys) $ \sys' ->
+  forAllBlind (liftArbitrary arbPermutation) $ \permf ->
     forAllShrink arbExpr shrinkExpr $ \p0 ->
       let p = if wrapOne flags then One p0 else p0 in
-        case (normTrace sys p, normTrace sys' p) of
+        case (normTrace sys (const id) p, normTrace sys permf p) of
           (Just t1, Just t2) ->
             whenFail (do putStrLn "==trace:1=="
                          putStr (unlines (showTrace t1))
@@ -134,10 +135,6 @@ prop_Confluence3 flags sys =
 
           _ -> discard
  where
-  arbPermute rsys =
-    do permf <- liftArbitrary arbPermutation
-       return $ rsys{ rules = \env p -> permf p (rules rsys env p) }
-  
   arbExpr =
     do p <- arbitrary
        return (preProcess sys (ruleEnv sys) p)
@@ -148,18 +145,18 @@ prop_Confluence3 flags sys =
     , validExpr sys (ruleEnv sys) p'
     ]
 
-  normTrace rsys p =
+  normTrace rsys permf p =
     if ignoreRecursive flags && isRecursive p then
       Nothing
     else
-      do ps <- tarjan1 100 next (start p)
+      do ps <- tarjan1 200 next (start p)
          let p' = minimum ps
          guard (not (ignoreRecursive flags && isRecursive (term p')))
          return p'
    where
     next (t :<-- tr) =
       [ q :<-- ((n,t):tr)
-      | (n,q) <- step (rules rsys) (ruleEnv rsys) t
+      | (n,q) <- permf t (step (rules rsys) (ruleEnv rsys) t)
       ]
 
 arbPermutation :: Gen ([a] -> [a])
