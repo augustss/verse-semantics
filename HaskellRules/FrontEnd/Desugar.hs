@@ -803,7 +803,7 @@ lowerTLamVerify i _rs is e1 e2 me3 = do
       Nothing -> pure (e2, e2)
       Just t -> do
         x <- newIdent (getLoc t) "x"
-        pure (e2, Exists [x] $ ApplyD t (Variable x))
+        pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
   pure $ Seq
     [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eAssert e2']
     ,           Lam i $ lExists is $ Seq [        e1, eAssume e2'']
