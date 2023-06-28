@@ -26,7 +26,7 @@ import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem)
 import Rules.Core(RuleEnv(..))
 import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
-import Rules.Verifier(verify)
+import Rules.Verifier(verifyM)
 import TRS.Traced(showTrace)
 
 --------------
@@ -254,27 +254,31 @@ assertVerify ti tflg e | typ == TSkip = do
                        | otherwise = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
       e' = preProcess sys (ruleEnv sys) . coreToTrs . exprToCore flags . desugar flags $ e
-      (done, trc) = verify sys e'
       shouldVerify = if typ == TBroken then testType ti == TFail else typ == TPass
 
-  when (fTrace flags) $ do
-    putStrLn "Verification trace:"
-    putStrLn $ unlines $ showTrace trc
+  case verifyM sys e' of
+    Nothing -> do
+      putStrLn $ pos ++ " timed out, use --max-norm-steps=N to change"
+      pure Excn
+    Just (done, trc) -> do
+      when (fTrace flags) $ do
+        putStrLn "Verification trace:"
+        putStrLn $ unlines $ showTrace trc
 
-  if done == shouldVerify then do
-    when noisy $
-      putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
-    pure Good
-   else do
-    putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
-              (if typ == TBroken then ", marked as broken" else "")
-    pure Bad
+      if done == shouldVerify then do
+        when noisy $
+          putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
+        pure Good
+       else do
+        putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
+                   (if typ == TBroken then ", marked as broken" else "")
+        pure Bad
  where
     loc = testLocn ti
     noisy = not (quiet tflg)
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
     typ = maybe (testType ti) snd $ find (\ (s,_) -> match s (sname sys)) (testExcn ti)
-    sys = system tflg
+    sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
     match (n, w) m = map toLower n `tst` map toLower m
       where tst = if w then isPrefixOf else (==)
 

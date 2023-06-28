@@ -11,3 +11,7 @@ verify(pass) {f(x:int):int=x+1; f(1)}
 verify(fail) {f(x:int):int=x+1; f()}
 verify(pass) {f(x:int):int=x+1; f(1)+1}
 verify(fail) {f(x:int):int=x+1; f(1)+()}
+
+verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
+# Times out with ICFP rules
+verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }

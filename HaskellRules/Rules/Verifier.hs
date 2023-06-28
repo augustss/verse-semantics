@@ -9,29 +9,37 @@ module Rules.Verifier(
   allSystemsVerify,
   icfpVerifier,
   verify,
+  verifyM,
   ) where
 import TRS.Bind
 import TRS.TRS
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (allSystemsICFP, execX, ltExpr)
+import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
 import Control.Monad (guard)
 import Data.List( intersect )
 
 -- | Run verification rules.
 
-verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
-verify sys e = res
+verifyM :: TRSystem Expr -> Expr -> Maybe (Bool, Traced Expr)
+verifyM sys e = res
  where
    res =
-     case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
-       Just (tr@(x :<-- _):_) -> (isDone x, tr)
-       _ -> undefined
+     case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
+       Just (tr@(x :<-- _):_) -> Just (isDone x, tr)
+       _ -> Nothing
    arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
   --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
+
+verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
+verify sys e =
+  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = -1 } }
+  in  case verifyM sys' e of
+        Just  x -> x
+        Nothing -> undefined
 
 isDone :: Expr -> Bool
 isDone = collect done (&&)
@@ -42,20 +50,29 @@ isDone = collect done (&&)
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
 icfpVerifier :: TRSystem Expr
-icfpVerifier = icfpActual
-  { sname = "ICFP-verify"
+icfpVerifier = icfp
+  { sname = "ICFPverify"
   , description = "ICFP + extra verifier rules"
-  , rules = (rules icfpActual -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
               <> generalizedIcfpRules
               <> assumeAssertRules
               <> verifierRules
   }
+  where icfp = systemICFP
 
-icfpActual :: TRSystem Expr
-icfpActual = head allSystemsICFP
+icfpeVerifier :: TRSystem Expr
+icfpeVerifier = icfp
+  { sname = "ICFPEverify"
+  , description = "ICFPE + extra verifier rules"
+  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+              <> generalizedIcfpRules
+              <> assumeAssertRules
+              <> verifierRules
+  }
+  where icfp = systemICFPE
 
 allSystemsVerify :: [TRSystem Expr]
-allSystemsVerify = [icfpVerifier]
+allSystemsVerify = [icfpVerifier, icfpeVerifier]
 
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
