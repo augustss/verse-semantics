@@ -123,8 +123,8 @@ choiceX lhs =
 
 -- ce
 isChoiceFree :: Expr -> Bool
-isChoiceFree (One _)       = True
-isChoiceFree (All _)       = True
+--isChoiceFree (One _)       = True
+--isChoiceFree (All _)       = True
 isChoiceFree (Val _)       = True
 isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
 isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
