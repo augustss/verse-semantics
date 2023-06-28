@@ -122,11 +122,15 @@ rulesSubst _ lhs =
   do e :>: (Var x :=: Val v) <- [lhs]
      pure ((Var x :=: v) :>: (e :>: Var x))
  ++
---  "EQN-COMPRESS" `name`
---  do (Var x :=: Val v) :>: Val v' <- [lhs]
---     guard (v == v')
---     pure (Var x :=: v)
--- ++
+  "EQN-SEQ-MOVE" `name`
+  do e1 :>: ((Var x :=: Val v) :>: e2) <- [lhs]
+     pure ((Var x :=: v) :>: e1 :>: e2)
+ ++
+  "EQN-VACUUM" `name`
+  do (Var x :=: Val v) :>: Val v' <- [lhs]
+     guard (v == v')
+     pure (Var x :=: v)
+ ++
   "EQN-SWAP" `name`
   do (Val v :=: Var x) <- [lhs]
      pure (Var x :=: v)
@@ -134,6 +138,24 @@ rulesSubst _ lhs =
 isVctx :: Ident -> Expr -> Bool
 isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
 isVctx _ _        = False
+
+{-
+xX :: Expr -> [(Expr->Expr, Expr)]
+xX lhs =
+  do pure (id, lhs)
+ ++
+  do v :=: xe <- [lhs]
+     (ctx, e) <- xX xe
+     pure ((v :=:). ctx, e)
+ ++
+  do e1 :>: xe <- [lhs]
+     (ctx, e) <- xX xe
+     pure ((e1 :>:). ctx, e)
+ ++
+  do xe :>: e2 <- [lhs]
+     (ctx, e) <- xX xe
+     pure ((:>: e2). ctx, e)
+-}
 
 --------------------------------------------------------------------------------
 
