@@ -193,10 +193,10 @@ rulesEqn _ lhs =
   "EQN-EQN" `name`
   do v1 :=: (v2 :=: e) <- [lhs]
      pure ((v1 :=: v2) :>: (v1 :=: e))
- ++
-  "EQN-CHOICE" `name`
-  do v :=: (e1 :|: e2) <- [lhs]
-     pure ((v :=: e1) :|: (v :=: e2))
+-- ++
+--  "EQN-CHOICE" `name`
+--  do v :=: (e1 :|: e2) <- [lhs]
+--     pure ((v :=: e1) :|: (v :=: e2))
  ++
   "EQN-SEQ" `name`
   do v :=: (e1 :>: e2) <- [lhs]
