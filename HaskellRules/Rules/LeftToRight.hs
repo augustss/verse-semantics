@@ -7,6 +7,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+import Rules.ICFP(rulesPrimOps)
 import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
@@ -133,15 +134,7 @@ isChoiceFree _             = False
 --------------------------------------------------------------------------------
 
 rulesApplication :: ERule
-rulesApplication _ lhs =
-  "APP-ADD" `name`
-  do Op Add :@: Arr [Int i, Int j] <- [lhs]
-     pure (Int (i+j))
- ++
-  "APP-GT" `name`
-  do Op Gt :@: Arr [Int i, Int j] <- [lhs]
-     pure (if i > j then Int i else Fail)
- ++
+rulesApplication env lhs =
   "APP-LAM" `name`
   do Lam bnd :@: Val v <- [lhs]
      let Bind x e = alphaRename (free v) bnd
@@ -150,6 +143,8 @@ rulesApplication _ lhs =
   "APP-TUP" `name`
   do Arr as :@: Val v <- [lhs]
      pure (foldr (:|:) Fail [ (v :=: Int i) :>: a | (i,a) <- [0..] `zip` as ])
+ ++
+  rulesPrimOps env lhs
 
 --------------------------------------------------------------------------------
 
