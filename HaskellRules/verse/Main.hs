@@ -24,7 +24,6 @@ import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 --import Verifier.Verify
-import Rules.ICFP(anf)
 import Rules.Verifier(icfpVerifier, verify)
 import TRS.Traced(toList, showTrace)
 --import TRS.Bind(free)
@@ -257,10 +256,11 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
-      let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
-          e' = anf $ coreToTrs $ asCore flg e
+      let sys = icfpVerifier
+      let flg = (flags s){ fVerify = True, fSplit = False }
+          e' = preProcess sys (ruleEnv sys) $ coreToTrs $ asCore flg e
       --putStrLn $ "Desugared:\n" ++ prettyShow e'
-      let (done, trc) = verify icfpVerifier e'
+      let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
         putStrLn $ unlines $ showTrace trc

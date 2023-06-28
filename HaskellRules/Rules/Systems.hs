@@ -8,6 +8,7 @@ import Rules.PLDI(allSystemsPLDI)
 import Rules.POPL(allSystemsPOPL)
 import Rules.KoenNaive(allSystemsKoen)
 import Rules.Block(allSystemsBlock)
+import Rules.Verifier(allSystemsVerify)
 
 type ESystem = TRSystem Expr
 
@@ -18,6 +19,7 @@ allSystems =
   ++ allSystemsPLDI
   ++ allSystemsKoen
   ++ allSystemsBlock
+  ++ allSystemsVerify
 
 lookupSystem :: String -> Either String ESystem
 lookupSystem = lookupSystemEx allSystems

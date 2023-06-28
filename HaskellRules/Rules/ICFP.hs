@@ -180,6 +180,7 @@ valid' onlyEq = expr
     expr (All e) = expr e
     expr (Assume e) = expr e
     expr (Assert e) = expr e
+    expr (Verify e) = expr e
     expr Fail = True
     expr Wrong{} = True
     expr (Split e (LAM _ e1) (LAM _ (LAM _ (LAM _ e2)))) =
@@ -188,7 +189,7 @@ valid' onlyEq = expr
       expr e && expr e1
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
-    expr _ = undefined -- GHC bug
+    expr e = error $ "valid: unexpected " ++ show e
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
     value Var{} = True

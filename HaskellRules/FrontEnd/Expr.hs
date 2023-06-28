@@ -6,7 +6,7 @@
 
 module FrontEnd.Expr(
   Loc, noLoc,
-  Ident(..),
+  Ident(..), unIdent,
   Expr(..),
   Core,
   pattern Fail,

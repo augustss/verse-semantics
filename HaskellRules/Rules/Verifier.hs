@@ -6,6 +6,7 @@
 {-# LANGUAGE InstanceSigs #-}
 
 module Rules.Verifier(
+  allSystemsVerify,
   icfpVerifier,
   verify,
   ) where
@@ -42,7 +43,8 @@ isDone = collect done (&&)
 
 icfpVerifier :: TRSystem Expr
 icfpVerifier = icfpActual
-  { sname = "ICFP + extra verifier rules"
+  { sname = "ICFP-verify"
+  , description = "ICFP + extra verifier rules"
   , rules = (rules icfpActual -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
               <> generalizedIcfpRules
               <> assumeAssertRules
@@ -51,6 +53,9 @@ icfpVerifier = icfpActual
 
 icfpActual :: TRSystem Expr
 icfpActual = head allSystemsICFP
+
+allSystemsVerify :: [TRSystem Expr]
+allSystemsVerify = [icfpVerifier]
 
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
