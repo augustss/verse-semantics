@@ -151,6 +151,7 @@ dsSmall = ds
     ds (HasType e1 e2) = HasType <$> ds e1 <*> ds e2
 
     -- Misc
+    ds (Variable (Ident l "_")) = DefineV <$> newIdent l "u"
     ds (Option Nothing) = pure eFalse
     -- option{e}  -->  if(x:=e)then truth(e)
     ds (Option (Just e)) = do

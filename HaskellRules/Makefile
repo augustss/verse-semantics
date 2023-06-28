@@ -2,6 +2,7 @@
 TESTFILE=versetests/tests.versetest
 TESTSTOREFILE=versetests/storetests.versetest
 TRICKY=versetests/tricky.versetest
+VERIFY=versetests/verify.versetest
 TESTPARSEFILE=versetests/test1.verse
 .PHONY: all test testfast clean
 
@@ -17,76 +18,23 @@ all:
 build:
 	cabal build
 
-testicfp:
-	make RULES=ICFP testrules
-	$(TESTER) --quiet --dfs --rules=ICFPR                   --max-steps=25000       $(TESTFILE)
-
 testrules:
 	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=25000       $(TESTFILE)
 	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 	$(QCTEST)               --rules=$(RULES) $(EXTRA) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
 
-testslow:
-	$(TESTER)               --rules=popl --no-under-lambda --max-steps=25000    $(TESTFILE)
-
-testfast:
-	$(TESTER) --quiet --parse                                                   $(TESTPARSEFILE)
-#	$(TESTER) --quiet       --rules=eval --no-under-lambda                      $(TESTFILE)
-#	$(TESTER) --quiet --eval --split                                            $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=POPL                   --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=POPLF                  --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=POPLL                  --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --dfs --rules=PLDI --final-inline    --max-steps=25000    $(TESTFILE)
-
-testnorec:
-	$(TESTER) --quiet --dfs --rules=POPLR                  --max-steps=25000    $(TESTFILE)
-
 testiblock:
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTFILE)
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTSTOREFILE)
 
-testblock:
-	$(TESTER) --quiet --dfs --rules=Block                  --max-steps=1000     $(TESTFILE)
-	$(TESTER) --quiet       --rules=Block                  --max-steps=25000    $(TESTFILE)
-
-testblockqc:
-	$(QCTEST) --rules=BlockA --ignore-fuel-stop --max-success=1000000
-
-testpoplaqc:
-	$(QCTEST) --rules=POPLA --ignore-fuel-stop --max-success=1000000
-
-testpoplxqc:
-	$(QCTEST) --rules=POPLX --ignore-fuel-stop --max-success=1000000
+testverify:
+	$(TESTER) --rules=ICFP-verify $(VERIFY)
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
 
-testpopll:
-	$(TESTER) --quiet --dfs --rules=POPLL --max-steps=1000                          $(TESTFILE)
-	$(TESTER)               --rules=POPLL --max-steps=25000 --max-norm-steps=100000 $(TRICKY)
-	$(TESTER) --quiet       --rules=POPLL --max-steps=25000                         $(TESTFILE)
-
-testpopllqc:
-	$(QCTEST) --rules=POPLL --ignore-fuel-stop --max-success=1000000
-
-testnorecqc:
-	$(QCTEST) --rules=POPLR --ignore-fuel-stop --max-success=10000
-
-trickytest: testtricky
-
 testtricky:
 	$(TESTER) --quiet --summary --no-error --all-rules --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
-
-testqcconf:
-	$(QCTEST) --rules=POPLV --ignore-fuel-stop
-	$(QCTEST) --rules=POPLV --max-success=30
-
-teststore:
-	$(TESTER) --rules=eval --split --no-under-lambda versetests/storetests.versetest
-
-teststorepopl:
-	$(TESTER) --rules=popls --split --final-inline --max-steps=200000 --no-under-lambda versetests/storetests.versetest
 
 clean:
 	cabal clean

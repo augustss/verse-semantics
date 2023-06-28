@@ -26,6 +26,8 @@ import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem)
 import Rules.Core(RuleEnv(..))
 import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
+import Rules.Verifier(verify)
+import TRS.Traced(showTrace)
 
 --------------
 
@@ -58,21 +60,27 @@ data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo Expr Expr
   | TestCoreEq TestInfo Core Core
+  | TestVerify TestInfo Expr
   deriving (Show)
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
 testInfo (TestCoreEq ti _ _) = ti
+testInfo (TestVerify   ti _) = ti
 
 data TestInfo = TestInfo
-  { testMName :: Maybe String
-  , testLocn :: Loc
-  , testType :: TestType
-  , testExcn :: [((String, Bool), TestType)]  -- The bool indicates the the string is just a prefix
+  { testMName  :: !(Maybe String)
+  , testLocn   :: !Loc
+  , testType   :: !TestType                      -- default test type
+  , testExcn   :: ![((String, Bool), TestType)]  -- the bool indicates the the string is just a prefix
   }
   deriving (Show)
 
-data TestType = TSkip | SEq | FEq
+data TestType
+  = TPass                 -- test should pass
+  | TFail                 -- test should fail
+  | TSkip                 -- test should be skipped
+  | TBroken               -- test is currently broken (i.e., pass/fail is negated)
   deriving (Show, Eq)
 
 pTestInfo :: P TestInfo
@@ -96,11 +104,12 @@ testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMN
 pTestType :: P TestType
 pTestType = do
   i <- pIdent
-  case i of
-    Ident _ "SEq"  -> pure SEq
-    Ident _ "FEq"  -> pure FEq
-    Ident _ "Skip" -> pure TSkip
-    _ -> fail "pTestType"
+  case map toLower $ unIdent i of
+    "pass"    -> pure TPass
+    "fail"    -> pure TFail
+    "skip"    -> pure TSkip
+    "broken"  -> pure TBroken
+    _         -> fail "pTestType"
 
 -- Parse an expression evaluation equality test
 pTestEq :: P Test
@@ -116,9 +125,16 @@ pTestCEq =
     tId <- pParens pTestInfo
     TestCoreEq tId <$> pBraces pCore    <*> pBraces pCore
 
+-- Parse an expression verification test
+pTestVerify :: P Test
+pTestVerify =
+  pKeyword "verify" *> do
+    tId <- pParens pTestInfo
+    TestVerify tId <$> pBraces pExprSeq
+
 -- Parse a test
 pTest :: P Test
-pTest = pTestEq <|> pTestCEq
+pTest = pTestEq <|> pTestCEq <|> pTestVerify
 
 -- Parse a file of tests
 pTestFile :: P [Test]
@@ -149,7 +165,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     putStrLn $ pos ++ " skipped"
   pure Skip
                                       | otherwise = do
-  let expectOK = typ == SEq
+  let expectOK = typ == TPass
   let vs1 = runM flg sys c1  -- May return multiple answers
   let v2  = run flg sys c2   -- Returns just one
 
@@ -192,7 +208,10 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
                     print v2
                 --undefined
               else do
-                putStrLn $ pos ++ " unexpected success, please update test case!"
+                putStrLn pos
+                when (typ == TBroken) $
+                  putStrLn " broken test has"
+                putStrLn " unexpected success"
             pure Bad
       ) (\e -> do
            when (not (noError tflg)) $ do
@@ -227,9 +246,44 @@ equivValue sys e1 e2 =
 
 --------------
 
+assertVerify :: HasCallStack => TestInfo -> TestFlags -> Expr -> IO TestRes
+assertVerify ti tflg e | typ == TSkip = do
+  when noisy $
+    putStrLn $ pos ++ " skipped"
+  pure Skip
+                       | otherwise = do
+  let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
+      e' = preProcess sys (ruleEnv sys) . coreToTrs . exprToCore flags . desugar flags $ e
+      (done, trc) = verify sys e'
+      shouldVerify = if typ == TBroken then testType ti == TFail else typ == TPass
+
+  when (fTrace flags) $ do
+    putStrLn "Verification trace:"
+    putStrLn $ unlines $ showTrace trc
+
+  if done == shouldVerify then do
+    when noisy $
+      putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
+    pure Good
+   else do
+    putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
+              (if typ == TBroken then ", marked as broken" else "")
+    pure Bad
+ where
+    loc = testLocn ti
+    noisy = not (quiet tflg)
+    pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
+    typ = maybe (testType ti) snd $ find (\ (s,_) -> match s (sname sys)) (testExcn ti)
+    sys = system tflg
+    match (n, w) m = map toLower n `tst` map toLower m
+      where tst = if w then isPrefixOf else (==)
+
+--------------
+
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
 runTest tflg (TestCoreEq n e1 e2) = assertEquivC n tflg e1 e2
+runTest tflg (TestVerify n e)     = assertVerify n tflg e
 
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts) = do
