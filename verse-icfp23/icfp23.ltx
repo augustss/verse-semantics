@@ -2246,24 +2246,26 @@ We discuss some of them here.
 \subsection{Simplifying the rules} \label{sec:simpler}
 
 The rules of \Cref{fig:rules} are more complicated than we would like, because our
-confluence proof requires that the unification rules form a terminating
-rewrite system (\Cref{sec:design-confluence}).  Tantalizingly, here is a much simpler set of rules that
-we believe is equally expressive, and is still confluent:
+proof of confluence requires that the unification rules form a \emph{terminating}
+rewrite system (\Cref{sec:design-confluence}).  Tantalizingly, we have
+found simpler versions of four of the unification and elimination rules that
+we believe are equally expressive and still support (modified
+versions of) our proofs of termination and confluence:
 $$
-\begin{array}{@@{\hskip0.5em} l  r @@{\;\;}c@@{\;\;} l l@@{}}
-  \rulename{subst'} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
+\begin{array}{@@{\hskip0.5em}l@@{\qquad}r @@{\;\;}c@@{\;\;}l@@{\qquad}l@@{}}
+  \rulename{subst${}'$} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
   & \text{if $|v| \not= |V^[x]|$}, \\
-  \rulename{var-swap'} & |y==x; e|    & \movesto & |x==y; e| & \text{(unconditionally)} \\
-  \rulename{seq-swap'} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
+  \rulename{var-swap${}'$} & |y==x; e|    & \movesto & |x==y; e| & \text{(unconditionally)} \\
+  \rulename{seq-swap${}'$} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
                       \text{(unconditionally)} \\
-\rulename{eqn-elim'} & |def x (x==v;e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{eqn-elim${}'$} & |def x (x==v;e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|v|,|e|}$} \\
 \end{array}
 $$
-Each of these rules is simpler than its counterpart in \Cref{fig:rules}. In particular \rulename{subst'}
-needs no context |X|: it simply substitutes to the right, relying on other rules (e.g. \rulename{eqn-float}
-and \rulename{seq-swap}) to float the equation to the left of its target.  Our testing framework (\Cref{sec:testing})
-gives us strong confidence that these simpler rules are confluent; actually \emph{proving} them confluent
-is work in progress.
+Each of these rules is simpler than its counterpart in \Cref{fig:rules}. In particular, rules \rulename{subst${}'$} and \rulename{eqn-elim${}'$}
+need no context~|X|: instead, they rely on other rules (\rulename{eqn-float}
+and \rulename{seq-swap${}'$}) to float the equation of interest upward and to the left.  Our testing framework (\Cref{sec:testing})
+has given us strong confidence that the entire set of rules, with these four simplifications, remains confluent; actually \emph{proving} it confluent
+is work in progress. We speculate that these same simplifications will also support a proof of skew confluence.
 
 % JB: Removed this section now that fail-l and fail-r are wrapped into SX; this also fixes this problem I think.
 % \subsection{Choice and failure} \label{sec:choice-and-failure}
