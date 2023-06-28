@@ -2335,13 +2335,13 @@ labeled expressions, something in the spirit of:
 $$
 \rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
 $$
-We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea directly inspired our denotational
+We believe this can be made to work and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea inspired our denotational
 semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
 
 \subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
 In \versecalc{}, we introduced |oneKW| and |allKW| as the primitive choice-consuming operators, and neither is more general than the other, as discussed in \cref{sec:all}.
-We could have introduced a more general operator |splitKW|\footnote{The name inspired by \citet{oleglogict}.} as $e \; ::= \; \cdots \vb |split e v_1 v_2|$ and rules:
+We could have introduced a more general operator |splitKW|\footnote{The name |splitKW| was inspired by \citet{oleglogict}.} as $e \; ::= \; \cdots \vb |split e v_1 v_2|$ and rules:
 \[\begin{array}{lrcll}
     \rulename{split-fail} & |split fail f g| & \movesto & |apply0 f| \\
     \rulename{split-value} & |split v f g| & \movesto & |applyN g (v, thunk fail)|  \\
