@@ -173,7 +173,7 @@
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x b| \vb |apply1N v_1 v_2| \vb |one b| \vb |all b| \\
+      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
       \text{Primops} & op  & ::= & |gt| \vb |add|
@@ -188,7 +188,7 @@
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Substitution contexts} & S & ::= & \hole \vb |v == S| \vb |e; S| \vb |S ; e| \\
+      \text{Execution contexts} & X & ::= & \hole \vb |v == X| \vb |e; X| \vb |X ; e| \\
       \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
                             & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
@@ -245,39 +245,35 @@
     % that arises because the longest rule name and the longer LHS are not on the same line
     % The \; reduces the spacing around the arrow
 \rulegroupname{Unification:}
-  \rulename{u-lit}   & |k_1 == k_2| & \movesto & |emptytup| & \text{if $k_1=k_2$} \\
+  \rulename{u-lit}   & |k_1 == k_2| & \movesto & |k_1| & \text{if $k_1=k_2$} \\
 %%  \rulename{u-tup} & \hspace{-1.8em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_0,xdots,v_n) == tup (v0',xdots,v_n')| & \movesto & |v_0==v0';xdots;v_n==v_n'| \\
-  \rulename{u-tup-0} & \hspace{-2.0em} |emptytup == emptytup| & \movesto & |emptytup| \\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-tup-0} do not match} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & |v_1==v1';xdots;v_n==v_n';tup (v_1,xdots,v_n)| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
   \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-  \rulename{subst} & |S^[x==v]| & \movesto & |(subst S x v)^[x==v]| \hspace*{-0.3em}
-  & \text{if $|x| \in \freevars{|S|}$, $|x| \notin \freevars{|v|}$ or $|v|$ is a lambda}, \\
-  &&&& \text{\hskip 0.7em and ($(|v| = |y| \implies |x| \prec |y|)$)} \\
-  \rulename{hnf-swap} & |hnf==x|    & \movesto & |x==hnf| \\
-  \rulename{var-swap} & |y==x|    & \movesto & |x==y| & \text{if |x| $\prec$ |y| } \\
+  \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
+  & \text{if $|v|$ is not $|V^[x]|$} \\
+  \rulename{val-swap} & |v==x|    & \movesto & |x==v| \\
 %%  \rulename{var-swap-subst} & |X^[x==y; e]| & \movesto & |subst X y x^[y==x; subst e y x]| & \text{if |y| $\prec$ |x| } \\
 %%  \rulename{val-swap-ord} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| & \text{if |eq_2| $\prec$ |eq_1| } \\
-  \rulename{seq-swap} & |e; x==v| & \movesto & |x==v; e; emptytup| &
-                      \text{unless (|b| is |y==v'| and |y| $\preceq$ |x|)} \\
+  \rulename{seq-swap} & |e; x==v| & \movesto & |x==v; e; x| & \\
 
     \\[-0.6em]
 
 \rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
+\rulename{eqn-compress} & |x==v; v| & \movesto & |x==v| \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (S^[x==v])| & \movesto & |S^[emptytup]| & \text{if $|x| \notin \freevars{|S^[v]|}$} \\
-\rulename{fail-elim} & |S^[fail]| & \movesto & |fail| & \text{if $|S| \ne \hole$} \\
+\rulename{eqn-elim} & |def x (X^[x==v])| & \movesto & |X^[v]| & \text{if $|x| \notin \freevars{|X^[v]|}$} \\
+\rulename{fail-elim} & |X^[fail]| & \movesto & |fail| \\
 
     \\[-0.6em]
 
 \rulegroupname{Normalization:}
-\rulename{exi-float}^{\alpha} & |S^[def x e]| & \movesto & |def x (S^[e])| & \text{if $|S| \ne \hole,\,  x \notin \freevars{|S|}$} \\
+\rulename{exi-float}^{\alpha} & |X^[def x e]| & \movesto & |def x (X^[e])| & \text{if $x \notin \freevars{|X|}$} \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1 ; (e_2 ; e_3)| \\
-\rulename{eqn-seq-push} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_2| \\
-\rulename{eqn-choice-push} & |v == (e_1 choice e_2)| & \movesto & |v == e_1 choice v == e_2| \\
-\rulename{eqn-eqn-push} & |v_1 == (v_2 == e)| & \movesto & |v_1 == emptytup ; v_2 == e| \\
-\rulename{eqn-result} & |v == e ; emptytup| & \movesto & |v == e| \\
+\rulename{eqn-eqn} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2 ; v_1 == e| \\
+\rulename{eqn-seq} & |v == (e_1 ; e_2)| & \movesto & |e_1 ; v == e_2| \\
+\rulename{eqn-choice} & |v == (e_1 choice e_2)| & \movesto & |v == e_1 choice v == e_2| \\
 \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
 %\rulename{seq-swap} & |eq_1; eq_2; e| & \movesto & |eq_2; eq_1; e| &
 %                      \hspace{-3em}\text{if ($eq_1 \in ceq$ or $eq_2 \in ceq$) and $eq_2 \prec eq_1$} \\
