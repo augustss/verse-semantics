@@ -24,7 +24,7 @@ import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 --import Verifier.Verify
-import Rules.Verifier(icfpVerifier, verify)
+import Rules.Verifier
 import TRS.Traced(toList, showTrace)
 --import TRS.Bind(free)
 

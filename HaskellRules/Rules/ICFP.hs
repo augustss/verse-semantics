@@ -4,6 +4,7 @@ module Rules.ICFP(
   allSystemsICFP,
   systemICFP,
   systemICFPE,
+  valid,
   isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
@@ -173,6 +174,9 @@ validK = valid' True
 valid' :: Bool -> Expr -> Bool
 valid' onlyEq = expr
   where
+    expr (Assume e) = expr e
+    expr (Assert e) = expr e
+    expr (Verify e) = expr e
     expr e@Val{} = value e
     expr (LAM _ e) = expr e
     expr (_ :=: _) = False
@@ -182,9 +186,6 @@ valid' onlyEq = expr
     expr (EXI _ e) = expr e
     expr (One e) = expr e
     expr (All e) = expr e
-    expr (Assume e) = expr e
-    expr (Assert e) = expr e
-    expr (Verify e) = expr e
     expr Fail = True
     expr Wrong{} = True
     expr (Split e (LAM _ e1) (LAM _ (LAM _ (LAM _ e2)))) =

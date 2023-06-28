@@ -11,7 +11,7 @@ TESTER=cabal run tester --
 QCTEST=cabal run qctest --
 
 RULES=ICFP
-VRULES=ICFPverify
+VRULES=ICFPEverify
 
 all: testiblock testverify testrules
 
