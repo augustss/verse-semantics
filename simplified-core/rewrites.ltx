@@ -173,7 +173,7 @@
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x b| \vb |apply1N v_1 v_2| \vb |one b| \vb |all b| \\
+      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
       \text{Primops} & op  & ::= & |gt| \vb |add|
