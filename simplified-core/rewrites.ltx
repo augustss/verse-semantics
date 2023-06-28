@@ -261,7 +261,7 @@
 
 \rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
-\rulename{eqn-compress} & |x==v; v| & \movesto & |x==v| \\
+\rulename{eqn-vacuum} & |x==v; v| & \movesto & |x==v| \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{eqn-elim} & |def x (X^[x==v])| & \movesto & |X^[v]| & \text{if $|x| \notin \freevars{|X^[v]|}$} \\
 \rulename{fail-elim} & |X^[fail]| & \movesto & |fail| \\
