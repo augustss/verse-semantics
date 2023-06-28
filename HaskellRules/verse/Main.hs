@@ -256,10 +256,10 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
-      let sys = icfpVerifier
+      let sys = icfpeVerifier
       let flg = (flags s){ fVerify = True, fSplit = False }
           e' = preProcess sys (ruleEnv sys) $ coreToTrs $ asCore flg e
-      --putStrLn $ "Desugared:\n" ++ prettyShow e'
+      putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
