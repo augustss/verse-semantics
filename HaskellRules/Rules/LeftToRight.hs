@@ -98,23 +98,6 @@ isVctx :: Ident -> Expr -> Bool
 isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
 isVctx _ _        = False
 
--- X
-xX :: Expr -> [(Expr->Expr, Expr)]
-xX lhs =
-  do pure (id, lhs)
- ++
-  do v :=: xe <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((v :=:). ctx, e)
- ++
-  do e1 :>: xe <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((e1 :>:). ctx, e)
- ++
-  do xe :>: e2 <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((:>: e2). ctx, e)
-
 -- CX
 choiceX :: Expr -> [(Expr->Expr, Expr)]
 choiceX lhs =
@@ -224,16 +207,20 @@ rulesNormalization _ lhs =
      pure e
  ++
   "EQN-ELIM" `name`
-  do Exi (Bind x xe) <- [lhs]
-     (ctx, (Var x' :=: Val v) :>: e) <- xX xe
+  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
      guard (x == x')
-     guard (x `notElem` free (ctx (Val v :>: e)))
-     pure (ctx e)
+     guard (x `notElem` free (v, e))
+     pure e
  ++
-  "EXI-FLOAT" `name`
-  do (ctx, Exi bnd) <- xX lhs
-     let Bind x e = alphaRename (free (ctx (Arr []))) bnd
-     pure (Exi (Bind x (ctx e)))
+  "EXI-FLOAT-L" `name`
+  do (v :=: Exi bnd) :>: e2 <- [lhs]
+     let Bind x e1 = alphaRename (free (v,e2)) bnd
+     pure (Exi (Bind x ((v :=: e1) :>: e2)))
+ ++
+  "EXI-FLOAT-R" `name`
+  do Exi (Bind x (v_eq_e1 :>: e2)) <- [lhs]
+     guard (x `notElem` free v_eq_e1)
+     pure (v_eq_e1 :>: Exi (Bind x e2))
  ++
   "EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]
