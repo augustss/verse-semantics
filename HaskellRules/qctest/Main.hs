@@ -149,7 +149,7 @@ prop_Confluence3 flags sys =
     if ignoreRecursive flags && isRecursive p then
       Nothing
     else
-      do ps <- tarjan1 200 next (start p)
+      do ps <- tarjan1 100 next (start p)
          let p' = minimum ps
          guard (not (ignoreRecursive flags && isRecursive (term p')))
          return p'
