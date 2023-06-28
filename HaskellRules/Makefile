@@ -11,9 +11,9 @@ TESTER=cabal run tester --
 QCTEST=cabal run qctest --
 
 RULES=ICFP
+VRULES=ICFPverify
 
-all:
-	@echo Specify a target
+all: testiblock testverify testrules
 
 build:
 	cabal build
@@ -28,7 +28,7 @@ testiblock:
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTSTOREFILE)
 
 testverify:
-	$(TESTER) --rules=ICFP-verify $(VERIFY)
+	$(TESTER) --quiet --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive

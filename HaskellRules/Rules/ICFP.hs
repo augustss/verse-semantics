@@ -1,6 +1,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.ICFP(allSystemsICFP, isRecursive, anf, anfK, execX, ltExpr) where
+module Rules.ICFP(
+  allSystemsICFP,
+  systemICFP,
+  systemICFPE,
+  isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -113,7 +117,7 @@ systemICFPE :: TRSystem Expr
 systemICFPE = s
   { sname = "ICFPE"
   , description = description s ++ " - EXI-SWAP - SEQ-SWAP"
-  , rules = rules s -= "EXI-SWAP" -= "SEQ-SWAP" -= "EXI-ELIML" <> ruleElimL
+  , rules = rules s -= "EXI-SWAP" -= "SEQ-SWAP" <> ruleElimL
   , rulesHaveStructural = False
   }
   where s = systemICFP
