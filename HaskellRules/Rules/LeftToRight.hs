@@ -104,18 +104,14 @@ choiceX :: Expr -> [(Expr->Expr, Expr)]
 choiceX lhs =
   do pure (id, lhs)
  ++
-  do Val v :=: xe <- [lhs]
+  do (Val v :=: xe) :>: e2 <- [lhs]
      (ctx, e) <- choiceX xe
-     pure ((v :=:) . ctx, e)
+     pure ((:>: e2) . (v :=:) . ctx, e)
  ++
-  do xe :>: e2 <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((:>: e2) . ctx, e)
- ++
-  do ce :>: xe <- [lhs]
+  do (Val v :=: ce) :>: xe <- [lhs]
      guard (isChoiceFree ce)
      (ctx, e) <- choiceX xe
-     pure ((ce :>:) . ctx, e)
+     pure (((v :=: ce) :>:) . ctx, e)
  ++
   do Exi (Bind x xe) <- [lhs]
      (ctx, e) <- choiceX xe
@@ -127,8 +123,8 @@ isChoiceFree :: Expr -> Bool
 --isChoiceFree (All _)       = True
 isChoiceFree (Val _)       = True
 isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
-isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
+--isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
+--isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
 isChoiceFree _             = False
 
 --------------------------------------------------------------------------------
@@ -187,10 +183,10 @@ rulesSubstitution _ lhs =
   do (Val v :=: Var x) <- [lhs]
      pure (Var x :=: v)
  ++
-  "EQN-FLOAT" `name`
-  do ce :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
+  "EQN-SWAP" `name`
+  do (Val v :=: ce) :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
      guard (isChoiceFree ce)
-     pure ((v1 :=: v2) :>: (ce :>: e))
+     pure ((v1 :=: v2) :>: ((v :=: ce) :>: e))
 
 --------------------------------------------------------------------------------
 
