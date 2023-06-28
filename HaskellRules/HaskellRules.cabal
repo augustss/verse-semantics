@@ -61,6 +61,7 @@ library all
     other-modules:    Rules.PLDI
                       Rules.POPL
                       Rules.KoenNaive
+                      Rules.LeftToRight
                       Rules.Block
 
     build-depends:
