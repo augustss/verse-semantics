@@ -1644,23 +1644,23 @@ lambda calculus.  Similarly, the elimination rules never discard a term that cou
 In any term there may of course be many redexes---that is good.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
 out of the many possible redexes, should be rewritten next to make progress toward the result?
-Let us call an evaluation strategy \emph{normalising} if it guarantees to terminate if there
+Let us call an evaluation strategy \emph{normalizing} if it guarantees to terminate if there
 is \emph{any} terminating sequence of reductions; \ie, if any path terminates with a value,
-then a normalising evaluation strategy will terminate with that same value\footnote{
+then a normalizing evaluation strategy will terminate with that same value\footnote{
 It would be even better if the strategy could guarantee to find the
 result in the minimal number of rewrite steps---so-called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
 invariably involves reducing under lambdas, so for practical purposes it is well out of reach.}.
 For example, in the pure lambda calculus, \emph{normal-order reduction},
-sometimes called \emph{leftmost-outermost reduction}, is a normalising strategy.
+sometimes called \emph{leftmost-outermost reduction}, is a normalizing strategy.
 
-For \versecalc{}, a first step towards a normalising strategy is to avoid no-ops.
+For \versecalc{}, a first step towards a normalizing strategy is to avoid no-ops.
 For example, there is no point in applying rule \rulename{subst} if $|x| \not\in \freevars{e}$;
-nor in applying \rulename{fail-elim} if |X = hole|.  Next, a normalising strategy
+nor in applying \rulename{fail-elim} if |X = hole|.  Next, a normalizing strategy
 must be careful with \rulename{exi-swap}, because it can easily apply infinitely;
 its role is to make it possible to use \rulename{exi-float}.  Dealing with these
 no-ops and flip-flops is not hard.
 
-With that done, we believe that a fair outermost strategy is normalising for
+With that done, we believe that a fair outermost strategy is normalizing for
 \versecalc{}: at each step, just select any redex that is not within a lambda or another redex.
 That sounds easy, but is tricky in practice for two reasons.
 First, a reduction may ``unlock'' a redex far to its left.
@@ -1668,12 +1668,12 @@ For example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
 use substitution to rewrite the |(x+y)| to |(2+3)|; and
 \emph{now} the |(2+3)| is a redex. Hence, a challenge for an implementation is to
-find the next redex efficiently. Secondly, as with other functional-logic languages such as Curry, a normalising
+find the next redex efficiently. Secondly, as with other functional-logic languages such as Curry, a normalizing
 strategy must be able to pursue redexes within multiple subterms in parallel (or alternately), without starving any of them, hence ``fair''.  For example |(apply0 loop; fail)|
-and |(fail; apply0 loop)| should both fail, so a normalising strategy must, in both cases, avoid getting stuck
+and |(fail; apply0 loop)| should both fail, so a normalizing strategy must, in both cases, avoid getting stuck
 in the |loop|.
 
-We have not yet, however, formalised such a strategy for \versecalc{} or proved it normalising.
+We have not yet, however, formalized such a strategy for \versecalc{} or proved it normalizing.
 We have several prototype implementations of \versecalc{}, each involving an abstract
 machine with a stack, a heap, a bunch of previously blocked computations, and so on. Exploring this
 design space is, however, beyond the scope of this paper.
@@ -1687,7 +1687,7 @@ design space is, however, beyond the scope of this paper.
 % ``left''---that is, residuation---must grapple with this problem,
 % so we leave evaluation strategy and compilation for future work.
 
-% Formalising an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
+% Formalizing an evaluation strategy for \versecalc{} is beyond the scope of this paper, but
 % we can make some informal comments.  First, in service of (b) we envisage compiling
 % lambdas to code, and thus we never rewrite under a lambda \cite{pj-book}.
 % Second, it never makes sense to evaluate in the right-hand argument of
@@ -2247,7 +2247,7 @@ We discuss some of them here.
 
 The rules of \Cref{fig:rules} are more complicated than we would like, because our
 confluence proof requires that the unification rules form a terminating
-rewrite system (\Cref{sec:design-confluence}).  Tantalisingly, here is a much simpler set of rules that
+rewrite system (\Cref{sec:design-confluence}).  Tantalizingly, here is a much simpler set of rules that
 we believe is equally expressive, and is still confluent:
 $$
 \begin{array}{@@{\hskip0.5em} l  r @@{\;\;}c@@{\;\;} l l@@{}}
@@ -2842,13 +2842,13 @@ $$
 % LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
 % LocalWords:  boolean un rcll ANF flatMap cartesian behavior fromTo
 % LocalWords:  featureful multivalued mapFlat powerset denotational
-% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
+% LocalWords:  Launchbury ulit ux localizing uc seql seqr unifyl ary
 % LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
 % LocalWords:  ReWrite CRWL fraguas formalization rhs dom fvs hanus
 % LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
 % LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
 % LocalWords:  subexpression Claessen equationally eliml fcn elimr
-% LocalWords:  rll redex Formalising equational stepX compositionally
+% LocalWords:  rll redex Formalizing equational stepX compositionally
 % LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
 % LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
 % LocalWords:  Smolka flavor FLC urefl onec obfuscatory opez Rodr
