@@ -259,7 +259,7 @@ cVerify = do
     tryIt (pure s) (\ _ -> pure s) $ do
       let flg = (flags s){ fNoLambdaIf = True, fVerify = True, fSplit = False }
           e' = anf $ coreToTrs $ asCore flg e
-      --putStrLn $ "Desugared:\n" ++ prettyShow e'
+      putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify icfpVerifier e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
@@ -311,7 +311,7 @@ verifyPrelude =
       [ cAssume $ CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) (CArray [vx, vy])), cInt vz, vz] ])
 
     cmpBinOpInt  p = (p, cmpBinOpInt' p)
-    cmpBinOpInt' p = ([x, y], 
+    cmpBinOpInt' p = ([x, y],
       [ cInt vx, cInt vy, CApply (CPrim p) (CArray [vx, vy]), cAssume (CSeq [cInt vx, vx]) ])
 
     yNe0 = CApply (CPrim "in'<>'") (CArray [vy, CInt 0])
@@ -326,7 +326,7 @@ verifyPrelude =
     vx = CVar x
     vy = CVar y
     vz = CVar z
--}    
+-}
 
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s

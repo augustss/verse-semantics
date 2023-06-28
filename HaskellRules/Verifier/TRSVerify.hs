@@ -6,7 +6,6 @@ import Rules.Verifier
 import TRS.Bind
 import TRS.TRS
 import TRS.Traced
-import TRS.Tarjan
 import Rules.Core
 import Rules.CoreEDSL
 import qualified Epic.Print as P
@@ -61,7 +60,7 @@ runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) =
   do putStr $ "Running test: " ++ testName ++ " ..."
      --P.pp e
-     case simplify e of
+     case Rules.Verifier.verify icfpVerifier e of
        (True, _) | expected ->
          do putStrLn " OK (verified)"
             return True
@@ -82,28 +81,16 @@ runTest (testName, e, expected) =
             P.pp x
             return False
 
-simplify :: Expr -> (Bool, Traced Expr)
-simplify e = res
- where
-   res =
-     case tarjan1 (-1) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
-       Just (tr@(x :<-- _):_) -> (isDone x, tr)
-       _ -> undefined
-   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
-
-  --norms           = normalFormsFuelTracePlain sys (-1) e
-  --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
-
-isDone :: Expr -> Bool
-isDone = collect done (&&)
- where
-  done (Assert _) = False
-  done _          = True
-
 -------------------------------------------------------------------------------------------
 
 pattern INT :: Expr -> Expr
 pattern INT e = Op IsInt :@: e
+
+eXIs :: [Ident] -> Expr -> Expr
+eXIs xs e = foldr EXI e xs
+
+lAMs :: [Ident] -> Expr -> Expr
+lAMs xs e = foldr LAM e xs
 
 iNT :: Expr -> Expr
 iNT e = INT e :>: e
@@ -171,6 +158,80 @@ ex5 /True
 ex5' / False (note: int(x) means call should succeed which, in this case, may not happen!)
 :verify g(x:any):int := { if int(x) then 10 else 20 }
 
+> :verify g(x:int, y:int) := { a := x; b := a; b = y }
+g(x : int, y : int) := {a := x; b := a; b = y}
+Desugared:
+ex g $i1.
+   (g = (($i1 = (verify {\$x2.
+                         ex $x3 $x4 x y.
+                            assume {(x = (\$$x. isint($$x); $$x)($x3));
+                                    (y = (\$$x. isint($$x); $$x)($x4));
+                                    ($x2 = <$x3, $x4>);
+                                    $x2};
+                            assert {ex a b. (a = x); (b = a); (b = y); b}};
+                 (\$x2.
+                  ex $x3 $x4 x y.
+                     ((x = (\$$x. isint($$x); $$x)($x3));
+                      (y = (\$$x. isint($$x); $$x)($x4));
+                      ($x2 = <$x3, $x4>);
+                      $x2);
+                     assume {ex a b. (a = x); (b = a); (b = y); b})));
+         $i1));
+   g
+
+
+> :verify g(x:int, y:int, z:int) := { a := x; b := a; b = y }
+g(x : int, y : int, z : int) := {a := x; b := a; b = y}
+Desugared:
+ex g $i1.
+   (g = (($i1 = (verify {\$x2.
+                         ex $x3 $x4 $x5 x y z.
+                            assume {(x = (\$$x. isint($$x); $$x)($x3));
+                                    (y = (\$$x. isint($$x); $$x)($x4));
+                                    (z = (\$$x. isint($$x); $$x)($x5));
+                                    ($x2 = <$x3, $x4, $x5>);
+                                    $x2};
+                            assert {ex a b. (a = x); (b = a); (b = y); b}};
+                 (\$x2.
+                  ex $x3 $x4 $x5 x y z.
+                     ((x = (\$$x. isint($$x); $$x)($x3));
+                      (y = (\$$x. isint($$x); $$x)($x4));
+                      (z = (\$$x. isint($$x); $$x)($x5));
+                      ($x2 = <$x3, $x4, $x5>);
+                      $x2);
+                     assume {ex a b. (a = x); (b = a); (b = y); b})));
+         $i1));
+   g
+
+
+> :verify g(x:int, y:int where x = y) := { a := x; b := a; b = y }
+g(x : int, y : int where x = y) := {a := x; b := a; b = y}
+Desugared:
+ex g $i2.
+   (g = (($i2 = (verify {\$x3.
+                         ex $x4 $x5 x $x1 y $i6.
+                            assume {(x = (\$$x. isint($$x); $$x)($x4));
+                                    ($x1 = ((y = (\$$x. isint($$x); $$x)($i6)); y));
+                                    (x = y);
+                                    ($x5 = $x1);
+                                    ($x3 = <$x4, $x5>);
+                                    $x3};
+                            assert {ex a b. (a = x); (b = a); (b = y); b}};
+                 (\$x3.
+                  ex $x4 $x5 x $x1 y $i6.
+                     ((x = (\$$x. isint($$x); $$x)($x4));
+                      ($x1 = ((y = (\$$x. isint($$x); $$x)($i6)); y));
+                      (x = y);
+                      ($x5 = $x1);
+                      ($x3 = <$x4, $x5>);
+                      $x3);
+                     assume {ex a b. (a = x); (b = a); (b = y); b})));
+         $i2));
+   g
+Verified
+
+
+
 -}
 -------------------------------------------------------------------------------------------
 ex00 :: Expr
@@ -208,6 +269,73 @@ ex0' = LAM x (LAM y (LAM z (
     z = ident "z"
     a = ident "a"
     b = ident "b"
+
+
+{-
+"hanging" desugared version of
+
+g(x:int, y:int, z:int) := { a := x; b := a; b = y }
+
+\xt.
+    ex $x3 $x4 $x5 x y z.
+      assume {(x  = (\$$x. isint($$x); $$x)($x3));
+              (y  = (\$$x. isint($$x); $$x)($x4));
+              (z  = (\$$x. isint($$x); $$x)($x5));
+              (xt = <$x3, $x4, $x5>);
+              xt};
+      assert {ex a b. (a = x); (b = a); (b = y); b}
+
+-}
+
+-- TODO: why does this hang the verifier?
+ex00_hang :: Expr
+ex00_hang =
+  LAM xt $
+    eXIs [x3, x4, x5, x, y, z] $
+      Assume (
+              (Var x  :=: iNT (Var x3)) :>:
+              (Var y  :=: iNT (Var x4)) :>:
+              (Var z  :=: iNT (Var x5)) :>:
+              (Var xt :=: Arr [Var x3, Var x4, Var x5]) :>:
+              Var xt
+             )
+      :>: Assert (Int 0)
+      -- :>: Assert (eXIs [a, b] ( (Var a :=: Var x) :>:  (Var b :=: Var a) :>: (Var b :=: Var y) :>: Var b))
+  where
+    x3 = ident "x3"
+    x4 = ident "x4"
+    x5 = ident "x5"
+    x  = ident "x"
+    y  = ident "y"
+    z  = ident "z"
+    -- a  = ident "a"
+    -- b  = ident "b"
+    xt = ident "xt"
+
+ex01_hang :: Expr
+ex01_hang =
+  lAMs [x3, x4, x5] $
+    eXIs [x, y, z] $
+      Assume (
+              (Var x  :=: iNT (Var x3)) :>:
+              (Var y  :=: iNT (Var x4)) :>:
+              (Var z  :=: iNT (Var x5)) :>:
+              Arr []
+              -- (Var xt :=: Arr [Var x3, Var x4, Var x5]) :>:
+              -- Var xt
+             )
+      :>: Assert (eXIs [a, b] ((Var a :=: Var x) :>: (Var b :=: Var a) :>: (Var b :=: Var y) :>: Var b))
+  where
+    x3 = ident "x3"
+    x4 = ident "x4"
+    x5 = ident "x5"
+    x  = ident "x"
+    y  = ident "y"
+    z  = ident "z"
+    a  = ident "a"
+    b  = ident "b"
+    -- xt = ident "xt"
+
 
 -------------------------------------------------------------------------------------------
 -- ex1' (andy's variant with x = suc x)
