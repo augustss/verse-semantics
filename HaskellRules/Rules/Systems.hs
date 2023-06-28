@@ -9,6 +9,7 @@ import Rules.POPL(allSystemsPOPL)
 import Rules.KoenNaive(allSystemsKoen)
 import Rules.Block(allSystemsBlock)
 import Rules.Verifier(allSystemsVerify)
+import Rules.LeftToRight(allSystemsLeftToRight)
 
 type ESystem = TRSystem Expr
 
@@ -20,6 +21,7 @@ allSystems =
   ++ allSystemsKoen
   ++ allSystemsBlock
   ++ allSystemsVerify
+  ++ allSystemsLeftToRight
 
 lookupSystem :: String -> Either String ESystem
 lookupSystem = lookupSystemEx allSystems

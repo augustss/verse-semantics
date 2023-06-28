@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-matches -Wno-name-shadowing #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.KoenNaive(allSystemsKoen) where
+module Rules.LeftToRight(allSystemsLeftToRight) where
 
 import TRS.Bind
 import TRS.System
@@ -11,14 +11,14 @@ import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
 
-allSystemsKoen :: [TRSystem Expr]
-allSystemsKoen =
-  [ systemKoen ]
+allSystemsLeftToRight :: [TRSystem Expr]
+allSystemsLeftToRight =
+  [ systemLeftToRight ]
 
-systemKoen :: TRSystem Expr
-systemKoen = TRSystem
-  { sname               = "Koen"
-  , description         = "Koen's simple rules"
+systemLeftToRight :: TRSystem Expr
+systemLeftToRight = TRSystem
+  { sname               = "L2R"
+  , description         = "Left-to-right evaluation rules"
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check validE . expr)
   , postProcess         = const id
@@ -29,18 +29,24 @@ systemKoen = TRSystem
   , validExpr           = const validE
   }
 
--- Turn an expression into the subset of the Koen grammar
+-- Turn an expression into the subset of the grammar
 expr :: Expr -> Expr
 expr (Arr es)         = letExprs (map expr es) Arr
 expr (fe :@: xe)      = letExprs (map expr [fe,xe]) $ \[f,x] -> f :@: x
 expr (Lam (Bind x e)) = Lam (Bind x (expr e))
-expr (e1 :=: e2)      = letExpr (expr e1) (:=: expr e2)
+expr (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
 expr (e1 :|: e2)      = expr e1 :|: expr e2
-expr (e1 :>: e2)      = expr e1 :>: expr e2
+expr (e1 :>: e2)      = expr e1 =:>: expr e2
 expr (Exi (Bind x e)) = Exi (Bind x (expr e))
 expr (One e)          = One (expr e)
 expr (All e)          = All (expr e)
 expr e                = e
+
+(=:>:) :: Expr -> Expr -> Expr
+e1@(_ :=: _) =:>: e2 = e1 :>: e2
+e1           =:>: e2 = Exi (Bind x ((Var x :=: e1) :>: e2))
+ where
+  x = identNotIn (free (e1,e2))
 
 letExpr :: Expr -> (Expr -> Expr) -> Expr
 letExpr e@(Val _)     f = f e
@@ -61,13 +67,16 @@ validE = ok
   ok (Arr xs)         = all isVal xs
   ok (Lam (Bind _ e)) = ok e
   ok (Exi (Bind _ e)) = ok e
-  ok (v :=: e)        = isVal v && ok e
-  ok (e1 :>: e2)      = ok e1 && ok e2
+  ok (_ :=: _)        = False
+  ok (e1 :>: e2)      = okeq e1 && ok e2
   ok (e1 :|: e2)      = ok e1 && ok e2
   ok (f :@: x)        = isVal f && isVal x
   ok (One e)          = ok e
   ok (All e)          = ok e
   ok _                = True
+
+  okeq (v :=: e)      = isVal v && ok e
+  okeq _              = False 
 
 --------------------------------------------------------------------------------
 
@@ -89,57 +98,18 @@ allRules =
 
 rulesFail :: ERule
 rulesFail _ lhs =
-  "FAIL-EQN" `name`
-  do _ :=: Fail <- [lhs]
-     pure Fail
- ++
-  "FAIL-SEQ-R" `name`
-  do _ :>: Fail <- [lhs]
-     pure Fail
- ++
-  "FAIL-SEQ-L" `name`
-  do Fail :>: _ <- [lhs]
+  "FAIL-ELIM" `name`
+  do (_, Fail) <- choiceX lhs
      pure Fail
  ++
   "FAIL-CHOICE-R" `name`
-  do e :|: Fail <- [lhs]
-     pure e
+  do e1 :|: Fail <- [lhs]
+     pure e1
  ++
   "FAIL-CHOICE-L" `name`
-  do Fail :|: e <- [lhs]
-     pure e
+  do Fail :|: e2 <- [lhs]
+     pure e2
 
---------------------------------------------------------------------------------
-
-rulesSubst :: ERule
-rulesSubst _ lhs =
-  "SUBST" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
-     guard (not (isVctx x v))
-     pure ((Var x :=: v) :>: subst [(x,v)] e)
- ++
-  "EQN-MOVE" `name`
-  do e :>: (Var x :=: Val v) <- [lhs]
-     pure ((Var x :=: v) :>: (e :>: Var x))
- ++
-  "EQN-SEQ-MOVE" `name`
-  do e1 :>: ((Var x :=: Val v) :>: e2) <- [lhs]
-     pure ((Var x :=: v) :>: e1 :>: e2)
- ++
-  "EQN-VACUUM" `name`
-  do (Var x :=: Val v) :>: Val v' <- [lhs]
-     guard (v == v')
-     pure (Var x :=: v)
- ++
-  "EQN-SWAP" `name`
-  do (Val v :=: Var x) <- [lhs]
-     pure (Var x :=: v)
-
-isVctx :: Ident -> Expr -> Bool
-isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
-isVctx _ _        = False
-
-{-
 xX :: Expr -> [(Expr->Expr, Expr)]
 xX lhs =
   do pure (id, lhs)
@@ -155,75 +125,73 @@ xX lhs =
   do xe :>: e2 <- [lhs]
      (ctx, e) <- xX xe
      pure ((:>: e2). ctx, e)
--}
+
+--------------------------------------------------------------------------------
+
+rulesSubst :: ERule
+rulesSubst _ lhs =
+  "SUBST" `name`
+  do (Var x :=: Val v) :>: e <- [lhs]
+     guard (not (isVctx x v))
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
+ ++
+  "EQN-MOVE" `name`
+  do ce :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
+     guard (isChoiceFree ce)
+     pure ((v1 :=: v2) :>: (ce :>: e))
+ ++
+  "EQN-SWAP" `name`
+  do (Val v :=: Var x) <- [lhs]
+     pure (Var x :=: v)
+
+isVctx :: Ident -> Expr -> Bool
+isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
+isVctx _ _        = False
 
 --------------------------------------------------------------------------------
 
 rulesUni :: ERule
 rulesUni _ lhs =
   "UNI-ARR" `name`
-  do Arr as :=: Arr bs <- [lhs]
+  do (Arr as :=: Arr bs) :>: e <- [lhs]
      guard (length as == length bs)
-     pure (foldr (:>:) (Arr as) [ a :=: b | (a,b) <- as `zip` bs ])
+     pure (foldr (:>:) e [ a :=: b | (a,b) <- as `zip` bs ])
  ++
   "UNI-INT" `name`
-  do Int k :=: Int k' <- [lhs]
+  do (Int k :=: Int k') :>: e <- [lhs]
      guard (k == k')
-     pure (Int k)
+     pure e
  ++
   "UNI-OCCURS" `name`
-  do Var x :=: Val v <- [lhs]
+  do (Var x :=: Val v) :>: _ <- [lhs]
      guard (isVctx x v)
      pure Fail
  ++
   "UNI-FAIL" `name`
-  do HNF a :=: HNF b <- [lhs]
+  do (HNF a :=: HNF b) :>: _ <- [lhs]
      guard (a =/= b)
      pure Fail
-
-(=/=) :: Expr -> Expr -> Bool
-Int k  =/= Int k' = k /= k'
-Arr as =/= Arr bs = length as /= length bs
-_      =/= _      = True
+ where
+  Int k  =/= Int k' = k /= k'
+  Arr as =/= Arr bs = length as /= length bs
+  _      =/= _      = True
 
 --------------------------------------------------------------------------------
 
 rulesEqn :: ERule
 rulesEqn _ lhs =
-  "EQN-EQN" `name`
-  do v1 :=: (v2 :=: e) <- [lhs]
-     pure ((v1 :=: v2) :>: (v1 :=: e))
--- ++
---  "EQN-CHOICE" `name`
---  do v :=: (e1 :|: e2) <- [lhs]
---     pure ((v :=: e1) :|: (v :=: e2))
- ++
-  "EQN-SEQ" `name`
-  do v :=: (e1 :>: e2) <- [lhs]
-     pure (e1 :>: (v :=: e2))
+  "EQN-SEQ-ASSOC" `name`
+  do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
+     pure ((v1 :=: e1) :>: (v2 :=: e2) :>: e3)
 
 --------------------------------------------------------------------------------
 
 rulesExi :: ERule
 rulesExi _ lhs =
-  "EXI-EQN-FLOAT" `name`
-  do v :=: Exi bnd <- [lhs]
-     let Bind x e = alphaRename (free v) bnd
-     pure (Exi (Bind x (v :=: e)))
- ++
-  "EXI-SEQ-L-FLOAT" `name`
-  do Exi bnd :>: e2 <- [lhs]
-     let Bind x e1 = alphaRename (free e2) bnd
-     pure (Exi (Bind x (e1 :>: e2)))
- ++
-  "EXI-SEQ-R-FLOAT" `name`
-  do e1 :>: Exi bnd <- [lhs]
-     let Bind x e2 = alphaRename (free e1) bnd
-     pure (Exi (Bind x (e1 :>: e2)))
--- ++
---  "EXI-CHOICE" `name`
---  do Exi (Bind x (e1 :|: e2)) <- [lhs]
---     pure (Exi (Bind x e1) :|: Exi (Bind x e2))
+  "EXI-FLOAT" `name`
+  do (ctx, Exi bnd) <- xX lhs
+     let Bind x e = alphaRename (free (ctx (Arr []))) bnd
+     pure (Exi (Bind x (ctx e)))
  ++
   "EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]
@@ -233,10 +201,6 @@ rulesExi _ lhs =
 
 rulesAssoc :: ERule
 rulesAssoc _ lhs =
-  "SEQ-ASSOC" `name`
-  do (e1 :>: e2) :>: e3 <- [lhs]
-     pure (e1 :>: (e2 :>: e3))
- ++
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
@@ -245,26 +209,23 @@ rulesAssoc _ lhs =
 
 rulesElim :: ERule
 rulesElim _ lhs =
-  "VAL-ELIM" `name`
-  do Val _ :>: e <- [lhs]
-     pure e
- ++
   "EXI-ELIM" `name`
   do Exi (Bind x e) <- [lhs]
      guard (x `notElem` free e)
      pure e
+-- ++
+--  "EQN-ELIM" `name`
+--  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
+--     guard (x == x')
+--     guard (x `notElem` free (v,e))
+--     pure e
  ++
   "EQN-ELIM" `name`
-  do Exi (Bind x (Var x' :=: Val v)) <- [lhs]
+  do Exi (Bind x xe) <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- xX xe
      guard (x == x')
-     guard (x `notElem` free v)
-     pure v
- ++
-  "EQN-SEQ-ELIM" `name`
-  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
-     guard (x == x')
-     guard (x `notElem` free (v,e))
-     pure e
+     guard (x `notElem` free (ctx (Val v :>: e)))
+     pure (ctx e)
 
 --------------------------------------------------------------------------------
 
@@ -320,26 +281,29 @@ rulesAll _ lhs =
 
 --------------------------------------------------------------------------------
 
-scopeX :: Expr -> [(Expr->Expr, Expr)]
-scopeX lhs =
-  do One xe <- [lhs]
-     (ctx, e) <- choicesX xe
-     pure (One . ctx, e)
+isChoiceFree :: Expr -> Bool
+isChoiceFree (One _)       = True
+isChoiceFree (All _)       = True
+isChoiceFree (Val _)       = True
+isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
+isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
+isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
+isChoiceFree _             = False
+
+rulesChoice :: ERule
+rulesChoice _ lhs =
+  "EQN-CHOICE" `name`
+  do (Val v :=: (e1 :|: e2)) :>: e3 <- [lhs]
+     pure (((v :=: e1) :>: e3) :|: ((v :=: e2) :>: e3))
  ++
-  do All xe <- [lhs]
-     (ctx, e) <- choicesX xe
-     pure (All . ctx, e)
- where
-  choicesX lhs =
-    do pure (id, lhs)
-   ++
-    do xe :|: e2 <- [lhs]
-       (ctx, e) <- choicesX xe
-       pure ((:|: e2) . ctx, e)
-   ++
-    do e1 :|: xe <- [lhs]
-       (ctx, e) <- choicesX xe
-       pure ((e1 :|:) . ctx, e)
+  "SEQ-CHOICE" `name`
+  do ce :>: (e1 :|: e2) <- [lhs]
+     guard (isChoiceFree ce)
+     pure ((ce :>: e1) :|: (ce :>: e2))
+ ++
+  "EXI-CHOICE" `name`
+  do Exi (Bind x (e1 :|: e2)) <- [lhs]
+     pure (Exi (Bind x e1) :|: Exi (Bind x e2))
 
 choiceX :: Expr -> [(Expr->Expr, Expr)]
 choiceX lhs =
@@ -361,22 +325,6 @@ choiceX lhs =
   do Exi (Bind x xe) <- [lhs]
      (ctx, e) <- choiceX xe
      pure ((Exi . Bind x) . ctx, e)
-
-isChoiceFree :: Expr -> Bool
-isChoiceFree (One _)       = True
-isChoiceFree (All _)       = True
-isChoiceFree (Val _)       = True
-isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
-isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree _             = False
-
-rulesChoice :: ERule
-rulesChoice _ lhs =
-  "CHOICE" `name`
-  do (ctx1, e) <- scopeX lhs
-     (ctx2, e1 :|: e2) <- choiceX e
-     pure (ctx1 (ctx2 e1 :|: ctx2 e2))
 
 --------------------------------------------------------------------------------
 
