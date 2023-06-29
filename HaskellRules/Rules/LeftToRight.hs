@@ -7,7 +7,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Rules.ICFP(rulesPrimOps)
+import Rules.ICFP(rulesPrimOps, isChoiceFreeOp)
 import Control.Monad( guard )
 import Data.List( union )
 
@@ -130,7 +130,7 @@ evalX lhs =
 -- ef
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True
-effectFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
+effectFree (Op op :@: _) = isChoiceFreeOp op
 effectFree _             = False
 
 --------------------------------------------------------------------------------
