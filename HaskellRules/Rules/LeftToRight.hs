@@ -99,40 +99,19 @@ isVctx :: Ident -> Expr -> Bool
 isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
 isVctx _ _        = False
 
--- X
-xX :: Expr -> [(Expr->Expr, Expr)]
-xX lhs =
-  do pure (id, lhs)
- ++
-  do v :=: xe <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((v :=:). ctx, e)
- ++
-  do e1 :>: xe <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((e1 :>:). ctx, e)
- ++
-  do xe :>: e2 <- [lhs]
-     (ctx, e) <- xX xe
-     pure ((:>: e2). ctx, e)
-
 -- CX
 choiceX :: Expr -> [(Expr->Expr, Expr)]
 choiceX lhs =
   do pure (id, lhs)
  ++
-  do Val v :=: xe <- [lhs]
+  do (Val v :=: xe) :>: e2 <- [lhs]
      (ctx, e) <- choiceX xe
-     pure ((v :=:) . ctx, e)
+     pure ((:>: e2) . (v :=:) . ctx, e)
  ++
-  do xe :>: e2 <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((:>: e2) . ctx, e)
- ++
-  do ce :>: xe <- [lhs]
+  do (Val v :=: ce) :>: xe <- [lhs]
      guard (isChoiceFree ce)
      (ctx, e) <- choiceX xe
-     pure ((ce :>:) . ctx, e)
+     pure (((v :=: ce) :>:) . ctx, e)
  ++
   do Exi (Bind x xe) <- [lhs]
      (ctx, e) <- choiceX xe
@@ -140,12 +119,12 @@ choiceX lhs =
 
 -- ce
 isChoiceFree :: Expr -> Bool
-isChoiceFree (One _)       = True
-isChoiceFree (All _)       = True
+--isChoiceFree (One _)       = True
+--isChoiceFree (All _)       = True
 isChoiceFree (Val _)       = True
 isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
-isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
+--isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
+--isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
 isChoiceFree _             = False
 
 --------------------------------------------------------------------------------
@@ -204,10 +183,10 @@ rulesSubstitution _ lhs =
   do (Val v :=: Var x) <- [lhs]
      pure (Var x :=: v)
  ++
-  "EQN-FLOAT" `name`
-  do ce :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
+  "EQN-SWAP" `name`
+  do (Val v :=: ce) :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
      guard (isChoiceFree ce)
-     pure ((v1 :=: v2) :>: (ce :>: e))
+     pure ((v1 :=: v2) :>: ((v :=: ce) :>: e))
 
 --------------------------------------------------------------------------------
 
@@ -219,16 +198,20 @@ rulesNormalization _ lhs =
      pure e
  ++
   "EQN-ELIM" `name`
-  do Exi (Bind x xe) <- [lhs]
-     (ctx, (Var x' :=: Val v) :>: e) <- xX xe
+  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
      guard (x == x')
-     guard (x `notElem` free (ctx (Val v :>: e)))
-     pure (ctx e)
+     guard (x `notElem` free (v, e))
+     pure e
  ++
-  "EXI-FLOAT" `name`
-  do (ctx, Exi bnd) <- xX lhs
-     let Bind x e = alphaRename (free (ctx (Arr []))) bnd
-     pure (Exi (Bind x (ctx e)))
+  "EXI-FLOAT-L" `name`
+  do (v :=: Exi bnd) :>: e2 <- [lhs]
+     let Bind x e1 = alphaRename (free (v,e2)) bnd
+     pure (Exi (Bind x ((v :=: e1) :>: e2)))
+ ++
+  "EXI-FLOAT-R" `name`
+  do Exi (Bind x (v_eq_e1 :>: e2)) <- [lhs]
+     guard (x `notElem` free v_eq_e1)
+     pure (v_eq_e1 :>: Exi (Bind x e2))
  ++
   "EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]

@@ -8,6 +8,7 @@
 module Rules.Verifier(
   allSystemsVerify,
   icfpVerifier,
+  icfpeVerifier,
   verify,
   verifyM,
   ) where
@@ -252,20 +253,31 @@ verifierRules :: VRule
 verifierRules env lhs =
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
    "Prove" `name`
-   do (ctx, g, e) <- eX lhs
+   do (ctx, g, _, e) <- eX lhs
       guard (case e of Assume _ -> False; _ -> True)
       guard (g `proves` e)
       pure (ctx (Assume e))
+   -- ++
+   -- -- if e1 e2 e3 ---> (assume{e1} ; e2) | (assume-fail{e1}; e3) IF mustDecides e1
+   -- -- unsoundly verifies if foo(n:any):int := if int[n] then 0 else n
+   -- "Unfold-If" `name`
+   -- do If e1 e2 e3 <- [lhs]
+   --    let bs = bndVars env
+   --    guard (mustDecide bs e1)
+   --    let (eThen, eElse) = unfoldIte e1 e2 e3
+   --    pure (eThen :|: eElse)
    ++
-   -- CTX[if e1 e2 e3] ---> CTX[(assume{e1} ; e2) | (assume-fail{e1}; e3)] IF CTX `mustDecide` e1
-   "Unfold-If" `name`
-   do (ctx, _, If e1 e2 e3) <- eX lhs
-      let bs = bndVars env
-      guard (mustDecide bs e1)
-      pure (ctx (unfoldIte e1 e2 e3))
+   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
+   "Fork-If" `name`
+   do Verify e <- [lhs]
+      (ctx, _, bs, If e1 e2 e3) <- eX e
+      let bs0 = bndVars env
+      guard (mustDecide (bs0 ++ bs) e1)
+      let (eThen, eElse) = unfoldIte e1 e2 e3
+      pure (Verify (ctx eThen) :>: Verify (ctx eElse))
 
-unfoldIte :: Expr -> Expr -> Expr -> Expr
-unfoldIte e1 e2 e3 = (Assume e1 :>: e2) :|: {- assume-fail{e1} :>: -} e3
+unfoldIte :: Expr -> Expr -> Expr -> (Expr, Expr)
+unfoldIte e1 e2 e3 = (Assume e1 :>: e2 , {- assume-fail{e1} :>: -} e3)
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
@@ -299,75 +311,76 @@ g `proves` e = unAssume e `elem` facts g
 -- | Expression Contexts
 -----------------------------------------------------------------------
 
-eX :: Expr -> [(EContext, QContext, Expr)]
-eX = execEX
 
-execEX :: Expr -> [(EContext, QContext, Expr)]
-execEX lhs = execEX1 lhs ++ [(id, Arr [], lhs)]
+eX :: Expr -> [(EContext, QContext, [BndVar], Expr)]
+eX = execEX []
 
-execEX1 :: Expr -> [(EContext, QContext, Expr)]
-execEX1 lhs =
+execEX :: [BndVar] -> Expr -> [(EContext, QContext, [BndVar], Expr)]
+execEX bs lhs = execEX1 bs lhs ++ [(id, Arr [], bs, lhs)]
+
+execEX1 :: [BndVar] -> Expr -> [(EContext, QContext, [BndVar], Expr)]
+execEX1 bs lhs =
   do v :=: x     <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (\ a -> v :=: ctx a, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (\ a -> v :=: ctx a, g, bs', hole)
  ++
    -- HOLE; e
   do x :>: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:>: e) . ctx, g :>: e, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:>: e) . ctx, g :>: e, bs', hole)
  ++
    -- e; HOLE
   do e :>: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :>:) . ctx, e :>: g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :>:) . ctx, e :>: g, bs', hole)
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (EXI y . ctx, g, hole)   -- y should be visible to e in g |- e
+     (ctx, g, bs', hole) <- execEX (BExi y : bs) x
+     pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
  ++
    -- HOLE e
   do x :@: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:@: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:@: e) . ctx, g, bs', hole)
  ++
    -- ONE HOLE
   do One x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (One . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (One . ctx, g, bs', hole)
  ++
   do All x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (All . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (All . ctx, g, bs', hole)
  ++
   do x :|: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:|: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:|: e) . ctx, g, bs', hole)
  ++
   do e :|: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :|:) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :|:) . ctx, g, bs', hole)
  ++
   do Lam (Bind y x) <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, hole)  -- y should be visible to e in g |- e
+     (ctx, g, bs', hole) <- execEX (BLam y : bs) x
+     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((:@: e) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((:@: e) . ctx, g, bs', hole)
  ++
   do e :@: x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure ((e :@:) . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure ((e :@:) . ctx, g, bs', hole)
  ++
   do If x e1 e2 <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (\a -> If (ctx a) e1 e2, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (\a -> If (ctx a) e1 e2, g, bs', hole)
  ++
   do Assert x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (Assert . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (Assert . ctx, g, bs', hole)
  ++
   do Verify x <- [lhs]
-     (ctx, g, hole) <- execEX x
-     pure (Verify . ctx, g, hole)
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (Verify . ctx, g, bs', hole)

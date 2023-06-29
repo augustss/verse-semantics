@@ -15,3 +15,41 @@ verify(fail) {f(x:int):int=x+1; f(1)+()}
 verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 # Times out with ICFP rules
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
+verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
+verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+
+# Ported tests from TRSVerify.hs
+verify(pass) { g() := (2 = 2; 2) }
+verify(pass) { g(x:int) := x }
+verify(pass) { g(x:int):int := x }
+verify(pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
+verify(fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
+verify(pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
+verify(pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
+verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
+verify(pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+verify(pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
+verify(pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
+verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
+verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
+verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
+verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
+
+# Koen's "stuck" tests
+verify(fail) { ex_stuck1(x:any) := { y:any; y } }
+verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
+verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
+
+# shows that Unfold-If is UNSOUND; instead use `Fork-If`
+verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
+verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
+verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
+verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
+
+
+
+
+# currently fails
+# verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+# verify(pass) { foo(x:any)<decides> := { x = 666 } }
+# verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
