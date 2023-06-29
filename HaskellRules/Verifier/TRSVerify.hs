@@ -60,7 +60,7 @@ runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) =
   do putStr $ "Running test: " ++ testName ++ " ..."
      --P.pp e
-     case Rules.Verifier.verify icfpVerifier e of
+     case Rules.Verifier.verify icfpeVerifier e of
        (True, _) | expected ->
          do putStrLn " OK (verified)"
             return True
@@ -497,7 +497,6 @@ ex_flex2rigid1 = verse $
        return $
          do x' .=. Int 3
 
--- TODO:PORT
 ex_flex2rigid2 :: Expr
 ex_flex2rigid2 = verse $
   timlam $ \x ->
