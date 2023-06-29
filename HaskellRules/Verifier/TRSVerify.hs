@@ -244,20 +244,15 @@ exNotValid = eXIs [g, i1] $ (Var g :=: (blob1 :>: blob2) :>: Var i1) :>: Var g
 blob1 :: Expr
 blob1 = Var i1 :=: (Verify (LAM x2 ( EXI x ((Assume ((Var x :=: iNT(Var x2)) :>: Var x) :>: Assert (Var x))))))
   where
- --    g = ident "g"
-     i1 = ident "i1"
-     x2 = ident "x2"
-     x = ident "x"
-
-
+    i1 = ident "i1"
+    x2 = ident "x2"
+    x = ident "x"
 
 blob2 :: Expr
 blob2 = LAM x2 (EXI x ((Var x :=: iNT(Var x2)) :>: Assume (Var x)))
   where
---       g = ident "g"
---       i1 = ident "i1"
-      x2 = ident "x2"
-      x = ident "x"
+    x2 = ident "x2"
+    x  = ident "x"
 
 -------------------------------------------------------------------------------------------
 ex00 :: Expr
@@ -404,6 +399,7 @@ FOO(x) = (x = 666 | x = 42); x
 -}
 -- f = \v. exi x. assume{x = FOO(v)}; assert{exi r. r = 708 - x; FOO(r)}
 
+-- TODO:PORT
 ex3 :: Expr
 ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
         LAM v (One {- to force SX/CX -}
@@ -436,7 +432,7 @@ ex4 =  lETs
           , (dec, LAM x (iNT (Var x) :>: Assume (EXI r (iNT (Var r)))))
           , (sum, LAM x (Assume (EXI r (iNT (Var r)))))
           ]
-          (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
+          (Verify (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
                                               (Assert (lETs
                                                         [ (t0, Var dec :@: Var x)
                                                         , (t1, Var sum :@: Var t0)
@@ -444,7 +440,7 @@ ex4 =  lETs
                                                         ((Var add :@: Var x) :@: Var t1)
                                                       ))
                                               (Int 0))
-                                  :>: iNT (Var r)))))
+                                  :>: iNT (Var r))))))
   where
     nat = ident "nat"
     dec = ident "dec"
@@ -457,65 +453,17 @@ ex4 =  lETs
     t1  = ident "t1"
 
 
-{-
-add x (sum (dec x))
-
-let
-  t0 = dec x
-  t1 = sum t0
-in
-  add x t1
-
--}
-
-
-{-
-
-assert {ex r. assume {isint(x)};
-              assume {le(<0, x>)};
-              (r = assert {ex t0. ex t1.
-                            isint(x);
-                            (t0 = assume {ex r. isint(r); r});
-                            (t1 = assume {ex r. isint(r); r});
-                            t1});
-              isint(r);
-        }
--}
-
 ----
 
 ex5 :: Expr
-ex5 = LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: INT (Var r))))
+ex5 = Verify $ LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: INT (Var r))))
   where
     x = ident "x"
     r = ident "r"
 
 ---
 
-{-
-suc :: Expr
-suc = verse $
-  lam "x" $ \x ->
-    do int x
-       assume $ do y <- exists "y"
-                   int y
-
-ff :: Expr
-ff = tlam vh0 [vh] (h :=: tlam vx0 [vx] (x :=: iNT x0) (Exi (Bind vy (y :=: (h0 :@: x) :>: iNT y))))
-                  (Exi (Bind vy (y :=: (h :@: Val (Int 3)) :>: iNT y)))
- where
-  vh0 = ident "h0"
-  h0  = Var vh0
-  vh  = ident "h"
-  h   = Var vh
-  vx  = ident "x"
-  x   = Var vx
-  vx0 = ident "x0"
-  x0  = Var vx0
-  vy  = ident "y"
-  y   = Var vy
--}
-
+-- TODO:PORT
 ex6 :: Expr
 ex6 = verse $
   do suc <- def (lam (\x -> do _ <- int x
@@ -533,6 +481,8 @@ ex6 = verse $
 
 --- examples testing rigid/flexible ---
 
+
+-- TODO:PORT
 ex_rigid2flex :: Expr
 ex_rigid2flex = verse $
   timlam $ \x ->
@@ -541,6 +491,7 @@ ex_rigid2flex = verse $
          do y <- exists
             x' .=. y
 
+-- TODO:PORT
 ex_flex2rigid1 :: Expr
 ex_flex2rigid1 = verse $
   timlam $ \x ->
@@ -548,6 +499,7 @@ ex_flex2rigid1 = verse $
        return $
          do x' .=. Int 3
 
+-- TODO:PORT
 ex_flex2rigid2 :: Expr
 ex_flex2rigid2 = verse $
   timlam $ \x ->
@@ -591,6 +543,6 @@ ex_if1 = verse $
                   def (ite b (Int 3) (Int 4)))
 
 ex_if2 :: Expr
-ex_if2 = LAM x $ (Assume (iNT (Var x))) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
+ex_if2 = Verify $ LAM x $ (Assume (iNT (Var x))) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
   where
     x = ident "x"
