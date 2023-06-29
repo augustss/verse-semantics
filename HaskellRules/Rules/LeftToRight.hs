@@ -35,7 +35,7 @@ expr :: Expr -> Expr
 expr (Arr es)         = letExprs (map expr es) Arr
 expr (fe :@: xe)      = letExprs (map expr [fe,xe]) $ \[f,x] -> f :@: x
 expr (Lam (Bind x e)) = Lam (Bind x (expr e))
-expr (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
+expr (e1 :=: e2)      = expr e1 =:= expr e2
 expr (e1 :|: e2)      = expr e1 :|: expr e2
 expr (e1 :>: e2)      = expr e1 =:>: expr e2
 expr (Exi (Bind x e)) = Exi (Bind x (expr e))
@@ -43,11 +43,18 @@ expr (One e)          = One (expr e)
 expr (All e)          = All (expr e)
 expr e                = e
 
+(=:=) :: Expr -> Expr -> Expr
+Val v               =:= e     = (v :=: e) :>: v
+e                   =:= Val v = (v :=: e) :>: v
+((v :=: e1) :>: e2) =:= e     = (v :=: e1) :>: (e2 =:= e)
+e1                  =:= e     = letExpr e1 (\x -> (x :=: e) :>: x)
+
 (=:>:) :: Expr -> Expr -> Expr
-e1@(_ :=: _) =:>: e2 = e1 :>: e2
-e1           =:>: e2 = Exi (Bind x ((Var x :=: e1) :>: e2))
+((v :=: e1) :>: e2) =:>: e = (v :=: e1) :>: (e2 =:>: e)
+Val v               =:>: e = e
+e1                  =:>: e = Exi (Bind x ((Var x :=: e1) :>: e))
  where
-  x = identNotIn (free (e1,e2))
+  x = identNotIn (free (e1,e))
 
 letExpr :: Expr -> (Expr -> Expr) -> Expr
 letExpr e@(Val _)     f = f e
