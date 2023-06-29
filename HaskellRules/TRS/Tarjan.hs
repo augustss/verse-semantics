@@ -34,12 +34,14 @@ tarjanAny :: forall a . Ord a => Bool -> Fuel -> (a -> [a]) -> a -> Maybe [[a]]
 tarjanAny justOne afuel nexts x = strongc afuel 0 M.empty S.empty [] x (\ _ _ _ _ _ -> Nothing)
  where
   strongc :: Fuel -> Int -> M.Map a (Int,Int) -> S.Set a -> [a] -> a -> Kont a -> Maybe [[a]]
-  strongc 0 _ _ _ _ _ _ = Nothing
   strongc fuel !index state onStack stack v k =
     visit (fuel-1) (index+1) (M.insert v (index,index) state) (S.insert v onStack) (v:stack) v (nexts v) k
   
   visit :: Fuel -> Int -> M.Map a (Int,Int) -> S.Set a -> [a] -> a -> [a] -> Kont a -> Maybe [[a]]
-  visit !fuel !index state onStack stack v [] k =
+  visit fuel _ _ _ _ _ _ _ | fuel <= 0 =
+    Nothing
+
+  visit fuel !index state onStack stack v [] k =
     if vindex == vlowlink then
       let xs = takeUntil (v==) stack in
         if justOne then
@@ -58,17 +60,16 @@ tarjanAny justOne afuel nexts x = strongc afuel 0 M.empty S.empty [] x (\ _ _ _ 
           \ fuel' index' state' onStack' stack' ->
             let (vindex, vlowlink) = state' ! v
                 (_windex, wlowlink) = state' ! w
-             in visit fuel' index' (M.insert v (vindex, vlowlink `min` wlowlink) state')
+             in visit (fuel'-1) index' (M.insert v (vindex, vlowlink `min` wlowlink) state')
                       onStack' stack' v ws k
 
       Just (windex, _wlowlink) ->
         if w `S.member` onStack then
-          visit fuel index (M.insert v (vindex, vlowlink `min` windex) state) onStack stack v ws k
+          visit (fuel-1) index (M.insert v (vindex, vlowlink `min` windex) state) onStack stack v ws k
         else
-          visit fuel index state onStack stack v ws k
+          visit (fuel-1) index state onStack stack v ws k
        where
         (vindex, vlowlink) = state ! v
-
 
 {-
 main = print $ head $ tarjan f 1
