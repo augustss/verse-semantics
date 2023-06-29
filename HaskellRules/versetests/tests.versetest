@@ -73,6 +73,7 @@ testeq(pass){array{}}                              {()}
 testeq(pass,pldi=fail)
            {x:=(1,2); y:=(1,3); one{x=y}}         {:false}
 testeq(pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
+# This does not work left-to-right
 testeq(pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 
 # Functions
@@ -122,7 +123,7 @@ testeq(pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 #testeq(pass) {p^[](:int):int}                      {0}
 
 # Times out with ICFPK
-testeq(pass,icfp=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
+testeq(pass,icfp=skip,l2r=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
 
 # Simple indexing
 testeq(pass) { a := (0,1); a[0] }                   {0}
@@ -156,7 +157,7 @@ testeq(pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq(pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq(pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq(pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip) {
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip) {
   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
   for(x:=upto[1,3]){x}}                           {(1,2,3)}
 # SLOW with PLDI
@@ -197,7 +198,7 @@ testeq(pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq(pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
 # Recursion
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
             {f(n:int) := if (n = 0)  {1} else  {n * f(n-1)}; f(5)}  {120}
 # SLOW with PLDI
 #testeq(pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
@@ -205,9 +206,9 @@ testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
 #            for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
              {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
              {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
 
 # Function argument matching
