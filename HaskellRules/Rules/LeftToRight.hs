@@ -47,11 +47,13 @@ expr e                = e
 Val v               =:= e     = (v :=: e) :>: v
 e                   =:= Val v = (v :=: e) :>: v
 ((v :=: e1) :>: e2) =:= e     = (v :=: e1) :>: (e2 =:= e)
+Exi bnd             =:= e     = Exi (Bind x (e1 =:= e)) where Bind x e1 = alphaRename (free e) bnd
 e1                  =:= e     = letExpr e1 (\x -> (x :=: e) :>: x)
 
 (=:>:) :: Expr -> Expr -> Expr
-((v :=: e1) :>: e2) =:>: e = (v :=: e1) :>: (e2 =:>: e)
 Val v               =:>: e = e
+((v :=: e1) :>: e2) =:>: e = (v :=: e1) :>: (e2 =:>: e)
+Exi bnd             =:>: e = Exi (Bind x (e1 =:>: e)) where Bind x e1 = alphaRename (free e) bnd
 e1                  =:>: e = Exi (Bind x ((Var x :=: e1) :>: e))
  where
   x = identNotIn (free (e1,e))
