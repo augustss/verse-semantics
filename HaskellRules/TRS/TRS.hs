@@ -27,7 +27,8 @@ import Text.Printf
 
 --------------------------------------------------------------------------------
 
-type Rule a = RuleEnv a -> a -> [(String, a)]
+type Rule a = RuleEnv a -> a -> [Rewrite a]
+type Rewrite a = (String, a)
 
 instance Show (Rule t) where
   show _ = "<<Rule>>"
@@ -61,7 +62,7 @@ stepS sys tt =
   case step (rules sys) (ruleEnv sys) tt of
     -- HACK: see comment on TRSystem
     -- If rules did nothing, then try rules2.
-    [] -> nub $ rec (rules2 sys) (ruleEnv sys) tt
+    [] -> sortRewrites sys $ nub $ rec (rules2 sys) (ruleEnv sys) tt
     xs -> xs
 
 data NormResult a = NormResult
@@ -156,6 +157,7 @@ data TRSystem t = TRSystem
   , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
   , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
   , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction
+  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites 
   }
 --  deriving (Show)
 

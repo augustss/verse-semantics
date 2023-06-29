@@ -27,6 +27,7 @@ systemKoen = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE
+  , sortRewrites        = id
   }
 
 -- Turn an expression into the subset of the Koen grammar

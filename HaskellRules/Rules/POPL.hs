@@ -33,6 +33,7 @@ systemPOPL = TRSystem
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
+  , sortRewrites        = id
   }
 
 systemPOPLL :: TRSystem Expr

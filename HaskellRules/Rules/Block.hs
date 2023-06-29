@@ -31,6 +31,7 @@ systemBlock = TRSystem
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
+  , sortRewrites        = id
   }
 
 systemBlockA :: TRSystem Expr
