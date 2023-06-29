@@ -208,7 +208,7 @@ testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
 #            for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
              {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
 testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
              {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
